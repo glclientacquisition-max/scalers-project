@@ -1,4 +1,5 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
+import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { AdminWalletsPanel } from "@/components/AdminWalletsPanel";
 import { logAdminError } from "@/lib/adminErrors";
 import { listAdminWallets } from "@/lib/adminWallets";
@@ -17,7 +18,7 @@ export default async function AdminWalletsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-display text-2xl tracking-tight">Wallets</h1>
+      <h1 className={deskListTitleClass}>Wallets</h1>
       <AdminWalletsPanel {...overview} />
     </div>
   );

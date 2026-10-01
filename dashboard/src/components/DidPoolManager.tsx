@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { btnPrimary } from "@/components/ui/deskChrome";
+import { adminTdClass, adminThClass } from "@/components/AdminIdentityList";
+import { btnPrimary, deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { Empty } from "@/components/ui/Empty";
 import type { DidPoolRow, PendingTenant } from "@/lib/didPool";
 
 export function DidPoolManager({
@@ -38,8 +40,8 @@ export function DidPoolManager({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
-        <h2 className="font-display text-2xl tracking-tight">Add number to pool</h2>
+      <div className="border-b border-line/70 pb-6">
+        <h2 className="text-title font-medium text-ink">Add number to pool</h2>
         <form
           className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
           onSubmit={(e) => {
@@ -55,7 +57,7 @@ export function DidPoolManager({
               value={e164}
               onChange={(e) => setE164(e.target.value)}
               required
-              className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+              className={`mt-1 ${deskFieldClass}`}
               placeholder="+2547…"
             />
           </label>
@@ -64,7 +66,7 @@ export function DidPoolManager({
             <input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+              className={`mt-1 ${deskFieldClass}`}
               placeholder="Optional"
             />
           </label>
@@ -78,8 +80,8 @@ export function DidPoolManager({
         </form>
       </div>
 
-      <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
-        <h2 className="font-display text-2xl tracking-tight">Assign to a business</h2>
+      <div className="border-b border-line/70 pb-6">
+        <h2 className="text-title font-medium text-ink">Assign to a business</h2>
         {pendingBusinesses.length === 0 ? (
           <p className="mt-2 text-sm text-[var(--ink-soft)]">
             No businesses are waiting for a phone number.
@@ -97,7 +99,7 @@ export function DidPoolManager({
               <select
                 value={assignBusinessId}
                 onChange={(e) => setAssignBusinessId(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+                className={`mt-1 ${deskFieldClass}`}
               >
                 {pendingBusinesses.map((b) => (
                   <option key={b.id} value={b.id}>
@@ -119,37 +121,36 @@ export function DidPoolManager({
 
       {error ? <p className="text-sm text-[var(--warn)]">{error}</p> : null}
 
-      <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
+      <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="bg-[var(--bg-deep)]/70 text-ink-soft">
-            <tr>
-              <th className="px-4 py-3 font-medium">Number</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Business</th>
-              <th className="px-4 py-3 font-medium">Notes</th>
+          <thead className="text-ink-2">
+            <tr className="border-b border-line/70">
+              <th className={adminThClass}>Number</th>
+              <th className={adminThClass}>Status</th>
+              <th className={adminThClass}>Business</th>
+              <th className={adminThClass}>Notes</th>
             </tr>
           </thead>
           <tbody>
             {pool.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-ink-soft">
-                  Pool empty. Add a pre-bought SautiKit number above.
+                <td colSpan={4}>
+                  <Empty title="Pool empty." line="Add a pre-bought SautiKit number above." />
                 </td>
               </tr>
             ) : (
               pool.map((row) => (
-                <tr key={row.id} className="border-t border-line/70 hover:bg-accent-soft/40">
-                  <td className="px-4 py-3 font-medium">{row.e164}</td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-full bg-[var(--bg-deep)] px-2.5 py-1 text-xs capitalize">
-                      {row.status}
-                    </span>
+                <tr key={row.id} className="border-t border-line/70">
+                  <td className={`${adminTdClass} font-medium tabular-nums`}>{row.e164}</td>
+                  <td className={`${adminTdClass} capitalize`}>{row.status}</td>
+                  <td className={adminTdClass}>
+                    <p className={deskPreviewClass}>
+                      {row.tenants?.business_name || (row.tenant_id ? "Linked business" : "n/a")}
+                    </p>
                   </td>
-                  <td className="px-4 py-3">
-                    {row.tenants?.business_name ||
-                      (row.tenant_id ? "Linked business" : "n/a")}
+                  <td className={`${adminTdClass} text-ink-2`}>
+                    <p className={deskPreviewClass}>{row.notes || "n/a"}</p>
                   </td>
-                  <td className="px-4 py-3 text-ink-soft">{row.notes || "n/a"}</td>
                 </tr>
               ))
             )}

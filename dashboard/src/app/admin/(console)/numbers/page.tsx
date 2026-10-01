@@ -1,4 +1,5 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
+import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { BuyNumberPanel } from "@/components/BuyNumberPanel";
 import { DidPoolManager } from "@/components/DidPoolManager";
 import { SautikitSyncButton } from "@/components/SautikitSyncButton";
@@ -21,7 +22,7 @@ export default async function AdminNumbersPage() {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-2xl tracking-tight">Number pool</h2>
+        <h1 className={deskListTitleClass}>Number pool</h1>
         <SautikitSyncButton />
       </div>
       <div className="mt-6 space-y-6">

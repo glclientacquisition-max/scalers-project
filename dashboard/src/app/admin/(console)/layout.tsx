@@ -1,8 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { AdminShell } from "@/components/AdminNav";
 import { AdminPhonePull } from "@/components/PhonePullSurface";
-import { BrandLockup } from "@/components/brand/BrandMark";
-import { AdminNav } from "@/components/AdminNav";
 import { getAdminSession, getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 
 // instant = false: Super Admin cookie session must run before chrome. Do not wrap the gate in Suspense.
@@ -10,7 +9,7 @@ export const instant = false;
 
 /**
  * Super Admin shell.
- * Mobile: top brand + horizontal nav. Desktop: navy sidebar + content.
+ * md+: own icon rail. Phone: the same list as bottom tabs. Nested screens lead with the parent list.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   if (!(await isLegacyAuthenticated())) {
@@ -21,46 +20,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const operatorName = adminSession?.user?.name || "ops";
 
   return (
-    <div className="min-h-screen lg:flex">
-      <aside className="sticky top-0 z-40 flex flex-col border-b border-white/10 bg-brand-900 text-white lg:min-h-screen lg:w-72 lg:shrink-0 lg:border-b-0 lg:border-r lg:border-white/10">
-        <div className="flex items-center justify-between gap-4 px-5 py-4 lg:py-5">
-          <BrandLockup
-            href="/admin"
-            name="Scalers"
-            context="Super Admin"
-            onDark
-            size="md"
-            priority
-          />
-          <form action="/api/logout" method="post" className="lg:hidden">
-            <button type="submit" className="text-sm text-sky-200/80 hover:text-white">
-              Sign out
-            </button>
-          </form>
-        </div>
-
-        <div className="px-3 pb-3 lg:flex-1 lg:pb-0">
-          <AdminNav onDark />
-        </div>
-
-        <div className="mt-auto hidden border-t border-white/10 px-5 py-5 lg:block">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-sky-200/55">
-            {operatorName}
-          </p>
-          <form action="/api/logout" method="post" className="mt-3">
-            <button type="submit" className="text-sm text-sky-200/80 hover:text-white">
-              Sign out
-            </button>
-          </form>
-        </div>
-      </aside>
-
-      <main data-admin-main="" data-pull-dirty-guard="" className="flex-1 px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
-        <Suspense fallback={null}>
-          <AdminPhonePull />
-        </Suspense>
-        <div className="mx-auto max-w-5xl">{children}</div>
-      </main>
-    </div>
+    <AdminShell operatorName={operatorName}>
+      <Suspense fallback={null}>
+        <AdminPhonePull scroll="admin" />
+      </Suspense>
+      {children}
+    </AdminShell>
   );
 }

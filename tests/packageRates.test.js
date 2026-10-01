@@ -23,9 +23,10 @@ describe("package overage math", () => {
   });
 
   it("puts Packages on Super Admin nav behind the existing username and access code", () => {
-    const nav = read("dashboard/src/components/AdminNav.tsx");
+    const nav = read("dashboard/src/lib/adminLinks.ts");
     const login = read("dashboard/src/app/admin/login/page.tsx");
     const api = read("dashboard/src/app/api/admin/packages/route.ts");
+    assert.match(read("dashboard/src/components/AdminNav.tsx"), /ADMIN_LINKS/);
     assert.match(nav, /href: "\/admin\/packages", label: "Packages"/);
     assert.match(login, /name="username"/);
     assert.match(login, /name="accessCode"/);

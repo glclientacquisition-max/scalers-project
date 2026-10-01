@@ -9,7 +9,7 @@ import {
 function DiagnosticsBlock() {
   const d = getSautikitKeyDiagnostics();
   return (
-    <div className="mt-3 rounded-xl border border-[var(--line)] bg-white/70 px-4 py-3 text-xs text-[var(--ink-soft)] space-y-1">
+    <div className="mt-3 border-t border-line/70 px-4 py-3 text-meta text-ink-2 space-y-1">
       <p className="font-medium text-[var(--ink)]">Key loaded on this server (safe diagnostics)</p>
       <p>
         Configured: {d.configured ? "yes" : "no"}
@@ -41,7 +41,7 @@ function DiagnosticsBlock() {
 export async function SautikitTelecomPanel() {
   if (!isSautikitConfigured()) {
     return (
-      <section className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
+      <section className="border-t border-line/70 pt-6">
         <h2 className="font-display text-2xl tracking-tight">Telecom (SautiKit)</h2>
         <p className="mt-2 text-sm text-[var(--ink-soft)]">
           Set <code>SAUTIKIT_API_KEY</code> on the dashboard server (Vercel Production) to see
@@ -60,7 +60,7 @@ export async function SautikitTelecomPanel() {
     const message = err instanceof Error ? err.message : String(err);
     const code = (err as { code?: string }).code;
     return (
-      <section className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6">
+      <section className="border-t border-attention/40 pt-6">
         <h2 className="font-display text-2xl tracking-tight">Telecom (SautiKit)</h2>
         <p className="mt-2 text-sm text-[var(--warn)]">Could not reach SautiKit: {message}</p>
         {code === "api_key.revoked" || /revoked/i.test(message) ? (
@@ -90,7 +90,7 @@ export async function SautikitTelecomPanel() {
   const freeInbound = numbers.every((n) => (n.inbound_per_min_minor || 0) === 0);
 
   return (
-    <section className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
+    <section className="border-t border-line/70 pt-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl tracking-tight">Telecom (SautiKit)</h2>

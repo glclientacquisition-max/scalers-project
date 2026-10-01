@@ -1,4 +1,5 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
+import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { AdminVoicesManager } from "@/components/AdminVoicesManager";
 import { logAdminError } from "@/lib/adminErrors";
 import {
@@ -22,9 +23,7 @@ export default async function AdminVoicesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-2xl tracking-tight text-ink">
-          Voices
-        </h1>
+        <h1 className={deskListTitleClass}>Voices</h1>
       </div>
       {loadError ? (
         <AdminSetupError />

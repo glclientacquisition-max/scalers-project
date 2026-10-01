@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminWalletRow, BillingMode } from "@/lib/adminWallets";
 import type { WalletLedgerRow } from "@/lib/wallet";
-import { btnPrimary } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { Empty } from "@/components/ui/Empty";
+import { adminRowActionClass, adminRowMutedClass, adminTdClass, adminThClass } from "@/components/AdminIdentityList";
 
 const CREDIT_PRESETS = [500, 1000, 5000, 10000];
 const DEBIT_PRESETS = [-500, -1000];
@@ -259,7 +261,7 @@ export function AdminWalletsPanel({
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid grid-cols-2 border-y border-line/70 sm:grid-cols-5" aria-label="Wallet totals">
         <Kpi label="Beta (free)" value={betaCount} />
         <Kpi label="Prepaid" value={prepaidCount} />
         <Kpi label="Low balance" value={lowCount} warn={lowCount > 0} />
@@ -273,7 +275,7 @@ export function AdminWalletsPanel({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+            className={`mt-1 ${deskFieldClass}`}
             placeholder="Business or number"
           />
         </label>
@@ -282,7 +284,7 @@ export function AdminWalletsPanel({
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as typeof filter)}
-            className="mt-1 block rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+            className={`mt-1 ${deskFieldClass}`}
           >
             <option value="all">All</option>
             <option value="beta">Beta only</option>
@@ -296,7 +298,7 @@ export function AdminWalletsPanel({
           <input
             value={actor}
             onChange={(e) => persistActor(e.target.value)}
-            className="mt-1 w-40 rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+            className={`mt-1 w-40 ${deskFieldClass}`}
             placeholder="your name"
           />
         </label>
@@ -305,31 +307,31 @@ export function AdminWalletsPanel({
       {error ? <p className="text-sm text-[var(--warn)]">{error}</p> : null}
       {status ? <p className="text-sm text-[var(--ok)]">{status}</p> : null}
 
-      <div className="overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--card)]">
-        <table className="w-full min-w-[820px] text-left text-sm">
-          <thead className="bg-[var(--bg-deep)]/70 text-[var(--ink-soft)]">
-            <tr>
-              <th className="px-4 py-3 font-medium">Business</th>
-              <th className="px-4 py-3 font-medium">Balance</th>
-              <th className="px-4 py-3 font-medium">Plan</th>
-              <th className="px-4 py-3 font-medium">Actions</th>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="text-ink-2">
+            <tr className="border-b border-line/70">
+              <th className={adminThClass}>Business</th>
+              <th className={adminThClass}>Balance</th>
+              <th className={adminThClass}>Plan</th>
+              <th className={adminThClass}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-[var(--ink-soft)]">
-                  No wallets match.
+                <td colSpan={4}>
+                  <Empty title="No wallets match." />
                 </td>
               </tr>
             ) : (
               filtered.map((r) => (
-                <tr key={r.id} className="border-t border-[var(--line)]/70 align-top">
-                  <td className="px-4 py-3">
-                    <p className="font-medium">{r.business_name}</p>
-                    <p className="text-xs text-[var(--ink-soft)]">{r.sautikit_virtual_number}</p>
+                <tr key={r.id} className="border-t border-line/70">
+                  <td className={adminTdClass}>
+                    <p className={`text-body font-medium text-ink ${deskPreviewClass}`}>{r.business_name}</p>
+                    <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>{r.sautikit_virtual_number}</p>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className={adminTdClass}>
                     <p
                       className={
                         r.wallet_balance_kes < 0 ? "font-medium text-[var(--warn)]" : "font-medium"
@@ -339,18 +341,18 @@ export function AdminWalletsPanel({
                     </p>
                     <p className="text-xs text-[var(--ink-soft)]">{statusLabel(r.wallet_status)}</p>
                   </td>
-                  <td className="px-4 py-3 text-xs">
+                  <td className={`${adminTdClass} text-meta`}>
                     <p>{planLabel(r.billing_enforcement)}</p>
                     {r.billing_enforcement === "off" && r.beta_notes ? (
                       <p className="text-[var(--ink-soft)]">{r.beta_notes}</p>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-x-3 gap-y-2">
+                  <td className={adminTdClass}>
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         disabled={pending}
-                        className="text-sm text-[var(--accent)]"
+                        className={adminRowActionClass}
                         onClick={() => openCredit(r)}
                       >
                         Credit
@@ -358,7 +360,7 @@ export function AdminWalletsPanel({
                       <button
                         type="button"
                         disabled={pending}
-                        className="text-sm text-[var(--accent)]"
+                        className={adminRowActionClass}
                         onClick={() => openPlan(r)}
                       >
                         Plan
@@ -366,7 +368,7 @@ export function AdminWalletsPanel({
                       <button
                         type="button"
                         disabled={pending}
-                        className="text-sm text-[var(--ink-soft)]"
+                        className={adminRowMutedClass}
                         onClick={() => void openLedger(r.id)}
                       >
                         Ledger
@@ -381,7 +383,7 @@ export function AdminWalletsPanel({
       </div>
 
       {creditTarget ? (
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
+        <div className="border-t border-line/70 pt-4">
           <p className="font-medium">Credit / debit: {creditTarget.business_name}</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
             Current balance KES {creditTarget.wallet_balance_kes.toLocaleString("en-KE")}. Positive
@@ -403,7 +405,7 @@ export function AdminWalletsPanel({
                   setDeltaKes(String(p));
                   if (!note.trim() || note === "Wallet correction") setNote("Wallet top-up");
                 }}
-                className="rounded-lg border border-[var(--line)] px-3 py-1 text-xs"
+                className={adminRowMutedClass}
               >
                 +{p.toLocaleString("en-KE")}
               </button>
@@ -416,7 +418,7 @@ export function AdminWalletsPanel({
                   setDeltaKes(String(p));
                   if (!note.trim() || note === "Wallet top-up") setNote("Wallet correction");
                 }}
-                className="rounded-lg border border-[var(--line)] px-3 py-1 text-xs"
+                className={adminRowMutedClass}
               >
                 {p.toLocaleString("en-KE")}
               </button>
@@ -428,7 +430,7 @@ export function AdminWalletsPanel({
               <input
                 value={deltaKes}
                 onChange={(e) => setDeltaKes(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+                className={`mt-1 ${deskFieldClass}`}
               />
             </label>
             <label className="text-sm">
@@ -436,7 +438,7 @@ export function AdminWalletsPanel({
               <input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+                className={`mt-1 ${deskFieldClass}`}
               />
             </label>
           </div>
@@ -462,7 +464,7 @@ export function AdminWalletsPanel({
             </button>
             <button
               type="button"
-              className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm"
+              className={btnGhost}
               onClick={() => setCreditId(null)}
             >
               Cancel
@@ -472,7 +474,7 @@ export function AdminWalletsPanel({
       ) : null}
 
       {modeTarget ? (
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
+        <div className="border-t border-line/70 pt-4">
           <p className="font-medium">Billing plan: {modeTarget.business_name}</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
             Current: <span className="font-medium text-[var(--ink)]">{planLabel(initialMode)}</span>
@@ -504,7 +506,7 @@ export function AdminWalletsPanel({
                     setModeNote(defaultModeNote(next, modeTarget));
                   }
                 }}
-                className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+                className={`mt-1 ${deskFieldClass}`}
               >
                 <option value="off">Beta (free), meter only</option>
                 <option value="soft">Prepaid (soft), debit, do not block</option>
@@ -516,7 +518,7 @@ export function AdminWalletsPanel({
               <input
                 value={modeNote}
                 onChange={(e) => setModeNote(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+                className={`mt-1 ${deskFieldClass}`}
               />
             </label>
           </div>
@@ -556,7 +558,7 @@ export function AdminWalletsPanel({
             </button>
             <button
               type="button"
-              className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm"
+              className={btnGhost}
               onClick={() => setModeId(null)}
             >
               Cancel
@@ -566,19 +568,19 @@ export function AdminWalletsPanel({
       ) : null}
 
       {ledgerTarget ? (
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
+        <div className="border-t border-line/70 pt-4">
           <div className="flex items-center justify-between gap-3">
             <p className="font-medium">Ledger: {ledgerTarget.business_name}</p>
             <button
               type="button"
-              className="text-sm text-[var(--ink-soft)]"
+              className={adminRowMutedClass}
               onClick={() => closePanels()}
             >
               Close
             </button>
           </div>
           {ledger.length === 0 ? (
-            <p className="mt-3 text-sm text-[var(--ink-soft)]">No entries.</p>
+            <Empty title="No entries." />
           ) : (
             <ul className="mt-4 divide-y divide-[var(--line)]">
               {ledger.map((row) => (
@@ -614,9 +616,9 @@ function Kpi({
   warn?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] px-4 py-3">
-      <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">{label}</p>
-      <p className={`mt-1 font-display text-2xl ${warn ? "text-[var(--warn)]" : ""}`}>{value}</p>
+    <div className="border-t border-line/70 px-4 py-3 sm:border-t-0 sm:border-l sm:first:border-l-0">
+      <p className={`text-body font-medium tabular-nums ${warn ? "text-attention" : "text-ink"}`}>{value}</p>
+      <p className="mt-0.5 truncate text-meta text-ink-2">{label}</p>
     </div>
   );
 }
