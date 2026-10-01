@@ -1,17 +1,23 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
+import { marketingHomeHref } from "@/lib/adminHost";
+import { getAuthUser } from "@/lib/auth";
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  const user = await getAuthUser();
+  if (user) redirect("/home");
+  const homeHref = marketingHomeHref();
   return (
     <main className="flex min-h-dvh items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
-        <BrandWordmark href="/" context="Sign in" variant="lockup" priority />
+        <BrandWordmark href={homeHref} context="Sign in" variant="lockup" priority />
         <h1 className="sr-only">Sign in to Scalers</h1>
 
         <form
@@ -64,7 +70,7 @@ export default function LoginPage({
         </p>
         <p className="mt-3">
           <Link
-            href="/"
+            href={homeHref}
             className="inline-flex min-h-11 items-center text-sm text-ink-soft hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             Scalers home

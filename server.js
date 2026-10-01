@@ -295,8 +295,8 @@ function deskBaseUrl() {
     String(
       process.env.DESK_PUBLIC_URL ||
         process.env.NEXT_PUBLIC_APP_URL ||
-        'https://scalers-project.vercel.app'
-    ).trim() || 'https://scalers-project.vercel.app'
+        'https://app.scalers.co.ke'
+    ).trim() || 'https://app.scalers.co.ke'
   );
 }
 

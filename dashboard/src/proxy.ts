@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  appHostRedirect,
   configuredAdminHost,
   configuredAppHost,
   hostnameOf,
@@ -33,6 +34,16 @@ export function proxy(request: NextRequest) {
     dest.host = adminHost;
     dest.port = "";
     return NextResponse.redirect(dest);
+  }
+
+  const split = appHostRedirect(hostname, path);
+  if (split) {
+    const dest = request.nextUrl.clone();
+    dest.protocol = "https";
+    dest.host = split.host;
+    dest.port = "";
+    dest.pathname = split.pathname;
+    return NextResponse.redirect(dest, 308);
   }
 
   return NextResponse.next();
