@@ -586,7 +586,7 @@ function formatReturningCallerForPrompt(card) {
     identity = `${who} (bound; not the household file; do not invent their history)`;
   } else if (card.sharedLine) {
     const hint = fileWho ? `file name ${fileWho}; ` : '';
-    identity = `not bound; shared line (${hint}ask who is speaking)`;
+    identity = `not bound; shared line (${hint}nothing is saved for this speaker; do not invent a booking, order, or hold)`;
   } else if (fileWho) {
     identity = `not bound; phone file for ${fileWho}; ask who is speaking; do not use this name or visit until they say it`;
   } else {

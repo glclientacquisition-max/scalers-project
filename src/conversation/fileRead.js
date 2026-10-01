@@ -19,6 +19,13 @@ const OFFER_ASK_RE =
 const INVENTED_FILE_RE =
   /\b(reschedule or cancel|cancel or reschedule|keep or change (?:that|them|it)|proceed with them|any of them)\b/i;
 
+// Talks as if a saved job already exists. "Book a couch" does not match.
+const PRESUPPOSE_RE =
+  /\b(?:your|the|that|this|my) (?:booking|order|hold|visit)\b|\bbooking yako\b|\boda yako\b|\bkuhusu booking\b|\breschedule\b|\bcancel (?:it|them|that)\b|\bchange about it\b|\bkughairi\b|\bkubadilisha\b|\bwith your booking\b/i;
+
+const EMPTY_FILE_FOLLOW_UP_RE =
+  /\b(really|which one|what do you mean|failing me|read it|someni|usome)\b/i;
+
 function looksLikeNewWork(text) {
   return NEW_WORK_RE.test(String(text || ''));
 }
@@ -64,10 +71,34 @@ function nothingOnFileLine(state, language) {
  * the model may read.
  * @returns {string}
  */
+function looksLikeEmptyFileFollowUp(text) {
+  const raw = String(text || '').trim();
+  if (!raw || looksLikeNewWork(raw) || looksLikeOfferAsk(raw)) return false;
+  if (raw.split(/\s+/).length > 14) return false;
+  return EMPTY_FILE_FOLLOW_UP_RE.test(raw);
+}
+
+function markNothingOnFile(state) {
+  if (!state || typeof state !== 'object') return;
+  if (!state.conversation || typeof state.conversation !== 'object') state.conversation = {};
+  state.conversation.toldNothingOnFile = true;
+}
+
 function fileReadLine({ text = '', state = {}, language } = {}) {
-  if (!looksLikeFileRead(text)) return '';
   if (hasReadableFile(state)) return '';
+  const again =
+    Boolean(state?.conversation?.toldNothingOnFile) && looksLikeEmptyFileFollowUp(text);
+  if (!looksLikeFileRead(text) && !again) return '';
+  markNothingOnFile(state);
   return nothingOnFileLine(state, language);
+}
+
+function presupposesSavedWork(sentence) {
+  const raw = String(sentence || '');
+  if (/\b(don't have|do not have|sina |nothing saved|no booking|no order)\b/i.test(raw)) {
+    return false;
+  }
+  return PRESUPPOSE_RE.test(raw) || INVENTED_FILE_RE.test(raw);
 }
 
 /**
@@ -79,17 +110,19 @@ function fileReadLine({ text = '', state = {}, language } = {}) {
 function sanitizeSpokenFileClaim(text, opts = {}) {
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return '';
+  if (hasReadableFile(opts.state)) return raw;
   const callerText = String(opts.callerText || '');
-  const askedMenu = looksLikeOfferAsk(callerText);
-  const fileRead = looksLikeFileRead(callerText);
-  const readable = hasReadableFile(opts.state);
-  if (fileRead && !readable && (INVENTED_FILE_RE.test(raw) || looksLikeServiceMenu(raw))) {
-    return nothingOnFileLine(opts.state, opts.language);
+  if (looksLikeOfferAsk(callerText) && !presupposesSavedWork(raw)) return raw;
+  const parts = raw.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const kept = parts.filter((part) => !presupposesSavedWork(part));
+  const out = kept.join(' ').trim();
+  if (out && out !== raw) return out;
+  if (!presupposesSavedWork(raw) && !looksLikeServiceMenu(raw)) return raw;
+  if (looksLikeOfferAsk(callerText) && looksLikeServiceMenu(raw)) return raw;
+  if (looksLikeServiceMenu(raw) && !looksLikeFileRead(callerText) && !looksLikeEmptyFileFollowUp(callerText)) {
+    return raw;
   }
-  if (!askedMenu && !readable && INVENTED_FILE_RE.test(raw) && fileRead) {
-    return nothingOnFileLine(opts.state, opts.language);
-  }
-  return raw;
+  return nothingOnFileLine(opts.state, opts.language);
 }
 
 function looksLikeServiceMenu(text) {
@@ -109,5 +142,7 @@ module.exports = {
   hasReadableFile,
   nothingOnFileLine,
   fileReadLine,
+  looksLikeEmptyFileFollowUp,
+  presupposesSavedWork,
   sanitizeSpokenFileClaim,
 };

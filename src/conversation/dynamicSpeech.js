@@ -12,7 +12,10 @@ const { prepareStreamedSpeech } = require('./callCorrectives');
 const { guardSpokenReply } = require('./speechGuard');
 const {
   fileReadLine,
+  hasReadableFile,
   looksLikeOfferAsk,
+  nothingOnFileLine,
+  presupposesSavedWork,
   sanitizeSpokenFileClaim,
 } = require('./fileRead');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
@@ -399,11 +402,15 @@ function polishSpokenReply(text, opts = {}) {
     stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts),
     { ...opts, callerText }
   );
-  return sanitizeSpokenFileClaim(spoken, {
+  const sanitized = sanitizeSpokenFileClaim(spoken, {
     callerText,
     state: opts.state,
     language: opts.language,
   });
+  if (!sanitized && !hasReadableFile(opts.state) && presupposesSavedWork(String(text || ''))) {
+    return nothingOnFileLine(opts.state, opts.language);
+  }
+  return sanitized;
 }
 
 /**

@@ -202,6 +202,43 @@ describe('file read is not a new job', () => {
     assert.match(oneService, /couch cleaning/i);
   });
 
+  it('keeps the empty file true on the next sentence, and strips a later invention', () => {
+    const state = homeState('Can you tell me my booking?');
+    assert.equal(reply('Can you tell me my booking?', state).line, "I don't have a booking for you.");
+    assert.equal(state.conversation.toldNothingOnFile, true);
+    assert.equal(reply('Really?', state).line, "I don't have a booking for you.");
+    assert.equal(reply('Which one is it?', state).line, "I don't have a booking for you.");
+    assert.equal(reply("You're failing me.", state).line, "I don't have a booking for you.");
+    assert.equal(reply('How much for couch cleaning?', state), null);
+    assert.equal(reply('What services do you offer?', state), null);
+
+    const invented = polishSpokenReply("Is there anything you'd like to change about it?", {
+      state,
+      callerTurns: ['Really?'],
+      language: 'en',
+    });
+    assert.equal(invented, "I don't have a booking for you.");
+
+    const greeting = polishSpokenReply(
+      'Nzuri sana. Nikupe usaidizi gani kuhusu booking yako leo?',
+      { state, callerTurns: ['Habari yako?'], language: 'sw' }
+    );
+    assert.match(greeting, /Nzuri sana/);
+    assert.doesNotMatch(greeting, /booking yako/i);
+
+    const retailInvented = polishSpokenReply('Would you like to cancel that order?', {
+      state: observeCallerTurn(createBrainState({ vertical: 'retail' }), {
+        text: 'Read my order.',
+        detectedLanguage: 'en',
+        resolvedLanguage: 'en',
+        profile: { vertical: 'retail' },
+      }),
+      callerTurns: ['Really?'],
+      language: 'en',
+    });
+    assert.equal(retailInvented, "I don't have an order or a hold for you.");
+  });
+
   it('uses the honest line instead of sorry-say-that-again on a file read', () => {
     const planned = planEmptyGeminiSpeech({
       brainState: homeState('Read them for me.'),
