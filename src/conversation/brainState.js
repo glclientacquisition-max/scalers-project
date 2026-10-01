@@ -16,6 +16,8 @@ const {
   looksLikeUrgentContact,
 } = require('./callCorrectives');
 const { mergeWorkResults } = require('./callResolution');
+const { evaluateAppointmentHours } = require('./appointmentHours');
+const { defaultHoursSchedule } = require('./businessHours');
 const {
   isHomeVisitState,
   mergeTimeAnswer,
@@ -39,6 +41,7 @@ const {
   looksLikePastBookingTalk,
 } = require('./visitTalk');
 const {
+  coverageAskPlace,
   decideVisitPlace,
   foldCanonicalPlace,
   isLocationRefusal,
@@ -504,6 +507,18 @@ function observeCallerTurn(state, input = {}) {
     String(input.profile?.vertical || next.vertical || '').toLowerCase() ===
     'home_services';
   const homeVisit = homeVertical && next.intent === 'booking';
+  if (homeVertical) {
+    const askedPlace = coverageAskPlace(text);
+    if (askedPlace) {
+      const foldedAsk = foldCanonicalPlace(askedPlace, input.profile) || askedPlace;
+      next.entities.location = {
+        value: foldedAsk,
+        source: 'caller_explicit',
+        confidence: 0.9,
+        confirmed: false,
+      };
+    }
+  }
   if (homeVisit && isLocationRefusal(text)) {
     next.conversation.locationRefusals =
       Number(next.conversation.locationRefusals || 0) + 1;
@@ -556,10 +571,13 @@ function observeCallerTurn(state, input = {}) {
     next.visitPlace = null;
   }
   next = applyVisitTimeAnswer(next, text, input.profile || {});
-  next.goal.missingSlots = missingGoalSlots(next, {
+  const slotProfile = {
     ...(input.profile || {}),
     vertical: input.profile?.vertical || next.vertical,
-  });
+  };
+  next.goal.missingSlots = missingGoalSlots(next, slotProfile);
+  next = applySpokenClockRefusal(next, input.profile || {}, input.now || new Date());
+  next.goal.missingSlots = missingGoalSlots(next, slotProfile);
   return next;
 }
 
@@ -568,6 +586,9 @@ function observeCallerTurn(state, input = {}) {
  * afternoon. A bare hour waits for its half of the day. After two asks with
  * no time, waive to a callback note. Never loop the same ask.
  */
+const BARE_NO = /^(?:no|nope|nah|hapana|siyo|sio)[.!]?$/i;
+const PERIOD_WORD = /\b(morning|asubuhi|afternoon|mchana|evening|jioni)\b/i;
+
 function applyVisitTimeAnswer(state, text, profile = {}) {
   const next = state;
   const asked = timeAskCount(next);
@@ -576,6 +597,37 @@ function applyVisitTimeAnswer(state, text, profile = {}) {
   const homeVisit = isHomeVisitState(next, profile);
   if (!homeVisit || !text) return next;
   const when = whenValue(next);
+  if (when && clockPhrase(when) && BARE_NO.test(text)) {
+    const clock = clockPhrase(when);
+    const refused = (next.actions?.refusedHours || []).some(
+      (item) => clockPhrase(item) === clock
+    );
+    if (refused) {
+      const day = dayCue(when);
+      if (day) {
+        next.entities.when = {
+          value: day,
+          source: 'caller_explicit',
+          confidence: 0.9,
+          confirmed: false,
+        };
+      }
+      return next;
+    }
+  }
+  // A period replaces a stored clock. "tomorrow morning" is not "tomorrow 7:00 AM".
+  if (when && clockPhrase(when) && PERIOD_WORD.test(text) && !clockPhrase(text)) {
+    const period = PERIOD_WORD.exec(text)[1].toLowerCase();
+    const day = dayCue(when) || dayCue(text) || '';
+    next.conversation.pendingHour = null;
+    next.entities.when = {
+      value: `${day} ${period}`.trim(),
+      source: 'caller_explicit',
+      confidence: 0.9,
+      confirmed: true,
+    };
+    return next;
+  }
   if (answeringTime && when && !whenHasClockTime(when)) {
     const merged = mergeTimeAnswer({
       when,
@@ -609,6 +661,62 @@ function applyVisitTimeAnswer(state, text, profile = {}) {
 
 const TIME_NO_PREFERENCE =
   /\b(any ?time|anytime|whenever|any (?:is|time is) fine|don'?t (?:know|mind|care)|not sure|wakati wowote|saa yoyote|sijui|yoyote)\b/i;
+
+/**
+ * Refuse an outside-hours clock on the turn it is said, before a tool runs.
+ * A complete visit still waits for the tool result. Coverage speech wins.
+ * A period is not a clock.
+ */
+function applySpokenClockRefusal(state, profile = {}, now = new Date()) {
+  const next = state;
+  if (!next.conversation) next.conversation = {};
+  next.conversation.clockRefusedThisTurn = false;
+  next.conversation.hoursBlock = null;
+  if (!isHomeVisitState(next, profile)) return next;
+  const when = whenValue(next);
+  if (!when || !clockPhrase(when)) return next;
+  const blocked = String(next.visitPlace?.blocked || '');
+  const coverageBlocks =
+    blocked === 'outside' || blocked === 'unknown_coverage' || blocked === 'refused';
+  const missing = Array.isArray(next.goal?.missingSlots) ? next.goal.missingSlots : [];
+  const toolWillRun =
+    !coverageBlocks &&
+    missing.length === 0 &&
+    !next.conversation.timeWaived &&
+    String(next.intent || '') === 'booking';
+  if (toolWillRun) return next;
+  const hours = evaluateAppointmentHours({
+    whenText: when,
+    schedule: profile.hoursSchedule || defaultHoursSchedule(),
+    now,
+  });
+  if (hours.code !== 'outside_hours') return next;
+  if (!next.actions) next.actions = {};
+  if (!Array.isArray(next.actions.refusedHours)) next.actions.refusedHours = [];
+  if (!next.actions.refusedHours.includes(when)) next.actions.refusedHours.push(when);
+  const day = dayCue(when);
+  if (day) {
+    next.entities.when = {
+      value: day,
+      source: 'caller_explicit',
+      confidence: 0.9,
+      confirmed: false,
+    };
+  } else if (next.entities && next.entities.when) {
+    delete next.entities.when;
+  }
+  if (!coverageBlocks) {
+    next.conversation.clockRefusedThisTurn = true;
+    next.conversation.hoursBlock = {
+      code: 'outside_hours',
+      beforeOpen: Boolean(hours.beforeOpen),
+      openLabel: hours.openLabel || '',
+      closeLabel: hours.closeLabel || '',
+      weekdayLong: hours.weekdayLong || '',
+    };
+  }
+  return next;
+}
 
 function rememberRefusedPlace(state, place) {
   const text = String(place || '').replace(/\s+/g, ' ').trim();
@@ -686,6 +794,7 @@ function recordActionResults(state, results = []) {
           record: {
             status: result.record.status || null,
             service_name: result.record.service_name || null,
+            call_id: result.record.call_id || null,
           },
         }
       : {}),

@@ -207,7 +207,9 @@ function createSimulator({
       toolResults: turn.toolResults,
       extra: JSON.stringify(turn.state.entities || {}),
     });
+    const hoursLine = /outside our hours|nje ya masaa|nje ya hours/i.test(line);
     for (const n of numbersIn(line)) {
+      if (hoursLine) continue;
       if (!known.has(n)) flag(`invented_number_${n}`);
     }
     if (String(profile.vertical || '').toLowerCase() === 'home_services' && /\blandmark\b/i.test(line)) {
@@ -250,6 +252,7 @@ function createSimulator({
       entities,
       profile,
       lastAgentText,
+      now,
     });
     const decision = determineNextBestAction({ state, capabilities: caps });
     state = setNextBestAction(state, decision);

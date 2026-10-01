@@ -66,7 +66,10 @@ function classify({ primaryIntent, resolution, leadStatus, hold, job, callStatus
   if (isSilenceCallStatus(callStatus)) return "missed";
   const intent = canonicalInboxIntent(primaryIntent);
   if (HUMAN_INTENTS.has(intent) || resolution === "needs_human") return "human";
-  if (JOB_INTENTS.has(intent)) return "job";
+  if (JOB_INTENTS.has(intent)) {
+    if (!job && resolution === "resolved") return "answered";
+    return "job";
+  }
   if (HOLD_INTENTS.has(intent)) return "hold";
   if (resolution === "resolved" || ANSWER_INTENTS.has(intent)) return "answered";
   return "answered";
@@ -400,16 +403,48 @@ describe("inbox purpose", () => {
       }),
       "job"
     );
-    // No visit row on this call. Intent alone still stamps job. The updated row stays on its original call.
+    // No visit row on this call. A resolved reschedule stamps answered. The visit row stays on the original call.
     assert.equal(
       classify({ primaryIntent: "reschedule", resolution: "resolved" }),
-      "job"
+      "answered"
     );
   });
 
   it("stamps book_visit as job from the Brain id", () => {
     assert.equal(classify({ primaryIntent: "book_visit" }), "job");
     assert.equal(classify({ primaryIntent: "booking" }), "job");
+  });
+
+  it("does not stamp Visit not booked when this call only updated another visit", () => {
+    assert.equal(
+      classify({ primaryIntent: "reschedule", resolution: "resolved" }),
+      "answered"
+    );
+    assert.equal(
+      classify({ primaryIntent: "book_visit", resolution: "resolved" }),
+      "answered"
+    );
+    assert.equal(
+      classify({ primaryIntent: "cancel", resolution: "resolved" }),
+      "answered"
+    );
+    assert.equal(
+      classify({
+        primaryIntent: "reschedule",
+        resolution: "resolved",
+        job: { id: "a1", status: "requested" },
+      }),
+      "job"
+    );
+    assert.equal(
+      signalLabel({ purpose: "job", job: { status: "requested" } }),
+      "Confirm visit"
+    );
+    assert.equal(signalLabel({ purpose: "answered" }), "Answered");
+    assert.equal(
+      classify({ primaryIntent: "book_visit", resolution: "needs_human" }),
+      "human"
+    );
   });
 });
 

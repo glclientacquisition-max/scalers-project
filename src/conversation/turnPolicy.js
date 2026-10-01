@@ -1,6 +1,6 @@
 // One caller turn, one contract. server.js and the offline simulator run the
 // same chain, so a playbook cannot bypass a gate. Order matters:
-// identity → coverage ask → place block → corrective → visit time ask → phatic.
+// identity → coverage ask → place block → hours refusal → corrective → visit time ask → phatic.
 // Anything that falls through goes to Gemini behind the speech and tool guards.
 // See docs/agents/BRAIN_TURN_CONTRACT.md.
 
@@ -14,6 +14,7 @@ const {
   pickPhaticReply,
 } = require('./dynamicSpeech');
 const { coverageAskSpeech, visitBlockSpeech } = require('./visitLocation');
+const { formatVisitTimeProblem } = require('./toolExecution');
 const {
   looksLikeLeaveIt,
   looksLikeNameIntroductionOnly,
@@ -91,6 +92,17 @@ function resolveLocalReply({
   }
   if (placeBlockLine && !AFFIRMATIVE_OPENER.test(clean)) {
     return { outcome: 'visit_block', line: placeBlockLine };
+  }
+
+  if (state?.conversation?.clockRefusedThisTurn) {
+    return {
+      outcome: 'hours',
+      line: formatVisitTimeProblem(
+        'outside_hours',
+        state.conversation.hoursBlock || {},
+        language
+      ),
+    };
   }
 
   // Leave-it and urgent outrank the time ladder. Everything else on a time ask

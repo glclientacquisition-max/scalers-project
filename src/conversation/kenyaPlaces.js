@@ -131,8 +131,20 @@ function nearestAllowedPlace(token, allowedNames) {
   const key = normalizePlaceKey(token);
   if (!key || key.includes(' ') || key.length < 5) return '';
   const allowed = allowedNames instanceof Set ? allowedNames : new Set(allowedNames || []);
+  const edits = oneEditNames(key);
+  if (edits.length > 1) {
+    const prefixed = edits.filter(
+      (name) => name.startsWith(key) && name.length === key.length + 1
+    );
+    return prefixed.length === 1 ? prefixed[0] : '';
+  }
   const exact = canonicalPlaceName(key);
-  if (exact) return !allowed.size || allowed.has(exact) ? exact : '';
+  if (exact) {
+    const prefix = exact.startsWith(key) && exact.length === key.length + 1;
+    const listed = Boolean(INDEX.places[key]);
+    if (listed || prefix) return exact;
+    return !allowed.size || allowed.has(exact) ? exact : '';
+  }
   if (!allowed.size) return '';
   let hit = '';
   for (const name of allowed) {

@@ -260,9 +260,13 @@ function ownerMustDial(flags, derived) {
   }
   if (flags?.finishedAnswer) return false;
   if (String(derived?.resolution || '') === 'resolved') return false;
+  if (flags?.updateFailed) return true;
   const intent = String(derived?.primaryIntent || flags?.intent || '');
   const visit =
     flags?.visitAsk === true || intent === 'book_visit' || intent === 'booking';
+  const change =
+    intent === 'cancel' || intent === 'cancellation' || intent === 'reschedule';
+  if (change && !visit) return !cleanPiece(flags?.when);
   if (!visit) return false;
   const missingName = !cleanPiece(flags?.callerName);
   const missingPlace = !cleanPiece(flags?.place);
@@ -438,12 +442,19 @@ function parseReviewJson(text) {
   };
 }
 
-function toolFlagsFromBrain(brainState) {
+function toolFlagsFromBrain(brainState, callId = null) {
   const results = hangupResults(brainState);
+  const here = (row) => {
+    if (!callId) return true;
+    const rowCall = row?.record?.call_id || '';
+    if (!rowCall) return true;
+    return String(rowCall) === String(callId);
+  };
   const ok = (action) =>
     results.some(
       (row) =>
         row &&
+        here(row) &&
         row.action === action &&
         (row.status === 'succeeded' || row.status === 'updated')
     );
@@ -452,6 +463,7 @@ function toolFlagsFromBrain(brainState) {
     const rows = results.filter(
       (row) =>
         row &&
+        here(row) &&
         wanted.has(row.action) &&
         (row.status === 'succeeded' || row.status === 'updated')
     );
@@ -468,6 +480,23 @@ function toolFlagsFromBrain(brainState) {
     holdSaved: ok('create_service_request'),
     callbackSaved: ok('create_service_request') && holdType === 'callback',
     visitSaved: ok('create_appointment') || ok('update_appointment'),
+    updatedElsewhere:
+      Boolean(callId) &&
+      results.some(
+        (row) =>
+          row?.action === 'update_appointment' &&
+          (row.status === 'succeeded' || row.status === 'updated') &&
+          row.record?.call_id &&
+          String(row.record.call_id) !== String(callId)
+      ),
+    updateFailed:
+      results.some(
+        (row) =>
+          row?.action === 'update_appointment' &&
+          (row.status === 'failed' || row.status === 'invalid')
+      ) &&
+      !ok('update_appointment') &&
+      !ok('create_appointment'),
     visitRequested: Boolean(visit) && (!visitStatus || visitStatus === 'requested'),
     refusedWhen: Array.isArray(brainState?.actions?.refusedHours)
       ? brainState.actions.refusedHours.filter(Boolean)
@@ -590,7 +619,19 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review } = {}) {
       out.want = VISIT_REQUESTED_NOTE;
     }
   }
-  if (!flags.visitSaved && !flags.callbackSaved) {
+  if (flags.updatedElsewhere && !flags.visitSaved && !flags.callbackSaved && !flags.holdSaved) {
+    out.done = 'None.';
+    out.next = 'None.';
+    out.applied.card = true;
+    if (looksLikeVisitRequestedNote(out.reason) || /visit not booked/i.test(out.reason || '')) {
+      out.reason = 'Answered.';
+      out.applied.reason = true;
+    }
+    if (looksLikeVisitRequestedNote(out.want) || /visit not booked/i.test(out.want || '')) {
+      out.want = 'Answered.';
+    }
+  }
+  if (!flags.visitSaved && !flags.callbackSaved && !flags.updatedElsewhere) {
     if (looksLikeVisitRequestedNote(out.reason) || looksLikeVisitRequestedNote(out.done)) {
       const summaryReason = cleanReason(summary?.reason || '');
       out.reason = looksLikeVisitRequestedNote(summaryReason) ? 'No visit saved.' : summaryReason || 'No visit saved.';
@@ -616,7 +657,7 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review } = {}) {
     out.done = 'None.';
     out.applied.card = true;
   }
-  if (cleanedNext) {
+  if (cleanedNext && !flags.updatedElsewhere) {
     out.next = polishCardLine(cleanedNext, flags);
     out.applied.card = true;
   }

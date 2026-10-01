@@ -208,6 +208,66 @@ describe('mergeTranscriptReview', () => {
     assert.equal(merged.resolution, 'resolved');
   });
 
+  it('does not ask the owner to confirm a visit updated on another call', () => {
+    const state = recordActionResults(createBrainState(), [
+      {
+        action: 'update_appointment',
+        status: 'succeeded',
+        appointmentStatus: 'requested',
+        record: { status: 'requested', call_id: 'call-original', service_name: 'Carpet cleaning' },
+      },
+    ]);
+    const flags = toolFlagsFromBrain(state, 'call-later');
+    assert.equal(flags.visitSaved, false);
+    assert.equal(flags.updatedElsewhere, true);
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'book_visit', resolution: 'resolved' },
+      summary: { reason: 'Caller moved the visit.' },
+      toolFlags: flags,
+      review: {
+        want: 'Visit not booked.',
+        done: 'Visit request saved — confirm on desk.',
+        next: 'Confirm the visit.',
+        mood: 'neutral',
+        reason: 'Visit not booked.',
+        confidence: 0.9,
+      },
+    });
+    assert.equal(merged.done, 'None.');
+    assert.equal(merged.next, 'None.');
+    assert.equal(merged.resolution, 'resolved');
+    assert.doesNotMatch(`${merged.done} ${merged.next} ${merged.reason}`, /Visit not booked|confirm on desk/i);
+  });
+
+  it('asks them back when the visit update failed', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'cancel', resolution: 'needs_human' },
+      summary: { reason: 'Caller wanted to move the visit.' },
+      toolFlags: {
+        holdSaved: false,
+        visitSaved: false,
+        callbackSaved: false,
+        updateFailed: true,
+        callerName: 'Amina',
+        service: 'carpet cleaning',
+        place: 'Runda',
+        when: '',
+        intent: 'cancellation',
+      },
+      review: {
+        want: 'Move the visit.',
+        done: 'None.',
+        next: 'None.',
+        mood: 'neutral',
+        reason: 'Move the visit.',
+        confidence: 0.9,
+      },
+    });
+    assert.equal(merged.next, 'Call them back.');
+    assert.equal(merged.resolution, 'needs_human');
+    assert.equal(merged.primaryIntent, 'human');
+  });
+
   it('does not say a visit was saved when no row succeeded', () => {
     const merged = mergeTranscriptReview({
       derived: { primaryIntent: 'book_visit', resolution: 'unresolved' },

@@ -131,6 +131,10 @@ describe('visit location ladder', () => {
     assert.equal(foldCanonicalPlace('Rwangai'), 'Rwangai');
     assert.equal(assessCoverage(foldCanonicalPlace('Rwangai', dusted), dusted), 'outside');
     assert.equal(foldCanonicalPlace('Shy, 7 is okay, Rongai', dusted), 'Rongai');
+    assert.equal(foldCanonicalPlace('Lurungai, Rungai', dusted), 'Rongai');
+    assert.equal(foldCanonicalPlace('rongae', dusted), 'rongae');
+    assert.equal(foldCanonicalPlace('Ronga', nairobi), 'Rongai');
+    assert.equal(foldCanonicalPlace('The grace apartments, Rongai', dusted), 'The grace apartments, Rongai');
     assert.match(
       coverageAskSpeech('What about Runda?', { vertical: 'home_services', ...nairobi }, 'en'),
       /Yes, we cover Runda/i
@@ -188,8 +192,10 @@ describe('visit location ladder', () => {
   });
 
   it('speaks the fixed outside line', () => {
-    assert.match(visitBlockSpeech('outside', 'en'), /outside our coverage/i);
-    assert.match(visitBlockSpeech('outside', 'sw'), /nje/i);
+    assert.equal(visitBlockSpeech('outside', 'en'), 'That area is outside our coverage.');
+    assert.equal(visitBlockSpeech('outside', 'sw'), 'Eneo hilo liko nje.');
+    assert.equal(visitBlockSpeech('outside', 'sheng'), 'Hiyo area iko nje.');
+    assert.doesNotMatch(visitBlockSpeech('outside', 'en'), /callback/i);
     assert.equal(visitBlockSpeech('refused', 'en'), '');
   });
 
@@ -250,7 +256,11 @@ describe('visit location ladder', () => {
     assert.equal(calls, 0);
     assert.equal(execution.results[0].status, 'invalid');
     assert.equal(execution.results[0].code, 'outside_coverage');
-    assert.match(formatToolConfirmation(execution.results, 'en'), /outside our coverage/i);
+    assert.equal(
+      formatToolConfirmation(execution.results, 'en'),
+      'That area is outside our coverage.'
+    );
+    assert.doesNotMatch(formatToolConfirmation(execution.results, 'en'), /callback/i);
     assert.match(formatToolConfirmation(execution.results, 'sw'), /nje/i);
     assert.match(formatToolConfirmation(execution.results, 'sheng'), /nje/i);
     assert.doesNotMatch(formatToolConfirmation(execution.results, 'en'), /landmark/i);

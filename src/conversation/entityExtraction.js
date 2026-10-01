@@ -580,7 +580,7 @@ function extractLandmark(text) {
     }
   }
   const inPlace =
-    /\b(?:in|at|kwa)\s+((?:the\s+|my\s+|our\s+)?[A-Za-z][\p{L}'’-]+(?:\s+[A-Za-z][\p{L}'’-]+){0,2})/u.exec(
+    /\b(?:in|at|kwa)\s+((?:the\s+|my\s+|our\s+)?[A-Za-z][\p{L}'’-]+(?:\s*,\s*[A-Za-z][\p{L}'’-]+){0,3})/u.exec(
       raw
     );
   if (inPlace) {
@@ -623,7 +623,13 @@ function extractWhen(text) {
     /\bsaa\s+(?:moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi|\d{1,2})(?:\s+(?:asubuhi|mchana|jioni|usiku))?\b/i.exec(
       raw
     );
-  return [relative?.[0], clock?.[0]].filter(Boolean).join(' ').trim() || null;
+  const parts = [relative?.[0], clock?.[0]].filter(Boolean);
+  if (relative && !clock) {
+    const period = /\b(morning|asubuhi|afternoon|mchana|evening|jioni)\b/i.exec(raw);
+    const word = period ? period[1].toLowerCase() : '';
+    if (word && !String(relative[0]).toLowerCase().includes(word)) parts.push(word);
+  }
+  return parts.join(' ').trim() || null;
 }
 
 function extractQuantity(text, intent) {
