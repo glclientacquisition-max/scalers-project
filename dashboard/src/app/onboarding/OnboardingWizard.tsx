@@ -14,6 +14,7 @@ import {
 } from "@/lib/vertical";
 import {
   HANDOFF_OPTIONS,
+  liveConnectBlurb,
   type HandoffMode,
 } from "@/lib/handoffMode";
 import { compactTextareaExpandHandlers } from "@/components/settingsUi";
@@ -264,6 +265,11 @@ export function OnboardingWizard() {
                       className={choiceClass(selected)}
                     >
                       <span className="font-medium text-ink">{opt.label}</span>
+                      {opt.id === "live_transfer" ? (
+                        <span className="mt-0.5 block text-sm text-ink-soft">
+                          {liveConnectBlurb()}
+                        </span>
+                      ) : null}
                     </button>
                   );
                 })}

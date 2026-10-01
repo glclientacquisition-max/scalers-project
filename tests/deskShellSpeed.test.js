@@ -329,7 +329,7 @@ describe("settings save scope", () => {
       "dashboard/src/lib/settingsSaveScope.ts",
       `mod.settingsScopeValidationError("hours", ${JSON.stringify(invalidEverywhere)})`
     );
-    assert.equal(err, "Set at least one open day in weekly hours.");
+    assert.equal(err, "Set at least one open day.");
     const ok = load(
       "dashboard/src/lib/settingsSaveScope.ts",
       `mod.settingsScopeValidationError("hours", ${JSON.stringify({

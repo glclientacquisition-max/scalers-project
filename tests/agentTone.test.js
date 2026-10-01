@@ -24,6 +24,7 @@ describe('agent tone offer', () => {
     assert.doesNotMatch(wizard, /Localized \/ Sheng|TONE_IDS/);
     assert.match(wizard, /TONE_OPTIONS/);
     assert.match(form, /TONE_OPTIONS/);
+    assert.doesNotMatch(form, /hint=\{TONE_OPTIONS/);
   });
 
   it('maps older chips onto Warm and keeps Professional', () => {
