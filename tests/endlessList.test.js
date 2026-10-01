@@ -140,6 +140,8 @@ describe("endless list slices", () => {
     assert.match(board, /lg:hidden/);
     assert.match(board, /hidden lg:block/);
     assert.match(board, /listWindowClass/);
+    assert.match(board, /inboxPhoneWindowClass/);
+    assert.match(read("dashboard/src/lib/endlessList.ts"), /inboxPhoneWindowClass/);
     assert.doesNotMatch(board, /<Pagination/);
   });
 

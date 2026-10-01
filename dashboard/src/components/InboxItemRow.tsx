@@ -356,7 +356,7 @@ export function InboxPhoneRow({
   const work = item.headline;
   const meta = showHold ? needed : showJob ? visit : when;
   const body = (
-    <div className="min-w-0 flex-1 overflow-hidden">
+    <div className="min-w-0 w-full flex-1">
       <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
         <InboxRowLabel
           unread={item.unread}

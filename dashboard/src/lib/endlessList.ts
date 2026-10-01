@@ -5,6 +5,13 @@ export const LIST_SLICE = 25;
 export const listWindowClass =
   "[&_li]:[content-visibility:auto] [&_li]:[contain-intrinsic-size:auto_4.5rem] [&_tr]:[content-visibility:auto] [&_tr]:[contain-intrinsic-size:auto_4.5rem]";
 
+/**
+ * Phone inbox rows stack the time under the name, then one reason line.
+ * 4.5rem fits the Action hit, not that stack. Size containment clips the reason.
+ */
+export const inboxPhoneWindowClass =
+  "[&_li]:[content-visibility:auto] [&_li]:[contain-intrinsic-size:auto_9.5rem]";
+
 export function nextShown(shown: number, total: number, pageSize: number): number {
   const size = Math.max(1, Math.floor(pageSize) || 1);
   const current = Math.max(0, Math.floor(shown) || 0);
