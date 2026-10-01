@@ -6,6 +6,9 @@ import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
 import { marketingHomeHref } from "@/lib/adminHost";
 import { getAuthUser } from "@/lib/auth";
 
+// instant = false: owner cookie session must run before the form. Do not wrap the gate in Suspense.
+export const instant = false;
+
 export default async function LoginPage({
   searchParams,
 }: {
