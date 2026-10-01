@@ -31,6 +31,14 @@ describe("DeskSelect primitive", () => {
     assert.match(desk, /Select\.Popup/);
     assert.match(desk, /Select\.Item/);
   });
+
+  it("wraps portal content in desk-theme so dark tokens resolve under body", () => {
+    assert.match(desk, /Select\.Portal/);
+    assert.match(desk, /className="desk-theme"/);
+    // Popup still uses token utilities that resolve under .desk-theme
+    assert.match(desk, /bg-surface/);
+    assert.match(desk, /text-ink/);
+  });
 });
 
 describe("DoD path swaps", () => {

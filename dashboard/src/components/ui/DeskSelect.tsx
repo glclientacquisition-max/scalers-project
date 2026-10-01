@@ -7,6 +7,8 @@ import { cx } from "@/lib/cx";
 /**
  * Closed chrome matches desk field classes; open list is a themed popover
  * (bg-surface + text-ink) so dark mode never falls back to a light OS popup.
+ * Portal content is wrapped in `.desk-theme` (same as InboxRowOverflow) so
+ * dark CSS vars resolve when Select.Portal mounts under body.
  * Color-scheme pin on remaining native selects stays; this covers DoD paths.
  */
 const popupClass =
@@ -76,33 +78,36 @@ export function DeskSelect<T extends string>({
           <ChevronDownIcon aria-hidden="true" className="h-5 w-5" />
         </Select.Icon>
       </Select.Trigger>
+      {/* Portal mounts under body; wrap so dark tokens (--surface/--ink) resolve under .desk-theme */}
       <Select.Portal>
-        <Select.Positioner
-          className="z-menu outline-none"
-          sideOffset={6}
-          collisionPadding={12}
-          alignItemWithTrigger={false}
-        >
-          <Select.Popup className={popupClass}>
-            <Select.List>
-              {options.map((opt) => (
-                <Select.Item
-                  key={opt.value}
-                  value={opt.value}
-                  disabled={opt.disabled}
-                  className={itemClass}
-                >
-                  <Select.ItemIndicator className="col-start-1 flex items-center justify-center text-ink">
-                    <CheckIcon aria-hidden="true" className="h-4 w-4" />
-                  </Select.ItemIndicator>
-                  <Select.ItemText className="col-start-2 min-w-0 truncate">
-                    {opt.label}
-                  </Select.ItemText>
-                </Select.Item>
-              ))}
-            </Select.List>
-          </Select.Popup>
-        </Select.Positioner>
+        <div className="desk-theme">
+          <Select.Positioner
+            className="z-menu outline-none"
+            sideOffset={6}
+            collisionPadding={12}
+            alignItemWithTrigger={false}
+          >
+            <Select.Popup className={popupClass}>
+              <Select.List>
+                {options.map((opt) => (
+                  <Select.Item
+                    key={opt.value}
+                    value={opt.value}
+                    disabled={opt.disabled}
+                    className={itemClass}
+                  >
+                    <Select.ItemIndicator className="col-start-1 flex items-center justify-center text-ink">
+                      <CheckIcon aria-hidden="true" className="h-4 w-4" />
+                    </Select.ItemIndicator>
+                    <Select.ItemText className="col-start-2 min-w-0 truncate">
+                      {opt.label}
+                    </Select.ItemText>
+                  </Select.Item>
+                ))}
+              </Select.List>
+            </Select.Popup>
+          </Select.Positioner>
+        </div>
       </Select.Portal>
     </Select.Root>
   );
