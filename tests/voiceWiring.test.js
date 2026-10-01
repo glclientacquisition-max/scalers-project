@@ -301,8 +301,17 @@ assert.match(
 
 assert.match(
   source,
-  /not retrying generateContent/,
-  'a hung or failed Gemini stream with no text must not start a second generateContent'
+  /nextGeminiStreamAttempt/,
+  'a failed stream with no audio retries once, then one backup model'
+);
+const streamFn = source.slice(
+  source.indexOf('async function runGeminiTurnStreaming'),
+  source.indexOf('async function runGeminiTurn')
+);
+assert.doesNotMatch(
+  streamFn,
+  /\.generateContent\(/,
+  'the stream path retries generateContentStream, not a second generateContent'
 );
 
 assert.match(

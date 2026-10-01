@@ -168,11 +168,30 @@ describe('file read is not a new job', () => {
     );
   });
 
-  it('lets a catalogue question through', () => {
+  it('answers the catalogue from the file', () => {
     const text = 'What services do you offer?';
     assert.equal(looksLikeOffer(text), true);
     const state = homeState(text);
-    assert.equal(reply(text, state), null);
+    const local = resolveLocalReply({
+      text,
+      state,
+      language: 'en',
+      profile: {
+        vertical: 'home_services',
+        servicesCatalog: [
+          { name: 'Couch cleaning' },
+          { name: 'Mattress cleaning' },
+          { name: 'Carpet cleaning' },
+        ],
+      },
+    });
+    assert.equal(local.outcome, 'catalogue');
+    assert.equal(
+      local.line,
+      'We offer Couch cleaning, Mattress cleaning, and Carpet cleaning. Which one do you need?'
+    );
+    assert.equal(looksLikeOffer('Maybe you can tell me the services that you have'), true);
+    assert.equal(looksLikeOffer('So uniambie services mko nayo'), true);
   });
 
   it('strips an unasked menu and an invented file before it is spoken', () => {
@@ -210,7 +229,7 @@ describe('file read is not a new job', () => {
     assert.equal(reply('Which one is it?', state).line, "I don't have a booking for you.");
     assert.equal(reply("You're failing me.", state).line, "I don't have a booking for you.");
     assert.equal(reply('How much for couch cleaning?', state), null);
-    assert.equal(reply('What services do you offer?', state), null);
+    assert.equal(reply('What services do you offer?', state).outcome, 'catalogue');
 
     const invented = polishSpokenReply("Is there anything you'd like to change about it?", {
       state,

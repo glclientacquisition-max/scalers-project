@@ -197,6 +197,43 @@ function isHardGeminiOutage(err) {
   return kind === 'billing' || kind === 'denied';
 }
 
+const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
+const DEFAULT_GEMINI_BACKUP_MODEL = 'gemini-3.5-flash-lite';
+
+function geminiPrimaryModel() {
+  return String(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL).trim() || DEFAULT_GEMINI_MODEL;
+}
+
+function geminiBackupModel() {
+  return (
+    String(process.env.GEMINI_BACKUP_MODEL || DEFAULT_GEMINI_BACKUP_MODEL).trim() ||
+    DEFAULT_GEMINI_BACKUP_MODEL
+  );
+}
+
+/**
+ * What to do after a stream produced no audio.
+ * One retry on the same model, then one backup only when the failure is
+ * capacity (503 / rate limit). Credits and a denied project stop.
+ * @returns {{ action: 'retry'|'backup'|'stop', model: string, waitMs: number }}
+ */
+function nextGeminiStreamAttempt({
+  err,
+  attempt = 0,
+  spoke = false,
+  primary = DEFAULT_GEMINI_MODEL,
+  backup = DEFAULT_GEMINI_BACKUP_MODEL,
+} = {}) {
+  const stop = { action: 'stop', model: primary, waitMs: 0 };
+  if (spoke || isHardGeminiOutage(err)) return stop;
+  const kind = classifyGeminiError(err).kind;
+  const busy = kind === 'unavailable' || kind === 'rate_limit';
+  const cut = isTimeoutError(err) || kind === 'error' || kind === 'unavailable' || kind === 'rate_limit';
+  if (attempt === 0 && cut) return { action: 'retry', model: primary, waitMs: 400 };
+  if (attempt === 1 && busy) return { action: 'backup', model: backup, waitMs: 0 };
+  return stop;
+}
+
 /**
  * After a streamed Gemini turn, decide whether prefetch TTS already spoke
  * and what (if anything) still needs speakText. Empty successful model
@@ -265,6 +302,11 @@ module.exports = {
   classifyGeminiError,
   isRetryableGeminiError,
   isHardGeminiOutage,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_BACKUP_MODEL,
+  geminiPrimaryModel,
+  geminiBackupModel,
+  nextGeminiStreamAttempt,
   resolvePrefetchedStreamSpeech,
   OUTCOME_TOOL_ACTIONS,
   spokenTextForToolTurn,

@@ -14,7 +14,7 @@ const NEW_WORK_RE =
   /\b(want to book|like to book|need to book|please book|book me|can you book|could you book|i want to order|i'd like to order|order \d+|buy \d+|nataka (?:cleaning|carpet|couch|sofa|mattress|kuweka)|naomba (?:cleaning|carpet))\b/i;
 
 const OFFER_ASK_RE =
-  /\b(what (?:do you (?:offer|do|sell|have)|services|can you do)|which services|what services|mnauza|huduma gani|what do you offer)\b/i;
+  /\b(what (?:do you (?:offer|do|sell|have)|services|can you do)|which services|what services|services (?:that |do )?you (?:have|offer)|tell me the services|uniambie (?:the )?services|services mko nayo|mnauza|huduma (?:gani|mnazo|mko)|what do you offer)\b/i;
 
 const INVENTED_FILE_RE =
   /\b(reschedule or cancel|cancel or reschedule|keep or change (?:that|them|it)|proceed with them|any of them)\b/i;

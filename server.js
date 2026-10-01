@@ -115,6 +115,9 @@ const {
   isRetryableGeminiError,
   classifyGeminiError,
   isHardGeminiOutage,
+  geminiPrimaryModel,
+  geminiBackupModel,
+  nextGeminiStreamAttempt,
   resolvePrefetchedStreamSpeech,
   spokenTextForToolTurn,
 } = require('./src/conversation/geminiVoice');
@@ -4526,7 +4529,8 @@ async function applyGeminiTools(callSid, parsed) {
 
 /**
  * Stream Gemini tokens → onSpokenChunk (sentence/clause flushes) → TTS.
- * A 503 or an empty timeout does not start a second generateContent.
+ * No audio yet: retry the same model once, then one backup model on 503.
+ * Audio already started: do not restart. Credits and denied are not retried.
  */
 async function runGeminiTurnStreaming(
   messages,
@@ -4534,72 +4538,102 @@ async function runGeminiTurnStreaming(
   systemPrompt = buildSystemPrompt(),
   { onSpokenChunk, shouldAbort } = {}
 ) {
-  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  const primary = geminiPrimaryModel();
+  const backup = geminiBackupModel();
   const contents = buildGeminiContents(messages);
-  const buffer = createSpokenStreamBuffer();
+  let model = primary;
+  let buffer = createSpokenStreamBuffer();
   let fullText = '';
   let streamFailed = false;
   let streamErr = null;
   let thoughtSignature = '';
   let modelParts = [];
   const timeoutMs = geminiTurnTimeoutMs();
+  let attempt = 0;
 
-  try {
-    console.log(
-      `[${callSid}] Calling Gemini stream (model: ${model}, messages: ${messages.length}, timeoutMs=${timeoutMs})`
-    );
-    await withTimeout(
-      (async () => {
-        const stream = await getGeminiClient().models.generateContentStream({
-          model,
-          contents,
-          config: geminiVoiceConfig(systemPrompt),
-        });
+  while (attempt < 3) {
+    fullText = '';
+    buffer = createSpokenStreamBuffer();
+    thoughtSignature = '';
+    modelParts = [];
+    streamErr = null;
+    streamFailed = false;
+    try {
+      console.log(
+        `[${callSid}] Calling Gemini stream (model: ${model}, attempt: ${attempt + 1}, messages: ${messages.length}, timeoutMs=${timeoutMs})`
+      );
+      await withTimeout(
+        (async () => {
+          const stream = await getGeminiClient().models.generateContentStream({
+            model,
+            contents,
+            config: geminiVoiceConfig(systemPrompt),
+          });
 
-        for await (const chunk of stream) {
-          if (shouldAbort?.()) {
-            console.log(`[${callSid}] Gemini stream aborted (barge-in)`);
-            break;
-          }
-          modelParts = appendGeminiStreamParts(modelParts, chunk);
-          thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
-          const delta = extractGeminiText(chunk);
-          if (!delta) continue;
-          fullText = joinSpokenPieces(fullText, delta);
-          const pieces = buffer.push(delta);
-          for (const piece of pieces) {
-            if (shouldAbort?.()) break;
-            if (typeof onSpokenChunk === 'function') {
-              try {
-                await onSpokenChunk(piece);
-              } catch (err) {
-                console.warn(
-                  `[${callSid}] spoken chunk TTS failed:`,
-                  err?.message || err
-                );
+          for await (const chunk of stream) {
+            if (shouldAbort?.()) {
+              console.log(`[${callSid}] Gemini stream aborted (barge-in)`);
+              break;
+            }
+            modelParts = appendGeminiStreamParts(modelParts, chunk);
+            thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
+            const delta = extractGeminiText(chunk);
+            if (!delta) continue;
+            fullText = joinSpokenPieces(fullText, delta);
+            const pieces = buffer.push(delta);
+            for (const piece of pieces) {
+              if (shouldAbort?.()) break;
+              if (typeof onSpokenChunk === 'function') {
+                try {
+                  await onSpokenChunk(piece);
+                } catch (err) {
+                  console.warn(
+                    `[${callSid}] spoken chunk TTS failed:`,
+                    err?.message || err
+                  );
+                }
               }
             }
           }
-        }
-      })(),
-      timeoutMs,
-      'Gemini stream'
-    );
-    console.log(
-      `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length}`
-    );
-  } catch (err) {
-    streamErr = err;
-    if (isTimeoutError(err) && fullText) {
-      console.warn(
-        `[${callSid}] Gemini stream timed out after ${timeoutMs}ms with partial text chars=${fullText.length}`
+        })(),
+        timeoutMs,
+        'Gemini stream'
       );
-    } else {
-      streamFailed = true;
-      console.error(
-        `[${callSid}] Gemini stream failed with no text; not retrying generateContent:`,
+      console.log(
+        `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length}`
+      );
+      break;
+    } catch (err) {
+      streamErr = err;
+      const spoke = Boolean(String(fullText).trim());
+      const next = nextGeminiStreamAttempt({
+        err,
+        attempt,
+        spoke,
+        primary,
+        backup,
+      });
+      if (next.action === 'stop') {
+        if (isTimeoutError(err) && spoke) {
+          console.warn(
+            `[${callSid}] Gemini stream timed out after ${timeoutMs}ms with partial text chars=${fullText.length}`
+          );
+        } else {
+          streamFailed = true;
+          console.error(
+            `[${callSid}] Gemini stream failed; stopping:`,
+            err?.message || err
+          );
+        }
+        break;
+      }
+      console.warn(
+        `[${callSid}] Gemini stream ${next.action} model=${next.model} after:`,
         err?.message || err
       );
+      if (next.waitMs) await sleep(next.waitMs);
+      model = next.model;
+      attempt += 1;
     }
   }
 
