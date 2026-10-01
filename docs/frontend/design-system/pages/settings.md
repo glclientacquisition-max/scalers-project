@@ -20,17 +20,17 @@ One header per group. Import sits directly under Catalog. Team is the first Peop
 
 Phone: dense index rows. Tap a row to drill in. Nested panels hide the bottom tab bar (`data-desk-nested`). The Settings hub keeps tabs. `DeskBack` icon, aria-label Settings (`lg:hidden`). The `md+` rail stays packed (`md:w-max md:max-w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). `SettingsSegmented` uses Inbox rate cards (`deskRateCardClass`). No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
 
-Sticky Save on Catalog and Train panels, top-right of the panel header. Alerts, Import, and Test use the same menu without a second compile save. Alerts Save is the panel primary. Test has one filled control: Call when the line is live, otherwise Generate preview.
+Sticky **Save** on Catalog and Train panels (except Pronunciation), top-right of the panel header (`TenantSettingsSaveButton` label is **Save**, not “Save and train”). After a successful compile the toast is `Saved · training line` (Alerts Save stays `Saved` only — no compile). Alerts, Import, and Test use the same menu without a second compile save. Alerts Save is the panel primary. Test has one filled control: Call when the line is live, otherwise **Hear greeting**.
 
-Bare `/settings` is the phone index. md+ `/settings` with no tab redirects to Hours (`?tab=train&panel=hours`) before a form renders. `?tab=train` still opens Identity. Test line still opens Test. `?tab=updates`, `?tab=today`, and `?tab=appearance` open the hub, then a wide screen follows the Hours redirect. Updates stay on Home. Appearance stays on the account menu. `?tab=alerts` is Alerts. Hash `#train` is not routed. `Train` is the verb on Save.
+Bare `/settings` is the phone index. md+ `/settings` with no tab redirects to Hours (`?tab=train&panel=hours`) before a form renders. `?tab=train` still opens Identity. Test line still opens Test. `?tab=updates`, `?tab=today`, and `?tab=appearance` open the hub, then a wide screen follows the Hours redirect. Updates stay on Home. Appearance stays on the account menu. `?tab=alerts` is Alerts. Hash `#train` is not routed. Sticky chrome is **Save**; compile still trains the line — honesty is the toast `Saved · training line`, not a Train verb on the button.
 
 ## Chrome
 
-Short in-page title Settings plus compact workspace name on the hub. The top strip is initials only. Line live / Number pending stays on Test. Import, Catalog, and the other panels do not repeat it. The account-menu theme cluster does not repeat it. Do not use `deskListTitleClass` on the hub. Sign out is the last account-menu item (`POST /api/logout` after confirm). No giant Business Profile `h1`. Sub-panels keep `DeskBack` in the title row (`DeskRecordLead`, `lg:hidden`). Hours, Pronunciation, and the other panels share that lead. Back never owns its own row. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Settings. Path stays `/settings`. Import Knowledge and Import Catalog are the settings import titles. Import Contacts is `/contacts/import`.
+Short in-page title Settings plus compact workspace name on the hub. The top strip is initials only. Hub rail status: Identity shows business name, else tone (Warm / Professional) — never the Voice label string; Voice shows the voice label / catalog description (`settingsOptionStatus`). Line live / Number pending stays on Test. Import, Catalog, and the other panels do not repeat it. The account-menu theme cluster does not repeat it. Do not use `deskListTitleClass` on the hub. Sign out is the last account-menu item (`POST /api/logout` after confirm). No giant Business Profile `h1`. Sub-panels keep `DeskBack` in the title row (`DeskRecordLead`, `lg:hidden`). Hours, Pronunciation, and the other panels share that lead. Back never owns its own row. **Save** stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`), except Pronunciation (header note **Saves live - no sticky Save**). The desk nav label is Settings. Path stays `/settings`. Import Knowledge and Import Catalog are the settings import titles. Import Contacts is `/contacts/import`.
 
 Phone index: full-width grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
 
-Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, and Alerts use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` rate cards (`deskRateCardClass`, same as Inbox and Contacts chips). Account-menu Appearance is the three theme cards, not that strip. Four-plus enums use `SettingsSelect`. Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
+Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, and Alerts use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` rate cards (`deskRateCardClass`, same as Inbox and Contacts chips). Account-menu Appearance is the three theme cards, not that strip. Four-plus enums use `SettingsSelect` (wraps `DeskSelect`; open list portals under `body` inside `.desk-theme` so dark tokens resolve). Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 
@@ -48,12 +48,12 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Hours | Open/Closed chip per day; after-hours chips | Day grid with open switches. When closed is segmented Keep helping / Message only |
 | Locations | Places table `lg+`, stacked phone | Unchanged dense table. Add place ghost |
 | Policies | Two-column textarea grid | Grouped Rules stacks. When unsure stack |
-| Team | Handoff chips. Notify chips | Live connect switch when transfer can run. People table `lg+`. Status: Rings {name} during open hours. |
+| Team | Handoff chips. Notify chips | Live connect switch when transfer can run (Team only — handoff off Voice, #514). People table `lg+` with **Role** column. Status: Rings {name} during open hours. |
 | Voice | Voice chips. Tool switches. Hear sample bordered | Voice select. Tool switches. Hear sample ghost. |
-| Pronunciation | Coach with duplicate heading | Coach. Embedded heading is sr-only. Studio modes use underline tabs |
+| Pronunciation | Coach with duplicate heading | Coach. Embedded heading is sr-only. Studio modes use underline tabs. No sticky Save — header **Saves live - no sticky Save** |
 | Updates | Duration chips. Live cards | Duration segmented. Live grouped list. Post update filled. Clear ghost |
 | Import | Radio cards. Native checkboxes | Paste / Website segmented. Include flags are switches. Scan / Add filled |
-| Test | Generate preview filled plus large tel control | One filled control: Call when live, else Generate preview. The other is ghost |
+| Test | Generate preview filled plus large tel control | One filled control: Call when live, else **Hear greeting**. The other is ghost |
 | Appearance | Account menu, not a Settings row | System / Light / Dark cluster. Label **This device**. `localStorage["scalers-desk-theme"]`. No Settings fetch |
 | Sign out | Ghost, instant POST | Ghost until confirm. **Sign out?** then filled **Sign out** / ghost **Stay**. POST `/api/logout` only after confirm |
 
@@ -61,9 +61,9 @@ Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notif
 
 ## Control inventory
 
-Scope: **this device** (browser only), **whole business** (tenant row, every owner), **assistant on calls** (after Save and train, or a live panel write that the compiler already reads).
+Scope: **this device** (browser only), **whole business** (tenant row, every owner), **assistant on calls** (after sticky **Save** compile — toast `Saved · training line` — or a live panel write that the compiler already reads).
 
-One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclusive options are `SettingsSegmented` rate cards. Four-plus exclusive are `SettingsSelect`. Destructive and session actions stay ghost until confirm.
+One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclusive options are `SettingsSegmented` rate cards. Four-plus exclusive are `SettingsSelect` (`DeskSelect` portal + `.desk-theme`). Destructive and session actions stay ghost until confirm.
 
 ### Identity (`?tab=train&panel=identity`)
 
@@ -76,7 +76,7 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | Public contacts type / label / handle | table + selects + inputs | `social_handles` | Whole business + assistant on calls |
 | Add phone / WhatsApp / social | ghost | appends a contact row | Whole business after Save |
 | Remove contact | icon ghost | drops a contact row | Whole business after Save |
-| Save and train | filled sticky | compile | Assistant on calls |
+| Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |
 
 ### Hours (`?tab=train&panel=hours`)
 
@@ -85,7 +85,7 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | Day open | switch × 7 | `hours_schedule` | Assistant on calls |
 | Opens / Closes | time input | `hours_schedule` | Assistant on calls |
 | When closed | segmented (2) | `after_hours_mode` (`serve` / `message`) | Assistant on calls |
-| Save and train | filled sticky | compile | Assistant on calls |
+| Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |
 
 ### Locations (`?tab=train&panel=locations`)
 
@@ -94,7 +94,7 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | Label / area / landmark / directions / coverage | table + input + textarea `rows={2}` | `business_locations`, `location_notes` | Assistant on calls |
 | Add place | ghost | appends a place | Whole business after Save |
 | Remove place | icon ghost | drops a place | Whole business after Save |
-| Save and train | filled sticky | compile | Assistant on calls |
+| Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |
 
 ### Policies (`?tab=train&panel=policies`)
 
@@ -102,7 +102,7 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | --- | --- | --- | --- |
 | Payment, Holds, Returns, Delivery, Cancellation, Warranty, Other | textarea `rows={2}` | `business_policies` | Assistant on calls |
 | When unsure / What to say | textarea `rows={2}` | `unknown_answer_fallback` | Assistant on calls |
-| Save and train | filled sticky | compile | Assistant on calls |
+| Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |
 
 ### Voice (`?tab=train&panel=tools`)
 
@@ -113,19 +113,19 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | Hear sample | ghost | preview blob only | This device |
 | Alert a teammate | switch | `tool_escalate` | Assistant on calls |
 | Hang up after goodbye | switch | `tool_end_call` | Assistant on calls |
-| Save and train | filled sticky | compile | Assistant on calls |
+| Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |
 
 ### Pronunciation (`?tab=train&panel=pronunciation`)
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
 | Practice / Library / Fix | segmented underline | studio tab only | This device |
+| Header note | text | none | **Saves live - no sticky Save** (no `TenantSettingsSaveButton` on this panel) |
 | Record and train | filled | `tts_lexicon` | Assistant on calls |
 | Save spelling | ghost | `tts_lexicon` | Assistant on calls |
 | Scan | muted text under the review list | suggestion queue | This device until Practice |
 | AI listen | filled. Opens on Last 10. Last 20 and Last 50 confirm | review queue | This device until Use this |
 | Use this | filled, label-sized | `tts_lexicon` | Assistant on calls |
-| Save and train | filled sticky | `tts_lexicon` compile | Assistant on calls |
 
 ### Updates
 
@@ -135,7 +135,7 @@ Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
-| Generate preview | filled if number pending, else ghost | `/api/pronunciation/preview` | This device |
+| Hear greeting | filled if number pending, else ghost | `/api/pronunciation/preview` | This device |
 | Call {DID} | filled if line live | `tel:` | This device + live line |
 
 ### FAQs (`?tab=train&panel=faqs`)
@@ -146,16 +146,16 @@ Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates
 | Question / Answer | table + input + textarea `rows={2}` | `faqs` | Assistant on calls |
 | Add FAQ | ghost | appends a row | Whole business after Save |
 | Remove FAQ | icon ghost | drops a row | Whole business after Save |
-| Save and train | filled sticky | compile | Assistant on calls |
+| Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |
 
 ### Catalog (`?tab=catalog`)
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
 | Service / product fields | table + inputs | `services_catalog`, `product_catalog` | Assistant on calls |
-| Add service / Add 3 / Paste list / Add place-style ghosts | ghost | local rows | Whole business after Save |
+| Add service / **Add 3 blank rows** / Paste list / Add place-style ghosts | ghost | local rows | Whole business after Save |
 | Add to services / Add to products | filled (bulk apply) | catalog arrays | Whole business after Save |
-| Save and train | filled sticky | compile | Assistant on calls |
+| Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |
 
 ### Import (`?tab=import`)
 
@@ -185,14 +185,14 @@ Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
-| Live connect | switch, when transfer can run or is already on | `handoff_mode` | Assistant on calls |
+| Live connect | switch, when transfer can run or is already on (Team only; handoff UI off Voice, #514) | `handoff_mode` | Assistant on calls |
 | Team phone | text | none | Rings {name} during open hours. or Add a team phone. |
-| Name / Handles / Phone / Email | table + inputs | `team_directory` | Whole business + assistant on calls |
+| Name / **Role** / Phone / Email | table + inputs | `team_directory` | Whole business + assistant on calls |
 | Escalate / Inbox / Ops | switch | teammate notify flags | Whole business |
 | Channels note | text | none | SMS, WhatsApp, and email follow Alerts. Not a channel pick |
 | Add person | ghost | appends a row | Whole business after Save |
 | Remove person | icon ghost | drops a row | Whole business after Save |
-| Save and train | filled sticky | compile | Assistant on calls |
+| Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |
 
 ### Appearance (account menu)
 
@@ -215,7 +215,7 @@ Pre-paint script in `app/layout.tsx` reads the same key so the choice survives r
 
 ## Language
 
-Owner-facing: assistant, train, line. Not “compile prompt” in chrome. Not Agent Persona. Not Escalation Team. Stark destination labels: Identity, Hours, Voice, Pronunciation, Catalog.
+Owner-facing: assistant, train, line. Sticky button is **Save**; toast after compile is `Saved · training line`. Not “Save and train” as the only chrome story. Not “compile prompt” in chrome. Not Agent Persona. Not Escalation Team. Not Handles on Team (column is **Role**). Test primary when pending is **Hear greeting**, not Generate preview. Stark destination labels: Identity, Hours, Voice, Pronunciation, Catalog.
 
 Allowed line copy: Line live / Number pending. Never Online.
 
