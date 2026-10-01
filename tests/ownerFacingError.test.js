@@ -15,6 +15,7 @@ function loadHelper() {
       ["relation service_requests does not exist Apply docs/supabase/contacts_and_requests.sql in Supabase.", "Could not save."],
       ["new row violates row-level security policy", "Could not save."],
       ["Set a time.", "Could not save."],
+      ["Minified React error #418; visit https://react.dev/errors/418?args[]=text", "Could not save."],
     ];
     console.log(JSON.stringify(cases.map(([raw, fallback]) => ownerFacingError(raw, fallback))));
   `;
@@ -32,5 +33,6 @@ test("ownerFacingError keeps operational copy and strips SQL internals", () => {
     "Could not save.",
     "Could not save.",
     "Set a time.",
+    "Could not save.",
   ]);
 });
