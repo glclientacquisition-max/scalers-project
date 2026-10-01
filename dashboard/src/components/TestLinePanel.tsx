@@ -5,20 +5,7 @@ import {
   lexiconForStorage,
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
-import {
-  previewBusinessAssistantIntro,
-  summarizeOfferingForIntro,
-} from "@/lib/businessAssistantIntro";
-import {
-  formatHoursForCompiler,
-  parseHoursSchedule,
-} from "@/lib/hoursSchedule";
-import {
-  firstDialableTeammate,
-  HANDOFF_OPTIONS,
-  parseHandoffMode,
-} from "@/lib/handoffMode";
-import { handoffMessageLine } from "@/lib/deskLiveTransfer";
+import { previewBusinessAssistantIntro } from "@/lib/businessAssistantIntro";
 import { previewSpokenLine } from "@/lib/pronunciationPacks";
 import {
   displaySonioxVoiceLabel,
@@ -65,46 +52,6 @@ export function TestLinePanel({
     () => parseTtsLexicon(tenant.tts_lexicon),
     [tenant.tts_lexicon]
   );
-
-  const hoursLine = useMemo(() => {
-    const schedule = parseHoursSchedule(tenant.hours_schedule);
-    const formatted = formatHoursForCompiler(schedule);
-    if (formatted) return formatted.replace(/\s+/g, " ").trim();
-    return String(tenant.business_hours || "").replace(/\s+/g, " ").trim();
-  }, [tenant.hours_schedule, tenant.business_hours]);
-
-  const offerLine = useMemo(() => {
-    const spoken = summarizeOfferingForIntro({
-      servicesCatalog: Array.isArray(tenant.services_catalog)
-        ? tenant.services_catalog
-        : [],
-      servicesOffered: tenant.services_offered,
-    });
-    if (spoken) return spoken.replace(/\s+/g, " ").trim();
-    const products = Array.isArray(tenant.product_catalog)
-      ? tenant.product_catalog
-      : [];
-    return (
-      products
-        .map((row) => String(row?.name || "").trim())
-        .find(Boolean) || ""
-    );
-  }, [tenant.services_catalog, tenant.services_offered, tenant.product_catalog]);
-
-  const handoffLine = useMemo(() => {
-    const mode = parseHandoffMode(tenant.handoff_mode);
-    const dest = firstDialableTeammate(
-      Array.isArray(tenant.team_directory) ? tenant.team_directory : []
-    );
-    if (mode === "live_transfer") {
-      return dest
-        ? `Rings ${dest.name} during open hours.`
-        : HANDOFF_OPTIONS.find((opt) => opt.id === mode)?.label || "";
-    }
-    return dest
-      ? handoffMessageLine(dest.name)
-      : HANDOFF_OPTIONS.find((opt) => opt.id === "callback")?.label || "";
-  }, [tenant.handoff_mode, tenant.team_directory]);
 
   const greetingPreview = useMemo(() => {
     if (!businessName) return "";
@@ -184,15 +131,6 @@ export function TestLinePanel({
             <blockquote className="border-l-2 border-accent/50 pl-4 text-base leading-relaxed text-ink">
               “{greetingPreview}”
             </blockquote>
-          ) : null}
-          {hoursLine ? (
-            <p className="min-w-0 truncate text-sm text-ink">{hoursLine}</p>
-          ) : null}
-          {offerLine ? (
-            <p className="min-w-0 truncate text-sm text-ink">{offerLine}</p>
-          ) : null}
-          {handoffLine ? (
-            <p className="min-w-0 truncate text-sm text-ink">{handoffLine}</p>
           ) : null}
           {greetingPreview ? (
             <>

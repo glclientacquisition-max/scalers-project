@@ -125,6 +125,20 @@ describe("settings list rest", () => {
     assert.match(testLine, /settingsPrimaryButtonClass/);
   });
 
+  it("shows only the greeting on Test Preview", () => {
+    assert.match(testLine, /“\{greetingPreview\}”/);
+    assert.match(testLine, /text: greetingPreview/);
+    assert.doesNotMatch(testLine, /hoursLine/);
+    assert.doesNotMatch(testLine, /offerLine/);
+    assert.doesNotMatch(testLine, /handoffLine/);
+    assert.doesNotMatch(testLine, /formatHoursForCompiler/);
+    assert.doesNotMatch(testLine, /summarizeOfferingForIntro/);
+    assert.doesNotMatch(testLine, /handoffMessageLine/);
+    assert.doesNotMatch(testLine, /firstDialableTeammate/);
+    assert.doesNotMatch(testLine, /Rings \$\{dest\.name\} during open hours\./);
+    assert.doesNotMatch(testLine, /title="Hours"|title="Offer"|title="Handoff"/);
+  });
+
   it("drops alert channel descriptions and keeps Unavailable", () => {
     assert.match(alerts, /Unavailable/);
     assert.match(alerts, /meta\.label/);
