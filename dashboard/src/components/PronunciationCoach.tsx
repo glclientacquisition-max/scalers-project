@@ -317,7 +317,8 @@ export function PronunciationCoach({
         setSttHints(pending.filter((c) => c.type === "LIKELY_MISHEARD"));
       }
     } else if (geminiState.error) {
-      setGeminiNote(geminiState.error);
+      setGeminiConfirmOpen(false);
+      setGeminiNote(null);
     }
   }, [geminiState]);
 
@@ -1296,23 +1297,28 @@ export function PronunciationCoach({
           <div className="space-y-3">
             <h3 className="font-medium text-ink">Needs review</h3>
 
-            {geminiNote ? (
-              <p
-                className={`text-xs ${
-                  geminiState.error || approveState.error || dismissState.error
-                    ? "text-[var(--warn)]"
-                    : "text-[var(--ink-soft)]"
-                }`}
-                role="status"
-              >
+            {geminiNote && (approveState.error || dismissState.error) ? (
+              <p className="text-xs text-[var(--warn)]" role="alert">
                 {geminiNote}
+              </p>
+            ) : null}
+            {geminiNote && !approveState.error && !dismissState.error ? (
+              <p className="text-xs text-[var(--ink-soft)]" role="status">
+                {geminiNote}
+              </p>
+            ) : null}
+            {loadQueueState.error ? (
+              <p className="text-xs text-[var(--warn)]" role="alert">
+                {loadQueueState.error}
               </p>
             ) : null}
 
             {fixReviewRows.length === 0 ? (
-              <p className="text-sm text-ink" role="status">
-                Nothing waiting.
-              </p>
+              loadQueueState.error ? null : (
+                <p className="text-sm text-ink" role="status">
+                  Nothing waiting.
+                </p>
+              )
             ) : (
               <ul
                 className="divide-y divide-line border-y border-line"
@@ -1570,6 +1576,11 @@ export function PronunciationCoach({
               </div>
             ) : null}
 
+            {geminiState.error ? (
+              <p className="text-xs text-[var(--warn)]" role="alert">
+                {geminiState.error}
+              </p>
+            ) : null}
             {mineState.error ? (
               <p className="text-xs text-[var(--warn)]">{mineState.error}</p>
             ) : null}

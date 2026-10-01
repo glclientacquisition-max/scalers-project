@@ -149,7 +149,19 @@ describe("pronunciation coach chrome", () => {
     assert.doesNotMatch(src, /Phone says wrong/);
     assert.doesNotMatch(src, /Opening line/);
     assert.match(src, /Nothing waiting/);
+    assert.doesNotMatch(src, /Nothing waiting\. Add a fix/);
+    assert.doesNotMatch(src, /AI will listen/);
+    assert.doesNotMatch(src, /Could not save pronunciation review/);
     assert.match(src, /Listen to the last \{geminiBatch\} recordings\. This is paid\./);
+    const needsReview = src.slice(
+      src.indexOf("{mode === \"fix\""),
+      src.indexOf("{/* 3) Find more */}")
+    );
+    assert.match(needsReview, /Nothing waiting\./);
+    assert.doesNotMatch(needsReview, /geminiState\.error/);
+    assert.doesNotMatch(needsReview, /Could not save the listen/);
+    const afterConfirm = src.slice(src.indexOf("geminiConfirmOpen ?"));
+    assert.match(afterConfirm, /geminiState\.error/);
     const findStart = src.indexOf("{/* 3) Find more */}");
     const findMore = src.slice(findStart, src.indexOf("geminiConfirmOpen ?", findStart));
     assert.match(findMore, /AI listen/);

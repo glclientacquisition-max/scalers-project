@@ -64,7 +64,7 @@ Lexicon writes still require `approved_by` + `approved_at` (enforced in `assertA
 - Reject / Snooze records a dismissal key so the same call+word does not resurface.
 - Heuristic **Scan recent calls** remains a separate candidate source feeding Practice.
 
-Apply `docs/supabase/pronunciation_gemini_scan.sql` for the queue / dismissal / log columns.
+Apply `docs/supabase/pronunciation_gemini_scan.sql` for the queue / dismissal / log columns and the `authenticated` UPDATE grant. Without that grant, a confirmed listen fails with "Could not save the listen." An empty Needs review line stays "Nothing waiting." The Fix tab reads `pronunciation_review_queue` on its own. The settings tenant select does not include it.
 
 ## Guardrails
 

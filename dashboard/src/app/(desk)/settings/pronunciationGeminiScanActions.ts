@@ -25,7 +25,11 @@ import {
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
-import { logDeskError, ownerFacingError, ownerSaveFailed } from "@/lib/ownerFacingError";
+import {
+  logDeskError,
+  ownerSaveFailed,
+  pronunciationWriteError,
+} from "@/lib/ownerFacingError";
 
 export type GeminiScanState = {
   error?: string;
@@ -77,6 +81,24 @@ function tenantQueueFields(tenant: Record<string, unknown>) {
   };
 }
 
+/** Settings tenant select omits these columns. Read them here or the queue looks empty. */
+async function readQueueFields(tenantId: string) {
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) return { error: "Not signed in." as const };
+  const { data, error } = await workspace.client
+    .from("tenants")
+    .select(
+      "pronunciation_review_queue, pronunciation_scan_dismissals, pronunciation_gemini_scan_logs"
+    )
+    .eq("id", tenantId)
+    .maybeSingle();
+  if (error) {
+    logDeskError("pronunciation-review-load", error.message);
+    return { error: "Could not load review." as const };
+  }
+  return tenantQueueFields((data || {}) as Record<string, unknown>);
+}
+
 async function persistQueueFields(opts: {
   tenantId: string;
   queue: PronunciationReviewCandidate[];
@@ -100,7 +122,7 @@ async function persistQueueFields(opts: {
     .eq("id", opts.tenantId);
   if (error) {
     logDeskError("pronunciation-scan", error.message);
-    return ownerFacingError(error.message, "Could not save pronunciation review.");
+    return pronunciationWriteError("review", error.message);
   }
   return null;
 }
@@ -119,8 +141,9 @@ export async function loadPronunciationReviewQueueAction(
     const id = String(formData.get("id") || "").trim();
     if (!id || id !== tenant.id) return { error: "Forbidden." };
 
-    const { queue } = tenantQueueFields(tenant as Record<string, unknown>);
-    const pending = queue.filter((c) => c.status === "pending");
+    const fields = await readQueueFields(tenant.id);
+    if ("error" in fields) return { error: fields.error };
+    const pending = fields.queue.filter((c) => c.status === "pending");
     return {
       ok: true,
       queue: pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION"),
@@ -214,7 +237,8 @@ async function runGeminiScanRecentCalls(
     };
   }
 
-  const fields = tenantQueueFields(tenant as Record<string, unknown>);
+  const fields = await readQueueFields(tenant.id);
+  if ("error" in fields) return { error: fields.error };
   const lexicon = parseTtsLexicon(
     formData.get("current_lexicon") ??
       (tenant as { tts_lexicon?: unknown }).tts_lexicon
@@ -266,11 +290,8 @@ async function runGeminiScanRecentCalls(
     .eq("id", tenant.id);
 
   if (persistErr) {
-    return ownerSaveFailed(
-      "pronunciation-scan-persist",
-      persistErr.message,
-      "Could not save pronunciation review."
-    );
+    logDeskError("pronunciation-scan-persist", persistErr.message);
+    return { error: pronunciationWriteError("listen", persistErr.message) };
   }
 
   const pending = nextQueue.filter((c) => c.status === "pending");
@@ -305,7 +326,8 @@ export async function approveGeminiScanCandidateAction(
   const editedSay = String(formData.get("edited_say") || "").trim();
   if (!candidateId) return { error: "Missing candidate." };
 
-  const fields = tenantQueueFields(tenant as Record<string, unknown>);
+  const fields = await readQueueFields(tenant.id);
+  if ("error" in fields) return { error: fields.error };
   const idx = fields.queue.findIndex((c) => c.id === candidateId);
   if (idx < 0) return { error: "Candidate not found (maybe already reviewed)." };
   const candidate = { ...fields.queue[idx] };
@@ -419,7 +441,8 @@ export async function dismissGeminiScanCandidateAction(
       : "rejected";
   if (!candidateId) return { error: "Missing candidate." };
 
-  const fields = tenantQueueFields(tenant as Record<string, unknown>);
+  const fields = await readQueueFields(tenant.id);
+  if ("error" in fields) return { error: fields.error };
   const candidate = fields.queue.find((c) => c.id === candidateId);
   if (!candidate) return { error: "Candidate not found." };
 
@@ -470,7 +493,8 @@ export async function queueGeminiCandidateForRecordingAction(
   if (!id || id !== tenant.id) return { error: "Forbidden." };
 
   const candidateId = String(formData.get("candidate_id") || "").trim();
-  const fields = tenantQueueFields(tenant as Record<string, unknown>);
+  const fields = await readQueueFields(tenant.id);
+  if ("error" in fields) return { error: fields.error };
   const candidate = fields.queue.find((c) => c.id === candidateId);
   if (!candidate) return { error: "Candidate not found." };
   if (candidate.type !== "AGENT_MISPRONUNCIATION") {
