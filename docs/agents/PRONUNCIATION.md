@@ -39,7 +39,7 @@ Open-ended “learn every word from my recording” produced entries like:
 | 1 | **Practice** | Run Greeting / Location / Team packs. **Use this take** saves to live lexicon. |
 | 2 | **Fix → Needs review** | Hear the proposed say, then **Use this** writes that one fix. Record and Spelling stay ghost and do not write alone. Hearing rows use muted Dismiss. |
 | 3 | **Fix → Add a fix** | Type the bad name → **Record & train**. Typed spelling is a fallback (“Or save a spelling…”). |
-| 4 | **Fix → Find more** | **Scan** (ghost) reads transcripts into Practice. **AI listen** (filled) drafts a review queue. Last 10 starts immediately. Last 20 and Last 50 confirm. Nothing from a listen writes `tts_lexicon`. |
+| 4 | **Fix → Find more** | **Scan** (ghost) reads transcripts into Practice. **AI listen** (filled) drafts a review queue. Last 10 starts immediately. Last 20 and Last 50 confirm with "Listen to the last N recordings." Nothing from a listen writes `tts_lexicon`. |
 | 5 | **Test** | **Play phone preview** (same Soniox path as calls), then tap the live DID. |
 
 **Do not** train common English (`where`, `city`, …). **Do** prefer real audio over AI phonetic guesses for unfamiliar words.
@@ -73,7 +73,7 @@ Apply `docs/supabase/pronunciation_gemini_scan.sql` for the queue / dismissal / 
 - Recording **Use this take** verifies via Gemini multimodal (requires `GEMINI_API_KEY` on Vercel).
 - Browser MIME is normalized (`audio/webm;codecs=opus` → `audio/webm`) before Gemini.
 - If Gemini is down/misconfigured, we still save **only the known pack targets** with a local say-as (never open-ended inventing).
-- Gemini Scan failures show a clear error and leave the Fix tab usable; partial bad model rows are dropped, not applied.
+- Listen failures the owner sees are "Could not listen.", "No recordings to listen to.", "Could not save the listen.", "Could not load review.", or "Could not save the review." A missing setup says "Listen is unavailable." A rate limit says "Wait a few minutes." Those lines do not name a provider, an API key, or a charge. Partial bad model rows are dropped, not applied.
 
 ## Do / don’t for `say` forms
 

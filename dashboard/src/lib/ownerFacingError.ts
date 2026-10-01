@@ -40,6 +40,8 @@ export function ownerFacingError(raw: unknown, fallback: string): string {
   return stripped;
 }
 
+const PROVIDER_LEAK = /gemini|paid api|\bapi key\b|this is paid|GEMINI_API_KEY/i;
+
 /** Owner copy when a review-queue write fails. Loading an empty queue is not a write. */
 export function pronunciationWriteError(
   kind: "listen" | "review",
@@ -47,7 +49,9 @@ export function pronunciationWriteError(
 ): string {
   const fallback =
     kind === "listen" ? "Could not save the listen." : "Could not save the review.";
-  return ownerFacingError(raw, fallback);
+  const shown = ownerFacingError(raw, fallback);
+  if (PROVIDER_LEAK.test(shown)) return fallback;
+  return shown;
 }
 
 export function ownerSaveFailed(

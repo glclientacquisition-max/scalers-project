@@ -307,7 +307,7 @@ export function suggestPronunciations(
     const line = makeLine({
       prompt: `Hi, this is ${agentName} from ${businessName}`,
       label: "Greeting",
-      reason: "One line trains both your agent name and business name.",
+      reason: "",
       targets: [...agentTargets, ...bizTargets],
       priority: 100,
     });
@@ -316,7 +316,7 @@ export function suggestPronunciations(
     const line = makeLine({
       prompt: `Thank you for calling ${businessName}`,
       label: "Business name",
-      reason: "Callers hear your business name first.",
+      reason: "",
       targets: bizTargets,
       priority: 98,
     });
@@ -325,7 +325,7 @@ export function suggestPronunciations(
     const line = makeLine({
       prompt: `Hi, this is ${agentName}. How can I help you today`,
       label: "Agent intro",
-      reason: "How the receptionist says their own name.",
+      reason: "",
       targets: agentTargets,
       priority: 96,
     });
@@ -358,7 +358,7 @@ export function suggestPronunciations(
     const line = makeLine({
       prompt,
       label: "Location",
-      reason: "Practice the place names callers ask for.",
+      reason: "",
       targets: placeTargets,
       priority: 92,
     });
@@ -379,7 +379,7 @@ export function suggestPronunciations(
     const line = makeLine({
       prompt,
       label: "Team",
-      reason: "Team names must sound right on transfers.",
+      reason: "",
       targets: teamTargets,
       priority: 88,
     });
@@ -399,7 +399,7 @@ export function suggestPronunciations(
     const line = makeLine({
       prompt,
       label: "Products",
-      reason: "Product names that trip up TTS.",
+      reason: "",
       targets: serviceTargets,
       priority: 80,
     });
@@ -466,7 +466,7 @@ export function parseSuggestionList(raw: unknown): PronunciationSuggestion[] {
     const row = item as Record<string, unknown>;
     const prompt = String(row.prompt || "").trim();
     const label = String(row.label || "Line").trim() || "Line";
-    const reason = String(row.reason || "Trains hard names in a natural line.").trim();
+    const reason = String(row.reason || "").trim();
     const targetLabels = Array.isArray(row.targets)
       ? row.targets.map((t) =>
           typeof t === "string"

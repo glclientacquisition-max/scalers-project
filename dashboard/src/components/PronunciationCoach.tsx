@@ -381,6 +381,7 @@ export function PronunciationCoach({
       const isRenew = s.id.startsWith("renew:");
       return {
         ...s,
+        reason: "",
         status: skippedIds.has(s.id)
           ? "skipped"
           : !isRenew && isPronunciationCovered(s, lexicon)
@@ -1548,10 +1549,10 @@ export function PronunciationCoach({
               <div
                 className="rounded-xl border border-warn/40 px-3 py-3 text-sm"
                 role="alertdialog"
-                aria-label="Confirm AI listen cost"
+                aria-label="Confirm AI listen"
               >
                 <p className="text-ink">
-                  Listen to the last {geminiBatch} recordings. This is paid.
+                  Listen to the last {geminiBatch} recordings.
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button

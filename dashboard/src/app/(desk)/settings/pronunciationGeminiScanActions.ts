@@ -60,6 +60,15 @@ export type GeminiScanQueueState = {
 
 const scanHits = new Map<string, number[]>();
 
+function ownerListenError(raw: unknown): string {
+  const message = (raw instanceof Error ? raw.message : String(raw ?? "")).trim();
+  if (/GEMINI_API_KEY|not configured/i.test(message)) return "Listen is unavailable.";
+  if (/\b429\b|rate limit|resource exhausted|quota/i.test(message)) {
+    return "Wait a few minutes.";
+  }
+  return "Could not listen.";
+}
+
 function rateLimitScan(tenantId: string): string | null {
   const now = Date.now();
   const windowMs = 15 * 60 * 1000;
@@ -167,7 +176,7 @@ export async function geminiScanRecentCallsAction(
     return await runGeminiScanRecentCalls(formData);
   } catch (err) {
     logDeskError("pronunciation-scan", err instanceof Error ? err.message : err);
-    return { error: "Could not listen." };
+    return { error: ownerListenError(err) };
   }
 }
 
@@ -199,7 +208,7 @@ async function runGeminiScanRecentCalls(
       needsConfirm: true,
       estimatedCalls: batchSize,
       batchSize,
-      message: `Listen to the last ${batchSize} recordings. This is paid.`,
+      message: `Listen to the last ${batchSize} recordings.`,
     };
   }
 
@@ -207,7 +216,7 @@ async function runGeminiScanRecentCalls(
   if (limited) return { error: limited };
 
   if (!process.env.GEMINI_API_KEY) {
-    return { error: "Could not listen." };
+    return { error: "Listen is unavailable." };
   }
 
   const workspace = await createWorkspaceDataClient();
@@ -221,7 +230,8 @@ async function runGeminiScanRecentCalls(
     .limit(batchSize);
 
   if (callErr) {
-    return ownerSaveFailed("pronunciation-scan-calls", callErr.message, "Could not listen.");
+    logDeskError("pronunciation-scan-calls", callErr.message);
+    return { error: ownerListenError(callErr) };
   }
 
   const withRecording = (calls || []).filter((c) =>
@@ -258,8 +268,9 @@ async function runGeminiScanRecentCalls(
       dismissals: fields.dismissals,
       existingQueue: fields.queue,
     });
-  } catch {
-    return { error: "Could not listen." };
+  } catch (err) {
+    logDeskError("pronunciation-scan", err instanceof Error ? err.message : err);
+    return { error: ownerListenError(err) };
   }
 
   const forReview = result.candidates;
@@ -511,7 +522,6 @@ export async function queueGeminiCandidateForRecordingAction(
     sttHints: fields.queue.filter(
       (c) => c.status === "pending" && c.type === "LIKELY_MISHEARD"
     ),
-    message:
-      "Queued for Practice. Record real audio. That is more reliable than the AI phonetic guess.",
+    message: "Queued for Practice.",
   };
 }
