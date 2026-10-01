@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
@@ -49,32 +47,6 @@ function SettingsChevron() {
   );
 }
 
-function SettingsIdentityRedirect() {
-  const router = useRouter();
-  useEffect(() => {
-    if (!window.matchMedia("(min-width: 768px)").matches) return;
-    router.replace("/settings?tab=train&panel=identity");
-  }, [router]);
-  return null;
-}
-
-function subscribeDeskMd(onChange: () => void) {
-  const media = window.matchMedia("(min-width: 768px)");
-  media.addEventListener("change", onChange);
-  return () => media.removeEventListener("change", onChange);
-}
-
-function deskMdNow() {
-  return window.matchMedia("(min-width: 768px)").matches;
-}
-
-/** Phone index must not mount the form. Desktop mounts it only at md+. */
-function SettingsMdOnly({ children }: { children: ReactNode }) {
-  const md = useSyncExternalStore(subscribeDeskMd, deskMdNow, () => false);
-  if (!md) return null;
-  return children;
-}
-
 function SettingsMenu({
   tab,
   trainPanel,
@@ -97,13 +69,11 @@ function SettingsMenu({
       className={isRail ? settingsRailClass : "min-w-0 w-full"}
     >
       {SETTINGS_NAV.map((section, index) => (
-        <section key={section.id} className={index === 0 ? undefined : "mt-4"}>
+        <section key={`${section.id}-${index}`} className={index === 0 ? undefined : "mt-4"}>
           <h2 className={`${settingsGroupTitleClass} mb-1 px-1`}>{section.title}</h2>
           <ul className={isRail ? railListClass : "w-full"}>
             {section.items.map((item) => {
-              const active = settingsNavItemActive(item.target, tab, trainPanel, {
-                selectHubIdentity: isRail,
-              });
+              const active = settingsNavItemActive(item.target, tab, trainPanel);
               const key = settingsStatusKey(item.target);
               const status = optionStatus[key] || "";
               return (
@@ -215,6 +185,27 @@ export function BusinessSettingsShell({
     JSON.stringify(tenant.social_handles || {}),
   ].join(":");
 
+  if (isMenu) {
+    return (
+      <div className="w-full min-w-0 md:hidden" data-settings-console="" data-pull-dirty-guard="">
+        <SettingsPageHeader
+          businessName={businessName}
+          lineLive={lineLive}
+          lineDetail={lineDetail}
+          index
+        />
+        <div className="mt-4">
+          <SettingsMenu
+            tab={tab}
+            trainPanel={trainPanel}
+            variant="index"
+            optionStatus={optionStatus}
+          />
+        </div>
+      </div>
+    );
+  }
+
   const rail = (
     <div className={settingsRailWrapClass}>
       <SettingsMenu
@@ -225,44 +216,6 @@ export function BusinessSettingsShell({
       />
     </div>
   );
-
-  if (isMenu) {
-    return (
-      <>
-        <div className="w-full min-w-0 md:hidden" data-settings-console="" data-pull-dirty-guard="">
-          <SettingsPageHeader
-            businessName={businessName}
-            lineLive={lineLive}
-            lineDetail={lineDetail}
-            index
-          />
-          <div className="mt-4">
-            <SettingsMenu
-              tab={tab}
-              trainPanel={trainPanel}
-              variant="index"
-              optionStatus={optionStatus}
-            />
-          </div>
-        </div>
-        <SettingsMdOnly>
-          <div className="hidden w-full min-w-0 md:block" data-pull-dirty-guard="">
-            <SettingsIdentityRedirect />
-            <TenantForm
-              key={tenantFormKey}
-              tenant={tenant}
-              panel="identity"
-              curatedVoices={curatedVoices}
-              heading="Identity"
-              sidebar={rail}
-              liveTransferExecutor={liveTransferExecutor}
-              showBack={false}
-            />
-          </div>
-        </SettingsMdOnly>
-      </>
-    );
-  }
 
   return (
     <div className="w-full min-w-0" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">

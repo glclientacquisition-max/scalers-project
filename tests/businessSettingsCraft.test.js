@@ -2,9 +2,46 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("path");
+const { spawnSync } = require("node:child_process");
 
 function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
+}
+
+function loadSettingsNav() {
+  const nav = path.join(__dirname, "../dashboard/src/lib/businessSettingsNav.ts");
+  const script = `
+    import {
+      SETTINGS_NAV,
+      settingsWideDefaultHref,
+      businessSettingsHref,
+      parseBusinessSettingsPanel,
+    } from ${JSON.stringify(nav)};
+    const sections = SETTINGS_NAV.map((section) => ({
+      id: section.id,
+      title: section.title,
+      labels: section.items.map((item) => item.label),
+    }));
+    console.log(JSON.stringify({
+      sections,
+      labels: sections.flatMap((section) => section.labels),
+      hoursWide: settingsWideDefaultHref(undefined, "1"),
+      phoneIndex: settingsWideDefaultHref(undefined, "0"),
+      missingCookie: settingsWideDefaultHref(undefined, undefined),
+      trainStays: settingsWideDefaultHref("train", "1"),
+      testStays: settingsWideDefaultHref("test", "1"),
+      trainHref: businessSettingsHref("train"),
+      testHref: businessSettingsHref("test"),
+      trainPanel: parseBusinessSettingsPanel(undefined, "train"),
+    }));
+  `;
+  const ran = spawnSync(
+    process.execPath,
+    ["--experimental-strip-types", "--input-type=module", "-e", script],
+    { encoding: "utf8" }
+  );
+  assert.equal(ran.status, 0, ran.stderr || ran.stdout);
+  return JSON.parse(ran.stdout.trim().split("\n").at(-1));
 }
 
 describe("business settings craft", () => {
@@ -43,16 +80,20 @@ describe("business settings craft", () => {
   it("groups settings by owner job without dropping shipped destinations", () => {
     assert.match(nav, /id: "business"/);
     assert.match(nav, /id: "assistant"/);
-    assert.match(nav, /id: "knowledge"/);
-    assert.match(nav, /id: "alerts"/);
+    assert.match(nav, /id: "offer"/);
+    assert.match(nav, /id: "people"/);
+    assert.doesNotMatch(nav, /id: "knowledge"/);
+    assert.doesNotMatch(nav, /id: "alerts"/);
     assert.doesNotMatch(nav, /id: "device"/);
     assert.match(nav, /title: "Business"/);
     assert.match(nav, /title: "Assistant"/);
+    assert.match(nav, /title: "Offer"/);
+    assert.match(nav, /title: "People"/);
     assert.doesNotMatch(nav, /label: "Assistant"/);
     assert.doesNotMatch(nav, /id: "receptionist"/);
     assert.doesNotMatch(nav, /title: "Receptionist"/);
-    assert.match(nav, /title: "Knowledge"/);
-    assert.match(nav, /title: "Alerts"/);
+    assert.doesNotMatch(nav, /title: "Knowledge"/);
+    assert.doesNotMatch(nav, /title: "Alerts"/);
     assert.doesNotMatch(nav, /title: "This device"/);
     assert.match(nav, /label: "Identity"/);
     assert.match(nav, /label: "Hours"/);
@@ -308,18 +349,67 @@ describe("business settings craft", () => {
     );
   });
 
-  it("selects Identity on the hub rail", () => {
+  it("orders jobs and keeps Team out of the Alerts group", () => {
+    const got = loadSettingsNav();
+    assert.deepEqual(got.labels, [
+      "Identity",
+      "Hours",
+      "Catalog",
+      "Import",
+      "FAQs",
+      "Locations",
+      "Policies",
+      "Team",
+      "Voice",
+      "Pronunciation",
+      "Alerts",
+      "Test",
+    ]);
+    assert.equal(got.labels[got.labels.indexOf("Catalog") + 1], "Import");
+    assert.ok(got.labels.indexOf("Identity") < got.labels.indexOf("Hours"));
+    const team = got.sections.find((section) => section.labels.includes("Team"));
+    const alerts = got.sections.find((section) => section.labels.includes("Alerts"));
+    assert.equal(team.title, "People");
+    assert.notEqual(team.id, "alerts");
+    assert.equal(team.labels.includes("Alerts"), false);
+    assert.equal(alerts.title, "People");
+    assert.equal(alerts.labels.includes("Team"), false);
+    assert.equal(got.sections.some((section) => section.title === "Alerts"), false);
+    assert.equal(got.hoursWide, "/settings?tab=train&panel=hours");
+    assert.equal(got.phoneIndex, null);
+    assert.equal(got.missingCookie, null);
+    assert.equal(got.trainStays, null);
+    assert.equal(got.testStays, null);
+    assert.equal(got.trainHref, "/settings?tab=train");
+    assert.equal(got.testHref, "/settings?tab=test");
+    assert.equal(got.trainPanel, "identity");
+  });
+
+  it("opens wide /settings on Hours and does not mount Identity on the index", () => {
+    const boot = read("dashboard/src/lib/deskMdBoot.ts");
+    const layout = read("dashboard/src/app/layout.tsx");
     const activeFn = nav.slice(
       nav.indexOf("export function settingsNavItemActive"),
       nav.indexOf("export function settingsNavItems")
     );
-    assert.match(shell, /selectHubIdentity: isRail/);
-    assert.match(shell, /panel="identity"/);
-    assert.match(shell, /showBack=\{false\}/);
+    const menu = shell.slice(shell.indexOf("if (isMenu)"), shell.indexOf("const rail ="));
+    assert.match(page, /settingsWideDefaultHref/);
+    assert.ok(page.indexOf("settingsWideDefaultHref") < page.indexOf("getCurrentTenant()"));
+    assert.match(page, /if \(!tabRaw\)/);
+    assert.match(nav, /export const SETTINGS_HOURS_HREF = businessSettingsHref\("train", "hours"\)/);
+    assert.match(nav, /if \(deskMd !== "1"\) return null/);
+    assert.match(boot, /min-width: 768px/);
+    assert.match(boot, /location\.search/);
+    assert.match(boot, /SETTINGS_HOURS_HREF/);
+    assert.match(layout, /DESK_MD_BOOT_SCRIPT/);
+    assert.doesNotMatch(shell, /SettingsIdentityRedirect/);
+    assert.doesNotMatch(shell, /panel=identity/);
+    assert.doesNotMatch(shell, /panel="identity"/);
+    assert.doesNotMatch(shell, /selectHubIdentity/);
+    assert.doesNotMatch(menu, /TenantForm/);
+    assert.match(menu, /md:hidden/);
     assert.match(activeFn, /tab === "train" && trainPanel === target\.panel/);
-    assert.match(activeFn, /target\.panel === "identity"/);
-    assert.match(activeFn, /selectHubIdentity/);
-    assert.match(activeFn, /tab === "menu"/);
+    assert.doesNotMatch(activeFn, /selectHubIdentity/);
     assert.doesNotMatch(shell, /selectHubAppearance/);
     assert.doesNotMatch(shell, /<AppearancePanel \/>/);
   });

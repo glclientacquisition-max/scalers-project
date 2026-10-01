@@ -79,16 +79,20 @@ export type SettingsNavItem = {
 };
 
 export type SettingsNavSection = {
-  id: "business" | "assistant" | "knowledge" | "alerts";
+  id: "business" | "offer" | "assistant" | "people";
   title: string;
   items: SettingsNavItem[];
 };
 
 /**
  * Settings destinations. /settings is the phone index.
- * Business → Assistant → Knowledge → Alerts.
+ * Wide screens open Hours. Phone keeps this list.
+ * Job order: Identity, Hours, Catalog, Import, FAQs, Locations, Policies,
+ * Team, Voice, Pronunciation, Alerts, Test.
+ * A group header repeats when the job order returns to that group.
+ * Import sits directly under Catalog. Team is People, not under Alerts.
  * Appearance is the account-menu theme cluster. It is not a settings tab.
- * Extra shipped panels sit in the closest group. URLs stay `?tab=` / `?panel=`.
+ * URLs stay `?tab=` / `?panel=`.
  */
 export const SETTINGS_NAV: SettingsNavSection[] = [
   {
@@ -97,9 +101,29 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     items: [
       { label: "Identity", target: { tab: "train", panel: "identity" } },
       { label: "Hours", target: { tab: "train", panel: "hours" } },
+    ],
+  },
+  {
+    id: "offer",
+    title: "Offer",
+    items: [
+      { label: "Catalog", target: { tab: "catalog" } },
+      { label: "Import", target: { tab: "import" } },
+      { label: "FAQs", target: { tab: "train", panel: "faqs" } },
+    ],
+  },
+  {
+    id: "business",
+    title: "Business",
+    items: [
       { label: "Locations", target: { tab: "train", panel: "locations" } },
       { label: "Policies", target: { tab: "train", panel: "policies" } },
     ],
+  },
+  {
+    id: "people",
+    title: "People",
+    items: [{ label: "Team", target: { tab: "train", panel: "team" } }],
   },
   {
     id: "assistant",
@@ -107,27 +131,36 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     items: [
       { label: "Voice", target: { tab: "train", panel: "tools" } },
       { label: "Pronunciation", target: { tab: "train", panel: "pronunciation" } },
-      { label: "Test", target: { tab: "test" } },
     ],
   },
   {
-    id: "knowledge",
-    title: "Knowledge",
-    items: [
-      { label: "FAQs", target: { tab: "train", panel: "faqs" } },
-      { label: "Catalog", target: { tab: "catalog" } },
-      { label: "Import", target: { tab: "import" } },
-    ],
+    id: "people",
+    title: "People",
+    items: [{ label: "Alerts", target: { tab: "alerts" } }],
   },
   {
-    id: "alerts",
-    title: "Alerts",
-    items: [
-      { label: "Alerts", target: { tab: "alerts" } },
-      { label: "Team", target: { tab: "train", panel: "team" } },
-    ],
+    id: "assistant",
+    title: "Assistant",
+    items: [{ label: "Test", target: { tab: "test" } }],
   },
 ];
+
+/** Wide-screen destination for `/settings` with no tab. */
+export const SETTINGS_HOURS_HREF = businessSettingsHref("train", "hours");
+
+/**
+ * md+ visits to `/settings` with no tab open Hours.
+ * No cookie (phone, or a first paint the server cannot see) stays on the index.
+ * `?tab=train` stays Identity so Home Train does not jump to Hours.
+ */
+export function settingsWideDefaultHref(
+  tabRaw: string | undefined | null,
+  deskMd: string | undefined | null
+): string | null {
+  if (tabRaw) return null;
+  if (deskMd !== "1") return null;
+  return SETTINGS_HOURS_HREF;
+}
 
 export function settingsNavHref(target: SettingsNavTarget): string {
   return target.tab === "train"
@@ -138,16 +171,10 @@ export function settingsNavHref(target: SettingsNavTarget): string {
 export function settingsNavItemActive(
   target: SettingsNavTarget,
   tab: BusinessSettingsTab,
-  trainPanel: SettingsPanel,
-  options?: { selectHubIdentity?: boolean }
+  trainPanel: SettingsPanel
 ): boolean {
   if (target.tab === "train") {
-    if (tab === "train" && trainPanel === target.panel) return true;
-    return (
-      target.panel === "identity" &&
-      Boolean(options?.selectHubIdentity) &&
-      tab === "menu"
-    );
+    return tab === "train" && trainPanel === target.panel;
   }
   return tab === target.tab;
 }
