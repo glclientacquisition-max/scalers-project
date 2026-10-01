@@ -190,6 +190,13 @@ function isRetryableGeminiError(err) {
   return classifyGeminiError(err).retryable === true;
 }
 
+/** Credits or a denied project. A 503 demand spike is not this. */
+function isHardGeminiOutage(err) {
+  if (!err) return false;
+  const kind = classifyGeminiError(err).kind;
+  return kind === 'billing' || kind === 'denied';
+}
+
 /**
  * After a streamed Gemini turn, decide whether prefetch TTS already spoke
  * and what (if anything) still needs speakText. Empty successful model
@@ -257,6 +264,7 @@ module.exports = {
   isTimeoutError,
   classifyGeminiError,
   isRetryableGeminiError,
+  isHardGeminiOutage,
   resolvePrefetchedStreamSpeech,
   OUTCOME_TOOL_ACTIONS,
   spokenTextForToolTurn,

@@ -10,6 +10,7 @@ const {
   isTimeoutError,
   classifyGeminiError,
   isRetryableGeminiError,
+  isHardGeminiOutage,
   resolvePrefetchedStreamSpeech,
   spokenTextForToolTurn,
 } = require('../src/conversation/geminiVoice');
@@ -256,6 +257,30 @@ describe('classifyGeminiError', () => {
       isRetryableGeminiError({ status: 429, message: 'RESOURCE_EXHAUSTED overloaded' }),
       true
     );
+  });
+
+  it('keeps the reach-them line for credits and a denied project only', () => {
+    assert.equal(
+      isHardGeminiOutage({
+        status: 429,
+        message: 'Your prepayment credits are depleted. Please go to AI Studio',
+      }),
+      true
+    );
+    assert.equal(
+      isHardGeminiOutage({ status: 403, message: 'Your project has been denied access' }),
+      true
+    );
+    assert.equal(
+      isHardGeminiOutage({
+        status: 503,
+        message:
+          'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.',
+      }),
+      false
+    );
+    assert.equal(isHardGeminiOutage(new Error('Incomplete JSON segment at the end')), false);
+    assert.equal(isHardGeminiOutage(null), false);
   });
 });
 

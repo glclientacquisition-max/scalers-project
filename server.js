@@ -114,6 +114,7 @@ const {
   isTimeoutError,
   isRetryableGeminiError,
   classifyGeminiError,
+  isHardGeminiOutage,
   resolvePrefetchedStreamSpeech,
   spokenTextForToolTurn,
 } = require('./src/conversation/geminiVoice');
@@ -2266,6 +2267,24 @@ mediaWss.on('connection', (ws, req) => {
     return planned.spoken;
   }
 
+  // A demand spike or a broken stream asks them to repeat once.
+  // The reach-them name line is only for credits or a denied project.
+  async function speechWhenModelMissed(result, userText) {
+    if (result?.llmHardDown) return resolveLlmRecoverySpeech(userText);
+    const planned = planEmptyGeminiSpeech({
+      brainState,
+      language: callLanguage,
+      userText,
+      llmDown: false,
+      alreadyOffered: emptyRepairOffered,
+    });
+    if (planned.speak && planned.line) {
+      emptyRepairOffered = true;
+      return planned.line;
+    }
+    return '';
+  }
+
   async function runCallerTurn(userText) {
     const clean = String(userText || '').replace(/\s+/g, ' ').trim();
     if (!clean) return;
@@ -2745,15 +2764,23 @@ mediaWss.on('connection', (ws, req) => {
             }
             speakSession = null;
             if (planned.speakNow && planned.reply && !bargeInActive) {
-              const reply =
-                result?.timedOut || result?.llmFailed
-                  ? await resolveLlmRecoverySpeech(clean)
-                  : planned.reply;
-              callTranscript.pushAgent(reply);
-              turnTiming.markFirstSpokenChunk();
-              await speakText(reply);
-              spokeThisTurn = true;
-              turnOutcome = result?.timedOut ? 'stream_timeout' : 'stream_fallback_full';
+              const missed = Boolean(result?.timedOut || result?.llmFailed);
+              const reply = missed
+                ? await speechWhenModelMissed(result, clean)
+                : planned.reply;
+              if (reply) {
+                callTranscript.pushAgent(reply);
+                turnTiming.markFirstSpokenChunk();
+                await speakText(reply);
+                spokeThisTurn = true;
+                turnOutcome = result?.llmHardDown
+                  ? 'speech_guarantee'
+                  : result?.timedOut
+                    ? 'stream_timeout'
+                    : missed
+                      ? 'speech_repair'
+                      : 'stream_fallback_full';
+              }
             }
           }
         } else if (!bargeInActive) {
@@ -2775,15 +2802,23 @@ mediaWss.on('connection', (ws, req) => {
             fallbackLine: currentLlmRecoveryLine(),
           });
           if (planned.speakNow && planned.reply) {
-            const reply =
-              result?.timedOut || result?.llmFailed
-                ? await resolveLlmRecoverySpeech(clean)
-                : planned.reply;
-            callTranscript.pushAgent(reply);
-            turnTiming.markFirstSpokenChunk();
-            await speakText(reply);
-            spokeThisTurn = true;
-            turnOutcome = result?.timedOut ? 'stream_timeout' : 'stream_fallback_full';
+            const missed = Boolean(result?.timedOut || result?.llmFailed);
+            const reply = missed
+              ? await speechWhenModelMissed(result, clean)
+              : planned.reply;
+            if (reply) {
+              callTranscript.pushAgent(reply);
+              turnTiming.markFirstSpokenChunk();
+              await speakText(reply);
+              spokeThisTurn = true;
+              turnOutcome = result?.llmHardDown
+                ? 'speech_guarantee'
+                : result?.timedOut
+                  ? 'stream_timeout'
+                  : missed
+                    ? 'speech_repair'
+                    : 'stream_fallback_full';
+            }
           }
         } else {
           discardUnspokenAssistant(result?.spokenText || '');
@@ -2809,7 +2844,7 @@ mediaWss.on('connection', (ws, req) => {
           (result?.actionConfirmation
             ? ''
             : result?.timedOut || result?.llmFailed
-              ? await resolveLlmRecoverySpeech(clean)
+              ? await speechWhenModelMissed(result, clean)
               : '');
         if (bargeInActive) {
           console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
@@ -2841,21 +2876,27 @@ mediaWss.on('connection', (ws, req) => {
         spokeThisTurn = true;
       }
 
-      // Empty Gemini success asks them to repeat once. It does not invent a
-      // slot and it does not speak the downtime name-ask. Credits/denied still does.
+      // Empty Gemini success asks them to repeat once. A 503 or a broken
+      // stream does the same. Credits or a denied project still uses the
+      // reach-them name line, once.
       if (!spokeThisTurn && !hidInternalNarration && !bargeInActive && tts) {
-        const llmDown = Boolean(result?.timedOut || result?.llmFailed);
-        if (llmDown) {
-          const guarantee = await resolveLlmRecoverySpeech(clean);
-          console.warn(
-            `[ws/media][${sidLabel()}] turn speech guarantee fired action=${nextBestAction.action}` +
-              ` slot=${nextBestAction.slot || ''} llmDown=1`
-          );
-          callTranscript.pushAgent(guarantee);
-          turnTiming.markFirstSpokenChunk();
-          await speakText(guarantee);
-          spokeThisTurn = true;
-          turnOutcome = 'speech_guarantee';
+        if (result?.timedOut || result?.llmFailed) {
+          const guarantee = await speechWhenModelMissed(result, clean);
+          if (guarantee) {
+            console.warn(
+              `[ws/media][${sidLabel()}] turn speech ${result?.llmHardDown ? 'guarantee' : 'repair'} action=${nextBestAction.action}` +
+                ` slot=${nextBestAction.slot || ''} llmHardDown=${result?.llmHardDown ? 1 : 0}`
+            );
+            callTranscript.pushAgent(guarantee);
+            turnTiming.markFirstSpokenChunk();
+            await speakText(guarantee);
+            spokeThisTurn = true;
+            turnOutcome = result?.llmHardDown ? 'speech_guarantee' : 'speech_repair';
+          } else {
+            console.log(
+              `[ws/media][${sidLabel()}] turn speech quiet action=${nextBestAction.action} reason=model_miss`
+            );
+          }
         } else {
           const planned = planEmptyGeminiSpeech({
             brainState,
@@ -4563,6 +4604,10 @@ async function runGeminiTurnStreaming(
   }
 
   if (streamFailed && !fullText) {
+    const hardDown = isHardGeminiOutage(streamErr);
+    if (streamErr && !isTimeoutError(streamErr)) {
+      noteGeminiProviderError(classifyGeminiError(streamErr), streamErr);
+    }
     return {
       spokenText: '',
       actionConfirmation: '',
@@ -4570,6 +4615,7 @@ async function runGeminiTurnStreaming(
       shouldEndCall: false,
       streamed: false,
       llmFailed: true,
+      llmHardDown: hardDown,
       timedOut: isTimeoutError(streamErr),
     };
   }
@@ -4681,6 +4727,7 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
       spokenText: '',
       shouldEndCall: false,
       llmFailed: true,
+      llmHardDown: isHardGeminiOutage(lastErr),
       timedOut: isTimeoutError(lastErr),
     };
   }
