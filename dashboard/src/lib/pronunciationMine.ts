@@ -692,13 +692,7 @@ export function mineSuggestionsFromAgentLines(opts: {
       label: "From calls",
       prompt: /[.?!]$/.test(natural) ? natural : `${natural}.`,
       kind: "sentence",
-      reason: row.boosted
-        ? row.count > 1
-          ? `Your profile name appeared ${row.count} times on recent calls — train if it sounded wrong.`
-          : "Heard on a recent call (matches your business profile) — train if unclear."
-        : row.count > 1
-          ? `Heard ${row.count} times on recent calls — may need clearer TTS.`
-          : "Spotted on a recent call — train if it sounded wrong.",
+      reason: "",
       targets: [{ label: row.label, match }],
       match,
       priority: Math.min(
@@ -742,8 +736,7 @@ export function customTrainingLine(opts: {
       label: opts.idPrefix === "renew" ? "Renew" : "Custom",
       prompt: /[.?!]$/.test(phrase) ? phrase : `${phrase}.`,
       kind: "sentence",
-      reason:
-        opts.reason || "You added this because it sounded wrong on a call.",
+      reason: opts.reason || "",
       targets,
       match: targets[0].match,
       priority: 95,
@@ -760,8 +753,7 @@ export function customTrainingLine(opts: {
     label: opts.idPrefix === "renew" ? "Renew" : "Custom",
     prompt,
     kind: "sentence",
-    reason:
-      opts.reason || "You added this because it sounded wrong on a call.",
+    reason: opts.reason || "",
     targets: [{ label: phrase, match }],
     match,
     priority: 95,

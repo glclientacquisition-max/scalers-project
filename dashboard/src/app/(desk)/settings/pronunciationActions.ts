@@ -231,12 +231,11 @@ export async function confirmPronunciationRecording(
       audioMimeType,
     });
   } catch (err) {
-    return {
-      error:
-        err instanceof Error
-          ? err.message
-          : "Could not learn that pronunciation.",
-    };
+    logDeskError(
+      "pronunciation-confirm",
+      err instanceof Error ? err.message : err
+    );
+    return { error: "Could not check that take." };
   }
 
   if (!derived.ok) {
