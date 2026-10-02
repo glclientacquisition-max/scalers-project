@@ -23,7 +23,7 @@ describe("business settings depth", () => {
   it("orders Assistant before Business and uses example placeholders", () => {
     const assistantName = form.indexOf("Assistant name");
     const businessBlock = form.indexOf('title="Business"');
-    const contacts = form.indexOf(">Public contacts<");
+    const contacts = form.indexOf('title="Public contacts"');
     assert.ok(assistantName > 0);
     assert.ok(assistantName < businessBlock);
     assert.ok(businessBlock < contacts);

@@ -111,6 +111,7 @@ import {
   compactTextareaExpandHandlers,
   settingsBlockTitleClass,
   settingsConsoleClass,
+  settingsFormBodyClass,
   settingsDenseFieldClass,
   settingsFieldClass,
   settingsGhostButtonClass,
@@ -746,6 +747,7 @@ export function TenantForm({
             }
           />
 
+      <div className={`${settingsFormBodyClass} space-y-4`}>
       <input type="hidden" name="id" value={tenant.id} />
       <input type="hidden" name="settings_scope" value={panel} />
       <input type="hidden" name="business_name" value={businessName} />
@@ -773,7 +775,7 @@ export function TenantForm({
       <input type="hidden" name="soniox_voice_label" value={sonioxVoiceLabel} />
       <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
-      <section className={panel === "identity" ? "space-y-6" : "hidden"}>
+      <section className={panel === "identity" ? "space-y-3" : "hidden"}>
         <SettingsGroup title="Assistant">
           <SettingsRow label="Assistant name" htmlFor="agent_name">
             <input
@@ -829,37 +831,66 @@ export function TenantForm({
           </SettingsRow>
         </SettingsGroup>
 
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-            <p className={settingsBlockTitleClass}>Public contacts</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => addSocialChannel("phone")}
-                className={settingsGhostButtonClass}
-              >
-                Add phone
-              </button>
-              <button
-                type="button"
-                onClick={() => addSocialChannel("whatsapp")}
-                className={settingsGhostButtonClass}
-              >
-                Add WhatsApp
-              </button>
-              <button
-                type="button"
-                onClick={() => addSocialChannel("instagram")}
-                className={settingsGhostButtonClass}
-              >
-                Add social
-              </button>
+        <SettingsGroup
+          title="Public contacts"
+          action={
+            socialHandles.channels.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => addSocialChannel("phone")}
+                  className={settingsGhostButtonClass}
+                >
+                  Add phone
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addSocialChannel("whatsapp")}
+                  className={settingsGhostButtonClass}
+                >
+                  Add WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addSocialChannel("instagram")}
+                  className={settingsGhostButtonClass}
+                >
+                  Add social
+                </button>
+              </div>
+            ) : undefined
+          }
+        >
+          {socialHandles.channels.length === 0 ? (
+            <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <p className="text-sm text-ink-soft">No public contacts yet</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => addSocialChannel("phone")}
+                  className={settingsGhostButtonClass}
+                >
+                  Add phone
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addSocialChannel("whatsapp")}
+                  className={settingsGhostButtonClass}
+                >
+                  Add WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addSocialChannel("instagram")}
+                  className={settingsGhostButtonClass}
+                >
+                  Add social
+                </button>
+              </div>
             </div>
-          </div>
-
-          {socialHandles.channels.length === 0 ? null : (
-            <>
-            <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
+          ) : (
+            <div className="min-w-0">
+            <div className="divide-y divide-line lg:hidden">
               {socialHandles.channels.map((channel, index) => (
                 <div
                   key={`social-m-${index}`}
@@ -919,7 +950,7 @@ export function TenantForm({
                 </div>
               ))}
             </div>
-            <div className="hidden overflow-hidden rounded-xl border border-line lg:block">
+            <div className="hidden lg:block">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] text-sm">
                   <thead>
@@ -1000,9 +1031,9 @@ export function TenantForm({
                 </table>
               </div>
             </div>
-            </>
+            </div>
           )}
-        </div>
+        </SettingsGroup>
       </section>
 
       <section className={panel === "catalog" ? "space-y-4" : "hidden"}>
@@ -2235,6 +2266,7 @@ export function TenantForm({
         </div>
         ) : null}
       </section>
+      </div>
 
         </div>
       </div>

@@ -30,7 +30,7 @@ export const settingsSectionClass = "space-y-3";
 
 /** Nested settings: packed inner rail + fluid panel. Fills the desk canvas from md. */
 export const settingsConsoleClass =
-  "flex w-full min-w-0 flex-col gap-6 md:flex-row md:items-start md:justify-start md:gap-4";
+  "flex w-full min-w-0 flex-col gap-6 md:flex-row md:items-start md:justify-start md:gap-3";
 
 export const settingsRailWrapClass =
   "hidden min-w-0 shrink-0 md:block md:w-max md:max-w-[13.5rem]";
@@ -39,6 +39,15 @@ export const settingsRailClass = "min-w-0 md:sticky md:top-4";
 
 export const settingsPanelClass =
   "min-w-0 flex-1 pb-[var(--desk-tabbar-clearance)] md:pb-0";
+
+/** Cap train/alerts form reading width so Identity fields are not ultrawide sparse. */
+export const settingsFormBodyClass = "min-w-0 w-full max-w-2xl";
+
+/** Text controls inside SettingsRow — ops form, not full remainder. */
+export const settingsControlMaxClass = "max-w-md";
+
+/** Selects inside SettingsRow — short values (Tone, type) stay compact. */
+export const settingsSelectMaxClass = "max-w-xs";
 
 export const settingsFormGridClass =
   "grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2";
@@ -230,14 +239,22 @@ export function SettingsRow({
 }) {
   const switchRow = control === "switch";
   return (
-    <div className="flex min-h-12 w-full items-center gap-3 px-4 py-2">
+    <div className="flex min-h-12 w-full items-center gap-3 px-4 py-2 md:min-h-11 md:px-3 md:py-1.5">
       <div className={switchRow ? "min-w-0 flex-1" : "w-[7.5rem] shrink-0 sm:w-36"}>
         <label htmlFor={htmlFor} className="block text-sm font-medium text-ink">
           {label}
         </label>
         {hint ? <p className="mt-0.5 text-xs text-ink-soft">{hint}</p> : null}
       </div>
-      <div className={switchRow ? "shrink-0" : "min-w-0 flex-1"}>{children}</div>
+      <div
+        className={
+          switchRow
+            ? "shrink-0"
+            : `min-w-0 flex-1 ${settingsControlMaxClass}`
+        }
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -322,7 +339,7 @@ export function SettingsSelect<T extends string>({
       value={value}
       aria-label={label}
       placeholder={placeholder}
-      className={`${settingsDenseFieldClass} min-w-0`}
+      className={`${settingsDenseFieldClass} min-w-0 ${settingsSelectMaxClass}`}
       options={options.map((opt) => ({ value: opt.id, label: opt.label }))}
       onChange={onChange}
     />
