@@ -2,6 +2,7 @@
 
 const { entityValue } = require('./entityExtraction');
 const { offeredVertical } = require('./vertical');
+const { isVisitClassEscalateReason } = require('./playbooks/homeServices');
 const { appendVisitNotes } = require('./visitLocation');
 const { looksLikeLeaveIt, looksLikeNonConsentAck } = require('./callCorrectives');
 const { clockPhrase, dayCue, whenHasClockTime } = require('./visitTime');
@@ -185,8 +186,21 @@ function callerSaidNumber(state = {}, value) {
  * injected ones. An acknowledgment never fires a save. A quantity the caller
  * never said is dropped. A visit with a day but no time is not a calendar row.
  */
+function shouldBlockHomeVisitClassEscalate(state = {}, escalatePayload) {
+  if (offeredVertical(state.vertical) !== 'home_services') return false;
+  if (String(state.intent || '') === 'booking') return true;
+  const reason = String(
+    escalatePayload?.reason || state.handoff?.reason || state.goal?.description || ''
+  );
+  return isVisitClassEscalateReason(reason);
+}
+
 function guardToolPlan(parsed, state = {}, capabilities = {}) {
   const next = parsed && typeof parsed === 'object' ? { ...parsed } : {};
+  if (next.escalate && shouldBlockHomeVisitClassEscalate(state, next.escalate)) {
+    delete next.escalate;
+    next.visitClassEscalateBlocked = true;
+  }
   if (ackWithoutConsent(state)) {
     delete next.serviceRequest;
     delete next.appointment;

@@ -102,6 +102,8 @@ No extra words. If they never stated a name, or you are unsure, return NONE.
 If they spelled letter by letter, join those letters.
 Prefer the usual Kenyan spelling of the same name (Isha or Eisha is Aisha). Asha is not Aisha. Do not invent a name they never used.`;
 
+const { isVisitClassEscalateReason } = require('./playbooks/homeServices');
+
 const pendingReviews = new Map();
 
 function isReviewEnabled() {
@@ -471,6 +473,7 @@ function toolFlagsFromBrain(brainState, callId = null) {
   };
   const visit = lastOf(['create_appointment', 'update_appointment']);
   const hold = lastOf(['create_service_request']);
+  const escalate = lastOf(['escalate']);
   const visitStatus = String(
     visit?.appointmentStatus || visit?.record?.status || 'requested'
   ).toLowerCase();
@@ -503,6 +506,9 @@ function toolFlagsFromBrain(brainState, callId = null) {
       : [],
     holdOpen: Boolean(hold) && (!holdStatus || holdStatus === 'open'),
     escalateSaved: ok('escalate'),
+    escalateReason: String(
+      escalate?.value?.reason || escalate?.record?.reason || ''
+    ).trim(),
     handoff: Boolean(
       brainState?.handoff?.requested || brainState?.handoff?.required
     ),
@@ -561,7 +567,7 @@ function askSnapshot(brainState) {
 /**
  * Conservative merge: owner sentence is welcome; tool outcomes are not undone.
  */
-function mergeTranscriptReview({ derived, summary, toolFlags, review } = {}) {
+function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical } = {}) {
   const flags = toolFlags || {};
   const derivedIntent = derived?.primaryIntent || null;
   const derivedResolution = derived?.resolution || 'unknown';
@@ -675,6 +681,18 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review } = {}) {
   if (!review) return out;
 
   if (flags.escalateSaved) {
+    const escalateReason =
+      cleanReason(summary?.reason || flags?.escalateReason || '') || out.reason;
+    const falseCleaningEscalate =
+      String(vertical || '').toLowerCase() === 'home_services' &&
+      isVisitClassEscalateReason(escalateReason);
+    if (falseCleaningEscalate && (flags.visitSaved || flags.visitRequested)) {
+      out.primaryIntent = 'book_visit';
+      out.resolution = 'resolved';
+      out.applied.resolution = derivedResolution !== 'resolved';
+      out.applied.intent = derivedIntent !== 'book_visit';
+      return out;
+    }
     out.primaryIntent = 'human';
     out.resolution = 'needs_human';
     if (review.needs_human !== true) {
@@ -1147,6 +1165,7 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
     summary: ctx.summary,
     toolFlags: ctx.toolFlags,
     review,
+    vertical: ctx.vertical,
   });
 
   if (

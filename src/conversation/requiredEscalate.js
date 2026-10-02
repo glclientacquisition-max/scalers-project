@@ -5,6 +5,8 @@ const {
   hasConcreteUrgentNeed,
   looksLikeUrgentContact,
 } = require('./callCorrectives');
+const { offeredVertical } = require('./vertical');
+const { isVisitClassEscalateReason } = require('./playbooks/homeServices');
 
 const GENERIC_REASON = /requested a human|human requested|live transfer is unavailable/i;
 
@@ -47,6 +49,14 @@ function ensureRequiredEscalate(parsed, state = {}, capabilities = {}) {
       !(Array.isArray(state.goal?.missingSlots) && state.goal.missingSlots.length));
 
   if (!needsEscalate) return next;
+
+  if (
+    offeredVertical(state.vertical) === 'home_services' &&
+    (String(state.intent || '') === 'booking' ||
+      isVisitClassEscalateReason(state.handoff?.reason || state.goal?.description || ''))
+  ) {
+    return next;
+  }
 
   const name = String(
     state.caller?.name || entityValue(state.entities?.name) || ''

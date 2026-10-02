@@ -2,6 +2,9 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   classifyHomeIntent,
+  looksLikeVisitClassCleaningUrgency,
+  looksLikeTrueHomeEmergency,
+  isVisitClassEscalateReason,
   missingHomeSlots,
   canCompleteHomeIntent,
   formatHomeServicesPlaybookForPrompt,
@@ -47,6 +50,28 @@ describe('home services playbooks', () => {
       classifyHomeIntent('Can you come fix my leaking tap tomorrow?'),
       'book_visit'
     );
+  });
+
+  it('pack #10: emergency Airbnb cleanup now is visit class not escalate reason', () => {
+    const line =
+      'Urgent emergency air bnb cleanup needed now in Westlands';
+    assert.equal(classifyHomeIntent(line), 'book_visit');
+    assert.equal(looksLikeVisitClassCleaningUrgency(line), true);
+    assert.equal(looksLikeTrueHomeEmergency(line), false);
+    assert.equal(isVisitClassEscalateReason(line), true);
+  });
+
+  it('out-of-scope plumber repair ask is not true emergency', () => {
+    const line = 'Can you send a plumber to fix the pipe under my sink?';
+    assert.equal(looksLikeTrueHomeEmergency(line), false);
+    assert.equal(classifyHomeIntent(line), 'book_visit');
+  });
+
+  it('pack #11: garbled burst pipe is true emergency', () => {
+    assert.equal(looksLikeTrueHomeEmergency('papers bust in the kitchen'), true);
+    assert.equal(looksLikeTrueHomeEmergency('pipehas everywhere'), true);
+    assert.equal(classifyHomeIntent('papers bust flooding'), 'emergency');
+    assert.equal(looksLikeVisitClassCleaningUrgency('papers bust'), false);
   });
 
   it('reserves emergency for burst flood fire gas or shock', () => {

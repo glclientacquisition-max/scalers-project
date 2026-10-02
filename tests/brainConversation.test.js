@@ -216,6 +216,17 @@ describe('multi-turn Brain outcomes', () => {
   it('treats home cleaning asks as booking and burst pipes as human', () => {
     const home = { vertical: 'home_services' };
     assert.equal(
+      inferIntent(
+        'Urgent emergency air bnb cleanup needed now in Westlands',
+        home
+      ),
+      'booking'
+    );
+    assert.equal(
+      inferIntent('papers bust pipehas water everywhere', home),
+      'human'
+    );
+    assert.equal(
       inferIntent('Urgent Airbnb clean tomorrow in Runda', home),
       'booking'
     );

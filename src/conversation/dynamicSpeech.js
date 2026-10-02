@@ -5,6 +5,7 @@ const {
   eatTimeOfDay,
   composeBusinessAssistantIntro,
   introLooksValid,
+  LANGUAGE_INVITE,
 } = require('./businessAssistantIntro');
 const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
@@ -32,6 +33,8 @@ function fallbackGreeting(businessName, opts = {}) {
   return composeBusinessAssistantIntro({
     businessName,
     agentName: opts.agentName,
+    vertical: opts.vertical,
+    requireLanguageInvite: opts.requireLanguageInvite,
     offeringLine: opts.offeringLine,
     servicesCatalog: opts.servicesCatalog,
     servicesOffered: opts.servicesOffered || opts.servicesNotes,
@@ -52,8 +55,8 @@ function cleanSpokenLine(text) {
     .trim();
 }
 
-function greetingLooksValid(line, businessName, agentName) {
-  return introLooksValid(cleanSpokenLine(line), businessName, agentName);
+function greetingLooksValid(line, businessName, agentName, opts = {}) {
+  return introLooksValid(cleanSpokenLine(line), businessName, agentName, opts);
 }
 
 /**
@@ -84,13 +87,16 @@ async function generateDynamicGreeting(opts) {
     servicesOffered: opts.servicesOffered || opts.servicesNotes,
     servicesNotes: opts.servicesNotes,
   };
-  const instant = fallbackGreeting(businessName, {
+  const vertical = String(opts.vertical || '').trim();
+  const introOpts = {
     agentName,
+    vertical,
     isOpen,
     afterHoursMode,
     closureNotice,
     ...offeringOpts,
-  });
+  };
+  const instant = fallbackGreeting(businessName, introOpts);
   if (mode !== 'gemini') return instant;
 
   const timeoutMs = Math.max(
@@ -130,7 +136,11 @@ You MUST include the exact business name "${businessName}".
 You MUST include your name ${agentName}.
 Do not use IVR lines like "you've reached" or "thank you for calling".
 Do not list services or prices in the greeting. Grounded offerings wait until they ask.
-Do not say they can speak in English or Kiswahili. Language match happens after they speak.
+${
+    vertical === 'home_services'
+      ? `You MUST include this exact sentence before How can I help: "${LANGUAGE_INVITE}"`
+      : 'Do not say they can speak in English or Kiswahili. Language match happens after they speak.'
+  }
 It is ${tod} in Nairobi. ${openLine}
 Use clear English for this first greeting (the caller has not spoken yet. Do not open with Habari).
 No quotes, no markdown, never say "the business" as a placeholder.
@@ -148,7 +158,7 @@ End with one open question: How can I help? (or the closed/message follow from t
     })
     .then((raw) => {
       const line = cleanSpokenLine(raw);
-      if (!greetingLooksValid(line, businessName, agentName)) return instant;
+      if (!greetingLooksValid(line, businessName, agentName, introOpts)) return instant;
       return line;
     })
     .catch(() => instant);

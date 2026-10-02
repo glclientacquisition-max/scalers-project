@@ -3278,6 +3278,7 @@ mediaWss.on('connection', (ws, req) => {
       greetingLine = await generateDynamicGreeting({
         businessName,
         agentName,
+        vertical: brainProfile?.vertical || '',
         servicesCatalog: brainProfile.servicesCatalog,
         servicesOffered: brainProfile.servicesOffered,
         isOpen: openStatus === 'unknown' ? null : openStatus === 'open',

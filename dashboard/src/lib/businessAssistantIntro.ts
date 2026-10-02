@@ -1,7 +1,7 @@
 /**
  * Desk mirror of src/conversation/businessAssistantIntro.js
  * Keep rules in sync: shop first, named person, one help question.
- * Open and closed: no services list, no language invite. Do not open with Habari.
+ * Open and closed: no services list. Home services: English/Kiswahili invite on first open. Do not open with Habari.
  */
 
 export const LANGUAGE_INVITE = "You can speak in English or Kiswahili.";
@@ -9,6 +9,8 @@ export const LANGUAGE_INVITE = "You can speak in English or Kiswahili.";
 export type BusinessAssistantIntroOpts = {
   businessName?: string | null;
   agentName?: string | null;
+  vertical?: string | null;
+  requireLanguageInvite?: boolean;
   offeringLine?: string | null;
   servicesCatalog?: Array<{ name?: string | null }> | null;
   servicesOffered?: string | null;
@@ -135,6 +137,20 @@ export function previewBusinessAssistantIntro(
   });
 }
 
+function wantsLanguageInvite(opts: BusinessAssistantIntroOpts = {}): boolean {
+  if (opts.requireLanguageInvite === true) return true;
+  const vertical = String(opts.vertical || "").trim().toLowerCase();
+  return (
+    vertical === "home_services" ||
+    vertical === "homeservices" ||
+    vertical === "home_service"
+  );
+}
+
+function languageInviteClause(opts: BusinessAssistantIntroOpts = {}): string {
+  return wantsLanguageInvite(opts) ? `${LANGUAGE_INVITE} ` : "";
+}
+
 export function composeBusinessAssistantIntro(
   opts: BusinessAssistantIntroOpts = {}
 ): string {
@@ -145,21 +161,22 @@ export function composeBusinessAssistantIntro(
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
   const identity = composeOpenerIdentity(opts);
+  const invite = languageInviteClause(opts);
   const help = "How can I help?";
   const nameAsk = "May I have your name?";
 
   if (closureNotice) {
     const follow = afterHoursMode === "message" ? nameAsk : help;
-    return `${identity} ${closureNotice} ${follow}`;
+    return `${identity} ${invite}${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === "message") {
-    return `${identity} We're closed now. ${nameAsk}`;
+    return `${identity} ${invite}We're closed now. ${nameAsk}`;
   }
 
   if (closed) {
-    return `${identity} We're closed now. ${help}`;
+    return `${identity} ${invite}We're closed now. ${help}`;
   }
 
-  return `${identity} ${help}`;
+  return `${identity} ${invite}${help}`;
 }
