@@ -37,7 +37,7 @@ Requirements:
 
 Nav label for ops: **Admin** (not “DID pool”). Primary billing work starts on **Packages**. **Ledger** is the nav label for `/admin/wallets` (same route).
 
-Customer billing story: **packages + on-demand**. The wallet ledger is visible for ops metering and adjustments until deliberate owner prepaid checkout ships.
+Customer billing story: **packages + on-demand**. The wallet ledger is visible for ops metering and adjustments. Owner **package checkout** is not shipped.
 
 Business-owner nav stays: Calls · Business · Sign out.
 
@@ -75,7 +75,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 
 ### 5. Wallet ledger (`/admin/wallets`)
 - Ops scaffolding: KES ledger balance, manual credit/debit, append-only ledger view, beta vs enforcement mode.
-- Not the headline owner money path. No owner prepaid checkout in this module.
+- Not the headline owner money path. No owner package checkout in this module.
 - Enforcement on: past included, on-demand debits the ledger when the business opted in. Beta: meter only, no charges.
 
 ### 6. Platform teardown / demo reset (one-time ops)

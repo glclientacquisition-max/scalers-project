@@ -1,26 +1,28 @@
-# Beta wallet program
+# Beta billing enforcement (packages + on-demand)
+
+Billing modes are **product controls** for metering and on-demand debits. They are not a wallet top-up product or a graduation into float top-up.
 
 ## Model
 
 | Mode (`billing_enforcement`) | Charges? | Blocks calls? | Use for |
 |---|---|---|---|
-| `off` | No (meter only) | No, until the package minute bucket is used up with on-demand off | **Beta whitelist** |
-| `soft` | Yes | No | Prepaid after graduation |
-| `hard` | Yes | Later (inbound gate) | Paid + enforcement |
+| `off` | No (meter only) | No, until package minutes are used up **and** on-demand is off | **Beta whitelist** |
+| `soft` | Yes (on-demand past included when opted in) | No | **On-demand soft** — debit scaffolding; ledger debits; do not block at zero |
+| `hard` | Yes | Later (inbound gate not shipped) | **On-demand hard** — charge; future inbound block when product-approved |
 
 New workspaces default to **`off`** (beta).
 
-Ops graduates a workspace: Admin → **Wallets** → Plan → `soft` (or `hard`).
-The Plan panel confirms before leaving beta (real charges start) and before waiving a negative balance on return to beta.
+Ops changes enforcement: Admin → **Ledger** (`/admin/wallets`) → Plan → `soft` or `hard`.
+The Plan panel confirms before leaving beta (real charges can start) and before waiving a negative balance on return to beta.
 
-When moving to beta, ops can **waive negative balance** (trial credit) so soft-era debt disappears.
+When moving back to beta, ops can **waive negative balance** (trial credit) so on-demand-era debt disappears.
 
-## Soft spend limit (owner)
+## Alerts and on-demand (desk)
 
-Optional monthly budget columns may exist (`wallet_soft_spend_limit.sql`) but are **not** the primary control. Preferred Cursor-like model:
+Package **included minutes** are the primary cap story. Ledger balance and low-balance alerts are **ops scaffolding** when enforcement is on.
 
-1. **Automatic live alerts** when prepaid is running low / empty (WhatsApp/email — no soft-limit setup).
-2. **On-demand usage** opt-in on Desk → Wallet when prepaid hits zero (`wallet_on_demand_alerts.sql`). The same toggle continues tenant SMS after included units (`sms_allowance.sql`).
+1. **Automatic live alerts** when ledger balance is low or at zero (WhatsApp/email — no soft-limit setup required).
+2. **On-demand usage** opt-in on Desk → **Usage** (`/wallet`) past included minutes (`wallet_on_demand_alerts.sql`). The same toggle continues tenant SMS after included units (`sms_allowance.sql`).
 
 ## Security (wallet_security_beta.sql)
 

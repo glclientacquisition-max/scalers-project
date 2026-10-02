@@ -4,7 +4,7 @@
 
 **What owners buy:** package subscription (included minutes, SMS, seats, one phone line) plus optional **on-demand** usage past included. Configure packages and on-demand rates in Super Admin → **Packages**.
 
-**What the wallet is:** an internal **KES ledger** for metering, on-demand debits, line rental, and ops adjustments. It is **not** the headline customer money path until deliberate owner prepaid checkout ships. Super Admin → **Ledger** (`/admin/wallets`) is ops scaffolding: balance, credits, enforcement mode.
+**What the wallet is:** an internal **KES ledger** for metering, on-demand debits, line rental, and ops adjustments. Customer money path is **packages + on-demand**; owner **package checkout** (M-Pesa/Paystack) is not shipped. The ledger stays ops scaffolding, not a float top-up product. Super Admin → **Ledger** (`/admin/wallets`) is ops scaffolding: balance, credits, enforcement mode.
 
 ## Goal
 
@@ -20,7 +20,7 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 | Free-beta tenants | Default `billing_enforcement = off` (whitelist): meter only, **no charges**. See `BETA_WALLET_PROGRAM.md` |
 | Hangup webhooks fire more than once | `charge_call_to_wallet` is idempotent per `call_id` |
 | Duration can arrive after first terminal event | First non-zero charge wins for v1; later duration upgrades do not double-bill |
-| Monthly line fee with no cron yet | Lazy `apply_line_rental` when Wallet page loads (unique per `YYYY-MM`) |
+| Monthly line fee with no cron yet | Lazy `apply_line_rental` when Desk → **Usage** loads (`/wallet`; unique per `YYYY-MM`) |
 | Line lapses when client misses renewal | `line_rental_grace.sql` tracks `line_paid_through`; wallet may go negative during `line_grace_days`; only then ops suspends the DID |
 | Need audit trail | Append-only `wallet_ledger`; balance is cached on `tenants.wallet_balance_kes` |
 | Owners must not forge credits | Ledger writes only via `security definer` RPCs granted to `service_role` |
@@ -34,7 +34,7 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 | Live transfer outbound | `call_charge` on a **second** `calls` row | **KES 9 / min** stored (`billing_rate_card` 0.15/sec). Not offered until live transfer. SautiKit costs **KES 3 / min**. Never fold into the inbound `call_id`. Beta does not originate outbound. See [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) §8. |
 | Line rental | `line_rental` | Fixed KES / calendar month (UTC) |
 | Ops seed / correction | `admin_adjustment` | Signed KES |
-| Future M-Pesa | `topup` | Positive KES |
+| Future owner pack payment (not shipped) | ops credit / entitlement (ledger may use `topup` kind technically) | Per package SKU — not a float top-up sell path |
 
 ## Apply order
 
@@ -77,7 +77,7 @@ Then apply `docs/supabase/package_entitlements.sql` (reserved email + seat inclu
 | On-demand usage (opt-in) | Default **off**. Package included minutes and SMS are not a ledger debit. Past the cap with on-demand off: the next inbound call is rejected, tenant SMS stops, no usage debit. Past the cap with on-demand on: answer and debit the rate card once `package_minute_consume.sql` is applied. Until that RPC exists, `charge_call_to_wallet` still runs and pauses only when the ledger balance is already 0. |
 | Soft inbound block | Separate hard-enforcement step (not this migration) |
 
-Owners enable on-demand on Desk → Wallet. Alerts fire from the voice charge path after each completed call debit. The same toggle covers included SMS (`sms_allowance.sql`).
+Owners enable on-demand on Desk → **Usage** (`/wallet`). Alerts fire from the voice charge path after each completed call debit. The same toggle covers included SMS (`sms_allowance.sql`).
 
 ## SMS included and stop at cap
 
