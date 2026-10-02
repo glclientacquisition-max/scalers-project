@@ -51,11 +51,8 @@ export default async function AdminOverviewPage() {
         <Link href="/admin/numbers" className={btnPrimary}>
           Add / manage numbers
         </Link>
-        <Link href="/admin/packages" className={btnGhost}>
-          Packages and on-demand
-        </Link>
-        <Link href="/admin/wallets" className={btnGhost}>
-          Ops ledger
+        <Link href="/admin/billing" className={btnGhost}>
+          Billing
         </Link>
         <Link href="/admin/businesses" className={btnGhost}>
           View businesses

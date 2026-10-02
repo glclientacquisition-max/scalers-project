@@ -1,24 +1,5 @@
-import { AdminSetupError } from "@/components/AdminSetupError";
-import { deskListTitleClass } from "@/components/ui/deskChrome";
-import { AdminPackagesPanel } from "@/components/AdminPackagesPanel";
-import { logAdminError } from "@/lib/adminErrors";
-import { loadPackageCatalog } from "@/lib/packageCatalog";
+import { redirect } from "next/navigation";
 
-export const instant = false;
-
-export default async function AdminPackagesPage() {
-  let catalog;
-  try {
-    catalog = await loadPackageCatalog();
-  } catch (err) {
-    logAdminError("packages", err);
-    return <AdminSetupError />;
-  }
-
-  return (
-    <div className="space-y-4">
-      <h1 className={deskListTitleClass}>Packages</h1>
-      <AdminPackagesPanel {...catalog} />
-    </div>
-  );
+export default function AdminPackagesRedirect() {
+  redirect("/admin/billing/catalog");
 }

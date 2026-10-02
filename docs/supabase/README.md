@@ -127,6 +127,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 24h | [`package_minute_consume.sql`](./package_minute_consume.sql) | `package_catalog.sql` | Hangup `consume_call_seconds`. Included seconds free. On-demand off: meter, no debit. On-demand SMS debit. Does not replace the protect trigger. |
 | 24i | [`package_rate_card_ondemand_6_9.sql`](./package_rate_card_ondemand_6_9.sql) | `package_catalog.sql` | Sets the existing rate card to inbound KES 0.10/sec and outbound KES 0.15/sec. Does not change package prices. |
 | 24j | [`package_prices_5_12_25.sql`](./package_prices_5_12_25.sql) | `package_catalog.sql` | Monthly prices KES 5,000 / 12,000 / 25,000. Each package includes 1 number. |
+| 24k | [`admin_billing_ops.sql`](./admin_billing_ops.sql) | `package_catalog.sql`, `wallet_security_beta.sql` | Admin grant package minutes + waive on-demand overage (`ops_audit_log`). |
 | 24f | [`whatsapp_threads.sql`](./whatsapp_threads.sql) | `notify_send_ledger.sql` | Platform two-way WhatsApp persist (`whatsapp_threads` / `whatsapp_messages`). Service role only. Not voice DID routing. |
 
 ---

@@ -27,10 +27,12 @@ export function AdminPackagesPanel({
   rates: initialRates,
   packages: initialPackages,
   businesses,
+  catalogOnly = false,
 }: {
   rates: BillingRateCard;
   packages: BillingPackage[];
   businesses: TenantSubscriptionRow[];
+  catalogOnly?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -93,9 +95,8 @@ export function AdminPackagesPanel({
       ) : null}
 
       <p className="text-sm text-ink-2">
-        Customer billing: assign a package (included minutes, SMS, and seats). On-demand rates apply
-        past included when the business opts in on the desk. Ops ledger and enforcement live under
-        Ledger.
+        Package SKUs and on-demand rates. Assign packages and run charging from{" "}
+        {catalogOnly ? "Billing client rows" : "Billing"}.
       </p>
 
       <section className="border-b border-line/70 pb-6">
@@ -338,6 +339,8 @@ export function AdminPackagesPanel({
         ))}
       </section>
 
+      {!catalogOnly ? (
+      <>
       <section>
         <h2 className="text-title font-medium text-ink">Businesses</h2>
         {businesses.length === 0 ? (
@@ -464,6 +467,8 @@ export function AdminPackagesPanel({
           </div>
         </form>
       </section>
+      </>
+      ) : null}
     </div>
   );
 }

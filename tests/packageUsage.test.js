@@ -148,11 +148,12 @@ describe("package usage meter", () => {
     assert.equal(shouldApplyLineRental("soft", true), false);
     assert.equal(shouldApplyLineRental("hard", false), true);
 
-    const wallets = read("dashboard/src/components/AdminWalletsPanel.tsx");
+    const billingDetail = read("dashboard/src/components/AdminBillingDetailPanel.tsx");
     const wallet = read("dashboard/src/lib/wallet.ts");
-    assert.match(wallets, /Beta: meter the package\. The wallet is not charged\./);
-    assert.match(wallets, /on-demand past included/);
-    assert.doesNotMatch(wallets, /line fees/);
+    assert.match(billingDetail, /Beta: meter the package\. On-demand ledger is not charged\./);
+    assert.match(billingDetail, /on-demand past included/);
+    assert.doesNotMatch(billingDetail, /line fees/);
+    assert.doesNotMatch(billingDetail, /CREDIT_PRESETS/);
     assert.match(wallet, /shouldApplyLineRental/);
     assert.match(wallet, /tenantHasAssignedPackage/);
   });

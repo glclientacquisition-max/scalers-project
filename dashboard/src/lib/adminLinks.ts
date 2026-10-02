@@ -11,8 +11,7 @@ export type AdminLink = {
 
 export const ADMIN_LINKS: readonly AdminLink[] = [
   { href: "/admin", label: "Overview", exact: true },
-  { href: "/admin/packages", label: "Packages", exact: false },
-  { href: "/admin/wallets", label: "Ledger", exact: false },
+  { href: "/admin/billing", label: "Billing", exact: false },
   { href: "/admin/businesses", label: "Businesses", exact: false },
   { href: "/admin/numbers", label: "Numbers", exact: false },
   { href: "/admin/voices", label: "Voices", exact: false },
