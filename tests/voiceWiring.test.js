@@ -430,6 +430,18 @@ assert.match(
 
 assert.match(
   source,
+  /lastError: getTelephonyProviderHealth\(\)/,
+  'healthz must expose telephony wallet health for the Platform board'
+);
+
+assert.match(
+  source,
+  /notePlatformOpsDegrade/,
+  'platform speech/reasoning/telephony degrade must alert the Scalers ops list'
+);
+
+assert.match(
+  source,
   /scheduleOutageClipWarm\(\{ voiceId: tenantSonioxVoiceId \}\)/,
   'live Soniox PCM must warm that catalog voice downtime clip'
 );

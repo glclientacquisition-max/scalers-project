@@ -8,6 +8,9 @@ const PLATFORM_KINDS = new Set([
   'wallet_empty',
   'outage_speech',
   'outage_llm',
+  'platform_ops_speech',
+  'platform_ops_reasoning',
+  'platform_ops_telephony',
 ]);
 
 const CALLER_KINDS = new Set([
