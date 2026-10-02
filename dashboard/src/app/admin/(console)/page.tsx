@@ -55,7 +55,7 @@ export default async function AdminOverviewPage() {
           Packages and on-demand
         </Link>
         <Link href="/admin/wallets" className={btnGhost}>
-          Wallet ledger
+          Ops ledger
         </Link>
         <Link href="/admin/businesses" className={btnGhost}>
           View businesses

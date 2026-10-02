@@ -38,7 +38,7 @@ export function AdminBusinessesPanel({
   const [confirmText, setConfirmText] = useState("");
   const [adjustId, setAdjustId] = useState<string | null>(null);
   const [deltaKes, setDeltaKes] = useState("1000");
-  const [adjustNote, setAdjustNote] = useState("Wallet top-up");
+  const [adjustNote, setAdjustNote] = useState("Ops credit");
 
   const PAGE_SIZE = 25;
 
@@ -94,7 +94,7 @@ export function AdminBusinessesPanel({
           onClick={() => {
             setAdjustId(b.id);
             setDeltaKes("1000");
-            setAdjustNote("Wallet top-up");
+            setAdjustNote("Ops credit");
           }}
           className={adminRowActionClass}
         >

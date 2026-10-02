@@ -15,7 +15,7 @@ export type WalletTopUpState = {
 };
 
 /**
- * Owner-initiated prepaid top-up. Plug in M-Pesa/Paystack by setting:
+ * Owner-initiated balance top-up stub. Plug in M-Pesa/Paystack by setting:
  * WALLET_TOPUP_ENABLED=true, WALLET_TOPUP_PROVIDER=mpesa|paystack, plus provider keys.
  */
 export async function initiateWalletTopUp(
@@ -77,6 +77,6 @@ export async function initiateWalletTopUp(
     ok: true,
     message:
       result.message ||
-      "Top-up started. Complete the payment on your phone to credit prepaid.",
+      "Top-up started. Complete the payment on your phone to credit your balance.",
   };
 }

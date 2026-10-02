@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { adminTdClass, adminThClass } from "@/components/AdminIdentityList";
 import { btnPrimary, deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
 import {
   annualPriceKes,
@@ -93,7 +94,7 @@ export function AdminPackagesPanel({
 
       <p className="text-sm text-ink-2">
         Customer billing: assign a package (included minutes, SMS, and seats). On-demand rates apply
-        past included when the business opts in on the desk. Wallet ledger and enforcement live under
+        past included when the business opts in on the desk. Ops ledger and enforcement live under
         Ledger.
       </p>
 
@@ -410,46 +411,47 @@ export function AdminPackagesPanel({
             );
           }}
         >
-          <label className="block text-sm sm:col-span-2">
+          <div className="block text-sm sm:col-span-2">
             <span className="font-medium text-ink">Business</span>
-            <select
+            <DeskSelect
+              aria-label="Business"
               className={`mt-2 ${fieldClass()}`}
+              portalThemeClass="admin-theme"
               value={businessId}
-              onChange={(e) => selectBusiness(e.target.value)}
-            >
-              {businesses.map((row) => (
-                <option key={row.tenantId} value={row.tenantId}>
-                  {row.businessName}
-                  {row.packageName ? ` (${row.packageName})` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
+              onChange={selectBusiness}
+              options={businesses.map((row) => ({
+                value: row.tenantId,
+                label: `${row.businessName}${row.packageName ? ` (${row.packageName})` : ""}`,
+              }))}
+            />
+          </div>
+          <div className="block text-sm">
             <span className="font-medium text-ink">Package</span>
-            <select
+            <DeskSelect
+              aria-label="Package"
               className={`mt-2 ${fieldClass()}`}
+              portalThemeClass="admin-theme"
               value={packageId}
-              onChange={(e) => setPackageId(e.target.value)}
-            >
-              {packs.filter((pack) => pack.isActive || pack.id === packageId).map((pack) => (
-                <option key={pack.id} value={pack.id}>
-                  {pack.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
+              onChange={setPackageId}
+              options={packs
+                .filter((pack) => pack.isActive || pack.id === packageId)
+                .map((pack) => ({ value: pack.id, label: pack.name }))}
+            />
+          </div>
+          <div className="block text-sm">
             <span className="font-medium text-ink">Period</span>
-            <select
+            <DeskSelect
+              aria-label="Billing period"
               className={`mt-2 ${fieldClass()}`}
+              portalThemeClass="admin-theme"
               value={period}
-              onChange={(e) => setPeriod(e.target.value as "month" | "year")}
-            >
-              <option value="month">Month</option>
-              <option value="year">Year</option>
-            </select>
-          </label>
+              onChange={setPeriod}
+              options={[
+                { value: "month", label: "Month" },
+                { value: "year", label: "Year" },
+              ]}
+            />
+          </div>
           <div className="sm:col-span-2 lg:col-span-4">
             <p className="mb-3 text-sm text-ink">
               {selected?.packageName

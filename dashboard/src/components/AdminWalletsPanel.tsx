@@ -1,16 +1,36 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminWalletRow, BillingMode } from "@/lib/adminWallets";
 import type { WalletLedgerRow } from "@/lib/wallet";
 import { btnGhost, btnPrimary, deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
 import { adminRowActionClass, adminRowMutedClass, adminTdClass, adminThClass } from "@/components/AdminIdentityList";
 
 const CREDIT_PRESETS = [500, 1000, 5000, 10000];
 const DEBIT_PRESETS = [-500, -1000];
 const ACTOR_STORAGE_KEY = "scalers.ops.actor";
+const OPS_CREDIT_NOTE = "Ops credit";
+const OPS_ADJUSTMENT_NOTE = "Ops adjustment";
+
+type LedgerFilter = "all" | "beta" | "charging" | "low" | "overdrawn";
+
+const FILTER_OPTIONS: { value: LedgerFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "beta", label: "Beta only" },
+  { value: "charging", label: "Charging only" },
+  { value: "low", label: "Low" },
+  { value: "overdrawn", label: "Overdrawn" },
+];
+
+const MODE_OPTIONS: { value: BillingMode; label: string }[] = [
+  { value: "off", label: "Beta (free), meter only" },
+  { value: "soft", label: "On-demand (soft), debit ledger, do not block" },
+  { value: "hard", label: "On-demand (hard), debit ledger; block later" },
+];
 
 function statusLabel(s: AdminWalletRow["wallet_status"]) {
   if (s === "beta") return "Beta (free)";
@@ -22,8 +42,8 @@ function statusLabel(s: AdminWalletRow["wallet_status"]) {
 
 function planLabel(mode: BillingMode): string {
   if (mode === "off") return "Beta (free)";
-  if (mode === "soft") return "Enforcement soft";
-  return "Enforcement hard";
+  if (mode === "soft") return "On-demand (soft)";
+  return "On-demand (hard)";
 }
 
 function planConsequence(mode: BillingMode): string {
@@ -31,35 +51,35 @@ function planConsequence(mode: BillingMode): string {
     return "Beta: meter package usage. Ledger is not charged.";
   }
   if (mode === "soft") {
-    return "Enforcement on: past included, on-demand debits the ledger when the business opted in. Calls still connect at zero balance.";
+    return "On-demand past included debits the ops ledger when the business opted in. Calls still connect at zero balance.";
   }
-  return "Enforcement on: past included, on-demand debits the ledger when opted in. Inbound block at zero balance is not wired yet.";
+  return "On-demand past included debits the ops ledger when opted in. Inbound block at zero balance is not wired yet.";
 }
 
 function defaultModeNote(mode: BillingMode, row?: AdminWalletRow | null): string {
   if (mode === "off") return row?.beta_notes || "Beta program whitelist";
-  return `Enforcement (${mode})`;
+  return `On-demand (${mode})`;
 }
 
 export function AdminWalletsPanel({
   rows,
   betaCount,
-  prepaidCount,
+  chargingCount,
   lowCount,
   overdrawnCount,
-  totalFloatKes,
+  totalLedgerBalanceKes,
 }: {
   rows: AdminWalletRow[];
   betaCount: number;
-  prepaidCount: number;
+  chargingCount: number;
   lowCount: number;
   overdrawnCount: number;
-  totalFloatKes: number;
+  totalLedgerBalanceKes: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "beta" | "prepaid" | "low" | "overdrawn">("all");
+  const [filter, setFilter] = useState<LedgerFilter>("all");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [creditId, setCreditId] = useState<string | null>(null);
@@ -67,7 +87,7 @@ export function AdminWalletsPanel({
   const [ledgerId, setLedgerId] = useState<string | null>(null);
   const [ledger, setLedger] = useState<WalletLedgerRow[]>([]);
   const [deltaKes, setDeltaKes] = useState("1000");
-  const [note, setNote] = useState("Wallet top-up");
+  const [note, setNote] = useState(OPS_CREDIT_NOTE);
   const [actor, setActor] = useState("ops");
   const [mode, setMode] = useState<BillingMode>("off");
   const [waiveNegative, setWaiveNegative] = useState(true);
@@ -97,7 +117,7 @@ export function AdminWalletsPanel({
     const q = query.trim().toLowerCase();
     return rows.filter((r) => {
       if (filter === "beta" && r.wallet_status !== "beta") return false;
-      if (filter === "prepaid" && r.billing_enforcement === "off") return false;
+      if (filter === "charging" && r.billing_enforcement === "off") return false;
       if (filter === "low" && r.wallet_status !== "low") return false;
       if (filter === "overdrawn" && r.wallet_status !== "overdrawn") return false;
       if (!q) return true;
@@ -120,7 +140,7 @@ export function AdminWalletsPanel({
     note.trim().length >= 3 &&
     actor.trim().length > 0;
 
-  const graduatingToEnforcement =
+  const graduatingToCharging =
     Boolean(modeTarget) && initialMode === "off" && mode !== "off";
   const returningToBeta =
     Boolean(modeTarget) && initialMode !== "off" && mode === "off";
@@ -147,7 +167,7 @@ export function AdminWalletsPanel({
     setLedger([]);
     setCreditId(row.id);
     setDeltaKes("1000");
-    setNote("Wallet top-up");
+    setNote(OPS_CREDIT_NOTE);
   }
 
   function openPlan(row: AdminWalletRow) {
@@ -162,7 +182,6 @@ export function AdminWalletsPanel({
     const nextNote = defaultModeNote(row.billing_enforcement, row);
     setModeNote(nextNote);
     setInitialModeNote(nextNote);
-    // Default waive on when leaving prepaid → beta (trial credit).
     setWaiveNegative(row.billing_enforcement !== "off");
   }
 
@@ -221,14 +240,14 @@ export function AdminWalletsPanel({
   async function savePlan() {
     if (!modeTarget || !planValid) return;
 
-    if (graduatingToEnforcement) {
+    if (graduatingToCharging) {
       const balance = modeTarget.wallet_balance_kes;
       const balanceLine =
         balance <= 0
-          ? `\n\nWallet is KES ${balance.toLocaleString("en-KE")}. They will be overdrawn or low once charging starts.`
-          : `\n\nCurrent balance KES ${balance.toLocaleString("en-KE")}.`;
+          ? `\n\nLedger is KES ${balance.toLocaleString("en-KE")}. They will be overdrawn or low once charging starts.`
+          : `\n\nCurrent ledger KES ${balance.toLocaleString("en-KE")}.`;
       const confirmed = window.confirm(
-        `Graduate ${modeTarget.business_name} from free beta to ${planLabel(mode)}?\n\n` +
+        `Start on-demand charging for ${modeTarget.business_name}?\n\n` +
           `${planConsequence(mode)}` +
           balanceLine +
           `\n\nThis turns on ledger debits for on-demand past included.`
@@ -260,17 +279,24 @@ export function AdminWalletsPanel({
   }
 
   return (
-    <div className="space-y-5">
-      <section className="grid grid-cols-2 border-y border-line/70 sm:grid-cols-5" aria-label="Wallet totals">
+    <div className="space-y-4">
+      <section
+        className="grid grid-cols-2 border-y border-line/70 sm:grid-cols-5"
+        aria-label="Ledger totals"
+      >
         <Kpi label="Beta (free)" value={betaCount} />
-        <Kpi label="Enforcement on" value={prepaidCount} />
+        <Kpi label="Charging" value={chargingCount} />
         <Kpi label="Low balance" value={lowCount} warn={lowCount > 0} />
         <Kpi label="Overdrawn" value={overdrawnCount} warn={overdrawnCount > 0} />
-        <Kpi label="Float (KES)" value={totalFloatKes.toLocaleString("en-KE")} />
+        <Kpi
+          label="Ledger balance (KES)"
+          value={totalLedgerBalanceKes.toLocaleString("en-KE")}
+          caption="Ops sum, not customer checkout"
+        />
       </section>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="text-sm grow min-w-[200px]">
+      <div className="flex flex-wrap items-end gap-2 sm:gap-3">
+        <label className="min-w-[200px] grow text-sm">
           Search
           <input
             value={query}
@@ -279,20 +305,17 @@ export function AdminWalletsPanel({
             placeholder="Business or number"
           />
         </label>
-        <label className="text-sm">
-          Filter
-          <select
+        <div className="text-sm">
+          <span className="font-medium text-ink">Filter</span>
+          <DeskSelect
+            aria-label="Filter businesses"
+            className={`mt-1 min-w-[11rem] ${deskFieldClass}`}
+            portalThemeClass="admin-theme"
             value={filter}
-            onChange={(e) => setFilter(e.target.value as typeof filter)}
-            className={`mt-1 ${deskFieldClass}`}
-          >
-            <option value="all">All</option>
-            <option value="beta">Beta only</option>
-            <option value="prepaid">Enforcement on only</option>
-            <option value="low">Low</option>
-            <option value="overdrawn">Overdrawn</option>
-          </select>
-        </label>
+            onChange={setFilter}
+            options={FILTER_OPTIONS}
+          />
+        </div>
         <label className="text-sm">
           Ops actor
           <input
@@ -312,7 +335,7 @@ export function AdminWalletsPanel({
           <thead className="text-ink-2">
             <tr className="border-b border-line/70">
               <th className={adminThClass}>Business</th>
-              <th className={adminThClass}>Balance</th>
+              <th className={adminThClass}>Ledger (KES)</th>
               <th className={adminThClass}>Plan</th>
               <th className={adminThClass}>Actions</th>
             </tr>
@@ -321,7 +344,15 @@ export function AdminWalletsPanel({
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={4}>
-                  <Empty title="No wallets match." />
+                  <Empty
+                    title="No businesses match."
+                    line="Assign a package on Packages or widen your filter."
+                    action={
+                      <Link href="/admin/packages" className={btnGhost}>
+                        Open Packages
+                      </Link>
+                    }
+                  />
                 </td>
               </tr>
             ) : (
@@ -371,7 +402,7 @@ export function AdminWalletsPanel({
                         className={adminRowMutedClass}
                         onClick={() => void openLedger(r.id)}
                       >
-                        Ledger
+                        History
                       </button>
                     </div>
                   </td>
@@ -383,17 +414,17 @@ export function AdminWalletsPanel({
       </div>
 
       {creditTarget ? (
-        <div className="border-t border-line/70 pt-4">
+        <div className="border-t border-line/70 pt-3">
           <p className="font-medium">Credit / debit: {creditTarget.business_name}</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Current balance KES {creditTarget.wallet_balance_kes.toLocaleString("en-KE")}. Positive
+            Current ledger KES {creditTarget.wallet_balance_kes.toLocaleString("en-KE")}. Positive
             credits, negative debits. Reason required (min 3 chars). Logged to ops audit as{" "}
             <span className="font-medium text-[var(--ink)]">{actor.trim() || "ops"}</span>.
           </p>
           {creditTarget.billing_enforcement === "off" ? (
             <p className="mt-2 text-xs text-[var(--ink-soft)]">
               This workspace is on free beta (not charged). Adjustments still change the displayed
-              balance for when you graduate them.
+              ledger for when you start on-demand charging.
             </p>
           ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -403,7 +434,7 @@ export function AdminWalletsPanel({
                 type="button"
                 onClick={() => {
                   setDeltaKes(String(p));
-                  if (!note.trim() || note === "Wallet correction") setNote("Wallet top-up");
+                  if (!note.trim() || note === OPS_ADJUSTMENT_NOTE) setNote(OPS_CREDIT_NOTE);
                 }}
                 className={adminRowMutedClass}
               >
@@ -416,7 +447,7 @@ export function AdminWalletsPanel({
                 type="button"
                 onClick={() => {
                   setDeltaKes(String(p));
-                  if (!note.trim() || note === "Wallet top-up") setNote("Wallet correction");
+                  if (!note.trim() || note === OPS_CREDIT_NOTE) setNote(OPS_ADJUSTMENT_NOTE);
                 }}
                 className={adminRowMutedClass}
               >
@@ -443,7 +474,7 @@ export function AdminWalletsPanel({
             </label>
           </div>
           <p className="mt-2 text-xs text-[var(--ink-soft)]">
-            New balance preview: KES{" "}
+            New ledger preview: KES{" "}
             {(creditTarget.wallet_balance_kes + (Number.isFinite(deltaNum) ? deltaNum : 0)).toLocaleString(
               "en-KE"
             )}
@@ -474,31 +505,33 @@ export function AdminWalletsPanel({
       ) : null}
 
       {modeTarget ? (
-        <div className="border-t border-line/70 pt-4">
+        <div className="border-t border-line/70 pt-3">
           <p className="font-medium">Billing plan: {modeTarget.business_name}</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
             Current: <span className="font-medium text-[var(--ink)]">{planLabel(initialMode)}</span>
             {" · "}
-            Balance KES {modeTarget.wallet_balance_kes.toLocaleString("en-KE")}.
+            Ledger KES {modeTarget.wallet_balance_kes.toLocaleString("en-KE")}.
           </p>
           <p className="mt-2 text-sm text-[var(--ink-soft)]">{planConsequence(mode)}</p>
-          {graduatingToEnforcement ? (
+          {graduatingToCharging ? (
             <p className="mt-2 text-sm text-[var(--warn)]">
-              Graduating off beta turns on ledger enforcement for on-demand past included. You will be asked to confirm before save.
+              Leaving beta turns on on-demand ledger debits past included. You will be asked to confirm
+              before save.
               {modeTarget.wallet_balance_kes <= 0
-                ? ` Balance is KES ${modeTarget.wallet_balance_kes.toLocaleString("en-KE")}. Top up first if you do not want them overdrawn.`
+                ? ` Ledger is KES ${modeTarget.wallet_balance_kes.toLocaleString("en-KE")}. Assign a package or post an ops credit if you do not want them overdrawn when charging starts.`
                 : null}
             </p>
           ) : null}
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="text-sm">
-              Mode
-              <select
+            <div className="text-sm">
+              <span className="font-medium text-ink">Mode</span>
+              <DeskSelect
+                aria-label="Billing mode"
+                className={`mt-1 ${deskFieldClass}`}
+                portalThemeClass="admin-theme"
                 value={mode}
-                onChange={(e) => {
-                  const next = e.target.value as BillingMode;
+                onChange={(next) => {
                   setMode(next);
-                  // Refresh default note when switching modes unless ops already typed a custom note.
                   if (
                     modeNote.trim() === initialModeNote.trim() ||
                     modeNote.trim() === defaultModeNote(mode, modeTarget)
@@ -506,13 +539,9 @@ export function AdminWalletsPanel({
                     setModeNote(defaultModeNote(next, modeTarget));
                   }
                 }}
-                className={`mt-1 ${deskFieldClass}`}
-              >
-                <option value="off">Beta (free), meter only</option>
-                <option value="soft">Enforcement soft: debit ledger, do not block</option>
-                <option value="hard">Enforcement hard: debit ledger; block later</option>
-              </select>
-            </label>
+                options={MODE_OPTIONS}
+              />
+            </div>
             <label className="text-sm">
               Note
               <input
@@ -535,7 +564,7 @@ export function AdminWalletsPanel({
               {waiveNegative && modeTarget.wallet_balance_kes < 0 ? (
                 <p className="text-xs text-[var(--ink-soft)]">
                   Will credit KES {Math.abs(modeTarget.wallet_balance_kes).toLocaleString("en-KE")} so
-                  balance returns to 0.
+                  ledger returns to 0.
                 </p>
               ) : null}
             </div>
@@ -554,7 +583,7 @@ export function AdminWalletsPanel({
               className={btnPrimary}
               onClick={() => void savePlan()}
             >
-              {graduatingToEnforcement ? "Turn on enforcement" : "Save plan"}
+              {graduatingToCharging ? "Start charging" : "Save plan"}
             </button>
             <button
               type="button"
@@ -568,7 +597,7 @@ export function AdminWalletsPanel({
       ) : null}
 
       {ledgerTarget ? (
-        <div className="border-t border-line/70 pt-4">
+        <div className="border-t border-line/70 pt-3">
           <div className="flex items-center justify-between gap-3">
             <p className="font-medium">Ledger: {ledgerTarget.business_name}</p>
             <button
@@ -610,15 +639,18 @@ function Kpi({
   label,
   value,
   warn,
+  caption,
 }: {
   label: string;
   value: string | number;
   warn?: boolean;
+  caption?: string;
 }) {
   return (
-    <div className="border-t border-line/70 px-4 py-3 sm:border-t-0 sm:border-l sm:first:border-l-0">
+    <div className="border-t border-line/70 px-3 py-2 sm:border-t-0 sm:border-l sm:px-4 sm:py-2.5 sm:first:border-l-0">
       <p className={`text-body font-medium tabular-nums ${warn ? "text-attention" : "text-ink"}`}>{value}</p>
       <p className="mt-0.5 truncate text-meta text-ink-2">{label}</p>
+      {caption ? <p className="truncate text-meta text-ink-3">{caption}</p> : null}
     </div>
   );
 }

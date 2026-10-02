@@ -12,6 +12,10 @@ import { settingsChipClass } from "@/components/settingsUi";
 
 const initial: WalletTopUpState = {};
 
+/**
+ * Owner balance top-up stub. Not mounted on Usage while checkout is off-package.
+ * Kept for wiring tests; not mounted on Usage while checkout stays package-first.
+ */
 export function WalletTopUpButton({
   tenantId,
   topUpEnabled,
@@ -35,14 +39,14 @@ export function WalletTopUpButton({
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={btnPrimary}>
-        Top up
+        Add balance
       </button>
 
       {open ? (
-        <DeskDialog title="Top up prepaid" onClose={close} pending={pending}>
+        <DeskDialog title="Add balance" onClose={close} pending={pending}>
           <p className="mt-1 text-sm text-ink-soft">
             {topUpEnabled
-              ? "Choose an amount. Payment credits your prepaid balance."
+              ? "Choose an amount. Payment posts to your ops ledger when checkout is live."
               : "Online top-up is not live on this workspace."}
           </p>
 

@@ -19,7 +19,7 @@ export default async function AdminWalletsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className={deskListTitleClass}>Wallet ledger</h1>
+      <h1 className={deskListTitleClass}>Ops ledger</h1>
       <p className="text-sm text-ink-2">
         Customer billing is packages plus on-demand on{" "}
         <Link href="/admin/packages" className="font-medium text-accent underline-offset-2 hover:underline">
