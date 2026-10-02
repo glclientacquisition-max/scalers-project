@@ -188,7 +188,7 @@ Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates
 | Live connect | switch, when transfer can run or is already on (Team only; handoff UI off Voice, #514) | `handoff_mode` | Assistant on calls |
 | Team phone | text | none | Rings {name} during open hours. or Add a team phone. |
 | Name / **Role** / Phone / Email | table + inputs | `team_directory` | Whole business + assistant on calls |
-| Urgent calls / Follow-ups / Shop running | switch | teammate notify flags (`receives_escalation` / `inbox` / `ops`) | Whole business |
+| Urgent / Follow-up / Ops | switch | teammate notify flags (`receives_escalation` / `inbox` / `ops`) | Whole business |
 | Channels note | text | none | Channels follow How we notify. Not a channel pick |
 | Add person | ghost | appends a row | Whole business after Save |
 | Remove person | icon ghost | drops a row | Whole business after Save |

@@ -185,9 +185,9 @@ const TEAM_NOTIFY_FLAGS: Array<{
   key: "receives_escalation" | "receives_inbox" | "receives_ops";
   label: string;
 }> = [
-  { key: "receives_escalation", label: "Urgent calls" },
-  { key: "receives_inbox", label: "Follow-ups" },
-  { key: "receives_ops", label: "Shop running" },
+  { key: "receives_escalation", label: "Urgent" },
+  { key: "receives_inbox", label: "Follow-up" },
+  { key: "receives_ops", label: "Ops" },
 ];
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 

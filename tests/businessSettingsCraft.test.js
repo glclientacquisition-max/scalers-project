@@ -458,9 +458,9 @@ describe("business settings craft", () => {
     assert.doesNotMatch(form, /min-w-\[640px\]/);
     assert.doesNotMatch(form, /minmax\(10rem,auto\)/);
     assert.match(form, /\{flag\.label\}/);
-    assert.match(form, /label: "Urgent calls"/);
-    assert.match(form, /label: "Follow-ups"/);
-    assert.match(form, /label: "Shop running"/);
+    assert.match(form, /label: "Urgent"/);
+    assert.match(form, /label: "Follow-up"/);
+    assert.match(form, /label: "Ops"/);
     assert.match(form, /Channels follow How we notify\./);
     assert.doesNotMatch(form, /label: "SMS"/);
     assert.doesNotMatch(form, /label: "WhatsApp"/);
