@@ -34,6 +34,7 @@ export function DeskSelect<T extends string>({
   disabled,
   name,
   required,
+  portalThemeClass,
 }: {
   id?: string;
   value: T | "";
@@ -45,9 +46,12 @@ export function DeskSelect<T extends string>({
   disabled?: boolean;
   name?: string;
   required?: boolean;
+  /** Portal wrapper for CSS vars when mounted under body (admin vs owner shell). */
+  portalThemeClass?: "desk-theme" | "admin-theme";
 }) {
   const items = options.map((opt) => ({ value: opt.value, label: opt.label }));
   const selected: T | null = value === "" ? null : value;
+  const portalTheme = portalThemeClass ?? "desk-theme";
 
   return (
     <Select.Root
@@ -80,7 +84,7 @@ export function DeskSelect<T extends string>({
       </Select.Trigger>
       {/* Portal mounts under body; wrap so dark tokens (--surface/--ink) resolve under .desk-theme */}
       <Select.Portal>
-        <div className="desk-theme">
+        <div className={portalTheme}>
           <Select.Positioner
             className="z-menu outline-none"
             sideOffset={6}

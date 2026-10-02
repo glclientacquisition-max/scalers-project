@@ -77,7 +77,7 @@ describe("usage balance refresh", () => {
     assert.equal(refreshUsageOnPaymentStartSafe(button), false);
     assert.doesNotMatch(button, /router\.refresh/);
     assert.doesNotMatch(button, /location\.reload/);
-    assert.match(topup, /Complete the payment on your phone to credit prepaid/);
+    assert.match(topup, /Complete the payment on your phone to credit your balance/);
     assert.doesNotMatch(read("dashboard/src/lib/deskPullAction.ts"), /topup|payment/i);
     assert.match(read("dashboard/src/components/PhonePullSurface.tsx"), /router\.refresh\(\)/);
     assert.doesNotMatch(read("dashboard/src/app/(desk)/wallet/page.tsx"), /location\.reload/);

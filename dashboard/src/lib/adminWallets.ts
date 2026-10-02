@@ -18,10 +18,10 @@ export type AdminWalletRow = {
 export type AdminWalletOverview = {
   rows: AdminWalletRow[];
   betaCount: number;
-  prepaidCount: number;
+  chargingCount: number;
   lowCount: number;
   overdrawnCount: number;
-  totalFloatKes: number;
+  totalLedgerBalanceKes: number;
 };
 
 function modeOf(v: string | null | undefined): BillingMode {
@@ -75,11 +75,11 @@ export async function listAdminWallets(): Promise<AdminWalletOverview> {
   return {
     rows,
     betaCount: rows.filter((r) => r.wallet_status === "beta").length,
-    prepaidCount: rows.filter((r) => r.billing_enforcement !== "off" && r.wallet_status !== "archived")
+    chargingCount: rows.filter((r) => r.billing_enforcement !== "off" && r.wallet_status !== "archived")
       .length,
     lowCount: rows.filter((r) => r.wallet_status === "low").length,
     overdrawnCount: rows.filter((r) => r.wallet_status === "overdrawn").length,
-    totalFloatKes: rows.reduce((sum, r) => sum + Math.max(0, r.wallet_balance_kes), 0),
+    totalLedgerBalanceKes: rows.reduce((sum, r) => sum + Math.max(0, r.wallet_balance_kes), 0),
   };
 }
 
