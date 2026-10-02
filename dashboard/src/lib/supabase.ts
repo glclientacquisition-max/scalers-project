@@ -241,7 +241,7 @@ export type TenantRow = {
   /** Owner opt-in monthly soft spend budget (warn only). */
   soft_spend_limit_enabled?: boolean | null;
   soft_spend_limit_kes?: number | null;
-  /** Owner opt-in: continue charging after prepaid hits zero. Same toggle covers included SMS. */
+  /** Owner opt-in: continue charging after ledger balance hits zero. Same toggle covers included SMS. */
   on_demand_usage_enabled?: boolean | null;
   /** Included tenant SMS segments. Default 200. */
   sms_included_units?: number | null;

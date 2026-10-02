@@ -39,11 +39,11 @@ export function WalletTopUpButton({
       </button>
 
       {open ? (
-        <DeskDialog title="Top up prepaid" onClose={close} pending={pending}>
+        <DeskDialog title="Add balance" onClose={close} pending={pending}>
           <p className="mt-1 text-sm text-ink-soft">
             {topUpEnabled
-              ? "Choose an amount. Payment credits your prepaid balance."
-              : "Online top-up is not live on this workspace."}
+              ? "Choose an amount. Payment credits your ledger balance."
+              : "Online add-balance is not live on this workspace."}
           </p>
 
           <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -90,7 +90,7 @@ export function WalletTopUpButton({
               ) : topUpEnabled ? (
                 `Pay KES ${amount.toLocaleString("en-KE")}`
               ) : (
-                "Top up not live yet"
+                "Add balance not live yet"
               )}
             </button>
           </form>

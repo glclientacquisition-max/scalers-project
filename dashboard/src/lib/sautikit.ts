@@ -266,7 +266,7 @@ export async function claimSautikitNumber(inventoryId: string): Promise<Sautikit
 }
 
 /**
- * Prepaid platform wallet. Requires an API key with the `wallet.read` scope —
+ * Platform cost wallet (SautiKit). Requires an API key with the `wallet.read` scope —
  * returns null when the current key lacks it (403 api_key.scope_denied).
  */
 export async function getSautikitWallet(): Promise<SautikitWallet | null> {

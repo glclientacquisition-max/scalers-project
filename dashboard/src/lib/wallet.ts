@@ -178,7 +178,7 @@ function minutesFromCallRows(
   };
 }
 
-/** Days the prepaid balance lasts at the current call pace. Null when no pace or no balance. */
+/** Days the ledger balance lasts at the current call pace. Null when no pace or no balance. */
 export function runwayDaysAtPace(opts: {
   minutesThisMonth: number;
   dayOfMonth: number;
@@ -276,7 +276,7 @@ export async function getTenantUsageSummary(
   const billingEnforcement = wallets.billingEnforcement || "off";
   const isBeta = isBetaBilling(billingEnforcement);
 
-  // A package price includes the number. The old line fee applies only to prepaid businesses with no package.
+  // A package price includes the number. The old line fee applies only to enforcement-on tenants with no package.
   if (billingEnforcement !== "off") {
     try {
       const hasPackage = await tenantHasAssignedPackage(tenantId);
@@ -354,7 +354,7 @@ export async function getTenantUsageSummary(
       }))
     : [];
 
-  // Soft budget counts prepaid ledger spend; beta uses illustrative rate-card cost.
+  // Soft budget counts ledger spend; beta uses illustrative rate-card cost.
   const softSpentKes = isBeta ? estimatedCostKes : callChargesKes + lineFeeKes;
   const softSpendLimit = resolveSoftSpendLimitStatus({
     enabled: wallets.softSpendLimitEnabled,
