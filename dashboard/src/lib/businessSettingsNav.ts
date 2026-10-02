@@ -126,7 +126,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     title: "People",
     items: [
       { label: "Team", target: { tab: "train", panel: "team" } },
-      { label: "Alerts", target: { tab: "alerts" } },
+      { label: "How we notify", target: { tab: "alerts" } },
     ],
   },
 ];
@@ -176,7 +176,7 @@ export function settingsPanelHeading(
 ): string | null {
   if (tab === "menu") return null;
   if (tab === "catalog") return "Catalog";
-  if (tab === "alerts") return "Alerts";
+  if (tab === "alerts") return "How we notify";
   if (tab === "import") {
     const v = String(vertical || "")
       .trim()

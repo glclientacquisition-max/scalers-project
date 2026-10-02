@@ -179,15 +179,15 @@ const emptyMember = (): TeamDirectoryEntry => ({
   ...EMPTY_TEAM_NOTIFY_FLAGS,
 });
 
-/** Permission kinds on the three saved notify flags. Channels stay on Alerts. */
-const TEAM_NOTIFY_CHANNEL_NOTE = "SMS, WhatsApp, and email follow Alerts.";
+/** Permission kinds on the three saved notify flags. Channels stay on How we notify. */
+const TEAM_NOTIFY_CHANNEL_NOTE = "Channels follow How we notify.";
 const TEAM_NOTIFY_FLAGS: Array<{
   key: "receives_escalation" | "receives_inbox" | "receives_ops";
   label: string;
 }> = [
-  { key: "receives_escalation", label: "Escalate" },
-  { key: "receives_inbox", label: "Inbox" },
-  { key: "receives_ops", label: "Ops" },
+  { key: "receives_escalation", label: "Urgent calls" },
+  { key: "receives_inbox", label: "Follow-ups" },
+  { key: "receives_ops", label: "Shop running" },
 ];
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 

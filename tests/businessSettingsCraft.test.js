@@ -107,7 +107,7 @@ describe("business settings craft", () => {
     assert.match(nav, /label: "FAQs"/);
     assert.match(nav, /label: "Catalog"/);
     assert.match(nav, /label: "Import"/);
-    assert.match(nav, /label: "Alerts"/);
+    assert.match(nav, /label: "How we notify"/);
     assert.match(nav, /label: "Team"/);
     assert.doesNotMatch(nav, /label: "Appearance"/);
     assert.match(nav, /panel: "identity"/);
@@ -350,7 +350,7 @@ describe("business settings craft", () => {
     );
   });
 
-  it("orders jobs and keeps Team out of the Alerts group", () => {
+  it("orders jobs and keeps Team out of the How we notify group", () => {
     const got = loadSettingsNav();
     assert.deepEqual(got.labels, [
       "Identity",
@@ -364,7 +364,7 @@ describe("business settings craft", () => {
       "Pronunciation",
       "Test",
       "Team",
-      "Alerts",
+      "How we notify",
     ]);
     assert.deepEqual(
       got.sections.map((section) => section.title),
@@ -374,10 +374,10 @@ describe("business settings craft", () => {
     assert.equal(got.labels[got.labels.indexOf("Catalog") + 1], "Import");
     assert.equal(got.labels.indexOf("Identity") + 1, got.labels.indexOf("Hours"));
     const people = got.sections.find((section) => section.title === "People");
-    assert.deepEqual(people.labels, ["Team", "Alerts"]);
+    assert.deepEqual(people.labels, ["Team", "How we notify"]);
     assert.equal(people.id, "people");
     assert.notEqual(people.id, "alerts");
-    assert.equal(got.sections.some((section) => section.title === "Alerts" || section.id === "alerts"), false);
+    assert.equal(got.sections.some((section) => section.title === "How we notify" || section.title === "Alerts" || section.id === "alerts"), false);
     assert.equal(got.hoursWide, "/settings?tab=train&panel=hours");
     assert.equal(got.phoneIndex, null);
     assert.equal(got.missingCookie, null);
@@ -458,10 +458,10 @@ describe("business settings craft", () => {
     assert.doesNotMatch(form, /min-w-\[640px\]/);
     assert.doesNotMatch(form, /minmax\(10rem,auto\)/);
     assert.match(form, /\{flag\.label\}/);
-    assert.match(form, /label: "Escalate"/);
-    assert.match(form, /label: "Inbox"/);
-    assert.match(form, /label: "Ops"/);
-    assert.match(form, /SMS, WhatsApp, and email follow Alerts\./);
+    assert.match(form, /label: "Urgent calls"/);
+    assert.match(form, /label: "Follow-ups"/);
+    assert.match(form, /label: "Shop running"/);
+    assert.match(form, /Channels follow How we notify\./);
     assert.doesNotMatch(form, /label: "SMS"/);
     assert.doesNotMatch(form, /label: "WhatsApp"/);
     assert.doesNotMatch(form, /label: "Email"/);

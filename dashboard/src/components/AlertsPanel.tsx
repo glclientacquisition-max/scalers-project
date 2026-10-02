@@ -67,7 +67,7 @@ export function AlertsPanel({
         businessName={businessName}
         lineLive={false}
         showBack
-        title="Alerts"
+        title="How we notify"
         alert={state.error}
         action={
           <button

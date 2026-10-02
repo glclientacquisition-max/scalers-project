@@ -13,16 +13,16 @@ See [`MASTER.md`](../MASTER.md) Components. Settings primitives live in `setting
 Business       Identity · Hours · Locations · Policies
 Knowledge      Catalog · Import · FAQs
 Assistant      Voice · Pronunciation · Test
-People         Team · Alerts
+People         Team · How we notify
 ```
 
-One header per group. Import sits directly under Catalog. Team is the first People row. Alerts is not the parent of Team. Locations and Policies keep those labels. FAQs stay in Knowledge. Updates stay on Home.
+One header per group. Import sits directly under Catalog. Team is the first People row. How we notify is not the parent of Team. Locations and Policies keep those labels. FAQs stay in Knowledge. Updates stay on Home.
 
 Phone: dense index rows. Tap a row to drill in. Nested panels hide the bottom tab bar (`data-desk-nested`). The Settings hub keeps tabs. `DeskBack` icon, aria-label Settings (`lg:hidden`). The `md+` rail stays packed (`md:w-max md:max-w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). `SettingsSegmented` uses Inbox rate cards (`deskRateCardClass`). No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
 
-Sticky **Save** on Catalog and Train panels (except Pronunciation), top-right of the panel header (`TenantSettingsSaveButton` label is **Save**, not “Save and train”). After a successful compile the toast is `Saved · training line` (Alerts Save stays `Saved` only — no compile). Alerts, Import, and Test use the same menu without a second compile save. Alerts Save is the panel primary. Test has one filled control: Call when the line is live, otherwise **Hear greeting**.
+Sticky **Save** on Catalog and Train panels (except Pronunciation), top-right of the panel header (`TenantSettingsSaveButton` label is **Save**, not “Save and train”). After a successful compile the toast is `Saved · training line` (How we notify Save stays `Saved` only — no compile). How we notify, Import, and Test use the same menu without a second compile save. How we notify Save is the panel primary. Test has one filled control: Call when the line is live, otherwise **Hear greeting**.
 
-Bare `/settings` is the phone index. md+ `/settings` with no tab redirects to Hours (`?tab=train&panel=hours`) before a form renders. `?tab=train` still opens Identity. Test line still opens Test. `?tab=updates`, `?tab=today`, and `?tab=appearance` open the hub, then a wide screen follows the Hours redirect. Updates stay on Home. Appearance stays on the account menu. `?tab=alerts` is Alerts. Hash `#train` is not routed. Sticky chrome is **Save**; compile still trains the line — honesty is the toast `Saved · training line`, not a Train verb on the button.
+Bare `/settings` is the phone index. md+ `/settings` with no tab redirects to Hours (`?tab=train&panel=hours`) before a form renders. `?tab=train` still opens Identity. Test line still opens Test. `?tab=updates`, `?tab=today`, and `?tab=appearance` open the hub, then a wide screen follows the Hours redirect. Updates stay on Home. Appearance stays on the account menu. `?tab=alerts` is How we notify (route id stays `alerts`). Hash `#train` is not routed. Sticky chrome is **Save**; compile still trains the line — honesty is the toast `Saved · training line`, not a Train verb on the button.
 
 ## Chrome
 
@@ -30,7 +30,7 @@ Short in-page title Settings plus compact workspace name on the hub. The top str
 
 Phone index: full-width grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
 
-Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, and Alerts use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` rate cards (`deskRateCardClass`, same as Inbox and Contacts chips). Account-menu Appearance is the three theme cards, not that strip. Four-plus enums use `SettingsSelect` (wraps `DeskSelect`; open list portals under `body` inside `.desk-theme` so dark tokens resolve). Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
+Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, and How we notify use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` rate cards (`deskRateCardClass`, same as Inbox and Contacts chips). Account-menu Appearance is the three theme cards, not that strip. Four-plus enums use `SettingsSelect` (wraps `DeskSelect`; open list portals under `body` inside `.desk-theme` so dark tokens resolve). Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 
@@ -43,7 +43,7 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Screen | Old control | New control |
 | --- | --- | --- |
 | Identity | Label-above inputs; tone and type chip rows | Grouped rows. Name fields. Tone select: Professional or Warm. Type select: Shop or Home services. Contacts table `md+`, stacked phone |
-| Alerts | Form grid plus bordered toggle cards | Grouped Contact / Channels / Callers rows. Channel and caller flags are switches. Save filled |
+| How we notify | Form grid plus bordered toggle cards | Grouped Contact / Channels / Callers rows. Channel and caller flags are switches. Save filled |
 | Catalog | Services and products tables `md+`, stacked phone | Unchanged tables. Add / paste stay ghost. Bulk apply filled |
 | Hours | Open/Closed chip per day; after-hours chips | Day grid with open switches. When closed is segmented Keep helping / Message only |
 | Locations | Places table `lg+`, stacked phone | Unchanged dense table. Add place ghost |
@@ -57,7 +57,7 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Appearance | Account menu, not a Settings row | System / Light / Dark cluster. Label **This device**. `localStorage["scalers-desk-theme"]`. No Settings fetch |
 | Sign out | Ghost, instant POST | Ghost until confirm. **Sign out?** then filled **Sign out** / ghost **Stay**. POST `/api/logout` only after confirm |
 
-Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notification_number`, `alert_email`, and `notify_channels` without recompiling the assistant prompt.
+Do not invent fields. Do not change compile keys. How we notify persists `whatsapp_notification_number`, `alert_email`, and `notify_channels` without recompiling the assistant prompt.
 
 ## Control inventory
 
@@ -171,7 +171,7 @@ Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates
 | Add selected / Add to catalogue | filled | checked sections / catalogue | Whole business + assistant on calls |
 | Start over | ghost | clears draft | This device |
 
-### Alerts (`?tab=alerts`)
+### How we notify (`?tab=alerts`)
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
@@ -188,8 +188,8 @@ Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates
 | Live connect | switch, when transfer can run or is already on (Team only; handoff UI off Voice, #514) | `handoff_mode` | Assistant on calls |
 | Team phone | text | none | Rings {name} during open hours. or Add a team phone. |
 | Name / **Role** / Phone / Email | table + inputs | `team_directory` | Whole business + assistant on calls |
-| Escalate / Inbox / Ops | switch | teammate notify flags | Whole business |
-| Channels note | text | none | SMS, WhatsApp, and email follow Alerts. Not a channel pick |
+| Urgent calls / Follow-ups / Shop running | switch | teammate notify flags (`receives_escalation` / `inbox` / `ops`) | Whole business |
+| Channels note | text | none | Channels follow How we notify. Not a channel pick |
 | Add person | ghost | appends a row | Whole business after Save |
 | Remove person | icon ghost | drops a row | Whole business after Save |
 | Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |
