@@ -192,6 +192,29 @@ describe('mergeTranscriptReview', () => {
     assert.equal(merged.resolution, 'resolved');
   });
 
+  it('downgrades false cleaning escalate when a visit was saved', () => {
+    const merged = mergeTranscriptReview({
+      vertical: 'home_services',
+      derived: { primaryIntent: 'human', resolution: 'needs_human' },
+      summary: {
+        reason: 'Urgent emergency air bnb cleanup needed now in Westlands',
+      },
+      toolFlags: {
+        ...visitFlags,
+        escalateSaved: true,
+        escalateReason:
+          'Urgent emergency air bnb cleanup needed now in Westlands',
+      },
+      review: {
+        primary_intent: 'human',
+        needs_human: true,
+        confidence: 0.95,
+      },
+    });
+    assert.equal(merged.primaryIntent, 'book_visit');
+    assert.notEqual(merged.resolution, 'needs_human');
+  });
+
   it('never overrides a saved visit with needs_human', () => {
     const merged = mergeTranscriptReview({
       derived: { primaryIntent: 'book_visit', resolution: 'resolved' },

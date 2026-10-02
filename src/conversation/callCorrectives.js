@@ -108,7 +108,11 @@ function ackIsConsent(questionsAsked, text) {
 function looksLikeUrgentContact(text) {
   const t = normalizeAckText(text);
   if (!t) return false;
-  if (/\b(carpet|couch|sofa|mattress|clean|cleaning|diary|diaries|order)\b/.test(t)) {
+  if (
+    /\b(carpet|couch|sofa|mattress|clean|cleaning|cleanup|airbnb|air\s*bnb|bnb|diary|diaries|order)\b/.test(
+      t
+    )
+  ) {
     return false;
   }
   return (

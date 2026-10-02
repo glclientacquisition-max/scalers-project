@@ -59,6 +59,25 @@ describe('required escalate injection', () => {
     assert.equal(parsed.escalate.reason, 'wants owner');
   });
 
+  it('skips injection for home visit-class urgency on booking intent', () => {
+    const parsed = ensureRequiredEscalate(
+      { escalate: null },
+      {
+        vertical: 'home_services',
+        intent: 'booking',
+        handoff: { requested: false },
+        resolution: { nextBestAction: 'ESCALATE' },
+        caller: { name: 'Alvin' },
+        goal: {
+          missingSlots: [],
+          description: 'Urgent emergency air bnb cleanup needed now in Westlands',
+        },
+      },
+      { escalate: true }
+    );
+    assert.equal(parsed.escalate, null);
+  });
+
   it('skips injection when name is still missing', () => {
     const parsed = ensureRequiredEscalate(
       { escalate: null },

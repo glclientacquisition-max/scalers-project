@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   ensureRequiredCreateRequest,
   formatCreateRequestDirective,
+  guardToolPlan,
 } = require('../src/conversation/requiredCreateRequest');
 const {
   executeBrainTools,
@@ -253,5 +254,27 @@ describe('required create-request injection', () => {
       formatCreateRequestDirective(retailHoldState({ vertical: 'hospitality' })),
       ''
     );
+  });
+
+  it('strips escalate on home visit-class urgency while booking', () => {
+    const state = homeBookingState({
+      goal: {
+        missingSlots: [],
+        description: 'Urgent emergency air bnb cleanup needed now in Westlands',
+      },
+    });
+    const parsed = guardToolPlan(
+      {
+        escalate: {
+          teammate: 'General queries',
+          name: 'Alvin',
+          reason: 'Urgent emergency air bnb cleanup needed now in Westlands',
+        },
+      },
+      state,
+      { escalate: true }
+    );
+    assert.equal(parsed.escalate, undefined);
+    assert.equal(parsed.visitClassEscalateBlocked, true);
   });
 });

@@ -181,6 +181,16 @@ function composeOpenerIdentity(opts = {}) {
  * }} opts
  * @returns {string}
  */
+function wantsLanguageInvite(opts = {}) {
+  if (opts.requireLanguageInvite === true) return true;
+  const vertical = String(opts.vertical || '').trim().toLowerCase();
+  return vertical === 'home_services' || vertical === 'homeservices' || vertical === 'home_service';
+}
+
+function languageInviteClause(opts = {}) {
+  return wantsLanguageInvite(opts) ? `${LANGUAGE_INVITE} ` : '';
+}
+
 function composeBusinessAssistantIntro(opts = {}) {
   const afterHoursMode =
     String(opts.afterHoursMode || 'serve').trim().toLowerCase() === 'message'
@@ -189,23 +199,24 @@ function composeBusinessAssistantIntro(opts = {}) {
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
   const identity = composeOpenerIdentity(opts);
+  const invite = languageInviteClause(opts);
   const help = 'How can I help?';
   const nameAsk = 'May I have your name?';
 
   if (closureNotice) {
     const follow = afterHoursMode === 'message' ? nameAsk : help;
-    return `${identity} ${closureNotice} ${follow}`;
+    return `${identity} ${invite}${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === 'message') {
-    return `${identity} We're closed now. ${nameAsk}`;
+    return `${identity} ${invite}We're closed now. ${nameAsk}`;
   }
 
   if (closed) {
-    return `${identity} We're closed now. ${help}`;
+    return `${identity} ${invite}We're closed now. ${help}`;
   }
 
-  return `${identity} ${help}`;
+  return `${identity} ${invite}${help}`;
 }
 
 /**
@@ -219,13 +230,18 @@ function previewBusinessAssistantIntro(opts = {}) {
   });
 }
 
-function introLooksValid(line, businessName, agentName) {
+function introLooksValid(line, businessName, agentName, opts = {}) {
   const text = String(line || '')
     .replace(/["“”']/g, '')
     .replace(/\s+/g, ' ')
     .trim();
   if (!text || text.length > 220) return false;
-  if (FORBIDDEN_FIRST_OPEN.test(text)) return false;
+  const requireInvite = wantsLanguageInvite(opts);
+  if (requireInvite) {
+    if (!/\byou can speak in english or kiswahili\b/i.test(text)) return false;
+  } else if (FORBIDDEN_FIRST_OPEN.test(text)) {
+    return false;
+  }
   const name = String(businessName || '').trim();
   if (name && !/^the business$/i.test(name)) {
     const nameToken = name.split(/\s+/)[0];
@@ -254,6 +270,7 @@ module.exports = {
   eatTimeOfDay,
   LANGUAGE_INVITE,
   FORBIDDEN_FIRST_OPEN,
+  wantsLanguageInvite,
   summarizeOfferingForIntro,
   composeOpenerIdentity,
   composeBusinessAssistantIntro,

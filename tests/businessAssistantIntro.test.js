@@ -134,6 +134,26 @@ describe('business assistant introduction', () => {
     assertForbiddenOpen(line);
   });
 
+  it('pack #0: home_services intro includes English/Kiswahili invite', () => {
+    const line = composeBusinessAssistantIntro({
+      businessName: 'Done and Dusted Cleaning Services',
+      agentName: 'Shy',
+      vertical: 'home_services',
+      isOpen: true,
+      now: afternoon,
+      variant: 0,
+    });
+    assert.match(line, /Done and Dusted Cleaning Services, this is Shy\./);
+    assert.match(line, /You can speak in English or Kiswahili\./);
+    assert.match(line, /How can I help/);
+    assert.ok(
+      introLooksValid(line, 'Done and Dusted Cleaning Services', 'Shy', {
+        vertical: 'home_services',
+      })
+    );
+    assert.doesNotMatch(line, /We help with/i);
+  });
+
   it('states closed honestly then asks the same question', () => {
     const line = composeBusinessAssistantIntro({
       businessName: 'ChapterOne Bookstore',

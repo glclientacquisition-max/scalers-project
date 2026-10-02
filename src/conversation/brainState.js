@@ -42,6 +42,10 @@ const {
   looksLikePastBookingTalk,
 } = require('./visitTalk');
 const {
+  looksLikeTrueHomeEmergency,
+  looksLikeVisitClassCleaningUrgency,
+} = require('./playbooks/homeServices');
+const {
   coverageAskPlace,
   decideVisitPlace,
   foldCanonicalPlace,
@@ -85,20 +89,6 @@ const GOAL_BY_INTENT = Object.freeze({
   product_inquiry: 'find_product',
   general_enquiry: 'resolve_enquiry',
 });
-
-function looksLikeHomeEmergency(value) {
-  if (
-    /\b(burst(\s+pipe)?|flood(ing)?|gas leak|electric shock|live wire|on fire|water everywhere|hatari)\b/.test(
-      value
-    )
-  ) {
-    return true;
-  }
-  return (
-    /\bemergency\b/.test(value) &&
-    /\b(pipe|flood|leak|shock|wire|fire|gas|power)\b/.test(value)
-  );
-}
 
 function looksLikeHomeVisitAsk(value) {
   if (
@@ -176,6 +166,12 @@ function inferIntent(text, opts = {}) {
   const value = String(text || '').trim().toLowerCase();
   const vertical = String(opts.vertical || '').toLowerCase();
   if (!value) return 'unknown';
+  if (vertical === 'home_services' && looksLikeVisitClassCleaningUrgency(value)) {
+    return 'booking';
+  }
+  if (vertical === 'home_services' && looksLikeTrueHomeEmergency(value)) {
+    return 'human';
+  }
   // Human / complaint before other patterns so "talk to the manager" wins.
   if (looksLikeUrgentContact(value)) return 'human';
   if (
@@ -183,9 +179,6 @@ function inferIntent(text, opts = {}) {
       value
     )
   ) {
-    return 'human';
-  }
-  if (looksLikeHomeEmergency(value)) {
     return 'human';
   }
   if (looksLikeCancelOrReschedule(value)) return 'cancellation';
@@ -344,10 +337,19 @@ function observeCallerTurn(state, input = {}) {
   if (!next.returning && input.profile?.callerMemory) {
     next.returning = returningFileFromCard(input.profile.callerMemory);
   }
-  const inferredIntent = inferIntent(text, {
+  let inferredIntent = inferIntent(text, {
     vertical: next.vertical || input.profile?.vertical,
     returning: next.returning,
   });
+  const vertical = String(next.vertical || input.profile?.vertical || '').toLowerCase();
+  if (
+    vertical === 'home_services' &&
+    inferredIntent === 'human' &&
+    looksLikeVisitClassCleaningUrgency(text) &&
+    !looksLikeTrueHomeEmergency(text)
+  ) {
+    inferredIntent = 'booking';
+  }
   const previousWasMeaningful = MEANINGFUL_INTENTS.has(next.intent);
   const fillingVisitPlace =
     next.intent === 'booking' &&
@@ -1007,7 +1009,7 @@ module.exports = {
   GOAL_BY_INTENT,
   createBrainState,
   inferIntent,
-  looksLikeHomeEmergency,
+  looksLikeHomeEmergency: looksLikeTrueHomeEmergency,
   looksLikeBookingIntent,
   looksLikeCancelOrReschedule,
   looksLikePastBookingTalk,

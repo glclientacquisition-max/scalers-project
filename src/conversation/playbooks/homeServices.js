@@ -70,6 +70,9 @@ const HOME_INTENTS = [
     patterns: [
       /\b(book|booking|appointment|schedule|visit|come (over|by|tomorrow|today)|nitakuja|njoo|tandika|install|repair|fix)\b/i,
       /\b(clean (my|the|our)|need (a |my )?(clean|carpet|couch|sofa|mattress|upholstery)|carpet clean|mattress clean|house clean|airbnb clean|sofa clean|couch clean)\b/i,
+      /\b(?:carpet|couch|sofa|mattress|house|upholstery|air\s*bnb|airbnb)\s+clean(?:ing|up)?\b/i,
+      /\b(?:urgent|asap|emergency|literally now|right now)\b.{0,48}\b(?:clean|carpet|couch|sofa|mattress|air\s*bnb|airbnb|house)\b/i,
+      /\b(?:clean|carpet|couch|sofa|mattress|air\s*bnb|airbnb|house)\b.{0,48}\b(?:urgent|asap|emergency|literally now|right now|needed now)\b/i,
       /\b(?:carpet|couch|sofa|mattress|house|upholstery|airbnb)\s+clean(?:ing)?\b.*\b(?:tomorrow|today|tonight|kesho|leo|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
     ],
   },
@@ -115,12 +118,12 @@ const HOME_INTENTS = [
     requiredSlots: ['name', 'reason'],
     optionalSlots: [],
     completion:
-      'True emergency only: burst pipe, flooding, fire, gas leak, or electric shock. Capture name + reason (save_caller_info). Follow POLICIES / HANDOFF MODE. Escalate when justified. Do not invent an ETA. Same-day, urgent, or ASAP cleaning is book_visit, not emergency.',
+      'True emergency only: burst pipe, flooding, fire, gas leak, or electric shock. Capture name + reason (save_caller_info). Follow POLICIES / HANDOFF MODE. Escalate when justified. Do not invent an ETA. Never substitute plumber or repair advice for escalate. Optional honesty (we are not plumbers) only after escalate is queued. Same-day, urgent, or ASAP cleaning is book_visit, not emergency.',
     tool: 'escalate',
     patterns: [
-      /\b(burst(\s+pipe)?|flood(ing)?|gas leak|electric shock|live wire|on fire|water everywhere|hatari)\b/i,
-      /\bemergency\b.{0,40}\b(pipe|flood|leak|shock|wire|fire|gas|power)\b/i,
-      /\b(pipe|flood|leak|shock|wire|fire|gas)\b.{0,40}\bemergency\b/i,
+      /\b(burst(\s+pipe)?|bust\s+pipe|papers?\s+bust|pipe\s*has|pipehas|flood(ing)?|gas leak|electric shock|live wire|on fire|water everywhere|hatari)\b/i,
+      /\bemergency\b.{0,40}\b(pipe|flood|leak|shock|wire|fire|gas|power|water)\b/i,
+      /\b(pipe|flood|leak|shock|wire|fire|gas|water)\b.{0,40}\bemergency\b/i,
     ],
   },
   {
@@ -149,6 +152,60 @@ const HOME_INTENTS = [
 
 const INTENT_BY_ID = Object.fromEntries(HOME_INTENTS.map((i) => [i.id, i]));
 
+const CLEANING_JOB =
+  /\b(carpet|couch|sofa|mattress|house|upholstery|air\s*bnb|airbnb|bnb)\b/i;
+const CLEANING_VERB = /\b(clean(?:ing)?|cleanup|fanya(?:\s+usafi)?)\b/i;
+const URGENCY_MARKERS =
+  /\b(urgent(?:ly)?|asap|a\.?s\.?a\.?p\.?|emergency|literally\s+now|right\s+now|needed\s+now|now)\b/i;
+
+/**
+ * Urgent / ASAP / "emergency" on a cleaning or Airbnb job — visit class only.
+ * @param {string} utterance
+ */
+function looksLikeVisitClassCleaningUrgency(utterance) {
+  const text = String(utterance || '').trim().toLowerCase();
+  if (!text) return false;
+  if (looksLikeTrueHomeEmergency(text)) return false;
+  if (!URGENCY_MARKERS.test(text)) return false;
+  if (/\b(do you|mnatoa|mnafanya|offer|provide)\b/.test(text)) return false;
+  return (
+    (CLEANING_JOB.test(text) && CLEANING_VERB.test(text)) ||
+    (CLEANING_JOB.test(text) && /\bairbnb\b/i.test(text)) ||
+    (URGENCY_MARKERS.test(text) && CLEANING_VERB.test(text) && CLEANING_JOB.test(text))
+  );
+}
+
+/**
+ * Burst pipe, flood, fire, gas, shock — including mild STT garble on live calls.
+ * @param {string} utterance
+ */
+function looksLikeTrueHomeEmergency(utterance) {
+  const text = String(utterance || '').trim().toLowerCase();
+  if (!text) return false;
+  if (
+    /\b(burst(\s+pipe)?|bust\s+pipe|papers?\s+bust|pipe\s*has|pipehas|flood(ing)?|gas\s+leak|electric\s+shock|live\s+wire|on\s+fire|water\s+everywhere|hatari)\b/.test(
+      text
+    )
+  ) {
+    return true;
+  }
+  return (
+    /\bemergency\b/.test(text) &&
+    /\b(pipe|flood|leak|shock|wire|fire|gas|power|water)\b/.test(text)
+  );
+}
+
+/**
+ * Escalate reason text that is really visit-class cleaning urgency (false emergency).
+ * @param {string} reason
+ */
+function isVisitClassEscalateReason(reason) {
+  const text = String(reason || '').trim();
+  if (!text) return false;
+  if (looksLikeTrueHomeEmergency(text)) return false;
+  return looksLikeVisitClassCleaningUrgency(text);
+}
+
 /**
  * @param {string} utterance
  * @returns {HomeIntent}
@@ -156,6 +213,16 @@ const INTENT_BY_ID = Object.fromEntries(HOME_INTENTS.map((i) => [i.id, i]));
 function classifyHomeIntent(utterance) {
   const text = String(utterance || '').trim();
   if (!text) return 'other';
+  if (looksLikeVisitClassCleaningUrgency(text)) return 'book_visit';
+  if (looksLikeTrueHomeEmergency(text)) return 'emergency';
+  if (/\b(do you|mnatoa|mnafanya|offer|provide)\b/i.test(text)) {
+    if (INTENT_BY_ID.service_inquiry.patterns.some((re) => re.test(text))) {
+      return 'service_inquiry';
+    }
+  }
+  if (INTENT_BY_ID.price_band.patterns.some((re) => re.test(text))) {
+    return 'price_band';
+  }
 
   /** @type {HomeIntent[]} */
   const priority = [
@@ -241,7 +308,9 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     '- In coverage: confirm service, day, time, and place, then the tool, then speak only the facts the tool saved.',
     '- Then, Okay, and Sawa are not a yes and not a time.',
     '- Cleaning, repair, install, pest, and similar jobs share this spine. Use SERVICES names; do not invent a niche that is not listed.',
-    '- Bare urgent / ASAP / same-day is not emergency. Escalate only for burst, flood, fire, gas, or shock.',
+    '- Bare urgent / ASAP / same-day / caller says emergency on cleaning or Airbnb is book_visit. Never escalate for that.',
+    '- Escalate only for burst, flood, fire, gas, or shock. Never invent plumber, stock, or trade repair advice.',
+    '- Out of Train scope: use UNKNOWN REQUEST LINE and note/callback. Do not bluff expertise.',
     '- After a clear completion, confirm briefly and goodbye.'
   );
 
@@ -251,6 +320,9 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
 module.exports = {
   HOME_INTENTS,
   classifyHomeIntent,
+  looksLikeVisitClassCleaningUrgency,
+  looksLikeTrueHomeEmergency,
+  isVisitClassEscalateReason,
   missingHomeSlots,
   canCompleteHomeIntent,
   formatHomeServicesPlaybookForPrompt,
