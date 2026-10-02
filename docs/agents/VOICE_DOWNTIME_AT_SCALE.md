@@ -20,7 +20,7 @@ Do not say Soniox, Gemini, SautiKit, billing, or "technical issue" to the caller
 | --- | --- | --- | --- |
 | Caller | Phone, that tenant's catalog voice | Every affected call | Speech down: hear the same person, call back, leave. Reasoning down: give a name, know the team will call back. |
 | Owner | SMS, then WhatsApp, then email | Once per business per kind per cooldown (default 30 min), and only if a caller actually hit that DID | Know their line is degraded. Not one text per abandoned call. |
-| Ops | `/healthz` + Railway logs | Once per process incident | See `soniox.lastError.billingExhausted`, `soniox.outageClips`, and `gemini.lastError`. |
+| Ops | SMS/email to `SCALERS_OPS_ALERT_*` + `/healthz` | Once per kind per cooldown while degraded | `notePlatformOpsDegrade` in `src/notifications/platformOpsAlert.js`. Owner `speechOutageNotify` unchanged. |
 
 ## Speech down: caller line
 
@@ -85,8 +85,11 @@ No vendor names. No "add funds" (that is wallet, a different incident). Uses the
 - `soniox.lastError.billingExhausted`
 - `soniox.outageClips` (default voice ready flags plus per-voice map)
 - `gemini.lastError` (`billingExhausted`, `denied`, last error kind)
+- `telephony.lastError` (SautiKit wallet probe: empty balance or 402)
 
-Desk Super Admin banner and a public status page are **Desk / Ops** follow-ups. Voice does not add UI.
+**Platform ops alerts (Scalers team, not owners):** set `SCALERS_OPS_ALERT_PHONES` and/or `SCALERS_OPS_ALERT_EMAILS` on Voice. When speech, reasoning, or telephony newly degrades, Voice sends one alert per kind until recovery (`VOICE_PLATFORM_OPS_COOLDOWN_MS`, default 30 min backstop). Hooks: Soniox billing in `sonioxProviderHealth.js`, Gemini billing/denied in `geminiProviderHealth.js`, telephony wallet in `src/sautikit/walletProbe.js` (interval `VOICE_TELEPHONY_WALLET_PROBE_MS`). Staging dry-run: `VOICE_PLATFORM_OPS_DRY_RUN=true` or `POST /internal/platform/ops-alert` with `VOICE_INTERNAL_SECRET`. Full path: [`PLATFORM_OPS_ALERTS.md`](./PLATFORM_OPS_ALERTS.md).
+
+Desk Super Admin Platform board reads `/healthz`. No public status page. Voice does not add Admin UI.
 
 ## What not to do
 

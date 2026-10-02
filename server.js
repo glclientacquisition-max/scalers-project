@@ -126,6 +126,15 @@ const {
   noteGeminiProviderOk,
   getGeminiProviderHealth,
 } = require('./src/conversation/geminiProviderHealth');
+const { getTelephonyProviderHealth } = require('./src/sautikit/telephonyProviderHealth');
+const {
+  startTelephonyWalletProbe,
+  probeSautikitWallet,
+} = require('./src/sautikit/walletProbe');
+const {
+  notePlatformOpsDegrade,
+  opsCooldownMs,
+} = require('./src/notifications/platformOpsAlert');
 const {
   selectProductsForTurn,
   formatTargetedProductsForPrompt,
@@ -469,6 +478,14 @@ app.get('/healthz', (_req, res) => {
       model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
       lastError: getGeminiProviderHealth(),
     },
+    telephony: {
+      configured: Boolean(process.env.SAUTIKIT_API_KEY),
+      lastError: getTelephonyProviderHealth(),
+    },
+    platformOps: {
+      dryRun: String(process.env.VOICE_PLATFORM_OPS_DRY_RUN || '').toLowerCase() === 'true',
+      cooldownMs: opsCooldownMs(),
+    },
     notify: {
       sms: {
         configured: sms.configured,
@@ -497,6 +514,28 @@ app.get('/internal/sms/status', async (req, res) => {
   }
   const status = await probeSmsCredentials({ force: true });
   return res.status(200).json({ ok: Boolean(status.verified), sms: status });
+});
+
+/** Ops: force SautiKit wallet probe (may fire telephony platform alert). */
+app.post('/internal/telephony/wallet-probe', async (req, res) => {
+  if (!voicePreviewAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const result = await probeSautikitWallet();
+  return res.status(200).json(result);
+});
+
+/** Staging proof: fire platform ops alert with VOICE_PLATFORM_OPS_DRY_RUN=true. */
+app.post('/internal/platform/ops-alert', async (req, res) => {
+  if (!voicePreviewAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const kind = String(req.body?.kind || 'speech').trim();
+  const result = await notePlatformOpsDegrade(kind, {
+    channel: 'manual',
+    message: String(req.body?.message || 'staging probe').trim(),
+  });
+  return res.status(200).json({ ok: Boolean(result.ok), result });
 });
 
 /** Owner desk re-ping. Same dispatch as live escalate. Force retries after a failed notify. */
@@ -4935,6 +4974,20 @@ server.listen(PORT, () => {
     console.log(`✓ Email alert fallback ready (from ${process.env.ALERT_EMAIL_FROM})`);
   } else {
     console.log(`ℹ Email fallback not set (RESEND_API_KEY + ALERT_EMAIL_FROM)`);
+  }
+  if (process.env.SAUTIKIT_API_KEY) {
+    startTelephonyWalletProbe();
+    console.log(`✓ Telephony wallet probe scheduled (VOICE_TELEPHONY_WALLET_PROBE_MS)`);
+  }
+  if (String(process.env.VOICE_PLATFORM_OPS_DRY_RUN || '').toLowerCase() === 'true') {
+    console.log(`ℹ Platform ops alerts in DRY_RUN (log only)`);
+  }
+  if (String(process.env.SCALERS_OPS_ALERT_PHONES || process.env.SCALERS_OPS_ALERT_EMAILS || '')) {
+    console.log(`✓ Platform ops alert list configured`);
+  } else {
+    console.log(
+      `ℹ Platform ops alert list not set (SCALERS_OPS_ALERT_PHONES / SCALERS_OPS_ALERT_EMAILS)`
+    );
   }
   if (String(process.env.SAUTIKIT_VALIDATE_WEBHOOKS || '').toLowerCase() === 'true') {
     console.log(`✓ SautiKit webhook signature validation ON`);
