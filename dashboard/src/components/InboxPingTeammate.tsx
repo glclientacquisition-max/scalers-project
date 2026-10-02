@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { pingTeammateAction } from "@/app/(desk)/calls/escalateActions";
 import { DeskHint } from "@/components/ui/DeskHint";
+import { DeskSelect } from "@/components/ui/DeskSelect";
 import {
   btnGhost,
   deskHitClass,
@@ -253,20 +254,20 @@ export function InboxPingTeammate({
           <label className="sr-only" htmlFor={`ping-teammate-${callId}`}>
             Teammate
           </label>
-          <select
+          <DeskSelect
             id={`ping-teammate-${callId}`}
+            aria-label="Teammate"
             value={picked}
             disabled={pending}
-            onChange={(event) => setPicked(event.target.value)}
             className={`min-h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-sm text-ink ${focusRingVisible} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
-          >
-            {people.map((person) => (
-              <option key={`${person.name}-${person.phone}`} value={person.name}>
-                {person.name}
-                {person.role ? ` (${person.role})` : ""}
-              </option>
-            ))}
-          </select>
+            options={people.map((person) => ({
+              value: person.name,
+              label: person.role
+                ? `${person.name} (${person.role})`
+                : person.name,
+            }))}
+            onChange={setPicked}
+          />
           <button
             type="button"
             disabled={pending || !picked}

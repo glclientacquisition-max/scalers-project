@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Pagination } from "@/components/ui/Pagination";
 import {
   useActionState,
@@ -1643,20 +1644,18 @@ export function PronunciationCoach({
                     ? "Save review"
                     : "AI listen"}
               </button>
-              <select
+              <DeskSelect
                 id="gemini-batch"
                 aria-label="Calls for AI listen"
-                value={geminiBatch}
-                onChange={(e) => setGeminiBatch(Number(e.target.value))}
+                value={String(geminiBatch)}
                 disabled={geminiPending || unsavedReview}
-                className="min-h-11 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-              >
-                {GEMINI_SCAN_BATCH_OPTIONS.map((n) => (
-                  <option key={n} value={n}>
-                    Last {n}
-                  </option>
-                ))}
-              </select>
+                className="min-h-11 min-w-[7.5rem] rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
+                options={GEMINI_SCAN_BATCH_OPTIONS.map((n) => ({
+                  value: String(n),
+                  label: `Last ${n}`,
+                }))}
+                onChange={(next) => setGeminiBatch(Number(next))}
+              />
               {listenNote ? (
                 <p className="text-sm text-ink-soft" role="status">
                   {listenNote}

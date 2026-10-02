@@ -67,6 +67,9 @@ describe("inbox ticket action chrome", () => {
     assert.match(detail, /inboxReturnHref\(inboxReturn\)/);
     assert.match(ticket, /InboxTicketMore[\s\S]*callId=\{callId\}[\s\S]*backHref=\{backHref\}[\s\S]*archived=\{archived\}/);
     assert.match(ticket, /inboxTicketOverflowActions\(\{ archived \}\)/);
+    assert.match(ticket, /createPortal\(<div className="desk-theme">\{menu\}<\/div>, document.body\)/);
+    assert.match(ticket, /border border-line bg-surface py-1/);
+    assert.match(ticket, /text-sm text-ink/);
     assert.match(ticket, /updateLeadStatus\(callId, next\)/);
     assert.match(ticket, /action\.label/);
     assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
