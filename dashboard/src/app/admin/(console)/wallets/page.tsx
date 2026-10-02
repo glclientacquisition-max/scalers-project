@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { AdminWalletsPanel } from "@/components/AdminWalletsPanel";
@@ -18,7 +19,14 @@ export default async function AdminWalletsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className={deskListTitleClass}>Wallets</h1>
+      <h1 className={deskListTitleClass}>Wallet ledger</h1>
+      <p className="text-sm text-ink-2">
+        Customer billing is packages plus on-demand on{" "}
+        <Link href="/admin/packages" className="font-medium text-accent underline-offset-2 hover:underline">
+          Packages
+        </Link>
+        . This page is ops scaffolding: ledger balance, credits, and enforcement mode. Not the owner checkout path.
+      </p>
       <AdminWalletsPanel {...overview} />
     </div>
   );

@@ -28,14 +28,16 @@ Requirements:
 
 ```
 /admin                 Overview (platform health)
-/admin/packages        Rate card, SKUs, annual discount, assign
-/admin/wallets         Wallet credit + plan
+/admin/packages        Packages, on-demand rates, assign (customer billing)
+/admin/wallets         Wallet ledger: ops balance, credits, enforcement (not owner checkout)
 /admin/businesses      All businesses + actions
 /admin/numbers         Number pool (add / assign / release)
 /admin/voices          Voice catalog
 ```
 
-Nav label for ops: **Admin** (not “DID pool”).
+Nav label for ops: **Admin** (not “DID pool”). Primary billing work starts on **Packages**. **Ledger** is the nav label for `/admin/wallets` (same route).
+
+Customer billing story: **packages + on-demand**. The wallet ledger is visible for ops metering and adjustments until deliberate owner prepaid checkout ships.
 
 Business-owner nav stays: Calls · Business · Sign out.
 
@@ -66,11 +68,17 @@ Business-owner nav stays: Calls · Business · Sign out.
 
 ### 4. Packages (`/admin/packages`)
 - Same username + access code as the rest of Super Admin. No second door.
+- **Customer billing path:** assign Starter / Growth / Scale (included buckets + monthly KES). On-demand rates apply past included when the business opts in on the desk.
 - Edit on-demand rates (inbound/outbound as KES per minute, stored per second), WhatsApp, SMS, email, and annual discount %.
 - Edit Starter / Growth / Scale included buckets and monthly KES. Annual price is monthly x 12 x (1 - discount %).
-- Assign a package and period to a business. Does not leave beta. Wallets Plan still does that.
+- Assign a package and period to a business. Does not turn on ledger enforcement. Use **Ledger** for beta vs enforcement mode.
 
-### 5. Platform teardown / demo reset (one-time ops)
+### 5. Wallet ledger (`/admin/wallets`)
+- Ops scaffolding: KES ledger balance, manual credit/debit, append-only ledger view, beta vs enforcement mode.
+- Not the headline owner money path. No owner prepaid checkout in this module.
+- Enforcement on: past included, on-demand debits the ledger when the business opted in. Beta: meter only, no charges.
+
+### 6. Platform teardown / demo reset (one-time ops)
 - Ability to **remove Jirani Home Services** completely and leave `+254709221536` as **Available** in the pool for the next business.
 - Documented SQL + in-UI action with typed confirmation (`REMOVE`).
 
@@ -100,9 +108,9 @@ Business-owner nav stays: Calls · Business · Sign out.
 ## Out of scope (later)
 
 - Full RLS for owner JWT reads (Phase B).
-- M-Pesa / Paystack wallet top-up (one KES wallet + ledger already shipped).
+- Owner package checkout (M-Pesa / Paystack). Ops ledger top-up stays manual until then.
 - Prompt wizard / onboarding questionnaire.
-- Dynamic SautiKit DID purchase API.
+- Dynamic phone-line DID purchase API.
 - Multi-user roles inside a business (admin/member invites).
 - Google OAuth for Super Admin.
 

@@ -52,10 +52,10 @@ export default async function AdminOverviewPage() {
           Add / manage numbers
         </Link>
         <Link href="/admin/packages" className={btnGhost}>
-          Packages
+          Packages and on-demand
         </Link>
         <Link href="/admin/wallets" className={btnGhost}>
-          Manage wallets
+          Wallet ledger
         </Link>
         <Link href="/admin/businesses" className={btnGhost}>
           View businesses

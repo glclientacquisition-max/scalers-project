@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       code === "api_key.scope_denied" || /numbers\.claim|scope_denied/i.test(message)
         ? " Mint Key B (SAUTIKIT_ADMIN_OPS_KEY) with numbers.claim on Vercel."
         : /insufficient|balance|wallet/i.test(message)
-          ? " Top up the SautiKit platform wallet first."
+          ? " Top up the phone line platform balance first."
           : "";
     return NextResponse.json({ error: `${message}${hint}`, code: code || null }, { status: 500 });
   }

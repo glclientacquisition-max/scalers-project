@@ -22,23 +22,23 @@ function statusLabel(s: AdminWalletRow["wallet_status"]) {
 
 function planLabel(mode: BillingMode): string {
   if (mode === "off") return "Beta (free)";
-  if (mode === "soft") return "Prepaid (soft)";
-  return "Prepaid (hard)";
+  if (mode === "soft") return "Enforcement soft";
+  return "Enforcement hard";
 }
 
 function planConsequence(mode: BillingMode): string {
   if (mode === "off") {
-    return "Beta: meter the package. The wallet is not charged.";
+    return "Beta: meter package usage. Ledger is not charged.";
   }
   if (mode === "soft") {
-    return "Prepaid: the wallet is charged for on-demand past included. Calls still connect at zero balance.";
+    return "Enforcement on: past included, on-demand debits the ledger when the business opted in. Calls still connect at zero balance.";
   }
-  return "Prepaid: the wallet is charged for on-demand past included. Inbound block at zero balance is not wired yet.";
+  return "Enforcement on: past included, on-demand debits the ledger when opted in. Inbound block at zero balance is not wired yet.";
 }
 
 function defaultModeNote(mode: BillingMode, row?: AdminWalletRow | null): string {
   if (mode === "off") return row?.beta_notes || "Beta program whitelist";
-  return `Prepaid (${mode})`;
+  return `Enforcement (${mode})`;
 }
 
 export function AdminWalletsPanel({
@@ -120,7 +120,7 @@ export function AdminWalletsPanel({
     note.trim().length >= 3 &&
     actor.trim().length > 0;
 
-  const graduatingToPrepaid =
+  const graduatingToEnforcement =
     Boolean(modeTarget) && initialMode === "off" && mode !== "off";
   const returningToBeta =
     Boolean(modeTarget) && initialMode !== "off" && mode === "off";
@@ -221,7 +221,7 @@ export function AdminWalletsPanel({
   async function savePlan() {
     if (!modeTarget || !planValid) return;
 
-    if (graduatingToPrepaid) {
+    if (graduatingToEnforcement) {
       const balance = modeTarget.wallet_balance_kes;
       const balanceLine =
         balance <= 0
@@ -231,7 +231,7 @@ export function AdminWalletsPanel({
         `Graduate ${modeTarget.business_name} from free beta to ${planLabel(mode)}?\n\n` +
           `${planConsequence(mode)}` +
           balanceLine +
-          `\n\nThis starts wallet debits for on-demand past included.`
+          `\n\nThis turns on ledger debits for on-demand past included.`
       );
       if (!confirmed) return;
     }
@@ -263,7 +263,7 @@ export function AdminWalletsPanel({
     <div className="space-y-5">
       <section className="grid grid-cols-2 border-y border-line/70 sm:grid-cols-5" aria-label="Wallet totals">
         <Kpi label="Beta (free)" value={betaCount} />
-        <Kpi label="Prepaid" value={prepaidCount} />
+        <Kpi label="Enforcement on" value={prepaidCount} />
         <Kpi label="Low balance" value={lowCount} warn={lowCount > 0} />
         <Kpi label="Overdrawn" value={overdrawnCount} warn={overdrawnCount > 0} />
         <Kpi label="Float (KES)" value={totalFloatKes.toLocaleString("en-KE")} />
@@ -288,7 +288,7 @@ export function AdminWalletsPanel({
           >
             <option value="all">All</option>
             <option value="beta">Beta only</option>
-            <option value="prepaid">Prepaid only</option>
+            <option value="prepaid">Enforcement on only</option>
             <option value="low">Low</option>
             <option value="overdrawn">Overdrawn</option>
           </select>
@@ -482,9 +482,9 @@ export function AdminWalletsPanel({
             Balance KES {modeTarget.wallet_balance_kes.toLocaleString("en-KE")}.
           </p>
           <p className="mt-2 text-sm text-[var(--ink-soft)]">{planConsequence(mode)}</p>
-          {graduatingToPrepaid ? (
+          {graduatingToEnforcement ? (
             <p className="mt-2 text-sm text-[var(--warn)]">
-              Graduating off beta starts real charges. You will be asked to confirm before save.
+              Graduating off beta turns on ledger enforcement for on-demand past included. You will be asked to confirm before save.
               {modeTarget.wallet_balance_kes <= 0
                 ? ` Balance is KES ${modeTarget.wallet_balance_kes.toLocaleString("en-KE")}. Top up first if you do not want them overdrawn.`
                 : null}
@@ -509,8 +509,8 @@ export function AdminWalletsPanel({
                 className={`mt-1 ${deskFieldClass}`}
               >
                 <option value="off">Beta (free), meter only</option>
-                <option value="soft">Prepaid (soft), debit, do not block</option>
-                <option value="hard">Prepaid (hard), debit; block later</option>
+                <option value="soft">Enforcement soft: debit ledger, do not block</option>
+                <option value="hard">Enforcement hard: debit ledger; block later</option>
               </select>
             </label>
             <label className="text-sm">
@@ -554,7 +554,7 @@ export function AdminWalletsPanel({
               className={btnPrimary}
               onClick={() => void savePlan()}
             >
-              {graduatingToPrepaid ? "Graduate & save" : "Save plan"}
+              {graduatingToEnforcement ? "Turn on enforcement" : "Save plan"}
             </button>
             <button
               type="button"

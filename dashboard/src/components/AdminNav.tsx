@@ -28,7 +28,7 @@ function AdminIcon({ name }: { name: string }) {
       </svg>
     );
   }
-  if (name === "Wallets") {
+  if (name === "Wallets" || name === "Ledger") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
         <rect x="3" y="5" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />

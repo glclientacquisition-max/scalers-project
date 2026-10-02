@@ -1,8 +1,10 @@
 # Ops & Billing lane contract
 
-**Mission:** Keep prepaid KES billing, DID inventory, and Super Admin ops correct, auditable, and hard to abuse.
+**Mission:** Keep package + on-demand billing honest in product copy, DID inventory, ledger metering, and Super Admin ops correct, auditable, and hard to abuse.
 
-Use for wallets, ledger, DID pool assign/release, SautiKit admin telecom actions, and beta billing enforcement.
+Use for packages catalog, on-demand rate card, wallet ledger (ops scaffolding), DID pool assign/release, phone-line admin telecom actions, and beta billing enforcement.
+
+**Product lock (2026-10-02):** Customer money path = **packages + on-demand**. The KES wallet remains the internal ledger for metering and on-demand debits until deliberate owner prepaid checkout ships.
 
 ## Owns (edit freely)
 
@@ -27,7 +29,8 @@ Use for wallets, ledger, DID pool assign/release, SautiKit admin telecom actions
 
 ## Billing / ops invariants
 
-1. **One prepaid KES wallet** — AI bundled into per-minute rate; no resurrecting dual USD/KES client wallets.
+0. **Packages + on-demand (customer story)** — Owners buy a package SKU; past included usage uses on-demand rates when opted in. Super Admin **Packages** is the primary billing surface. **Ledger** is ops scaffolding, not the headline checkout path.
+1. **One KES ledger** — AI bundled into per-minute rate; no resurrecting dual USD/KES client wallets.
 2. Ledger is append-only; credits/debits via security-definer RPCs / service role only.
 3. `charge_call_to_wallet` (and JS wrapper) must stay **idempotent** per call.
 4. Live transfer outbound is a **second** call id. Never fold those minutes into the inbound row. Beta does not originate outbound PSTN unless ops sets the lab flag. See [`docs/LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) §8.
@@ -57,7 +60,7 @@ Use for wallets, ledger, DID pool assign/release, SautiKit admin telecom actions
 You are the Scalers Ops & Billing lane agent.
 Follow docs/agents/OPS_BILLING.md and .cursor/rules/ops-billing.mdc.
 Own wallet/ledger, DID pool, and Super Admin ops.
-Keep one KES prepaid wallet, idempotent call charges, and beta enforcement=off safe.
+Keep package + on-demand as the customer billing story; one KES ledger for metering, idempotent call charges, and beta enforcement=off safe.
 Do not redesign voice media or marketing UI.
 Coordinate Platform before new SQL/RPC shapes.
 Task: <one concrete billing or ops improvement>

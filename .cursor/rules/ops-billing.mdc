@@ -8,7 +8,7 @@ alwaysApply: false
 
 Full contract: `docs/agents/OPS_BILLING.md`.
 
-- Own one prepaid KES wallet, ledger, DID pool, Super Admin ops.
+- Own one KES ledger, packages/on-demand product copy, DID pool, Super Admin ops.
 - Keep call charges idempotent; beta `billing_enforcement=off` must not charge.
 - Avoid voice media redesign and marketing UI rewrites.
 - Coordinate Platform before new SQL/RPC shapes; service role stays server-only.
