@@ -107,6 +107,14 @@ describe("desk shell speed", () => {
     assert.match(actions, /pick\(\s*"hoursSchedule"/);
   });
 
+  it("remounts TenantForm when the Settings panel changes", () => {
+    const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
+    assert.match(shell, /formPanel/);
+    assert.match(shell, /tenantFormKey/);
+    // Scoped payload strips policies on Hours; remount is what rehydrates them.
+    assert.match(shell, /Without remounting on panel change/);
+  });
+
   it("keeps the prompt and catalogs off a Hours view", () => {
     const view = load(
       "dashboard/src/lib/settingsPanelPayload.ts",

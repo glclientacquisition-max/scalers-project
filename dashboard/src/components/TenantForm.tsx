@@ -724,7 +724,15 @@ export function TenantForm({
     panel === "locations" && firstPlaceLine ? firstPlaceLine : locationNotes;
 
   return (
-    <form id={TENANT_SETTINGS_FORM_ID} action={formAction}>
+    <form
+      id={TENANT_SETTINGS_FORM_ID}
+      action={formAction}
+      onSubmit={(event) => {
+        // Pronunciation saves live via its own actions. Enter inside the coach
+        // must not post this form (feels like a full Settings reload).
+        if (panel === "pronunciation") event.preventDefault();
+      }}
+    >
       <div className={settingsConsoleClass}>
         {sidebar}
 
