@@ -139,6 +139,13 @@ describe("settings list rest", () => {
     assert.doesNotMatch(testLine, /title="Hours"|title="Offer"|title="Handoff"/);
   });
 
+  it("blocks TenantForm submit while Pronunciation is open", () => {
+    const form = read("dashboard/src/components/TenantForm.tsx");
+    assert.match(form, /panel === "pronunciation"\) event\.preventDefault/);
+    const coach = read("dashboard/src/components/PronunciationCoach.tsx");
+    assert.match(coach, /startTransition\(\(\) => geminiAction\(fd\)\)/);
+  });
+
   it("drops alert channel descriptions and keeps Unavailable", () => {
     assert.match(alerts, /Unavailable/);
     assert.match(alerts, /meta\.label/);

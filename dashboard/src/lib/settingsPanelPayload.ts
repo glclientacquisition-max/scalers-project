@@ -3,6 +3,10 @@ import type { TenantRow } from "@/lib/supabase";
 /**
  * Fields the active Settings view reads. The prompt and the catalogs stay off
  * every other panel. Save merges the stored tenant for fields this view omits.
+ *
+ * Contract: BusinessSettingsShell remounts TenantForm when `formPanel` (and
+ * stripped-field fingerprints) change, because TenantForm hydrates policies /
+ * locations / lexicon / catalogs only in useState initializers.
  */
 const KEEP: Record<string, readonly (keyof TenantRow)[]> = {
   menu: ["social_handles", "business_locations", "business_policies"],

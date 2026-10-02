@@ -805,7 +805,7 @@ export function PronunciationCoach({
     fd.set("current_lexicon", lexiconJson);
     fd.set("batch_size", String(geminiBatch));
     if (confirmed) fd.set("confirmed", "1");
-    geminiAction(fd);
+    startTransition(() => geminiAction(fd));
   }
 
   function saveHeldReview() {
@@ -813,7 +813,7 @@ export function PronunciationCoach({
     fd.set("id", tenantId);
     fd.set("save_only", "1");
     fd.set("review_queue", JSON.stringify([...reviewQueue, ...sttHints]));
-    geminiAction(fd);
+    startTransition(() => geminiAction(fd));
   }
 
   function approveCandidate(c: PronunciationReviewCandidate) {
@@ -823,7 +823,7 @@ export function PronunciationCoach({
     fd.set("current_lexicon", lexiconJson);
     const edited = (reviewEdits[c.id] ?? c.suggested_form).trim();
     if (edited) fd.set("edited_say", edited);
-    approveAction(fd);
+    startTransition(() => approveAction(fd));
   }
 
   function dismissCandidate(
@@ -834,7 +834,7 @@ export function PronunciationCoach({
     fd.set("id", tenantId);
     fd.set("candidate_id", c.id);
     fd.set("mode", mode);
-    dismissAction(fd);
+    startTransition(() => dismissAction(fd));
   }
 
   function recordCandidateInstead(c: PronunciationReviewCandidate) {
@@ -1486,6 +1486,9 @@ export function PronunciationCoach({
                               [c.id]: e.target.value,
                             }))
                           }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.preventDefault();
+                          }}
                           aria-label={`Spelling for ${row.phrase}`}
                           className="min-h-11 w-40 max-w-full rounded-xl border border-line bg-surface px-3 font-mono text-sm text-ink outline-none focus:outline-none focus:ring-2 focus:ring-brand"
                         />
@@ -1537,6 +1540,9 @@ export function PronunciationCoach({
                 onChange={(e) => {
                   setAddPhrase(e.target.value);
                   setAddError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.preventDefault();
                 }}
                 placeholder="Muindi Mbingu"
                 className="mt-1 w-full max-w-lg rounded-xl border border-[var(--line)] bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-[var(--accent)]"

@@ -175,12 +175,20 @@ export function BusinessSettingsShell({
   const { lineLive, lineDetail } = settingsLineState(tenant.sautikit_virtual_number);
   const businessName = tenant.business_name?.trim() || "Business";
 
+  // Panel is part of the key: tenantForSettingsView strips catalogs/policies/etc.
+  // per panel, but TenantForm only reads those fields in useState initializers.
+  // Without remounting on panel change, Hours → Policies keeps empty openPolicyIds
+  // until a hard refresh. Length fingerprints alone miss policies/locations/lexicon.
   const tenantFormKey = [
     tenant.id,
+    formPanel,
     Array.isArray(tenant.services_catalog) ? tenant.services_catalog.length : 0,
     Array.isArray(tenant.product_catalog) ? tenant.product_catalog.length : 0,
     Array.isArray(tenant.faqs) ? tenant.faqs.length : 0,
     Array.isArray(tenant.team_directory) ? tenant.team_directory.length : 0,
+    Array.isArray(tenant.business_locations) ? tenant.business_locations.length : 0,
+    Array.isArray(tenant.tts_lexicon) ? tenant.tts_lexicon.length : 0,
+    JSON.stringify(tenant.business_policies || {}),
     String(tenant.llm_system_prompt || "").length,
     tenant.vertical || "",
     JSON.stringify(tenant.social_handles || {}),
