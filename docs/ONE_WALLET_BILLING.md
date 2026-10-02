@@ -1,8 +1,14 @@
-# One-wallet billing (KES prepaid)
+# One-wallet billing (KES ledger)
+
+## Product positioning (2026-10-02)
+
+**What owners buy:** package subscription (included minutes, SMS, seats, one phone line) plus optional **on-demand** usage past included. Configure packages and on-demand rates in Super Admin → **Packages**.
+
+**What the wallet is:** an internal **KES ledger** for metering, on-demand debits, line rental, and ops adjustments. It is **not** the headline customer money path until deliberate owner prepaid checkout ships. Super Admin → **Ledger** (`/admin/wallets`) is ops scaffolding: balance, credits, enforcement mode.
 
 ## Goal
 
-Replace dual wallets (telecom KES + AI USD) with a **single prepaid KES wallet**.
+Replace dual wallets (telecom KES + AI USD) with a **single KES ledger** used for metering and on-demand overage.
 AI cost is included in the per-minute retail rate — not a separate client balance.
 
 ## Constraints and how we solve them
@@ -10,7 +16,7 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 | Constraint | Solution |
 |---|---|
 | Existing dual balances in production | One-time backfill: `wallet_balance_kes = telecom_kes + round(ai_usd × 130)` |
-| Kenyan SMB payment rails | Wallet is KES-only; M-Pesa/Paystack top-up slots into `topup` ledger kind later |
+| Kenyan SMB payment rails | Ledger is KES-only; future owner checkout (M-Pesa/Paystack) is separate from this ops ledger |
 | Free-beta tenants | Default `billing_enforcement = off` (whitelist): meter only, **no charges**. See `BETA_WALLET_PROGRAM.md` |
 | Hangup webhooks fire more than once | `charge_call_to_wallet` is idempotent per `call_id` |
 | Duration can arrive after first terminal event | First non-zero charge wins for v1; later duration upgrades do not double-bill |
@@ -62,27 +68,27 @@ Then apply `docs/supabase/sms_allowance.sql` after `notify_send_ledger.sql` (inc
 
 Then apply `docs/supabase/package_entitlements.sql` (reserved email + seat included columns; no gate).
 
-## Prepaid alerts + on-demand (Cursor-like)
+## On-demand alerts and opt-in
 
 | Piece | Behavior |
 |---|---|
-| Prepaid balance | Paid wallet money used first for call + line charges |
+| Ledger balance | Used for on-demand debits and line charges when enforcement is on |
 | Automatic live alerts | WhatsApp/email when balance drops under `wallet_low_balance_kes` (default 200) and again at ≤ 0. No owner soft-limit setup required. |
-| On-demand usage (opt-in) | Default **off**. Package included minutes and SMS are not a wallet debit. Past the cap with on-demand off: the next inbound call is rejected, tenant SMS stops, no usage debit. Past the cap with on-demand on: answer and debit the rate card once `package_minute_consume.sql` is applied. Until that RPC exists, `charge_call_to_wallet` still runs and pauses only when the prepaid balance is already 0. |
+| On-demand usage (opt-in) | Default **off**. Package included minutes and SMS are not a ledger debit. Past the cap with on-demand off: the next inbound call is rejected, tenant SMS stops, no usage debit. Past the cap with on-demand on: answer and debit the rate card once `package_minute_consume.sql` is applied. Until that RPC exists, `charge_call_to_wallet` still runs and pauses only when the ledger balance is already 0. |
 | Soft inbound block | Separate hard-enforcement step (not this migration) |
 
 Owners enable on-demand on Desk → Wallet. Alerts fire from the voice charge path after each completed call debit. The same toggle covers included SMS (`sms_allowance.sql`).
 
-## SMS included + stop at cap (Cursor-like)
+## SMS included and stop at cap
 
-Staff SMS and caller SMS share one tenant bucket. Wallet, line-outage, and speech/LLM outage SMS stay Scalers-paid and are never gated.
+Staff SMS and caller SMS share one tenant bucket. Ledger, line-outage, and speech or assistant outage SMS stay Scalers-paid and are never gated.
 
 | Piece | Behavior |
 |---|---|
 | Included SMS | Default **200** segments (`tenants.sms_included_units`). Packages later replace this number. |
 | Meter | `sms_used_units` increments via `consume_sms_units` before each tenant SMS. Ledger `notify_sends.overage` is true when the send is past included. |
 | Stop at cap | Paid + on-demand **off**: skip tenant SMS. Staff WhatsApp / email / desk note still try. Escalate still saves. |
-| On-demand | Same Wallet toggle as minutes. Tenant SMS continues past included and debits `sms_kes` after `package_minute_consume.sql`. |
+| On-demand | Same desk toggle as minutes. Tenant SMS continues past included and debits `sms_kes` after `package_minute_consume.sql`. |
 | Beta (`billing_enforcement = off`) | Meter only. Never block. Never debit. |
 
 Missing `consume_sms_units` fails open so staging still sends until the SQL is applied. On-demand off never debits SMS.
@@ -91,13 +97,13 @@ Package buckets (email, seats, later SKUs): [`PACKAGES.md`](./PACKAGES.md). Colu
 
 ## Line rental grace (2026-09-03)
 
-Clients without a package pay Scalers a monthly line fee at our retail rate, not SautiKit's cost. Beta is free. A business with an assigned package does not get this fee: the monthly price already includes the number.
+Clients without a package pay Scalers a monthly line fee at our retail rate, not the carrier wholesale cost. Beta is free. A business with an assigned package does not get this fee: the monthly price already includes the number.
 
 | State | Condition | Line |
 | --- | --- | --- |
 | Beta (`billing_enforcement = off`) | Always | Live. No charge. |
 | Active | `now() <= line_paid_through` | Live. |
-| Grace | `line_paid_through < now() <= line_paid_through + line_grace_days` | Live. Wallet may go negative. |
+| Grace | `line_paid_through < now() <= line_paid_through + line_grace_days` | Live. Ledger may go negative. |
 | Suspended | Past grace | Ops runs `suspend_line_for_nonpayment`. DID becomes `disabled`, not `available`. |
 
 `apply_line_rental` extends `line_paid_through` by one month per charge and sets `line_status = active`. Annual plans are the same RPC called with 12 months when pricing is set.
@@ -105,7 +111,7 @@ Clients without a package pay Scalers a monthly line fee at our retail rate, not
 ## Later
 
 - Package SKUs that write included SMS / email / seats. See [`PACKAGES.md`](./PACKAGES.md)
-- M-Pesa / Paystack STK top-up → `topup` ledger rows
+- Owner package checkout (M-Pesa/Paystack) — not ops ledger top-up as the primary product
 - Hard enforcement on inbound when balance ≤ 0 and on-demand off
 - Automatic line-expiry alerts (T-7 / T-1) from the voice notify stack
 - Annual / official subscription pricing (product decision)

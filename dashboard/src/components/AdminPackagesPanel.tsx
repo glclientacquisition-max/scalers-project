@@ -91,6 +91,12 @@ export function AdminPackagesPanel({
         </p>
       ) : null}
 
+      <p className="text-sm text-ink-2">
+        Customer billing: assign a package (included minutes, SMS, and seats). On-demand rates apply
+        past included when the business opts in on the desk. Wallet ledger and enforcement live under
+        Ledger.
+      </p>
+
       <section className="border-b border-line/70 pb-6">
         <h2 className="text-title font-medium text-ink">On-demand rates</h2>
         <form

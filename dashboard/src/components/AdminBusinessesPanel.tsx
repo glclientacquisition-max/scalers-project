@@ -98,7 +98,7 @@ export function AdminBusinessesPanel({
           }}
           className={adminRowActionClass}
         >
-          Adjust wallet
+          Adjust ledger
         </button>
         <button
           type="button"
@@ -206,10 +206,10 @@ export function AdminBusinessesPanel({
 
       {adjustId ? (
         <div className="border-t border-line/70 pt-4">
-          <p className="font-medium">Adjust wallet</p>
+          <p className="font-medium">Adjust ledger</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Single KES prepaid wallet. Positive credits, negative debits. Writes a ledger entry.
-            M-Pesa top-up comes next.
+            Ops ledger balance only. Customer billing is package plus on-demand on Packages. Positive
+            credits, negative debits. Writes a ledger entry.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
