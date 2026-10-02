@@ -378,7 +378,12 @@ export function SettingsPageHeader({
     return (
       <header className="mb-4 min-w-0">
         <h1 className="font-display text-xl font-semibold tracking-tight text-ink">Settings</h1>
-        <p className="mt-1 min-w-0 truncate text-sm font-medium text-ink">{businessName}</p>
+        <p
+          className="mt-1 min-w-0 break-words text-sm font-medium text-ink [overflow-wrap:anywhere]"
+          title={businessName}
+        >
+          {businessName}
+        </p>
         {line}
       </header>
     );

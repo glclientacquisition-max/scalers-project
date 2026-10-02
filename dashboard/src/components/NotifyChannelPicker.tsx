@@ -42,7 +42,7 @@ const LOGO: Record<NotifyChannelId, (p: { className?: string }) => ReactNode> = 
 export function NotifyChannelPicker({
   value,
   onChange,
-  heading = "Alerts",
+  heading = "Channels",
 }: {
   value: NotifyChannels;
   onChange: (next: NotifyChannels) => void;

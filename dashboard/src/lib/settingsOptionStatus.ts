@@ -5,7 +5,9 @@ export type SettingsStatusVoice = {
 };
 
 export type SettingsStatusTenant = {
+  business_name?: string | null;
   agent_name?: string | null;
+  agent_tone?: string | null;
   sautikit_virtual_number?: string | null;
   soniox_voice_id?: string | null;
   soniox_voice_label?: string | null;
@@ -91,6 +93,34 @@ function voiceStatus(
   return "";
 }
 
+/** Hub Identity meta: business / tone — never the same string Voice shows. */
+function identityStatus(
+  tenant: SettingsStatusTenant,
+  voices: SettingsStatusVoice[]
+): string {
+  const business = String(tenant.business_name || "").trim();
+  if (business) return business;
+
+  const tone = String(tenant.agent_tone || "")
+    .trim()
+    .toLowerCase();
+  if (tone === "professional") return "Professional";
+  if (
+    tone === "warm" ||
+    tone === "friendly" ||
+    tone === "empathetic" ||
+    tone === "localized"
+  ) {
+    return "Warm";
+  }
+
+  const name = String(tenant.agent_name || "").trim();
+  if (!name || /^receptionist$/i.test(name)) return "";
+  const voice = voiceStatus(tenant, voices);
+  if (voice && name.toLowerCase() === voice.toLowerCase()) return "";
+  return name;
+}
+
 export function settingsOptionStatus(
   target: SettingsStatusTarget,
   tenant: SettingsStatusTenant,
@@ -125,10 +155,8 @@ export function settingsOptionStatus(
       const count = placeCount(tenant.business_locations);
       return count ? String(count) : "";
     }
-    case "identity": {
-      const name = String(tenant.agent_name || "").trim();
-      return name && !/^receptionist$/i.test(name) ? name : "";
-    }
+    case "identity":
+      return identityStatus(tenant, voices);
     case "pronunciation": {
       const count = Array.isArray(tenant.tts_lexicon) ? tenant.tts_lexicon.length : 0;
       return count ? String(count) : "";

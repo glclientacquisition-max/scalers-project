@@ -99,6 +99,7 @@ function SettingsMenu({
                     </span>
                     {status ? (
                       <span
+                        title={status}
                         className={
                           isRail
                             ? "max-w-[5.5rem] shrink-0 truncate text-xs font-normal text-ink-soft"

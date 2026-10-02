@@ -93,11 +93,11 @@ describe("honest chrome P0", () => {
     assert.doesNotMatch(shell, /<KnowledgeIngestPanel[\s\S]{0,80}<CatalogImportPanel/);
   });
 
-  it("labels the three notify toggles Escalate, Inbox, and Ops", () => {
-    assert.match(form, /key: "receives_escalation", label: "Escalate"/);
-    assert.match(form, /key: "receives_inbox", label: "Inbox"/);
+  it("labels the three notify toggles Urgent, Follow-up, and Ops", () => {
+    assert.match(form, /key: "receives_escalation", label: "Urgent"/);
+    assert.match(form, /key: "receives_inbox", label: "Follow-up"/);
     assert.match(form, /key: "receives_ops", label: "Ops"/);
-    assert.match(form, /SMS, WhatsApp, and email follow Alerts\./);
+    assert.match(form, /Channels follow How we notify\./);
     assert.match(form, /hint=\{TEAM_NOTIFY_CHANNEL_NOTE\}/);
     assert.doesNotMatch(form, /label: "SMS"/);
     assert.doesNotMatch(form, /label: "WhatsApp"/);

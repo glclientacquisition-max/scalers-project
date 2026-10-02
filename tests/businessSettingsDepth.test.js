@@ -165,7 +165,8 @@ describe("business settings depth", () => {
   });
 
   it("saves alerts on their own panel to the same tenant columns", () => {
-    assert.match(nav, /if \(tab === "alerts"\) return "Alerts"/);
+    assert.match(nav, /if \(tab === "alerts"\) return "How we notify"/);
+    assert.match(alerts, /title="How we notify"/);
     assert.match(alerts, /Alert phone/);
     assert.match(alerts, /Text customers/);
     assert.match(alerts, /Text back missed calls/);
@@ -200,7 +201,12 @@ describe("business settings depth", () => {
       form.indexOf('panel === "faqs"')
     );
     assert.match(team, /Add person/);
-    assert.match(team, /liveConnectBlurb\(liveDest\?\.name\)/);
+    assert.match(team, /liveTransferExecutor \|\| handoffMode === "live_transfer"/);
+    assert.match(
+      team,
+      /liveTransferExecutor \|\| handoffMode === "live_transfer"[\s\S]*liveConnectBlurb\(liveDest\?\.name\)/
+    );
+    assert.equal((team.match(/liveConnectBlurb/g) || []).length, 1);
     assert.match(team, /label="Live connect"/);
     assert.match(team, /<ToolSwitch/);
     assert.match(team, /setHandoffMode\(next \? "live_transfer" : "callback"\)/);
@@ -209,9 +215,22 @@ describe("business settings depth", () => {
     assert.doesNotMatch(team, /label="Handoff mode"/);
     assert.doesNotMatch(team, /Message teammate/);
     assert.doesNotMatch(team, />Handoff</);
+    assert.doesNotMatch(team, /btnPrimaryFill|settingsPrimaryButtonClass/);
+    assert.match(team, /<span>Role<\/span>/);
+    assert.doesNotMatch(team, /Handles/);
     assert.match(form, /name="handoff_mode"/);
     assert.doesNotMatch(team, /Alert phone/);
     assert.match(alerts, /Alert phone/);
     assert.doesNotMatch(alerts, /Add person/);
+  });
+
+  it("names Policies empty next step without inventing Train facts", () => {
+    const block = form.slice(
+      form.indexOf('panel === "policies"'),
+      form.indexOf('panel === "tools"')
+    );
+    assert.match(block, /No rules yet\. Add payment or cancellation/);
+    assert.match(block, /Add rule/);
+    assert.doesNotMatch(block, /Paybill|Till number|KES 500|same-day guarantee/);
   });
 });

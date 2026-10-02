@@ -179,14 +179,14 @@ const emptyMember = (): TeamDirectoryEntry => ({
   ...EMPTY_TEAM_NOTIFY_FLAGS,
 });
 
-/** Permission kinds on the three saved notify flags. Channels stay on Alerts. */
-const TEAM_NOTIFY_CHANNEL_NOTE = "SMS, WhatsApp, and email follow Alerts.";
+/** Permission kinds on the three saved notify flags. Channels stay on How we notify. */
+const TEAM_NOTIFY_CHANNEL_NOTE = "Channels follow How we notify.";
 const TEAM_NOTIFY_FLAGS: Array<{
   key: "receives_escalation" | "receives_inbox" | "receives_ops";
   label: string;
 }> = [
-  { key: "receives_escalation", label: "Escalate" },
-  { key: "receives_inbox", label: "Inbox" },
+  { key: "receives_escalation", label: "Urgent" },
+  { key: "receives_inbox", label: "Follow-up" },
   { key: "receives_ops", label: "Ops" },
 ];
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
@@ -490,7 +490,8 @@ export function TenantForm({
   );
 
   useEffect(() => {
-    if (state.ok) notify("Saved");
+    // Compile finished before ok - owners should hear the line was trained, not only "Saved".
+    if (state.ok) notify("Saved · training line");
   }, [state]);
 
   useEffect(() => {
@@ -728,7 +729,11 @@ export function TenantForm({
             title={heading}
             alert={state.error}
             action={
-              panel === "pronunciation" ? undefined : (
+              panel === "pronunciation" ? (
+                <p className="max-w-[11rem] text-right text-xs leading-snug text-ink-soft">
+                  Saves live - no sticky Save
+                </p>
+              ) : (
                 <TenantSettingsSaveButton pending={pending} />
               )
             }
@@ -795,7 +800,8 @@ export function TenantForm({
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               placeholder="Westlands Books"
-              className={denseFieldClass}
+              title={businessName || undefined}
+              className={`${denseFieldClass} break-words [overflow-wrap:anywhere]`}
             />
           </SettingsRow>
           <SettingsRow
@@ -1022,9 +1028,10 @@ export function TenantForm({
               <button
                 type="button"
                 onClick={() => addBlankServiceRows(3)}
+                title="Add 3 blank rows"
                 className={settingsGhostButtonClass}
               >
-                Add 3
+                Add 3 blank rows
               </button>
               <label className="sr-only" htmlFor="bulk_services">
                 Paste list
@@ -1773,6 +1780,11 @@ export function TenantForm({
               />
             </SettingsStack>
           ) : null}
+          {openPolicyIds.length === 0 ? (
+            <p className="px-4 py-2 text-sm text-ink-soft" role="status">
+              No rules yet. Add payment or cancellation to start - write what callers should hear.
+            </p>
+          ) : null}
           {POLICY_FIELDS.filter((field) => openPolicyIds.includes(field.id)).map((field) => (
             <SettingsStack
               key={field.id}
@@ -1963,19 +1975,23 @@ export function TenantForm({
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
         {liveTransferExecutor || handoffMode === "live_transfer" ? (
-          <SettingsGroup>
-            <SettingsRow label="Live connect" control="switch">
-              <ToolSwitch
-                checked={handoffMode === "live_transfer"}
-                label="Live connect"
-                onChange={(next) =>
-                  setHandoffMode(next ? "live_transfer" : "callback")
-                }
-              />
-            </SettingsRow>
-          </SettingsGroup>
+          <>
+            <SettingsGroup>
+              <SettingsRow label="Live connect" control="switch">
+                <ToolSwitch
+                  checked={handoffMode === "live_transfer"}
+                  label="Live connect"
+                  onChange={(next) =>
+                    setHandoffMode(next ? "live_transfer" : "callback")
+                  }
+                />
+              </SettingsRow>
+            </SettingsGroup>
+            <p className="px-1 text-xs text-ink-soft">
+              {liveConnectBlurb(liveDest?.name)}
+            </p>
+          </>
         ) : null}
-        <p className="px-1 text-xs text-ink-soft">{liveConnectBlurb(liveDest?.name)}</p>
 
         <div className="space-y-1">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -1996,7 +2012,7 @@ export function TenantForm({
         <div className="overflow-hidden rounded-xl border border-line">
           <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
             <span>Name</span>
-            <span>Handles</span>
+            <span>Role</span>
             <span>Phone</span>
             <span>Email</span>
             <span className="grid w-[15rem] grid-cols-3 gap-1 text-center text-caption font-medium normal-case tracking-normal">
@@ -2013,7 +2029,7 @@ export function TenantForm({
               key={`team-${index}`}
               className="grid grid-cols-1 gap-3 border-b border-line px-3 py-3 last:border-b-0 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-start lg:gap-x-3 lg:py-2"
             >
-              <div className="min-w-0 truncate">
+              <div className="min-w-0">
                 <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-name-${index}`}>
                   Name
                 </label>
@@ -2022,12 +2038,13 @@ export function TenantForm({
                   value={member.name}
                   onChange={(e) => updateTeam(index, "name", e.target.value)}
                   placeholder="Wanjiku Mwangi"
-                  className={`${denseFieldClass} mt-1 min-w-0 truncate lg:mt-0`}
+                  title={member.name || undefined}
+                  className={`${denseFieldClass} mt-1 min-w-0 break-words [overflow-wrap:anywhere] lg:mt-0`}
                 />
               </div>
               <div className="min-w-0">
                 <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-role-${index}`}>
-                  Handles
+                  Role
                 </label>
                 <input
                   id={`team-role-${index}`}
@@ -2049,7 +2066,7 @@ export function TenantForm({
                   className={`${denseFieldClass} mt-1 lg:mt-0`}
                 />
               </div>
-              <div className="min-w-0 truncate">
+              <div className="min-w-0">
                 <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-email-${index}`}>
                   Email
                 </label>
@@ -2059,7 +2076,8 @@ export function TenantForm({
                   value={member.email || ""}
                   onChange={(e) => updateTeam(index, "email", e.target.value)}
                   placeholder="wanjiku@shop.co.ke"
-                  className={`${denseFieldClass} mt-1 min-w-0 truncate lg:mt-0`}
+                  title={member.email || undefined}
+                  className={`${denseFieldClass} mt-1 min-w-0 break-words [overflow-wrap:anywhere] lg:mt-0`}
                 />
               </div>
               <div

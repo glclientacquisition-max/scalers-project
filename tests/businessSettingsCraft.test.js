@@ -70,7 +70,8 @@ describe("business settings craft", () => {
     assert.match(ui, /Line live/);
     assert.match(ui, /Number pending/);
     assert.match(form, /Assistant name/);
-    assert.match(form, /notify\("Saved"\)/);
+    assert.match(form, /notify\("Saved · training line"\)/);
+    assert.doesNotMatch(form, /notify\("Saved"\)/);
     assert.doesNotMatch(form, /Your assistant will use this on the next call/);
     assert.doesNotMatch(form, /Your receptionist/);
     assert.match(test, /previewBusinessAssistantIntro/);
@@ -106,7 +107,7 @@ describe("business settings craft", () => {
     assert.match(nav, /label: "FAQs"/);
     assert.match(nav, /label: "Catalog"/);
     assert.match(nav, /label: "Import"/);
-    assert.match(nav, /label: "Alerts"/);
+    assert.match(nav, /label: "How we notify"/);
     assert.match(nav, /label: "Team"/);
     assert.doesNotMatch(nav, /label: "Appearance"/);
     assert.match(nav, /panel: "identity"/);
@@ -349,7 +350,7 @@ describe("business settings craft", () => {
     );
   });
 
-  it("orders jobs and keeps Team out of the Alerts group", () => {
+  it("orders jobs and keeps Team out of the How we notify group", () => {
     const got = loadSettingsNav();
     assert.deepEqual(got.labels, [
       "Identity",
@@ -363,7 +364,7 @@ describe("business settings craft", () => {
       "Pronunciation",
       "Test",
       "Team",
-      "Alerts",
+      "How we notify",
     ]);
     assert.deepEqual(
       got.sections.map((section) => section.title),
@@ -373,10 +374,10 @@ describe("business settings craft", () => {
     assert.equal(got.labels[got.labels.indexOf("Catalog") + 1], "Import");
     assert.equal(got.labels.indexOf("Identity") + 1, got.labels.indexOf("Hours"));
     const people = got.sections.find((section) => section.title === "People");
-    assert.deepEqual(people.labels, ["Team", "Alerts"]);
+    assert.deepEqual(people.labels, ["Team", "How we notify"]);
     assert.equal(people.id, "people");
     assert.notEqual(people.id, "alerts");
-    assert.equal(got.sections.some((section) => section.title === "Alerts" || section.id === "alerts"), false);
+    assert.equal(got.sections.some((section) => section.title === "How we notify" || section.title === "Alerts" || section.id === "alerts"), false);
     assert.equal(got.hoursWide, "/settings?tab=train&panel=hours");
     assert.equal(got.phoneIndex, null);
     assert.equal(got.missingCookie, null);
@@ -428,14 +429,26 @@ describe("business settings craft", () => {
     );
     assert.match(catalogScan, /settingsActionClass/);
     assert.doesNotMatch(catalogScan, /settingsPrimaryButtonClass/);
-    assert.match(form, /panel === "pronunciation" \? undefined/);
+    assert.match(form, /Saves live - no sticky Save/);
+    assert.doesNotMatch(form, /panel === "pronunciation" \? undefined/);
     assert.match(coach, /btnPrimary/);
+    assert.match(coach, /fixHasUsePrimary/);
     assert.match(form, /settingsGhostButtonClass/);
     assert.match(form, /Add service/);
-    assert.match(form, /Add 3/);
+    assert.match(form, /Add 3 blank rows/);
     assert.match(save, /min-h-11/);
     assert.doesNotMatch(save, /min-h-14/);
     assert.doesNotMatch(save, /w-full/);
+    // Team: callback-only must not mount a filled handoff chip beside Save (#514).
+    const team = form.slice(
+      form.indexOf('panel === "team"'),
+      form.indexOf('panel === "faqs"')
+    );
+    assert.doesNotMatch(team, /HANDOFF_OPTIONS/);
+    assert.doesNotMatch(team, /SettingsSegmented/);
+    assert.doesNotMatch(team, /Message teammate/);
+    assert.doesNotMatch(team, /btnPrimaryFill|settingsPrimaryButtonClass/);
+    assert.doesNotMatch(team, /deskRateCardClass/);
   });
 
   it("truncates dense settings tables and labels team notify", () => {
@@ -445,15 +458,47 @@ describe("business settings craft", () => {
     assert.doesNotMatch(form, /min-w-\[640px\]/);
     assert.doesNotMatch(form, /minmax\(10rem,auto\)/);
     assert.match(form, /\{flag\.label\}/);
-    assert.match(form, /label: "Escalate"/);
-    assert.match(form, /label: "Inbox"/);
+    assert.match(form, /label: "Urgent"/);
+    assert.match(form, /label: "Follow-up"/);
     assert.match(form, /label: "Ops"/);
-    assert.match(form, /SMS, WhatsApp, and email follow Alerts\./);
+    assert.match(form, /Channels follow How we notify\./);
     assert.doesNotMatch(form, /label: "SMS"/);
     assert.doesNotMatch(form, /label: "WhatsApp"/);
     assert.doesNotMatch(form, /label: "Email"/);
     assert.doesNotMatch(form, /title=\{flag\.label\}/);
     assert.doesNotMatch(form, /Invite teammate|tenant_members/);
+    const team = form.slice(
+      form.indexOf('panel === "team"'),
+      form.indexOf('panel === "faqs"')
+    );
+    assert.match(team, /<span>Role<\/span>/);
+    assert.match(team, />\s*Role\s*</);
+    assert.doesNotMatch(team, /Handles/);
+    // Batch B: email/name carry title + wrap — no silent truncate data loss.
+    assert.match(team, /title=\{member\.email \|\| undefined\}/);
+    assert.match(team, /title=\{member\.name \|\| undefined\}/);
+    assert.match(team, /break-words \[overflow-wrap:anywhere\]/);
+    assert.doesNotMatch(team, /min-w-0 truncate/);
+  });
+
+  it("recovers empty Policies/Test and clarifies Identity truncation", () => {
+    const policies = form.slice(
+      form.indexOf('panel === "policies"'),
+      form.indexOf('panel === "tools"')
+    );
+    assert.match(policies, /No rules yet\. Add payment or cancellation/);
+    assert.match(policies, /openPolicyIds\.length === 0/);
+    assert.doesNotMatch(policies, /M-Pesa Paybill|30% deposit required/);
+
+    assert.match(test, /Add a business name in/);
+    assert.match(test, /businessSettingsHref\("train", "identity"\)/);
+    assert.match(test, /to preview the greeting/);
+
+    assert.match(form, /id="business_name"[\s\S]*title=\{businessName/);
+    assert.match(ui, /title=\{businessName\}/);
+    assert.match(ui, /break-words text-sm font-medium text-ink/);
+    assert.match(shell, /title=\{status\}/);
+    assert.match(form, /title="Add 3 blank rows"/);
   });
 
   it("packs Profile sub-strips instead of stretching them across the pane", () => {
