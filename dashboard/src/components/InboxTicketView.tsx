@@ -267,7 +267,7 @@ function InboxTicketMore({
           <MoreGlyph />
         </button>
       </DeskHint>
-      {open && typeof document !== "undefined" ? createPortal(menu, document.body) : null}
+      {open && typeof document !== "undefined" ? createPortal(<div className="desk-theme">{menu}</div>, document.body) : null}
     </div>
   );
 }
