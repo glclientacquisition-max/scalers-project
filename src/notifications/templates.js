@@ -168,6 +168,28 @@ function walletEmptyBody({ businessName, onDemandEnabled } = {}) {
   return [head, detail].join('\n');
 }
 
+function platformOpsDegradeBody(kind = 'speech', detail = {}) {
+  const lane =
+    kind === 'reasoning' || kind === 'llm'
+      ? 'Reasoning'
+      : kind === 'telephony'
+        ? 'Phone line'
+        : 'Speech';
+  const lines = [
+    `Scalers platform ${lane} is degraded.`,
+    'Check /admin Platform board and Voice GET /healthz.',
+  ];
+  const channel = String(detail.channel || '').trim();
+  if (channel) lines.push(`Channel: ${channel}`);
+  const message = String(detail.message || '').trim();
+  if (message) lines.push(`Detail: ${message.slice(0, 160)}`);
+  if (detail.balanceMinor != null && detail.currency) {
+    const major = Number(detail.balanceMinor) / 100;
+    lines.push(`Wallet: ${detail.currency} ${major}`);
+  }
+  return lines.join('\n');
+}
+
 function outageBody(businessName, kind = 'speech') {
   const who = String(businessName || '').trim();
   if (kind === 'llm') {
@@ -230,6 +252,7 @@ module.exports = {
   appointmentTitle,
   escalationBody,
   missedTextbackBody,
+  platformOpsDegradeBody,
   outageBody,
   renderCallerText,
   renderStaffSubject,

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AdminSetupError } from "@/components/AdminSetupError";
-import { SautikitTelecomPanel } from "@/components/SautikitTelecomPanel";
+import { PlatformRunBoard } from "@/components/PlatformRunBoard";
 import { adminTdClass, adminThClass } from "@/components/AdminIdentityList";
 import { btnGhost, btnPrimary, deskPreviewClass } from "@/components/ui/deskChrome";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
@@ -62,7 +62,7 @@ export default async function AdminOverviewPage() {
         </Link>
       </section>
 
-      <SautikitTelecomPanel />
+      <PlatformRunBoard />
 
       <section>
         <h2 className="text-title font-medium text-ink">Needs attention</h2>
