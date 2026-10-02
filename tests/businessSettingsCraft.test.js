@@ -514,7 +514,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(segmented, /flex-1/);
     assert.doesNotMatch(segmented, /w-full min-w-0 border-b/);
 
-    assert.match(ui, /md:justify-start md:gap-4/);
+    assert.match(ui, /md:justify-start md:gap-3/);
     assert.doesNotMatch(
       ui.slice(
         ui.indexOf("export const settingsConsoleClass"),
@@ -527,7 +527,7 @@ describe("business settings craft", () => {
       shell.indexOf("const isRail = variant === \"rail\""),
       shell.indexOf("const railLinkClass") + "const railLinkClass".length + 240
     );
-    assert.match(rail, /inline-flex min-h-11 w-full items-center justify-start/);
+    assert.match(rail, /inline-flex min-h-9 w-full items-center justify-start gap-1\.5 border-l-2 px-2\.5/);
     assert.match(rail, /w-max max-w-full space-y-0.5/);
     assert.doesNotMatch(rail, /justify-between/);
     assert.doesNotMatch(rail, /flex-1/);
@@ -543,4 +543,29 @@ describe("business settings craft", () => {
     assert.doesNotMatch(tablist, /flex-1/);
     assert.doesNotMatch(tablist, /flex-wrap gap-1 border-b/);
   });
+
+  it("caps form reading width and densifies SettingsRow controls on md+", () => {
+    assert.match(ui, /export const settingsFormBodyClass = "min-w-0 w-full max-w-2xl"/);
+    assert.match(ui, /export const settingsControlMaxClass = "max-w-md"/);
+    assert.match(ui, /export const settingsSelectMaxClass = "max-w-xs"/);
+    assert.match(ui, /md:min-h-11 md:px-3 md:py-1\.5/);
+    assert.match(ui, /settingsControlMaxClass/);
+    assert.match(ui, /settingsSelectMaxClass/);
+    assert.match(form, /settingsFormBodyClass/);
+    assert.match(alerts, /settingsFormBodyClass/);
+    assert.match(shell, /min-h-9/);
+    assert.match(shell, /mt-2\.5/);
+    assert.match(shell, /mb-0\.5/);
+    assert.match(shell, /min-h-12/);
+    assert.match(form, /No public contacts yet/);
+    assert.match(form, /title="Public contacts"/);
+    assert.doesNotMatch(
+      form.slice(
+        form.indexOf('title="Public contacts"'),
+        form.indexOf('panel === "catalog"')
+      ),
+      /No public contacts yet[\s\S]{0,200}\+254 7/
+    );
+  });
+
 });

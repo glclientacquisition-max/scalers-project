@@ -10,6 +10,7 @@ import {
   SettingsRow,
   ToolSwitch,
   settingsDenseFieldClass,
+  settingsFormBodyClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
 import {
@@ -90,7 +91,7 @@ export function AlertsPanel({
       <form
         id={ALERTS_SETTINGS_FORM_ID}
         action={formAction}
-        className="min-w-0 space-y-6"
+        className={`${settingsFormBodyClass} space-y-6`}
       >
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input

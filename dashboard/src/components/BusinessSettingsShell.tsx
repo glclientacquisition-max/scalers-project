@@ -61,7 +61,7 @@ function SettingsMenu({
   const isRail = variant === "rail";
   const railListClass = "w-max max-w-full space-y-0.5";
   const railLinkClass =
-    "inline-flex min-h-11 w-full items-center justify-start gap-2 border-l-2 px-3 text-sm font-medium";
+    "inline-flex min-h-9 w-full items-center justify-start gap-1.5 border-l-2 px-2.5 text-sm font-medium";
   return (
     <nav
       aria-label="Settings sections"
@@ -69,8 +69,8 @@ function SettingsMenu({
       className={isRail ? settingsRailClass : "min-w-0 w-full"}
     >
       {SETTINGS_NAV.map((section, index) => (
-        <section key={section.id} className={index === 0 ? undefined : "mt-4"}>
-          <h2 className={`${settingsGroupTitleClass} mb-1 px-1`}>{section.title}</h2>
+        <section key={section.id} className={index === 0 ? undefined : "mt-2.5"}>
+          <h2 className={`${settingsGroupTitleClass} mb-0.5 px-1`}>{section.title}</h2>
           <ul className={isRail ? railListClass : "w-full"}>
             {section.items.map((item) => {
               const active = settingsNavItemActive(item.target, tab, trainPanel);
