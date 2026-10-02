@@ -93,6 +93,7 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { CoverageAreaField } from "@/components/CoverageAreaField";
+import { DeskSelect } from "@/components/ui/DeskSelect";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 import { notify } from "@/components/ui/DeskNotice";
@@ -218,6 +219,12 @@ const initial: SettingsCompileState = {};
 const fieldClass = settingsFieldClass;
 const tableFieldClass = settingsTableFieldClass;
 const denseFieldClass = settingsDenseFieldClass;
+
+const STOCK_OPTIONS = [
+  { value: "yes", label: "In stock" },
+  { value: "no", label: "Out of stock" },
+  { value: "unknown", label: "Unknown" },
+] as const;
 
 function PolicyTextarea({
   id,
@@ -856,18 +863,17 @@ export function TenantForm({
                     <label className="sr-only" htmlFor={`social-kind-m-${index}`}>
                       Type
                     </label>
-                    <select
+                    <DeskSelect
                       id={`social-kind-m-${index}`}
+                      aria-label="Type"
                       value={channel.kind}
-                      onChange={(e) => updateSocialChannel(index, "kind", e.target.value)}
                       className={denseFieldClass}
-                    >
-                      {SOCIAL_CHANNEL_KINDS.map((k) => (
-                        <option key={k.id} value={k.id}>
-                          {k.label}
-                        </option>
-                      ))}
-                    </select>
+                      options={SOCIAL_CHANNEL_KINDS.map((k) => ({
+                        value: k.id,
+                        label: k.label,
+                      }))}
+                      onChange={(next) => updateSocialChannel(index, "kind", next)}
+                    />
                   </div>
                   <div className="min-w-0">
                     <label className="sr-only" htmlFor={`social-label-m-${index}`}>
@@ -927,20 +933,19 @@ export function TenantForm({
                           <label className="sr-only" htmlFor={`social-kind-${index}`}>
                             Type
                           </label>
-                          <select
+                          <DeskSelect
                             id={`social-kind-${index}`}
+                            aria-label="Type"
                             value={channel.kind}
-                            onChange={(e) =>
-                              updateSocialChannel(index, "kind", e.target.value)
-                            }
                             className={denseFieldClass}
-                          >
-                            {SOCIAL_CHANNEL_KINDS.map((k) => (
-                              <option key={k.id} value={k.id}>
-                                {k.label}
-                              </option>
-                            ))}
-                          </select>
+                            options={SOCIAL_CHANNEL_KINDS.map((k) => ({
+                              value: k.id,
+                              label: k.label,
+                            }))}
+                            onChange={(next) =>
+                              updateSocialChannel(index, "kind", next)
+                            }
+                          />
                         </td>
                         <td className="px-3 py-1.5">
                           <label className="sr-only" htmlFor={`social-label-${index}`}>
@@ -1337,12 +1342,21 @@ export function TenantForm({
                     </div>
                     <div className="col-span-2 min-w-0">
                       <label className="sr-only" htmlFor={`prod-stock-m-${index}`}>Stock</label>
-                      <select id={`prod-stock-m-${index}`} value={product.in_stock || ""} onChange={(e) => updateProduct(index, "in_stock", e.target.value)} className={denseFieldClass}>
-                        <option value="">Not set</option>
-                        <option value="yes">In stock</option>
-                        <option value="no">Out of stock</option>
-                        <option value="unknown">Unknown</option>
-                      </select>
+                      <DeskSelect
+                        id={`prod-stock-m-${index}`}
+                        aria-label="Stock"
+                        value={
+                          product.in_stock === "yes" ||
+                          product.in_stock === "no" ||
+                          product.in_stock === "unknown"
+                            ? product.in_stock
+                            : ""
+                        }
+                        placeholder="Not set"
+                        className={denseFieldClass}
+                        options={STOCK_OPTIONS}
+                        onChange={(next) => updateProduct(index, "in_stock", next)}
+                      />
                     </div>
                   </div>
                 );
@@ -1415,17 +1429,23 @@ export function TenantForm({
                             <label className="sr-only" htmlFor={`prod-stock-${index}`}>
                               Stock status
                             </label>
-                            <select
+                            <DeskSelect
                               id={`prod-stock-${index}`}
-                              value={product.in_stock || ""}
-                              onChange={(e) => updateProduct(index, "in_stock", e.target.value)}
+                              aria-label="Stock status"
+                              value={
+                                product.in_stock === "yes" ||
+                                product.in_stock === "no" ||
+                                product.in_stock === "unknown"
+                                  ? product.in_stock
+                                  : ""
+                              }
+                              placeholder="Not set"
                               className={tableFieldClass}
-                            >
-                              <option value="">Not set</option>
-                              <option value="yes">In stock</option>
-                              <option value="no">Out of stock</option>
-                              <option value="unknown">Unknown</option>
-                            </select>
+                              options={STOCK_OPTIONS}
+                              onChange={(next) =>
+                                updateProduct(index, "in_stock", next)
+                              }
+                            />
                           </td>
                           <td className="px-2 py-2">
                             <button
@@ -1798,28 +1818,24 @@ export function TenantForm({
               <label className="sr-only" htmlFor="add-policy-rule">
                 Add rule
               </label>
-              <select
+              <DeskSelect
                 id="add-policy-rule"
                 aria-label="Add rule"
                 value=""
-                onChange={(e) => {
-                  const id = e.target.value as PolicyFieldId;
-                  if (!id) return;
+                placeholder="Add rule"
+                className={`${settingsGhostButtonClass} w-auto`}
+                options={POLICY_FIELDS.filter(
+                  (field) => !openPolicyIds.includes(field.id)
+                ).map((field) => ({
+                  value: field.id,
+                  label: field.label,
+                }))}
+                onChange={(id) => {
                   setOpenPolicyIds((prev) =>
                     prev.includes(id) ? prev : [...prev, id]
                   );
                 }}
-                className={`${settingsGhostButtonClass} w-auto`}
-              >
-                <option value="">Add rule</option>
-                {POLICY_FIELDS.filter((field) => !openPolicyIds.includes(field.id)).map(
-                  (field) => (
-                    <option key={field.id} value={field.id}>
-                      {field.label}
-                    </option>
-                  )
-                )}
-              </select>
+              />
             </div>
           ) : null}
         </SettingsGroup>

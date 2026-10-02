@@ -1,4 +1,4 @@
-// DeskSelect: themed open list for dark DoD paths (Contacts Sort, SettingsSelect).
+// DeskSelect: themed open list for dark DoD paths (Contacts Sort, SettingsSelect, residual owner).
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
@@ -61,5 +61,38 @@ describe("DoD path swaps", () => {
     assert.match(chunk, /settingsDenseFieldClass/);
     assert.doesNotMatch(chunk, /<select[\s>]/);
     assert.match(ui, /from "@\/components\/ui\/DeskSelect"/);
+  });
+});
+
+describe("Residual owner DeskSelect swaps", () => {
+  it("TenantForm public contact type + catalog stock + add-rule use DeskSelect", () => {
+    const form = read("dashboard/src/components/TenantForm.tsx");
+    assert.match(form, /from "@\/components\/ui\/DeskSelect"/);
+    assert.match(form, /STOCK_OPTIONS/);
+    assert.match(form, /social-kind-m-/);
+    assert.match(form, /social-kind-/);
+    assert.match(form, /prod-stock-m-/);
+    assert.match(form, /prod-stock-/);
+    assert.match(form, /add-policy-rule/);
+    assert.match(form, /placeholder="Not set"/);
+    assert.match(form, /placeholder="Add rule"/);
+    assert.doesNotMatch(form, /<select[\s>]/);
+  });
+
+  it("PronunciationCoach AI listen batch uses DeskSelect", () => {
+    const coach = read("dashboard/src/components/PronunciationCoach.tsx");
+    assert.match(coach, /from "@\/components\/ui\/DeskSelect"/);
+    assert.match(coach, /aria-label="Calls for AI listen"/);
+    assert.match(coach, /gemini-batch/);
+    assert.match(coach, /<DeskSelect/);
+    assert.doesNotMatch(coach, /<select[\s>]/);
+  });
+
+  it("InboxPingTeammate block picker uses DeskSelect", () => {
+    const ping = read("dashboard/src/components/InboxPingTeammate.tsx");
+    assert.match(ping, /from "@\/components\/ui\/DeskSelect"/);
+    assert.match(ping, /aria-label="Teammate"/);
+    assert.match(ping, /<DeskSelect/);
+    assert.doesNotMatch(ping, /<select[\s>]/);
   });
 });
