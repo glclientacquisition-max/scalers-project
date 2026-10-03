@@ -20,6 +20,7 @@ const {
 } = require('../../src/conversation/language');
 const { resolveLocalReply, classifyCallerTurn } = require('../../src/conversation/turnPolicy');
 const { parseGeminiResponse } = require('../../src/conversation/toolMarkers');
+const { parseGeminiTools } = require('../../src/conversation/geminiFunctions');
 const { ensureRequiredEscalate } = require('../../src/conversation/requiredEscalate');
 const {
   ensureRequiredCreateRequest,
@@ -276,7 +277,7 @@ function createSimulator({
       outcome = local.outcome;
     } else {
       rawModel = gemini({ state, decision, text: clean, profile, language: callLanguage, leak, turnIndex: turns.length });
-      const parsed = parseGeminiResponse(rawModel);
+      const parsed = parseGeminiTools({ text: rawModel });
       const enforced = guardToolPlan(
         ensureRequiredEscalate(ensureRequiredCreateRequest(parsed, state, caps), state, caps),
         state,

@@ -143,6 +143,7 @@ module.exports = {
   nothingOnFileLine,
   fileReadLine,
   looksLikeEmptyFileFollowUp,
+  markNothingOnFile,
   presupposesSavedWork,
   sanitizeSpokenFileClaim,
 };

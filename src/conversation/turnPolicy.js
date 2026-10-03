@@ -24,6 +24,7 @@ const {
 } = require('./callCorrectives');
 const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
 const { fileReadLine } = require('./fileRead');
+const { callerFileLocalReply } = require('./callerFile');
 const { hoursAskLine, offerCatalogueLine } = require('./knownFacts');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
@@ -84,6 +85,8 @@ function resolveLocalReply({
     };
   }
 
+  const ownedFile = callerFileLocalReply({ text: clean, state, language });
+  if (ownedFile) return ownedFile;
   const savedLine = fileReadLine({ text: clean, state, language });
   if (savedLine) return { outcome: 'file_read', line: savedLine };
 

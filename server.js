@@ -73,6 +73,16 @@ const { bulletinClosureNotice } = require('./src/conversation/dailyBulletin');
 const { parseAgentTools } = require('./src/conversation/agentTools');
 const { parseGeminiResponse } = require('./src/conversation/toolMarkers');
 const {
+  geminiToolsConfig,
+  parseGeminiTools,
+  extractGeminiFunctionCalls,
+} = require('./src/conversation/geminiFunctions');
+const {
+  callerFileSpeech,
+  callerFileOwnsSpeech,
+  NODE_ID: CALLER_FILE_NODE,
+} = require('./src/conversation/callerFile');
+const {
   createBrainState,
   inferIntent,
   observeCallerTurn,
@@ -120,6 +130,8 @@ const {
   nextGeminiStreamAttempt,
   resolvePrefetchedStreamSpeech,
   spokenTextForToolTurn,
+  partsHaveFunctionCalls,
+  HOLD_SPEECH_UNTIL_TOOLS_CLOSE,
 } = require('./src/conversation/geminiVoice');
 const {
   noteGeminiProviderError,
@@ -4398,7 +4410,8 @@ async function generateGeminiText({
   return text;
 }
 
-function geminiVoiceConfig(systemPrompt) {
+function geminiVoiceConfig(systemPrompt, { escalate = true, endCall = true } = {}) {
+  const tools = geminiToolsConfig({ escalate, endCall });
   return {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     // Slightly lower temp + shorter cap → faster, more consistent phone lines.
@@ -4408,6 +4421,57 @@ function geminiVoiceConfig(systemPrompt) {
     thinkingConfig: {
       thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'MINIMAL',
     },
+    ...tools,
+  };
+}
+
+/**
+ * After tools run: caller_file owns visit-existence speech for save_caller_info
+ * and file lookups. Other tool turns stay quiet (formatToolConfirmation speaks
+ * create/escalate outcomes). Never speak the model line and the code line for
+ * the same fact.
+ */
+function resolveToolTurnSpeech({
+  callSid,
+  parsed,
+  toolResults = [],
+  modelSpoken = '',
+  callerText = '',
+} = {}) {
+  const state = callBrainStates.get(callSid) || createBrainState();
+  const language = state.language?.current || 'en';
+  const actionConfirmation = formatToolConfirmation(toolResults, language);
+  const owns = callerFileOwnsSpeech({
+    state,
+    callerText,
+    toolResults,
+  });
+  let codeLine = '';
+  if (owns) {
+    const saved = (Array.isArray(toolResults) ? toolResults : []).some(
+      (result) =>
+        result?.action === 'save_caller_info' && result.status !== 'duplicate'
+    );
+    codeLine = callerFileSpeech({
+      state,
+      language,
+      mode: saved ? 'save' : 'lookup',
+      callerText,
+    });
+  }
+  const blanked = spokenTextForToolTurn({
+    spoken: modelSpoken,
+    toolResults,
+  });
+  const spokenText = polishSpokenReply(
+    codeLine || blanked,
+    finalSpeechGuardOpts(callSid, toolResults)
+  );
+  return {
+    spokenText,
+    actionConfirmation,
+    holdSpeechUntilToolsClose: Boolean(parsed?.[HOLD_SPEECH_UNTIL_TOOLS_CLOSE]),
+    node: owns ? CALLER_FILE_NODE : null,
   };
 }
 
@@ -4617,6 +4681,15 @@ async function applyGeminiTools(callSid, parsed) {
  * No audio yet: retry the same model once, then one backup model on 503.
  * Audio already started: do not restart. Credits and denied are not retried.
  */
+
+function voiceToolToggles(callSid) {
+  const tools = callAgentTools.get(callSid) || parseAgentTools(null);
+  return {
+    escalate: tools.escalate !== false,
+    endCall: tools.end_call !== false,
+  };
+}
+
 async function runGeminiTurnStreaming(
   messages,
   callSid,
@@ -4652,7 +4725,7 @@ async function runGeminiTurnStreaming(
           const stream = await getGeminiClient().models.generateContentStream({
             model,
             contents,
-            config: geminiVoiceConfig(systemPrompt),
+            config: geminiVoiceConfig(systemPrompt, voiceToolToggles(callSid)),
           });
 
           for await (const chunk of stream) {
@@ -4662,10 +4735,15 @@ async function runGeminiTurnStreaming(
             }
             modelParts = appendGeminiStreamParts(modelParts, chunk);
             thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
+            if (partsHaveFunctionCalls(extractGeminiParts(chunk))) {
+              buffer.setHoldSpeechUntilToolsClose(true);
+            }
             const delta = extractGeminiText(chunk);
             if (!delta) continue;
             fullText = joinSpokenPieces(fullText, delta);
-            const pieces = buffer.push(delta);
+            const pieces = buffer.push(delta, {
+              holdSpeechUntilToolsClose: buffer.getHoldSpeechUntilToolsClose(),
+            });
             for (const piece of pieces) {
               if (shouldAbort?.()) break;
               if (typeof onSpokenChunk === 'function') {
@@ -4757,40 +4835,45 @@ async function runGeminiTurnStreaming(
     buffer.finish();
   }
 
-  const parsed = parseGeminiResponse(fullText || buffer.getRaw());
+  const rawText = fullText || buffer.getRaw();
+  const parsed = parseGeminiTools({
+    text: rawText,
+    geminiParts: modelParts,
+    functionCalls: extractGeminiFunctionCalls(modelParts),
+  });
+  if (parsed.holdSpeechUntilToolsClose) {
+    buffer.setHoldSpeechUntilToolsClose(true);
+  }
   const execution = await safeApplyGeminiTools(callSid, parsed);
-  const actionConfirmation = formatToolConfirmation(
-    execution.results,
-    callBrainStates.get(callSid)?.language?.current || 'en'
-  );
-  const spokenText = polishSpokenReply(
-    spokenTextForToolTurn({
-      spoken: spokenTextWithoutToolFallback({
-        spoken: buffer.getSpokenEmitted() || parsed.spokenText,
-        actionConfirmation,
-      }),
-      toolResults: execution.results,
+  const speech = resolveToolTurnSpeech({
+    callSid,
+    parsed,
+    toolResults: execution.results,
+    modelSpoken: spokenTextWithoutToolFallback({
+      spoken: buffer.getSpokenEmitted() || parsed.spokenText,
+      actionConfirmation: '',
     }),
-    finalSpeechGuardOpts(callSid, execution.results)
-  );
+  });
 
   const geminiParts = modelPartsForHistory({
     geminiParts: modelParts,
-    text: fullText || buffer.getRaw(),
+    text: rawText,
     thoughtSignature,
   });
   messages.push({
     role: 'assistant',
-    content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
+    content: [speech.spokenText, speech.actionConfirmation].filter(Boolean).join(' '),
     geminiParts,
     thoughtSignature: thoughtSignature || undefined,
   });
   return {
-    spokenText,
-    actionConfirmation,
+    spokenText: speech.spokenText,
+    actionConfirmation: speech.actionConfirmation,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
     streamed: !streamFailed,
+    holdSpeechUntilToolsClose: speech.holdSpeechUntilToolsClose,
+    node: speech.node,
   };
 }
 
@@ -4814,7 +4897,7 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
         getGeminiClient().models.generateContent({
           model,
           contents,
-          config: geminiVoiceConfig(systemPrompt),
+          config: geminiVoiceConfig(systemPrompt, voiceToolToggles(callSid)),
         }),
         geminiTurnTimeoutMs(),
         'Gemini generateContent'
@@ -4852,29 +4935,29 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
   }
 
   const outputText = extractGeminiText(response);
-  const parsed = parseGeminiResponse(outputText);
+  const responseParts = extractGeminiParts(response);
+  const parsed = parseGeminiTools({
+    text: outputText,
+    geminiParts: responseParts,
+    functionCalls: extractGeminiFunctionCalls(responseParts),
+  });
   const execution = await safeApplyGeminiTools(callSid, parsed);
-  const actionConfirmation = formatToolConfirmation(
-    execution.results,
-    callBrainStates.get(callSid)?.language?.current || 'en'
-  );
-  const spokenText = polishSpokenReply(
-    spokenTextForToolTurn({
-      spoken: spokenTextWithoutToolFallback({
-        spoken: parsed.spokenText,
-        actionConfirmation,
-      }),
-      toolResults: execution.results,
+  const speech = resolveToolTurnSpeech({
+    callSid,
+    parsed,
+    toolResults: execution.results,
+    modelSpoken: spokenTextWithoutToolFallback({
+      spoken: parsed.spokenText,
+      actionConfirmation: '',
     }),
-    finalSpeechGuardOpts(callSid, execution.results)
-  );
+  });
 
   const thoughtSignature = extractThoughtSignature(response) || undefined;
   messages.push({
     role: 'assistant',
-    content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
+    content: [speech.spokenText, speech.actionConfirmation].filter(Boolean).join(' '),
     geminiParts: modelPartsForHistory({
-      geminiParts: extractGeminiParts(response),
+      geminiParts: responseParts,
       text: outputText,
       thoughtSignature,
     }),
@@ -4882,10 +4965,12 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
   });
 
   return {
-    spokenText,
-    actionConfirmation,
+    spokenText: speech.spokenText,
+    actionConfirmation: speech.actionConfirmation,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
+    holdSpeechUntilToolsClose: speech.holdSpeechUntilToolsClose,
+    node: speech.node,
   };
 }
 
