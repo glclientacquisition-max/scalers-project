@@ -221,7 +221,8 @@ describe('returning-caller card', () => {
     assert.equal(named.returning.fileRole, 'primary');
     assert.equal(named.returning.nextVisit, 'carpet cleaning | Tuesday 10 AM');
     assert.match(formatReturningCallerForPrompt(profile.callerMemory), /Open: visit \| carpet cleaning/);
-    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /Open first/);
+    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /name each Open line/);
+    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /never say "I don't have a booking"/);
     assert.match(formatBrainStateForPrompt(named), /open visit/i);
     assert.equal(
       pickPhaticReply({ language: 'en', callerMemory: profile.callerMemory }),
@@ -620,7 +621,8 @@ describe('returning-caller card', () => {
     assert.match(block, /Standing: Usually carpet. Morning. Kiswahili./);
     assert.match(block, /Language: sw/);
     assert.match(block, /Note: prefers morning/);
-    assert.match(block, /Open first/);
+    assert.match(block, /name each Open line/);
+    assert.match(block, /never say "I don't have a booking"/);
     assert.doesNotMatch(block, /Caller:/);
 
     const state = createBrainState({ callerMemory: bound });
@@ -772,6 +774,124 @@ describe('returning-caller card', () => {
     assert.doesNotMatch(card.nextAppointment, /tomorrow/);
     assert.match(card.recentBookings.join(' '), /past/i);
     assert.doesNotMatch(card.recentBookings.join(' '), /\btomorrow\b/i);
+  });
+
+  it('after a yes, names two open items and forbids denying a booking', () => {
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254790381872',
+        name: 'Alvin',
+        metadata: {},
+      },
+      openRequests: [
+        { request_type: 'request', item: 'carpet cleaning', when_text: 'tomorrow' },
+        { request_type: 'request', item: 'carpet cleaning', when_text: 'tomorrow' },
+      ],
+    });
+    const unbound = formatReturningCallerForPrompt(card);
+    assert.match(unbound, /Am I speaking with Alvin/);
+    assert.match(unbound, /Never say there is no booking, no visit, or nothing on file/);
+    assert.doesNotMatch(unbound, /carpet cleaning/);
+
+    const notThem = formatReturningCallerForPrompt(bindCallerMemoryCard(card, 'Brian'));
+    assert.match(notThem, /not the household file/i);
+    assert.doesNotMatch(notThem, /carpet cleaning/);
+    assert.doesNotMatch(notThem, /Open:/);
+
+    const yes = bindCallerMemoryCard(card, 'Alvin');
+    const block = formatReturningCallerForPrompt(yes);
+    assert.equal(
+      (block.match(/Open: request \| carpet cleaning \| tomorrow/g) || []).length,
+      2
+    );
+    assert.match(block, /name each Open line/);
+    assert.match(block, /never say "I don't have a booking"/);
+    assert.match(block, /nothing on file/);
+
+    const state = createBrainState({ callerMemory: yes });
+    const callState = formatBrainStateForPrompt(state);
+    assert.equal(
+      (callState.match(/Caller file open request: request \| carpet cleaning \| tomorrow/g) || []).length,
+      2
+    );
+    assert.match(callState, /never say "I don't have a booking"/);
+
+    const cleared = {
+      ...yes,
+      openRequests: [],
+      openVisits: [],
+      nextAppointment: null,
+    };
+    const afterCancel = formatReturningCallerForPrompt(cleared);
+    assert.doesNotMatch(afterCancel, /never say "I don't have a booking"/);
+    assert.doesNotMatch(afterCancel, /Open:/);
+    const rules = buildSystemPrompt({ businessName: 'Scalers', agentName: 'A' });
+    assert.match(rules, /While CALL STATE lists any open visit or open request/);
+    assert.match(rules, /If those lines are gone, you may say nothing is open/);
+    assert.match(
+      rules,
+      /immediately say the job, when, and place for every still-open line, and treat CALL STATE as fact/
+    );
+    assert.match(rules, /never say there is no booking, no visit, or nothing on file/);
+
+    const confirmedTurn = buildSystemPrompt({
+      businessName: 'Scalers',
+      agentName: 'A',
+      callerMemory: yes,
+    });
+    assert.match(confirmedTurn, /Alvin \(bound; use this name\)/);
+    assert.match(confirmedTurn, /Open: request \| carpet cleaning \| tomorrow/);
+    assert.match(
+      confirmedTurn,
+      /If you append ONLY save_caller_info, you MUST speak your natural response and read any open visits still listed/
+    );
+    assert.match(
+      confirmedTurn,
+      /If you append create_service_request, create_appointment, or update_appointment, speak nothing/
+    );
+    assert.match(
+      confirmedTurn,
+      /If you append create_appointment or update_appointment, speak nothing/
+    );
+    assert.doesNotMatch(confirmedTurn, /If you append any tool this turn, speak nothing/);
+    assert.match(callState, /immediately say the job, when, and place for every still-open line/);
+    assert.match(callState, /treat CALL STATE as fact/);
+  });
+
+  it('names each still-open visit after confirm instead of filing the second as history', () => {
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254790381872',
+        name: 'Alvin',
+        metadata: {},
+      },
+      nextAppointment: {
+        id: 'a',
+        service_name: 'carpet cleaning',
+        when_text: 'tomorrow',
+        status: 'requested',
+        address_landmark: 'Rongai',
+      },
+      recentAppointments: [
+        {
+          id: 'b',
+          service_name: 'carpet cleaning',
+          when_text: 'tomorrow',
+          status: 'requested',
+          address_landmark: 'Westlands',
+        },
+      ],
+    });
+    const yes = bindCallerMemoryCard(card, 'Alvin');
+    const block = formatReturningCallerForPrompt(yes);
+    assert.match(block, /Open: visit \| carpet cleaning \| tomorrow \| requested \| Rongai/);
+    assert.match(block, /Open: visit \| carpet cleaning \| tomorrow \| requested \| Westlands/);
+    assert.doesNotMatch(block, /History: carpet cleaning \| tomorrow/);
+    assert.match(block, /name each Open line/);
+    const callState = formatBrainStateForPrompt(createBrainState({ callerMemory: yes }));
+    assert.match(callState, /open visit: carpet cleaning \| tomorrow \| requested \| Rongai/);
+    assert.match(callState, /open visit: carpet cleaning \| tomorrow \| requested \| Westlands/);
+    assert.match(callState, /While any is listed/);
   });
 
   it('drops a hold whose relative day is already past', () => {
