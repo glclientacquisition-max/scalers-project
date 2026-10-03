@@ -10,7 +10,7 @@ const {
 const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { prepareStreamedSpeech } = require('./callCorrectives');
-const { guardSpokenReply } = require('./speechGuard');
+const { dropSpeechSlop, guardSpokenReply } = require('./speechGuard');
 const {
   fileReadLine,
   hasReadableFile,
@@ -423,7 +423,8 @@ function polishSpokenReply(text, opts = {}) {
   if (!sanitized && !hasReadableFile(opts.state) && presupposesSavedWork(String(text || ''))) {
     return nothingOnFileLine(opts.state, opts.language);
   }
-  return sanitized;
+  // Last mouth. A dump trim or a later prompt cannot put filler back.
+  return dropSpeechSlop(sanitized, callerText);
 }
 
 /**
