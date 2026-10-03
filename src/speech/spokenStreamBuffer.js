@@ -215,6 +215,9 @@ function createSpokenStreamBuffer(opts = {}) {
   let holdSpeechUntilToolsClose = Boolean(opts.holdSpeechUntilToolsClose);
   const earlyFlushChars = opts.earlyFlushChars;
   const earlyFlushWords = opts.earlyFlushWords;
+  // Name-confirm turns must not send a sentence to speech before the tool
+  // block closes. A finished denial would already be in the caller's ear.
+  const suppressFlush = Boolean(opts.suppressFlush);
 
   /**
    * @param {string} delta
@@ -228,6 +231,7 @@ function createSpokenStreamBuffer(opts = {}) {
     } else if (pushOpts.holdSpeechUntilToolsClose === false) {
       holdSpeechUntilToolsClose = false;
     }
+    if (suppressFlush) return [];
     const final = Boolean(pushOpts.final);
     const speakable = stripMarkersForSpeech(raw, { final });
 
@@ -265,6 +269,7 @@ function createSpokenStreamBuffer(opts = {}) {
   }
 
   function finish() {
+    if (suppressFlush) return [];
     return push('', { final: true });
   }
 

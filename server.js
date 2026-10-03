@@ -97,6 +97,7 @@ const {
   attachCallerMemory,
   liveCallerFileStamp,
 } = require('./src/conversation/callerMemory');
+const { formatNameConfirmSpeech, openLineHoldDecision } = require('./src/conversation/openLineSpeech');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const { collectKnownCallerNames } = require('./src/conversation/callerNameMatch');
 const {
@@ -4479,7 +4480,20 @@ function resolveToolTurnSpeech({
 } = {}) {
   const state = callBrainStates.get(callSid) || createBrainState();
   const language = state.language?.current || 'en';
-  const actionConfirmation = formatToolConfirmation(toolResults, language);
+  const outcomeConfirmation = formatToolConfirmation(toolResults, language);
+  const hold = holdCallerSpeech(callSid, [{ role: 'user', content: callerText }]);
+  // Name-confirm and an already-bound visit lookup: model stays quiet.
+  // formatNameConfirmSpeech reads the open lines. A tool outcome still wins.
+  if (hold.holdSpeech) {
+    if (hold.holdNameConfirm) clearNameJustConfirmed(callSid);
+    return {
+      spokenText: '',
+      actionConfirmation: outcomeConfirmation || nameConfirmSpeech(callSid),
+      holdSpeech: true,
+      holdSpeechUntilToolsClose: Boolean(parsed?.[HOLD_SPEECH_UNTIL_TOOLS_CLOSE]),
+      node: null,
+    };
+  }
   const owns = callerFileOwnsSpeech({
     state,
     callerText,
@@ -4508,7 +4522,8 @@ function resolveToolTurnSpeech({
   );
   return {
     spokenText,
-    actionConfirmation,
+    actionConfirmation: outcomeConfirmation,
+    holdSpeech: false,
     holdSpeechUntilToolsClose: Boolean(parsed?.[HOLD_SPEECH_UNTIL_TOOLS_CLOSE]),
     node: owns ? CALLER_FILE_NODE : null,
   };
@@ -4729,6 +4744,41 @@ function voiceToolToggles(callSid) {
   };
 }
 
+function nameJustConfirmed(callSid) {
+  return callBrainStates.get(callSid)?.caller?.nameJustConfirmed === true;
+}
+
+function latestCallerUtterance(messages) {
+  if (!Array.isArray(messages)) return '';
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === 'user') return String(messages[i].content || '');
+  }
+  return '';
+}
+
+function holdCallerSpeech(callSid, messages) {
+  const caller = callBrainStates.get(callSid)?.caller;
+  return openLineHoldDecision({
+    nameConfirmed: caller?.nameConfirmed === true,
+    nameJustConfirmed: nameJustConfirmed(callSid),
+    callerText: latestCallerUtterance(messages),
+  });
+}
+
+function clearNameJustConfirmed(callSid) {
+  const caller = callBrainStates.get(callSid)?.caller;
+  if (caller) caller.nameJustConfirmed = false;
+}
+
+function nameConfirmSpeech(callSid) {
+  const state = callBrainStates.get(callSid);
+  return formatNameConfirmSpeech({
+    openVisits: state?.returning?.openVisits,
+    openRequests: state?.returning?.openRequests,
+    language: state?.language?.current,
+  });
+}
+
 async function runGeminiTurnStreaming(
   messages,
   callSid,
@@ -4738,8 +4788,12 @@ async function runGeminiTurnStreaming(
   const primary = geminiPrimaryModel();
   const backup = geminiBackupModel();
   const contents = buildGeminiContents(messages);
+  const hold = holdCallerSpeech(callSid, messages);
+  const holdSpeech = hold.holdSpeech;
   let model = primary;
-  let buffer = createSpokenStreamBuffer();
+  let buffer = createSpokenStreamBuffer(
+    holdSpeech ? { suppressFlush: true } : {}
+  );
   let fullText = '';
   let streamFailed = false;
   let streamErr = null;
@@ -4750,7 +4804,9 @@ async function runGeminiTurnStreaming(
 
   while (attempt < 3) {
     fullText = '';
-    buffer = createSpokenStreamBuffer();
+    buffer = createSpokenStreamBuffer(
+      holdSpeech ? { suppressFlush: true } : {}
+    );
     thoughtSignature = '';
     modelParts = [];
     streamErr = null;
@@ -4897,6 +4953,7 @@ async function runGeminiTurnStreaming(
     callSid,
     parsed,
     toolResults: execution.results,
+    callerText: latestCallerUtterance(messages),
     modelSpoken: spokenTextWithoutToolFallback({
       spoken: buffer.getSpokenEmitted() || parsed.spokenText,
       actionConfirmation: '',
@@ -4904,8 +4961,8 @@ async function runGeminiTurnStreaming(
   });
 
   const geminiParts = modelPartsForHistory({
-    geminiParts: modelParts,
-    text: rawText,
+    geminiParts: speech.holdSpeech ? [] : modelParts,
+    text: speech.holdSpeech ? speech.actionConfirmation : rawText,
     thoughtSignature,
   });
   messages.push({
@@ -5013,6 +5070,7 @@ async function runGeminiTurn(
     callSid,
     parsed,
     toolResults: execution.results,
+    callerText: latestCallerUtterance(messages),
     modelSpoken: spokenTextWithoutToolFallback({
       spoken: parsed.spokenText,
       actionConfirmation: '',
@@ -5024,8 +5082,8 @@ async function runGeminiTurn(
     role: 'assistant',
     content: [speech.spokenText, speech.actionConfirmation].filter(Boolean).join(' '),
     geminiParts: modelPartsForHistory({
-      geminiParts: responseParts,
-      text: outputText,
+      geminiParts: speech.holdSpeech ? [] : responseParts,
+      text: speech.holdSpeech ? speech.actionConfirmation : outputText,
       thoughtSignature,
     }),
     thoughtSignature,
