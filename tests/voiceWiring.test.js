@@ -304,9 +304,10 @@ assert.match(
   /nextGeminiStreamAttempt/,
   'a failed stream with no audio retries once, then one backup model'
 );
+const streamFnStart = source.indexOf('async function runGeminiTurnStreaming');
 const streamFn = source.slice(
-  source.indexOf('async function runGeminiTurnStreaming'),
-  source.indexOf('async function runGeminiTurn')
+  streamFnStart,
+  source.indexOf('async function runGeminiTurn', streamFnStart + 1)
 );
 assert.doesNotMatch(
   streamFn,
@@ -532,6 +533,38 @@ assert.match(
   /type:\s*['"]killAudio['"]/,
   'media clear must send drachtio killAudio on barge-in'
 );
+
+assert.match(
+  source,
+  /function cancelInFlightVoice/,
+  'barge-in and a node change share one media-socket cancel'
+);
+
+assert.match(
+  source,
+  /function cancelSpeech\(reason\) \{\s*cancelInFlightVoice\(reason\);/,
+  'existing barge-in still cancels speech through the shared entry'
+);
+
+const cancelFn = source.slice(
+  source.indexOf('function cancelInFlightVoice'),
+  source.indexOf('function cancelSpeech')
+);
+assert.match(cancelFn, /applyVoiceSocketCancel/, 'socket cancel must use the shared plan');
+assert.match(cancelFn, /turnBusy = false/, 'cancel must return the caller turn to listening');
+assert.doesNotMatch(cancelFn, /tts\.cancel\(\)/, 'cancel must not kill every Soniox stream');
+assert.doesNotMatch(cancelFn, /stt\.close|stt\.cancel/, 'STT stays up across a voice cancel');
+
+const streamStart = source.indexOf('async function runGeminiTurnStreaming');
+const streamFnCancel = source.slice(
+  streamStart,
+  source.indexOf('async function runGeminiTurn', streamStart + 1)
+);
+assert.match(streamFnCancel, /abortSignal/, 'Gemini stream must take an AbortSignal');
+assert.match(streamFnCancel, /takeGeminiVoiceStream/, 'Gemini stream must open through the abortable reader');
+const toolAt = streamFnCancel.indexOf('safeApplyGeminiTools');
+const guardAt = streamFnCancel.lastIndexOf('geminiTurnWasCancelled', toolAt);
+assert.ok(guardAt !== -1 && guardAt < toolAt, 'tool apply is skipped when the Gemini turn was cancelled');
 
 assert.match(
   sttSource,
