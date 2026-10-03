@@ -480,8 +480,7 @@ function observeCallerTurn(state, input = {}) {
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
   next.caller.nameCollision = nameResolution.nameCollision || null;
   applyLiveCallerFile(input.profile, next);
-  const wasNameConfirmed = Boolean(state?.caller?.nameConfirmed);
-  if (!wasNameConfirmed && next.caller.nameConfirmed) {
+  if (!Boolean(state?.caller?.nameConfirmed) && next.caller.nameConfirmed) {
     const prior = (next.conversation.answersReceived || []).slice(0, -1);
     const askedRows = prior.some(
       (row) =>
