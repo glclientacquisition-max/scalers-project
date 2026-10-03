@@ -219,7 +219,7 @@ describe('returning-caller card', () => {
     assert.equal(named.caller.name, 'Alex');
     assert.equal(named.caller.nameConfirmed, true);
     assert.equal(named.returning.fileRole, 'primary');
-    assert.equal(named.returning.nextVisit, 'carpet cleaning | Tuesday 10 AM');
+    assert.equal(named.returning.nextVisit, 'carpet cleaning');
     assert.match(formatReturningCallerForPrompt(profile.callerMemory), /Open: visit \| carpet cleaning/);
     assert.match(formatReturningCallerForPrompt(profile.callerMemory), /immediately say each still-open line/);
     assert.match(formatReturningCallerForPrompt(profile.callerMemory), /one sentence each, then one question/);
@@ -324,7 +324,7 @@ describe('returning-caller card', () => {
     assert.equal(named.caller.name, 'Amina');
     assert.equal(named.caller.nameConfirmed, true);
     assert.equal(named.returning.fileRole, 'primary');
-    assert.equal(named.returning.nextVisit, 'carpet cleaning | Tuesday 10 AM');
+    assert.equal(named.returning.nextVisit, 'carpet cleaning');
     assert.match(formatBrainStateForPrompt(named), /open visit/i);
     assert.doesNotMatch(formatBrainStateForPrompt(named), /Ask who is speaking/);
     assert.match(formatReturningCallerForPrompt(profile.callerMemory), /use this name/i);
@@ -472,8 +472,8 @@ describe('returning-caller card', () => {
       ],
     });
     assert.deepEqual(card.recentBookings, [
-      'carpet cleaning | last Tuesday | done',
-      'couch cleaning | 3 March | done',
+      'carpet cleaning | done',
+      'couch cleaning | done',
     ]);
     assert.doesNotMatch(card.recentBookings.join(' '), /mattress clean/);
     const unboundBlock = formatReturningCallerForPrompt(card);
@@ -497,8 +497,8 @@ describe('returning-caller card', () => {
       }),
     });
     const block = formatReturningCallerForPrompt(profile.callerMemory);
-    assert.match(block, /History: carpet cleaning \| last Tuesday \| done/);
-    assert.match(block, /History: couch cleaning \| 3 March \| done/);
+    assert.match(block, /History: carpet cleaning \| done/);
+    assert.match(block, /History: couch cleaning \| done/);
     assert.match(block, /History only if they mention that job/);
     assert.doesNotMatch(block, /fumigation/);
     assert.match(formatBrainStateForPrompt(state), /Caller file history:.*carpet cleaning/);
@@ -604,8 +604,8 @@ describe('returning-caller card', () => {
     assert.equal(card.place, 'Rongai');
     assert.equal(card.usualJob, 'carpet cleaning');
     assert.equal(card.language, 'sw');
-    assert.match(card.nextAppointment, /mattress clean \| Friday \| requested \| Rongai/);
-    assert.equal(card.openRequests[0], 'hold | Atomic Habits | Saturday');
+    assert.match(card.nextAppointment, /mattress clean \| requested \| Rongai/);
+    assert.equal(card.openRequests[0], 'hold | Atomic Habits');
 
     const unbound = formatReturningCallerForPrompt(card);
     assert.doesNotMatch(unbound, /Open:/);
@@ -615,10 +615,10 @@ describe('returning-caller card', () => {
     const bound = bindCallerMemoryCard(card, 'Jane');
     const block = formatReturningCallerForPrompt(bound);
     assert.match(block, /Speaker: Jane \(bound; use this name\)/);
-    assert.match(block, /Open: visit \| mattress clean \| Friday \| requested \| Rongai/);
-    assert.match(block, /Open: hold \| Atomic Habits \| Saturday/);
+    assert.match(block, /Open: visit \| mattress clean \| requested \| Rongai/);
+    assert.match(block, /Open: hold \| Atomic Habits/);
     assert.match(block, /Last: carpet Tuesday/);
-    assert.match(block, /History: carpet cleaning \| last Tuesday \| done \| Rongai/);
+    assert.match(block, /History: carpet cleaning \| done \| Rongai/);
     assert.match(block, /Place: Rongai/);
     assert.match(block, /Usual: carpet cleaning/);
     assert.match(block, /Standing: Usually carpet. Morning. Kiswahili./);
@@ -691,10 +691,9 @@ describe('returning-caller card', () => {
         created_at: '2026-06-01T06:00:00.000Z',
       },
     });
-    assert.match(card.nextAppointment, /past/i);
     assert.match(card.nextAppointment, /carpet cleaning/i);
-    assert.doesNotMatch(card.nextAppointment, /\b(tomorrow|today|kesho|leo)\b/i);
-    assert.match(card.openVisits[0], /past/i);
+    assert.doesNotMatch(card.nextAppointment, /\b(tomorrow|today|kesho|leo|past)\b/i);
+    assert.doesNotMatch(card.openVisits[0], /\b(tomorrow|today|kesho|leo|past)\b/i);
     assert.doesNotMatch(card.openVisits.join(' '), /\b(tomorrow|today|kesho|leo)\b/i);
     assert.doesNotMatch(card.lastReason, /\b(tomorrow|today|kesho|leo)\b/i);
     assert.match(card.lastReason, /past/i);
@@ -703,7 +702,7 @@ describe('returning-caller card', () => {
     assert.match(block, /past/i);
     assert.doesNotMatch(block, /\b(tomorrow|today|kesho|leo)\b/i);
     const state = createBrainState({ callerMemory: bindCallerMemoryCard(card, 'Jane') });
-    assert.match(state.returning.nextVisit, /past/i);
+    assert.doesNotMatch(state.returning.nextVisit, /\b(tomorrow|today|past)\b/i);
     assert.match(formatBrainStateForPrompt(state), /open visit/i);
     assert.doesNotMatch(formatBrainStateForPrompt(state), /\btomorrow\b/i);
   });
@@ -779,8 +778,7 @@ describe('returning-caller card', () => {
     assert.match(card.nextAppointment, /sofa cleaning/);
     assert.doesNotMatch(card.nextAppointment, /tomorrow/);
     assert.match(card.openVisits.join(' '), /carpet cleaning/i);
-    assert.match(card.openVisits.join(' '), /past/i);
-    assert.doesNotMatch(card.openVisits.join(' '), /\btomorrow\b/i);
+    assert.doesNotMatch(card.openVisits.join(' '), /\b(tomorrow|past)\b/i);
     assert.doesNotMatch(card.recentBookings.join(' '), /\btomorrow\b/i);
   });
 
@@ -812,7 +810,7 @@ describe('returning-caller card', () => {
     const yes = bindCallerMemoryCard(card, 'Alvin');
     const block = formatReturningCallerForPrompt(yes);
     assert.equal(
-      (block.match(/Open: request \| carpet cleaning \| tomorrow/g) || []).length,
+      (block.match(/Open: request \| carpet cleaning/g) || []).length,
       2
     );
     assert.match(block, /immediately say each still-open line \(job, when, place; only fields present\), one sentence each, then one question/);
@@ -823,7 +821,7 @@ describe('returning-caller card', () => {
     const state = createBrainState({ callerMemory: yes });
     const callState = formatBrainStateForPrompt(state);
     assert.equal(
-      (callState.match(/Caller file open request: request \| carpet cleaning \| tomorrow/g) || []).length,
+      (callState.match(/Caller file open request: request \| carpet cleaning/g) || []).length,
       2
     );
     assert.match(callState, /immediately say each still-open line/);
@@ -860,7 +858,7 @@ describe('returning-caller card', () => {
       callerMemory: yes,
     });
     assert.match(confirmedTurn, /Alvin \(bound; use this name\)/);
-    assert.match(confirmedTurn, /Open: request \| carpet cleaning \| tomorrow/);
+    assert.match(confirmedTurn, /Open: request \| carpet cleaning/);
     assert.match(
       confirmedTurn,
       /If you append ONLY save_caller_info, you MUST speak your natural response and read any open visits still listed/
@@ -910,16 +908,16 @@ describe('returning-caller card', () => {
     });
     const yes = bindCallerMemoryCard(card, 'Alvin');
     const block = formatReturningCallerForPrompt(yes);
-    assert.match(block, /Open: visit \| carpet cleaning \| tomorrow \| requested \| Rongai/);
-    assert.match(block, /Open: visit \| carpet cleaning \| tomorrow \| requested \| Westlands/);
+    assert.match(block, /Open: visit \| carpet cleaning \| requested \| Rongai/);
+    assert.match(block, /Open: visit \| carpet cleaning \| requested \| Westlands/);
     assert.doesNotMatch(block, /History: carpet cleaning \| tomorrow/);
     assert.match(block, /immediately say each still-open line/);
     assert.match(block, /one sentence each, then one question/);
     assert.doesNotMatch(block, /no booking/i);
     assert.doesNotMatch(block, /nothing on file/i);
     const callState = formatBrainStateForPrompt(createBrainState({ callerMemory: yes }));
-    assert.match(callState, /open visit: carpet cleaning \| tomorrow \| requested \| Rongai/);
-    assert.match(callState, /open visit: carpet cleaning \| tomorrow \| requested \| Westlands/);
+    assert.match(callState, /open visit: carpet cleaning \| requested \| Rongai/);
+    assert.match(callState, /open visit: carpet cleaning \| requested \| Westlands/);
     assert.match(callState, /immediately say each still-open line/);
     assert.doesNotMatch(callState, /no booking/i);
     assert.doesNotMatch(callState, /nothing on file/i);
@@ -946,8 +944,7 @@ describe('returning-caller card', () => {
     });
     assert.equal(card.openRequests.length, 1);
     assert.match(card.openRequests[0], /hold \| Atomic Habits/i);
-    assert.match(card.openRequests[0], /past/i);
-    assert.doesNotMatch(card.openRequests[0], /\btomorrow\b/i);
+    assert.doesNotMatch(card.openRequests[0], /\b(tomorrow|past)\b/i);
     assert.equal(card.openVisits.length, 0);
   });
 });

@@ -226,15 +226,15 @@ function whenPhraseIn(notes) {
 }
 
 /**
- * A spoken when comes from this row's window, or from a time in this row's
- * notes. A when_text that the notes do not contain is not this row's time.
- * No notes at all still uses this row's own when_text.
+ * A spoken when comes from this row's window, or from a time written in
+ * this row's notes. when_text alone is not a when. No window and no time
+ * in the notes means the spoken when is empty.
  */
 function whenTextThisRowOwns(row) {
   const whenText = String(row?.when_text || row?.whenText || '').trim();
   if (rowHasWindow(row)) return whenText;
   const notes = String(row?.notes || '').trim();
-  if (!notes) return whenText;
+  if (!notes) return '';
   if (whenText && notes.toLowerCase().includes(whenText.toLowerCase())) return whenText;
   return whenPhraseIn(notes);
 }

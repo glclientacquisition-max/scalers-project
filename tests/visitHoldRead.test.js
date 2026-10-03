@@ -100,7 +100,8 @@ describe('visit and hold read before the empty-file line', () => {
     const state = boundState(card, 'home_services');
     assert.equal(looksLikePastBookingTalk('And my previous ones?'), true);
     const line = heard(card, 'And my previous ones?');
-    assert.match(line, /You have carpet cleaning, last Tuesday/);
+    assert.match(line, /You have carpet cleaning/);
+    assert.doesNotMatch(line, /last Tuesday/);
     assert.notEqual(line, BOOKING_DENIAL);
     const block = formatReturningCallerForPrompt(bindCallerMemoryCard(card, 'Alvin'));
     assert.match(block, /History: carpet cleaning/i);
@@ -384,9 +385,11 @@ describe('backend read plays instead of an unnamed-visit question', () => {
 
   it('previous reads finished visits and fulfilled or cancelled holds', () => {
     const line = heard(cardWithRows(), 'And my previous ones?');
-    assert.match(line, /sofa cleaning, last Tuesday, Westlands/i);
+    assert.match(line, /sofa cleaning, Westlands/i);
+    assert.doesNotMatch(line, /last Tuesday/i);
     assert.match(line, /Old Book/i);
-    assert.match(line, /diaries request, 3 March/i);
+    assert.match(line, /diaries request/i);
+    assert.doesNotMatch(line, /3 March/i);
     assert.doesNotMatch(line, /pet stain/i);
     assert.doesNotMatch(line, /I don't have a booking for you/i);
   });
@@ -475,7 +478,8 @@ describe('windowless requested visits and compliments', () => {
     assert.equal((line.match(/You have Couch cleaning, Kilimani/g) || []).length, 2);
     assert.match(line, /You have Carpet cleaning, Kilimani/);
     assert.equal((line.match(/You have Carpet cleaning, Westlands/g) || []).length, 2);
-    assert.match(line, /You have Carpet cleaning, 22 Sep, Barnabas/);
+    assert.match(line, /You have Carpet cleaning, Barnabas/);
+    assert.doesNotMatch(line, /22 Sep/);
     const local = resolveLocalReply({
       text: 'What are my bookings?',
       state: boundState(card, 'home_services'),
@@ -572,6 +576,13 @@ describe('a when stays on the row that has it', () => {
           created_at: '2026-08-16T01:39:28.589Z',
         },
         {
+          id: 'no-notes',
+          service_name: 'Mattress cleaning',
+          status: 'requested',
+          when_text: 'at 4:00 PM',
+          address_landmark: 'Runda',
+        },
+        {
           id: 'barnabas',
           service_name: 'Carpet cleaning',
           status: 'requested',
@@ -604,6 +615,8 @@ describe('a when stays on the row that has it', () => {
     assert.match(lines, /past 22 Sep 2026 09:00/);
     assert.equal((lines.match(/22 Sep/g) || []).length, 1);
     assert.doesNotMatch(lines, /22 Sep 22 Sep/);
+    assert.match(lines, /Mattress cleaning \| requested \| Runda/);
+    assert.doesNotMatch(lines, /4:00/);
     const sentence = heard(card, 'What are my bookings?');
     assert.notEqual(sentence, NOTHING_OPEN);
     assert.match(sentence, /You have Couch cleaning, Kilimani/);
@@ -612,6 +625,8 @@ describe('a when stays on the row that has it', () => {
     assert.equal((sentence.match(/12:00 PM/g) || []).length, 1);
     assert.match(sentence, /past 22 Sep 2026 09:00/);
     assert.doesNotMatch(sentence, /22 Sep 22 Sep/);
+    assert.match(sentence, /You have Mattress cleaning, Runda/);
+    assert.doesNotMatch(sentence, /4:00/);
     assert.equal(
       resolveLocalReply({
         text: 'What are my bookings?',
