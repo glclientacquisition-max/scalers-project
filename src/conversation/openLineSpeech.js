@@ -1,5 +1,6 @@
-// Backend speech for the turn right after the caller confirms their name.
-// The model must not speak on that turn. These lines use only fields present.
+// Backend speech for a name-confirm turn, and for a later turn where a
+// caller who is already name-confirmed asks what is still open.
+// The model must not speak on those turns. These lines use only fields present.
 
 const STATUS = /^(requested|confirmed|open|pending|cancelled|canceled|done|completed)$/i;
 const LEAD = /^(request|hold|enquiry|inquiry)$/i;
@@ -49,6 +50,36 @@ function nothingOpen(language) {
   return 'Nothing is still open.';
 }
 
+
+// Lookup of visits already on file. Caller text only.
+// Not a new booking, a change, a cancel, hours, or a services menu.
+const LOOKUP_BLOCK_RE =
+  /\b(?:cancel(?:led|lation)?|reschedul\w*|change|move|badilisha|ahirisha|kughairi|kubadilisha|book(?:\s+(?:a|an|me|us))?|schedule(?:\s+(?:a|an))?|(?:want|need|like) to book|what time|when (?:do|are) you open|opening hours|business hours|which services|what services|services do you offer|what do you offer)\b/i;
+
+const LOOKUP_RE =
+  /\b(?:inquire about (?:my |our )?(?:bookings?|visits?|appointments?)|(?:my|our) bookings?|do i have (?:a |any )?(?:visits?|bookings?|appointments?)|what are my (?:bookings?|visits?|appointments?)|check (?:on )?(?:my |our )?(?:bookings?|visits?|appointments?)|bookings zangu|booking yangu|ziara zangu)\b/i;
+
+function looksLikeOpenVisitLookup(text) {
+  const raw = String(text || '').trim();
+  if (!raw || LOOKUP_BLOCK_RE.test(raw)) return false;
+  return LOOKUP_RE.test(raw);
+}
+
+function openLineHoldDecision({
+  nameConfirmed = false,
+  nameJustConfirmed = false,
+  callerText = '',
+} = {}) {
+  const just = nameJustConfirmed === true;
+  const lookup =
+    nameConfirmed === true && !just && looksLikeOpenVisitLookup(callerText);
+  return {
+    holdNameConfirm: just,
+    holdVisitLookup: lookup,
+    holdSpeech: just || lookup,
+  };
+}
+
 function formatNameConfirmSpeech({
   openVisits = [],
   openRequests = [],
@@ -70,4 +101,6 @@ function formatNameConfirmSpeech({
 
 module.exports = {
   formatNameConfirmSpeech,
+  looksLikeOpenVisitLookup,
+  openLineHoldDecision,
 };
