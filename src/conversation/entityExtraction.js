@@ -232,6 +232,14 @@ function fileLockedName(name, knownNames = []) {
  * STT variants of a known name fold to that spelling instead of overwriting.
  * Collision pairs (Colin/Collins) stay unconfirmed until the caller picks or spells.
  */
+function agentAskedPendingName(lastAgentText, pendingName) {
+  const asked = String(lastAgentText || '');
+  const pending = String(pendingName || '').trim();
+  if (!asked || !pending) return false;
+  const escaped = pending.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`am i speaking with\\s+${escaped}`, 'i').test(asked);
+}
+
 function applyCallerNameConfirmation(
   previous = {},
   text = '',
@@ -306,6 +314,14 @@ function applyCallerNameConfirmation(
       previous?.entities?.name?.source || 'caller_explicit',
       0.95
     );
+  }
+
+  if (!prevName && !extracted && isNameAffirmation(text)) {
+    const pending = String(opts.pendingFileName || '').trim();
+    if (pending && agentAskedPendingName(opts.lastAgentText, pending)) {
+      const locked = fileLockedName(pending, knownNames) || pending;
+      return done(locked, true, 'caller_file', 0.95);
+    }
   }
 
   if (!prevName && extracted) {

@@ -9,7 +9,7 @@ const {
 } = require('./entityExtraction');
 const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt, formatControlVoiceForPrompt } = require('./goalModel');
 const { looksLikePhaticCallerTurn, looksLikePaceOnlyTurn } = require('./dynamicSpeech');
-const { looksLikeFileRead, hasReadableFile } = require('./fileRead');
+const { looksLikeFileRead, hasReadableFile, spokenFileRead } = require('./fileRead');
 const {
   ackIsConsent,
   looksLikeLeaveIt,
@@ -466,6 +466,13 @@ function observeCallerTurn(state, input = {}) {
         profile: input.profile,
         state: state || next,
       }),
+      pendingFileName:
+        input.profile?.callerMemory?.fileOwnerName ||
+        input.profile?.callerMemory?.name ||
+        next.returning?.fileOwnerName ||
+        next.returning?.name ||
+        null,
+      lastAgentText: input.lastAgentText,
     }
   );
   next.entities = { ...next.entities, ...nameResolution.entities };
@@ -473,6 +480,23 @@ function observeCallerTurn(state, input = {}) {
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
   next.caller.nameCollision = nameResolution.nameCollision || null;
   applyLiveCallerFile(input.profile, next);
+  const wasNameConfirmed = Boolean(state?.caller?.nameConfirmed);
+  if (!wasNameConfirmed && next.caller.nameConfirmed) {
+    const prior = (next.conversation.answersReceived || []).slice(0, -1);
+    const askedRows = prior.some(
+      (row) =>
+        looksLikeFileRead(row) ||
+        looksLikePastBookingTalk(row) ||
+        /\bupcoming\b/i.test(String(row || ''))
+    );
+    if (askedRows) next.conversation.speakFileRead = true;
+  }
+  next.conversation.fileReadSentence =
+    spokenFileRead({
+      text,
+      state: next,
+      language: next.language?.current,
+    }) || '';
   if (next.caller.name && !entityValue(next.entities.name)) {
     next.entities.name = {
       value: next.caller.name,

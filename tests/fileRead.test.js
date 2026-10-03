@@ -82,7 +82,7 @@ describe('file read is not a new job', () => {
     assert.equal(inferIntent(text, { vertical: 'home_services' }), 'cancellation');
   });
 
-  it('lets the model read a bound home file that has a visit', () => {
+  it('backend reads a bound home file instead of leaving it to the model', () => {
     const card = {
       name: 'Alex',
       sharedLine: false,
@@ -100,11 +100,10 @@ describe('file read is not a new job', () => {
         profile: { vertical: 'home_services', callerMemory: card },
       }
     );
-    if (state.returning?.identityBound && state.returning?.nextVisit) {
-      assert.equal(reply('What are my bookings?', state), null);
-    } else {
-      assert.equal(reply('What are my bookings?', state), null);
-    }
+    const local = reply('What are my bookings?', state);
+    assert.equal(local, null);
+    assert.equal(state.conversation.fileReadSentence, 'You have carpet, Tuesday 10 AM.');
+    assert.doesNotMatch(state.conversation.fileReadSentence, /these visits|something specific/i);
   });
 
   it('says so in Kiswahili when a bound home file is empty', () => {
@@ -116,14 +115,22 @@ describe('file read is not a new job', () => {
       openRequests: [],
       recentBookings: [],
     };
-    const state = createBrainState({ vertical: 'home_services', callerMemory: card });
+    const profile = { vertical: 'home_services', callerMemory: card };
+    const state = observeCallerTurn(createBrainState(profile), {
+      text: 'Niambie booking yangu.',
+      profile,
+      detectedLanguage: 'sw',
+      resolvedLanguage: 'sw',
+    });
     const local = resolveLocalReply({
       text: 'Niambie booking yangu.',
       state,
+      profile,
       language: 'sw',
     });
-    assert.equal(local.line, 'Hakuna kilicho wazi.');
-    assert.notEqual(local.line, 'Sina booking yako.');
+    assert.equal(local, null);
+    assert.equal(state.conversation.fileReadSentence, 'Hakuna kilicho wazi.');
+    assert.notEqual(state.conversation.fileReadSentence, 'Sina booking yako.');
   });
 
   const retailAsks = [
@@ -231,17 +238,41 @@ describe('file read is not a new job', () => {
       openRequests: [],
       recentBookings: [],
     };
-    const state = createBrainState({
-      vertical: 'home_services',
-      callerMemory: card,
+    const profile = { vertical: 'home_services', callerMemory: card };
+    let state = observeCallerTurn(createBrainState(profile), {
+      text: 'Can you tell me my booking?',
+      profile,
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
     });
-    state.conversation = state.conversation || {};
-    assert.equal(reply('Can you tell me my booking?', state).line, 'Nothing is still open.');
+    assert.equal(reply('Can you tell me my booking?', state), null);
+    assert.equal(state.conversation.fileReadSentence, 'Nothing is still open.');
     assert.equal(state.conversation.toldNothingOnFile, true);
-    assert.equal(reply('Really?', state).line, 'Nothing is still open.');
-    assert.notEqual(reply('Really?', state).line, "I don't have a booking for you.");
-    assert.equal(reply('Which one is it?', state).line, 'Nothing is still open.');
-    assert.equal(reply("You're failing me.", state).line, 'Nothing is still open.');
+    state = observeCallerTurn(state, {
+      text: 'Really?',
+      profile,
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    assert.equal(reply('Really?', state), null);
+    assert.equal(state.conversation.fileReadSentence, 'Nothing is still open.');
+    assert.notEqual(state.conversation.fileReadSentence, "I don't have a booking for you.");
+    state = observeCallerTurn(state, {
+      text: 'Which one is it?',
+      profile,
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    assert.equal(reply('Which one is it?', state), null);
+    assert.equal(state.conversation.fileReadSentence, 'Nothing is still open.');
+    state = observeCallerTurn(state, {
+      text: "You're failing me.",
+      profile,
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    assert.equal(reply("You're failing me.", state), null);
+    assert.equal(state.conversation.fileReadSentence, 'Nothing is still open.');
     assert.equal(reply('How much for couch cleaning?', state), null);
     assert.equal(reply('What services do you offer?', state).outcome, 'catalogue');
 
