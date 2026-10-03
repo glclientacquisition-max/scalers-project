@@ -13,9 +13,10 @@ const { prepareStreamedSpeech } = require('./callCorrectives');
 const { guardSpokenReply } = require('./speechGuard');
 const {
   fileReadLine,
+  fileRowsWereRead,
   hasReadableFile,
   looksLikeOfferAsk,
-  nothingOnFileLine,
+  nothingStillOpenLine,
   presupposesSavedWork,
   sanitizeSpokenFileClaim,
 } = require('./fileRead');
@@ -418,7 +419,8 @@ function polishSpokenReply(text, opts = {}) {
     language: opts.language,
   });
   if (!sanitized && !hasReadableFile(opts.state) && presupposesSavedWork(String(text || ''))) {
-    return nothingOnFileLine(opts.state, opts.language);
+    if (!fileRowsWereRead(opts.state)) return '';
+    return nothingStillOpenLine(opts.state, opts.language);
   }
   return sanitized;
 }

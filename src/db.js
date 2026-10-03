@@ -1288,28 +1288,60 @@ async function upsertContact({
   return data || null;
 }
 
-async function listOpenRequestsForCaller(tenantId, contactId, phoneNorm) {
+async function listRequestsByStatus(tenantId, contactId, phoneNorm, statuses, limit, label) {
   const base = () =>
     supabase
       .from('service_requests')
-      .select('id, request_type, item, when_text, status, notes, created_at')
+      .select(
+        'id, request_type, item, when_text, status, notes, created_at, window_start, window_end'
+      )
       .eq('tenant_id', tenantId)
-      .eq('status', 'open')
+      .in('status', statuses)
       .order('created_at', { ascending: false })
-      .limit(2);
+      .limit(limit);
 
   if (contactId) {
     const { data, error } = await base().eq('contact_id', contactId);
     if (error && /service_requests|relation/i.test(error.message)) return [];
-    if (error) throwIfError('getCallerMemory(requests)', error);
+    if (error) throwIfError(`getCallerMemory(${label})`, error);
     if (data?.length) return data;
   }
   const phoneKeys = storedPhoneLookupKeys(phoneNorm);
   if (!phoneKeys.length) return [];
   const { data, error } = await base().in('caller_phone', phoneKeys);
   if (error && /service_requests|relation/i.test(error.message)) return [];
-  if (error) throwIfError('getCallerMemory(requests-phone)', error);
+  if (error) throwIfError(`getCallerMemory(${label}-phone)`, error);
   return data || [];
+}
+
+async function listOpenRequestsForCaller(tenantId, contactId, phoneNorm) {
+  // Open rows include a past-due hold. Finished holds are loaded too so
+  // "previous" can read them. window_start is required to judge the window.
+  const open = await listRequestsByStatus(
+    tenantId,
+    contactId,
+    phoneNorm,
+    ['open'],
+    8,
+    'requests'
+  );
+  const finished = await listRequestsByStatus(
+    tenantId,
+    contactId,
+    phoneNorm,
+    ['fulfilled', 'cancelled'],
+    8,
+    'finished-requests'
+  );
+  const seen = new Set();
+  const out = [];
+  for (const row of [...open, ...finished]) {
+    const id = String(row?.id || '');
+    if (id && seen.has(id)) continue;
+    if (id) seen.add(id);
+    out.push(row);
+  }
+  return out;
 }
 
 async function listNextAppointmentForCaller(tenantId, contactId, phoneNorm) {

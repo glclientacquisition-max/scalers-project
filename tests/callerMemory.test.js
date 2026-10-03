@@ -691,20 +691,20 @@ describe('returning-caller card', () => {
         created_at: '2026-06-01T06:00:00.000Z',
       },
     });
-    assert.equal(card.nextAppointment, null);
-    assert.equal(card.nextVisitWhen, null);
-    assert.match(card.recentBookings[0], /past/i);
-    assert.doesNotMatch(card.recentBookings.join(' '), /\b(tomorrow|today|kesho|leo)\b/i);
+    assert.match(card.nextAppointment, /past/i);
+    assert.match(card.nextAppointment, /carpet cleaning/i);
+    assert.doesNotMatch(card.nextAppointment, /\b(tomorrow|today|kesho|leo)\b/i);
+    assert.match(card.openVisits[0], /past/i);
+    assert.doesNotMatch(card.openVisits.join(' '), /\b(tomorrow|today|kesho|leo)\b/i);
     assert.doesNotMatch(card.lastReason, /\b(tomorrow|today|kesho|leo)\b/i);
     assert.match(card.lastReason, /past/i);
     const block = formatReturningCallerForPrompt(bindCallerMemoryCard(card, 'Jane'));
-    assert.doesNotMatch(block, /Open: visit/);
-    assert.doesNotMatch(block, /\b(tomorrow|today|kesho|leo)\b/i);
-    assert.match(block, /History:/);
+    assert.match(block, /Open: visit/);
     assert.match(block, /past/i);
+    assert.doesNotMatch(block, /\b(tomorrow|today|kesho|leo)\b/i);
     const state = createBrainState({ callerMemory: bindCallerMemoryCard(card, 'Jane') });
-    assert.equal(state.returning.nextVisit, null);
-    assert.doesNotMatch(formatBrainStateForPrompt(state), /open visit/i);
+    assert.match(state.returning.nextVisit, /past/i);
+    assert.match(formatBrainStateForPrompt(state), /open visit/i);
     assert.doesNotMatch(formatBrainStateForPrompt(state), /\btomorrow\b/i);
   });
 
@@ -778,7 +778,9 @@ describe('returning-caller card', () => {
     });
     assert.match(card.nextAppointment, /sofa cleaning/);
     assert.doesNotMatch(card.nextAppointment, /tomorrow/);
-    assert.match(card.recentBookings.join(' '), /past/i);
+    assert.match(card.openVisits.join(' '), /carpet cleaning/i);
+    assert.match(card.openVisits.join(' '), /past/i);
+    assert.doesNotMatch(card.openVisits.join(' '), /\btomorrow\b/i);
     assert.doesNotMatch(card.recentBookings.join(' '), /\btomorrow\b/i);
   });
 
@@ -923,7 +925,7 @@ describe('returning-caller card', () => {
     assert.doesNotMatch(callState, /nothing on file/i);
   });
 
-  it('drops a hold whose relative day is already past', () => {
+  it('keeps a past-due open hold on the card', () => {
     const now = new Date('2026-09-30T08:00:00.000Z');
     const card = buildCallerMemoryCard({
       now,
@@ -936,11 +938,16 @@ describe('returning-caller card', () => {
         {
           request_type: 'hold',
           item: 'Atomic Habits',
+          status: 'open',
           when_text: 'tomorrow',
           created_at: '2026-06-01T06:00:00.000Z',
         },
       ],
     });
-    assert.equal(card.openRequests.length, 0);
+    assert.equal(card.openRequests.length, 1);
+    assert.match(card.openRequests[0], /hold \| Atomic Habits/i);
+    assert.match(card.openRequests[0], /past/i);
+    assert.doesNotMatch(card.openRequests[0], /\btomorrow\b/i);
+    assert.equal(card.openVisits.length, 0);
   });
 });

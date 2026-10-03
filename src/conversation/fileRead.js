@@ -47,9 +47,32 @@ function hasReadableFile(state) {
   if (!file || !file.identityBound) return false;
   if (file.fileRole && file.fileRole !== 'primary') return false;
   if (file.nextVisit) return true;
+  if (Array.isArray(file.openVisits) && file.openVisits.length > 0) return true;
   if (Array.isArray(file.openRequests) && file.openRequests.length > 0) return true;
   if (Array.isArray(file.recentBookings) && file.recentBookings.length > 0) return true;
   return false;
+}
+
+/**
+ * Visit and hold rows are on the bound primary file. Until then, a lookup
+ * must not be answered with an empty-file line.
+ */
+function fileRowsWereRead(state) {
+  const file = state?.returning;
+  if (!file || file.identityBound !== true) return false;
+  if (file.fileRole && file.fileRole !== 'primary') return false;
+  return true;
+}
+
+/**
+ * Existing nothing-open line. Not a new denial.
+ * Swahili and Sheng are the existing translations of this one line.
+ */
+function nothingStillOpenLine(state, language) {
+  const lang = String(language || state?.language?.current || 'en').toLowerCase();
+  if (lang === 'sw') return 'Hakuna kilicho wazi.';
+  if (lang === 'sheng') return 'Hakuna kitu iko open.';
+  return 'Nothing is still open.';
 }
 
 function nothingOnFileLine(state, language) {
@@ -89,8 +112,10 @@ function fileReadLine({ text = '', state = {}, language } = {}) {
   const again =
     Boolean(state?.conversation?.toldNothingOnFile) && looksLikeEmptyFileFollowUp(text);
   if (!looksLikeFileRead(text) && !again) return '';
+  // Do not return the empty-file line before the visit or hold rows are read.
+  if (!fileRowsWereRead(state)) return '';
   markNothingOnFile(state);
-  return nothingOnFileLine(state, language);
+  return nothingStillOpenLine(state, language);
 }
 
 function presupposesSavedWork(sentence) {
@@ -122,7 +147,8 @@ function sanitizeSpokenFileClaim(text, opts = {}) {
   if (looksLikeServiceMenu(raw) && !looksLikeFileRead(callerText) && !looksLikeEmptyFileFollowUp(callerText)) {
     return raw;
   }
-  return nothingOnFileLine(opts.state, opts.language);
+  if (!fileRowsWereRead(opts.state)) return '';
+  return nothingStillOpenLine(opts.state, opts.language);
 }
 
 function looksLikeServiceMenu(text) {
@@ -140,7 +166,9 @@ module.exports = {
   looksLikeOfferAsk,
   looksLikeServiceMenu,
   hasReadableFile,
+  fileRowsWereRead,
   nothingOnFileLine,
+  nothingStillOpenLine,
   fileReadLine,
   looksLikeEmptyFileFollowUp,
   presupposesSavedWork,

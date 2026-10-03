@@ -1,7 +1,10 @@
 // Returning-caller card: compact phone file for the next live call.
 // Not Brain state (that dies with the call) and not a transcript dump.
 // Visit lines are refreshed against now (EAT). A stored "tomorrow" is not
-// repeated once that window or date has passed.
+// repeated once that window or date has passed. A past-due requested or
+// confirmed visit stays on the card. A past-due hold (service request,
+// request_type hold, status open) stays too. Fulfilled and cancelled holds
+// are history, not open rows.
 
 const { namesMatch } = require('./contactIdentity');
 const { isJunkCallerName } = require('./callerNameQuality');
@@ -57,8 +60,11 @@ function buildCallerMemoryCard({
   const nextRow = nextItem ? nextItem.row : null;
   const lastReason = clip(scrubLivedReason(contact.last_reason, lived));
   const notes = clip(contact.notes, 60);
-  const requests = freshOpenRequestRows(openRequests, now)
-    .slice(0, 2)
+  const requestSplit = splitRequestRows(openRequests, now);
+  // Cap is wide enough that a past-due open hold is not dropped just because
+  // two newer open rows exist. Date-past is not a reason to drop status open.
+  const requests = requestSplit.open
+    .slice(0, 8)
     .map(clipRequestLine)
     .filter(Boolean);
   const openVisitLines = lived.open
@@ -80,7 +86,10 @@ function buildCallerMemoryCard({
     : null;
   const extraOpenRows = lived.open.slice(1).map((item) => item.row);
   const recentRows = selectRecentAppointmentRows(lived.history, null);
-  const recentBookings = recentRows.map((row) => clipVisitLine(row)).filter(Boolean);
+  const recentBookings = [
+    ...recentRows.map((row) => clipVisitLine(row)).filter(Boolean),
+    ...requestSplit.finished.map(clipFinishedRequestLine).filter(Boolean),
+  ];
   const profile = clipCallerProfile(contact.metadata);
   const place = profile.landmark || nextVisitLandmark || derivePlace(recentRows);
   const usualJob = profile.typicalJob || deriveUsualJob([...recentRows, ...extraOpenRows], nextRow);
@@ -158,6 +167,13 @@ function clipRequestLine(row) {
   return line || null;
 }
 
+function clipFinishedRequestLine(row) {
+  const line = clipRequestLine(row);
+  if (!line) return null;
+  const status = clip(row.status, 16);
+  return status ? `${line} | ${status}` : line;
+}
+
 function clipCallerProfile(metadata) {
   const raw = metadata && typeof metadata === 'object' ? metadata.caller_profile : null;
   if (!raw || typeof raw !== 'object') {
@@ -218,16 +234,20 @@ function collectLivedAppointments(nextAppointment, recentAppointments, now) {
     const lived = classifyLivedVisit(row, now);
     const refreshed = refreshLivedRow(row, lived);
     const status = String(row.status || '').toLowerCase();
-    const openStatus = !status || status === 'requested' || status === 'confirmed';
-    const isOpen = openStatus && !lived.past;
+    const finishedVisit = ['cancelled', 'canceled', 'done', 'completed', 'fulfilled'].includes(status);
+    // Past-due requested or confirmed stays open. Only a finished visit is history.
+    const openStatus =
+      !finishedVisit && (!status || status === 'requested' || status === 'confirmed');
+    const isOpen = openStatus;
     judged.push({ lived, open: isOpen });
     if (isOpen) open.push({ row: refreshed, lived });
     else history.push(refreshed);
   }
   open.sort((a, b) => {
+    if (a.lived.past !== b.lived.past) return a.lived.past ? 1 : -1;
     const ta = a.lived.instant ? a.lived.instant.getTime() : Number.POSITIVE_INFINITY;
     const tb = b.lived.instant ? b.lived.instant.getTime() : Number.POSITIVE_INFINITY;
-    return ta - tb;
+    return a.lived.past ? tb - ta : ta - tb;
   });
   return { open, history, judged };
 }
@@ -251,19 +271,41 @@ function scrubLivedReason(text, lived) {
   if (word === 'today') {
     return raw.replace(/\b(?:tomorrow|kesho)\b/gi, 'today').replace(/\s+/g, ' ').trim();
   }
-  if (word === 'tomorrow' || word === 'past') return raw;
+  if (word === 'past' || lead.lived.past) {
+    return raw
+      .replace(/\b(?:today|tomorrow|tonight|leo|kesho)\b/gi, 'past')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  if (word === 'tomorrow') return raw;
   return raw.replace(/\b(?:tomorrow|kesho)\b/gi, word).replace(/\s+/g, ' ').trim();
 }
 
-function freshOpenRequestRows(rows, now) {
-  const out = [];
+const FINISHED_REQUEST = new Set(['fulfilled', 'cancelled', 'canceled']);
+
+/**
+ * A hold is a service_requests row (request_type hold), not an appointment.
+ * status open stays, including when the window has passed.
+ * fulfilled and cancelled are history for a "previous" read.
+ */
+function splitRequestRows(rows, now) {
+  const open = [];
+  const finished = [];
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!row || typeof row !== 'object') continue;
     const lived = classifyLivedVisit(row, now);
-    if (lived.past) continue;
-    out.push(refreshLivedRow(row, lived));
+    const refreshed = refreshLivedRow(row, lived);
+    const status = String(row.status || 'open').toLowerCase();
+    if (FINISHED_REQUEST.has(status)) finished.push(refreshed);
+    else if (status === 'open') open.push({ row: refreshed, lived });
   }
-  return out;
+  open.sort((a, b) => {
+    if (a.lived.past !== b.lived.past) return a.lived.past ? 1 : -1;
+    const ta = a.lived.instant ? a.lived.instant.getTime() : Number.POSITIVE_INFINITY;
+    const tb = b.lived.instant ? b.lived.instant.getTime() : Number.POSITIVE_INFINITY;
+    return a.lived.past ? tb - ta : ta - tb;
+  });
+  return { open: open.map((item) => item.row), finished };
 }
 
 function selectRecentAppointmentRows(rows = [], nextAppointment = null) {

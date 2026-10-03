@@ -58,9 +58,7 @@ describe('file read is not a new job', () => {
       assert.equal(inferIntent(text, { vertical: 'home_services' }), 'general_enquiry');
       const state = homeState(text);
       const local = reply(text, state);
-      assert.equal(local.outcome, 'file_read');
-      assert.equal(local.line, "I don't have a booking for you.");
-      assert.doesNotMatch(local.line, /reschedule|cancel|carpet|couch|mattress/i);
+      assert.equal(local, null);
       const decision = determineNextBestAction({
         state,
         capabilities: { createAppointment: true, saveCallerInfo: true },
@@ -105,23 +103,27 @@ describe('file read is not a new job', () => {
     if (state.returning?.identityBound && state.returning?.nextVisit) {
       assert.equal(reply('What are my bookings?', state), null);
     } else {
-      assert.equal(reply('What are my bookings?', state).line, "I don't have a booking for you.");
+      assert.equal(reply('What are my bookings?', state), null);
     }
   });
 
-  it('says so in Kiswahili when a home file is empty', () => {
-    const state = observeCallerTurn(createBrainState({ vertical: 'home_services' }), {
-      text: 'Niambie booking yangu.',
-      detectedLanguage: 'sw',
-      resolvedLanguage: 'sw',
-      profile: { vertical: 'home_services' },
-    });
+  it('says so in Kiswahili when a bound home file is empty', () => {
+    const card = {
+      name: 'Amina',
+      identityBound: true,
+      fileRole: 'primary',
+      openVisits: [],
+      openRequests: [],
+      recentBookings: [],
+    };
+    const state = createBrainState({ vertical: 'home_services', callerMemory: card });
     const local = resolveLocalReply({
       text: 'Niambie booking yangu.',
       state,
       language: 'sw',
     });
-    assert.equal(local.line, 'Sina booking yako.');
+    assert.equal(local.line, 'Hakuna kilicho wazi.');
+    assert.notEqual(local.line, 'Sina booking yako.');
   });
 
   const retailAsks = [
@@ -147,9 +149,7 @@ describe('file read is not a new job', () => {
         language: 'en',
         profile: { vertical: 'retail' },
       });
-      assert.equal(local.outcome, 'file_read');
-      assert.equal(local.line, "I don't have an order or a hold for you.");
-      assert.doesNotMatch(local.line, /diary|diaries|reschedule/i);
+      assert.equal(local, null);
     });
   }
 
@@ -211,7 +211,8 @@ describe('file read is not a new job', () => {
       callerTurns: ['Which ones do I have in place?'],
       language: 'en',
     });
-    assert.equal(invented, "I don't have a booking for you.");
+    assert.equal(invented, '');
+    assert.notEqual(invented, "I don't have a booking for you.");
 
     const oneService = polishSpokenReply('We can do couch cleaning.', {
       state: homeState('How much for couch cleaning?'),
@@ -222,12 +223,25 @@ describe('file read is not a new job', () => {
   });
 
   it('keeps the empty file true on the next sentence, and strips a later invention', () => {
-    const state = homeState('Can you tell me my booking?');
-    assert.equal(reply('Can you tell me my booking?', state).line, "I don't have a booking for you.");
+    const card = {
+      name: 'Alvin',
+      identityBound: true,
+      fileRole: 'primary',
+      openVisits: [],
+      openRequests: [],
+      recentBookings: [],
+    };
+    const state = createBrainState({
+      vertical: 'home_services',
+      callerMemory: card,
+    });
+    state.conversation = state.conversation || {};
+    assert.equal(reply('Can you tell me my booking?', state).line, 'Nothing is still open.');
     assert.equal(state.conversation.toldNothingOnFile, true);
-    assert.equal(reply('Really?', state).line, "I don't have a booking for you.");
-    assert.equal(reply('Which one is it?', state).line, "I don't have a booking for you.");
-    assert.equal(reply("You're failing me.", state).line, "I don't have a booking for you.");
+    assert.equal(reply('Really?', state).line, 'Nothing is still open.');
+    assert.notEqual(reply('Really?', state).line, "I don't have a booking for you.");
+    assert.equal(reply('Which one is it?', state).line, 'Nothing is still open.');
+    assert.equal(reply("You're failing me.", state).line, 'Nothing is still open.');
     assert.equal(reply('How much for couch cleaning?', state), null);
     assert.equal(reply('What services do you offer?', state).outcome, 'catalogue');
 
@@ -236,7 +250,8 @@ describe('file read is not a new job', () => {
       callerTurns: ['Really?'],
       language: 'en',
     });
-    assert.equal(invented, "I don't have a booking for you.");
+    assert.equal(invented, 'Nothing is still open.');
+    assert.notEqual(invented, "I don't have a booking for you.");
 
     const greeting = polishSpokenReply(
       'Nzuri sana. Nikupe usaidizi gani kuhusu booking yako leo?',
@@ -255,19 +270,28 @@ describe('file read is not a new job', () => {
       callerTurns: ['Really?'],
       language: 'en',
     });
-    assert.equal(retailInvented, "I don't have an order or a hold for you.");
+    assert.equal(retailInvented, '');
+    assert.notEqual(retailInvented, "I don't have an order or a hold for you.");
   });
 
   it('uses the honest line instead of sorry-say-that-again on a file read', () => {
+    const card = {
+      name: 'Alvin',
+      identityBound: true,
+      fileRole: 'primary',
+      openVisits: [],
+      openRequests: [],
+      recentBookings: [],
+    };
     const planned = planEmptyGeminiSpeech({
-      brainState: homeState('Read them for me.'),
+      brainState: createBrainState({ vertical: 'home_services', callerMemory: card }),
       language: 'en',
       userText: 'Read them for me.',
       llmDown: false,
       alreadyOffered: true,
     });
     assert.equal(planned.kind, 'file_read');
-    assert.equal(planned.line, "I don't have a booking for you.");
+    assert.equal(planned.line, 'Nothing is still open.');
     assert.doesNotMatch(planned.line, /say that again/i);
   });
 });
