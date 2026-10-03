@@ -624,8 +624,17 @@ function formatReturningCallerForPrompt(card) {
   }
 
   if (!known) {
+    const mayHaveVisit = Boolean(
+      card.nextAppointment ||
+      card.nextVisit ||
+      card.lastReason ||
+      (Array.isArray(card.openRequests) && card.openRequests.length) ||
+      (Array.isArray(card.recentBookings) && card.recentBookings.length)
+    );
     lines.push(
-      '- Use: do not ask who is speaking unless you are about to save something. Do not attach Open, Last, or History yet. Do not greet them as the file name. Answer what they just said.'
+      mayHaveVisit
+        ? '- Use: a visit may exist on this number. Do not say there is no booking. Ask their name before you attach or deny it. Do not greet them as the file name. Answer what they just said.'
+        : '- Use: do not ask who is speaking unless you are about to save something. Do not attach Open, Last, or History yet. Do not greet them as the file name. Answer what they just said.'
     );
   } else if (!usable) {
     lines.push(
@@ -633,7 +642,7 @@ function formatReturningCallerForPrompt(card) {
     );
   } else if (card.nextAppointment) {
     lines.push(
-      '- Use: Open first. If they want it moved or cancelled, update that visit. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name.'
+      '- Use: name the Open visit (job, when, status) before any change or keep. If they want it moved or cancelled, update that visit. Do not say there is no booking. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name.'
     );
   } else if (card.lastReason) {
     lines.push(
