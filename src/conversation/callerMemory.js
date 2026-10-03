@@ -48,6 +48,7 @@ function buildCallerMemoryCard({
   openRequests = [],
   nextAppointment = null,
   recentAppointments = [],
+  openAppointments = [],
   now = new Date(),
 } = {}) {
   if (!contact || typeof contact !== 'object') return null;
@@ -55,7 +56,12 @@ function buildCallerMemoryCard({
   const name = String(contact.name || '').trim() || null;
   const alternates = alternateNames(contact.metadata);
   const sharedLine = alternates.length > 0;
-  const lived = collectLivedAppointments(nextAppointment, recentAppointments, now);
+  const lived = collectLivedAppointments(
+    nextAppointment,
+    recentAppointments,
+    now,
+    openAppointments
+  );
   const nextItem = lived.open[0] || null;
   const nextRow = nextItem ? nextItem.row : null;
   const lastReason = clip(scrubLivedReason(contact.last_reason, lived));
@@ -63,8 +69,8 @@ function buildCallerMemoryCard({
   const requestSplit = splitRequestRows(openRequests, now);
   // Cap is wide enough that a past-due open hold is not dropped just because
   // two newer open rows exist. Date-past is not a reason to drop status open.
+  // Every still-open request. A past-due open hold is not dropped for a newer pair.
   const requests = requestSplit.open
-    .slice(0, 8)
     .map(clipRequestLine)
     .filter(Boolean);
   const openVisitLines = lived.open
@@ -211,10 +217,13 @@ function refreshLivedRow(row, lived) {
   return { ...row, when_text: whenText, whenText };
 }
 
-function collectLivedAppointments(nextAppointment, recentAppointments, now) {
+function collectLivedAppointments(nextAppointment, recentAppointments, now, openAppointments = []) {
   const seen = new Set();
   const source = [];
+  // Open appointments include requested rows with no window. The newest
+  // visit alone is not the file.
   const rows = [
+    ...(Array.isArray(openAppointments) ? openAppointments : []),
     nextAppointment,
     ...(Array.isArray(recentAppointments) ? recentAppointments : []),
   ];

@@ -6,6 +6,7 @@ const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
 } = require('./visitTalk');
+const { looksLikeCompliment } = require('./entityExtraction');
 
 const FILE_READ_RE =
   /\b(what do i have|what have i got|which ones?(?:\s+do)? i have|which (?:booking|bookings|order|orders|hold|holds)|any (?:booking|bookings|order|orders|hold|holds)|is there any that i have|previous (?:booking|bookings|order|orders|hold)|my previous|check (?:for me )?(?:the |my )?(?:previous )?(?:booking|order|hold)|read (?:them|it|me|for me)|the one(?:s)? (?:that )?i have|ones i have|in place|bookings zangu|booking yangu|order yangu|hold yangu|oda yangu|niambie (?:booking|oda|order|hold)|what(?:'s| is) on hold|on hold for me|my (?:order|orders|hold|holds))\b/i;
@@ -217,8 +218,10 @@ function priorCallerText(state) {
 function spokenFileRead({ text = '', state = {}, language } = {}) {
   const forced = Boolean(state?.conversation?.speakFileRead);
   if (state?.conversation) state.conversation.speakFileRead = false;
-  if (!fileRowsWereRead(state)) return '';
   const current = String(text || '');
+  // A compliment is not a visit, hold, or order lookup.
+  if (looksLikeCompliment(current)) return '';
+  if (!fileRowsWereRead(state)) return '';
   const context = forced ? `${priorCallerText(state)} ${current}` : current;
   const upcoming = /\bupcoming\b/i.test(context);
   const readThem = /\bread (?:them|it)\b/i.test(current);

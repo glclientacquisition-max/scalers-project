@@ -12,6 +12,7 @@ const { determineNextBestAction } = require('../src/conversation/nextBestAction'
 const { resolveLocalReply } = require('../src/conversation/turnPolicy');
 const { hasReadableFile } = require('../src/conversation/fileRead');
 const { looksLikePastBookingTalk } = require('../src/conversation/visitTalk');
+const { extractName } = require('../src/conversation/entityExtraction');
 
 const BOOKING_DENIAL = "I don't have a booking for you.";
 const HOLD_DENIAL = "I don't have an order or a hold for you.";
@@ -401,5 +402,127 @@ describe('backend read plays instead of an unnamed-visit question', () => {
     assert.doesNotMatch(played(yes), /What would you like to do/);
     const again = say('can you read them to me?');
     assert.equal(played(again), NOTHING_OPEN);
+  });
+});
+
+describe('windowless requested visits and compliments', () => {
+  const now = new Date('2026-10-03T15:53:00.000Z');
+
+  function dialCard() {
+    return buildCallerMemoryCard({
+      now,
+      contact: { phone: '+254790381872', name: 'Alvin', metadata: {} },
+      nextAppointment: {
+        id: 'pet',
+        service_name: 'Pet stain removal',
+        status: 'requested',
+        when_text: '17 Sep 10:00 AM',
+        window_start: '2026-09-17T07:00:00.000Z',
+        address_landmark: 'I saidI',
+      },
+      recentAppointments: [],
+      openAppointments: [
+        {
+          id: 'pet',
+          service_name: 'Pet stain removal',
+          status: 'requested',
+          when_text: '17 Sep 10:00 AM',
+          window_start: '2026-09-17T07:00:00.000Z',
+          address_landmark: 'I saidI',
+        },
+        { id: 'c1', service_name: 'Couch cleaning', status: 'requested', address_landmark: 'Kilimani' },
+        { id: 'c2', service_name: 'Couch cleaning', status: 'requested', address_landmark: 'Kilimani' },
+        { id: 'c3', service_name: 'Carpet cleaning', status: 'requested', address_landmark: 'Kilimani' },
+        { id: 'c4', service_name: 'Carpet cleaning', status: 'requested', address_landmark: 'Westlands' },
+        { id: 'c5', service_name: 'Carpet cleaning', status: 'requested', address_landmark: 'Westlands' },
+        {
+          id: 'c6',
+          service_name: 'Carpet cleaning',
+          status: 'requested',
+          when_text: '22 Sep',
+          address_landmark: 'Barnabas',
+        },
+      ],
+      openRequests: [
+        {
+          id: 'r1',
+          request_type: 'request',
+          item: 'carpet and pet stain',
+          status: 'open',
+          when_text: '17 Sep 10:00 AM',
+          window_start: '2026-09-17T07:00:00.000Z',
+        },
+        {
+          id: 'r2',
+          request_type: 'request',
+          item: 'callback SMS confirmation',
+          status: 'open',
+          when_text: '17 Sep 10:00 AM',
+          window_start: '2026-09-17T07:00:00.000Z',
+        },
+      ],
+    });
+  }
+
+  it('reads every windowless requested visit, not only the dated visit and two requests', () => {
+    const card = dialCard();
+    assert.equal(card.openVisits.length, 7);
+    const line = heard(card, 'What are my bookings?');
+    assert.notEqual(line, NOTHING_OPEN);
+    assert.match(line, /Pet stain removal/);
+    assert.match(line, /carpet and pet stain/);
+    assert.match(line, /callback SMS confirmation/);
+    assert.equal((line.match(/You have Couch cleaning, Kilimani/g) || []).length, 2);
+    assert.match(line, /You have Carpet cleaning, Kilimani/);
+    assert.equal((line.match(/You have Carpet cleaning, Westlands/g) || []).length, 2);
+    assert.match(line, /You have Carpet cleaning, 22 Sep, Barnabas/);
+    const local = resolveLocalReply({
+      text: 'What are my bookings?',
+      state: boundState(card, 'home_services'),
+      language: 'en',
+    });
+    assert.equal(local, null);
+  });
+
+  it('does not publish a file read or a name from a compliment while visits are still requested', () => {
+    assert.equal(extractName("I'm Alvin"), 'Alvin');
+    assert.equal(extractName("Actually, I'm impressed by your work"), null);
+    assert.equal(extractName("I'm impressed by your work"), null);
+    const card = dialCard();
+    const bound = bindCallerMemoryCard(card, 'Alvin');
+    const profile = { vertical: 'home_services', callerMemory: bound };
+    let state = createBrainState(profile);
+    state = observeCallerTurn(state, {
+      text: "I wanted to inquire about my booking.",
+      profile,
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    state = observeCallerTurn(state, {
+      text: 'Yes',
+      profile,
+      lastAgentText: 'Am I speaking with Alvin?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    assert.equal(state.caller.name, 'Alvin');
+    assert.notEqual(state.conversation.fileReadSentence, NOTHING_OPEN);
+    state = observeCallerTurn(state, {
+      text: "Actually, I'm impressed by your work",
+      profile,
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    const local = resolveLocalReply({
+      text: "Actually, I'm impressed by your work",
+      state,
+      profile,
+      language: 'en',
+    });
+    assert.equal(local, null);
+    assert.equal(state.conversation.fileReadSentence, '');
+    assert.notEqual(state.conversation.fileReadSentence, NOTHING_OPEN);
+    assert.equal(state.caller.name, 'Alvin');
+    assert.notEqual(state.caller.name, 'impressed by your');
   });
 });

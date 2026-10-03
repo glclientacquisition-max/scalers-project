@@ -1322,7 +1322,7 @@ async function listOpenRequestsForCaller(tenantId, contactId, phoneNorm) {
     contactId,
     phoneNorm,
     ['open'],
-    8,
+    30,
     'requests'
   );
   const finished = await listRequestsByStatus(
@@ -1342,6 +1342,34 @@ async function listOpenRequestsForCaller(tenantId, contactId, phoneNorm) {
     out.push(row);
   }
   return out;
+}
+
+async function listStillOpenAppointmentsForCaller(tenantId, contactId, phoneNorm) {
+  // Every requested or confirmed visit, including rows with no window.
+  // The newest visit is not a stand-in for the rest.
+  const base = () =>
+    supabase
+      .from('appointments')
+      .select(
+        'id, service_name, status, when_text, window_start, address_landmark, created_at'
+      )
+      .eq('tenant_id', tenantId)
+      .in('status', ['requested', 'confirmed'])
+      .order('created_at', { ascending: false })
+      .limit(30);
+
+  if (contactId) {
+    const { data, error } = await base().eq('contact_id', contactId);
+    if (error && /appointments|relation/i.test(error.message)) return [];
+    if (error) throwIfError('getCallerMemory(open-appointments)', error);
+    if (data?.length) return data;
+  }
+  const phoneKeys = storedPhoneLookupKeys(phoneNorm);
+  if (!phoneKeys.length) return [];
+  const { data, error } = await base().in('caller_phone', phoneKeys);
+  if (error && /appointments|relation/i.test(error.message)) return [];
+  if (error) throwIfError('getCallerMemory(open-appointments-phone)', error);
+  return data || [];
 }
 
 async function listNextAppointmentForCaller(tenantId, contactId, phoneNorm) {
@@ -1427,6 +1455,11 @@ async function getCallerMemory({ tenantId, phone } = {}) {
     contact.id,
     phoneNorm
   );
+  const openAppointments = await listStillOpenAppointmentsForCaller(
+    tenantId,
+    contact.id,
+    phoneNorm
+  );
   const nextAppointment = await listNextAppointmentForCaller(
     tenantId,
     contact.id,
@@ -1440,6 +1473,7 @@ async function getCallerMemory({ tenantId, phone } = {}) {
   return buildCallerMemoryCard({
     contact,
     openRequests,
+    openAppointments,
     nextAppointment,
     recentAppointments,
   });
