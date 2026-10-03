@@ -287,6 +287,97 @@ function resolvePrefetchedStreamSpeech({
   return { alreadySpoken: false, reply: '', speakNow: false };
 }
 
+
+function isGeminiAbortError(err) {
+  if (!err) return false;
+  if (err.name === 'AbortError') return true;
+  const msg = String(err.message || '');
+  return /operation was aborted|request was aborted|the user aborted/i.test(msg);
+}
+
+/**
+ * A cancelled voice turn must not execute markers that already arrived.
+ * AbortSignal is the request cancel. shouldAbort covers the socket latch.
+ */
+function geminiTurnWasCancelled({ aborted = false, abortSignal, shouldAbort } = {}) {
+  return Boolean(aborted || abortSignal?.aborted || shouldAbort?.());
+}
+
+function cancelledGeminiTurnResult() {
+  return {
+    spokenText: '',
+    actionConfirmation: '',
+    toolResults: [],
+    shouldEndCall: false,
+    streamed: false,
+    cancelled: true,
+    llmFailed: false,
+    timedOut: false,
+  };
+}
+
+/**
+ * Pull a Gemini stream until it ends or the abort signal fires.
+ * Breaking the loop is not the cancel. The signal has to reject the
+ * blocked read so the caller turn does not sit until the stream times out.
+ */
+async function readGeminiStreamUntilAbort({
+  stream,
+  abortSignal,
+  shouldAbort,
+  onChunk,
+} = {}) {
+  let consumed = 0;
+  const aborting = () => Boolean(abortSignal?.aborted || shouldAbort?.());
+  if (aborting()) return { aborted: true, consumed };
+  try {
+    for await (const chunk of stream) {
+      if (aborting()) return { aborted: true, consumed };
+      consumed += 1;
+      if (typeof onChunk === 'function') await onChunk(chunk);
+      if (aborting()) return { aborted: true, consumed };
+    }
+  } catch (err) {
+    if (isGeminiAbortError(err) || aborting()) {
+      return { aborted: true, consumed, err };
+    }
+    throw err;
+  }
+  if (aborting()) return { aborted: true, consumed };
+  return { aborted: false, consumed };
+}
+
+/**
+ * Open generateContentStream with the caller's AbortSignal on the request.
+ */
+async function takeGeminiVoiceStream({
+  client,
+  model,
+  contents,
+  config,
+  abortSignal,
+  shouldAbort,
+  onChunk,
+} = {}) {
+  if (geminiTurnWasCancelled({ abortSignal, shouldAbort })) {
+    return { aborted: true, consumed: 0 };
+  }
+  const stream = await client.models.generateContentStream({
+    model,
+    contents,
+    config: {
+      ...(config || {}),
+      ...(abortSignal ? { abortSignal } : {}),
+    },
+  });
+  return readGeminiStreamUntilAbort({
+    stream,
+    abortSignal,
+    shouldAbort,
+    onChunk,
+  });
+}
+
 module.exports = {
   CONTEXT_WINDOW,
   DEFAULT_TURN_TIMEOUT_MS,
@@ -310,4 +401,9 @@ module.exports = {
   resolvePrefetchedStreamSpeech,
   OUTCOME_TOOL_ACTIONS,
   spokenTextForToolTurn,
+  isGeminiAbortError,
+  geminiTurnWasCancelled,
+  cancelledGeminiTurnResult,
+  readGeminiStreamUntilAbort,
+  takeGeminiVoiceStream,
 };
