@@ -1351,7 +1351,7 @@ async function listStillOpenAppointmentsForCaller(tenantId, contactId, phoneNorm
     supabase
       .from('appointments')
       .select(
-        'id, service_name, status, when_text, window_start, address_landmark, created_at'
+        'id, service_name, status, when_text, window_start, address_landmark, notes, created_at'
       )
       .eq('tenant_id', tenantId)
       .in('status', ['requested', 'confirmed'])
@@ -1377,7 +1377,7 @@ async function listNextAppointmentForCaller(tenantId, contactId, phoneNorm) {
     supabase
       .from('appointments')
       .select(
-        'id, service_name, status, when_text, window_start, address_landmark, created_at'
+        'id, service_name, status, when_text, window_start, address_landmark, notes, created_at'
       )
       .eq('tenant_id', tenantId)
       .in('status', ['requested', 'confirmed'])
@@ -1403,7 +1403,7 @@ async function listRecentAppointmentsForCaller(tenantId, contactId, phoneNorm) {
     supabase
       .from('appointments')
       .select(
-        'id, service_name, status, when_text, window_start, address_landmark, created_at'
+        'id, service_name, status, when_text, window_start, address_landmark, notes, created_at'
       )
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })

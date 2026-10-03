@@ -212,8 +212,47 @@ function clipPersonProfiles(metadata) {
   return out;
 }
 
-function refreshLivedRow(row, lived) {
-  const whenText = lived.whenLabel || row.when_text || row.whenText || '';
+function rowHasWindow(row) {
+  return Boolean(row?.window_start || row?.windowStart || row?.window_end || row?.windowEnd);
+}
+
+function whenPhraseIn(notes) {
+  const value = String(notes || '').replace(/\s+/g, ' ').trim();
+  if (!value) return '';
+  const match = value.match(
+    /\b((?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|leo|kesho)(?:\s+(?:at|in|the|morning|afternoon|evening|night|\d{1,2}(?::\d{2})?\s*(?:am|pm)?)){0,4}|(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*(?:\s+\d{4})?(?:\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?)\b/i
+  );
+  return match ? String(match[1] || '').trim() : '';
+}
+
+/**
+ * A spoken when comes from this row's window, or from a time in this row's
+ * notes. A when_text that the notes do not contain is not this row's time.
+ * No notes at all still uses this row's own when_text.
+ */
+function whenTextThisRowOwns(row) {
+  const whenText = String(row?.when_text || row?.whenText || '').trim();
+  if (rowHasWindow(row)) return whenText;
+  const notes = String(row?.notes || '').trim();
+  if (!notes) return whenText;
+  if (whenText && notes.toLowerCase().includes(whenText.toLowerCase())) return whenText;
+  return whenPhraseIn(notes);
+}
+
+function refreshLivedRow(row, lived, now = new Date()) {
+  const owned = whenTextThisRowOwns(row);
+  const original = String(row?.when_text || row?.whenText || '').trim();
+  let whenText = lived.whenLabel || '';
+  if (!rowHasWindow(row)) {
+    if (!owned) whenText = '';
+    else if (owned !== original) {
+      const again = classifyLivedVisit(
+        { ...row, when_text: owned, whenText: owned, window_start: null, window_end: null },
+        now
+      );
+      whenText = again.whenLabel || '';
+    }
+  }
   return { ...row, when_text: whenText, whenText };
 }
 
@@ -241,7 +280,7 @@ function collectLivedAppointments(nextAppointment, recentAppointments, now, open
   const judged = [];
   for (const row of source) {
     const lived = classifyLivedVisit(row, now);
-    const refreshed = refreshLivedRow(row, lived);
+    const refreshed = refreshLivedRow(row, lived, now);
     const status = String(row.status || '').toLowerCase();
     const finishedVisit = ['cancelled', 'canceled', 'done', 'completed', 'fulfilled'].includes(status);
     // Past-due requested or confirmed stays open. Only a finished visit is history.
@@ -303,7 +342,7 @@ function splitRequestRows(rows, now) {
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!row || typeof row !== 'object') continue;
     const lived = classifyLivedVisit(row, now);
-    const refreshed = refreshLivedRow(row, lived);
+    const refreshed = refreshLivedRow(row, lived, now);
     const status = String(row.status || 'open').toLowerCase();
     if (FINISHED_REQUEST.has(status)) finished.push(refreshed);
     else if (status === 'open') open.push({ row: refreshed, lived });
@@ -601,6 +640,10 @@ function returningFileFromCard(card) {
   const fileRole = card.fileRole || null;
   const usable = returningFileUsable({ ...card, fileRole, identityBound });
   const fileOwnerName = fileOwnerNameOf(card);
+  const hasOpenRows = Boolean(
+    (Array.isArray(card.openVisits) && card.openVisits.length) ||
+      (Array.isArray(card.openRequests) && card.openRequests.length)
+  );
   const filePending =
     !identityBound &&
     Boolean(card.sharedLine || card.name || fileOwnerName || fileHasHistory(card));
@@ -628,6 +671,7 @@ function returningFileFromCard(card) {
     standing: identityBound ? card.standing || null : null,
     language: identityBound ? card.language || null : null,
     identityBound,
+    hasOpenRows,
     boundName: identityBound ? card.boundName || card.name || null : null,
     fileRole,
     fileOwnerName,

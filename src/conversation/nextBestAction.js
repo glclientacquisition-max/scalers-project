@@ -24,6 +24,15 @@ const DIRECT_ANSWER_INTENTS = new Set([
 
 const REQUEST_INTENTS = new Set(['hold', 'order', 'booking', 'cancellation']);
 
+function phoneFileHasOpenRows(state) {
+  const file = state?.returning;
+  if (!file || typeof file !== 'object') return false;
+  if (file.hasOpenRows) return true;
+  if (Array.isArray(file.openVisits) && file.openVisits.length) return true;
+  if (Array.isArray(file.openRequests) && file.openRequests.length) return true;
+  return false;
+}
+
 function determineNextBestAction({ state, capabilities = {} } = {}) {
   const intent = String(state?.intent || 'unknown');
   const repairCount = Number(state?.repair?.failureCount || 0);
@@ -36,7 +45,8 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       state?.goal?.description ||
       ''
   );
-  if (looksLikeFileRead(latestUtterance) && !hasReadableFile(state)) {
+  const openRowsOnFile = phoneFileHasOpenRows(state);
+  if (looksLikeFileRead(latestUtterance) && !hasReadableFile(state) && !openRowsOnFile) {
     return {
       action: ACTIONS.ANSWER,
       reason:
@@ -52,6 +62,13 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     speakerPendingOnFile(state?.returning) &&
     state?.caller?.nameConfirmed !== true
   ) {
+    if (openRowsOnFile) {
+      return {
+        action: ACTIONS.ANSWER,
+        reason:
+          'Name is not confirmed. Requested rows are already on this number. Do not say nothing is saved. Do not start a new booking. Confirm the name before reading the file.',
+      };
+    }
     return {
       action: ACTIONS.ANSWER,
       reason:

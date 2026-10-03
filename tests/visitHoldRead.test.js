@@ -526,3 +526,132 @@ describe('windowless requested visits and compliments', () => {
     assert.notEqual(state.caller.name, 'impressed by your');
   });
 });
+
+describe('a when stays on the row that has it', () => {
+  const now = new Date('2026-10-03T16:35:00.000Z');
+
+  function dialCard() {
+    return buildCallerMemoryCard({
+      now,
+      contact: { phone: '+254790381872', name: 'Alvin', metadata: {} },
+      openAppointments: [
+        {
+          id: 'couch',
+          service_name: 'Couch cleaning',
+          status: 'requested',
+          when_text: 'at 7:00 PM',
+          address_landmark: 'Kilimani',
+          notes: 'Couch cleaning',
+          created_at: '2026-08-16T00:29:40.282Z',
+        },
+        {
+          id: 'kilimani-carpet',
+          service_name: 'Carpet cleaning',
+          status: 'requested',
+          when_text: 'Monday morning',
+          address_landmark: 'Kilimani Nairobi',
+          notes: 'Caller will not be available, someone else will be on site',
+          created_at: '2026-08-16T00:52:24.100Z',
+        },
+        {
+          id: 'westlands-bare',
+          service_name: 'Carpet cleaning',
+          status: 'requested',
+          when_text: 'tomorrow at 12:00 PM',
+          address_landmark: 'Westlands',
+          notes: 'Carpet cleaning booking',
+          created_at: '2026-08-16T01:39:18.731Z',
+        },
+        {
+          id: 'westlands-noted',
+          service_name: 'Carpet cleaning',
+          status: 'requested',
+          when_text: 'tomorrow at 12:00 PM',
+          address_landmark: 'Westlands, Nairobi',
+          notes: 'visit — Carpet cleaning — tomorrow at 12:00 PM — Westlands, Nairobi',
+          created_at: '2026-08-16T01:39:28.589Z',
+        },
+        {
+          id: 'barnabas',
+          service_name: 'Carpet cleaning',
+          status: 'requested',
+          when_text: '22 Sep 2026 09:00',
+          window_start: '2026-09-22T06:00:00.000Z',
+          address_landmark: 'Barnabas',
+          notes: 'Carpet cleaning booking request',
+          created_at: '2026-09-04T03:02:24.156Z',
+        },
+      ],
+    });
+  }
+
+  it('does not give a windowless row a sibling when, and says the Barnabas date once', () => {
+    const card = dialCard();
+    const lines = card.openVisits.join(' || ');
+    assert.match(lines, /Couch cleaning \| requested \| Kilimani/);
+    assert.doesNotMatch(lines, /7:00/);
+    assert.doesNotMatch(lines, /16 Aug/);
+    assert.match(lines, /Kilimani Nairobi/);
+    assert.doesNotMatch(lines, /Monday morning/);
+    assert.doesNotMatch(lines, /17 Aug Monday/);
+    assert.doesNotMatch(
+      card.openVisits.find((line) => /\| Westlands$/.test(line)) || '',
+      /12:00/
+    );
+    assert.match(lines, /Westlands, Nairobi/);
+    assert.match(lines, /12:00 PM/);
+    assert.equal((lines.match(/12:00 PM/g) || []).length, 1);
+    assert.match(lines, /past 22 Sep 2026 09:00/);
+    assert.equal((lines.match(/22 Sep/g) || []).length, 1);
+    assert.doesNotMatch(lines, /22 Sep 22 Sep/);
+    const sentence = heard(card, 'What are my bookings?');
+    assert.notEqual(sentence, NOTHING_OPEN);
+    assert.match(sentence, /You have Couch cleaning, Kilimani/);
+    assert.doesNotMatch(sentence, /7:00|16 Aug|Monday morning/);
+    assert.match(sentence, /12:00 PM/);
+    assert.equal((sentence.match(/12:00 PM/g) || []).length, 1);
+    assert.match(sentence, /past 22 Sep 2026 09:00/);
+    assert.doesNotMatch(sentence, /22 Sep 22 Sep/);
+    assert.equal(
+      resolveLocalReply({
+        text: 'What are my bookings?',
+        state: boundState(card, 'home_services'),
+        language: 'en',
+      }),
+      null
+    );
+  });
+
+  it('does not tell the model the file is empty when requested rows exist', () => {
+    const card = dialCard();
+    const profile = { vertical: 'home_services', callerMemory: card };
+    let state = createBrainState(profile);
+    state = observeCallerTurn(state, {
+      text: 'I wanted to inquire about my booking.',
+      profile,
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    assert.equal(state.caller.nameConfirmed, false);
+    const decision = determineNextBestAction({
+      state,
+      capabilities: { createAppointment: true },
+    });
+    assert.doesNotMatch(decision.reason, /Nothing saved for this speaker/);
+    assert.doesNotMatch(decision.reason, /do not have a booking/i);
+    assert.doesNotMatch(decision.reason, /do not have their bookings/i);
+    const empty = buildCallerMemoryCard({
+      contact: { phone: '+254790381872', name: 'Alvin', metadata: {} },
+    });
+    const emptyProfile = { vertical: 'home_services', callerMemory: empty };
+    let emptyState = createBrainState(emptyProfile);
+    emptyState = observeCallerTurn(emptyState, {
+      text: 'I wanted to inquire about my booking.',
+      profile: emptyProfile,
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    const emptyDecision = determineNextBestAction({ state: emptyState });
+    assert.match(emptyDecision.reason, /Nothing saved for this speaker/);
+  });
+});
