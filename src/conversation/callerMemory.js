@@ -588,7 +588,7 @@ function formatReturningCallerForPrompt(card) {
     const hint = fileWho ? `file name ${fileWho}; ` : '';
     identity = `not bound; shared line (${hint}nothing is saved for this speaker; do not invent a booking, order, or hold)`;
   } else if (fileWho) {
-    identity = `not bound; phone file for ${fileWho}; ask who is speaking; do not use this name or visit until they say it`;
+    identity = `not bound; phone file for ${fileWho}; confirm this name once before any visit; do not greet them as this name`;
   } else {
     identity = 'not bound; do not invent a name';
   }
@@ -633,7 +633,7 @@ function formatReturningCallerForPrompt(card) {
     );
     lines.push(
       mayHaveVisit
-        ? '- Use: a visit may exist on this number. Do not say there is no booking. Ask their name before you attach or deny it. Do not greet them as the file name. Answer what they just said.'
+        ? `- Use: confirm once, "Am I speaking with ${fileWho || 'the name on this number'}?" Do not greet them as that name. Do not describe the visit yet. Never say there is no booking, no visit, or nothing on file. If they confirm, name each Open visit in one sentence (job, when, place). If they say no, ask who is speaking and do not read this file. Answer what they just said.`
         : '- Use: do not ask who is speaking unless you are about to save something. Do not attach Open, Last, or History yet. Do not greet them as the file name. Answer what they just said.'
     );
   } else if (!usable) {
@@ -668,7 +668,7 @@ function formatReturningFileForCallState(returning) {
       return '- Caller file speaker: not bound. Shared line. Do not ask who is speaking unless you are about to save something. Do not use the file name. Do not attach Open or History. Answer what they just said.';
     }
     if (who) {
-      return `- Caller file speaker: not bound. Phone file for ${who}. Do not use this name or visit until they say who they are. Answer what they just said.`;
+      return `- Caller file speaker: not bound. Phone file for ${who}. Ask once: Am I speaking with ${who}? Do not greet them as that name. Do not describe a visit until they confirm. Never say there is no booking. If they say no, do not read this file. Answer what they just said.`;
     }
     return '- Caller file speaker: not bound. Do not attach a visit until they say who they are. Answer what they just said.';
   }
