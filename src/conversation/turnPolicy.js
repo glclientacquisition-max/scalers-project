@@ -25,6 +25,7 @@ const {
 const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
 const { fileReadLine } = require('./fileRead');
 const { hoursAskLine, offerCatalogueLine } = require('./knownFacts');
+const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
@@ -118,7 +119,16 @@ function resolveLocalReply({
   const action = String(decision.action || state?.resolution?.nextBestAction || '');
   const slot = String(decision.slot || state?.resolution?.targetSlot || '');
   const timeAsk = action === 'ASK_CLARIFICATION' && slot === 'time';
-  if (timeAsk && !looksLikeLeaveIt(clean) && !looksLikeUrgentContact(clean)) {
+  if (
+    state?.messageOnly &&
+    timeAsk &&
+    !looksLikeLeaveIt(clean) &&
+    !looksLikeUrgentContact(clean) &&
+    !callerTurnKinds(clean).knowledge
+  ) {
+    return { outcome: 'message_only', line: messageOnlyCallbackLine(language) };
+  }
+  if (timeAsk && !state?.messageOnly && !looksLikeLeaveIt(clean) && !looksLikeUrgentContact(clean)) {
     return {
       outcome: 'visit_time',
       line: timeAskLine({

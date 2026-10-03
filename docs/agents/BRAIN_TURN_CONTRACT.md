@@ -83,6 +83,11 @@ Dropped sentence by sentence:
   `capabilities.liveTransfer`.
 - **Coverage flips** ("we can come to Runda") unless `assessCoverage` says
   inside.
+- **Message only booking collection.** When `state.messageOnly` is on, a
+  sentence that asks which service to book, or for a day, a time, or a place,
+  is dropped. A file answer (services, price, hours, where the business is)
+  stays. If the caller is booking, the spoken line is "I'll take a message and
+  have the team call you." Serve mode is unchanged.
 
 If the caller asked a price, count, or time and the only answer was dropped,
 the line becomes "I don't have that on file. I can note it for the team."

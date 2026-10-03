@@ -22,6 +22,7 @@ const {
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 const { looksLikeFileVisitTalk } = require('./visitTalk');
 const { detectSpeedRequest } = require('../speech/speedControl');
+const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
 
 /**
  * Instant greeting — brand-first English opener (see businessAssistantIntro.js).
@@ -566,6 +567,25 @@ function pickSpeechGuaranteeLine({
   }
   const nameKnown = callerNameAlreadyKnown({ brainState, userText });
   let slot = nextGuaranteeSlot({ nextBestAction, brainState, nameKnown });
+  if (brainState?.messageOnly) {
+    const intent = String(brainState.intent || '').toLowerCase();
+    const request = ['booking', 'cancellation', 'hold', 'order'].includes(intent);
+    const visitSlot = [
+      'when',
+      'time',
+      'location',
+      'landmark',
+      'area',
+      'service',
+      'subject',
+      'branch',
+      'when_or_reference',
+      'catalog_item',
+    ].includes(slot);
+    if ((request || visitSlot) && !(slot === 'name' && !nameKnown) && !callerTurnKinds(userText).knowledge) {
+      return messageOnlyCallbackLine(language);
+    }
+  }
   // Live leftover HD_bc9f610692de: a bookings/visit ask after the name is in
   // must not speech-guarantee another name ask or invent a when.
   if (looksLikeFileVisitTalk(userText) || looksLikePaceOnlyTurn(userText)) {

@@ -116,8 +116,10 @@ function buildContextHeader(profile = {}) {
         : "Do not say the shop is closed.";
     statusBlock = `BUSINESS STATUS: MESSAGE ONLY (hard lock, any time of day).
 ${closedFact}
-Ask for the name if you do not have it. Take the message. Save a callback only.
-Do not book, move, cancel, or read a visit. Do not invent a day, a clock time, or a slot.
+Answer services, prices, hours, and where the business is from the file.
+Do not ask which service to book. Do not ask for a day, a time, or a place.
+If they want a visit, say you will take a message and the team will call them.
+Ask for the name only to save that message. Do not book, move, cancel, or read a visit.
 Do not append create_appointment or update_appointment. Do not save a hold, order, or enquiry.`;
   } else if (closedByBulletin) {
     statusBlock = `BUSINESS STATUS: CLOSED today per Today's update (overrides normal hours; mode: KEEP SERVING).

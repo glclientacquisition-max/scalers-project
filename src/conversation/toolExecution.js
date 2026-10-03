@@ -9,6 +9,7 @@ const {
 const { canonicalizeCallerName } = require('./callerNameMatch');
 const { isJunkCallerName } = require('./callerNameQuality');
 const { confirmationLanguage } = require('./language');
+const { messageOnlyCallbackLine } = require('./messageOnly');
 const {
   readVisitPlace,
   classifyVisitLocation,
@@ -1088,9 +1089,7 @@ function formatToolConfirmation(results = [], language = 'en') {
   const sw = lang === 'sw';
   const sheng = lang === 'sheng';
   if (meaningful.code === 'message_only') {
-    if (sw) return 'Naweza kuchukua ujumbe. Siwezi kuweka wala kughairi ziara.';
-    if (sheng) return 'Naweza take message. Siwezi book wala cancel visit.';
-    return "I can take a message. I can't book or cancel a visit.";
+    return messageOnlyCallbackLine(sheng ? 'sheng' : sw ? 'sw' : 'en');
   }
   if (meaningful.action === 'tool_request') {
     if (sw) return 'Sijaweza kukamilisha hatua hiyo.';

@@ -219,6 +219,9 @@ function clarificationForSlot(slot) {
 }
 
 function formatControlVoiceForPrompt(state) {
+  if (state?.messageOnly) {
+    return '- Control: answer services, price, hours, and where the business is. Do not collect a booking.';
+  }
   const job =
     visitSopSlotValue(state, 'service') ||
     entityValue(state?.entities?.product) ||
@@ -240,6 +243,9 @@ function formatControlVoiceForPrompt(state) {
 }
 
 function formatGoalRequirementsForPrompt(state) {
+  if (state?.messageOnly) {
+    return 'Message only. Answer services, prices, hours, and where the business is from the file. Do not ask which service to book, a day, a time, or a place. If they want a visit, say you will take a message and the team will call them. Ask for a name only to save that message.';
+  }
   const missing = Array.isArray(state?.goal?.missingSlots)
     ? state.goal.missingSlots
     : [];

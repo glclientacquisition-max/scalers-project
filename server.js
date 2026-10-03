@@ -3028,7 +3028,10 @@ mediaWss.on('connection', (ws, req) => {
         const confirmation = String(result.actionConfirmation).trim();
         const lookupSpoken = spokenChunks.join(' ').trim();
         // The lookup sentence is already on the stream. Do not speakText it.
-        if (!(spokeLookupSentence && confirmation === lookupSpoken)) {
+        const alreadySaid =
+          /take a message|nitachukua ujumbe/i.test(lookupSpoken) &&
+          /take a message|nitachukua ujumbe/i.test(confirmation);
+        if (!(spokeLookupSentence && confirmation === lookupSpoken) && !alreadySaid) {
           await actionProgressSpeak;
           callTranscript.pushAgent(result.actionConfirmation);
           await speakText(result.actionConfirmation);

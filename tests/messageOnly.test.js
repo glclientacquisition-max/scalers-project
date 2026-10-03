@@ -11,9 +11,14 @@ const { buildContextHeader } = require('../src/prompts');
 const { composeBusinessAssistantIntro } = require('../src/conversation/businessAssistantIntro');
 const { createBrainState, formatBrainStateForPrompt } = require('../src/conversation/brainState');
 const { fileReadLine } = require('../src/conversation/fileRead');
+const { polishSpokenReply } = require('../src/conversation/dynamicSpeech');
+const { resolveLocalReply } = require('../src/conversation/turnPolicy');
+const { determineNextBestAction } = require('../src/conversation/nextBestAction');
+const { defaultHoursSchedule } = require('../src/conversation/businessHours');
 const {
   applyMessageOnlyCapabilities,
   isMessageOnlyMode,
+  messageOnlyCallbackLine,
 } = require('../src/conversation/messageOnly');
 
 const locked = {
@@ -69,7 +74,7 @@ describe('message only lock', () => {
     assert.equal(execution.results[0].code, 'message_only');
     const spoken = formatToolConfirmation(execution.results, 'en');
     assert.match(spoken, /take a message/i);
-    assert.doesNotMatch(spoken, /\b9\b|tomorrow|AM|PM/i);
+    assert.doesNotMatch(spoken, /\b9\b|tomorrow|\bAM\b|\bPM\b/i);
   });
 
   it('refuses a cancel', async () => {
@@ -261,5 +266,139 @@ describe('message only lock', () => {
       }),
       'ChapterOne Bookstore, this is Aisha. How can I help?'
     );
+  });
+
+  it('answers a fact and refuses the booking ask', () => {
+    const line = messageOnlyCallbackLine('en');
+    const services = polishSpokenReply(
+      'We offer carpet cleaning and pet stain removal. Which service would you like to book?',
+      {
+        state: { messageOnly: true },
+        callerTurns: ['What services do you offer?'],
+        profile: { afterHoursMode: 'message' },
+        capabilities: { messageOnly: true },
+        language: 'en',
+      }
+    );
+    assert.match(services, /carpet cleaning/i);
+    assert.doesNotMatch(services, /which service|book/i);
+    assert.doesNotMatch(services, /take a message/i);
+
+    const price = polishSpokenReply(
+      'Carpet cleaning costs 3500 shillings. What time tomorrow?',
+      {
+        state: { messageOnly: true },
+        callerTurns: ['How much is carpet cleaning, and can you come tomorrow?'],
+        profile: {
+          afterHoursMode: 'message',
+          servicesCatalog: [{ name: 'Carpet cleaning', price_range: '3500' }],
+        },
+        capabilities: { messageOnly: true },
+        language: 'en',
+      }
+    );
+    assert.match(price, /3500/);
+    assert.match(price, /take a message/i);
+    assert.doesNotMatch(price, /what time|tomorrow/i);
+
+    const hours = polishSpokenReply("We're open today.", {
+      state: { messageOnly: true },
+      callerTurns: ['Are you open?'],
+      profile: { afterHoursMode: 'message', businessHours: '8 AM to 6 PM' },
+      capabilities: { messageOnly: true },
+      language: 'en',
+    });
+    assert.match(hours, /open today/i);
+    const hoursLocal = resolveLocalReply({
+      text: 'Are you open?',
+      state: { messageOnly: true, conversation: {} },
+      language: 'en',
+      profile: { afterHoursMode: 'message', hoursSchedule: defaultHoursSchedule() },
+      nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'time' },
+    });
+    assert.equal(hoursLocal.outcome, 'hours_ask');
+    assert.match(hoursLocal.line, /open|closed/i);
+    assert.doesNotMatch(hoursLocal.line, /what time/i);
+
+    const place = polishSpokenReply("We're in Westlands.", {
+      state: { messageOnly: true },
+      callerTurns: ['Where are you?'],
+      profile: { afterHoursMode: 'message', businessLocations: [{ name: 'Westlands' }] },
+      capabilities: { messageOnly: true },
+      language: 'en',
+    });
+    assert.match(place, /Westlands/);
+    assert.doesNotMatch(place, /where should we/i);
+
+    const booking = polishSpokenReply(
+      'We offer carpet cleaning. Which service would you like to book? Tomorrow at 11. Where should we come?',
+      {
+        state: { messageOnly: true },
+        callerTurns: ['I want to book a carpet clean tomorrow at 11 in Westlands.'],
+        profile: { afterHoursMode: 'message' },
+        capabilities: { messageOnly: true },
+        language: 'en',
+      }
+    );
+    assert.equal(booking, line);
+    assert.doesNotMatch(booking, /which service|tomorrow|11|Westlands|where should/i);
+
+    const named = polishSpokenReply('May I have your name? When should we come?', {
+      state: { messageOnly: true },
+      callerTurns: ['Please book a carpet clean.'],
+      profile: { afterHoursMode: 'message' },
+      capabilities: { messageOnly: true },
+      language: 'en',
+    });
+    assert.match(named, /your name/i);
+    assert.match(named, /take a message/i);
+    assert.doesNotMatch(named, /when should we come/i);
+
+    const serve = polishSpokenReply('Which service would you like to book?', {
+      state: { messageOnly: false },
+      callerTurns: ['I want to book a carpet clean.'],
+      profile: { afterHoursMode: 'serve' },
+      language: 'en',
+    });
+    assert.match(serve, /Which service would you like to book/);
+  });
+
+  it('does not ask for a visit slot on the local line', () => {
+    const booked = resolveLocalReply({
+      text: 'Tomorrow.',
+      state: { messageOnly: true, conversation: {} },
+      language: 'en',
+      nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'time' },
+    });
+    assert.equal(booked.outcome, 'message_only');
+    assert.equal(booked.line, messageOnlyCallbackLine('en'));
+    assert.doesNotMatch(booked.line, /what time/i);
+
+    const decision = determineNextBestAction({
+      state: {
+        messageOnly: true,
+        intent: 'booking',
+        goal: { missingSlots: ['when', 'location'], status: 'open', description: 'book' },
+        conversation: { answersReceived: ['Book a carpet clean tomorrow'] },
+        repair: { failureCount: 0 },
+        resolution: {},
+      },
+      capabilities: { messageOnly: true },
+    });
+    assert.equal(decision.action, 'CAPTURE');
+    assert.match(decision.reason, /Do not ask which service to book/);
+
+    const priced = determineNextBestAction({
+      state: {
+        messageOnly: true,
+        intent: 'booking',
+        goal: { missingSlots: ['when'], status: 'open' },
+        conversation: { answersReceived: ['How much is carpet cleaning?'] },
+        repair: { failureCount: 0 },
+        resolution: {},
+      },
+      capabilities: { messageOnly: true },
+    });
+    assert.equal(priced.action, 'ANSWER');
   });
 });

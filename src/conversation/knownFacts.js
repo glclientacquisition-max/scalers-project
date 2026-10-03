@@ -8,6 +8,7 @@ const {
   eatParts,
 } = require('./businessHours');
 const { looksLikeOfferAsk, looksLikeNewWork } = require('./fileRead');
+const { isMessageOnlyMode } = require('./messageOnly');
 
 const HOURS_ASK_RE =
   /\b(are you open|you open now|opening hours|your hours|what are your hours|what time do you (?:open|close)|when do you (?:open|close)|at what time are you opening|what time are you opening|mko wazi|mnafungua|mnafunga|saa ngapi mna(?:fungua|funga))\b/i;
@@ -124,6 +125,10 @@ function offerCatalogueLine(text, profile = {}, language = 'en') {
   }
   const list = joinSpoken(names);
   const more = normalizeServices(profile.servicesCatalog).length > 4;
+  if (isMessageOnlyMode(profile.afterHoursMode)) {
+    if (sw) return more ? `Tuna ${list}, na zingine.` : `Tuna ${list}.`;
+    return more ? `We offer ${list}, and more.` : `We offer ${list}.`;
+  }
   if (sw) {
     return more ? `Tuna ${list}, na zingine. Unahitaji gani?` : `Tuna ${list}. Unahitaji gani?`;
   }

@@ -254,6 +254,13 @@ function buildLiveGroundTruth(profile = {}) {
 
   parts.push('', formatUnknownAnswerPolicy(unknown));
 
+  if (isMessageOnlyMode(profile.afterHoursMode)) {
+    parts.push(
+      '',
+      'MESSAGE ONLY: answer services, prices, hours, and the locations above. Do not ask which service to book, a day, a time, or a place. If they want a visit, say you will take a message and the team will call them.'
+    );
+  }
+
   parts.push(
     '',
     'Never invent prices, stock, availability, services, locations, policies, people, or FAQ answers outside this ground truth.',

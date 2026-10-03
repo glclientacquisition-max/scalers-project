@@ -13,6 +13,7 @@ const {
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
 } = require('./callCorrectives');
+const { callerTurnKinds } = require('./messageOnly');
 
 const DIRECT_ANSWER_INTENTS = new Set([
   'hours',
@@ -56,6 +57,22 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       action: ACTIONS.ANSWER,
       reason:
         'Name is unknown. Do not use the file name, open visit, or history. Say you do not have their bookings. Do not list services. Ask their name only if you are about to save something.',
+    };
+  }
+
+  if (state?.messageOnly && REQUEST_INTENTS.has(intent)) {
+    const askedFact = callerTurnKinds(latestUtterance).knowledge;
+    if (askedFact) {
+      return {
+        action: ACTIONS.ANSWER,
+        reason:
+          'Message only. Answer the fact from the file. Do not ask which service to book, a day, a time, or a place.',
+      };
+    }
+    return {
+      action: ACTIONS.CAPTURE,
+      reason:
+        'Message only. Do not ask which service to book, a day, a time, or a place. Say you will take a message and the team will call. Ask for a name only if it is missing.',
     };
   }
 

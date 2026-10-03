@@ -9,6 +9,11 @@ const { numbersIn } = require('./numberWords');
 const { assessCoverage } = require('./visitLocation');
 const { canonicalPlaceName } = require('./kenyaPlaces');
 const { openSlotLine } = require('./callCorrectives');
+const {
+  isMessageOnlyMode,
+  messageOnlyCallbackLine,
+  shapeMessageOnlySpeech,
+} = require('./messageOnly');
 
 const SAVED_CLAIM =
   /\b(i(?:'ve| have) (?:saved|noted|booked|logged|recorded|sent|passed|forwarded|escalated|scheduled|submitted|placed|reserved|held)\b|(?:is|has been|are) (?:saved|noted|booked|logged|recorded|scheduled|confirmed|reserved|on hold|submitted)\b|(?:the )?team will (?:call|contact|reach|get back)|(?:someone|we|they) will (?:call|contact|reach|get back to) you|nimehifadhi|nimeandika|nimetuma|imehifadhiwa|imeandikwa|tutakupigia|watakupigia|nime-?save)/i;
@@ -164,9 +169,36 @@ function sentenceNamesUnboundPlace(sentence, allowedText) {
  * @param {string} [ctx.language]
  * @param {boolean} [ctx.allowEmpty]  return '' instead of a fallback line
  */
+function messageOnlyOn(ctx) {
+  return Boolean(
+    ctx.state?.messageOnly ||
+      ctx.capabilities?.messageOnly ||
+      isMessageOnlyMode(ctx.profile?.afterHoursMode)
+  );
+}
+
+function withMessageOnlyCallback(out, ctx, appendCallback) {
+  if (!appendCallback) return out;
+  const line = messageOnlyCallbackLine(ctx.language);
+  const body = String(out || '').trim();
+  if (!body) return line;
+  if (/take a message|nitachukua ujumbe/i.test(body)) return body;
+  return `${body} ${line}`;
+}
+
 function guardSpokenReply(text, ctx = {}) {
-  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  let raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return '';
+  const locked = messageOnlyOn(ctx);
+  let appendCallback = false;
+  if (locked) {
+    const callerText = String((ctx.callerTurns || []).slice(-1)[0] || '');
+    const shaped = shapeMessageOnlySpeech(raw, { callerText });
+    raw = shaped.text;
+    appendCallback = shaped.appendCallback;
+    if (!raw && appendCallback) return messageOnlyCallbackLine(ctx.language);
+    if (!raw) return '';
+  }
   const known = knownNumbers(ctx);
   const clocks = allowedClocks(ctx);
   const saved = toolSucceededThisTurn(ctx.toolResults);
@@ -205,7 +237,14 @@ function guardSpokenReply(text, ctx = {}) {
   if (holdOpenSlot && droppedJob && BARE_CLOSER.test(out)) out = '';
   const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
   const askedNumber = droppedNumber && NUMBER_ASK.test(lastCallerTurn);
-  if (out) return askedNumber ? `${unknownFallback(ctx.language)} ${out}` : out;
+  if (out) {
+    return withMessageOnlyCallback(
+      askedNumber ? `${unknownFallback(ctx.language)} ${out}` : out,
+      ctx,
+      appendCallback
+    );
+  }
+  if (locked && appendCallback) return messageOnlyCallbackLine(ctx.language);
   if (holdOpenSlot && droppedJob) {
     return ctx.allowEmpty ? '' : openSlotLine(ctx.state, ctx.language);
   }
