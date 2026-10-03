@@ -37,6 +37,7 @@ const {
   speakerPendingOnFile,
   returningFileFromCard,
 } = require('./callerMemory');
+const { isMessageOnlyMode } = require('./messageOnly');
 const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
@@ -328,11 +329,15 @@ function createBrainState(profile = {}) {
       refusedHours: [],
       refusedPlaces: [],
     },
+    messageOnly: isMessageOnlyMode(profile.afterHoursMode),
   };
 }
 
 function observeCallerTurn(state, input = {}) {
   let next = structuredClone(state || createBrainState(input.profile));
+  if (input.profile && input.profile.afterHoursMode != null) {
+    next.messageOnly = isMessageOnlyMode(input.profile.afterHoursMode);
+  }
   const text = String(input.text || '').trim();
   if (!next.returning && input.profile?.callerMemory) {
     next.returning = returningFileFromCard(input.profile.callerMemory);
@@ -977,7 +982,16 @@ function formatBrainStateForPrompt(state) {
     `- ${formatRepairForPrompt(value)}`,
     formatNameConfirmForPrompt(value),
     formatHearAgainForPrompt(value),
-    formatReturningFileForCallState(value.returning),
+    formatReturningFileForCallState(
+      value.messageOnly
+        ? {
+            ...(value.returning || {}),
+            openVisits: [],
+            nextVisit: null,
+            recentBookings: [],
+          }
+        : value.returning
+    ),
     value.conversation?.nonConsentAck
       ? '- Acknowledgment only (Then, Okay, Sawa, or leave it). Not a quantity, a time, or a yes. Do not invent a count. Do not say a visit or order is saved.'
       : '',
@@ -988,7 +1002,9 @@ function formatBrainStateForPrompt(state) {
       ? '- No visit time after two asks. Do not ask again. Save a callback note with the day via create_service_request. The team confirms the time. Do not say booked.'
       : '',
     value.conversation?.phatic
-      ? speakerPendingOnFile(value.returning)
+      ? value.messageOnly
+        ? '- Phatic turn: one short well, then ask for the name if it is missing and take a message. Do not read a visit. Do not invent a time.'
+        : speakerPendingOnFile(value.returning)
         ? '- Phatic turn: one short well, then offer help. Do not ask who is speaking. Do not use the file name. Do not list services.'
         : value.returning?.nextVisit && returningFileUsable(value.returning)
           ? '- Phatic turn: one short well, then the open visit. Do not list services or start a new book.'

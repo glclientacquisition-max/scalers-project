@@ -45,11 +45,11 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Identity | Label-above inputs; tone and type chip rows | Grouped rows. Name fields. Tone select: Professional or Warm. Type select: Shop or Home services. Contacts table `md+`, stacked phone |
 | How we notify | Form grid plus bordered toggle cards | Grouped Contact / Channels / Callers rows. Channel and caller flags are switches. Save filled |
 | Catalog | Services and products tables `md+`, stacked phone | Unchanged tables. Add / paste stay ghost. Bulk apply filled |
-| Hours | Open/Closed chip per day; after-hours chips | Day grid with open switches. When closed is segmented Keep helping / Message only |
+| Hours | Open/Closed chip per day; after-hours chips | Day grid with open switches. Open and close times only |
 | Locations | Places table `lg+`, stacked phone | Unchanged dense table. Add place ghost |
 | Policies | Two-column textarea grid | Grouped Rules stacks. When unsure stack |
 | Team | Handoff chips. Notify chips | Live connect switch when transfer can run (Team only — handoff off Voice, #514). People table `lg+` with **Role** column. Status: Rings {name} during open hours. |
-| Voice | Voice chips. Tool switches. Hear sample bordered | Voice select. Tool switches. Hear sample ghost. |
+| Voice | Voice chips. Tool switches. Hear sample bordered | Voice select. On a call: Message only, or Full assistant greyed Not ready. Tool switches. Hear sample ghost. |
 | Pronunciation | Coach with duplicate heading | Coach. Embedded heading is sr-only. Studio modes use underline tabs. No sticky Save — header **Saves live - no sticky Save** |
 | Updates | Duration chips. Live cards | Duration segmented. Live grouped list. Post update filled. Clear ghost |
 | Import | Radio cards. Native checkboxes | Paste / Website segmented. Include flags are switches. Scan / Add filled |
@@ -84,7 +84,6 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | --- | --- | --- | --- |
 | Day open | switch × 7 | `hours_schedule` | Assistant on calls |
 | Opens / Closes | time input | `hours_schedule` | Assistant on calls |
-| When closed | segmented (2) | `after_hours_mode` (`serve` / `message`) | Assistant on calls |
 | Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |
 
 ### Locations (`?tab=train&panel=locations`)
@@ -111,6 +110,7 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | Voice | select (4+) | `soniox_voice_id` | Assistant on calls |
 | Voice label | input | `soniox_voice_label` | Whole business (desk label) |
 | Hear sample | ghost | preview blob only | This device |
+| On a call | segmented. Message only can be selected. Full assistant stays visible, grey, and cannot be selected. Label is Not ready, not missing access | `after_hours_mode` (`message`, or stored `serve`) | Assistant on calls |
 | Alert a teammate | switch | `tool_escalate` | Assistant on calls |
 | Hang up after goodbye | switch | `tool_end_call` | Assistant on calls |
 | Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |

@@ -583,6 +583,39 @@ async function executeBrainTools({
     }
   }
 
+  if (parsed?.serviceRequest && capabilities.messageOnly) {
+    const typeRaw = String(parsed.serviceRequest.type || '').trim().toLowerCase();
+    if (typeRaw !== 'callback') {
+      results.push({
+        action: 'create_service_request',
+        status: 'disabled',
+        code: 'message_only',
+        reason: 'Message only. Only a callback can be saved.',
+      });
+      parsed.serviceRequest = null;
+    } else if (!String(parsed.serviceRequest.name || '').trim()) {
+      results.push({
+        action: 'create_service_request',
+        status: 'invalid',
+        reason: 'A callback needs the caller name.',
+        missingSlots: ['name'],
+      });
+      parsed.serviceRequest = null;
+    } else {
+      const notes = String(parsed.serviceRequest.notes || '').trim();
+      const item = String(parsed.serviceRequest.item || '').trim();
+      const whenText = String(
+        parsed.serviceRequest.whenText || parsed.serviceRequest.when_text || ''
+      ).trim();
+      parsed.serviceRequest = {
+        ...parsed.serviceRequest,
+        whenText: '',
+        when_text: '',
+        notes: notes || (!item ? whenText : notes),
+      };
+    }
+  }
+
   if (parsed?.serviceRequest) {
     const validation = validateServiceRequest(parsed.serviceRequest, identityOpts);
     const fingerprint = validation.valid
@@ -708,7 +741,14 @@ async function executeBrainTools({
     }
   }
 
-  if (parsed?.appointment) {
+  if (capabilities.messageOnly && parsed?.appointment) {
+    results.push({
+      action: 'create_appointment',
+      status: 'disabled',
+      code: 'message_only',
+      reason: 'Message only. Booking is not available.',
+    });
+  } else if (parsed?.appointment) {
     const validation = validateCreateAppointment(parsed.appointment, {
       hoursSchedule,
       now,
@@ -775,7 +815,14 @@ async function executeBrainTools({
     }
   }
 
-  if (parsed?.appointmentUpdate) {
+  if (capabilities.messageOnly && parsed?.appointmentUpdate) {
+    results.push({
+      action: 'update_appointment',
+      status: 'disabled',
+      code: 'message_only',
+      reason: 'Message only. Cancel and reschedule are not available.',
+    });
+  } else if (parsed?.appointmentUpdate) {
     const validation = validateUpdateAppointment(parsed.appointmentUpdate, {
       hoursSchedule,
       now,
@@ -1040,6 +1087,11 @@ function formatToolConfirmation(results = [], language = 'en') {
   const lang = confirmationLanguage(language);
   const sw = lang === 'sw';
   const sheng = lang === 'sheng';
+  if (meaningful.code === 'message_only') {
+    if (sw) return 'Naweza kuchukua ujumbe. Siwezi kuweka wala kughairi ziara.';
+    if (sheng) return 'Naweza take message. Siwezi book wala cancel visit.';
+    return "I can take a message. I can't book or cancel a visit.";
+  }
   if (meaningful.action === 'tool_request') {
     if (sw) return 'Sijaweza kukamilisha hatua hiyo.';
     if (sheng) return 'Sijaweza ku-complete hiyo action.';

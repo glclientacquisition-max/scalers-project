@@ -145,6 +145,7 @@ function buildLiveGroundTruth(profile = {}) {
   const { formatProductsOverview } = require('./productCatalog');
   const { formatOpenVisitsForPrompt } = require('./visitCalendar');
   const { selectOpenVisitsForPrompt } = require('./callerMemory');
+  const { isMessageOnlyMode } = require('./messageOnly');
   const {
     normalizeSocialHandles,
     socialHandlesHaveContent,
@@ -160,9 +161,11 @@ function buildLiveGroundTruth(profile = {}) {
   const tools = parseAgentTools(profile.agentTools);
   const vertical = parseVertical(profile.vertical);
   const handoffMode = parseHandoffMode(profile.handoffMode);
-  const openVisits = formatOpenVisitsForPrompt(
-    selectOpenVisitsForPrompt(profile.openAppointments, profile.callerMemory)
-  );
+  const openVisits = isMessageOnlyMode(profile.afterHoursMode)
+    ? ''
+    : formatOpenVisitsForPrompt(
+        selectOpenVisitsForPrompt(profile.openAppointments, profile.callerMemory)
+      );
   const hasAny =
     services.length ||
     products.length ||

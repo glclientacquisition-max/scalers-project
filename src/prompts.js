@@ -18,6 +18,10 @@ const {
 const { parseAgentTools } = require('./conversation/agentTools');
 const { formatPlaybookForPrompt } = require('./conversation/playbooks');
 const { formatReturningCallerForPrompt } = require('./conversation/callerMemory');
+const {
+  callerCardWithoutVisits,
+  isMessageOnlyMode,
+} = require('./conversation/messageOnly');
 
 const DEFAULT_KNOWLEDGE = `No tenant-specific business knowledge is configured.
 Do not answer business-specific questions from model memory.
@@ -101,11 +105,20 @@ function buildContextHeader(profile = {}) {
   const effectiveStatus =
     closedByBulletin && status === 'open' ? 'closed' : status;
 
+  const messageOnly = isMessageOnlyMode(afterHoursMode);
+
   let statusBlock;
-  if (closedByBulletin && afterHoursMode === 'message') {
-    statusBlock = `BUSINESS STATUS: CLOSED today per Today's update (overrides normal hours; mode: MESSAGE ONLY).
-Tell callers the bulletin fact in natural words. Then offer to save a callback request.
-Do not go silent after the fact. Do not claim you are open. Do not deep-dive into same-day fulfillment.`;
+  if (messageOnly) {
+    const closedFact = closedByBulletin
+      ? "The shop is closed today per Today's update. Say that fact, then take a message."
+      : effectiveStatus === 'closed'
+        ? 'The shop is closed now. Say that, then take a message.'
+        : "Do not say the shop is closed.";
+    statusBlock = `BUSINESS STATUS: MESSAGE ONLY (hard lock, any time of day).
+${closedFact}
+Ask for the name if you do not have it. Take the message. Save a callback only.
+Do not book, move, cancel, or read a visit. Do not invent a day, a clock time, or a slot.
+Do not append create_appointment or update_appointment. Do not save a hold, order, or enquiry.`;
   } else if (closedByBulletin) {
     statusBlock = `BUSINESS STATUS: CLOSED today per Today's update (overrides normal hours; mode: KEEP SERVING).
 Tell callers the bulletin fact in natural words, then immediately say you can still help and ask what they need.
@@ -114,10 +127,6 @@ Do not go silent after stating the update. Do not claim walk-in / same-day opera
   } else if (effectiveStatus === 'open') {
     statusBlock = `BUSINESS STATUS: OPEN now.
 If asked whether you are open, say yes. Help normally.`;
-  } else if (effectiveStatus === 'closed' && afterHoursMode === 'message') {
-    statusBlock = `BUSINESS STATUS: CLOSED now (after-hours mode: MESSAGE ONLY).
-Tell the caller you are closed. Offer to save a callback request when open.
-Keep answers brief. Save a callback request only if the caller wants one and the action is available. Do not promise same-day service.`;
   } else if (effectiveStatus === 'closed') {
     statusBlock = `BUSINESS STATUS: CLOSED now (after-hours mode: KEEP SERVING).
 Be honest that the business is closed for walk-in / same-day fulfillment right now.
@@ -137,7 +146,9 @@ Still help from verified knowledge. Ask for details only when they are needed fo
 
   const bulletinBlock = formatBulletinForPrompt(profile.dailyBulletin);
   const bulletinSection = bulletinBlock ? `\n${bulletinBlock}\n` : '\n';
-  const returningBlock = formatReturningCallerForPrompt(profile.callerMemory);
+  const returningBlock = formatReturningCallerForPrompt(
+    messageOnly ? callerCardWithoutVisits(profile.callerMemory) : profile.callerMemory
+  );
   const returningSection = returningBlock ? `${returningBlock}\n` : '';
 
   return `RECEPTION BRIEF (obey this; do not read it aloud):

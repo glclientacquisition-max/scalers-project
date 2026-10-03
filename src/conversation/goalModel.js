@@ -140,6 +140,7 @@ function visitSopSlotValue(state, slot) {
 }
 
 function formatVisitSopForPrompt(state) {
+  if (state?.messageOnly) return '';
   const vertical = String(state?.vertical || '').toLowerCase();
   if (vertical !== 'home_services' || String(state?.intent || '') !== 'booking') {
     return '';

@@ -91,6 +91,7 @@ const {
   buildBrainCapabilities,
   formatAuthorityPolicy,
 } = require('./src/conversation/brainPolicy');
+const { applyMessageOnlyCapabilities } = require('./src/conversation/messageOnly');
 const { determineNextBestAction } = require('./src/conversation/nextBestAction');
 const { logBrainTrace } = require('./src/conversation/brainObservability');
 const {
@@ -357,15 +358,18 @@ function capabilitiesForProfile(profile = {}, parsedTools = null) {
   const ready = liveTransferReady({
     profile: { ...profile, agentTools: tools },
   });
-  return buildBrainCapabilities(
-    { ...profile, agentTools: tools },
-    {
-      createServiceRequest: true,
-      createAppointment: true,
-      updateAppointment: true,
-      notifyCallback: true,
-      liveTransfer: ready.ready,
-    }
+  return applyMessageOnlyCapabilities(
+    buildBrainCapabilities(
+      { ...profile, agentTools: tools },
+      {
+        createServiceRequest: true,
+        createAppointment: true,
+        updateAppointment: true,
+        notifyCallback: true,
+        liveTransfer: ready.ready,
+      }
+    ),
+    profile.afterHoursMode
   );
 }
 
