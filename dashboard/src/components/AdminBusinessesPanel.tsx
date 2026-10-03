@@ -208,7 +208,7 @@ export function AdminBusinessesPanel({
         <div className="border-t border-line/70 pt-4">
           <p className="font-medium">Adjust ledger</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Ops ledger balance only. Customer billing is package plus on-demand on Packages. Positive
+            On-demand ledger balance (ops). Customer billing is package plus on-demand on Billing. Positive
             credits, negative debits. Writes a ledger entry.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">

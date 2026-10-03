@@ -176,7 +176,8 @@ describe("desk token hygiene", () => {
   const SKIP = new Set([
     "components/AdminNav.tsx",
     "components/AdminVoicesManager.tsx",
-    "components/AdminWalletsPanel.tsx",
+    "components/AdminBillingListPanel.tsx",
+    "components/AdminBillingDetailPanel.tsx",
     "components/AdminBusinessesPanel.tsx",
     "components/DidPoolManager.tsx",
   ]);

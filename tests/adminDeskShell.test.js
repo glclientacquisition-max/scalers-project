@@ -18,7 +18,8 @@ function loadParents() {
     import { adminParentTarget, ADMIN_LINKS } from ${JSON.stringify(linksPath)};
     const cases = {
       overview: adminParentTarget("/admin"),
-      wallets: adminParentTarget("/admin/wallets"),
+      billingClient: adminParentTarget("/admin/billing/abc"),
+      walletsRedirect: adminParentTarget("/admin/wallets"),
       nested: adminParentTarget("/admin/businesses/abc"),
       unknown: adminParentTarget("/admin/ops/extra"),
       query: adminParentTarget("/admin/voices/1?x=1"),
@@ -72,11 +73,13 @@ describe("admin desk standard shell", () => {
   it("names a nested screen for the parent admin list", () => {
     const got = loadParents();
     assert.equal(got.overview, null);
-    assert.equal(got.wallets, null);
+    assert.deepEqual(got.billingClient, { href: "/admin/billing", label: "Billing" });
+    assert.deepEqual(got.walletsRedirect, { href: "/admin", label: "Overview" });
     assert.deepEqual(got.nested, { href: "/admin/businesses", label: "Businesses" });
     assert.deepEqual(got.unknown, { href: "/admin", label: "Overview" });
     assert.deepEqual(got.query, { href: "/admin/voices", label: "Voices" });
-    assert.ok(got.labels.includes("Packages"));
+    assert.ok(got.labels.includes("Billing"));
+    assert.ok(!got.labels.includes("Ledger"));
     for (const label of got.labels) {
       assert.notEqual(label, "Back");
     }
