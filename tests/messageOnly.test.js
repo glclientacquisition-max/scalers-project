@@ -7,7 +7,7 @@ const {
 } = require('../src/conversation/toolExecution');
 const { ensureRequiredCreateRequest } = require('../src/conversation/requiredCreateRequest');
 const { buildLiveGroundTruth } = require('../src/conversation/liveKnowledge');
-const { buildContextHeader } = require('../src/prompts');
+const { buildContextHeader, buildSystemPrompt, CONVERSATION_RULES } = require('../src/prompts');
 const { composeBusinessAssistantIntro } = require('../src/conversation/businessAssistantIntro');
 const { createBrainState, formatBrainStateForPrompt } = require('../src/conversation/brainState');
 const { fileReadLine } = require('../src/conversation/fileRead');
@@ -400,5 +400,46 @@ describe('message only lock', () => {
       capabilities: { messageOnly: true },
     });
     assert.equal(priced.action, 'ANSWER');
+  });
+
+  it('reads an asked-for catalogue and confirms a name on file', () => {
+    const header = buildContextHeader({
+      afterHoursMode: 'message',
+      businessName: 'Done and Dusted',
+      agentName: 'Aisha',
+    });
+    const prompt = buildSystemPrompt({
+      afterHoursMode: 'message',
+      businessName: 'Done and Dusted',
+      agentName: 'Aisha',
+      vertical: 'home_services',
+    });
+    const compiled = `${header}\n${CONVERSATION_RULES}\n${prompt}`;
+    assert.match(compiled, /Do not list couch, carpet, mattress, or any job menu/);
+    assert.match(compiled, /Do not pitch services/);
+    assert.match(
+      header,
+      /If they ask what you offer, which services, or what you do, you MUST read the catalogue from the file/
+    );
+    assert.match(
+      CONVERSATION_RULES,
+      /If they ask what you offer, which services, or what you do, you MUST read the catalogue from the file/
+    );
+    assert.match(compiled, /beats the 25-word cap and the no-lists rule/);
+    assert.match(compiled, /Do not ask what they need done instead/);
+    assert.match(
+      header,
+      /you have my name, I called before, or my name is on file, you MUST ask once: Am I speaking with \{that name\}\?/
+    );
+    assert.match(
+      CONVERSATION_RULES,
+      /you have my name, I called before, or my name is on file, you MUST ask once: Am I speaking with \{that name\}\?/
+    );
+    assert.match(compiled, /Do not say there is no name saved/);
+    assert.match(compiled, /Do not greet them as that name before they confirm/);
+    assert.match(header, /Do not ask for a day, a time, or a place/);
+    assert.match(header, /take a message and the team will call them/);
+    assert.match(header, /Do not append create_appointment or update_appointment/);
+    assert.doesNotMatch(header, /KEEP SERVING/);
   });
 });
