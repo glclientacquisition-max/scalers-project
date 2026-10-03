@@ -221,8 +221,11 @@ describe('returning-caller card', () => {
     assert.equal(named.returning.fileRole, 'primary');
     assert.equal(named.returning.nextVisit, 'carpet cleaning | Tuesday 10 AM');
     assert.match(formatReturningCallerForPrompt(profile.callerMemory), /Open: visit \| carpet cleaning/);
-    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /name each Open line/);
-    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /never say "I don't have a booking"/);
+    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /immediately say each still-open line/);
+    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /one sentence each, then one question/);
+    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /Treat CALL STATE as fact/);
+    assert.doesNotMatch(formatReturningCallerForPrompt(profile.callerMemory), /no booking/i);
+    assert.doesNotMatch(formatReturningCallerForPrompt(profile.callerMemory), /nothing on file/i);
     assert.match(formatBrainStateForPrompt(named), /open visit/i);
     assert.equal(
       pickPhaticReply({ language: 'en', callerMemory: profile.callerMemory }),
@@ -621,8 +624,11 @@ describe('returning-caller card', () => {
     assert.match(block, /Standing: Usually carpet. Morning. Kiswahili./);
     assert.match(block, /Language: sw/);
     assert.match(block, /Note: prefers morning/);
-    assert.match(block, /name each Open line/);
-    assert.match(block, /never say "I don't have a booking"/);
+    assert.match(block, /immediately say each still-open line/);
+    assert.match(block, /one sentence each, then one question/);
+    assert.match(block, /Treat CALL STATE as fact/);
+    assert.doesNotMatch(block, /no booking/i);
+    assert.doesNotMatch(block, /nothing on file/i);
     assert.doesNotMatch(block, /Caller:/);
 
     const state = createBrainState({ callerMemory: bound });
@@ -776,7 +782,7 @@ describe('returning-caller card', () => {
     assert.doesNotMatch(card.recentBookings.join(' '), /\btomorrow\b/i);
   });
 
-  it('after a yes, names two open items and forbids denying a booking', () => {
+  it('after a yes, names two open items and does not teach a denial', () => {
     const card = buildCallerMemoryCard({
       contact: {
         phone: '+254790381872',
@@ -790,7 +796,10 @@ describe('returning-caller card', () => {
     });
     const unbound = formatReturningCallerForPrompt(card);
     assert.match(unbound, /Am I speaking with Alvin/);
-    assert.match(unbound, /Never say there is no booking, no visit, or nothing on file/);
+    assert.match(unbound, /Do not talk about visits yet/);
+    assert.match(unbound, /do not read this file/);
+    assert.doesNotMatch(unbound, /no booking/i);
+    assert.doesNotMatch(unbound, /nothing on file/i);
     assert.doesNotMatch(unbound, /carpet cleaning/);
 
     const notThem = formatReturningCallerForPrompt(bindCallerMemoryCard(card, 'Brian'));
@@ -804,9 +813,10 @@ describe('returning-caller card', () => {
       (block.match(/Open: request \| carpet cleaning \| tomorrow/g) || []).length,
       2
     );
-    assert.match(block, /name each Open line/);
-    assert.match(block, /never say "I don't have a booking"/);
-    assert.match(block, /nothing on file/);
+    assert.match(block, /immediately say each still-open line \(job, when, place; only fields present\), one sentence each, then one question/);
+    assert.match(block, /Treat CALL STATE as fact/);
+    assert.doesNotMatch(block, /no booking/i);
+    assert.doesNotMatch(block, /nothing on file/i);
 
     const state = createBrainState({ callerMemory: yes });
     const callState = formatBrainStateForPrompt(state);
@@ -814,7 +824,11 @@ describe('returning-caller card', () => {
       (callState.match(/Caller file open request: request \| carpet cleaning \| tomorrow/g) || []).length,
       2
     );
-    assert.match(callState, /never say "I don't have a booking"/);
+    assert.match(callState, /immediately say each still-open line/);
+    assert.match(callState, /one sentence each, then one question/);
+    assert.match(callState, /Treat CALL STATE as fact/);
+    assert.doesNotMatch(callState, /no booking/i);
+    assert.doesNotMatch(callState, /nothing on file/i);
 
     const cleared = {
       ...yes,
@@ -823,16 +837,20 @@ describe('returning-caller card', () => {
       nextAppointment: null,
     };
     const afterCancel = formatReturningCallerForPrompt(cleared);
-    assert.doesNotMatch(afterCancel, /never say "I don't have a booking"/);
+    assert.doesNotMatch(afterCancel, /no booking/i);
+    assert.doesNotMatch(afterCancel, /nothing on file/i);
     assert.doesNotMatch(afterCancel, /Open:/);
     const rules = buildSystemPrompt({ businessName: 'Scalers', agentName: 'A' });
-    assert.match(rules, /While CALL STATE lists any open visit or open request/);
-    assert.match(rules, /If those lines are gone, you may say nothing is open/);
+    assert.match(rules, /Do not talk about visits yet/);
+    assert.match(rules, /Ask once: Am I speaking with that name/);
+    assert.match(rules, /If those lines are gone, you may say nothing is still open/);
     assert.match(
       rules,
-      /immediately say the job, when, and place for every still-open line, and treat CALL STATE as fact/
+      /immediately say each still-open line \(job, when, place; only fields present\), one sentence each, then one question/
     );
-    assert.match(rules, /never say there is no booking, no visit, or nothing on file/);
+    assert.match(rules, /Treat CALL STATE as fact/);
+    assert.doesNotMatch(rules, /no booking/i);
+    assert.doesNotMatch(rules, /nothing on file/i);
 
     const confirmedTurn = buildSystemPrompt({
       businessName: 'Scalers',
@@ -854,8 +872,14 @@ describe('returning-caller card', () => {
       /If you append create_appointment or update_appointment, speak nothing/
     );
     assert.doesNotMatch(confirmedTurn, /If you append any tool this turn, speak nothing/);
-    assert.match(callState, /immediately say the job, when, and place for every still-open line/);
-    assert.match(callState, /treat CALL STATE as fact/);
+    assert.match(callState, /immediately say each still-open line/);
+    assert.match(callState, /Treat CALL STATE as fact/);
+    assert.doesNotMatch(confirmedTurn, /no booking/i);
+    assert.doesNotMatch(confirmedTurn, /nothing on file/i);
+    assert.match(
+      confirmedTurn,
+      /immediately say each still-open line \(job, when, place; only fields present\), one sentence each, then one question/
+    );
   });
 
   it('names each still-open visit after confirm instead of filing the second as history', () => {
@@ -887,11 +911,16 @@ describe('returning-caller card', () => {
     assert.match(block, /Open: visit \| carpet cleaning \| tomorrow \| requested \| Rongai/);
     assert.match(block, /Open: visit \| carpet cleaning \| tomorrow \| requested \| Westlands/);
     assert.doesNotMatch(block, /History: carpet cleaning \| tomorrow/);
-    assert.match(block, /name each Open line/);
+    assert.match(block, /immediately say each still-open line/);
+    assert.match(block, /one sentence each, then one question/);
+    assert.doesNotMatch(block, /no booking/i);
+    assert.doesNotMatch(block, /nothing on file/i);
     const callState = formatBrainStateForPrompt(createBrainState({ callerMemory: yes }));
     assert.match(callState, /open visit: carpet cleaning \| tomorrow \| requested \| Rongai/);
     assert.match(callState, /open visit: carpet cleaning \| tomorrow \| requested \| Westlands/);
-    assert.match(callState, /While any is listed/);
+    assert.match(callState, /immediately say each still-open line/);
+    assert.doesNotMatch(callState, /no booking/i);
+    assert.doesNotMatch(callState, /nothing on file/i);
   });
 
   it('drops a hold whose relative day is already past', () => {

@@ -596,7 +596,7 @@ function openVisitLinesOf(card) {
 }
 
 function stillOpenUseLine() {
-  return '- Use: when the caller has confirmed their name and CALL STATE lists an open visit or open request, immediately say the job, when, and place for every still-open line, and treat CALL STATE as fact; name each Open line in one sentence (job, when, place; only fields on that line). While any Open line is still listed, never say "I don\'t have a booking", "no booking", "no visit", or "nothing on file". If they want one moved or cancelled, update that one. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name. If no Open line remains, you may say nothing is open.';
+  return '- Use: when the caller has confirmed their name and CALL STATE lists an open visit or open request, immediately say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. If they want one moved or cancelled, update that one. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name. If no Open line remains, you may say nothing is still open.';
 }
 
 function formatReturningCallerForPrompt(card) {
@@ -659,7 +659,7 @@ function formatReturningCallerForPrompt(card) {
     );
     lines.push(
       mayHaveVisit
-        ? `- Use: confirm once, "Am I speaking with ${fileWho || 'the name on this number'}?" Do not greet them as that name. Do not describe the visit yet. Never say there is no booking, no visit, or nothing on file. If they confirm, name each Open visit in one sentence (job, when, place). If they say no, ask who is speaking and do not read this file. Answer what they just said.`
+        ? `- Use: confirm once, "Am I speaking with ${fileWho || 'the name on this number'}?" Do not greet them as that name. Do not talk about visits yet. If they say no, ask who is speaking and do not read this file. If they confirm, and open lines are listed, immediately say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. Answer what they just said.`
         : '- Use: do not ask who is speaking unless you are about to save something. Do not attach Open, Last, or History yet. Do not greet them as the file name. Answer what they just said.'
     );
   } else if (!usable) {
@@ -695,7 +695,7 @@ function formatReturningFileForCallState(returning) {
       return '- Caller file speaker: not bound. Shared line. Do not ask who is speaking unless you are about to save something. Do not use the file name. Do not attach Open or History. Answer what they just said.';
     }
     if (who) {
-      return `- Caller file speaker: not bound. Phone file for ${who}. Ask once: Am I speaking with ${who}? Do not greet them as that name. Do not describe a visit until they confirm. Never say there is no booking. If they say no, do not read this file. Answer what they just said.`;
+      return `- Caller file speaker: not bound. Phone file for ${who}. Ask once: Am I speaking with ${who}? Do not greet them as that name. Do not talk about visits yet. If they say no, do not read this file. Answer what they just said.`;
     }
     return '- Caller file speaker: not bound. Do not attach a visit until they say who they are. Answer what they just said.';
   }
@@ -731,7 +731,7 @@ function formatReturningFileForCallState(returning) {
   }
   if (visitLines.length || openRequests.length) {
     lines.push(
-      '- Caller file still open: when the caller has confirmed their name and CALL STATE lists an open visit or open request, immediately say the job, when, and place for every still-open line, and treat CALL STATE as fact. Name each open visit and open request in one sentence (job, when, place; only fields present). While any is listed, never say "I don\'t have a booking", "no booking", "no visit", or "nothing on file". If none remain listed, you may say nothing is open.'
+      '- Caller file still open: when the caller has confirmed their name and CALL STATE lists an open visit or open request, immediately say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. If none remain listed, you may say nothing is still open.'
     );
   }
   if (returning.lastReason) {
