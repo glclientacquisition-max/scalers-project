@@ -35,7 +35,15 @@ describe("business settings depth", () => {
   });
 
   it("uses job labels and example-only policy copy", () => {
-    assert.match(form, />When closed</);
+    assert.match(form, /label="On a call"/);
+    assert.doesNotMatch(form, />When closed</);
+    const modes = read("dashboard/src/lib/afterHours.ts");
+    assert.match(modes, /label: "Message only"/);
+    assert.match(modes, /label: "Full assistant"/);
+    assert.match(modes, /blurb: "Not ready"/);
+    assert.match(modes, /disabled: true/);
+    assert.doesNotMatch(modes, /Keep helping/);
+    assert.doesNotMatch(modes, /missing access|upgrade|Gemini|Soniox|GPT/i);
     assert.match(form, /title="When unsure"/);
     assert.match(form, /What to say/);
     assert.match(form, /placeholder="Wanjiku Mwangi"/);

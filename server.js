@@ -91,6 +91,7 @@ const {
   buildBrainCapabilities,
   formatAuthorityPolicy,
 } = require('./src/conversation/brainPolicy');
+const { applyMessageOnlyCapabilities } = require('./src/conversation/messageOnly');
 const { determineNextBestAction } = require('./src/conversation/nextBestAction');
 const { logBrainTrace } = require('./src/conversation/brainObservability');
 const {
@@ -357,15 +358,18 @@ function capabilitiesForProfile(profile = {}, parsedTools = null) {
   const ready = liveTransferReady({
     profile: { ...profile, agentTools: tools },
   });
-  return buildBrainCapabilities(
-    { ...profile, agentTools: tools },
-    {
-      createServiceRequest: true,
-      createAppointment: true,
-      updateAppointment: true,
-      notifyCallback: true,
-      liveTransfer: ready.ready,
-    }
+  return applyMessageOnlyCapabilities(
+    buildBrainCapabilities(
+      { ...profile, agentTools: tools },
+      {
+        createServiceRequest: true,
+        createAppointment: true,
+        updateAppointment: true,
+        notifyCallback: true,
+        liveTransfer: ready.ready,
+      }
+    ),
+    profile.afterHoursMode
   );
 }
 
@@ -3024,7 +3028,10 @@ mediaWss.on('connection', (ws, req) => {
         const confirmation = String(result.actionConfirmation).trim();
         const lookupSpoken = spokenChunks.join(' ').trim();
         // The lookup sentence is already on the stream. Do not speakText it.
-        if (!(spokeLookupSentence && confirmation === lookupSpoken)) {
+        const alreadySaid =
+          /take a message|nitachukua ujumbe/i.test(lookupSpoken) &&
+          /take a message|nitachukua ujumbe/i.test(confirmation);
+        if (!(spokeLookupSentence && confirmation === lookupSpoken) && !alreadySaid) {
           await actionProgressSpeak;
           callTranscript.pushAgent(result.actionConfirmation);
           await speakText(result.actionConfirmation);
