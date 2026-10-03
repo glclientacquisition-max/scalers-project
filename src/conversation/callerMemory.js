@@ -596,7 +596,7 @@ function openVisitLinesOf(card) {
 }
 
 function stillOpenUseLine() {
-  return '- Use: name each Open line in one sentence (job, when, place; only fields on that line). While any Open line is still listed, never say "I don\'t have a booking", "no booking", "no visit", or "nothing on file". If they want one moved or cancelled, update that one. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name. If no Open line remains, you may say nothing is open.';
+  return '- Use: when the caller has confirmed their name and CALL STATE lists an open visit or open request, immediately say the job, when, and place for every still-open line, and treat CALL STATE as fact; name each Open line in one sentence (job, when, place; only fields on that line). While any Open line is still listed, never say "I don\'t have a booking", "no booking", "no visit", or "nothing on file". If they want one moved or cancelled, update that one. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name. If no Open line remains, you may say nothing is open.';
 }
 
 function formatReturningCallerForPrompt(card) {
@@ -731,7 +731,7 @@ function formatReturningFileForCallState(returning) {
   }
   if (visitLines.length || openRequests.length) {
     lines.push(
-      '- Caller file still open: name each open visit and open request in one sentence (job, when, place; only fields present). While any is listed, never say "I don\'t have a booking", "no booking", "no visit", or "nothing on file". If none remain listed, you may say nothing is open.'
+      '- Caller file still open: when the caller has confirmed their name and CALL STATE lists an open visit or open request, immediately say the job, when, and place for every still-open line, and treat CALL STATE as fact. Name each open visit and open request in one sentence (job, when, place; only fields present). While any is listed, never say "I don\'t have a booking", "no booking", "no visit", or "nothing on file". If none remain listed, you may say nothing is open.'
     );
   }
   if (returning.lastReason) {

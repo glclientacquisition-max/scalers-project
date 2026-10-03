@@ -828,6 +828,34 @@ describe('returning-caller card', () => {
     const rules = buildSystemPrompt({ businessName: 'Scalers', agentName: 'A' });
     assert.match(rules, /While CALL STATE lists any open visit or open request/);
     assert.match(rules, /If those lines are gone, you may say nothing is open/);
+    assert.match(
+      rules,
+      /immediately say the job, when, and place for every still-open line, and treat CALL STATE as fact/
+    );
+    assert.match(rules, /never say there is no booking, no visit, or nothing on file/);
+
+    const confirmedTurn = buildSystemPrompt({
+      businessName: 'Scalers',
+      agentName: 'A',
+      callerMemory: yes,
+    });
+    assert.match(confirmedTurn, /Alvin \(bound; use this name\)/);
+    assert.match(confirmedTurn, /Open: request \| carpet cleaning \| tomorrow/);
+    assert.match(
+      confirmedTurn,
+      /If you append ONLY save_caller_info, you MUST speak your natural response and read any open visits still listed/
+    );
+    assert.match(
+      confirmedTurn,
+      /If you append create_service_request, create_appointment, or update_appointment, speak nothing/
+    );
+    assert.match(
+      confirmedTurn,
+      /If you append create_appointment or update_appointment, speak nothing/
+    );
+    assert.doesNotMatch(confirmedTurn, /If you append any tool this turn, speak nothing/);
+    assert.match(callState, /immediately say the job, when, and place for every still-open line/);
+    assert.match(callState, /treat CALL STATE as fact/);
   });
 
   it('names each still-open visit after confirm instead of filing the second as history', () => {
