@@ -475,7 +475,12 @@ function observeCallerTurn(state, input = {}) {
   );
   next.entities = { ...next.entities, ...nameResolution.entities };
   next.caller.name = nameResolution.name || null;
+  const wasNameConfirmed = Boolean(state?.caller?.nameConfirmed);
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
+  next.caller.nameJustConfirmed =
+    !wasNameConfirmed && next.caller.nameConfirmed
+      ? true
+      : Boolean(state?.caller?.nameJustConfirmed) && next.caller.nameConfirmed;
   next.caller.nameCollision = nameResolution.nameCollision || null;
   applyLiveCallerFile(input.profile, next);
   if (next.caller.name && !entityValue(next.entities.name)) {
