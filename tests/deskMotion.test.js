@@ -99,6 +99,7 @@ describe("desk motion canon", () => {
     assert.match(reduce, /\.desk-notice/);
     assert.match(reduce, /\.landing-rise/);
     assert.match(reduce, /\.landing-drift/);
+    assert.match(reduce, /\.landing-loop/);
     assert.match(reduce, /animation-duration: 0\.01ms !important/);
     assert.match(reduce, /transition-duration: 0\.01ms !important/);
     assert.match(master, /\*\*pending\*\*/);
