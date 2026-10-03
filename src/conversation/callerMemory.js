@@ -61,7 +61,10 @@ function buildCallerMemoryCard({
     .slice(0, 2)
     .map(clipRequestLine)
     .filter(Boolean);
-  const appointment = clipVisitLine(nextRow);
+  const openVisitLines = lived.open
+    .map((item) => clipVisitLine(item.row))
+    .filter(Boolean);
+  const appointment = openVisitLines[0] || null;
   const nextVisitService = nextRow
     ? clip(nextRow.service_name || nextRow.serviceName, 48) || null
     : null;
@@ -75,14 +78,12 @@ function buildCallerMemoryCard({
         48
       ) || null
     : null;
-  const recentRows = selectRecentAppointmentRows(
-    [...lived.history, ...lived.open.slice(1).map((item) => item.row)],
-    null
-  );
+  const extraOpenRows = lived.open.slice(1).map((item) => item.row);
+  const recentRows = selectRecentAppointmentRows(lived.history, null);
   const recentBookings = recentRows.map((row) => clipVisitLine(row)).filter(Boolean);
   const profile = clipCallerProfile(contact.metadata);
   const place = profile.landmark || nextVisitLandmark || derivePlace(recentRows);
-  const usualJob = profile.typicalJob || deriveUsualJob(recentRows, nextRow);
+  const usualJob = profile.typicalJob || deriveUsualJob([...recentRows, ...extraOpenRows], nextRow);
   const standing = profile.standing;
   const language = profile.language;
   const personProfiles = clipPersonProfiles(contact.metadata);
@@ -110,6 +111,7 @@ function buildCallerMemoryCard({
     lastReason: lastReason || null,
     notes: notes || null,
     openRequests: requests,
+    openVisits: openVisitLines,
     nextAppointment: appointment,
     nextVisitService,
     nextVisitWhen,
@@ -328,6 +330,7 @@ function snapshotHouseholdFile(card) {
     lastReason: card?.lastReason || null,
     notes: card?.notes || null,
     openRequests: Array.isArray(card?.openRequests) ? card.openRequests : [],
+    openVisits: Array.isArray(card?.openVisits) ? card.openVisits : [],
     nextAppointment: card?.nextAppointment || null,
     nextVisitService: card?.nextVisitService || null,
     nextVisitWhen: card?.nextVisitWhen || null,
@@ -497,6 +500,7 @@ function bindCallerMemoryCard(card, spokenName) {
       lastReason: householdFile.lastReason,
       notes: householdFile.notes,
       openRequests: householdFile.openRequests,
+      openVisits: householdFile.openVisits,
       nextAppointment: householdFile.nextAppointment,
       nextVisitService: householdFile.nextVisitService,
       nextVisitWhen: householdFile.nextVisitWhen,
@@ -514,6 +518,7 @@ function bindCallerMemoryCard(card, spokenName) {
     lastReason: null,
     notes: null,
     openRequests: [],
+    openVisits: [],
     nextAppointment: null,
     nextVisitService: null,
     nextVisitWhen: null,
@@ -553,6 +558,13 @@ function returningFileFromCard(card) {
     greetByName: Boolean(card.greetByName),
     name: card.name || null,
     lastReason: usable ? card.lastReason || null : null,
+    openVisits: !usable
+      ? []
+      : Array.isArray(card.openVisits)
+        ? card.openVisits
+        : card.nextAppointment
+          ? [card.nextAppointment]
+          : [],
     nextVisit: usable ? card.nextAppointment || null : null,
     nextVisitService: usable ? card.nextVisitService || null : null,
     nextVisitWhen: usable ? card.nextVisitWhen || null : null,
@@ -571,6 +583,20 @@ function returningFileFromCard(card) {
     filePending,
     phone: card.phone || null,
   };
+}
+
+function openVisitLinesOf(card) {
+  if (!card || typeof card !== 'object') return [];
+  if (Array.isArray(card.openVisits) && card.openVisits.length) {
+    return card.openVisits.filter(Boolean);
+  }
+  if (card.nextAppointment) return [card.nextAppointment];
+  if (card.nextVisit) return [card.nextVisit];
+  return [];
+}
+
+function stillOpenUseLine() {
+  return '- Use: name each Open line in one sentence (job, when, place; only fields on that line). While any Open line is still listed, never say "I don\'t have a booking", "no booking", "no visit", or "nothing on file". If they want one moved or cancelled, update that one. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name. If no Open line remains, you may say nothing is open.';
 }
 
 function formatReturningCallerForPrompt(card) {
@@ -599,8 +625,8 @@ function formatReturningCallerForPrompt(card) {
   ];
 
   if (usable) {
-    if (card.nextAppointment) {
-      lines.push(`- Open: visit | ${card.nextAppointment}`);
+    for (const line of openVisitLinesOf(card)) {
+      lines.push(`- Open: visit | ${line}`);
     }
     const openRequests = Array.isArray(card.openRequests) ? card.openRequests : [];
     for (const row of openRequests) {
@@ -640,10 +666,11 @@ function formatReturningCallerForPrompt(card) {
     lines.push(
       '- Use: this speaker does not own the household file. Do not attach that visit or last reason.'
     );
-  } else if (card.nextAppointment) {
-    lines.push(
-      '- Use: name the Open visit (job, when, status) before any change or keep. If they want it moved or cancelled, update that visit. Do not say there is no booking. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name.'
-    );
+  } else if (
+    openVisitLinesOf(card).length ||
+    (Array.isArray(card.openRequests) && card.openRequests.length)
+  ) {
+    lines.push(stillOpenUseLine());
   } else if (card.lastReason) {
     lines.push(
       '- Use: Last is the default job unless they name a new one. History only if they mention that job. Do not re-ask the name.'
@@ -688,14 +715,24 @@ function formatReturningFileForCallState(returning) {
   } else {
     lines.push('- Caller file speaker: bound. Do not re-ask the name.');
   }
-  if (returning.nextVisit) {
+  const visitLines = Array.isArray(returning.openVisits) && returning.openVisits.length
+    ? returning.openVisits.filter(Boolean)
+    : returning.nextVisit
+      ? [returning.nextVisit]
+      : [];
+  for (const visit of visitLines) {
     lines.push(
-      `- Caller file open visit: ${returning.nextVisit}. Speak to that visit. Do not create a second visit unless they ask for a new job.`
+      `- Caller file open visit: ${visit}. Speak to that visit. Do not create a second visit unless they ask for a new job.`
     );
   }
   const openRequests = Array.isArray(returning.openRequests) ? returning.openRequests : [];
   for (const row of openRequests) {
     lines.push(`- Caller file open request: ${row}`);
+  }
+  if (visitLines.length || openRequests.length) {
+    lines.push(
+      '- Caller file still open: name each open visit and open request in one sentence (job, when, place; only fields present). While any is listed, never say "I don\'t have a booking", "no booking", "no visit", or "nothing on file". If none remain listed, you may say nothing is open.'
+    );
   }
   if (returning.lastReason) {
     lines.push(
