@@ -111,7 +111,7 @@ describe('required escalate injection', () => {
       caller: { name: null },
     });
     assert.match(block, /name is missing/i);
-    assert.match(block, /Do NOT append escalate/i);
+    assert.match(block, /Do NOT call escalate/i);
   });
 
   it('maps floor manager reason to Floor Manager teammate', () => {

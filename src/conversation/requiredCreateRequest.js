@@ -330,7 +330,7 @@ function formatCreateRequestDirective(state = {}) {
 
   return [
     'REQUIRED ACTION THIS TURN (do not read aloud):',
-    `Slots are complete. Append the ${tool} ###TOOL### marker now.`,
+    `Slots are complete. Call the ${tool} function now.`,
     'Spoken line: speak nothing, or only Okay / Sawa. Never say booked, saved, held, moved, or cancelled. The backend speaks the outcome.',
   ].join('\n');
 }

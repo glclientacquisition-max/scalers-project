@@ -84,7 +84,7 @@ describe('file read is not a new job', () => {
     assert.equal(inferIntent(text, { vertical: 'home_services' }), 'cancellation');
   });
 
-  it('lets the model read a bound home file that has a visit', () => {
+  it('lets caller_file speak a bound home file that has a visit', () => {
     const card = {
       name: 'Alex',
       sharedLine: false,
@@ -102,10 +102,14 @@ describe('file read is not a new job', () => {
         profile: { vertical: 'home_services', callerMemory: card },
       }
     );
+    const local = reply('What are my bookings?', state);
     if (state.returning?.identityBound && state.returning?.nextVisit) {
-      assert.equal(reply('What are my bookings?', state), null);
+      assert.equal(local.outcome, 'file_read');
+      assert.equal(local.node, 'caller_file');
+      assert.match(local.line, /You have carpet/i);
+      assert.doesNotMatch(local.line, /don't have a booking/i);
     } else {
-      assert.equal(reply('What are my bookings?', state).line, "I don't have a booking for you.");
+      assert.equal(local.line, "I don't have a booking for you.");
     }
   });
 

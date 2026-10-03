@@ -39,6 +39,9 @@ const {
   warmFillerAckPcm,
 } = require('./src/speech/fillerPcmCache');
 const {
+  applyVoiceSocketCancel,
+} = require('./src/speech/voiceSocketCancel');
+const {
   isGreetingCacheEnabled,
   lookupGreetingPcm,
   putGreetingPcm,
@@ -73,6 +76,16 @@ const { bulletinClosureNotice } = require('./src/conversation/dailyBulletin');
 const { parseAgentTools } = require('./src/conversation/agentTools');
 const { parseGeminiResponse } = require('./src/conversation/toolMarkers');
 const {
+  geminiToolsConfig,
+  parseGeminiTools,
+  extractGeminiFunctionCalls,
+} = require('./src/conversation/geminiFunctions');
+const {
+  callerFileSpeech,
+  callerFileOwnsSpeech,
+  NODE_ID: CALLER_FILE_NODE,
+} = require('./src/conversation/callerFile');
+const {
   createBrainState,
   inferIntent,
   observeCallerTurn,
@@ -84,6 +97,7 @@ const {
   attachCallerMemory,
   liveCallerFileStamp,
 } = require('./src/conversation/callerMemory');
+const { formatNameConfirmSpeech, openLineHoldDecision } = require('./src/conversation/openLineSpeech');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const { collectKnownCallerNames } = require('./src/conversation/callerNameMatch');
 const {
@@ -120,6 +134,12 @@ const {
   nextGeminiStreamAttempt,
   resolvePrefetchedStreamSpeech,
   spokenTextForToolTurn,
+  partsHaveFunctionCalls,
+  HOLD_SPEECH_UNTIL_TOOLS_CLOSE,
+  isGeminiAbortError,
+  geminiTurnWasCancelled,
+  cancelledGeminiTurnResult,
+  takeGeminiVoiceStream,
 } = require('./src/conversation/geminiVoice');
 const {
   noteGeminiProviderError,
@@ -1752,6 +1772,12 @@ mediaWss.on('connection', (ws, req) => {
   let bargeCancelledText = '';
   let playbackGeneration = 0;
   let activePlaybackGeneration = 0;
+  /** In-flight Gemini request for this socket. Cancel aborts it. */
+  let activeGeminiAbort = null;
+  /** Bumped when a caller turn starts so a cancel can return to listen. */
+  let callerTurnSerial = 0;
+  /** Soniox reply stream opened before playback. Not cancelled unless it is playing. */
+  let replyPrefetchStreamId = null;
   let pendingUtterance = null;
   let systemPrompt = buildSystemPrompt();
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
@@ -2208,33 +2234,49 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
-  function cancelSpeech(reason) {
+  /**
+   * Barge-in and a future node change share this. Abort Gemini, drop the
+   * playing TTS stream only, kill queued bridge audio, and listen again.
+   * STT is not closed. A prefetched reply that is not playing is not cancelled.
+   */
+  function cancelInFlightVoice(reason) {
     const endingGen = activePlaybackGeneration;
     clearFillerTimer();
     idleNudge.clear();
+    bargeCancelledText = lastAgentText;
+    const plan = applyVoiceSocketCancel(
+      {
+        activeOutboundStreamId,
+        prefetchStreamId: replyPrefetchStreamId,
+        playbackGeneration,
+        geminiAbort: activeGeminiAbort,
+        tts,
+        abandonPlayback: () => agentReplay.abandonPlayback(),
+        clearMediaPlayback: () => clearMediaPlayback(ws),
+      },
+      reason
+    );
     bargeInActive = true;
     suppressReplyRemainder = true;
-    bargeCancelledText = lastAgentText;
-    playbackGeneration += 1;
+    playbackGeneration = plan.playbackGeneration;
     speaking = false;
+    turnBusy = false;
     interimBargeText = '';
     fillerStreamId = null;
     activeOutboundStreamId = null;
-    agentReplay.abandonPlayback();
-    console.log(`[ws/media][${sidLabel()}] barge-in cancel (${reason})`);
-    if (tts) {
-      try {
-        tts.cancel();
-      } catch {
-        /* ignore */
-      }
-    }
-    clearMediaPlayback(ws);
+    console.log(
+      `[ws/media][${sidLabel()}] voice cancel (${reason}) gen=${playbackGeneration}` +
+        (plan.cancelTtsId ? ` tts=${plan.cancelTtsId}` : ' tts=none')
+    );
     if (activeTurnTiming) {
       logTurnTiming(activeTurnTiming, { outcome: 'barge_in' });
       activeTurnTiming = null;
     }
     releaseQueuedCallerSpeech(endingGen);
+  }
+
+  function cancelSpeech(reason) {
+    cancelInFlightVoice(reason);
   }
 
   function discardUnspokenAssistant(reply) {
@@ -2398,6 +2440,9 @@ mediaWss.on('connection', (ws, req) => {
     }
 
     overlapHold.discardExcept(0);
+    let geminiController = null;
+    let turnAbortSignal = null;
+    const myTurn = ++callerTurnSerial;
     turnBusy = true;
     bargeInActive = false;
     const turnTiming = createVoiceTurnTiming(sidLabel());
@@ -2642,6 +2687,7 @@ mediaWss.on('connection', (ws, req) => {
           })
           .then((session) => {
             speakSession = session;
+            if (session?.streamId) replyPrefetchStreamId = session.streamId;
             console.log(`[ws/media][${sidLabel()}] llm→tts stream prefetched`);
             return session;
           })
@@ -2659,6 +2705,9 @@ mediaWss.on('connection', (ws, req) => {
         clearFillerTimer();
         if (!fillerStarted) return;
         fillerStarted = false;
+        // Voice cancel already dropped filler audio and bumped generation.
+        // Do not bump again if this turn was aborted — a newer listen may own playback.
+        if (bargeInActive || turnAbortSignal?.aborted) return;
         // Drop filler PCM via generation bump + cancel ONLY the filler stream.
         // Do NOT tts.cancel() with no id — that kills the prefetched reply stream.
         playbackGeneration += 1;
@@ -2727,12 +2776,8 @@ mediaWss.on('connection', (ws, req) => {
 
         const session = await ensureReplySpeakSession();
         if (!session || bargeInActive || suppressReplyRemainder) {
-          try {
-            session?.cancel();
-          } catch {
-            /* ignore */
-          }
-          speakSession = null;
+          // Not playing yet. Leave a prefetched stream up. The socket cancel
+          // already stopped the stream that was actually in the ear.
           return;
         }
 
@@ -2745,6 +2790,7 @@ mediaWss.on('connection', (ws, req) => {
           if (prev > 0) overlapHold.reassignPending(prev, activePlaybackGeneration);
         }
         activeOutboundStreamId = session.streamId;
+        if (replyPrefetchStreamId === session.streamId) replyPrefetchStreamId = null;
         speaking = true;
         if (/[.!?]$/.test(text)) bargeCancelledText = '';
 
@@ -2752,6 +2798,12 @@ mediaWss.on('connection', (ws, req) => {
         spokenChunks.push(text);
         lastAgentText = spokenChunks.join(' ');
       }
+
+      geminiController = new AbortController();
+      activeGeminiAbort = geminiController;
+      turnAbortSignal = geminiController.signal;
+      const turnWasCancelled = () =>
+        bargeInActive || Boolean(turnAbortSignal?.aborted);
 
       let result;
       let turnOutcome = 'ok';
@@ -2783,29 +2835,27 @@ mediaWss.on('connection', (ws, req) => {
         turnTiming.markLlmStart();
         result = await runGeminiTurnStreaming(messages, sidLabel(), turnSystemPrompt, {
           onSpokenChunk,
-          shouldAbort: () => bargeInActive,
+          abortSignal: turnAbortSignal,
+          shouldAbort: turnWasCancelled,
         });
         stopFillerForReply();
 
-        if (speakSession) {
-          if (bargeInActive) {
-            try {
-              speakSession.cancel();
-            } catch {
-              /* ignore */
-            }
-            console.log(`[ws/media][${sidLabel()}] discarding streamed reply after barge-in`);
-            discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
-            bargeInActive = false;
-            speakSession = null;
-            if (activePlaybackGeneration === streamPlaybackGen) {
-              speaking = false;
-              releaseQueuedCallerSpeech(streamPlaybackGen);
-            }
-            logTurnTiming(turnTiming, { outcome: 'barge_in' });
-            if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-            return;
+        if (turnWasCancelled() || result?.cancelled) {
+          // Do not cancel the prefetched reply here. cancelInFlightVoice
+          // already stopped the stream id that was playing.
+          console.log(`[ws/media][${sidLabel()}] discarding streamed reply after voice cancel`);
+          discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
+          speakSession = null;
+          if (callerTurnSerial === myTurn) bargeInActive = false;
+          if (activePlaybackGeneration === streamPlaybackGen && streamPlaybackGen) {
+            speaking = false;
           }
+          logTurnTiming(turnTiming, { outcome: 'barge_in' });
+          if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+          return;
+        }
+
+        if (speakSession) {
           const planned = resolvePrefetchedStreamSpeech({
             spokenChunks: spokenChunks.join(' '),
             spokenText: result?.spokenText,
@@ -2905,16 +2955,13 @@ mediaWss.on('connection', (ws, req) => {
                     : 'stream_fallback_full';
             }
           }
-        } else {
-          discardUnspokenAssistant(result?.spokenText || '');
-          bargeInActive = false;
-          logTurnTiming(turnTiming, { outcome: 'barge_in' });
-          if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-          return;
         }
       } else {
         turnTiming.markLlmStart();
-        result = await runGeminiTurn(messages, sidLabel(), turnSystemPrompt);
+        result = await runGeminiTurn(messages, sidLabel(), turnSystemPrompt, {
+          abortSignal: turnAbortSignal,
+          shouldAbort: turnWasCancelled,
+        });
         stopFillerForReply();
         if (speakSession) {
           try {
@@ -2931,10 +2978,10 @@ mediaWss.on('connection', (ws, req) => {
             : result?.timedOut || result?.llmFailed
               ? await speechWhenModelMissed(result, clean)
               : '');
-        if (bargeInActive) {
-          console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
+        if (bargeInActive || result?.cancelled) {
+          console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after voice cancel`);
           discardUnspokenAssistant(reply);
-          bargeInActive = false;
+          if (callerTurnSerial === myTurn) bargeInActive = false;
           logTurnTiming(turnTiming, { outcome: 'barge_in' });
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
@@ -3043,8 +3090,13 @@ mediaWss.on('connection', (ws, req) => {
         logTurnTiming(turnTiming, { outcome: 'early_return' });
         activeTurnTiming = null;
       }
-      turnBusy = false;
-      kickPendingTurn();
+      if (callerTurnSerial === myTurn) {
+        if (geminiController && activeGeminiAbort === geminiController) {
+          activeGeminiAbort = null;
+        }
+        turnBusy = false;
+        kickPendingTurn();
+      }
     }
   }
 
@@ -4398,7 +4450,8 @@ async function generateGeminiText({
   return text;
 }
 
-function geminiVoiceConfig(systemPrompt) {
+function geminiVoiceConfig(systemPrompt, { escalate = true, endCall = true } = {}) {
+  const tools = geminiToolsConfig({ escalate, endCall });
   return {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     // Slightly lower temp + shorter cap → faster, more consistent phone lines.
@@ -4408,6 +4461,71 @@ function geminiVoiceConfig(systemPrompt) {
     thinkingConfig: {
       thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'MINIMAL',
     },
+    ...tools,
+  };
+}
+
+/**
+ * After tools run: caller_file owns visit-existence speech for save_caller_info
+ * and file lookups. Other tool turns stay quiet (formatToolConfirmation speaks
+ * create/escalate outcomes). Never speak the model line and the code line for
+ * the same fact.
+ */
+function resolveToolTurnSpeech({
+  callSid,
+  parsed,
+  toolResults = [],
+  modelSpoken = '',
+  callerText = '',
+} = {}) {
+  const state = callBrainStates.get(callSid) || createBrainState();
+  const language = state.language?.current || 'en';
+  const outcomeConfirmation = formatToolConfirmation(toolResults, language);
+  const hold = holdCallerSpeech(callSid, [{ role: 'user', content: callerText }]);
+  // Name-confirm and an already-bound visit lookup: model stays quiet.
+  // formatNameConfirmSpeech reads the open lines. A tool outcome still wins.
+  if (hold.holdSpeech) {
+    if (hold.holdNameConfirm) clearNameJustConfirmed(callSid);
+    return {
+      spokenText: '',
+      actionConfirmation: outcomeConfirmation || nameConfirmSpeech(callSid),
+      holdSpeech: true,
+      holdSpeechUntilToolsClose: Boolean(parsed?.[HOLD_SPEECH_UNTIL_TOOLS_CLOSE]),
+      node: null,
+    };
+  }
+  const owns = callerFileOwnsSpeech({
+    state,
+    callerText,
+    toolResults,
+  });
+  let codeLine = '';
+  if (owns) {
+    const saved = (Array.isArray(toolResults) ? toolResults : []).some(
+      (result) =>
+        result?.action === 'save_caller_info' && result.status !== 'duplicate'
+    );
+    codeLine = callerFileSpeech({
+      state,
+      language,
+      mode: saved ? 'save' : 'lookup',
+      callerText,
+    });
+  }
+  const blanked = spokenTextForToolTurn({
+    spoken: modelSpoken,
+    toolResults,
+  });
+  const spokenText = polishSpokenReply(
+    codeLine || blanked,
+    finalSpeechGuardOpts(callSid, toolResults)
+  );
+  return {
+    spokenText,
+    actionConfirmation: outcomeConfirmation,
+    holdSpeech: false,
+    holdSpeechUntilToolsClose: Boolean(parsed?.[HOLD_SPEECH_UNTIL_TOOLS_CLOSE]),
+    node: owns ? CALLER_FILE_NODE : null,
   };
 }
 
@@ -4617,17 +4735,65 @@ async function applyGeminiTools(callSid, parsed) {
  * No audio yet: retry the same model once, then one backup model on 503.
  * Audio already started: do not restart. Credits and denied are not retried.
  */
+
+function voiceToolToggles(callSid) {
+  const tools = callAgentTools.get(callSid) || parseAgentTools(null);
+  return {
+    escalate: tools.escalate !== false,
+    endCall: tools.end_call !== false,
+  };
+}
+
+function nameJustConfirmed(callSid) {
+  return callBrainStates.get(callSid)?.caller?.nameJustConfirmed === true;
+}
+
+function latestCallerUtterance(messages) {
+  if (!Array.isArray(messages)) return '';
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === 'user') return String(messages[i].content || '');
+  }
+  return '';
+}
+
+function holdCallerSpeech(callSid, messages) {
+  const caller = callBrainStates.get(callSid)?.caller;
+  return openLineHoldDecision({
+    nameConfirmed: caller?.nameConfirmed === true,
+    nameJustConfirmed: nameJustConfirmed(callSid),
+    callerText: latestCallerUtterance(messages),
+  });
+}
+
+function clearNameJustConfirmed(callSid) {
+  const caller = callBrainStates.get(callSid)?.caller;
+  if (caller) caller.nameJustConfirmed = false;
+}
+
+function nameConfirmSpeech(callSid) {
+  const state = callBrainStates.get(callSid);
+  return formatNameConfirmSpeech({
+    openVisits: state?.returning?.openVisits,
+    openRequests: state?.returning?.openRequests,
+    language: state?.language?.current,
+  });
+}
+
 async function runGeminiTurnStreaming(
   messages,
   callSid,
   systemPrompt = buildSystemPrompt(),
-  { onSpokenChunk, shouldAbort } = {}
+  { onSpokenChunk, shouldAbort, abortSignal } = {}
 ) {
   const primary = geminiPrimaryModel();
   const backup = geminiBackupModel();
   const contents = buildGeminiContents(messages);
+  const hold = holdCallerSpeech(callSid, messages);
+  const holdSpeech = hold.holdSpeech;
   let model = primary;
-  let buffer = createSpokenStreamBuffer();
+  let buffer = createSpokenStreamBuffer(
+    holdSpeech ? { suppressFlush: true } : {}
+  );
   let fullText = '';
   let streamFailed = false;
   let streamErr = null;
@@ -4638,7 +4804,9 @@ async function runGeminiTurnStreaming(
 
   while (attempt < 3) {
     fullText = '';
-    buffer = createSpokenStreamBuffer();
+    buffer = createSpokenStreamBuffer(
+      holdSpeech ? { suppressFlush: true } : {}
+    );
     thoughtSignature = '';
     modelParts = [];
     streamErr = null;
@@ -4647,27 +4815,28 @@ async function runGeminiTurnStreaming(
       console.log(
         `[${callSid}] Calling Gemini stream (model: ${model}, attempt: ${attempt + 1}, messages: ${messages.length}, timeoutMs=${timeoutMs})`
       );
-      await withTimeout(
-        (async () => {
-          const stream = await getGeminiClient().models.generateContentStream({
-            model,
-            contents,
-            config: geminiVoiceConfig(systemPrompt),
-          });
-
-          for await (const chunk of stream) {
-            if (shouldAbort?.()) {
-              console.log(`[${callSid}] Gemini stream aborted (barge-in)`);
-              break;
-            }
+      const taken = await withTimeout(
+        takeGeminiVoiceStream({
+          client: getGeminiClient(),
+          model,
+          contents,
+          config: geminiVoiceConfig(systemPrompt, voiceToolToggles(callSid)),
+          abortSignal,
+          shouldAbort,
+          onChunk: async (chunk) => {
             modelParts = appendGeminiStreamParts(modelParts, chunk);
             thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
+            if (partsHaveFunctionCalls(extractGeminiParts(chunk))) {
+              buffer.setHoldSpeechUntilToolsClose(true);
+            }
             const delta = extractGeminiText(chunk);
-            if (!delta) continue;
+            if (!delta) return;
             fullText = joinSpokenPieces(fullText, delta);
-            const pieces = buffer.push(delta);
+            const pieces = buffer.push(delta, {
+              holdSpeechUntilToolsClose: buffer.getHoldSpeechUntilToolsClose(),
+            });
             for (const piece of pieces) {
-              if (shouldAbort?.()) break;
+              if (geminiTurnWasCancelled({ abortSignal, shouldAbort })) return;
               if (typeof onSpokenChunk === 'function') {
                 try {
                   await onSpokenChunk(piece);
@@ -4679,16 +4848,24 @@ async function runGeminiTurnStreaming(
                 }
               }
             }
-          }
-        })(),
+          },
+        }),
         timeoutMs,
         'Gemini stream'
       );
+      if (geminiTurnWasCancelled({ aborted: taken.aborted, abortSignal, shouldAbort })) {
+        console.log(`[${callSid}] Gemini stream aborted`);
+        return cancelledGeminiTurnResult();
+      }
       console.log(
         `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length}`
       );
       break;
     } catch (err) {
+      if (isGeminiAbortError(err) || geminiTurnWasCancelled({ abortSignal, shouldAbort })) {
+        console.log(`[${callSid}] Gemini stream aborted`);
+        return cancelledGeminiTurnResult();
+      }
       streamErr = err;
       const spoke = Boolean(String(fullText).trim());
       const next = nextGeminiStreamAttempt({
@@ -4739,65 +4916,84 @@ async function runGeminiTurnStreaming(
     };
   }
 
-  if (!shouldAbort?.()) {
-    for (const piece of buffer.finish()) {
-      if (typeof onSpokenChunk === 'function') {
-        try {
-          await onSpokenChunk(piece);
-        } catch (err) {
-          console.warn(
-            `[${callSid}] spoken chunk TTS failed:`,
-            err?.message || err
-          );
-        }
-      }
-    }
-  } else {
-    // Finalize buffer state without speaking remainder.
+  if (geminiTurnWasCancelled({ abortSignal, shouldAbort })) {
     buffer.finish();
+    return cancelledGeminiTurnResult();
   }
 
-  const parsed = parseGeminiResponse(fullText || buffer.getRaw());
+  for (const piece of buffer.finish()) {
+    if (geminiTurnWasCancelled({ abortSignal, shouldAbort })) break;
+    if (typeof onSpokenChunk === 'function') {
+      try {
+        await onSpokenChunk(piece);
+      } catch (err) {
+        console.warn(
+          `[${callSid}] spoken chunk TTS failed:`,
+          err?.message || err
+        );
+      }
+    }
+  }
+
+  if (geminiTurnWasCancelled({ abortSignal, shouldAbort })) {
+    return cancelledGeminiTurnResult();
+  }
+
+  const rawText = fullText || buffer.getRaw();
+  const parsed = parseGeminiTools({
+    text: rawText,
+    geminiParts: modelParts,
+    functionCalls: extractGeminiFunctionCalls(modelParts),
+  });
+  if (parsed.holdSpeechUntilToolsClose) {
+    buffer.setHoldSpeechUntilToolsClose(true);
+  }
   const execution = await safeApplyGeminiTools(callSid, parsed);
-  const actionConfirmation = formatToolConfirmation(
-    execution.results,
-    callBrainStates.get(callSid)?.language?.current || 'en'
-  );
-  const spokenText = polishSpokenReply(
-    spokenTextForToolTurn({
-      spoken: spokenTextWithoutToolFallback({
-        spoken: buffer.getSpokenEmitted() || parsed.spokenText,
-        actionConfirmation,
-      }),
-      toolResults: execution.results,
+  const speech = resolveToolTurnSpeech({
+    callSid,
+    parsed,
+    toolResults: execution.results,
+    callerText: latestCallerUtterance(messages),
+    modelSpoken: spokenTextWithoutToolFallback({
+      spoken: buffer.getSpokenEmitted() || parsed.spokenText,
+      actionConfirmation: '',
     }),
-    finalSpeechGuardOpts(callSid, execution.results)
-  );
+  });
 
   const geminiParts = modelPartsForHistory({
-    geminiParts: modelParts,
-    text: fullText || buffer.getRaw(),
+    geminiParts: speech.holdSpeech ? [] : modelParts,
+    text: speech.holdSpeech ? speech.actionConfirmation : rawText,
     thoughtSignature,
   });
   messages.push({
     role: 'assistant',
-    content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
+    content: [speech.spokenText, speech.actionConfirmation].filter(Boolean).join(' '),
     geminiParts,
     thoughtSignature: thoughtSignature || undefined,
   });
   return {
-    spokenText,
-    actionConfirmation,
+    spokenText: speech.spokenText,
+    actionConfirmation: speech.actionConfirmation,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
     streamed: !streamFailed,
+    holdSpeechUntilToolsClose: speech.holdSpeechUntilToolsClose,
+    node: speech.node,
   };
 }
 
 // Runs one turn of the conversation through Gemini, preserving the chat
 // history and executing the caller-info / end-call signals via structured
 // markers returned in the model output.
-async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt()) {
+async function runGeminiTurn(
+  messages,
+  callSid,
+  systemPrompt = buildSystemPrompt(),
+  { abortSignal, shouldAbort } = {}
+) {
+  if (geminiTurnWasCancelled({ abortSignal, shouldAbort })) {
+    return cancelledGeminiTurnResult();
+  }
   const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
   const maxAttempts = Math.max(1, Number(process.env.GEMINI_MAX_RETRIES || 3));
   let response;
@@ -4814,7 +5010,10 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
         getGeminiClient().models.generateContent({
           model,
           contents,
-          config: geminiVoiceConfig(systemPrompt),
+          config: {
+            ...geminiVoiceConfig(systemPrompt, voiceToolToggles(callSid)),
+            ...(abortSignal ? { abortSignal } : {}),
+          },
         }),
         geminiTurnTimeoutMs(),
         'Gemini generateContent'
@@ -4824,6 +5023,10 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
       noteGeminiProviderOk();
       break;
     } catch (err) {
+      if (isGeminiAbortError(err) || geminiTurnWasCancelled({ abortSignal, shouldAbort })) {
+        console.log(`[${callSid}] Gemini generateContent aborted`);
+        return cancelledGeminiTurnResult();
+      }
       lastErr = err;
       noteGeminiProviderError(classifyGeminiError(err), err);
       const retryable = !isTimeoutError(err) && isRetryableGeminiError(err);
@@ -4851,41 +5054,48 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
     };
   }
 
+  if (geminiTurnWasCancelled({ abortSignal, shouldAbort })) {
+    return cancelledGeminiTurnResult();
+  }
+
   const outputText = extractGeminiText(response);
-  const parsed = parseGeminiResponse(outputText);
+  const responseParts = extractGeminiParts(response);
+  const parsed = parseGeminiTools({
+    text: outputText,
+    geminiParts: responseParts,
+    functionCalls: extractGeminiFunctionCalls(responseParts),
+  });
   const execution = await safeApplyGeminiTools(callSid, parsed);
-  const actionConfirmation = formatToolConfirmation(
-    execution.results,
-    callBrainStates.get(callSid)?.language?.current || 'en'
-  );
-  const spokenText = polishSpokenReply(
-    spokenTextForToolTurn({
-      spoken: spokenTextWithoutToolFallback({
-        spoken: parsed.spokenText,
-        actionConfirmation,
-      }),
-      toolResults: execution.results,
+  const speech = resolveToolTurnSpeech({
+    callSid,
+    parsed,
+    toolResults: execution.results,
+    callerText: latestCallerUtterance(messages),
+    modelSpoken: spokenTextWithoutToolFallback({
+      spoken: parsed.spokenText,
+      actionConfirmation: '',
     }),
-    finalSpeechGuardOpts(callSid, execution.results)
-  );
+  });
 
   const thoughtSignature = extractThoughtSignature(response) || undefined;
   messages.push({
     role: 'assistant',
-    content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
+    content: [speech.spokenText, speech.actionConfirmation].filter(Boolean).join(' '),
     geminiParts: modelPartsForHistory({
-      geminiParts: extractGeminiParts(response),
-      text: outputText,
+      geminiParts: speech.holdSpeech ? [] : responseParts,
+      text: speech.holdSpeech ? speech.actionConfirmation : outputText,
       thoughtSignature,
     }),
     thoughtSignature,
   });
 
   return {
-    spokenText,
-    actionConfirmation,
+    spokenText: speech.spokenText,
+    actionConfirmation: speech.actionConfirmation,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
+    holdSpeechUntilToolsClose: speech.holdSpeechUntilToolsClose,
+    node: speech.node,
   };
 }
 

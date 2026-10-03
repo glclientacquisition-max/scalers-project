@@ -36,8 +36,12 @@ function stripMarkersForSpeech(raw, opts = {}) {
   const final = Boolean(opts.final);
   let s = String(raw || '');
 
-  // Drop completed tool payloads.
+  // Drop completed tool payloads and bare tool JSON the model printed as text.
   s = s.replace(/###TOOL###[\s\S]*?###ENDTOOL###/gi, '');
+  s = s.replace(
+    /\{\s*"(?:save_caller_info|create_service_request|create_appointment|update_appointment|escalate|end_call)"\s*:[\s\S]*?\}\s*/g,
+    ''
+  );
 
   if (final) {
     s = s.replace(/###ENDCALL###/gi, '');
@@ -49,8 +53,11 @@ function stripMarkersForSpeech(raw, opts = {}) {
     const toolStart = s.search(/###\s*TOOL###/i);
     const endStart = s.search(/###\s*END/i);
     const hashStart = s.search(/###\s*$/);
+    const jsonStart = s.search(
+      /\{\s*"(?:save_caller_info|create_service_request|create_appointment|update_appointment|escalate|end_call)"\s*:/
+    );
     let cut = s.length;
-    for (const idx of [toolStart, endStart, hashStart]) {
+    for (const idx of [toolStart, endStart, hashStart, jsonStart]) {
       if (idx >= 0 && idx < cut) cut = idx;
     }
     s = s.slice(0, cut);
@@ -205,22 +212,32 @@ function findPendingText(speakable, emittedSpoken) {
 function createSpokenStreamBuffer(opts = {}) {
   let raw = '';
   let emittedSpoken = '';
+  let holdSpeechUntilToolsClose = Boolean(opts.holdSpeechUntilToolsClose);
   const earlyFlushChars = opts.earlyFlushChars;
   const earlyFlushWords = opts.earlyFlushWords;
+  // Name-confirm turns must not send a sentence to speech before the tool
+  // block closes. A finished denial would already be in the caller's ear.
+  const suppressFlush = Boolean(opts.suppressFlush);
 
   /**
    * @param {string} delta
-   * @param {{ final?: boolean }} [pushOpts]
+   * @param {{ final?: boolean, holdSpeechUntilToolsClose?: boolean }} [pushOpts]
    * @returns {string[]} newly flushable spoken chunks
    */
   function push(delta, pushOpts = {}) {
     if (delta) raw = joinSpokenPieces(raw, delta);
+    if (pushOpts.holdSpeechUntilToolsClose === true) {
+      holdSpeechUntilToolsClose = true;
+    } else if (pushOpts.holdSpeechUntilToolsClose === false) {
+      holdSpeechUntilToolsClose = false;
+    }
+    if (suppressFlush) return [];
     const final = Boolean(pushOpts.final);
     const speakable = stripMarkersForSpeech(raw, { final });
 
-    // Backend confirmation speaks the tool outcome. Do not flush leftover
-    // model prose after a complete tool block (accept-then-object on live calls).
-    if (hasCompleteToolBlock(raw)) {
+    // Native function-call turns and ###TOOL### blocks: do not speak until
+    // the turn's tool parts are closed. Voice binds to holdSpeechUntilToolsClose.
+    if (holdSpeechUntilToolsClose || hasCompleteToolBlock(raw) || hasBareToolJson(raw)) {
       const pending = findPendingText(speakable, emittedSpoken);
       if (pending) {
         emittedSpoken = `${emittedSpoken} ${pending}`.replace(/\s+/g, ' ').trim();
@@ -252,6 +269,7 @@ function createSpokenStreamBuffer(opts = {}) {
   }
 
   function finish() {
+    if (suppressFlush) return [];
     return push('', { final: true });
   }
 
@@ -263,13 +281,29 @@ function createSpokenStreamBuffer(opts = {}) {
     return emittedSpoken.trim();
   }
 
+  function setHoldSpeechUntilToolsClose(value) {
+    holdSpeechUntilToolsClose = Boolean(value);
+  }
+
+  function getHoldSpeechUntilToolsClose() {
+    return holdSpeechUntilToolsClose;
+  }
+
   return {
     push,
     finish,
     getRaw,
     getSpokenEmitted,
     stripMarkersForSpeech,
+    setHoldSpeechUntilToolsClose,
+    getHoldSpeechUntilToolsClose,
   };
+}
+
+function hasBareToolJson(raw) {
+  return /\{\s*"(?:save_caller_info|create_service_request|create_appointment|update_appointment|escalate|end_call)"\s*:/i.test(
+    String(raw || '')
+  );
 }
 
 module.exports = {
@@ -277,4 +311,5 @@ module.exports = {
   stripMarkersForSpeech,
   splitSpeakableChunks,
   createSpokenStreamBuffer,
+  hasBareToolJson,
 };

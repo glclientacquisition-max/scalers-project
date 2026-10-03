@@ -470,7 +470,12 @@ function observeCallerTurn(state, input = {}) {
   );
   next.entities = { ...next.entities, ...nameResolution.entities };
   next.caller.name = nameResolution.name || null;
+  const wasNameConfirmed = Boolean(state?.caller?.nameConfirmed);
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
+  next.caller.nameJustConfirmed =
+    !wasNameConfirmed && next.caller.nameConfirmed
+      ? true
+      : Boolean(state?.caller?.nameJustConfirmed) && next.caller.nameConfirmed;
   next.caller.nameCollision = nameResolution.nameCollision || null;
   applyLiveCallerFile(input.profile, next);
   if (next.caller.name && !entityValue(next.entities.name)) {
@@ -919,13 +924,13 @@ function formatNameConfirmForPrompt(state) {
     : [];
   if (pair.length >= 2) {
     const heard = name || pair[0];
-    return `- Name collision: heard ${heard}. Ask once: ${pair.join(' or ')}? Do not guess. Do not append save_caller_info until they pick one or spell it.`;
+    return `- Name collision: heard ${heard}. Ask once: ${pair.join(' or ')}? Do not guess. Do not call save_caller_info until they pick one or spell it.`;
   }
   if (!name) return '';
   if (state?.caller?.nameConfirmed) {
-    return `- Caller name: ${name} (confirmed). Use this spelling. Do not ask for the name again. Do not ask if the name is right. You may append save_caller_info with this confirmed name.`;
+    return `- Caller name: ${name} (confirmed). Use this spelling. Do not ask for the name again. Do not ask if the name is right. You may call save_caller_info with this confirmed name.`;
   }
-  return `- Caller name is known (${name}). Do not ask for the name again. Do not ask "is that right?". Continue the next missing slot. Do not append save_caller_info until they confirm, correct, or continue.`;
+  return `- Caller name is known (${name}). Do not ask for the name again. Do not ask "is that right?". Continue the next missing slot. Do not call save_caller_info until they confirm, correct, or continue.`;
 }
 
 function formatHearAgainForPrompt(state) {

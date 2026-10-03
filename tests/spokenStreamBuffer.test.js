@@ -266,3 +266,14 @@ if (process.exitCode) {
 } else {
   console.log(`\nAll ${passed} tests passed.`);
 }
+
+test('name-confirm hold does not speak a denial before the tool block', () => {
+  const buf = createSpokenStreamBuffer({ suppressFlush: true });
+  assert.deepStrictEqual(buf.push("I don't have a booking for you. "), []);
+  assert.deepStrictEqual(
+    buf.push('###TOOL###{"save_caller_info":{"name":"Alvin"}}###ENDTOOL###'),
+    []
+  );
+  assert.deepStrictEqual(buf.finish(), []);
+  assert.strictEqual(buf.getSpokenEmitted(), '');
+});

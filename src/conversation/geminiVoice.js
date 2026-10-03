@@ -47,9 +47,35 @@ function cloneGeminiPart(part) {
   if (part.thought === true) cloned.thought = true;
   const signature = part.thoughtSignature || part.thought_signature;
   if (signature) cloned.thoughtSignature = String(signature);
-  if (!cloned.text && !cloned.thoughtSignature && !cloned.thought) return null;
+  const functionCall = part.functionCall || part.function_call;
+  if (functionCall && typeof functionCall === 'object') {
+    cloned.functionCall = {
+      name: String(functionCall.name || '').trim(),
+      args:
+        functionCall.args && typeof functionCall.args === 'object'
+          ? functionCall.args
+          : functionCall.arguments && typeof functionCall.arguments === 'object'
+            ? functionCall.arguments
+            : {},
+    };
+  }
+  if (
+    !cloned.text &&
+    !cloned.thoughtSignature &&
+    !cloned.thought &&
+    !cloned.functionCall
+  ) {
+    return null;
+  }
   const cleaned = sanitizePartText(cloned);
-  if (!cleaned.text && !cleaned.thoughtSignature && !cleaned.thought) return null;
+  if (
+    !cleaned.text &&
+    !cleaned.thoughtSignature &&
+    !cleaned.thought &&
+    !cleaned.functionCall
+  ) {
+    return null;
+  }
   return cleaned;
 }
 
@@ -104,7 +130,18 @@ function buildGeminiContents(messages, windowSize = CONTEXT_WINDOW) {
     const role = message.role === 'assistant' ? 'model' : 'user';
     let parts;
     if (role === 'model' && Array.isArray(message.geminiParts) && message.geminiParts.length) {
-      parts = message.geminiParts.map(cloneGeminiPart).filter(Boolean);
+      // Day-one: we execute tools ourselves and speak the code line. Do not
+      // replay functionCall parts without a matching functionResponse.
+      parts = message.geminiParts
+        .map(cloneGeminiPart)
+        .filter(Boolean)
+        .map((part) => {
+          if (!part.functionCall) return part;
+          const { functionCall, ...rest } = part;
+          void functionCall;
+          return rest.text || rest.thoughtSignature || rest.thought ? rest : null;
+        })
+        .filter(Boolean);
     } else {
       const part = { text: String(message.content || '') };
       if (role === 'model' && message.thoughtSignature) {
@@ -246,10 +283,18 @@ const OUTCOME_TOOL_ACTIONS = new Set([
   'update_appointment',
   'escalate',
   'tool_request',
+  'save_caller_info',
 ]);
 
 /**
+ * Hold flag name Voice binds to: do not speak until this turn's function-call
+ * parts are closed. Set on the turn result / buffer so the media loop can wait.
+ */
+const HOLD_SPEECH_UNTIL_TOOLS_CLOSE = 'holdSpeechUntilToolsClose';
+
+/**
  * Action-capable turns use the deterministic backend confirmation.
+ * save_caller_info also blanks model prose — caller_file speaks open rows.
  * Model prose must not claim success (or object) before execution finishes.
  */
 function spokenTextForToolTurn({ spoken = '', toolResults = [] } = {}) {
@@ -259,6 +304,17 @@ function spokenTextForToolTurn({ spoken = '', toolResults = [] } = {}) {
   );
   if (freshOutcome) return '';
   return String(spoken || '').trim();
+}
+
+function partsHaveFunctionCalls(parts) {
+  if (!Array.isArray(parts)) return false;
+  return parts.some(
+    (part) => part && (part.functionCall || part.function_call)
+  );
+}
+
+function holdSpeechFlag(value = true) {
+  return { [HOLD_SPEECH_UNTIL_TOOLS_CLOSE]: Boolean(value) };
 }
 
 function resolvePrefetchedStreamSpeech({
@@ -287,9 +343,101 @@ function resolvePrefetchedStreamSpeech({
   return { alreadySpoken: false, reply: '', speakNow: false };
 }
 
+
+function isGeminiAbortError(err) {
+  if (!err) return false;
+  if (err.name === 'AbortError') return true;
+  const msg = String(err.message || '');
+  return /operation was aborted|request was aborted|the user aborted/i.test(msg);
+}
+
+/**
+ * A cancelled voice turn must not execute markers that already arrived.
+ * AbortSignal is the request cancel. shouldAbort covers the socket latch.
+ */
+function geminiTurnWasCancelled({ aborted = false, abortSignal, shouldAbort } = {}) {
+  return Boolean(aborted || abortSignal?.aborted || shouldAbort?.());
+}
+
+function cancelledGeminiTurnResult() {
+  return {
+    spokenText: '',
+    actionConfirmation: '',
+    toolResults: [],
+    shouldEndCall: false,
+    streamed: false,
+    cancelled: true,
+    llmFailed: false,
+    timedOut: false,
+  };
+}
+
+/**
+ * Pull a Gemini stream until it ends or the abort signal fires.
+ * Breaking the loop is not the cancel. The signal has to reject the
+ * blocked read so the caller turn does not sit until the stream times out.
+ */
+async function readGeminiStreamUntilAbort({
+  stream,
+  abortSignal,
+  shouldAbort,
+  onChunk,
+} = {}) {
+  let consumed = 0;
+  const aborting = () => Boolean(abortSignal?.aborted || shouldAbort?.());
+  if (aborting()) return { aborted: true, consumed };
+  try {
+    for await (const chunk of stream) {
+      if (aborting()) return { aborted: true, consumed };
+      consumed += 1;
+      if (typeof onChunk === 'function') await onChunk(chunk);
+      if (aborting()) return { aborted: true, consumed };
+    }
+  } catch (err) {
+    if (isGeminiAbortError(err) || aborting()) {
+      return { aborted: true, consumed, err };
+    }
+    throw err;
+  }
+  if (aborting()) return { aborted: true, consumed };
+  return { aborted: false, consumed };
+}
+
+/**
+ * Open generateContentStream with the caller's AbortSignal on the request.
+ */
+async function takeGeminiVoiceStream({
+  client,
+  model,
+  contents,
+  config,
+  abortSignal,
+  shouldAbort,
+  onChunk,
+} = {}) {
+  if (geminiTurnWasCancelled({ abortSignal, shouldAbort })) {
+    return { aborted: true, consumed: 0 };
+  }
+  const stream = await client.models.generateContentStream({
+    model,
+    contents,
+    config: {
+      ...(config || {}),
+      ...(abortSignal ? { abortSignal } : {}),
+    },
+  });
+  return readGeminiStreamUntilAbort({
+    stream,
+    abortSignal,
+    shouldAbort,
+    onChunk,
+  });
+}
+
 module.exports = {
   CONTEXT_WINDOW,
   DEFAULT_TURN_TIMEOUT_MS,
+  HOLD_SPEECH_UNTIL_TOOLS_CLOSE,
   geminiTurnTimeoutMs,
   extractGeminiText,
   extractThoughtSignature,
@@ -310,4 +458,11 @@ module.exports = {
   resolvePrefetchedStreamSpeech,
   OUTCOME_TOOL_ACTIONS,
   spokenTextForToolTurn,
+  partsHaveFunctionCalls,
+  holdSpeechFlag,
+  isGeminiAbortError,
+  geminiTurnWasCancelled,
+  cancelledGeminiTurnResult,
+  readGeminiStreamUntilAbort,
+  takeGeminiVoiceStream,
 };

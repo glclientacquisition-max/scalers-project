@@ -101,7 +101,7 @@ function formatEscalateActionDirective(state = {}) {
     const connect = action === 'TRANSFER';
     return [
       'REQUIRED ACTION THIS TURN (do not read aloud):',
-      `Caller name is known (${name}). Append the escalate ###TOOL### marker now.`,
+      `Caller name is known (${name}). Call the escalate function now.`,
       connect
         ? 'Spoken line: say only that you will try to connect them. Never claim the transfer is done.'
         : 'Do not only share a WhatsApp or phone number — the escalate tool must fire so the team is notified.',
@@ -123,7 +123,7 @@ function formatEscalateActionDirective(state = {}) {
       'REQUIRED ACTION THIS TURN:',
       'Caller asked for a human / manager but name is missing.',
       'Ask only for their name in one short sentence.',
-      'Do NOT append escalate until the name is known.',
+      'Do NOT call escalate until the name is known.',
       'Do not invent that you already notified anyone.',
     ].join('\n');
   }
