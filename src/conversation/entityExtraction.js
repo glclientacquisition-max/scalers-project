@@ -102,6 +102,12 @@ function cleanNameCapture(raw, opts = {}) {
   });
 }
 
+function looksLikeCompliment(text) {
+  return /\b(?:i'?m|i am)\s+(?:so\s+|very\s+|really\s+|quite\s+|just\s+)?(?:impressed|happy|glad|pleased|grateful|thankful|amazed|delighted)\b/i.test(
+    String(text || '')
+  );
+}
+
 function extractName(text, opts = {}) {
   const raw = String(text || '');
   const spelled = parseSpelledCallerName(raw);
@@ -137,10 +143,11 @@ function extractName(text, opts = {}) {
     /\b(?:i'?m|i am)\s+([\p{L}'’-]+)(?:\s+([\p{L}'’-]+))?(?:\s+([\p{L}'’-]+))?/iu.exec(
       raw
     );
-  if (im) {
+  // "I'm impressed by your work" is not a name. "I'm Alvin" still is.
+  if (im && !looksLikeCompliment(raw)) {
     const collected = [];
     for (const word of [im[1], im[2], im[3]].filter(Boolean)) {
-      if (/^(and|na|calling|looking|from|in|at|to|for|who|that)$/i.test(word)) break;
+      if (/^(and|na|calling|looking|from|in|at|to|for|who|that|by|your|with|about|of|work)$/i.test(word)) break;
       collected.push(word);
     }
     const value = collected.join(' ');
@@ -232,6 +239,14 @@ function fileLockedName(name, knownNames = []) {
  * STT variants of a known name fold to that spelling instead of overwriting.
  * Collision pairs (Colin/Collins) stay unconfirmed until the caller picks or spells.
  */
+function agentAskedPendingName(lastAgentText, pendingName) {
+  const asked = String(lastAgentText || '');
+  const pending = String(pendingName || '').trim();
+  if (!asked || !pending) return false;
+  const escaped = pending.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`am i speaking with\\s+${escaped}`, 'i').test(asked);
+}
+
 function applyCallerNameConfirmation(
   previous = {},
   text = '',
@@ -306,6 +321,14 @@ function applyCallerNameConfirmation(
       previous?.entities?.name?.source || 'caller_explicit',
       0.95
     );
+  }
+
+  if (!prevName && !extracted && isNameAffirmation(text)) {
+    const pending = String(opts.pendingFileName || '').trim();
+    if (pending && agentAskedPendingName(opts.lastAgentText, pending)) {
+      const locked = fileLockedName(pending, knownNames) || pending;
+      return done(locked, true, 'caller_file', 0.95);
+    }
   }
 
   if (!prevName && extracted) {
@@ -516,6 +539,13 @@ function isPlausibleCallerName(value) {
   }
   const words = name.split(/\s+/);
   if (words.some((word) => NAME_BLOCKLIST.has(word.toLowerCase()))) return false;
+  if (/^(?:impressed|amazed|delighted|grateful|thankful|pleased)$/i.test(lower)) return false;
+  if (
+    /\b(?:impressed|amazed|delighted|grateful|thankful|pleased|glad)\b/i.test(lower) &&
+    /\b(?:by|your|with|about|work)\b/i.test(lower)
+  ) {
+    return false;
+  }
   if (words.length > 3) return false;
   if (/\d/.test(name)) return false;
   if (!/^[\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,2}$/u.test(name)) {
@@ -802,6 +832,7 @@ module.exports = {
   entity,
   findCatalogMatch,
   extractName,
+  looksLikeCompliment,
   extractCorrectedName,
   isNameAffirmation,
   isNameNegation,
