@@ -84,6 +84,7 @@ const {
   attachCallerMemory,
   liveCallerFileStamp,
 } = require('./src/conversation/callerMemory');
+const { formatNameConfirmSpeech } = require('./src/conversation/openLineSpeech');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const { collectKnownCallerNames } = require('./src/conversation/callerNameMatch');
 const {
@@ -4617,6 +4618,25 @@ async function applyGeminiTools(callSid, parsed) {
  * No audio yet: retry the same model once, then one backup model on 503.
  * Audio already started: do not restart. Credits and denied are not retried.
  */
+
+function nameJustConfirmed(callSid) {
+  return callBrainStates.get(callSid)?.caller?.nameJustConfirmed === true;
+}
+
+function clearNameJustConfirmed(callSid) {
+  const caller = callBrainStates.get(callSid)?.caller;
+  if (caller) caller.nameJustConfirmed = false;
+}
+
+function nameConfirmSpeech(callSid) {
+  const state = callBrainStates.get(callSid);
+  return formatNameConfirmSpeech({
+    openVisits: state?.returning?.openVisits,
+    openRequests: state?.returning?.openRequests,
+    language: state?.language?.current,
+  });
+}
+
 async function runGeminiTurnStreaming(
   messages,
   callSid,
@@ -4626,8 +4646,11 @@ async function runGeminiTurnStreaming(
   const primary = geminiPrimaryModel();
   const backup = geminiBackupModel();
   const contents = buildGeminiContents(messages);
+  const holdNameConfirm = nameJustConfirmed(callSid);
   let model = primary;
-  let buffer = createSpokenStreamBuffer();
+  let buffer = createSpokenStreamBuffer(
+    holdNameConfirm ? { suppressFlush: true } : {}
+  );
   let fullText = '';
   let streamFailed = false;
   let streamErr = null;
@@ -4638,7 +4661,9 @@ async function runGeminiTurnStreaming(
 
   while (attempt < 3) {
     fullText = '';
-    buffer = createSpokenStreamBuffer();
+    buffer = createSpokenStreamBuffer(
+      holdNameConfirm ? { suppressFlush: true } : {}
+    );
     thoughtSignature = '';
     modelParts = [];
     streamErr = null;
@@ -4759,24 +4784,31 @@ async function runGeminiTurnStreaming(
 
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
   const execution = await safeApplyGeminiTools(callSid, parsed);
-  const actionConfirmation = formatToolConfirmation(
+  const outcomeConfirmation = formatToolConfirmation(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
-  const spokenText = polishSpokenReply(
-    spokenTextForToolTurn({
-      spoken: spokenTextWithoutToolFallback({
-        spoken: buffer.getSpokenEmitted() || parsed.spokenText,
-        actionConfirmation,
-      }),
-      toolResults: execution.results,
-    }),
-    finalSpeechGuardOpts(callSid, execution.results)
-  );
+  const actionConfirmation =
+    holdNameConfirm && !outcomeConfirmation
+      ? nameConfirmSpeech(callSid)
+      : outcomeConfirmation;
+  const spokenText = holdNameConfirm
+    ? ''
+    : polishSpokenReply(
+        spokenTextForToolTurn({
+          spoken: spokenTextWithoutToolFallback({
+            spoken: buffer.getSpokenEmitted() || parsed.spokenText,
+            actionConfirmation,
+          }),
+          toolResults: execution.results,
+        }),
+        finalSpeechGuardOpts(callSid, execution.results)
+      );
+  if (holdNameConfirm) clearNameJustConfirmed(callSid);
 
   const geminiParts = modelPartsForHistory({
-    geminiParts: modelParts,
-    text: fullText || buffer.getRaw(),
+    geminiParts: holdNameConfirm ? [] : modelParts,
+    text: holdNameConfirm ? actionConfirmation : fullText || buffer.getRaw(),
     thoughtSignature,
   });
   messages.push({
@@ -4854,28 +4886,36 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
   const outputText = extractGeminiText(response);
   const parsed = parseGeminiResponse(outputText);
   const execution = await safeApplyGeminiTools(callSid, parsed);
-  const actionConfirmation = formatToolConfirmation(
+  const holdNameConfirm = nameJustConfirmed(callSid);
+  const outcomeConfirmation = formatToolConfirmation(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
-  const spokenText = polishSpokenReply(
-    spokenTextForToolTurn({
-      spoken: spokenTextWithoutToolFallback({
-        spoken: parsed.spokenText,
-        actionConfirmation,
-      }),
-      toolResults: execution.results,
-    }),
-    finalSpeechGuardOpts(callSid, execution.results)
-  );
+  const actionConfirmation =
+    holdNameConfirm && !outcomeConfirmation
+      ? nameConfirmSpeech(callSid)
+      : outcomeConfirmation;
+  const spokenText = holdNameConfirm
+    ? ''
+    : polishSpokenReply(
+        spokenTextForToolTurn({
+          spoken: spokenTextWithoutToolFallback({
+            spoken: parsed.spokenText,
+            actionConfirmation,
+          }),
+          toolResults: execution.results,
+        }),
+        finalSpeechGuardOpts(callSid, execution.results)
+      );
+  if (holdNameConfirm) clearNameJustConfirmed(callSid);
 
   const thoughtSignature = extractThoughtSignature(response) || undefined;
   messages.push({
     role: 'assistant',
     content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
     geminiParts: modelPartsForHistory({
-      geminiParts: extractGeminiParts(response),
-      text: outputText,
+      geminiParts: holdNameConfirm ? [] : extractGeminiParts(response),
+      text: holdNameConfirm ? actionConfirmation : outputText,
       thoughtSignature,
     }),
     thoughtSignature,
