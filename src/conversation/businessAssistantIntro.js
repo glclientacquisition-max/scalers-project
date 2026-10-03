@@ -216,6 +216,10 @@ function composeBusinessAssistantIntro(opts = {}) {
     return `${identity} ${invite}We're closed now. ${help}`;
   }
 
+  if (afterHoursMode === 'message') {
+    return `${identity} ${invite}I can take a message. ${nameAsk}`;
+  }
+
   return `${identity} ${invite}${help}`;
 }
 

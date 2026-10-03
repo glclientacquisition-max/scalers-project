@@ -273,6 +273,26 @@ function updateReady(payload) {
  */
 function ensureRequiredCreateRequest(parsed, state = {}, capabilities = {}) {
   const next = parsed && typeof parsed === 'object' ? { ...parsed } : {};
+  if (capabilities.messageOnly || state.messageOnly) {
+    delete next.appointment;
+    delete next.appointmentUpdate;
+    const type = String(next.serviceRequest?.type || '').trim().toLowerCase();
+    if (next.serviceRequest && type !== 'callback') delete next.serviceRequest;
+    if (next.serviceRequest) {
+      const notes = String(next.serviceRequest.notes || '').trim();
+      const item = String(next.serviceRequest.item || '').trim();
+      const whenText = String(
+        next.serviceRequest.whenText || next.serviceRequest.when_text || ''
+      ).trim();
+      next.serviceRequest = {
+        ...next.serviceRequest,
+        whenText: '',
+        when_text: '',
+        notes: notes || (!item ? whenText : notes),
+      };
+    }
+    return next;
+  }
   const action = String(state.resolution?.nextBestAction || '');
   if (action !== 'CREATE_REQUEST') return next;
   if (!slotsComplete(state)) return next;
@@ -310,6 +330,7 @@ function ensureRequiredCreateRequest(parsed, state = {}, capabilities = {}) {
 }
 
 function formatCreateRequestDirective(state = {}) {
+  if (state.messageOnly) return '';
   const action = String(state.resolution?.nextBestAction || '');
   if (action !== 'CREATE_REQUEST' || !slotsComplete(state)) return '';
 

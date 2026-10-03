@@ -10,7 +10,7 @@ const {
 const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { prepareStreamedSpeech } = require('./callCorrectives');
-const { guardSpokenReply } = require('./speechGuard');
+const { dropSpeechSlop, guardSpokenReply } = require('./speechGuard');
 const {
   fileReadLine,
   hasReadableFile,
@@ -22,6 +22,7 @@ const {
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 const { looksLikeFileVisitTalk } = require('./visitTalk');
 const { detectSpeedRequest } = require('../speech/speedControl');
+const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
 
 /**
  * Instant greeting — brand-first English opener (see businessAssistantIntro.js).
@@ -113,8 +114,10 @@ async function generateDynamicGreeting(opts) {
     ? afterHoursMode === 'message'
       ? `Today's update: "${closureNotice}". Mention that fact in natural words, then say you can take a message and ask for their name. Do not end on the fact alone.`
       : `Today's update: "${closureNotice}". Mention that fact in natural words, then say you can still help and ask how you can assist. Do not end on the fact alone.`
-    : isOpen === false && afterHoursMode === 'message'
-      ? 'The business is CLOSED now. Say you can take a message for the team.'
+    : afterHoursMode === 'message'
+      ? isOpen === false
+        ? 'The business is CLOSED now. Message only. Say you can take a message and ask for their name. Do not book, cancel, or name a time.'
+        : 'Message only, any time of day. Say you can take a message and ask for their name. Do not say the shop is closed. Do not book, cancel, or name a time.'
       : isOpen === false
         ? 'The business is CLOSED now, but you still help. Say you are closed yet can still assist.'
         : isOpen === true
@@ -420,7 +423,8 @@ function polishSpokenReply(text, opts = {}) {
   if (!sanitized && !hasReadableFile(opts.state) && presupposesSavedWork(String(text || ''))) {
     return nothingOnFileLine(opts.state, opts.language);
   }
-  return sanitized;
+  // Last mouth. A dump trim or a later prompt cannot put filler back.
+  return dropSpeechSlop(sanitized, callerText);
 }
 
 /**
@@ -564,6 +568,25 @@ function pickSpeechGuaranteeLine({
   }
   const nameKnown = callerNameAlreadyKnown({ brainState, userText });
   let slot = nextGuaranteeSlot({ nextBestAction, brainState, nameKnown });
+  if (brainState?.messageOnly) {
+    const intent = String(brainState.intent || '').toLowerCase();
+    const request = ['booking', 'cancellation', 'hold', 'order'].includes(intent);
+    const visitSlot = [
+      'when',
+      'time',
+      'location',
+      'landmark',
+      'area',
+      'service',
+      'subject',
+      'branch',
+      'when_or_reference',
+      'catalog_item',
+    ].includes(slot);
+    if ((request || visitSlot) && !(slot === 'name' && !nameKnown) && !callerTurnKinds(userText).knowledge) {
+      return messageOnlyCallbackLine(language);
+    }
+  }
   // Live leftover HD_bc9f610692de: a bookings/visit ask after the name is in
   // must not speech-guarantee another name ask or invent a when.
   if (looksLikeFileVisitTalk(userText) || looksLikePaceOnlyTurn(userText)) {

@@ -311,7 +311,7 @@ describe("business settings craft", () => {
     assert.match(form, /<ToolSwitch/);
     assert.match(form, /setDayOpen\(day, next\)/);
     assert.match(form, /SettingsSegmented/);
-    assert.match(form, /label="When closed"/);
+    assert.match(form, /label="On a call"/);
     assert.match(form, /<SettingsSelect/);
     assert.match(alerts, /<ToolSwitch/);
     assert.match(alerts, /ALERTS_SETTINGS_FORM_ID/);
@@ -336,13 +336,23 @@ describe("business settings craft", () => {
     assert.doesNotMatch(form, /choiceChipClass/);
   });
 
-  it("clears the phone tab bar and keeps Hours When closed in the Hours group", () => {
+  it("clears the phone tab bar and keeps Hours to open and close times", () => {
     assert.match(ui, /settingsPanelClass/);
     assert.match(ui, /pb-\[var\(--desk-tabbar-clearance\)\]/);
     assert.match(form, /title="Hours"/);
     const hoursStart = form.indexOf('title="Hours"');
     const hoursChunk = form.slice(hoursStart, hoursStart + 9000);
-    assert.match(hoursChunk, /label="When closed"/);
+    assert.doesNotMatch(hoursChunk, /label="On a call"/);
+    assert.doesNotMatch(hoursChunk, /Message only/);
+    const voiceStart = form.indexOf('title="Voice"');
+    const voiceChunk = form.slice(voiceStart, voiceStart + 5000);
+    assert.match(voiceChunk, /label="On a call"/);
+    assert.match(voiceChunk, /disabled: opt.disabled/);
+    const modes = read("dashboard/src/lib/afterHours.ts");
+    assert.match(modes, /label: "Message only"/);
+    assert.match(modes, /label: "Full assistant"/);
+    assert.match(modes, /Not ready/);
+    assert.match(modes, /disabled: true/);
     assert.match(form, /lg:hidden/);
     assert.doesNotMatch(
       form,

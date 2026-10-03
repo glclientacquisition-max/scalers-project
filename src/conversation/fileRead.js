@@ -6,6 +6,7 @@ const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
 } = require('./visitTalk');
+const { messageOnlyNoVisitLine } = require('./messageOnly');
 
 const FILE_READ_RE =
   /\b(what do i have|what have i got|which ones?(?:\s+do)? i have|which (?:booking|bookings|order|orders|hold|holds)|any (?:booking|bookings|order|orders|hold|holds)|is there any that i have|previous (?:booking|bookings|order|orders|hold)|my previous|check (?:for me )?(?:the |my )?(?:previous )?(?:booking|order|hold)|read (?:them|it|me|for me)|the one(?:s)? (?:that )?i have|ones i have|in place|bookings zangu|booking yangu|order yangu|hold yangu|oda yangu|niambie (?:booking|oda|order|hold)|what(?:'s| is) on hold|on hold for me|my (?:order|orders|hold|holds))\b/i;
@@ -85,6 +86,9 @@ function markNothingOnFile(state) {
 }
 
 function fileReadLine({ text = '', state = {}, language } = {}) {
+  if (state?.messageOnly && (looksLikeFileRead(text) || looksLikeEmptyFileFollowUp(text))) {
+    return messageOnlyNoVisitLine(language || state?.language?.current);
+  }
   if (hasReadableFile(state)) return '';
   const again =
     Boolean(state?.conversation?.toldNothingOnFile) && looksLikeEmptyFileFollowUp(text);
@@ -110,6 +114,11 @@ function presupposesSavedWork(sentence) {
 function sanitizeSpokenFileClaim(text, opts = {}) {
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return '';
+  if (opts.state?.messageOnly && presupposesSavedWork(raw)) {
+    const parts = raw.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const kept = parts.filter((part) => !presupposesSavedWork(part));
+    return kept.join(' ').trim() || messageOnlyNoVisitLine(opts.language);
+  }
   if (hasReadableFile(opts.state)) return raw;
   const callerText = String(opts.callerText || '');
   if (looksLikeOfferAsk(callerText) && !presupposesSavedWork(raw)) return raw;

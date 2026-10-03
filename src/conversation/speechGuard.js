@@ -9,6 +9,12 @@ const { numbersIn } = require('./numberWords');
 const { assessCoverage } = require('./visitLocation');
 const { canonicalPlaceName } = require('./kenyaPlaces');
 const { openSlotLine } = require('./callCorrectives');
+const {
+  callerTurnKinds,
+  isMessageOnlyMode,
+  messageOnlyCallbackLine,
+  shapeMessageOnlySpeech,
+} = require('./messageOnly');
 
 const SAVED_CLAIM =
   /\b(i(?:'ve| have) (?:saved|noted|booked|logged|recorded|sent|passed|forwarded|escalated|scheduled|submitted|placed|reserved|held)\b|(?:is|has been|are) (?:saved|noted|booked|logged|recorded|scheduled|confirmed|reserved|on hold|submitted)\b|(?:the )?team will (?:call|contact|reach|get back)|(?:someone|we|they) will (?:call|contact|reach|get back to) you|nimehifadhi|nimeandika|nimetuma|imehifadhiwa|imeandikwa|tutakupigia|watakupigia|nime-?save)/i;
@@ -31,10 +37,66 @@ const ACTION_NARRATION =
 const COVERAGE_CLAIM =
   /\b(?:[Ww]e|[Tt]una|[Tt]unaweza|[Tt]uta)(?:\s+\w+){0,2}?\s+(?:cover|serve|reach|come(?:\s+out)?\s+to|kuja|kufika)\s+(?:to\s+)?([A-Z][\w'’]*(?:\s+[A-Z][\w'’]*){0,2})/;
 
+// Filler that does not answer the caller. Dropped in the mouth, not by a
+// prompt line, so a later prompt cannot speak it. A real answer in the same
+// turn stays.
+const HELP_FILLER = /\bwe can help with that\b/i;
+const ALREADY_ANSWERED_FILLER =
+  /\bwhat do you need done\b|\bhow can (?:we|i) help you today\b|\bnote (?:it|that|this) down for the team\b/i;
+const CALLBACK_PITCH =
+  /\bwould you like me to leave a message\b|\bleave a message for the team\b/i;
+const CALLER_CALLBACK_ASK =
+  /\b(call(?:\s+me)?\s*back|callback|leave (?:me )?a message|take a message|have (?:the team|someone) call)\b/i;
+const SPECIFIC_ASK_EXTRA =
+  /\b(which service|what service|services? do you (?:offer|do|have)|list (?:for me )?(?:the )?services)\b/i;
+
 // The caller asked for a number. A dropped invented number must be replaced by
 // an honest line, not by silence.
 const NUMBER_ASK =
   /\b(how much|how many|price|prices|cost|costs|charge|charges|rate|rates|bei|pesa ngapi|ngapi|what time|saa ngapi|when do you (?:open|close)|hours)\b/i;
+
+function callerAskedSpecificQuestion(text) {
+  const raw = String(text || '');
+  return callerTurnKinds(raw).knowledge || SPECIFIC_ASK_EXTRA.test(raw);
+}
+
+function callerAskedForCallback(text) {
+  return CALLER_CALLBACK_ASK.test(String(text || ''));
+}
+
+/** The booking line and a name confirm are answers, not filler. */
+function isProtectedSpeech(sentence) {
+  const raw = String(sentence || '').trim();
+  if (!raw) return false;
+  if (/^i['’]?ll take a message and have the team call you[.!?]?$/i.test(raw)) return true;
+  if (/^nitachukua ujumbe na timu itakupigia[.!?]?$/i.test(raw)) return true;
+  if (/\bam i speaking with\b/i.test(raw)) return true;
+  return false;
+}
+
+/**
+ * One sentence of slop. "We can help with that" never answers.
+ * "What do you need done" and an unasked callback pitch drop only when they
+ * do not answer what the caller just said.
+ */
+function sentenceIsSpeechSlop(sentence, callerText) {
+  const raw = String(sentence || '').trim();
+  if (!raw || isProtectedSpeech(raw)) return false;
+  if (HELP_FILLER.test(raw)) return true;
+  if (callerAskedSpecificQuestion(callerText) && ALREADY_ANSWERED_FILLER.test(raw)) return true;
+  if (!callerAskedForCallback(callerText) && CALLBACK_PITCH.test(raw)) return true;
+  return false;
+}
+
+/** Drop slop sentences. Keep every other sentence in the turn. */
+function dropSpeechSlop(text, callerText) {
+  const kept = [];
+  for (const sentence of splitSentences(text)) {
+    if (sentenceIsSpeechSlop(sentence, callerText)) continue;
+    kept.push(sentence);
+  }
+  return kept.join(' ').trim();
+}
 
 function splitSentences(text) {
   return String(text || '')
@@ -164,9 +226,36 @@ function sentenceNamesUnboundPlace(sentence, allowedText) {
  * @param {string} [ctx.language]
  * @param {boolean} [ctx.allowEmpty]  return '' instead of a fallback line
  */
+function messageOnlyOn(ctx) {
+  return Boolean(
+    ctx.state?.messageOnly ||
+      ctx.capabilities?.messageOnly ||
+      isMessageOnlyMode(ctx.profile?.afterHoursMode)
+  );
+}
+
+function withMessageOnlyCallback(out, ctx, appendCallback) {
+  if (!appendCallback) return out;
+  const line = messageOnlyCallbackLine(ctx.language);
+  const body = String(out || '').trim();
+  if (!body) return line;
+  if (/take a message|nitachukua ujumbe/i.test(body)) return body;
+  return `${body} ${line}`;
+}
+
 function guardSpokenReply(text, ctx = {}) {
-  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  let raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return '';
+  const locked = messageOnlyOn(ctx);
+  let appendCallback = false;
+  if (locked) {
+    const callerText = String((ctx.callerTurns || []).slice(-1)[0] || '');
+    const shaped = shapeMessageOnlySpeech(raw, { callerText });
+    raw = shaped.text;
+    appendCallback = shaped.appendCallback;
+    if (!raw && appendCallback) return messageOnlyCallbackLine(ctx.language);
+    if (!raw) return '';
+  }
   const known = knownNumbers(ctx);
   const clocks = allowedClocks(ctx);
   const saved = toolSucceededThisTurn(ctx.toolResults);
@@ -182,7 +271,9 @@ function guardSpokenReply(text, ctx = {}) {
   const kept = [];
   let droppedNumber = false;
   let droppedJob = false;
+  const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
   for (const sentence of splitSentences(raw)) {
+    if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) continue;
     if (ACTION_NARRATION.test(sentence)) continue;
     if (!saved && (SAVED_CLAIM.test(sentence) || JOB_CLOSE.test(sentence))) {
       droppedJob = true;
@@ -203,9 +294,15 @@ function guardSpokenReply(text, ctx = {}) {
   }
   let out = kept.join(' ').trim();
   if (holdOpenSlot && droppedJob && BARE_CLOSER.test(out)) out = '';
-  const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
   const askedNumber = droppedNumber && NUMBER_ASK.test(lastCallerTurn);
-  if (out) return askedNumber ? `${unknownFallback(ctx.language)} ${out}` : out;
+  if (out) {
+    return withMessageOnlyCallback(
+      askedNumber ? `${unknownFallback(ctx.language)} ${out}` : out,
+      ctx,
+      appendCallback
+    );
+  }
+  if (locked && appendCallback) return messageOnlyCallbackLine(ctx.language);
   if (holdOpenSlot && droppedJob) {
     return ctx.allowEmpty ? '' : openSlotLine(ctx.state, ctx.language);
   }
@@ -220,6 +317,8 @@ module.exports = {
   ACTION_NARRATION,
   narratesInternalAction,
   guardSpokenReply,
+  dropSpeechSlop,
+  sentenceIsSpeechSlop,
   knownNumbers,
   numbersIn,
   splitSentences,
