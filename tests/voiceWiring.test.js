@@ -122,7 +122,7 @@ assert.match(
 assert.match(
   source,
   /looksLikePaceOnlyTurn\(clean\)/,
-  'pace-only turns must skip Gemini and not restart who-is-speaking'
+  'pace-only turns must not speak Okay or Sawa and return before the model'
 );
 
 assert.match(

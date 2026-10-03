@@ -84,6 +84,7 @@ const {
   attachCallerMemory,
   liveCallerFileStamp,
 } = require('./src/conversation/callerMemory');
+const { formatNameConfirmSpeech, openLineHoldDecision } = require('./src/conversation/openLineSpeech');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const { collectKnownCallerNames } = require('./src/conversation/callerNameMatch');
 const {
@@ -205,7 +206,6 @@ const {
   generateDynamicGreeting,
   pickContextualAck,
   pickActionProgress,
-  pickClarifyProgress,
   planEmptyGeminiSpeech,
   shouldSpeakHandoffNameAsk,
   pickLlmRecoveryLine,
@@ -2385,11 +2385,10 @@ mediaWss.on('connection', (ws, req) => {
     });
     const replayLine = hearAgainReplayText();
     if (idleDecision.replay && replayLine) {
+      // Mid-call replay must not speak a canned line and end the turn.
       console.log(
-        `[ws/media][${sidLabel()}] agent_question_replay reason=${idleDecision.reason}`
+        `[ws/media][${sidLabel()}] agent_question_replay reason=${idleDecision.reason} stays-on-stream`
       );
-      await speakText(replayLine, { isReplay: true });
-      return;
     }
     // Skip pure noise, but keep yes/no and short names when the agent just asked.
     if (shouldSkipCallerTurn(clean, { lastAgentText })) {
@@ -2422,18 +2421,8 @@ mediaWss.on('connection', (ws, req) => {
     }
     // Live miss HD_391a57aae9e9: "slower" must not restart who-is-speaking / visit SOP.
     if (looksLikePaceOnlyTurn(clean)) {
-      const paceLine =
-        callLanguage === 'sw' || callLanguage === 'sheng' ? 'Sawa.' : 'Okay.';
-      console.log(`[ws/media][${callKey}] pace-only skip gemini lang=${callLanguage}`);
-      callTranscript.pushCaller(clean);
-      messages.push({ role: 'user', content: clean });
-      callTranscript.pushAgent(paceLine);
-      messages.push({ role: 'assistant', content: paceLine, local: true });
-      turnTiming.markFirstSpokenChunk();
-      await speakText(paceLine);
-      logTurnTiming(turnTiming, { outcome: 'pace' });
-      if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-      return;
+      // Okay / Sawa must not speak-and-return. The model keeps the sentence stream.
+      console.log(`[ws/media][${callKey}] pace-only stays on sentence stream lang=${callLanguage}`);
     }
     const capabilities =
       callBrainCapabilities.get(callKey) ||
@@ -2469,6 +2458,12 @@ mediaWss.on('connection', (ws, req) => {
     }
     const nextBestAction = determineNextBestAction({ state: brainState, capabilities });
     brainState = setNextBestAction(brainState, nextBestAction);
+    if (
+      previousBrainState?.caller?.nameConfirmed !== true &&
+      brainState?.caller?.nameConfirmed === true
+    ) {
+      brainState.caller.nameJustConfirmed = true;
+    }
     callBrainStates.set(callKey, brainState);
     callBrainCapabilities.set(callKey, capabilities);
     logBrainTrace({
@@ -2512,10 +2507,13 @@ mediaWss.on('connection', (ws, req) => {
     let spokeThisTurn = false;
     let progressAlreadySpoken = false;
     let hidInternalNarration = false;
+    let speechHold = { holdSpeech: false, holdNameConfirm: false, holdVisitLookup: false };
+    let suppressModelSpeech = false;
+    let spokeLookupSentence = false;
     try {
-      // One turn contract for every playbook: identity → coverage ask →
-      // place block → hours refusal → corrective → visit time ladder → phatic. Gemini only
-      // runs when this returns null. See docs/agents/BRAIN_TURN_CONTRACT.md.
+      // Local lines stay off the call. Catalogue, hours, pace, identity, and the
+      // old booking denial must not speak-and-return. Gemini keeps the sentence
+      // stream. A visit, hold, or order lookup is the exception below.
       const localReply = resolveLocalReply({
         text: clean,
         state: brainState,
@@ -2527,25 +2525,19 @@ mediaWss.on('connection', (ws, req) => {
       });
       if (localReply) {
         console.log(
-          `[ws/media][${callKey}] ${localReply.outcome} local reply lang=${callLanguage}: ${localReply.line}`
+          `[ws/media][${callKey}] ${localReply.outcome} local line not spoken lang=${callLanguage}: ${localReply.line}`
         );
-        callTranscript.pushAgent(localReply.line);
-        messages.push({ role: 'assistant', content: localReply.line, local: true });
-        turnTiming.markFirstSpokenChunk();
-        await speakText(localReply.line);
-        spokeThisTurn = true;
-        logTurnTiming(turnTiming, { outcome: localReply.outcome });
-        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-        return;
       }
+      speechHold = holdCallerSpeech(callKey, messages);
+      const fileReadAsk = localReply?.outcome === 'file_read';
+      suppressModelSpeech = Boolean(speechHold.holdSpeech || fileReadAsk);
       const bareCloser = looksLikeBareCloser(clean);
 
       const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
         nextBestAction.action
       );
-      // Human handoff with missing name uses ASK_CLARIFICATION. Speak now so
-      // the caller never waits silently on Gemini (live miss: HD_02bda14e6547).
-      // Skip if they already gave a name (live miss: HD_b4cb560bae33 / Alvin).
+      // Handoff name-ask is still detected (live miss: HD_b4cb560bae33 / Alvin).
+      // It must not speak a canned line or force the sentence stream off.
       const handoffNameAsk =
         !bareCloser &&
         shouldSpeakHandoffNameAsk({
@@ -2553,37 +2545,19 @@ mediaWss.on('connection', (ws, req) => {
           brainState,
           userText: clean,
         });
-      const needsImmediateProgress = actionMayExecute || handoffNameAsk;
+      // Tool turns still wait on Gemini. The progress one-shot must not take
+      // the turn, and a handoff name-ask must not force the stream off.
+      const needsImmediateProgress = actionMayExecute;
 
-      // Action / handoff-clarify turns disable streaming and wait on Gemini+tools.
-      // Speak progress immediately so orders/escalations are not dead air.
       /** @type {Promise<void>} */
       let actionProgressSpeak = Promise.resolve();
-      if (needsImmediateProgress && tts && !bargeInActive) {
-        const progressLine = handoffNameAsk
-          ? pickClarifyProgress({
-              action: nextBestAction.action,
-              slot: nextBestAction.slot || 'name',
-              intent: brainState.intent,
-              language: callLanguage,
-            })
-          : pickActionProgress(nextBestAction.action, callLanguage);
-        clearFillerTimer();
-        turnTiming.markFiller();
+      if ((needsImmediateProgress || handoffNameAsk) && tts && !bargeInActive) {
+        const progressLine = pickActionProgress(nextBestAction.action, callLanguage);
         console.log(
           `[ws/media][${sidLabel()}] action-progress action=${nextBestAction.action}` +
             `${handoffNameAsk ? ' handoffNameAsk=1' : ''}` +
-            ` lang=${callLanguage}: ${progressLine}`
+            ` lang=${callLanguage} withheld: ${progressLine}`
         );
-        // Persist progress in the desk transcript — callers hear this line.
-        callTranscript.pushAgent(progressLine);
-        progressAlreadySpoken = true;
-        spokeThisTurn = true;
-        actionProgressSpeak = speakText(progressLine)
-          .then(() => {
-            spokeThisTurn = true;
-          })
-          .catch(() => {});
       }
 
       // VOICE_FILLER=auto (default): adaptive ack only if first spoken audio is slow.
@@ -2623,7 +2597,7 @@ mediaWss.on('connection', (ws, req) => {
       const streamOn =
         Boolean(process.env.GEMINI_API_KEY) &&
         Boolean(tts) &&
-        !needsImmediateProgress &&
+        (!needsImmediateProgress || suppressModelSpeech) &&
         (process.env.VOICE_LLM_STREAM || 'on').toLowerCase() !== 'off';
 
       let speakSession = null;
@@ -2695,6 +2669,8 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       async function onSpokenChunk(chunk) {
+        // Visit, hold, and order lookups speak nameConfirmSpeech, not the model.
+        if (suppressModelSpeech) return;
         // Streamed chunks are spoken before tools run, so a saved claim or a
         // number the caller never said must not reach TTS. Confirmation of a
         // save comes from formatToolConfirmation after the tool result.
@@ -2753,6 +2729,70 @@ mediaWss.on('connection', (ws, req) => {
         lastAgentText = spokenChunks.join(' ');
       }
 
+      async function speakLookupSentence() {
+        if (!suppressModelSpeech || spokeLookupSentence || bargeInActive) return false;
+        const sentence = String(nameConfirmSpeech(callKey) || '').trim();
+        if (!sentence || !tts) {
+          try {
+            speakSession?.cancel();
+          } catch {
+            /* ignore */
+          }
+          speakSession = null;
+          return false;
+        }
+        stopFillerForReply();
+        const session = await ensureReplySpeakSession();
+        if (!session || bargeInActive || suppressReplyRemainder) {
+          try {
+            session?.cancel();
+          } catch {
+            /* ignore */
+          }
+          speakSession = null;
+          return false;
+        }
+        const startingPlayback = !speaking || activePlaybackGeneration !== playbackGeneration;
+        if (startingPlayback) {
+          const prev = activePlaybackGeneration;
+          activePlaybackGeneration = ++playbackGeneration;
+          streamPlaybackGen = activePlaybackGeneration;
+          speakStartedAt = Date.now();
+          if (prev > 0) overlapHold.reassignPending(prev, activePlaybackGeneration);
+        }
+        activeOutboundStreamId = session.streamId;
+        speaking = true;
+        firstSpokenChunk = true;
+        spokeThisTurn = true;
+        turnTiming.markFirstSpokenChunk();
+        if (/[.!?]$/.test(sentence)) bargeCancelledText = '';
+        session.pushText(sentence);
+        spokenChunks.push(sentence);
+        lastAgentText = spokenChunks.join(' ');
+        agentReplay.beginSpeech(sentence);
+        try {
+          await session.end();
+        } catch (err) {
+          console.error(
+            `[ws/media][${sidLabel()}] TTS stream end failed:`,
+            err?.message || err
+          );
+        } finally {
+          if (activePlaybackGeneration === streamPlaybackGen) {
+            speaking = false;
+            commitAgentQuestionIfNeeded();
+            releaseQueuedCallerSpeech(streamPlaybackGen);
+          } else {
+            agentReplay.abandonPlayback();
+          }
+          speakSession = null;
+        }
+        callTranscript.pushAgent(sentence);
+        spokeLookupSentence = true;
+        console.log(`[ws/media][${sidLabel()}] lookup sentence on stream: ${sentence}`);
+        return true;
+      }
+
       let result;
       let turnOutcome = 'ok';
       if (!process.env.GEMINI_API_KEY) {
@@ -2773,11 +2813,15 @@ mediaWss.on('connection', (ws, req) => {
           speakSession = null;
         }
         if (!bargeInActive) {
-          await actionProgressSpeak;
-          callTranscript.pushAgent(result.spokenText);
-          turnTiming.markFirstSpokenChunk();
-          await speakText(result.spokenText);
-          spokeThisTurn = true;
+          if (suppressModelSpeech) {
+            await speakLookupSentence();
+          } else {
+            await actionProgressSpeak;
+            callTranscript.pushAgent(result.spokenText);
+            turnTiming.markFirstSpokenChunk();
+            await speakText(result.spokenText);
+            spokeThisTurn = true;
+          }
         }
       } else if (streamOn) {
         turnTiming.markLlmStart();
@@ -2787,7 +2831,27 @@ mediaWss.on('connection', (ws, req) => {
         });
         stopFillerForReply();
 
-        if (speakSession) {
+        if (suppressModelSpeech) {
+          if (bargeInActive) {
+            try {
+              speakSession?.cancel();
+            } catch {
+              /* ignore */
+            }
+            console.log(`[ws/media][${sidLabel()}] discarding streamed reply after barge-in`);
+            discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
+            bargeInActive = false;
+            speakSession = null;
+            if (activePlaybackGeneration === streamPlaybackGen) {
+              speaking = false;
+              releaseQueuedCallerSpeech(streamPlaybackGen);
+            }
+            logTurnTiming(turnTiming, { outcome: 'barge_in' });
+            if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+            return;
+          }
+          await speakLookupSentence();
+        } else if (speakSession) {
           if (bargeInActive) {
             try {
               speakSession.cancel();
@@ -2946,7 +3010,9 @@ mediaWss.on('connection', (ws, req) => {
           handoffNameAsk &&
           progressAlreadySpoken &&
           !result?.actionConfirmation;
-        if (reply && !skipDuplicateAsk) {
+        if (suppressModelSpeech) {
+          await speakLookupSentence();
+        } else if (reply && !skipDuplicateAsk) {
           callTranscript.pushAgent(reply);
           turnTiming.markFirstSpokenChunk();
           await speakText(reply);
@@ -2955,10 +3021,15 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       if (result?.actionConfirmation && !bargeInActive) {
-        await actionProgressSpeak;
-        callTranscript.pushAgent(result.actionConfirmation);
-        await speakText(result.actionConfirmation);
-        spokeThisTurn = true;
+        const confirmation = String(result.actionConfirmation).trim();
+        const lookupSpoken = spokenChunks.join(' ').trim();
+        // The lookup sentence is already on the stream. Do not speakText it.
+        if (!(spokeLookupSentence && confirmation === lookupSpoken)) {
+          await actionProgressSpeak;
+          callTranscript.pushAgent(result.actionConfirmation);
+          await speakText(result.actionConfirmation);
+          spokeThisTurn = true;
+        }
       }
 
       // Empty Gemini success asks them to repeat once. A 503 or a broken
@@ -3038,6 +3109,7 @@ mediaWss.on('connection', (ws, req) => {
       logTurnTiming(turnTiming, { outcome: 'error' });
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
     } finally {
+      if (speechHold.holdNameConfirm) clearNameJustConfirmed(callKey);
       clearFillerTimer();
       if (activeTurnTiming === turnTiming) {
         logTurnTiming(turnTiming, { outcome: 'early_return' });
@@ -4617,6 +4689,42 @@ async function applyGeminiTools(callSid, parsed) {
  * No audio yet: retry the same model once, then one backup model on 503.
  * Audio already started: do not restart. Credits and denied are not retried.
  */
+
+function nameJustConfirmed(callSid) {
+  return callBrainStates.get(callSid)?.caller?.nameJustConfirmed === true;
+}
+
+function latestCallerUtterance(messages) {
+  if (!Array.isArray(messages)) return '';
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === 'user') return String(messages[i].content || '');
+  }
+  return '';
+}
+
+function holdCallerSpeech(callSid, messages) {
+  const caller = callBrainStates.get(callSid)?.caller;
+  return openLineHoldDecision({
+    nameConfirmed: caller?.nameConfirmed === true,
+    nameJustConfirmed: caller?.nameJustConfirmed === true,
+    callerText: latestCallerUtterance(messages),
+  });
+}
+
+function clearNameJustConfirmed(callSid) {
+  const caller = callBrainStates.get(callSid)?.caller;
+  if (caller) caller.nameJustConfirmed = false;
+}
+
+function nameConfirmSpeech(callSid) {
+  const state = callBrainStates.get(callSid);
+  return formatNameConfirmSpeech({
+    openVisits: state?.returning?.openVisits,
+    openRequests: state?.returning?.openRequests,
+    language: state?.language?.current,
+  });
+}
+
 async function runGeminiTurnStreaming(
   messages,
   callSid,
