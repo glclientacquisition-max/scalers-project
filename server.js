@@ -84,7 +84,7 @@ const {
   attachCallerMemory,
   liveCallerFileStamp,
 } = require('./src/conversation/callerMemory');
-const { formatNameConfirmSpeech, openLineHoldDecision } = require('./src/conversation/openLineSpeech');
+const { formatNameConfirmSpeech, openLineHoldDecision, shouldPublishOpenFileSentence } = require('./src/conversation/openLineSpeech');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const { collectKnownCallerNames } = require('./src/conversation/callerNameMatch');
 const {
@@ -217,7 +217,7 @@ const {
   polishSpokenReply,
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
-const { resolveLocalReply } = require('./src/conversation/turnPolicy');
+const { resolveLocalReply, fileNameAskLine } = require('./src/conversation/turnPolicy');
 const { narratesInternalAction } = require('./src/conversation/speechGuard');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -2539,9 +2539,26 @@ mediaWss.on('connection', (ws, req) => {
           `[ws/media][${callKey}] ${localReply.outcome} local line not spoken lang=${callLanguage}: ${localReply.line}`
         );
       }
+      // Phone file already has a name: ask only that. Do not let the model
+      // ask as if the name were missing, and do not attach visits.
+      const fileNameAsk = fileNameAskLine(brainState);
+      if (fileNameAsk) {
+        brainState.caller.fileNameAskSpoken = true;
+        callBrainStates.set(callKey, brainState);
+        console.log(`[ws/media][${callKey}] file name ask: ${fileNameAsk}`);
+        if (!bargeInActive) {
+          callTranscript.pushAgent(fileNameAsk);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(fileNameAsk);
+          spokeThisTurn = true;
+        }
+        return;
+      }
       speechHold = holdCallerSpeech(callKey, messages);
       const fileReadAsk = localReply?.outcome === 'file_read';
-      suppressModelSpeech = Boolean(speechHold.holdSpeech || fileReadAsk);
+      // Name lock holds speech in the hold record, but must not publish the
+      // open file. A visit lookup after the lock still can.
+      suppressModelSpeech = shouldPublishOpenFileSentence(speechHold, fileReadAsk);
       const bareCloser = looksLikeBareCloser(clean);
 
       const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(

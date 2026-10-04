@@ -264,6 +264,7 @@ function createBrainState(profile = {}) {
       nameConfirmed: Boolean(caller.nameConfirmed),
       nameCollision: Array.isArray(caller.nameCollision) ? caller.nameCollision : null,
       fileNameAsked: null,
+      fileNameAskSpoken: false,
     },
     returning: returningFileFromCard(profile.callerMemory),
     language: {
@@ -947,6 +948,9 @@ function formatNameConfirmForPrompt(state) {
   if (!name) {
     const pending = String(state?.caller?.fileNameAsked || '').trim();
     if (pending) {
+      if (state?.caller?.fileNameAskSpoken === true) {
+        return `- File name already asked: Am I speaking with ${pending}? Do not ask for a name. Do not say May I have your name. A yes means ${pending}. Do not talk about visits yet. Do not say nothing is open.`;
+      }
       return `- Ask once, in these words: Am I speaking with ${pending}? Do not greet them as that name. Do not talk about visits yet. Do not say nothing is open. A yes means ${pending}.`;
     }
     const missing = Array.isArray(state?.goal?.missingSlots) ? state.goal.missingSlots : [];

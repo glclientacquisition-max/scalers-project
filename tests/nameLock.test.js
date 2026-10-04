@@ -13,7 +13,10 @@ const {
   looksLikeCompliment,
 } = require('../src/conversation/entityExtraction');
 const { missingGoalSlots } = require('../src/conversation/goalModel');
-const { resolveLocalReply } = require('../src/conversation/turnPolicy');
+const { resolveLocalReply, fileNameAskLine } = require('../src/conversation/turnPolicy');
+const { openLineHoldDecision, shouldPublishOpenFileSentence, formatNameConfirmSpeech } = require('../src/conversation/openLineSpeech');
+const fs = require('fs');
+const path = require('path');
 const { ensureRequiredEscalate } = require('../src/conversation/requiredEscalate');
 const { executeBrainTools } = require('../src/conversation/toolExecution');
 const { parseGeminiResponse } = require('../src/conversation/toolMarkers');
@@ -184,6 +187,56 @@ describe('caller name stays the file name', () => {
     assert.equal(escalatedName, 'Alvin');
     assert.equal(bookedName, 'Alvin');
     assert.ok(execution.results.some((row) => row.action === 'save_caller_info' && row.status === 'succeeded'));
+  });
+
+  it('asks only the file name and does not publish the open file until a booking ask', () => {
+    const profile = { vertical: 'home_services', callerMemory: { ...alvinCard } };
+    const asked = turn(createBrainState(profile), 'Hello', profile);
+    const ask = fileNameAskLine(asked);
+    assert.equal(ask, 'Am I speaking with Alvin?');
+    assert.doesNotMatch(ask, /carpet|visit|callback|What would you like to do|Nothing is still open/i);
+    assert.equal(
+      resolveLocalReply({ text: 'Hello', state: asked, profile, language: 'en' }),
+      null
+    );
+
+    const locked = turn(asked, 'Uh, my name is Alvin', profile);
+    assert.equal(locked.caller.name, 'Alvin');
+    assert.equal(locked.caller.nameConfirmed, true);
+    assert.equal(fileNameAskLine(locked), '');
+    const nameLockHold = openLineHoldDecision({
+      nameConfirmed: true,
+      nameJustConfirmed: true,
+      callerText: 'Uh, my name is Alvin',
+    });
+    assert.equal(nameLockHold.holdNameConfirm, true);
+    assert.equal(shouldPublishOpenFileSentence(nameLockHold, false), false);
+    const openFile = formatNameConfirmSpeech({
+      language: 'en',
+      openVisits: locked.returning.openVisits,
+      openRequests: locked.returning.openRequests,
+    });
+    assert.match(openFile, /carpet/i);
+    assert.notEqual(ask, openFile);
+
+    const bookings = turn(locked, 'What are my bookings?', profile);
+    assert.equal(bookings.caller.name, 'Alvin');
+    const bookingHold = openLineHoldDecision({
+      nameConfirmed: true,
+      nameJustConfirmed: false,
+      callerText: 'What are my bookings?',
+    });
+    assert.equal(shouldPublishOpenFileSentence(bookingHold, false), true);
+
+    const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    const start = server.indexOf('async function runCallerTurn');
+    const end = server.indexOf('function flushUtterance', start);
+    const turnSource = server.slice(start, end);
+    assert.match(turnSource, /const fileNameAsk = fileNameAskLine\(brainState\)/);
+    assert.match(turnSource, /speakText\(fileNameAsk\)/);
+    assert.match(turnSource, /shouldPublishOpenFileSentence\(speechHold, fileReadAsk\)/);
+    assert.doesNotMatch(turnSource, /speechHold\.holdSpeech \|\| fileReadAsk/);
+    assert.doesNotMatch(turnSource, /speakText\(localReply\.line\)/);
   });
 
   it('puts the file name in Soniox terms without letting the term list decide the name', () => {

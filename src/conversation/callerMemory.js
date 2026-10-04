@@ -596,7 +596,7 @@ function openVisitLinesOf(card) {
 }
 
 function stillOpenUseLine() {
-  return '- Use: when the caller has confirmed their name and CALL STATE lists an open visit or open request, immediately say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. If they want one moved or cancelled, update that one. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name. If no Open line remains, you may say nothing is still open.';
+  return '- Use: do not read open visits, holds, callbacks, or orders unless the caller asks about them. If they ask, say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. Do not read them on the turn the name is confirmed. If they want one moved or cancelled, update that one. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name. If they ask and no Open line remains, you may say nothing is still open.';
 }
 
 function formatReturningCallerForPrompt(card) {
@@ -659,7 +659,7 @@ function formatReturningCallerForPrompt(card) {
     );
     lines.push(
       mayHaveVisit
-        ? `- Use: confirm once, "Am I speaking with ${fileWho || 'the name on this number'}?" Do not greet them as that name. Do not talk about visits yet. If they say no, ask who is speaking and do not read this file. If they confirm, and open lines are listed, immediately say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. Answer what they just said.`
+        ? `- Use: confirm once, "Am I speaking with ${fileWho || 'the name on this number'}?" Do not greet them as that name. Do not talk about visits yet. If they say no, ask who is speaking and do not read this file. If they confirm, answer what they just said. Do not read open visits, holds, callbacks, or orders on that turn.`
         : '- Use: do not ask who is speaking unless you are about to save something. Do not attach Open, Last, or History yet. Do not greet them as the file name. Answer what they just said.'
     );
   } else if (!usable) {
@@ -722,7 +722,7 @@ function formatReturningFileForCallState(returning) {
       : [];
   for (const visit of visitLines) {
     lines.push(
-      `- Caller file open visit: ${visit}. Speak to that visit. Do not create a second visit unless they ask for a new job.`
+      `- Caller file open visit: ${visit}. Do not read this unless they ask about a visit, booking, hold, callback, or order. Do not create a second visit unless they ask for a new job.`
     );
   }
   const openRequests = Array.isArray(returning.openRequests) ? returning.openRequests : [];
@@ -731,7 +731,7 @@ function formatReturningFileForCallState(returning) {
   }
   if (visitLines.length || openRequests.length) {
     lines.push(
-      '- Caller file still open: when the caller has confirmed their name and CALL STATE lists an open visit or open request, immediately say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. If none remain listed, you may say nothing is still open.'
+      '- Caller file still open: do not read open visits, holds, callbacks, or orders unless the caller asks about them. If they ask, say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. Do not read them on the turn the name is confirmed. If none remain listed, you may say nothing is still open.'
     );
   }
   if (returning.lastReason) {
