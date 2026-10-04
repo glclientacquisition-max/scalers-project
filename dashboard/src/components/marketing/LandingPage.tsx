@@ -5,7 +5,7 @@ import { PackagePrices } from "@/components/marketing/PackagePrices";
 import { strawPublicBoard, type PublicPackageBoard } from "@/lib/packageCatalog";
 
 /**
- * Marketing home: hero, then the package table.
+ * Marketing home: hero, how it works, then the package table.
  * Authenticated owners get a direct path back to their workspace.
  */
 export function LandingPage({
@@ -94,12 +94,16 @@ export function LandingPage({
             </div>
 
             <h1 className="landing-rise landing-rise-delay-2 mt-8 font-display text-3xl leading-tight tracking-tight text-white sm:text-4xl md:text-[2.75rem]">
-              The autonomous business assistant for Kenyan SMEs.
+              Your 24-hour call assistant, so you do not miss the client.
             </h1>
 
             <p className="landing-rise landing-rise-delay-3 mt-4 max-w-md text-base leading-relaxed text-sky-100/90 sm:text-lg">
-              Answers when you&apos;re busy, after hours, or on-site. Captures the
-              caller&apos;s name and reason, then sends the lead to WhatsApp.
+              It answers when you are busy, after hours, on another call, or the line is off.
+            </p>
+
+            <p className="landing-rise landing-rise-delay-3 mt-3 max-w-md text-sm leading-relaxed text-sky-100/65">
+              Scalers is a business assistant that actually helps you run the business, from the
+              client call through to the booking, the order, or whatever comes next.
             </p>
 
             <div className="landing-rise landing-rise-delay-4 mt-10 flex flex-wrap items-center gap-3">
@@ -121,10 +125,35 @@ export function LandingPage({
           </div>
         </section>
 
-        <p className="landing-rise landing-rise-delay-4 text-xs text-sky-100/55 sm:text-sm">
-          Built for local businesses in Kenya that can&apos;t afford a missed lead.
-        </p>
       </div>
+      </section>
+
+      <section className="bg-canvas px-6 py-16 text-ink sm:px-8">
+        <div className="mx-auto max-w-desk">
+          <h2 className="font-display text-display text-ink">How it works</h2>
+          <ol className="mt-8 max-w-xl space-y-5 text-base leading-relaxed text-ink">
+            <li className="flex gap-4">
+              <span className="font-display text-ink-soft">1</span>
+              <span>You set the business in the Desk: who you are, hours, services, and the answers.</span>
+            </li>
+            <li className="flex gap-4">
+              <span className="font-display text-ink-soft">2</span>
+              <span>The assistant takes the call.</span>
+            </li>
+            <li className="flex gap-4">
+              <span className="font-display text-ink-soft">3</span>
+              <span>You get SMS, WhatsApp, or email, then work it in the inbox: call back, WhatsApp, or an SMS you approve.</span>
+            </li>
+          </ol>
+          <div className="mt-10">
+            <Link
+              href={actionHref}
+              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-900 px-6 py-3 text-base font-medium text-white transition hover:bg-brand-800 focus-visible:outline-none focus-visible:shadow-focus"
+            >
+              {actionLabel}
+            </Link>
+          </div>
+        </div>
       </section>
 
       <section id="packages" className="bg-canvas px-6 py-16 text-ink sm:px-8">
