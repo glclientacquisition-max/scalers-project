@@ -98,6 +98,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 15 | `tts_lexicon.sql` | `tenants`; grant may be overwritten later |
 | 16 | `pronunciation_gemini_scan.sql` | `tts_lexicon.sql` |
 | 17 | `soniox_voice_id.sql` | `tenants`, `platform_soniox_voices` table |
+| 17b | `greeting_spoken_name.sql` | `soniox_voice_id.sql`. Spoken shop name + short invite. Apply by hand. Deploy does not run it. |
 
 ---
 

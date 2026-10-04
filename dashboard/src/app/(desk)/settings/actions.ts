@@ -125,6 +125,19 @@ export async function saveAndCompileSettings(
       String(formData.get("services_offered") || "").trim(),
       String(tenant.services_offered || "").trim()
     );
+  const clipOwnerLine = (raw: string, max: number) =>
+    raw.replace(/\s+/g, " ").trim().slice(0, max).trim();
+
+  const spokenName = pick(
+    "spokenName",
+    clipOwnerLine(String(formData.get("spoken_name") || ""), 40),
+    clipOwnerLine(String(tenant.spoken_name || ""), 40)
+  );
+  const greetingInvite = pick(
+    "greetingInvite",
+    clipOwnerLine(String(formData.get("greeting_invite") || ""), 80),
+    clipOwnerLine(String(tenant.greeting_invite || ""), 80)
+  );
   const agentName = pick(
     "agentName",
     String(formData.get("agent_name") || "").trim() || "Receptionist",
@@ -283,6 +296,8 @@ export async function saveAndCompileSettings(
     hours_schedule: scheduleForSave,
     after_hours_mode: afterHoursMode,
     agent_name: agentName,
+    spoken_name: spokenName || null,
+    greeting_invite: greetingInvite || null,
     agent_tone: agentTone,
     team_directory: teamDirectory,
     faqs,

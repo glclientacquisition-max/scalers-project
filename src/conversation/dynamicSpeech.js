@@ -4,6 +4,9 @@ const { decideCallerEvent, isInterruptOnlyUtterance } = require('../speech/turnT
 const {
   eatTimeOfDay,
   composeBusinessAssistantIntro,
+  composeOpenerIdentity,
+  greetingHelpLine,
+  spokenShopLabel,
   introLooksValid,
   LANGUAGE_INVITE,
 } = require('./businessAssistantIntro');
@@ -32,6 +35,8 @@ const { detectSpeedRequest } = require('../speech/speedControl');
 function fallbackGreeting(businessName, opts = {}) {
   return composeBusinessAssistantIntro({
     businessName,
+    spokenName: opts.spokenName,
+    greetingInvite: opts.greetingInvite,
     agentName: opts.agentName,
     vertical: opts.vertical,
     requireLanguageInvite: opts.requireLanguageInvite,
@@ -90,6 +95,8 @@ async function generateDynamicGreeting(opts) {
   const vertical = String(opts.vertical || '').trim();
   const introOpts = {
     agentName,
+    spokenName: opts.spokenName,
+    greetingInvite: opts.greetingInvite,
     vertical,
     isOpen,
     afterHoursMode,
@@ -122,30 +129,34 @@ async function generateDynamicGreeting(opts) {
           : 'Open/closed status is unknown; do not claim the shop is closed.';
 
   const maxWords = closureNotice ? 36 : 28;
-  const dayLead =
-    tod === 'morning'
-      ? `Good morning, ${businessName}, this is ${agentName}.`
-      : tod === 'evening'
-        ? `Good evening, ${businessName}, this is ${agentName}.`
-        : `${businessName}, this is ${agentName}.`;
+  const shopSpoken =
+    spokenShopLabel({ spokenName: opts.spokenName }) || businessName;
+  const dayLead = composeOpenerIdentity({
+    businessName,
+    spokenName: opts.spokenName,
+    greetingInvite: opts.greetingInvite,
+    agentName,
+  });
+  const helpClose = greetingHelpLine({ greetingInvite: opts.greetingInvite });
   const instruction = `You are ${agentName}, the live phone business assistant for ${businessName} in Kenya.
 Write ONE short spoken greeting to open the call (max ${maxWords} words).
 Sound like one calm person picking up the shop phone.
-Lead with the shop then your name, for example: "${dayLead} How can I help?"
-You MUST include the exact business name "${businessName}".
+Lead with the shop then your name, for example: "${dayLead} ${helpClose}"
+You MUST include the exact shop name "${shopSpoken}".
 You MUST include your name ${agentName}.
+Do not add a joke. Do not pretend to be the owner.
 Do not use IVR lines like "you've reached" or "thank you for calling".
 Do not list services or prices in the greeting. Grounded offerings wait until they ask.
 ${
     vertical === 'home_services'
-      ? `You MUST include this exact sentence before How can I help: "${LANGUAGE_INVITE}"`
+      ? `You MUST include this exact sentence before the closing question: "${LANGUAGE_INVITE}"`
       : 'Do not say they can speak in English or Kiswahili. Language match happens after they speak.'
   }
 It is ${tod} in Nairobi. ${openLine}
 Use clear English for this first greeting (the caller has not spoken yet. Do not open with Habari).
 No quotes, no markdown, never say "the business" as a placeholder.
 Never say you are an AI, virtual assistant, or intelligent agent.
-End with one open question: How can I help? (or the closed/message follow from the status line).`;
+End with this exact close: ${helpClose} (or the closed/message name-ask from the status line when taking a message).`;
 
   const task = opts
     .generateText({

@@ -8,6 +8,8 @@ export const LANGUAGE_INVITE = "You can speak in English or Kiswahili.";
 
 export type BusinessAssistantIntroOpts = {
   businessName?: string | null;
+  spokenName?: string | null;
+  greetingInvite?: string | null;
   agentName?: string | null;
   vertical?: string | null;
   requireLanguageInvite?: boolean;
@@ -41,6 +43,62 @@ function cleanName(value: unknown, fallback: string): string {
     .replace(/\s+/g, " ")
     .trim();
   return text || fallback;
+}
+
+const SPOKEN_NAME_MAX = 40;
+const GREETING_INVITE_MAX = 80;
+
+function clipGreetingField(value: unknown, max: number): string {
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "";
+  if (text.length <= max) return text;
+  return text.slice(0, max).trim();
+}
+
+function isDefaultShopName(value: unknown): boolean {
+  const shop = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return !shop || /^the business$/i.test(shop);
+}
+
+function spokenShopLabel(opts: BusinessAssistantIntroOpts = {}): string {
+  const spoken = clipGreetingField(opts.spokenName, SPOKEN_NAME_MAX);
+  if (!spoken || isDefaultShopName(spoken)) return "";
+  return spoken;
+}
+
+function shopLabelForIntro(opts: BusinessAssistantIntroOpts = {}): string {
+  return spokenShopLabel(opts) || cleanName(opts.businessName, "the business");
+}
+
+function customInviteText(opts: BusinessAssistantIntroOpts = {}): string {
+  const invite = clipGreetingField(opts.greetingInvite, GREETING_INVITE_MAX);
+  if (!invite) return "";
+  const bare = invite.replace(/[.!?…]+$/g, "").trim();
+  if (/^how can i help$/i.test(bare)) return "";
+  return invite;
+}
+
+function capitalizeSentence(text: string): string {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function greetingHelpLine(opts: BusinessAssistantIntroOpts = {}): string {
+  const invite = customInviteText(opts);
+  if (!invite) return "How can I help?";
+  let line = invite;
+  if (!/[.!?…]$/.test(line)) {
+    if (/^(how|what|where|when|who|which|can|could|would|may)\b/i.test(line)) {
+      line = `${line}?`;
+    } else {
+      line = `${line}.`;
+    }
+  }
+  return capitalizeSentence(line);
 }
 
 function isDefaultAgentName(value: unknown): boolean {
@@ -116,7 +174,7 @@ export function summarizeOfferingForIntro(
 }
 
 function composeOpenerIdentity(opts: BusinessAssistantIntroOpts = {}): string {
-  const businessName = cleanName(opts.businessName, "the business");
+  const businessName = shopLabelForIntro(opts);
   const agentName = cleanName(opts.agentName, "");
   const tod = eatTimeOfDay(opts.now || new Date());
   const day = dayWordPrefix(tod);
@@ -162,7 +220,7 @@ export function composeBusinessAssistantIntro(
   const closed = opts.isOpen === false;
   const identity = composeOpenerIdentity(opts);
   const invite = languageInviteClause(opts);
-  const help = "How can I help?";
+  const help = greetingHelpLine(opts);
   const nameAsk = "May I have your name?";
 
   if (closureNotice) {
