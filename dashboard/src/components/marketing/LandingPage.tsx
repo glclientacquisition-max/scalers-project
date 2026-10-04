@@ -131,20 +131,91 @@ export function LandingPage({
       <section className="bg-canvas px-6 py-16 text-ink sm:px-8">
         <div className="mx-auto max-w-desk">
           <h2 className="font-display text-display text-ink">How it works</h2>
-          <ol className="mt-8 max-w-xl space-y-5 text-base leading-relaxed text-ink">
-            <li className="flex gap-4">
-              <span className="font-display text-ink-soft">1</span>
-              <span>You set the business in the Desk: who you are, hours, services, and the answers.</span>
-            </li>
-            <li className="flex gap-4">
-              <span className="font-display text-ink-soft">2</span>
-              <span>The assistant takes the call.</span>
-            </li>
-            <li className="flex gap-4">
-              <span className="font-display text-ink-soft">3</span>
-              <span>You get SMS, WhatsApp, or email, then work it in the inbox: call back, WhatsApp, or an SMS you approve.</span>
-            </li>
-          </ol>
+          <div className="mt-8 grid items-start gap-10 lg:grid-cols-[minmax(0,24rem)_1fr] lg:gap-12">
+            <ol className="max-w-xl space-y-5 text-base leading-relaxed text-ink">
+              <li className="flex gap-4">
+                <span className="font-display text-ink-soft">1</span>
+                <span>You set the business in the Desk: who you are, hours, services, and the answers.</span>
+              </li>
+              <li className="flex gap-4">
+                <span className="font-display text-ink-soft">2</span>
+                <span>The assistant takes the call.</span>
+              </li>
+              <li className="flex gap-4">
+                <span className="font-display text-ink-soft">3</span>
+                <span>You get SMS, WhatsApp, or email, then work it in the inbox: call back, WhatsApp, or an SMS you approve.</span>
+              </li>
+            </ol>
+            <div className="landing-rise grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <div className="overflow-hidden rounded-2xl border border-line bg-surface" aria-hidden>
+                <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+                  <Image
+                    src={brandAssets.iconTransparent}
+                    alt=""
+                    width={20}
+                    height={20}
+                    className="h-5 w-5 object-contain"
+                  />
+                  <p className="text-sm font-medium text-ink">Desk</p>
+                </div>
+                <ul className="space-y-3 p-3">
+                  {[
+                    ["Who you are", "Your business"],
+                    ["Hours", "Your hours"],
+                    ["Services", "Your services"],
+                    ["Answers", "Your answers"],
+                  ].map(([label, value]) => (
+                    <li key={label}>
+                      <p className="text-caption text-ink-soft">{label}</p>
+                      <p className="mt-1 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-sm text-ink">
+                        {value}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-line bg-surface" aria-hidden>
+                <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+                  <Image
+                    src={brandAssets.iconTransparent}
+                    alt=""
+                    width={20}
+                    height={20}
+                    className="h-5 w-5 object-contain"
+                  />
+                  <p className="text-sm font-medium text-ink">Inbox</p>
+                </div>
+                <div className="flex items-start gap-2 px-3 py-3">
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
+                  <div>
+                    <p className="text-sm font-medium text-ink">Client</p>
+                    <p className="text-caption text-ink-soft">Needs you</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 border-t border-line px-3 py-3">
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-attention" />
+                  <div>
+                    <p className="text-sm font-medium text-ink">Client</p>
+                    <p className="text-caption text-ink-soft">Missed</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 border-t border-line px-3 py-2.5">
+                  <span className="rounded-lg border border-ok/40 bg-ok-soft px-2 py-1 text-caption font-medium text-ok">
+                    Mark done
+                  </span>
+                  <span className="rounded-lg border border-line px-2 py-1 text-caption font-medium text-ink">
+                    Call
+                  </span>
+                  <span className="rounded-lg bg-whatsapp/15 px-2 py-1 text-caption font-medium text-whatsapp-deep">
+                    WhatsApp
+                  </span>
+                  <span className="rounded-lg bg-accent-tonal px-2 py-1 text-caption font-medium text-accent">
+                    Send SMS
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
           <div className="mt-10">
             <Link
               href={actionHref}
