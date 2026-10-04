@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { brandAssets } from "@/components/brand/assets";
+import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { PackagePrices } from "@/components/marketing/PackagePrices";
 import { strawPublicBoard, type PublicPackageBoard } from "@/lib/packageCatalog";
 
@@ -128,33 +129,7 @@ export function LandingPage({
       </div>
       </section>
 
-      <section className="bg-canvas px-6 py-16 text-ink sm:px-8">
-        <div className="mx-auto max-w-desk">
-          <h2 className="font-display text-display text-ink">How it works</h2>
-          <ol className="mt-8 max-w-xl space-y-5 text-base leading-relaxed text-ink">
-            <li className="flex gap-4">
-              <span className="font-display text-ink-soft">1</span>
-              <span>You set the business in the Desk: who you are, hours, services, and the answers.</span>
-            </li>
-            <li className="flex gap-4">
-              <span className="font-display text-ink-soft">2</span>
-              <span>The assistant takes the call.</span>
-            </li>
-            <li className="flex gap-4">
-              <span className="font-display text-ink-soft">3</span>
-              <span>You get SMS, WhatsApp, or email, then work it in the inbox: call back, WhatsApp, or an SMS you approve.</span>
-            </li>
-          </ol>
-          <div className="mt-10">
-            <Link
-              href={actionHref}
-              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-900 px-6 py-3 text-base font-medium text-white transition hover:bg-brand-800 focus-visible:outline-none focus-visible:shadow-focus"
-            >
-              {actionLabel}
-            </Link>
-          </div>
-        </div>
-      </section>
+      <HowItWorks actionHref={actionHref} actionLabel={actionLabel} />
 
       <section id="packages" className="bg-canvas px-6 py-16 text-ink sm:px-8">
         <div className="mx-auto max-w-desk">

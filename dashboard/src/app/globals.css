@@ -493,6 +493,92 @@ h3,
   animation: desk-land-fade var(--motion-land) var(--motion-ease) both;
 }
 
+
+/* How it works: one 16s loop. Call comes in, the assistant answers, the lead arrives.
+   Base styles are the settled frames. Motion only overrides them. */
+@keyframes hiw-field-1 {
+  0%, 2% { opacity: 0; transform: translateY(10px); }
+  8%, 100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-field-2 {
+  0%, 6% { opacity: 0; transform: translateY(10px); }
+  12%, 100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-field-3 {
+  0%, 10% { opacity: 0; transform: translateY(10px); }
+  16%, 100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-field-4 {
+  0%, 14% { opacity: 0; transform: translateY(10px); }
+  20%, 100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-incoming {
+  0%, 18% { opacity: 0; transform: translateY(8px); }
+  24%, 36% { opacity: 1; transform: none; }
+  44%, 100% { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes hiw-ring {
+  0%, 20% { opacity: 0; transform: scale(0.82); }
+  26% { opacity: 0.85; transform: scale(1); }
+  32% { opacity: 0; transform: scale(1.45); }
+  36% { opacity: 0.45; transform: scale(1.05); }
+  42%, 100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes hiw-answered {
+  0%, 38% { opacity: 0; transform: translateY(10px); }
+  46%, 100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-wave-a {
+  0%, 44% { transform: scaleY(0.35); }
+  52% { transform: scaleY(1); }
+  60% { transform: scaleY(0.4); }
+  70% { transform: scaleY(0.85); }
+  82%, 100% { transform: scaleY(0.55); }
+}
+@keyframes hiw-wave-b {
+  0%, 44% { transform: scaleY(0.7); }
+  54% { transform: scaleY(0.35); }
+  64% { transform: scaleY(1); }
+  76% { transform: scaleY(0.45); }
+  88%, 100% { transform: scaleY(0.75); }
+}
+@keyframes hiw-lead {
+  0%, 48% { opacity: 0; transform: translateY(14px); }
+  58%, 100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-ch-1 {
+  0%, 56% { opacity: 0; transform: translateY(8px); }
+  62%, 100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-ch-2 {
+  0%, 62% { opacity: 0; transform: translateY(8px); }
+  68%, 100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-ch-3 {
+  0%, 68% { opacity: 0; transform: translateY(8px); }
+  74%, 100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-actions {
+  0%, 72% { opacity: 0; transform: translateY(8px); }
+  80%, 100% { opacity: 1; transform: none; }
+}
+
+.hiw-field-1 { animation: hiw-field-1 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-field-2 { animation: hiw-field-2 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-field-3 { animation: hiw-field-3 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-field-4 { animation: hiw-field-4 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-incoming { opacity: 0; animation: hiw-incoming 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-ring { opacity: 0; animation: hiw-ring 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-answered { animation: hiw-answered 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-wave { transform-origin: center bottom; transform: scaleY(0.6); }
+.hiw-wave-a { animation: hiw-wave-a 16s ease-in-out infinite both; }
+.hiw-wave-b { animation: hiw-wave-b 16s ease-in-out infinite both; }
+.hiw-lead { animation: hiw-lead 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-ch-1 { animation: hiw-ch-1 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-ch-2 { animation: hiw-ch-2 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-ch-3 { animation: hiw-ch-3 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-actions { animation: hiw-actions 16s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+
 /* Notice enter/exit. Shift family: opacity + transform, --motion-fast. */
 .desk-notice {
   opacity: 0;
@@ -524,7 +610,21 @@ h3,
   .landing-rise,
   .landing-drift,
   .desk-live-ping,
-  .desk-just-landed::after {
+  .desk-just-landed::after,
+  .hiw-field-1,
+  .hiw-field-2,
+  .hiw-field-3,
+  .hiw-field-4,
+  .hiw-incoming,
+  .hiw-ring,
+  .hiw-answered,
+  .hiw-wave-a,
+  .hiw-wave-b,
+  .hiw-lead,
+  .hiw-ch-1,
+  .hiw-ch-2,
+  .hiw-ch-3,
+  .hiw-actions {
     animation: none;
   }
 
