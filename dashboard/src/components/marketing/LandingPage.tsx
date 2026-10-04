@@ -75,7 +75,7 @@ export function LandingPage({
           </nav>
         </header>
 
-        <section className="flex flex-1 flex-col justify-center py-16 sm:py-20">
+        <section className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[minmax(0,36rem)_minmax(16rem,1fr)] sm:py-20">
           <div className="max-w-xl">
             <div className="landing-rise landing-rise-delay-1 flex items-center gap-3">
               <span className="relative inline-flex h-14 w-14 shrink-0 sm:h-16 sm:w-16">
@@ -122,6 +122,19 @@ export function LandingPage({
                 </Link>
               ) : null}
             </div>
+          </div>
+          <div className="rounded-2xl bg-white p-6 text-brand-900 sm:p-8" aria-hidden>
+            <Image
+              src={brandAssets.iconTransparent}
+              alt=""
+              width={40}
+              height={40}
+              className="h-10 w-10 object-contain"
+            />
+            <p className="mt-6 text-sm text-ink-soft">Incoming</p>
+            <p className="mt-1 font-display text-3xl tracking-tight text-ink">Client</p>
+            <p className="mt-6 text-sm text-ink-soft">Answered</p>
+            <p className="mt-1 text-base text-ink">Call assistant</p>
           </div>
         </section>
 
@@ -245,7 +258,7 @@ export function LandingPage({
 
       <section id="packages" className="bg-canvas px-6 py-16 text-ink sm:px-8">
         <div className="mx-auto max-w-desk">
-          <PackagePrices board={offers} />
+          <PackagePrices board={offers} actionHref={actionHref} actionLabel={actionLabel} />
         </div>
       </section>
     </main>

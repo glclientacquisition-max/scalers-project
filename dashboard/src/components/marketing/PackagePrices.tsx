@@ -30,11 +30,11 @@ function PlanCard({
       <h3 className="font-display text-title text-ink">{pack.name}</h3>
       <p className="mt-4 font-display text-display tabular-nums text-ink">{packagePriceLabel(price)}</p>
       <p className="mt-1 text-meta text-ink-soft">{period === "month" ? "Per month" : "Per year"}</p>
-      <p className="mt-5 font-display text-title tabular-nums text-ink">
-        {pack.minutes.toLocaleString("en-KE")}
-        <span className="ml-1 text-meta font-normal text-ink-soft">min</span>
-      </p>
-      <dl className="mt-4 border-t border-line">
+      <dl className="mt-6 border-t border-line">
+        <div className="flex items-baseline justify-between gap-3 border-b border-line py-2">
+          <dt className="text-meta text-ink-soft">Minutes</dt>
+          <dd className="text-body tabular-nums text-ink">{pack.minutes.toLocaleString("en-KE")}</dd>
+        </div>
         {INCLUDED.map((row) => (
           <div key={row.key} className="flex items-baseline justify-between gap-3 border-b border-line py-2">
             <dt className="text-meta text-ink-soft">{row.label}</dt>
@@ -46,7 +46,15 @@ function PlanCard({
   );
 }
 
-export function PackagePrices({ board }: { board: PublicPackageBoard }) {
+export function PackagePrices({
+  board,
+  actionHref = "/signup",
+  actionLabel = "Sign up",
+}: {
+  board: PublicPackageBoard;
+  actionHref?: string;
+  actionLabel?: string;
+}) {
   const [period, setPeriod] = useState<"month" | "year">("month");
   const packs = board.packages;
   const anchorSku = packs.length === 3 ? "growth" : "";
@@ -88,10 +96,10 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
       </p>
 
       <Link
-        href="/signup"
-        className="mt-6 inline-flex min-h-12 items-center justify-center rounded-lg bg-accent px-6 text-base font-medium text-accent-on focus-visible:outline-none focus-visible:shadow-focus"
+        href={actionHref}
+        className="mt-8 inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-900 px-6 text-base font-medium text-white focus-visible:outline-none focus-visible:shadow-focus"
       >
-        Create workspace
+        {actionLabel}
       </Link>
     </div>
   );
