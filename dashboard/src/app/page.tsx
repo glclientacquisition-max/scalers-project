@@ -14,7 +14,7 @@ const display = Sora({
 export default function Home() {
   return (
     <div className={`${display.variable} contents`}>
-      <Suspense fallback={<LandingPage />}>
+      <Suspense fallback={<LandingPage signedIn={false} />}>
         <HomeGate />
       </Suspense>
     </div>
@@ -26,7 +26,6 @@ async function HomeGate() {
     getAuthUser(),
     isLegacyAuthenticated(),
   ]);
-  if (user) redirect("/home");
-  if (legacy) redirect("/admin");
-  return <LandingPage />;
+  if (legacy && !user) redirect("/admin");
+  return <LandingPage signedIn={Boolean(user)} />;
 }
