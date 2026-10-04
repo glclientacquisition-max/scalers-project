@@ -64,7 +64,7 @@
       "text": "Bei ni 1500/=. Asante sana.",
       "callLanguage": "sw",
       "expectLanguage": "sw",
-      "expectProductionText": "Bei ni shilingi elfu moja mia tano. Asante sana."
+      "expectProductionText": "Bei ni shilingi elfu moja na mia tano. Asante sana."
     },
     {
       "id": "24-price-slash-hyphen-sw",
@@ -458,7 +458,7 @@
       "text": "Bei ni Ksh 2,500/=.",
       "callLanguage": "sw",
       "expectLanguage": "sw",
-      "expectProductionText": "Bei ni shilingi elfu mbili mia tano."
+      "expectProductionText": "Bei ni shilingi elfu mbili na mia tano."
     },
     {
       "id": "52-sw-numeric-clock-period",
