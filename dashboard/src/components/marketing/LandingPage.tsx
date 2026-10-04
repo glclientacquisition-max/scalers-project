@@ -1,15 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { brandAssets } from "@/components/brand/assets";
-import { PackagePrices } from "@/components/marketing/PackagePrices";
-import { strawPublicBoard, type PublicPackageBoard } from "@/lib/packageCatalog";
 
 /**
- * Logged-out marketing home: hero, then the package table.
+ * Logged-out marketing home. Package prices stay off this page until pricing is ready.
  * Authenticated users never see this.
  */
-export function LandingPage({ board }: { board?: PublicPackageBoard }) {
-  const offers = board ?? strawPublicBoard();
+export function LandingPage() {
   return (
     <main>
       <section className="relative min-h-dvh overflow-hidden">
@@ -35,12 +32,6 @@ export function LandingPage({ board }: { board?: PublicPackageBoard }) {
             Scalers
           </span>
           <nav className="flex items-center gap-2">
-            <a
-              href="#packages"
-              className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus"
-            >
-              Packages
-            </a>
             <Link
               href="/login"
               className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus"
@@ -100,11 +91,6 @@ export function LandingPage({ board }: { board?: PublicPackageBoard }) {
       </div>
       </section>
 
-      <section id="packages" className="bg-canvas px-6 py-16 text-ink sm:px-8">
-        <div className="mx-auto max-w-desk">
-          <PackagePrices board={offers} />
-        </div>
-      </section>
     </main>
   );
 }
