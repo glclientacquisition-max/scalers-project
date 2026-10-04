@@ -493,70 +493,61 @@ h3,
   animation: desk-land-fade var(--motion-land) var(--motion-ease) both;
 }
 
-/* One sequence. Hero: the call is answered. How it works: Desk, call, inbox, then the steps.
-   Base styles are the settled frames. */
-.hero-call { position: relative; min-height: 16rem; }
-.hero-in, .hero-out { position: absolute; inset: 0; }
+/* Hero call plays once: Incoming, one ring, then Answered. The two states never share opacity.
+   How it works: three mocks rise once. The step sentences stay put. */
+.hero-call { display: grid; }
+.hero-in, .hero-out { grid-area: 1 / 1; }
 .hero-in { opacity: 1; }
 .hero-out { opacity: 0; }
-.hero-wave { transform-origin: center bottom; transform: scaleY(0.55); }
+.hero-ring { opacity: 0; transform: scale(0.86); }
+.hero-book { opacity: 0; transform: translateY(8px); }
+.hero-wave { transform-origin: center bottom; transform: scaleY(1); }
 
-.hiw-pane { position: relative; min-height: 24rem; }
-.hiw-scene { position: absolute; inset: 0; opacity: 0; transform: translateX(12px); }
-.hiw-scene-desk { opacity: 1; transform: none; }
+.hiw-mock { opacity: 0; transform: translateY(12px); }
 
-.hero-call[data-play="1"] .hero-in { animation: hero-in 5.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.hero-call[data-play="1"] .hero-out { animation: hero-out 5.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.hero-call[data-play="1"] .hero-ring { animation: hero-ring 5.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.hero-call[data-play="1"] .hero-wave-a { animation: hero-wave-a 5.5s ease-in-out both; }
-.hero-call[data-play="1"] .hero-wave-b { animation: hero-wave-b 5.5s ease-in-out both; }
+.hero-call[data-play="1"] .hero-in { animation: hero-in 7s ease-out both; }
+.hero-call[data-play="1"] .hero-out { animation: hero-out 7s ease-out both; }
+.hero-call[data-play="1"] .hero-ring { animation: hero-ring 7s ease-out both; }
+.hero-call[data-play="1"] .hero-book { animation: hero-book 7s ease-out both; }
+.hero-call[data-play="1"] .hero-wave-a { animation: hero-wave-a 7s ease-out both; }
+.hero-call[data-play="1"] .hero-wave-b { animation: hero-wave-b 7s ease-out both; }
 
-.hiw-stage[data-play="1"] .hiw-scene-desk { animation: seq-desk 12s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.hiw-stage[data-play="1"] .hiw-scene-call { animation: seq-call 12s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.hiw-stage[data-play="1"] .hiw-scene-inbox { animation: seq-inbox 12s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.hiw-stage[data-play="1"] .hiw-steps { animation: seq-steps 12s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-mock { animation: hiw-rise 0.6s ease-out both; }
+.hiw-stage[data-play="1"] .hiw-mock:nth-child(2) { animation-delay: 0.12s; }
+.hiw-stage[data-play="1"] .hiw-mock:nth-child(3) { animation-delay: 0.24s; }
 
 @keyframes hero-in {
-  0%, 42% { opacity: 1; transform: none; }
-  58%, 100% { opacity: 0; transform: translateY(-8px); }
+  0%, 34% { opacity: 1; }
+  44%, 100% { opacity: 0; }
 }
 @keyframes hero-out {
-  0%, 46% { opacity: 0; transform: translateY(10px); }
-  64%, 100% { opacity: 1; transform: none; }
+  0%, 48% { opacity: 0; }
+  60%, 100% { opacity: 1; }
 }
 @keyframes hero-ring {
-  0%, 18% { opacity: 0; transform: scale(0.84); }
-  28% { opacity: 0.85; transform: scale(1); }
-  40% { opacity: 0; transform: scale(1.4); }
-  100% { opacity: 0; transform: scale(1.2); }
+  0%, 8% { opacity: 0; transform: scale(0.86); }
+  16% { opacity: 0.9; transform: scale(1); }
+  28%, 100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes hero-book {
+  0%, 66% { opacity: 0; transform: translateY(8px); }
+  78%, 100% { opacity: 1; transform: none; }
 }
 @keyframes hero-wave-a {
-  0%, 60% { transform: scaleY(0.35); }
-  72% { transform: scaleY(1); }
-  84% { transform: scaleY(0.45); }
-  100% { transform: scaleY(0.7); }
+  0%, 60% { transform: scaleY(1); }
+  72% { transform: scaleY(0.4); }
+  86% { transform: scaleY(1); }
+  100% { transform: scaleY(1); }
 }
 @keyframes hero-wave-b {
-  0%, 60% { transform: scaleY(0.7); }
-  76% { transform: scaleY(0.3); }
-  90%, 100% { transform: scaleY(0.85); }
+  0%, 64% { transform: scaleY(1); }
+  76% { transform: scaleY(1.12); }
+  90% { transform: scaleY(0.72); }
+  100% { transform: scaleY(1); }
 }
-@keyframes seq-desk {
-  0%, 22% { opacity: 1; transform: none; }
-  30%, 100% { opacity: 0; transform: translateX(-12px); }
-}
-@keyframes seq-call {
-  0%, 24% { opacity: 0; transform: translateX(12px); }
-  32%, 52% { opacity: 1; transform: none; }
-  60%, 100% { opacity: 0; transform: translateX(-12px); }
-}
-@keyframes seq-inbox {
-  0%, 54% { opacity: 0; transform: translateX(12px); }
-  64%, 100% { opacity: 1; transform: none; }
-}
-@keyframes seq-steps {
-  0%, 72% { opacity: 0; transform: translateY(10px); }
-  84%, 100% { opacity: 1; transform: none; }
+@keyframes hiw-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* Notice enter/exit. Shift family: opacity + transform, --motion-fast. */
@@ -598,12 +589,10 @@ h3,
     animation: none !important;
   }
   .hero-in,
-  .hiw-scene-desk,
-  .hiw-scene-call,
-  .hero-ring { opacity: 0 !important; }
+  .hero-ring { display: none !important; }
   .hero-out,
-  .hiw-scene-inbox,
-  .hiw-steps {
+  .hero-book,
+  .hiw-mock {
     opacity: 1 !important;
     transform: none !important;
   }

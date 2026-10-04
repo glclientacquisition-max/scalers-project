@@ -3,7 +3,7 @@ import Link from "next/link";
 import { brandAssets } from "@/components/brand/assets";
 import { HeroCall, HowStage } from "@/components/marketing/LandingStory";
 import { PackagePrices } from "@/components/marketing/PackagePrices";
-import { strawPublicBoard, type PublicPackageBoard } from "@/lib/packageCatalog";
+import { emptyPublicBoard, type PublicPackageBoard } from "@/lib/packageCatalog";
 
 /**
  * Marketing home: hero, how it works, then the package table.
@@ -16,7 +16,7 @@ export function LandingPage({
   board?: PublicPackageBoard;
   signedIn?: boolean;
 }) {
-  const offers = board ?? strawPublicBoard();
+  const offers = board ?? emptyPublicBoard();
   const actionHref = signedIn ? "/home" : "/signup";
   const actionLabel = signedIn ? "Dashboard" : "Sign up";
   return (
@@ -134,7 +134,7 @@ export function LandingPage({
         <div className="mx-auto max-w-desk">
           <h2 className="font-display text-display text-ink">How it works</h2>
           <HowStage>
-          <ol className="mt-10 max-w-xl space-y-5 text-base leading-relaxed text-ink">
+          <ol className="max-w-xl space-y-5 text-base leading-relaxed text-ink">
             <li className="flex gap-4">
               <span className="font-display text-ink-soft">1</span>
               <span>You set the business in the Desk: who you are, hours, services, and the answers.</span>

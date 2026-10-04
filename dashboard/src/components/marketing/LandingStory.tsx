@@ -44,13 +44,13 @@ export function HeroCall() {
         <p className="mt-6 text-sm text-ink-soft">Answered</p>
         <p className="mt-1 font-display text-3xl tracking-tight">Client</p>
         <p className="mt-2 text-base">Call assistant</p>
-        <div className="mt-5 flex h-7 items-end gap-1">
-          {["a", "b", "a", "b", "a"].map((kind, i) => (
-            <span
-              key={i}
-              className={`hero-wave inline-block w-1 rounded-full bg-accent ${kind === "a" ? "hero-wave-a h-6" : "hero-wave-b h-4"}`}
-            />
-          ))}
+        <p className="hero-book mt-3 text-sm text-ink-soft">They asked for a booking.</p>
+        <div className="mt-5 flex h-7 items-end gap-1 overflow-hidden">
+          <span className="hero-wave hero-wave-a inline-block h-4 w-1 rounded-full bg-accent" />
+          <span className="hero-wave hero-wave-b inline-block h-6 w-1 rounded-full bg-accent" />
+          <span className="hero-wave hero-wave-a inline-block h-3 w-1 rounded-full bg-accent" />
+          <span className="hero-wave hero-wave-b inline-block h-7 w-1 rounded-full bg-accent" />
+          <span className="hero-wave hero-wave-a inline-block h-5 w-1 rounded-full bg-accent" />
         </div>
       </div>
     </div>
@@ -68,8 +68,8 @@ export function HowStage({ children }: { children: ReactNode }) {
   const ref = usePlayOnView();
   return (
     <div ref={ref} className="hiw-stage mt-10">
-      <div className="hiw-pane" aria-hidden>
-        <div className="hiw-scene hiw-scene-desk overflow-hidden rounded-2xl border border-line bg-surface">
+      <div className="grid gap-4 md:grid-cols-3" aria-hidden>
+        <div className="hiw-mock overflow-hidden rounded-2xl border border-line bg-surface">
           <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
             <Mark className="h-5 w-5 object-contain" />
             <p className="text-sm font-medium">Desk</p>
@@ -83,14 +83,13 @@ export function HowStage({ children }: { children: ReactNode }) {
             ))}
           </ul>
         </div>
-        <div className="hiw-scene hiw-scene-call flex flex-col justify-center overflow-hidden rounded-2xl bg-gradient-to-b from-brand-800 to-brand-900 px-6 py-8 text-white">
-          <Mark className="h-12 w-12 object-contain" />
-          <p className="mt-6 text-sm text-sky-100/80">Incoming</p>
-          <p className="mt-1 font-display text-3xl tracking-tight">Client</p>
-          <p className="mt-6 text-sm text-sky-100/80">Answered</p>
-          <p className="mt-1 text-base">Call assistant</p>
+        <div className="hiw-mock flex flex-col justify-center overflow-hidden rounded-2xl border border-line bg-surface p-4">
+          <p className="text-sm text-ink-soft">Answered</p>
+          <p className="mt-1 font-display text-2xl tracking-tight">Client</p>
+          <p className="mt-2 text-base">Call assistant</p>
+          <p className="mt-3 text-sm text-ink-soft">They asked for a booking.</p>
         </div>
-        <div className="hiw-scene hiw-scene-inbox overflow-hidden rounded-2xl border border-line bg-surface">
+        <div className="hiw-mock overflow-hidden rounded-2xl border border-line bg-surface">
           <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
             <Mark className="h-5 w-5 object-contain" />
             <p className="text-sm font-medium">Inbox</p>
@@ -102,17 +101,7 @@ export function HowStage({ children }: { children: ReactNode }) {
               <p className="text-caption text-ink-soft">Needs you</p>
             </div>
           </div>
-          <div className="flex items-start gap-2 border-t border-line px-3 py-3">
-            <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-attention" />
-            <div>
-              <p className="text-sm font-medium">Client</p>
-              <p className="text-caption text-ink-soft">Missed</p>
-            </div>
-          </div>
           <div className="flex flex-wrap gap-2 border-t border-line px-3 py-2.5">
-            <span className="rounded-lg border border-ok/40 bg-ok-soft px-2 py-1 text-caption font-medium text-ok">
-              Mark done
-            </span>
             <span className="rounded-lg border border-line px-2 py-1 text-caption font-medium">Call</span>
             <span className="rounded-lg bg-whatsapp/15 px-2 py-1 text-caption font-medium text-whatsapp-deep">
               WhatsApp
@@ -123,7 +112,7 @@ export function HowStage({ children }: { children: ReactNode }) {
           </div>
         </div>
       </div>
-      <div className="hiw-steps">{children}</div>
+      <div className="mt-10">{children}</div>
     </div>
   );
 }
