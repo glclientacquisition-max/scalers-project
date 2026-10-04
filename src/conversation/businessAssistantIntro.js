@@ -61,14 +61,24 @@ function customInviteText(opts = {}) {
   return invite;
 }
 
+function capitalizeSentence(text) {
+  const line = String(text || '');
+  if (!line) return line;
+  return line.charAt(0).toUpperCase() + line.slice(1);
+}
+
 function greetingHelpLine(opts = {}) {
   const invite = customInviteText(opts);
   if (!invite) return 'How can I help?';
-  if (/[.!?…]$/.test(invite)) return invite;
-  if (/^(how|what|where|when|who|which|can|could|would|may)\b/i.test(invite)) {
-    return `${invite}?`;
+  let line = invite;
+  if (!/[.!?…]$/.test(line)) {
+    if (/^(how|what|where|when|who|which|can|could|would|may)\b/i.test(line)) {
+      line = `${line}?`;
+    } else {
+      line = `${line}.`;
+    }
   }
-  return `${invite}.`;
+  return capitalizeSentence(line);
 }
 
 function isDefaultShopName(value) {
@@ -192,7 +202,7 @@ function formatOfferingClause(raw) {
  * Shop-first identity. Morning/evening is a first-word swap only.
  * Empty spoken name and empty invite keep today's line:
  * "Good evening, {business}, this is {agent}."
- * A short invite switches the name beat to "{shop}. {agent} here."
+ * A short invite stays its own later sentence. The name stays in this one.
  * @returns {string} e.g. "ChapterOne Bookstore, this is Aisha."
  */
 function composeOpenerIdentity(opts = {}) {
@@ -201,9 +211,6 @@ function composeOpenerIdentity(opts = {}) {
   const tod = eatTimeOfDay(opts.now || new Date());
   const day = dayWordPrefix(tod);
   if (!isDefaultAgentName(agentName)) {
-    if (customInviteText(opts)) {
-      return `${day}${businessName}. ${agentName} here.`;
-    }
     return `${day}${businessName}, this is ${agentName}.`;
   }
   return `${day}${businessName}.`;

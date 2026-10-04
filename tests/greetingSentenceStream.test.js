@@ -69,6 +69,10 @@ describe('greeting streams one push per sentence', () => {
     assert.match(iife, /speakGreetingSentences\(greetingLine,/);
     assert.match(iife, /greetingCacheKey:\s*found\.key/);
     assert.match(iife, /speakGreetingSentences\(fallback\)/);
+    const fallbackAt = iife.indexOf('const fallback = buildGreeting');
+    assert.ok(fallbackAt > 0);
+    const fallbackCall = iife.slice(fallbackAt, fallbackAt + 420);
+    assert.match(fallbackCall, /vertical:\s*brainProfile\?\.vertical \|\| ''/);
     assert.doesNotMatch(iife, /speakText\(/);
     assert.doesNotMatch(iife, /cutNoAiSlop/);
     assert.match(serverSource, /speed: speedForLanguage\(prepared\.language\)/);

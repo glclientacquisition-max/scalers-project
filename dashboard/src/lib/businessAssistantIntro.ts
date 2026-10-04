@@ -82,14 +82,23 @@ function customInviteText(opts: BusinessAssistantIntroOpts = {}): string {
   return invite;
 }
 
+function capitalizeSentence(text: string): string {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function greetingHelpLine(opts: BusinessAssistantIntroOpts = {}): string {
   const invite = customInviteText(opts);
   if (!invite) return "How can I help?";
-  if (/[.!?…]$/.test(invite)) return invite;
-  if (/^(how|what|where|when|who|which|can|could|would|may)\b/i.test(invite)) {
-    return `${invite}?`;
+  let line = invite;
+  if (!/[.!?…]$/.test(line)) {
+    if (/^(how|what|where|when|who|which|can|could|would|may)\b/i.test(line)) {
+      line = `${line}?`;
+    } else {
+      line = `${line}.`;
+    }
   }
-  return `${invite}.`;
+  return capitalizeSentence(line);
 }
 
 function isDefaultAgentName(value: unknown): boolean {
@@ -170,9 +179,6 @@ function composeOpenerIdentity(opts: BusinessAssistantIntroOpts = {}): string {
   const tod = eatTimeOfDay(opts.now || new Date());
   const day = dayWordPrefix(tod);
   if (!isDefaultAgentName(agentName)) {
-    if (customInviteText(opts)) {
-      return `${day}${businessName}. ${agentName} here.`;
-    }
     return `${day}${businessName}, this is ${agentName}.`;
   }
   return `${day}${businessName}.`;

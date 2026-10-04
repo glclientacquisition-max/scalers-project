@@ -282,8 +282,9 @@ describe('business assistant introduction', () => {
     });
     assert.equal(
       line,
-      'Good evening, Done and Dusted. Amina here. Tell me the clean you need.'
+      'Good evening, Done and Dusted, this is Amina. Tell me the clean you need.'
     );
+    assert.doesNotMatch(line, /Amina here\./);
     assert.doesNotMatch(line, /Limited/);
     assert.ok(
       introLooksValid(line, 'Done and Dusted Cleaning Services Limited', 'Amina', {
@@ -317,8 +318,9 @@ describe('business assistant introduction', () => {
     });
     assert.equal(
       line,
-      'ChapterOne Bookstore. Aisha here. Tell me what you want to order.'
+      'ChapterOne Bookstore, this is Aisha. Tell me what you want to order.'
     );
+    assert.doesNotMatch(line, /Aisha here\./);
   });
 
   it('keeps How can I help when the invite is empty', () => {
@@ -350,9 +352,41 @@ describe('business assistant introduction', () => {
       now: evening,
     });
     assert.match(line, /^Good evening, Done and Dusted Cleaning Services Lim/);
+    assert.match(line, /, this is Amina\./);
     assert.doesNotMatch(line, /paragraph/);
-    const shop = line.split('.')[0].replace(/^Good evening, /, '');
+    const shop = line
+      .split('.')[0]
+      .replace(/^Good evening, /, '')
+      .replace(/, this is Amina$/, '');
     assert.ok(shop.length <= 40, shop);
+  });
+
+
+  it('keeps Shy inside the shop sentence and capitalizes a question invite', () => {
+    const line = composeBusinessAssistantIntro({
+      businessName: 'Done and Dusted Cleaning Services',
+      spokenName: 'Done and Dusted',
+      agentName: 'Shy',
+      greetingInvite: 'where are we cleaning',
+      vertical: 'home_services',
+      isOpen: false,
+      afterHoursMode: 'serve',
+      now: evening,
+    });
+    assert.equal(
+      line,
+      "Good evening, Done and Dusted, this is Shy. You can speak in English or Kiswahili. We're closed now. Where are we cleaning?"
+    );
+    assert.match(line, /Done and Dusted, this is Shy\./);
+    assert.doesNotMatch(line, /Shy here\./);
+    assert.match(line, /Where are we cleaning\?/);
+    assert.ok(
+      introLooksValid(line, 'Done and Dusted Cleaning Services', 'Shy', {
+        spokenName: 'Done and Dusted',
+        greetingInvite: 'where are we cleaning',
+        vertical: 'home_services',
+      })
+    );
   });
 
   it('treats the business as a default shop name', () => {

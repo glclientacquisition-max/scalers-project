@@ -3615,6 +3615,7 @@ mediaWss.on('connection', (ws, req) => {
           agentName,
           spokenName,
           greetingInvite,
+          vertical: brainProfile?.vertical || '',
           servicesCatalog: brainProfile.servicesCatalog,
           servicesOffered: brainProfile.servicesOffered,
           isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
