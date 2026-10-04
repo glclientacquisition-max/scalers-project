@@ -1969,8 +1969,6 @@ export function TenantForm({
               options={AFTER_HOURS_OPTIONS.map((opt) => ({
                 id: opt.id,
                 label: opt.label,
-                disabled: opt.disabled,
-                hint: opt.disabled ? opt.blurb : undefined,
               }))}
               onChange={setAfterHoursMode}
             />

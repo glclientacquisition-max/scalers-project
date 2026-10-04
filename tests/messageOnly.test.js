@@ -443,3 +443,155 @@ describe('message only lock', () => {
     assert.doesNotMatch(header, /KEEP SERVING/);
   });
 });
+
+
+const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+const { observeCallerTurn } = require('../src/conversation/brainState');
+const { composeBusinessAssistantIntro: composeIntro } = require('../src/conversation/businessAssistantIntro');
+
+function messageTurn(state, text, profile) {
+  return observeCallerTurn(state, {
+    text,
+    detectedLanguage: 'en',
+    resolvedLanguage: 'en',
+    profile,
+    entities: extractConversationEntities(text, { profile, state }),
+  });
+}
+
+describe('message name lock', () => {
+  const alvinCard = {
+    name: 'Alvin',
+    fileOwnerName: 'Alvin',
+    sharedLine: false,
+    greetByName: true,
+    alternateNames: ['Brian'],
+    nextAppointment: 'carpet, Thursday 10 AM',
+    openVisits: ['carpet, Thursday 10 AM'],
+  };
+
+  it('asks the file name on the opener and does not ask it again', () => {
+    const profile = { vertical: 'home_services', afterHoursMode: 'message', callerMemory: { ...alvinCard } };
+    assert.equal(
+      composeIntro({
+        businessName: 'Done and Dusted',
+        agentName: 'Aisha',
+        isOpen: true,
+        afterHoursMode: 'message',
+        callerFileName: 'Alvin',
+        now: new Date('2026-08-13T10:00:00.000Z'),
+      }),
+      'Done and Dusted, this is Aisha. I can take a message. Am I speaking with Alvin?'
+    );
+    const state = createBrainState(profile);
+    assert.equal(state.caller.fileNameAsked, 'Alvin');
+    assert.equal(state.caller.fileNameAskSpoken, true);
+    const hello = messageTurn(state, 'Hello', profile);
+    assert.equal(hello.caller.nameConfirmed, false);
+    assert.equal(hello.caller.fileNameAsked, 'Alvin');
+    const prompt = formatBrainStateForPrompt(hello);
+    assert.match(prompt, /File name already asked: Alvin/);
+    assert.match(prompt, /Do not ask for a name/);
+    assert.doesNotMatch(prompt, /Thursday 10 AM/);
+    assert.doesNotMatch(prompt, /Ask once: Am I speaking with Alvin/);
+    const decision = determineNextBestAction({
+      state: { ...hello, intent: 'booking', goal: { missingSlots: ['name', 'when'], status: 'open' } },
+      capabilities: locked,
+    });
+    assert.doesNotMatch(String(decision.reason || ''), /May I have your name|Ask once: Am I speaking/i);
+  });
+
+  it('binds yes only after the file-name ask and ignores a compliment', () => {
+    const profile = { vertical: 'home_services', afterHoursMode: 'message', callerMemory: { ...alvinCard } };
+    const state = createBrainState(profile);
+    state.caller.fileNameAskSpoken = false;
+    state.caller.fileNameAsked = null;
+    const early = messageTurn(state, 'Yes', profile);
+    assert.equal(early.caller.nameConfirmed, false);
+
+    const asked = createBrainState(profile);
+    const bound = messageTurn(asked, 'Yes', profile);
+    assert.equal(bound.caller.name, 'Alvin');
+    assert.equal(bound.caller.nameConfirmed, true);
+    assert.equal(bound.entities.name.source, 'caller_file');
+    assert.doesNotMatch(formatBrainStateForPrompt(bound), /Thursday 10 AM/);
+
+    const junk = messageTurn(createBrainState(profile), "Actually, I'm impressed by your work", profile);
+    assert.equal(junk.caller.name, null);
+    assert.equal(junk.caller.nameConfirmed, false);
+    assert.equal(junk.caller.fileNameAsked, 'Alvin');
+  });
+
+  it('does not keep an I am span that is not the file name', () => {
+    const profile = { vertical: 'home_services', afterHoursMode: 'message', callerMemory: { ...alvinCard } };
+    const state = messageTurn(createBrainState(profile), "I'm Brian", profile);
+    assert.equal(state.caller.name, null);
+    assert.equal(state.caller.nameConfirmed, false);
+    assert.equal(state.caller.name, null);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /Thursday/);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /nothing is saved/i);
+  });
+
+  it('asks once when no name is on file and does not auto-confirm I am', () => {
+    const profile = { vertical: 'home_services', afterHoursMode: 'message' };
+    const said = messageTurn(createBrainState(profile), "I'm Alvin", profile);
+    assert.equal(said.caller.name, 'Alvin');
+    assert.equal(said.caller.nameConfirmed, false);
+    assert.equal(said.entities.name.source, 'caller_im');
+    assert.match(formatBrainStateForPrompt(said), /Do not ask for the name again/);
+    const continued = messageTurn(said, 'Please call me about the sofa', profile);
+    assert.equal(continued.caller.name, 'Alvin');
+    assert.equal(continued.caller.nameConfirmed, true);
+    const junk = messageTurn(createBrainState(profile), "Actually, I'm impressed by your work", profile);
+    assert.equal(junk.caller.name, null);
+  });
+
+  it('saves the held name on the callback and still drops a clock', async () => {
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_service_request":{"type":"callback","name":"impressed by your","item":"Call about the sofa","when_text":"tomorrow at 9 AM"}}###ENDTOOL###'
+    );
+    let saved = null;
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities: locked,
+      heldCallerName: 'Alvin',
+      handlers: {
+        createServiceRequest: async (request) => {
+          saved = request;
+          return { id: 'req_1', request_type: request.type, status: 'open' };
+        },
+      },
+    });
+    assert.equal(execution.results[0].status, 'succeeded');
+    assert.equal(saved.name, 'Alvin');
+    assert.equal(saved.whenText, '');
+    assert.doesNotMatch(JSON.stringify(saved), /9 AM|impressed/i);
+
+    const onlyClock = parseGeminiResponse(
+      '###TOOL###{"create_service_request":{"type":"callback","name":"Jane","when_text":"tomorrow at 9 AM"}}###ENDTOOL###'
+    );
+    let clockCalls = 0;
+    const clocked = await executeBrainTools({
+      parsed: onlyClock,
+      capabilities: locked,
+      handlers: {
+        createServiceRequest: async () => {
+          clockCalls += 1;
+          return { id: 'req_2' };
+        },
+      },
+    });
+    assert.equal(clockCalls, 0);
+    assert.notEqual(clocked.results[0].status, 'succeeded');
+  });
+
+  it('does not set the file-name ask on the full assistant', () => {
+    const serve = createBrainState({
+      afterHoursMode: 'serve',
+      callerMemory: { name: 'Alvin', fileOwnerName: 'Alvin' },
+    });
+    assert.equal(serve.messageOnly, false);
+    assert.equal(serve.caller.fileNameAskSpoken, false);
+    assert.equal(serve.caller.fileNameAsked, null);
+  });
+});

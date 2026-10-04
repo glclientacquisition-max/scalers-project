@@ -250,7 +250,15 @@ function guardSpokenReply(text, ctx = {}) {
   let appendCallback = false;
   if (locked) {
     const callerText = String((ctx.callerTurns || []).slice(-1)[0] || '');
-    const shaped = shapeMessageOnlySpeech(raw, { callerText });
+    const shaped = shapeMessageOnlySpeech(raw, {
+      callerText,
+      nameAlreadyAsked: Boolean(
+        ctx.state?.caller?.nameConfirmed ||
+          ctx.state?.caller?.fileNameAskSpoken ||
+          ctx.state?.caller?.messageNameAskSpoken ||
+          ctx.state?.caller?.name
+      ),
+    });
     raw = shaped.text;
     appendCallback = shaped.appendCallback;
     if (!raw && appendCallback) return messageOnlyCallbackLine(ctx.language);

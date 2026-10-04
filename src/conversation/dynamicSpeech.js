@@ -43,6 +43,7 @@ function fallbackGreeting(businessName, opts = {}) {
     isOpen: opts.isOpen,
     afterHoursMode: opts.afterHoursMode,
     closureNotice: opts.closureNotice,
+    callerFileName: opts.callerFileName || opts.fileOwnerName,
     now: opts.now,
     variant: opts.variant,
   });
@@ -95,6 +96,7 @@ async function generateDynamicGreeting(opts) {
     isOpen,
     afterHoursMode,
     closureNotice,
+    callerFileName: opts.callerFileName || opts.fileOwnerName,
     ...offeringOpts,
   };
   const instant = fallbackGreeting(businessName, introOpts);

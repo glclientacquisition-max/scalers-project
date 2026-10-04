@@ -37,7 +37,12 @@ const {
   speakerPendingOnFile,
   returningFileFromCard,
 } = require('./callerMemory');
-const { isMessageOnlyMode } = require('./messageOnly');
+const {
+  isMessageOnlyMode,
+  messageFileOwnerName,
+  messageNamePlausible,
+  reconcileMessageOnlyName,
+} = require('./messageOnly');
 const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
@@ -256,7 +261,7 @@ function createBrainState(profile = {}) {
     },
     profile.callerMemory
   );
-  return {
+  const state = {
     version: 2,
     vertical: String(profile.vertical || 'general'),
     caller: {
@@ -264,6 +269,9 @@ function createBrainState(profile = {}) {
       phone: caller.phone || null,
       nameConfirmed: Boolean(caller.nameConfirmed),
       nameCollision: Array.isArray(caller.nameCollision) ? caller.nameCollision : null,
+      fileNameAsked: null,
+      fileNameAskSpoken: false,
+      messageNameAskSpoken: false,
     },
     returning: returningFileFromCard(profile.callerMemory),
     language: {
@@ -331,6 +339,16 @@ function createBrainState(profile = {}) {
     },
     messageOnly: isMessageOnlyMode(profile.afterHoursMode),
   };
+  if (state.messageOnly) {
+    const owner = messageFileOwnerName(profile, state.returning);
+    if (owner && messageNamePlausible(owner)) {
+      state.caller.fileNameAsked = owner;
+      state.caller.fileNameAskSpoken = true;
+    } else {
+      state.caller.messageNameAskSpoken = true;
+    }
+  }
+  return state;
 }
 
 function observeCallerTurn(state, input = {}) {
@@ -477,6 +495,22 @@ function observeCallerTurn(state, input = {}) {
   next.caller.name = nameResolution.name || null;
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
   next.caller.nameCollision = nameResolution.nameCollision || null;
+  if (next.messageOnly) {
+    const reconciled = reconcileMessageOnlyName({
+      previousCaller: state?.caller || {},
+      text,
+      resolution: nameResolution,
+      profile: input.profile,
+      returning: next.returning,
+    });
+    next.caller.name = reconciled.name;
+    next.caller.nameConfirmed = reconciled.nameConfirmed;
+    next.caller.fileNameAsked = reconciled.fileNameAsked;
+    next.caller.fileNameAskSpoken = reconciled.fileNameAskSpoken;
+    next.caller.messageNameAskSpoken = reconciled.messageNameAskSpoken;
+    if (reconciled.entitiesName) next.entities.name = reconciled.entitiesName;
+    else delete next.entities.name;
+  }
   applyLiveCallerFile(input.profile, next);
   if (next.caller.name && !entityValue(next.entities.name)) {
     next.entities.name = {
@@ -918,6 +952,20 @@ function recordActionResults(state, results = []) {
 }
 
 function formatNameConfirmForPrompt(state) {
+  if (state?.messageOnly) {
+    const locked = String(state?.caller?.name || '').trim();
+    if (state?.caller?.nameConfirmed && locked) {
+      return `- Caller name: ${locked} (confirmed). Use this spelling. Do not ask for the name again. The callback uses this name. Do not read a visit.`;
+    }
+    const pending = String(state?.caller?.fileNameAsked || '').trim();
+    if (state?.caller?.fileNameAskSpoken && pending) {
+      return `- File name already asked: ${pending}. Use ${pending}. Do not ask for a name. Do not say May I have your name. A yes or "my name is ${pending}" locks it. Do not read open visits, holds, or callbacks. Do not say nothing is open.`;
+    }
+    if (locked) {
+      return `- Caller name is known (${locked}). Do not ask for the name again. Do not confirm a compliment. Take the message. Do not read a visit.`;
+    }
+    return '- Name was already asked once. Do not ask again. Save a name only after they say a plausible one. A compliment is not a name. Do not read a visit.';
+  }
   const name = String(state?.caller?.name || '').trim();
   const pair = Array.isArray(state?.caller?.nameCollision)
     ? state.caller.nameCollision.filter(Boolean)
@@ -990,7 +1038,10 @@ function formatBrainStateForPrompt(state) {
             nextVisit: null,
             recentBookings: [],
           }
-        : value.returning
+        : value.returning,
+      value.messageOnly
+        ? { fileNameAskSpoken: value.caller?.fileNameAskSpoken === true }
+        : undefined
     ),
     value.conversation?.nonConsentAck
       ? '- Acknowledgment only (Then, Okay, Sawa, or leave it). Not a quantity, a time, or a yes. Do not invent a count. Do not say a visit or order is saved.'
@@ -1003,13 +1054,16 @@ function formatBrainStateForPrompt(state) {
       : '',
     value.conversation?.phatic
       ? value.messageOnly
-        ? '- Phatic turn: one short well, then ask for the name if it is missing and take a message. Do not read a visit. Do not invent a time.'
+        ? value.caller?.fileNameAskSpoken
+          ? `- Phatic turn: one short well, then take a message. File name ${value.caller.fileNameAsked} already asked. Do not ask for a name. Do not read a visit. Do not say nothing is open.`
+          : '- Phatic turn: one short well, then take a message. The name was already asked. Do not ask again. Do not read a visit. Do not invent a time.'
         : speakerPendingOnFile(value.returning)
         ? '- Phatic turn: one short well, then offer help. Do not ask who is speaking. Do not use the file name. Do not list services.'
         : value.returning?.nextVisit && returningFileUsable(value.returning)
           ? '- Phatic turn: one short well, then the open visit. Do not list services or start a new book.'
           : '- Phatic turn: they only greeted or asked how you are. One short well, then offer help. Do not ask who is speaking. Do not list services, prices, or jobs.'
       : '',
+    (value.messageOnly && String(value.caller?.fileNameAsked || '').trim()) ||
     hasReadableFile(value)
       ? ''
       : '- FILE: nothing is saved for this speaker. Do not talk as if a booking, order, or hold exists. If they ask again, or sound confused, repeat that nothing is saved. Do not offer to reschedule or cancel.',

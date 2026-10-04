@@ -42,8 +42,15 @@ function hasAnyEntity(entities, keys) {
 }
 
 function slotFilled(state, requirement) {
-  if (requirement.slot === 'name' && String(state?.caller?.name || '').trim()) {
-    return true;
+  if (requirement.slot === 'name') {
+    if (String(state?.caller?.name || '').trim()) return true;
+    if (
+      state?.messageOnly &&
+      state?.caller?.fileNameAskSpoken === true &&
+      String(state?.caller?.fileNameAsked || '').trim()
+    ) {
+      return true;
+    }
   }
   return hasAnyEntity(state?.entities || {}, requirement.anyOf);
 }
@@ -244,7 +251,14 @@ function formatControlVoiceForPrompt(state) {
 
 function formatGoalRequirementsForPrompt(state) {
   if (state?.messageOnly) {
-    return 'Message only. Answer services, prices, hours, and where the business is from the file. Do not ask which service to book, a day, a time, or a place. If they want a visit, say you will take a message and the team will call them. Ask for a name only to save that message.';
+    const pending = String(state?.caller?.fileNameAsked || '').trim();
+    const locked = state?.caller?.nameConfirmed ? String(state?.caller?.name || '').trim() : '';
+    const nameLine = locked
+      ? `The name is ${locked}. Do not ask for it again.`
+      : pending && state?.caller?.fileNameAskSpoken
+        ? `File name already asked: ${pending}. Use ${pending}. Do not ask for a name. Do not say May I have your name.`
+        : 'The name was already asked once. Do not ask again. A compliment is not a name.';
+    return `Message only. Answer services, prices, hours, and where the business is from the file. Do not ask which service to book, a day, a time, or a place. If they want a visit, say you will take a message and the team will call them. ${nameLine} Do not read a visit.`;
   }
   const missing = Array.isArray(state?.goal?.missingSlots)
     ? state.goal.missingSlots

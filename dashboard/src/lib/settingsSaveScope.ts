@@ -5,7 +5,7 @@
  *
  * Identity does not own places or policies. The hours location line is owned by
  * Locations, which is the screen that edits it. Hours owns the weekly grid only.
- * Voice (`tools`) owns after_hours_mode (Message only). It also posts handoff_mode
+ * Voice (`tools`) owns after_hours_mode (Message only or Full assistant). It also posts handoff_mode
  * with the rest of the form. Team owns that field, so a Voice save keeps the stored
  * handoff mode, directory, lexicon, catalogs, and FAQs.
  */

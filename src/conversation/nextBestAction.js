@@ -69,10 +69,16 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
           'Message only. Answer the fact from the file. Do not ask which service to book, a day, a time, or a place.',
       };
     }
+    const pending = String(state?.caller?.fileNameAsked || '').trim();
+    const asked =
+      state?.caller?.nameConfirmed === true ||
+      state?.caller?.fileNameAskSpoken === true ||
+      state?.caller?.messageNameAskSpoken === true;
     return {
       action: ACTIONS.CAPTURE,
-      reason:
-        'Message only. Do not ask which service to book, a day, a time, or a place. Say you will take a message and the team will call. Ask for a name only if it is missing.',
+      reason: asked
+        ? `Message only. Do not ask which service to book, a day, a time, or a place. Say you will take a message and the team will call. Do not ask for the name again.${pending ? ` Use ${pending}.` : ''}`
+        : 'Message only. Do not ask which service to book, a day, a time, or a place. Say you will take a message and the team will call. Ask for a name only if it is missing.',
     };
   }
 

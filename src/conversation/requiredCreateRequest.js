@@ -7,6 +7,7 @@ const { appendVisitNotes } = require('./visitLocation');
 const { looksLikeLeaveIt, looksLikeNonConsentAck } = require('./callCorrectives');
 const { clockPhrase, dayCue, whenHasClockTime } = require('./visitTime');
 const { numbersIn } = require('./numberWords');
+const { callbackNotesWithoutClock, heldMessageCallerName } = require('./messageOnly');
 
 const REQUEST_INTENTS = new Set([
   'hold',
@@ -284,11 +285,14 @@ function ensureRequiredCreateRequest(parsed, state = {}, capabilities = {}) {
       const whenText = String(
         next.serviceRequest.whenText || next.serviceRequest.when_text || ''
       ).trim();
+      const held = heldMessageCallerName(state.caller);
       next.serviceRequest = {
         ...next.serviceRequest,
         whenText: '',
         when_text: '',
-        notes: notes || (!item ? whenText : notes),
+        when: '',
+        name: held || next.serviceRequest.name,
+        notes: callbackNotesWithoutClock(notes, whenText, item),
       };
     }
     return next;

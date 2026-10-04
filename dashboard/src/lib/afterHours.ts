@@ -4,7 +4,6 @@ export const AFTER_HOURS_OPTIONS: {
   id: AfterHoursMode;
   label: string;
   blurb: string;
-  disabled?: boolean;
 }[] = [
   {
     id: "message",
@@ -14,8 +13,7 @@ export const AFTER_HOURS_OPTIONS: {
   {
     id: "serve",
     label: "Full assistant",
-    blurb: "Not ready",
-    disabled: true,
+    blurb: "Answer, book, and change a visit.",
   },
 ];
 

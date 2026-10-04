@@ -40,8 +40,9 @@ describe("business settings depth", () => {
     const modes = read("dashboard/src/lib/afterHours.ts");
     assert.match(modes, /label: "Message only"/);
     assert.match(modes, /label: "Full assistant"/);
-    assert.match(modes, /blurb: "Not ready"/);
-    assert.match(modes, /disabled: true/);
+    assert.match(modes, /Answer, book, and change a visit/);
+    assert.doesNotMatch(modes, /Not ready/);
+    assert.doesNotMatch(modes, /disabled:\s*true/);
     assert.doesNotMatch(modes, /Keep helping/);
     assert.doesNotMatch(modes, /missing access|upgrade|Gemini|Soniox|GPT/i);
     assert.match(form, /title="When unsure"/);

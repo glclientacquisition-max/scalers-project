@@ -49,7 +49,7 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Locations | Places table `lg+`, stacked phone | Unchanged dense table. Add place ghost |
 | Policies | Two-column textarea grid | Grouped Rules stacks. When unsure stack |
 | Team | Handoff chips. Notify chips | Live connect switch when transfer can run (Team only — handoff off Voice, #514). People table `lg+` with **Role** column. Status: Rings {name} during open hours. |
-| Voice | Voice chips. Tool switches. Hear sample bordered | Voice select. On a call: Message only, or Full assistant greyed Not ready. Tool switches. Hear sample ghost. |
+| Voice | Voice chips. Tool switches. Hear sample bordered | Voice select. On a call: Message only or Full assistant, both selectable. Tool switches. Hear sample ghost. |
 | Pronunciation | Coach with duplicate heading | Coach. Embedded heading is sr-only. Studio modes use underline tabs. No sticky Save — header **Saves live - no sticky Save** |
 | Updates | Duration chips. Live cards | Duration segmented. Live grouped list. Post update filled. Clear ghost |
 | Import | Radio cards. Native checkboxes | Paste / Website segmented. Include flags are switches. Scan / Add filled |
@@ -110,7 +110,7 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | Voice | select (4+) | `soniox_voice_id` | Assistant on calls |
 | Voice label | input | `soniox_voice_label` | Whole business (desk label) |
 | Hear sample | ghost | preview blob only | This device |
-| On a call | segmented. Message only can be selected. Full assistant stays visible, grey, and cannot be selected. Label is Not ready, not missing access | `after_hours_mode` (`message`, or stored `serve`) | Assistant on calls |
+| On a call | segmented. Message only or Full assistant. Both can be selected. Message only takes a name and a message. Full assistant answers, books, and changes a visit. Selecting Full assistant does not force message only | `after_hours_mode` (`message` or `serve`) | Assistant on calls |
 | Alert a teammate | switch | `tool_escalate` | Assistant on calls |
 | Hang up after goodbye | switch | `tool_end_call` | Assistant on calls |
 | Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |

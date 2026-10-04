@@ -91,7 +91,11 @@ const {
   buildBrainCapabilities,
   formatAuthorityPolicy,
 } = require('./src/conversation/brainPolicy');
-const { applyMessageOnlyCapabilities } = require('./src/conversation/messageOnly');
+const {
+  applyMessageOnlyCapabilities,
+  messageFileOwnerName,
+  heldMessageCallerName,
+} = require('./src/conversation/messageOnly');
 const { determineNextBestAction } = require('./src/conversation/nextBestAction');
 const { logBrainTrace } = require('./src/conversation/brainObservability');
 const {
@@ -1893,6 +1897,8 @@ mediaWss.on('connection', (ws, req) => {
         isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
         afterHoursMode,
         closureNotice,
+        callerFileName:
+          afterHoursMode === 'message' ? messageFileOwnerName(profile) : '',
       });
       messages = [{ role: 'system', content: systemPrompt }];
       profileLoaded = true;
@@ -3408,6 +3414,8 @@ mediaWss.on('connection', (ws, req) => {
         isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
         afterHoursMode,
         closureNotice,
+        callerFileName:
+          afterHoursMode === 'message' ? messageFileOwnerName(brainProfile) : '',
         callSid: sidLabel(),
         mode: 'instant',
       });
@@ -4534,6 +4542,7 @@ async function applyGeminiTools(callSid, parsed) {
       groundedProfile.businessName || process.env.BUSINESS_NAME || '',
     hoursSchedule: groundedProfile.hoursSchedule || null,
     nameConfirmed: state.caller?.nameConfirmed === true,
+    heldCallerName: state.messageOnly ? heldMessageCallerName(state.caller) : '',
     openAppointments: groundedProfile.openAppointments || [],
     callerPhone: state.caller?.phone || '',
     knownNames: collectKnownCallerNames({

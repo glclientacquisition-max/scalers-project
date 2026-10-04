@@ -347,12 +347,14 @@ describe("business settings craft", () => {
     const voiceStart = form.indexOf('title="Voice"');
     const voiceChunk = form.slice(voiceStart, voiceStart + 5000);
     assert.match(voiceChunk, /label="On a call"/);
-    assert.match(voiceChunk, /disabled: opt.disabled/);
+    assert.match(voiceChunk, /onChange={setAfterHoursMode}/);
+    assert.doesNotMatch(voiceChunk, /disabled: opt.disabled/);
+    assert.doesNotMatch(voiceChunk, /Not ready/);
     const modes = read("dashboard/src/lib/afterHours.ts");
     assert.match(modes, /label: "Message only"/);
     assert.match(modes, /label: "Full assistant"/);
-    assert.match(modes, /Not ready/);
-    assert.match(modes, /disabled: true/);
+    assert.doesNotMatch(modes, /Not ready/);
+    assert.doesNotMatch(modes, /disabled:\s*true/);
     assert.match(form, /lg:hidden/);
     assert.doesNotMatch(
       form,

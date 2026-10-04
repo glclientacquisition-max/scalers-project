@@ -18,6 +18,7 @@ export type BusinessAssistantIntroOpts = {
   isOpen?: boolean | null;
   afterHoursMode?: string | null;
   closureNotice?: string | null;
+  callerFileName?: string | null;
   /** Fixed clock for deterministic previews */
   now?: Date;
   variant?: 0 | 1;
@@ -163,7 +164,11 @@ export function composeBusinessAssistantIntro(
   const identity = composeOpenerIdentity(opts);
   const invite = languageInviteClause(opts);
   const help = "How can I help?";
-  const nameAsk = "May I have your name?";
+  const fileName = String(opts.callerFileName || "").trim();
+  const nameAsk =
+    fileName && /^[\p{L}][\p{L}'’\- ]{0,39}$/u.test(fileName)
+      ? `Am I speaking with ${fileName}?`
+      : "May I have your name?";
 
   if (closureNotice) {
     const follow = afterHoursMode === "message" ? nameAsk : help;

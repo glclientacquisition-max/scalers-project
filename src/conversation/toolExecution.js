@@ -9,7 +9,7 @@ const {
 const { canonicalizeCallerName } = require('./callerNameMatch');
 const { isJunkCallerName } = require('./callerNameQuality');
 const { confirmationLanguage } = require('./language');
-const { messageOnlyCallbackLine } = require('./messageOnly');
+const { messageOnlyCallbackLine, callbackNotesWithoutClock, heldMessageCallerName, messageNamePlausible } = require('./messageOnly');
 const {
   readVisitPlace,
   classifyVisitLocation,
@@ -564,6 +564,7 @@ async function executeBrainTools({
   hoursSchedule = null,
   now = new Date(),
   nameConfirmed = true,
+  heldCallerName = '',
   openAppointments = [],
   callerPhone = '',
   knownNames = [],
@@ -585,6 +586,14 @@ async function executeBrainTools({
   }
 
   if (parsed?.serviceRequest && capabilities.messageOnly) {
+    const heldName = heldMessageCallerName({
+      name: heldCallerName,
+      nameConfirmed: Boolean(String(heldCallerName || '').trim()),
+    });
+    if (heldName) parsed.serviceRequest = { ...parsed.serviceRequest, name: heldName };
+    else if (!messageNamePlausible(parsed.serviceRequest.name)) {
+      parsed.serviceRequest = { ...parsed.serviceRequest, name: '' };
+    }
     const typeRaw = String(parsed.serviceRequest.type || '').trim().toLowerCase();
     if (typeRaw !== 'callback') {
       results.push({
@@ -606,13 +615,17 @@ async function executeBrainTools({
       const notes = String(parsed.serviceRequest.notes || '').trim();
       const item = String(parsed.serviceRequest.item || '').trim();
       const whenText = String(
-        parsed.serviceRequest.whenText || parsed.serviceRequest.when_text || ''
+        parsed.serviceRequest.whenText ||
+          parsed.serviceRequest.when_text ||
+          parsed.serviceRequest.when ||
+          ''
       ).trim();
       parsed.serviceRequest = {
         ...parsed.serviceRequest,
         whenText: '',
         when_text: '',
-        notes: notes || (!item ? whenText : notes),
+        when: '',
+        notes: callbackNotesWithoutClock(notes, whenText, item),
       };
     }
   }
