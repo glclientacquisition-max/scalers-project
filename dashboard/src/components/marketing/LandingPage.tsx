@@ -5,11 +5,19 @@ import { PackagePrices } from "@/components/marketing/PackagePrices";
 import { strawPublicBoard, type PublicPackageBoard } from "@/lib/packageCatalog";
 
 /**
- * Logged-out marketing home: hero, then the package table.
- * Authenticated users never see this.
+ * Marketing home: hero, then the package table.
+ * Authenticated owners get a direct path back to their workspace.
  */
-export function LandingPage({ board }: { board?: PublicPackageBoard }) {
+export function LandingPage({
+  board,
+  signedIn = false,
+}: {
+  board?: PublicPackageBoard;
+  signedIn?: boolean;
+}) {
   const offers = board ?? strawPublicBoard();
+  const actionHref = signedIn ? "/home" : "/signup";
+  const actionLabel = signedIn ? "Dashboard" : "Sign up";
   return (
     <main>
       <section className="relative min-h-dvh overflow-hidden">
@@ -41,12 +49,29 @@ export function LandingPage({ board }: { board?: PublicPackageBoard }) {
             >
               Packages
             </a>
-            <Link
-              href="/login"
-              className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus"
-            >
-              Sign in
-            </Link>
+            {signedIn ? (
+              <Link
+                href={actionHref}
+                className="inline-flex min-h-11 items-center rounded-xl bg-white px-4 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus"
+              >
+                {actionLabel}
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href={actionHref}
+                  className="inline-flex min-h-11 items-center rounded-xl bg-white px-4 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus"
+                >
+                  {actionLabel}
+                </Link>
+              </>
+            )}
           </nav>
         </header>
 
@@ -79,17 +104,19 @@ export function LandingPage({ board }: { board?: PublicPackageBoard }) {
 
             <div className="landing-rise landing-rise-delay-4 mt-10 flex flex-wrap items-center gap-3">
               <Link
-                href="/signup"
+                href={actionHref}
                 className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-6 py-3 text-base font-medium text-brand-900 transition hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus"
               >
-                Create workspace
+                {actionLabel}
               </Link>
-              <Link
-                href="/login"
-                className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/30 px-6 py-3 text-base font-medium text-white transition hover:border-white/55 hover:bg-white/5 focus-visible:outline-none focus-visible:shadow-focus"
-              >
-                Sign in
-              </Link>
+              {!signedIn ? (
+                <Link
+                  href="/login"
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/30 px-6 py-3 text-base font-medium text-white transition hover:border-white/55 hover:bg-white/5 focus-visible:outline-none focus-visible:shadow-focus"
+                >
+                  Sign in
+                </Link>
+              ) : null}
             </div>
           </div>
         </section>
