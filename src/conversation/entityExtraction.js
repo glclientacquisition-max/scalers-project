@@ -250,6 +250,22 @@ function extractCorrectedName(text, opts = {}) {
   });
 }
 
+function bareAskedFileName(text, pending) {
+  const asked = String(pending || '').trim();
+  if (!asked || isJunkCallerName(asked)) return false;
+  let raw = String(text || '')
+    .trim()
+    .replace(/[.!?]+$/g, '')
+    .trim();
+  raw = raw.replace(/^(?:uh+|um+|erm+|er+|ah+|eh+|hmm+)[, ]+/i, '').trim();
+  raw = raw.replace(/[.!?]+$/g, '').trim();
+  if (!raw || isJunkCallerName(raw)) return false;
+  const askedWords = asked.split(/\s+/).filter(Boolean);
+  const heardWords = raw.split(/\s+/).filter(Boolean);
+  if (heardWords.length !== askedWords.length) return false;
+  return namesLikelySame(raw, asked);
+}
+
 function affirmsAskedFileName(text, pending, extracted) {
   const asked = String(pending || '').trim();
   if (!asked) return false;
@@ -376,6 +392,13 @@ function applyCallerNameConfirmation(
       const locked = fileLockedName(pending, knownNames) || pending;
       return done(locked, true, 'caller_file', 0.95);
     }
+  }
+
+  // "Uh, Alvin" after the file-name ask is that name, not a longer span.
+  if (!prevConfirmed && opts.fileNameJustAsked && bareAskedFileName(text, opts.pendingFileName)) {
+    const pending = String(opts.pendingFileName || '').trim();
+    const locked = fileLockedName(pending, knownNames) || pending;
+    return done(locked, true, 'caller_file', 0.95);
   }
 
   if (!prevName && extracted) {

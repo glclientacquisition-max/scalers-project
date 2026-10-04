@@ -4,6 +4,7 @@ const {
   createBrainState,
   observeCallerTurn,
   formatBrainStateForPrompt,
+  setNextBestAction,
 } = require('../src/conversation/brainState');
 const { determineNextBestAction } = require('../src/conversation/nextBestAction');
 const {
@@ -18,7 +19,8 @@ const { openLineHoldDecision, shouldPublishOpenFileSentence, formatNameConfirmSp
 const fs = require('fs');
 const path = require('path');
 const { ensureRequiredEscalate } = require('../src/conversation/requiredEscalate');
-const { executeBrainTools } = require('../src/conversation/toolExecution');
+const { executeBrainTools, formatToolConfirmation } = require('../src/conversation/toolExecution');
+const { guardSpokenReply } = require('../src/conversation/speechGuard');
 const { parseGeminiResponse } = require('../src/conversation/toolMarkers');
 const { buildSttContext, isSttContextEnabled } = require('../src/speech/sttContext');
 
@@ -344,5 +346,110 @@ describe('caller name stays the file name', () => {
     assert.equal(said.entities.name.value, 'Alvin');
     assert.equal(fileNameAskLine(said), '');
     assert.equal(extractName('This is Alvin speaking.'), 'Alvin');
+  });
+
+  it('asks the file name after a finished greeting and keeps it for the note', async () => {
+    const profile = { vertical: 'home_services', afterHoursMode: 'serve', callerMemory: { ...alvinCard } };
+    const caps = {
+      escalate: true,
+      createAppointment: true,
+      createServiceRequest: true,
+      saveCallerInfo: true,
+    };
+    const booking = turn(
+      createBrainState(profile),
+      'I want carpet cleaning around ABC tomorrow at Westlands at 9:00 AM',
+      profile
+    );
+    const gate = planCallerModelTurn(booking, {
+      greetingBarged: false,
+      fileNameAskCommitted: false,
+    });
+    assert.equal(gate.runModel, false);
+    assert.equal(gate.line, 'Am I speaking with Alvin?');
+    assert.doesNotMatch(gate.line, /May I have your name|name, please|carpet|visit|tomorrow/i);
+
+    booking.caller.fileNameAskSpoken = true;
+    const heard = turn(booking, 'Uh, Alvin.', profile);
+    assert.equal(heard.caller.name, 'Alvin');
+    assert.notEqual(heard.caller.name, 'Uh Alvin');
+    assert.equal(heard.caller.nameConfirmed, true);
+    assert.equal(heard.entities.name.source, 'caller_file');
+    assert.equal(fileNameAskLine(heard), '');
+
+    const yesBranch = turn(booking, "Yes, you're speaking with Alvin.", profile);
+    assert.equal(yesBranch.caller.name, 'Alvin');
+    assert.equal(yesBranch.caller.nameConfirmed, true);
+
+    const timePhrase = turn(booking, 'Ataround', profile);
+    assert.notEqual(timePhrase.caller.name, 'Ataround');
+    assert.equal(timePhrase.caller.nameConfirmed, false);
+
+    let state = heard;
+    state = turn(state, 'what else do you offer?', profile);
+    state = turn(state, 'window cleaning', profile);
+    state = turn(state, 'do you remember my name?', profile);
+    assert.equal(state.caller.name, 'Alvin');
+    assert.equal(state.caller.nameConfirmed, true);
+    assert.equal(fileNameAskLine(state), '');
+    const rememberPrompt = formatBrainStateForPrompt(state);
+    assert.doesNotMatch(rememberPrompt, /May I have your name|Tell me your name|Ask once for their name|Ask once: Am I speaking/i);
+    assert.match(
+      guardSpokenReply('Yes, you are Alvin.', {
+        state,
+        callerTurns: ['do you remember my name?'],
+        language: 'en',
+      }),
+      /Alvin/
+    );
+    assert.equal(
+      guardSpokenReply('Tell me your name so I can reach the team for you.', {
+        state,
+        callerTurns: ['do you remember my name?'],
+        language: 'en',
+      }),
+      'Yes, you are Alvin.'
+    );
+
+    const note = 'Make a note for the team to contact me urgently about the window cleaning';
+    state = turn(state, note, profile);
+    assert.equal(state.caller.name, 'Alvin');
+    assert.equal(state.intent, 'human');
+    const decision = determineNextBestAction({ state, capabilities: caps });
+    assert.notEqual(decision.slot, 'name');
+    assert.doesNotMatch(String(decision.reason || ''), /May I have your name|Tell me your name|Ask once for their name/i);
+    state = setNextBestAction(state, decision);
+    const notePrompt = formatBrainStateForPrompt(state);
+    assert.doesNotMatch(notePrompt, /May I have your name|Tell me your name|Ask once for their name|what is your name/i);
+    assert.equal(fileNameAskLine(state), '');
+    const noteSpeech = guardSpokenReply('Tell me your name so I can reach the team for you.', {
+      state,
+      callerTurns: [note],
+      language: 'en',
+    });
+    assert.doesNotMatch(noteSpeech, /your name|May I have your name|name, please/i);
+
+    const injected = ensureRequiredEscalate({}, state, caps);
+    assert.equal(injected.escalate.name, 'Alvin');
+    assert.doesNotMatch(String(injected.escalate.reason || ''), /^$/);
+
+    let escalatedName = null;
+    const execution = await executeBrainTools({
+      parsed: {
+        escalate: { teammate: 'owner', name: '', reason: note },
+      },
+      capabilities: caps,
+      nameConfirmed: true,
+      heldCallerName: state.caller.name,
+      handlers: {
+        escalate: async (info) => {
+          escalatedName = info.name;
+          return { ok: true, channel: 'whatsapp' };
+        },
+      },
+    });
+    assert.equal(escalatedName, 'Alvin');
+    const spoken = formatToolConfirmation(execution.results, 'en');
+    assert.doesNotMatch(spoken, /your name|May I have your name/i);
   });
 });

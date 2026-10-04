@@ -507,6 +507,12 @@ function pickClarifyProgress(opts = {}) {
 
 function callerNameAlreadyKnown({ brainState = {}, userText = '' } = {}) {
   if (String(brainState?.caller?.name || '').trim()) return true;
+  if (
+    brainState?.caller?.fileNameAskSpoken === true &&
+    String(brainState?.caller?.fileNameAsked || '').trim()
+  ) {
+    return true;
+  }
   const entityName = brainState?.entities?.name;
   const entityValue =
     entityName && typeof entityName === 'object'

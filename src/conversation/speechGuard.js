@@ -64,6 +64,33 @@ function callerAskedForCallback(text) {
   return CALLER_CALLBACK_ASK.test(String(text || ''));
 }
 
+const NAME_ASK_SPEECH =
+  /\b(?:may i have your name|what(?:'s| is) your name|tell me your name|could i (?:have|get) your name|can i (?:have|get) your name|who am i speaking (?:with|to)|your name,? please|name, please|jina lako|niambie jina)\b/i;
+
+const REMEMBERED_NAME_ASK =
+  /\b(?:do you )?remember my name\b|\bwhat(?:'s| is) my name\b|\bdo you know my name\b/i;
+
+function heldCallerName(state) {
+  const confirmed =
+    state?.caller?.nameConfirmed === true ? String(state?.caller?.name || '').trim() : '';
+  if (confirmed) return confirmed;
+  if (state?.caller?.fileNameAskSpoken === true) {
+    const pending = String(state?.caller?.fileNameAsked || '').trim();
+    if (pending) return pending;
+  }
+  return String(state?.caller?.name || '').trim();
+}
+
+function sentenceAsksForCallerName(sentence) {
+  const raw = String(sentence || '').trim();
+  if (!raw || /\bam i speaking with\b/i.test(raw)) return false;
+  return NAME_ASK_SPEECH.test(raw);
+}
+
+function callerAsksRememberedName(text) {
+  return REMEMBERED_NAME_ASK.test(String(text || ''));
+}
+
 /** The booking line and a name confirm are answers, not filler. */
 function isProtectedSpeech(sentence) {
   const raw = String(sentence || '').trim();
@@ -280,7 +307,13 @@ function guardSpokenReply(text, ctx = {}) {
   let droppedNumber = false;
   let droppedJob = false;
   const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
+  const heldName = heldCallerName(ctx.state);
+  let droppedNameAsk = false;
   for (const sentence of splitSentences(raw)) {
+    if (heldName && sentenceAsksForCallerName(sentence)) {
+      droppedNameAsk = true;
+      continue;
+    }
     if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) continue;
     if (ACTION_NARRATION.test(sentence)) continue;
     if (!saved && (SAVED_CLAIM.test(sentence) || JOB_CLOSE.test(sentence))) {
@@ -311,8 +344,22 @@ function guardSpokenReply(text, ctx = {}) {
     );
   }
   if (locked && appendCallback) return messageOnlyCallbackLine(ctx.language);
+  if (!out && heldName && callerAsksRememberedName(lastCallerTurn)) {
+    return `Yes, you are ${heldName}.`;
+  }
+  if (!out && droppedNameAsk) {
+    if (holdOpenSlot && droppedJob) {
+      const slotLine = openSlotLine(ctx.state, ctx.language);
+      if (slotLine && !sentenceAsksForCallerName(slotLine)) return slotLine;
+    }
+    return ctx.allowEmpty ? '' : ackFallback(ctx.language);
+  }
   if (holdOpenSlot && droppedJob) {
-    return ctx.allowEmpty ? '' : openSlotLine(ctx.state, ctx.language);
+    const slotLine = openSlotLine(ctx.state, ctx.language);
+    if (heldName && sentenceAsksForCallerName(slotLine)) {
+      return ctx.allowEmpty ? '' : ackFallback(ctx.language);
+    }
+    return ctx.allowEmpty ? '' : slotLine;
   }
   if (ctx.allowEmpty && !askedNumber) return '';
   return droppedNumber ? unknownFallback(ctx.language) : ackFallback(ctx.language);
