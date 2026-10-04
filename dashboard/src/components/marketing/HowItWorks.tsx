@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { brandAssets } from "@/components/brand/assets";
 
 const STEPS = [
@@ -15,6 +16,9 @@ const DESK_FIELDS = [
   { label: "Answers", beat: "hiw-field-4" },
 ] as const;
 
+const USAGE_ROWS = ["Minutes", "SMS", "Email", "WhatsApp"] as const;
+const RATE_ROWS = ["Calls", "SMS", "Email", "WhatsApp"] as const;
+
 function Mark({ className }: { className: string }) {
   return (
     <Image
@@ -27,13 +31,21 @@ function Mark({ className }: { className: string }) {
   );
 }
 
-function DeskFrame() {
+function FrameShell({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface" aria-hidden>
       <div className="flex items-center gap-2 border-b border-line px-3 py-2">
         <Mark className="h-5 w-5 object-contain" />
-        <p className="text-sm font-medium text-ink">Desk</p>
+        <p className="text-sm font-medium text-ink">{title}</p>
       </div>
+      {children}
+    </div>
+  );
+}
+
+function DeskFrame() {
+  return (
+    <FrameShell title="Desk">
       <div className="grid grid-cols-[6.75rem_1fr]">
         <ul className="border-r border-line py-2 text-xs text-ink-soft">
           <li className="px-2.5 py-1.5">Identity</li>
@@ -52,7 +64,7 @@ function DeskFrame() {
           ))}
         </ul>
       </div>
-    </div>
+    </FrameShell>
   );
 }
 
@@ -90,32 +102,52 @@ function PhoneFrame() {
 
 function InboxFrame() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface" aria-hidden>
-      <div className="flex items-center gap-2 border-b border-line px-3 py-2">
-        <Mark className="h-5 w-5 object-contain" />
-        <p className="text-sm font-medium text-ink">Inbox</p>
-      </div>
-      <div className="hiw-lead px-3 py-3">
-        <div className="flex items-start gap-2">
-          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
-          <div>
-            <p className="text-sm font-medium text-ink">Client</p>
-            <p className="text-xs text-ink-soft">Needs you</p>
-          </div>
-        </div>
-        <ul className="mt-3 flex flex-wrap gap-1.5">
-          <li className="hiw-ch-1 rounded-full border border-line px-2 py-0.5 text-caption font-medium text-ink">
-            SMS
+    <FrameShell title="Inbox">
+      <div className="space-y-2 border-b border-line px-3 py-2.5">
+        <p className="hiw-search rounded-lg border border-line px-2 py-1 text-caption text-ink-soft">
+          Search
+        </p>
+        <ul className="hiw-filter flex flex-wrap gap-1.5">
+          <li className="rounded-full bg-accent-tonal px-2 py-0.5 text-caption font-medium text-accent">
+            Needs you
           </li>
-          <li className="hiw-ch-2 rounded-full bg-whatsapp/15 px-2 py-0.5 text-caption font-medium text-whatsapp-deep">
-            WhatsApp
+          <li className="rounded-full border border-line px-2 py-0.5 text-caption font-medium text-ink">
+            Missed
           </li>
-          <li className="hiw-ch-3 rounded-full border border-line px-2 py-0.5 text-caption font-medium text-ink">
-            Email
+          <li className="rounded-full border border-line px-2 py-0.5 text-caption font-medium text-ink">
+            Answered
           </li>
         </ul>
       </div>
+      <div className="hiw-lead flex items-start gap-2 px-3 py-2.5">
+        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
+        <div>
+          <p className="text-sm font-medium text-ink">Client</p>
+          <p className="text-xs text-ink-soft">Needs you</p>
+        </div>
+      </div>
+      <div className="hiw-missed flex items-start gap-2 border-t border-line px-3 py-2.5">
+        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-attention" />
+        <div>
+          <p className="text-sm font-medium text-ink">Client</p>
+          <p className="text-xs text-ink-soft">Missed</p>
+        </div>
+      </div>
+      <ul className="flex flex-wrap gap-1.5 border-t border-line px-3 py-2.5">
+        <li className="hiw-ch-1 rounded-full border border-line px-2 py-0.5 text-caption font-medium text-ink">
+          SMS
+        </li>
+        <li className="hiw-ch-2 rounded-full bg-whatsapp/15 px-2 py-0.5 text-caption font-medium text-whatsapp-deep">
+          WhatsApp
+        </li>
+        <li className="hiw-ch-3 rounded-full border border-line px-2 py-0.5 text-caption font-medium text-ink">
+          Email
+        </li>
+      </ul>
       <div className="hiw-actions flex flex-wrap gap-2 border-t border-line px-3 py-2.5">
+        <span className="rounded-lg border border-ok/40 bg-ok-soft px-2 py-1 text-caption font-medium text-ok">
+          Mark done
+        </span>
         <span className="rounded-lg border border-line px-2 py-1 text-caption font-medium text-ink">
           Call
         </span>
@@ -126,6 +158,72 @@ function InboxFrame() {
           Send SMS
         </span>
       </div>
+    </FrameShell>
+  );
+}
+
+function ContactsFrame() {
+  return (
+    <div className="hiw-contact">
+      <FrameShell title="Contacts">
+        <p className="border-b border-line px-3 py-2 text-caption text-ink-soft">Name or number</p>
+        <div className="px-3 py-2.5">
+          <p className="text-sm font-medium text-ink">Client</p>
+          <p className="mt-2 text-caption font-medium text-ink-soft">History</p>
+          <ul className="mt-1.5 space-y-1.5">
+            <li className="hiw-history-1 flex items-center justify-between gap-3 text-sm text-ink">
+              <span>Call</span>
+              <span className="text-caption text-ink-soft">Answered</span>
+            </li>
+            <li className="hiw-history-2 flex items-center justify-between gap-3 text-sm text-ink">
+              <span>Call</span>
+              <span className="text-caption text-ink-soft">Missed</span>
+            </li>
+          </ul>
+        </div>
+        <div className="hiw-contact-actions flex gap-2 border-t border-line px-3 py-2.5">
+          <span className="rounded-lg border border-line px-2 py-1 text-caption font-medium text-ink">
+            Call
+          </span>
+          <span className="rounded-lg bg-whatsapp/15 px-2 py-1 text-caption font-medium text-whatsapp-deep">
+            WhatsApp
+          </span>
+        </div>
+      </FrameShell>
+    </div>
+  );
+}
+
+function UsageFrame() {
+  return (
+    <div className="hiw-usage">
+      <FrameShell title="Usage">
+        <div className="px-3 py-3">
+          <p className="text-caption font-medium text-ink-soft">Package</p>
+          <ul className="mt-3 space-y-2.5">
+            {USAGE_ROWS.map((label) => (
+              <li key={label}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-sm text-ink">{label}</p>
+                  <p className="text-caption text-ink-soft">Used</p>
+                </div>
+                <div className="mt-1 h-1.5 rounded-full bg-surface-2" />
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-caption font-medium text-ink-soft">On-demand rates</p>
+          <ul className="mt-1.5">
+            {RATE_ROWS.map((label) => (
+              <li
+                key={label}
+                className="flex items-center justify-between border-b border-line py-1.5 text-sm text-ink last:border-b-0"
+              >
+                <span>{label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </FrameShell>
     </div>
   );
 }
@@ -157,6 +255,10 @@ export function HowItWorks({
             );
           })}
         </ol>
+        <div className="mt-10 grid gap-6 lg:grid-cols-2">
+          <ContactsFrame />
+          <UsageFrame />
+        </div>
         <div className="mt-10">
           <Link
             href={actionHref}
