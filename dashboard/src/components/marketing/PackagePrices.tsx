@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import type { PublicPackageBoard, PublicPackageOffer } from "@/lib/packageCatalog";
 import { formatKes, packagePriceLabel } from "@/lib/packagePriceLabel";
 
@@ -53,12 +52,8 @@ function liveRates(board: PublicPackageBoard): boolean {
 
 export function PackagePrices({
   board,
-  actionHref = "/signup",
-  actionLabel = "Sign up",
 }: {
   board: PublicPackageBoard;
-  actionHref?: string;
-  actionLabel?: string;
 }) {
   const [period, setPeriod] = useState<"month" | "year">("month");
   const packs = board.packages;
@@ -107,12 +102,6 @@ export function PackagePrices({
         </p>
       ) : null}
 
-      <Link
-        href={actionHref}
-        className="mt-8 inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-900 px-6 text-base font-medium text-white focus-visible:outline-none focus-visible:shadow-focus"
-      >
-        {actionLabel}
-      </Link>
     </div>
   );
 }

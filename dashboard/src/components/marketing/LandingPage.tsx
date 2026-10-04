@@ -39,21 +39,21 @@ export function LandingPage({
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-desk flex-col px-6 pb-10 pt-6 sm:px-8">
-        <header className="flex items-center justify-between gap-4 landing-rise">
-          <span className="font-display text-lg tracking-tight text-white sm:text-xl">
+        <header className="flex items-center justify-between gap-3 landing-rise">
+          <span className="shrink-0 font-display text-base tracking-tight text-white sm:text-xl">
             Scalers
           </span>
-          <nav className="flex items-center gap-2">
+          <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
             <a
               href="#packages"
-              className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus"
+              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl px-2 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus sm:px-3"
             >
               Packages
             </a>
             {signedIn ? (
               <Link
                 href={actionHref}
-                className="inline-flex min-h-11 items-center rounded-xl bg-white px-4 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus"
+                className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus sm:px-4"
               >
                 {actionLabel}
               </Link>
@@ -61,13 +61,13 @@ export function LandingPage({
               <>
                 <Link
                   href="/login"
-                  className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus"
+                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl px-2 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus sm:px-3"
                 >
                   Sign in
                 </Link>
                 <Link
                   href={actionHref}
-                  className="inline-flex min-h-11 items-center rounded-xl bg-white px-4 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus"
+                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus sm:px-4"
                 >
                   {actionLabel}
                 </Link>
@@ -76,8 +76,8 @@ export function LandingPage({
           </nav>
         </header>
 
-        <section className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[minmax(0,36rem)_minmax(16rem,1fr)] sm:py-20">
-          <div className="max-w-xl">
+        <section className="grid flex-1 items-stretch gap-10 py-12 lg:grid-cols-2 lg:grid-rows-[minmax(28rem,1fr)] lg:gap-12 lg:py-16">
+          <div className="max-w-xl min-w-0 self-center">
             <div className="landing-rise landing-rise-delay-1 flex items-center gap-3">
               <span className="relative inline-flex h-14 w-14 shrink-0 sm:h-16 sm:w-16">
                 <Image
@@ -94,7 +94,7 @@ export function LandingPage({
               </p>
             </div>
 
-            <h1 className="landing-rise landing-rise-delay-2 mt-8 font-display text-3xl leading-tight tracking-tight text-white sm:text-4xl md:text-[2.75rem]">
+            <h1 className="landing-rise landing-rise-delay-2 mt-8 font-display text-3xl leading-tight tracking-tight text-white sm:text-4xl md:text-[2.75rem] text-balance">
               Your 24-hour call assistant, so you do not miss the client.
             </h1>
 
@@ -133,36 +133,25 @@ export function LandingPage({
       <section className="bg-canvas px-6 py-16 text-ink sm:px-8">
         <div className="mx-auto max-w-desk">
           <h2 className="font-display text-display text-ink">How it works</h2>
-          <HowStage>
-          <ol className="max-w-xl space-y-5 text-base leading-relaxed text-ink">
-            <li className="flex gap-4">
-              <span className="font-display text-ink-soft">1</span>
-              <span>You set the business in the Desk: who you are, hours, services, and the answers.</span>
-            </li>
-            <li className="flex gap-4">
-              <span className="font-display text-ink-soft">2</span>
-              <span>The assistant takes the call.</span>
-            </li>
-            <li className="flex gap-4">
-              <span className="font-display text-ink-soft">3</span>
-              <span>You get SMS, WhatsApp, or email, then work it in the inbox: call back, WhatsApp, or an SMS you approve.</span>
-            </li>
-          </ol>
-          </HowStage>
-          <div className="mt-10">
+          <HowStage />
+        </div>
+      </section>
+
+      <section id="packages" className="bg-canvas px-6 pb-20 pt-4 text-ink sm:px-8">
+        <div className="mx-auto max-w-desk">
+          <PackagePrices board={offers} />
+          <div className="mt-14 max-w-xl">
+            <p className="text-base leading-relaxed text-ink">
+              Scalers is a business assistant that actually helps you run the business, from the
+              client call through to the booking, the order, or whatever comes next.
+            </p>
             <Link
               href={actionHref}
-              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-900 px-6 py-3 text-base font-medium text-white transition hover:bg-brand-800 focus-visible:outline-none focus-visible:shadow-focus"
+              className="mt-6 inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-900 px-6 py-3 text-base font-medium text-white transition hover:bg-brand-800 focus-visible:outline-none focus-visible:shadow-focus"
             >
               {actionLabel}
             </Link>
           </div>
-        </div>
-      </section>
-
-      <section id="packages" className="bg-canvas px-6 py-16 text-ink sm:px-8">
-        <div className="mx-auto max-w-desk">
-          <PackagePrices board={offers} actionHref={actionHref} actionLabel={actionLabel} />
         </div>
       </section>
     </main>
