@@ -493,15 +493,71 @@ h3,
   animation: desk-land-fade var(--motion-land) var(--motion-ease) both;
 }
 
-/* Call mock: one settle, not a loop. Settled text stays readable. */
-@keyframes hiw-call-settle {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: none; }
+/* One sequence. Hero: the call is answered. How it works: Desk, call, inbox, then the steps.
+   Base styles are the settled frames. */
+.hero-call { position: relative; min-height: 16rem; }
+.hero-in, .hero-out { position: absolute; inset: 0; }
+.hero-in { opacity: 1; }
+.hero-out { opacity: 0; }
+.hero-wave { transform-origin: center bottom; transform: scaleY(0.55); }
+
+.hiw-pane { position: relative; min-height: 24rem; }
+.hiw-scene { position: absolute; inset: 0; opacity: 0; transform: translateX(12px); }
+.hiw-scene-desk { opacity: 1; transform: none; }
+
+.hero-call[data-play="1"] .hero-in { animation: hero-in 5.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hero-call[data-play="1"] .hero-out { animation: hero-out 5.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hero-call[data-play="1"] .hero-ring { animation: hero-ring 5.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hero-call[data-play="1"] .hero-wave-a { animation: hero-wave-a 5.5s ease-in-out both; }
+.hero-call[data-play="1"] .hero-wave-b { animation: hero-wave-b 5.5s ease-in-out both; }
+
+.hiw-stage[data-play="1"] .hiw-scene-desk { animation: seq-desk 12s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-scene-call { animation: seq-call 12s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-scene-inbox { animation: seq-inbox 12s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-steps { animation: seq-steps 12s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes hero-in {
+  0%, 42% { opacity: 1; transform: none; }
+  58%, 100% { opacity: 0; transform: translateY(-8px); }
 }
-.hiw-call-settle {
-  animation: hiw-call-settle 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+@keyframes hero-out {
+  0%, 46% { opacity: 0; transform: translateY(10px); }
+  64%, 100% { opacity: 1; transform: none; }
 }
-.hiw-call-settle-late { animation-delay: 0.18s; }
+@keyframes hero-ring {
+  0%, 18% { opacity: 0; transform: scale(0.84); }
+  28% { opacity: 0.85; transform: scale(1); }
+  40% { opacity: 0; transform: scale(1.4); }
+  100% { opacity: 0; transform: scale(1.2); }
+}
+@keyframes hero-wave-a {
+  0%, 60% { transform: scaleY(0.35); }
+  72% { transform: scaleY(1); }
+  84% { transform: scaleY(0.45); }
+  100% { transform: scaleY(0.7); }
+}
+@keyframes hero-wave-b {
+  0%, 60% { transform: scaleY(0.7); }
+  76% { transform: scaleY(0.3); }
+  90%, 100% { transform: scaleY(0.85); }
+}
+@keyframes seq-desk {
+  0%, 22% { opacity: 1; transform: none; }
+  30%, 100% { opacity: 0; transform: translateX(-12px); }
+}
+@keyframes seq-call {
+  0%, 24% { opacity: 0; transform: translateX(12px); }
+  32%, 52% { opacity: 1; transform: none; }
+  60%, 100% { opacity: 0; transform: translateX(-12px); }
+}
+@keyframes seq-inbox {
+  0%, 54% { opacity: 0; transform: translateX(12px); }
+  64%, 100% { opacity: 1; transform: none; }
+}
+@keyframes seq-steps {
+  0%, 72% { opacity: 0; transform: translateY(10px); }
+  84%, 100% { opacity: 1; transform: none; }
+}
 
 /* Notice enter/exit. Shift family: opacity + transform, --motion-fast. */
 .desk-notice {
@@ -535,9 +591,21 @@ h3,
   .landing-drift,
   .desk-live-ping,
   .desk-just-landed::after,
-  .hiw-call-settle,
-  .hiw-call-settle-late {
-    animation: none;
+  .hero-call,
+  .hero-call *,
+  .hiw-stage,
+  .hiw-stage * {
+    animation: none !important;
+  }
+  .hero-in,
+  .hiw-scene-desk,
+  .hiw-scene-call,
+  .hero-ring { opacity: 0 !important; }
+  .hero-out,
+  .hiw-scene-inbox,
+  .hiw-steps {
+    opacity: 1 !important;
+    transform: none !important;
   }
 
   .desk-shift {

@@ -89,6 +89,45 @@ export function PackagePrices({
         ))}
       </div>
 
+      <div className="mt-10 overflow-x-auto">
+        <table className="w-full min-w-[36rem] text-left text-sm">
+          <caption className="sr-only">Included</caption>
+          <thead className="border-b border-line text-ink-soft">
+            <tr>
+              <th scope="col" className="py-2 pr-3 font-medium">Included</th>
+              {packs.map((pack) => (
+                <th key={pack.sku} scope="col" className="px-3 py-2 text-right font-medium text-ink">
+                  {pack.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(
+              [
+                ["Minutes", "minutes"],
+                ["SMS", "sms"],
+                ["Email", "email"],
+                ["WhatsApp", "staffWa"],
+                ["Seats", "seats"],
+                ["Number", "dids"],
+              ] as const
+            ).map(([label, key]) => (
+              <tr key={key} className="border-b border-line">
+                <th scope="row" className="py-3 pr-3 font-normal text-ink-soft">
+                  {label}
+                </th>
+                {packs.map((pack) => (
+                  <td key={pack.sku} className="px-3 py-3 text-right tabular-nums text-ink">
+                    {pack[key].toLocaleString("en-KE")}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <p className="mt-6 max-w-xl text-sm leading-relaxed text-ink-soft">
         On-demand, past included: calls KES {formatKes(board.inboundKesPerMinute)}/min. SMS KES{" "}
         {formatKes(board.smsKes)}. Email KES {formatKes(board.emailKes)}. WhatsApp KES{" "}

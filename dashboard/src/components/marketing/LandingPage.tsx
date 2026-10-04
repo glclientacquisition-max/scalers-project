@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { brandAssets } from "@/components/brand/assets";
+import { HeroCall, HowStage } from "@/components/marketing/LandingStory";
 import { PackagePrices } from "@/components/marketing/PackagePrices";
 import { strawPublicBoard, type PublicPackageBoard } from "@/lib/packageCatalog";
 
@@ -123,19 +124,7 @@ export function LandingPage({
               ) : null}
             </div>
           </div>
-          <div className="rounded-2xl bg-white p-6 text-brand-900 sm:p-8" aria-hidden>
-            <Image
-              src={brandAssets.iconTransparent}
-              alt=""
-              width={40}
-              height={40}
-              className="h-10 w-10 object-contain"
-            />
-            <p className="mt-6 text-sm text-ink-soft">Incoming</p>
-            <p className="mt-1 font-display text-3xl tracking-tight text-ink">Client</p>
-            <p className="mt-6 text-sm text-ink-soft">Answered</p>
-            <p className="mt-1 text-base text-ink">Call assistant</p>
-          </div>
+          <HeroCall />
         </section>
 
       </div>
@@ -144,93 +133,7 @@ export function LandingPage({
       <section className="bg-canvas px-6 py-16 text-ink sm:px-8">
         <div className="mx-auto max-w-desk">
           <h2 className="font-display text-display text-ink">How it works</h2>
-          <div className="mt-10 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,1.15fr)_minmax(0,1fr)]">
-            <div className="overflow-hidden rounded-2xl border border-line bg-surface" aria-hidden>
-              <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
-                <Image
-                  src={brandAssets.iconTransparent}
-                  alt=""
-                  width={20}
-                  height={20}
-                  className="h-5 w-5 object-contain"
-                />
-                <p className="text-sm font-medium text-ink">Desk</p>
-              </div>
-              <ul className="space-y-3 p-3">
-                {[
-                  ["Who you are", "Your business"],
-                  ["Hours", "Your hours"],
-                  ["Services", "Your services"],
-                  ["Answers", "Your answers"],
-                ].map(([label, value]) => (
-                  <li key={label}>
-                    <p className="text-caption text-ink-soft">{label}</p>
-                    <p className="mt-1 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-sm text-ink">
-                      {value}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div
-              className="flex flex-col justify-center overflow-hidden rounded-2xl bg-gradient-to-b from-brand-800 to-brand-900 px-6 py-8 text-white"
-              aria-hidden
-            >
-              <Image
-                src={brandAssets.iconTransparent}
-                alt=""
-                width={48}
-                height={48}
-                className="hiw-call-settle h-12 w-12 object-contain"
-              />
-              <p className="hiw-call-settle hiw-call-settle-late mt-6 text-sm text-sky-100/80">Incoming</p>
-              <p className="hiw-call-settle hiw-call-settle-late mt-1 font-display text-3xl tracking-tight">Client</p>
-              <p className="mt-6 text-sm text-sky-100/80">Answered</p>
-              <p className="mt-1 text-base text-white">Call assistant</p>
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-line bg-surface" aria-hidden>
-              <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
-                <Image
-                  src={brandAssets.iconTransparent}
-                  alt=""
-                  width={20}
-                  height={20}
-                  className="h-5 w-5 object-contain"
-                />
-                <p className="text-sm font-medium text-ink">Inbox</p>
-              </div>
-              <div className="flex items-start gap-2 px-3 py-3">
-                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
-                <div>
-                  <p className="text-sm font-medium text-ink">Client</p>
-                  <p className="text-caption text-ink-soft">Needs you</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2 border-t border-line px-3 py-3">
-                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-attention" />
-                <div>
-                  <p className="text-sm font-medium text-ink">Client</p>
-                  <p className="text-caption text-ink-soft">Missed</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2 border-t border-line px-3 py-2.5">
-                <span className="rounded-lg border border-ok/40 bg-ok-soft px-2 py-1 text-caption font-medium text-ok">
-                  Mark done
-                </span>
-                <span className="rounded-lg border border-line px-2 py-1 text-caption font-medium text-ink">
-                  Call
-                </span>
-                <span className="rounded-lg bg-whatsapp/15 px-2 py-1 text-caption font-medium text-whatsapp-deep">
-                  WhatsApp
-                </span>
-                <span className="rounded-lg bg-accent-tonal px-2 py-1 text-caption font-medium text-accent">
-                  Send SMS
-                </span>
-              </div>
-            </div>
-          </div>
+          <HowStage>
           <ol className="mt-10 max-w-xl space-y-5 text-base leading-relaxed text-ink">
             <li className="flex gap-4">
               <span className="font-display text-ink-soft">1</span>
@@ -245,6 +148,7 @@ export function LandingPage({
               <span>You get SMS, WhatsApp, or email, then work it in the inbox: call back, WhatsApp, or an SMS you approve.</span>
             </li>
           </ol>
+          </HowStage>
           <div className="mt-10">
             <Link
               href={actionHref}
