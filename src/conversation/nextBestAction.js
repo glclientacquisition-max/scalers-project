@@ -116,6 +116,13 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     if (state?.conversation?.phatic && speakerPendingOnFile(returning)) {
       const pending = String(state?.caller?.fileNameAsked || '').trim();
       if (pending && !returning?.sharedLine) {
+        if (state?.caller?.fileNameAskSpoken === true) {
+          return {
+            action: ACTIONS.ANSWER,
+            reason:
+              `File name ${pending} already asked. One short well, then offer help. Do not ask for a name. Do not talk about visits yet. Do not say nothing is open. Do not list services.`,
+          };
+        }
         return {
           action: ACTIONS.ASK_CLARIFICATION,
           slot: 'name',
@@ -245,6 +252,26 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
   if (missingSlots.length) {
     if (missingSlots[0] === 'name' && state?.caller?.nameConfirmed !== true) {
       const pending = String(state?.caller?.fileNameAsked || '').trim();
+      // Code already spoke the file-name ask. Do not tell Gemini to ask again
+      // or treat the file as nameless — keep using the pending name.
+      if (
+        pending &&
+        state?.caller?.fileNameAskSpoken === true &&
+        !state?.returning?.sharedLine
+      ) {
+        const rest = missingSlots.filter((slot) => slot !== 'name');
+        if (rest.length) {
+          return {
+            action: ACTIONS.ASK_CLARIFICATION,
+            slot: rest[0],
+            reason: `File name ${pending} already asked. Use ${pending}. Do not ask for a name. Do not say May I have your name. Ask only for ${rest[0]}.`,
+          };
+        }
+        return {
+          action: ACTIONS.ASK_CLARIFICATION,
+          reason: `File name ${pending} already asked. Use ${pending}. Do not ask for a name. Continue the booking.`,
+        };
+      }
       if (pending && !state?.returning?.sharedLine) {
         return {
           action: ACTIONS.ASK_CLARIFICATION,

@@ -949,7 +949,7 @@ function formatNameConfirmForPrompt(state) {
     const pending = String(state?.caller?.fileNameAsked || '').trim();
     if (pending) {
       if (state?.caller?.fileNameAskSpoken === true) {
-        return `- File name already asked: Am I speaking with ${pending}? Do not ask for a name. Do not say May I have your name. A yes means ${pending}. Do not talk about visits yet. Do not say nothing is open.`;
+        return `- File name already asked: ${pending}. Use ${pending}. Do not ask for a name. Do not say May I have your name. Continue the next missing slot (day, time, place). A yes or "my name is ${pending}" locks it. Do not read open visits, holds, or callbacks unless they ask. Do not say nothing is open.`;
       }
       return `- Ask once, in these words: Am I speaking with ${pending}? Do not greet them as that name. Do not talk about visits yet. Do not say nothing is open. A yes means ${pending}.`;
     }
@@ -1021,7 +1021,9 @@ function formatBrainStateForPrompt(state) {
     `- ${formatRepairForPrompt(value)}`,
     formatNameConfirmForPrompt(value),
     formatHearAgainForPrompt(value),
-    formatReturningFileForCallState(value.returning),
+    formatReturningFileForCallState(value.returning, {
+      fileNameAskSpoken: value.caller?.fileNameAskSpoken === true,
+    }),
     value.conversation?.nonConsentAck
       ? '- Acknowledgment only (Then, Okay, Sawa, or leave it). Not a quantity, a time, or a yes. Do not invent a count. Do not say a visit or order is saved.'
       : '',
@@ -1033,7 +1035,9 @@ function formatBrainStateForPrompt(state) {
       : '',
     value.conversation?.phatic
       ? value.caller?.fileNameAsked
-        ? `- Phatic turn: one short well, then ask once: Am I speaking with ${value.caller.fileNameAsked}? Do not talk about visits yet. Do not say nothing is open.`
+        ? value.caller?.fileNameAskSpoken === true
+          ? `- Phatic turn: one short well, then offer help. File name ${value.caller.fileNameAsked} already asked. Do not ask for a name. Do not talk about visits yet. Do not say nothing is open.`
+          : `- Phatic turn: one short well, then ask once: Am I speaking with ${value.caller.fileNameAsked}? Do not talk about visits yet. Do not say nothing is open.`
         : speakerPendingOnFile(value.returning)
         ? '- Phatic turn: one short well, then offer help. Do not ask who is speaking. Do not use the file name. Do not list services.'
         : value.returning?.nextVisit && returningFileUsable(value.returning)

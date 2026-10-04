@@ -239,6 +239,50 @@ describe('caller name stays the file name', () => {
     assert.doesNotMatch(turnSource, /speakText\(localReply\.line\)/);
   });
 
+
+  it('after the file-name ask was spoken and unanswered, a booking turn keeps the file name and does not ask again', () => {
+    const profile = { vertical: 'home_services', callerMemory: { ...alvinCard } };
+    const asked = turn(createBrainState(profile), 'Hello', profile);
+    assert.equal(asked.caller.fileNameAsked, 'Alvin');
+    assert.equal(fileNameAskLine(asked), 'Am I speaking with Alvin?');
+    asked.caller.fileNameAskSpoken = true;
+    assert.equal(fileNameAskLine(asked), '');
+
+    const booking = turn(asked, 'Ok book carpet cleaning for me', profile);
+    // structuredClone keeps fileNameAskSpoken from the prior state
+    assert.equal(booking.caller.fileNameAskSpoken, true);
+    assert.equal(booking.caller.fileNameAsked, 'Alvin');
+    assert.equal(booking.caller.nameConfirmed, false);
+    assert.equal(booking.intent, 'booking');
+    assert.equal(missingGoalSlots(booking, profile).includes('name'), false);
+
+    const decision = determineNextBestAction({
+      state: booking,
+      capabilities: { createAppointment: true, createServiceRequest: true },
+    });
+    assert.notEqual(decision.slot, 'name');
+    assert.doesNotMatch(
+      String(decision.reason || ''),
+      /Ask once: Am I speaking|May I have your name|No name is on file/i
+    );
+
+    const prompt = formatBrainStateForPrompt(booking);
+    assert.match(prompt, /File name already asked: Alvin/);
+    assert.match(prompt, /Use Alvin/);
+    assert.match(prompt, /Do not ask for a name/);
+    assert.match(prompt, /Do not say May I have your name/);
+    assert.doesNotMatch(prompt, /Ask once: Am I speaking with Alvin/);
+    assert.doesNotMatch(prompt, /Caller name: not on file/);
+    assert.doesNotMatch(prompt, /ask only for name/i);
+
+    // Name-only ask still stands before spoken; compliment guard still holds
+    const junk = turn(asked, "Actually, I'm impressed by your work", profile);
+    assert.equal(junk.caller.name, null);
+    assert.equal(junk.caller.nameConfirmed, false);
+    assert.equal(junk.caller.fileNameAskSpoken, true);
+    assert.equal(fileNameAskLine(junk), '');
+  });
+
   it('puts the file name in Soniox terms without letting the term list decide the name', () => {
     const ctx = buildSttContext({
       businessName: 'Done and Dusted',

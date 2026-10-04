@@ -687,7 +687,7 @@ function formatReturningCallerForPrompt(card) {
   return lines.join('\n');
 }
 
-function formatReturningFileForCallState(returning) {
+function formatReturningFileForCallState(returning, opts = {}) {
   if (!returning || typeof returning !== 'object') return '';
   if (!speakerKnownOnFile(returning)) {
     const who = returning.fileOwnerName || returning.name;
@@ -695,6 +695,9 @@ function formatReturningFileForCallState(returning) {
       return '- Caller file speaker: not bound. Shared line. Do not ask who is speaking unless you are about to save something. Do not use the file name. Do not attach Open or History. Answer what they just said.';
     }
     if (who) {
+      if (opts.fileNameAskSpoken === true) {
+        return `- Caller file speaker: not bound. Phone file for ${who}. File name already asked. Use ${who}. Do not ask for a name. Do not say May I have your name. Continue the next missing slot. A yes or "my name is ${who}" locks it. Do not read open visits, holds, or callbacks unless they ask. Answer what they just said.`;
+      }
       return `- Caller file speaker: not bound. Phone file for ${who}. Ask once: Am I speaking with ${who}? Do not greet them as that name. Do not talk about visits yet. If they say no, do not read this file. Answer what they just said.`;
     }
     return '- Caller file speaker: not bound. Do not attach a visit until they say who they are. Answer what they just said.';
