@@ -494,129 +494,206 @@ h3,
 }
 
 
-/* How it works: one 20s loop. Desk, the call, inbox, contacts, then usage.
-   Base styles are the settled frames. Motion only overrides them. */
-@keyframes hiw-field-1 {
-  0%, 1% { opacity: 0; transform: translateY(10px); }
-  5%, 100% { opacity: 1; transform: none; }
+/* How it works: one Desk window. Scenes push forward once the section is on screen.
+   Base style is the opening Settings frame. Reduced motion stacks every scene. */
+.hiw-stage {
+  display: grid;
+  grid-template-columns: 1fr;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  background: var(--surface);
 }
-@keyframes hiw-field-2 {
-  0%, 3% { opacity: 0; transform: translateY(10px); }
-  7%, 100% { opacity: 1; transform: none; }
+.hiw-rail {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--hairline);
+  padding: 0.5rem;
 }
-@keyframes hiw-field-3 {
-  0%, 5% { opacity: 0; transform: translateY(10px); }
-  9%, 100% { opacity: 1; transform: none; }
+.hiw-rail-item {
+  position: relative;
+  z-index: 1;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.8125rem;
+  color: var(--ink-2);
 }
-@keyframes hiw-field-4 {
-  0%, 7% { opacity: 0; transform: translateY(10px); }
-  11%, 100% { opacity: 1; transform: none; }
+.hiw-pane {
+  position: relative;
+  min-height: 26rem;
+}
+.hiw-scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.85rem 1rem 1rem;
+  opacity: 0;
+  transform: translateX(16px);
+}
+.hiw-scene-desk { opacity: 1; transform: none; }
+.hiw-scene-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.hiw-incoming, .hiw-answered {
+  position: absolute;
+  inset: 2.4rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.hiw-answered { opacity: 0; }
+
+@media (min-width: 768px) {
+  .hiw-stage { grid-template-columns: 8.5rem 1fr; }
+  .hiw-rail {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 0;
+    border-bottom: 0;
+    border-right: 1px solid var(--hairline);
+    padding: 0.75rem 0;
+  }
+  .hiw-rail-mark {
+    position: absolute;
+    left: 0;
+    top: 0.75rem;
+    width: 2px;
+    height: 2.25rem;
+    background: var(--accent);
+    transform: translateY(0);
+  }
+  .hiw-rail-item {
+    display: flex;
+    align-items: center;
+    height: 2.25rem;
+    padding-left: 0.9rem;
+  }
+}
+
+.hiw-stage[data-play="1"] .hiw-scene-desk { animation: hiw-desk 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-scene-call { animation: hiw-call 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-scene-inbox { animation: hiw-inbox 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-scene-contacts { animation: hiw-contacts 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-scene-usage { animation: hiw-usage-scene 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-rail-mark { animation: hiw-rail 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-incoming { animation: hiw-incoming 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-answered { animation: hiw-answered 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-ring { animation: hiw-ring 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-wave-a { animation: hiw-wave-a 11s ease-in-out both; }
+.hiw-stage[data-play="1"] .hiw-wave-b { animation: hiw-wave-b 11s ease-in-out both; }
+.hiw-stage[data-play="1"] .hiw-b1 { animation: hiw-b1 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-b2 { animation: hiw-b2 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-b3 { animation: hiw-b3 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-b4 { animation: hiw-b4 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-s1 { animation: hiw-s1 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-s2 { animation: hiw-s2 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-s3 { animation: hiw-s3 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-s4 { animation: hiw-s4 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-c1 { animation: hiw-c1 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hiw-stage[data-play="1"] .hiw-c2 { animation: hiw-c2 11s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes hiw-desk {
+  0%, 15% { opacity: 1; transform: none; }
+  20%, 100% { opacity: 0; transform: translateX(-16px); }
+}
+@keyframes hiw-call {
+  0%, 16% { opacity: 0; transform: translateX(16px); }
+  21%, 33% { opacity: 1; transform: none; }
+  38%, 100% { opacity: 0; transform: translateX(-16px); }
+}
+@keyframes hiw-inbox {
+  0%, 35% { opacity: 0; transform: translateX(16px); }
+  40%, 56% { opacity: 1; transform: none; }
+  61%, 100% { opacity: 0; transform: translateX(-16px); }
+}
+@keyframes hiw-contacts {
+  0%, 58% { opacity: 0; transform: translateX(16px); }
+  63%, 76% { opacity: 1; transform: none; }
+  81%, 100% { opacity: 0; transform: translateX(-16px); }
+}
+@keyframes hiw-usage-scene {
+  0%, 78% { opacity: 0; transform: translateX(16px); }
+  84%, 100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-rail {
+  0%, 34% { transform: translateY(0); }
+  40%, 58% { transform: translateY(2.25rem); }
+  63%, 78% { transform: translateY(4.5rem); }
+  84%, 100% { transform: translateY(6.75rem); }
 }
 @keyframes hiw-incoming {
-  0%, 12% { opacity: 0; transform: translateY(8px); }
-  16%, 24% { opacity: 1; transform: none; }
-  30%, 100% { opacity: 0; transform: translateY(-6px); }
-}
-@keyframes hiw-ring {
-  0%, 13% { opacity: 0; transform: scale(0.82); }
-  17% { opacity: 0.85; transform: scale(1); }
-  21% { opacity: 0; transform: scale(1.45); }
-  24% { opacity: 0.45; transform: scale(1.05); }
-  28%, 100% { opacity: 0; transform: scale(1.35); }
+  0%, 18% { opacity: 0; transform: translateY(8px); }
+  22%, 27% { opacity: 1; transform: none; }
+  32%, 100% { opacity: 0; transform: translateY(-8px); }
 }
 @keyframes hiw-answered {
-  0%, 26% { opacity: 0; transform: translateY(10px); }
-  32%, 100% { opacity: 1; transform: none; }
+  0%, 28% { opacity: 0; transform: translateY(8px); }
+  33%, 36% { opacity: 1; transform: none; }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-ring {
+  0%, 20% { opacity: 0; transform: scale(0.86); }
+  24% { opacity: 0.8; transform: scale(1); }
+  28%, 100% { opacity: 0; transform: scale(1.35); }
 }
 @keyframes hiw-wave-a {
-  0%, 30% { transform: scaleY(0.35); }
-  38% { transform: scaleY(1); }
-  46% { transform: scaleY(0.4); }
-  56% { transform: scaleY(0.85); }
-  70%, 100% { transform: scaleY(0.55); }
+  0%, 30% { transform: scaleY(0.4); }
+  33% { transform: scaleY(1); }
+  36% { transform: scaleY(0.45); }
 }
 @keyframes hiw-wave-b {
-  0%, 30% { transform: scaleY(0.7); }
-  40% { transform: scaleY(0.35); }
-  50% { transform: scaleY(1); }
-  60% { transform: scaleY(0.45); }
-  74%, 100% { transform: scaleY(0.75); }
+  0%, 30% { transform: scaleY(0.75); }
+  34% { transform: scaleY(0.35); }
+  36% { transform: scaleY(0.9); }
 }
-@keyframes hiw-search {
-  0%, 32% { opacity: 0; transform: translateY(8px); }
-  36%, 100% { opacity: 1; transform: none; }
+@keyframes hiw-b1 {
+  0%, 2% { opacity: 0; transform: translateY(8px); }
+  6%, 100% { opacity: 1; transform: none; }
 }
-@keyframes hiw-filter {
-  0%, 35% { opacity: 0; transform: translateY(8px); }
-  39%, 100% { opacity: 1; transform: none; }
+@keyframes hiw-b2 {
+  0%, 5% { opacity: 0; transform: translateY(8px); }
+  9%, 100% { opacity: 1; transform: none; }
 }
-@keyframes hiw-lead {
-  0%, 38% { opacity: 0; transform: translateY(12px); }
-  43%, 100% { opacity: 1; transform: none; }
+@keyframes hiw-b3 {
+  0%, 8% { opacity: 0; transform: translateY(8px); }
+  12%, 100% { opacity: 1; transform: none; }
 }
-@keyframes hiw-missed {
-  0%, 42% { opacity: 0; transform: translateY(12px); }
-  47%, 100% { opacity: 1; transform: none; }
+@keyframes hiw-b4 {
+  0%, 11% { opacity: 0; transform: translateY(8px); }
+  15%, 100% { opacity: 1; transform: none; }
 }
-@keyframes hiw-ch-1 {
-  0%, 46% { opacity: 0; transform: translateY(8px); }
-  50%, 100% { opacity: 1; transform: none; }
+@keyframes hiw-s1 {
+  0%, 40% { opacity: 0; transform: translateY(8px); }
+  44%, 100% { opacity: 1; transform: none; }
 }
-@keyframes hiw-ch-2 {
-  0%, 49% { opacity: 0; transform: translateY(8px); }
-  53%, 100% { opacity: 1; transform: none; }
+@keyframes hiw-s2 {
+  0%, 44% { opacity: 0; transform: translateY(8px); }
+  48%, 100% { opacity: 1; transform: none; }
 }
-@keyframes hiw-ch-3 {
+@keyframes hiw-s3 {
+  0%, 48% { opacity: 0; transform: translateY(8px); }
+  52%, 100% { opacity: 1; transform: none; }
+}
+@keyframes hiw-s4 {
   0%, 52% { opacity: 0; transform: translateY(8px); }
   56%, 100% { opacity: 1; transform: none; }
 }
-@keyframes hiw-actions {
-  0%, 55% { opacity: 0; transform: translateY(8px); }
-  60%, 100% { opacity: 1; transform: none; }
-}
-@keyframes hiw-contact {
-  0%, 60% { opacity: 0; transform: translateY(12px); }
-  66%, 100% { opacity: 1; transform: none; }
-}
-@keyframes hiw-history-1 {
+@keyframes hiw-c1 {
   0%, 64% { opacity: 0; transform: translateY(8px); }
-  69%, 100% { opacity: 1; transform: none; }
+  68%, 100% { opacity: 1; transform: none; }
 }
-@keyframes hiw-history-2 {
-  0%, 68% { opacity: 0; transform: translateY(8px); }
-  73%, 100% { opacity: 1; transform: none; }
+@keyframes hiw-c2 {
+  0%, 70% { opacity: 0; transform: translateY(8px); }
+  74%, 100% { opacity: 1; transform: none; }
 }
-@keyframes hiw-contact-actions {
-  0%, 72% { opacity: 0; transform: translateY(8px); }
-  77%, 100% { opacity: 1; transform: none; }
-}
-@keyframes hiw-usage {
-  0%, 76% { opacity: 0; transform: translateY(12px); }
-  82%, 100% { opacity: 1; transform: none; }
-}
-.hiw-field-1 { animation: hiw-field-1 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-field-2 { animation: hiw-field-2 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-field-3 { animation: hiw-field-3 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-field-4 { animation: hiw-field-4 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-incoming { opacity: 0; animation: hiw-incoming 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-ring { opacity: 0; animation: hiw-ring 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-answered { animation: hiw-answered 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+
 .hiw-wave { transform-origin: center bottom; transform: scaleY(0.6); }
-.hiw-wave-a { animation: hiw-wave-a 20s ease-in-out infinite both; }
-.hiw-wave-b { animation: hiw-wave-b 20s ease-in-out infinite both; }
-.hiw-search { animation: hiw-search 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-filter { animation: hiw-filter 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-lead { animation: hiw-lead 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-missed { animation: hiw-missed 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-ch-1 { animation: hiw-ch-1 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-ch-2 { animation: hiw-ch-2 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-ch-3 { animation: hiw-ch-3 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-actions { animation: hiw-actions 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-contact { animation: hiw-contact 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-history-1 { animation: hiw-history-1 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-history-2 { animation: hiw-history-2 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-contact-actions { animation: hiw-contact-actions 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
-.hiw-usage { animation: hiw-usage 20s cubic-bezier(0.22, 1, 0.36, 1) infinite both; }
+.hiw-ring { opacity: 0; }
 
 /* Notice enter/exit. Shift family: opacity + transform, --motion-fast. */
 .desk-notice {
@@ -650,30 +727,24 @@ h3,
   .landing-drift,
   .desk-live-ping,
   .desk-just-landed::after,
-  .hiw-field-1,
-  .hiw-field-2,
-  .hiw-field-3,
-  .hiw-field-4,
-  .hiw-incoming,
-  .hiw-ring,
-  .hiw-answered,
-  .hiw-wave-a,
-  .hiw-wave-b,
-  .hiw-lead,
-  .hiw-search,
-  .hiw-filter,
-  .hiw-missed,
-  .hiw-ch-1,
-  .hiw-ch-2,
-  .hiw-ch-3,
-  .hiw-actions,
-  .hiw-contact,
-  .hiw-history-1,
-  .hiw-history-2,
-  .hiw-contact-actions,
-  .hiw-usage {
-    animation: none;
+  .hiw-stage,
+  .hiw-stage * {
+    animation: none !important;
   }
+
+  .hiw-pane { min-height: 0; }
+  .hiw-scene,
+  .hiw-incoming,
+  .hiw-answered,
+  .hiw-b1, .hiw-b2, .hiw-b3, .hiw-b4,
+  .hiw-s1, .hiw-s2, .hiw-s3, .hiw-s4,
+  .hiw-c1, .hiw-c2 {
+    position: static !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .hiw-scene + .hiw-scene { border-top: 1px solid var(--hairline); }
+  .hiw-rail-mark { display: none; }
 
   .desk-shift {
     transition: none;
