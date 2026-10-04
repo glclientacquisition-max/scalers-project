@@ -236,6 +236,7 @@ const {
   createSpokenStreamBuffer,
   joinSpokenPieces,
 } = require('./src/speech/spokenStreamBuffer');
+const { cutNoAiSlop } = require('./src/speech/noAiSlop');
 const {
   createOverlapHold,
   createAgentReplayMemory,
@@ -2689,6 +2690,10 @@ mediaWss.on('connection', (ws, req) => {
           if (rawChunk.trim() && narratesInternalAction(rawChunk)) hidInternalNarration = true;
           return;
         }
+        // Model text only. Visit / hold / order lines go out through
+        // speakLookupSentence and must not pass through this cut.
+        text = cutNoAiSlop(text);
+        if (!text) return;
         if (!tts) return;
         if (suppressReplyRemainder || bargeInActive) return;
         if (isOrphanFragment(bargeCancelledText, text)) {
@@ -2916,7 +2921,7 @@ mediaWss.on('connection', (ws, req) => {
               const missed = Boolean(result?.timedOut || result?.llmFailed);
               const reply = missed
                 ? await speechWhenModelMissed(result, clean)
-                : planned.reply;
+                : cutNoAiSlop(planned.reply);
               if (reply) {
                 callTranscript.pushAgent(reply);
                 turnTiming.markFirstSpokenChunk();
@@ -2954,7 +2959,7 @@ mediaWss.on('connection', (ws, req) => {
             const missed = Boolean(result?.timedOut || result?.llmFailed);
             const reply = missed
               ? await speechWhenModelMissed(result, clean)
-              : planned.reply;
+              : cutNoAiSlop(planned.reply);
             if (reply) {
               callTranscript.pushAgent(reply);
               turnTiming.markFirstSpokenChunk();
@@ -2988,8 +2993,9 @@ mediaWss.on('connection', (ws, req) => {
           }
           speakSession = null;
         }
+        const modelLine = result?.spokenText ? cutNoAiSlop(result.spokenText) : '';
         const reply =
-          result?.spokenText ||
+          (result?.spokenText ? modelLine : '') ||
           (result?.actionConfirmation
             ? ''
             : result?.timedOut || result?.llmFailed
