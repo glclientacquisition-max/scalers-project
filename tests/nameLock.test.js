@@ -13,7 +13,7 @@ const {
   looksLikeCompliment,
 } = require('../src/conversation/entityExtraction');
 const { missingGoalSlots } = require('../src/conversation/goalModel');
-const { resolveLocalReply, fileNameAskLine } = require('../src/conversation/turnPolicy');
+const { resolveLocalReply, fileNameAskLine, planCallerModelTurn } = require('../src/conversation/turnPolicy');
 const { openLineHoldDecision, shouldPublishOpenFileSentence, formatNameConfirmSpeech } = require('../src/conversation/openLineSpeech');
 const fs = require('fs');
 const path = require('path');
@@ -232,8 +232,18 @@ describe('caller name stays the file name', () => {
     const start = server.indexOf('async function runCallerTurn');
     const end = server.indexOf('function flushUtterance', start);
     const turnSource = server.slice(start, end);
-    assert.match(turnSource, /const fileNameAsk = fileNameAskLine\(brainState\)/);
+    assert.match(turnSource, /planCallerModelTurn\(brainState/);
+    assert.match(turnSource, /const fileNameAsk = nameGate\.line/);
     assert.match(turnSource, /speakText\(fileNameAsk\)/);
+    const gateAt = turnSource.indexOf('planCallerModelTurn');
+    const modelAt = turnSource.indexOf('runGeminiTurn');
+    assert.ok(gateAt >= 0 && modelAt > gateAt);
+    const promptStart = server.indexOf("if (data.type === 'prompt')");
+    const promptEnd = server.indexOf("ws.on('error'", promptStart);
+    const promptSource = server.slice(promptStart, promptEnd);
+    const promptGate = promptSource.indexOf('planCallerModelTurn');
+    const promptModel = promptSource.indexOf('runGeminiTurn');
+    assert.ok(promptGate >= 0 && promptModel > promptGate);
     assert.match(turnSource, /shouldPublishOpenFileSentence\(speechHold, fileReadAsk\)/);
     assert.doesNotMatch(turnSource, /speechHold\.holdSpeech \|\| fileReadAsk/);
     assert.doesNotMatch(turnSource, /speakText\(localReply\.line\)/);
@@ -298,5 +308,41 @@ describe('caller name stays the file name', () => {
     assert.equal(isSttContextEnabled(), false);
     if (prev == null) delete process.env.SONIOX_STT_CONTEXT;
     else process.env.SONIOX_STT_CONTEXT = prev;
+  });
+
+  it('a barged booking turn asks only the file name and does not run the model', () => {
+    const profile = { vertical: 'home_services', afterHoursMode: 'serve', callerMemory: { ...alvinCard } };
+    const barge = turn(createBrainState(profile), 'Uh, I want to, like, um, book.', profile);
+    assert.equal(barge.caller.nameConfirmed, false);
+    assert.equal(barge.caller.fileNameAsked, 'Alvin');
+    const gate = planCallerModelTurn(barge, { greetingBarged: true, fileNameAskCommitted: false });
+    assert.equal(gate.runModel, false);
+    assert.equal(gate.line, 'Am I speaking with Alvin?');
+    assert.doesNotMatch(gate.line, /May I have your name|name, please|carpet|visit/i);
+
+    // A greeting that was cancelled must not count as the ask already spoken.
+    const preset = turn(createBrainState(profile), 'Uh, I want to, like, um, book.', profile);
+    preset.caller.fileNameAskSpoken = true;
+    const cleared = planCallerModelTurn(preset, { greetingBarged: true, fileNameAskCommitted: false });
+    assert.equal(cleared.runModel, false);
+    assert.equal(cleared.line, 'Am I speaking with Alvin?');
+
+    preset.caller.fileNameAskSpoken = true;
+    const heard = planCallerModelTurn(preset, { greetingBarged: true, fileNameAskCommitted: true });
+    assert.equal(heard.runModel, true);
+    assert.equal(heard.line, '');
+  });
+
+  it('locks the file name when the caller says this is Alvin speaking', () => {
+    const profile = { vertical: 'home_services', callerMemory: { ...alvinCard } };
+    const asked = turn(createBrainState(profile), 'Hello', profile);
+    asked.caller.fileNameAskSpoken = true;
+    const said = turn(asked, 'This is Alvin speaking.', profile);
+    assert.equal(said.caller.name, 'Alvin');
+    assert.notEqual(said.caller.name, 'Alvin speaking');
+    assert.equal(said.caller.nameConfirmed, true);
+    assert.equal(said.entities.name.value, 'Alvin');
+    assert.equal(fileNameAskLine(said), '');
+    assert.equal(extractName('This is Alvin speaking.'), 'Alvin');
   });
 });

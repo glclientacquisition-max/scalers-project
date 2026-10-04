@@ -93,7 +93,7 @@ function findCatalogMatch(text, profile = {}) {
 
 function cleanNameCapture(raw, opts = {}) {
   const value = String(raw || '')
-    .replace(/\s+(?:and|na|calling|looking|nataka)\b.*$/i, '')
+    .replace(/\s+(?:and|na|calling|looking|nataka|speaking|here)\b.*$/i, '')
     .trim();
   if (!isPlausibleCallerName(value)) return null;
   return canonicalizeCallerName(value, {
@@ -109,7 +109,7 @@ function looksLikeCompliment(text) {
 }
 
 const IM_NAME_STOP =
-  /^(and|na|calling|looking|from|in|at|to|for|who|that|by|your|with|about|of|work)$/i;
+  /^(and|na|calling|looking|speaking|here|from|in|at|to|for|who|that|by|your|with|about|of|work)$/i;
 
 function earlierExplicitName(raw) {
   if (

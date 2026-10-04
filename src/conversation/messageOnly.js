@@ -170,7 +170,7 @@ function looksLikeCompliment(text) {
 }
 
 const IM_NAME_STOP =
-  /^(and|na|calling|looking|from|in|at|to|for|who|that|by|your|with|about|of|work)$/i;
+  /^(and|na|calling|looking|speaking|here|from|in|at|to|for|who|that|by|your|with|about|of|work)$/i;
 
 function earlierExplicitName(raw) {
   if (
@@ -267,7 +267,9 @@ function reconcileMessageOnlyName({
       name: name || null,
       nameConfirmed: locked,
       fileNameAsked: asked || null,
-      fileNameAskSpoken: Boolean(fileAskSpoken || (owner && asked)),
+      // Do not mark the ask spoken just because the file has a name.
+      // That flag is only for a line the caller could have heard.
+      fileNameAskSpoken: fileAskSpoken === true,
       messageNameAskSpoken: Boolean(bareAskSpoken || (!owner && !asked)),
       entitiesName: messageNameEntity(name, source, locked),
     };

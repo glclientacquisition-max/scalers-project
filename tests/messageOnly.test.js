@@ -485,7 +485,12 @@ describe('message name lock', () => {
     );
     const state = createBrainState(profile);
     assert.equal(state.caller.fileNameAsked, 'Alvin');
-    assert.equal(state.caller.fileNameAskSpoken, true);
+    // The opener text asks. The flag stays false until that audio is heard.
+    assert.equal(state.caller.fileNameAskSpoken, false);
+    const barged = messageTurn(state, 'Uh, I want to, like, um, book.', profile);
+    assert.equal(barged.caller.fileNameAskSpoken, false);
+    assert.equal(barged.caller.fileNameAsked, 'Alvin');
+    state.caller.fileNameAskSpoken = true;
     const hello = messageTurn(state, 'Hello', profile);
     assert.equal(hello.caller.nameConfirmed, false);
     assert.equal(hello.caller.fileNameAsked, 'Alvin');
@@ -510,6 +515,7 @@ describe('message name lock', () => {
     assert.equal(early.caller.nameConfirmed, false);
 
     const asked = createBrainState(profile);
+    asked.caller.fileNameAskSpoken = true;
     const bound = messageTurn(asked, 'Yes', profile);
     assert.equal(bound.caller.name, 'Alvin');
     assert.equal(bound.caller.nameConfirmed, true);

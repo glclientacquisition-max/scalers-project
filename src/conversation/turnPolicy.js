@@ -70,6 +70,39 @@ function fileNameAskLine(state) {
   return `Am I speaking with ${pending}?`;
 }
 
+/**
+ * One gate in front of every model turn, including a greeting barge.
+ * A cancelled greeting did not deliver the ask. Until this process commits
+ * the line, the only reply is "Am I speaking with {name}?" and the model
+ * does not run. A heard greeting or a committed ask is not asked again.
+ */
+function planCallerModelTurn(state, opts = {}) {
+  const caller = state?.caller;
+  if (
+    caller &&
+    opts.greetingBarged === true &&
+    opts.fileNameAskCommitted !== true &&
+    caller.nameConfirmed !== true
+  ) {
+    caller.fileNameAskSpoken = false;
+  }
+  if (
+    caller &&
+    caller.nameConfirmed !== true &&
+    caller.fileNameAskSpoken !== true &&
+    !String(caller.fileNameAsked || '').trim() &&
+    state?.returning &&
+    !state.returning.sharedLine &&
+    !state.returning.identityBound
+  ) {
+    const who = String(state.returning.fileOwnerName || state.returning.name || '').trim();
+    if (who) caller.fileNameAsked = who;
+  }
+  const line = fileNameAskLine(state);
+  if (line) return { runModel: false, line };
+  return { runModel: true, line: '' };
+}
+
 function resolveLocalReply({
   text,
   state,
@@ -162,5 +195,6 @@ function resolveLocalReply({
 module.exports = {
   classifyCallerTurn,
   fileNameAskLine,
+  planCallerModelTurn,
   resolveLocalReply,
 };

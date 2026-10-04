@@ -342,8 +342,11 @@ function createBrainState(profile = {}) {
   if (state.messageOnly) {
     const owner = messageFileOwnerName(profile, state.returning);
     if (owner && messageNamePlausible(owner)) {
+      // The greeting may say this. It is not spoken until that audio
+      // finishes, or until the caller-turn gate says it. A barge of the
+      // greeting must still ask here, and must not reach the model.
       state.caller.fileNameAsked = owner;
-      state.caller.fileNameAskSpoken = true;
+      state.caller.fileNameAskSpoken = false;
     } else {
       state.caller.messageNameAskSpoken = true;
     }

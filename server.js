@@ -222,7 +222,7 @@ const {
   polishSpokenReply,
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
-const { resolveLocalReply, fileNameAskLine } = require('./src/conversation/turnPolicy');
+const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
 const { narratesInternalAction } = require('./src/conversation/speechGuard');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -1780,6 +1780,11 @@ mediaWss.on('connection', (ws, req) => {
   }
   let greetingStarted = false;
   let greetingAwaitingFirstPcm = false;
+  // A barge cancels the greeting before its name ask can be heard.
+  // Until this process commits that line, the caller turn must say it.
+  let greetingInterrupted = false;
+  let greetingSettled = false;
+  let fileNameAsksCommitted = 0;
   const firstForward = {
     greetingPlayed: false,
     greetingLogged: false,
@@ -2294,6 +2299,7 @@ mediaWss.on('connection', (ws, req) => {
       }
       return decision;
     }
+    if (!greetingSettled) greetingInterrupted = true;
     if (looksLikeJobNoun(text)) {
       firstForward.bargedJob = true;
       firstForward.bargeText = String(text || '').trim();
@@ -2551,17 +2557,23 @@ mediaWss.on('connection', (ws, req) => {
       }
       // Phone file already has a name: ask only that. Do not let the model
       // ask as if the name were missing, and do not attach visits.
-      const fileNameAsk = fileNameAskLine(brainState);
-      if (fileNameAsk) {
+      // A greeting barge reaches this gate before Gemini. The model does not run.
+      const nameGate = planCallerModelTurn(brainState, {
+        greetingBarged: greetingInterrupted && !greetingSettled,
+        fileNameAskCommitted: fileNameAsksCommitted > 0,
+      });
+      const fileNameAsk = nameGate.line;
+      if (!nameGate.runModel && fileNameAsk) {
         brainState.caller.fileNameAskSpoken = true;
+        fileNameAsksCommitted += 1;
         callBrainStates.set(callKey, brainState);
         console.log(`[ws/media][${callKey}] file name ask: ${fileNameAsk}`);
-        if (!bargeInActive) {
-          callTranscript.pushAgent(fileNameAsk);
-          turnTiming.markFirstSpokenChunk();
-          await speakText(fileNameAsk);
-          spokeThisTurn = true;
-        }
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(fileNameAsk);
+        turnTiming.markFirstSpokenChunk();
+        await speakText(fileNameAsk);
+        spokeThisTurn = true;
         return;
       }
       speechHold = holdCallerSpeech(callKey, messages);
@@ -3411,6 +3423,16 @@ mediaWss.on('connection', (ws, req) => {
     resolveTtsReady(null);
   }
 
+  function markGreetingFileNameAsk(line) {
+    if (greetingInterrupted || fileNameAsksCommitted > 0) return;
+    if (!/Am I speaking with\s+\S/i.test(String(line || ''))) return;
+    const state = sessionCallSid ? callBrainStates.get(sessionCallSid) : null;
+    if (!state?.caller || state.caller.nameConfirmed === true) return;
+    state.caller.fileNameAskSpoken = true;
+    fileNameAsksCommitted += 1;
+    callBrainStates.set(sessionCallSid, state);
+  }
+
   // Greet once the tenant profile is loaded (correct shop name). Cached PCM
   // plays before TTS-ready wait so answer-to-greeting is not dead air.
   (async () => {
@@ -3463,6 +3485,7 @@ mediaWss.on('connection', (ws, req) => {
         await playCachedFillerPcm(found.pcm, { text: greetingLine });
         callTranscript.pushAgent(greetingLine);
         messages.push({ role: 'assistant', content: greetingLine, local: true });
+        if (!greetingInterrupted) markGreetingFileNameAsk(greetingLine);
       } else {
         let readyTts = await ttsReadyPromise;
         if (speechOutageStarted) return;
@@ -3506,6 +3529,7 @@ mediaWss.on('connection', (ws, req) => {
         if (spoken?.ok) {
           callTranscript.pushAgent(greetingLine);
           messages.push({ role: 'assistant', content: greetingLine, local: true });
+          if (!greetingInterrupted && !spoken.cancelled) markGreetingFileNameAsk(greetingLine);
         }
       }
       if (tts && isFillerCacheEnabled()) {
@@ -3524,7 +3548,9 @@ mediaWss.on('connection', (ws, req) => {
           })
           .catch(() => {});
       }
+      greetingSettled = true;
     } catch (err) {
+      greetingSettled = true;
       console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
       try {
         if (isDefaultShopName(businessName) || !tts) {
@@ -4387,6 +4413,19 @@ wss.on('connection', (ws) => {
         ]
           .filter(Boolean)
           .join('\n\n');
+
+        const nameGate = planCallerModelTurn(brainState, {
+          greetingBarged: false,
+          fileNameAskCommitted: brainState?.caller?.fileNameAskSpoken === true,
+        });
+        if (!nameGate.runModel && nameGate.line) {
+          brainState.caller.fileNameAskSpoken = true;
+          callBrainStates.set(callSid, brainState);
+          transcriptLog.push(`Agent: ${nameGate.line}`);
+          ws.send(JSON.stringify({ type: 'text', token: nameGate.line, last: true }));
+          await db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') });
+          return;
+        }
 
         const reply = await runGeminiTurn(messages, callSid, turnPrompt);
         const replyText = [reply.spokenText, reply.actionConfirmation]
