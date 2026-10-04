@@ -84,7 +84,15 @@ const {
   attachCallerMemory,
   liveCallerFileStamp,
 } = require('./src/conversation/callerMemory');
-const { formatNameConfirmSpeech, openLineHoldDecision, shouldPublishOpenFileSentence } = require('./src/conversation/openLineSpeech');
+const {
+  formatNameConfirmSpeech,
+  looksLikeHistoryReview,
+  looksLikeOpenVisitLookup,
+  looksLikeVisitReviewMore,
+  openLineHoldDecision,
+  planVisitReadTurn,
+  shouldPublishOpenFileSentence,
+} = require('./src/conversation/openLineSpeech');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const { collectKnownCallerNames } = require('./src/conversation/callerNameMatch');
 const {
@@ -403,6 +411,19 @@ async function hydrateCallerMemory(profile, callSid) {
     getCall: (sid) => db.getCall(sid),
     getCallerMemory: (opts) => db.getCallerMemory(opts),
   });
+}
+
+async function loadVisitReviewAppointments(callSid, profile) {
+  try {
+    const call = await db.getCall(callSid);
+    const tenantId = profile?.id || call?.tenant_id;
+    const phone = call?.from_number || profile?.callerMemory?.phone;
+    if (!tenantId || !phone) return [];
+    return await db.listCallerAppointmentsForReview({ tenantId, phone });
+  } catch (err) {
+    console.warn(`[${callSid}] visit review load failed:`, err?.message || err);
+    return [];
+  }
 }
 
 let geminiClient = null;
@@ -2702,6 +2723,44 @@ mediaWss.on('connection', (ws, req) => {
       // Name lock holds speech in the hold record, but must not publish the
       // open file. A visit lookup after the lock still can.
       suppressModelSpeech = shouldPublishOpenFileSentence(speechHold, fileReadAsk);
+      const visitAsk =
+        looksLikeOpenVisitLookup(clean) ||
+        looksLikeVisitReviewMore(clean) ||
+        looksLikeHistoryReview(clean);
+      let visitAppointments = [];
+      if (
+        visitAsk &&
+        brainState?.messageOnly !== true &&
+        brainState?.caller?.nameConfirmed === true &&
+        brainState?.caller?.nameJustConfirmed !== true
+      ) {
+        visitAppointments = await loadVisitReviewAppointments(callKey, brainProfile);
+      }
+      const visitRead = planVisitReadTurn({
+        nameConfirmed: brainState?.caller?.nameConfirmed === true,
+        nameJustConfirmed: brainState?.caller?.nameJustConfirmed === true,
+        callerText: clean,
+        messageOnly: brainState?.messageOnly === true,
+        language: callLanguage,
+        openVisits: brainState?.returning?.openVisits,
+        appointments: visitAppointments,
+        cursor: brainState?.conversation?.visitReview || null,
+      });
+      if (visitRead.runModel === false && visitRead.line) {
+        if (!brainState.conversation || typeof brainState.conversation !== 'object') {
+          brainState.conversation = {};
+        }
+        brainState.conversation.visitReview = visitRead.cursor;
+        callBrainStates.set(callKey, brainState);
+        console.log(`[ws/media][${callKey}] visit read before model: ${visitRead.line}`);
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(visitRead.line);
+        turnTiming.markFirstSpokenChunk();
+        await speakText(visitRead.line);
+        spokeThisTurn = true;
+        return;
+      }
       const bareCloser = looksLikeBareCloser(clean);
 
       const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
@@ -4548,6 +4607,42 @@ wss.on('connection', (ws) => {
           callBrainStates.set(callSid, brainState);
           transcriptLog.push(`Agent: ${nameGate.line}`);
           ws.send(JSON.stringify({ type: 'text', token: nameGate.line, last: true }));
+          await db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') });
+          return;
+        }
+
+        const promptText = String(data.voicePrompt || '');
+        const promptVisitAsk =
+          looksLikeOpenVisitLookup(promptText) ||
+          looksLikeVisitReviewMore(promptText) ||
+          looksLikeHistoryReview(promptText);
+        let promptAppointments = [];
+        if (
+          promptVisitAsk &&
+          brainState?.messageOnly !== true &&
+          brainState?.caller?.nameConfirmed === true &&
+          brainState?.caller?.nameJustConfirmed !== true
+        ) {
+          promptAppointments = await loadVisitReviewAppointments(callSid, brainProfile);
+        }
+        const promptVisitRead = planVisitReadTurn({
+          nameConfirmed: brainState?.caller?.nameConfirmed === true,
+          nameJustConfirmed: brainState?.caller?.nameJustConfirmed === true,
+          callerText: promptText,
+          messageOnly: brainState?.messageOnly === true,
+          language: callLanguage,
+          openVisits: brainState?.returning?.openVisits,
+          appointments: promptAppointments,
+          cursor: brainState?.conversation?.visitReview || null,
+        });
+        if (promptVisitRead.runModel === false && promptVisitRead.line) {
+          if (!brainState.conversation || typeof brainState.conversation !== 'object') {
+            brainState.conversation = {};
+          }
+          brainState.conversation.visitReview = promptVisitRead.cursor;
+          callBrainStates.set(callSid, brainState);
+          transcriptLog.push(`Agent: ${promptVisitRead.line}`);
+          ws.send(JSON.stringify({ type: 'text', token: promptVisitRead.line, last: true }));
           await db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') });
           return;
         }

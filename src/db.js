@@ -1378,8 +1378,69 @@ async function listRecentAppointmentsForCaller(tenantId, contactId, phoneNorm) {
 }
 
 /**
+ * Every appointment on this phone, newest first. Called only when a review
+ * asks for them. Not used by the live prompt. No fixed maximum: pages until
+ * a short page comes back.
+ */
+async function listCallerAppointmentsForReview({ tenantId, phone } = {}) {
+  const phoneNorm = normalizeStoredPhone(phone);
+  if (!tenantId || !phoneNorm) return [];
+  const phoneKeys = storedPhoneLookupKeys(phoneNorm);
+  if (!phoneKeys.length) return [];
+
+  const { data: contact, error: contactErr } = await supabase
+    .from('contacts')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .in('phone', phoneKeys)
+    .order('phone', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (contactErr && /contacts|relation/i.test(contactErr.message || '')) return [];
+  if (contactErr) throwIfError('listCallerAppointmentsForReview(contact)', contactErr);
+
+  async function pull(filter) {
+    const pageSize = 100;
+    const rows = [];
+    let offset = 0;
+    for (;;) {
+      let query = supabase
+        .from('appointments')
+        .select('id, service_name, status, when_text, address_landmark, created_at, caller_phone')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false });
+      query = filter(query);
+      const { data, error } = await query.range(offset, offset + pageSize - 1);
+      if (error && /appointments|relation/i.test(error.message || '')) return rows;
+      if (error) throwIfError('listCallerAppointmentsForReview', error);
+      const batch = data || [];
+      rows.push(...batch);
+      if (batch.length < pageSize) return rows;
+      offset += batch.length;
+    }
+  }
+
+  const byContact = contact?.id
+    ? await pull((query) => query.eq('contact_id', contact.id))
+    : [];
+  const byPhone = await pull((query) => query.in('caller_phone', phoneKeys));
+  const seen = new Set();
+  const merged = [];
+  for (const row of [...byContact, ...byPhone]) {
+    const id = String(row?.id || '');
+    if (id) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+    }
+    merged.push(row);
+  }
+  return merged;
+}
+
+/**
  * Load the returning-caller card for a live call (read path).
  * Returns null when the number is new or the contacts table is missing.
+ * This card stays small. A review of older visits uses listCallerAppointmentsForReview.
  */
 async function getCallerMemory({ tenantId, phone } = {}) {
   const phoneNorm = normalizeStoredPhone(phone);
@@ -2085,6 +2146,7 @@ module.exports = {
   markEscalationSent,
   upsertContact,
   getCallerMemory,
+  listCallerAppointmentsForReview,
   createServiceRequest,
   updateServiceRequest,
   createAppointment,

@@ -86,14 +86,14 @@ function buildCallerMemoryCard({
     .map(clipRequestLine)
     .filter(Boolean);
   const openVisitLines = lived.open
-    .map((item) => clipVisitLine(item.row))
+    .map((item) => clipVisitLine(item.row, { whenMax: null }))
     .filter(Boolean);
   const appointment = openVisitLines[0] || null;
   const nextVisitService = nextRow
     ? clip(nextRow.service_name || nextRow.serviceName, 48) || null
     : null;
   const nextVisitWhen = nextRow
-    ? clip(nextRow.when_text || nextRow.whenText, 32) || null
+    ? fullWhen(nextRow.when_text || nextRow.whenText) || null
     : null;
   const nextVisitStatus = nextRow ? clip(nextRow.status, 16) || null : null;
   const nextVisitLandmark = nextRow
@@ -160,10 +160,21 @@ function joinWorkBits(parts) {
   return parts.filter(Boolean).join(' | ');
 }
 
-function clipVisitLine(row) {
+function fullWhen(raw) {
+  const clean = String(raw || '')
+    .replace(/[—–]/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean || looksLikeTranscript(clean)) return '';
+  return clean;
+}
+
+function clipVisitLine(row, opts = {}) {
   if (!row || typeof row !== 'object') return null;
   const service = clip(row.service_name || row.serviceName, 48);
-  const whenText = clip(row.when_text || row.whenText, 32);
+  const whenMax = Object.prototype.hasOwnProperty.call(opts, 'whenMax') ? opts.whenMax : 32;
+  const whenText =
+    whenMax == null ? fullWhen(row.when_text || row.whenText) : clip(row.when_text || row.whenText, whenMax);
   const status = clip(row.status, 16);
   const landmark = clip(
     row.address_landmark || row.addressLandmark || row.landmark,
@@ -288,6 +299,70 @@ function freshOpenRequestRows(rows, now) {
     out.push(refreshLivedRow(row, lived));
   }
   return out;
+}
+
+function reviewStamp(row, index) {
+  const at = Date.parse(row?.created_at || row?.createdAt || '');
+  return { at: Number.isFinite(at) ? at : 0, index };
+}
+
+function isOpenUpcoming(row, now) {
+  const lived = classifyLivedVisit(row, now);
+  const status = String(row?.status || '').toLowerCase();
+  const openStatus = !status || status === 'requested' || status === 'confirmed';
+  return openStatus && !lived.past;
+}
+
+/**
+ * Open and upcoming first, then done or past rows. Newest first inside each
+ * group. No maximum: the caller pages with `page` until hasMore is false.
+ */
+function orderCallerAppointmentsForReview(rows = [], now = new Date()) {
+  const open = [];
+  const done = [];
+  (Array.isArray(rows) ? rows : []).forEach((row, index) => {
+    if (!row || typeof row !== 'object') return;
+    const stamp = reviewStamp(row, index);
+    (isOpenUpcoming(row, now) ? open : done).push({ row, ...stamp });
+  });
+  const byNewest = (a, b) => b.at - a.at || b.index - a.index;
+  open.sort(byNewest);
+  done.sort(byNewest);
+  return {
+    open: open.map((item) => item.row),
+    done: done.map((item) => item.row),
+  };
+}
+
+function reviewVisitLine(row) {
+  if (!row || typeof row !== 'object') return null;
+  const service = clip(row.service_name || row.serviceName, 80);
+  const whenText = fullWhen(row.when_text || row.whenText);
+  const status = clip(row.status, 16);
+  const landmark = clip(row.address_landmark || row.addressLandmark || row.landmark, 80);
+  return joinWorkBits([service, whenText, status, landmark]) || null;
+}
+
+function pageCallerVisitReview(rows = [], { page = 0, pageSize = 8, now = new Date(), scope = 'all' } = {}) {
+  const ordered = orderCallerAppointmentsForReview(rows, now);
+  const source =
+    scope === 'open'
+      ? ordered.open
+      : scope === 'done'
+        ? ordered.done
+        : [...ordered.open, ...ordered.done];
+  const size = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 8;
+  const index = Math.max(0, Math.floor(Number(page) || 0));
+  const start = index * size;
+  const slice = source.slice(start, start + size);
+  return {
+    page: index,
+    pageSize: size,
+    lines: slice.map(reviewVisitLine).filter(Boolean),
+    total: source.length,
+    hasMore: start + size < source.length,
+    scope,
+  };
 }
 
 function selectRecentAppointmentRows(rows = [], nextAppointment = null) {
@@ -644,7 +719,7 @@ function formatReturningCallerForPrompt(card) {
   }
 
   const lines = [
-    'RETURNING CALLER (lived file. Cite a row. Do not read this as a list):',
+    'RETURNING CALLER (lived file. Cite a row they name. If they ask what they have, the backend speaks the open rows. Do not ask which visit to update):',
     `- Speaker: ${identity}`,
   ];
 
@@ -828,6 +903,7 @@ module.exports = {
   returningFileFromCard,
   returningFileUsable,
   seedCallerFromMemory,
+  pageCallerVisitReview,
   selectOpenVisitsForPrompt,
   speakerKnownOnFile,
   speakerPendingOnFile,

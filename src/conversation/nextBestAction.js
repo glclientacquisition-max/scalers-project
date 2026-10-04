@@ -14,6 +14,11 @@ const {
   looksLikeNonConsentAck,
 } = require('./callCorrectives');
 const { callerTurnKinds } = require('./messageOnly');
+const {
+  looksLikeHistoryReview,
+  looksLikeOpenVisitLookup,
+  looksLikeVisitReviewMore,
+} = require('./openLineSpeech');
 
 const DIRECT_ANSWER_INTENTS = new Set([
   'hours',
@@ -24,6 +29,25 @@ const DIRECT_ANSWER_INTENTS = new Set([
 ]);
 
 const REQUEST_INTENTS = new Set(['hold', 'order', 'booking', 'cancellation']);
+
+function visitFileReadDecision(state) {
+  const returning = state?.returning;
+  if (!returningFileUsable(returning)) return null;
+  const said = String(state?.goal?.description || '');
+  const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
+  const asked = [said, latest].some(
+    (line) =>
+      looksLikeOpenVisitLookup(line) ||
+      looksLikeVisitReviewMore(line) ||
+      looksLikeHistoryReview(line)
+  );
+  if (!asked) return null;
+  return {
+    action: ACTIONS.ANSWER,
+    reason:
+      'They asked what they have. The backend speaks the open visit rows. Do not ask which visit to update or cancel. Do not treat this as a reschedule.',
+  };
+}
 
 function determineNextBestAction({ state, capabilities = {} } = {}) {
   const intent = String(state?.intent || 'unknown');
@@ -129,6 +153,9 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       reason: `Heard a collision name; ask once: ${nameCollision.join(' or ')}?`,
     };
   }
+
+  const fileRead = visitFileReadDecision(state);
+  if (fileRead) return fileRead;
 
   if (intent === 'unknown' || intent === 'general_enquiry') {
     const returning = state?.returning;
