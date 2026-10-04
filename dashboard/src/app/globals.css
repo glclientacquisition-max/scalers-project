@@ -493,6 +493,16 @@ h3,
   animation: desk-land-fade var(--motion-land) var(--motion-ease) both;
 }
 
+/* Call mock: one settle, not a loop. Settled text stays readable. */
+@keyframes hiw-call-settle {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.hiw-call-settle {
+  animation: hiw-call-settle 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.hiw-call-settle-late { animation-delay: 0.18s; }
+
 /* Notice enter/exit. Shift family: opacity + transform, --motion-fast. */
 .desk-notice {
   opacity: 0;
@@ -524,7 +534,9 @@ h3,
   .landing-rise,
   .landing-drift,
   .desk-live-ping,
-  .desk-just-landed::after {
+  .desk-just-landed::after,
+  .hiw-call-settle,
+  .hiw-call-settle-late {
     animation: none;
   }
 
