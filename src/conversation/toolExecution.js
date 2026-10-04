@@ -4,6 +4,7 @@ const { findProductMatch, normalizeProducts } = require('./productCatalog');
 const {
   evaluateAppointmentHours,
   formatRequestedWhenLabel,
+  formatStoredWhenText,
   weekdaySpoken,
 } = require('./appointmentHours');
 const { canonicalizeCallerName } = require('./callerNameMatch');
@@ -361,16 +362,21 @@ function validateEscalation(raw, { agentName = '', businessName = '', knownNames
 
 function stampVisitWindow(value, hours) {
   // A period ("tomorrow morning") is not a clock. Drop any 10:00 the model sent.
-  if (hours?.resolved?.periodLabel) {
-    return { ...value, windowStart: '', windowEnd: '' };
+  // Save the absolute Nairobi day, not the word "tomorrow".
+  const period = String(hours?.resolved?.periodLabel || '').trim();
+  if (period) {
+    const whenText = formatStoredWhenText(hours.resolved) || value.whenText;
+    return { ...value, whenText, windowStart: '', windowEnd: '' };
   }
   const instant = hours?.resolved?.instant;
   if (!instant || Number.isNaN(instant.getTime())) return value;
   const iso = instant.toISOString();
+  const whenText = formatStoredWhenText(hours.resolved) || value.whenText;
   return {
     ...value,
-    windowStart: value.windowStart || iso,
-    windowEnd: value.windowEnd || iso,
+    whenText,
+    windowStart: iso,
+    windowEnd: iso,
   };
 }
 

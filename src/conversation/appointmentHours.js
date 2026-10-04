@@ -244,6 +244,7 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
       absMinutes
     );
     const parts = eatParts(instant);
+    const periodLabel = clock == null ? periodWord(raw) : '';
     return {
       ok: true,
       instant,
@@ -251,6 +252,7 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
       weekday: parts.weekday,
       weekdayLong: parts.weekdayLong,
       minutesSinceMidnight: absMinutes,
+      periodLabel,
     };
   }
 
@@ -398,6 +400,22 @@ function evaluateAppointmentHours({ whenText, schedule, now = new Date() } = {})
   };
 }
 
+function formatStoredWhenText(resolved) {
+  if (!resolved || resolved.isNow) return '';
+  const instant = resolved.instant;
+  if (!instant || Number.isNaN(instant.getTime())) return '';
+  const parts = eatParts(instant);
+  if (!parts.weekdayLong || !parts.dateLabel) return '';
+  const period = String(resolved.periodLabel || '').trim().toLowerCase();
+  if (/^(morning|afternoon|evening)$/.test(period)) {
+    return `${parts.weekdayLong} ${parts.dateLabel}, ${period}`;
+  }
+  if (period) return '';
+  const time = minutesToHour12(resolved.minutesSinceMidnight);
+  if (!time) return '';
+  return `${parts.weekdayLong} ${parts.dateLabel}, ${time}`;
+}
+
 function formatRequestedWhenLabel(hours, language = 'en') {
   const resolved = hours?.resolved;
   if (!resolved || resolved.isNow) return '';
@@ -427,6 +445,7 @@ module.exports = {
   classifyInstant,
   nextOpenDay,
   formatRequestedWhenLabel,
+  formatStoredWhenText,
   weekdaySpoken,
   minutesToHour12,
 };

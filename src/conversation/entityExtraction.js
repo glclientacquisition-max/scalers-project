@@ -250,6 +250,25 @@ function extractCorrectedName(text, opts = {}) {
   });
 }
 
+function affirmsAskedFileName(text, pending, extracted) {
+  const asked = String(pending || '').trim();
+  if (!asked) return false;
+  if (isNameAffirmation(text)) return true;
+  const raw = String(text || '').trim();
+  if (!/^(?:yes|yeah|yep|yup|ndiyo|ndio)\b/i.test(raw)) return false;
+  if (extracted && !namesLikelySame(extracted, asked) && !isJunkCallerName(extracted)) {
+    return false;
+  }
+  const escaped = asked.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const speaking = new RegExp(
+    `\\b(?:speaking with|speaking to|talking with|talking to)\\s+${escaped}\\b`,
+    'i'
+  );
+  if (speaking.test(raw)) return true;
+  const named = extractName(raw, { knownNames: [asked], preferKnown: true });
+  return Boolean(named && namesLikelySame(named, asked));
+}
+
 function fileLockedName(name, knownNames = []) {
   const { matchCallerName } = require('./callerNameMatch');
   const hit = matchCallerName(name, { knownNames, preferKnown: true });
@@ -330,7 +349,7 @@ function applyCallerNameConfirmation(
       return done(prevName, false, previous?.entities?.name?.source || 'caller_explicit', 0.9);
     }
     if (extracted && extracted !== prevName) {
-      if (samePerson(extracted, prevName)) {
+      if (samePerson(extracted, prevName) || isJunkCallerName(extracted)) {
         return done(prevName, true, previous?.entities?.name?.source || 'caller_explicit', 0.95);
       }
       return done(extracted, true, source, 0.95);
@@ -345,7 +364,13 @@ function applyCallerNameConfirmation(
 
   // A yes binds only the file name the code just asked. It does not confirm
   // some other "I'm …" span, and it does not depend on the model inventing the ask.
-  if (!prevConfirmed && opts.fileNameJustAsked && isNameAffirmation(text) && !extracted) {
+  // Yes binds only the file name the code just asked, including
+  // "Yes, you're speaking with Alvin". It does not bind a different name.
+  if (
+    !prevConfirmed &&
+    opts.fileNameJustAsked &&
+    affirmsAskedFileName(text, opts.pendingFileName, extracted)
+  ) {
     const pending = String(opts.pendingFileName || '').trim();
     if (pending) {
       const locked = fileLockedName(pending, knownNames) || pending;
@@ -878,6 +903,7 @@ module.exports = {
   imIntroductionName,
   extractCorrectedName,
   isNameAffirmation,
+  affirmsAskedFileName,
   isNameNegation,
   applyCallerNameConfirmation,
   extractPhone,

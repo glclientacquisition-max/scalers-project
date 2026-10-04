@@ -24,6 +24,9 @@ const JUNK_CALLER_NAMES = new Set([
   'assistant',
   'ai',
   'bot',
+  // Speech-to-text of "at around". A time filler, never a caller.
+  'ataround',
+  'at around',
 ]);
 
 function cleanCallerName(raw) {
@@ -40,6 +43,7 @@ function isJunkCallerName(raw) {
   const compact = lower.replace(/[\s'-]+/g, '');
   if (JUNK_CALLER_NAMES.has(lower) || JUNK_CALLER_NAMES.has(compact)) return true;
   if (/^(where|what|when|who|how|why)(\s+are you)?$/i.test(lower)) return true;
+  if (compact === 'ataround' || compact === 'atround') return true;
   return false;
 }
 

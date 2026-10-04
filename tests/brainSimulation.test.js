@@ -90,7 +90,7 @@ describe('brain simulation: home visit', () => {
     const spoken = lines(sim);
     assert.match(spoken[2], /twelve noon\?/i);
     assert.equal(sim.saved.appointments.length, 1);
-    assert.match(sim.saved.appointments[0].whenText, /tomorrow 12 pm/i);
+    assert.equal(sim.saved.appointments[0].whenText, 'Wednesday 19 August 2026, 12 PM');
     assert.equal(sim.saved.serviceRequests.length, 0);
     clean(sim);
   });
