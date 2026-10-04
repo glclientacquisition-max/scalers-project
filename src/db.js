@@ -924,10 +924,20 @@ async function getTenantById(tenantId) {
   let { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
+
+  if (error && /spoken_name|greeting_invite/i.test(error.message || '')) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(
+        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'
+      )
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
 
   if (error && /billing_enforcement|wallet_balance_kes/i.test(error.message)) {
     ({ data, error } = await supabase
@@ -1078,6 +1088,8 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     return {
       id: resolvedId,
       businessName: process.env.BUSINESS_NAME || 'the business',
+      spokenName: null,
+      greetingInvite: null,
       agentName: process.env.AGENT_NAME || 'Receptionist',
       llmSystemPrompt: null,
       knowledge: process.env.BUSINESS_KNOWLEDGE || null,
@@ -1122,6 +1134,8 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
   return {
     id: row.id,
     businessName: row.business_name,
+    spokenName: row.spoken_name || null,
+    greetingInvite: row.greeting_invite || null,
     agentName: row.agent_name || 'Receptionist',
     agentTone: row.agent_tone || null,
     llmSystemPrompt: row.llm_system_prompt || null,

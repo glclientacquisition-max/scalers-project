@@ -1759,6 +1759,8 @@ mediaWss.on('connection', (ws, req) => {
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
   let agentName = process.env.AGENT_NAME || 'Receptionist';
+  let spokenName = '';
+  let greetingInvite = '';
   let hoursSchedule = null;
   let openStatus = 'unknown';
   let afterHoursMode = 'serve';
@@ -1866,6 +1868,8 @@ mediaWss.on('connection', (ws, req) => {
       brainProfile = profile;
       businessName = profile.businessName || businessName;
       agentName = profile.agentName || agentName;
+      spokenName = profile.spokenName || '';
+      greetingInvite = profile.greetingInvite || '';
       hoursSchedule = profile.hoursSchedule || null;
       afterHoursMode = profile.afterHoursMode || 'serve';
       openStatus = openClosedStatus(hoursSchedule);
@@ -1887,6 +1891,8 @@ mediaWss.on('connection', (ws, req) => {
       }
       greetingLine = buildGreeting(businessName, {
         agentName,
+        spokenName,
+        greetingInvite,
         isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
         afterHoursMode,
         closureNotice,
@@ -3510,6 +3516,8 @@ mediaWss.on('connection', (ws, req) => {
       greetingLine = await generateDynamicGreeting({
         businessName,
         agentName,
+        spokenName,
+        greetingInvite,
         vertical: brainProfile?.vertical || '',
         servicesCatalog: brainProfile.servicesCatalog,
         servicesOffered: brainProfile.servicesOffered,
@@ -3605,6 +3613,8 @@ mediaWss.on('connection', (ws, req) => {
         }
         const fallback = buildGreeting(businessName, {
           agentName,
+          spokenName,
+          greetingInvite,
           servicesCatalog: brainProfile.servicesCatalog,
           servicesOffered: brainProfile.servicesOffered,
           isOpen: openStatus === 'unknown' ? null : openStatus === 'open',

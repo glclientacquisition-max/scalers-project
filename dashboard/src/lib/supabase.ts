@@ -196,6 +196,10 @@ export type TenantRow = {
   hours_schedule?: HoursScheduleRow | null;
   after_hours_mode?: "serve" | "message" | null;
   agent_name?: string | null;
+  /** Short shop name callers hear. Empty uses business_name. */
+  spoken_name?: string | null;
+  /** Line after the shop and agent name. Empty uses How can I help? */
+  greeting_invite?: string | null;
   agent_tone?: string | null;
   team_directory?: TeamDirectoryEntry[] | null;
   faqs?: FaqEntry[] | null;
