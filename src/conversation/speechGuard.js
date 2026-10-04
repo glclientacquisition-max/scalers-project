@@ -65,7 +65,7 @@ function callerAskedForCallback(text) {
 }
 
 const NAME_ASK_SPEECH =
-  /\b(?:may i have your name|what(?:'s| is) your name|tell me your name|could i (?:have|get) your name|can i (?:have|get) your name|who am i speaking (?:with|to)|your name,? please|name, please|jina lako|niambie jina)\b/i;
+  /\b(?:may i have your name|what(?:'s| is) your name|tell me your name|could i (?:have|get) your name|can i (?:have|get) your name|who am i speaking (?:with|to)|your name,? please|name, please|jina lako|niambie jina|unaitwa nani|sina jina)\b/i;
 
 const REMEMBERED_NAME_ASK =
   /\b(?:do you )?remember my name\b|\bwhat(?:'s| is) my name\b|\bdo you know my name\b/i;
@@ -214,6 +214,27 @@ function narratesInternalAction(text) {
   return sentences.length > 0 && sentences.every((sentence) => ACTION_NARRATION.test(sentence));
 }
 
+
+function filePriceAnswer(profile, callerText) {
+  const ask = String(callerText || '').toLowerCase();
+  const rows = Array.isArray(profile?.servicesCatalog) ? profile.servicesCatalog : [];
+  const hits = [];
+  for (const row of rows) {
+    const name = String(row?.name || '').trim();
+    const price = String(row?.price_range || row?.priceRange || '').trim();
+    if (!name || !price || !/\d/.test(price)) continue;
+    const generic = new Set(['cleaning', 'service', 'services', 'general']);
+    const nameHit = name
+      .toLowerCase()
+      .split(/\s+/)
+      .some((word) => word.length > 3 && !generic.has(word) && ask.includes(word));
+    const seatHit = /\b(seats?|kiti|viti)\b/i.test(ask) && /\bper seat\b/i.test(price);
+    if (nameHit || seatHit) hits.push({ name, price });
+  }
+  if (hits.length !== 1) return '';
+  return `${hits[0].name} is ${hits[0].price}.`;
+}
+
 function unknownFallback(language) {
   const lang = confirmationLanguage(language);
   if (lang === 'sw') return 'Sina hiyo kwenye rekodi. Naweza kuandika kwa timu.';
@@ -336,13 +357,12 @@ function guardSpokenReply(text, ctx = {}) {
   let out = kept.join(' ').trim();
   if (holdOpenSlot && droppedJob && BARE_CLOSER.test(out)) out = '';
   const askedNumber = droppedNumber && NUMBER_ASK.test(lastCallerTurn);
+  const priced = askedNumber ? filePriceAnswer(ctx.profile, lastCallerTurn) : '';
   if (out) {
-    return withMessageOnlyCallback(
-      askedNumber ? `${unknownFallback(ctx.language)} ${out}` : out,
-      ctx,
-      appendCallback
-    );
+    const lead = priced || (askedNumber ? unknownFallback(ctx.language) : '');
+    return withMessageOnlyCallback(lead ? `${lead} ${out}` : out, ctx, appendCallback);
   }
+  if (priced) return withMessageOnlyCallback(priced, ctx, appendCallback);
   if (locked && appendCallback) return messageOnlyCallbackLine(ctx.language);
   if (!out && heldName && callerAsksRememberedName(lastCallerTurn)) {
     return `Yes, you are ${heldName}.`;
@@ -362,6 +382,10 @@ function guardSpokenReply(text, ctx = {}) {
     return ctx.allowEmpty ? '' : slotLine;
   }
   if (ctx.allowEmpty && !askedNumber) return '';
+  if (droppedNumber && NUMBER_ASK.test(lastCallerTurn)) {
+    const priced = filePriceAnswer(ctx.profile, lastCallerTurn);
+    if (priced) return withMessageOnlyCallback(priced, ctx, appendCallback);
+  }
   return droppedNumber ? unknownFallback(ctx.language) : ackFallback(ctx.language);
 }
 

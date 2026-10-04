@@ -660,6 +660,13 @@ function applyVisitTimeAnswer(state, text, profile = {}) {
   const lastAsk = (next.conversation.questionsAsked || []).slice(-1)[0];
   const answeringTime = lastAsk === 'time' || next.conversation.pendingHour != null;
   const homeVisit = isHomeVisitState(next, profile);
+  if (text && /\b(any ?time|anytime|whenever|wakati wowote|saa yoyote)\b/i.test(text) && !clockPhrase(text)) {
+    const waivedWhen = whenValue(next);
+    if (waivedWhen && dayCue(waivedWhen)) {
+      next.conversation.timeWaived = true;
+      next.conversation.pendingHour = null;
+    }
+  }
   if (!homeVisit || !text) return next;
   const when = whenValue(next);
   if (when && clockPhrase(when) && BARE_NO.test(text)) {

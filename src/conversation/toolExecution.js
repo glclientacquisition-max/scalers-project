@@ -3,10 +3,13 @@
 const { findProductMatch, normalizeProducts } = require('./productCatalog');
 const {
   evaluateAppointmentHours,
+  formatDayOnlyWhen,
   formatRequestedWhenLabel,
   formatStoredWhenText,
+  parseAbsoluteWhenDate,
   weekdaySpoken,
 } = require('./appointmentHours');
+const { clockPhrase, dayCue } = require('./visitTime');
 const { canonicalizeCallerName } = require('./callerNameMatch');
 const { isJunkCallerName } = require('./callerNameQuality');
 const { confirmationLanguage } = require('./language');
@@ -360,6 +363,14 @@ function validateEscalation(raw, { agentName = '', businessName = '', knownNames
   return { valid: true, value };
 }
 
+
+function dayOnlyWhen(whenText) {
+  const text = String(whenText || '').trim();
+  if (!text || clockPhrase(text)) return false;
+  if (/\b(morning|asubuhi|afternoon|mchana|evening|jioni)\b/i.test(text)) return false;
+  return Boolean(dayCue(text) || parseAbsoluteWhenDate(text));
+}
+
 function stampVisitWindow(value, hours) {
   // A period ("tomorrow morning") is not a clock. Drop any 10:00 the model sent.
   // Save the absolute Nairobi day, not the word "tomorrow".
@@ -475,6 +486,27 @@ function validateCreateAppointment(
       code: 'outside_coverage',
       missingSlots: [],
       value,
+    };
+  }
+  if (dayOnlyWhen(value.whenText)) {
+    const day = formatDayOnlyWhen(value.whenText, now);
+    if (!day) {
+      return {
+        valid: false,
+        reason: 'unparsed_when',
+        code: 'unparsed_when',
+        missingSlots: ['when_text'],
+        value,
+      };
+    }
+    return {
+      valid: true,
+      value: {
+        ...applyVisitPlaceNotes(value, coverageProfile),
+        whenText: day,
+        windowStart: '',
+        windowEnd: '',
+      },
     };
   }
   const hours = visitTimeGate(value.whenText, {

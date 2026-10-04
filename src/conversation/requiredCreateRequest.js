@@ -5,7 +5,8 @@ const { offeredVertical } = require('./vertical');
 const { isVisitClassEscalateReason } = require('./playbooks/homeServices');
 const { appendVisitNotes } = require('./visitLocation');
 const { looksLikeLeaveIt, looksLikeNonConsentAck } = require('./callCorrectives');
-const { clockPhrase, dayCue, whenHasClockTime } = require('./visitTime');
+const { clockPhrase, dayCue } = require('./visitTime');
+const { formatDayOnlyWhen, parseAbsoluteWhenDate } = require('./appointmentHours');
 const { numbersIn } = require('./numberWords');
 const { callbackNotesWithoutClock, heldMessageCallerName } = require('./messageOnly');
 
@@ -113,6 +114,47 @@ function buildServiceRequest(state = {}) {
 }
 
 /** Day known, time never given. Save the visit as a callback note, not a calendar slot. */
+
+function clockKey(text) {
+  const hit = String(text || '').match(/(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)/i);
+  if (!hit) return '';
+  const hour = String(Number(hit[1]));
+  const minute = hit[2] && Number(hit[2]) ? String(Number(hit[2])).padStart(2, '0') : '';
+  const ap = hit[3].replace(/\./g, '').toLowerCase();
+  return minute ? `${hour}:${minute}${ap}` : `${hour}${ap}`;
+}
+
+function callerSaidClock(state, whenText) {
+  const wanted = clockKey(whenText);
+  if (!wanted) return false;
+  const turns = (state?.conversation?.answersReceived || []).join(' ');
+  if (clockKey(turns) === wanted) return true;
+  const hour = Number(String(wanted).match(/^(\d{1,2})/)?.[1]);
+  if (!hour) return false;
+  // "12" then a noon confirm is that hour. "6 seats" is not 6 AM.
+  const bare = new RegExp(
+    `(?:^|\\b(?:at|saa)\\s+)${hour}\\b(?!\\s*(?:seats?|kiti|viti|coaches?))|\\b${hour}\\b(?!\\s*(?:seats?|kiti|viti|coaches?|\d))`,
+    'i'
+  );
+  return bare.test(turns);
+}
+
+function stripClock(whenText) {
+  return String(whenText || '')
+    .replace(/\b(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b/gi, ' ')
+    .replace(/\s+,/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function planNow(state, capabilities) {
+  const raw = capabilities?.now || state?.now;
+  const date = raw instanceof Date ? raw : raw ? new Date(raw) : new Date();
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+const PERIOD_WORD = /\b(morning|asubuhi|afternoon|mchana|evening|jioni)\b/i;
+
 function mentionsRefusedClock(whenText, state) {
   const clock = clockPhrase(whenText);
   if (!clock) return false;
@@ -234,13 +276,34 @@ function guardToolPlan(parsed, state = {}, capabilities = {}) {
     next.serviceRequest = request;
   }
   if (next.appointment && typeof next.appointment === 'object') {
-    const whenText = String(next.appointment.whenText || next.appointment.when_text || '');
-    if (whenText && dayCue(whenText) && !whenHasClockTime(whenText)) {
-      if (state.conversation?.timeWaived && capabilities.createServiceRequest) {
-        if (!next.serviceRequest) next.serviceRequest = buildVisitCallback(state);
-      } else {
-        next.needsVisitTime = whenText;
-      }
+    let whenText = String(next.appointment.whenText || next.appointment.when_text || '');
+    if (clockPhrase(whenText) && !callerSaidClock(state, whenText)) {
+      whenText = stripClock(whenText);
+      next.appointment = {
+        ...next.appointment,
+        whenText,
+        when_text: whenText,
+        windowStart: '',
+        windowEnd: '',
+        window_start: '',
+        window_end: '',
+      };
+    }
+    const hasDay = Boolean(dayCue(whenText) || parseAbsoluteWhenDate(whenText));
+    const bareDay = Boolean(whenText) && hasDay && !clockPhrase(whenText) && !PERIOD_WORD.test(whenText);
+    if (bareDay && state.conversation?.timeWaived) {
+      const day = formatDayOnlyWhen(whenText, planNow(state, capabilities));
+      next.appointment = {
+        ...next.appointment,
+        whenText: day || whenText,
+        when_text: day || whenText,
+        windowStart: '',
+        windowEnd: '',
+        window_start: '',
+        window_end: '',
+      };
+    } else if (bareDay) {
+      next.needsVisitTime = whenText;
       delete next.appointment;
     }
   }

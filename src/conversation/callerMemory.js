@@ -5,6 +5,7 @@
 
 const { namesMatch } = require('./contactIdentity');
 const { isJunkCallerName } = require('./callerNameQuality');
+const { isPlausibleCallerName } = require('./entityExtraction');
 const { compactNameKey } = require('./callerNameMatch');
 const { classifyLivedVisit } = require('./visitCalendar');
 
@@ -25,6 +26,29 @@ function looksLikeTranscript(text) {
   const value = String(text || '');
   if (/\b(caller|agent|assistant)\s*:/i.test(value)) return true;
   return (value.match(/\n/g) || []).length >= 3;
+}
+
+
+const NAME_CRUMB =
+  /^(?:speaking|speak|speaks|bwana|mr|mrs|ms|miss|sir|madam|the|a|an|my|your|by|of|to|for|and|with|from|aje|nauliza|jina|name|uh|um|yes|yeah|this|is|am|i|im)$/i;
+
+/** Another person on this phone. Same-person speech and junk are not a shared line. */
+function distinctOtherPerson(primary, alternate) {
+  const alt = String(alternate || '').trim();
+  if (!alt || isJunkCallerName(alt)) return false;
+  if (primary && namesMatch(alt, primary)) return false;
+  const owner = new Set(
+    String(primary || '')
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+  );
+  const leftover = alt.split(/\s+/).filter((word) => {
+    const lower = word.toLowerCase();
+    return !NAME_CRUMB.test(lower) && !owner.has(lower);
+  });
+  if (!leftover.length) return false;
+  return isPlausibleCallerName(leftover.join(' '));
 }
 
 function alternateNames(metadata) {
@@ -51,7 +75,7 @@ function buildCallerMemoryCard({
   const phone = String(contact.phone || '').trim();
   const name = String(contact.name || '').trim() || null;
   const alternates = alternateNames(contact.metadata);
-  const sharedLine = alternates.length > 0;
+  const sharedLine = alternates.some((alt) => distinctOtherPerson(name, alt));
   const lived = collectLivedAppointments(nextAppointment, recentAppointments, now);
   const nextItem = lived.open[0] || null;
   const nextRow = nextItem ? nextItem.row : null;

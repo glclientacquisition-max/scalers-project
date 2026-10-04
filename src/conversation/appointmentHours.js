@@ -416,6 +416,34 @@ function formatStoredWhenText(resolved) {
   return `${parts.weekdayLong} ${parts.dateLabel}, ${time}`;
 }
 
+
+/**
+ * Calendar day only. "kesho" on Sunday 4 Oct 2026 is Monday 5 October 2026.
+ * No clock, and the word tomorrow is not stored.
+ */
+function formatDayOnlyWhen(raw, now = new Date()) {
+  const text = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  const absolute = parseAbsoluteWhenDate(text);
+  let instant = null;
+  if (absolute) {
+    instant = eatAbsoluteInstant(absolute.year, absolute.month, absolute.day, 0);
+  } else {
+    const hasTomorrow = /\b(tomorrow|kesho)\b/i.test(text);
+    const hasToday = /\b(today|leo)\b/i.test(text);
+    const weekday = parseWeekdayKey(text);
+    let offset = null;
+    if (hasTomorrow) offset = 1;
+    else if (hasToday) offset = 0;
+    else if (weekday) offset = dayOffset(eatParts(now).weekday, weekday);
+    if (offset == null) return '';
+    instant = eatInstant(now, offset, 0);
+  }
+  const parts = eatParts(instant);
+  if (!parts.weekdayLong || !parts.dateLabel) return '';
+  return `${parts.weekdayLong} ${parts.dateLabel}`;
+}
+
 function formatRequestedWhenLabel(hours, language = 'en') {
   const resolved = hours?.resolved;
   if (!resolved || resolved.isNow) return '';
@@ -446,6 +474,7 @@ module.exports = {
   nextOpenDay,
   formatRequestedWhenLabel,
   formatStoredWhenText,
+  formatDayOnlyWhen,
   weekdaySpoken,
   minutesToHour12,
 };

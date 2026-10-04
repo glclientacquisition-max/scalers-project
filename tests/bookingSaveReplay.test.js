@@ -9,6 +9,10 @@ const { executeBrainTools } = require('../src/conversation/toolExecution');
 const { parseGeminiResponse } = require('../src/conversation/toolMarkers');
 const { defaultHoursSchedule } = require('../src/conversation/businessHours');
 const { appointmentEvent, renderEventText } = require('../src/notifications/events');
+const { buildCallerMemoryCard } = require('../src/conversation/callerMemory');
+const { planCallerModelTurn } = require('../src/conversation/turnPolicy');
+const { guardToolPlan } = require('../src/conversation/requiredCreateRequest');
+const { guardSpokenReply } = require('../src/conversation/speechGuard');
 
 const profile = {
   vertical: 'home_services',
@@ -157,5 +161,115 @@ describe('failed Sunday booking replay', () => {
     assert.equal(payloads[0].windowEnd, '');
     assert.equal(payloads[0].landmark, 'Westlands ABC');
     assert.equal(/10:00|10 AM/.test(payloads[0].whenText), false);
+  });
+
+  it('asks the file name on the Alvin line and does not save an invented 8 AM', async () => {
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254790381872',
+        name: 'Alvin',
+        metadata: {
+          alternate_names: [
+            { name: 'Bwana Alvin' },
+            { name: 'Alvin speaking' },
+            { name: 'impressed by your' },
+            { name: 'Nauliza aje' },
+            { name: 'Alvin speak' },
+          ],
+        },
+      },
+    });
+    assert.equal(card.sharedLine, false);
+    const live = {
+      vertical: 'home_services',
+      callerMemory: card,
+      servicesCatalog: [{ name: 'Couch cleaning' }],
+      hoursSchedule: defaultHoursSchedule(),
+    };
+    const now = new Date('2026-10-04T23:02:34+03:00');
+    const step = (state, text) =>
+      observeCallerTurn(state, {
+        text,
+        detectedLanguage: 'en',
+        resolvedLanguage: 'en',
+        profile: live,
+        now,
+        entities: extractConversationEntities(text, { profile: live, state }),
+      });
+
+    let state = step(createBrainState(live), 'Niliuliza sh');
+    assert.equal(state.caller.fileNameAsked, 'Alvin');
+    const gate = planCallerModelTurn(state, { fileNameAskCommitted: false });
+    assert.equal(gate.runModel, false);
+    assert.equal(gate.line, 'Am I speaking with Alvin?');
+    state.caller.fileNameAskSpoken = true;
+
+    const denied = guardSpokenReply(
+      'Je, ningepata jina lako. Ninasoma kutoka kwenye mfumo lakini sina jina lako bado. Je, unaitwa nani tafadhali?',
+      { state, callerTurns: ['Ah, natumai uona jina langu.'], allowEmpty: true }
+    );
+    assert.equal(/unaitwa nani|jina lako|sina jina/i.test(denied), false);
+
+    state = step(state, 'Alvin.');
+    assert.equal(state.caller.name, 'Alvin');
+    assert.equal(state.caller.nameConfirmed, true);
+    state = step(state, 'Wewe, wewe nipange kesho.');
+    state = step(state, "Ah, Westlands. Like, anytime from tomorrow I'm free.");
+    assert.equal(state.conversation.timeWaived, true);
+
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Couch cleaning","name":"Alvin","when_text":"Monday 5 October 2026, 8 AM","location":"Westlands","notes":"confirm access","window_start":"2026-10-05T05:00:04.278Z","window_end":"2026-10-05T05:00:04.278Z"}}###ENDTOOL###'
+    );
+    const guarded = guardToolPlan(parsed, state, {
+      createServiceRequest: true,
+      createAppointment: true,
+      now,
+    });
+    assert.equal(guarded.appointment.whenText, 'Monday 5 October 2026');
+    assert.equal(guarded.appointment.window_start, '');
+    assert.equal(guarded.appointment.window_end, '');
+    const saved = [];
+    const execution = await executeBrainTools({
+      parsed: guarded,
+      capabilities: { createAppointment: true, saveCallerInfo: true, createServiceRequest: true },
+      hoursSchedule: defaultHoursSchedule(),
+      now,
+      nameConfirmed: true,
+      heldCallerName: 'Alvin',
+      handlers: {
+        createAppointment: async (appointment) => {
+          saved.push(appointment);
+          return { id: 'appt_8', status: 'requested' };
+        },
+      },
+    });
+    assert.equal(execution.results.find((row) => row.action === 'create_appointment').status, 'succeeded');
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].name, 'Alvin');
+    assert.equal(saved[0].whenText, 'Monday 5 October 2026');
+    assert.equal(saved[0].windowStart, '');
+    assert.equal(saved[0].windowEnd, '');
+    assert.equal(saved[0].landmark, 'Westlands');
+    assert.equal(/tomorrow|kesho|8\s*AM|08:00/i.test(saved[0].whenText), false);
+    assert.equal(saved[0].windowStart, '');
+  });
+
+  it('speaks the couch seat price on file instead of saying it is missing', () => {
+    const spoken = guardSpokenReply(
+      'That will be 3600 shillings. Would you like to book a cleaning visit?',
+      {
+        callerTurns: ['Uh, I have 6 seats. How much will it be for cleaning all of them?'],
+        profile: {
+          servicesCatalog: [
+            { name: 'Couch cleaning', price_range: 'Ksh 600 per seat' },
+            { name: 'Carpet cleaning', price_range: 'Ksh 1500-2000' },
+          ],
+        },
+        language: 'en',
+      }
+    );
+    assert.match(spoken, /Couch cleaning is Ksh 600 per seat/);
+    assert.doesNotMatch(spoken, /don't have that on file/i);
+    assert.doesNotMatch(spoken, /3600/);
   });
 });
