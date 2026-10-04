@@ -156,6 +156,21 @@ function splitSpeakableChunks(text, opts = {}) {
 }
 
 /**
+ * Push one already-prepared utterance as speakable sentences on an open
+ * Soniox stream, then end that stream once. Not a single full-string push.
+ * @param {{ pushText: (text: string) => unknown, end: () => Promise<unknown> }} session
+ * @param {string} preparedText
+ */
+async function speakPreparedSentences(session, preparedText) {
+  const { chunks } = splitSpeakableChunks(preparedText, { final: true });
+  for (const sentence of chunks) {
+    session.pushText(sentence);
+  }
+  const spoken = await session.end();
+  return { chunks, spoken };
+}
+
+/**
  * Model sentences that claim a booking/save before backend validation.
  * Those must never reach TTS. formatToolConfirmation speaks the outcome.
  */
@@ -276,5 +291,6 @@ module.exports = {
   joinSpokenPieces,
   stripMarkersForSpeech,
   splitSpeakableChunks,
+  speakPreparedSentences,
   createSpokenStreamBuffer,
 };

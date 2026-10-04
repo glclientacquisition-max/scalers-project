@@ -13,6 +13,8 @@
 --   business_hours text     (owner-facing; see tenant_business_profile.sql)
 --   services_offered text   (owner-facing)
 --   agent_name text         (receptionist intro name; default Receptionist)
+--   spoken_name text        (short shop name on the greeting; empty uses business_name; greeting_spoken_name.sql)
+--   greeting_invite text    (line after the name; empty uses How can I help?; greeting_spoken_name.sql)
 --   agent_tone text         (professional | friendly | empathetic | localized)
 --   team_directory jsonb    ([{name, role, phone}]; knowledge_acquisition_phase1.sql)
 --   faqs jsonb              ([{question, answer}]; knowledge_acquisition_phase1.sql)
