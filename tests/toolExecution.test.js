@@ -593,6 +593,54 @@ describe('validated tool execution', () => {
     assert.equal(/confirmed/i.test(spoken), false);
   });
 
+  it('saves tomorrow morning as the Nairobi day plus the period, with no clock window', async () => {
+    const payloads = [];
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Carpet cleaning","name":"Alvin","when_text":"tomorrow morning","landmark":"Westlands ABC","window_start":"2026-10-05T07:00:00.000Z","window_end":"2026-10-05T07:00:00.000Z"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date('2026-10-04T12:00:00+03:00'),
+      handlers: {
+        createAppointment: async (appointment) => {
+          payloads.push(appointment);
+          return { id: 'appt_period', status: 'requested' };
+        },
+      },
+    });
+    assert.equal(execution.results[0].status, 'succeeded');
+    assert.equal(payloads.length, 1);
+    assert.equal(payloads[0].whenText, 'Monday 5 October 2026, morning');
+    assert.equal(payloads[0].windowStart, '');
+    assert.equal(payloads[0].windowEnd, '');
+    assert.equal(payloads[0].landmark, 'Westlands ABC');
+    assert.equal(/10:00|10 AM/.test(payloads[0].whenText), false);
+  });
+
+  it('keeps an absolute Nairobi day and appends only the period word', async () => {
+    const payloads = [];
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Carpet cleaning","name":"Alvin","when_text":"5 October 2026 morning","landmark":"Westlands"}}###ENDTOOL###'
+    );
+    await executeBrainTools({
+      parsed,
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date('2026-10-04T12:00:00+03:00'),
+      handlers: {
+        createAppointment: async (appointment) => {
+          payloads.push(appointment);
+          return { id: 'appt_abs', status: 'requested' };
+        },
+      },
+    });
+    assert.equal(payloads[0].whenText, 'Monday 5 October 2026, morning');
+    assert.equal(payloads[0].windowStart, '');
+    assert.equal(payloads[0].windowEnd, '');
+  });
+
   it('persists a visit even when another open visit sits on the same hour', async () => {
     let calls = 0;
     const parsed = parseGeminiResponse(
