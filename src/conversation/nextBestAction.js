@@ -114,6 +114,14 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       (state?.conversation?.answersReceived || []).slice(-1)[0] || ''
     );
     if (state?.conversation?.phatic && speakerPendingOnFile(returning)) {
+      const pending = String(state?.caller?.fileNameAsked || '').trim();
+      if (pending && !returning?.sharedLine) {
+        return {
+          action: ACTIONS.ASK_CLARIFICATION,
+          slot: 'name',
+          reason: `Ask once: Am I speaking with ${pending}? Do not talk about visits yet. Do not say nothing is open. Do not list services.`,
+        };
+      }
       return {
         action: ACTIONS.ANSWER,
         reason:
@@ -235,6 +243,22 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
   }
 
   if (missingSlots.length) {
+    if (missingSlots[0] === 'name' && state?.caller?.nameConfirmed !== true) {
+      const pending = String(state?.caller?.fileNameAsked || '').trim();
+      if (pending && !state?.returning?.sharedLine) {
+        return {
+          action: ACTIONS.ASK_CLARIFICATION,
+          slot: 'name',
+          reason: `Ask once: Am I speaking with ${pending}? Do not ask for a different name. Do not talk about visits yet. Do not say nothing is open.`,
+        };
+      }
+      return {
+        action: ACTIONS.ASK_CLARIFICATION,
+        slot: 'name',
+        reason:
+          'No name is on file. Ask once for their name. Do not ask again after they give one.',
+      };
+    }
     return {
       action: ACTIONS.ASK_CLARIFICATION,
       slot: missingSlots[0],

@@ -200,10 +200,10 @@ describe('returning-caller card', () => {
       state: hello,
       capabilities: { createServiceRequest: true, createAppointment: true },
     });
-    assert.equal(who.action, 'ANSWER');
-    assert.notEqual(who.slot, 'name');
-    assert.match(who.reason, /Do not ask who is speaking/i);
-    assert.match(who.reason, /Do not use the file name/i);
+    assert.equal(who.action, 'ASK_CLARIFICATION');
+    assert.equal(who.slot, 'name');
+    assert.match(who.reason, /Am I speaking with Alex/i);
+    assert.match(who.reason, /Do not say nothing is open/i);
     assert.doesNotMatch(who.reason, /carpet/i);
 
     const named = observeCallerTurn(seeded, {

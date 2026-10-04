@@ -1851,6 +1851,16 @@ mediaWss.on('connection', (ws, req) => {
       businessLocations: profile.businessLocations || [],
       teamDirectory: profile.teamDirectory || [],
       ttsLexicon: Array.isArray(profile.ttsLexicon) ? profile.ttsLexicon : [],
+      callerMemory: profile.callerMemory
+        ? {
+            name: profile.callerMemory.fileOwnerName || profile.callerMemory.name || null,
+            fileOwnerName:
+              profile.callerMemory.fileOwnerName || profile.callerMemory.name || null,
+            alternateNames: Array.isArray(profile.callerMemory.alternateNames)
+              ? profile.callerMemory.alternateNames
+              : [],
+          }
+        : null,
     };
     return buildSttContext(sttTenantSnapshot);
   }
@@ -4527,6 +4537,7 @@ async function applyGeminiTools(callSid, parsed) {
       groundedProfile.businessName || process.env.BUSINESS_NAME || '',
     hoursSchedule: groundedProfile.hoursSchedule || null,
     nameConfirmed: state.caller?.nameConfirmed === true,
+    heldCallerName: String(state.caller?.name || '').trim(),
     openAppointments: groundedProfile.openAppointments || [],
     callerPhone: state.caller?.phone || '',
     knownNames: collectKnownCallerNames({

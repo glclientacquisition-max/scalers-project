@@ -185,6 +185,11 @@ function formatVisitSopForPrompt(state) {
     } else if (next === 'location' && decision?.quality === 'area_only') {
       nextLine =
         'You have the area. Ask once which building, gate, or junction. Never say landmark.';
+    } else if (next === 'name') {
+      const pending = String(state?.caller?.fileNameAsked || '').trim();
+      nextLine = pending
+        ? `Ask once: Am I speaking with ${pending}? Do not ask for a different name. Do not talk about visits yet. Never say landmark.`
+        : 'No name is on file. Ask once for their name. Do not ask again after they give one. Never say landmark.';
     } else if (next) {
       nextLine = job
         ? `Name ${job} in one clause, then ask only for ${next}. Never re-ask a filled slot. Never say landmark.`
