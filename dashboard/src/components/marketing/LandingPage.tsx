@@ -2,21 +2,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { brandAssets } from "@/components/brand/assets";
 import { HeroCall, HowStage } from "@/components/marketing/LandingStory";
-import { PackagePrices } from "@/components/marketing/PackagePrices";
-import { emptyPublicBoard, type PublicPackageBoard } from "@/lib/packageCatalog";
 
 /**
- * Marketing home: hero, how it works, then the package table.
+ * Marketing home: hero, how it works, then sign up.
+ * Package prices stay off this page until pricing is ready.
  * Authenticated owners get a direct path back to their workspace.
  */
 export function LandingPage({
-  board,
   signedIn = false,
 }: {
-  board?: PublicPackageBoard;
   signedIn?: boolean;
 }) {
-  const offers = board ?? emptyPublicBoard();
   const actionHref = signedIn ? "/home" : "/signup";
   const actionLabel = signedIn ? "Dashboard" : "Sign up";
   return (
@@ -44,12 +40,6 @@ export function LandingPage({
             Scalers
           </span>
           <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <a
-              href="#packages"
-              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl px-2 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus sm:px-3"
-            >
-              Packages
-            </a>
             {signedIn ? (
               <Link
                 href={actionHref}
@@ -137,10 +127,9 @@ export function LandingPage({
         </div>
       </section>
 
-      <section id="packages" className="bg-canvas px-6 pb-20 pt-4 text-ink sm:px-8">
+      <section className="bg-canvas px-6 pb-20 pt-4 text-ink sm:px-8">
         <div className="mx-auto max-w-desk">
-          <PackagePrices board={offers} />
-          <div className="mt-14 max-w-xl">
+          <div className="max-w-xl">
             <p className="text-base leading-relaxed text-ink">
               Scalers is a business assistant that actually helps you run the business, from the
               client call through to the booking, the order, or whatever comes next.

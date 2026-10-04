@@ -50,7 +50,7 @@ describe("package usage meter", () => {
     assert.doesNotMatch(page, /daysRemainingAtPace/);
   });
 
-  it("lists package prices on the landing page from the catalog", () => {
+  it("does not list package prices on the landing page", () => {
     const catalog = read("dashboard/src/lib/packageCatalog.ts");
     const landing = read("dashboard/src/components/marketing/LandingPage.tsx");
     const prices = read("dashboard/src/components/marketing/PackagePrices.tsx");
@@ -60,10 +60,13 @@ describe("package usage meter", () => {
     assert.match(catalog, /annualPriceKes\(monthlyPriceKes, discount\)/);
     assert.match(loader, /emptyPublicBoard/);
     assert.doesNotMatch(loader, /strawPublicBoard/);
-    assert.match(home, /loadPublicPackageOffers/);
+    assert.doesNotMatch(home, /loadPublicPackageOffers/);
     assert.doesNotMatch(home, /strawPublicBoard/);
-    assert.match(landing, /id="packages"/);
-    assert.match(landing, /emptyPublicBoard/);
+    assert.doesNotMatch(landing, /PackagePrices/);
+    assert.doesNotMatch(landing, /id="packages"/);
+    assert.doesNotMatch(landing, /href="#packages"/);
+    assert.doesNotMatch(landing, /Packages/);
+    assert.doesNotMatch(landing, /emptyPublicBoard/);
     assert.doesNotMatch(landing, /strawPublicBoard/);
     assert.doesNotMatch(landing, /5000|12000|25000/);
     assert.match(prices, /packagePriceLabel/);
