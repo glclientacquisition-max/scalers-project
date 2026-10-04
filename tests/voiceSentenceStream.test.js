@@ -82,7 +82,7 @@ describe('mid-call one-shots do not speak-and-return', () => {
   });
 
   it('leaves greeting, outage, and empty-speech recovery in place', () => {
-    assert.match(serverSource, /isGreeting:\s*true/);
+    assert.match(serverSource, /async function speakGreetingSentences/);
     assert.match(serverSource, /function handleSpeechProviderOutage/);
     assert.match(serverSource, /planEmptyGeminiSpeech\(\{/);
     assert.match(serverSource, /Sorry, say that again\?|planned\.line/);

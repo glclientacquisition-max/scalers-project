@@ -493,6 +493,57 @@ h3,
   animation: desk-land-fade var(--motion-land) var(--motion-ease) both;
 }
 
+/* Hero call plays once: Incoming, one ring, then Answered. The two states never share opacity.
+   How it works: three pictures rise once. The sentences under them stay put. */
+.hero-call { display: grid; }
+.hero-in, .hero-out { grid-area: 1 / 1; }
+.hero-in { opacity: 1; }
+.hero-out { opacity: 0; }
+.hero-ring { opacity: 0; transform: scale(0.86); }
+.hero-wave { transform-origin: center bottom; transform: scaleY(1); }
+
+.hiw-mock { opacity: 0; transform: translateY(12px); }
+
+.hero-call[data-play="1"] .hero-in { animation: hero-in 7s ease-out both; }
+.hero-call[data-play="1"] .hero-out { animation: hero-out 7s ease-out both; }
+.hero-call[data-play="1"] .hero-ring { animation: hero-ring 7s ease-out both; }
+.hero-call[data-play="1"] .hero-wave-a { animation: hero-wave-a 7s ease-out both; }
+.hero-call[data-play="1"] .hero-wave-b { animation: hero-wave-b 7s ease-out both; }
+
+.hiw-stage[data-play="1"] .hiw-mock { animation: hiw-rise 0.6s ease-out both; }
+.hiw-stage[data-play="1"] li:nth-child(2) .hiw-mock { animation-delay: 0.12s; }
+.hiw-stage[data-play="1"] li:nth-child(3) .hiw-mock { animation-delay: 0.24s; }
+
+@keyframes hero-in {
+  0%, 32% { opacity: 1; }
+  40%, 100% { opacity: 0; }
+}
+@keyframes hero-out {
+  0%, 40% { opacity: 0; }
+  48%, 100% { opacity: 1; }
+}
+@keyframes hero-ring {
+  0%, 8% { opacity: 0; transform: scale(0.86); }
+  16% { opacity: 0.9; transform: scale(1); }
+  26%, 100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes hero-wave-a {
+  0%, 52% { transform: scaleY(1); }
+  64% { transform: scaleY(0.45); }
+  78% { transform: scaleY(1); }
+  100% { transform: scaleY(1); }
+}
+@keyframes hero-wave-b {
+  0%, 56% { transform: scaleY(1); }
+  68% { transform: scaleY(1.08); }
+  82% { transform: scaleY(0.7); }
+  100% { transform: scaleY(1); }
+}
+@keyframes hiw-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
 /* Notice enter/exit. Shift family: opacity + transform, --motion-fast. */
 .desk-notice {
   opacity: 0;
@@ -524,8 +575,19 @@ h3,
   .landing-rise,
   .landing-drift,
   .desk-live-ping,
-  .desk-just-landed::after {
-    animation: none;
+  .desk-just-landed::after,
+  .hero-call,
+  .hero-call *,
+  .hiw-stage,
+  .hiw-stage * {
+    animation: none !important;
+  }
+  .hero-in,
+  .hero-ring { display: none !important; }
+  .hero-out,
+  .hiw-mock {
+    opacity: 1 !important;
+    transform: none !important;
   }
 
   .desk-shift {

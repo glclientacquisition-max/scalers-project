@@ -240,6 +240,7 @@ const {
 const {
   createSpokenStreamBuffer,
   joinSpokenPieces,
+  speakPreparedSentences,
 } = require('./src/speech/spokenStreamBuffer');
 const { cutNoAiSlop } = require('./src/speech/noAiSlop');
 const {
@@ -1766,6 +1767,8 @@ mediaWss.on('connection', (ws, req) => {
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
   let agentName = process.env.AGENT_NAME || 'Receptionist';
+  let spokenName = '';
+  let greetingInvite = '';
   let hoursSchedule = null;
   let openStatus = 'unknown';
   let afterHoursMode = 'serve';
@@ -1888,6 +1891,8 @@ mediaWss.on('connection', (ws, req) => {
       brainProfile = profile;
       businessName = profile.businessName || businessName;
       agentName = profile.agentName || agentName;
+      spokenName = profile.spokenName || '';
+      greetingInvite = profile.greetingInvite || '';
       hoursSchedule = profile.hoursSchedule || null;
       afterHoursMode = profile.afterHoursMode || 'serve';
       openStatus = openClosedStatus(hoursSchedule);
@@ -1909,6 +1914,8 @@ mediaWss.on('connection', (ws, req) => {
       }
       greetingLine = buildGreeting(businessName, {
         agentName,
+        spokenName,
+        greetingInvite,
         isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
         afterHoursMode,
         closureNotice,
@@ -2093,6 +2100,120 @@ mediaWss.on('connection', (ws, req) => {
     }
     hangupAfterSpeechOutage(800);
     return { ok: false, outage: true };
+  }
+
+
+  /**
+   * Greeting only. One open Soniox stream, one pushText per sentence, one end.
+   * The cache stores this streamed render under the existing prepared-text key.
+   * The slop cut does not run here. This is not speakText's single full-string push.
+   */
+  async function speakGreetingSentences(text, opts = {}) {
+    if (!text) return { ok: false };
+    if (speechOutageStarted) return { ok: false, outage: true };
+    if (!tts && ttsReadyPromise) {
+      try {
+        await Promise.race([
+          ttsReadyPromise,
+          new Promise((resolve) => setTimeout(resolve, 3000)),
+        ]);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!tts) {
+      console.warn(
+        `[ws/media][${sidLabel()}] greeting skipped — TTS unavailable: ${String(text).slice(0, 80)}`
+      );
+      return handleSpeechProviderOutage('tts unavailable');
+    }
+    bargeInActive = false;
+    suppressReplyRemainder = false;
+    if (/[.!?]$/.test(String(text).trim())) bargeCancelledText = '';
+    lastAgentText = String(text);
+    agentReplay.beginSpeech(text);
+    activePlaybackGeneration = ++playbackGeneration;
+    const gen = activePlaybackGeneration;
+    const armId = `arming-${gen}`;
+    activeOutboundStreamId = armId;
+    speaking = true;
+    speakStartedAt = Date.now();
+    const extraLexicon = Array.isArray(opts.extraLexicon)
+      ? opts.extraLexicon
+      : mergeIdentityLexicon(ttsLexiconOverrides, { businessName, agentName });
+    const prepared = prepareForTts(text, {
+      callLanguage,
+      extraLexicon,
+    });
+    console.log(
+      `[ws/media][${sidLabel()}] greeting tts sentences lang=${prepared.language}` +
+        ` original=${JSON.stringify(prepared.original)}` +
+        ` spoken=${JSON.stringify(prepared.text)}`
+    );
+    let session = null;
+    try {
+      session = await tts.beginSpeak({
+        callLanguage,
+        language: prepared.language,
+        alreadyPrepared: true,
+        speedScale: 1,
+        extraLexicon,
+        capture: Boolean(opts.greetingCacheKey && isGreetingCacheEnabled() && ttsSpeedScale === 1),
+      });
+      if (bargeInActive || activePlaybackGeneration !== gen) {
+        try {
+          session.cancel();
+        } catch {
+          /* ignore */
+        }
+        if (activeOutboundStreamId === armId) activeOutboundStreamId = null;
+        if (activePlaybackGeneration === gen) {
+          activePlaybackGeneration = ++playbackGeneration;
+        }
+        return { ok: false, cancelled: true };
+      }
+      activeOutboundStreamId = session.streamId;
+      const streamed = await speakPreparedSentences(session, prepared.text);
+      const spoken = streamed.spoken;
+      if (
+        opts.greetingCacheKey &&
+        spoken?.pcm?.length &&
+        !spoken.cancelled &&
+        isGreetingCacheEnabled()
+      ) {
+        putGreetingPcm(opts.greetingCacheKey, spoken.pcm);
+      }
+      if (!streamed.chunks.length || spoken?.empty) return { ok: false, empty: true };
+      return { ok: !spoken?.cancelled, sentences: streamed.chunks.length };
+    } catch (err) {
+      console.error(`[ws/media][${sidLabel()}] greeting TTS failed:`, err?.message || err);
+      try {
+        session?.cancel();
+      } catch {
+        /* ignore */
+      }
+      const classified = classifySonioxError(err);
+      if (classified.billing || classified.fatal) {
+        return handleSpeechProviderOutage(
+          `tts ${classified.code || classified.message}`
+        );
+      }
+      return { ok: false };
+    } finally {
+      if (activePlaybackGeneration === gen) {
+        speaking = false;
+        if (
+          activeOutboundStreamId === session?.streamId ||
+          activeOutboundStreamId === armId
+        ) {
+          activeOutboundStreamId = null;
+        }
+        if (!speechOutageStarted) {
+          commitAgentQuestionIfNeeded();
+          releaseQueuedCallerSpeech(gen);
+        }
+      }
+    }
   }
 
   async function speakText(text, opts = {}) {
@@ -3457,6 +3578,8 @@ mediaWss.on('connection', (ws, req) => {
       greetingLine = await generateDynamicGreeting({
         businessName,
         agentName,
+        spokenName,
+        greetingInvite,
         vertical: brainProfile?.vertical || '',
         servicesCatalog: brainProfile.servicesCatalog,
         servicesOffered: brainProfile.servicesOffered,
@@ -3520,8 +3643,7 @@ mediaWss.on('connection', (ws, req) => {
         }
 
         greetingAwaitingFirstPcm = true;
-        const spoken = await speakText(greetingLine, {
-          isGreeting: true,
+        const spoken = await speakGreetingSentences(greetingLine, {
           greetingCacheKey: found.key,
           extraLexicon: found.extraLexicon,
         });
@@ -3559,6 +3681,9 @@ mediaWss.on('connection', (ws, req) => {
         }
         const fallback = buildGreeting(businessName, {
           agentName,
+          spokenName,
+          greetingInvite,
+          vertical: brainProfile?.vertical || '',
           servicesCatalog: brainProfile.servicesCatalog,
           servicesOffered: brainProfile.servicesOffered,
           isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
@@ -3566,7 +3691,7 @@ mediaWss.on('connection', (ws, req) => {
           closureNotice,
         });
         greetingAwaitingFirstPcm = true;
-        await speakText(fallback, { isGreeting: true });
+        await speakGreetingSentences(fallback);
         messages.push({ role: 'assistant', content: fallback, local: true });
       } catch {
         /* ignore */

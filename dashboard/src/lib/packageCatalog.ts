@@ -218,6 +218,19 @@ export function strawPublicBoard(): PublicPackageBoard {
   };
 }
 
+/** No invented prices. Missing catalog or rate card stays blank on the public page. */
+export function emptyPublicBoard(): PublicPackageBoard {
+  return {
+    discountPercent: 0,
+    inboundKesPerMinute: 0,
+    outboundKesPerMinute: 0,
+    smsKes: 0,
+    emailKes: 0,
+    whatsappKes: 0,
+    packages: [],
+  };
+}
+
 export async function loadPublicPackageOffers(): Promise<PublicPackageBoard> {
   try {
     const admin = getSupabaseAdmin();
@@ -234,11 +247,14 @@ export async function loadPublicPackageOffers(): Promise<PublicPackageBoard> {
         .select("sku, name, monthly_price_kes, seats, minutes, sms, email, staff_wa, dids, sort_order, is_active")
         .order("sort_order", { ascending: true }),
     ]);
-    if (packsRes.error || !packsRes.data?.length) return strawPublicBoard();
-    const rates =
-      ratesRes.error || !ratesRes.data
-        ? { ...DEFAULT_RATES }
-        : mapRates(ratesRes.data as Record<string, unknown>);
+    if (packsRes.error || !packsRes.data?.length) return emptyPublicBoard();
+    const rateRow =
+      ratesRes.error || !ratesRes.data ? null : (ratesRes.data as Record<string, unknown>);
+    const discountRaw = rateRow?.annual_discount_percent;
+    const discount =
+      rateRow && discountRaw != null && discountRaw !== ""
+        ? parseDiscountPercent(discountRaw)
+        : null;
     const packages = packsRes.data
       .filter((row) => row.is_active !== false)
       .map((row) => {
@@ -247,7 +263,8 @@ export async function loadPublicPackageOffers(): Promise<PublicPackageBoard> {
           sku: String(row.sku || ""),
           name: String(row.name || ""),
           monthlyPriceKes,
-          annualPriceKes: annualPriceKes(monthlyPriceKes, rates.annualDiscountPercent),
+          annualPriceKes:
+            discount == null ? 0 : annualPriceKes(monthlyPriceKes, discount),
           seats: num(row.seats),
           minutes: num(row.minutes),
           sms: num(row.sms),
@@ -257,18 +274,22 @@ export async function loadPublicPackageOffers(): Promise<PublicPackageBoard> {
         };
       })
       .filter((pack) => pack.name);
-    if (!packages.length) return strawPublicBoard();
+    if (!packages.length) return emptyPublicBoard();
+    const money = (raw: unknown) => {
+      const n = parseMoney(raw);
+      return n == null ? 0 : n;
+    };
     return {
-      discountPercent: rates.annualDiscountPercent,
-      inboundKesPerMinute: inboundKesPerMinute(rates.inboundKesPerSecond),
-      outboundKesPerMinute: outboundKesPerMinute(rates.outboundKesPerSecond),
-      smsKes: rates.smsKes,
-      emailKes: rates.emailKes,
-      whatsappKes: rates.whatsappKes,
+      discountPercent: discount ?? 0,
+      inboundKesPerMinute: rateRow ? inboundKesPerMinute(money(rateRow.inbound_kes_per_second)) : 0,
+      outboundKesPerMinute: rateRow ? outboundKesPerMinute(money(rateRow.outbound_kes_per_second)) : 0,
+      smsKes: rateRow ? money(rateRow.sms_kes) : 0,
+      emailKes: rateRow ? money(rateRow.email_kes) : 0,
+      whatsappKes: rateRow ? money(rateRow.whatsapp_kes) : 0,
       packages,
     };
   } catch {
-    return strawPublicBoard();
+    return emptyPublicBoard();
   }
 }
 

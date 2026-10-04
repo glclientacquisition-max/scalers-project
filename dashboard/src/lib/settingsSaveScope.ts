@@ -12,6 +12,8 @@
 const SETTINGS_SCOPE_FIELDS: Record<string, readonly string[]> = {
   identity: [
     "businessName",
+    "spokenName",
+    "greetingInvite",
     "agentName",
     "agentTone",
     "vertical",

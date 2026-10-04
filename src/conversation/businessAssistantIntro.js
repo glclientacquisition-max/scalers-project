@@ -28,6 +28,59 @@ function cleanName(value, fallback) {
   return text || fallback;
 }
 
+const SPOKEN_NAME_MAX = 40;
+const GREETING_INVITE_MAX = 80;
+
+function clipGreetingField(value, max) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  if (text.length <= max) return text;
+  return text.slice(0, max).trim();
+}
+
+/** Short shop name for the greeting. Empty, or "the business", means use the stored name. */
+function spokenShopLabel(opts = {}) {
+  const spoken = clipGreetingField(opts.spokenName, SPOKEN_NAME_MAX);
+  if (!spoken || isDefaultShopName(spoken)) return '';
+  return spoken;
+}
+
+function shopLabelForIntro(opts = {}) {
+  return (
+    spokenShopLabel(opts) ||
+    cleanName(opts.businessName || process.env.BUSINESS_NAME, 'the business')
+  );
+}
+
+/** Owner invite, or "" when empty / the default question (keeps today's line). */
+function customInviteText(opts = {}) {
+  const invite = clipGreetingField(opts.greetingInvite, GREETING_INVITE_MAX);
+  if (!invite) return '';
+  const bare = invite.replace(/[.!?…]+$/g, '').trim();
+  if (/^how can i help$/i.test(bare)) return '';
+  return invite;
+}
+
+function capitalizeSentence(text) {
+  const line = String(text || '');
+  if (!line) return line;
+  return line.charAt(0).toUpperCase() + line.slice(1);
+}
+
+function greetingHelpLine(opts = {}) {
+  const invite = customInviteText(opts);
+  if (!invite) return 'How can I help?';
+  let line = invite;
+  if (!/[.!?…]$/.test(line)) {
+    if (/^(how|what|where|when|who|which|can|could|would|may)\b/i.test(line)) {
+      line = `${line}?`;
+    } else {
+      line = `${line}.`;
+    }
+  }
+  return capitalizeSentence(line);
+}
+
 function isDefaultShopName(value) {
   const shop = String(value || '')
     .replace(/\s+/g, ' ')
@@ -147,13 +200,13 @@ function formatOfferingClause(raw) {
 
 /**
  * Shop-first identity. Morning/evening is a first-word swap only.
+ * Empty spoken name and empty invite keep today's line:
+ * "Good evening, {business}, this is {agent}."
+ * A short invite stays its own later sentence. The name stays in this one.
  * @returns {string} e.g. "ChapterOne Bookstore, this is Aisha."
  */
 function composeOpenerIdentity(opts = {}) {
-  const businessName = cleanName(
-    opts.businessName || process.env.BUSINESS_NAME,
-    'the business'
-  );
+  const businessName = shopLabelForIntro(opts);
   const agentName = cleanName(opts.agentName, '');
   const tod = eatTimeOfDay(opts.now || new Date());
   const day = dayWordPrefix(tod);
@@ -168,6 +221,8 @@ function composeOpenerIdentity(opts = {}) {
  *
  * @param {{
  *   businessName?: string,
+ *   spokenName?: string,
+ *   greetingInvite?: string,
  *   agentName?: string,
  *   offeringLine?: string,
  *   servicesCatalog?: Array|{name?: string}|string,
@@ -200,7 +255,7 @@ function composeBusinessAssistantIntro(opts = {}) {
   const closed = opts.isOpen === false;
   const identity = composeOpenerIdentity(opts);
   const invite = languageInviteClause(opts);
-  const help = 'How can I help?';
+  const help = greetingHelpLine(opts);
   const fileName = String(opts.callerFileName || opts.fileOwnerName || '').trim();
   const nameAsk =
     fileName && /^[\p{L}][\p{L}'’\- ]{0,39}$/u.test(fileName)
@@ -250,11 +305,24 @@ function introLooksValid(line, businessName, agentName, opts = {}) {
   } else if (FORBIDDEN_FIRST_OPEN.test(text)) {
     return false;
   }
-  const name = String(businessName || '').trim();
+  const spoken = spokenShopLabel(opts);
+  const name = spoken || String(businessName || '').trim();
   if (name && !/^the business$/i.test(name)) {
-    const nameToken = name.split(/\s+/)[0];
-    if (nameToken && nameToken.length >= 3) {
-      if (!text.toLowerCase().includes(nameToken.toLowerCase())) return false;
+    if (spoken) {
+      if (!text.toLowerCase().includes(spoken.toLowerCase())) return false;
+      const legal = String(businessName || '').trim();
+      if (
+        legal &&
+        legal.length > spoken.length &&
+        text.toLowerCase().includes(legal.toLowerCase())
+      ) {
+        return false;
+      }
+    } else {
+      const nameToken = name.split(/\s+/)[0];
+      if (nameToken && nameToken.length >= 3) {
+        if (!text.toLowerCase().includes(nameToken.toLowerCase())) return false;
+      }
     }
     if (/\bthe business\b/i.test(text) && !/\bthe business\b/i.test(name)) {
       return false;
@@ -265,7 +333,14 @@ function introLooksValid(line, businessName, agentName, opts = {}) {
     if (!text.toLowerCase().includes(agent.toLowerCase())) return false;
   }
   if (/^\s*habari\b/i.test(text)) return false;
-  if (
+  const customInvite = customInviteText(opts);
+  if (customInvite) {
+    const bare = customInvite.replace(/[.!?…]+$/g, '').trim().toLowerCase();
+    const hasCustom = bare && text.toLowerCase().includes(bare);
+    const hasNameAsk =
+      /\bmay i have your name\b/i.test(text) || /\bam i speaking with\b/i.test(text);
+    if (!hasCustom && !hasNameAsk) return false;
+  } else if (
     !/\bhow can i help\b/i.test(text) &&
     !/\bmay i have your name\b/i.test(text) &&
     !/\bam i speaking with\b/i.test(text)
@@ -283,6 +358,11 @@ module.exports = {
   summarizeOfferingForIntro,
   composeOpenerIdentity,
   composeBusinessAssistantIntro,
+  spokenShopLabel,
+  greetingHelpLine,
+  clipGreetingField,
+  SPOKEN_NAME_MAX,
+  GREETING_INVITE_MAX,
   previewBusinessAssistantIntro,
   introLooksValid,
   shortenNotice,

@@ -10,20 +10,20 @@ const siteUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Scalers | Autonomous business assistant for Kenya",
+    default: "Scalers, your 24-hour call assistant",
     template: "%s · Scalers",
   },
   description:
-    "Autonomous business assistant for Kenyan SMEs. Answers when you're busy, after hours, or on-site, then sends leads to WhatsApp.",
+    "It answers when you are busy, after hours, on another call, or the line is off, so you do not miss the client.",
   applicationName: "Scalers",
   icons: {
     icon: [{ url: "/brand/favicon.png", type: "image/png" }],
     apple: [{ url: "/brand/favicon.png" }],
   },
   openGraph: {
-    title: "Scalers | Autonomous business assistant for Kenya",
+    title: "Scalers, your 24-hour call assistant",
     description:
-      "Answers when you're busy, after hours, or on-site. Captures the caller's name and reason, then sends the lead to WhatsApp.",
+      "It answers when you are busy, after hours, on another call, or the line is off, so you do not miss the client.",
     siteName: "Scalers",
     images: [
       {
@@ -36,9 +36,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "Scalers | Autonomous business assistant for Kenya",
+    title: "Scalers, your 24-hour call assistant",
     description:
-      "Answers when you're busy, after hours, or on-site. Captures the caller's name and reason, then sends the lead to WhatsApp.",
+      "It answers when you are busy, after hours, on another call, or the line is off, so you do not miss the client.",
     images: ["/og.png"],
   },
 };

@@ -85,6 +85,8 @@ create table if not exists public.tenants (
   social_handles jsonb not null default '{}'::jsonb,
   soniox_voice_id text,
   soniox_voice_label text,
+  spoken_name text,
+  greeting_invite text,
   pronunciation_review_queue jsonb not null default '[]'::jsonb,
   pronunciation_scan_dismissals jsonb not null default '[]'::jsonb,
   pronunciation_gemini_scan_logs jsonb not null default '[]'::jsonb,
@@ -363,6 +365,8 @@ grant update (
   social_handles,
   soniox_voice_id,
   soniox_voice_label,
+  spoken_name,
+  greeting_invite,
   pronunciation_review_queue,
   pronunciation_scan_dismissals,
   pronunciation_gemini_scan_logs

@@ -59,6 +59,8 @@ export function TestLinePanel({
     if (!businessName) return "";
     const sample = previewBusinessAssistantIntro({
       businessName,
+      spokenName: tenant.spoken_name,
+      greetingInvite: tenant.greeting_invite,
       agentName,
       servicesCatalog: Array.isArray(tenant.services_catalog)
         ? tenant.services_catalog
@@ -69,6 +71,8 @@ export function TestLinePanel({
   }, [
     businessName,
     agentName,
+    tenant.spoken_name,
+    tenant.greeting_invite,
     lexicon,
     tenant.services_catalog,
     tenant.services_offered,

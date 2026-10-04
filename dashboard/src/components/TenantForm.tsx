@@ -325,6 +325,8 @@ export function TenantForm({
     tenant.unknown_answer_fallback || ""
   );
   const [agentName, setAgentName] = useState(tenant.agent_name || "");
+  const [spokenName, setSpokenName] = useState(tenant.spoken_name || "");
+  const [greetingInvite, setGreetingInvite] = useState(tenant.greeting_invite || "");
   const [tone, setTone] = useState<OnboardingTone | "">(initialTone(tenant));
   const [hoursSchedule, setHoursSchedule] = useState<HoursSchedule>(() =>
     scheduleForForm(tenant.hours_schedule, tenant.business_hours || "")
@@ -773,6 +775,8 @@ export function TenantForm({
       <input type="hidden" name="business_locations" value={locationsJson} />
       <input type="hidden" name="business_policies" value={policiesJson} />
       <input type="hidden" name="agent_name" value={agentName} />
+      <input type="hidden" name="spoken_name" value={spokenName} />
+      <input type="hidden" name="greeting_invite" value={greetingInvite} />
       <input type="hidden" name="agent_tone" value={tone} />
       <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
       <input type="hidden" name="team_directory" value={teamJson} />
@@ -819,6 +823,35 @@ export function TenantForm({
               placeholder="Westlands Books"
               title={businessName || undefined}
               className={`${denseFieldClass} break-words [overflow-wrap:anywhere]`}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Spoken name"
+            htmlFor="spoken_name"
+            hint="What callers hear"
+          >
+            <input
+              id="spoken_name"
+              value={spokenName}
+              onChange={(e) => setSpokenName(e.target.value)}
+              placeholder="Done and Dusted"
+              maxLength={40}
+              title={spokenName || undefined}
+              className={denseFieldClass}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Short invite"
+            htmlFor="greeting_invite"
+            hint="The line after the name"
+          >
+            <input
+              id="greeting_invite"
+              value={greetingInvite}
+              onChange={(e) => setGreetingInvite(e.target.value)}
+              placeholder="How can I help?"
+              maxLength={80}
+              className={denseFieldClass}
             />
           </SettingsRow>
           <SettingsRow
