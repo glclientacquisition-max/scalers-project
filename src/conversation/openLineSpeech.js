@@ -99,8 +99,16 @@ function formatNameConfirmSpeech({
   return `${lines.join(' ')} ${question(lang)}`;
 }
 
+// Name lock must not publish the open file. A later visit, booking, hold,
+// callback, or order ask still can. The speech hold itself stays as it is.
+function shouldPublishOpenFileSentence(hold = {}, fileReadAsk = false) {
+  if (hold?.holdNameConfirm === true) return false;
+  return Boolean(hold?.holdVisitLookup || fileReadAsk);
+}
+
 module.exports = {
   formatNameConfirmSpeech,
   looksLikeOpenVisitLookup,
   openLineHoldDecision,
+  shouldPublishOpenFileSentence,
 };

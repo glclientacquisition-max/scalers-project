@@ -13,7 +13,7 @@ describe('required escalate injection', () => {
         intent: 'human',
         handoff: { requested: true, reason: 'Caller requested manager' },
         resolution: { nextBestAction: 'ESCALATE' },
-        caller: { name: 'Brian' },
+        caller: { name: 'Brian', nameConfirmed: true },
         entities: {},
         goal: { missingSlots: [], description: 'speak to manager' },
       },
@@ -31,7 +31,7 @@ describe('required escalate injection', () => {
         intent: 'human',
         handoff: { requested: true, reason: 'Caller requested manager' },
         resolution: { nextBestAction: 'TRANSFER' },
-        caller: { name: 'Kim' },
+        caller: { name: 'Kim', nameConfirmed: true },
         entities: {},
         goal: { missingSlots: [], description: 'speak to manager' },
       },
@@ -51,7 +51,7 @@ describe('required escalate injection', () => {
       },
       {
         resolution: { nextBestAction: 'ESCALATE' },
-        caller: { name: 'Kim' },
+        caller: { name: 'Kim', nameConfirmed: true },
       },
       { escalate: true }
     );
@@ -96,7 +96,7 @@ describe('required escalate injection', () => {
   it('formats a hard turn directive when escalate is due', () => {
     const block = formatEscalateActionDirective({
       resolution: { nextBestAction: 'ESCALATE' },
-      caller: { name: 'Brian' },
+      caller: { name: 'Brian', nameConfirmed: true },
     });
     assert.match(block, /REQUIRED ACTION THIS TURN/i);
     assert.match(block, /Brian/);
@@ -119,7 +119,7 @@ describe('required escalate injection', () => {
       { escalate: null },
       {
         resolution: { nextBestAction: 'ESCALATE' },
-        caller: { name: 'Brian' },
+        caller: { name: 'Brian', nameConfirmed: true },
         handoff: { reason: 'Caller wants Floor Manager' },
         goal: { description: 'speak to Floor Manager' },
       },

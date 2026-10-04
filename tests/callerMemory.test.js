@@ -200,10 +200,10 @@ describe('returning-caller card', () => {
       state: hello,
       capabilities: { createServiceRequest: true, createAppointment: true },
     });
-    assert.equal(who.action, 'ANSWER');
-    assert.notEqual(who.slot, 'name');
-    assert.match(who.reason, /Do not ask who is speaking/i);
-    assert.match(who.reason, /Do not use the file name/i);
+    assert.equal(who.action, 'ASK_CLARIFICATION');
+    assert.equal(who.slot, 'name');
+    assert.match(who.reason, /Am I speaking with Alex/i);
+    assert.match(who.reason, /Do not say nothing is open/i);
     assert.doesNotMatch(who.reason, /carpet/i);
 
     const named = observeCallerTurn(seeded, {
@@ -221,7 +221,7 @@ describe('returning-caller card', () => {
     assert.equal(named.returning.fileRole, 'primary');
     assert.equal(named.returning.nextVisit, 'carpet cleaning | Tuesday 10 AM');
     assert.match(formatReturningCallerForPrompt(profile.callerMemory), /Open: visit \| carpet cleaning/);
-    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /immediately say each still-open line/);
+    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /unless the caller asks/);
     assert.match(formatReturningCallerForPrompt(profile.callerMemory), /one sentence each, then one question/);
     assert.match(formatReturningCallerForPrompt(profile.callerMemory), /Treat CALL STATE as fact/);
     assert.doesNotMatch(formatReturningCallerForPrompt(profile.callerMemory), /no booking/i);
@@ -624,7 +624,7 @@ describe('returning-caller card', () => {
     assert.match(block, /Standing: Usually carpet. Morning. Kiswahili./);
     assert.match(block, /Language: sw/);
     assert.match(block, /Note: prefers morning/);
-    assert.match(block, /immediately say each still-open line/);
+    assert.match(block, /unless the caller asks/);
     assert.match(block, /one sentence each, then one question/);
     assert.match(block, /Treat CALL STATE as fact/);
     assert.doesNotMatch(block, /no booking/i);
@@ -813,7 +813,7 @@ describe('returning-caller card', () => {
       (block.match(/Open: request \| carpet cleaning \| tomorrow/g) || []).length,
       2
     );
-    assert.match(block, /immediately say each still-open line \(job, when, place; only fields present\), one sentence each, then one question/);
+    assert.match(block, /say each still-open line \(job, when, place; only fields present\), one sentence each, then one question/);
     assert.match(block, /Treat CALL STATE as fact/);
     assert.doesNotMatch(block, /no booking/i);
     assert.doesNotMatch(block, /nothing on file/i);
@@ -824,7 +824,7 @@ describe('returning-caller card', () => {
       (callState.match(/Caller file open request: request \| carpet cleaning \| tomorrow/g) || []).length,
       2
     );
-    assert.match(callState, /immediately say each still-open line/);
+    assert.match(callState, /unless the caller asks/);
     assert.match(callState, /one sentence each, then one question/);
     assert.match(callState, /Treat CALL STATE as fact/);
     assert.doesNotMatch(callState, /no booking/i);
@@ -843,12 +843,9 @@ describe('returning-caller card', () => {
     const rules = buildSystemPrompt({ businessName: 'Scalers', agentName: 'A' });
     assert.match(rules, /Do not talk about visits yet/);
     assert.match(rules, /Ask once: Am I speaking with that name/);
-    assert.match(rules, /If those lines are gone, you may say nothing is still open/);
-    assert.match(
-      rules,
-      /immediately say each still-open line \(job, when, place; only fields present\), one sentence each, then one question/
-    );
-    assert.match(rules, /Treat CALL STATE as fact/);
+    assert.match(rules, /If they ask and those lines are gone, you may say nothing is still open/);
+    assert.match(rules, /Do not read open visits, holds, callbacks, or orders on that turn/);
+    assert.match(rules, /Read those lines only when they ask about them/);
     assert.doesNotMatch(rules, /no booking/i);
     assert.doesNotMatch(rules, /nothing on file/i);
 
@@ -861,7 +858,7 @@ describe('returning-caller card', () => {
     assert.match(confirmedTurn, /Open: request \| carpet cleaning \| tomorrow/);
     assert.match(
       confirmedTurn,
-      /If you append ONLY save_caller_info, you MUST speak your natural response and read any open visits still listed/
+      /If you append ONLY save_caller_info, you MUST speak your natural response\. Do not read open visits, holds, callbacks, or orders unless they just asked about them/
     );
     assert.match(
       confirmedTurn,
@@ -872,13 +869,13 @@ describe('returning-caller card', () => {
       /If you append create_appointment or update_appointment, speak nothing/
     );
     assert.doesNotMatch(confirmedTurn, /If you append any tool this turn, speak nothing/);
-    assert.match(callState, /immediately say each still-open line/);
+    assert.match(callState, /unless the caller asks/);
     assert.match(callState, /Treat CALL STATE as fact/);
     assert.doesNotMatch(confirmedTurn, /no booking/i);
     assert.doesNotMatch(confirmedTurn, /nothing on file/i);
     assert.match(
       confirmedTurn,
-      /immediately say each still-open line \(job, when, place; only fields present\), one sentence each, then one question/
+      /say each still-open line \(job, when, place; only fields present\), one sentence each, then one question/
     );
   });
 
@@ -911,14 +908,14 @@ describe('returning-caller card', () => {
     assert.match(block, /Open: visit \| carpet cleaning \| tomorrow \| requested \| Rongai/);
     assert.match(block, /Open: visit \| carpet cleaning \| tomorrow \| requested \| Westlands/);
     assert.doesNotMatch(block, /History: carpet cleaning \| tomorrow/);
-    assert.match(block, /immediately say each still-open line/);
+    assert.match(block, /unless the caller asks/);
     assert.match(block, /one sentence each, then one question/);
     assert.doesNotMatch(block, /no booking/i);
     assert.doesNotMatch(block, /nothing on file/i);
     const callState = formatBrainStateForPrompt(createBrainState({ callerMemory: yes }));
     assert.match(callState, /open visit: carpet cleaning \| tomorrow \| requested \| Rongai/);
     assert.match(callState, /open visit: carpet cleaning \| tomorrow \| requested \| Westlands/);
-    assert.match(callState, /immediately say each still-open line/);
+    assert.match(callState, /unless the caller asks/);
     assert.doesNotMatch(callState, /no booking/i);
     assert.doesNotMatch(callState, /nothing on file/i);
   });

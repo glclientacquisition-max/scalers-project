@@ -293,6 +293,7 @@ function createSimulator({
         hoursSchedule: profile.hoursSchedule || defaultHoursSchedule(),
         now,
         nameConfirmed: state.caller?.nameConfirmed === true,
+        heldCallerName: String(state.caller?.name || '').trim(),
         openAppointments: profile.openAppointments || [],
         callerPhone: state.caller?.phone || '',
         knownNames: collectKnownCallerNames({ profile, state }),

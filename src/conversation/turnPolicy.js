@@ -62,6 +62,14 @@ function classifyCallerTurn(text) {
  * Deterministic reply before Gemini. Returns null when Gemini should run.
  * @returns {{ outcome: string, line: string } | null}
  */
+function fileNameAskLine(state) {
+  if (state?.caller?.nameConfirmed === true) return '';
+  if (state?.caller?.fileNameAskSpoken === true) return '';
+  const pending = String(state?.caller?.fileNameAsked || '').trim();
+  if (!pending) return '';
+  return `Am I speaking with ${pending}?`;
+}
+
 function resolveLocalReply({
   text,
   state,
@@ -153,5 +161,6 @@ function resolveLocalReply({
 
 module.exports = {
   classifyCallerTurn,
+  fileNameAskLine,
   resolveLocalReply,
 };

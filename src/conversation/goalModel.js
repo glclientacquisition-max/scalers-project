@@ -41,16 +41,19 @@ function hasAnyEntity(entities, keys) {
   return keys.some((key) => Boolean(entityValue(entities?.[key])));
 }
 
+/** File name the code already asked aloud; keep using it for slots. */
+function spokenFileName(state) {
+  if (state?.caller?.nameConfirmed === true) return '';
+  if (state?.caller?.fileNameAskSpoken !== true) return '';
+  return String(state?.caller?.fileNameAsked || '').trim();
+}
+
 function slotFilled(state, requirement) {
   if (requirement.slot === 'name') {
     if (String(state?.caller?.name || '').trim()) return true;
-    if (
-      state?.messageOnly &&
-      state?.caller?.fileNameAskSpoken === true &&
-      String(state?.caller?.fileNameAsked || '').trim()
-    ) {
-      return true;
-    }
+    // After the file-name ask was spoken, do not treat the file as nameless.
+    // Message only uses the same ask, so a later callback does not ask again.
+    if (spokenFileName(state)) return true;
   }
   return hasAnyEntity(state?.entities || {}, requirement.anyOf);
 }
@@ -129,7 +132,12 @@ function homeVisitDecision(state, profile = {}) {
 
 function visitSopSlotValue(state, slot) {
   if (slot === 'name') {
-    return String(state?.caller?.name || '').trim() || entityValue(state?.entities?.name);
+    return (
+      String(state?.caller?.name || '').trim() ||
+      entityValue(state?.entities?.name) ||
+      spokenFileName(state) ||
+      ''
+    );
   }
   if (slot === 'service') {
     return (
@@ -193,6 +201,18 @@ function formatVisitSopForPrompt(state) {
     } else if (next === 'location' && decision?.quality === 'area_only') {
       nextLine =
         'You have the area. Ask once which building, gate, or junction. Never say landmark.';
+    } else if (next === 'name') {
+      const pending = String(state?.caller?.fileNameAsked || '').trim();
+      const spoken = spokenFileName(state);
+      if (spoken) {
+        nextLine = job
+          ? `Name ${job} in one clause, then ask only for the next missing slot. Use ${spoken}. Do not ask for a name. Never say landmark.`
+          : `Use ${spoken}. Do not ask for a name. Ask only for the next missing slot. Never say landmark.`;
+      } else {
+        nextLine = pending
+          ? `Ask once: Am I speaking with ${pending}? Do not ask for a different name. Do not talk about visits yet. Never say landmark.`
+          : 'No name is on file. Ask once for their name. Do not ask again after they give one. Never say landmark.';
+      }
     } else if (next) {
       nextLine = job
         ? `Name ${job} in one clause, then ask only for ${next}. Never re-ask a filled slot. Never say landmark.`
@@ -274,6 +294,7 @@ function formatGoalRequirementsForPrompt(state) {
 }
 
 module.exports = {
+  spokenFileName,
   GOAL_REQUIREMENTS,
   hasAnyEntity,
   missingGoalSlots,

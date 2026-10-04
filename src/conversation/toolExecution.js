@@ -552,6 +552,18 @@ function validateUpdateAppointment(
   return { valid: true, value };
 }
 
+function applyHeldCallerName(parsed, held) {
+  if (!held || !parsed || typeof parsed !== 'object') return parsed;
+  const stamp = (row) => (row && typeof row === 'object' ? { ...row, name: held } : row);
+  const next = { ...parsed };
+  // Replace a name the model sent. Do not invent a save the model did not send.
+  if (next.name) next.name = held;
+  if (next.escalate) next.escalate = stamp(next.escalate);
+  if (next.appointment) next.appointment = stamp(next.appointment);
+  if (next.serviceRequest) next.serviceRequest = stamp(next.serviceRequest);
+  return next;
+}
+
 async function executeBrainTools({
   parsed,
   capabilities = {},
@@ -571,6 +583,16 @@ async function executeBrainTools({
   businessPolicies = null,
   businessLocations = null,
 } = {}) {
+  const held = clean(heldCallerName, 120);
+  if (held) {
+    parsed = applyHeldCallerName(parsed, held);
+  } else if (nameConfirmed === false && parsed?.escalate) {
+    // Unconfirmed and nothing held: do not carry a name the model invented.
+    parsed = {
+      ...parsed,
+      escalate: { ...parsed.escalate, name: '' },
+    };
+  }
   const completed = new Set(completedFingerprints);
   const results = [];
   const identityOpts = { productCatalog, agentName, businessName, knownNames };
