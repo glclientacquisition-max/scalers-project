@@ -58,7 +58,10 @@ function moneyKes(b: AdminBusiness) {
 }
 
 function phoneLine(b: AdminBusiness) {
-  return b.status === "waiting" ? "Waiting" : b.sautikit_virtual_number;
+  if (b.status === "waiting") return "Waiting";
+  const number = b.sautikit_virtual_number.trim();
+  if (number.startsWith("pending:")) return "None";
+  return number;
 }
 
 function previewLine(b: AdminBusiness) {

@@ -124,6 +124,7 @@ describe("admin console polish", () => {
     assert.match(panel, /Notify/);
     assert.match(panel, /Created/);
     assert.match(panel, /whatsapp_notification_number/);
+    assert.match(panel, /startsWith\("pending:"\)/);
     assert.match(panel, /Assign next/);
     assert.doesNotMatch(panel, /Assign next available/);
     assert.match(panel, /next === "shop"/);
