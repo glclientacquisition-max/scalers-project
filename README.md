@@ -40,6 +40,8 @@ Two apps, one git repo. They deploy separately. There is no npm workspace.
 | `evals/` | Brain eval fixture. Run `npm run eval:brain`. |
 | `Dockerfile`, `railway.toml`, `render.yaml` | Voice deploy. Render is the alternate host. |
 
+How the pieces fit, in one page: [`docs/architecture/SYSTEM_ARCHITECTURE.md`](docs/architecture/SYSTEM_ARCHITECTURE.md).
+
 Lanes (Voice, Brain, Desk, Ops & Billing, Platform): [`AGENTS.md`](AGENTS.md).
 
 `server.js` is still one process. The target split is [`docs/architecture/TARGET_MODULE_LAYOUT.md`](docs/architecture/TARGET_MODULE_LAYOUT.md). Do that extract in its own pull request, with no behavior change.

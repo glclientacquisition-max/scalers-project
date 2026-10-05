@@ -1,9 +1,10 @@
 # B2B AI Voice SaaS — Architecture & Migration Blueprint
 
-> **Status:** Migration blueprint — **historical + target reference**  
-> **Current production stack (2026-08-14):** SautiKit + Soniox + Gemini + Supabase — see [`docs/architecture/CURRENT_STATE.md`](CURRENT_STATE.md)  
-> **Historical baseline (pre-Aug 2026):** Twilio ConversationRelay + Gemini + SQLite  
-> **Target (remaining work):** Modular `server.js` split, optional GPT-4o-mini, full provider flags
+> **Status:** HISTORICAL + TARGET. Not the live picture.  
+> **Live picture:** [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) (2026-10-05). Fact inventory: [`CURRENT_STATE.md`](./CURRENT_STATE.md).  
+> **Historical baseline (pre-Aug 2026):** Twilio ConversationRelay + Gemini + SQLite.  
+> **What landed:** SautiKit + Soniox + Gemini + Supabase. Voice on Railway. Desk on Vercel.  
+> **Still a target:** Split `server.js` toward [`TARGET_MODULE_LAYOUT.md`](./TARGET_MODULE_LAYOUT.md). Provider flags and a second LLM are not implemented. Do not treat those as shipped.
 
 ---
 
@@ -21,7 +22,7 @@ An automated, sub-second latency AI receptionist platform built specifically for
 | Intelligence | Gemini | **Gemini** | Optional GPT-4o-mini; RAG TBD |
 | Persistence | SQLite | **Supabase** | CLI migrations (future) |
 | Notifications | Twilio WhatsApp | **TextSMS → SautiKit WA → email** | — |
-| Hosting | Single Express | **Railway voice + Vercel desk** | Staging env TBD |
+| Hosting | Single Express | **Railway voice + Vercel desk** | Staging is documented in [`../operations/ENVIRONMENTS.md`](../operations/ENVIRONMENTS.md). Remaining target is the `server.js` split, not a missing staging host. |
 
 > **Done:** SQLite removed. Supabase persistence via `src/db.js`. SautiKit telephony active. Legacy `/ws/relay` still present but unused.
 
@@ -138,7 +139,7 @@ src/
     schema.sql              # see docs/supabase/schema.sql
   notify/
     whatsapp.js             # SautiKit WhatsApp (Twilio bridge optional)
-dashboard/                  # Next.js (separate deploy) — later phase
+dashboard/                  # Next.js Desk, live on Vercel (not a later phase)
 ```
 
 **Migration rule:** Keep `db.js` signatures (`upsertCall`, `saveCallerInfo`, `appendTranscript`, `attachRecording`, `getCall`, `markWhatsappSent`) so the orchestrator stays storage-agnostic while SQLite → Supabase swaps behind the interface.
@@ -297,6 +298,8 @@ TWILIO_WHATSAPP_FROM=
 ---
 
 ## 10. Phased Migration Plan
+
+**Historical plan from August 2026.** Phases 0 through 6 describe the move off Twilio and SQLite. Voice, the Desk, and Supabase are live. This list is not a shipping checklist. The live picture is [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md). The unfinished split of `server.js` is [`TARGET_MODULE_LAYOUT.md`](./TARGET_MODULE_LAYOUT.md).
 
 ### Phase 0 — Blueprint & contracts *(this PR)*
 

@@ -29,7 +29,8 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 | --- | --- |
 | [`README.md`](README.md) | What Scalers is, how to run it, short repo map |
 | [`docs/README.md`](docs/README.md) | Doc folder index |
-| [`docs/architecture/CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md) | What Scalers **is** today (Aug 2026 baseline) |
+| [`docs/architecture/SYSTEM_ARCHITECTURE.md`](docs/architecture/SYSTEM_ARCHITECTURE.md) | How voice, Desk, and Supabase fit together |
+| [`docs/architecture/CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md) | File-level facts (Aug 2026 baseline, later corrections marked) |
 | [`docs/platform/PLATFORM_SYSTEM_MAP.md`](docs/platform/PLATFORM_SYSTEM_MAP.md) | Platform as-is map: voice, notify, WhatsApp, wallet, Brain SoR, ladder jobs |
 | [`docs/governance/SOURCE_OF_TRUTH.md`](docs/governance/SOURCE_OF_TRUTH.md) | Subsystem ownership |
 | [`docs/governance/DEVELOPMENT_WORKFLOW.md`](docs/governance/DEVELOPMENT_WORKFLOW.md) | Branching, lifecycle, PR checklist |

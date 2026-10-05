@@ -311,7 +311,8 @@ Company Brain §7. Do not reorder without Product + founder.
 | [`NOTIFY_SQL_CATALOG.md`](./NOTIFY_SQL_CATALOG.md) | ALCR vs staging notify SQL + apply checklist |
 | [`../product/DELIVERY_VOCAB.md`](../product/DELIVERY_VOCAB.md) | Critic ladder: opened / followed_up / sent / delivered / failed |
 | [`../agents/PLATFORM.md`](../agents/PLATFORM.md) | Lane owns |
-| [`../architecture/CURRENT_STATE.md`](../architecture/CURRENT_STATE.md) | Aug 2026 baseline; this map is newer |
+| [`../architecture/SYSTEM_ARCHITECTURE.md`](../architecture/SYSTEM_ARCHITECTURE.md) | 5-minute picture of voice, Desk, and Supabase |
+| [`../architecture/CURRENT_STATE.md`](../architecture/CURRENT_STATE.md) | Aug 2026 fact inventory; this map is newer on notify and wallet |
 
 ---
 

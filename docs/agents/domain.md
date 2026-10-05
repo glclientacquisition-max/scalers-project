@@ -6,7 +6,8 @@ How engineering skills consume Scalers domain documentation.
 
 - **`CONTEXT.md`** at the repo root (glossary)
 - **`AGENTS.md`** and the lane contract for the task (`docs/agents/{LANE}.md`)
-- **`docs/architecture/CURRENT_STATE.md`** and **`docs/governance/SOURCE_OF_TRUTH.md`**
+- **`docs/architecture/SYSTEM_ARCHITECTURE.md`** (how the pieces fit) and **`docs/architecture/CURRENT_STATE.md`** (file-level facts)
+- **`docs/governance/SOURCE_OF_TRUTH.md`**
 - **`docs/adr/`**: ADRs that touch the area
 - **`docs/specs/`**: accepted specs for in-flight work
 

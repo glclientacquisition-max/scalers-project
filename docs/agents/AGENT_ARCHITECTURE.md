@@ -1,7 +1,8 @@
 # Agent architecture
 
-**Status:** Current-state documentation (2026-08-14)  
-**Scope:** How the Scalers AI receptionist agent works today on live calls.
+**Status:** Fact inventory for the live-call agent (2026-08-14).  
+**System picture:** [`../architecture/SYSTEM_ARCHITECTURE.md`](../architecture/SYSTEM_ARCHITECTURE.md). This file is the prompt stack on a call, not the deploy map.  
+**Scope:** How the Business Assistant reasons on a live call.
 
 For lane ownership see `docs/agents/BRAIN.md`. For versioning gaps see [`PROMPT_VERSIONING.md`](./PROMPT_VERSIONING.md).
 

@@ -1,7 +1,9 @@
 # Scalers data flow
 
-**Status:** Current-state documentation (2026-08-14)  
-**Purpose:** Lifecycle of data through a live call and related desk flows.
+**Status:** Fact inventory for one call. Not the system picture.  
+**Read first:** [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) (updated 2026-10-05).  
+**Baseline:** 2026-08-14. Section 9 billing was corrected 2026-10-05.  
+**Purpose:** Lifecycle of data through a live call and the Desk compile path. What is memory-only vs written to Supabase.
 
 Legend: **Persisted** = written to Supabase. **Memory** = process-local only. **External** = third-party service.
 
@@ -114,15 +116,17 @@ Legend: **Persisted** = written to Supabase. **Memory** = process-local only. **
 
 ---
 
-## 9. Wallet charging
+## 9. Package metering and wallet
+
+**Updated 2026-10-05.** Customer billing is packages plus on-demand. Owner M-Pesa checkout is not shipped. Live Dial is not shipped, so the outbound transfer row is not created on a normal call.
 
 | Stage | Condition | Persistence |
 | --- | --- | --- |
-| Meter duration | On call completion | `calls.ai_processing_minutes` |
-| Charge | When `billing_enforcement` is `soft`/`hard` | **Persisted** — `chargeCallToWallet` → `wallet_ledger` |
+| Meter included minutes | Hangup, after `consume_call_seconds` SQL is applied | Package counters on the tenant |
+| On-demand debit | Past included minutes, enforcement on, on-demand on | **Persisted** — `chargeCallToWallet` → `wallet_ledger` |
+| Beta | `billing_enforcement = off` | Meter only. No charge. |
 
-**FACT:** Beta default `billing_enforcement = off` — meter only, no charge.  
-**Files:** `src/db.js` `chargeCallToWallet`, `docs/operations/ONE_WALLET_BILLING.md`
+**Files:** `src/db.js` `chargeCallToWallet`, [`../operations/PACKAGES.md`](../operations/PACKAGES.md), [`../operations/ONE_WALLET_BILLING.md`](../operations/ONE_WALLET_BILLING.md)
 
 ---
 
@@ -168,6 +172,6 @@ Legend: **Persisted** = written to Supabase. **Memory** = process-local only. **
 
 ## Related documents
 
-- [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md)
+- [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) — 5-minute picture
 - [`../governance/SOURCE_OF_TRUTH.md`](../governance/SOURCE_OF_TRUTH.md)
 - [`../agents/AGENT_ARCHITECTURE.md`](../agents/AGENT_ARCHITECTURE.md)
