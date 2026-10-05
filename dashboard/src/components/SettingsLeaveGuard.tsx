@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -19,7 +20,7 @@ const SettingsLeaveContext = createContext<SetSource>(() => {});
 
 export function useSettingsLeaveSource(id: string, dirty: boolean) {
   const setSource = useContext(SettingsLeaveContext);
-  useEffect(() => {
+  useLayoutEffect(() => {
     setSource(id, dirty);
     return () => setSource(id, false);
   }, [id, dirty, setSource]);

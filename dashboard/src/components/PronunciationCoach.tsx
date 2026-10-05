@@ -219,6 +219,9 @@ export function PronunciationCoach({
   const [removeTarget, setRemoveTarget] = useState<{ match: string; label: string } | null>(
     null
   );
+  const removeHeld = useRef(removeTarget);
+  if (removeTarget) removeHeld.current = removeTarget;
+  const removeView = removeTarget ?? removeHeld.current;
   useSettingsLeaveSource("pronunciation", unsavedReview);
   const reviewTouchedRef = useRef(false);
 
@@ -1747,7 +1750,7 @@ export function PronunciationCoach({
       />
       <ConfirmSheet
         open={removeTarget != null}
-        title={removeTarget ? `Remove ${removeTarget.label}?` : "Remove?"}
+        title={removeView ? `Remove ${removeView.label}?` : "Remove?"}
         confirmLabel="Remove"
         danger
         pending={persistPending}
@@ -1755,8 +1758,8 @@ export function PronunciationCoach({
           if (!persistPending) setRemoveTarget(null);
         }}
         onConfirm={() => {
-          if (!removeTarget) return;
-          removeEntry(removeTarget.match);
+          if (!removeView) return;
+          removeEntry(removeView.match);
           setRemoveTarget(null);
         }}
       >

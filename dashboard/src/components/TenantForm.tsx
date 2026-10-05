@@ -784,6 +784,9 @@ export function TenantForm({
     body: string;
     run: () => void;
   } | null>(null);
+  const removeHeld = useRef(removeAsk);
+  if (removeAsk) removeHeld.current = removeAsk;
+  const removeView = removeAsk ?? removeHeld.current;
 
   function requestRemove(row: object, title: string, body: string, run: () => void) {
     if (!isSavedRow(row)) {
@@ -2435,17 +2438,17 @@ export function TenantForm({
       </div>
       <ConfirmSheet
         open={removeAsk != null}
-        title={removeAsk?.title || "Remove?"}
+        title={removeView?.title || "Remove?"}
         confirmLabel="Remove"
         danger
         onClose={() => setRemoveAsk(null)}
         onConfirm={() => {
-          const run = removeAsk?.run;
+          const run = removeView?.run;
           setRemoveAsk(null);
           run?.();
         }}
       >
-        {removeAsk?.body}
+        {removeView?.body}
       </ConfirmSheet>
     </form>
   );
