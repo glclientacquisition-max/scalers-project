@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { listDidPool, listPendingTenants } from "@/lib/didPool";
 import { sendOpsMail, isOpsMailConfigured } from "@/lib/opsMail";
 import {
@@ -206,6 +207,7 @@ export async function evaluatePlatformOps(): Promise<{
   infra: ReturnType<typeof infraFromEnv>;
   mailConfigured: boolean;
 }> {
+  await connection();
   const [{ settings, persisted }, pool, pending, expiredBeta, voice, telecom] = await Promise.all([
     loadOpsSettings(),
     listDidPool().catch(() => []),
