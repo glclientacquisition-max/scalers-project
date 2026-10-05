@@ -507,7 +507,7 @@ describe("business settings craft", () => {
     assert.match(test, /businessSettingsHref\("train", "identity"\)/);
     assert.match(test, /to preview the greeting/);
 
-    assert.match(form, /id="business_name"[\s\S]*title=\{businessName/);
+    assert.match(form, /id="business_name"[\s\S]{0,240}title=\{businessName/);
     assert.match(ui, /title=\{businessName\}/);
     assert.match(ui, /break-words text-sm font-medium text-ink/);
     assert.match(shell, /title=\{status\}/);
