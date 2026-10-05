@@ -13,6 +13,7 @@ import {
   OPS_NOTICE_KINDS,
   parseKindFlags,
   parseOpsEmails,
+  parsePeople,
   type OpsNoticeKind,
 } from "@/lib/platformOpsModel";
 
@@ -39,9 +40,9 @@ export async function POST(request: Request) {
   try {
     if (action === "save_settings") {
       const settings = await saveOpsSettings({
-        emails: parseOpsEmails(
+        people: parsePeople(body.people, parseOpsEmails(
           Array.isArray(body.emails) ? body.emails.join(",") : String(body.emails || ""),
-        ),
+        )),
         kinds: parseKindFlags(body.kinds),
         sautikitWarnMinor: Number.isFinite(Number(body.sautikit_warn_minor))
           ? Number(body.sautikit_warn_minor)
@@ -57,13 +58,13 @@ export async function POST(request: Request) {
       const result = await sendOpsMail({
         to: emails,
         subject: "Scalers ops: test",
-        text: "Test from Platform. This is staff ops mail, not an owner alert.",
+        text: "Test from Platform.",
       });
       if (result.skipped === "ops_mail_unconfigured") {
-        return NextResponse.json({ error: "Set RESEND_API_KEY and OPS_EMAIL_FROM." }, { status: 400 });
+        return NextResponse.json({ error: "Mail is off." }, { status: 400 });
       }
       if (result.skipped === "no_recipients") {
-        return NextResponse.json({ error: "Add a staff email first." }, { status: 400 });
+        return NextResponse.json({ error: "Add a person first." }, { status: 400 });
       }
       return NextResponse.json({ ok: true });
     }
@@ -88,6 +89,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   } catch (err) {
     logAdminError("platform-ops", err);
-    return NextResponse.json({ error: adminFacingError(err, "Could not update ops mail.") }, { status: 500 });
+    return NextResponse.json({ error: adminFacingError(err, "Could not save.") }, { status: 500 });
   }
 }

@@ -205,12 +205,20 @@ describe("admin console polish", () => {
     assert.match(opsApi, /prepare_resend/);
     assert.match(opsApi, /verify_resend/);
     const opsForm = read("dashboard/src/components/AdminPlatformOpsForm.tsx");
-    assert.match(opsForm, /Create domain/);
-    assert.match(opsForm, /id="ops-mail"/);
-    assert.match(opsForm, /What to send/);
-    assert.match(opsForm, /DNS records/);
-    assert.match(opsForm, /Desk send is off/);
-    assert.doesNotMatch(opsForm, /Set RESEND_API_KEY/);
+    assert.match(opsForm, /id="escalate"/);
+    assert.match(opsForm, /Escalate/);
+    assert.match(opsForm, /Add person/);
+    assert.match(opsForm, /Warn below/);
+    assert.match(opsForm, /Notify for/);
+    assert.doesNotMatch(opsForm, /Create domain/);
+    assert.doesNotMatch(opsForm, /DNS records/);
+    assert.doesNotMatch(opsForm, /Ops mail/);
+    assert.doesNotMatch(opsForm, /RESEND_API_KEY/);
+    const board = read("dashboard/src/components/PlatformRunBoard.tsx");
+    assert.doesNotMatch(board, /KeyDiagnostics/);
+    assert.doesNotMatch(board, /SAUTIKIT_API_KEY/);
+    const platform = read("dashboard/src/app/admin/(console)/platform/page.tsx");
+    assert.doesNotMatch(platform, /Infrastructure/);
   });
 
   it("documents the admin shell as the desk geometry with its own links", () => {

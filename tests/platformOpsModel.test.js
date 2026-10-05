@@ -135,7 +135,10 @@ describe("platform ops model", () => {
         subject: m.opsMailSubject("beta_expired"),
         recovered: m.opsMailSubject("speech", true),
         domain: m.OPS_RESEND_DOMAIN,
-        hint: m.kindHint("pool_empty"),
+        people: m.parsePeople([
+          { name: "Mercy", phone: "+254700000001", email: "mercy@scalers.co.ke" },
+          { name: "", phone: "", email: "bad" },
+        ], ["ops@scalers.co.ke"]),
         queue: m.mergeQueueRows({
           notices: [
             { kind: "pool_empty", detail: "1 business waiting. No numbers available.", status: "open" },
@@ -147,11 +150,12 @@ describe("platform ops model", () => {
     `);
     assert.deepEqual(got.emails, ["ops@scalers.co.ke", "mercy@scalers.co.ke"]);
     assert.equal(got.domain, "ops.scalers.co.ke");
-    assert.equal(got.subject, "Scalers ops: Beta expired");
     assert.equal(got.recovered, "Scalers ops: Speech recovered");
-    assert.equal(got.hint, "No number to assign");
-    assert.equal(got.queue.length, 2);
-    assert.equal(got.queue[0].href, "/admin/platform#ops-mail");
+    assert.equal(got.people.length, 1);
+    assert.equal(got.people[0].name, "Mercy");
+    assert.equal(got.people[0].phone, "+254700000001");
+    assert.equal(got.subject, "Scalers ops: Beta ended");
+    assert.equal(got.queue[0].href, "/admin/platform#escalate");
     assert.equal(got.queue[0].stamp, "Open");
     assert.equal(got.queue[1].href, "/admin/businesses#biz-b1");
     assert.equal(got.queue[1].stamp, "Waiting");

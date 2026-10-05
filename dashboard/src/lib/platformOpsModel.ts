@@ -17,8 +17,16 @@ export type OpsHealthTone = "ok" | "attention" | "neutral";
 
 export type OpsKindFlags = Record<OpsNoticeKind, boolean>;
 
+export type OpsPerson = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+};
+
 export type OpsSettings = {
   emails: string[];
+  people: OpsPerson[];
   kinds: OpsKindFlags;
   sautikitWarnMinor: number;
 };
@@ -88,6 +96,7 @@ export function defaultKindFlags(): OpsKindFlags {
 export function defaultOpsSettings(): OpsSettings {
   return {
     emails: [],
+    people: [],
     kinds: defaultKindFlags(),
     sautikitWarnMinor: DEFAULT_SAUTIKIT_WARN_MINOR,
   };
@@ -97,6 +106,48 @@ export function normalizeOpsEmail(raw: string): string {
   const email = String(raw || "").trim().toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "";
   return email;
+}
+
+export function parseOpsPhone(raw: string): string {
+  const phone = String(raw || "").trim();
+  if (!phone) return "";
+  if (!/^\+?[0-9][0-9\s-]{6,19}$/.test(phone)) return "";
+  return phone.replace(/\s+/g, " ");
+}
+
+export function parsePeople(raw: unknown, fallbackEmails: string[] = []): OpsPerson[] {
+  const seen = new Set<string>();
+  const people: OpsPerson[] = [];
+  if (Array.isArray(raw)) {
+    for (const row of raw) {
+      if (!row || typeof row !== "object") continue;
+      const rec = row as Record<string, unknown>;
+      const email = normalizeOpsEmail(String(rec.email || ""));
+      const phone = parseOpsPhone(String(rec.phone || ""));
+      const name = String(rec.name || "").trim();
+      if (!email && !phone && !name) continue;
+      const id = email || phone || `p-${people.length + 1}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      people.push({
+        id,
+        name: name || (email ? email.split("@")[0] : ""),
+        phone,
+        email,
+      });
+    }
+  }
+  if (people.length) return people;
+  return fallbackEmails.flatMap((email) => {
+    const ok = normalizeOpsEmail(email);
+    if (!ok || seen.has(ok)) return [];
+    seen.add(ok);
+    return [{ id: ok, name: ok.split("@")[0] || "", phone: "", email: ok }];
+  });
+}
+
+export function emailsFromPeople(people: OpsPerson[]): string[] {
+  return parseOpsEmails(people.map((person) => person.email).join(","));
 }
 
 export function parseOpsEmails(raw: string): string[] {
@@ -125,18 +176,9 @@ export function kindLabel(kind: OpsNoticeKind): string {
   if (kind === "speech") return "Speech";
   if (kind === "reasoning") return "Reasoning";
   if (kind === "phone_line") return "Phone line";
-  if (kind === "sautikit_low") return "Phone wallet low";
-  if (kind === "pool_empty") return "Number pool empty";
-  return "Beta expired";
-}
-
-export function kindHint(kind: OpsNoticeKind): string {
-  if (kind === "speech") return "Voice audio";
-  if (kind === "reasoning") return "Conversation model";
-  if (kind === "phone_line") return "Provider line";
-  if (kind === "sautikit_low") return "SautiKit balance";
-  if (kind === "pool_empty") return "No number to assign";
-  return "Stay Beta. Notice only.";
+  if (kind === "sautikit_low") return "Line money low";
+  if (kind === "pool_empty") return "No numbers";
+  return "Beta ended";
 }
 
 export type HealthSlice = { tone: OpsHealthTone; detail: string | null };
@@ -185,16 +227,16 @@ export function deriveOpsSignals(input: {
       kind: "sautikit_low",
       active: walletLow,
       critical: walletEmpty,
-      title: "Phone wallet low",
+      title: "Line money low",
       detail: walletEmpty
-        ? "Phone wallet is empty"
-        : `Phone wallet is at or under the warn level`,
+        ? "Line money is empty"
+        : "Line money is at or under the warn level",
     },
     {
       kind: "pool_empty",
       active: poolEmpty,
       critical: poolEmpty,
-      title: "Number pool empty",
+      title: "No numbers",
       detail:
         input.waitingBusinesses > 0
           ? `${input.waitingBusinesses} business waiting. No numbers available.`
@@ -204,7 +246,7 @@ export function deriveOpsSignals(input: {
       kind: "beta_expired",
       active: input.expiredBetaCount > 0,
       critical: false,
-      title: "Beta expired",
+      title: "Beta ended",
       detail:
         input.expiredBetaCount === 1
           ? "1 business beta has ended"
@@ -295,8 +337,8 @@ export function mergeQueueRows(input: {
     rows.push({
       key: `ops-${notice.kind}`,
       title: kindLabel(notice.kind),
-      detail: notice.detail || kindHint(notice.kind),
-      href: "/admin/platform#ops-mail",
+      detail: notice.detail || kindLabel(notice.kind),
+      href: "/admin/platform#escalate",
       stamp: "Open",
     });
   }

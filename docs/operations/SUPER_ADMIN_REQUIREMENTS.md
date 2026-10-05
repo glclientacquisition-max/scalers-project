@@ -50,12 +50,11 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Status strip: Platform OK, notice, or critical. Opens `/admin/platform`.
 - KPI cards: total businesses, active businesses, businesses waiting for a number, available DIDs, assigned DIDs, calls (last 7 days).
 - Needs you: open staff notices plus businesses with a pending DID or inactive flag.
-- Primary CTAs: Add number · Packages · View businesses.
+- Primary CTA: Add number.
 
 ### 1b. Platform (`/admin/platform`)
-- Cards for phone line, speech, reasoning (balance when the API has one, last-fail signal when it does not).
-- Infrastructure: Railway (voice health), Vercel and Supabase (URL set, no fake green).
-- Ops mail: staff emails, type toggles, phone-wallet warn level, test send. Sender is `OPS_EMAIL_FROM` on `ops.scalers.co.ke`. Not owner alerts.
+- Health: phone line, speech, reasoning, money.
+- Escalate: people (name, phone, email), notify types, warn below. Mail sender is infra (`OPS_EMAIL_FROM`). Not owner alerts. No Resend or DNS controls.
 
 ### 2. Businesses (`/admin/businesses`)
 - Table: Business name · Phone DID · Notify number · Status (Active / Waiting for number / Archived) · Created · Actions.

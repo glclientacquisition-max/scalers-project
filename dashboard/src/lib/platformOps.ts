@@ -5,11 +5,13 @@ import {
   defaultOpsSettings,
   deriveOpsSignals,
   deriveStatusStrip,
+  emailsFromPeople,
   infraFromEnv,
   kindLabel,
   opsMailSubject,
   parseKindFlags,
   parseOpsEmails,
+  parsePeople,
   reconcileNotices,
   type OpsKindFlags,
   type OpsNotice,
@@ -77,12 +79,18 @@ export async function loadOpsSettings(): Promise<{ settings: OpsSettings; persis
     const { data, error } = await admin.from("platform_ops_settings").select("*").eq("id", 1).maybeSingle();
     if (error) throw error;
     if (!data) {
-      return { settings: { ...defaultOpsSettings(), emails: envEmails() }, persisted: true };
+      const people = parsePeople([], envEmails());
+      return {
+        settings: { ...defaultOpsSettings(), emails: emailsFromPeople(people), people },
+        persisted: true,
+      };
     }
-    const emails = Array.isArray(data.emails) ? parseOpsEmails(data.emails.join(",")) : [];
+    const emails = Array.isArray(data.emails) ? parseOpsEmails(data.emails.join(",")) : envEmails();
+    const people = parsePeople(data.people, emails.length ? emails : envEmails());
     return {
       settings: {
-        emails: emails.length ? emails : envEmails(),
+        emails: emailsFromPeople(people).length ? emailsFromPeople(people) : emails,
+        people,
         kinds: parseKindFlags(data.kinds),
         sautikitWarnMinor: Number(data.sautikit_warn_minor) || defaultOpsSettings().sautikitWarnMinor,
       },
@@ -90,30 +98,45 @@ export async function loadOpsSettings(): Promise<{ settings: OpsSettings; persis
     };
   } catch (err) {
     if (isMissingTable(err)) {
-      return { settings: { ...defaultOpsSettings(), emails: envEmails() }, persisted: false };
+      const people = parsePeople([], envEmails());
+      return {
+        settings: { ...defaultOpsSettings(), emails: emailsFromPeople(people).length ? emailsFromPeople(people) : envEmails(), people },
+        persisted: false,
+      };
     }
     throw err;
   }
 }
 
 export async function saveOpsSettings(input: {
-  emails: string[];
+  emails?: string[];
+  people?: ReturnType<typeof parsePeople>;
   kinds: OpsKindFlags;
   sautikitWarnMinor: number;
 }): Promise<OpsSettings> {
+  const people = parsePeople(input.people || [], input.emails || []);
+  const emails = emailsFromPeople(people);
   const settings: OpsSettings = {
-    emails: input.emails,
+    emails,
+    people,
     kinds: input.kinds,
     sautikitWarnMinor: Math.max(0, Math.round(input.sautikitWarnMinor)),
   };
   const admin = getSupabaseAdmin();
-  const { error } = await admin.from("platform_ops_settings").upsert({
+  const row = {
     id: 1,
     emails: settings.emails,
+    people: settings.people,
     kinds: settings.kinds,
     sautikit_warn_minor: settings.sautikitWarnMinor,
     updated_at: new Date().toISOString(),
-  });
+  };
+  let { error } = await admin.from("platform_ops_settings").upsert(row);
+  if (error && /people/i.test(error.message)) {
+    const fallback = { ...row };
+    delete (fallback as { people?: unknown }).people;
+    ({ error } = await admin.from("platform_ops_settings").upsert(fallback));
+  }
   if (error) throw error;
   return settings;
 }

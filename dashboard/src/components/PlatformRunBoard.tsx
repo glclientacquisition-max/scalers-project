@@ -10,7 +10,6 @@ import {
 import { fetchVoiceHealthz } from "@/lib/platformVoiceHealth";
 import {
   formatMinor,
-  getSautikitKeyDiagnostics,
   getSautikitWallet,
   isSautikitConfigured,
   listSautikitNumbers,
@@ -18,45 +17,6 @@ import {
 
 function healthStampTone(tone: PlatformHealthTone): "ok" | "attention" | "neutral" {
   return tone;
-}
-
-function KeyDiagnostics() {
-  const d = getSautikitKeyDiagnostics();
-  const rows: Array<[string, string]> = [
-    ["Configured", d.configured ? "yes" : "no"],
-    ["Fingerprint", d.fingerprint || "n/a"],
-    ["Length", d.length ? String(d.length) : "n/a"],
-    ["Starts with eyJ", d.startsWithEyJ ? "yes" : "no"],
-    ["Label", d.label || "n/a"],
-    ["Scopes", d.scopes.length ? d.scopes.join(", ") : "n/a"],
-    ["Workspace", d.workspaceId || "n/a"],
-  ];
-
-  return (
-    <details className="mt-4 border-t border-line/70 pt-4">
-      <summary className="cursor-pointer text-meta font-medium text-ink-2">Phone line API key</summary>
-      <dl className="mt-2">
-        {rows.map(([label, value]) => (
-          <div
-            key={label}
-            className="flex min-w-0 items-baseline gap-3 border-t border-line/70 py-3 first:border-t-0"
-          >
-            <dt className="w-36 shrink-0 text-meta text-ink-2">{label}</dt>
-            <dd className="min-w-0 text-sm text-ink">{value}</dd>
-          </div>
-        ))}
-      </dl>
-      {d.issues.length ? (
-        <ul className="border-t border-line/70">
-          {d.issues.map((issue) => (
-            <li key={issue} className="border-t border-line/70 py-3 text-sm text-attention first:border-t-0">
-              {issue}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </details>
-  );
 }
 
 async function loadPhoneLineTelecom(): Promise<PhoneLineTelecomInput> {
@@ -92,13 +52,7 @@ export async function PlatformRunBoard() {
     <section className="border-t border-hairline pt-6" aria-label="Health">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="text-title font-medium text-ink">Health</h2>
-        {voice.status === "ok" && voice.payload.gitSha ? (
-          <p className="text-meta text-ink-3 tabular-nums">Voice {voice.payload.gitSha.slice(0, 7)}</p>
-        ) : voice.status !== "ok" ? (
-          <p className="text-meta text-attention">{voice.message}</p>
-        ) : null}
       </div>
-      <p className="mt-1 text-meta text-ink-2">Phone line, speech, and reasoning at a glance.</p>
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[480px] text-left text-sm">
@@ -131,12 +85,6 @@ export async function PlatformRunBoard() {
           </tbody>
         </table>
       </div>
-
-      {telecom.status === "not_configured" ? (
-        <p className="mt-4 text-sm text-ink-2">
-          Set <code>SAUTIKIT_API_KEY</code> on the dashboard server to load phone line numbers and wallet.
-        </p>
-      ) : null}
 
       {telecom.status === "ok" ? (
         <div className="mt-6">
@@ -203,8 +151,6 @@ export async function PlatformRunBoard() {
           ) : null}
         </div>
       ) : null}
-
-      <KeyDiagnostics />
     </section>
   );
 }
