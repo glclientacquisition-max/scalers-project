@@ -1,12 +1,8 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
-import { deskListTitleClass } from "@/components/ui/deskChrome";
-import { BuyNumberPanel } from "@/components/BuyNumberPanel";
 import { DidPoolManager } from "@/components/DidPoolManager";
-import { SautikitSyncButton } from "@/components/SautikitSyncButton";
 import { logAdminError } from "@/lib/adminErrors";
 import { listDidPool, listPendingTenants } from "@/lib/didPool";
 
-// instant = false: request-time Super Admin data under the admin auth shell.
 export const instant = false;
 
 export default async function AdminNumbersPage() {
@@ -20,15 +16,8 @@ export default async function AdminNumbersPage() {
   }
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={deskListTitleClass}>Number pool</h1>
-        <SautikitSyncButton />
-      </div>
-      <div className="mt-6 space-y-6">
-        <BuyNumberPanel />
-        <DidPoolManager pool={pool} pendingBusinesses={pendingBusinesses} />
-      </div>
+    <div className="space-y-4">
+      <DidPoolManager pool={pool} pendingBusinesses={pendingBusinesses} />
     </div>
   );
 }
