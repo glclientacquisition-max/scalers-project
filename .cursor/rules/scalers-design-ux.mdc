@@ -9,7 +9,7 @@ Charter: `docs/frontend/FRONTEND_2_0_CHARTER.md`. It wins over older frontend do
 
 ## Build from the kit
 
-- Primitives live in `dashboard/src/components/ui/`: `Button`, `IconButton`, `Field`, `Input`, `Textarea`, `Select`, `Segmented`, `Stamp`, `Avatar`, `ListRow`, `PageHeader`, `Sheet`, `Menu`, `Tooltip`, `Empty`, `Skeleton`, `Table`. Use them. Do not compose a new button from class strings.
+- Primitives live in `dashboard/src/components/ui/`: `Button`, `IconButton`, `Field`, `Input`, `Textarea`, `Select`, `Segmented`, `Switch`, `Stamp`, `Avatar`, `ListRow`, `PageHeader`, `Sheet`, `Menu`, `Tooltip`, `Empty`, `Skeleton`, `Table`. Use them. Do not compose a new button from class strings.
 - Behavior comes from Base UI. Icons come from Heroicons. No other UI runtime.
 - One `AppShell` for desk and admin. Tabs below `md`, rail on `md+`. Nested routes hide tabs and lead with Back.
 

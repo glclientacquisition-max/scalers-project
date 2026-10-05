@@ -53,8 +53,9 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Primary CTA: Add number.
 
 ### 1b. Platform (`/admin/platform`)
-- Health: phone line, speech, reasoning as list rows. Numbers is a row to `/admin/numbers`.
-- People: escalate contacts (name, phone, email). Warn below and notify types sit under People.
+- Line: phone, speech, reasoning as list rows (money on the right). Numbers opens `/admin/numbers`.
+- People: contacts. Add person is a sheet.
+- Alerts: Low money amount plus notify switches in a sheet. Open issues sit under Needs you; Done clears them. Acked items stay off this page.
 
 ### 2. Businesses (`/admin/businesses`)
 - Table: Business name · Phone DID · Notify number · Status (Active / Waiting for number / Archived) · Created · Actions.

@@ -208,8 +208,14 @@ describe("admin console polish", () => {
     assert.match(opsForm, /id="escalate"/);
     assert.match(opsForm, />People</);
     assert.match(opsForm, /Add person/);
-    assert.match(opsForm, /Warn below/);
-    assert.match(opsForm, /Notify for/);
+    assert.match(opsForm, /Low money/);
+    assert.match(opsForm, /<Sheet/);
+    assert.match(opsForm, /<Switch/);
+    assert.match(opsForm, /Done/);
+    assert.match(opsForm, /Needs you/);
+    assert.doesNotMatch(opsForm, /Warn below/);
+    assert.doesNotMatch(opsForm, /Mark seen/);
+    assert.doesNotMatch(opsForm, /Seen</);
     assert.doesNotMatch(opsForm, /Create domain/);
     assert.doesNotMatch(opsForm, /DNS records/);
     assert.doesNotMatch(opsForm, /Ops mail/);

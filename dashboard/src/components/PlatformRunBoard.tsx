@@ -2,7 +2,6 @@ import { ListRow } from "@/components/ui/ListRow";
 import { Stamp } from "@/components/ui/Stamp";
 import {
   buildPlatformRunRows,
-  platformRowPreview,
   type PhoneLineTelecomInput,
   type PlatformHealthTone,
 } from "@/lib/platformRunBoardModel";
@@ -49,14 +48,15 @@ export async function PlatformRunBoard() {
           <ListRow
             key={row.id}
             title={row.title}
-            preview={platformRowPreview(row)}
+            preview={row.health.detail || undefined}
+            when={row.money.primary !== "Unknown" ? row.money.primary : undefined}
             stamp={<Stamp tone={healthStampTone(row.health.tone)}>{row.health.label}</Stamp>}
           />
         ))}
         <ListRow
           href="/admin/numbers"
           title="Numbers"
-          preview={numberCount > 0 ? String(numberCount) : "None"}
+          when={numberCount > 0 ? String(numberCount) : "None"}
         />
       </ul>
     </section>

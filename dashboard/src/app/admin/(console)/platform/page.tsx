@@ -16,13 +16,11 @@ export default async function AdminPlatformPage() {
     return <AdminSetupError />;
   }
 
-  const openCount = snapshot.notices.filter((notice) => notice.status === "open").length;
-
   return (
     <div className="space-y-4">
-      <PageHeader title="Platform" meta={openCount > 0 ? `${openCount} open` : undefined} />
+      <PageHeader title="Platform" />
 
-      <AdminOpsNotices notices={snapshot.notices} />
+      <AdminOpsNotices notices={snapshot.notices.filter((notice) => notice.status === "open")} />
       <PlatformRunBoard />
       <AdminPlatformOpsForm settings={snapshot.settings} persisted={snapshot.persisted} />
     </div>
