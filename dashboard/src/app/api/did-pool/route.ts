@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
+import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { addDidToPool, listDidPool, listPendingTenants, normalizeE164 } from "@/lib/didPool";
+import {
+  addDidToPool,
+  listDidPool,
+  listPendingTenants,
+  normalizeE164,
+  releaseAssignedDid,
+} from "@/lib/didPool";
 
 export async function GET() {
   if (!(await isLegacyAuthenticated())) {
@@ -52,6 +59,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, e164: data });
     }
 
+    if (action === "release") {
+      const result = await releaseAssignedDid(String(body.e164 || ""));
+      return NextResponse.json({ ok: true, ...result });
+    }
+
     if (action === "assign_specific") {
       const tenantId = String(body.tenant_id || "");
       const e164 = normalizeE164(String(body.e164 || ""));
@@ -69,7 +81,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    logAdminError("did-pool", err);
+    return NextResponse.json(
+      { error: adminFacingError(err, "Could not update the number pool.") },
+      { status: 500 }
+    );
   }
 }

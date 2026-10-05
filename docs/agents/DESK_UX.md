@@ -39,6 +39,7 @@ Use for landing, signup/onboarding UX, calls inbox, settings presentation, navig
 6. **Proof:** the Playwright gate in `dashboard/e2e` at 360, 390, 768, 1280, light and dark, before a PR is ready.
 7. Auth: owner sessions use Supabase SSR + RLS; never expose `SUPABASE_SERVICE_ROLE_KEY` to the browser.
 8. Onboarding redirect for blank/default prompts stays intact unless Platform/Brain agree to change the gate.
+9. **Universal app:** Super Admin is the same product, not a second engineering console. Status and people only. Resend, DNS, API keys, fingerprints, and env names stay in infra. Escalate is a person list (name, phone, email). Run `/no-ai-slop` on copy. This rule is for every Desk/Admin chat, not a one-off.
 
 ## Test / verify
 

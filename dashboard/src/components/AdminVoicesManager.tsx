@@ -9,6 +9,7 @@ import {
   adminRowDangerClass,
   adminRowMutedClass,
 } from "@/components/AdminIdentityList";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { btnGhost, btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
 import { Empty } from "@/components/ui/Empty";
 import type { PlatformSonioxVoiceRow } from "@/lib/sonioxVoiceCatalog";
@@ -26,6 +27,8 @@ export function AdminVoicesManager({
   const [sortOrder, setSortOrder] = useState("100");
   const [makeDefault, setMakeDefault] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function run(body: Record<string, unknown>) {
     setError(null);
@@ -40,6 +43,14 @@ export function AdminVoicesManager({
       return;
     }
     startTransition(() => router.refresh());
+  }
+
+  async function removeVoice() {
+    if (!deleteId) return;
+    setDeleting(true);
+    await run({ action: "delete", id: deleteId });
+    setDeleting(false);
+    setDeleteId(null);
   }
 
   function startEdit(voice: PlatformSonioxVoiceRow) {
@@ -199,15 +210,7 @@ export function AdminVoicesManager({
                       <button
                         type="button"
                         disabled={pending}
-                        onClick={() => {
-                          if (
-                            confirm(
-                              "Remove this voice from the catalog? Workspaces using it will fall back to the default."
-                            )
-                          ) {
-                            void run({ action: "delete", id: voice.id });
-                          }
-                        }}
+                        onClick={() => setDeleteId(voice.id)}
                         className={adminRowDangerClass}
                       >
                         Delete
@@ -220,6 +223,20 @@ export function AdminVoicesManager({
           </AdminIdentityList>
         )}
       </div>
+      <ConfirmSheet
+        open={deleteId !== null}
+        theme="admin"
+        danger
+        pending={deleting}
+        title="Remove this voice"
+        confirmLabel="Remove"
+        onClose={() => {
+          if (!deleting) setDeleteId(null);
+        }}
+        onConfirm={() => void removeVoice()}
+      >
+        <p>Workspaces using it will fall back to the default.</p>
+      </ConfirmSheet>
     </div>
   );
 }

@@ -57,6 +57,7 @@ Frontend 2.0 design pack (2026-09-30, charter `docs/frontend/FRONTEND_2_0_CHARTE
 5. Wayfinder maps and specs live as markdown under `docs/specs/`.
 6. Code-review is two-axis: standards vs spec. Do not merge the axes.
 7. After desk UI work: `/ui-skills` then `/reticle`. Copy: `/no-ai-slop`.
+8. Before presenting desk or admin UI: `/impeccable` (context, then Operate critique or detect) and `/no-ai-slop` on strings. Charter tokens and kit still win. Admin is a universal app: no vendor setup controls on product screens.
 
 ## Left upstream (fights law or needs a new MCP)
 

@@ -17,6 +17,14 @@ import { PHONE_TAB_REFRESH_EVENT } from "@/lib/endlessList";
 
 function AdminIcon({ name }: { name: string }) {
   const cls = "h-5 w-5";
+  if (name === "Platform") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <circle cx="10" cy="10" r="6.5" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M10 6.5v4l2.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
   if (name === "Overview") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>

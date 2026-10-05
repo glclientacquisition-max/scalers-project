@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { adminTdClass, adminThClass } from "@/components/AdminIdentityList";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { btnGhost, btnPrimary } from "@/components/ui/deskChrome";
 import { Empty } from "@/components/ui/Empty";
 import { SkeletonList } from "@/components/ui/Skeleton";
@@ -19,6 +20,7 @@ export function BuyNumberPanel() {
   const [pending, startTransition] = useTransition();
   const [loading, setLoading] = useState(true);
   const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [buyTarget, setBuyTarget] = useState<{ inventoryId: string; e164: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [rows, setRows] = useState<AvailableRow[]>([]);
@@ -47,13 +49,6 @@ export function BuyNumberPanel() {
   }, []);
 
   async function buy(inventoryId: string, e164: string) {
-    if (
-      !window.confirm(
-        `Buy ${e164} from SautiKit?\n\nThis spends platform wallet credit (KES 100/mo line rental) and adds the number to your pool as Available.`
-      )
-    ) {
-      return;
-    }
     setBuyingId(inventoryId);
     setError(null);
     setStatus(null);
@@ -72,6 +67,7 @@ export function BuyNumberPanel() {
       setError(err instanceof Error ? err.message : "Buy failed");
     } finally {
       setBuyingId(null);
+      setBuyTarget(null);
     }
   }
 
@@ -130,7 +126,7 @@ export function BuyNumberPanel() {
                       <button
                         type="button"
                         disabled={Boolean(buyingId) || !buyConfigured}
-                        onClick={() => void buy(row.inventory_id, row.e164)}
+                        onClick={() => setBuyTarget({ inventoryId: row.inventory_id, e164: row.e164 })}
                         className={btnPrimary}
                       >
                         {buyingId === row.inventory_id ? "Buying…" : "Buy"}
@@ -168,6 +164,27 @@ export function BuyNumberPanel() {
           ) : null}
         </>
       )}
+      <ConfirmSheet
+        open={buyTarget !== null}
+        theme="admin"
+        pending={buyingId !== null}
+        title="Buy this number"
+        confirmLabel="Buy"
+        onClose={() => {
+          if (!buyingId) setBuyTarget(null);
+        }}
+        onConfirm={() => {
+          if (!buyTarget) return;
+          void buy(buyTarget.inventoryId, buyTarget.e164);
+        }}
+      >
+        {buyTarget ? (
+          <div className="space-y-3">
+            <p>Buy {buyTarget.e164} from SautiKit.</p>
+            <p>This spends platform wallet credit (KES 100/mo line rental) and adds the number to your pool as Available.</p>
+          </div>
+        ) : null}
+      </ConfirmSheet>
     </div>
   );
 }

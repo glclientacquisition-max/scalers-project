@@ -27,7 +27,8 @@ Requirements:
 ## Information architecture
 
 ```
-/admin                 Overview (platform health)
+/admin                 Overview: status strip, KPIs, needs-you queue
+/admin/platform        Provider cards, infrastructure signals, ops mail
 /admin/packages        Packages, on-demand rates, assign (customer billing)
 /admin/wallets         Wallet ledger: ops balance, credits, enforcement (not owner checkout)
 /admin/businesses      All businesses + actions
@@ -46,9 +47,15 @@ Business-owner nav stays: Calls · Business · Sign out.
 ## Module requirements
 
 ### 1. Overview (`/admin`)
+- Status strip: OK, Needs you, or Down. Opens `/admin/platform`.
 - KPI cards: total businesses, active businesses, businesses waiting for a number, available DIDs, assigned DIDs, calls (last 7 days).
-- Short “Needs attention” list: businesses with `pending:` DID or inactive flag.
-- Primary CTAs: Add number · Packages · View businesses.
+- Needs you: open staff notices plus businesses with a pending DID or inactive flag.
+- Primary CTA: Add number.
+
+### 1b. Platform (`/admin/platform`)
+- Line: phone, speech, reasoning as list rows (money on the right). Numbers opens `/admin/numbers`.
+- People: contacts. Add person is a sheet.
+- Alerts: Low money amount plus notify switches in a sheet. Open issues sit under Needs you; Done clears them. Acked items stay off this page.
 
 ### 2. Businesses (`/admin/businesses`)
 - Table: Business name · Phone DID · Notify number · Status (Active / Waiting for number / Archived) · Created · Actions.

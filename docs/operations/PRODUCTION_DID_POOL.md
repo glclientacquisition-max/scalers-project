@@ -16,7 +16,7 @@ New Scalers signups get a real `+254…` DID from a pre-bought pool instead of s
    - Same Stream / media settings as the smoke DID
 
 3. **Seed the pool** (pick one):
-   - Desk: `/admin/login` with username + access code → **Admin → Numbers**  
+   - Admin: `/admin/login` with username + access code → **Numbers** → Add to pool  
    - Or SQL:
 
 ```sql
@@ -25,9 +25,16 @@ insert into public.sautikit_did_pool (e164, status, notes) values
 on conflict (e164) do nothing;
 ```
 
-4. **Pending tenants** already signed up with `pending:…`:
-   - Desk → DID pool → select tenant → **Assign next available**
+4. **Businesses** already signed up with `pending:…`:
+   - Numbers → Assign to a business → **Assign next available**, or pick a specific Available number
    - Or: `select public.assign_did_from_pool('<tenant-uuid>');`
+
+## Release
+
+**Numbers** and **Businesses** both ask before Release number. The number returns to Available.
+
+- If a business still holds it, that business goes back to Waiting for a number.
+- If the business row is already gone and the pool row is still Assigned, release from **Numbers** frees the row anyway. That is the path for `+254709221536` after Jirani Home Services was removed.
 
 ## Runtime behaviour
 
@@ -37,7 +44,7 @@ on conflict (e164) do nothing;
 
 ## Do not
 
-- Put Jirani’s live DID in the pool as `available` (backfill already marks it `assigned`).
+- Seed Jirani’s live DID as `available` while that business still holds it (backfill marks it `assigned`). After the business is gone, release it from Numbers.
 - Expose `SUPABASE_SERVICE_ROLE_KEY` to the browser.
 - Treat a new DID as the answer to a SautiKit outage. Restore or forward the existing number. See `docs/agents/VOICE_DOWNTIME_AT_SCALE.md#telephony-down-bridge-playbook`.
 - Release a suspended-for-nonpayment DID straight to `available`. `suspend_line_for_nonpayment` marks it `disabled` so ops can decide.

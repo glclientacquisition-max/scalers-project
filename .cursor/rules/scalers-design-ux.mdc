@@ -9,7 +9,7 @@ Charter: `docs/frontend/FRONTEND_2_0_CHARTER.md`. It wins over older frontend do
 
 ## Build from the kit
 
-- Primitives live in `dashboard/src/components/ui/`: `Button`, `IconButton`, `Field`, `Input`, `Textarea`, `Select`, `Segmented`, `Stamp`, `Avatar`, `ListRow`, `PageHeader`, `Sheet`, `Menu`, `Tooltip`, `Empty`, `Skeleton`, `Table`. Use them. Do not compose a new button from class strings.
+- Primitives live in `dashboard/src/components/ui/`: `Button`, `IconButton`, `Field`, `Input`, `Textarea`, `Select`, `Segmented`, `Switch`, `Stamp`, `Avatar`, `ListRow`, `PageHeader`, `Sheet`, `Menu`, `Tooltip`, `Empty`, `Skeleton`, `Table`. Use them. Do not compose a new button from class strings.
 - Behavior comes from Base UI. Icons come from Heroicons. No other UI runtime.
 - One `AppShell` for desk and admin. Tabs below `md`, rail on `md+`. Nested routes hide tabs and lead with Back.
 
@@ -35,11 +35,20 @@ Charter: `docs/frontend/FRONTEND_2_0_CHARTER.md`. It wins over older frontend do
 
 - Verbs and nouns the owner already knows. Sentence case. No filler, no instructional subheaders, no exclamation marks.
 - No em dashes or en dashes in UI strings. Hyphens in compound words are fine.
+- Run `/no-ai-slop` on every new UI string. If the line could sit on another product unchanged, cut it.
+
+## Product, not infra
+
+Admin is a universal app (WhatsApp / Instagram / Truecaller bar). Screens show the job: people, money, line up or down.
+- Do not put vendor setup in product UI: Resend Create domain, DNS records, API keys, fingerprints, env var names, git SHAs.
+- Who we notify are people (name, phone, email) under Escalate or Settings. Not a comma mailbox. Not ops mail as a heading.
+- Connect domain, DNS, and keys in infra. Leave them off the page.
 
 ## Motion and access
 
 - Verbs: pending, live, land, shift, press. Under 300ms, `--ease-out`. Reduced motion snaps.
 - Overlays use `Sheet`: a bottom drawer. The finger tracks it. A downward flick dismisses it. No motion package.
+- Settings sections stay pages with Back. A drawer is a short confirm or chooser. Admin confirms use `ConfirmSheet`.
 - 44px hit floor. Icon-only controls carry a visible name on hover and focus. Focus ring `ring-2 ring-brand`.
 
 ## Proof
