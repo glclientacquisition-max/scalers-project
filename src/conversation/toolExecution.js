@@ -6,6 +6,7 @@ const {
   formatRequestedWhenLabel,
   weekdaySpoken,
 } = require('./appointmentHours');
+const { eatParts } = require('./businessHours');
 const { canonicalizeCallerName } = require('./callerNameMatch');
 const { isJunkCallerName } = require('./callerNameQuality');
 const { confirmationLanguage } = require('./language');
@@ -358,10 +359,24 @@ function validateEscalation(raw, { agentName = '', businessName = '', knownNames
   return { valid: true, value };
 }
 
+function nairobiDayAndPeriod(instant, periodLabel) {
+  const period = String(periodLabel || '').trim().toLowerCase();
+  if (!/^(morning|afternoon|evening)$/.test(period)) return '';
+  if (!instant || Number.isNaN(instant.getTime())) return '';
+  const parts = eatParts(instant);
+  if (!parts.weekdayLong || !parts.dateLabel) return '';
+  // Same Nairobi instant the hours gate already resolved. No second clock.
+  return `${parts.weekdayLong} ${parts.dateLabel}, ${period}`;
+}
+
 function stampVisitWindow(value, hours) {
   // A period ("tomorrow morning") is not a clock. Drop any 10:00 the model sent.
+  // Save the absolute Nairobi day plus the period word, not the relative phrase.
   if (hours?.resolved?.periodLabel) {
-    return { ...value, windowStart: '', windowEnd: '' };
+    const whenText =
+      nairobiDayAndPeriod(hours.resolved.instant, hours.resolved.periodLabel) ||
+      value.whenText;
+    return { ...value, whenText, windowStart: '', windowEnd: '' };
   }
   const instant = hours?.resolved?.instant;
   if (!instant || Number.isNaN(instant.getTime())) return value;

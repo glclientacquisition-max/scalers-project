@@ -244,6 +244,7 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
       absMinutes
     );
     const parts = eatParts(instant);
+    const periodLabel = clock == null ? periodWord(raw) : '';
     return {
       ok: true,
       instant,
@@ -251,6 +252,7 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
       weekday: parts.weekday,
       weekdayLong: parts.weekdayLong,
       minutesSinceMidnight: absMinutes,
+      periodLabel,
     };
   }
 
