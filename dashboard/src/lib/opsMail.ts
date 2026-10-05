@@ -28,29 +28,6 @@ export function isOpsMailConfigured(): boolean {
   return Boolean(resendKey() && opsFromAddress());
 }
 
-export function normalizeResendRecords(raw: unknown): OpsDnsRecord[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.flatMap((row) => {
-    if (!row || typeof row !== "object") return [];
-    const rec = row as Record<string, unknown>;
-    const type = String(rec.type || "").toUpperCase();
-    const value = String(rec.value || rec.content || "").trim();
-    if (!type || !value) return [];
-    const priorityRaw = rec.priority;
-    const priority =
-      typeof priorityRaw === "number" && Number.isFinite(priorityRaw) ? priorityRaw : null;
-    return [
-      {
-        name: String(rec.name || "").trim() || OPS_RESEND_DOMAIN,
-        type,
-        value,
-        priority,
-        status: String(rec.status || "").trim() || "pending",
-      },
-    ];
-  });
-}
-
 async function resendJson(
   path: string,
   init: { method?: string; body?: unknown } = {},
