@@ -155,16 +155,16 @@ describe("business settings craft", () => {
   });
 
   it("uses non-clickable group headers and a phone index of destination rows", () => {
-    assert.match(shell, /settingsGroupTitleClass/);
+    assert.match(shell, /text-meta font-medium text-ink-2/);
     assert.match(ui, /uppercase tracking-wide text-gray-500/);
     assert.match(ui, /pointer-events-none/);
     assert.match(shell, /data-settings-menu=\{variant\}/);
     assert.match(shell, /md:hidden/);
     assert.match(shell, /SettingsChevron/);
-    assert.match(shell, /min-h-12/);
+    assert.match(shell, /min-h-11/);
     assert.match(shell, /variant: "index" \| "rail"/);
     assert.match(shell, /settingsRailWrapClass/);
-    assert.match(ui, /hidden min-w-0 shrink-0 md:block md:w-max md:max-w-\[13\.5rem\]/);
+    assert.match(ui, /hidden min-w-0 shrink-0 md:block md:w-64/);
     assert.match(ui, /md:sticky md:top-4/);
   });
 
@@ -232,7 +232,7 @@ describe("business settings craft", () => {
     assert.match(shell, /variant: "index" \| "rail"/);
     assert.match(shell, /settingsRailWrapClass/);
     assert.match(shell, /SettingsChevron/);
-    assert.match(shell, /min-h-12/);
+    assert.match(shell, /min-h-11/);
     assert.match(ui, /SettingsBackLink/);
     assert.match(form, /showBack/);
   });
@@ -269,7 +269,7 @@ describe("business settings craft", () => {
     assert.match(ui, /hover:border-accent\/35/);
     assert.match(ui, /active:scale-\[0\.99\]/);
     assert.match(ui, /focus-visible:ring-accent\/40/);
-    assert.match(shell, /active:bg-accent\/\[0\.08\]/);
+    assert.match(shell, /active:bg-surface-2/);
     assert.match(save, /active:scale-\[0\.99\]/);
     assert.match(form, /SettingsPageHeader/);
     assert.doesNotMatch(shell, /glass|mesh|MetricCard/);
@@ -283,7 +283,7 @@ describe("business settings craft", () => {
     assert.match(shell, /settingsRailWrapClass/);
     assert.doesNotMatch(shell, /max-w-5xl|max-w-xl/);
     assert.doesNotMatch(test, /max-w-xl/);
-    assert.match(ui, /md:w-max md:max-w-\[13\.5rem\]/);
+    assert.match(ui, /md:w-64/);
     assert.match(ui, /md:flex-row/);
     assert.match(ui, /grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2/);
     assert.match(ui, /min-w-0 flex-1/);
@@ -293,8 +293,9 @@ describe("business settings craft", () => {
     assert.match(form, /grid-cols-\[minmax\(0,7rem\)_minmax\(0,1fr\)_2\.75rem_2\.75rem\]/);
     assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_auto_2\.5rem\]/);
     assert.match(form, /grid-cols-\[minmax\(0,1fr\)_minmax\(0,1\.2fr\)_2\.75rem\]/);
-    assert.match(shell, /border-l-2/);
-    assert.match(shell, /border-accent text-accent-deep/);
+    assert.match(shell, /rounded-2xl border border-hairline bg-surface/);
+    assert.match(shell, /bg-accent-tonal/);
+    assert.doesNotMatch(shell, /border-l-2/);
     const deskNav = read("dashboard/src/components/DeskNav.tsx");
     assert.match(deskNav, /data-settings-console/);
     assert.match(deskNav, /md:has-\[\[data-settings-console\]\]:max-w-none/);
@@ -537,13 +538,13 @@ describe("business settings craft", () => {
 
     const rail = shell.slice(
       shell.indexOf("const isRail = variant === \"rail\""),
-      shell.indexOf("const railLinkClass") + "const railLinkClass".length + 240
+      shell.indexOf("function settingsLineState")
     );
-    assert.match(rail, /inline-flex min-h-9 w-full items-center justify-start gap-1\.5 border-l-2 px-2\.5/);
-    assert.match(rail, /w-max max-w-full space-y-0.5/);
+    assert.match(shell, /flex min-h-11 w-full items-center gap-3 px-3 text-body font-medium text-ink/);
+    assert.match(rail, /rounded-2xl border border-hairline/);
+    assert.match(rail, /<SettingsChevron active=\{active\} \/>/);
+    assert.doesNotMatch(rail, /border-l-2/);
     assert.doesNotMatch(rail, /justify-between/);
-    assert.doesNotMatch(rail, /flex-1/);
-    assert.doesNotMatch(rail, /mt-6/);
 
     const coach = read("dashboard/src/components/PronunciationCoach.tsx");
     const tablistStart = coach.indexOf('aria-label="Pronunciation studio modes"');
@@ -565,10 +566,10 @@ describe("business settings craft", () => {
     assert.match(ui, /settingsSelectMaxClass/);
     assert.match(form, /settingsFormBodyClass/);
     assert.match(alerts, /settingsFormBodyClass/);
-    assert.match(shell, /min-h-9/);
-    assert.match(shell, /mt-2\.5/);
-    assert.match(shell, /mb-0\.5/);
-    assert.match(shell, /min-h-12/);
+    assert.match(shell, /min-h-11/);
+    assert.match(shell, /mt-6/);
+    assert.match(shell, /mb-2/);
+    assert.doesNotMatch(shell, /min-h-9/);
     assert.match(form, /No public contacts yet/);
     assert.match(form, /title="Public contacts"/);
     assert.doesNotMatch(

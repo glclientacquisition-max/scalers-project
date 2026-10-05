@@ -33,7 +33,7 @@ export const settingsConsoleClass =
   "flex w-full min-w-0 flex-col gap-6 md:flex-row md:items-start md:justify-start md:gap-3";
 
 export const settingsRailWrapClass =
-  "hidden min-w-0 shrink-0 md:block md:w-max md:max-w-[13.5rem]";
+  "hidden min-w-0 shrink-0 md:block md:w-64";
 
 export const settingsRailClass = "min-w-0 md:sticky md:top-4";
 
