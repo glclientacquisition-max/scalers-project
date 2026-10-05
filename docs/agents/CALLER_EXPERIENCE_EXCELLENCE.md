@@ -11,7 +11,7 @@ Two clients, never mixed:
 | **Caller** | The business’s customer on the DID | Leave with an answer, a requested visit/hold, or an honest next step. Never feel interviewed or lied to. |
 | **Owner** | The business that pays Scalers | The line represented their brand. The desk and SMS match what was promised on the phone. |
 
-North star stays full assist (`docs/BUSINESS_INTELLIGENCE_ROADMAP.md`): complete the caller’s job from live ground truth. MVP is still unanswered-line reliability (`docs/MVP_SHIP_AND_TEST.md`). This note is the gap between those two for **conversation quality**.
+North star stays full assist (`docs/product/BUSINESS_INTELLIGENCE_ROADMAP.md`): complete the caller’s job from live ground truth. MVP is still unanswered-line reliability (`docs/product/MVP_SHIP_AND_TEST.md`). This note is the gap between those two for **conversation quality**.
 
 Evidence: live SIDs in `LIVE_CALL_FINDINGS.md`, `CALL_MESSAGE_GAP.md`, home live pack, returning-caller spec, escalation vs live transfer. Repo tests are not the GO.
 

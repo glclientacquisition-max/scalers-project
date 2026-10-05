@@ -28,7 +28,7 @@ npm ci && npm start
 
 | Concern | Setup |
 | --- | --- |
-| Public webhook URL | `npm run tunnel` or `npm run tunnel:cloudflared` — see `docs/WEBHOOK_TUNNEL.md` |
+| Public webhook URL | `npm run tunnel` or `npm run tunnel:cloudflared` — see `docs/operations/WEBHOOK_TUNNEL.md` |
 | SautiKit | Point test DID webhook at tunnel URL |
 | Required env | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
 | Optional | `GEMINI_API_KEY`, `SONIOX_API_KEY`, `SAUTIKIT_*` |

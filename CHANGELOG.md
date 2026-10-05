@@ -20,9 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md` — clarified historical Twilio/SQLite baseline vs current SautiKit stack
-- `docs/TARGET_MODULE_LAYOUT.md` — clarified planned vs implemented module layout
-- `README.md` — links to governance documentation
+- `docs/architecture/ARCHITECTURE_MIGRATION_BLUEPRINT.md` — clarified historical Twilio/SQLite baseline vs current SautiKit stack
+- `docs/architecture/TARGET_MODULE_LAYOUT.md` — clarified planned vs implemented module layout
+- `README.md` — rewritten in plain English for the live product (voice Business Assistant, Desk, what is not shipped)
+- Loose notes moved off `docs/` root into `docs/product/`, `docs/operations/`, and `docs/architecture/`. Acceptance notes moved from `scalers/acceptance/` to `docs/acceptance/`. `server.js`, `src/`, and `dashboard/` stayed put.
+- `docs/architecture/SYSTEM_ARCHITECTURE.md` is the plain-English picture of voice, Desk, and Supabase. `CURRENT_STATE.md` and `DATA_FLOW.md` stay fact inventories. The migration blueprint and target module layout are marked historical or target. Live Dial and owner M-Pesa checkout stay unshipped.
 
 ---
 

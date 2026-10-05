@@ -34,8 +34,8 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | Subsystem | Source of truth | Path | Evidence | Alternatives | Status |
 | --- | --- | --- | --- | --- | --- |
 | Agent runtime | Gemini turn loop | `server.js` `runGeminiTurn*` | `@google/genai` import; called from media handler | `/ws/relay` path | CORE |
-| Human handoff (async) | Escalate notify + desk note | `src/conversation/escalationFeature.js`, `server.js` `maybeSendEscalationNotification` | [`../ESCALATION.md`](../ESCALATION.md) | Live Dial | CORE |
-| Human handoff (live) | Conference + outbound REST (cold Dial after Stream blocked) | Gated off (`VOICE_LIVE_TRANSFER`) | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED |
+| Human handoff (async) | Escalate notify + desk note | `src/conversation/escalationFeature.js`, `server.js` `maybeSendEscalationNotification` | [`../ESCALATION.md`](../product/ESCALATION.md) | Live Dial | CORE |
+| Human handoff (live) | Conference + outbound REST (cold Dial after Stream blocked) | Gated off (`VOICE_LIVE_TRANSFER`) | [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED |
 | Runtime prompt assembly | Context + rules + profile | `src/prompts.js` | `buildSystemPrompt`, `buildContextHeader` | Env `BUSINESS_*` | CORE |
 | Brain state | Per-call semantic memory, seeded from returning-caller card | `src/conversation/brainState.js` | `callBrainStates` Map in `server.js` | None | CORE |
 | Returning-caller card | Compact phone file at call setup | `src/conversation/callerMemory.js` + `getCallerMemory` | CONTEXT HEADER; ADR-0005 | Transcript dump, RAG | CORE |
@@ -124,7 +124,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | Call wallet debit | RPC `charge_call_to_wallet` | `src/db.js` | Idempotent per `call_id` | None | CORE |
 | Inbound on-demand | `billing_rate_card.inbound_kes_per_second` | 0.10 (KES 6/min) | Package overage. Env `WALLET_RATE_KES_PER_MINUTE` default 0 is fallback only if `consume_call_seconds` is missing | Raise the rate card if SautiKit starts charging inbound | CORE |
 | Outbound live transfer | `billing_rate_card.outbound_kes_per_second` | 0.15 (KES 9/min) | Stored. Hidden until live transfer. SautiKit outbound cost **KES 3/min** answered; unanswered 0. Env default 4 is fallback only | Conference executor not live | PROPOSED (executor) / CORE (rates) |
-| Transfer billing helpers | `src/billing/liveTransferLegs.js` | Ops | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) §8 | Fold outbound into inbound | CORE (do not fold) |
+| Transfer billing helpers | `src/billing/liveTransferLegs.js` | Ops | [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) §8 | Fold outbound into inbound | CORE (do not fold) |
 
 ---
 
@@ -169,7 +169,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | SMS | TextSMS.co.ke | `src/notifications/sms.js` | Private-beta primary | — | CORE |
 | WhatsApp | SautiKit Messaging | `src/notifications/whatsapp.js` + `whatsappTemplates.js` + `src/sautikit/whatsappInbound.js` | Platform sender `+254709221536`; staff originate = utility templates; inbound ack only. Calling parked. | Shop Embedded Signup | CORE (Phase 1) |
 | Email | Resend | `src/notifications/email.js` | Fallback | — | CORE |
-| Message contract | What owner vs caller receives | `docs/CALL_MESSAGE_CONTRACT.md` | Product contract | — | CORE |
+| Message contract | What owner vs caller receives | `docs/product/CALL_MESSAGE_CONTRACT.md` | Product contract | — | CORE |
 
 ---
 

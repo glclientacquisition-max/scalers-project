@@ -21,11 +21,11 @@ Use this when the task is about audio path, latency, barge-in, fillers, TTS pron
 | `scripts/smoke-recording-webhook.js` | Live HTTP POST `/voice/events` recording envelopes |
 | `tests/naturalnessScore.test.js` | Roboticness pass/fail scanner for live transcripts |
 | `.env.example` | Voice/Soniox/turn-taking env knobs only |
-| `docs/WEBHOOK_TUNNEL.md` | Local tunnel for SautiKit media |
+| `docs/operations/WEBHOOK_TUNNEL.md` | Local tunnel for SautiKit media |
 | `docs/agents/VOICE_DOWNTIME_AT_SCALE.md` | Multi-tenant speech-outage contract |
 | `docs/agents/VOICE_NATURALNESS.md` | Live DID roboticness eval (pass/fail, freeze SHA) |
-| `docs/CALL_MESSAGE_CONTRACT.md` | Owner vs caller post-call message contract |
-| `docs/CALL_MESSAGE_GAP.md` | Live owner SMS vs excellence bar |
+| `docs/product/CALL_MESSAGE_CONTRACT.md` | Owner vs caller post-call message contract |
+| `docs/product/CALL_MESSAGE_GAP.md` | Live owner SMS vs excellence bar |
 
 Also OK: small imports from `src/conversation/language.js` / `dynamicSpeech.js` **only** when needed for fillers, greetings, or language sticky behavior on the media path.
 
@@ -61,7 +61,7 @@ Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; pro
 6. Spoken agent lines that play to the caller should land in the transcript.
 7. Keep `db.js` orchestration surface stable (`upsertCall`, `appendTranscript`, `attachRecording`, `chargeCallToWallet`, …).
 8. Greeting must await tenant profile. Play a cached tenant greeting clip when present so TTS-ready wait is not dead air. If TTS is not ready and there is no cache: existing downtime clip, then hangup. Never mute. Never speak a default-name opener. Never call `speakText` while `tts` is still null. Log `connect_to_greeting_pcm_ms` from answer/forward to first greeting PCM. TTS connect runs in parallel with tenant fetch.
-9. Action turns (`CREATE_REQUEST` / `CAPTURE` / `ESCALATE` / `TRANSFER`) speak an immediate progress line before Gemini+tools; do not leave dead air. `TRANSFER` / `liveTransfer` is **not** executable until conference REST in [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) rings a human and `VOICE_LIVE_TRANSFER=on`. Do not close Stream for cold Dial. Do not claim a bridge from the media loop. SautiKit outbound cost is KES 3/min answered; tenant outbound on the package rate card is KES 9/min and is not offered until live transfer ships (Ops owns rates).
+9. Action turns (`CREATE_REQUEST` / `CAPTURE` / `ESCALATE` / `TRANSFER`) speak an immediate progress line before Gemini+tools; do not leave dead air. `TRANSFER` / `liveTransfer` is **not** executable until conference REST in [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) rings a human and `VOICE_LIVE_TRANSFER=on`. Do not close Stream for cold Dial. Do not claim a bridge from the media loop. SautiKit outbound cost is KES 3/min answered; tenant outbound on the package rate card is KES 9/min and is not offered until live transfer ships (Ops owns rates).
 10. Filler cancel must target **only** the filler `stream_id` (plus generation bump). Never `tts.cancel()` with no id while a reply stream is prefetched.
 11. Soniox **402 billing exhausted** is a speech-provider outage, not a turn-policy miss. Play the catalog-voice downtime recording (same voice as that line's greeting), hang up, and surface `soniox.lastError` plus `soniox.outageClips` on `/healthz`. Key clips by catalog voice × language. Keep the spoken line voice-generic. Alert each owner at most once per cooldown. See [`VOICE_DOWNTIME_AT_SCALE.md`](./VOICE_DOWNTIME_AT_SCALE.md).
 12. Gemini **credits depleted / denied** is a reasoning outage, not speech. STT and TTS still work. Keep the line open, ask for a name, save it, and alert the owner once per cooldown. Surface `gemini.lastError` on `/healthz`. Do not retry depleted credits on the next turn.
@@ -93,7 +93,7 @@ npm run test:voice
 
 Runs: TTS normalize → spoken stream buffer → turn-taking → wiring.
 
-For media/webhook local bring-up: `npm start` + `npm run tunnel:cloudflared` (see `docs/WEBHOOK_TUNNEL.md`).
+For media/webhook local bring-up: `npm start` + `npm run tunnel:cloudflared` (see `docs/operations/WEBHOOK_TUNNEL.md`).
 
 Staging DID tests require the pull request on Railway staging first. Opening a pull request into `main` runs `.github/workflows/stage-pull-request.yml`, which rebuilds `cursor/staging-voice-468b` as `main` plus every open pull request, including one that targets another feature branch. That stacked pull request joins on the next rebuild. Confirm `GET /healthz` `gitSha` is that staging tip. Closing the pull request takes it off the practice line. A one-off deploy can still use `.github/workflows/staging-voice-deploy.yml`. Merge to `main` only after that staging call.
 
@@ -125,7 +125,7 @@ OSS setups that already sound human, and which pieces transfer onto Soniox: [`..
 
 ## Good first tickets
 
-- Staging spike: Stream-stop → `<Dial>` (see [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) Spike 0). Do not enable `liveTransfer` until that spike is green.
+- Staging spike: Stream-stop → `<Dial>` (see [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) Spike 0). Do not enable `liveTransfer` until that spike is green.
 - Phase 2 from `VOICE_SPEED_CONSISTENCY.md` (media clear, interim barge, cached ack PCM)
 - Kenya TTS pronunciation edge cases (money, names, Sheng)
 - Extract media session from `server.js` toward `src/telephony/mediaStreamHandler.js` without behavior change

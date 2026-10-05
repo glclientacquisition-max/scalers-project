@@ -1,7 +1,9 @@
-# Target module skeleton (future — not current layout)
+# Target module skeleton (future, not the current layout)
 
-> **Current state:** See [`docs/architecture/CURRENT_STATE.md`](./architecture/CURRENT_STATE.md).  
-> Voice logic remains concentrated in `server.js` (~2,841 LOC). Partial extraction exists: `src/speech/`, `src/conversation/`, `src/sautikit/webhook.js`.
+> **Status:** TARGET. Do not read this tree as the repo you clone.  
+> **Live picture:** [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) (2026-10-05). Fact inventory: [`CURRENT_STATE.md`](./CURRENT_STATE.md).  
+> Voice logic still lives in root `server.js`. Partial extraction exists: `src/speech/`, `src/conversation/`, `src/notifications/`, `src/billing/`, `src/sautikit/webhook.js`.  
+> Leave `server.js` at the repo root until a dedicated extract. Railway and the Dockerfile start that file. The next code slice is `src/telephony/` with no behavior change. See [Left in place](../README.md#left-in-place).
 
 This tree is the **intended** production layout from
 [`ARCHITECTURE_MIGRATION_BLUEPRINT.md`](./ARCHITECTURE_MIGRATION_BLUEPRINT.md).

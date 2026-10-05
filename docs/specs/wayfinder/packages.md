@@ -3,7 +3,7 @@
 **Destination:** Owners buy a monthly or annual package with included buckets. Exhausted buckets continue only if on-demand is on, or the owner upgrades. Super Admin owns the catalog at `/admin/packages` after the existing username + access code login.  
 **Lane:** Ops & Billing (numbers, Admin). Platform (SQL/RPC). Desk (Usage). Voice (consume minutes on hangup, later).  
 **Status:** Control plane shipping. Owner Usage and Home read remaining buckets. Hangup consume is `package_minute_consume.sql` (apply before it meters). Prepaid env-rate charge remains only until that RPC exists.  
-**Companion:** [`../../PACKAGES.md`](../../PACKAGES.md), [`../../supabase/package_catalog.sql`](../../supabase/package_catalog.sql)
+**Companion:** [`../../PACKAGES.md`](../../operations/PACKAGES.md), [`../../supabase/package_catalog.sql`](../../supabase/package_catalog.sql)
 
 ## Decisions so far
 

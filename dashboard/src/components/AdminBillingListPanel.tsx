@@ -8,7 +8,7 @@ import {
   type AdminBillingRow,
 } from "@/lib/adminBilling";
 import { adminRowActionClass, adminTdClass, adminThClass } from "@/components/AdminIdentityList";
-import { btnGhost, deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
 import { usedOfIncluded } from "@/lib/packageUsageAlign";

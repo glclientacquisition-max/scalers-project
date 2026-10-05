@@ -93,7 +93,7 @@ Resolution: `needs_human` when escalate succeeded or handoff requested without a
 2. **Desk UI** — show `escalation_notify.channels` on call detail, or “Needs human. Notify failed.”
 3. **Per-tenant sender ID** (optional) when businesses register their own shortcodes
 4. **Delivery receipts** — TextSMS DLR webhook → update `escalation_notify`
-5. **Live transfer** — spec: [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) + [`adr/ADR-0004-live-human-transfer.md`](./adr/ADR-0004-live-human-transfer.md). Do not implement until the Stream-stop → Dial staging spike passes. Keep this async escalate path as default and as Dial fallback.
+5. **Live transfer** — spec: [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) + [`adr/ADR-0004-live-human-transfer.md`](../adr/ADR-0004-live-human-transfer.md). Do not implement until the Stream-stop → Dial staging spike passes. Keep this async escalate path as default and as Dial fallback.
 6. **Owner preference** — SMS vs WA vs email priority per tenant
 7. **Quiet hours** — delay SMS, still desk-note immediately
 

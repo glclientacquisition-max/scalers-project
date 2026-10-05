@@ -4,7 +4,7 @@
 // No live channel: server.js persists failed notify. Desk shows notify failed.
 //
 // Event model: `src/notifications/events.js` builds one typed event per alert.
-// This module renders it per channel and sends. Contract: docs/CALL_MESSAGE_CONTRACT.md.
+// This module renders it per channel and sends. Contract: docs/product/CALL_MESSAGE_CONTRACT.md.
 
 const {
   isWhatsAppConfigured,

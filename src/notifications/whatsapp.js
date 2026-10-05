@@ -4,7 +4,7 @@
 // (SautiKit 81424fbd-8f4c-459a-858d-98ced4393df6 / +254709221536).
 // Voice on that DID still belongs to Done and Dusted until Phase 2.
 // Do not send shop-caller chat from this number. Do not enable Calling.
-// Staff originate: Meta utility templates (docs/WHATSAPP_TEMPLATES.md).
+// Staff originate: Meta utility templates (docs/product/WHATSAPP_TEMPLATES.md).
 // Session text only inside an open 24h window (inbound ack, or a follow-up ping).
 
 const SAUTIKIT_API_BASE = process.env.SAUTIKIT_API_BASE || 'https://api.sautikit.com';

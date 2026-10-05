@@ -59,7 +59,7 @@ Point number webhooks to:
 
 Subscribe: `call.completed`, `recording.ready` (minimum).
 
-See: `docs/PRODUCTION_CUTOVER.md`, `docs/WEBHOOK_TUNNEL.md` (local).
+See: `docs/operations/PRODUCTION_CUTOVER.md`, `docs/operations/WEBHOOK_TUNNEL.md` (local).
 
 ---
 
@@ -158,4 +158,4 @@ Voice uses **service role**. Owners use **anon + JWT**.
 - [`ENVIRONMENTS.md`](./ENVIRONMENTS.md)
 - [`../governance/RELEASE_PROCESS.md`](../governance/RELEASE_PROCESS.md)
 - [`../architecture/SYSTEM_ARCHITECTURE.md`](../architecture/SYSTEM_ARCHITECTURE.md)
-- [`../PRODUCTION_CUTOVER.md`](../PRODUCTION_CUTOVER.md)
+- [`../PRODUCTION_CUTOVER.md`](PRODUCTION_CUTOVER.md)

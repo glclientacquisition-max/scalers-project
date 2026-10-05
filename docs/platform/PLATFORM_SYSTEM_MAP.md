@@ -50,12 +50,12 @@ Status: **live** = production path in code and used. **partial** = code exists, 
 | Instagram / other social | Handles on the tenant profile | `tenants.social_handles`; `src/conversation/socialHandles.js` | **docs-only** as a channel | Brain may *read* a handle. There is no IG inbox, Graph, or send. |
 | Wallet / ledger | One prepaid KES wallet | `docs/supabase/one_wallet_billing.sql`; `src/db.js` `chargeCallToWallet`; desk `/wallet` | **live** (beta meters, does not charge) | Do not show dual USD/KES as the product. M-Pesa top-up is a stub. |
 | SMS allowance | Included segments, same on-demand toggle | `docs/supabase/sms_allowance.sql`; `consumeSmsUnits` | **live** if SQL applied; skip tenant SMS if RPC missing | Skip tenant SMS at cap (paid) or `rpc_missing`. Never debit KES for SMS. Never claim sent without a ledger row. |
-| Packages / SKUs | Reserved email + seat columns | `docs/supabase/package_entitlements.sql`; [`../PACKAGES.md`](../PACKAGES.md) | **docs-only** | No shop UI. Do not gate email or invites. |
-| DID pool | Assign / release Kenya numbers | `sautikit_did_pool`; admin APIs; [`../PRODUCTION_DID_POOL.md`](../PRODUCTION_DID_POOL.md) | **live** | `+254709221536` must never be `available`. |
+| Packages / SKUs | Reserved email + seat columns | `docs/supabase/package_entitlements.sql`; [`../PACKAGES.md`](../operations/PACKAGES.md) | **docs-only** | No shop UI. Do not gate email or invites. |
+| DID pool | Assign / release Kenya numbers | `sautikit_did_pool`; admin APIs; [`../PRODUCTION_DID_POOL.md`](../operations/PRODUCTION_DID_POOL.md) | **live** | `+254709221536` must never be `available`. |
 | Auth (owner) | Supabase Auth JWT + RLS | `dashboard/src/lib/auth.ts`; `docs/supabase/owner_rls.sql` | **live** | Service role never in `NEXT_PUBLIC_*`. |
 | Auth (Super Admin) | Better Auth username + access code | `admin-auth.ts`; `/admin/login`; `ADMIN_HOST` | **live** | Not owner auth. HMAC leftover only. |
 | Deploy | Voice Railway, desk Vercel, DB Supabase | `Dockerfile`, `railway.toml`, `dashboard/vercel.json` | **live** | Stay on Vercel through the wedge. Cloudflare = later spike only. |
-| Module split | `src/telephony/`, `LLM_PROVIDER` | [`../TARGET_MODULE_LAYOUT.md`](../TARGET_MODULE_LAYOUT.md) | **docs-only** | `server.js` is still the orchestrator. Do not rewrite it in this ladder step. |
+| Module split | `src/telephony/`, `LLM_PROVIDER` | [`../TARGET_MODULE_LAYOUT.md`](../architecture/TARGET_MODULE_LAYOUT.md) | **docs-only** | `server.js` is still the orchestrator. Do not rewrite it in this ladder step. |
 | RAG / embeddings | `knowledge_chunks` | Blueprint + BI roadmap | **docs-only** | Not in `src/`. Do not plan mid-call retrieve. |
 | Campaigns / growth send | Blast / re-engage | Company Brain §7 step 6 | **docs-only** | No engine. No Meta marketing templates in repo. |
 | Baileys / WA Web | Unofficial session | — | **dead** (hard kill) | Do not add. |
@@ -160,7 +160,7 @@ Two different “brains.” Do not collapse them.
 
 ### What exists (repo)
 
-Phase 0–2 of [`../BUSINESS_INTELLIGENCE_ROADMAP.md`](../BUSINESS_INTELLIGENCE_ROADMAP.md) largely landed:
+Phase 0–2 of [`../BUSINESS_INTELLIGENCE_ROADMAP.md`](../product/BUSINESS_INTELLIGENCE_ROADMAP.md) largely landed:
 
 - `tenants.vertical`, `handoff_mode`, `business_locations`, `business_policies`
 - `contacts` + `service_requests` + `appointments`
@@ -219,9 +219,9 @@ Delivery statuses already parse and persist (`persistWhatsAppStatus`). Desk does
 
 ### Notify (staff + caller SMS)
 
-Ladder: TextSMS.co.ke → SautiKit WhatsApp → Resend → desk note. One success per dest + kind + call. Escalate: one teammate, no extra owner SMS. Contract: [`../CALL_MESSAGE_CONTRACT.md`](../CALL_MESSAGE_CONTRACT.md).
+Ladder: TextSMS.co.ke → SautiKit WhatsApp → Resend → desk note. One success per dest + kind + call. Escalate: one teammate, no extra owner SMS. Contract: [`../CALL_MESSAGE_CONTRACT.md`](../product/CALL_MESSAGE_CONTRACT.md).
 
-Known payload gap (Voice, not a new channel): mid-call lead SMS fires on `save_caller_info` before hangup `owner_review`. Visit/hold marks `whatsapp_sent` so hangup does not double the lead. [`../CALL_MESSAGE_GAP.md`](../CALL_MESSAGE_GAP.md).
+Known payload gap (Voice, not a new channel): mid-call lead SMS fires on `save_caller_info` before hangup `owner_review`. Visit/hold marks `whatsapp_sent` so hangup does not double the lead. [`../CALL_MESSAGE_GAP.md`](../product/CALL_MESSAGE_GAP.md).
 
 Desk Ping (`pingTeammateAction` → `POST /internal/desk/escalate`) reuses the same notify path and the same `formatEscalationDelivery` honesty.
 
@@ -302,16 +302,17 @@ Company Brain §7. Do not reorder without Product + founder.
 | Doc | Use |
 | --- | --- |
 | [`../company/COMPANY_BRAIN.md`](../company/COMPANY_BRAIN.md) | North star, wedge, ladder, roster |
-| [`../BUSINESS_INTELLIGENCE_ROADMAP.md`](../BUSINESS_INTELLIGENCE_ROADMAP.md) | Voice Brain destination (stale “no CRM” in §2; trust §11 + this map) |
-| [`../CALL_MESSAGE_CONTRACT.md`](../CALL_MESSAGE_CONTRACT.md) / [`../CALL_MESSAGE_GAP.md`](../CALL_MESSAGE_GAP.md) | Who gets what after a call |
-| [`../ESCALATION.md`](../ESCALATION.md) | Async handoff (the shipped product) |
-| [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) / ADR-0004 | Blocked Dial; conference next |
-| [`../WHATSAPP_TEMPLATES.md`](../WHATSAPP_TEMPLATES.md) / [`../specs/whatsapp-two-way.md`](../specs/whatsapp-two-way.md) | Staff templates + dual-use DID |
-| [`../ONE_WALLET_BILLING.md`](../ONE_WALLET_BILLING.md) / [`../BETA_WALLET_PROGRAM.md`](../BETA_WALLET_PROGRAM.md) | Prepaid truth |
+| [`../BUSINESS_INTELLIGENCE_ROADMAP.md`](../product/BUSINESS_INTELLIGENCE_ROADMAP.md) | Voice Brain destination (stale “no CRM” in §2; trust §11 + this map) |
+| [`../CALL_MESSAGE_CONTRACT.md`](../product/CALL_MESSAGE_CONTRACT.md) / [`../CALL_MESSAGE_GAP.md`](../product/CALL_MESSAGE_GAP.md) | Who gets what after a call |
+| [`../ESCALATION.md`](../product/ESCALATION.md) | Async handoff (the shipped product) |
+| [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) / ADR-0004 | Blocked Dial; conference next |
+| [`../WHATSAPP_TEMPLATES.md`](../product/WHATSAPP_TEMPLATES.md) / [`../specs/whatsapp-two-way.md`](../specs/whatsapp-two-way.md) | Staff templates + dual-use DID |
+| [`../ONE_WALLET_BILLING.md`](../operations/ONE_WALLET_BILLING.md) / [`../BETA_WALLET_PROGRAM.md`](../operations/BETA_WALLET_PROGRAM.md) | Prepaid truth |
 | [`NOTIFY_SQL_CATALOG.md`](./NOTIFY_SQL_CATALOG.md) | ALCR vs staging notify SQL + apply checklist |
 | [`../product/DELIVERY_VOCAB.md`](../product/DELIVERY_VOCAB.md) | Critic ladder: opened / followed_up / sent / delivered / failed |
 | [`../agents/PLATFORM.md`](../agents/PLATFORM.md) | Lane owns |
-| [`../architecture/CURRENT_STATE.md`](../architecture/CURRENT_STATE.md) | Aug 2026 baseline; this map is newer |
+| [`../architecture/SYSTEM_ARCHITECTURE.md`](../architecture/SYSTEM_ARCHITECTURE.md) | 5-minute picture of voice, Desk, and Supabase |
+| [`../architecture/CURRENT_STATE.md`](../architecture/CURRENT_STATE.md) | Aug 2026 fact inventory; this map is newer on notify and wallet |
 
 ---
 

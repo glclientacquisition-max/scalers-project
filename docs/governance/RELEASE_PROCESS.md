@@ -111,8 +111,8 @@ Dedicated staging voice/desk URLs: see [`ENVIRONMENTS.md`](../operations/ENVIRON
 
 During private beta:
 
-- `billing_enforcement = off` default (meter only) — see `docs/BETA_WALLET_PROGRAM.md`
-- MVP gate: `npm run test:mvp` + `docs/MVP_SHIP_AND_TEST.md`
+- `billing_enforcement = off` default (meter only) — see `docs/operations/BETA_WALLET_PROGRAM.md`
+- MVP gate: `npm run test:mvp` + `docs/product/MVP_SHIP_AND_TEST.md`
 
 ---
 

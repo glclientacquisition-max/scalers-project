@@ -6,7 +6,8 @@ How engineering skills consume Scalers domain documentation.
 
 - **`CONTEXT.md`** at the repo root (glossary)
 - **`AGENTS.md`** and the lane contract for the task (`docs/agents/{LANE}.md`)
-- **`docs/architecture/CURRENT_STATE.md`** and **`docs/governance/SOURCE_OF_TRUTH.md`**
+- **`docs/architecture/SYSTEM_ARCHITECTURE.md`** (how the pieces fit) and **`docs/architecture/CURRENT_STATE.md`** (file-level facts)
+- **`docs/governance/SOURCE_OF_TRUTH.md`**
 - **`docs/adr/`**: ADRs that touch the area
 - **`docs/specs/`**: accepted specs for in-flight work
 
@@ -20,11 +21,19 @@ Single-context repo:
 /
 ├── CONTEXT.md
 ├── AGENTS.md
+├── README.md            ← what is live, how to run, short repo map
 ├── docs/
+│   ├── README.md        ← folder index
 │   ├── adr/
 │   ├── agents/          ← lane contracts (source of truth for who edits what)
-│   └── specs/           ← feature specs and wayfinder maps
-└── src/
+│   ├── architecture/
+│   ├── operations/
+│   ├── product/
+│   ├── specs/           ← feature specs and wayfinder maps
+│   └── supabase/        ← manual SQL
+├── server.js            ← voice entry (do not relocate)
+├── src/
+└── dashboard/           ← Desk (Vercel root directory)
 ```
 
 Lane contracts stay in `docs/agents/`. Do not move them to `CONTEXT.md`. `CONTEXT.md` is vocabulary only.

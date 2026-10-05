@@ -1,178 +1,105 @@
-# Scalers system architecture
+# How Scalers fits together
 
-**Status:** Current-state documentation (2026-08-14)  
-**Scope:** Components that exist in the repository today. No invented subsystems.
+**Status:** Entry map. Read this first.  
+**Updated:** 2026-10-05  
+**Scope:** What is live in the repo today.
 
----
+Scalers is a Kenya multi-tenant Business Assistant. One business, one phone number, one Desk. This page is the picture. Detail lives in the links at the bottom.
 
-## High-level overview
+Three runtime pieces:
 
-Scalers has three runtime surfaces:
-
-1. **Voice engine** — `server.js` on Railway/Render
-2. **Owner desk + Super Admin** — `dashboard/` on Vercel
-3. **Supabase** — PostgreSQL, Auth, Storage
-
-External services: **SautiKit** (telephony), **Soniox** (STT/TTS), **Google Gemini** (LLM), **TextSMS** / **SautiKit WhatsApp** / **Resend** (notifications).
-
----
-
-## Live call path (voice)
-
-```mermaid
-flowchart LR
-  Caller["Caller +254"]
-  SK["SautiKit"]
-  SJ["server.js"]
-  Media["/ws/media PCM"]
-  STT["Soniox STT"]
-  Brain["Brain state"]
-  Gemini["Gemini"]
-  Tools["toolExecution"]
-  TTS["Soniox TTS"]
-  DB["src/db.js → Supabase"]
-  Notify["dispatch"]
-
-  Caller --> SK
-  SK -->|"POST /voice/incoming"| SJ
-  SJ -->|"Stream XML"| SK
-  SK <-->|"wss audio.drachtio.org"| Media
-  Media --> STT
-  STT --> Brain
-  Brain --> Gemini
-  Gemini --> Tools
-  Tools --> DB
-  Gemini --> TTS
-  TTS --> Media
-  Media --> SK
-  SK --> Caller
-  SJ -->|"POST /voice/events"| DB
-  Tools --> Notify
-```
-
-### Step-by-step (with file references)
-
-| Step | Component | File(s) |
+| Piece | Where it runs | What it holds |
 | --- | --- | --- |
-| 1 | Inbound webhook | `server.js` `handleVoiceIncoming`, `src/sautikit/webhook.js` |
-| 2 | Stream XML `connect="true"` | `server.js:609–612` |
-| 3 | PCM WebSocket | `server.js` `mediaWss` `/ws/media` |
-| 4 | STT | `src/speech/sonioxStt.js`, `sttContext.js` |
-| 5 | Turn endpointing / barge-in | `turnTaking.js`, `interimBarge.js` |
-| 6 | Tenant profile + prompt | `src/db.js` `getTenantProfile`, `src/prompts.js` |
-| 7 | Brain state + next action | `brainState.js`, `nextBestAction.js`, `brainPolicy.js` |
-| 8 | LLM turn | `server.js` `runGeminiTurnStreaming` |
-| 9 | Tool parse + execute | `toolMarkers.js`, `toolExecution.js` |
-| 10 | TTS + playback | `sonioxTts.js`, `ttsNormalize.js`, `spokenStreamBuffer.js` |
-| 11 | Call completion | `server.js` `/voice/events`, `callResolution.js` |
-| 12 | Notify owner | `src/notifications/dispatch.js` |
+| Voice | Railway (`server.js`). Render is the alternate host. | The live call |
+| Desk | Vercel (`dashboard/`) | What the owner and Super Admin see |
+| Supabase | Supabase Cloud | Tenants, calls, contacts, packages, auth, recordings |
 
-**LEGACY (not production path):** `/ws/relay` ConversationRelay text loop — `server.js:2261+`.
+SautiKit carries the phone call. Soniox hears and speaks. Gemini decides the next line. TextSMS, SautiKit WhatsApp, and Resend deliver owner alerts.
 
----
+## A missed call (live)
 
-## Dashboard path (owner)
+1. The caller rings the business SautiKit number. SautiKit POSTs to `server.js` (`POST /voice/incoming`, also `/` and `/voice`). `src/sautikit/webhook.js` checks the webhook.
+2. The voice process writes a `calls` row through `src/db.js` and answers with Stream XML. SautiKit opens a PCM websocket at `/ws/media` (subprotocol `audio.drachtio.org`, 16 kHz).
+3. Soniox STT (`src/speech/sonioxStt.js`) turns audio into text. Turn-taking and barge-in live in `src/speech/`.
+4. Brain state for this call sits in memory (`src/conversation/brainState.js`). The prompt is the tenant's compiled text plus live facts (`src/prompts.js`). Gemini runs inside `server.js` (`runGeminiTurnStreaming`).
+5. Tool markers in the model reply are parsed and run (`toolMarkers.js`, `toolExecution.js`). Saving the caller's name and reason writes the lead. A human request notifies a teammate and leaves a Desk note. That async handoff is shipped ([`../product/ESCALATION.md`](../product/ESCALATION.md)).
+6. Soniox TTS speaks the reply back down the same websocket.
+7. On hangup, SautiKit POSTs `/voice/events`. The process stores duration, resolution, and any recording. Included minutes are metered. Past the package, on-demand can debit. While `billing_enforcement` is off, usage is metered and the tenant is not charged.
+8. Owner notify goes SMS, then WhatsApp, then email, for channels the business turned on (`src/notifications/dispatch.js`).
 
-```mermaid
-flowchart LR
-  Browser["Owner browser"]
-  Next["dashboard/ Next.js"]
-  Auth["Supabase Auth"]
-  PG["Supabase PostgreSQL"]
-  Voice["Voice engine"]
-
-  Browser --> Next
-  Next --> Auth
-  Next -->|"RLS client"| PG
-  Next -->|"compile settings"| PG
-  Next -->|"TTS preview"| Voice
+```text
+Caller → SautiKit → server.js /voice/incoming
+                 → /ws/media → Soniox STT → Gemini → tools → Soniox TTS
+                 → Supabase (call, lead) → owner SMS / WhatsApp / email
 ```
 
-| Flow | Mechanism |
+`server.js` is still the orchestrator. Speech, brain, billing helpers, and notify already live under `src/`. The next code change is to lift telephony out of `server.js` into `src/telephony/` with no change to this path. That layout is a target, not the tree you clone: [`TARGET_MODULE_LAYOUT.md`](./TARGET_MODULE_LAYOUT.md).
+
+`/ws/relay` is still wired. It is the old ConversationRelay text loop. It is not the production path.
+
+## Not shipped
+
+- Live Dial to a person during the call. Spec only: [`../product/LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md). The shipped handoff is the async notify above.
+- Owner M-Pesa checkout for a package. Super Admin assigns the package. See [`../operations/PACKAGES.md`](../operations/PACKAGES.md).
+
+## Desk
+
+Next.js app in `dashboard/`. Vercel project root is `dashboard`.
+
+Owners sign in with Supabase Auth. They see Overview, Inbox, Contacts, Usage, and Settings (`dashboard/src/components/DeskNav.tsx`). Setup and onboarding compile business facts into `tenants.llm_system_prompt`. The Inbox is the call list. The owner approves a text to the caller (Confirm or Done) before it sends, when text to customers is on. Usage (`/wallet`) shows package buckets. It is not a top-up shop.
+
+Super Admin is a separate shell at `/admin` (Overview, Billing, Businesses, Numbers, Voices). Package assign is `/admin/packages`. Sign-in is Better Auth username plus access code (`dashboard/src/lib/admin-auth.ts`). An old shared-password cookie still works during the transition. Admin routes use the service role on the server and bypass owner row security. Optional host: `admin.scalers.co.ke`.
+
+The Desk reads and writes Supabase. TTS preview calls the voice process (`VOICE_PUBLIC_BASE_URL`, `POST /api/tts/preview`).
+
+## Supabase
+
+Supabase is the system of record.
+
+| Stored here | Examples |
 | --- | --- |
-| Signup / login | Supabase Auth (`dashboard/src/lib/auth.ts`) |
-| Onboarding | Server actions → `promptCompiler.ts` → `tenants.llm_system_prompt` |
-| Settings | `TenantForm.tsx` → `settings/actions.ts` → compile + save |
-| Calls inbox | `(desk)/calls/` → Supabase RLS queries |
-| Wallet | `(desk)/wallet/` → read ledger via RLS |
-| Phone preview | `TestLinePanel` → `VOICE_PUBLIC_BASE_URL` `/api/tts/preview` |
+| Who the business is | `tenants`, `tenant_members`, compiled prompt, hours, catalog |
+| What happened on the phone | `calls`, `transcripts`, recording in the `call-recordings` bucket |
+| Who called before | `contacts`, open requests |
+| Money | Package counters and `wallet_ledger`. The ledger is metering scaffolding. |
+| Which number | `sautikit_did_pool` assigned onto the tenant |
 
----
+Voice uses the service role (`src/lib/supabaseClient.js`). Owners use their Auth JWT and row-level security. The service role key stays off `NEXT_PUBLIC_*` variables.
 
-## Super Admin path
+SQL is hand-applied from `docs/supabase/`. There is no CLI migrations folder. Apply order: [`../supabase/README.md`](../supabase/README.md). Which scripts are already on the production project is not recorded in git.
 
-```mermaid
-flowchart LR
-  Ops["Ops browser"]
-  Admin["/admin/*"]
-  Cookie["Legacy cookie auth"]
-  SR["Service role client"]
-  PG["Supabase"]
-  SKAPI["SautiKit API"]
+## Deploy
 
-  Ops --> Admin
-  Admin --> Cookie
-  Admin --> SR
-  SR --> PG
-  Admin --> SKAPI
-```
+| Unit | Host | Entry |
+| --- | --- | --- |
+| Voice | Railway. Render is the alternate. | `Dockerfile` runs `node server.js` |
+| Desk | Vercel | Root directory `dashboard` |
+| Data | Supabase | External |
 
-**FACT:** Super Admin bypasses owner RLS via service role on server routes (`dashboard/src/app/api/admin/*`).
+Local voice is `npm start` plus a tunnel when SautiKit must reach your laptop. Staging voice and Desk are documented in [`../operations/ENVIRONMENTS.md`](../operations/ENVIRONMENTS.md). Production hostnames in code are references. This page does not claim a live health check.
 
----
+## Who edits what
 
-## Database relationships (simplified)
+One task, one lane, one pull request. Full path lists: [`../../AGENTS.md`](../../AGENTS.md).
 
-```mermaid
-erDiagram
-  tenants ||--o{ tenant_members : has
-  tenants ||--o{ calls : receives
-  calls ||--o{ transcripts : contains
-  tenants ||--o{ wallet_ledger : bills
-  tenants ||--o{ contacts : crm
-  tenants ||--o{ service_requests : requests
-  sautikit_did_pool }o--|| tenants : assigns
-```
+| Lane | Owns |
+| --- | --- |
+| Voice | `server.js`, `src/speech/`, `src/sautikit/`, call latency |
+| Brain | `src/conversation/`, `src/prompts.js`, the Desk prompt compiler |
+| Desk | Owner and marketing UI in `dashboard/` |
+| Ops & Billing | Packages, DID pool, Super Admin behavior, wallet metering |
+| Platform | `src/db.js`, Supabase SQL, auth clients, deploy glue |
 
-Authoritative schema notes: `docs/supabase/schema.sql` (reference only).
+Schema changes start with Platform. Then the feature lane.
 
----
+## Where to read next
 
-## Deploy topology
-
-```
-                    ┌─────────────┐
-                    │   Vercel    │
-                    │  dashboard/ │
-                    └──────┬──────┘
-                           │ Supabase Auth + RLS
-┌──────────┐         ┌─────▼──────┐         ┌─────────────┐
-│ SautiKit │◄───────►│  Railway   │────────►│  Supabase   │
-│telephony │  PCM WS │ server.js  │ service │  PG + Auth  │
-└──────────┘         └────────────┘  role   │  + Storage  │
-     ▲                                      └─────────────┘
-     │                                              ▲
-  Caller                                     Vercel reads/writes
-```
-
----
-
-## Module layout (actual vs target)
-
-**FACT — implemented today:**
-
-- `src/speech/*` — STT/TTS pipeline
-- `src/conversation/*` — Brain runtime
-- `src/notifications/*` — Alert dispatch
-- `src/sautikit/webhook.js` — Webhook guard only (not full telephony module split)
-
-**TARGET (not implemented):** Modular `src/telephony/`, `src/orchestrator/` — see [`../TARGET_MODULE_LAYOUT.md`](../TARGET_MODULE_LAYOUT.md).
-
----
-
-## Related documents
-
-- [`CURRENT_STATE.md`](./CURRENT_STATE.md)
-- [`DATA_FLOW.md`](./DATA_FLOW.md)
-- [`../agents/AGENT_ARCHITECTURE.md`](../agents/AGENT_ARCHITECTURE.md)
-- [`../operations/DEPLOYMENT.md`](../operations/DEPLOYMENT.md)
+| Doc | Kind | Use it for |
+| --- | --- | --- |
+| [`CURRENT_STATE.md`](./CURRENT_STATE.md) | Fact inventory | File-level facts. August 2026 baseline, with later corrections marked. |
+| [`DATA_FLOW.md`](./DATA_FLOW.md) | Fact inventory | What stays in memory on a call, and what is written to Supabase. |
+| [`TARGET_MODULE_LAYOUT.md`](./TARGET_MODULE_LAYOUT.md) | Target | Future `src/telephony/` split. Not the current tree. |
+| [`ARCHITECTURE_MIGRATION_BLUEPRINT.md`](./ARCHITECTURE_MIGRATION_BLUEPRINT.md) | Historical + target | Twilio and SQLite history, and work still listed as remaining. |
+| [`../governance/SOURCE_OF_TRUTH.md`](../governance/SOURCE_OF_TRUTH.md) | Fact inventory | Which file is canonical for each subsystem. |
+| [`../agents/AGENT_ARCHITECTURE.md`](../agents/AGENT_ARCHITECTURE.md) | Fact inventory | Prompt layers on a live call. |
+| [`../platform/PLATFORM_SYSTEM_MAP.md`](../platform/PLATFORM_SYSTEM_MAP.md) | Fact inventory | Notify, WhatsApp, wallet, and ladder jobs across channels. |

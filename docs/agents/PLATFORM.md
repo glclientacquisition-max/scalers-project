@@ -14,7 +14,7 @@ Use for database migrations, auth membership, environment/deploy, and any change
 | `dashboard/src/lib/auth.ts`, `admin-auth.ts`, `adminOperators.ts`, `adminHost.ts` | Auth session helpers / Super Admin Better Auth |
 | `dashboard/src/lib/supabase/**`, `supabase.ts`, `tenant.ts` | Supabase clients + tenant resolution |
 | `dashboard/src/app/api/login/**`, `api/logout/**`, `api/auth/**`, `api/admin/session/**`, `api/tenant/**` | Auth/session APIs |
-| `docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md`, `TARGET_MODULE_LAYOUT.md`, `PRODUCTION_CUTOVER.md` | Platform architecture docs |
+| `docs/architecture/ARCHITECTURE_MIGRATION_BLUEPRINT.md`, `docs/architecture/TARGET_MODULE_LAYOUT.md`, `docs/operations/PRODUCTION_CUTOVER.md` | Platform architecture and cutover docs |
 | `Dockerfile`, `railway.toml`, `render.yaml`, root `.env.example` structure | Deploy / env skeleton |
 | `.cursor/mcp.json` | Cursor Railway MCP (Voice deploy tooling) |
 | `AGENTS.md`, `docs/agents/**` | Lane contracts (meta) |

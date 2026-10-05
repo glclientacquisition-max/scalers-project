@@ -12,7 +12,7 @@ Use for packages catalog, on-demand rate card, wallet ledger (ops scaffolding), 
 | --- | --- |
 | `docs/supabase/wallet_*.sql`, `one_wallet_billing.sql` | Wallet schema / RPCs (coordinate Platform; apply order in [`docs/supabase/README.md`](../supabase/README.md)) |
 | `docs/supabase/did_number_pool.sql`, `super_admin_ops.sql` | DID pool + ops helpers |
-| `docs/ONE_WALLET_BILLING.md`, `BETA_WALLET_PROGRAM.md`, `PACKAGES.md`, `PRODUCTION_DID_POOL.md`, `SUPER_ADMIN_REQUIREMENTS.md` | Ops docs |
+| `docs/operations/ONE_WALLET_BILLING.md`, `BETA_WALLET_PROGRAM.md`, `PACKAGES.md`, `PRODUCTION_DID_POOL.md`, `SUPER_ADMIN_REQUIREMENTS.md` | Ops docs (all under `docs/operations/`) |
 | `dashboard/src/app/admin/**` | Super Admin shell + pages |
 | `dashboard/src/app/api/admin/**`, `api/did-pool/**` | Ops APIs (service role) |
 | `dashboard/src/lib/admin.ts`, `adminWallets.ts`, `didPool.ts`, `wallet.ts`, `sautikit.ts` | Ops libraries |
@@ -33,8 +33,8 @@ Use for packages catalog, on-demand rate card, wallet ledger (ops scaffolding), 
 1. **One KES ledger** — AI bundled into per-minute rate; no resurrecting dual USD/KES client wallets.
 2. Ledger is append-only; credits/debits via security-definer RPCs / service role only.
 3. `charge_call_to_wallet` (and JS wrapper) must stay **idempotent** per call.
-4. Live transfer outbound is a **second** call id. Never fold those minutes into the inbound row. Beta does not originate outbound PSTN unless ops sets the lab flag. See [`docs/LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) §8.
-5. Beta default: `billing_enforcement = off` → meter only, no charges (`docs/BETA_WALLET_PROGRAM.md`).
+4. Live transfer outbound is a **second** call id. Never fold those minutes into the inbound row. Beta does not originate outbound PSTN unless ops sets the lab flag. See [`docs/product/LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) §8.
+5. Beta default: `billing_enforcement = off` → meter only, no charges (`docs/operations/BETA_WALLET_PROGRAM.md`).
 6. Soft/hard enforcement behavior must match docs; do not silently bill beta tenants.
 7. DID pool statuses (`available` / `assigned` / `reserved` / `disabled`) stay consistent with tenant `sautikit_virtual_number`.
 8. Super Admin uses service role server-side; never ship service role to `NEXT_PUBLIC_*`.

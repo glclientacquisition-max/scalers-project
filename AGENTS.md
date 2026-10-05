@@ -27,14 +27,17 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 
 | Doc | Purpose |
 | --- | --- |
-| [`docs/architecture/CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md) | What Scalers **is** today (Aug 2026 baseline) |
+| [`README.md`](README.md) | What Scalers is, how to run it, short repo map |
+| [`docs/README.md`](docs/README.md) | Doc folder index |
+| [`docs/architecture/SYSTEM_ARCHITECTURE.md`](docs/architecture/SYSTEM_ARCHITECTURE.md) | How voice, Desk, and Supabase fit together |
+| [`docs/architecture/CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md) | File-level facts (Aug 2026 baseline, later corrections marked) |
 | [`docs/platform/PLATFORM_SYSTEM_MAP.md`](docs/platform/PLATFORM_SYSTEM_MAP.md) | Platform as-is map: voice, notify, WhatsApp, wallet, Brain SoR, ladder jobs |
 | [`docs/governance/SOURCE_OF_TRUTH.md`](docs/governance/SOURCE_OF_TRUTH.md) | Subsystem ownership |
 | [`docs/governance/DEVELOPMENT_WORKFLOW.md`](docs/governance/DEVELOPMENT_WORKFLOW.md) | Branching, lifecycle, PR checklist |
 | [`docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md`](docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md) | Permanent engineering rules |
 | [`docs/agents/AGENT_ARCHITECTURE.md`](docs/agents/AGENT_ARCHITECTURE.md) | AI agent stack on live calls |
-| [`docs/LIVE_TRANSFER.md`](docs/LIVE_TRANSFER.md) | Live human Dial (spec; not shipped) |
-| [`docs/ESCALATION.md`](docs/ESCALATION.md) | Async human notify (shipped) |
+| [`docs/product/LIVE_TRANSFER.md`](docs/product/LIVE_TRANSFER.md) | Live human Dial (spec; not shipped) |
+| [`docs/product/ESCALATION.md`](docs/product/ESCALATION.md) | Async human notify (shipped) |
 | [`docs/database/DATABASE_GOVERNANCE.md`](docs/database/DATABASE_GOVERNANCE.md) | Manual SQL model |
 | [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](docs/frontend/FRONTEND_RECONNAISSANCE.md) | Desk Frontend 2.0 recon (no UI until constitution) |
 

@@ -1,8 +1,9 @@
 # Scalers current state
 
-**Status:** As-is documentation (Phase 2 governance baseline)  
-**Baseline commit:** `main` @ `5b875dc` (documented 2026-08-14)  
-**Purpose:** Describe what Scalers **is today**, not the target future architecture.
+**Status:** Fact inventory. Not the 5-minute picture.  
+**Read first:** [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) (updated 2026-10-05).  
+**Baseline commit:** `main` @ `5b875dc` (documented 2026-08-14). Sections marked **Updated 2026-10-05** correct later facts.  
+**Purpose:** File-level facts about what Scalers is today. The target module split is [`TARGET_MODULE_LAYOUT.md`](./TARGET_MODULE_LAYOUT.md). The Twilio/SQLite history is [`ARCHITECTURE_MIGRATION_BLUEPRINT.md`](./ARCHITECTURE_MIGRATION_BLUEPRINT.md).
 
 Legend: **FACT** = verified in repo or tests. **INFERENCE** = reasonable conclusion from evidence. **UNKNOWN** = not verified in this audit.
 
@@ -10,37 +11,38 @@ Legend: **FACT** = verified in repo or tests. **INFERENCE** = reasonable conclus
 
 ## Executive summary
 
-Scalers is a B2B AI voice receptionist for East African businesses. A **Node.js voice engine** (`server.js`) handles live telephony, speech, and agent reasoning. A **Next.js dashboard** (`dashboard/`) provides owner desk, onboarding, settings, and Super Admin ops. **Supabase** is the system of record for tenants, calls, transcripts, billing, and auth.
+Scalers is a Kenya-focused multi-tenant Business Assistant. A **Node.js voice engine** (`server.js`) handles live telephony, speech, and agent reasoning. A **Next.js Desk** (`dashboard/`) is setup, inbox, contacts, usage, and Super Admin. **Supabase** is the system of record for tenants, calls, transcripts, billing, and auth. The picture is [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md).
 
 **FACT:** Two deploy units: voice on Railway/Render (Docker), desk on Vercel.  
 **FACT:** Telephony path is SautiKit + Soniox STT/TTS + Gemini. Twilio is no longer the active telephony path.  
-**UNKNOWN:** Live health of production Railway/Vercel deploys and exact Supabase migration tier on production.
+**UNKNOWN:** Live health of production Railway/Vercel deploys and which SQL scripts are applied on the production Supabase project.  
+**Updated 2026-10-05:** Staging is documented as active in [`../operations/ENVIRONMENTS.md`](../operations/ENVIRONMENTS.md). CI workflows are in `.github/workflows/`.
 
 ---
 
 ## Repository structure
 
+Living map: [`../../README.md`](../../README.md) and [`../README.md`](../README.md).
+
 ```
-/workspace
-├── server.js              # Voice engine entry (2,841 LOC) — FACT
-├── db.js                  # Shim → src/db.js — FACT
-├── src/                   # Voice modules (~53 JS files) — FACT
-│   ├── speech/            # Soniox STT/TTS, turn-taking, normalize
-│   ├── conversation/      # Brain runtime, tools, catalog
-│   ├── notifications/     # SMS, WhatsApp, email dispatch
-│   ├── sautikit/          # Webhook guard
-│   ├── db.js              # Voice DB API (1,110 LOC)
-│   └── prompts.js         # Runtime prompt assembly
-├── dashboard/             # Next.js 16 app (~128 TS/TSX files) — FACT
-├── docs/                  # Product, lane, SQL, governance docs
-├── tests/                 # 35 test files — FACT
-├── scripts/               # Smoke tests, tunnels, harnesses
-├── Dockerfile, railway.toml, render.yaml
-└── AGENTS.md              # Five-lane agent governance
+server.js                 # Voice HTTP + media websocket + turn loop — FACT
+db.js                     # Shim → src/db.js — FACT
+src/speech/               # Soniox STT/TTS, turn-taking — FACT
+src/conversation/         # Brain runtime, tools, playbooks — FACT
+src/notifications/        # SMS, WhatsApp, email — FACT
+src/sautikit/             # Webhook guard — FACT
+src/billing/              # Package overage, transfer legs — FACT
+src/db.js                 # Voice DB API — FACT
+dashboard/                # Next.js Desk + Super Admin — FACT
+docs/                     # Indexed in docs/README.md — FACT
+tests/                    # Node tests — FACT
+scripts/                  # Smoke, tunnel, staging helpers — FACT
+Dockerfile, railway.toml, render.yaml
 ```
 
 **FACT:** Not a formal monorepo (no npm workspaces). Root package `missed-call-agent`, desk package `dashboard`.  
-**FACT:** No `.github/workflows/` CI in repo.
+**FACT:** CI lives in `.github/workflows/` (`ci.yml` plus staging workflows).  
+**FACT:** `server.js`, `src/`, `db.js`, and `dashboard/` stay at these paths. Railway starts `server.js`. Vercel root directory is `dashboard`.
 
 See also: [`../governance/REPOSITORY_INVENTORY.md`](../governance/REPOSITORY_INVENTORY.md).
 
@@ -53,7 +55,7 @@ See also: [`../governance/REPOSITORY_INVENTORY.md`](../governance/REPOSITORY_INV
 | Marketing | `dashboard/src/app/page.tsx` | Landing |
 | Auth | `login/`, `signup/` | Supabase Auth email/password |
 | Onboarding | `onboarding/` | Wizard → compile `llm_system_prompt` |
-| Owner desk | `(desk)/` | Home, calls, settings, wallet, requests |
+| Owner desk | `(desk)/` | Overview, Inbox, Contacts, Usage (`/wallet`), Settings. Holds and visits are routes under `requests/` and `appointments/`. |
 | Super Admin | `admin/` | Businesses, numbers, wallets, voices |
 | API routes | `dashboard/src/app/api/` | Auth, admin, pronunciation preview, voices |
 
@@ -122,22 +124,28 @@ See: [`../database/DATABASE_GOVERNANCE.md`](../database/DATABASE_GOVERNANCE.md).
 
 ## Authentication
 
+**Updated 2026-10-05.** The August baseline called Super Admin a legacy cookie. The live gate is below.
+
 | Role | Mechanism | Path |
 | --- | --- | --- |
-| Owner | Supabase Auth + RLS | `dashboard/src/lib/auth.ts`, `owner_rls.sql` |
-| Super Admin | Legacy HMAC cookie | `isLegacyAuthenticated()`, `admin/layout.tsx` |
+| Owner | Supabase Auth JWT + RLS | `dashboard/src/lib/auth.ts`, `owner_rls.sql` |
+| Super Admin | Better Auth username + access code | `dashboard/src/lib/admin-auth.ts`, `/admin/login` |
+| Transition only | HMAC `DASHBOARD_PASSWORD` cookie | Still accepted inside `isAdminAuthenticated` |
 | Voice engine | Service role (bypasses RLS) | `src/lib/supabaseClient.js` |
 
+**FACT:** `isLegacyAuthenticated` is an alias of `isAdminAuthenticated`. It accepts a Better Auth session or the leftover cookie.  
 **FACT:** Service role must never appear in `NEXT_PUBLIC_*`.
 
 ---
 
 ## Billing
 
-**FACT:** Wallet RPC `charge_call_to_wallet` is the billing source of truth (idempotent per `call_id`).  
-**FACT:** Locked SautiKit cost vs Scalers retail (KES, answered minutes): inbound 0 / 0; outbound 3 / 4 (KES 1/min margin). Unanswered outbound 0 / 0.  
-**FACT:** `src/billing/liveTransferLegs.js` — inbound `calls` row uses `WALLET_RATE_KES_PER_MINUTE` (default 0). Outbound live-transfer row (`kind=live_transfer`) uses `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (default 4).  
-**FACT:** Beta (`billing_enforcement=off`) does not originate outbound transfer unless `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on`. See [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) §8.
+**Updated 2026-10-05.** The August "inbound 0 / outbound KES 4" lines are superseded. Customer billing is packages plus on-demand. Owner M-Pesa checkout is not shipped.
+
+**FACT:** Hangup meters included minutes via `consume_call_seconds` once that SQL is applied. On-demand past the cap is KES 0.10/sec (KES 6/min) on the rate card.  
+**FACT:** `charge_call_to_wallet` stays idempotent per `call_id`. Env `WALLET_RATE_KES_PER_MINUTE` (default 0) is a fallback when the consume RPC is missing.  
+**FACT:** Outbound live-transfer rate is stored at KES 0.15/sec (KES 9/min) and is not offered until Live Dial ships. SautiKit outbound cost is KES 3/min answered. A transfer would be a second `calls` row. See [`../product/LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) §8 and [`../operations/PACKAGES.md`](../operations/PACKAGES.md).  
+**FACT:** Beta (`billing_enforcement=off`) meters and does not charge. It does not originate outbound transfer unless `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on`.
 
 ---
 
@@ -156,8 +164,8 @@ See: [`../database/DATABASE_GOVERNANCE.md`](../database/DATABASE_GOVERNANCE.md).
 | Desk | Vercel | `dashboard/vercel.json`, root dir `dashboard` |
 | Database | Supabase | External |
 
-**INFERENCE:** Referenced production URLs: `scalers-project-production.up.railway.app` (voice), `scalers-project.vercel.app` (desk).  
-**UNKNOWN:** Staging environment topology.
+**INFERENCE:** Referenced production URLs in code: `scalers-project-production.up.railway.app` (voice), `scalers-project.vercel.app` (desk). This inventory does not confirm they are the live hosts.  
+**Updated 2026-10-05:** Staging topology is in [`../operations/ENVIRONMENTS.md`](../operations/ENVIRONMENTS.md) (Railway voice, Vercel Desk, Supabase `scalers-staging`).
 
 See: [`../operations/DEPLOYMENT.md`](../operations/DEPLOYMENT.md), [`../operations/ENVIRONMENTS.md`](../operations/ENVIRONMENTS.md).
 
@@ -197,9 +205,11 @@ See: [`../governance/TESTING_BASELINE.md`](../governance/TESTING_BASELINE.md).
 | Gap | Status |
 | --- | --- |
 | Per-call agent version attribution | Not implemented |
-| CI/CD in repo | Not present |
-| Staging environment | UNKNOWN |
+| CI in repo | **Updated 2026-10-05:** present in `.github/workflows/` (`ci.yml`, staging workflows) |
+| Staging environment | **Updated 2026-10-05:** documented in [`../operations/ENVIRONMENTS.md`](../operations/ENVIRONMENTS.md) |
 | Production SQL migration tier | UNKNOWN |
+| Live Dial | Spec only. Not shipped. |
+| Owner package checkout | Not shipped. Super Admin assigns packages. |
 | JS/TS duplication (intro, lexicon) | ACTIVE risk |
 
 See: [`../governance/TECHNICAL_DEBT.md`](../governance/TECHNICAL_DEBT.md), [`../agents/PROMPT_VERSIONING.md`](../agents/PROMPT_VERSIONING.md).
@@ -208,7 +218,7 @@ See: [`../governance/TECHNICAL_DEBT.md`](../governance/TECHNICAL_DEBT.md), [`../
 
 ## Related documents
 
-- [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) — component diagram and paths
+- [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) — 5-minute picture. Read that before this inventory.
 - [`DATA_FLOW.md`](./DATA_FLOW.md) — call lifecycle and persistence
 - [`../governance/SOURCE_OF_TRUTH.md`](../governance/SOURCE_OF_TRUTH.md) — subsystem ownership
 - [`../agents/AGENT_ARCHITECTURE.md`](../agents/AGENT_ARCHITECTURE.md) — AI agent stack
