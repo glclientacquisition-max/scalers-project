@@ -35,6 +35,14 @@ describe("desk batch D screen fit and recovery", () => {
     assert.match(sheet, /h-11 w-11/);
     assert.doesNotMatch(sheet, /framer-motion|motion\/react/);
     assert.doesNotMatch(dialog, /shadow-xl|landing-rise|animate-|transition-opacity|scale-/);
+    const master = read("docs/frontend/design-system/MASTER.md");
+    const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
+    const mandate = read(".cursor/rules/scalers-design-ux.mdc");
+    assert.match(master, /`Sheet` bottom drawer via `DeskDialog`/);
+    assert.doesNotMatch(master, /stops above the tab bar/);
+    assert.match(constitution, /modal is the `Sheet` drawer/);
+    assert.doesNotMatch(constitution, /modal enter-static/);
+    assert.match(mandate, /Overlays use `Sheet`: a bottom drawer/);
   });
 
   it("gives empty lists one next step", () => {

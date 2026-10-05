@@ -24,6 +24,7 @@ Also load [UI UX Pro Max (Scalers)](sand-workflow:ui-ux-pro-max-scalers) for the
 **Hard constraints for every design option:**
 
 - No Framer Motion, Remotion, GSAP, or Lottie on Desk/Admin
+- Owner overlays are the `Sheet` bottom drawer (swipe down). Do not design a centered dialog
 - Admin UI says **Business** not Tenant
 - Dense operational tables OK; no marketing fluff on Admin
 - Owners stay on `(desk)` + `DESK_LINKS`; ops on `/admin/*` + `ADMIN_LINKS` — never merge shells/sessions
