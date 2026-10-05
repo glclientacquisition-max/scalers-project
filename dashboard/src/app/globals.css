@@ -85,39 +85,26 @@
   --motion-land: 900ms;
   --motion-live: 1.4s;
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Glass chrome (tab bar, rail, sheets, menus, auth cards). Lists stay opaque. */
+  --surface-3: #ffffff;
+  --glass: color-mix(in srgb, var(--surface) 78%, transparent);
+  --glass-highlight: rgb(255 255 255 / 0.72);
+  --glass-blur: 16px;
 }
 
 /*
- * Native option lists follow the document color-scheme. Tokens stay on
- * .desk-theme / .admin-theme. System leaves this unset so the OS wins.
- * `only` forbids UA scheme overrides when the owner picked an explicit theme.
+ * Native option lists follow the document color-scheme. System leaves this
+ * unset so the OS wins. `only` forbids UA scheme overrides on an explicit pick.
+ * Dark roles live on :root so marketing, auth, onboarding, desk, and admin share
+ * one palette. Aliases (--bg, --card, --accent-fill) follow these roles.
  */
 :root[data-theme="dark"] {
   color-scheme: dark only;
-}
-
-:root[data-theme="light"] {
-  color-scheme: light only;
-}
-
-:root[data-theme="dark"] body {
-  color-scheme: dark only;
-}
-
-:root[data-theme="light"] body {
-  color-scheme: light only;
-}
-
-/*
- * Dark palette for the owner desk and the Super Admin shell. Marketing, auth,
- * and onboarding stay light. Activation: <html data-theme="dark">, or
- * system dark with no explicit choice. The two blocks must stay in sync.
- */
-:root[data-theme="dark"] .desk-theme,
-:root[data-theme="dark"] .admin-theme {
   --canvas: #0b1220;
   --surface: #121c2c;
   --surface-2: #1a2638;
+  --surface-3: #223148;
   --hairline: #24324a;
   --ink: #e9eff7;
   --ink-2: #9dafc6;
@@ -140,7 +127,25 @@
   --warn-deep: #fdba74;
   --shadow-sheet: 0 12px 32px -12px rgb(0 0 0 / 0.6);
   --shadow-menu: 0 8px 24px -8px rgb(0 0 0 / 0.55);
+  --glass: color-mix(in srgb, var(--surface) 58%, transparent);
+  --glass-highlight: rgb(255 255 255 / 0.1);
   --tw-ring-offset-color: var(--surface);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light only;
+}
+
+:root[data-theme="dark"] body {
+  color-scheme: dark only;
+}
+
+:root[data-theme="light"] body {
+  color-scheme: light only;
+}
+
+:root[data-theme="dark"] .desk-theme,
+:root[data-theme="dark"] .admin-theme {
   color-scheme: dark only;
   background: var(--canvas);
 }
@@ -153,11 +158,11 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .desk-theme,
-  :root:not([data-theme="light"]) .admin-theme {
+  :root:not([data-theme="light"]) {
     --canvas: #0b1220;
     --surface: #121c2c;
     --surface-2: #1a2638;
+    --surface-3: #223148;
     --hairline: #24324a;
     --ink: #e9eff7;
     --ink-2: #9dafc6;
@@ -180,7 +185,13 @@
     --warn-deep: #fdba74;
     --shadow-sheet: 0 12px 32px -12px rgb(0 0 0 / 0.6);
     --shadow-menu: 0 8px 24px -8px rgb(0 0 0 / 0.55);
+    --glass: color-mix(in srgb, var(--surface) 58%, transparent);
+    --glass-highlight: rgb(255 255 255 / 0.1);
     --tw-ring-offset-color: var(--surface);
+  }
+
+  :root:not([data-theme="light"]) .desk-theme,
+  :root:not([data-theme="light"]) .admin-theme {
     color-scheme: dark only;
     background: var(--canvas);
   }
@@ -193,17 +204,35 @@
   }
 }
 
-:root[data-theme="dark"] .desk-theme ::selection,
-:root[data-theme="dark"] .admin-theme ::selection {
+:root[data-theme="dark"] ::selection {
   background: color-mix(in srgb, var(--accent) 45%, transparent);
   color: var(--ink);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .desk-theme ::selection,
-  :root:not([data-theme="light"]) .admin-theme ::selection {
+  :root:not([data-theme="light"]) ::selection {
     background: color-mix(in srgb, var(--accent) 45%, transparent);
     color: var(--ink);
+  }
+}
+
+/*
+ * Frosted chrome. Tab bar, rail, sheets, menus, landing header, auth cards.
+ * Opaque canvas and list rows stay flat. Reduced transparency snaps to surface.
+ */
+.glass-chrome {
+  background-color: var(--glass);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.35);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.35);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-chrome {
+    background-color: var(--surface);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 
@@ -235,13 +264,13 @@ html:has([data-admin-shell]) body {
 
 :root[data-theme="dark"] body:has(.desk-theme),
 :root[data-theme="dark"] body:has([data-admin-shell]) {
-  background: #0b1220;
+  background: var(--canvas);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) body:has(.desk-theme),
   :root:not([data-theme="light"]) body:has([data-admin-shell]) {
-    background: #0b1220;
+    background: var(--canvas);
   }
 }
 

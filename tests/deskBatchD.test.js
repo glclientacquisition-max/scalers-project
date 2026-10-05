@@ -31,6 +31,8 @@ describe("desk batch D screen fit and recovery", () => {
     assert.match(dialog, /dismissible=\{!pending\}/);
     assert.match(sheet, /swipeDirection="down"/);
     assert.match(sheet, /desk-drawer/);
+    assert.match(sheet, /glass-chrome/);
+    assert.match(sheet, /themeClass/);
     assert.match(sheet, /items-end/);
     assert.match(sheet, /h-11 w-11/);
     assert.doesNotMatch(sheet, /framer-motion|motion\/react/);

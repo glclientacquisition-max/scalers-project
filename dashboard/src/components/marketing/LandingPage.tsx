@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { brandAssets } from "@/components/brand/assets";
 import { HeroCall, HowStage } from "@/components/marketing/LandingStory";
+import { ThemeDock } from "@/components/ThemePicker";
 
 /**
  * Marketing home: hero, how it works, then sign up.
@@ -35,11 +36,12 @@ export function LandingPage({
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-desk flex-col px-6 pb-10 pt-6 sm:px-8">
-        <header className="flex items-center justify-between gap-3 landing-rise">
+        <header className="glass-chrome flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/15 px-3 py-2 landing-rise">
           <span className="shrink-0 font-display text-base tracking-tight text-white sm:text-xl">
             Scalers
           </span>
           <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <ThemeDock tone="onDark" />
             {signedIn ? (
               <Link
                 href={actionHref}

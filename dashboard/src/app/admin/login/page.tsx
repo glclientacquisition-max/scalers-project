@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { BrandWordmark } from "@/components/brand/BrandMark";
+import { ThemeDock } from "@/components/ThemePicker";
 import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
 import { isLegacyAuthenticated } from "@/lib/auth";
 
@@ -22,10 +23,13 @@ export default async function AdminLoginPage({
   return (
     <main className="flex min-h-dvh items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
-        <BrandWordmark href="/admin/login" context="Super Admin" variant="lockup" priority />
+        <div className="flex items-start justify-between gap-3">
+          <BrandWordmark href="/admin/login" context="Super Admin" variant="lockup" priority />
+          <ThemeDock />
+        </div>
         <h1 className="sr-only">Super Admin</h1>
 
-        <form action="/api/admin/session" method="post" className="mt-8 space-y-4 rounded-panel border border-line bg-surface p-6">
+        <form action="/api/admin/session" method="post" className="glass-chrome mt-8 space-y-4 rounded-panel border border-line p-6">
           <div>
             <label className="block text-sm font-medium text-ink" htmlFor="username">
               Username

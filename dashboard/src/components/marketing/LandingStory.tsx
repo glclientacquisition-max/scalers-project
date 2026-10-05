@@ -44,7 +44,7 @@ function usePlayOnView() {
 export function HeroCall() {
   const ref = usePlayOnMount();
   return (
-    <div ref={ref} className="hero-call h-full min-h-[28rem] w-full min-w-0 rounded-2xl bg-white text-ink shadow-lift" aria-hidden>
+    <div ref={ref} className="hero-call glass-chrome h-full min-h-[28rem] w-full min-w-0 rounded-2xl text-ink shadow-lift" aria-hidden>
       <div className="hero-in flex h-full min-h-[28rem] flex-col justify-center p-8 sm:p-10">
         <p className="text-sm text-ink-soft">Incoming</p>
         <p className="mt-2 font-display text-3xl tracking-tight">Client</p>
@@ -93,7 +93,7 @@ export function HowStage() {
     <div ref={ref} className="hiw-stage mt-10">
       <ol className="grid list-none gap-10 md:grid-cols-3 md:gap-6">
         <li className="flex min-w-0 flex-col gap-4">
-          <div className="hiw-mock overflow-hidden rounded-2xl border border-line bg-surface" aria-hidden>
+          <div className="hiw-mock overflow-hidden rounded-2xl border border-line glass-chrome" aria-hidden>
             <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
               <Mark className="h-5 w-5 object-contain" />
               <p className="text-sm font-medium">Desk</p>
@@ -110,7 +110,7 @@ export function HowStage() {
           <p className="text-base leading-relaxed text-ink">{STEPS[0]}</p>
         </li>
         <li className="flex min-w-0 flex-col gap-4">
-          <div className="hiw-mock flex flex-col justify-center overflow-hidden rounded-2xl border border-line bg-surface p-4" aria-hidden>
+          <div className="hiw-mock flex flex-col justify-center overflow-hidden rounded-2xl border border-line glass-chrome p-4" aria-hidden>
             <p className="text-sm text-ink-soft">Answered</p>
             <p className="mt-1 font-display text-xl tracking-tight">Client</p>
             <p className="mt-2 text-base">Call assistant</p>
@@ -119,7 +119,7 @@ export function HowStage() {
           <p className="text-base leading-relaxed text-ink">{STEPS[1]}</p>
         </li>
         <li className="flex min-w-0 flex-col gap-4">
-          <div className="hiw-mock overflow-hidden rounded-2xl border border-line bg-surface" aria-hidden>
+          <div className="hiw-mock overflow-hidden rounded-2xl border border-line glass-chrome" aria-hidden>
             <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
               <Mark className="h-5 w-5 object-contain" />
               <p className="text-sm font-medium">Inbox</p>
