@@ -89,9 +89,9 @@ export async function PlatformRunBoard() {
   const freeInbound = numbers.length > 0 && numbers.every((n) => (n.inbound_per_min_minor || 0) === 0);
 
   return (
-    <section className="border-t border-line/70 pt-6" aria-label="Platform">
+    <section className="border-t border-hairline pt-6" aria-label="Health">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="text-title font-medium text-ink">Platform</h2>
+        <h2 className="text-title font-medium text-ink">Health</h2>
         {voice.status === "ok" && voice.payload.gitSha ? (
           <p className="text-meta text-ink-3 tabular-nums">Voice {voice.payload.gitSha.slice(0, 7)}</p>
         ) : voice.status !== "ok" ? (

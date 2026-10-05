@@ -135,6 +135,7 @@ describe("platform ops model", () => {
         subject: m.opsMailSubject("beta_expired"),
         recovered: m.opsMailSubject("speech", true),
         domain: m.OPS_RESEND_DOMAIN,
+        hint: m.kindHint("pool_empty"),
         queue: m.mergeQueueRows({
           notices: [
             { kind: "pool_empty", detail: "1 business waiting. No numbers available.", status: "open" },
@@ -148,8 +149,11 @@ describe("platform ops model", () => {
     assert.equal(got.domain, "ops.scalers.co.ke");
     assert.equal(got.subject, "Scalers ops: Beta expired");
     assert.equal(got.recovered, "Scalers ops: Speech recovered");
+    assert.equal(got.hint, "No number to assign");
     assert.equal(got.queue.length, 2);
-    assert.equal(got.queue[0].href, "/admin/platform");
-    assert.equal(got.queue[1].href, "/admin/businesses");
+    assert.equal(got.queue[0].href, "/admin/platform#ops-mail");
+    assert.equal(got.queue[0].stamp, "Open");
+    assert.equal(got.queue[1].href, "/admin/businesses#biz-b1");
+    assert.equal(got.queue[1].stamp, "Waiting");
   });
 });

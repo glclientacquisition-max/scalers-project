@@ -255,7 +255,7 @@ export function AdminBusinessesPanel({
                   : "None";
                 const phone = waiting ? "Not assigned" : b.sautikit_virtual_number;
                 return (
-                  <tr key={b.id} className="border-t border-line/70">
+                  <tr id={`biz-${b.id}`} key={b.id} className="border-t border-line/70">
                     <td className={adminTdClass}>
                       <p className={`font-medium text-ink ${deskPreviewClass}`}>{b.business_name}</p>
                       <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>{packLabel}</p>

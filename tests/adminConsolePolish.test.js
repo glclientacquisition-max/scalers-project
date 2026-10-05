@@ -96,7 +96,7 @@ describe("admin console polish", () => {
       if (/bg-\[var\(--accent\)\]/.test(source)) offenders.push(rel);
     }
     assert.deepEqual(offenders, []);
-    assert.match(read("dashboard/src/app/admin/(console)/page.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/app/admin/(console)/page.tsx"), /ButtonLink/);
     assert.match(read("dashboard/src/components/DidPoolManager.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /btnPrimary/);
@@ -104,13 +104,16 @@ describe("admin console polish", () => {
     assert.match(read("dashboard/src/components/BuyNumberPanel.tsx"), /btnPrimary/);
   });
 
-  it("renders overview attention as a dense table with row tap", () => {
+  it("renders overview attention as ListRow work items", () => {
     const page = read("dashboard/src/app/admin/(console)/page.tsx");
     assert.match(page, /lg:grid-cols-4/);
     assert.match(page, /Needs you/);
-    assert.match(page, /<table/);
-    assert.match(page, /DeskRowHit/);
-    assert.match(page, /href="\/admin\/businesses"/);
+    assert.match(page, /ListRow/);
+    assert.match(page, /row\.href/);
+    assert.match(page, /Nothing waiting\./);
+    assert.match(page, /Add a number when a business needs one/);
+    assert.doesNotMatch(page, /<table/);
+    assert.doesNotMatch(page, /DeskRowHit/);
     assert.doesNotMatch(page, /Manage →/);
   });
 
@@ -169,11 +172,11 @@ describe("admin console polish", () => {
       "dashboard/src/app/admin/(console)/voices/page.tsx",
       "dashboard/src/app/admin/(console)/businesses/page.tsx",
       "dashboard/src/app/admin/(console)/numbers/page.tsx",
-      "dashboard/src/app/admin/(console)/platform/page.tsx",
     ]) {
       const src = read(rel);
       assert.match(src, /deskListTitleClass/);
     }
+    assert.match(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /PageHeader/);
   });
 
   it("opens Packages with assign and Ledger with the wallets panel", () => {
@@ -188,10 +191,9 @@ describe("admin console polish", () => {
     assert.match(wallets, /deskListTitleClass/);
     assert.doesNotMatch(wallets, /redirect\(/);
     const overview = read("dashboard/src/app/admin/(console)/page.tsx");
-    assert.match(overview, /href="\/admin\/packages"/);
-    assert.match(overview, />\s*Packages\s*</);
     assert.match(overview, /Add number/);
     assert.match(overview, /href="\/admin\/platform"/);
+    assert.doesNotMatch(overview, /href="\/admin\/packages"/);
     assert.match(overview, /evaluatePlatformOps/);
     assert.doesNotMatch(overview, /PlatformRunBoard/);
     assert.doesNotMatch(overview, /href="\/admin\/billing"/);
@@ -202,7 +204,13 @@ describe("admin console polish", () => {
     const opsApi = read("dashboard/src/app/api/admin/platform-ops/route.ts");
     assert.match(opsApi, /prepare_resend/);
     assert.match(opsApi, /verify_resend/);
-    assert.match(read("dashboard/src/components/AdminPlatformOpsForm.tsx"), /Create domain/);
+    const opsForm = read("dashboard/src/components/AdminPlatformOpsForm.tsx");
+    assert.match(opsForm, /Create domain/);
+    assert.match(opsForm, /id="ops-mail"/);
+    assert.match(opsForm, /What to send/);
+    assert.match(opsForm, /DNS records/);
+    assert.match(opsForm, /Desk send is off/);
+    assert.doesNotMatch(opsForm, /Set RESEND_API_KEY/);
   });
 
   it("documents the admin shell as the desk geometry with its own links", () => {

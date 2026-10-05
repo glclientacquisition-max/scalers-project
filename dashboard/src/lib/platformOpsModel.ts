@@ -130,6 +130,15 @@ export function kindLabel(kind: OpsNoticeKind): string {
   return "Beta expired";
 }
 
+export function kindHint(kind: OpsNoticeKind): string {
+  if (kind === "speech") return "Voice audio";
+  if (kind === "reasoning") return "Conversation model";
+  if (kind === "phone_line") return "Provider line";
+  if (kind === "sautikit_low") return "SautiKit balance";
+  if (kind === "pool_empty") return "No number to assign";
+  return "Stay Beta. Notice only.";
+}
+
 export type HealthSlice = { tone: OpsHealthTone; detail: string | null };
 
 export function deriveOpsSignals(input: {
@@ -279,23 +288,26 @@ export function opsMailSubject(kind: OpsNoticeKind, recovered = false): string {
 export function mergeQueueRows(input: {
   notices: Array<{ kind: OpsNoticeKind; detail: string | null; status: OpsNoticeStatus }>;
   businesses: Array<{ id: string; name: string; status: string }>;
-}): Array<{ key: string; title: string; detail: string; href: string }> {
-  const rows: Array<{ key: string; title: string; detail: string; href: string }> = [];
+}): Array<{ key: string; title: string; detail: string; href: string; stamp: string }> {
+  const rows: Array<{ key: string; title: string; detail: string; href: string; stamp: string }> = [];
   for (const notice of input.notices) {
     if (notice.status !== "open") continue;
     rows.push({
       key: `ops-${notice.kind}`,
       title: kindLabel(notice.kind),
-      detail: notice.detail || kindLabel(notice.kind),
-      href: "/admin/platform",
+      detail: notice.detail || kindHint(notice.kind),
+      href: "/admin/platform#ops-mail",
+      stamp: "Open",
     });
   }
   for (const business of input.businesses) {
+    const waiting = business.status === "waiting";
     rows.push({
       key: `biz-${business.id}`,
       title: business.name,
-      detail: business.status === "waiting" ? "Waiting for a number" : "Archived",
-      href: "/admin/businesses",
+      detail: waiting ? "Waiting for a number" : "Archived",
+      href: `/admin/businesses#biz-${business.id}`,
+      stamp: waiting ? "Waiting" : "Archived",
     });
   }
   return rows;

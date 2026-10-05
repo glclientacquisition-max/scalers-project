@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { AdminSetupError } from "@/components/AdminSetupError";
-import { adminTdClass, adminThClass } from "@/components/AdminIdentityList";
-import { btnGhost, btnPrimary, deskPreviewClass } from "@/components/ui/deskChrome";
-import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
+import { ButtonLink } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
+import { ListRow } from "@/components/ui/ListRow";
 import { Stamp } from "@/components/ui/Stamp";
+import { deskPreviewClass } from "@/components/ui/deskChrome";
 import { getAdminOverview } from "@/lib/admin";
 import { logAdminError } from "@/lib/adminErrors";
 import { evaluatePlatformOps } from "@/lib/platformOps";
@@ -14,8 +14,8 @@ export const instant = false;
 
 function Kpi({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
-    <div className="border-t border-line/70 px-4 py-3 sm:border-l sm:border-t-0 sm:first:border-l-0">
-      <p className="text-body font-medium tabular-nums text-ink">{value}</p>
+    <div className="border-t border-hairline px-4 py-3 sm:border-l sm:border-t-0 sm:first:border-l-0">
+      <p className="text-title font-medium tabular-nums text-ink">{value}</p>
       <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>{label}</p>
       {hint ? <p className={`text-meta text-ink-3 ${deskPreviewClass}`}>{hint}</p> : null}
     </div>
@@ -51,21 +51,21 @@ export default async function AdminOverviewPage() {
     <div className="space-y-8">
       <Link
         href="/admin/platform"
-        className="flex min-h-11 items-center justify-between gap-3 border-y border-line/70 px-4 py-3"
+        className="flex min-h-11 items-center justify-between gap-3 border-y border-hairline px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         <div>
           <p className="text-meta text-ink-2">Platform</p>
           <p className="text-body font-medium text-ink">{ops.strip.label}</p>
         </div>
-        <Stamp tone={stripTone}>{ops.strip.tone === "ok" ? "OK" : "Needs you"}</Stamp>
+        <Stamp tone={stripTone}>{ops.strip.tone === "ok" ? "Ok" : "Needs you"}</Stamp>
       </Link>
 
-      <section className="grid border-y border-line/70 sm:grid-cols-2 lg:grid-cols-4" aria-label="Overview totals">
+      <section className="grid border-y border-hairline sm:grid-cols-2 lg:grid-cols-4" aria-label="Overview totals">
         <Kpi label="Businesses" value={overview.totalBusinesses} hint={`${overview.activeBusinesses} live`} />
         <Kpi
           label="Waiting for a number"
           value={overview.waitingForNumber}
-          hint="Need a DID from the pool"
+          hint="Need a number from the pool"
         />
         <Kpi
           label="Numbers available"
@@ -79,46 +79,32 @@ export default async function AdminOverviewPage() {
         <Kpi label="Calls (7 days)" value={overview.callsLast7Days} />
       </section>
 
-      <section className="flex flex-wrap gap-3">
-        <Link href="/admin/numbers" className={btnPrimary}>
-          Add number
-        </Link>
-        <Link href="/admin/packages" className={btnGhost}>
-          Packages
-        </Link>
-        <Link href="/admin/businesses" className={btnGhost}>
-          View businesses
-        </Link>
-      </section>
+      {queue.length > 0 ? (
+        <section>
+          <ButtonLink href="/admin/numbers">Add number</ButtonLink>
+        </section>
+      ) : null}
 
       <section>
         <h2 className="text-title font-medium text-ink">Needs you</h2>
         {queue.length === 0 ? (
-          <Empty title="Nothing waiting." />
+          <Empty
+            title="Nothing waiting."
+            line="Add a number when a business needs one."
+            action={<ButtonLink href="/admin/numbers">Add number</ButtonLink>}
+          />
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-ink-2">
-                <tr className="border-b border-line/70">
-                  <th className={adminThClass}>Item</th>
-                  <th className={adminThClass}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {queue.map((row) => (
-                  <tr key={row.key} className="relative border-t border-line/70">
-                    <td className={adminTdClass}>
-                      <DeskRowHit href={row.href} label={row.title} />
-                      <p className={`${deskRowMutedClass} font-medium text-ink ${deskPreviewClass}`}>{row.title}</p>
-                    </td>
-                    <td className={`${adminTdClass} text-ink-2`}>
-                      <span className={deskRowMutedClass}>{row.detail}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ul className="mt-3 divide-y divide-hairline">
+            {queue.map((row) => (
+              <ListRow
+                key={row.key}
+                href={row.href}
+                title={row.title}
+                preview={row.detail}
+                stamp={<Stamp tone="attention">{row.stamp}</Stamp>}
+              />
+            ))}
+          </ul>
         )}
       </section>
     </div>
