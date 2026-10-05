@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
 import { DeskThemeProvider } from "@/components/DeskThemeProvider";
 import { NotifyHost } from "@/components/ui/DeskNotice";
 import { DESK_MD_BOOT_SCRIPT } from "@/lib/deskMdBoot";
-import { DESK_THEME_STORAGE_KEY, parseDeskTheme } from "@/lib/deskTheme";
+import { DESK_THEME_STORAGE_KEY } from "@/lib/deskTheme";
 import "./globals.css";
 
 const siteUrl =
@@ -52,14 +51,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const saved = parseDeskTheme((await cookies()).get(DESK_THEME_STORAGE_KEY)?.value);
   return (
-    <html lang="en" {...(saved === "system" ? {} : { "data-theme": saved })}>
+    <html lang="en">
       <body className="min-h-dvh bg-canvas font-sans text-ink antialiased">
         {/* Desk theme before paint: localStorage, then cookie. Explicit choice wins. */}
         <script
@@ -69,7 +67,7 @@ export default async function RootLayout({
           }}
         />
         <script dangerouslySetInnerHTML={{ __html: DESK_MD_BOOT_SCRIPT }} />
-        <DeskThemeProvider initial={saved}>{children}</DeskThemeProvider>
+        <DeskThemeProvider initial="system">{children}</DeskThemeProvider>
         <NotifyHost />
       </body>
     </html>

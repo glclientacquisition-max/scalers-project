@@ -111,8 +111,8 @@ describe("theme activation", () => {
     assert.match(layout, /dark only/);
     assert.match(layout, /meta\[name="color-scheme"\]/);
     assert.match(layout, /dangerouslySetInnerHTML/);
-    assert.match(layout, /cookies\(\)/);
-    assert.match(layout, /data-theme/);
+    assert.doesNotMatch(layout, /cookies\(\)/);
+    assert.match(layout, /dataset\.theme=t/);
     assert.match(layout, /DeskThemeProvider/);
   });
 
