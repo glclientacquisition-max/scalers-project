@@ -31,8 +31,8 @@ describe("platform run board", () => {
     assert.doesNotMatch(health, /VOICE_INTERNAL_SECRET/);
   });
 
-  it("admin overview uses Platform board without vendor telecom headline", () => {
-    const page = read("dashboard/src/app/admin/(console)/page.tsx");
+  it("admin Platform page uses the run board without a vendor telecom headline", () => {
+    const page = read("dashboard/src/app/admin/(console)/platform/page.tsx");
     const board = read("dashboard/src/components/PlatformRunBoard.tsx");
     assert.match(page, /PlatformRunBoard/);
     assert.doesNotMatch(page, /SautikitTelecomPanel/);

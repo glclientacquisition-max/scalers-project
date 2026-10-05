@@ -107,7 +107,7 @@ describe("admin console polish", () => {
   it("renders overview attention as a dense table with row tap", () => {
     const page = read("dashboard/src/app/admin/(console)/page.tsx");
     assert.match(page, /lg:grid-cols-4/);
-    assert.match(page, /Needs attention/);
+    assert.match(page, /Needs you/);
     assert.match(page, /<table/);
     assert.match(page, /DeskRowHit/);
     assert.match(page, /href="\/admin\/businesses"/);
@@ -169,6 +169,7 @@ describe("admin console polish", () => {
       "dashboard/src/app/admin/(console)/voices/page.tsx",
       "dashboard/src/app/admin/(console)/businesses/page.tsx",
       "dashboard/src/app/admin/(console)/numbers/page.tsx",
+      "dashboard/src/app/admin/(console)/platform/page.tsx",
     ]) {
       const src = read(rel);
       assert.match(src, /deskListTitleClass/);
@@ -190,6 +191,9 @@ describe("admin console polish", () => {
     assert.match(overview, /href="\/admin\/packages"/);
     assert.match(overview, />\s*Packages\s*</);
     assert.match(overview, /Add number/);
+    assert.match(overview, /href="\/admin\/platform"/);
+    assert.match(overview, /evaluatePlatformOps/);
+    assert.doesNotMatch(overview, /PlatformRunBoard/);
     assert.doesNotMatch(overview, /href="\/admin\/billing"/);
     const poolApi = read("dashboard/src/app/api/did-pool/route.ts");
     assert.match(poolApi, /action === "release"/);

@@ -81,6 +81,7 @@ describe("admin desk standard shell", () => {
     assert.deepEqual(got.unknown, { href: "/admin", label: "Overview" });
     assert.deepEqual(got.query, { href: "/admin/voices", label: "Voices" });
     assert.ok(got.labels.includes("Packages"));
+    assert.ok(got.labels.includes("Platform"));
     assert.ok(got.labels.includes("Ledger"));
     assert.ok(!got.labels.includes("Billing"));
     for (const label of got.labels) {

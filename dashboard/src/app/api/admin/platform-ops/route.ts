@@ -1,0 +1,68 @@
+import { NextResponse } from "next/server";
+import { adminFacingError, logAdminError } from "@/lib/adminErrors";
+import { isLegacyAuthenticated } from "@/lib/auth";
+import { sendOpsMail } from "@/lib/opsMail";
+import { ackOpsNotice, saveOpsSettings } from "@/lib/platformOps";
+import {
+  DEFAULT_SAUTIKIT_WARN_MINOR,
+  OPS_NOTICE_KINDS,
+  parseKindFlags,
+  parseOpsEmails,
+  type OpsNoticeKind,
+} from "@/lib/platformOpsModel";
+
+export async function POST(request: Request) {
+  if (!(await isLegacyAuthenticated())) {
+    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const action = String(body.action || "");
+
+  try {
+    if (action === "save_settings") {
+      const settings = await saveOpsSettings({
+        emails: parseOpsEmails(
+          Array.isArray(body.emails) ? body.emails.join(",") : String(body.emails || ""),
+        ),
+        kinds: parseKindFlags(body.kinds),
+        sautikitWarnMinor: Number.isFinite(Number(body.sautikit_warn_minor))
+          ? Number(body.sautikit_warn_minor)
+          : DEFAULT_SAUTIKIT_WARN_MINOR,
+      });
+      return NextResponse.json({ ok: true, settings });
+    }
+
+    if (action === "test_send") {
+      const emails = parseOpsEmails(
+        Array.isArray(body.emails) ? body.emails.join(",") : String(body.emails || ""),
+      );
+      const result = await sendOpsMail({
+        to: emails,
+        subject: "Scalers ops: test",
+        text: "Test from Platform. This is staff ops mail, not an owner alert.",
+      });
+      if (result.skipped === "ops_mail_unconfigured") {
+        return NextResponse.json({ error: "Set RESEND_API_KEY and OPS_EMAIL_FROM." }, { status: 400 });
+      }
+      if (result.skipped === "no_recipients") {
+        return NextResponse.json({ error: "Add a staff email first." }, { status: 400 });
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "ack") {
+      const kind = String(body.kind || "") as OpsNoticeKind;
+      if (!OPS_NOTICE_KINDS.includes(kind)) {
+        return NextResponse.json({ error: "Unknown notice." }, { status: 400 });
+      }
+      await ackOpsNotice(kind);
+      return NextResponse.json({ ok: true });
+    }
+
+    return NextResponse.json({ error: "Unknown action." }, { status: 400 });
+  } catch (err) {
+    logAdminError("platform-ops", err);
+    return NextResponse.json({ error: adminFacingError(err, "Could not update ops mail.") }, { status: 500 });
+  }
+}
