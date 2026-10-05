@@ -19,6 +19,7 @@ export function ListRow({
   unread = false,
   className,
   ariaLabel,
+  id,
 }: {
   href?: string;
   onOpen?: () => void;
@@ -35,6 +36,8 @@ export function ListRow({
   unread?: boolean;
   className?: string;
   ariaLabel?: string;
+  /** Hash target for ops queues. */
+  id?: string;
 }) {
   const bodyClass =
     "flex min-w-0 flex-1 items-center gap-3 py-3 ps-4 pe-2 text-start outline-none transition-colors duration-fast ease-out focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
@@ -70,6 +73,7 @@ export function ListRow({
 
   return (
     <li
+      id={id}
       className={cx(
         "flex items-stretch bg-surface transition-colors duration-fast ease-out hover:bg-surface-2/60 has-[a:active]:bg-surface-2 has-[button:active]:bg-surface-2",
         className,

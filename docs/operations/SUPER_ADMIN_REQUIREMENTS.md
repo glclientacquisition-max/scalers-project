@@ -58,13 +58,9 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Alerts: Low money amount plus notify switches in a sheet. Open issues sit under Needs you; Done clears them. Acked items stay off this page.
 
 ### 2. Businesses (`/admin/businesses`)
-- Table: Business name · Phone DID · Notify number · Status (Active / Waiting for number / Archived) · Created · Actions.
-- Actions per row:
-  - **Assign number** (next available or pick from pool) when waiting.
-  - **Release number** (DID returns to pool as available; business goes to Waiting).
-  - **Remove business** (destructive): release DID if any, delete memberships, delete that business’s calls/transcripts, delete business row. Auth users are not deleted in v1.
-- Empty / loading / error states with clear copy.
-- Search by business name or DID (v1 can be client filter).
+- Needs you: waiting businesses. Assign is a sheet (next available or pick).
+- List: one row per shop (number, package, money, stamp). Open the row for notify, package assign, ledger, release, remove. Type REMOVE to delete.
+- Search by business name or number. Copy says **business**, not tenant.
 
 ### 3. Numbers (`/admin/numbers`)
 - Needs you: businesses waiting. Assign is a sheet (next available or pick).
