@@ -31,7 +31,7 @@ describe('business type offer', () => {
     assert.match(wizard, /VERTICAL_OPTIONS/);
     assert.match(wizard, /opt\.blurb/);
     assert.match(form, /verticalSettingsOptions/);
-    assert.match(form, /verticalBlurb\(vertical\)/);
+    assert.match(form, /detail: opt\.blurb/);
   });
 
   it('maps shop onto retail and keeps hospitality as a stored id', () => {

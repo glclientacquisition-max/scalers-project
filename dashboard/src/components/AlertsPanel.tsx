@@ -9,7 +9,7 @@ import {
   SettingsPageHeader,
   SettingsRow,
   ToolSwitch,
-  settingsDenseFieldClass,
+  settingsValueFieldClass,
   settingsFormBodyClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
@@ -113,7 +113,7 @@ export function AlertsPanel({
               value={ownerWhatsapp}
               onChange={(e) => setOwnerWhatsapp(e.target.value)}
               placeholder="+254 700 000 000"
-              className={settingsDenseFieldClass}
+              className={settingsValueFieldClass}
             />
           </SettingsRow>
           <SettingsRow label="Email" htmlFor="alert_email">
@@ -123,7 +123,7 @@ export function AlertsPanel({
               value={alertEmail}
               onChange={(e) => setAlertEmail(e.target.value)}
               placeholder="owner@shop.co.ke"
-              className={settingsDenseFieldClass}
+              className={settingsValueFieldClass}
             />
           </SettingsRow>
         </SettingsGroup>

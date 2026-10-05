@@ -52,15 +52,23 @@ describe("DoD path swaps", () => {
     assert.doesNotMatch(sort, /<select[\s>]/);
   });
 
-  it("SettingsSelect wraps DeskSelect so Tone and siblings theme open", () => {
+  it("SettingsSelect opens a ChoiceSheet so Tone and Voice drag away", () => {
     const ui = read("dashboard/src/components/settingsUi.tsx");
+    const sheet = read("dashboard/src/components/ui/ChoiceSheet.tsx");
     const start = ui.indexOf("export function SettingsSelect");
     assert.ok(start >= 0);
-    const chunk = ui.slice(start, start + 900);
-    assert.match(chunk, /<DeskSelect/);
-    assert.match(chunk, /settingsDenseFieldClass/);
+    const chunk = ui.slice(start, start + 1400);
+    assert.match(chunk, /<ChoiceSheet/);
+    assert.match(chunk, /rowLabel=\{label\}/);
+    assert.match(chunk, /detail: opt\.detail/);
     assert.doesNotMatch(chunk, /<select[\s>]/);
-    assert.match(ui, /from "@\/components\/ui\/DeskSelect"/);
+    assert.doesNotMatch(chunk, /<DeskSelect/);
+    assert.match(sheet, /<Sheet/);
+    assert.match(sheet, /aria-haspopup="dialog"/);
+    assert.match(sheet, /min-h-11/);
+    assert.match(sheet, /CheckIcon/);
+    assert.match(sheet, /rowLabel/);
+    assert.match(sheet, /text-end text-body/);
   });
 });
 

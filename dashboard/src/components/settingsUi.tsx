@@ -7,7 +7,7 @@
  */
 
 import type { ReactNode } from "react";
-import { DeskSelect } from "@/components/ui/DeskSelect";
+import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import {
   btnPrimary,
@@ -33,7 +33,7 @@ export const settingsConsoleClass =
   "flex w-full min-w-0 flex-col gap-6 md:flex-row md:items-start md:justify-start md:gap-3";
 
 export const settingsRailWrapClass =
-  "hidden min-w-0 shrink-0 md:block md:w-max md:max-w-[13.5rem]";
+  "hidden min-w-0 shrink-0 md:block md:w-64";
 
 export const settingsRailClass = "min-w-0 md:sticky md:top-4";
 
@@ -45,6 +45,10 @@ export const settingsFormBodyClass = "min-w-0 w-full max-w-2xl";
 
 /** Text controls inside SettingsRow — ops form, not full remainder. */
 export const settingsControlMaxClass = "max-w-md";
+
+/** A settings value. The row is the field: no box, current text on the right. */
+export const settingsValueFieldClass =
+  "w-full min-h-11 min-w-0 bg-transparent px-1 text-end text-body text-ink outline-none placeholder:text-ink-3 focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
 
 /** Selects inside SettingsRow — short values (Tone, type) stay compact. */
 export const settingsSelectMaxClass = "max-w-xs";
@@ -72,7 +76,7 @@ export const settingsBlockTitleClass =
 
 /** Non-clickable group header. Same dialect as the settings rail. */
 export const settingsGroupTitleClass =
-  "pointer-events-none mb-0 select-none text-xs font-bold uppercase tracking-wide text-gray-500";
+  "pointer-events-none mb-0 select-none text-meta font-medium text-ink-2";
 
 export function settingsRadioCardClass(selected: boolean) {
   return [
@@ -217,7 +221,7 @@ export function SettingsGroup({
           {action}
         </div>
       ) : null}
-      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+      <div className="divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
         {children}
       </div>
     </section>
@@ -238,23 +242,28 @@ export function SettingsRow({
   children: ReactNode;
 }) {
   const switchRow = control === "switch";
+  if (switchRow) {
+    return (
+      <div className="flex min-h-12 w-full items-center gap-3 px-4 py-2 md:min-h-11 md:px-3 md:py-1.5">
+        <div className="min-w-0 flex-1">
+          <label htmlFor={htmlFor} className="block text-sm font-medium text-ink">
+            {label}
+          </label>
+          {hint ? <p className="mt-0.5 text-xs text-ink-soft">{hint}</p> : null}
+        </div>
+        <div className="shrink-0">{children}</div>
+      </div>
+    );
+  }
   return (
-    <div className="flex min-h-12 w-full items-center gap-3 px-4 py-2 md:min-h-11 md:px-3 md:py-1.5">
-      <div className={switchRow ? "min-w-0 flex-1" : "w-[7.5rem] shrink-0 sm:w-36"}>
-        <label htmlFor={htmlFor} className="block text-sm font-medium text-ink">
+    <div className="w-full px-4 py-1.5">
+      <div className="flex min-h-11 w-full items-center gap-3">
+        <label htmlFor={htmlFor} className="shrink-0 text-body font-medium text-ink">
           {label}
         </label>
-        {hint ? <p className="mt-0.5 text-xs text-ink-soft">{hint}</p> : null}
+        <div className="min-w-0 flex-1">{children}</div>
       </div>
-      <div
-        className={
-          switchRow
-            ? "shrink-0"
-            : `min-w-0 flex-1 ${settingsControlMaxClass}`
-        }
-      >
-        {children}
-      </div>
+      {hint ? <p className="pb-1 text-meta text-ink-2">{hint}</p> : null}
     </div>
   );
 }
@@ -337,18 +346,22 @@ export function SettingsSelect<T extends string>({
   id: string;
   value: T | "";
   onChange: (value: T) => void;
-  options: readonly { id: T; label: string }[];
+  options: readonly { id: T; label: string; detail?: string }[];
   label?: string;
   placeholder?: string;
 }) {
   return (
-    <DeskSelect
+    <ChoiceSheet
       id={id}
+      title={label || placeholder || "Choose"}
+      rowLabel={label}
       value={value}
-      aria-label={label}
       placeholder={placeholder}
-      className={`${settingsDenseFieldClass} min-w-0 ${settingsSelectMaxClass}`}
-      options={options.map((opt) => ({ value: opt.id, label: opt.label }))}
+      options={options.map((opt) => ({
+        value: opt.id,
+        label: opt.label,
+        detail: opt.detail && opt.detail !== opt.label ? opt.detail : undefined,
+      }))}
       onChange={onChange}
     />
   );

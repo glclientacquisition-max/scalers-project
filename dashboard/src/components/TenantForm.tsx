@@ -64,7 +64,6 @@ import { SERVICES_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
 import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import {
   parseVertical,
-  verticalBlurb,
   verticalSettingsOptions,
   type BusinessVertical,
 } from "@/lib/vertical";
@@ -113,6 +112,7 @@ import {
   settingsConsoleClass,
   settingsFormBodyClass,
   settingsDenseFieldClass,
+  settingsValueFieldClass,
   settingsFieldClass,
   settingsGhostButtonClass,
   settingsPanelClass,
@@ -796,22 +796,21 @@ export function TenantForm({
               onChange={(e) => setAgentName(e.target.value)}
               placeholder="Aisha"
               maxLength={40}
-              className={denseFieldClass}
+              className={settingsValueFieldClass}
             />
           </SettingsRow>
-          <SettingsRow label="Tone" htmlFor="agent_tone">
-            <SettingsSelect
-              id="agent_tone"
-              label="Tone"
-              value={tone}
-              placeholder="Tone"
-              onChange={(id) => setTone(id)}
-              options={TONE_OPTIONS.map((opt) => ({
-                id: opt.id,
-                label: TONE_LABELS[opt.id],
-              }))}
-            />
-          </SettingsRow>
+          <SettingsSelect
+            id="agent_tone"
+            label="Tone"
+            value={tone}
+            placeholder="Tone"
+            onChange={(id) => setTone(id)}
+            options={TONE_OPTIONS.map((opt) => ({
+              id: opt.id,
+              label: TONE_LABELS[opt.id],
+              detail: opt.blurb,
+            }))}
+          />
         </SettingsGroup>
 
         <SettingsGroup title="Business">
@@ -822,7 +821,7 @@ export function TenantForm({
               onChange={(e) => setBusinessName(e.target.value)}
               placeholder="Westlands Books"
               title={businessName || undefined}
-              className={`${denseFieldClass} break-words [overflow-wrap:anywhere]`}
+              className={settingsValueFieldClass}
             />
           </SettingsRow>
           <SettingsRow
@@ -837,7 +836,7 @@ export function TenantForm({
               placeholder="Done and Dusted"
               maxLength={40}
               title={spokenName || undefined}
-              className={denseFieldClass}
+              className={settingsValueFieldClass}
             />
           </SettingsRow>
           <SettingsRow
@@ -851,25 +850,20 @@ export function TenantForm({
               onChange={(e) => setGreetingInvite(e.target.value)}
               placeholder="How can I help?"
               maxLength={80}
-              className={denseFieldClass}
+              className={settingsValueFieldClass}
             />
           </SettingsRow>
-          <SettingsRow
+          <SettingsSelect
+            id="business_vertical"
             label="Business type"
-            htmlFor="business_vertical"
-            hint={verticalBlurb(vertical)}
-          >
-            <SettingsSelect
-              id="business_vertical"
-              label="Business type"
-              value={vertical}
-              onChange={setVertical}
-              options={verticalSettingsOptions(vertical).map((opt) => ({
-                id: opt.id,
-                label: opt.label,
-              }))}
-            />
-          </SettingsRow>
+            value={vertical}
+            onChange={setVertical}
+            options={verticalSettingsOptions(vertical).map((opt) => ({
+              id: opt.id,
+              label: opt.label,
+              detail: opt.blurb,
+            }))}
+          />
         </SettingsGroup>
 
         <SettingsGroup
@@ -1926,24 +1920,20 @@ export function TenantForm({
 
             <section className={panel === "tools" ? "space-y-6" : "hidden"}>
         <SettingsGroup title="Voice">
-          <SettingsRow label="Voice" htmlFor="soniox_voice_id">
-            {voiceOptions.length > 1 ? (
-              <SettingsSelect
-                id="soniox_voice_id"
-                label="Phone voice profile"
-                value={sonioxVoiceId}
-                onChange={setSonioxVoiceId}
-                options={voiceOptions.map((voice) => ({
-                  id: voice.id,
-                  label: displaySonioxVoiceLabel("", voice.id, voiceOptions),
-                }))}
-              />
-            ) : (
-              <p className="text-sm text-ink-soft">
-                {voiceOptions[0]?.description || "No voices loaded."}
-              </p>
-            )}
-          </SettingsRow>
+          {voiceOptions.length > 0 ? (
+            <SettingsSelect
+              id="soniox_voice_id"
+              label="Voice"
+              value={sonioxVoiceId}
+              onChange={setSonioxVoiceId}
+              options={voiceOptions.map((voice) => ({
+                id: voice.id,
+                label: displaySonioxVoiceLabel("", voice.id, voiceOptions),
+              }))}
+            />
+          ) : (
+            <p className="px-4 py-3 text-sm text-ink-soft">No voices loaded.</p>
+          )}
           <SettingsRow label="Voice label" htmlFor="soniox_voice_label">
             <input
               id="soniox_voice_label"
@@ -1952,7 +1942,7 @@ export function TenantForm({
               value={sonioxVoiceLabel}
               onChange={(e) => setSonioxVoiceLabel(e.target.value)}
               placeholder="Shop voice"
-              className={denseFieldClass}
+              className={settingsValueFieldClass}
             />
           </SettingsRow>
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2">

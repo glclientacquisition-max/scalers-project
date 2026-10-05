@@ -181,10 +181,10 @@ describe("desk shell chrome", () => {
     assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /<SignOutButton layout="menu"/);
     assert.doesNotMatch(read("dashboard/src/components/DeskAccountBar.tsx"), />\s*Sign out\s*</);
     assert.match(settingsUi, /uppercase tracking-wide text-gray-500/);
-    assert.match(settingsShell, /settingsGroupTitleClass/);
+    assert.match(settingsShell, /text-meta font-medium text-ink-2/);
     assert.match(settingsShell, /data-settings-menu/);
     assert.match(settingsShell, /SettingsChevron/);
-    assert.match(settingsUi, /md:w-max md:max-w-\[13\.5rem\]/);
+    assert.match(settingsUi, /md:w-64/);
     assert.doesNotMatch(settingsShell, /max-w-5xl|max-w-xl/);
     assert.doesNotMatch(home, /Sign out/);
     assert.match(home, /HomeOverviewHeader/);
