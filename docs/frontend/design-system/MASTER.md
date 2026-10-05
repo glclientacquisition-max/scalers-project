@@ -43,25 +43,26 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 
 ## Dark mode
 
-The desk (`app/(desk)`) ships a dark palette; marketing, auth, onboarding, and admin stay light.
+Dark mode is the entire platform: marketing, auth, onboarding, owner desk, Super Admin. One token table on `:root`. Glass is chrome only.
 
-- **Token-driven.** Dark redefines the same CSS variables (`--bg`, `--card`, `--ink`, `--line`, `--accent`, fills, status colors). Components never write `dark:` variants; they reference tokens and flip for free.
-- **Scoped.** Dark tokens apply only inside `.desk-theme` (the desk layout root, mirrored on `dev/inbox` for visual tests). Activation: `<html data-theme="dark|light">` set by the pre-paint script in `app/layout.tsx`, or `prefers-color-scheme` when no explicit choice. Both selectors live in `globals.css` and must stay in sync. Tokens stay scoped to `.desk-theme` and `.admin-theme`; `color-scheme: dark only` / `light only` pins `html`, `body`, `.desk-theme`, and native `select`/`option` (plus a `meta[name=color-scheme]`) so residual native option popups match the card when the UA honors it. Owner DoD paths (Contacts Sort, SettingsSelect) use `DeskSelect`: closed chrome stays field-like; the open list is a themed popover (`bg-surface` + `text-ink`) so dark never falls back to a light OS popup.
-- **Choice is per-device.** `ThemePicker` (account menu Appearance) writes `localStorage["scalers-desk-theme"]` (`system` default) and applies instantly. Three theme cards. Never a tenant setting, never server state.
-- **Fills invert.** On bright fills (accent, warn, ok, lead) the label is `text-accent-on-fill`: white on deep blue in light, deep navy on bright fills in dark. `#0096FF` text on dark is `accent-deep` (`#6BC2FF`).
-- **Inherited ink.** `body` sits outside `.desk-theme`, so its `color` is computed from light `--ink`. `.desk-theme` sets `color` and `caret-color` from `--ink`. Form controls (input/textarea/select) pin `color` and autofill `-webkit-text-fill-color` so typed characters never inherit navy onto a dark field. Field class strings include `text-ink` and `placeholder:text-ink-soft/70`.
+- **Token-driven.** Dark redefines the same CSS variables on `:root[data-theme="dark"]` and on `prefers-color-scheme: dark` when the choice is System. Components never write `dark:` variants; they reference tokens and flip for free. Aliases (`--bg`, `--card`, `--accent-fill`) follow `--canvas` / `--surface` / `--accent`.
+- **Not desk-only.** `.desk-theme` and `.admin-theme` still pin `color`, caret, and native `select` / `option`. They do not own the palette. Portals under `body` inherit the document tokens.
+- **Glass chrome.** `.glass-chrome` is the frosted shell for tab bars, rails, sheets, menus, the landing header, and auth cards. Lists, canvas, and row surfaces stay opaque. `prefers-reduced-transparency` snaps glass to `--surface`. No laser beams, dither grain, or clock dials on the desk. `color-scheme: dark only` / `light only` still pins an explicit pick on `html` and `body`.
+- **Choice is per-device.** `ThemePicker` (account menu) and `ThemeDock` (landing, login, signup, onboarding, Super Admin login) write `localStorage["scalers-desk-theme"]` (`system` default) and apply instantly. Never a tenant setting, never server state.
+- **Fills invert.** On bright fills (accent, warn, ok, lead) the label is `text-accent-on-fill`: white on deep blue in light, deep navy on bright fills in dark.
+- **Inherited ink.** `.desk-theme` and `.admin-theme` set `color` and `caret-color` from `--ink`. Form controls pin `color` and autofill `-webkit-text-fill-color`. Field class strings include `text-ink`.
 
 | Token role | Light | Dark |
 | --- | --- | --- |
-| Canvas `--bg` | `#F4F7FB` | `#0A1420` |
-| Card `--card` | `#FFFFFF` | `#122236` |
+| Canvas `--bg` | `#F4F7FB` | `#0B1220` |
+| Card `--card` | `#FFFFFF` | `#121C2C` |
 | Ink `--ink` | `#0A192F` | `#E9EFF7` |
 | Soft ink `--ink-soft` | `#4A5B73` | `#9DAFC6` |
-| Line `--line` | `#D5DEE9` | `#24374F` |
+| Line `--line` | `#D5DEE9` | `#24324A` |
 | Accent `--accent` | `#0096FF` | `#2AA8FF` |
-| Link `--accent-deep` | `#005CCC` | `#6BC2FF` |
-| Fill `--accent-fill` | `#005CCC` | `#1F9FFF` |
-| On fill `--accent-on-fill` | `#FFFFFF` | `#062033` |
+| Link `--accent-deep` | `#005CCC` | `#3D9BFF` |
+| Fill `--accent-fill` | `#005CCC` | `#3D9BFF` |
+| On fill `--accent-on-fill` | `#FFFFFF` | `#071426` |
 
 **Shared class strings:** `dashboard/src/components/ui/deskChrome.ts`. Settings fields stay in `settingsUi.tsx` but must use the same focus ring.
 

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BrandWordmark } from "@/components/brand/BrandMark";
+import { ThemeDock } from "@/components/ThemePicker";
 import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
 import { marketingHomeHref } from "@/lib/adminHost";
 import { getAuthUser } from "@/lib/auth";
@@ -20,13 +21,16 @@ export default async function LoginPage({
   return (
     <main className="flex min-h-dvh items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
-        <BrandWordmark href={homeHref} context="Sign in" variant="lockup" priority />
+        <div className="flex items-start justify-between gap-3">
+          <BrandWordmark href={homeHref} context="Sign in" variant="lockup" priority />
+          <ThemeDock />
+        </div>
         <h1 className="sr-only">Sign in to Scalers</h1>
 
         <form
           action="/api/login"
           method="post"
-          className="mt-8 space-y-4 rounded-panel border border-line bg-surface p-6"
+          className="glass-chrome mt-8 space-y-4 rounded-panel border border-line p-6"
         >
           <div>
             <label className="block text-sm font-medium text-ink" htmlFor="email">

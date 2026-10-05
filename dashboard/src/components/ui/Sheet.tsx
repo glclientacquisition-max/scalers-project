@@ -51,7 +51,7 @@ export function Sheet({
           <Drawer.Viewport className="pointer-events-none fixed inset-0 z-sheet flex items-end justify-center">
             <Drawer.Popup
               className={cx(
-                "desk-drawer pointer-events-auto flex max-h-[85dvh] w-full flex-col rounded-t-2xl bg-surface text-ink shadow-sheet outline-none motion-reduce:transition-none",
+                "desk-drawer glass-chrome pointer-events-auto flex max-h-[85dvh] w-full flex-col rounded-t-2xl text-ink shadow-sheet outline-none motion-reduce:transition-none",
                 "sm:mb-4 sm:rounded-2xl",
                 size === "lg" ? "sm:max-w-2xl" : "sm:max-w-md",
               )}

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { BrandWordmark } from "@/components/brand/BrandMark";
+import { ThemeDock } from "@/components/ThemePicker";
 import { getAuthUser, isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
 import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getCurrentTenant } from "@/lib/tenant";
@@ -43,7 +44,10 @@ export default async function OnboardingPage() {
         <div className="w-full max-w-lg">
           <div className="flex items-start justify-between gap-3">
             <BrandWordmark href="/onboarding" context="Workspace" variant="lockup" priority />
-            <OnboardingExit />
+            <div className="flex items-center gap-1">
+              <ThemeDock />
+              <OnboardingExit />
+            </div>
           </div>
           <p className="mt-6 text-ink-soft leading-relaxed">
             No workspace linked to this account. Sign up again or contact support.
@@ -62,7 +66,10 @@ export default async function OnboardingPage() {
       <div className="w-full max-w-xl">
         <div className="flex items-start justify-between gap-3">
           <BrandWordmark href="/onboarding" context="Setup" variant="lockup" priority />
-          <OnboardingExit />
+          <div className="flex items-center gap-1">
+            <ThemeDock />
+            <OnboardingExit />
+          </div>
         </div>
         <h1 className="mt-8 font-display text-2xl text-ink">
           Set up {tenant.business_name}

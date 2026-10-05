@@ -17,7 +17,7 @@ describe("DeskSelect primitive", () => {
   it("uses Base UI Select with surface+ink open popup tokens", () => {
     assert.match(desk, /from "@base-ui\/react\/select"/);
     assert.match(desk, /export function DeskSelect/);
-    assert.match(desk, /bg-surface/);
+    assert.match(desk, /glass-chrome/);
     assert.match(desk, /text-ink/);
     assert.match(desk, /shadow-menu/);
     assert.match(desk, /border-hairline/);
@@ -34,9 +34,8 @@ describe("DeskSelect primitive", () => {
 
   it("wraps portal content in desk-theme so dark tokens resolve under body", () => {
     assert.match(desk, /Select\.Portal/);
-    assert.match(desk, /className="desk-theme"/);
-    // Popup still uses token utilities that resolve under .desk-theme
-    assert.match(desk, /bg-surface/);
+    assert.match(desk, /portalTheme/);
+    assert.match(desk, /glass-chrome/);
     assert.match(desk, /text-ink/);
   });
 });
