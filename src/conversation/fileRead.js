@@ -6,6 +6,7 @@ const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
 } = require('./visitTalk');
+const { looksLikeCompliment } = require('./entityExtraction');
 
 const FILE_READ_RE =
   /\b(what do i have|what have i got|which ones?(?:\s+do)? i have|which (?:booking|bookings|order|orders|hold|holds)|any (?:booking|bookings|order|orders|hold|holds)|is there any that i have|previous (?:booking|bookings|order|orders|hold)|my previous|check (?:for me )?(?:the |my )?(?:previous )?(?:booking|order|hold)|read (?:them|it|me|for me)|the one(?:s)? (?:that )?i have|ones i have|in place|bookings zangu|booking yangu|order yangu|hold yangu|oda yangu|niambie (?:booking|oda|order|hold)|what(?:'s| is) on hold|on hold for me|my (?:order|orders|hold|holds))\b/i;
@@ -47,9 +48,32 @@ function hasReadableFile(state) {
   if (!file || !file.identityBound) return false;
   if (file.fileRole && file.fileRole !== 'primary') return false;
   if (file.nextVisit) return true;
+  if (Array.isArray(file.openVisits) && file.openVisits.length > 0) return true;
   if (Array.isArray(file.openRequests) && file.openRequests.length > 0) return true;
   if (Array.isArray(file.recentBookings) && file.recentBookings.length > 0) return true;
   return false;
+}
+
+/**
+ * Visit and hold rows are on the bound primary file. Until then, a lookup
+ * must not be answered with an empty-file line.
+ */
+function fileRowsWereRead(state) {
+  const file = state?.returning;
+  if (!file || file.identityBound !== true) return false;
+  if (file.fileRole && file.fileRole !== 'primary') return false;
+  return true;
+}
+
+/**
+ * Existing nothing-open line. Not a new denial.
+ * Swahili and Sheng are the existing translations of this one line.
+ */
+function nothingStillOpenLine(state, language) {
+  const lang = String(language || state?.language?.current || 'en').toLowerCase();
+  if (lang === 'sw') return 'Hakuna kilicho wazi.';
+  if (lang === 'sheng') return 'Hakuna kitu iko open.';
+  return 'Nothing is still open.';
 }
 
 function nothingOnFileLine(state, language) {
@@ -89,8 +113,10 @@ function fileReadLine({ text = '', state = {}, language } = {}) {
   const again =
     Boolean(state?.conversation?.toldNothingOnFile) && looksLikeEmptyFileFollowUp(text);
   if (!looksLikeFileRead(text) && !again) return '';
+  // Do not return the empty-file line before the visit or hold rows are read.
+  if (!fileRowsWereRead(state)) return '';
   markNothingOnFile(state);
-  return nothingOnFileLine(state, language);
+  return nothingStillOpenLine(state, language);
 }
 
 function presupposesSavedWork(sentence) {
@@ -122,7 +148,8 @@ function sanitizeSpokenFileClaim(text, opts = {}) {
   if (looksLikeServiceMenu(raw) && !looksLikeFileRead(callerText) && !looksLikeEmptyFileFollowUp(callerText)) {
     return raw;
   }
-  return nothingOnFileLine(opts.state, opts.language);
+  if (!fileRowsWereRead(opts.state)) return '';
+  return nothingStillOpenLine(opts.state, opts.language);
 }
 
 function looksLikeServiceMenu(text) {
@@ -134,13 +161,115 @@ function looksLikeServiceMenu(text) {
   return new Set(nouns).size >= 3;
 }
 
+const SPOKEN_STATUS = /^(requested|confirmed|open|pending|cancelled|canceled|done|completed|fulfilled)$/i;
+const SPOKEN_LEAD = /^(request|hold|order|enquiry|inquiry)$/i;
+
+function spokenBits(line) {
+  return String(line || '')
+    .split('|')
+    .map((part) => part.trim())
+    .filter((part) => part && !SPOKEN_STATUS.test(part));
+}
+
+/**
+ * Existing open-line sentence. Job and when. Place only when that field is
+ * present. Not a new template.
+ */
+function speakSavedLine(line, language, kind) {
+  const bits = spokenBits(line);
+  const parts = bits[0] && SPOKEN_LEAD.test(bits[0]) ? bits.slice(1) : bits;
+  const job = parts[0] || '';
+  const when = parts[1] || '';
+  const place = parts[2] || '';
+  if (!job) return '';
+  const tail = [when, place].filter(Boolean);
+  const detail = tail.length ? `, ${tail.join(', ')}` : '';
+  const lang = String(language || 'en').toLowerCase();
+  if (lang === 'sw') {
+    const lead = kind === 'request' ? `Una ombi la ${job}` : `Una ${job}`;
+    return `${lead}${detail}.`;
+  }
+  if (lang === 'sheng') {
+    const lead = kind === 'request' ? `Uko na request ya ${job}` : `Uko na ${job}`;
+    return `${lead}${detail}.`;
+  }
+  const lead = kind === 'request' ? `You have a ${job} request` : `You have ${job}`;
+  return `${lead}${detail}.`;
+}
+
+function historyOnlyAsk(text) {
+  const raw = String(text || '');
+  if (!looksLikePastBookingTalk(raw)) return false;
+  if (/\bupcoming\b/i.test(raw)) return false;
+  if (/\bread (?:them|it)\b/i.test(raw)) return false;
+  if (looksLikeExistingVisitTalk(raw) && !/\bprevious\b/i.test(raw)) return false;
+  return true;
+}
+
+function priorCallerText(state) {
+  return (state?.conversation?.answersReceived || []).slice(0, -1).join(' ');
+}
+
+/**
+ * Backend read of the caller file. Empty string when this turn is not a
+ * visit, hold, or order lookup. Nothing open and nothing recent is the
+ * existing "Nothing is still open."
+ */
+function spokenFileRead({ text = '', state = {}, language } = {}) {
+  const forced = Boolean(state?.conversation?.speakFileRead);
+  if (state?.conversation) state.conversation.speakFileRead = false;
+  const current = String(text || '');
+  // A compliment is not a visit, hold, or order lookup.
+  if (looksLikeCompliment(current)) return '';
+  if (!fileRowsWereRead(state)) return '';
+  const context = forced ? `${priorCallerText(state)} ${current}` : current;
+  const upcoming = /\bupcoming\b/i.test(context);
+  const readThem = /\bread (?:them|it)\b/i.test(current);
+  const fileAsk = looksLikeFileRead(current) || looksLikePastBookingTalk(current) || upcoming || readThem;
+  const followUp =
+    Boolean(state?.conversation?.toldNothingOnFile) && looksLikeEmptyFileFollowUp(current);
+  if (!forced && !fileAsk && !followUp) return '';
+  const onlyHistory = !forced && historyOnlyAsk(current);
+  const wantHistory = looksLikePastBookingTalk(context);
+  const file = state.returning || {};
+  const lines = [];
+  if (!onlyHistory) {
+    const visits = Array.isArray(file.openVisits) ? file.openVisits : [];
+    for (const row of visits) {
+      const said = speakSavedLine(row, language, 'visit');
+      if (said) lines.push(said);
+    }
+    const requests = Array.isArray(file.openRequests) ? file.openRequests : [];
+    for (const row of requests) {
+      const said = speakSavedLine(row, language, 'request');
+      if (said) lines.push(said);
+    }
+  }
+  if (wantHistory || onlyHistory) {
+    const recent = Array.isArray(file.recentBookings) ? file.recentBookings : [];
+    for (const row of recent) {
+      const kind = SPOKEN_LEAD.test(spokenBits(row)[0] || '') ? 'request' : 'visit';
+      const said = speakSavedLine(row, language, kind);
+      if (said && !lines.includes(said)) lines.push(said);
+    }
+  }
+  if (!lines.length) {
+    markNothingOnFile(state);
+    return nothingStillOpenLine(state, language);
+  }
+  return lines.join(' ');
+}
+
 module.exports = {
   looksLikeFileRead,
   looksLikeNewWork,
   looksLikeOfferAsk,
   looksLikeServiceMenu,
   hasReadableFile,
+  fileRowsWereRead,
   nothingOnFileLine,
+  nothingStillOpenLine,
+  spokenFileRead,
   fileReadLine,
   looksLikeEmptyFileFollowUp,
   presupposesSavedWork,

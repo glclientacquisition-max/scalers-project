@@ -1,7 +1,10 @@
 // Returning-caller card: compact phone file for the next live call.
 // Not Brain state (that dies with the call) and not a transcript dump.
 // Visit lines are refreshed against now (EAT). A stored "tomorrow" is not
-// repeated once that window or date has passed.
+// repeated once that window or date has passed. A past-due requested or
+// confirmed visit stays on the card. A past-due hold (service request,
+// request_type hold, status open) stays too. Fulfilled and cancelled holds
+// are history, not open rows.
 
 const { namesMatch } = require('./contactIdentity');
 const { isJunkCallerName } = require('./callerNameQuality');
@@ -45,6 +48,7 @@ function buildCallerMemoryCard({
   openRequests = [],
   nextAppointment = null,
   recentAppointments = [],
+  openAppointments = [],
   now = new Date(),
 } = {}) {
   if (!contact || typeof contact !== 'object') return null;
@@ -52,13 +56,21 @@ function buildCallerMemoryCard({
   const name = String(contact.name || '').trim() || null;
   const alternates = alternateNames(contact.metadata);
   const sharedLine = alternates.length > 0;
-  const lived = collectLivedAppointments(nextAppointment, recentAppointments, now);
+  const lived = collectLivedAppointments(
+    nextAppointment,
+    recentAppointments,
+    now,
+    openAppointments
+  );
   const nextItem = lived.open[0] || null;
   const nextRow = nextItem ? nextItem.row : null;
   const lastReason = clip(scrubLivedReason(contact.last_reason, lived));
   const notes = clip(contact.notes, 60);
-  const requests = freshOpenRequestRows(openRequests, now)
-    .slice(0, 2)
+  const requestSplit = splitRequestRows(openRequests, now);
+  // Cap is wide enough that a past-due open hold is not dropped just because
+  // two newer open rows exist. Date-past is not a reason to drop status open.
+  // Every still-open request. A past-due open hold is not dropped for a newer pair.
+  const requests = requestSplit.open
     .map(clipRequestLine)
     .filter(Boolean);
   const openVisitLines = lived.open
@@ -80,7 +92,10 @@ function buildCallerMemoryCard({
     : null;
   const extraOpenRows = lived.open.slice(1).map((item) => item.row);
   const recentRows = selectRecentAppointmentRows(lived.history, null);
-  const recentBookings = recentRows.map((row) => clipVisitLine(row)).filter(Boolean);
+  const recentBookings = [
+    ...recentRows.map((row) => clipVisitLine(row)).filter(Boolean),
+    ...requestSplit.finished.map(clipFinishedRequestLine).filter(Boolean),
+  ];
   const profile = clipCallerProfile(contact.metadata);
   const place = profile.landmark || nextVisitLandmark || derivePlace(recentRows);
   const usualJob = profile.typicalJob || deriveUsualJob([...recentRows, ...extraOpenRows], nextRow);
@@ -158,6 +173,13 @@ function clipRequestLine(row) {
   return line || null;
 }
 
+function clipFinishedRequestLine(row) {
+  const line = clipRequestLine(row);
+  if (!line) return null;
+  const status = clip(row.status, 16);
+  return status ? `${line} | ${status}` : line;
+}
+
 function clipCallerProfile(metadata) {
   const raw = metadata && typeof metadata === 'object' ? metadata.caller_profile : null;
   if (!raw || typeof raw !== 'object') {
@@ -190,15 +212,57 @@ function clipPersonProfiles(metadata) {
   return out;
 }
 
-function refreshLivedRow(row, lived) {
-  const whenText = lived.whenLabel || row.when_text || row.whenText || '';
+function rowHasWindow(row) {
+  return Boolean(row?.window_start || row?.windowStart || row?.window_end || row?.windowEnd);
+}
+
+function whenPhraseIn(notes) {
+  const value = String(notes || '').replace(/\s+/g, ' ').trim();
+  if (!value) return '';
+  const match = value.match(
+    /\b((?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|leo|kesho)(?:\s+(?:at|in|the|morning|afternoon|evening|night|\d{1,2}(?::\d{2})?\s*(?:am|pm)?)){0,4}|(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*(?:\s+\d{4})?(?:\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?)\b/i
+  );
+  return match ? String(match[1] || '').trim() : '';
+}
+
+/**
+ * A spoken when comes from this row's window, or from a time written in
+ * this row's notes. when_text alone is not a when. No window and no time
+ * in the notes means the spoken when is empty.
+ */
+function whenTextThisRowOwns(row) {
+  const whenText = String(row?.when_text || row?.whenText || '').trim();
+  if (rowHasWindow(row)) return whenText;
+  const notes = String(row?.notes || '').trim();
+  if (!notes) return '';
+  if (whenText && notes.toLowerCase().includes(whenText.toLowerCase())) return whenText;
+  return whenPhraseIn(notes);
+}
+
+function refreshLivedRow(row, lived, now = new Date()) {
+  const owned = whenTextThisRowOwns(row);
+  const original = String(row?.when_text || row?.whenText || '').trim();
+  let whenText = lived.whenLabel || '';
+  if (!rowHasWindow(row)) {
+    if (!owned) whenText = '';
+    else if (owned !== original) {
+      const again = classifyLivedVisit(
+        { ...row, when_text: owned, whenText: owned, window_start: null, window_end: null },
+        now
+      );
+      whenText = again.whenLabel || '';
+    }
+  }
   return { ...row, when_text: whenText, whenText };
 }
 
-function collectLivedAppointments(nextAppointment, recentAppointments, now) {
+function collectLivedAppointments(nextAppointment, recentAppointments, now, openAppointments = []) {
   const seen = new Set();
   const source = [];
+  // Open appointments include requested rows with no window. The newest
+  // visit alone is not the file.
   const rows = [
+    ...(Array.isArray(openAppointments) ? openAppointments : []),
     nextAppointment,
     ...(Array.isArray(recentAppointments) ? recentAppointments : []),
   ];
@@ -216,18 +280,22 @@ function collectLivedAppointments(nextAppointment, recentAppointments, now) {
   const judged = [];
   for (const row of source) {
     const lived = classifyLivedVisit(row, now);
-    const refreshed = refreshLivedRow(row, lived);
+    const refreshed = refreshLivedRow(row, lived, now);
     const status = String(row.status || '').toLowerCase();
-    const openStatus = !status || status === 'requested' || status === 'confirmed';
-    const isOpen = openStatus && !lived.past;
+    const finishedVisit = ['cancelled', 'canceled', 'done', 'completed', 'fulfilled'].includes(status);
+    // Past-due requested or confirmed stays open. Only a finished visit is history.
+    const openStatus =
+      !finishedVisit && (!status || status === 'requested' || status === 'confirmed');
+    const isOpen = openStatus;
     judged.push({ lived, open: isOpen });
     if (isOpen) open.push({ row: refreshed, lived });
     else history.push(refreshed);
   }
   open.sort((a, b) => {
+    if (a.lived.past !== b.lived.past) return a.lived.past ? 1 : -1;
     const ta = a.lived.instant ? a.lived.instant.getTime() : Number.POSITIVE_INFINITY;
     const tb = b.lived.instant ? b.lived.instant.getTime() : Number.POSITIVE_INFINITY;
-    return ta - tb;
+    return a.lived.past ? tb - ta : ta - tb;
   });
   return { open, history, judged };
 }
@@ -251,19 +319,41 @@ function scrubLivedReason(text, lived) {
   if (word === 'today') {
     return raw.replace(/\b(?:tomorrow|kesho)\b/gi, 'today').replace(/\s+/g, ' ').trim();
   }
-  if (word === 'tomorrow' || word === 'past') return raw;
+  if (word === 'past' || lead.lived.past) {
+    return raw
+      .replace(/\b(?:today|tomorrow|tonight|leo|kesho)\b/gi, 'past')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  if (word === 'tomorrow') return raw;
   return raw.replace(/\b(?:tomorrow|kesho)\b/gi, word).replace(/\s+/g, ' ').trim();
 }
 
-function freshOpenRequestRows(rows, now) {
-  const out = [];
+const FINISHED_REQUEST = new Set(['fulfilled', 'cancelled', 'canceled']);
+
+/**
+ * A hold is a service_requests row (request_type hold), not an appointment.
+ * status open stays, including when the window has passed.
+ * fulfilled and cancelled are history for a "previous" read.
+ */
+function splitRequestRows(rows, now) {
+  const open = [];
+  const finished = [];
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!row || typeof row !== 'object') continue;
     const lived = classifyLivedVisit(row, now);
-    if (lived.past) continue;
-    out.push(refreshLivedRow(row, lived));
+    const refreshed = refreshLivedRow(row, lived, now);
+    const status = String(row.status || 'open').toLowerCase();
+    if (FINISHED_REQUEST.has(status)) finished.push(refreshed);
+    else if (status === 'open') open.push({ row: refreshed, lived });
   }
-  return out;
+  open.sort((a, b) => {
+    if (a.lived.past !== b.lived.past) return a.lived.past ? 1 : -1;
+    const ta = a.lived.instant ? a.lived.instant.getTime() : Number.POSITIVE_INFINITY;
+    const tb = b.lived.instant ? b.lived.instant.getTime() : Number.POSITIVE_INFINITY;
+    return a.lived.past ? tb - ta : ta - tb;
+  });
+  return { open: open.map((item) => item.row), finished };
 }
 
 function selectRecentAppointmentRows(rows = [], nextAppointment = null) {
@@ -550,6 +640,10 @@ function returningFileFromCard(card) {
   const fileRole = card.fileRole || null;
   const usable = returningFileUsable({ ...card, fileRole, identityBound });
   const fileOwnerName = fileOwnerNameOf(card);
+  const hasOpenRows = Boolean(
+    (Array.isArray(card.openVisits) && card.openVisits.length) ||
+      (Array.isArray(card.openRequests) && card.openRequests.length)
+  );
   const filePending =
     !identityBound &&
     Boolean(card.sharedLine || card.name || fileOwnerName || fileHasHistory(card));
@@ -577,6 +671,7 @@ function returningFileFromCard(card) {
     standing: identityBound ? card.standing || null : null,
     language: identityBound ? card.language || null : null,
     identityBound,
+    hasOpenRows,
     boundName: identityBound ? card.boundName || card.name || null : null,
     fileRole,
     fileOwnerName,

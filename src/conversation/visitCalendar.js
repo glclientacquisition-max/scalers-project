@@ -137,6 +137,15 @@ function ymdFromAbsolute(absolute) {
   return `${absolute.year}-${month}-${day}`;
 }
 
+function textAlreadySaysDay(whenText, dayKey) {
+  const text = String(whenText || '');
+  const short = shortDate(dayKey);
+  if (!short) return false;
+  const [day, month] = short.split(' ');
+  if (day && month && new RegExp(`\\b${day}\\s+${month}\\b`, 'i').test(text)) return true;
+  return Boolean(dayKey && text.includes(dayKey));
+}
+
 function livedWhenLabel(whenText, { past, dayKey, spokenDay, relative }) {
   const original = String(whenText || '').replace(/\s+/g, ' ').trim();
   if (past) {
@@ -144,7 +153,8 @@ function livedWhenLabel(whenText, { past, dayKey, spokenDay, relative }) {
       .replace(RELATIVE_DAY_REPLACE_RE, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const dateBit = dayKey ? shortDate(dayKey) : '';
+    // The window date is already in the raw string. Do not say it twice.
+    const dateBit = dayKey && !textAlreadySaysDay(original, dayKey) ? shortDate(dayKey) : '';
     const core = [dateBit, stripped].filter(Boolean).join(' ').trim();
     return core ? `past ${core}` : 'past';
   }
