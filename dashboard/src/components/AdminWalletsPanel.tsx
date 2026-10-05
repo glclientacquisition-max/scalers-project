@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { AdminWalletRow, BillingMode } from "@/lib/adminWallets";
 import type { WalletLedgerRow } from "@/lib/wallet";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
+import { Sheet } from "@/components/ui/Sheet";
 import { btnGhost, btnPrimary, deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
@@ -407,10 +408,30 @@ export function AdminWalletsPanel({
         </table>
       </div>
 
-      {creditTarget ? (
-        <div className="border-t border-line/70 pt-3">
-          <p className="font-medium">Credit / debit: {creditTarget.business_name}</p>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]">
+      <Sheet
+        open={Boolean(creditTarget)}
+        theme="admin"
+        title="Credit or debit"
+        description={creditTarget?.business_name}
+        onOpenChange={(next) => {
+          if (!next) setCreditId(null);
+        }}
+        footer={
+          creditTarget ? (
+            <button
+              type="button"
+              disabled={pending || !creditValid}
+              className={btnPrimary}
+              onClick={() => void applyCredit()}
+            >
+              {deltaNum < 0 ? "Apply debit" : "Apply credit"}
+            </button>
+          ) : null
+        }
+      >
+        {creditTarget ? (
+        <div>
+          <p className="text-sm text-[var(--ink-soft)]">
             Current ledger KES {creditTarget.wallet_balance_kes.toLocaleString("en-KE")}. Positive
             credits, negative debits. Reason required (min 3 chars). Logged to ops audit as{" "}
             <span className="font-medium text-[var(--ink)]">{actor.trim() || "ops"}</span>.
@@ -478,30 +499,36 @@ export function AdminWalletsPanel({
               Enter a non-zero amount and a reason (at least 3 characters).
             </p>
           ) : null}
-          <div className="mt-4 flex gap-3">
-            <button
-              type="button"
-              disabled={pending || !creditValid}
-              className={btnPrimary}
-              onClick={() => void applyCredit()}
-            >
-              {deltaNum < 0 ? "Apply debit" : "Apply credit"}
-            </button>
-            <button
-              type="button"
-              className={btnGhost}
-              onClick={() => setCreditId(null)}
-            >
-              Cancel
-            </button>
-          </div>
         </div>
-      ) : null}
+        ) : null}
+      </Sheet>
 
-      {modeTarget ? (
-        <div className="border-t border-line/70 pt-3">
-          <p className="font-medium">Billing plan: {modeTarget.business_name}</p>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]">
+      <Sheet
+        open={Boolean(modeTarget)}
+        theme="admin"
+        size="lg"
+        title="Billing plan"
+        description={modeTarget?.business_name}
+        dismissible={!savingPlan && confirm === null}
+        onOpenChange={(next) => {
+          if (!next) setModeId(null);
+        }}
+        footer={
+          modeTarget ? (
+            <button
+              type="button"
+              disabled={pending || savingPlan || !planValid}
+              className={btnPrimary}
+              onClick={() => requestPlanSave()}
+            >
+              {graduatingToCharging ? "Start charging" : "Save plan"}
+            </button>
+          ) : null
+        }
+      >
+        {modeTarget ? (
+        <div>
+          <p className="text-sm text-[var(--ink-soft)]">
             Current: <span className="font-medium text-[var(--ink)]">{planLabel(initialMode)}</span>
             {" · "}
             Ledger KES {modeTarget.wallet_balance_kes.toLocaleString("en-KE")}.
@@ -570,25 +597,9 @@ export function AdminWalletsPanel({
                 : "Change the mode or note to enable save."}
             </p>
           ) : null}
-          <div className="mt-4 flex gap-3">
-            <button
-              type="button"
-              disabled={pending || !planValid}
-              className={btnPrimary}
-              onClick={() => requestPlanSave()}
-            >
-              {graduatingToCharging ? "Start charging" : "Save plan"}
-            </button>
-            <button
-              type="button"
-              className={btnGhost}
-              onClick={() => setModeId(null)}
-            >
-              Cancel
-            </button>
-          </div>
         </div>
-      ) : null}
+        ) : null}
+      </Sheet>
 
       {ledgerTarget ? (
         <div className="border-t border-line/70 pt-3">
