@@ -10,6 +10,7 @@ import {
 } from "@/lib/adminBilling";
 import type { BillingMode } from "@/lib/adminWallets";
 import { adminTdClass } from "@/components/AdminIdentityList";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { btnGhost, btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
@@ -41,6 +42,8 @@ function planConsequence(mode: BillingMode): string {
 export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClientDetail }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [chargeOpen, setChargeOpen] = useState(false);
+  const [savingCharge, setSavingCharge] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [actor, setActor] = useState("ops");
@@ -120,6 +123,22 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
     const histJson = await histRes.json().catch(() => ({}));
     if (histRes.ok) setHistory(histJson.history || []);
     return true;
+  }
+
+  async function confirmCharge() {
+    setSavingCharge(true);
+    await post(
+      {
+        action: "set_billing_mode",
+        business_id: detail.row.id,
+        mode,
+        note: modeNote.trim(),
+        waive_negative: mode === "off" ? waiveNegative : false,
+      },
+      `Charging mode → ${chargingModeLabel(mode)}.`
+    );
+    setSavingCharge(false);
+    setChargeOpen(false);
   }
 
   const row = detail.row;
@@ -239,10 +258,8 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
             e.preventDefault();
             const graduating = detail.row.billing_enforcement === "off" && mode !== "off";
             if (graduating) {
-              const ok = window.confirm(
-                `Start on-demand charging for ${row.business_name}?\n\n${planConsequence(mode)}`
-              );
-              if (!ok) return;
+              setChargeOpen(true);
+              return;
             }
             void post(
               {
@@ -469,6 +486,22 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
           </ul>
         )}
       </section>
+      <ConfirmSheet
+        open={chargeOpen}
+        theme="admin"
+        pending={savingCharge}
+        title="Start on-demand charging"
+        confirmLabel="Start charging"
+        onClose={() => {
+          if (!savingCharge) setChargeOpen(false);
+        }}
+        onConfirm={() => void confirmCharge()}
+      >
+        <div className="space-y-3">
+          <p>Start on-demand charging for {row.business_name}.</p>
+          <p>{planConsequence(mode)}</p>
+        </div>
+      </ConfirmSheet>
     </div>
   );
 }

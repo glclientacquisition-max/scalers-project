@@ -20,6 +20,7 @@ export function Sheet({
   footer,
   size = "md",
   dismissible = true,
+  theme = "desk",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -31,7 +32,10 @@ export function Sheet({
   size?: "md" | "lg";
   /** When false, swipe, scrim, and Escape leave the drawer open. */
   dismissible?: boolean;
+  /** Portal sits on document.body, so the shell theme has to travel with it. */
+  theme?: "desk" | "admin";
 }) {
+  const themeClass = theme === "admin" ? "admin-theme" : "desk-theme";
   return (
     <Drawer.Root
       open={open}
@@ -47,11 +51,12 @@ export function Sheet({
     >
       <Drawer.VirtualKeyboardProvider>
         <Drawer.Portal>
-          <Drawer.Backdrop className="desk-drawer-backdrop fixed inset-0 z-sheet motion-reduce:transition-none" />
-          <Drawer.Viewport className="pointer-events-none fixed inset-0 z-sheet flex items-end justify-center">
+          <Drawer.Backdrop className={cx("desk-drawer-backdrop fixed inset-0 z-sheet motion-reduce:transition-none", themeClass)} />
+          <Drawer.Viewport className={cx("pointer-events-none fixed inset-0 z-sheet flex items-end justify-center", themeClass)}>
             <Drawer.Popup
               className={cx(
                 "desk-drawer pointer-events-auto flex max-h-[85dvh] w-full flex-col rounded-t-2xl bg-surface text-ink shadow-sheet outline-none motion-reduce:transition-none",
+                themeClass,
                 "sm:mb-4 sm:rounded-2xl",
                 size === "lg" ? "sm:max-w-2xl" : "sm:max-w-md",
               )}
