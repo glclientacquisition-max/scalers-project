@@ -43,6 +43,20 @@ describe("desk batch D screen fit and recovery", () => {
     assert.match(constitution, /modal is the `Sheet` drawer/);
     assert.doesNotMatch(constitution, /modal enter-static/);
     assert.match(mandate, /Overlays use `Sheet`: a bottom drawer/);
+    assert.match(master, /Settings sections stay pages/);
+    const confirm = read("dashboard/src/components/ui/ConfirmSheet.tsx");
+    assert.match(confirm, /<Sheet/);
+    for (const file of [
+      "dashboard/src/components/AdminVoicesManager.tsx",
+      "dashboard/src/components/AdminWalletsPanel.tsx",
+      "dashboard/src/components/AdminBillingDetailPanel.tsx",
+      "dashboard/src/components/BuyNumberPanel.tsx",
+    ]) {
+      const src = read(file);
+      assert.match(src, /ConfirmSheet/);
+      assert.doesNotMatch(src, /window\.confirm/);
+      assert.doesNotMatch(src, /\bconfirm\(/);
+    }
   });
 
   it("gives empty lists one next step", () => {

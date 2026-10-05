@@ -40,6 +40,7 @@ Charter: `docs/frontend/FRONTEND_2_0_CHARTER.md`. It wins over older frontend do
 
 - Verbs: pending, live, land, shift, press. Under 300ms, `--ease-out`. Reduced motion snaps.
 - Overlays use `Sheet`: a bottom drawer. The finger tracks it. A downward flick dismisses it. No motion package.
+- Settings sections stay pages with Back. A drawer is a short confirm or chooser. Admin confirms use `ConfirmSheet`.
 - 44px hit floor. Icon-only controls carry a visible name on hover and focus. Focus ring `ring-2 ring-brand`.
 
 ## Proof

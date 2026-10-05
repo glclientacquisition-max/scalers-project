@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminWalletRow, BillingMode } from "@/lib/adminWallets";
 import type { WalletLedgerRow } from "@/lib/wallet";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { btnGhost, btnPrimary, deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
@@ -78,6 +79,8 @@ export function AdminWalletsPanel({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [confirm, setConfirm] = useState<"charge" | "waive" | null>(null);
+  const [savingPlan, setSavingPlan] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<LedgerFilter>("all");
   const [error, setError] = useState<string | null>(null);
@@ -237,33 +240,22 @@ export function AdminWalletsPanel({
     }
   }
 
-  async function savePlan() {
+  function requestPlanSave() {
     if (!modeTarget || !planValid) return;
-
     if (graduatingToCharging) {
-      const balance = modeTarget.wallet_balance_kes;
-      const balanceLine =
-        balance <= 0
-          ? `\n\nLedger is KES ${balance.toLocaleString("en-KE")}. They will be overdrawn or low once charging starts.`
-          : `\n\nCurrent ledger KES ${balance.toLocaleString("en-KE")}.`;
-      const confirmed = window.confirm(
-        `Start on-demand charging for ${modeTarget.business_name}?\n\n` +
-          `${planConsequence(mode)}` +
-          balanceLine +
-          `\n\nThis turns on ledger debits for on-demand past included.`
-      );
-      if (!confirmed) return;
+      setConfirm("charge");
+      return;
     }
-
     if (returningToBeta && waiveNegative && modeTarget.wallet_balance_kes < 0) {
-      const confirmed = window.confirm(
-        `Move ${modeTarget.business_name} back to free beta and waive KES ${Math.abs(
-          modeTarget.wallet_balance_kes
-        ).toLocaleString("en-KE")} of negative balance?`
-      );
-      if (!confirmed) return;
+      setConfirm("waive");
+      return;
     }
+    void commitPlan();
+  }
 
+  async function commitPlan() {
+    if (!modeTarget || !planValid) return;
+    setSavingPlan(true);
     const ok = await run({
       action: "set_billing_mode",
       business_id: modeTarget.id,
@@ -272,6 +264,8 @@ export function AdminWalletsPanel({
       actor: actor.trim() || "ops",
       waive_negative: mode === "off" ? waiveNegative : false,
     });
+    setSavingPlan(false);
+    setConfirm(null);
     if (ok) {
       setStatus(`Updated plan for ${modeTarget.business_name} → ${planLabel(mode)}.`);
       setModeId(null);
@@ -581,7 +575,7 @@ export function AdminWalletsPanel({
               type="button"
               disabled={pending || !planValid}
               className={btnPrimary}
-              onClick={() => void savePlan()}
+              onClick={() => requestPlanSave()}
             >
               {graduatingToCharging ? "Start charging" : "Save plan"}
             </button>
@@ -631,6 +625,36 @@ export function AdminWalletsPanel({
           )}
         </div>
       ) : null}
+      <ConfirmSheet
+        open={confirm !== null}
+        theme="admin"
+        pending={savingPlan}
+        danger={confirm === "waive"}
+        title={confirm === "waive" ? "Move back to free beta" : "Start on-demand charging"}
+        confirmLabel={confirm === "waive" ? "Waive and save" : "Start charging"}
+        onClose={() => {
+          if (!savingPlan) setConfirm(null);
+        }}
+        onConfirm={() => void commitPlan()}
+      >
+        {confirm === "waive" && modeTarget ? (
+          <p>
+            Move {modeTarget.business_name} back to free beta and waive KES{" "}
+            {Math.abs(modeTarget.wallet_balance_kes).toLocaleString("en-KE")} of negative balance.
+          </p>
+        ) : modeTarget ? (
+          <div className="space-y-3">
+            <p>Start on-demand charging for {modeTarget.business_name}.</p>
+            <p>{planConsequence(mode)}</p>
+            <p>
+              {modeTarget.wallet_balance_kes <= 0
+                ? `Ledger is KES ${modeTarget.wallet_balance_kes.toLocaleString("en-KE")}. They will be overdrawn or low once charging starts.`
+                : `Current ledger KES ${modeTarget.wallet_balance_kes.toLocaleString("en-KE")}.`}
+            </p>
+            <p>This turns on ledger debits for on-demand past included.</p>
+          </div>
+        ) : null}
+      </ConfirmSheet>
     </div>
   );
 }
