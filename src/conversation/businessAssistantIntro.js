@@ -256,7 +256,11 @@ function composeBusinessAssistantIntro(opts = {}) {
   const identity = composeOpenerIdentity(opts);
   const invite = languageInviteClause(opts);
   const help = greetingHelpLine(opts);
-  const nameAsk = 'May I have your name?';
+  const fileName = String(opts.callerFileName || opts.fileOwnerName || '').trim();
+  const nameAsk =
+    fileName && /^[\p{L}][\p{L}'’\- ]{0,39}$/u.test(fileName)
+      ? `Am I speaking with ${fileName}?`
+      : 'May I have your name?';
 
   if (closureNotice) {
     const follow = afterHoursMode === 'message' ? nameAsk : help;
@@ -269,6 +273,10 @@ function composeBusinessAssistantIntro(opts = {}) {
 
   if (closed) {
     return `${identity} ${invite}We're closed now. ${help}`;
+  }
+
+  if (afterHoursMode === 'message') {
+    return `${identity} ${invite}I can take a message. ${nameAsk}`;
   }
 
   return `${identity} ${invite}${help}`;
@@ -329,11 +337,13 @@ function introLooksValid(line, businessName, agentName, opts = {}) {
   if (customInvite) {
     const bare = customInvite.replace(/[.!?…]+$/g, '').trim().toLowerCase();
     const hasCustom = bare && text.toLowerCase().includes(bare);
-    const hasNameAsk = /\bmay i have your name\b/i.test(text);
+    const hasNameAsk =
+      /\bmay i have your name\b/i.test(text) || /\bam i speaking with\b/i.test(text);
     if (!hasCustom && !hasNameAsk) return false;
   } else if (
     !/\bhow can i help\b/i.test(text) &&
-    !/\bmay i have your name\b/i.test(text)
+    !/\bmay i have your name\b/i.test(text) &&
+    !/\bam i speaking with\b/i.test(text)
   ) {
     return false;
   }

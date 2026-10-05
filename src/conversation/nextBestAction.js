@@ -13,6 +13,11 @@ const {
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
 } = require('./callCorrectives');
+const { callerTurnKinds } = require('./messageOnly');
+const {
+  looksLikeOpenVisitLookup,
+  looksLikeVisitReviewMore,
+} = require('./openLineSpeech');
 
 const DIRECT_ANSWER_INTENTS = new Set([
   'hours',
@@ -23,6 +28,28 @@ const DIRECT_ANSWER_INTENTS = new Set([
 ]);
 
 const REQUEST_INTENTS = new Set(['hold', 'order', 'booking', 'cancellation']);
+
+function visitFileReadDecision(state) {
+  const returning = state?.returning;
+  if (!returningFileUsable(returning)) return null;
+  const hasOpen =
+    Boolean(returning.hasOpenRows) ||
+    (Array.isArray(returning.openVisits) && returning.openVisits.length > 0) ||
+    (Array.isArray(returning.openRequests) && returning.openRequests.length > 0);
+  // History-only files fall through to the recent-bookings reason (#538).
+  if (!hasOpen) return null;
+  const said = String(state?.goal?.description || '');
+  const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
+  const asked = [said, latest].some(
+    (line) => looksLikeOpenVisitLookup(line) || looksLikeVisitReviewMore(line)
+  );
+  if (!asked) return null;
+  return {
+    action: ACTIONS.ANSWER,
+    reason:
+      'They asked what they have. The backend speaks the open visit rows. Do not ask which visit to update or cancel. Do not treat this as a reschedule.',
+  };
+}
 
 function phoneFileHasOpenRows(state) {
   const file = state?.returning;
@@ -76,6 +103,28 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     };
   }
 
+  if (state?.messageOnly && REQUEST_INTENTS.has(intent)) {
+    const askedFact = callerTurnKinds(latestUtterance).knowledge;
+    if (askedFact) {
+      return {
+        action: ACTIONS.ANSWER,
+        reason:
+          'Message only. Answer the fact from the file. Do not ask which service to book, a day, a time, or a place.',
+      };
+    }
+    const pending = String(state?.caller?.fileNameAsked || '').trim();
+    const asked =
+      state?.caller?.nameConfirmed === true ||
+      state?.caller?.fileNameAskSpoken === true ||
+      state?.caller?.messageNameAskSpoken === true;
+    return {
+      action: ACTIONS.CAPTURE,
+      reason: asked
+        ? `Message only. Do not ask which service to book, a day, a time, or a place. Say you will take a message and the team will call. Do not ask for the name again.${pending ? ` Use ${pending}.` : ''}`
+        : 'Message only. Do not ask which service to book, a day, a time, or a place. Say you will take a message and the team will call. Ask for a name only if it is missing.',
+    };
+  }
+
   if (looksLikePaceOnlyTurn(latestUtterance)) {
     return {
       action: ACTIONS.ANSWER,
@@ -124,6 +173,9 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     };
   }
 
+  const fileRead = visitFileReadDecision(state);
+  if (fileRead) return fileRead;
+
   if (intent === 'unknown' || intent === 'general_enquiry') {
     const returning = state?.returning;
     const said = String(state?.goal?.description || '');
@@ -131,6 +183,21 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       (state?.conversation?.answersReceived || []).slice(-1)[0] || ''
     );
     if (state?.conversation?.phatic && speakerPendingOnFile(returning)) {
+      const pending = String(state?.caller?.fileNameAsked || '').trim();
+      if (pending && !returning?.sharedLine) {
+        if (state?.caller?.fileNameAskSpoken === true) {
+          return {
+            action: ACTIONS.ANSWER,
+            reason:
+              `File name ${pending} already asked. One short well, then offer help. Do not ask for a name. Do not talk about visits yet. Do not say nothing is open. Do not list services.`,
+          };
+        }
+        return {
+          action: ACTIONS.ASK_CLARIFICATION,
+          slot: 'name',
+          reason: `Ask once: Am I speaking with ${pending}? Do not talk about visits yet. Do not say nothing is open. Do not list services.`,
+        };
+      }
       return {
         action: ACTIONS.ANSWER,
         reason:
@@ -252,6 +319,42 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
   }
 
   if (missingSlots.length) {
+    if (missingSlots[0] === 'name' && state?.caller?.nameConfirmed !== true) {
+      const pending = String(state?.caller?.fileNameAsked || '').trim();
+      // Code already spoke the file-name ask. Do not tell Gemini to ask again
+      // or treat the file as nameless — keep using the pending name.
+      if (
+        pending &&
+        state?.caller?.fileNameAskSpoken === true &&
+        !state?.returning?.sharedLine
+      ) {
+        const rest = missingSlots.filter((slot) => slot !== 'name');
+        if (rest.length) {
+          return {
+            action: ACTIONS.ASK_CLARIFICATION,
+            slot: rest[0],
+            reason: `File name ${pending} already asked. Use ${pending}. Do not ask for a name. Do not say May I have your name. Ask only for ${rest[0]}.`,
+          };
+        }
+        return {
+          action: ACTIONS.ASK_CLARIFICATION,
+          reason: `File name ${pending} already asked. Use ${pending}. Do not ask for a name. Continue the booking.`,
+        };
+      }
+      if (pending && !state?.returning?.sharedLine) {
+        return {
+          action: ACTIONS.ASK_CLARIFICATION,
+          slot: 'name',
+          reason: `Ask once: Am I speaking with ${pending}? Do not ask for a different name. Do not talk about visits yet. Do not say nothing is open.`,
+        };
+      }
+      return {
+        action: ACTIONS.ASK_CLARIFICATION,
+        slot: 'name',
+        reason:
+          'No name is on file. Ask once for their name. Do not ask again after they give one.',
+      };
+    }
     return {
       action: ACTIONS.ASK_CLARIFICATION,
       slot: missingSlots[0],

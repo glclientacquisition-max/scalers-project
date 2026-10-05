@@ -59,6 +59,30 @@ function curateTerms(values, max = MAX_STT_TERMS) {
  * @param {object} [tenant]
  * @returns {string[]}
  */
+function callerHearingNames(tenant = {}) {
+  const card =
+    tenant.callerMemory && typeof tenant.callerMemory === 'object' ? tenant.callerMemory : {};
+  const values = [
+    tenant.callerName,
+    tenant.caller_name,
+    card.fileOwnerName,
+    card.name,
+    ...(Array.isArray(card.alternateNames) ? card.alternateNames : []),
+    ...(Array.isArray(tenant.alternateNames) ? tenant.alternateNames : []),
+  ];
+  const seen = new Set();
+  const names = [];
+  for (const value of values) {
+    const term = cleanTerm(value);
+    if (term.length < 2 || term.length > 80) continue;
+    const key = term.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(term);
+  }
+  return names;
+}
+
 function collectTenantTerms(tenant = {}) {
   const terms = [];
 
@@ -100,6 +124,9 @@ function collectTenantTerms(tenant = {}) {
     const say = cleanTerm(entry?.say);
     if (say && say !== match) terms.push(say);
   }
+
+  // Hearing bias only. These terms do not decide that a span is the caller name.
+  for (const name of callerHearingNames(tenant)) terms.push(name);
 
   return curateTerms(terms);
 }
@@ -145,6 +172,10 @@ function buildSttContext(tenant) {
   if (vertical && vertical !== 'general') {
     general.push({ key: 'vertical', value: vertical });
   }
+  const participants = callerHearingNames(tenant);
+  if (participants.length) {
+    general.push({ key: 'participant', value: participants.join(', ') });
+  }
 
   return { general, terms };
 }
@@ -160,6 +191,7 @@ function isSttContextEnabled() {
 
 module.exports = {
   buildSttContext,
+  callerHearingNames,
   collectTenantTerms,
   curateTerms,
   isSttContextEnabled,

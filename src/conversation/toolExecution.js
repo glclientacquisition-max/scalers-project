@@ -3,13 +3,17 @@
 const { findProductMatch, normalizeProducts } = require('./productCatalog');
 const {
   evaluateAppointmentHours,
+  formatDayOnlyWhen,
   formatRequestedWhenLabel,
+  formatStoredWhenText,
+  parseAbsoluteWhenDate,
   weekdaySpoken,
 } = require('./appointmentHours');
-const { eatParts } = require('./businessHours');
+const { clockPhrase, dayCue } = require('./visitTime');
 const { canonicalizeCallerName } = require('./callerNameMatch');
 const { isJunkCallerName } = require('./callerNameQuality');
 const { confirmationLanguage } = require('./language');
+const { messageOnlyCallbackLine, callbackNotesWithoutClock, heldMessageCallerName, messageNamePlausible } = require('./messageOnly');
 const {
   readVisitPlace,
   classifyVisitLocation,
@@ -359,32 +363,31 @@ function validateEscalation(raw, { agentName = '', businessName = '', knownNames
   return { valid: true, value };
 }
 
-function nairobiDayAndPeriod(instant, periodLabel) {
-  const period = String(periodLabel || '').trim().toLowerCase();
-  if (!/^(morning|afternoon|evening)$/.test(period)) return '';
-  if (!instant || Number.isNaN(instant.getTime())) return '';
-  const parts = eatParts(instant);
-  if (!parts.weekdayLong || !parts.dateLabel) return '';
-  // Same Nairobi instant the hours gate already resolved. No second clock.
-  return `${parts.weekdayLong} ${parts.dateLabel}, ${period}`;
+
+function dayOnlyWhen(whenText) {
+  const text = String(whenText || '').trim();
+  if (!text || clockPhrase(text)) return false;
+  if (/\b(morning|asubuhi|afternoon|mchana|evening|jioni)\b/i.test(text)) return false;
+  return Boolean(dayCue(text) || parseAbsoluteWhenDate(text));
 }
 
 function stampVisitWindow(value, hours) {
   // A period ("tomorrow morning") is not a clock. Drop any 10:00 the model sent.
-  // Save the absolute Nairobi day plus the period word, not the relative phrase.
-  if (hours?.resolved?.periodLabel) {
-    const whenText =
-      nairobiDayAndPeriod(hours.resolved.instant, hours.resolved.periodLabel) ||
-      value.whenText;
+  // Save the absolute Nairobi day, not the word "tomorrow".
+  const period = String(hours?.resolved?.periodLabel || '').trim();
+  if (period) {
+    const whenText = formatStoredWhenText(hours.resolved) || value.whenText;
     return { ...value, whenText, windowStart: '', windowEnd: '' };
   }
   const instant = hours?.resolved?.instant;
   if (!instant || Number.isNaN(instant.getTime())) return value;
   const iso = instant.toISOString();
+  const whenText = formatStoredWhenText(hours.resolved) || value.whenText;
   return {
     ...value,
-    windowStart: value.windowStart || iso,
-    windowEnd: value.windowEnd || iso,
+    whenText,
+    windowStart: iso,
+    windowEnd: iso,
   };
 }
 
@@ -485,6 +488,27 @@ function validateCreateAppointment(
       value,
     };
   }
+  if (dayOnlyWhen(value.whenText)) {
+    const day = formatDayOnlyWhen(value.whenText, now);
+    if (!day) {
+      return {
+        valid: false,
+        reason: 'unparsed_when',
+        code: 'unparsed_when',
+        missingSlots: ['when_text'],
+        value,
+      };
+    }
+    return {
+      valid: true,
+      value: {
+        ...applyVisitPlaceNotes(value, coverageProfile),
+        whenText: day,
+        windowStart: '',
+        windowEnd: '',
+      },
+    };
+  }
   const hours = visitTimeGate(value.whenText, {
     hoursSchedule,
     now,
@@ -566,6 +590,18 @@ function validateUpdateAppointment(
   return { valid: true, value };
 }
 
+function applyHeldCallerName(parsed, held) {
+  if (!held || !parsed || typeof parsed !== 'object') return parsed;
+  const stamp = (row) => (row && typeof row === 'object' ? { ...row, name: held } : row);
+  const next = { ...parsed };
+  // Replace a name the model sent. Do not invent a save the model did not send.
+  if (next.name) next.name = held;
+  if (next.escalate) next.escalate = stamp(next.escalate);
+  if (next.appointment) next.appointment = stamp(next.appointment);
+  if (next.serviceRequest) next.serviceRequest = stamp(next.serviceRequest);
+  return next;
+}
+
 async function executeBrainTools({
   parsed,
   capabilities = {},
@@ -578,12 +614,23 @@ async function executeBrainTools({
   hoursSchedule = null,
   now = new Date(),
   nameConfirmed = true,
+  heldCallerName = '',
   openAppointments = [],
   callerPhone = '',
   knownNames = [],
   businessPolicies = null,
   businessLocations = null,
 } = {}) {
+  const held = clean(heldCallerName, 120);
+  if (held) {
+    parsed = applyHeldCallerName(parsed, held);
+  } else if (nameConfirmed === false && parsed?.escalate) {
+    // Unconfirmed and nothing held: do not carry a name the model invented.
+    parsed = {
+      ...parsed,
+      escalate: { ...parsed.escalate, name: '' },
+    };
+  }
   const completed = new Set(completedFingerprints);
   const results = [];
   const identityOpts = { productCatalog, agentName, businessName, knownNames };
@@ -595,6 +642,51 @@ async function executeBrainTools({
         status: 'invalid',
         reason: clean(error?.message || 'Invalid tool request.', 300),
       });
+    }
+  }
+
+  if (parsed?.serviceRequest && capabilities.messageOnly) {
+    const heldName = heldMessageCallerName({
+      name: heldCallerName,
+      nameConfirmed: Boolean(String(heldCallerName || '').trim()),
+    });
+    if (heldName) parsed.serviceRequest = { ...parsed.serviceRequest, name: heldName };
+    else if (!messageNamePlausible(parsed.serviceRequest.name)) {
+      parsed.serviceRequest = { ...parsed.serviceRequest, name: '' };
+    }
+    const typeRaw = String(parsed.serviceRequest.type || '').trim().toLowerCase();
+    if (typeRaw !== 'callback') {
+      results.push({
+        action: 'create_service_request',
+        status: 'disabled',
+        code: 'message_only',
+        reason: 'Message only. Only a callback can be saved.',
+      });
+      parsed.serviceRequest = null;
+    } else if (!String(parsed.serviceRequest.name || '').trim()) {
+      results.push({
+        action: 'create_service_request',
+        status: 'invalid',
+        reason: 'A callback needs the caller name.',
+        missingSlots: ['name'],
+      });
+      parsed.serviceRequest = null;
+    } else {
+      const notes = String(parsed.serviceRequest.notes || '').trim();
+      const item = String(parsed.serviceRequest.item || '').trim();
+      const whenText = String(
+        parsed.serviceRequest.whenText ||
+          parsed.serviceRequest.when_text ||
+          parsed.serviceRequest.when ||
+          ''
+      ).trim();
+      parsed.serviceRequest = {
+        ...parsed.serviceRequest,
+        whenText: '',
+        when_text: '',
+        when: '',
+        notes: callbackNotesWithoutClock(notes, whenText, item),
+      };
     }
   }
 
@@ -723,7 +815,14 @@ async function executeBrainTools({
     }
   }
 
-  if (parsed?.appointment) {
+  if (capabilities.messageOnly && parsed?.appointment) {
+    results.push({
+      action: 'create_appointment',
+      status: 'disabled',
+      code: 'message_only',
+      reason: 'Message only. Booking is not available.',
+    });
+  } else if (parsed?.appointment) {
     const validation = validateCreateAppointment(parsed.appointment, {
       hoursSchedule,
       now,
@@ -790,7 +889,14 @@ async function executeBrainTools({
     }
   }
 
-  if (parsed?.appointmentUpdate) {
+  if (capabilities.messageOnly && parsed?.appointmentUpdate) {
+    results.push({
+      action: 'update_appointment',
+      status: 'disabled',
+      code: 'message_only',
+      reason: 'Message only. Cancel and reschedule are not available.',
+    });
+  } else if (parsed?.appointmentUpdate) {
     const validation = validateUpdateAppointment(parsed.appointmentUpdate, {
       hoursSchedule,
       now,
@@ -1055,6 +1161,9 @@ function formatToolConfirmation(results = [], language = 'en') {
   const lang = confirmationLanguage(language);
   const sw = lang === 'sw';
   const sheng = lang === 'sheng';
+  if (meaningful.code === 'message_only') {
+    return messageOnlyCallbackLine(sheng ? 'sheng' : sw ? 'sw' : 'en');
+  }
   if (meaningful.action === 'tool_request') {
     if (sw) return 'Sijaweza kukamilisha hatua hiyo.';
     if (sheng) return 'Sijaweza ku-complete hiyo action.';

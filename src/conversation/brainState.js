@@ -38,6 +38,12 @@ const {
   returningFileFromCard,
 } = require('./callerMemory');
 const {
+  isMessageOnlyMode,
+  messageFileOwnerName,
+  messageNamePlausible,
+  reconcileMessageOnlyName,
+} = require('./messageOnly');
+const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
 } = require('./visitTalk');
@@ -255,7 +261,7 @@ function createBrainState(profile = {}) {
     },
     profile.callerMemory
   );
-  return {
+  const state = {
     version: 2,
     vertical: String(profile.vertical || 'general'),
     caller: {
@@ -263,6 +269,9 @@ function createBrainState(profile = {}) {
       phone: caller.phone || null,
       nameConfirmed: Boolean(caller.nameConfirmed),
       nameCollision: Array.isArray(caller.nameCollision) ? caller.nameCollision : null,
+      fileNameAsked: null,
+      fileNameAskSpoken: false,
+      messageNameAskSpoken: false,
     },
     returning: returningFileFromCard(profile.callerMemory),
     language: {
@@ -328,11 +337,28 @@ function createBrainState(profile = {}) {
       refusedHours: [],
       refusedPlaces: [],
     },
+    messageOnly: isMessageOnlyMode(profile.afterHoursMode),
   };
+  if (state.messageOnly) {
+    const owner = messageFileOwnerName(profile, state.returning);
+    if (owner && messageNamePlausible(owner)) {
+      // The greeting may say this. It is not spoken until that audio
+      // finishes, or until the caller-turn gate says it. A barge of the
+      // greeting must still ask here, and must not reach the model.
+      state.caller.fileNameAsked = owner;
+      state.caller.fileNameAskSpoken = false;
+    } else {
+      state.caller.messageNameAskSpoken = true;
+    }
+  }
+  return state;
 }
 
 function observeCallerTurn(state, input = {}) {
   let next = structuredClone(state || createBrainState(input.profile));
+  if (input.profile && input.profile.afterHoursMode != null) {
+    next.messageOnly = isMessageOnlyMode(input.profile.afterHoursMode);
+  }
   const text = String(input.text || '').trim();
   if (!next.returning && input.profile?.callerMemory) {
     next.returning = returningFileFromCard(input.profile.callerMemory);
@@ -454,6 +480,16 @@ function observeCallerTurn(state, input = {}) {
     };
   }
   const { collectKnownCallerNames } = require('./callerNameMatch');
+  const memoryCard = input.profile?.callerMemory || {};
+  const fileOwnerName = next.returning?.sharedLine
+    ? ''
+    : String(
+        memoryCard.fileOwnerName ||
+          memoryCard.name ||
+          next.returning?.fileOwnerName ||
+          ''
+      ).trim();
+  const askedFileName = String(state?.caller?.fileNameAsked || '').trim();
   const nameResolution = applyCallerNameConfirmation(
     {
       caller: state?.caller || next.caller,
@@ -466,12 +502,15 @@ function observeCallerTurn(state, input = {}) {
         profile: input.profile,
         state: state || next,
       }),
+      fileNameJustAsked: Boolean(askedFileName),
       pendingFileName:
+        askedFileName ||
         input.profile?.callerMemory?.fileOwnerName ||
         input.profile?.callerMemory?.name ||
         next.returning?.fileOwnerName ||
         next.returning?.name ||
         null,
+      fileOwnerName,
       lastAgentText: input.lastAgentText,
     }
   );
@@ -479,7 +518,28 @@ function observeCallerTurn(state, input = {}) {
   next.caller.name = nameResolution.name || null;
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
   next.caller.nameCollision = nameResolution.nameCollision || null;
+  if (next.messageOnly) {
+    const reconciled = reconcileMessageOnlyName({
+      previousCaller: state?.caller || {},
+      text,
+      resolution: nameResolution,
+      profile: input.profile,
+      returning: next.returning,
+    });
+    next.caller.name = reconciled.name;
+    next.caller.nameConfirmed = reconciled.nameConfirmed;
+    next.caller.fileNameAsked = reconciled.fileNameAsked;
+    next.caller.fileNameAskSpoken = reconciled.fileNameAskSpoken;
+    next.caller.messageNameAskSpoken = reconciled.messageNameAskSpoken;
+    if (reconciled.entitiesName) next.entities.name = reconciled.entitiesName;
+    else delete next.entities.name;
+  } else if (!next.caller.name) {
+    delete next.entities.name;
+  }
   applyLiveCallerFile(input.profile, next);
+  if (!next.messageOnly) {
+    next.caller.fileNameAsked = ownedFileAsk(next.returning, next.caller);
+  }
   if (!Boolean(state?.caller?.nameConfirmed) && next.caller.nameConfirmed) {
     const prior = (next.conversation.answersReceived || []).slice(0, -1);
     const askedRows = prior.some(
@@ -623,6 +683,13 @@ function applyVisitTimeAnswer(state, text, profile = {}) {
   const lastAsk = (next.conversation.questionsAsked || []).slice(-1)[0];
   const answeringTime = lastAsk === 'time' || next.conversation.pendingHour != null;
   const homeVisit = isHomeVisitState(next, profile);
+  if (text && /\b(any ?time|anytime|whenever|wakati wowote|saa yoyote)\b/i.test(text) && !clockPhrase(text)) {
+    const waivedWhen = whenValue(next);
+    if (waivedWhen && dayCue(waivedWhen)) {
+      next.conversation.timeWaived = true;
+      next.conversation.pendingHour = null;
+    }
+  }
   if (!homeVisit || !text) return next;
   const when = whenValue(next);
   if (when && clockPhrase(when) && BARE_NO.test(text)) {
@@ -935,7 +1002,28 @@ function recordActionResults(state, results = []) {
   return next;
 }
 
+function ownedFileAsk(returning, caller) {
+  if (!returning || caller?.nameConfirmed === true) return null;
+  if (returning.identityBound || returning.sharedLine) return null;
+  const who = String(returning.fileOwnerName || returning.name || '').trim();
+  return who || null;
+}
+
 function formatNameConfirmForPrompt(state) {
+  if (state?.messageOnly) {
+    const locked = String(state?.caller?.name || '').trim();
+    if (state?.caller?.nameConfirmed && locked) {
+      return `- Caller name: ${locked} (confirmed). Use this spelling. Do not ask for the name again. The callback uses this name. Do not read a visit.`;
+    }
+    const pending = String(state?.caller?.fileNameAsked || '').trim();
+    if (state?.caller?.fileNameAskSpoken && pending) {
+      return `- File name already asked: ${pending}. Use ${pending}. Do not ask for a name. Do not say May I have your name. A yes or "my name is ${pending}" locks it. Do not read open visits, holds, or callbacks. Do not say nothing is open.`;
+    }
+    if (locked) {
+      return `- Caller name is known (${locked}). Do not ask for the name again. Do not confirm a compliment. Take the message. Do not read a visit.`;
+    }
+    return '- Name was already asked once. Do not ask again. Save a name only after they say a plausible one. A compliment is not a name. Do not read a visit.';
+  }
   const name = String(state?.caller?.name || '').trim();
   const pair = Array.isArray(state?.caller?.nameCollision)
     ? state.caller.nameCollision.filter(Boolean)
@@ -944,7 +1032,20 @@ function formatNameConfirmForPrompt(state) {
     const heard = name || pair[0];
     return `- Name collision: heard ${heard}. Ask once: ${pair.join(' or ')}? Do not guess. Do not append save_caller_info until they pick one or spell it.`;
   }
-  if (!name) return '';
+  if (!name) {
+    const pending = String(state?.caller?.fileNameAsked || '').trim();
+    if (pending) {
+      if (state?.caller?.fileNameAskSpoken === true) {
+        return `- File name already asked: ${pending}. Use ${pending}. Do not ask for a name. Do not say May I have your name. Continue the next missing slot (day, time, place). A yes or "my name is ${pending}" locks it. Do not read open visits, holds, or callbacks unless they ask. Do not say nothing is open.`;
+      }
+      return `- Ask once, in these words: Am I speaking with ${pending}? Do not greet them as that name. Do not talk about visits yet. Do not say nothing is open. A yes means ${pending}.`;
+    }
+    const missing = Array.isArray(state?.goal?.missingSlots) ? state.goal.missingSlots : [];
+    if (missing.includes('name')) {
+      return '- Caller name: not on file. Ask once for their name. Do not ask again after they give one.';
+    }
+    return '';
+  }
   if (state?.caller?.nameConfirmed) {
     return `- Caller name: ${name} (confirmed). Use this spelling. Do not ask for the name again. Do not ask if the name is right. You may append save_caller_info with this confirmed name.`;
   }
@@ -968,6 +1069,13 @@ function formatHearAgainForPrompt(state) {
     return `- Hear-again: they missed the last line. Ask only for ${nextSlot} more clearly. Do not re-ask the name. Do not save, book, or call a tool.`;
   }
   return '- Hear-again: caller did not hear the last line. Repeat that question more clearly. Do not save, book, or call a tool.';
+}
+
+function pendingFileAskHidesEmptyDenial(state) {
+  const pending = String(state?.caller?.fileNameAsked || '').trim();
+  if (!pending || state?.caller?.nameConfirmed === true) return false;
+  const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
+  return !looksLikeFileRead(latest);
 }
 
 function formatBrainStateForPrompt(state) {
@@ -1000,7 +1108,20 @@ function formatBrainStateForPrompt(state) {
     `- ${formatRepairForPrompt(value)}`,
     formatNameConfirmForPrompt(value),
     formatHearAgainForPrompt(value),
-    formatReturningFileForCallState(value.returning),
+    formatReturningFileForCallState(
+      value.messageOnly
+        ? {
+            ...(value.returning || {}),
+            openVisits: [],
+            nextVisit: null,
+            recentBookings: [],
+          }
+        : value.returning,
+      {
+        fileNameAskSpoken: value.caller?.fileNameAskSpoken === true,
+        messageOnly: value.messageOnly === true,
+      }
+    ),
     value.conversation?.nonConsentAck
       ? '- Acknowledgment only (Then, Okay, Sawa, or leave it). Not a quantity, a time, or a yes. Do not invent a count. Do not say a visit or order is saved.'
       : '',
@@ -1011,13 +1132,23 @@ function formatBrainStateForPrompt(state) {
       ? '- No visit time after two asks. Do not ask again. Save a callback note with the day via create_service_request. The team confirms the time. Do not say booked.'
       : '',
     value.conversation?.phatic
-      ? speakerPendingOnFile(value.returning)
+      ? value.messageOnly
+        ? value.caller?.fileNameAskSpoken
+          ? `- Phatic turn: one short well, then take a message. File name ${value.caller.fileNameAsked} already asked. Do not ask for a name. Do not read a visit. Do not say nothing is open.`
+          : '- Phatic turn: one short well, then take a message. The name was already asked. Do not ask again. Do not read a visit. Do not invent a time.'
+        : value.caller?.fileNameAsked
+        ? value.caller?.fileNameAskSpoken === true
+          ? `- Phatic turn: one short well, then offer help. File name ${value.caller.fileNameAsked} already asked. Do not ask for a name. Do not talk about visits yet. Do not say nothing is open.`
+          : `- Phatic turn: one short well, then ask once: Am I speaking with ${value.caller.fileNameAsked}? Do not talk about visits yet. Do not say nothing is open.`
+        : speakerPendingOnFile(value.returning)
         ? '- Phatic turn: one short well, then offer help. Do not ask who is speaking. Do not use the file name. Do not list services.'
         : value.returning?.nextVisit && returningFileUsable(value.returning)
           ? '- Phatic turn: one short well, then the open visit. Do not list services or start a new book.'
           : '- Phatic turn: they only greeted or asked how you are. One short well, then offer help. Do not ask who is speaking. Do not list services, prices, or jobs.'
       : '',
-    hasReadableFile(value)
+    (value.messageOnly && String(value.caller?.fileNameAsked || '').trim()) ||
+    hasReadableFile(value) ||
+    pendingFileAskHidesEmptyDenial(value)
       ? ''
       : '- FILE: nothing is saved for this speaker. Do not talk as if a booking, order, or hold exists. If they ask again, or sound confused, repeat that nothing is saved. Do not offer to reschedule or cancel.',
     `- Handoff requested: ${value.handoff.requested ? 'yes' : 'no'}`,
@@ -1042,4 +1173,5 @@ module.exports = {
   recordActionResults,
   formatNameConfirmForPrompt,
   formatBrainStateForPrompt,
+  ownedFileAsk,
 };

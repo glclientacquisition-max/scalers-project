@@ -72,7 +72,8 @@ describe("settings list rest", () => {
     assert.match(form, />Closes</);
     assert.match(form, />Day</);
     assert.match(form, />Open</);
-    assert.match(form, />When closed</);
+    assert.doesNotMatch(form, />When closed</);
+    assert.match(form, /label="On a call"/);
   });
 
   it("shows policy rules only after they have text, plus Add rule", () => {

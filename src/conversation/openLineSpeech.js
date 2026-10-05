@@ -57,12 +57,31 @@ const LOOKUP_BLOCK_RE =
   /\b(?:cancel(?:led|lation)?|reschedul\w*|change|move|badilisha|ahirisha|kughairi|kubadilisha|book(?:\s+(?:a|an|me|us))?|schedule(?:\s+(?:a|an))?|(?:want|need|like) to book|what time|when (?:do|are) you open|opening hours|business hours|which services|what services|services do you offer|what do you offer)\b/i;
 
 const LOOKUP_RE =
-  /\b(?:inquire about (?:my |our )?(?:bookings?|visits?|appointments?)|(?:my|our) bookings?|do i have (?:a |any )?(?:visits?|bookings?|appointments?)|what are my (?:bookings?|visits?|appointments?)|check (?:on )?(?:my |our )?(?:bookings?|visits?|appointments?)|bookings zangu|booking yangu|ziara zangu)\b/i;
+  /\b(?:inquire about (?:my |our )?(?:bookings?|visits?|appointments?)|(?:my|our) bookings?|do i have (?:a |any )?(?:visits?|bookings?|appointments?)|what are my (?:bookings?|visits?|appointments?)|what (?:bookings?|visits?|appointments?) do i have|what do i have|check (?:on )?(?:my |our )?(?:bookings?|visits?|appointments?)|(?:just |please )?(?:list them|list my (?:bookings?|visits?|appointments?)|listed)|update me (?:about|on) what i have|tell me what i have|bookings zangu|booking yangu|ziara zangu|nini niko nayo|nilicho nacho|orodhesha|niambie (?:ziara|bookings))\b/i;
+
+// A later page of the same file. Not a new booking and not the first list.
+const REVIEW_MORE_RE =
+  /\b(?:older ones?|the rest|previous ones?|the previous|show me more|what else(?: do i have)?|more of them|and the rest|za zamani|zilizobaki|zingine|nyingine)\b/i;
+
+const HISTORY_RE =
+  /\b(?:my history|booking history|visit history|appointment history|past (?:bookings?|visits?|appointments?)|historia(?: yangu)?)\b/i;
 
 function looksLikeOpenVisitLookup(text) {
   const raw = String(text || '').trim();
   if (!raw || LOOKUP_BLOCK_RE.test(raw)) return false;
   return LOOKUP_RE.test(raw);
+}
+
+function looksLikeVisitReviewMore(text) {
+  const raw = String(text || '').trim();
+  if (!raw || LOOKUP_BLOCK_RE.test(raw)) return false;
+  return REVIEW_MORE_RE.test(raw);
+}
+
+function looksLikeHistoryReview(text) {
+  const raw = String(text || '').trim();
+  if (!raw || LOOKUP_BLOCK_RE.test(raw)) return false;
+  return HISTORY_RE.test(raw);
 }
 
 function openLineHoldDecision({
@@ -71,8 +90,11 @@ function openLineHoldDecision({
   callerText = '',
 } = {}) {
   const just = nameJustConfirmed === true;
-  const lookup =
-    nameConfirmed === true && !just && looksLikeOpenVisitLookup(callerText);
+  const asked =
+    looksLikeOpenVisitLookup(callerText) ||
+    looksLikeVisitReviewMore(callerText) ||
+    looksLikeHistoryReview(callerText);
+  const lookup = nameConfirmed === true && !just && asked;
   return {
     holdNameConfirm: just,
     holdVisitLookup: lookup,
@@ -99,8 +121,166 @@ function formatNameConfirmSpeech({
   return `${lines.join(' ')} ${question(lang)}`;
 }
 
+// Name lock must not publish the open file. A later visit, booking, hold,
+// callback, or order ask still can. The speech hold itself stays as it is.
+function shouldPublishOpenFileSentence(hold = {}, fileReadAsk = false) {
+  if (hold?.holdNameConfirm === true) return false;
+  return Boolean(hold?.holdVisitLookup || fileReadAsk);
+}
+
+const { messageOnlyNoVisitLine } = require('./messageOnly');
+const { pageCallerVisitReview } = require('./callerMemory');
+
+const VISIT_REVIEW_PAGE = 8;
+
+function pageSpokenLines(lines, page, pageSize) {
+  const source = (Array.isArray(lines) ? lines : []).filter(Boolean);
+  const size = pageSize;
+  const index = Math.max(0, page);
+  const start = index * size;
+  return {
+    lines: source.slice(start, start + size),
+    total: source.length,
+    hasMore: start + size < source.length,
+  };
+}
+
+function speakVisitLines(lines, language, { more = false } = {}) {
+  if (lines.length) {
+    return formatNameConfirmSpeech({
+      openVisits: lines,
+      openRequests: [],
+      language,
+    });
+  }
+  if (more) {
+    if (language === 'sw' || language === 'sheng') return 'Hakuna zaidi.';
+    return 'Nothing further back.';
+  }
+  return formatNameConfirmSpeech({ openVisits: [], openRequests: [], language });
+}
+
+/**
+ * Code speaks the file before the model. Open rows on a "what do I have" ask.
+ * Older rows only when they ask for history or the next page. No fixed maximum.
+ * Name lock and message-only do not read visits.
+ */
+function planVisitReadTurn({
+  nameConfirmed = false,
+  nameJustConfirmed = false,
+  callerText = '',
+  messageOnly = false,
+  language = 'en',
+  openVisits = [],
+  appointments = [],
+  cursor = null,
+  now = new Date(),
+  pageSize = VISIT_REVIEW_PAGE,
+} = {}) {
+  const more = looksLikeVisitReviewMore(callerText);
+  const history = looksLikeHistoryReview(callerText);
+  const lookup = looksLikeOpenVisitLookup(callerText);
+  const current =
+    cursor && typeof cursor === 'object' ? cursor : { phase: 'open', page: 0 };
+  if (!lookup && !more && !history) return { runModel: true, line: '', cursor: current };
+  if (nameJustConfirmed === true || nameConfirmed !== true) {
+    return { runModel: true, line: '', cursor: current };
+  }
+  const lang = languageOf(language);
+  if (messageOnly) {
+    return { runModel: false, line: messageOnlyNoVisitLine(lang), cursor: current };
+  }
+  const size = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : VISIT_REVIEW_PAGE;
+  const rows = Array.isArray(appointments) ? appointments : [];
+  const hasRows = rows.length > 0;
+
+  if (lookup && !more && !history) {
+    if (hasRows) {
+      const page = pageCallerVisitReview(rows, { page: 0, pageSize: size, now, scope: 'open' });
+      const done = pageCallerVisitReview(rows, { page: 0, pageSize: size, now, scope: 'done' });
+      const next = page.hasMore ? { phase: 'open', page: 1 } : { phase: 'done', page: 0 };
+      return {
+        runModel: false,
+        line: speakVisitLines(page.lines, lang),
+        cursor: next,
+        hasMore: page.hasMore || done.total > 0,
+      };
+    }
+    const page = pageSpokenLines(openVisits, 0, size);
+    return {
+      runModel: false,
+      line: speakVisitLines(page.lines, lang),
+      cursor: page.hasMore ? { phase: 'open', page: 1 } : { phase: 'done', page: 0 },
+      hasMore: page.hasMore,
+    };
+  }
+
+  if (history && !more) {
+    if (hasRows) {
+      const page = pageCallerVisitReview(rows, { page: 0, pageSize: size, now, scope: 'all' });
+      return {
+        runModel: false,
+        line: speakVisitLines(page.lines, lang, { more: true }),
+        cursor: page.hasMore ? { phase: 'all', page: 1 } : { phase: 'all', page: 0 },
+        hasMore: page.hasMore,
+      };
+    }
+    const page = pageSpokenLines(openVisits, 0, size);
+    return {
+      runModel: false,
+      line: speakVisitLines(page.lines, lang, { more: true }),
+      cursor: { phase: 'done', page: 0 },
+      hasMore: page.hasMore,
+    };
+  }
+
+  const phase = current.phase === 'open' || current.phase === 'all' ? current.phase : 'done';
+  const pageIndex = Math.max(0, Number(current.page) || 0);
+  if (hasRows) {
+    const page = pageCallerVisitReview(rows, {
+      page: pageIndex,
+      pageSize: size,
+      now,
+      scope: phase,
+    });
+    let next = { phase, page: pageIndex };
+    let hasMore = page.hasMore;
+    if (page.hasMore) next = { phase, page: pageIndex + 1 };
+    else if (phase === 'open') {
+      next = { phase: 'done', page: 0 };
+      const done = pageCallerVisitReview(rows, { page: 0, pageSize: size, now, scope: 'done' });
+      hasMore = done.total > 0;
+    }
+    return {
+      runModel: false,
+      line: speakVisitLines(page.lines, lang, { more: true }),
+      cursor: next,
+      hasMore,
+    };
+  }
+  if (phase === 'open') {
+    const page = pageSpokenLines(openVisits, pageIndex, size);
+    return {
+      runModel: false,
+      line: speakVisitLines(page.lines, lang, { more: true }),
+      cursor: page.hasMore ? { phase: 'open', page: pageIndex + 1 } : { phase: 'done', page: 0 },
+      hasMore: page.hasMore,
+    };
+  }
+  return {
+    runModel: false,
+    line: speakVisitLines([], lang, { more: true }),
+    cursor: { phase: 'done', page: pageIndex },
+    hasMore: false,
+  };
+}
+
 module.exports = {
   formatNameConfirmSpeech,
+  looksLikeHistoryReview,
   looksLikeOpenVisitLookup,
+  looksLikeVisitReviewMore,
   openLineHoldDecision,
+  planVisitReadTurn,
+  shouldPublishOpenFileSentence,
 };

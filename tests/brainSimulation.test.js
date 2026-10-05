@@ -90,7 +90,7 @@ describe('brain simulation: home visit', () => {
     const spoken = lines(sim);
     assert.match(spoken[2], /twelve noon\?/i);
     assert.equal(sim.saved.appointments.length, 1);
-    assert.match(sim.saved.appointments[0].whenText, /tomorrow 12 pm/i);
+    assert.equal(sim.saved.appointments[0].whenText, 'Wednesday 19 August 2026, 12 PM');
     assert.equal(sim.saved.serviceRequests.length, 0);
     clean(sim);
   });
@@ -205,7 +205,12 @@ describe('brain simulation: facts', () => {
     const sim = createSimulator({ profile: hospitality });
     await sim.run(['Do you have rooms tonight for 2 people?', 'How much per night?']);
     for (const line of lines(sim)) assert.doesNotMatch(line, /\b(500|7)\b/);
-    clean(sim);
+    // Filler-only speech ("we can help with that") is silence, not a made-up count.
+    assert.doesNotMatch(lines(sim).join('\n'), /we can help with that/i);
+    assert.deepEqual(
+      sim.violations.filter((row) => !/^dead_air:/.test(String(row))),
+      []
+    );
   });
 
   it('Swahili filler keeps the ask in Swahili and fires no tool', async () => {

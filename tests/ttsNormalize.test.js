@@ -80,8 +80,69 @@ console.log('spokenForms');
 test('expandMoney EN/SW', () => {
   assert.match(expandMoney('KES 5000', 'en'), /five thousand shillings/);
   assert.match(expandMoney('2000 bob', 'en'), /two thousand shillings/);
-  assert.match(expandMoney('Ksh 1500', 'sw'), /shilingi elfu moja mia tano/);
+  assert.strictEqual(expandMoney('Ksh 1500', 'sw'), 'shilingi elfu moja na mia tano');
+  assert.strictEqual(expandMoney('Ksh 600', 'sw'), 'shilingi mia sita');
+  assert.strictEqual(expandMoney('Ksh 2500', 'sw'), 'shilingi elfu mbili na mia tano');
   assert.ok(numberToSw(2000).includes('elfu'));
+});
+
+
+test('swahili prices are words, with na between thousands and hundreds', () => {
+  assert.strictEqual(numberToSw(1500), 'elfu moja na mia tano');
+  assert.strictEqual(numberToSw(600), 'mia sita');
+  assert.strictEqual(numberToSw(2500), 'elfu mbili na mia tano');
+  assert.strictEqual(expandSpokenForms('Bei ni 1500', 'sw'), 'Bei ni elfu moja na mia tano');
+  assert.strictEqual(expandSpokenForms('shilingi 1500', 'sw'), 'shilingi elfu moja na mia tano');
+  assert.strictEqual(expandSpokenForms('1500 shilingi', 'sw'), 'shilingi elfu moja na mia tano');
+  assert.strictEqual(
+    expandSpokenForms('The price is 3,000', 'sw'),
+    'The price is elfu tatu'
+  );
+  assert.strictEqual(expandSpokenForms('1.5k', 'sw'), 'elfu moja na mia tano');
+  assert.strictEqual(expandSpokenForms('1.5k', 'en'), '1500');
+  assert.strictEqual(
+    prepareForTts('Bei ni 1500.', { callLanguage: 'sw' }).text,
+    'Bei ni elfu moja na mia tano.'
+  );
+  assert.strictEqual(
+    prepareForTts('shilingi 1500.', { callLanguage: 'sw' }).text,
+    'shilingi elfu moja na mia tano.'
+  );
+  assert.strictEqual(
+    prepareForTts('1500 shilingi.', { callLanguage: 'sw' }).text,
+    'shilingi elfu moja na mia tano.'
+  );
+  assert.strictEqual(
+    prepareForTts('The price is 3,000.', { callLanguage: 'sw' }).text,
+    'The price is elfu tatu.'
+  );
+  assert.strictEqual(
+    prepareForTts('The price is 3,000.', { callLanguage: 'en' }).text,
+    'The price is 3,000.'
+  );
+  assert.strictEqual(
+    prepareForTts('Bei ni 1.5k.', { callLanguage: 'sw' }).text,
+    'Bei ni elfu moja na mia tano.'
+  );
+  assert.strictEqual(prepareForTts('It costs 1.5k.', { callLanguage: 'en' }).text, 'It costs 1500.');
+  assert.strictEqual(
+    prepareForTts('Piga 0712345678.', { callLanguage: 'sw' }).text,
+    'Piga 0 7 1 2 3 4 5 6 7 8.'
+  );
+  assert.strictEqual(
+    prepareForTts('Pay to till number 5194830.', { callLanguage: 'sw' }).text,
+    'Pay to till number 5 1 9 4 8 3 0.'
+  );
+  assert.match(
+    prepareForTts('Paybill 247247, account 10203040.', { callLanguage: 'sw' }).text,
+    /pay bill 2 4 7 2 4 7, account 1 0 2 0 3 0 4 0/
+  );
+  assert.strictEqual(
+    prepareForTts('Order number 45678.', { callLanguage: 'sw' }).text,
+    'Order number 4 5 6 7 8.'
+  );
+  assert.ok(!/elfu|mia/.test(prepareForTts('Piga 0712345678.', { callLanguage: 'sw' }).text));
+  assert.ok(!/elfu|mia/.test(prepareForTts('Order number 45678.', { callLanguage: 'sw' }).text));
 });
 
 test('expandMoney ranges convert both sides', () => {
@@ -111,7 +172,7 @@ test('expandMoney receipt shorthand /= and /-', () => {
   assert.strictEqual(expandMoney('500/-', 'en'), 'five hundred shillings');
   assert.strictEqual(
     expandMoney('1500/=', 'sw'),
-    'shilingi elfu moja mia tano'
+    'shilingi elfu moja na mia tano'
   );
   assert.strictEqual(expandMoney('500/-', 'sw'), 'shilingi mia tano');
   assert.strictEqual(
@@ -424,7 +485,7 @@ test('receipt shorthand with currency prefix never strands the code', () => {
   assert.strictEqual(prepareForTts('KSh 500/=', { callLanguage: 'en' }).text, 'five hundred shillings');
   assert.strictEqual(
     prepareForTts('Bei ni Ksh 2,500/=.', { callLanguage: 'sw' }).text,
-    'Bei ni shilingi elfu mbili mia tano.'
+    'Bei ni shilingi elfu mbili na mia tano.'
   );
 });
 
@@ -469,7 +530,7 @@ test('cents are spoken, never truncated', () => {
   assert.strictEqual(prepareForTts('KSh 0.50.', { callLanguage: 'en' }).text, 'fifty cents.');
   assert.strictEqual(
     prepareForTts('KSh 1,200.50', { callLanguage: 'sw' }).text,
-    'shilingi elfu moja mia mbili na senti hamsini'
+    'shilingi elfu moja na mia mbili na senti hamsini'
   );
 });
 

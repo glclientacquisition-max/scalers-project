@@ -163,8 +163,9 @@ function numberToSw(n) {
     else if (th < 100) head = `elfu ${numberToSwUnder100(th)}`;
     else head = `elfu ${numberToSw(th)}`;
     if (!rest) return head;
-    if (rest < 100) return `${head} ${numberToSwUnder100(rest)}`;
-    return `${head} ${numberToSw(rest)}`;
+    // "elfu moja na mia tano", not "elfu moja mia tano".
+    const tail = rest < 100 ? numberToSwUnder100(rest) : numberToSw(rest);
+    return `${head} na ${tail}`;
   }
   if (num < 1000000000) {
     const m = Math.floor(num / 1000000);
@@ -226,7 +227,7 @@ function formatAmountRange(rawA, rawB, lang, withUnit) {
 
 const AMOUNT_CAPTURE = '([\\d,]+(?:\\.\\d{1,2})?)';
 const RANGE_DASH = '(?:\\s*[-–—]\\s*|\\s+(?:to|hadi)\\s+)';
-const KES_PREFIX = '(?:kes|kshs|ksh|shillings?|sh)';
+const KES_PREFIX = '(?:kes|kshs|ksh|shillings?|shilingi|sh)';
 
 /**
  * Kenyan shorthand thousands: 50k → 50000, 1.5k → 1500.
@@ -234,11 +235,18 @@ const KES_PREFIX = '(?:kes|kshs|ksh|shillings?|sh)';
  * Guards block 5km / 10kg.
  * @param {string} text
  */
-function expandKThousands(text) {
-  return String(text || '').replace(/\b(\d+(?:\.\d+)?)k(?!\w)/gi, (full, raw) => {
+function expandKThousands(text, lang = 'en') {
+  return String(text || '').replace(/\b(\d+(?:\.\d+)?)k(?!\w)/gi, (full, raw, offset, src) => {
     const n = Number(raw);
     if (!Number.isFinite(n)) return full;
-    return String(Math.round(n * 1000));
+    const amount = Math.round(n * 1000);
+    const before = src.slice(Math.max(0, offset - 32), offset);
+    const currencyBefore =
+      /(?:\b(?:kes|kshs|ksh|shillings?|shilingi|sh|bob)\.?\s*)$/i.test(before);
+    // Bare shorthand (1.5k) is a price. On a Swahili call it must not stay digits.
+    // A currency word in front stays digits so expandMoney can claim KES 5k.
+    if (lang === 'sw' && !currencyBefore) return speakNumber(amount, 'sw');
+    return String(amount);
   });
 }
 
@@ -255,7 +263,7 @@ function expandMoney(text, lang = 'en') {
   // Prefix range: KSh 500-800 / KES 1,500–2,000/= / KSh 500 to 800
   out = out.replace(
     new RegExp(
-      `\\b${KES_PREFIX}\\.?\\s*${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}(?:\\s*(?:kes|ksh|kshs|bob|shillings?)|\\/[=-])?`,
+      `\\b${KES_PREFIX}\\.?\\s*${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}(?:\\s*(?:kes|ksh|kshs|bob|shillings?|shilingi)|\\/[=-])?`,
       'gi'
     ),
     (full, a, b) => formatAmountRange(a, b, ttsLang, true) || full
@@ -264,7 +272,7 @@ function expandMoney(text, lang = 'en') {
   // Suffix range: 500-800 bob / 1,500-2,000 shillings / 500 to 800 bob
   out = out.replace(
     new RegExp(
-      `\\b${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}\\s*(?:kes|ksh|kshs|bob|shillings?)\\b`,
+      `\\b${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}\\s*(?:kes|ksh|kshs|bob|shillings?|shilingi)\\b`,
       'gi'
     ),
     (full, a, b) => formatAmountRange(a, b, ttsLang, true) || full
@@ -317,7 +325,7 @@ function expandMoney(text, lang = 'en') {
   );
 
   out = out.replace(
-    /\b([\d,]+(?:\.\d{1,2})?)\s*(?:kes|ksh|kshs|bob|shillings?)\b/gi,
+    /\b([\d,]+(?:\.\d{1,2})?)\s*(?:kes|ksh|kshs|bob|shillings?|shilingi)\b/gi,
     (full, raw) => {
       const amount = parseAmount(raw);
       return amount == null ? full : speakAmount(amount, ttsLang);
@@ -347,6 +355,40 @@ function expandBarePriceInContext(text, lang = 'en') {
       }
       const amount = parseAmount(rawA);
       return amount == null ? full : `${label}${speakNumber(amount, ttsLang)}`;
+    }
+  );
+}
+
+
+/**
+ * Swahili calls must not leave a price as digits. Currency codes are already
+ * claimed by expandMoney. This catches "Bei ni 1500" and "The price is 3,000"
+ * when the call language is Swahili. Phones, tills, paybills, and order ids
+ * are not price cues, so they are left for the identifier and phone expanders.
+ * @param {string} text
+ * @param {'en'|'sw'|string} lang
+ */
+function looksLikeAccountNumber(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (/^0[17]\d{8}$/.test(digits)) return true;
+  if (/^254\d{9}$/.test(digits)) return true;
+  if (!String(raw || '').includes(',') && digits.length >= 8) return true;
+  return false;
+}
+
+function expandSwahiliBarePrices(text, lang = 'en') {
+  if (lang !== 'sw') return String(text || '');
+  return String(text || '').replace(
+    /\b((?:the\s+)?(?:bei|price)\b\s*(?:ni|is|ya|:)\s*)([\d,]+(?:\.\d{1,2})?)(?:\s*(?:[-–—]|to|hadi)\s*([\d,]+(?:\.\d{1,2})?))?/gi,
+    (full, label, rawA, rawB) => {
+      if (looksLikeAccountNumber(rawA) || (rawB && looksLikeAccountNumber(rawB))) return full;
+      const glue = /\s$/.test(label) ? '' : ' ';
+      if (rawB) {
+        const spoken = formatAmountRange(rawA, rawB, 'sw', false);
+        return spoken ? `${label}${glue}${spoken}` : full;
+      }
+      const amount = parseAmount(rawA);
+      return amount == null ? full : `${label}${glue}${speakNumber(amount, 'sw')}`;
     }
   );
 }
@@ -609,9 +651,10 @@ function expandPhones(text) {
 function expandSpokenForms(text, lang = 'en') {
   let out = String(text || '');
   out = expandTimeRanges12h(out, lang);
-  out = expandKThousands(out);
+  out = expandKThousands(out, lang);
   out = expandMoney(out, lang);
   out = expandBarePriceInContext(out, lang);
+  out = expandSwahiliBarePrices(out, lang);
   out = expandIdentifiers(out);
   out = expandNumberUnitRanges(out, lang);
   out = expandSwahiliClockTimes(out);
@@ -624,6 +667,7 @@ function expandSpokenForms(text, lang = 'en') {
 module.exports = {
   expandMoney,
   expandBarePriceInContext,
+  expandSwahiliBarePrices,
   expandKThousands,
   expandTimeRanges12h,
   expandIdentifiers,

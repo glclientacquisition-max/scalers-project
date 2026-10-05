@@ -93,7 +93,7 @@ function findCatalogMatch(text, profile = {}) {
 
 function cleanNameCapture(raw, opts = {}) {
   const value = String(raw || '')
-    .replace(/\s+(?:and|na|calling|looking|nataka)\b.*$/i, '')
+    .replace(/\s+(?:and|na|calling|looking|nataka|speaking|here)\b.*$/i, '')
     .trim();
   if (!isPlausibleCallerName(value)) return null;
   return canonicalizeCallerName(value, {
@@ -107,6 +107,44 @@ function looksLikeCompliment(text) {
     String(text || '')
   );
 }
+
+const IM_NAME_STOP =
+  /^(and|na|calling|looking|speaking|here|from|in|at|to|for|who|that|by|your|with|about|of|work)$/i;
+
+function earlierExplicitName(raw) {
+  if (
+    /(?:\bmy name is\b|\bi am called\b|\bi'm called\b|\bthis is\b|\bnaitwa\b|\bninaitwa\b|\bjina langu ni\b|\bjina ni\b)\s+[\p{L}'’-]/iu.test(
+      raw
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b[\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,2}\s+is(?:\s+(?:the|my))?\s+name\b/iu.test(raw)
+  ) {
+    return true;
+  }
+  if (/\b[\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,2}\s+is calling\b/iu.test(raw)) return true;
+  return false;
+}
+
+/** "I'm Alvin" is a name span. "I'm impressed by your work" is not. */
+function imIntroductionName(text) {
+  const raw = String(text || '');
+  if (!raw || looksLikeCompliment(raw) || earlierExplicitName(raw)) return null;
+  const im =
+    /\b(?:i'?m|i am)\s+([\p{L}'’-]+)(?:\s+([\p{L}'’-]+))?(?:\s+([\p{L}'’-]+))?/iu.exec(
+      raw
+    );
+  if (!im) return null;
+  const collected = [];
+  for (const word of [im[1], im[2], im[3]].filter(Boolean)) {
+    if (IM_NAME_STOP.test(word)) break;
+    collected.push(word);
+  }
+  return collected.join(' ') || null;
+}
+
 
 function extractName(text, opts = {}) {
   const raw = String(text || '');
@@ -139,28 +177,19 @@ function extractName(text, opts = {}) {
     if (captured) return captured;
   }
 
-  const im =
-    /\b(?:i'?m|i am)\s+([\p{L}'’-]+)(?:\s+([\p{L}'’-]+))?(?:\s+([\p{L}'’-]+))?/iu.exec(
-      raw
-    );
-  // "I'm impressed by your work" is not a name. "I'm Alvin" still is.
-  if (im && !looksLikeCompliment(raw)) {
-    const collected = [];
-    for (const word of [im[1], im[2], im[3]].filter(Boolean)) {
-      if (/^(and|na|calling|looking|from|in|at|to|for|who|that|by|your|with|about|of|work)$/i.test(word)) break;
-      collected.push(word);
-    }
-    const value = collected.join(' ');
+  const imValue = imIntroductionName(raw);
+  if (imValue) {
     const wordCount = raw.trim().split(/\s+/).length;
     const allowIntro =
       opts.firstMissing === 'name' ||
       wordCount <= 6 ||
       /^(?:hi|hello|hey|habari)[,.]?\s+(?:i'?m|i am)\b/i.test(raw.trim());
     if (allowIntro) {
-      const captured = cleanNameCapture(value, opts);
+      const captured = cleanNameCapture(imValue, opts);
       if (captured) return captured;
     }
   }
+
 
   if (opts.firstMissing === 'name') {
     const spoken =
@@ -220,6 +249,41 @@ function extractCorrectedName(text, opts = {}) {
     knownNames: opts.knownNames,
     preferKnown: false,
   });
+}
+
+function bareAskedFileName(text, pending) {
+  const asked = String(pending || '').trim();
+  if (!asked || isJunkCallerName(asked)) return false;
+  let raw = String(text || '')
+    .trim()
+    .replace(/[.!?]+$/g, '')
+    .trim();
+  raw = raw.replace(/^(?:uh+|um+|erm+|er+|ah+|eh+|hmm+)[, ]+/i, '').trim();
+  raw = raw.replace(/[.!?]+$/g, '').trim();
+  if (!raw || isJunkCallerName(raw)) return false;
+  const askedWords = asked.split(/\s+/).filter(Boolean);
+  const heardWords = raw.split(/\s+/).filter(Boolean);
+  if (heardWords.length !== askedWords.length) return false;
+  return namesLikelySame(raw, asked);
+}
+
+function affirmsAskedFileName(text, pending, extracted) {
+  const asked = String(pending || '').trim();
+  if (!asked) return false;
+  if (isNameAffirmation(text)) return true;
+  const raw = String(text || '').trim();
+  if (!/^(?:yes|yeah|yep|yup|ndiyo|ndio)\b/i.test(raw)) return false;
+  if (extracted && !namesLikelySame(extracted, asked) && !isJunkCallerName(extracted)) {
+    return false;
+  }
+  const escaped = asked.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const speaking = new RegExp(
+    `\\b(?:speaking with|speaking to|talking with|talking to)\\s+${escaped}\\b`,
+    'i'
+  );
+  if (speaking.test(raw)) return true;
+  const named = extractName(raw, { knownNames: [asked], preferKnown: true });
+  return Boolean(named && namesLikelySame(named, asked));
 }
 
 function fileLockedName(name, knownNames = []) {
@@ -310,7 +374,7 @@ function applyCallerNameConfirmation(
       return done(prevName, false, previous?.entities?.name?.source || 'caller_explicit', 0.9);
     }
     if (extracted && extracted !== prevName) {
-      if (samePerson(extracted, prevName)) {
+      if (samePerson(extracted, prevName) || isJunkCallerName(extracted)) {
         return done(prevName, true, previous?.entities?.name?.source || 'caller_explicit', 0.95);
       }
       return done(extracted, true, source, 0.95);
@@ -323,6 +387,30 @@ function applyCallerNameConfirmation(
     );
   }
 
+  // A yes binds only the file name the code just asked. It does not confirm
+  // some other "I'm …" span, and it does not depend on the model inventing the ask.
+  // Yes binds only the file name the code just asked, including
+  // "Yes, you're speaking with Alvin". It does not bind a different name.
+  if (
+    !prevConfirmed &&
+    opts.fileNameJustAsked &&
+    affirmsAskedFileName(text, opts.pendingFileName, extracted)
+  ) {
+    const pending = String(opts.pendingFileName || '').trim();
+    if (pending) {
+      const locked = fileLockedName(pending, knownNames) || pending;
+      return done(locked, true, 'caller_file', 0.95);
+    }
+  }
+
+  // "Uh, Alvin" after the file-name ask is that name, not a longer span.
+  if (!prevConfirmed && opts.fileNameJustAsked && bareAskedFileName(text, opts.pendingFileName)) {
+    const pending = String(opts.pendingFileName || '').trim();
+    const locked = fileLockedName(pending, knownNames) || pending;
+    return done(locked, true, 'caller_file', 0.95);
+  }
+
+  // Yes after the spoken "Am I speaking with {name}?" (visit-read path).
   if (!prevName && !extracted && isNameAffirmation(text)) {
     const pending = String(opts.pendingFileName || '').trim();
     if (pending && agentAskedPendingName(opts.lastAgentText, pending)) {
@@ -331,13 +419,29 @@ function applyCallerNameConfirmation(
     }
   }
 
+
   if (!prevName && extracted) {
+    if (source === 'caller_spelled') {
+      return done(extracted, true, source, entities.name?.confidence || 0.98);
+    }
+    // An "I'm …" span is confirmed only when it is the phone-file name.
+    // A different span is not stored while that name is still being asked,
+    // and it is not auto-confirmed just because it matches an alternate.
+    if (source === 'caller_im') {
+      const owner = String(opts.fileOwnerName || '').trim();
+      if (owner && samePerson(extracted, owner)) {
+        return done(owner, true, 'caller_file', 0.95);
+      }
+      if (owner) {
+        delete entities.name;
+        return done(null, false, source, 0.5);
+      }
+      const imPair = collisionGroupFor(extracted);
+      return done(extracted, false, source, entities.name?.confidence || 0.9, imPair);
+    }
     const locked = fileLockedName(extracted, knownNames);
     if (locked) {
       return done(locked, true, 'caller_file', 0.95);
-    }
-    if (source === 'caller_spelled') {
-      return done(extracted, true, source, entities.name?.confidence || 0.98);
     }
     const nextPair = collisionGroupFor(extracted);
     const autoConfirm = source === 'caller_explicit' && !nextPair;
@@ -349,6 +453,7 @@ function applyCallerNameConfirmation(
       nextPair
     );
   }
+
 
   if (prevName) {
     if (isHearAgainSignal(text)) {
@@ -756,7 +861,11 @@ function extractConversationEntities(
       knownNames,
       preferKnown,
     });
-  if (name && !entities.name) entities.name = entity(name, 'caller_explicit', 0.95, false);
+  if (name && !entities.name) {
+    const imRaw = imIntroductionName(text);
+    const fromIm = Boolean(imRaw) && namesLikelySame(imRaw, name);
+    entities.name = entity(name, fromIm ? 'caller_im' : 'caller_explicit', 0.95, false);
+  }
   const phone = extractPhone(text);
   if (phone) entities.phone = entity(phone, 'caller_explicit', 0.98, true);
   const when = extractWhen(text);
@@ -833,8 +942,11 @@ module.exports = {
   findCatalogMatch,
   extractName,
   looksLikeCompliment,
+  imIntroductionName,
+
   extractCorrectedName,
   isNameAffirmation,
+  affirmsAskedFileName,
   isNameNegation,
   applyCallerNameConfirmation,
   extractPhone,

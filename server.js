@@ -84,13 +84,26 @@ const {
   attachCallerMemory,
   liveCallerFileStamp,
 } = require('./src/conversation/callerMemory');
-const { formatNameConfirmSpeech, openLineHoldDecision } = require('./src/conversation/openLineSpeech');
+const {
+  formatNameConfirmSpeech,
+  looksLikeHistoryReview,
+  looksLikeOpenVisitLookup,
+  looksLikeVisitReviewMore,
+  openLineHoldDecision,
+  planVisitReadTurn,
+  shouldPublishOpenFileSentence,
+} = require('./src/conversation/openLineSpeech');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const { collectKnownCallerNames } = require('./src/conversation/callerNameMatch');
 const {
   buildBrainCapabilities,
   formatAuthorityPolicy,
 } = require('./src/conversation/brainPolicy');
+const {
+  applyMessageOnlyCapabilities,
+  messageFileOwnerName,
+  heldMessageCallerName,
+} = require('./src/conversation/messageOnly');
 const { determineNextBestAction } = require('./src/conversation/nextBestAction');
 const { logBrainTrace } = require('./src/conversation/brainObservability');
 const {
@@ -217,7 +230,7 @@ const {
   polishSpokenReply,
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
-const { resolveLocalReply } = require('./src/conversation/turnPolicy');
+const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
 const { narratesInternalAction } = require('./src/conversation/speechGuard');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -359,15 +372,18 @@ function capabilitiesForProfile(profile = {}, parsedTools = null) {
   const ready = liveTransferReady({
     profile: { ...profile, agentTools: tools },
   });
-  return buildBrainCapabilities(
-    { ...profile, agentTools: tools },
-    {
-      createServiceRequest: true,
-      createAppointment: true,
-      updateAppointment: true,
-      notifyCallback: true,
-      liveTransfer: ready.ready,
-    }
+  return applyMessageOnlyCapabilities(
+    buildBrainCapabilities(
+      { ...profile, agentTools: tools },
+      {
+        createServiceRequest: true,
+        createAppointment: true,
+        updateAppointment: true,
+        notifyCallback: true,
+        liveTransfer: ready.ready,
+      }
+    ),
+    profile.afterHoursMode
   );
 }
 
@@ -395,6 +411,19 @@ async function hydrateCallerMemory(profile, callSid) {
     getCall: (sid) => db.getCall(sid),
     getCallerMemory: (opts) => db.getCallerMemory(opts),
   });
+}
+
+async function loadVisitReviewAppointments(callSid, profile) {
+  try {
+    const call = await db.getCall(callSid);
+    const tenantId = profile?.id || call?.tenant_id;
+    const phone = call?.from_number || profile?.callerMemory?.phone;
+    if (!tenantId || !phone) return [];
+    return await db.listCallerAppointmentsForReview({ tenantId, phone });
+  } catch (err) {
+    console.warn(`[${callSid}] visit review load failed:`, err?.message || err);
+    return [];
+  }
 }
 
 let geminiClient = null;
@@ -1775,6 +1804,11 @@ mediaWss.on('connection', (ws, req) => {
   }
   let greetingStarted = false;
   let greetingAwaitingFirstPcm = false;
+  // A barge cancels the greeting before its name ask can be heard.
+  // Until this process commits that line, the caller turn must say it.
+  let greetingInterrupted = false;
+  let greetingSettled = false;
+  let fileNameAsksCommitted = 0;
   const firstForward = {
     greetingPlayed: false,
     greetingLogged: false,
@@ -1854,6 +1888,16 @@ mediaWss.on('connection', (ws, req) => {
       businessLocations: profile.businessLocations || [],
       teamDirectory: profile.teamDirectory || [],
       ttsLexicon: Array.isArray(profile.ttsLexicon) ? profile.ttsLexicon : [],
+      callerMemory: profile.callerMemory
+        ? {
+            name: profile.callerMemory.fileOwnerName || profile.callerMemory.name || null,
+            fileOwnerName:
+              profile.callerMemory.fileOwnerName || profile.callerMemory.name || null,
+            alternateNames: Array.isArray(profile.callerMemory.alternateNames)
+              ? profile.callerMemory.alternateNames
+              : [],
+          }
+        : null,
     };
     return buildSttContext(sttTenantSnapshot);
   }
@@ -1896,6 +1940,8 @@ mediaWss.on('connection', (ws, req) => {
         isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
         afterHoursMode,
         closureNotice,
+        callerFileName:
+          afterHoursMode === 'message' ? messageFileOwnerName(profile) : '',
       });
       messages = [{ role: 'system', content: systemPrompt }];
       profileLoaded = true;
@@ -2395,6 +2441,7 @@ mediaWss.on('connection', (ws, req) => {
       }
       return decision;
     }
+    if (!greetingSettled) greetingInterrupted = true;
     if (looksLikeJobNoun(text)) {
       firstForward.bargedJob = true;
       firstForward.bargeText = String(text || '').trim();
@@ -2650,9 +2697,70 @@ mediaWss.on('connection', (ws, req) => {
           `[ws/media][${callKey}] ${localReply.outcome} local line not spoken lang=${callLanguage}: ${localReply.line}`
         );
       }
+      // Phone file already has a name: ask only that. Do not let the model
+      // ask as if the name were missing, and do not attach visits.
+      // A greeting barge reaches this gate before Gemini. The model does not run.
+      const nameGate = planCallerModelTurn(brainState, {
+        greetingBarged: greetingInterrupted && !greetingSettled,
+        fileNameAskCommitted: fileNameAsksCommitted > 0,
+      });
+      const fileNameAsk = nameGate.line;
+      if (!nameGate.runModel && fileNameAsk) {
+        brainState.caller.fileNameAskSpoken = true;
+        fileNameAsksCommitted += 1;
+        callBrainStates.set(callKey, brainState);
+        console.log(`[ws/media][${callKey}] file name ask: ${fileNameAsk}`);
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(fileNameAsk);
+        turnTiming.markFirstSpokenChunk();
+        await speakText(fileNameAsk);
+        spokeThisTurn = true;
+        return;
+      }
       speechHold = holdCallerSpeech(callKey, messages);
       const fileReadAsk = localReply?.outcome === 'file_read';
-      suppressModelSpeech = Boolean(speechHold.holdSpeech || fileReadAsk);
+      // Name lock holds speech in the hold record, but must not publish the
+      // open file. A visit lookup after the lock still can.
+      suppressModelSpeech = shouldPublishOpenFileSentence(speechHold, fileReadAsk);
+      const visitAsk =
+        looksLikeOpenVisitLookup(clean) ||
+        looksLikeVisitReviewMore(clean) ||
+        looksLikeHistoryReview(clean);
+      let visitAppointments = [];
+      if (
+        visitAsk &&
+        brainState?.messageOnly !== true &&
+        brainState?.caller?.nameConfirmed === true &&
+        brainState?.caller?.nameJustConfirmed !== true
+      ) {
+        visitAppointments = await loadVisitReviewAppointments(callKey, brainProfile);
+      }
+      const visitRead = planVisitReadTurn({
+        nameConfirmed: brainState?.caller?.nameConfirmed === true,
+        nameJustConfirmed: brainState?.caller?.nameJustConfirmed === true,
+        callerText: clean,
+        messageOnly: brainState?.messageOnly === true,
+        language: callLanguage,
+        openVisits: brainState?.returning?.openVisits,
+        appointments: visitAppointments,
+        cursor: brainState?.conversation?.visitReview || null,
+      });
+      if (visitRead.runModel === false && visitRead.line) {
+        if (!brainState.conversation || typeof brainState.conversation !== 'object') {
+          brainState.conversation = {};
+        }
+        brainState.conversation.visitReview = visitRead.cursor;
+        callBrainStates.set(callKey, brainState);
+        console.log(`[ws/media][${callKey}] visit read before model: ${visitRead.line}`);
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(visitRead.line);
+        turnTiming.markFirstSpokenChunk();
+        await speakText(visitRead.line);
+        spokeThisTurn = true;
+        return;
+      }
       const bareCloser = looksLikeBareCloser(clean);
 
       const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
@@ -3151,7 +3259,10 @@ mediaWss.on('connection', (ws, req) => {
         const confirmation = String(result.actionConfirmation).trim();
         const lookupSpoken = spokenChunks.join(' ').trim();
         // The lookup sentence is already on the stream. Do not speakText it.
-        if (!(spokeLookupSentence && confirmation === lookupSpoken)) {
+        const alreadySaid =
+          /take a message|nitachukua ujumbe/i.test(lookupSpoken) &&
+          /take a message|nitachukua ujumbe/i.test(confirmation);
+        if (!(spokeLookupSentence && confirmation === lookupSpoken) && !alreadySaid) {
           await actionProgressSpeak;
           callTranscript.pushAgent(result.actionConfirmation);
           await speakText(result.actionConfirmation);
@@ -3492,6 +3603,16 @@ mediaWss.on('connection', (ws, req) => {
     resolveTtsReady(null);
   }
 
+  function markGreetingFileNameAsk(line) {
+    if (greetingInterrupted || fileNameAsksCommitted > 0) return;
+    if (!/Am I speaking with\s+\S/i.test(String(line || ''))) return;
+    const state = sessionCallSid ? callBrainStates.get(sessionCallSid) : null;
+    if (!state?.caller || state.caller.nameConfirmed === true) return;
+    state.caller.fileNameAskSpoken = true;
+    fileNameAsksCommitted += 1;
+    callBrainStates.set(sessionCallSid, state);
+  }
+
   // Greet once the tenant profile is loaded (correct shop name). Cached PCM
   // plays before TTS-ready wait so answer-to-greeting is not dead air.
   (async () => {
@@ -3524,6 +3645,8 @@ mediaWss.on('connection', (ws, req) => {
         isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
         afterHoursMode,
         closureNotice,
+        callerFileName:
+          afterHoursMode === 'message' ? messageFileOwnerName(brainProfile) : '',
         callSid: sidLabel(),
         mode: 'instant',
       });
@@ -3544,6 +3667,7 @@ mediaWss.on('connection', (ws, req) => {
         await playCachedFillerPcm(found.pcm, { text: greetingLine });
         callTranscript.pushAgent(greetingLine);
         messages.push({ role: 'assistant', content: greetingLine, local: true });
+        if (!greetingInterrupted) markGreetingFileNameAsk(greetingLine);
       } else {
         let readyTts = await ttsReadyPromise;
         if (speechOutageStarted) return;
@@ -3586,6 +3710,7 @@ mediaWss.on('connection', (ws, req) => {
         if (spoken?.ok) {
           callTranscript.pushAgent(greetingLine);
           messages.push({ role: 'assistant', content: greetingLine, local: true });
+          if (!greetingInterrupted && !spoken.cancelled) markGreetingFileNameAsk(greetingLine);
         }
       }
       if (tts && isFillerCacheEnabled()) {
@@ -3604,7 +3729,9 @@ mediaWss.on('connection', (ws, req) => {
           })
           .catch(() => {});
       }
+      greetingSettled = true;
     } catch (err) {
+      greetingSettled = true;
       console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
       try {
         if (isDefaultShopName(businessName) || !tts) {
@@ -4471,6 +4598,55 @@ wss.on('connection', (ws) => {
           .filter(Boolean)
           .join('\n\n');
 
+        const nameGate = planCallerModelTurn(brainState, {
+          greetingBarged: false,
+          fileNameAskCommitted: brainState?.caller?.fileNameAskSpoken === true,
+        });
+        if (!nameGate.runModel && nameGate.line) {
+          brainState.caller.fileNameAskSpoken = true;
+          callBrainStates.set(callSid, brainState);
+          transcriptLog.push(`Agent: ${nameGate.line}`);
+          ws.send(JSON.stringify({ type: 'text', token: nameGate.line, last: true }));
+          await db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') });
+          return;
+        }
+
+        const promptText = String(data.voicePrompt || '');
+        const promptVisitAsk =
+          looksLikeOpenVisitLookup(promptText) ||
+          looksLikeVisitReviewMore(promptText) ||
+          looksLikeHistoryReview(promptText);
+        let promptAppointments = [];
+        if (
+          promptVisitAsk &&
+          brainState?.messageOnly !== true &&
+          brainState?.caller?.nameConfirmed === true &&
+          brainState?.caller?.nameJustConfirmed !== true
+        ) {
+          promptAppointments = await loadVisitReviewAppointments(callSid, brainProfile);
+        }
+        const promptVisitRead = planVisitReadTurn({
+          nameConfirmed: brainState?.caller?.nameConfirmed === true,
+          nameJustConfirmed: brainState?.caller?.nameJustConfirmed === true,
+          callerText: promptText,
+          messageOnly: brainState?.messageOnly === true,
+          language: callLanguage,
+          openVisits: brainState?.returning?.openVisits,
+          appointments: promptAppointments,
+          cursor: brainState?.conversation?.visitReview || null,
+        });
+        if (promptVisitRead.runModel === false && promptVisitRead.line) {
+          if (!brainState.conversation || typeof brainState.conversation !== 'object') {
+            brainState.conversation = {};
+          }
+          brainState.conversation.visitReview = promptVisitRead.cursor;
+          callBrainStates.set(callSid, brainState);
+          transcriptLog.push(`Agent: ${promptVisitRead.line}`);
+          ws.send(JSON.stringify({ type: 'text', token: promptVisitRead.line, last: true }));
+          await db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') });
+          return;
+        }
+
         const reply = await runGeminiTurn(messages, callSid, turnPrompt);
         const replyText = [reply.spokenText, reply.actionConfirmation]
           .filter(Boolean)
@@ -4652,6 +4828,9 @@ async function applyGeminiTools(callSid, parsed) {
       groundedProfile.businessName || process.env.BUSINESS_NAME || '',
     hoursSchedule: groundedProfile.hoursSchedule || null,
     nameConfirmed: state.caller?.nameConfirmed === true,
+    heldCallerName: state.messageOnly
+      ? heldMessageCallerName(state.caller)
+      : String(state.caller?.name || '').trim(),
     openAppointments: groundedProfile.openAppointments || [],
     callerPhone: state.caller?.phone || '',
     knownNames: collectKnownCallerNames({

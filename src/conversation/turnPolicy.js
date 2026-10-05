@@ -24,6 +24,7 @@ const {
 } = require('./callCorrectives');
 const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
 const { hoursAskLine, offerCatalogueLine } = require('./knownFacts');
+const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
@@ -60,6 +61,47 @@ function classifyCallerTurn(text) {
  * Deterministic reply before Gemini. Returns null when Gemini should run.
  * @returns {{ outcome: string, line: string } | null}
  */
+function fileNameAskLine(state) {
+  if (state?.caller?.nameConfirmed === true) return '';
+  if (state?.caller?.fileNameAskSpoken === true) return '';
+  const pending = String(state?.caller?.fileNameAsked || '').trim();
+  if (!pending) return '';
+  return `Am I speaking with ${pending}?`;
+}
+
+/**
+ * One gate in front of every model turn, including a greeting barge.
+ * A cancelled greeting did not deliver the ask. Until this process commits
+ * the line, the only reply is "Am I speaking with {name}?" and the model
+ * does not run. A heard greeting or a committed ask is not asked again.
+ */
+function planCallerModelTurn(state, opts = {}) {
+  const caller = state?.caller;
+  if (
+    caller &&
+    opts.greetingBarged === true &&
+    opts.fileNameAskCommitted !== true &&
+    caller.nameConfirmed !== true
+  ) {
+    caller.fileNameAskSpoken = false;
+  }
+  if (
+    caller &&
+    caller.nameConfirmed !== true &&
+    caller.fileNameAskSpoken !== true &&
+    !String(caller.fileNameAsked || '').trim() &&
+    state?.returning &&
+    !state.returning.sharedLine &&
+    !state.returning.identityBound
+  ) {
+    const who = String(state.returning.fileOwnerName || state.returning.name || '').trim();
+    if (who) caller.fileNameAsked = who;
+  }
+  const line = fileNameAskLine(state);
+  if (line) return { runModel: false, line };
+  return { runModel: true, line: '' };
+}
+
 function resolveLocalReply({
   text,
   state,
@@ -117,7 +159,16 @@ function resolveLocalReply({
   const action = String(decision.action || state?.resolution?.nextBestAction || '');
   const slot = String(decision.slot || state?.resolution?.targetSlot || '');
   const timeAsk = action === 'ASK_CLARIFICATION' && slot === 'time';
-  if (timeAsk && !looksLikeLeaveIt(clean) && !looksLikeUrgentContact(clean)) {
+  if (
+    state?.messageOnly &&
+    timeAsk &&
+    !looksLikeLeaveIt(clean) &&
+    !looksLikeUrgentContact(clean) &&
+    !callerTurnKinds(clean).knowledge
+  ) {
+    return { outcome: 'message_only', line: messageOnlyCallbackLine(language) };
+  }
+  if (timeAsk && !state?.messageOnly && !looksLikeLeaveIt(clean) && !looksLikeUrgentContact(clean)) {
     return {
       outcome: 'visit_time',
       line: timeAskLine({
@@ -142,5 +193,7 @@ function resolveLocalReply({
 
 module.exports = {
   classifyCallerTurn,
+  fileNameAskLine,
+  planCallerModelTurn,
   resolveLocalReply,
 };

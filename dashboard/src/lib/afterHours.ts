@@ -6,14 +6,14 @@ export const AFTER_HOURS_OPTIONS: {
   blurb: string;
 }[] = [
   {
-    id: "serve",
-    label: "Keep helping",
-    blurb: "Answer and capture leads when closed.",
-  },
-  {
     id: "message",
     label: "Message only",
-    blurb: "Note the request for a callback.",
+    blurb: "Take a name and a message.",
+  },
+  {
+    id: "serve",
+    label: "Full assistant",
+    blurb: "Answer, book, and change a visit.",
   },
 ];
 

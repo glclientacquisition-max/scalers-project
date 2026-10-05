@@ -1654,18 +1654,6 @@ export function TenantForm({
               </div>
             );
           })}
-          <div className="space-y-1.5 px-4 py-3">
-            <p className="text-sm font-medium text-ink">When closed</p>
-            <SettingsSegmented
-              label="When closed"
-              value={afterHoursMode}
-              options={AFTER_HOURS_OPTIONS.map((opt) => ({
-                id: opt.id,
-                label: opt.label,
-              }))}
-              onChange={setAfterHoursMode}
-            />
-          </div>
         </SettingsGroup>
       </section>
 
@@ -2006,6 +1994,18 @@ export function TenantForm({
               {voiceSampleError}
             </p>
           ) : null}
+          <div className="space-y-1.5 px-4 py-3">
+            <p className="text-sm font-medium text-ink">On a call</p>
+            <SettingsSegmented
+              label="On a call"
+              value={afterHoursMode}
+              options={AFTER_HOURS_OPTIONS.map((opt) => ({
+                id: opt.id,
+                label: opt.label,
+              }))}
+              onChange={setAfterHoursMode}
+            />
+          </div>
         </SettingsGroup>
         <SettingsGroup title="Tools">
           {AGENT_TOOL_OPTIONS.map((opt) => {

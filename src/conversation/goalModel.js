@@ -41,9 +41,19 @@ function hasAnyEntity(entities, keys) {
   return keys.some((key) => Boolean(entityValue(entities?.[key])));
 }
 
+/** File name the code already asked aloud; keep using it for slots. */
+function spokenFileName(state) {
+  if (state?.caller?.nameConfirmed === true) return '';
+  if (state?.caller?.fileNameAskSpoken !== true) return '';
+  return String(state?.caller?.fileNameAsked || '').trim();
+}
+
 function slotFilled(state, requirement) {
-  if (requirement.slot === 'name' && String(state?.caller?.name || '').trim()) {
-    return true;
+  if (requirement.slot === 'name') {
+    if (String(state?.caller?.name || '').trim()) return true;
+    // After the file-name ask was spoken, do not treat the file as nameless.
+    // Message only uses the same ask, so a later callback does not ask again.
+    if (spokenFileName(state)) return true;
   }
   return hasAnyEntity(state?.entities || {}, requirement.anyOf);
 }
@@ -122,7 +132,12 @@ function homeVisitDecision(state, profile = {}) {
 
 function visitSopSlotValue(state, slot) {
   if (slot === 'name') {
-    return String(state?.caller?.name || '').trim() || entityValue(state?.entities?.name);
+    return (
+      String(state?.caller?.name || '').trim() ||
+      entityValue(state?.entities?.name) ||
+      spokenFileName(state) ||
+      ''
+    );
   }
   if (slot === 'service') {
     return (
@@ -140,6 +155,7 @@ function visitSopSlotValue(state, slot) {
 }
 
 function formatVisitSopForPrompt(state) {
+  if (state?.messageOnly) return '';
   const vertical = String(state?.vertical || '').toLowerCase();
   if (vertical !== 'home_services' || String(state?.intent || '') !== 'booking') {
     return '';
@@ -185,6 +201,18 @@ function formatVisitSopForPrompt(state) {
     } else if (next === 'location' && decision?.quality === 'area_only') {
       nextLine =
         'You have the area. Ask once which building, gate, or junction. Never say landmark.';
+    } else if (next === 'name') {
+      const pending = String(state?.caller?.fileNameAsked || '').trim();
+      const spoken = spokenFileName(state);
+      if (spoken) {
+        nextLine = job
+          ? `Name ${job} in one clause, then ask only for the next missing slot. Use ${spoken}. Do not ask for a name. Never say landmark.`
+          : `Use ${spoken}. Do not ask for a name. Ask only for the next missing slot. Never say landmark.`;
+      } else {
+        nextLine = pending
+          ? `Ask once: Am I speaking with ${pending}? Do not ask for a different name. Do not talk about visits yet. Never say landmark.`
+          : 'No name is on file. Ask once for their name. Do not ask again after they give one. Never say landmark.';
+      }
     } else if (next) {
       nextLine = job
         ? `Name ${job} in one clause, then ask only for ${next}. Never re-ask a filled slot. Never say landmark.`
@@ -218,6 +246,9 @@ function clarificationForSlot(slot) {
 }
 
 function formatControlVoiceForPrompt(state) {
+  if (state?.messageOnly) {
+    return '- Control: answer services, price, hours, and where the business is. Do not collect a booking.';
+  }
   const job =
     visitSopSlotValue(state, 'service') ||
     entityValue(state?.entities?.product) ||
@@ -239,6 +270,16 @@ function formatControlVoiceForPrompt(state) {
 }
 
 function formatGoalRequirementsForPrompt(state) {
+  if (state?.messageOnly) {
+    const pending = String(state?.caller?.fileNameAsked || '').trim();
+    const locked = state?.caller?.nameConfirmed ? String(state?.caller?.name || '').trim() : '';
+    const nameLine = locked
+      ? `The name is ${locked}. Do not ask for it again.`
+      : pending && state?.caller?.fileNameAskSpoken
+        ? `File name already asked: ${pending}. Use ${pending}. Do not ask for a name. Do not say May I have your name.`
+        : 'The name was already asked once. Do not ask again. A compliment is not a name.';
+    return `Message only. Answer services, prices, hours, and where the business is from the file. Do not ask which service to book, a day, a time, or a place. If they want a visit, say you will take a message and the team will call them. ${nameLine} Do not read a visit.`;
+  }
   const missing = Array.isArray(state?.goal?.missingSlots)
     ? state.goal.missingSlots
     : [];
@@ -253,6 +294,7 @@ function formatGoalRequirementsForPrompt(state) {
 }
 
 module.exports = {
+  spokenFileName,
   GOAL_REQUIREMENTS,
   hasAnyEntity,
   missingGoalSlots,

@@ -108,6 +108,14 @@ function ackIsConsent(questionsAsked, text) {
 function looksLikeUrgentContact(text) {
   const t = normalizeAckText(text);
   if (!t) return false;
+  // "Contact me urgently about the window cleaning" is a note for the team.
+  // A cleaning job that is merely urgent stays a visit, not this ask.
+  if (
+    /\bcontact\b.{0,40}\burgent(?:ly)?\b/.test(t) ||
+    /\burgent(?:ly)?\b.{0,40}\bcontact\b/.test(t)
+  ) {
+    return true;
+  }
   if (
     /\b(carpet|couch|sofa|mattress|clean|cleaning|cleanup|airbnb|air\s*bnb|bnb|diary|diaries|order)\b/.test(
       t
@@ -116,8 +124,6 @@ function looksLikeUrgentContact(text) {
     return false;
   }
   return (
-    /\bcontact\b.{0,24}\burgent(?:ly)?\b/.test(t) ||
-    /\burgent(?:ly)?\b.{0,24}\bcontact\b/.test(t) ||
     /\b(?:it is|its|this is) urgent\b/.test(t) ||
     /\b(?:ni|iko) (?:haraka|dharura)\b/.test(t)
   );

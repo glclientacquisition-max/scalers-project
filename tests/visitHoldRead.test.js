@@ -81,7 +81,7 @@ describe('visit and hold read before the empty-file line', () => {
     const block = formatReturningCallerForPrompt(bindCallerMemoryCard(card, 'Alvin'));
     assert.match(block, /Open: visit \| carpet cleaning/i);
     assert.match(block, /Open: visit \| pet stain/i);
-    assert.match(block, /immediately say each still-open line/);
+    assert.match(block, /unless the caller asks/);
   });
 
   it('reads history for previous ones instead of the empty-file denial', () => {
@@ -153,7 +153,7 @@ describe('visit and hold read before the empty-file line', () => {
     assert.notEqual(line, BOOKING_DENIAL);
     const block = formatReturningCallerForPrompt(bindCallerMemoryCard(card, 'Esga'));
     assert.match(block, /Open: hold \| Atomic Habits/i);
-    assert.match(block, /immediately say each still-open line/);
+    assert.match(block, /unless the caller asks/);
     assert.doesNotMatch(block, /I don't have an order or a hold for you/);
   });
 

@@ -8,8 +8,10 @@
 
 const { namesMatch } = require('./contactIdentity');
 const { isJunkCallerName } = require('./callerNameQuality');
+const { isPlausibleCallerName } = require('./entityExtraction');
 const { compactNameKey } = require('./callerNameMatch');
 const { classifyLivedVisit } = require('./visitCalendar');
+const { parseAbsoluteWhenDate } = require('./appointmentHours');
 
 const CLIP = 80;
 
@@ -28,6 +30,29 @@ function looksLikeTranscript(text) {
   const value = String(text || '');
   if (/\b(caller|agent|assistant)\s*:/i.test(value)) return true;
   return (value.match(/\n/g) || []).length >= 3;
+}
+
+
+const NAME_CRUMB =
+  /^(?:speaking|speak|speaks|bwana|mr|mrs|ms|miss|sir|madam|the|a|an|my|your|by|of|to|for|and|with|from|aje|nauliza|jina|name|uh|um|yes|yeah|this|is|am|i|im)$/i;
+
+/** Another person on this phone. Same-person speech and junk are not a shared line. */
+function distinctOtherPerson(primary, alternate) {
+  const alt = String(alternate || '').trim();
+  if (!alt || isJunkCallerName(alt)) return false;
+  if (primary && namesMatch(alt, primary)) return false;
+  const owner = new Set(
+    String(primary || '')
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+  );
+  const leftover = alt.split(/\s+/).filter((word) => {
+    const lower = word.toLowerCase();
+    return !NAME_CRUMB.test(lower) && !owner.has(lower);
+  });
+  if (!leftover.length) return false;
+  return isPlausibleCallerName(leftover.join(' '));
 }
 
 function alternateNames(metadata) {
@@ -55,7 +80,7 @@ function buildCallerMemoryCard({
   const phone = String(contact.phone || '').trim();
   const name = String(contact.name || '').trim() || null;
   const alternates = alternateNames(contact.metadata);
-  const sharedLine = alternates.length > 0;
+  const sharedLine = alternates.some((alt) => distinctOtherPerson(name, alt));
   const lived = collectLivedAppointments(
     nextAppointment,
     recentAppointments,
@@ -74,14 +99,14 @@ function buildCallerMemoryCard({
     .map(clipRequestLine)
     .filter(Boolean);
   const openVisitLines = lived.open
-    .map((item) => clipVisitLine(item.row))
+    .map((item) => clipVisitLine(item.row, { whenMax: null }))
     .filter(Boolean);
   const appointment = openVisitLines[0] || null;
   const nextVisitService = nextRow
     ? clip(nextRow.service_name || nextRow.serviceName, 48) || null
     : null;
   const nextVisitWhen = nextRow
-    ? clip(nextRow.when_text || nextRow.whenText, 32) || null
+    ? fullWhen(nextRow.when_text || nextRow.whenText) || null
     : null;
   const nextVisitStatus = nextRow ? clip(nextRow.status, 16) || null : null;
   const nextVisitLandmark = nextRow
@@ -151,10 +176,21 @@ function joinWorkBits(parts) {
   return parts.filter(Boolean).join(' | ');
 }
 
-function clipVisitLine(row) {
+function fullWhen(raw) {
+  const clean = String(raw || '')
+    .replace(/[—–]/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean || looksLikeTranscript(clean)) return '';
+  return clean;
+}
+
+function clipVisitLine(row, opts = {}) {
   if (!row || typeof row !== 'object') return null;
   const service = clip(row.service_name || row.serviceName, 48);
-  const whenText = clip(row.when_text || row.whenText, 32);
+  const whenMax = Object.prototype.hasOwnProperty.call(opts, 'whenMax') ? opts.whenMax : 32;
+  const whenText =
+    whenMax == null ? fullWhen(row.when_text || row.whenText) : clip(row.when_text || row.whenText, whenMax);
   const status = clip(row.status, 16);
   const landmark = clip(
     row.address_landmark || row.addressLandmark || row.landmark,
@@ -233,6 +269,8 @@ function whenPhraseIn(notes) {
 function whenTextThisRowOwns(row) {
   const whenText = String(row?.when_text || row?.whenText || '').trim();
   if (rowHasWindow(row)) return whenText;
+  // Absolute Nairobi day saved with empty windows (#545) is this row's when.
+  if (whenText && parseAbsoluteWhenDate(whenText)) return whenText;
   const notes = String(row?.notes || '').trim();
   if (!notes) return '';
   if (whenText && notes.toLowerCase().includes(whenText.toLowerCase())) return whenText;
@@ -354,6 +392,70 @@ function splitRequestRows(rows, now) {
     return a.lived.past ? tb - ta : ta - tb;
   });
   return { open: open.map((item) => item.row), finished };
+}
+
+function reviewStamp(row, index) {
+  const at = Date.parse(row?.created_at || row?.createdAt || '');
+  return { at: Number.isFinite(at) ? at : 0, index };
+}
+
+function isOpenUpcoming(row, now) {
+  const lived = classifyLivedVisit(row, now);
+  const status = String(row?.status || '').toLowerCase();
+  const openStatus = !status || status === 'requested' || status === 'confirmed';
+  return openStatus && !lived.past;
+}
+
+/**
+ * Open and upcoming first, then done or past rows. Newest first inside each
+ * group. No maximum: the caller pages with `page` until hasMore is false.
+ */
+function orderCallerAppointmentsForReview(rows = [], now = new Date()) {
+  const open = [];
+  const done = [];
+  (Array.isArray(rows) ? rows : []).forEach((row, index) => {
+    if (!row || typeof row !== 'object') return;
+    const stamp = reviewStamp(row, index);
+    (isOpenUpcoming(row, now) ? open : done).push({ row, ...stamp });
+  });
+  const byNewest = (a, b) => b.at - a.at || b.index - a.index;
+  open.sort(byNewest);
+  done.sort(byNewest);
+  return {
+    open: open.map((item) => item.row),
+    done: done.map((item) => item.row),
+  };
+}
+
+function reviewVisitLine(row) {
+  if (!row || typeof row !== 'object') return null;
+  const service = clip(row.service_name || row.serviceName, 80);
+  const whenText = fullWhen(row.when_text || row.whenText);
+  const status = clip(row.status, 16);
+  const landmark = clip(row.address_landmark || row.addressLandmark || row.landmark, 80);
+  return joinWorkBits([service, whenText, status, landmark]) || null;
+}
+
+function pageCallerVisitReview(rows = [], { page = 0, pageSize = 8, now = new Date(), scope = 'all' } = {}) {
+  const ordered = orderCallerAppointmentsForReview(rows, now);
+  const source =
+    scope === 'open'
+      ? ordered.open
+      : scope === 'done'
+        ? ordered.done
+        : [...ordered.open, ...ordered.done];
+  const size = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 8;
+  const index = Math.max(0, Math.floor(Number(page) || 0));
+  const start = index * size;
+  const slice = source.slice(start, start + size);
+  return {
+    page: index,
+    pageSize: size,
+    lines: slice.map(reviewVisitLine).filter(Boolean),
+    total: source.length,
+    hasMore: start + size < source.length,
+    scope,
+  };
 }
 
 function selectRecentAppointmentRows(rows = [], nextAppointment = null) {
@@ -691,7 +793,7 @@ function openVisitLinesOf(card) {
 }
 
 function stillOpenUseLine() {
-  return '- Use: when the caller has confirmed their name and CALL STATE lists an open visit or open request, immediately say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. If they want one moved or cancelled, update that one. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name. If no Open line remains, you may say nothing is still open.';
+  return '- Use: do not read open visits, holds, callbacks, or orders unless the caller asks about them. If they ask, say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. Do not read them on the turn the name is confirmed. If they want one moved or cancelled, update that one. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name. If they ask and no Open line remains, you may say nothing is still open.';
 }
 
 function formatReturningCallerForPrompt(card) {
@@ -715,7 +817,7 @@ function formatReturningCallerForPrompt(card) {
   }
 
   const lines = [
-    'RETURNING CALLER (lived file. Cite a row. Do not read this as a list):',
+    'RETURNING CALLER (lived file. Cite a row they name. If they ask what they have, the backend speaks the open rows. Do not ask which visit to update):',
     `- Speaker: ${identity}`,
   ];
 
@@ -754,7 +856,7 @@ function formatReturningCallerForPrompt(card) {
     );
     lines.push(
       mayHaveVisit
-        ? `- Use: confirm once, "Am I speaking with ${fileWho || 'the name on this number'}?" Do not greet them as that name. Do not talk about visits yet. If they say no, ask who is speaking and do not read this file. If they confirm, and open lines are listed, immediately say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. Answer what they just said.`
+        ? `- Use: confirm once, "Am I speaking with ${fileWho || 'the name on this number'}?" Do not greet them as that name. Do not talk about visits yet. If they say no, ask who is speaking and do not read this file. If they confirm, answer what they just said. Do not read open visits, holds, callbacks, or orders on that turn.`
         : '- Use: do not ask who is speaking unless you are about to save something. Do not attach Open, Last, or History yet. Do not greet them as the file name. Answer what they just said.'
     );
   } else if (!usable) {
@@ -782,7 +884,7 @@ function formatReturningCallerForPrompt(card) {
   return lines.join('\n');
 }
 
-function formatReturningFileForCallState(returning) {
+function formatReturningFileForCallState(returning, opts = {}) {
   if (!returning || typeof returning !== 'object') return '';
   if (!speakerKnownOnFile(returning)) {
     const who = returning.fileOwnerName || returning.name;
@@ -790,6 +892,12 @@ function formatReturningFileForCallState(returning) {
       return '- Caller file speaker: not bound. Shared line. Do not ask who is speaking unless you are about to save something. Do not use the file name. Do not attach Open or History. Answer what they just said.';
     }
     if (who) {
+      if (opts.fileNameAskSpoken === true) {
+        if (opts.messageOnly) {
+          return `- Caller file speaker: not bound. Phone file for ${who}. File name already asked. Use ${who}. Do not ask for a name. Do not say May I have your name. A yes or "my name is ${who}" locks it. Do not read open visits. Answer what they just said.`;
+        }
+        return `- Caller file speaker: not bound. Phone file for ${who}. File name already asked. Use ${who}. Do not ask for a name. Do not say May I have your name. Continue the next missing slot. A yes or "my name is ${who}" locks it. Do not read open visits, holds, or callbacks unless they ask. Answer what they just said.`;
+      }
       return `- Caller file speaker: not bound. Phone file for ${who}. Ask once: Am I speaking with ${who}? Do not greet them as that name. Do not talk about visits yet. If they say no, do not read this file. Answer what they just said.`;
     }
     return '- Caller file speaker: not bound. Do not attach a visit until they say who they are. Answer what they just said.';
@@ -817,7 +925,7 @@ function formatReturningFileForCallState(returning) {
       : [];
   for (const visit of visitLines) {
     lines.push(
-      `- Caller file open visit: ${visit}. Speak to that visit. Do not create a second visit unless they ask for a new job.`
+      `- Caller file open visit: ${visit}. Do not read this unless they ask about a visit, booking, hold, callback, or order. Do not create a second visit unless they ask for a new job.`
     );
   }
   const openRequests = Array.isArray(returning.openRequests) ? returning.openRequests : [];
@@ -826,7 +934,7 @@ function formatReturningFileForCallState(returning) {
   }
   if (visitLines.length || openRequests.length) {
     lines.push(
-      '- Caller file still open: when the caller has confirmed their name and CALL STATE lists an open visit or open request, immediately say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. If none remain listed, you may say nothing is still open.'
+      '- Caller file still open: do not read open visits, holds, callbacks, or orders unless the caller asks about them. If they ask, say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. Do not read them on the turn the name is confirmed. If none remain listed, you may say nothing is still open.'
     );
   }
   if (returning.lastReason) {
@@ -893,6 +1001,7 @@ module.exports = {
   returningFileFromCard,
   returningFileUsable,
   seedCallerFromMemory,
+  pageCallerVisitReview,
   selectOpenVisitsForPrompt,
   speakerKnownOnFile,
   speakerPendingOnFile,

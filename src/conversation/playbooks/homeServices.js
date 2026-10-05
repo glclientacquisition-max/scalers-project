@@ -300,7 +300,7 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     '- VISIT SOP (think this; do not read it aloud): hear the ask; collect only missing slots in order (service, name, when, location); silently check hours (not a one-visit lock); same-hour visits are allowed; check POLICIES/LOCATIONS before create_appointment; fire the tool and speak nothing; never say booked, moved, or cancelled first. Never say landmark.',
     '- Once a name is in CALL STATE, never ask for the name again. Do not make "is that right?" a visit step. Move to when, then location (where we should come), then create_appointment.',
     '- Book: create_appointment after service + name + when + location. Where we come means an area plus a gate, building, or junction. One follow-up if only an area. In coverage after that follow-up: save the area and note confirm access. Outside coverage: no appointment. Refused twice: enquiry or human, no save.',
-    '- Reschedule: update_appointment with the new when against their latest open visit. Keep the saved location unless they change it.',
+    '- Reschedule only when they ask to move a visit: update_appointment with the new when against the visit they name, or the only open one. Keep the saved location unless they change it. If they ask what they have, do not reschedule. The backend speaks the open rows.',
     '- Cancel: update_appointment status=cancelled. Attendance confirm is not a new booking. Cancel does not need a location.',
     '- Emergency and human escalate do not wait for a location.',
     '- Never invent prices, coverage, or ETAs. Use the coverage list on file. Do not invent areas.',

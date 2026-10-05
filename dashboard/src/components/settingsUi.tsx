@@ -286,7 +286,7 @@ export function SettingsSegmented<T extends string>({
 }: {
   label: string;
   value: T;
-  options: readonly { id: T; label: string }[];
+  options: readonly { id: T; label: string; disabled?: boolean; hint?: string }[];
   onChange: (id: T) => void;
 }) {
   return (
@@ -305,10 +305,18 @@ export function SettingsSegmented<T extends string>({
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                onClick={() => onChange(opt.id)}
-                className={deskRateCardClass(selected)}
+                aria-disabled={opt.disabled || undefined}
+                disabled={opt.disabled}
+                onClick={() => {
+                  if (opt.disabled) return;
+                  onChange(opt.id);
+                }}
+                className={`${deskRateCardClass(selected)}${opt.disabled ? " cursor-not-allowed opacity-50" : ""}`}
               >
                 {opt.label}
+                {opt.hint ? (
+                  <span className="ml-1 text-xs font-normal text-ink-soft">{opt.hint}</span>
+                ) : null}
               </button>
             </li>
           );

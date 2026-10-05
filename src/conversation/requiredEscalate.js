@@ -35,6 +35,16 @@ function statedNeed(state = {}) {
  * escalate payload if the model only spoke contact details without a marker.
  * @returns {object} parsed tool payload (possibly with escalate filled in)
  */
+function lockedCallerName(state) {
+  return String(state?.caller?.name || entityValue(state.entities?.name) || '').trim();
+}
+
+function pendingFileAsk(state) {
+  if (state?.caller?.nameConfirmed === true) return '';
+  if (state?.returning?.sharedLine || state?.returning?.identityBound) return '';
+  return String(state?.caller?.fileNameAsked || state?.returning?.fileOwnerName || '').trim();
+}
+
 function ensureRequiredEscalate(parsed, state = {}, capabilities = {}) {
   const next = parsed && typeof parsed === 'object' ? { ...parsed } : {};
   if (!capabilities.escalate) return next;
@@ -58,9 +68,7 @@ function ensureRequiredEscalate(parsed, state = {}, capabilities = {}) {
     return next;
   }
 
-  const name = String(
-    state.caller?.name || entityValue(state.entities?.name) || ''
-  ).trim();
+  const name = lockedCallerName(state);
   if (!name) return next;
 
   const decided = String(
@@ -91,9 +99,7 @@ function ensureRequiredEscalate(parsed, state = {}, capabilities = {}) {
  */
 function formatEscalateActionDirective(state = {}) {
   const action = String(state.resolution?.nextBestAction || '');
-  const name = String(
-    state.caller?.name || entityValue(state.entities?.name) || ''
-  ).trim();
+  const name = lockedCallerName(state);
   const intent = String(state.intent || '');
   const handoffRequested = Boolean(state.handoff?.requested);
 
@@ -119,10 +125,20 @@ function formatEscalateActionDirective(state = {}) {
     (intent === 'human' || handoffRequested) &&
     !name
   ) {
+    const pending = pendingFileAsk(state);
+    if (pending) {
+      return [
+        'REQUIRED ACTION THIS TURN:',
+        `Ask once, in these words: Am I speaking with ${pending}?`,
+        'Do not ask for a different name. Do not talk about visits yet. Do not say nothing is open.',
+        'Do NOT append escalate until that name is confirmed.',
+        'Do not invent that you already notified anyone.',
+      ].join('\n');
+    }
     return [
       'REQUIRED ACTION THIS TURN:',
       'Caller asked for a human / manager but name is missing.',
-      'Ask only for their name in one short sentence.',
+      'Ask once for their name. Do not ask again after they give one.',
       'Do NOT append escalate until the name is known.',
       'Do not invent that you already notified anyone.',
     ].join('\n');

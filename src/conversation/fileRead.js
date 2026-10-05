@@ -6,6 +6,7 @@ const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
 } = require('./visitTalk');
+const { messageOnlyNoVisitLine } = require('./messageOnly');
 const { looksLikeCompliment } = require('./entityExtraction');
 
 const FILE_READ_RE =
@@ -109,6 +110,9 @@ function markNothingOnFile(state) {
 }
 
 function fileReadLine({ text = '', state = {}, language } = {}) {
+  if (state?.messageOnly && (looksLikeFileRead(text) || looksLikeEmptyFileFollowUp(text))) {
+    return messageOnlyNoVisitLine(language || state?.language?.current);
+  }
   if (hasReadableFile(state)) return '';
   const again =
     Boolean(state?.conversation?.toldNothingOnFile) && looksLikeEmptyFileFollowUp(text);
@@ -136,6 +140,11 @@ function presupposesSavedWork(sentence) {
 function sanitizeSpokenFileClaim(text, opts = {}) {
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return '';
+  if (opts.state?.messageOnly && presupposesSavedWork(raw)) {
+    const parts = raw.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const kept = parts.filter((part) => !presupposesSavedWork(part));
+    return kept.join(' ').trim() || messageOnlyNoVisitLine(opts.language);
+  }
   if (hasReadableFile(opts.state)) return raw;
   const callerText = String(opts.callerText || '');
   if (looksLikeOfferAsk(callerText) && !presupposesSavedWork(raw)) return raw;
