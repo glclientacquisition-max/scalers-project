@@ -68,7 +68,7 @@ describe("admin desk standard shell", () => {
     assert.match(links, /safe-area-inset-top/);
     assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/(desk)/loading.tsx")), false);
     assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/admin/loading.tsx")), false);
-    assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/admin/(console)/loading.tsx")), false);
+    assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/admin/(console)/loading.tsx")), true);
   });
 
   it("names a nested screen for the parent admin list", () => {
@@ -90,5 +90,24 @@ describe("admin desk standard shell", () => {
     assert.equal(got.nested.label === "Back", false);
     assert.doesNotMatch(adminNav, />Back</);
     assert.match(adminNav, /adminParentTarget/);
+  });
+
+  it("gives Super Admin the same account header as the desk, with This device", () => {
+    const menu = read("dashboard/src/components/AdminAccountMenu.tsx");
+    const account = read("dashboard/src/components/DeskAccountMenu.tsx");
+    assert.match(adminNav, /<AdminAccountMenu/);
+    assert.match(adminNav, /operatorName/);
+    assert.doesNotMatch(adminNav, /action="\/api\/logout"/);
+    assert.match(menu, /data-account-bar=""/);
+    assert.match(menu, /href="\/admin"/);
+    assert.match(menu, /<ThemePicker \/>/);
+    assert.match(menu, />\s*This device\s*</);
+    assert.match(menu, />\s*Appearance\s*</);
+    assert.match(menu, /SignOutButton/);
+    assert.doesNotMatch(menu, /DeskAccountMenu|switchDeskTenant|\/home/);
+    assert.match(account, /data-account-bar=""/);
+    const adminDoc = read("docs/frontend/design-system/pages/admin.md");
+    assert.match(adminDoc, /account header/);
+    assert.match(adminDoc, /This device/);
   });
 });

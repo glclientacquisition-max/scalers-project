@@ -3,6 +3,7 @@
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { AdminAccountMenu } from "@/components/AdminAccountMenu";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { DeskHint } from "@/components/ui/DeskHint";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
@@ -161,8 +162,8 @@ function useAdminPending() {
   return { pendingHref, setPendingHref };
 }
 
-/** md+ icon rail. Same geometry as the owner desk. Own link list. */
-export function AdminRail({ operatorName }: { operatorName: string }) {
+/** md+ icon rail. Same geometry as the owner desk. Own link list. Sign out lives in the account menu. */
+export function AdminRail() {
   const { pendingHref, setPendingHref } = useAdminPending();
 
   return (
@@ -199,24 +200,6 @@ export function AdminRail({ operatorName }: { operatorName: string }) {
           />
         ))}
       </nav>
-      <div className="flex flex-col items-center gap-1 px-1 pb-3">
-        <p className="w-full truncate px-1 text-center text-[10px] font-medium text-ink-2">
-          {operatorName}
-        </p>
-        <form action="/api/logout" method="post" className="w-full">
-          <button
-            type="submit"
-            className={[
-              "flex min-h-11 w-full items-center justify-center rounded-xl text-meta font-medium text-ink-2",
-              deskShiftClass,
-              focusRingVisible,
-              "hover:bg-surface-2 hover:text-ink",
-            ].join(" ")}
-          >
-            Sign out
-          </button>
-        </form>
-      </div>
     </div>
   );
 }
@@ -310,24 +293,9 @@ export function AdminShell({
 
   return (
     <div data-admin-shell="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>
-      <AdminRail operatorName={operatorName} />
+      <AdminRail />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex min-h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4 md:hidden">
-          <p className="min-w-0 truncate text-meta text-ink-2">{operatorName}</p>
-          <form action="/api/logout" method="post">
-            <button
-              type="submit"
-              className={[
-                "inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-ink",
-                deskShiftClass,
-                focusRingVisible,
-                "hover:bg-surface-2",
-              ].join(" ")}
-            >
-              Sign out
-            </button>
-          </form>
-        </div>
+        <AdminAccountMenu name={operatorName} />
         <main data-admin-main="" data-pull-dirty-guard="" className={adminMainClass}>
           <AdminNestedBack />
           {children}
