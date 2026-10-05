@@ -56,7 +56,11 @@ export function AdminOpsNotices({ notices }: { notices: OpsNotice[] }) {
           <ListRow
             key={notice.id}
             title={kindLabel(notice.kind)}
-            preview={notice.detail || kindLabel(notice.kind)}
+            preview={
+              notice.detail && notice.detail !== kindLabel(notice.kind)
+                ? notice.detail
+                : undefined
+            }
             unread
             actions={
               <Button

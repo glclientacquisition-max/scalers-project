@@ -94,7 +94,7 @@ describe("platform ops model", () => {
     assert.equal(got.stripWarn.tone, "attention");
     assert.equal(got.stripEmpty.tone, "down");
     assert.equal(got.stripOk.tone, "ok");
-    assert.equal(got.stripOk.label, "Platform OK");
+    assert.equal(got.stripOk.label, "OK");
   });
 
   it("opens and notifies once, then resolves when the signal clears", () => {
@@ -154,7 +154,7 @@ describe("platform ops model", () => {
     assert.equal(got.people.length, 1);
     assert.equal(got.people[0].name, "Mercy");
     assert.equal(got.people[0].phone, "+254700000001");
-    assert.equal(got.subject, "Scalers ops: Beta ended");
+    assert.equal(got.subject, "Scalers ops: Beta");
     assert.equal(got.queue[0].href, "/admin/platform#escalate");
     assert.equal(got.queue[0].stamp, "Open");
     assert.equal(got.queue[1].href, "/admin/businesses#biz-b1");

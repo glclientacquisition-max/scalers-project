@@ -47,7 +47,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 ## Module requirements
 
 ### 1. Overview (`/admin`)
-- Status strip: Platform OK, notice, or critical. Opens `/admin/platform`.
+- Status strip: OK, Needs you, or Down. Opens `/admin/platform`.
 - KPI cards: total businesses, active businesses, businesses waiting for a number, available DIDs, assigned DIDs, calls (last 7 days).
 - Needs you: open staff notices plus businesses with a pending DID or inactive flag.
 - Primary CTA: Add number.

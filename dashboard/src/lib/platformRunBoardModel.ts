@@ -205,7 +205,7 @@ export function buildPlatformRunRows(opts: {
   return [
     {
       id: "phone",
-      title: "Phone line",
+      title: "Phone",
       subtitle: "Numbers and line wallet",
       health: derivePhoneLineHealth(opts.telecom),
       money: derivePhoneLineMoney(opts.telecom),

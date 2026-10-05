@@ -175,10 +175,10 @@ export function parseKindFlags(raw: unknown): OpsKindFlags {
 export function kindLabel(kind: OpsNoticeKind): string {
   if (kind === "speech") return "Speech";
   if (kind === "reasoning") return "Reasoning";
-  if (kind === "phone_line") return "Phone line";
-  if (kind === "sautikit_low") return "Line money low";
-  if (kind === "pool_empty") return "No numbers";
-  return "Beta ended";
+  if (kind === "phone_line") return "Phone";
+  if (kind === "sautikit_low") return "Money";
+  if (kind === "pool_empty") return "Numbers";
+  return "Beta";
 }
 
 export type HealthSlice = { tone: OpsHealthTone; detail: string | null };
@@ -207,50 +207,48 @@ export function deriveOpsSignals(input: {
       active: input.speech.tone === "attention",
       critical: input.speech.tone === "attention",
       title: "Speech",
-      detail: input.speech.detail || "Speech is degraded",
+      detail: input.speech.detail || "Down",
     },
     {
       kind: "reasoning",
       active: input.reasoning.tone === "attention",
       critical: input.reasoning.tone === "attention",
       title: "Reasoning",
-      detail: input.reasoning.detail || "Reasoning is degraded",
+      detail: input.reasoning.detail || "Down",
     },
     {
       kind: "phone_line",
       active: input.phoneLine.tone === "attention",
       critical: input.phoneLine.tone === "attention",
-      title: "Phone line",
-      detail: input.phoneLine.detail || "Phone line is degraded",
+      title: "Phone",
+      detail: input.phoneLine.detail || "Down",
     },
     {
       kind: "sautikit_low",
       active: walletLow,
       critical: walletEmpty,
-      title: "Line money low",
-      detail: walletEmpty
-        ? "Line money is empty"
-        : "Line money is at or under the warn level",
+      title: "Money",
+      detail: walletEmpty ? "Empty" : "Low",
     },
     {
       kind: "pool_empty",
       active: poolEmpty,
       critical: poolEmpty,
-      title: "No numbers",
+      title: "Numbers",
       detail:
         input.waitingBusinesses > 0
-          ? `${input.waitingBusinesses} business waiting. No numbers available.`
-          : "No numbers available",
+          ? `${input.waitingBusinesses} waiting`
+          : "None",
     },
     {
       kind: "beta_expired",
       active: input.expiredBetaCount > 0,
       critical: false,
-      title: "Beta ended",
+      title: "Beta",
       detail:
         input.expiredBetaCount === 1
-          ? "1 business beta has ended"
-          : `${input.expiredBetaCount} business betas have ended`,
+          ? "1 ended"
+          : `${input.expiredBetaCount} ended`,
     },
   ];
 }
@@ -266,7 +264,7 @@ export function deriveStatusStrip(signals: OpsSignal[]): {
   if (criticalCount > 0) {
     return {
       tone: "down",
-      label: criticalCount === 1 ? "1 critical notice" : `${criticalCount} critical notices`,
+      label: criticalCount === 1 ? "1 down" : `${criticalCount} down`,
       openCount: active.length,
       criticalCount,
     };
@@ -274,12 +272,12 @@ export function deriveStatusStrip(signals: OpsSignal[]): {
   if (active.length > 0) {
     return {
       tone: "attention",
-      label: active.length === 1 ? "1 notice" : `${active.length} notices`,
+      label: "Needs you",
       openCount: active.length,
       criticalCount: 0,
     };
   }
-  return { tone: "ok", label: "Platform OK", openCount: 0, criticalCount: 0 };
+  return { tone: "ok", label: "OK", openCount: 0, criticalCount: 0 };
 }
 
 export function reconcileNotices(
@@ -337,7 +335,7 @@ export function mergeQueueRows(input: {
     rows.push({
       key: `ops-${notice.kind}`,
       title: kindLabel(notice.kind),
-      detail: notice.detail || kindLabel(notice.kind),
+      detail: notice.detail && notice.detail !== kindLabel(notice.kind) ? notice.detail : "",
       href: "/admin/platform#escalate",
       stamp: "Open",
     });

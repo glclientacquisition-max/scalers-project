@@ -176,7 +176,8 @@ describe("admin console polish", () => {
       const src = read(rel);
       assert.match(src, /deskListTitleClass/);
     }
-    assert.match(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /PageHeader/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /PageHeader/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /deskListTitleClass/);
   });
 
   it("opens Packages with assign and Ledger with the wallets panel", () => {

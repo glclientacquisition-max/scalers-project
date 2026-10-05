@@ -100,7 +100,7 @@ export default async function AdminOverviewPage() {
                 key={row.key}
                 href={row.href}
                 title={row.title}
-                preview={row.detail}
+                preview={row.detail || undefined}
                 stamp={<Stamp tone="attention">{row.stamp}</Stamp>}
               />
             ))}
