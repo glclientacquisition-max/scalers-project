@@ -27,6 +27,15 @@ Imported and adapted (2026-09):
 | `/next-cache-components-adoption` | [vercel/next.js](https://github.com/vercel/next.js) | Turn on Cache Components and clear blocking routes. |
 | `/next-cache-components-optimizer` | [vercel/next.js](https://github.com/vercel/next.js) | Grow a route's static shell under Cache Components. |
 
+Superpowers ([obra/superpowers](https://github.com/obra/superpowers)): `using-superpowers`, `brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `using-git-worktrees`, `finishing-a-development-branch`, `subagent-driven-development`, `dispatching-parallel-agents`, `requesting-code-review`, `receiving-code-review`, `writing-skills`, `diagnosing-superpowers`. `using-superpowers` applies at the start of a chat. Scalers lane contracts and `AGENTS.md` still win when they conflict.
+
+Scalers design (local, same layout):
+
+| Skill | Job |
+| --- | --- |
+| `/ui-ux-pro-max-scalers` | Desk and Super Admin UI checklist. Charter, MASTER tokens, and `desk-motion` win. |
+| `/design-an-interface-scalers` | Design a Desk or Admin surface twice before coding. |
+
 Frontend 2.0 design pack (2026-09-30, charter `docs/frontend/FRONTEND_2_0_CHARTER.md` §7):
 
 | Skill | From | Job |
