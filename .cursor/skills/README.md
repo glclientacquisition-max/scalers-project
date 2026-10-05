@@ -13,7 +13,6 @@ Imported and adapted (2026-09):
 | `/reticle` | [reticlehq/reticle](https://github.com/reticlehq/reticle) | Prove a UI change in the running app. No SDK install. |
 | `/chisle` | [JayPokale/Chisle](https://github.com/JayPokale/Chisle) | Terse replies, YAGNI diffs. `/chisle-audit` is read-only. |
 | `/ui-skills` | [ibelick/ui-skills](https://github.com/ibelick/ui-skills) | Route to `/baseline-ui`, `/improve-ui`, `/fixing-accessibility`. |
-| `/no-ai-slop` | [petergyang/no-ai-slop](https://github.com/petergyang/no-ai-slop) + [unslop](https://github.com/cursor/plugins/blob/main/pstack/skills/unslop/SKILL.md) | Stark desk copy and drafts. |
 
 `npx skills` installs (canonical copies in `.agents/skills/`, linked here). Lockfile: [`skills-lock.json`](../../skills-lock.json).
 
@@ -26,6 +25,7 @@ Imported and adapted (2026-09):
 | `/next-cache-components` | [vercel-labs/next-skills@dc1de9c](https://github.com/vercel-labs/next-skills/tree/dc1de9caf7612d73f56a8dec3cb1bd6c9ec096b9) | Cache Components reference (`use cache`, `cacheLife`, `cacheTag`). |
 | `/next-cache-components-adoption` | [vercel/next.js](https://github.com/vercel/next.js) | Turn on Cache Components and clear blocking routes. |
 | `/next-cache-components-optimizer` | [vercel/next.js](https://github.com/vercel/next.js) | Grow a route's static shell under Cache Components. |
+| `/no-ai-slop` | [petergyang/no-ai-slop](https://github.com/petergyang/no-ai-slop) | Edit or detect AI writing tells. Desk copy still follows the constitution. |
 
 Superpowers ([obra/superpowers](https://github.com/obra/superpowers)): `using-superpowers`, `brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `using-git-worktrees`, `finishing-a-development-branch`, `subagent-driven-development`, `dispatching-parallel-agents`, `requesting-code-review`, `receiving-code-review`, `writing-skills`, `diagnosing-superpowers`. `using-superpowers` applies at the start of a chat. Scalers lane contracts and `AGENTS.md` still win when they conflict.
 
@@ -65,6 +65,6 @@ Frontend 2.0 design pack (2026-09-30, charter `docs/frontend/FRONTEND_2_0_CHARTE
 - GSAP packs (desk motion is CSS only).
 - `create-design-md` (charter §4 is the token source).
 - `Euraika-Labs/ai-slopcheck` (Python scanner, no skill).
-- `yetone/kill-ai-slop` wholesale (would restyle brand tokens). Visual tells live in `/frontend-design`, `/redesign-existing-projects`, and `/no-ai-slop`.
+- `yetone/kill-ai-slop` wholesale (would restyle brand tokens). Visual tells live in `/frontend-design` and `/redesign-existing-projects`. Writing tells: `/no-ai-slop`.
 
 Do not install GSD / BMAD / Spec-Kit as a second operating system.

@@ -65,7 +65,7 @@
       "source": "pbakaus/impeccable",
       "sourceType": "github",
       "skillPath": ".agents/skills/impeccable/SKILL.md",
-      "computedHash": "ab2e93b86777949d56ca8bb19530e6332e64e86d969127f7d1ab0a3ee7306702"
+      "computedHash": "f663c52fe49d805ed1b0d19e466a14034594130a4847e9726d8bfb8587c7186a"
     },
     "minimalist-ui": {
       "source": "leonxlnx/taste-skill",
@@ -98,6 +98,12 @@
       "sourceType": "github",
       "skillPath": "skills/next-cache-components-optimizer/SKILL.md",
       "computedHash": "c62f6c13119c4e9027268edaa07291c33d74a676e1bd93583349c07efd990f6b"
+    },
+    "no-ai-slop": {
+      "source": "petergyang/no-ai-slop",
+      "sourceType": "github",
+      "skillPath": "skills/no-ai-slop/SKILL.md",
+      "computedHash": "77d287e3c8e09874e144ee35f6fb0ee1adcf609012c7c3273e9c8fe2054ce5af"
     },
     "receiving-code-review": {
       "source": "obra/superpowers",
