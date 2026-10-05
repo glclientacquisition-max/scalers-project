@@ -78,6 +78,9 @@ describe("dark palette", () => {
     assert.match(css, /\.glass-chrome \{/);
     assert.match(css, /backdrop-filter: blur\(var\(--glass-blur\)\)/);
     assert.match(css, /prefers-reduced-transparency: reduce/);
+    const sheet = read("dashboard/src/components/ui/Sheet.tsx");
+    assert.match(sheet, /desk-drawer glass-chrome/);
+    assert.match(sheet, /themeClass/);
   });
 
   it("recomputes ink on the desk shell so typed text is not inherited navy", () => {
@@ -95,13 +98,35 @@ describe("theme activation", () => {
     assert.match(themeLib, /localStorage\.getItem\(DESK_THEME_STORAGE_KEY\)/);
     assert.match(themeLib, /localStorage\.setItem\(DESK_THEME_STORAGE_KEY, choice\)/);
     assert.match(themeLib, /localStorage\.removeItem\(DESK_THEME_STORAGE_KEY\)/);
+    assert.match(themeLib, /document\.cookie/);
+    assert.match(themeLib, /Max-Age=0/);
+    assert.match(themeLib, /SameSite=Lax/);
+    assert.match(themeLib, /export function subscribeDeskTheme/);
+    assert.match(themeLib, /export function readDeskThemeCookie/);
     assert.match(layout, /DESK_THEME_STORAGE_KEY/);
     assert.match(layout, /localStorage\.getItem\(\$\{JSON\.stringify\(DESK_THEME_STORAGE_KEY\)\}\)/);
+    assert.match(layout, /document\.cookie/);
     assert.match(layout, /var r=document\.documentElement;r\.dataset\.theme=t/);
     assert.match(layout, /style\.colorScheme=s/);
     assert.match(layout, /dark only/);
     assert.match(layout, /meta\[name="color-scheme"\]/);
     assert.match(layout, /dangerouslySetInnerHTML/);
+    assert.match(layout, /cookies\(\)/);
+    assert.match(layout, /data-theme/);
+    assert.match(layout, /DeskThemeProvider/);
+  });
+
+  it("hydrates This device from the saved choice, not a System default", () => {
+    const picker = read("dashboard/src/components/ThemePicker.tsx");
+    const kit = read("dashboard/src/app/dev/kit/KitShowcase.tsx");
+    const provider = read("dashboard/src/components/DeskThemeProvider.tsx");
+    assert.match(picker, /useSyncExternalStore/);
+    assert.match(picker, /subscribeDeskTheme/);
+    assert.doesNotMatch(picker, /useState<DeskTheme>\("system"\)/);
+    assert.match(provider, /DeskThemeProvider/);
+    assert.match(kit, /useThemeChoice/);
+    assert.match(kit, /pick\(/);
+    assert.doesNotMatch(kit, /previous/);
   });
 
   it("pins the document color-scheme so native option lists match the card", () => {

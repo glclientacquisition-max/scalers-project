@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+import { useDeskThemeInitial } from "@/components/DeskThemeProvider";
 import { deskShiftClass, focusRing, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   applyDeskTheme,
   readDeskTheme,
+  subscribeDeskTheme,
   writeDeskTheme,
   type DeskTheme,
 } from "@/lib/deskTheme";
@@ -15,17 +17,11 @@ const CHOICES = [
   { id: "dark", label: "Dark" },
 ] as const;
 
-function useThemeChoice() {
-  const [choice, setChoice] = useState<DeskTheme>("system");
-
-  useEffect(() => {
-    const saved = readDeskTheme();
-    setChoice(saved);
-    applyDeskTheme(saved);
-  }, []);
+export function useThemeChoice() {
+  const initial = useDeskThemeInitial();
+  const choice = useSyncExternalStore(subscribeDeskTheme, readDeskTheme, () => initial);
 
   const pick = (next: DeskTheme) => {
-    setChoice(next);
     writeDeskTheme(next);
     applyDeskTheme(next);
   };

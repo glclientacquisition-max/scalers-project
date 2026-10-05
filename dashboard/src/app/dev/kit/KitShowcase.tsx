@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useThemeChoice } from "@/components/ThemePicker";
 import {
   ArchiveBoxIcon,
   ArrowUpRightIcon,
@@ -52,22 +53,11 @@ function Section({ id, title, children }: { id: string; title: string; children:
 }
 
 export function KitShowcase() {
-  const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
+  const { choice: theme, pick } = useThemeChoice();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filter, setFilter] = useState("all");
   const [density, setDensity] = useState("comfortable");
   const [pending, setPending] = useState(false);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const previous = root.getAttribute("data-theme");
-    if (theme === "system") root.removeAttribute("data-theme");
-    else root.setAttribute("data-theme", theme);
-    return () => {
-      if (previous) root.setAttribute("data-theme", previous);
-      else root.removeAttribute("data-theme");
-    };
-  }, [theme]);
 
   return (
     <TooltipProvider>
@@ -81,7 +71,7 @@ export function KitShowcase() {
                 <SegmentedControl
                   label="Theme"
                   value={theme}
-                  onChange={(value) => setTheme(value as "system" | "light" | "dark")}
+                  onChange={(value) => pick(value as "system" | "light" | "dark")}
                   items={[
                     { value: "system", label: "Auto" },
                     { value: "light", label: "Light", icon: <SunIcon aria-hidden="true" /> },
