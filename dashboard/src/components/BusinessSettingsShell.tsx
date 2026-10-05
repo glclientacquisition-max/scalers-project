@@ -32,7 +32,7 @@ function SettingsChevron({ active }: { active: boolean }) {
   return (
     <ChevronRightIcon
       aria-hidden
-      className={active ? "size-5 shrink-0 text-accent" : "size-5 shrink-0 text-ink-3"}
+      className={active ? "size-5 shrink-0 text-ink" : "size-5 shrink-0 text-ink-3"}
     />
   );
 }
@@ -63,7 +63,7 @@ function SettingsMenu({
           <h2 className="pointer-events-none mb-2 select-none px-1 text-meta font-medium text-ink-2">
             {section.title}
           </h2>
-          <ul className="overflow-hidden rounded-2xl border border-hairline bg-surface">
+          <ul className="overflow-hidden rounded-2xl border border-hairline bg-surface [&>li:first-child>a]:rounded-t-2xl [&>li:last-child>a]:rounded-b-2xl">
             {section.items.map((item) => {
               const active = settingsNavItemActive(item.target, tab, trainPanel);
               const key = settingsStatusKey(item.target);
