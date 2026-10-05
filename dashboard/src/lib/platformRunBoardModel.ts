@@ -53,7 +53,7 @@ export function deriveSpeechHealth(
     const detail =
       voice?.status === "unreachable" || voice?.status === "invalid"
         ? voice.message
-        : null;
+        : "Not connected";
     return { tone: "neutral", label: "Unknown", detail };
   }
 
@@ -78,7 +78,7 @@ export function deriveSpeechHealth(
   }
 
   if (soniox?.stt === false && soniox?.tts === false) {
-    return { tone: "neutral", label: "Unknown", detail: "Speech not configured on voice" };
+    return { tone: "neutral", label: "Unknown", detail: "Not connected" };
   }
 
   return { tone: "ok", label: "OK", detail: null };
@@ -91,7 +91,7 @@ export function deriveReasoningHealth(
     const detail =
       voice?.status === "unreachable" || voice?.status === "invalid"
         ? voice.message
-        : null;
+        : "Not connected";
     return { tone: "neutral", label: "Unknown", detail };
   }
 
@@ -120,7 +120,7 @@ export function deriveReasoningHealth(
   }
 
   if (!gemini?.configured) {
-    return { tone: "neutral", label: "Unknown", detail: "Reasoning not configured on voice" };
+    return { tone: "neutral", label: "Unknown", detail: "Not connected" };
   }
 
   return { tone: "ok", label: "OK", detail: null };
@@ -131,7 +131,7 @@ export function derivePhoneLineHealth(telecom: PhoneLineTelecomInput): PlatformR
     return {
       tone: "neutral",
       label: "Unknown",
-      detail: "Set the phone line API key on the dashboard server",
+      detail: "Not connected",
     };
   }
   if (telecom.status === "error") {
@@ -145,12 +145,12 @@ export function derivePhoneLineHealth(telecom: PhoneLineTelecomInput): PlatformR
     return {
       tone: "attention",
       label: "Degraded",
-      detail: `${missingWebhook.length} active number(s) missing voice webhook`,
+      detail: "Line not connected",
     };
   }
 
   if (active.length === 0 && numbers.length === 0) {
-    return { tone: "neutral", label: "Empty", detail: "No numbers on the account" };
+    return { tone: "neutral", label: "Empty", detail: "No numbers" };
   }
 
   return { tone: "ok", label: "OK", detail: null };
@@ -185,11 +185,17 @@ export function derivePhoneLineMoney(telecom: PhoneLineTelecomInput): PlatformRo
 }
 
 export function speechMoneyLabel(): PlatformRowMoney {
-  return { primary: "Unknown", hint: "No speech balance API" };
+  return { primary: "Unknown", hint: null };
 }
 
 export function reasoningMoneyLabel(): PlatformRowMoney {
-  return { primary: "Unknown", hint: "No reasoning balance API" };
+  return { primary: "Unknown", hint: null };
+}
+
+export function platformRowPreview(row: PlatformRunRow): string | undefined {
+  if (row.health.detail) return row.health.detail;
+  if (row.money.primary && row.money.primary !== "Unknown") return row.money.primary;
+  return undefined;
 }
 
 export function buildPlatformRunRows(opts: {
@@ -199,7 +205,7 @@ export function buildPlatformRunRows(opts: {
   return [
     {
       id: "phone",
-      title: "Phone line",
+      title: "Phone",
       subtitle: "Numbers and line wallet",
       health: derivePhoneLineHealth(opts.telecom),
       money: derivePhoneLineMoney(opts.telecom),

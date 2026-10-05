@@ -155,6 +155,61 @@ export async function buyNumberIntoPool(inventoryId: string): Promise<DidPoolRow
   return data as DidPoolRow;
 }
 
+/**
+ * Return an assigned or reserved pool number to Available.
+ * A living business goes through release_did_from_business (DID Available, business waits).
+ * If the business row is already gone, the pool row is freed directly.
+ */
+export async function releaseAssignedDid(rawE164: string): Promise<{
+  e164: string;
+  releasedBusiness: boolean;
+}> {
+  const e164 = normalizeE164(rawE164);
+  if (!e164) throw new Error("Invalid Kenyan E.164 number");
+
+  const admin = getSupabaseAdmin();
+  const { data: row, error } = await admin
+    .from("sautikit_did_pool")
+    .select("id, e164, status, tenant_id")
+    .eq("e164", e164)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) throw new Error("Number is not in the pool");
+  if (row.status === "available") return { e164, releasedBusiness: false };
+  if (row.status === "disabled") throw new Error("This number is disabled");
+
+  if (row.tenant_id) {
+    const { data: business, error: businessError } = await admin
+      .from("tenants")
+      .select("id")
+      .eq("id", row.tenant_id)
+      .maybeSingle();
+    if (businessError) throw businessError;
+    if (business) {
+      const { error: rpcError } = await admin.rpc("release_did_from_business", {
+        p_tenant_id: row.tenant_id,
+      });
+      if (rpcError) throw rpcError;
+      return { e164, releasedBusiness: true };
+    }
+  }
+
+  const { data: updated, error: updateError } = await admin
+    .from("sautikit_did_pool")
+    .update({
+      status: "available",
+      tenant_id: null,
+      assigned_at: null,
+    })
+    .eq("id", row.id)
+    .in("status", ["assigned", "reserved"])
+    .select("id")
+    .maybeSingle();
+  if (updateError) throw updateError;
+  if (!updated) throw new Error("Number could not be released");
+  return { e164, releasedBusiness: false };
+}
+
 export async function addDidToPool(opts: {
   e164: string;
   notes?: string;
@@ -174,6 +229,9 @@ export async function addDidToPool(opts: {
       "id, created_at, e164, sautikit_number_id, status, tenant_id, assigned_at, notes"
     )
     .single();
-  if (error) throw error;
+  if (error) {
+    if (error.code === "23505") throw new Error("That number is already in the pool.");
+    throw error;
+  }
   return data as DidPoolRow;
 }

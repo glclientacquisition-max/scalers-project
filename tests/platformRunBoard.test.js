@@ -31,16 +31,19 @@ describe("platform run board", () => {
     assert.doesNotMatch(health, /VOICE_INTERNAL_SECRET/);
   });
 
-  it("admin overview uses Platform board without vendor telecom headline", () => {
-    const page = read("dashboard/src/app/admin/(console)/page.tsx");
+  it("admin Platform page uses the run board without a vendor telecom headline", () => {
+    const page = read("dashboard/src/app/admin/(console)/platform/page.tsx");
     const board = read("dashboard/src/components/PlatformRunBoard.tsx");
     assert.match(page, /PlatformRunBoard/);
     assert.doesNotMatch(page, /SautikitTelecomPanel/);
     const model = read("dashboard/src/lib/platformRunBoardModel.ts");
     assert.match(model, /title: "Speech"/);
     assert.match(model, /title: "Reasoning"/);
-    assert.match(board, /Phone line/);
-    assert.doesNotMatch(board, /SautiKit/);
+    assert.match(model, /title: "Phone"/);
+    assert.match(board, /href="\/admin\/numbers"/);
+    assert.match(board, /ListRow/);
     assert.doesNotMatch(board, /Telecom \(/);
+    assert.doesNotMatch(board, /adminThClass/);
+    assert.doesNotMatch(board, /Phone line numbers/);
   });
 });

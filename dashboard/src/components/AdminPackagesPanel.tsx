@@ -95,9 +95,83 @@ export function AdminPackagesPanel({
       ) : null}
 
       <p className="text-sm text-ink-2">
-        Package SKUs and on-demand rates. Assign packages and run charging from{" "}
-        {catalogOnly ? "Billing client rows" : "Billing"}.
+        {catalogOnly
+          ? "Rates and SKUs. Assign a package and period on Packages."
+          : "Assign a package and a period. Assignment leaves ledger enforcement unchanged. Set beta or enforcement on Ledger."}
       </p>
+
+      {!catalogOnly ? (
+        <section className="border-b border-line/70 pb-6">
+          <h2 className="text-title font-medium text-ink">Assign</h2>
+          <form
+            className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void post(
+                {
+                  action: "assign",
+                  business_id: businessId,
+                  package_id: packageId,
+                  period,
+                },
+                "Package assigned."
+              );
+            }}
+          >
+            <div className="block text-sm sm:col-span-2">
+              <span className="font-medium text-ink">Business</span>
+              <DeskSelect
+                aria-label="Business"
+                className={`mt-2 ${fieldClass()}`}
+                portalThemeClass="admin-theme"
+                value={businessId}
+                onChange={selectBusiness}
+                options={businesses.map((row) => ({
+                  value: row.tenantId,
+                  label: `${row.businessName}${row.packageName ? ` (${row.packageName})` : ""}`,
+                }))}
+              />
+            </div>
+            <div className="block text-sm">
+              <span className="font-medium text-ink">Package</span>
+              <DeskSelect
+                aria-label="Package"
+                className={`mt-2 ${fieldClass()}`}
+                portalThemeClass="admin-theme"
+                value={packageId}
+                onChange={setPackageId}
+                options={packs
+                  .filter((pack) => pack.isActive || pack.id === packageId)
+                  .map((pack) => ({ value: pack.id, label: pack.name }))}
+              />
+            </div>
+            <div className="block text-sm">
+              <span className="font-medium text-ink">Period</span>
+              <DeskSelect
+                aria-label="Billing period"
+                className={`mt-2 ${fieldClass()}`}
+                portalThemeClass="admin-theme"
+                value={period}
+                onChange={setPeriod}
+                options={[
+                  { value: "month", label: "Month" },
+                  { value: "year", label: "Year" },
+                ]}
+              />
+            </div>
+            <div className="sm:col-span-2 lg:col-span-4">
+              <p className="mb-3 text-sm text-ink">
+                {selected?.packageName
+                  ? `Now ${selected.packageName}${selected.period ? ` / ${selected.period}` : ""}`
+                  : "Now none"}
+              </p>
+              <button type="submit" disabled={pending || !businessId || !packageId} className={btnPrimary}>
+                Assign
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
 
       <section className="border-b border-line/70 pb-6">
         <h2 className="text-title font-medium text-ink">On-demand rates</h2>
@@ -340,7 +414,6 @@ export function AdminPackagesPanel({
       </section>
 
       {!catalogOnly ? (
-      <>
       <section>
         <h2 className="text-title font-medium text-ink">Businesses</h2>
         {businesses.length === 0 ? (
@@ -396,78 +469,6 @@ export function AdminPackagesPanel({
           </div>
         )}
       </section>
-
-      <section className="border-t border-line/70 pt-6">
-        <h2 className="text-title font-medium text-ink">Assign</h2>
-        <form
-          className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void post(
-              {
-                action: "assign",
-                business_id: businessId,
-                package_id: packageId,
-                period,
-              },
-              "Package assigned."
-            );
-          }}
-        >
-          <div className="block text-sm sm:col-span-2">
-            <span className="font-medium text-ink">Business</span>
-            <DeskSelect
-              aria-label="Business"
-              className={`mt-2 ${fieldClass()}`}
-              portalThemeClass="admin-theme"
-              value={businessId}
-              onChange={selectBusiness}
-              options={businesses.map((row) => ({
-                value: row.tenantId,
-                label: `${row.businessName}${row.packageName ? ` (${row.packageName})` : ""}`,
-              }))}
-            />
-          </div>
-          <div className="block text-sm">
-            <span className="font-medium text-ink">Package</span>
-            <DeskSelect
-              aria-label="Package"
-              className={`mt-2 ${fieldClass()}`}
-              portalThemeClass="admin-theme"
-              value={packageId}
-              onChange={setPackageId}
-              options={packs
-                .filter((pack) => pack.isActive || pack.id === packageId)
-                .map((pack) => ({ value: pack.id, label: pack.name }))}
-            />
-          </div>
-          <div className="block text-sm">
-            <span className="font-medium text-ink">Period</span>
-            <DeskSelect
-              aria-label="Billing period"
-              className={`mt-2 ${fieldClass()}`}
-              portalThemeClass="admin-theme"
-              value={period}
-              onChange={setPeriod}
-              options={[
-                { value: "month", label: "Month" },
-                { value: "year", label: "Year" },
-              ]}
-            />
-          </div>
-          <div className="sm:col-span-2 lg:col-span-4">
-            <p className="mb-3 text-sm text-ink">
-              {selected?.packageName
-                ? `Now ${selected.packageName}${selected.period ? ` / ${selected.period}` : ""}`
-                : "Now none"}
-            </p>
-            <button type="submit" disabled={pending || !businessId || !packageId} className={btnPrimary}>
-              Assign
-            </button>
-          </div>
-        </form>
-      </section>
-      </>
       ) : null}
     </div>
   );
