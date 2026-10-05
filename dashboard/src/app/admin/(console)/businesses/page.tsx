@@ -23,7 +23,9 @@ export default async function AdminBusinessesPage() {
         <AdminBusinessesPanel
           businesses={overview.businesses}
           pendingBusinesses={overview.pendingBusinesses}
-          availableDidCount={overview.availableDids}
+          availableDids={overview.pool
+            .filter((row) => row.status === "available")
+            .map((row) => ({ e164: row.e164 }))}
         />
       </div>
     </div>

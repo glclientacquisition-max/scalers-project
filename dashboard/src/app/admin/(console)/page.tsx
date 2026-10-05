@@ -42,17 +42,21 @@ export default async function AdminOverviewPage() {
         <Kpi
           label="Numbers available"
           value={overview.availableDids}
-          hint={`${overview.assignedDids} assigned`}
+          hint={
+            overview.availableDids === 0
+              ? "Add a number to assign"
+              : `${overview.assignedDids} assigned`
+          }
         />
         <Kpi label="Calls (7 days)" value={overview.callsLast7Days} />
       </section>
 
       <section className="flex flex-wrap gap-3">
         <Link href="/admin/numbers" className={btnPrimary}>
-          Add / manage numbers
+          Add number
         </Link>
-        <Link href="/admin/billing" className={btnGhost}>
-          Billing
+        <Link href="/admin/packages" className={btnGhost}>
+          Packages
         </Link>
         <Link href="/admin/businesses" className={btnGhost}>
           View businesses

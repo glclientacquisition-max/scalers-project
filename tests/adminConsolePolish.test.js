@@ -114,23 +114,39 @@ describe("admin console polish", () => {
     assert.doesNotMatch(page, /Manage →/);
   });
 
-  it("lists businesses as identity rows with package, wallet, and actions", () => {
+  it("lists businesses in one table with notify, created, and a confirmed release", () => {
     const panel = read("dashboard/src/components/AdminBusinessesPanel.tsx");
-    assert.match(panel, /AdminIdentityRow/);
+    assert.match(panel, /<table/);
+    assert.match(panel, /Notify/);
+    assert.match(panel, /Created/);
+    assert.match(panel, /whatsapp_notification_number/);
     assert.doesNotMatch(panel, /lg:hidden/);
     assert.doesNotMatch(panel, /rounded-2xl/);
     assert.match(panel, /Assign next number/);
-    assert.match(panel, /Adjust wallet/);
+    assert.match(panel, /assign_specific/);
+    assert.match(panel, /Add number/);
+    assert.match(panel, /No numbers available/);
+    assert.match(panel, /Release this number\?/);
+    assert.match(panel, /returns to Available/);
+    assert.match(panel, /Adjust ledger/);
     assert.match(panel, /b\.package_name/);
     assert.match(panel, /wallet_balance_kes/);
+    assert.doesNotMatch(panel, /disabled=\{pending \|\| availableDidCount === 0\}/);
   });
 
-  it("lists DID pool rows in one dense table", () => {
+  it("lists DID pool rows in one dense table with an empty-available path", () => {
     const panel = read("dashboard/src/components/DidPoolManager.tsx");
     assert.match(panel, /<table/);
     assert.doesNotMatch(panel, /lg:hidden/);
     assert.match(panel, /Add to pool/);
     assert.match(panel, /Assign next available/);
+    assert.match(panel, /assign_specific/);
+    assert.match(panel, /No numbers available/);
+    assert.match(panel, /Add number/);
+    assert.match(panel, /action: "release"/);
+    assert.match(panel, /Release this number\?/);
+    assert.match(panel, /returns to Available/);
+    assert.doesNotMatch(panel, /disabled=\{pending \|\| available === 0\}/);
   });
 
   it("renders SautiKit diagnostics as a dense table, not a padded card", () => {
@@ -157,6 +173,28 @@ describe("admin console polish", () => {
       const src = read(rel);
       assert.match(src, /deskListTitleClass/);
     }
+  });
+
+  it("opens Packages with assign and Ledger with the wallets panel", () => {
+    const packages = read("dashboard/src/app/admin/(console)/packages/page.tsx");
+    assert.match(packages, /loadPackageCatalog/);
+    assert.match(packages, /deskListTitleClass/);
+    assert.doesNotMatch(packages, /catalogOnly/);
+    assert.doesNotMatch(packages, /redirect\(/);
+    const wallets = read("dashboard/src/app/admin/(console)/wallets/page.tsx");
+    assert.match(wallets, /AdminWalletsPanel/);
+    assert.match(wallets, /Ledger/);
+    assert.match(wallets, /deskListTitleClass/);
+    assert.doesNotMatch(wallets, /redirect\(/);
+    const overview = read("dashboard/src/app/admin/(console)/page.tsx");
+    assert.match(overview, /href="\/admin\/packages"/);
+    assert.match(overview, />\s*Packages\s*</);
+    assert.match(overview, /Add number/);
+    assert.doesNotMatch(overview, /href="\/admin\/billing"/);
+    const poolApi = read("dashboard/src/app/api/did-pool/route.ts");
+    assert.match(poolApi, /action === "release"/);
+    assert.match(poolApi, /releaseAssignedDid/);
+    assert.match(read("dashboard/src/lib/didPool.ts"), /export async function releaseAssignedDid/);
   });
 
   it("documents the admin shell as the desk geometry with its own links", () => {

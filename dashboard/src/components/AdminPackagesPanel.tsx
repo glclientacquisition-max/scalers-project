@@ -95,8 +95,9 @@ export function AdminPackagesPanel({
       ) : null}
 
       <p className="text-sm text-ink-2">
-        Package SKUs and on-demand rates. Assign packages and run charging from{" "}
-        {catalogOnly ? "Billing client rows" : "Billing"}.
+        {catalogOnly
+          ? "Rates and SKUs. Assign a package and period on Packages."
+          : "Assign a package and a period. Assignment leaves ledger enforcement unchanged. Set beta or enforcement on Ledger."}
       </p>
 
       <section className="border-b border-line/70 pb-6">

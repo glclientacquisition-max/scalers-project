@@ -66,11 +66,12 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
       </section>
 
       <p className="text-sm text-ink-2">
-        Observe every client: package minutes, on-demand charging mode, and overage. Use{" "}
-        <Link href="/admin/billing/catalog" className="font-medium text-accent underline-offset-2 hover:underline">
-          Catalog
-        </Link>{" "}
-        to edit SKUs and rates.
+        Observe every client: package minutes, on-demand charging mode, and overage. Edit SKUs, rates, and
+        assignments on{" "}
+        <Link href="/admin/packages" className="font-medium text-accent underline-offset-2 hover:underline">
+          Packages
+        </Link>
+        .
       </p>
 
       <div className="flex flex-wrap items-end gap-2 sm:gap-3">
