@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import { NotifyChannelPicker } from "@/components/NotifyChannelPicker";
@@ -23,6 +23,7 @@ import {
 } from "@/app/(desk)/settings/alertsActions";
 import { pendingSpinnerClass } from "@/components/ui/deskChrome";
 import { notify } from "@/components/ui/DeskNotice";
+import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
 
 const initial: AlertsActionState = {};
 
@@ -44,11 +45,24 @@ export function AlertsPanel({
     parseNotifyChannels(tenant.notify_channels)
   );
   const [state, formAction, pending] = useActionState(saveAlertsAction, initial);
+  const alertsDraft = [
+    ownerWhatsapp,
+    alertEmail,
+    JSON.stringify(notifyChannels),
+  ].join("\u0001");
+  const [alertsBaseline, setAlertsBaseline] = useState(alertsDraft);
+  const alertsDirty = alertsDraft !== alertsBaseline;
+  const savedAlertsRef = useRef(state);
+  useSettingsLeaveSource("alerts", alertsDirty);
 
   useEffect(() => {
-    setOwnerWhatsapp(tenant.whatsapp_notification_number || "");
-    setAlertEmail(tenant.alert_email || "");
-    setNotifyChannels(parseNotifyChannels(tenant.notify_channels));
+    const phone = tenant.whatsapp_notification_number || "";
+    const email = tenant.alert_email || "";
+    const channels = parseNotifyChannels(tenant.notify_channels);
+    setOwnerWhatsapp(phone);
+    setAlertEmail(email);
+    setNotifyChannels(channels);
+    setAlertsBaseline([phone, email, JSON.stringify(channels)].join("\u0001"));
   }, [
     tenant.whatsapp_notification_number,
     tenant.alert_email,
@@ -56,11 +70,12 @@ export function AlertsPanel({
   ]);
 
   useEffect(() => {
-    if (state.ok) {
-      notify(state.message || "Saved");
-      router.refresh();
-    }
-  }, [state, router]);
+    if (!state.ok || savedAlertsRef.current === state) return;
+    savedAlertsRef.current = state;
+    setAlertsBaseline(alertsDraft);
+    notify(state.message || "Saved");
+    router.refresh();
+  }, [state, alertsDraft, router]);
 
   return (
     <section className="min-w-0 w-full space-y-6">

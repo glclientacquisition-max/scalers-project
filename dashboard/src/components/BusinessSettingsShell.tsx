@@ -6,6 +6,7 @@ import type { TenantRow } from "@/lib/supabase";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
 import { CatalogImportPanel } from "@/components/CatalogImportPanel";
+import { SettingsLeaveGuard } from "@/components/SettingsLeaveGuard";
 import { TenantForm } from "@/components/TenantForm";
 import { TestLinePanel } from "@/components/TestLinePanel";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
@@ -176,6 +177,7 @@ export function BusinessSettingsShell({
 
   if (isMenu) {
     return (
+      <SettingsLeaveGuard>
       <div className="w-full min-w-0 md:hidden" data-settings-console="" data-pull-dirty-guard="">
         <SettingsPageHeader
           businessName={businessName}
@@ -192,6 +194,7 @@ export function BusinessSettingsShell({
           />
         </div>
       </div>
+      </SettingsLeaveGuard>
     );
   }
 
@@ -207,6 +210,7 @@ export function BusinessSettingsShell({
   );
 
   return (
+    <SettingsLeaveGuard>
     <div className="w-full min-w-0" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">
       {showForm ? (
         <TenantForm
@@ -247,6 +251,7 @@ export function BusinessSettingsShell({
         </div>
       )}
     </div>
+    </SettingsLeaveGuard>
   );
 }
 

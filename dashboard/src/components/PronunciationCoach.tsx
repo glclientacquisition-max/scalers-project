@@ -64,6 +64,8 @@ import {
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { deskShiftClass, filterTabClass, btnPrimary, deskPreviewClass, pendingSpinnerClass, pendingSpinnerInkClass } from "@/components/ui/deskChrome";
 import { settingsGhostButtonClass } from "@/components/settingsUi";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
+import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
 
 type CallerProofRow = { name: string; say: string };
 
@@ -214,6 +216,10 @@ export function PronunciationCoach({
   const [unsavedReview, setUnsavedReview] = useState(false);
   const unsavedReviewRef = useRef(false);
   unsavedReviewRef.current = unsavedReview;
+  const [removeTarget, setRemoveTarget] = useState<{ match: string; label: string } | null>(
+    null
+  );
+  useSettingsLeaveSource("pronunciation", unsavedReview);
   const reviewTouchedRef = useRef(false);
 
   const [recording, setRecording] = useState(false);
@@ -1282,7 +1288,12 @@ export function PronunciationCoach({
                       </button>
                       <button
                         type="button"
-                        onClick={() => removeEntry(entry.match)}
+                        onClick={() =>
+                          setRemoveTarget({
+                            match: entry.match,
+                            label: label || "this word",
+                          })
+                        }
                         disabled={persistPending}
                         className={`${libraryLinkClass} disabled:opacity-60`}
                       >
@@ -1734,6 +1745,23 @@ export function PronunciationCoach({
           setHearUrl(null);
         }}
       />
+      <ConfirmSheet
+        open={removeTarget != null}
+        title={removeTarget ? `Remove ${removeTarget.label}?` : "Remove?"}
+        confirmLabel="Remove"
+        danger
+        pending={persistPending}
+        onClose={() => {
+          if (!persistPending) setRemoveTarget(null);
+        }}
+        onConfirm={() => {
+          if (!removeTarget) return;
+          removeEntry(removeTarget.match);
+          setRemoveTarget(null);
+        }}
+      >
+        The phone stops using it.
+      </ConfirmSheet>
     </section>
   );
 }
