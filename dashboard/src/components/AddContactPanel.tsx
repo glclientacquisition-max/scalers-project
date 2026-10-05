@@ -101,13 +101,13 @@ export function AddContactPanel() {
         Add
       </button>
 
-      {open ? (
-        <DeskDialog
-          title={mode === "form" ? "Add contact" : "Add"}
-          onClose={close}
-          pending={pending}
-          panelClassName="max-w-lg"
-        >
+      <DeskDialog
+        open={open}
+        title={mode === "form" ? "Add contact" : "Add"}
+        onClose={close}
+        pending={pending}
+        panelClassName="max-w-lg"
+      >
           {mode === "chooser" ? (
             <div className="mt-5 flex flex-col gap-2">
               <button
@@ -240,8 +240,7 @@ export function AddContactPanel() {
               ) : null}
             </form>
           )}
-        </DeskDialog>
-      ) : null}
+      </DeskDialog>
     </>
   );
 }

@@ -133,6 +133,28 @@ test.describe("/dev/kit interactions", () => {
     await expect(dialog).toBeHidden();
   });
 
+  test("drawer follows a downward drag past halfway and closes", async ({ page }) => {
+    await page.goto("/dev/kit");
+    await settle(page);
+    await page.getByRole("button", { name: "Open sheet" }).click();
+    const dialog = page.getByRole("dialog", { name: "Archive this call?" });
+    await expect(dialog).toBeVisible();
+    const viewport = page.viewportSize()!;
+    await expect.poll(async () => {
+      const box = await dialog.boundingBox();
+      if (!box) return false;
+      return box.y + box.height <= viewport.height + 2 && box.y < viewport.height * 0.85;
+    }).toBe(true);
+    const box = (await dialog.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const startY = box.y + 16;
+    await page.mouse.move(x, startY);
+    await page.mouse.down();
+    await page.mouse.move(x, startY + box.height * 0.7, { steps: 12 });
+    await page.mouse.up();
+    await expect(dialog).toBeHidden();
+  });
+
   test("menu opens on click and moves with arrow keys", async ({ page }) => {
     await page.goto("/dev/kit");
     await settle(page);

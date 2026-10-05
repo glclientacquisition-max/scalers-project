@@ -38,7 +38,8 @@ Charter: `docs/frontend/FRONTEND_2_0_CHARTER.md`. It wins over older frontend do
 
 ## Motion and access
 
-- Verbs: pending, live, land, shift, press. Under 300ms, `--ease-out`. Nothing animates on keyboard actions. Reduced motion respected.
+- Verbs: pending, live, land, shift, press. Under 300ms, `--ease-out`. Reduced motion snaps.
+- Overlays use `Sheet`: a bottom drawer. The finger tracks it. A downward flick dismisses it. No motion package.
 - 44px hit floor. Icon-only controls carry a visible name on hover and focus. Focus ring `ring-2 ring-brand`.
 
 ## Proof

@@ -24,15 +24,16 @@ describe("desk batch D screen fit and recovery", () => {
     assert.match(css, /--desk-tabbar-clearance:\s*env\(safe-area-inset-bottom, 0px\)/);
   });
 
-  it("keeps sheets above the tab bar", () => {
+  it("opens owner overlays as a bottom drawer with a 44px close", () => {
     const dialog = read("dashboard/src/components/ui/DeskDialog.tsx");
-    assert.match(dialog, /z-40/);
-    assert.match(
-      dialog,
-      /bottom-\[calc\(var\(--desk-tabbar-h\)\+env\(safe-area-inset-bottom,0px\)\)\]/
-    );
-    assert.match(dialog, /h-11 w-11/);
-    assert.match(dialog, /No enter animation/);
+    const sheet = read("dashboard/src/components/ui/Sheet.tsx");
+    assert.match(dialog, /<Sheet/);
+    assert.match(dialog, /dismissible=\{!pending\}/);
+    assert.match(sheet, /swipeDirection="down"/);
+    assert.match(sheet, /desk-drawer/);
+    assert.match(sheet, /items-end/);
+    assert.match(sheet, /h-11 w-11/);
+    assert.doesNotMatch(sheet, /framer-motion|motion\/react/);
     assert.doesNotMatch(dialog, /shadow-xl|landing-rise|animate-|transition-opacity|scale-/);
   });
 

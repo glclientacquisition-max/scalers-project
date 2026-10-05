@@ -158,7 +158,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 
 ## Motion
 
-Five desk verbs. Skill: `.cursor/skills/desk-motion/SKILL.md`. Tokens: `--motion-fast` 150ms, `--motion-land` 900ms, `--motion-live` 1.4s, `--motion-ease`. Class names and `DESK_*_MS` live in `dashboard/src/lib/deskMotion.ts`. No Framer Motion, `motion/react`, springs, or ad-hoc durations.
+Five desk verbs. Skill: `.cursor/skills/desk-motion/SKILL.md`. Tokens: `--motion-fast` 150ms, `--motion-land` 900ms, `--motion-live` 1.4s, `--motion-ease`. Class names and `DESK_*_MS` live in `dashboard/src/lib/deskMotion.ts`. No Framer Motion, `motion/react`, springs, or ad-hoc durations. The Sheet drawer is the one gesture: Base UI swipe, not a spring package.
 
 | Verb | Primitive | Loop? |
 | --- | --- | --- |
@@ -176,7 +176,7 @@ Map a surface to a type, then to a verb. Do not invent a per-page animation.
 | List | Inbox queue, Contacts, wallet ledger | `land` on a live insert after first paint. Row hover/selected: `shift`. Stable keys (`item.id`). No enter-stagger. No layout reorder. |
 | Detail | Ticket transcript, contact profile, action dock | Instant swap. Key the route by record id. Panel chrome does not slide. |
 | Notice | Archive undo, Saved | `DeskNotice` + `useNotify`. Enter `translateY(12px)`, exit `translateY(8px)`, opacity. Transform only. `role="status"`. One pattern. |
-| Modal | `DeskDialog`, overflow menu, `DeskHint` | Enter-static. No scale, no overlay fade. |
+| Modal | `Sheet` drawer, overflow menu, `DeskHint` | Drawer swipes down. Menus and hints stay still. |
 | State | Filter tabs, badges, chips | `shift` / `filterTabClass`. No `layoutId`. |
 | Empty / loading | `deskEmptyClass` | Empty is static. A desk tap shows the list skeleton in the page slot. Mutation pending is the ink spinner on the control. No `animate-pulse` except the pronunciation recording dot and the list skeleton. |
 | Numbers | Wallet balance, Home counts, call duration | Instant `tabular-nums`. No count-up. |
