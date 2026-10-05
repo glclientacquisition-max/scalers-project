@@ -3,7 +3,7 @@
 **Status:** Desk option exists. Cold Dial after Stream is **blocked** on current SautiKit (staging 2026-09-06). Default `VOICE_LIVE_TRANSFER=off`. Keep callback escalate until a conference REST spike rings a human. Tenant option is Business → Train → Escalation Team (`handoff_mode`). Brain sets `liveTransfer` only when that option, open hours, a directory phone, and the env flag all pass.  
 **Job:** When a caller needs a human *and* the business opted in, Scalers leaves the AI media stream and bridges the live call to a real teammate. If the bridge cannot run or the human does not answer, the existing async escalate path still notifies and the caller hears an honest fallback.
 
-**Related:** async notify is already shipped in [`ESCALATION.md`](./ESCALATION.md). Decision record: [`adr/ADR-0004-live-human-transfer.md`](./adr/ADR-0004-live-human-transfer.md).
+**Related:** async notify is already shipped in [`ESCALATION.md`](./ESCALATION.md). Decision record: [`adr/ADR-0004-live-human-transfer.md`](../adr/ADR-0004-live-human-transfer.md).
 
 ---
 

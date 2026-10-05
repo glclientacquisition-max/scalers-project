@@ -2,7 +2,7 @@
 
 **Product job (MVP):** When a business signs up and finishes onboarding, callers who would otherwise hit an unanswered line get a **live AI receptionist** that greets them, answers common questions from the business facts on file, takes a useful message / request when needed, and notifies the owner.
 
-**North star (keep, but do not block MVP):** Move toward “resolves the caller’s job” (full-assist Brain — catalogue holds, deeper playbooks, learning loop). See `docs/BUSINESS_INTELLIGENCE_ROADMAP.md`. We do **not** forget that plan; we sequence it **after** the missed-call answer path is reliable.
+**North star (keep, but do not block MVP):** Move toward “resolves the caller’s job” (full-assist Brain — catalogue holds, deeper playbooks, learning loop). See `docs/product/BUSINESS_INTELLIGENCE_ROADMAP.md`. We do **not** forget that plan; we sequence it **after** the missed-call answer path is reliable.
 
 **Beachhead:** Retail (ChapterOne Bookstore · DID `+254709221536` · Aisha) validates the path; onboarding must produce the same *kind* of readiness for new tenants.
 
@@ -47,7 +47,7 @@ Canonical modules: `src/conversation/businessAssistantIntro.js` (voice) and `das
 | Hold / order (retail) | Catalogue-grounded or enquiry — never fake |
 | Leave a message / callback | Save + SMS → WhatsApp → email notify |
 | Book a visit (home_services) | Service + name + when + landmark → Inbox Visits; owner visit notify; no mid-call lead dump |
-| Speak to a human | Async escalate (name required); SMS-first notify; never fake live transfer — see `docs/ESCALATION.md` |
+| Speak to a human | Async escalate (name required); SMS-first notify; never fake live transfer — see `docs/product/ESCALATION.md` |
 | Language | en / sw / sheng match **after** the caller speaks |
 
 **Out of MVP claim (still on the long-term plan):** live transfer, Google Calendar, POS sync, RAG, hospitality depth, “95% full assist.”

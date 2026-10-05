@@ -166,7 +166,7 @@ Authoritative schema notes: `docs/supabase/schema.sql` (reference only).
 - `src/notifications/*` — Alert dispatch
 - `src/sautikit/webhook.js` — Webhook guard only (not full telephony module split)
 
-**TARGET (not implemented):** Modular `src/telephony/`, `src/orchestrator/` — see [`../TARGET_MODULE_LAYOUT.md`](../TARGET_MODULE_LAYOUT.md).
+**TARGET (not implemented):** Modular `src/telephony/`, `src/orchestrator/` — see [`../TARGET_MODULE_LAYOUT.md`](TARGET_MODULE_LAYOUT.md).
 
 ---
 

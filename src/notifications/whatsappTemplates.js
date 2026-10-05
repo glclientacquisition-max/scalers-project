@@ -1,5 +1,5 @@
 // Meta utility templates for staff WhatsApp.
-// Catalog to submit: docs/WHATSAPP_TEMPLATES.md
+// Catalog to submit: docs/product/WHATSAPP_TEMPLATES.md
 // Session text is not used. Params are never empty. No URLs. No em dashes.
 
 const PARAM_MAX = 500;

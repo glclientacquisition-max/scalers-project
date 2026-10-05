@@ -26,7 +26,7 @@ There is **no** `supabase/migrations/` folder in this repository.
 | Migration ledger | `docs/supabase/MIGRATION_LEDGER.md` | Change registry + CLI history |
 | Foundation bootstrap | `docs/supabase/foundation_bootstrap.sql` | Greenfield only — not production apply |
 | Voice DB API | `src/db.js` | Application contract over live schema |
-| Product/billing docs | `docs/ONE_WALLET_BILLING.md`, etc. | Business rules for RPC behavior |
+| Product/billing docs | `docs/operations/ONE_WALLET_BILLING.md`, etc. | Business rules for RPC behavior |
 
 ---
 
@@ -77,7 +77,7 @@ Full detail: [`../supabase/README.md`](../supabase/README.md).
 
 - Older introspected live shape notes for `tenants`, `calls`, `transcripts`, and related tables.
 - Header: **REFERENCE ONLY — not an apply migration**.
-- For greenfield provisioning, use [`foundation_bootstrap.sql`](./foundation_bootstrap.sql) instead.
+- For greenfield provisioning, use [`foundation_bootstrap.sql`](../supabase/foundation_bootstrap.sql) instead.
 
 ---
 

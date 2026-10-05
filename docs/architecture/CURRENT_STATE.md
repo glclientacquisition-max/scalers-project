@@ -20,27 +20,27 @@ Scalers is a B2B AI voice receptionist for East African businesses. A **Node.js 
 
 ## Repository structure
 
+Living map: [`../../README.md`](../../README.md) and [`../README.md`](../README.md).
+
 ```
-/workspace
-├── server.js              # Voice engine entry (2,841 LOC) — FACT
-├── db.js                  # Shim → src/db.js — FACT
-├── src/                   # Voice modules (~53 JS files) — FACT
-│   ├── speech/            # Soniox STT/TTS, turn-taking, normalize
-│   ├── conversation/      # Brain runtime, tools, catalog
-│   ├── notifications/     # SMS, WhatsApp, email dispatch
-│   ├── sautikit/          # Webhook guard
-│   ├── db.js              # Voice DB API (1,110 LOC)
-│   └── prompts.js         # Runtime prompt assembly
-├── dashboard/             # Next.js 16 app (~128 TS/TSX files) — FACT
-├── docs/                  # Product, lane, SQL, governance docs
-├── tests/                 # 35 test files — FACT
-├── scripts/               # Smoke tests, tunnels, harnesses
-├── Dockerfile, railway.toml, render.yaml
-└── AGENTS.md              # Five-lane agent governance
+server.js                 # Voice HTTP + media websocket + turn loop — FACT
+db.js                     # Shim → src/db.js — FACT
+src/speech/               # Soniox STT/TTS, turn-taking — FACT
+src/conversation/         # Brain runtime, tools, playbooks — FACT
+src/notifications/        # SMS, WhatsApp, email — FACT
+src/sautikit/             # Webhook guard — FACT
+src/billing/              # Package overage, transfer legs — FACT
+src/db.js                 # Voice DB API — FACT
+dashboard/                # Next.js Desk + Super Admin — FACT
+docs/                     # Indexed in docs/README.md — FACT
+tests/                    # Node tests — FACT
+scripts/                  # Smoke, tunnel, staging helpers — FACT
+Dockerfile, railway.toml, render.yaml
 ```
 
 **FACT:** Not a formal monorepo (no npm workspaces). Root package `missed-call-agent`, desk package `dashboard`.  
-**FACT:** No `.github/workflows/` CI in repo.
+**FACT:** CI lives in `.github/workflows/` (`ci.yml` plus staging workflows).  
+**FACT:** `server.js`, `src/`, `db.js`, and `dashboard/` stay at these paths. Railway starts `server.js`. Vercel root directory is `dashboard`.
 
 See also: [`../governance/REPOSITORY_INVENTORY.md`](../governance/REPOSITORY_INVENTORY.md).
 
@@ -137,7 +137,7 @@ See: [`../database/DATABASE_GOVERNANCE.md`](../database/DATABASE_GOVERNANCE.md).
 **FACT:** Wallet RPC `charge_call_to_wallet` is the billing source of truth (idempotent per `call_id`).  
 **FACT:** Locked SautiKit cost vs Scalers retail (KES, answered minutes): inbound 0 / 0; outbound 3 / 4 (KES 1/min margin). Unanswered outbound 0 / 0.  
 **FACT:** `src/billing/liveTransferLegs.js` — inbound `calls` row uses `WALLET_RATE_KES_PER_MINUTE` (default 0). Outbound live-transfer row (`kind=live_transfer`) uses `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (default 4).  
-**FACT:** Beta (`billing_enforcement=off`) does not originate outbound transfer unless `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on`. See [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) §8.
+**FACT:** Beta (`billing_enforcement=off`) does not originate outbound transfer unless `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on`. See [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) §8.
 
 ---
 

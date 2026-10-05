@@ -11,7 +11,7 @@ Classification: **CORE** · **ACTIVE** · **LEGACY** · **EXPERIMENTAL** · **DU
 
 | Path | Purpose | Status | Notes |
 | --- | --- | --- | --- |
-| `server.js` | Voice HTTP + WS + turn loop | CORE | 2,841 LOC monolith |
+| `server.js` | Voice HTTP + WS + turn loop | CORE | Still the monolith at repo root |
 | `db.js` | Compatibility shim | ACTIVE | Re-exports `src/db.js` |
 | `src/db.js` | Voice DB API | CORE | Stable contract for all lanes |
 | `src/lib/supabaseClient.js` | Service-role client | CORE | Server-only |
@@ -21,7 +21,7 @@ Classification: **CORE** · **ACTIVE** · **LEGACY** · **EXPERIMENTAL** · **DU
 | `src/notifications/` | Alert dispatch | CORE | Ops + Voice |
 | `src/sautikit/webhook.js` | Webhook signature guard | ACTIVE | Partial telephony extraction |
 | `src/data/soniox-voices.json` | Voice catalog JSON fallback | CORE | Duplicated in dashboard |
-| `tests/` | Automated tests | ACTIVE | 35 files |
+| `tests/` | Automated tests | ACTIVE | Voice, brain, and desk unit checks |
 | `scripts/` | Smoke, tunnel, harness | ACTIVE | Manual QA |
 | `Dockerfile` | Voice container | CORE | Node 22 |
 | `railway.toml` | Railway deploy | CORE | |
@@ -54,16 +54,18 @@ Classification: **CORE** · **ACTIVE** · **LEGACY** · **EXPERIMENTAL** · **DU
 | --- | --- | --- | --- |
 | `AGENTS.md` | Five-lane governance | CORE | Extended in Phase 2 |
 | `docs/agents/*.md` | Lane contracts | CORE | VOICE, BRAIN, DESK_UX, OPS, PLATFORM |
-| `docs/architecture/` | Current-state architecture | ACTIVE | Phase 2 |
+| `docs/README.md` | Doc folder index | ACTIVE | Start here |
+| `docs/product/` | Call, handoff, MVP, and package-adjacent product notes | ACTIVE | Moved off `docs/` root |
+| `docs/architecture/` | Current-state architecture | ACTIVE | Includes blueprint and target layout |
 | `docs/governance/` | Governance baseline | ACTIVE | Phase 2 |
 | `docs/database/` | DB governance | ACTIVE | Phase 2 |
-| `docs/operations/` | Deploy + env | ACTIVE | Phase 2 |
+| `docs/operations/` | Deploy, env, packages, wallet, DID pool, tunnel | ACTIVE | Includes notes moved off `docs/` root |
 | `docs/adr/` | Architecture decisions | ACTIVE | Phase 2 |
 | `docs/supabase/` | SQL scripts + apply order | CORE | 31 scripts |
-| `docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md` | Migration history + target | ACTIVE | Updated: historical vs current |
-| `docs/TARGET_MODULE_LAYOUT.md` | Target module tree | ACTIVE | Future layout |
-| `docs/MVP_SHIP_AND_TEST.md` | MVP gate | CORE | Product |
-| `docs/ONE_WALLET_BILLING.md` | Billing spec | CORE | Ops |
+| `docs/architecture/ARCHITECTURE_MIGRATION_BLUEPRINT.md` | Migration history + target | ACTIVE | Updated: historical vs current |
+| `docs/architecture/TARGET_MODULE_LAYOUT.md` | Target module tree | ACTIVE | Future layout |
+| `docs/product/MVP_SHIP_AND_TEST.md` | MVP gate | CORE | Product |
+| `docs/operations/ONE_WALLET_BILLING.md` | Billing spec | CORE | Ops |
 
 ---
 

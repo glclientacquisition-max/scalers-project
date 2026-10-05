@@ -2,7 +2,7 @@
 /**
  * MVP retail Brain smoke (no network).
  * Exercises the frozen MVP path: intent → NBA → validated tools → summary.
- * Beachhead scenarios mirror docs/MVP_SHIP_AND_TEST.md.
+ * Beachhead scenarios mirror docs/product/MVP_SHIP_AND_TEST.md.
  */
 
 const {

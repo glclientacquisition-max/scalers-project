@@ -1,6 +1,6 @@
 ---
 description: Scalers Platform lane — Supabase schema/RLS, db.js contracts, auth, deploy
-globs: docs/supabase/**,src/db.js,src/lib/supabaseClient.js,db.js,dashboard/src/lib/auth.ts,dashboard/src/lib/supabase/**,dashboard/src/lib/supabase.ts,dashboard/src/lib/tenant.ts,dashboard/src/app/api/login/**,dashboard/src/app/api/logout/**,dashboard/src/app/api/tenant/**,docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md,docs/TARGET_MODULE_LAYOUT.md,docs/PRODUCTION_CUTOVER.md,docs/agents/**,AGENTS.md,Dockerfile,railway.toml,render.yaml,.env.example,scripts/smoke-db.js
+globs: docs/supabase/**,src/db.js,src/lib/supabaseClient.js,db.js,dashboard/src/lib/auth.ts,dashboard/src/lib/supabase/**,dashboard/src/lib/supabase.ts,dashboard/src/lib/tenant.ts,dashboard/src/app/api/login/**,dashboard/src/app/api/logout/**,dashboard/src/app/api/tenant/**,docs/architecture/ARCHITECTURE_MIGRATION_BLUEPRINT.md,docs/architecture/TARGET_MODULE_LAYOUT.md,docs/operations/PRODUCTION_CUTOVER.md,docs/agents/**,AGENTS.md,Dockerfile,railway.toml,render.yaml,.env.example,scripts/smoke-db.js
 alwaysApply: false
 ---
 

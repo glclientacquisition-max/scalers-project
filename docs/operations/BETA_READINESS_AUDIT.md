@@ -128,4 +128,4 @@ Scalers MVP core loops exist and are test-covered at unit/smoke level. Staging d
 
 - [`PHASE_3G_COMPLETION_REPORT.md`](./PHASE_3G_COMPLETION_REPORT.md)
 - [`../security/PHASE_3F_SECURITY_REVIEW.md`](../security/PHASE_3F_SECURITY_REVIEW.md)
-- [`BETA_WALLET_PROGRAM.md`](../BETA_WALLET_PROGRAM.md) (if exists)
+- [`BETA_WALLET_PROGRAM.md`](BETA_WALLET_PROGRAM.md) (if exists)

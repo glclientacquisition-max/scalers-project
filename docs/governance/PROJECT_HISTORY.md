@@ -27,8 +27,8 @@ Do not treat this as a semver release history. No fabricated version numbers.
 
 | When | Milestone | Evidence | Label |
 | --- | --- | --- | --- |
-| Aug 2026 | SautiKit/Soniox/Supabase blueprint approved | `4907ea7` PR #2, `docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md` | **FACT** |
-| Aug 2026 | Target modular layout documented | `docs/TARGET_MODULE_LAYOUT.md` | **FACT** |
+| Aug 2026 | SautiKit/Soniox/Supabase blueprint approved | `4907ea7` PR #2, `docs/architecture/ARCHITECTURE_MIGRATION_BLUEPRINT.md` | **FACT** |
+| Aug 2026 | Target modular layout documented | `docs/architecture/TARGET_MODULE_LAYOUT.md` | **FACT** |
 
 **RECONSTRUCTED — Historical stack (pre-migration):** Twilio ConversationRelay + SQLite + single Express process. Documented in blueprint §1 as the starting baseline. Twilio is **no longer** the active telephony path.
 

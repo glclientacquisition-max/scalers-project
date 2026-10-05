@@ -140,5 +140,5 @@ Call the home-services DID. Log SID, pass/fail.
 | Seeds | `dashboard/src/lib/homeServicesOnboardingPack.ts` |
 | Compiler job line | `dashboard/src/lib/promptCompiler.ts` |
 | Smoke | `scripts/smoke-home-services-playbooks.js` |
-| Phase 2 plan | `docs/HOME_SERVICES_PHASE2.md` |
-| Retail MVP (still required) | `docs/MVP_SHIP_AND_TEST.md` |
+| Phase 2 plan | `docs/product/HOME_SERVICES_PHASE2.md` |
+| Retail MVP (still required) | `docs/product/MVP_SHIP_AND_TEST.md` |

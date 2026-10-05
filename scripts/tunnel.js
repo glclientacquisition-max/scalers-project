@@ -48,7 +48,7 @@ async function main() {
 
      npm run tunnel:cloudflared
 
-   Or use Cursor Ports (see docs/WEBHOOK_TUNNEL.md).
+   Or use Cursor Ports (see docs/operations/WEBHOOK_TUNNEL.md).
 `);
 
   tunnel.on('close', () => {

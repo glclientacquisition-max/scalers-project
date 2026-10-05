@@ -52,5 +52,5 @@ Reconstructed: 2026-08-14 (decisions landed August 2026 per Git history)
 ## Related systems
 
 - `server.js`, `src/speech/`, `src/db.js`
-- `docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md`
+- `docs/architecture/ARCHITECTURE_MIGRATION_BLUEPRINT.md`
 - [`../architecture/CURRENT_STATE.md`](../architecture/CURRENT_STATE.md)

@@ -6,9 +6,9 @@ Apply in the **Supabase SQL Editor** (or `psql`) against the target project. Voi
 
 For product notes on wallet/DID, see also:
 
-- [`docs/ONE_WALLET_BILLING.md`](../ONE_WALLET_BILLING.md)
-- [`docs/BETA_WALLET_PROGRAM.md`](../BETA_WALLET_PROGRAM.md)
-- [`docs/PRODUCTION_DID_POOL.md`](../PRODUCTION_DID_POOL.md)
+- [`docs/operations/ONE_WALLET_BILLING.md`](../operations/ONE_WALLET_BILLING.md)
+- [`docs/operations/BETA_WALLET_PROGRAM.md`](../operations/BETA_WALLET_PROGRAM.md)
+- [`docs/operations/PRODUCTION_DID_POOL.md`](../operations/PRODUCTION_DID_POOL.md)
 
 Production vs staging notify objects: [`docs/platform/NOTIFY_SQL_CATALOG.md`](../platform/NOTIFY_SQL_CATALOG.md). Never apply [`foundation_bootstrap.sql`](./foundation_bootstrap.sql) to ALCR.
 

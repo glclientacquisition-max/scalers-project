@@ -107,7 +107,7 @@ Hard delete, ledger writes, DID assignment, and prompt compile semantics stay Pl
 ### Wallet & billing (one KES prepaid wallet + beta)
 
 1. Apply `docs/supabase/wallet_metering.sql`, `one_wallet_billing.sql`, then `wallet_security_beta.sql`.
-2. Beta whitelist: `billing_enforcement = off` (default) — meter only, no charges. See `docs/BETA_WALLET_PROGRAM.md`.
+2. Beta whitelist: `billing_enforcement = off` (default) — meter only, no charges. See `docs/operations/BETA_WALLET_PROGRAM.md`.
 3. Owners open **Wallet** for balance / usage (beta badge when free).
 4. Voice engine charges only when enforcement is `soft`/`hard`.
 5. Super Admin → **Wallets**: credit, plan toggle (beta ↔ prepaid), ledger. M-Pesa next.
@@ -120,7 +120,7 @@ Hard delete, ledger writes, DID assignment, and prompt compile semantics stay Pl
 4. Open `/admin/login` (or `admin.scalers.co.ke` when `ADMIN_HOST` is set). Username + access code from `ADMIN_OPERATORS` or `ADMIN_ACCESS_CODE` + `ADMIN_USERNAMES`.
 5. Use **Numbers** to seed DIDs; **Businesses** to assign / release / remove.
 
-See `docs/PRODUCTION_DID_POOL.md` and `docs/SUPER_ADMIN_REQUIREMENTS.md`.
+See `docs/operations/PRODUCTION_DID_POOL.md` and `docs/operations/SUPER_ADMIN_REQUIREMENTS.md`.
 
 ## Local
 

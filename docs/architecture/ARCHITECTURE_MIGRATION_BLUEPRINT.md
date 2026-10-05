@@ -1,7 +1,7 @@
 # B2B AI Voice SaaS — Architecture & Migration Blueprint
 
 > **Status:** Migration blueprint — **historical + target reference**  
-> **Current production stack (2026-08-14):** SautiKit + Soniox + Gemini + Supabase — see [`docs/architecture/CURRENT_STATE.md`](./architecture/CURRENT_STATE.md)  
+> **Current production stack (2026-08-14):** SautiKit + Soniox + Gemini + Supabase — see [`docs/architecture/CURRENT_STATE.md`](CURRENT_STATE.md)  
 > **Historical baseline (pre-Aug 2026):** Twilio ConversationRelay + Gemini + SQLite  
 > **Target (remaining work):** Modular `server.js` split, optional GPT-4o-mini, full provider flags
 
@@ -243,7 +243,7 @@ Keep marker parsing (`###TOOL###` / `###ENDCALL###`) until tool-calling is prove
 
 ## 8. Data Model (Supabase)
 
-See [`docs/supabase/schema.sql`](./supabase/schema.sql).
+See [`docs/supabase/schema.sql`](../supabase/schema.sql).
 
 **Core tables**
 

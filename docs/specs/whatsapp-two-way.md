@@ -54,7 +54,7 @@ Kind names (`scalers_lead`, `scalers_escalation`, `scalers_visit`, `scalers_requ
 
 If Meta approved a different first name, pass it: `sendWhatsAppTemplate({ templateName, language })` or `--template` on the dry-run script.
 
-Helpers: `sendOwnerWhatsApp` (window-aware), `sendWhatsAppTemplate` (always template). Catalog: [`../WHATSAPP_TEMPLATES.md`](../WHATSAPP_TEMPLATES.md).
+Helpers: `sendOwnerWhatsApp` (window-aware), `sendWhatsAppTemplate` (always template). Catalog: [`../WHATSAPP_TEMPLATES.md`](../product/WHATSAPP_TEMPLATES.md).
 
 ## Phase 2 (separate PR, after a new Kenya DID exists)
 

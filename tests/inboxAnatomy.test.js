@@ -151,7 +151,7 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(statusFn, /caller_hold_cancelled/);
     assert.match(statusFn, /type === "hold" \|\| type === "order"/);
     assert.match(statusFn, /sendRecordedDeskCallerSms/);
-    const contract = read("docs/CALL_MESSAGE_CONTRACT.md");
+    const contract = read("docs/product/CALL_MESSAGE_CONTRACT.md");
     assert.match(contract, /caller_hold_ready/);
     assert.match(contract, /caller_hold_cancelled/);
     assert.match(contract, /Owner taps Done/);

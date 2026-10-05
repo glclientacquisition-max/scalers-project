@@ -122,7 +122,7 @@ Legend: **Persisted** = written to Supabase. **Memory** = process-local only. **
 | Charge | When `billing_enforcement` is `soft`/`hard` | **Persisted** — `chargeCallToWallet` → `wallet_ledger` |
 
 **FACT:** Beta default `billing_enforcement = off` — meter only, no charge.  
-**Files:** `src/db.js` `chargeCallToWallet`, `docs/ONE_WALLET_BILLING.md`
+**Files:** `src/db.js` `chargeCallToWallet`, `docs/operations/ONE_WALLET_BILLING.md`
 
 ---
 

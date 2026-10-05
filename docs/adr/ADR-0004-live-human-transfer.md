@@ -25,7 +25,7 @@ Warm transfer via Conference plus an outbound agent leg is documented by SautiKi
 5. On Dial failure, `<Say>` + hangup. Do not re-open Stream in v1.
 6. Defer warm conference / whisper / DTMF 0 to v2.
 
-Canonical spec: [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md).
+Canonical spec: [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md).
 
 ## Alternatives considered
 
@@ -55,5 +55,5 @@ Canonical spec: [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md).
 - `server.js` `/voice/incoming`, `/ws/media`
 - `src/conversation/brainPolicy.js`, `nextBestAction.js`, `escalation.js`
 - `tenants.handoff_mode`, `tenants.team_directory`
-- [`../ESCALATION.md`](../ESCALATION.md)
+- [`../ESCALATION.md`](../product/ESCALATION.md)
 - SautiKit Dial: https://sautikit.com/developers/voice-actions/dial

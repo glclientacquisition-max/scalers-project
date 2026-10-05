@@ -1,6 +1,8 @@
 # Contributing to Scalers
 
-Thank you for contributing. Scalers is a voice AI receptionist with a **voice engine** (Node.js), **owner desk** (Next.js), and **Supabase** backend. Read this before opening a PR.
+Thank you for contributing. Scalers is a Kenya Business Assistant: a Node.js voice engine, a Next.js Desk, and Supabase. Read this before opening a PR.
+
+Repo map: [`README.md`](README.md). Doc index: [`docs/README.md`](docs/README.md).
 
 **AI agents:** Start with [`AGENTS.md`](AGENTS.md) and the lane contract for your task.
 
