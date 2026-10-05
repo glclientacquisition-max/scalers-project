@@ -77,6 +77,8 @@ Distinguish documentation work from architectural rewrites. Governance PRs must 
 
 Composable Matt Pocock skills in `.cursor/skills/` (grill-with-docs, wayfinder, tdd, code-review) plus **desk-motion**, **reticle**, **chisle**, **ui-skills**, and **no-ai-slop**. Vercel/Next packs from `npx skills` live in `.agents/skills/` and are linked from `.cursor/skills/`. They do **not** replace lanes. Index: [`.cursor/skills/README.md`](.cursor/skills/README.md).
 
+Before presenting desk or admin UI work, run `/impeccable` (`impeccable context`, then Operate: critique or detect). The Frontend 2.0 charter still wins over Impeccable taste.
+
 ### Issue tracker
 
 GitHub for humans; Cloud Agents write specs under `docs/specs/` (read-only `gh`). See `docs/agents/issue-tracker.md`.
