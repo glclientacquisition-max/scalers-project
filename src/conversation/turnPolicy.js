@@ -23,7 +23,6 @@ const {
   pickCorrectiveReply,
 } = require('./callCorrectives');
 const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
-const { fileReadLine } = require('./fileRead');
 const { hoursAskLine, offerCatalogueLine } = require('./knownFacts');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
 
@@ -126,8 +125,8 @@ function resolveLocalReply({
     };
   }
 
-  const savedLine = fileReadLine({ text: clean, state, language });
-  if (savedLine) return { outcome: 'file_read', line: savedLine };
+  // Visit, hold, and order words are on conversation.fileReadSentence for Voice.
+  // Do not speak them here. A local reply would end the turn before Gemini.
 
   const offerLine = offerCatalogueLine(clean, profile, language);
   if (offerLine) return { outcome: 'catalogue', line: offerLine };

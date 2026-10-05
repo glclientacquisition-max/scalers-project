@@ -8,7 +8,7 @@ function looksLikeExistingVisitTalk(value) {
 }
 
 function looksLikePastBookingTalk(value) {
-  return /\b(last (time|visit|job|booking|appointment)|previous (visit|booking|job)|last time you (came|were)|ile mara|mara ya mwisho)\b/i.test(
+  return /\b(last (time|visit|job|booking|appointment|hold|order)|previous (visit|booking|job|hold|order|ones?)|my previous|last time you (came|were)|ile mara|mara ya mwisho)\b/i.test(
     String(value || '')
   );
 }

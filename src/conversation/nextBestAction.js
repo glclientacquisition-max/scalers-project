@@ -15,7 +15,6 @@ const {
 } = require('./callCorrectives');
 const { callerTurnKinds } = require('./messageOnly');
 const {
-  looksLikeHistoryReview,
   looksLikeOpenVisitLookup,
   looksLikeVisitReviewMore,
 } = require('./openLineSpeech');
@@ -33,13 +32,16 @@ const REQUEST_INTENTS = new Set(['hold', 'order', 'booking', 'cancellation']);
 function visitFileReadDecision(state) {
   const returning = state?.returning;
   if (!returningFileUsable(returning)) return null;
+  const hasOpen =
+    Boolean(returning.hasOpenRows) ||
+    (Array.isArray(returning.openVisits) && returning.openVisits.length > 0) ||
+    (Array.isArray(returning.openRequests) && returning.openRequests.length > 0);
+  // History-only files fall through to the recent-bookings reason (#538).
+  if (!hasOpen) return null;
   const said = String(state?.goal?.description || '');
   const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
   const asked = [said, latest].some(
-    (line) =>
-      looksLikeOpenVisitLookup(line) ||
-      looksLikeVisitReviewMore(line) ||
-      looksLikeHistoryReview(line)
+    (line) => looksLikeOpenVisitLookup(line) || looksLikeVisitReviewMore(line)
   );
   if (!asked) return null;
   return {
@@ -47,6 +49,15 @@ function visitFileReadDecision(state) {
     reason:
       'They asked what they have. The backend speaks the open visit rows. Do not ask which visit to update or cancel. Do not treat this as a reschedule.',
   };
+}
+
+function phoneFileHasOpenRows(state) {
+  const file = state?.returning;
+  if (!file || typeof file !== 'object') return false;
+  if (file.hasOpenRows) return true;
+  if (Array.isArray(file.openVisits) && file.openVisits.length) return true;
+  if (Array.isArray(file.openRequests) && file.openRequests.length) return true;
+  return false;
 }
 
 function determineNextBestAction({ state, capabilities = {} } = {}) {
@@ -61,7 +72,8 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       state?.goal?.description ||
       ''
   );
-  if (looksLikeFileRead(latestUtterance) && !hasReadableFile(state)) {
+  const openRowsOnFile = phoneFileHasOpenRows(state);
+  if (looksLikeFileRead(latestUtterance) && !hasReadableFile(state) && !openRowsOnFile) {
     return {
       action: ACTIONS.ANSWER,
       reason:
@@ -77,6 +89,13 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     speakerPendingOnFile(state?.returning) &&
     state?.caller?.nameConfirmed !== true
   ) {
+    if (openRowsOnFile) {
+      return {
+        action: ACTIONS.ANSWER,
+        reason:
+          'Name is not confirmed. Requested rows are already on this number. Do not say nothing is saved. Do not start a new booking. Confirm the name before reading the file.',
+      };
+    }
     return {
       action: ACTIONS.ANSWER,
       reason:
