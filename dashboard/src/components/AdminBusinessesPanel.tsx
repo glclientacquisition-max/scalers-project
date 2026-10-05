@@ -61,6 +61,21 @@ function phoneLine(b: AdminBusiness) {
   return b.status === "waiting" ? "Waiting" : b.sautikit_virtual_number;
 }
 
+function previewLine(b: AdminBusiness) {
+  const pack = packLabel(b);
+  if (b.status === "waiting") return pack === "None" ? "Waiting" : pack;
+  return pack === "None" ? phoneLine(b) : `${phoneLine(b)} · ${pack}`;
+}
+
+function SheetNote({ error }: { error: string }) {
+  if (!error) return null;
+  return (
+    <p className="pb-3 text-body text-attention" role="alert">
+      {error}
+    </p>
+  );
+}
+
 export function AdminBusinessesPanel({
   businesses,
   pendingBusinesses,
@@ -115,7 +130,12 @@ export function AdminBusinessesPanel({
     if (id && byId.has(id)) setSheet({ kind: "shop", id });
   }, [byId]);
 
-  async function run(body: Record<string, unknown>, url = "/api/admin/businesses") {
+  async function run(
+    body: Record<string, unknown>,
+    url = "/api/admin/businesses",
+    next: "shop" | "close" = "shop",
+  ) {
+    const shopId = sheet?.id;
     setError("");
     setStatus("");
     const res = await fetch(url, {
@@ -128,8 +148,9 @@ export function AdminBusinessesPanel({
       setError(json.error || "Could not save.");
       return false;
     }
-    setSheet(null);
     setConfirmText("");
+    setSheet(next === "shop" && shopId ? { kind: "shop", id: shopId } : null);
+    setStatus("Saved.");
     startTransition(() => router.refresh());
     return true;
   }
@@ -150,12 +171,17 @@ export function AdminBusinessesPanel({
     }
   }
 
+  function openKind(kind: SheetKind, id: string) {
+    setError("");
+    setSheet({ kind, id });
+  }
+
   function openShop(id: string) {
-    setSheet({ kind: "shop", id });
+    openKind("shop", id);
   }
 
   function openAssign(id: string) {
-    setSheet({ kind: "assign", id });
+    openKind("assign", id);
   }
 
   const emptyTitle = businesses.length === 0 ? "No businesses." : "No match.";
@@ -206,18 +232,19 @@ export function AdminBusinessesPanel({
       <section>
         <p className="px-4 text-caption text-ink-3">Businesses</p>
         <div className="px-4 py-2">
-          <Field id="biz-search" label="Search">
-            {(props) => (
-              <Input
-                {...props}
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setPage(1);
-                }}
-              />
-            )}
-          </Field>
+          <Input
+            id="biz-search"
+            type="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            placeholder="Search"
+            aria-label="Search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(1);
+            }}
+          />
         </div>
         <Segmented
           label="Businesses filter"
@@ -261,31 +288,23 @@ export function AdminBusinessesPanel({
                 key={b.id}
                 id={`biz-${b.id}`}
                 title={b.business_name}
-                preview={b.status === "waiting" ? packLabel(b) : `${phoneLine(b)} · ${packLabel(b)}`}
+                preview={previewLine(b)}
                 when={moneyKes(b)}
                 stamp={<Stamp tone={statusTone(b.status)}>{statusLabel(b.status)}</Stamp>}
                 onOpen={() => openShop(b.id)}
-                actions={
-                  b.status === "waiting" && freeCount > 0 ? (
-                    <Button type="button" variant="tonal" size="sm" onClick={() => openAssign(b.id)}>
-                      Assign
-                    </Button>
-                  ) : undefined
-                }
               />
             ))}
           </ul>
         )}
         {filtered.length > PAGE_SIZE ? (
-          <div className="flex items-center justify-between gap-3 px-4 py-3">
-            <p className="text-meta tabular-nums text-ink-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+            <p className="min-w-0 text-meta tabular-nums text-ink-2">
               {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}
             </p>
-            <div className="flex gap-2">
+            <div className="flex shrink-0 gap-2">
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
                 disabled={safePage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
@@ -294,7 +313,6 @@ export function AdminBusinessesPanel({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
                 disabled={safePage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               >
@@ -311,11 +329,11 @@ export function AdminBusinessesPanel({
           if (!next) setSheet(null);
         }}
         title={open?.business_name || "Business"}
-        description={open ? formatCreated(open.created_at) : undefined}
         theme="admin"
       >
+        <SheetNote error={error} />
         {open ? (
-          <ul className="divide-y divide-hairline">
+          <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
             <ListRow title="Number" preview={phoneLine(open)} />
             <ListRow title="Notify" preview={notifyLabel(open.whatsapp_notification_number)} />
             <ListRow title="Created" preview={formatCreated(open.created_at)} />
@@ -324,7 +342,7 @@ export function AdminBusinessesPanel({
               preview={packLabel(open)}
               onOpen={() => {
                 setPeriod(open.package_period || "month");
-                setSheet({ kind: "package", id: open.id });
+                openKind("package", open.id);
                 void loadPacks();
               }}
             />
@@ -334,7 +352,7 @@ export function AdminBusinessesPanel({
               onOpen={() => {
                 setDeltaKes("1000");
                 setAdjustNote("Ops credit");
-                setSheet({ kind: "ledger", id: open.id });
+                openKind("ledger", open.id);
               }}
             />
             {open.status === "waiting" ? (
@@ -346,9 +364,13 @@ export function AdminBusinessesPanel({
               />
             ) : null}
             {open.status === "active" ? (
-              <ListRow title="Release" preview={open.sautikit_virtual_number} onOpen={() => setSheet({ kind: "release", id: open.id })} />
+              <ListRow
+                title="Release"
+                preview={open.sautikit_virtual_number}
+                onOpen={() => openKind("release", open.id)}
+              />
             ) : null}
-            <ListRow title="Remove" preview="Frees the number" onOpen={() => setSheet({ kind: "remove", id: open.id })} />
+            <ListRow title="Remove" preview="Frees the number" onOpen={() => openKind("remove", open.id)} />
           </ul>
         ) : null}
       </Sheet>
@@ -364,20 +386,24 @@ export function AdminBusinessesPanel({
           freeCount > 0 ? (
             <Button
               type="button"
+              block
               pending={pending}
               onClick={() => open && void run({ action: "assign_next", business_id: open.id })}
             >
-              Assign next available
+              Assign next
             </Button>
           ) : (
-            <ButtonLink href="/admin/numbers">Add number</ButtonLink>
+            <ButtonLink href="/admin/numbers" block>
+              Add number
+            </ButtonLink>
           )
         }
       >
+        <SheetNote error={error} />
         {freeCount === 0 ? (
           <Empty className="px-0 py-8" title="No numbers available" line="Add a number, then assign." />
         ) : (
-          <ul className="divide-y divide-hairline">
+          <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
             {availableDids.map((row) => (
               <ListRow
                 key={row.e164}
@@ -409,12 +435,18 @@ export function AdminBusinessesPanel({
         theme="admin"
         footer={
           <>
-            <Button type="button" variant="ghost" onClick={() => open && setSheet({ kind: "shop", id: open.id })}>
+            <Button
+              type="button"
+              variant="ghost"
+              block
+              onClick={() => open && openKind("shop", open.id)}
+            >
               Cancel
             </Button>
             <Button
               type="button"
               variant="danger"
+              block
               pending={pending}
               onClick={() => open && void run({ action: "release_did", business_id: open.id })}
             >
@@ -423,6 +455,7 @@ export function AdminBusinessesPanel({
           </>
         }
       >
+        <SheetNote error={error} />
         <p className="text-body text-ink-2">The number stays in the pool as Available.</p>
       </Sheet>
 
@@ -436,6 +469,7 @@ export function AdminBusinessesPanel({
         footer={
           <Button
             type="button"
+            block
             pending={pending}
             onClick={() =>
               open &&
@@ -451,12 +485,14 @@ export function AdminBusinessesPanel({
           </Button>
         }
       >
+        <SheetNote error={error} />
         <div className="space-y-3">
           <Field id="biz-delta" label="Amount" hint="KES. Plus credits, minus debits.">
             {(props) => (
               <Input
                 {...props}
                 className="tabular-nums"
+                inputMode="decimal"
                 value={deltaKes}
                 onChange={(event) => setDeltaKes(event.target.value)}
               />
@@ -480,6 +516,7 @@ export function AdminBusinessesPanel({
         footer={
           <Button
             type="button"
+            block
             pending={pending}
             disabled={!packageId}
             onClick={() =>
@@ -494,7 +531,9 @@ export function AdminBusinessesPanel({
           </Button>
         }
       >
+        <SheetNote error={error} />
         <Segmented
+          className="-mx-5 px-5 sm:-mx-6 sm:px-6 md:-mx-6 md:px-6"
           label="Period"
           items={[
             { key: "month", label: "Month", active: period === "month" },
@@ -503,9 +542,14 @@ export function AdminBusinessesPanel({
           onSelect={(key) => setPeriod(key as "month" | "year")}
         />
         {packs.length === 0 ? (
-          <Empty className="px-0 py-8" title="No packages." line="Set SKUs on Packages." />
+          <Empty
+            className="px-0 py-8"
+            title="No packages."
+            line="Set SKUs on Packages."
+            action={<ButtonLink href="/admin/packages">Packages</ButtonLink>}
+          />
         ) : (
-          <ul className="divide-y divide-hairline">
+          <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
             {packs.map((pack) => (
               <ListRow
                 key={pack.id}
@@ -534,9 +578,10 @@ export function AdminBusinessesPanel({
             <Button
               type="button"
               variant="ghost"
+              block
               onClick={() => {
                 setConfirmText("");
-                if (open) setSheet({ kind: "shop", id: open.id });
+                if (open) openKind("shop", open.id);
               }}
             >
               Cancel
@@ -544,18 +589,28 @@ export function AdminBusinessesPanel({
             <Button
               type="button"
               variant="danger"
+              block
               pending={pending}
               disabled={confirmText !== "REMOVE"}
-              onClick={() => open && void run({ action: "remove", business_id: open.id })}
+              onClick={() =>
+                open && void run({ action: "remove", business_id: open.id }, "/api/admin/businesses", "close")
+              }
             >
               Remove
             </Button>
           </>
         }
       >
+        <SheetNote error={error} />
         <Field id="biz-remove" label="Confirm">
           {(props) => (
-            <Input {...props} value={confirmText} onChange={(event) => setConfirmText(event.target.value)} />
+            <Input
+              {...props}
+              autoComplete="off"
+              spellCheck={false}
+              value={confirmText}
+              onChange={(event) => setConfirmText(event.target.value)}
+            />
           )}
         </Field>
       </Sheet>

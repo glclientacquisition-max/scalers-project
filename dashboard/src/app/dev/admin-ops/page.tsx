@@ -43,6 +43,8 @@ const POOL: DidPoolRow[] = [
   },
 ];
 
+const AVAILABLE_DIDS = [{ e164: "+254700000001" }, { e164: "+254700000002" }];
+
 const BUSINESSES: AdminBusiness[] = [
   {
     id: "biz-waiting",
@@ -61,7 +63,7 @@ const BUSINESSES: AdminBusiness[] = [
   {
     id: "biz-live",
     created_at: "2026-09-02T08:00:00.000Z",
-    business_name: "Sample Shop",
+    business_name: "Sample Shop with a long display name",
     sautikit_virtual_number: "+254711000111",
     whatsapp_notification_number: "+254733000333",
     is_active: true,
@@ -72,6 +74,34 @@ const BUSINESSES: AdminBusiness[] = [
     package_period: "month",
     status: "active",
   },
+  {
+    id: "biz-archived",
+    created_at: "2026-08-12T08:00:00.000Z",
+    business_name: "Closed Kiosk",
+    sautikit_virtual_number: "pending:biz-archived",
+    whatsapp_notification_number: "pending",
+    is_active: false,
+    wallet_balance_kes: 0,
+    telecom_wallet_balance_kes: 0,
+    ai_wallet_balance_usd: 0,
+    package_name: null,
+    package_period: null,
+    status: "archived",
+  },
+  ...Array.from({ length: 24 }, (_, index) => ({
+    id: `biz-page-${index + 1}`,
+    created_at: "2026-07-01T08:00:00.000Z",
+    business_name: `Shop ${index + 1}`,
+    sautikit_virtual_number: `+25471100${String(200 + index).padStart(4, "0")}`,
+    whatsapp_notification_number: "+254733000333",
+    is_active: true,
+    wallet_balance_kes: 0,
+    telecom_wallet_balance_kes: 0,
+    ai_wallet_balance_usd: 0,
+    package_name: index % 2 === 0 ? "Starter" : null,
+    package_period: index % 2 === 0 ? ("month" as const) : null,
+    status: "active" as const,
+  })),
 ];
 
 export default function DevAdminOpsPage() {
@@ -91,7 +121,7 @@ export default function DevAdminOpsPage() {
           <AdminBusinessesPanel
             businesses={BUSINESSES}
             pendingBusinesses={PENDING}
-            availableDids={[]}
+            availableDids={AVAILABLE_DIDS}
           />
         </section>
       </div>
