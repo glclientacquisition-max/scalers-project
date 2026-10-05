@@ -35,6 +35,14 @@ Charter: `docs/frontend/FRONTEND_2_0_CHARTER.md`. It wins over older frontend do
 
 - Verbs and nouns the owner already knows. Sentence case. No filler, no instructional subheaders, no exclamation marks.
 - No em dashes or en dashes in UI strings. Hyphens in compound words are fine.
+- Run `/no-ai-slop` on every new UI string. If the line could sit on another product unchanged, cut it.
+
+## Product, not infra
+
+Admin is a universal app (WhatsApp / Instagram / Truecaller bar). Screens show the job: people, money, line up or down.
+- Do not put vendor setup in product UI: Resend Create domain, DNS records, API keys, fingerprints, env var names, git SHAs.
+- Who we notify are people (name, phone, email) under Escalate or Settings. Not a comma mailbox. Not ops mail as a heading.
+- Connect domain, DNS, and keys in infra. Leave them off the page.
 
 ## Motion and access
 

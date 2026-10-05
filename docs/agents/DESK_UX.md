@@ -34,6 +34,7 @@ Use for landing, signup/onboarding UX, calls inbox, settings presentation, navig
 1. **Strict shell split:** owners → `(desk)` with `DESK_LINKS`; ops → `/admin/*` with `ADMIN_LINKS`. Both render through one `AppShell` (tabs below `md`, rail on `md+`). Never merge the two link lists or their sessions.
 2. Brand-first marketing: Scalers must read as the hero identity on the landing first viewport.
 3. **Frontend 2.0 mandate (always on):** Follow `.cursor/rules/scalers-design-ux.mdc` and the charter on every UI change. Build from the kit in `components/ui/`. Tokens only, no hex. `ListRow` for lists, `Segmented` for filters, `IconButton` for row actions, docked Save, shaped skeletons, `Empty` with a next action.
+3b. **Universal app:** Super Admin is the same product, not a second engineering console. Status and people only. Resend, DNS, API keys, fingerprints, and env names stay in infra. Escalate is a person list (name, phone, email). Run `/no-ai-slop` on copy. This rule is for every Desk/Admin chat, not a one-off.
 4. **Motion:** Follow `.cursor/skills/desk-motion/SKILL.md` and `emil-design-eng`. Only pending, live, land, shift, press. Notices use `DeskNotice`. No Lottie or Framer Motion on desk.
 5. Phone and desktop share one composition. Split panes from `lg`. Controls do not change size by label length.
 6. **Proof:** the Playwright gate in `dashboard/e2e` at 360, 390, 768, 1280, light and dark, before a PR is ready.

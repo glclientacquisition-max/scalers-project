@@ -77,7 +77,9 @@ Distinguish documentation work from architectural rewrites. Governance PRs must 
 
 Composable Matt Pocock skills in `.cursor/skills/` (grill-with-docs, wayfinder, tdd, code-review) plus **desk-motion**, **reticle**, **chisle**, **ui-skills**, and **no-ai-slop**. Vercel/Next packs from `npx skills` live in `.agents/skills/` and are linked from `.cursor/skills/`. They do **not** replace lanes. Index: [`.cursor/skills/README.md`](.cursor/skills/README.md).
 
-Before presenting desk or admin UI work, run `/impeccable` (`impeccable context`, then Operate: critique or detect). The Frontend 2.0 charter still wins over Impeccable taste.
+Before presenting desk or admin UI work, run `/impeccable` (`impeccable context`, then Operate: critique or detect) and `/no-ai-slop` on new strings. The Frontend 2.0 charter still wins over Impeccable taste.
+
+**Universal app (every chat, every lane that touches UI):** treat owner desk and Super Admin like a phone product, not a vendor console. People, money, status. No Resend/DNS/API-key/env controls on product screens. Escalate contacts are name, phone, email. Copy is nouns the operator already knows. These rules apply in this chat and in later chats.
 
 ### Issue tracker
 

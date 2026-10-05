@@ -38,6 +38,7 @@ Use for packages catalog, on-demand rate card, wallet ledger (ops scaffolding), 
 6. Soft/hard enforcement behavior must match docs; do not silently bill beta tenants.
 7. DID pool statuses (`available` / `assigned` / `reserved` / `disabled`) stay consistent with tenant `sautikit_virtual_number`.
 8. Super Admin uses service role server-side; never ship service role to `NEXT_PUBLIC_*`.
+9. Super Admin is a universal app, same bar as the owner desk. Platform shows line, speech, reasoning, money. Who we notify are people (name, phone, email) under Escalate. Domain, DNS, Resend, and API keys are infra, not Admin controls. `/no-ai-slop` on ops UI copy. This holds in every Ops/Admin chat.
 
 ## Rate card defaults (env)
 
