@@ -23,37 +23,91 @@ function warnKes(minor: number): string {
   return String(Math.round((Number(minor) || 0) / 100));
 }
 
+async function postOps(body: Record<string, unknown>) {
+  const res = await fetch("/api/admin/platform-ops", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(json.error || "Could not save.");
+}
+
+export function AdminOpsNotices({ notices }: { notices: OpsNotice[] }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  if (!notices.length) return null;
+
+  return (
+    <section>
+      <p className="px-4 text-caption text-ink-3">Open</p>
+      {error ? (
+        <p className="px-4 text-body text-attention" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <ul className="divide-y divide-hairline">
+        {notices.map((notice) => (
+          <ListRow
+            key={notice.id}
+            title={kindLabel(notice.kind)}
+            preview={notice.detail || kindLabel(notice.kind)}
+            stamp={
+              <Stamp tone={notice.status === "acked" ? "neutral" : "attention"}>
+                {notice.status === "acked" ? "Seen" : "Open"}
+              </Stamp>
+            }
+            actions={
+              notice.status === "open" ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  pending={busy === notice.id}
+                  onClick={() => {
+                    setBusy(notice.id);
+                    setError("");
+                    void postOps({ action: "ack", kind: notice.kind as OpsNoticeKind })
+                      .catch((err) => setError(err instanceof Error ? err.message : "Could not save."))
+                      .finally(() => setBusy(null));
+                  }}
+                >
+                  Mark seen
+                </Button>
+              ) : undefined
+            }
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function AdminPlatformOpsForm({
   settings,
   persisted,
-  notices,
 }: {
   settings: OpsSettings;
   persisted: boolean;
-  notices: OpsNotice[];
 }) {
   const [people, setPeople] = useState<OpsPerson[]>(settings.people);
+  const [adding, setAdding] = useState(settings.people.length === 0);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [kinds, setKinds] = useState<OpsKindFlags>(settings.kinds);
   const [warn, setWarn] = useState(warnKes(settings.sautikitWarnMinor));
-  const [busy, setBusy] = useState<"save" | "test" | "ack" | null>(null);
+  const [busy, setBusy] = useState<"save" | "test" | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
-  async function post(body: Record<string, unknown>, ok: string, which: typeof busy) {
+  async function run(body: Record<string, unknown>, ok: string, which: "save" | "test") {
     setBusy(which);
     setError("");
     setStatus("");
     try {
-      const res = await fetch("/api/admin/platform-ops", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const json = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(json.error || "Could not save.");
+      await postOps(body);
       setStatus(ok);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save.");
@@ -71,25 +125,29 @@ export function AdminPlatformOpsForm({
     setName("");
     setPhone("");
     setEmail("");
+    if (next.length) setAdding(false);
   }
 
   if (!persisted) {
     return (
-      <Empty title="No one to notify." />
+      <section id="escalate">
+        <p className="px-4 text-caption text-ink-3">People</p>
+        <Empty title="No one to notify." />
+      </section>
     );
   }
 
   return (
-    <section id="escalate" className="space-y-4 border-t border-hairline pt-6">
-      <h2 className="text-title font-medium text-ink">Escalate</h2>
+    <section id="escalate">
+      <p className="px-4 text-caption text-ink-3">People</p>
 
       {error ? (
-        <p className="text-body text-attention" role="alert">
+        <p className="px-4 text-body text-attention" role="alert">
           {error}
         </p>
       ) : null}
       {status ? (
-        <p className="text-body text-ok" role="status">
+        <p className="px-4 text-body text-ok" role="status">
           {status}
         </p>
       ) : null}
@@ -117,10 +175,10 @@ export function AdminPlatformOpsForm({
       ) : null}
 
       <form
-        className="space-y-4"
+        className="px-4"
         onSubmit={(event) => {
           event.preventDefault();
-          void post(
+          void run(
             {
               action: "save_settings",
               people,
@@ -132,70 +190,96 @@ export function AdminPlatformOpsForm({
           );
         }}
       >
-        <Field id="escalate-name" label="Name">
-          {(props) => (
-            <Input {...props} value={name} onChange={(event) => setName(event.target.value)} />
-          )}
-        </Field>
-        <Field id="escalate-phone" label="Phone">
-          {(props) => (
-            <Input
-              {...props}
-              inputMode="tel"
-              autoComplete="tel"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-            />
-          )}
-        </Field>
-        <Field id="escalate-email" label="Email">
-          {(props) => (
-            <Input
-              {...props}
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          )}
-        </Field>
-        <Button type="button" variant="tonal" onClick={addPerson}>
-          Add person
-        </Button>
-        <Field id="escalate-warn" label="Warn below" hint="KES">
-          {(props) => (
-            <Input
-              {...props}
-              type="number"
-              min={0}
-              step="1"
-              className="tabular-nums"
-              value={warn}
-              onChange={(event) => setWarn(event.target.value)}
-            />
-          )}
-        </Field>
-        <fieldset>
-          <legend className="text-body font-medium text-ink">Notify for</legend>
-          <ul className="mt-2 space-y-1">
-            {OPS_NOTICE_KINDS.map((kind) => (
-              <li key={kind}>
-                <label className="inline-flex min-h-11 items-center gap-3 text-body text-ink">
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5"
-                    checked={kinds[kind]}
-                    onChange={(event) =>
-                      setKinds((prev) => ({ ...prev, [kind]: event.target.checked }))
-                    }
-                  />
-                  {kindLabel(kind)}
-                </label>
-              </li>
-            ))}
-          </ul>
-        </fieldset>
-        <div className="sticky bottom-[calc(var(--desk-tabbar-h,3.5rem)+env(safe-area-inset-bottom))] z-20 flex flex-wrap gap-3 border-t border-hairline bg-surface py-3 md:static md:border-0 md:py-0">
+        {adding ? (
+          <div className="grid gap-3 py-3 sm:grid-cols-3">
+            <Field id="escalate-name" label="Name">
+              {(props) => (
+                <Input {...props} value={name} onChange={(event) => setName(event.target.value)} />
+              )}
+            </Field>
+            <Field id="escalate-phone" label="Phone">
+              {(props) => (
+                <Input
+                  {...props}
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                />
+              )}
+            </Field>
+            <Field id="escalate-email" label="Email">
+              {(props) => (
+                <Input
+                  {...props}
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              )}
+            </Field>
+            <div className="flex flex-wrap gap-2 sm:col-span-3">
+              <Button type="button" variant="tonal" size="sm" onClick={addPerson}>
+                Add person
+              </Button>
+              {people.length > 0 ? (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setAdding(false)}>
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <div className="py-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setAdding(true)}>
+              Add person
+            </Button>
+          </div>
+        )}
+
+        <details className="border-t border-hairline py-2">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center text-body text-ink [&::-webkit-details-marker]:hidden">
+            Warn below {warn} KES
+          </summary>
+          <div className="space-y-3 pb-3">
+            <Field id="escalate-warn" label="Warn below" hint="KES">
+              {(props) => (
+                <Input
+                  {...props}
+                  type="number"
+                  min={0}
+                  step="1"
+                  className="tabular-nums"
+                  value={warn}
+                  onChange={(event) => setWarn(event.target.value)}
+                />
+              )}
+            </Field>
+            <fieldset>
+              <legend className="text-meta text-ink-2">Notify for</legend>
+              <ul className="mt-1 grid grid-cols-2 gap-x-3">
+                {OPS_NOTICE_KINDS.map((kind) => (
+                  <li key={kind}>
+                    <label className="inline-flex min-h-11 items-center gap-2 text-body text-ink">
+                      <input
+                        type="checkbox"
+                        className="h-5 w-5"
+                        checked={kinds[kind]}
+                        onChange={(event) =>
+                          setKinds((prev) => ({ ...prev, [kind]: event.target.checked }))
+                        }
+                      />
+                      {kindLabel(kind)}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </fieldset>
+          </div>
+        </details>
+
+        <div className="sticky bottom-[calc(var(--desk-tabbar-h,3.5rem)+env(safe-area-inset-bottom))] z-20 flex flex-wrap gap-2 border-t border-hairline bg-surface py-3 md:static md:border-0 md:py-0">
           <Button type="submit" pending={busy === "save"}>
             Save
           </Button>
@@ -204,54 +288,13 @@ export function AdminPlatformOpsForm({
             variant="tonal"
             pending={busy === "test"}
             onClick={() =>
-              void post(
-                { action: "test_send", emails: emailsFromPeople(people) },
-                "Test sent.",
-                "test",
-              )
+              void run({ action: "test_send", emails: emailsFromPeople(people) }, "Test sent.", "test")
             }
           >
             Send test
           </Button>
         </div>
       </form>
-
-      {notices.length ? (
-        <ul className="divide-y divide-hairline">
-          {notices.map((notice) => (
-            <ListRow
-              key={notice.id}
-              title={kindLabel(notice.kind)}
-              preview={notice.detail || kindLabel(notice.kind)}
-              stamp={
-                <Stamp tone={notice.status === "acked" ? "neutral" : "attention"}>
-                  {notice.status === "acked" ? "Seen" : "Open"}
-                </Stamp>
-              }
-              actions={
-                notice.status === "open" ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    pending={busy === "ack"}
-                    onClick={() =>
-                      void post(
-                        { action: "ack", kind: notice.kind as OpsNoticeKind },
-                        "Seen.",
-                        "ack",
-                      )
-                    }
-                  >
-                    Mark seen
-                  </Button>
-                ) : undefined
-              }
-            />
-          ))}
-        </ul>
-      ) : null}
     </section>
   );
 }
-

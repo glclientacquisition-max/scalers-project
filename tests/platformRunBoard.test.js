@@ -39,8 +39,11 @@ describe("platform run board", () => {
     const model = read("dashboard/src/lib/platformRunBoardModel.ts");
     assert.match(model, /title: "Speech"/);
     assert.match(model, /title: "Reasoning"/);
-    assert.match(board, /Phone line/);
-    assert.doesNotMatch(board, /SautiKit/);
+    assert.match(model, /title: "Phone line"/);
+    assert.match(board, /href="\/admin\/numbers"/);
+    assert.match(board, /ListRow/);
     assert.doesNotMatch(board, /Telecom \(/);
+    assert.doesNotMatch(board, /adminThClass/);
+    assert.doesNotMatch(board, /Phone line numbers/);
   });
 });

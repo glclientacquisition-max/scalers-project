@@ -53,8 +53,8 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Primary CTA: Add number.
 
 ### 1b. Platform (`/admin/platform`)
-- Health: phone line, speech, reasoning, money.
-- Escalate: people (name, phone, email), notify types, warn below. Mail sender is infra (`OPS_EMAIL_FROM`). Not owner alerts. No Resend or DNS controls.
+- Health: phone line, speech, reasoning as list rows. Numbers is a row to `/admin/numbers`.
+- People: escalate contacts (name, phone, email). Warn below and notify types sit under People.
 
 ### 2. Businesses (`/admin/businesses`)
 - Table: Business name · Phone DID · Notify number · Status (Active / Waiting for number / Archived) · Created · Actions.

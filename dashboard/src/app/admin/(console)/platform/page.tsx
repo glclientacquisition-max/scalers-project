@@ -1,4 +1,4 @@
-import { AdminPlatformOpsForm } from "@/components/AdminPlatformOpsForm";
+import { AdminOpsNotices, AdminPlatformOpsForm } from "@/components/AdminPlatformOpsForm";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { PlatformRunBoard } from "@/components/PlatformRunBoard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -16,17 +16,15 @@ export default async function AdminPlatformPage() {
     return <AdminSetupError />;
   }
 
+  const openCount = snapshot.notices.filter((notice) => notice.status === "open").length;
+
   return (
-    <div className="space-y-8">
-      <PageHeader title="Platform" />
+    <div className="space-y-4">
+      <PageHeader title="Platform" meta={openCount > 0 ? `${openCount} open` : undefined} />
 
+      <AdminOpsNotices notices={snapshot.notices} />
       <PlatformRunBoard />
-
-      <AdminPlatformOpsForm
-        settings={snapshot.settings}
-        persisted={snapshot.persisted}
-        notices={snapshot.notices}
-      />
+      <AdminPlatformOpsForm settings={snapshot.settings} persisted={snapshot.persisted} />
     </div>
   );
 }

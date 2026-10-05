@@ -206,7 +206,7 @@ describe("admin console polish", () => {
     assert.match(opsApi, /verify_resend/);
     const opsForm = read("dashboard/src/components/AdminPlatformOpsForm.tsx");
     assert.match(opsForm, /id="escalate"/);
-    assert.match(opsForm, /Escalate/);
+    assert.match(opsForm, />People</);
     assert.match(opsForm, /Add person/);
     assert.match(opsForm, /Warn below/);
     assert.match(opsForm, /Notify for/);
@@ -218,6 +218,8 @@ describe("admin console polish", () => {
     assert.doesNotMatch(board, /KeyDiagnostics/);
     assert.doesNotMatch(board, /SAUTIKIT_API_KEY/);
     const platform = read("dashboard/src/app/admin/(console)/platform/page.tsx");
+    assert.match(platform, /AdminOpsNotices/);
+    assert.match(platform, /PlatformRunBoard/);
     assert.doesNotMatch(platform, /Infrastructure/);
   });
 
