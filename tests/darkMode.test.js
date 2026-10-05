@@ -198,10 +198,13 @@ describe("theme activation", () => {
     const landing = read("dashboard/src/components/marketing/LandingPage.tsx");
     const login = read("dashboard/src/app/login/page.tsx");
     const adminLogin = read("dashboard/src/app/admin/login/page.tsx");
+    const adminMenu = read("dashboard/src/components/AdminAccountMenu.tsx");
     assert.match(picker, /export function ThemeDock/);
     assert.match(landing, /<ThemeDock/);
     assert.match(login, /<ThemeDock/);
     assert.match(adminLogin, /<ThemeDock/);
+    assert.match(adminMenu, /<ThemePicker \/>/);
+    assert.match(adminMenu, />\s*This device\s*</);
     assert.match(account, /<ThemePicker \/>/);
     assert.match(account, />\s*This device\s*</);
     assert.doesNotMatch(account, /\/settings/);
