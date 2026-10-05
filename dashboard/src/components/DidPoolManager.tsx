@@ -1,26 +1,22 @@
 "use client";
 
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { adminRowMutedClass, adminTdClass, adminThClass } from "@/components/AdminIdentityList";
+import { ChevronRightIcon } from "@heroicons/react/20/solid";
+import { BuyNumberPanel } from "@/components/BuyNumberPanel";
 import { Button } from "@/components/ui/Button";
-import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
-import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
 import { Field, Input } from "@/components/ui/Field";
+import { ListRow } from "@/components/ui/ListRow";
+import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { Stamp, type StampTone } from "@/components/ui/Stamp";
 import type { DidPoolRow, PendingTenant } from "@/lib/didPool";
 
-const ADD_FIELD_ID = "add-did-e164";
+type PoolFilter = "all" | "available" | "assigned";
 
-function focusAddNumber() {
-  document.getElementById(ADD_FIELD_ID)?.focus();
-}
-
-function waitingLine(count: number) {
-  if (count === 1) return "1 business is waiting.";
-  return `${count} businesses are waiting.`;
+function waitingPreview(count: number) {
+  return count === 1 ? "1 waiting" : `${count} waiting`;
 }
 
 function statusTone(status: string): StampTone {
@@ -41,7 +37,7 @@ function businessLabel(row: DidPoolRow) {
   if (row.tenants?.business_name) return row.tenants.business_name;
   if (row.tenant_id) return "Linked business";
   if (row.status === "assigned" || row.status === "reserved") return "Not linked";
-  return "None";
+  return "";
 }
 
 function canRelease(status: string) {
@@ -57,20 +53,27 @@ export function DidPoolManager({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  const [filter, setFilter] = useState<PoolFilter>("all");
+  const [sheet, setSheet] = useState<"add" | "buy" | "assign" | "release" | null>(null);
   const [e164, setE164] = useState("");
   const [notes, setNotes] = useState("");
-  const [assignBusinessId, setAssignBusinessId] = useState(pendingBusinesses[0]?.id || "");
-  const [pickE164, setPickE164] = useState("next");
+  const [assignBusiness, setAssignBusiness] = useState<PendingTenant | null>(null);
   const [releaseTarget, setReleaseTarget] = useState<DidPoolRow | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
 
   const availableRows = pool.filter((row) => row.status === "available");
-  const available = availableRows.length;
+  const assignedCount = pool.filter((row) => row.status === "assigned").length;
+  const visible = useMemo(() => {
+    if (filter === "available") return pool.filter((row) => row.status === "available");
+    if (filter === "assigned") return pool.filter((row) => row.status === "assigned" || row.status === "reserved");
+    return pool;
+  }, [filter, pool]);
 
   async function run(body: Record<string, unknown>) {
-    setError(null);
-    setStatus(null);
+    setError("");
+    setStatus("");
     const res = await fetch("/api/did-pool", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -82,7 +85,7 @@ export function DidPoolManager({
       row?: { e164?: string };
     };
     if (!res.ok) {
-      setError(json.error || "Request failed");
+      setError(json.error || "Could not save.");
       return null;
     }
     startTransition(() => router.refresh());
@@ -92,21 +95,23 @@ export function DidPoolManager({
   async function addNumber() {
     const json = await run({ action: "add", e164, notes });
     if (!json) return;
-    const added = json.row?.e164 || e164;
-    setStatus(`Added ${added}. It is Available.`);
+    setStatus(`Added ${json.row?.e164 || e164}.`);
     setE164("");
     setNotes("");
+    setSheet(null);
   }
 
-  async function assignNumber() {
+  async function assignNumber(pick: "next" | string) {
+    if (!assignBusiness) return;
     const body =
-      pickE164 === "next"
-        ? { action: "assign_next", tenant_id: assignBusinessId }
-        : { action: "assign_specific", tenant_id: assignBusinessId, e164: pickE164 };
+      pick === "next"
+        ? { action: "assign_next", tenant_id: assignBusiness.id }
+        : { action: "assign_specific", tenant_id: assignBusiness.id, e164: pick };
     const json = await run(body);
     if (!json) return;
-    setStatus(`Assigned ${json.e164 || pickE164}.`);
-    setPickE164("next");
+    setStatus(`Assigned ${json.e164 || pick}.`);
+    setAssignBusiness(null);
+    setSheet(null);
   }
 
   async function confirmRelease() {
@@ -115,211 +120,257 @@ export function DidPoolManager({
     const json = await run({ action: "release", e164: target.e164 });
     if (!json) return;
     setReleaseTarget(null);
+    setSheet(null);
     setStatus(`${target.e164} is Available.`);
   }
 
-  const releaseBusiness = releaseTarget ? businessLabel(releaseTarget) : null;
-  const releaseLinked = releaseBusiness && releaseBusiness !== "None" && releaseBusiness !== "Not linked";
+  async function syncPool() {
+    setSyncBusy(true);
+    setError("");
+    setStatus("");
+    try {
+      const res = await fetch("/api/admin/sautikit-sync", { method: "POST" });
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        added?: string[];
+        linked?: string[];
+      };
+      if (!res.ok) throw new Error(json.error || "Could not sync.");
+      const added = json.added?.length || 0;
+      const linked = json.linked?.length || 0;
+      setStatus(added || linked ? `Synced. ${added} added.` : "Already in sync.");
+      startTransition(() => router.refresh());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sync.");
+    } finally {
+      setSyncBusy(false);
+    }
+  }
+
+  function openAssign(business: PendingTenant) {
+    setAssignBusiness(business);
+    setSheet("assign");
+  }
+
+  const releaseBusiness = releaseTarget ? businessLabel(releaseTarget) : "";
+  const releaseLinked = Boolean(releaseBusiness);
 
   return (
-    <div className="space-y-6">
-      <div className="border-b border-line/70 pb-6">
-        <h2 className="text-title font-medium text-ink">Add number to pool</h2>
-        <form
-          className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void addNumber();
-          }}
-        >
-          <Field id={ADD_FIELD_ID} label="Phone number (E.164)" required className="flex-1">
-            {(props) => (
-              <Input
-                {...props}
-                value={e164}
-                onChange={(event) => setE164(event.target.value)}
-                placeholder="+2547…"
-                autoComplete="off"
-                inputMode="tel"
+    <>
+      {pendingBusinesses.length > 0 ? (
+        <section>
+          <p className="px-4 text-caption text-ink-3">Needs you</p>
+          <ul className="divide-y divide-hairline">
+            {pendingBusinesses.map((business) => (
+              <ListRow
+                key={business.id}
+                title={business.business_name}
+                preview="Waiting"
+                unread
+                actions={
+                  <Button type="button" variant="tonal" size="sm" onClick={() => openAssign(business)}>
+                    Assign
+                  </Button>
+                }
               />
-            )}
-          </Field>
-          <Field id="add-did-notes" label="Notes" className="flex-1">
-            {(props) => (
-              <Input
-                {...props}
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional"
-              />
-            )}
-          </Field>
-          <button type="submit" disabled={pending || !e164.trim()} className={btnPrimary}>
-            Add to pool
-          </button>
-        </form>
-      </div>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
-      <div className="border-b border-line/70 pb-6">
-        <h2 className="text-title font-medium text-ink">Assign to a business</h2>
-        {pendingBusinesses.length === 0 ? (
-          <p className="mt-2 text-body text-ink-2">No businesses are waiting for a number.</p>
-        ) : available === 0 ? (
+      <section>
+        <p className="px-4 text-caption text-ink-3">Pool</p>
+        <Segmented
+          label="Pool filter"
+          items={[
+            { key: "all", label: "All", count: pool.length, active: filter === "all" },
+            { key: "available", label: "Available", count: availableRows.length, active: filter === "available" },
+            { key: "assigned", label: "Assigned", count: assignedCount, active: filter === "assigned" },
+          ]}
+          onSelect={(key) => setFilter(key as PoolFilter)}
+        />
+        {error ? (
+          <p className="px-4 text-body text-attention" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {status ? (
+          <p className="px-4 text-body text-ok" role="status">
+            {status}
+          </p>
+        ) : null}
+        {visible.length === 0 ? (
           <Empty
-            className="px-0 py-8"
-            title="No numbers available"
-            line={waitingLine(pendingBusinesses.length)}
+            title="No numbers."
+            line={pendingBusinesses.length ? waitingPreview(pendingBusinesses.length) : "Add a number."}
             action={
-              <Button type="button" variant="tonal" onClick={focusAddNumber}>
+              <Button type="button" variant="tonal" onClick={() => setSheet("add")}>
                 Add number
               </Button>
             }
           />
         ) : (
-          <form
-            className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void assignNumber();
-            }}
-          >
-            <div className="block min-w-0 flex-1 text-sm">
-              <span className="font-medium text-ink">Business</span>
-              <DeskSelect
-                aria-label="Business"
-                className={`mt-1 ${deskFieldClass}`}
-                portalThemeClass="admin-theme"
-                value={assignBusinessId}
-                onChange={setAssignBusinessId}
-                options={pendingBusinesses.map((business) => ({
-                  value: business.id,
-                  label: business.business_name,
-                }))}
+          <ul className="divide-y divide-hairline">
+            {visible.map((row) => (
+              <ListRow
+                key={row.id}
+                title={row.e164}
+                preview={businessLabel(row) || row.notes || undefined}
+                stamp={<Stamp tone={statusTone(row.status)}>{statusLabel(row.status)}</Stamp>}
+                actions={
+                  canRelease(row.status) ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setReleaseTarget(row);
+                        setSheet("release");
+                      }}
+                    >
+                      Release
+                    </Button>
+                  ) : undefined
+                }
               />
-            </div>
-            <div className="block min-w-0 flex-1 text-sm">
-              <span className="font-medium text-ink">Number</span>
-              <DeskSelect
-                aria-label="Number"
-                className={`mt-1 ${deskFieldClass}`}
-                portalThemeClass="admin-theme"
-                value={pickE164}
-                onChange={setPickE164}
-                options={[
-                  { value: "next", label: "Next available" },
-                  ...availableRows.map((row) => ({ value: row.e164, label: row.e164 })),
-                ]}
-              />
-            </div>
-            <Button type="submit" variant="tonal" pending={pending} disabled={!assignBusinessId}>
-              {pickE164 === "next" ? "Assign next available" : "Assign this number"}
-            </Button>
-          </form>
+            ))}
+          </ul>
         )}
-      </div>
-
-      {error ? (
-        <p className="text-body text-attention" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {status ? (
-        <p className="text-body text-ok" role="status">
-          {status}
-        </p>
-      ) : null}
-
-      <p className="text-meta text-ink-2">
-        <span className="tabular-nums">{available}</span> available ·{" "}
-        <span className="tabular-nums">{pool.filter((row) => row.status === "assigned").length}</span> assigned
-      </p>
-
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="text-ink-2">
-            <tr className="border-b border-line/70">
-              <th className={adminThClass}>Number</th>
-              <th className={adminThClass}>Status</th>
-              <th className={adminThClass}>Business</th>
-              <th className={adminThClass}>Notes</th>
-              <th className={adminThClass}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pool.length === 0 ? (
-              <tr>
-                <td colSpan={5}>
-                  <Empty
-                    title="Pool empty."
-                    line="Added numbers show here as Available."
-                    action={
-                      <Button type="button" variant="tonal" onClick={focusAddNumber}>
-                        Add number
-                      </Button>
-                    }
-                  />
-                </td>
-              </tr>
-            ) : (
-              pool.map((row) => (
-                <tr key={row.id} className="border-t border-line/70">
-                  <td className={`${adminTdClass} font-medium tabular-nums`}>{row.e164}</td>
-                  <td className={adminTdClass}>
-                    <Stamp tone={statusTone(row.status)}>{statusLabel(row.status)}</Stamp>
-                  </td>
-                  <td className={adminTdClass}>{businessLabel(row)}</td>
-                  <td className={`${adminTdClass} text-ink-2`}>{row.notes || "None"}</td>
-                  <td className={adminTdClass}>
-                    {canRelease(row.status) ? (
-                      <button
-                        type="button"
-                        className={adminRowMutedClass}
-                        disabled={pending}
-                        onClick={() => setReleaseTarget(row)}
-                      >
-                        Release number
-                      </button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+        <ul className="divide-y divide-hairline">
+          <ListRow
+            title="Add number"
+            onOpen={() => setSheet("add")}
+            when={<ChevronRightIcon className="h-5 w-5 text-ink-3" aria-hidden="true" />}
+          />
+          <ListRow
+            title="Buy"
+            onOpen={() => setSheet("buy")}
+            when={<ChevronRightIcon className="h-5 w-5 text-ink-3" aria-hidden="true" />}
+          />
+          <ListRow
+            title="Sync"
+            preview={syncBusy ? "Working" : undefined}
+            onOpen={() => void syncPool()}
+          />
+        </ul>
+      </section>
 
       <Sheet
-        open={releaseTarget !== null}
+        open={sheet === "add"}
+        onOpenChange={(open) => setSheet(open ? "add" : null)}
+        title="Add number"
+        theme="admin"
+        footer={
+          <Button type="button" pending={pending} disabled={!e164.trim()} onClick={() => void addNumber()}>
+            Add
+          </Button>
+        }
+      >
+        <div className="space-y-3">
+          <Field id="add-did-e164" label="Phone" hint="Kenya mobile">
+            {(props) => (
+              <Input
+                {...props}
+                value={e164}
+                onChange={(event) => setE164(event.target.value)}
+                inputMode="tel"
+                autoComplete="off"
+              />
+            )}
+          </Field>
+          <Field id="add-did-notes" label="Notes">
+            {(props) => (
+              <Input {...props} value={notes} onChange={(event) => setNotes(event.target.value)} />
+            )}
+          </Field>
+        </div>
+      </Sheet>
+
+      <BuyNumberPanel
+        open={sheet === "buy"}
+        onOpenChange={(open) => setSheet(open ? "buy" : null)}
+        onBought={(number) => {
+          setStatus(`Bought ${number}.`);
+          setSheet(null);
+          startTransition(() => router.refresh());
+        }}
+      />
+
+      <Sheet
+        open={sheet === "assign"}
         onOpenChange={(open) => {
-          if (!open) setReleaseTarget(null);
+          if (!open) {
+            setAssignBusiness(null);
+            setSheet(null);
+          }
+        }}
+        title={assignBusiness?.business_name || "Assign"}
+        theme="admin"
+        footer={
+          availableRows.length > 0 ? (
+            <Button type="button" pending={pending} onClick={() => void assignNumber("next")}>
+              Assign next available
+            </Button>
+          ) : (
+            <Button type="button" variant="tonal" onClick={() => setSheet("add")}>
+              Add number
+            </Button>
+          )
+        }
+      >
+        {availableRows.length === 0 ? (
+          <Empty className="px-0 py-8" title="No numbers available" line={waitingPreview(pendingBusinesses.length)} />
+        ) : (
+          <ul className="divide-y divide-hairline">
+            {availableRows.map((row) => (
+              <ListRow
+                key={row.id}
+                title={row.e164}
+                preview={row.notes || undefined}
+                onOpen={() => void assignNumber(row.e164)}
+              />
+            ))}
+          </ul>
+        )}
+      </Sheet>
+
+      <Sheet
+        open={sheet === "release"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReleaseTarget(null);
+            setSheet(null);
+          }
         }}
         title="Release this number?"
         description={
           releaseTarget
             ? releaseLinked
-              ? `${releaseTarget.e164} returns to Available. ${releaseBusiness} will wait for a number.`
-              : `${releaseTarget.e164} returns to Available. No business is linked.`
+              ? `${releaseTarget.e164} returns to Available. ${releaseBusiness} waits.`
+              : `${releaseTarget.e164} returns to Available.`
             : undefined
         }
+        theme="admin"
         footer={
           <>
-            <Button type="button" variant="ghost" onClick={() => setReleaseTarget(null)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setReleaseTarget(null);
+                setSheet(null);
+              }}
+            >
               Cancel
             </Button>
             <Button type="button" variant="danger" pending={pending} onClick={() => void confirmRelease()}>
-              Release number
+              Release
             </Button>
           </>
         }
       >
-        {error ? (
-          <p className="text-body text-attention" role="alert">
-            {error}
-          </p>
-        ) : (
-          <p className="text-body text-ink-2">The pool row becomes Available.</p>
-        )}
+        <p className="text-body text-ink-2">The pool row becomes Available.</p>
       </Sheet>
-    </div>
+    </>
   );
 }

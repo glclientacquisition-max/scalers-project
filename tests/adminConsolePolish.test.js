@@ -97,11 +97,11 @@ describe("admin console polish", () => {
     }
     assert.deepEqual(offenders, []);
     assert.match(read("dashboard/src/app/admin/(console)/page.tsx"), /ButtonLink/);
-    assert.match(read("dashboard/src/components/DidPoolManager.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/components/DidPoolManager.tsx"), /<Button/);
     assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/AdminVoicesManager.tsx"), /btnPrimary/);
-    assert.match(read("dashboard/src/components/BuyNumberPanel.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/components/BuyNumberPanel.tsx"), /ConfirmSheet/);
   });
 
   it("renders overview attention as ListRow work items", () => {
@@ -137,18 +137,19 @@ describe("admin console polish", () => {
     assert.doesNotMatch(panel, /disabled=\{pending \|\| availableDidCount === 0\}/);
   });
 
-  it("lists DID pool rows in one dense table with an empty-available path", () => {
+  it("lists DID pool as ListRows with assign, add, and a confirmed release", () => {
     const panel = read("dashboard/src/components/DidPoolManager.tsx");
-    assert.match(panel, /<table/);
-    assert.doesNotMatch(panel, /lg:hidden/);
-    assert.match(panel, /Add to pool/);
+    assert.match(panel, /ListRow/);
+    assert.doesNotMatch(panel, /<table/);
+    assert.match(panel, /Add number/);
     assert.match(panel, /Assign next available/);
     assert.match(panel, /assign_specific/);
     assert.match(panel, /No numbers available/);
-    assert.match(panel, /Add number/);
     assert.match(panel, /action: "release"/);
     assert.match(panel, /Release this number\?/);
     assert.match(panel, /returns to Available/);
+    assert.doesNotMatch(panel, /SAUTIKIT_/);
+    assert.doesNotMatch(panel, /fingerprint/);
     assert.doesNotMatch(panel, /disabled=\{pending \|\| available === 0\}/);
   });
 
@@ -171,13 +172,17 @@ describe("admin console polish", () => {
       "dashboard/src/app/admin/(console)/packages/page.tsx",
       "dashboard/src/app/admin/(console)/voices/page.tsx",
       "dashboard/src/app/admin/(console)/businesses/page.tsx",
-      "dashboard/src/app/admin/(console)/numbers/page.tsx",
     ]) {
       const src = read(rel);
       assert.match(src, /deskListTitleClass/);
     }
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /PageHeader/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /deskListTitleClass/);
+    const numbers = read("dashboard/src/app/admin/(console)/numbers/page.tsx");
+    assert.doesNotMatch(numbers, /deskListTitleClass/);
+    assert.doesNotMatch(numbers, /SautikitSyncButton/);
+    assert.doesNotMatch(numbers, /BuyNumberPanel/);
+    assert.match(numbers, /DidPoolManager/);
   });
 
   it("opens Packages with assign and Ledger with the wallets panel", () => {
