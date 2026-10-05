@@ -44,6 +44,7 @@ Frontend 2.0 design pack (2026-09-30, charter `docs/frontend/FRONTEND_2_0_CHARTE
 | `/redesign-existing-projects` | [leonxlnx/taste-skill](https://github.com/leonxlnx/taste-skill) | Audit an existing surface. |
 | `/design-taste-frontend`, `/high-end-visual-design`, `/minimalist-ui` | [leonxlnx/taste-skill](https://github.com/leonxlnx/taste-skill) | Taste references for type, color, spacing. |
 | `/emil-design-eng`, `/review-animations` | [emilkowalski/skills](https://github.com/emilkowalski/skills) | Motion, press states, sheets, menus. `desk-motion` still owns the verb names. |
+| `/apple-design` | [emilkowalski/skills](https://github.com/emilkowalski/skills) | Apple fluid-interface path: springs, 1:1 gestures, materials, type. Charter and `desk-motion` still win until a remake replaces them. |
 | `/impeccable` | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | Polish pass on a finished surface. |
 | `/accessibility` | [addyosmani/web-quality-skills](https://github.com/addyosmani/web-quality-skills) | Before marking a phase ready. |
 | `/shadcn` | [shadcn-ui/ui](https://github.com/shadcn-ui/ui) | Component API and composition patterns. Patterns only, no runtime. |
