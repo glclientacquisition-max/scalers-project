@@ -63,9 +63,8 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Search by business name or number. Copy says **business**, not tenant.
 
 ### 3. Numbers (`/admin/numbers`)
-- Add DID to pool (E.164 + notes).
-- Pool table: Number · Status (Available / Assigned / Disabled) · Business · Notes.
-- Assign next available → selected business waiting for a number.
+- Needs you: businesses waiting. Assign is a sheet (next available or pick).
+- Pool: list rows (number, business, Available or Assigned). Add, Buy, and Sync sit under the list. Buy confirms in a sheet. No vendor keys on the page.
 - Prevent double-assign (DB uniqueness + status gates — already in Phase C SQL).
 - Copy must say **business**, not tenant.
 

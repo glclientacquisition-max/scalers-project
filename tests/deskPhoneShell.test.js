@@ -57,7 +57,7 @@ describe("desk phone shell", () => {
     assert.match(nav, /whitespace-nowrap/);
     const tabBar = nav.slice(nav.indexOf("export function DeskTabBar"));
     assert.doesNotMatch(tabBar, /max-w-full truncate/);
-    assert.match(nav, /bg-surface/);
+    assert.match(nav, /glass-chrome/);
     assert.doesNotMatch(nav, /bg-surface\/95/);
     assert.doesNotMatch(nav, /backdrop-blur/);
     assert.match(layout, /deskShellClass/);
@@ -66,7 +66,7 @@ describe("desk phone shell", () => {
     assert.doesNotMatch(nav, /deskShellClass =\s*\n\s*"desk-theme flex h-dvh/);
     assert.match(css, /html:has\(\.desk-theme\)/);
     assert.match(css, /overscroll-behavior: none/);
-    assert.match(css, /body:has\(\.desk-theme\) \{\s*background: #0b1220;/);
+    assert.match(css, /body:has\(\.desk-theme\).*background: var\(--canvas\)/s);
     assert.match(nav, /min-h-0 min-w-0 max-w-desk flex-1 overflow-y-auto/);
     assert.doesNotMatch(layout, /context=\{businessName\}/);
     const inboxRow = read("dashboard/src/components/InboxItemRow.tsx");

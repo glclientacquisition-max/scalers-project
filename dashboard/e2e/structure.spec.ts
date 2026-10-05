@@ -187,4 +187,21 @@ test.describe("/dev/kit interactions", () => {
     expect(light).toBeGreaterThan(0.9);
     expect(dark).toBeLessThan(0.1);
   });
+
+  test("keeps This device pick after reload and on login", async ({ page, context }) => {
+    await page.goto("/dev/kit");
+    await settle(page);
+    await page.getByRole("radio", { name: "Dark" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    expect(await page.evaluate(() => localStorage.getItem("scalers-desk-theme"))).toBe("dark");
+    expect((await context.cookies()).find((cookie) => cookie.name === "scalers-desk-theme")?.value).toBe("dark");
+    await page.reload();
+    await settle(page);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(page.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
+    await page.goto("/login");
+    await settle(page);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(page.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
+  });
 });

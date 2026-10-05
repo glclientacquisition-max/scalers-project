@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandWordmark } from "@/components/brand/BrandMark";
+import { ThemeDock } from "@/components/ThemePicker";
 import { marketingHomeHref } from "@/lib/adminHost";
 import { SignupForm } from "./SignupForm";
 
@@ -7,7 +8,10 @@ export default function SignupPage() {
   return (
     <main className="flex min-h-dvh items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
-        <BrandWordmark href={marketingHomeHref()} context="New workspace" variant="lockup" priority />
+        <div className="flex items-start justify-between gap-3">
+          <BrandWordmark href={marketingHomeHref()} context="New workspace" variant="lockup" priority />
+          <ThemeDock />
+        </div>
         <h1 className="sr-only">Create a Scalers workspace</h1>
 
         <div className="mt-8">

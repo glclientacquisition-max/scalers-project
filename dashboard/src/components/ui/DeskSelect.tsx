@@ -12,7 +12,7 @@ import { cx } from "@/lib/cx";
  * Color-scheme pin on remaining native selects stays; this covers DoD paths.
  */
 const popupClass =
-  "z-menu max-h-[min(20rem,var(--available-height))] min-w-[var(--anchor-width)] origin-[var(--transform-origin)] overflow-y-auto rounded-xl border border-hairline bg-surface py-1.5 text-body text-ink shadow-menu outline-none transition-[opacity,transform] duration-fast ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 motion-reduce:transition-none";
+  "glass-chrome z-menu max-h-[min(20rem,var(--available-height))] min-w-[var(--anchor-width)] origin-[var(--transform-origin)] overflow-y-auto rounded-xl border border-hairline py-1.5 text-body text-ink shadow-menu outline-none transition-[opacity,transform] duration-fast ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 motion-reduce:transition-none";
 
 const itemClass =
   "grid min-h-11 cursor-default select-none grid-cols-[1rem_1fr] items-center gap-2 px-3 outline-none data-[highlighted]:bg-surface-2 data-[disabled]:opacity-50";

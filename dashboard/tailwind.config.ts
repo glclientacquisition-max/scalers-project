@@ -40,6 +40,7 @@ export default {
         surface: {
           DEFAULT: token("surface"),
           2: token("surface-2"),
+          3: token("surface-3"),
           muted: token("surface-2"),
           canvas: token("canvas"),
         },

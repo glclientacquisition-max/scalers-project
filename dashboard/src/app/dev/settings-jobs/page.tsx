@@ -64,6 +64,15 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             tenant={tenant}
             tab={tab}
             trainPanel={trainPanel}
+            curatedVoices={[
+              {
+                id: "7b197f3c-84b4-4404-986f-114e4dac1432",
+                description: "Warm Kenyan receptionist tone",
+                default: true,
+              },
+              { id: "dev-voice-clear", description: "Clear and brief" },
+              { id: "dev-voice-calm", description: "Calm and slow" },
+            ]}
             optionStatus={settingsIndexStatuses(
               tenant,
               [],

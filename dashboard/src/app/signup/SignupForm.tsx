@@ -12,7 +12,7 @@ export function SignupForm() {
 
   if (state.checkEmail) {
     return (
-      <div className="mt-10 rounded-panel border border-line bg-surface p-6">
+      <div className="mt-10 rounded-panel border border-line glass-chrome p-6">
         <p className="font-medium text-ink">Check your email</p>
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">
           Confirm the link, then sign in.
@@ -30,7 +30,7 @@ export function SignupForm() {
   return (
     <form
       action={formAction}
-      className="mt-8 space-y-4 rounded-panel border border-line bg-surface p-6"
+      className="mt-8 space-y-4 rounded-panel border border-line glass-chrome p-6"
     >
       <div>
         <label className="block text-sm font-medium text-ink" htmlFor="business_name">

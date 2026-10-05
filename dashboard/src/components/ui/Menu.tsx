@@ -5,7 +5,7 @@ import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { cx } from "@/lib/cx";
 
 const popupClass =
-  "z-menu min-w-48 origin-[var(--transform-origin)] rounded-xl border border-hairline bg-surface py-1.5 text-body text-ink shadow-menu outline-none transition-[opacity,transform] duration-fast ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 motion-reduce:transition-none";
+  "glass-chrome z-menu min-w-48 origin-[var(--transform-origin)] rounded-xl border border-hairline py-1.5 text-body text-ink shadow-menu outline-none transition-[opacity,transform] duration-fast ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 motion-reduce:transition-none";
 
 const itemClass =
   "flex min-h-11 cursor-default select-none items-center gap-3 px-3 outline-none data-[highlighted]:bg-surface-2 data-[disabled]:opacity-50 [&>svg]:h-5 [&>svg]:w-5 [&>svg]:text-ink-2";

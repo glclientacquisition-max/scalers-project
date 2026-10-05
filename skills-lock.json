@@ -13,6 +13,12 @@
       "skillPath": "skills/brainstorming/SKILL.md",
       "computedHash": "b95dc657c5dd79caf7340ee6dead6faf2ce2d1cc613352a027fa8993966b41b7"
     },
+    "dark-mode-design": {
+      "source": "owl-listener/designer-skills",
+      "sourceType": "github",
+      "skillPath": "ui-design/skills/dark-mode-design/SKILL.md",
+      "computedHash": "1389e4e63cfd7ffcc7bd363d9ab3556935c76107f9cf595451a4730438e701cf"
+    },
     "design-taste-frontend": {
       "source": "leonxlnx/taste-skill",
       "sourceType": "github",
@@ -30,6 +36,12 @@
       "sourceType": "github",
       "skillPath": "skills/dispatching-parallel-agents/SKILL.md",
       "computedHash": "b011107f17188e0b2898bb1856b5bac8b49537cc86e737c82126558a235bd62a"
+    },
+    "dither-laser-dark-mode": {
+      "source": "mengto/skills",
+      "sourceType": "github",
+      "skillPath": "agent-skills/web-design/dither-laser-dark-mode/SKILL.md",
+      "computedHash": "87fb6f9e9a8ad85051808fa2008147739c4230356965cfdafe0ccbcfb2bf17bd"
     },
     "emil-design-eng": {
       "source": "emilkowalski/skills",
@@ -54,6 +66,12 @@
       "sourceType": "github",
       "skillPath": "skills/frontend-design/SKILL.md",
       "computedHash": "89496d5dd00f4810205f351759594fc2742bf8eea85a2f2b2d1de59f4bd91576"
+    },
+    "glass-dark-mode-clock": {
+      "source": "mengto/skills",
+      "sourceType": "github",
+      "skillPath": "agent-skills/web-design/glass-dark-mode-clock/SKILL.md",
+      "computedHash": "c0d1287776c21cf9617545d4408fa7c8d290f62911c7e6118e59a6b3dbf7932d"
     },
     "high-end-visual-design": {
       "source": "leonxlnx/taste-skill",

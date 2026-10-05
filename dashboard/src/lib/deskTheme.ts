@@ -5,16 +5,64 @@
 
 export const DESK_THEME_STORAGE_KEY = "scalers-desk-theme";
 
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+const COOKIE_PAIR = new RegExp(`(?:^|;\\s*)${DESK_THEME_STORAGE_KEY}=(light|dark)(?:;|$)`);
+
 export type DeskTheme = "system" | "light" | "dark";
+
+const listeners = new Set<() => void>();
 
 export function parseDeskTheme(raw: string | null | undefined): DeskTheme {
   return raw === "light" || raw === "dark" ? raw : "system";
 }
 
+export function readDeskThemeCookie(source: string | null | undefined): DeskTheme {
+  const match = source?.match(COOKIE_PAIR);
+  return match ? parseDeskTheme(match[1]) : "system";
+}
+
+function writeDeskThemeCookie(choice: DeskTheme): void {
+  if (typeof document === "undefined") return;
+  if (choice === "system") {
+    document.cookie = `${DESK_THEME_STORAGE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
+    return;
+  }
+  document.cookie = `${DESK_THEME_STORAGE_KEY}=${choice}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
+function emitDeskTheme(): void {
+  for (const listener of listeners) listener();
+}
+
+export function subscribeDeskTheme(onStoreChange: () => void): () => void {
+  listeners.add(onStoreChange);
+  if (typeof window === "undefined") {
+    return () => {
+      listeners.delete(onStoreChange);
+    };
+  }
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === DESK_THEME_STORAGE_KEY || event.key === null) {
+      onStoreChange();
+    }
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    listeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
 export function readDeskTheme(): DeskTheme {
   if (typeof window === "undefined") return "system";
   try {
-    return parseDeskTheme(window.localStorage.getItem(DESK_THEME_STORAGE_KEY));
+    const stored = window.localStorage.getItem(DESK_THEME_STORAGE_KEY);
+    if (stored === "light" || stored === "dark") return stored;
+  } catch {
+    // private mode: cookie still covers this device
+  }
+  try {
+    return readDeskThemeCookie(document.cookie);
   } catch {
     return "system";
   }
@@ -29,8 +77,14 @@ export function writeDeskTheme(choice: DeskTheme): void {
       window.localStorage.setItem(DESK_THEME_STORAGE_KEY, choice);
     }
   } catch {
-    // private mode: applyDeskTheme still covers this session
+    // private mode: cookie + applyDeskTheme still cover this session
   }
+  try {
+    writeDeskThemeCookie(choice);
+  } catch {
+    // ignore cookie write failures
+  }
+  emitDeskTheme();
 }
 
 /** Inline CSSOM value: `only` blocks UA scheme overrides for explicit picks. */

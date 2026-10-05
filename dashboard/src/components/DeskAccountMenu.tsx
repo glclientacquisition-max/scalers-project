@@ -132,7 +132,7 @@ export function DeskAccountMenu({
           aria-label="Account"
           data-account-menu=""
           className={[
-            "absolute end-3 top-12 z-40 rounded-xl border border-line bg-surface p-1 shadow-menu",
+            "absolute end-3 top-12 z-40 rounded-xl border border-line glass-chrome p-1 shadow-menu",
             themeOpen
               ? "w-[min(22rem,calc(100vw-1.5rem))]"
               : "w-[min(16rem,calc(100vw-1.5rem))]",

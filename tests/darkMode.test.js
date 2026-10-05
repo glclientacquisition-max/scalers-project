@@ -1,4 +1,4 @@
-// Dark mode: token-driven, desk-scoped, per-device choice.
+// Dark mode: token-driven, platform-wide, per-device choice. Glass chrome only.
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
@@ -21,54 +21,66 @@ function* walk(dir) {
 }
 
 const DARK_TOKENS = [
-  "--bg:",
-  "--card:",
+  "--canvas:",
+  "--surface:",
+  "--surface-2:",
+  "--hairline:",
   "--ink:",
-  "--ink-soft:",
-  "--line:",
+  "--ink-2:",
   "--accent:",
-  "--accent-deep:",
-  "--accent-fill:",
-  "--accent-on-fill:",
-  "--warn:",
+  "--accent-on:",
+  "--brand:",
+  "--glass:",
   "--ok:",
 ];
 
 describe("dark palette", () => {
   const css = read("dashboard/src/app/globals.css");
 
-  it("activates on explicit choice and on system dark, scoped to the desk", () => {
-    assert.match(css, /:root\[data-theme="dark"\] \.desk-theme/);
+  it("activates on explicit choice and on system dark for the whole document", () => {
+    assert.match(css, /:root\[data-theme="dark"\] \{/);
     assert.match(css, /@media \(prefers-color-scheme: dark\)/);
-    assert.match(css, /:root:not\(\[data-theme="light"\]\) \.desk-theme/);
+    assert.match(css, /:root:not\(\[data-theme="light"\]\) \{/);
     assert.match(css, /color-scheme: dark/);
   });
 
-  it("redefines every core token in both dark blocks", () => {
-    const blocks = css.match(/\.desk-theme\s*\{[^}]+\}/gs) || [];
-    assert.ok(blocks.length >= 2, "two dark blocks stay in sync");
-    for (const block of blocks.slice(0, 2)) {
+  it("redefines every core token on :root in both dark blocks", () => {
+    const explicit = css.match(/:root\[data-theme="dark"\]\s*\{[^}]+\}/s);
+    const system = css.match(
+      /@media \(prefers-color-scheme: dark\)\s*\{[\s\S]*?:root:not\(\[data-theme="light"\]\)\s*\{[^}]+\}/,
+    );
+    assert.ok(explicit, "explicit dark :root block");
+    assert.ok(system, "system dark :root block");
+    for (const block of [explicit[0], system[0]]) {
       for (const token of DARK_TOKENS) {
         assert.ok(block.includes(token), `dark block defines ${token}`);
       }
     }
   });
 
-  it("keeps light values identical to the pre-dark palette", () => {
+  it("keeps charter light values on :root", () => {
     for (const pair of [
-      /--bg: #f4f7fb/,
-      /--card: #ffffff/,
+      /--canvas: #f4f7fb/,
+      /--surface: #ffffff/,
       /--ink: #0a192f/,
-      /--accent: #0096ff/,
-      /--accent-deep: #005ccc/,
-      /--accent-fill: #005ccc/,
+      /--accent: #005ccc/,
+      /--brand: #0096ff/,
     ]) {
       assert.match(css, pair);
     }
   });
 
-  it("offsets focus rings against the card token, never white, in dark", () => {
-    assert.match(css, /--tw-ring-offset-color: var\(--card\)/);
+  it("offsets focus rings against the surface token, never white, in dark", () => {
+    assert.match(css, /--tw-ring-offset-color: var\(--surface\)/);
+  });
+
+  it("defines glass chrome for elevated shells only", () => {
+    assert.match(css, /\.glass-chrome \{/);
+    assert.match(css, /backdrop-filter: blur\(var\(--glass-blur\)\)/);
+    assert.match(css, /prefers-reduced-transparency: reduce/);
+    const sheet = read("dashboard/src/components/ui/Sheet.tsx");
+    assert.match(sheet, /desk-drawer glass-chrome/);
+    assert.match(sheet, /themeClass/);
   });
 
   it("recomputes ink on the desk shell so typed text is not inherited navy", () => {
@@ -86,13 +98,35 @@ describe("theme activation", () => {
     assert.match(themeLib, /localStorage\.getItem\(DESK_THEME_STORAGE_KEY\)/);
     assert.match(themeLib, /localStorage\.setItem\(DESK_THEME_STORAGE_KEY, choice\)/);
     assert.match(themeLib, /localStorage\.removeItem\(DESK_THEME_STORAGE_KEY\)/);
+    assert.match(themeLib, /document\.cookie/);
+    assert.match(themeLib, /Max-Age=0/);
+    assert.match(themeLib, /SameSite=Lax/);
+    assert.match(themeLib, /export function subscribeDeskTheme/);
+    assert.match(themeLib, /export function readDeskThemeCookie/);
     assert.match(layout, /DESK_THEME_STORAGE_KEY/);
     assert.match(layout, /localStorage\.getItem\(\$\{JSON\.stringify\(DESK_THEME_STORAGE_KEY\)\}\)/);
+    assert.match(layout, /document\.cookie/);
     assert.match(layout, /var r=document\.documentElement;r\.dataset\.theme=t/);
     assert.match(layout, /style\.colorScheme=s/);
     assert.match(layout, /dark only/);
     assert.match(layout, /meta\[name="color-scheme"\]/);
     assert.match(layout, /dangerouslySetInnerHTML/);
+    assert.doesNotMatch(layout, /cookies\(\)/);
+    assert.match(layout, /dataset\.theme=t/);
+    assert.match(layout, /DeskThemeProvider/);
+  });
+
+  it("hydrates This device from the saved choice, not a System default", () => {
+    const picker = read("dashboard/src/components/ThemePicker.tsx");
+    const kit = read("dashboard/src/app/dev/kit/KitShowcase.tsx");
+    const provider = read("dashboard/src/components/DeskThemeProvider.tsx");
+    assert.match(picker, /useSyncExternalStore/);
+    assert.match(picker, /subscribeDeskTheme/);
+    assert.doesNotMatch(picker, /useState<DeskTheme>\("system"\)/);
+    assert.match(provider, /DeskThemeProvider/);
+    assert.match(kit, /useThemeChoice/);
+    assert.match(kit, /pick\(/);
+    assert.doesNotMatch(kit, /previous/);
   });
 
   it("pins the document color-scheme so native option lists match the card", () => {
@@ -106,7 +140,7 @@ describe("theme activation", () => {
     assert.match(themeLib, /meta\[name="color-scheme"\]/);
     assert.match(themeLib, /"dark only"/);
     assert.match(themeLib, /"light only"/);
-    assert.match(css, /:root\[data-theme="dark"\] \{\s*color-scheme: dark only;\s*\}/);
+    assert.match(css, /:root\[data-theme="dark"\] \{\s*color-scheme: dark only;/);
     assert.match(css, /:root\[data-theme="light"\] \{\s*color-scheme: light only;\s*\}/);
     assert.match(css, /:root\[data-theme="dark"\] body \{\s*color-scheme: dark only;\s*\}/);
     assert.match(css, /:root\[data-theme="light"\] body \{\s*color-scheme: light only;\s*\}/);
@@ -121,7 +155,7 @@ describe("theme activation", () => {
     );
     assert.match(css, /\.desk-theme option,\s*\.desk-theme optgroup,\s*\.admin-theme option,\s*\.admin-theme optgroup \{\s*color: var\(--ink\);\s*background-color: var\(--card\);/);
     assert.match(master, /color-scheme: dark only/);
-    assert.doesNotMatch(css, /:root\[data-theme="dark"\] \{\s*--canvas/);
+    assert.match(css, /:root\[data-theme="dark"\] \{\s*color-scheme: dark only;[\s\S]*?--canvas:/);
   });
 
   it("scopes the desk layout and the dev bench to the theme", () => {
@@ -161,6 +195,13 @@ describe("theme activation", () => {
     const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
     const account = read("dashboard/src/components/DeskAccountMenu.tsx");
     const settingsNav = read("dashboard/src/lib/businessSettingsNav.ts");
+    const landing = read("dashboard/src/components/marketing/LandingPage.tsx");
+    const login = read("dashboard/src/app/login/page.tsx");
+    const adminLogin = read("dashboard/src/app/admin/login/page.tsx");
+    assert.match(picker, /export function ThemeDock/);
+    assert.match(landing, /<ThemeDock/);
+    assert.match(login, /<ThemeDock/);
+    assert.match(adminLogin, /<ThemeDock/);
     assert.match(account, /<ThemePicker \/>/);
     assert.match(account, />\s*This device\s*</);
     assert.doesNotMatch(account, /\/settings/);
@@ -219,5 +260,7 @@ describe("desk token hygiene", () => {
     assert.match(master, /## Dark mode/);
     assert.match(master, /desk-theme/);
     assert.match(master, /accent-on-fill/);
+    assert.match(master, /entire platform/);
+    assert.match(master, /glass-chrome/);
   });
 });

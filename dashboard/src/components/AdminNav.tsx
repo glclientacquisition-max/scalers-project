@@ -168,7 +168,7 @@ export function AdminRail({ operatorName }: { operatorName: string }) {
   return (
     <div
       data-admin-rail=""
-      className="hidden h-full w-[5.5rem] shrink-0 flex-col border-r border-line/80 bg-surface md:flex"
+      className="glass-chrome hidden h-full w-[5.5rem] shrink-0 flex-col border-r border-line/80 md:flex"
     >
       <div className="flex h-14 items-center justify-center">
         <DeskHint label="Scalers">
@@ -237,7 +237,7 @@ export function AdminTabBar() {
     <nav
       data-admin-tabbar=""
       aria-label="Super Admin"
-      className="fixed inset-x-0 bottom-0 z-50 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-visible border-t border-line/80 bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="glass-chrome fixed inset-x-0 bottom-0 z-50 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-visible border-t border-line/80 pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <ul className="flex">
         {ADMIN_LINKS.map((item) => (

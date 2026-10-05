@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import type { TenantRow } from "@/lib/supabase";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
@@ -21,31 +22,23 @@ import { settingsStatusKey } from "@/lib/settingsOptionStatus";
 import {
   SettingsPageHeader,
   settingsConsoleClass,
-  settingsGroupTitleClass,
   settingsPanelClass,
   settingsRailClass,
   settingsRailWrapClass,
 } from "@/components/settingsUi";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 
-function SettingsChevron() {
+function SettingsChevron({ active }: { active: boolean }) {
   return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      className="h-4 w-4 shrink-0 text-ink-soft"
+    <ChevronRightIcon
       aria-hidden
-    >
-      <path
-        d="M7.5 4.5 13 10l-5.5 5.5"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+      className={active ? "size-5 shrink-0 text-ink" : "size-5 shrink-0 text-ink-3"}
+    />
   );
 }
+
+const settingsMenuRowClass =
+  "flex min-h-11 w-full items-center gap-3 px-3 text-body font-medium text-ink";
 
 function SettingsMenu({
   tab,
@@ -59,9 +52,6 @@ function SettingsMenu({
   optionStatus: Record<string, string>;
 }) {
   const isRail = variant === "rail";
-  const railListClass = "w-max max-w-full space-y-0.5";
-  const railLinkClass =
-    "inline-flex min-h-9 w-full items-center justify-start gap-1.5 border-l-2 px-2.5 text-sm font-medium";
   return (
     <nav
       aria-label="Settings sections"
@@ -69,47 +59,37 @@ function SettingsMenu({
       className={isRail ? settingsRailClass : "min-w-0 w-full"}
     >
       {SETTINGS_NAV.map((section, index) => (
-        <section key={section.id} className={index === 0 ? undefined : "mt-2.5"}>
-          <h2 className={`${settingsGroupTitleClass} mb-0.5 px-1`}>{section.title}</h2>
-          <ul className={isRail ? railListClass : "w-full"}>
+        <section key={section.id} className={index === 0 ? undefined : "mt-6"}>
+          <h2 className="pointer-events-none mb-2 select-none px-1 text-meta font-medium text-ink-2">
+            {section.title}
+          </h2>
+          <ul className="overflow-hidden rounded-2xl border border-hairline bg-surface [&>li:first-child>a]:rounded-t-2xl [&>li:last-child>a]:rounded-b-2xl">
             {section.items.map((item) => {
               const active = settingsNavItemActive(item.target, tab, trainPanel);
               const key = settingsStatusKey(item.target);
               const status = optionStatus[key] || "";
               return (
-                <li key={key} className={isRail ? undefined : "border-b border-line"}>
+                <li key={key} className="border-b border-hairline last:border-b-0">
                   <Link
                     href={settingsNavHref(item.target)}
                     aria-current={active ? "page" : undefined}
                     className={[
-                      isRail
-                        ? `${railLinkClass} ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`
-                        : `flex min-h-12 w-full items-center gap-3 px-1 text-sm font-medium ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent`,
-                      active
-                        ? isRail
-                          ? "border-accent text-accent-deep"
-                          : "text-accent-deep"
-                        : isRail
-                          ? "border-transparent text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]"
-                          : "text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]",
+                      settingsMenuRowClass,
+                      deskShiftClass,
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
+                      active ? "bg-accent-tonal" : "hover:bg-surface-2 active:bg-surface-2",
                     ].join(" ")}
                   >
-                    <span className={isRail ? "max-w-[7.5rem] truncate" : "min-w-0 flex-1 truncate"}>
-                      {item.label}
-                    </span>
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
                     {status ? (
                       <span
                         title={status}
-                        className={
-                          isRail
-                            ? "max-w-[5.5rem] shrink-0 truncate text-xs font-normal text-ink-soft"
-                            : "max-w-[45%] shrink-0 truncate text-sm font-normal text-ink-soft"
-                        }
+                        className="max-w-[45%] shrink-0 truncate text-meta font-normal text-ink-2"
                       >
                         {status}
                       </span>
                     ) : null}
-                    {isRail ? null : <SettingsChevron />}
+                    <SettingsChevron active={active} />
                   </Link>
                 </li>
               );
@@ -203,7 +183,7 @@ export function BusinessSettingsShell({
           lineDetail={lineDetail}
           index
         />
-        <div className="mt-4">
+        <div>
           <SettingsMenu
             tab={tab}
             trainPanel={trainPanel}

@@ -17,7 +17,7 @@ describe("DeskSelect primitive", () => {
   it("uses Base UI Select with surface+ink open popup tokens", () => {
     assert.match(desk, /from "@base-ui\/react\/select"/);
     assert.match(desk, /export function DeskSelect/);
-    assert.match(desk, /bg-surface/);
+    assert.match(desk, /glass-chrome/);
     assert.match(desk, /text-ink/);
     assert.match(desk, /shadow-menu/);
     assert.match(desk, /border-hairline/);
@@ -34,9 +34,8 @@ describe("DeskSelect primitive", () => {
 
   it("wraps portal content in desk-theme so dark tokens resolve under body", () => {
     assert.match(desk, /Select\.Portal/);
-    assert.match(desk, /className="desk-theme"/);
-    // Popup still uses token utilities that resolve under .desk-theme
-    assert.match(desk, /bg-surface/);
+    assert.match(desk, /portalTheme/);
+    assert.match(desk, /glass-chrome/);
     assert.match(desk, /text-ink/);
   });
 });
@@ -52,15 +51,23 @@ describe("DoD path swaps", () => {
     assert.doesNotMatch(sort, /<select[\s>]/);
   });
 
-  it("SettingsSelect wraps DeskSelect so Tone and siblings theme open", () => {
+  it("SettingsSelect opens a ChoiceSheet so Tone and Voice drag away", () => {
     const ui = read("dashboard/src/components/settingsUi.tsx");
+    const sheet = read("dashboard/src/components/ui/ChoiceSheet.tsx");
     const start = ui.indexOf("export function SettingsSelect");
     assert.ok(start >= 0);
-    const chunk = ui.slice(start, start + 900);
-    assert.match(chunk, /<DeskSelect/);
-    assert.match(chunk, /settingsDenseFieldClass/);
+    const chunk = ui.slice(start, start + 1400);
+    assert.match(chunk, /<ChoiceSheet/);
+    assert.match(chunk, /rowLabel=\{label\}/);
+    assert.match(chunk, /detail: opt\.detail/);
     assert.doesNotMatch(chunk, /<select[\s>]/);
-    assert.match(ui, /from "@\/components\/ui\/DeskSelect"/);
+    assert.doesNotMatch(chunk, /<DeskSelect/);
+    assert.match(sheet, /<Sheet/);
+    assert.match(sheet, /aria-haspopup="dialog"/);
+    assert.match(sheet, /min-h-11/);
+    assert.match(sheet, /CheckIcon/);
+    assert.match(sheet, /rowLabel/);
+    assert.match(sheet, /text-end text-body/);
   });
 });
 
