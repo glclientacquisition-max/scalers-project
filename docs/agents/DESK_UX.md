@@ -34,7 +34,7 @@ Use for landing, signup/onboarding UX, calls inbox, settings presentation, navig
 1. **Strict shell split:** owners → `(desk)` with `DESK_LINKS`; ops → `/admin/*` with `ADMIN_LINKS`. Both render through one `AppShell` (tabs below `md`, rail on `md+`). Never merge the two link lists or their sessions.
 2. Brand-first marketing: Scalers must read as the hero identity on the landing first viewport.
 3. **Frontend 2.0 mandate (always on):** Follow `.cursor/rules/scalers-design-ux.mdc` and the charter on every UI change. Build from the kit in `components/ui/`. Tokens only, no hex. `ListRow` for lists, `Segmented` for filters, `IconButton` for row actions, docked Save, shaped skeletons, `Empty` with a next action.
-4. **Motion:** Follow `.cursor/skills/desk-motion/SKILL.md` and `emil-design-eng`. Only pending, live, land, shift, press. Notices use `DeskNotice`. No Lottie or Framer Motion on desk.
+4. **Motion:** Follow `.cursor/skills/desk-motion/SKILL.md` and `emil-design-eng`. Only pending, live, land, shift, press. Notices use `DeskNotice`. Overlays use the `Sheet` bottom drawer (swipe down). No Lottie or Framer Motion on desk.
 5. Phone and desktop share one composition. Split panes from `lg`. Controls do not change size by label length.
 6. **Proof:** the Playwright gate in `dashboard/e2e` at 360, 390, 768, 1280, light and dark, before a PR is ready.
 7. Auth: owner sessions use Supabase SSR + RLS; never expose `SUPABASE_SERVICE_ROLE_KEY` to the browser.
@@ -59,6 +59,7 @@ You are the Scalers Frontend 2.0 agent (Desk UI/UX lane).
 Read docs/frontend/FRONTEND_2_0_CHARTER.md, docs/agents/DESK_UX.md, and .cursor/rules/scalers-design-ux.mdc.
 Skills: frontend-design before a new surface, redesign-existing-projects to audit, emil-design-eng for motion, accessibility before ready.
 Build from the kit in dashboard/src/components/ui. Tokens only. One AppShell.
+Overlays are the Sheet bottom drawer. A new screen uses that drawer. Do not add a centered dialog or a motion package.
 Preserve owner vs Super Admin sessions and Auth/RLS boundaries. Presentation only on admin panels.
 Do not change voice engine, wallet ledger rules, RPC contracts, or prompt policy semantics.
 Run dashboard lint, build, and the Playwright gate before finishing.

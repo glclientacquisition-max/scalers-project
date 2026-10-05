@@ -116,7 +116,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 | Pagination | `ui/Pagination.tsx` (`min-h-11`). URL lists use `href`. In-memory lists use `onPage`. History keeps View more. |
 | Field | `deskFieldClass`. Settings: `settingsFieldClass` = `mt-1` + `deskFieldClass` |
 | Sticky save | `settingsStickyHeaderClass` under `--desk-header-h`. Settings is a packed inner rail (`md:w-max md:max-w-[13.5rem]`) plus a fluid panel. Segmented strips are content-width, not a full-bleed justified bar. |
-| Dialog | `DeskDialog`: overlay, Escape, focus restore. No enter animation. Phone sheet stops above the tab bar (`bottom` is `--desk-tabbar-h` plus safe area, `z-40`) so nav stays reachable and the sheet CTA is not under the dock. |
+| Dialog | `Sheet` bottom drawer via `DeskDialog`. Every width. Width-capped and lifted from `sm`. The finger tracks the panel. A downward flick, or a drag past halfway, dismisses it. Escape uses that same exit. A pending submit sets `dismissible={false}`. The scrim covers the tab bar. Close is a 44px icon button. Menus and hints are not drawers. |
 | Desk back | `DeskBack` plus `DeskRecordLead` in `DeskBack.tsx`. Icon-only chevron, 44px muted ghost, destination as `aria-label` / `DeskHint`. Nested insides (ticket, contact file, import, Archived, Settings panels) put the chevron in the first content row with the title or identity. Never a solo back row. Trail hits stay on the right. Ticket and Archived use `align="center"`. Contact file uses `start` so the chevron sits with the name. |
 | Account strip | `DeskAccountBar` mounts `DeskAccountMenu`. Thin bar. Phone mark on the left (`md:hidden`). Avatar is an `h-7 w-7` accent disk with on-fill initials inside an `h-11 w-11` hit. Open state is a 2px accent ring. Menu floats with `shadow-menu`. Order: workspace name (plain header), Workspace switcher only when there is more than one, Appearance, divider, Sign out last. Appearance opens the theme cluster in that menu. It does not open Settings. No Profile row. No bare Sign out. No workspace title in the strip. Hidden on ticket chat (`data-desk-ticket-chat` on the shell, and `:has([data-ticket-chat])` only before `data-desk-route-ready`). Overview, Inbox, Contacts, Usage, and Settings keep it. The thread header keeps `DeskBack`. |
 | Desk rail | `DeskRail` in `DeskNav.tsx`. `md+` only. `w-[4.5rem]`. Same `DESK_LINKS` as the phone tabs (Overview, Inbox, Contacts, Usage, Settings). Icon-only 44px hits, `DeskHint` names. Needs you badge on Inbox. Mark-only Scalers at the top. Sign out lives in the account menu, last, not at the rail foot. |
@@ -158,7 +158,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 
 ## Motion
 
-Five desk verbs. Skill: `.cursor/skills/desk-motion/SKILL.md`. Tokens: `--motion-fast` 150ms, `--motion-land` 900ms, `--motion-live` 1.4s, `--motion-ease`. Class names and `DESK_*_MS` live in `dashboard/src/lib/deskMotion.ts`. No Framer Motion, `motion/react`, springs, or ad-hoc durations.
+Five desk verbs. Skill: `.cursor/skills/desk-motion/SKILL.md`. Tokens: `--motion-fast` 150ms, `--motion-land` 900ms, `--motion-live` 1.4s, `--motion-ease`. Class names and `DESK_*_MS` live in `dashboard/src/lib/deskMotion.ts`. No Framer Motion, `motion/react`, springs, or ad-hoc durations. The Sheet drawer is the one gesture: Base UI swipe, not a spring package.
 
 | Verb | Primitive | Loop? |
 | --- | --- | --- |
@@ -176,14 +176,14 @@ Map a surface to a type, then to a verb. Do not invent a per-page animation.
 | List | Inbox queue, Contacts, wallet ledger | `land` on a live insert after first paint. Row hover/selected: `shift`. Stable keys (`item.id`). No enter-stagger. No layout reorder. |
 | Detail | Ticket transcript, contact profile, action dock | Instant swap. Key the route by record id. Panel chrome does not slide. |
 | Notice | Archive undo, Saved | `DeskNotice` + `useNotify`. Enter `translateY(12px)`, exit `translateY(8px)`, opacity. Transform only. `role="status"`. One pattern. |
-| Modal | `DeskDialog`, overflow menu, `DeskHint` | Enter-static. No scale, no overlay fade. |
+| Modal | `Sheet` drawer, overflow menu, `DeskHint` | Drawer swipes down. Menus and hints stay still. |
 | State | Filter tabs, badges, chips | `shift` / `filterTabClass`. No `layoutId`. |
 | Empty / loading | `deskEmptyClass` | Empty is static. A desk tap shows the list skeleton in the page slot. Mutation pending is the ink spinner on the control. No `animate-pulse` except the pronunciation recording dot and the list skeleton. |
 | Numbers | Wallet balance, Home counts, call duration | Instant `tabular-nums`. No count-up. |
 | Form | Fields, field errors | Focus/border: `shift`. Errors mount instantly next to the field. No shake. |
 | Route | Overview, Inbox, Contacts, Usage, Settings | Instant shell. A tap paints the list skeleton over the page slot and holds it until that page's content commits. No fade. No route spinner. The new page's lists land on later inserts only. |
 
-Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those classes. `DeskDialog` does not animate in. Catalog: `/dev/motion` when `DASHBOARD_OPEN`. Reduced motion: named kills plus a global `animation-duration` / `transition-duration` fallback.
+Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those classes. Owner overlays are the `Sheet` drawer. Other verbs do not grow a second enter animation. Catalog: `/dev/motion` when `DASHBOARD_OPEN`. Reduced motion: named kills plus a global `animation-duration` / `transition-duration` fallback.
 
 ---
 

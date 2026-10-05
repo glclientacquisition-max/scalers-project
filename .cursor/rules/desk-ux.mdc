@@ -15,6 +15,6 @@ Frontend 2.0 charter: `docs/frontend/FRONTEND_2_0_CHARTER.md` (wins). History: `
 - Do not change voice engine, ledger/RPC rules, or Brain prompt semantics.
 - Prefer pure styling on Admin/DID/wallet panels; leave ops behavior to Ops lane.
 - Never expose service-role keys to the client. Run `cd dashboard && npm run lint` / `build`.
-- Motion: `.cursor/skills/desk-motion/SKILL.md`. Only pending, live, land, shift, press.
+- Motion: `.cursor/skills/desk-motion/SKILL.md`. Only pending, live, land, shift, press. Overlays use the `Sheet` bottom drawer.
 - Fluid: one composition. List verbs use `btnDock`. Phone stacks. `md+` tables. Hits stay 44px.
 - Preview truncate: lists are one ellipsized line (`deskPreviewClass`). Full hangup copy lives on the record.

@@ -42,8 +42,7 @@ export function WalletTopUpButton({
         Add balance
       </button>
 
-      {open ? (
-        <DeskDialog title="Add balance" onClose={close} pending={pending}>
+      <DeskDialog open={open} title="Add balance" onClose={close} pending={pending}>
           <p className="mt-1 text-sm text-ink-soft">
             {topUpEnabled
               ? "Choose an amount. Payment posts to your ops ledger when checkout is live."
@@ -98,8 +97,7 @@ export function WalletTopUpButton({
               )}
             </button>
           </form>
-        </DeskDialog>
-      ) : null}
+      </DeskDialog>
     </>
   );
 }

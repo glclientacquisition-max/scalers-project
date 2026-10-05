@@ -1,19 +1,22 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { Sheet } from "@/components/ui/Sheet";
 
 /**
- * Occasional overlay. No enter animation.
- * Escape closes. Focus moves to the panel, then returns to the opener.
+ * Owner overlay. Renders the Sheet drawer. Swipe down, the scrim, and Escape
+ * close it. A pending submit keeps it open. No enter animation on the verbs
+ * outside this drawer.
  */
 export function DeskDialog({
+  open,
   title,
-  titleId,
   onClose,
   pending = false,
   panelClassName = "max-w-md",
   children,
 }: {
+  open: boolean;
   title: string;
   titleId?: string;
   onClose: () => void;
@@ -21,68 +24,19 @@ export function DeskDialog({
   panelClassName?: string;
   children: ReactNode;
 }) {
-  const autoId = useId();
-  const headingId = titleId || autoId;
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
-
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape" && !pending) {
-        event.preventDefault();
-        onClose();
-      }
-    }
-
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      previous?.focus?.();
-    };
-  }, [onClose, pending]);
+  const wide = /max-w-(lg|xl|2xl|3xl|4xl)/.test(panelClassName);
 
   return (
-    <div
-      className="fixed inset-x-0 top-0 z-40 flex items-end justify-center bg-ink/40 p-4 bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] sm:items-center"
-      role="presentation"
-      onClick={() => {
-        if (!pending) onClose();
+    <Sheet
+      open={open}
+      dismissible={!pending}
+      size={wide ? "lg" : "md"}
+      title={title}
+      onOpenChange={(next) => {
+        if (!next) onClose();
       }}
     >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={headingId}
-        tabIndex={-1}
-        className={[
-          "max-h-full w-full overflow-y-auto rounded-2xl border border-line bg-surface p-4 focus:outline-none sm:p-6",
-          panelClassName,
-        ].join(" ")}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <h2
-            id={headingId}
-            className="font-display text-xl tracking-tight text-ink"
-          >
-            {title}
-          </h2>
-          <button
-            type="button"
-            onClick={() => {
-              if (!pending) onClose();
-            }}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-sm text-ink-soft hover:bg-surface-canvas hover:text-ink"
-            aria-label="Close"
-          >
-            Close
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
+      {children}
+    </Sheet>
   );
 }

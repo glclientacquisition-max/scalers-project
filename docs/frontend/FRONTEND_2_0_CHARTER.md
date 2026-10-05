@@ -146,7 +146,7 @@ Each is one file, one component, tokens only, dark-safe, keyboard-safe. Behavior
 | `Avatar` | initials or image, 32/40/48, circle | `InboxRowAvatar`, contact circles |
 | `ListRow` | avatar, title, one preview line, when, stamp, trailing actions; link or button | `InboxItemRow`, `ContactListRow`, `deskRow*` |
 | `PageHeader` | title, optional back, optional trailing action, consistent top rhythm | ad hoc `h1` blocks, `DeskIndexLead`, `DeskRecordLead` |
-| `Sheet` | phone bottom sheet, desktop centered dialog, one component; Base UI Dialog | `DeskDialog` |
+| `Sheet` | bottom drawer at every width, width-capped from `sm`; swipe down to dismiss; Base UI Drawer | `DeskDialog` |
 | `Menu` | Base UI Menu, origin-aware scale, arrow keys | `InboxRowOverflow` menus, `DeskAccountMenu` |
 | `Tooltip` | Base UI Tooltip, instant after first | `DeskHint` |
 | `Toast` | keep `DeskNotice` API, restyle on tokens | same |

@@ -51,7 +51,7 @@ Do not recommend Vue/Svelte/Flutter/SwiftUI/Three.js/GSAP stacks for Desk work.
 | 4 | Visual system | MASTER tokens; kit components; SVG/Lucide icons | Hex in JSX; emoji-as-icon; mixing marketing chrome into Admin |
 | 5 | Layout | One composition phone→desktop; split panes from `lg`; Playwright 360/390/768/1280 | Horizontal scroll; fixed-px shells; controls that resize by label length |
 | 6 | Type and color | Tokenized type scale; semantic colors; primary CTA and ribbon via tokens only | Body text under 12px; gray-on-gray; inventing palettes |
-| 7 | Motion | desk-motion only (pending/live/land/shift/press); respect `prefers-reduced-motion` | GSAP/Framer/Lottie/Remotion; scroll-pin theater |
+| 7 | Motion | desk-motion only (pending/live/land/shift/press); overlays are the `Sheet` bottom drawer; respect `prefers-reduced-motion` | GSAP/Framer/Lottie/Remotion; scroll-pin theater; a centered dialog |
 | 8 | Forms | Visible labels; inline errors; docked Save patterns | Placeholder-as-label; errors only at page top |
 | 9 | Navigation | Predictable back; shell split preserved; deep links to desk routes | Merging owner + admin nav/sessions |
 | 10 | Charts and tables | Dense tables OK; legends/tooltips; not color-alone | Marketing dashboard fluff on Admin; decorative chart junk |

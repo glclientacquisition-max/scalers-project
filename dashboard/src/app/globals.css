@@ -544,6 +544,48 @@ h3,
   to { opacity: 1; transform: none; }
 }
 
+/*
+ * Sheet drawer. Base UI writes the finger offset into --drawer-swipe-movement-y
+ * and the flick into --drawer-swipe-strength. 1:1 while swiping. Release slides
+ * down the same path it entered. Keyboard and pointer share that exit.
+ */
+.desk-drawer {
+  transform: translateY(calc(var(--drawer-snap-point-offset, 0px) + var(--drawer-swipe-movement-y, 0px)));
+  transition: transform var(--sheet-ms) var(--ease-out);
+}
+
+.desk-drawer[data-starting-style],
+.desk-drawer[data-ending-style] {
+  transform: translateY(100%);
+}
+
+.desk-drawer[data-ending-style] {
+  transition-duration: calc(var(--drawer-swipe-strength, 1) * var(--sheet-ms));
+}
+
+.desk-drawer[data-swiping] {
+  transition-duration: 0ms;
+}
+
+.desk-drawer-backdrop {
+  background-color: var(--ink);
+  opacity: calc(0.4 * (1 - var(--drawer-swipe-progress, 0)));
+  transition: opacity var(--sheet-ms) var(--ease-out);
+}
+
+.desk-drawer-backdrop[data-starting-style],
+.desk-drawer-backdrop[data-ending-style] {
+  opacity: 0;
+}
+
+.desk-drawer-backdrop[data-ending-style] {
+  transition-duration: calc(var(--drawer-swipe-strength, 1) * var(--sheet-ms));
+}
+
+.desk-drawer-backdrop[data-swiping] {
+  transition-duration: 0ms;
+}
+
 /* Notice enter/exit. Shift family: opacity + transform, --motion-fast. */
 .desk-notice {
   opacity: 0;

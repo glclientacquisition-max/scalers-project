@@ -34,7 +34,7 @@ Prefer native HTML. Minimal diffs. Do not migrate to Radix, Base UI, or a new pr
 
 **Keyboard.** Real `button` / `a` / `input`. All actions reachable by Tab. Visible focus. No `tabindex` greater than 0. Escape closes `DeskDialog`.
 
-**Focus and dialogs.** Trap focus while open. Restore to the trigger. Do not scroll the page away on open. `DeskDialog` stays enter-static (no zoom).
+**Focus and dialogs.** Trap focus while open. Restore to the trigger. Do not scroll the page away on open. Owner overlays are the `Sheet` drawer (swipe down). Escape closes them. No zoom.
 
 **Semantics.** Native elements over role hacks. Lists use `ul`/`ol`. Tables use `th`. Do not skip heading levels.
 

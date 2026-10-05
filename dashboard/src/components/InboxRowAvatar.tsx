@@ -72,15 +72,13 @@ export function InboxRowAvatar({
       </button>
     );
   }
-  const stub = open
-    ? createPortal(
-        <DeskDialog title={who} onClose={() => setOpen(false)}>
-          <p className="mt-2 font-mono text-sm text-ink">{phone?.trim() || "No phone"}</p>
-          <p className="mt-4 text-sm text-ink-soft">{error || "No history yet"}</p>
-        </DeskDialog>,
-        document.body
-      )
-    : null;
+  const stub = createPortal(
+    <DeskDialog open={open} title={who} onClose={() => setOpen(false)}>
+      <p className="mt-2 font-mono text-sm text-ink">{phone?.trim() || "No phone"}</p>
+      <p className="mt-4 text-sm text-ink-soft">{error || "No history yet"}</p>
+    </DeskDialog>,
+    document.body
+  );
 
   if (contactHref) {
     return (
