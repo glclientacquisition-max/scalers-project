@@ -199,6 +199,10 @@ describe("admin console polish", () => {
     assert.match(poolApi, /action === "release"/);
     assert.match(poolApi, /releaseAssignedDid/);
     assert.match(read("dashboard/src/lib/didPool.ts"), /export async function releaseAssignedDid/);
+    const opsApi = read("dashboard/src/app/api/admin/platform-ops/route.ts");
+    assert.match(opsApi, /prepare_resend/);
+    assert.match(opsApi, /verify_resend/);
+    assert.match(read("dashboard/src/components/AdminPlatformOpsForm.tsx"), /Create domain/);
   });
 
   it("documents the admin shell as the desk geometry with its own links", () => {

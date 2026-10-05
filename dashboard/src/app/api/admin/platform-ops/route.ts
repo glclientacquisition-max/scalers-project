@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
-import { sendOpsMail } from "@/lib/opsMail";
+import {
+  ensureOpsResendDomain,
+  getOpsResendDomain,
+  sendOpsMail,
+  verifyOpsResendDomain,
+} from "@/lib/opsMail";
 import { ackOpsNotice, saveOpsSettings } from "@/lib/platformOps";
 import {
   DEFAULT_SAUTIKIT_WARN_MINOR,
@@ -10,6 +15,18 @@ import {
   parseOpsEmails,
   type OpsNoticeKind,
 } from "@/lib/platformOpsModel";
+
+export async function GET() {
+  if (!(await isLegacyAuthenticated())) {
+    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  }
+  try {
+    return NextResponse.json({ ok: true, domain: await getOpsResendDomain() });
+  } catch (err) {
+    logAdminError("platform-ops", err);
+    return NextResponse.json({ error: adminFacingError(err, "Could not read Resend.") }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   if (!(await isLegacyAuthenticated())) {
@@ -49,6 +66,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Add a staff email first." }, { status: 400 });
       }
       return NextResponse.json({ ok: true });
+    }
+
+    if (action === "prepare_resend") {
+      return NextResponse.json({ ok: true, domain: await ensureOpsResendDomain() });
+    }
+
+    if (action === "verify_resend") {
+      return NextResponse.json({ ok: true, domain: await verifyOpsResendDomain() });
     }
 
     if (action === "ack") {

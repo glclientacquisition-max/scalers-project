@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
 import { Field, Input, Textarea } from "@/components/ui/Field";
 import { Stamp } from "@/components/ui/Stamp";
+import type { OpsDnsRecord, OpsResendDomain } from "@/lib/opsMail";
 import {
   OPS_NOTICE_KINDS,
   kindLabel,
@@ -14,6 +15,14 @@ import {
   type OpsNoticeKind,
   type OpsSettings,
 } from "@/lib/platformOpsModel";
+
+function domainStamp(status: string): { tone: "ok" | "attention" | "neutral"; label: string } {
+  if (status === "verified") return { tone: "ok", label: "Verified" };
+  if (status === "no_key") return { tone: "attention", label: "Key missing" };
+  if (status === "error") return { tone: "attention", label: "Error" };
+  if (status === "missing") return { tone: "neutral", label: "Not created" };
+  return { tone: "neutral", label: "Pending DNS" };
+}
 
 function warnKes(minor: number): string {
   return String(Math.round((Number(minor) || 0) / 100));
@@ -36,6 +45,20 @@ export function AdminPlatformOpsForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [domain, setDomain] = useState<OpsResendDomain | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/admin/platform-ops")
+      .then((res) => res.json())
+      .then((json: { domain?: OpsResendDomain }) => {
+        if (!cancelled && json.domain) setDomain(json.domain);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function post(body: Record<string, unknown>, ok: string) {
     setPending(true);
@@ -47,8 +70,12 @@ export function AdminPlatformOpsForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        domain?: OpsResendDomain;
+      };
       if (!res.ok) throw new Error(json.error || "Could not update ops mail.");
+      if (json.domain) setDomain(json.domain);
       setStatus(ok);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update ops mail.");
@@ -75,10 +102,12 @@ export function AdminPlatformOpsForm({
         </p>
         {!mailConfigured ? (
           <p className="mt-2 text-meta text-attention">
-            Set RESEND_API_KEY and OPS_EMAIL_FROM to send.
+            Set RESEND_API_KEY and OPS_EMAIL_FROM on the desk to send.
           </p>
         ) : null}
       </div>
+
+      {domain ? <ResendDomainCard domain={domain} pending={pending} onAction={post} /> : null}
 
       {error ? (
         <p className="text-body text-attention" role="alert">
@@ -207,5 +236,63 @@ export function AdminPlatformOpsForm({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ResendDomainCard({
+  domain,
+  pending,
+  onAction,
+}: {
+  domain: OpsResendDomain;
+  pending: boolean;
+  onAction: (body: Record<string, unknown>, ok: string) => Promise<void>;
+}) {
+  const stamp = domainStamp(domain.status);
+  return (
+    <div className="space-y-3 rounded-2xl border border-hairline bg-surface-2 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-body font-medium text-ink">Resend {domain.domain}</p>
+          <p className="text-meta text-ink-2">{domain.message}</p>
+        </div>
+        <Stamp tone={stamp.tone}>{stamp.label}</Stamp>
+      </div>
+      {domain.records.length ? (
+        <ul className="space-y-2">
+          {domain.records.map((record: OpsDnsRecord) => (
+            <li key={`${record.type}-${record.name}-${record.value}`} className="text-meta text-ink">
+              <span className="font-medium tabular-nums">{record.type}</span>{" "}
+              {record.name}
+              {record.priority != null ? ` ${record.priority}` : ""} {record.value}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="flex flex-wrap gap-3">
+        {domain.status === "missing" || domain.status === "error" ? (
+          <Button
+            type="button"
+            variant="tonal"
+            size="sm"
+            pending={pending}
+            onClick={() => void onAction({ action: "prepare_resend" }, "Resend domain created.")}
+          >
+            Create domain
+          </Button>
+        ) : null}
+        {domain.status !== "no_key" && domain.status !== "missing" && domain.status !== "verified" ? (
+          <Button
+            type="button"
+            variant="tonal"
+            size="sm"
+            pending={pending}
+            onClick={() => void onAction({ action: "verify_resend" }, "Checked Resend DNS.")}
+          >
+            Check DNS
+          </Button>
+        ) : null}
+      </div>
+    </div>
   );
 }

@@ -41,6 +41,38 @@ export type OpsNotice = {
 
 export const DEFAULT_SAUTIKIT_WARN_MINOR = 50_000;
 export const OPS_MAIL_COOLDOWN_MS = 30 * 60 * 1000;
+export const OPS_RESEND_DOMAIN = "ops.scalers.co.ke";
+
+export type OpsDnsRecord = {
+  name: string;
+  type: string;
+  value: string;
+  priority: number | null;
+  status: string;
+};
+
+export function normalizeResendRecords(raw: unknown): OpsDnsRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((row) => {
+    if (!row || typeof row !== "object") return [];
+    const rec = row as Record<string, unknown>;
+    const type = String(rec.type || "").toUpperCase();
+    const value = String(rec.value || rec.content || "").trim();
+    if (!type || !value) return [];
+    const priorityRaw = rec.priority;
+    const priority =
+      typeof priorityRaw === "number" && Number.isFinite(priorityRaw) ? priorityRaw : null;
+    return [
+      {
+        name: String(rec.name || "").trim() || OPS_RESEND_DOMAIN,
+        type,
+        value,
+        priority,
+        status: String(rec.status || "").trim() || "pending",
+      },
+    ];
+  });
+}
 
 export function defaultKindFlags(): OpsKindFlags {
   return {

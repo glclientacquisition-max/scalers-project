@@ -134,6 +134,7 @@ describe("platform ops model", () => {
         emails: m.parseOpsEmails("Ops@Scalers.co.ke, bad, ops@scalers.co.ke; mercy@scalers.co.ke"),
         subject: m.opsMailSubject("beta_expired"),
         recovered: m.opsMailSubject("speech", true),
+        domain: m.OPS_RESEND_DOMAIN,
         queue: m.mergeQueueRows({
           notices: [
             { kind: "pool_empty", detail: "1 business waiting. No numbers available.", status: "open" },
@@ -144,6 +145,7 @@ describe("platform ops model", () => {
       }));
     `);
     assert.deepEqual(got.emails, ["ops@scalers.co.ke", "mercy@scalers.co.ke"]);
+    assert.equal(got.domain, "ops.scalers.co.ke");
     assert.equal(got.subject, "Scalers ops: Beta expired");
     assert.equal(got.recovered, "Scalers ops: Speech recovered");
     assert.equal(got.queue.length, 2);
