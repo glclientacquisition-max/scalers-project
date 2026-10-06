@@ -42,6 +42,11 @@ export type TeamMember = {
 export type FaqItem = {
   question: string;
   answer: string;
+  source?: string;
+  status?: string;
+  confirmed?: boolean;
+  confirmed_by?: string;
+  confirmed_at?: string;
 };
 
 /** True when the tenant still has a blank or signup-default receptionist prompt. */

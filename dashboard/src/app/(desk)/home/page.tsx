@@ -35,6 +35,11 @@ import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { LivePing } from "@/components/ui/deskRow";
+import { Stamp } from "@/components/ui/Stamp";
+import { HomeCapture } from "@/components/HomeCapture";
+import { getTenantCompletenessScore, getTenantHoldGate } from "@/lib/provenance";
+import { homeStakes, shopStakes } from "@/lib/baStakes";
+import { parseHoursSchedule } from "@/lib/hoursSchedule";
 import { isBetaBilling } from "@/lib/wallet";
 import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
 import { homeMinuteStatus } from "@/lib/usageCap";
@@ -90,7 +95,7 @@ async function HomeOverviewBody() {
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const [todayRes, inbox, pack] = await Promise.all([
+  const [todayRes, inbox, pack, score, hold] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
@@ -98,6 +103,8 @@ async function HomeOverviewBody() {
       .gte("created_at", dayStart),
     loadCachedInboxItems(tenant.id, vertical),
     loadOwnerPackageMeter(tenant.id),
+    getTenantCompletenessScore(tenant.id),
+    getTenantHoldGate(tenant.id),
   ]);
   timer.mark("data");
   console.info(timer.line("home"));
@@ -248,7 +255,12 @@ async function HomeOverviewBody() {
                     focusRingVisible,
                   ].join(" ")}
                 >
-                  <span className="text-ink">{queue.label}</span>
+                  <span className="flex min-w-0 items-center gap-2 text-ink">
+                    <span>{queue.label}</span>
+                    {queue.id === "hold" && hold && !hold.allowed ? (
+                      <Stamp tone="attention">Locked</Stamp>
+                    ) : null}
+                  </span>
                   <span className="flex min-w-0 items-center gap-3 text-ink-soft">
                     <span className={`min-w-0 ${deskPreviewClass}`}>
                       <span className="tabular-nums text-base font-semibold text-ink">
@@ -367,6 +379,42 @@ async function HomeOverviewBody() {
             </>
           ) : null}
         </section>
+        {score ? (
+          <HomeCapture
+            tenantId={tenant.id}
+            vertical={vertical}
+            score={score}
+            stakes={
+              vertical === "home_services"
+                ? homeStakes({
+                    services: (tenant.services_catalog || []).map((row) => {
+                      const extra = row as {
+                        pricing_mode?: string;
+                        site_visit_required?: boolean | null;
+                      };
+                      return {
+                        name: row.name,
+                        pricing_mode: extra.pricing_mode,
+                        site_visit_required: extra.site_visit_required,
+                      };
+                    }),
+                    coverage: [
+                      ...(tenant.business_locations || []).map(
+                        (place) => place.landmark || place.address || ""
+                      ),
+                      ...(tenant.business_policies?.coverage_areas || []),
+                    ]
+                      .filter(Boolean)
+                      .join(", "),
+                  })
+                : shopStakes({
+                    products: tenant.product_catalog || [],
+                    schedule: parseHoursSchedule(tenant.hours_schedule),
+                    holdsAllowed: Boolean(hold?.allowed),
+                  })
+            }
+          />
+        ) : null}
         </div>
 
         <aside className="min-w-0 lg:sticky lg:top-24 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1">

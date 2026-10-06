@@ -58,8 +58,11 @@ import {
   FAQ_ANSWER_MAX,
   FAQ_MAX,
   FAQ_QUESTION_MAX,
+  clampFaq,
   normalizeFaqKey,
 } from "@/lib/faqs";
+import { CaptureConfirmList } from "@/components/CaptureConfirmList";
+import { confirmCaptureFields } from "@/app/(desk)/settings/provenanceActions";
 import { SERVICES_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
 import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import {
@@ -169,11 +172,13 @@ function normalizeTeam(
 function normalizeFaqs(raw: TenantRow["faqs"]): FaqEntry[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((row) => ({
-      question: String(row?.question || "").trim(),
-      answer: String(row?.answer || "").trim(),
-    }))
-    .filter((row) => row.question || row.answer);
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const next = clampFaq(row);
+      if (!next.question && !next.answer) return null;
+      return markSavedRow(next);
+    })
+    .filter((row): row is FaqEntry => Boolean(row));
 }
 
 const emptyMember = (): TeamDirectoryEntry => ({
@@ -386,9 +391,9 @@ export function TenantForm({
     return rows.length ? rows.map((row) => markSavedRow(row)) : [emptyMember()];
   });
   const liveDest = firstDialableTeammate(team);
-  const [faqs, setFaqs] = useState<FaqEntry[]>(() =>
-    normalizeFaqs(tenant.faqs).map((row) => markSavedRow(row))
-  );
+  const [faqs, setFaqs] = useState<FaqEntry[]>(() => normalizeFaqs(tenant.faqs));
+  const [ownerPaths, setOwnerPaths] = useState<string[]>([]);
+  const [confirming, setConfirming] = useState(false);
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
   );
@@ -415,10 +420,7 @@ export function TenantForm({
       JSON.stringify(
         faqs
           .filter((f) => f.question.trim() && f.answer.trim())
-          .map((f) => ({
-            question: f.question.trim().slice(0, FAQ_QUESTION_MAX),
-            answer: f.answer.trim().slice(0, FAQ_ANSWER_MAX),
-          }))
+          .map((f) => clampFaq(f))
       ),
     [faqs]
   );
@@ -565,23 +567,59 @@ export function TenantForm({
     );
   }
 
+  function queueOwnerPath(path: string) {
+    setOwnerPaths((prev) => (prev.includes(path) ? prev : [...prev, path]));
+  }
+
   function updateFaq(index: number, key: keyof FaqEntry, value: string) {
+    const current = faqs[index];
+    if (
+      current &&
+      (key === "question" || key === "answer") &&
+      current[key] !== value
+    ) {
+      queueOwnerPath(`faqs.${index + 1}`);
+    }
     setFaqs((prev) =>
-      prev.map((row, i) =>
-        i === index ? carrySavedRow({ ...row, [key]: value }, row) : row
-      )
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        if (key !== "question" && key !== "answer") {
+          return carrySavedRow({ ...row, [key]: value }, row);
+        }
+        if (row[key] === value) return row;
+        const keepGolden = row.source === "owner" && row.status === "golden";
+        return carrySavedRow(
+          {
+            ...row,
+            [key]: value,
+            source: "owner",
+            status: keepGolden ? "golden" : "confirmed",
+            confirmed: true,
+          },
+          row
+        );
+      })
     );
   }
 
   function updateService(index: number, key: keyof ServiceItem, value: string) {
+    const current = services[index];
+    if (current && String(current[key] ?? "") !== value && current.name.trim()) {
+      queueOwnerPath(`catalog.service.${index + 1}.name`);
+    }
     setServices((prev) =>
       prev.map((row, i) =>
-        i === index ? carrySavedRow({ ...row, [key]: value }, row) : row
+        i === index ? carrySavedRow({ ...row, [key]: value, source: "owner" }, row) : row
       )
     );
   }
 
   function updateProduct(index: number, key: keyof ProductItem, value: string) {
+    const current = products[index];
+    if (current && String(current[key] ?? "") !== value && current.name.trim()) {
+      const sku = current.sku.trim() || String(index + 1);
+      queueOwnerPath(`catalog.product.${sku}.name`);
+    }
     setProducts((prev) =>
       prev.map((row, i) => {
         if (i !== index) return row;
@@ -589,6 +627,7 @@ export function TenantForm({
           return carrySavedRow(
             {
               ...row,
+              source: "owner",
               aliases: value
                 .split(/[,;|]/)
                 .map((a) => a.trim())
@@ -598,9 +637,56 @@ export function TenantForm({
             row
           );
         }
-        return carrySavedRow({ ...row, [key]: value }, row);
+        return carrySavedRow({ ...row, [key]: value, source: "owner" }, row);
       })
     );
+  }
+
+  async function confirmPaths(paths: string[]) {
+    const unique = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
+    if (!unique.length) return;
+    const wanted = new Set(unique);
+    setFaqs((prev) =>
+      prev.map((row, index) => {
+        if (!wanted.has(`faqs.${index + 1}`)) return row;
+        const keepGolden = row.source === "owner" && row.status === "golden";
+        return {
+          ...row,
+          source: "owner",
+          status: keepGolden ? "golden" : "confirmed",
+          confirmed: true,
+        };
+      })
+    );
+    setServices((prev) =>
+      prev.map((row, index) =>
+        wanted.has(`catalog.service.${index + 1}.name`) ? { ...row, source: "owner" } : row
+      )
+    );
+    setProducts((prev) =>
+      prev.map((row, index) => {
+        const sku = row.sku.trim() || String(index + 1);
+        return wanted.has(`catalog.product.${sku}.name`) ? { ...row, source: "owner" } : row;
+      })
+    );
+    setPolicies((prev) => {
+      const provenance = { ...prev.provenance };
+      let changed = false;
+      for (const path of unique) {
+        const match = path.match(/^policies\.(payment|deposit|returns|delivery|cancellation|warranty|other)$/);
+        if (!match) continue;
+        provenance[match[1]] = { source: "owner", confirmed: true };
+        changed = true;
+      }
+      return changed ? { ...prev, provenance } : prev;
+    });
+    unique.forEach(queueOwnerPath);
+    setConfirming(true);
+    try {
+      await confirmCaptureFields(unique);
+    } finally {
+      setConfirming(false);
+    }
   }
 
   function updateSocialChannel(
@@ -851,6 +937,7 @@ export function TenantForm({
       <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
       <input type="hidden" name="team_directory" value={teamJson} />
       <input type="hidden" name="faqs" value={faqsJson} />
+      <input type="hidden" name="owner_field_paths" value={JSON.stringify(ownerPaths)} />
       <input type="hidden" name="tool_escalate" value={agentTools.escalate ? "1" : "0"} />
       <input type="hidden" name="tool_end_call" value={agentTools.end_call ? "1" : "0"} />
       <input type="hidden" name="soniox_voice_id" value={sonioxVoiceId} />
@@ -1290,6 +1377,18 @@ export function TenantForm({
             </div>
           </details>
 
+          <CaptureConfirmList
+            pending={confirming}
+            onConfirm={(path) => void confirmPaths([path])}
+            onConfirmAll={(paths) => void confirmPaths(paths)}
+            rows={services.map((service, index) => ({
+              path: `catalog.service.${index + 1}.name`,
+              title: service.name.trim(),
+              preview: service.price_range.trim() || service.notes.trim(),
+              confirmed: service.source === "owner",
+            }))}
+          />
+
           <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
             {visibleServices.map((service, localIndex) => {
               const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
@@ -1488,6 +1587,18 @@ export function TenantForm({
               </button>
             </div>
           </div>
+
+          <CaptureConfirmList
+            pending={confirming}
+            onConfirm={(path) => void confirmPaths([path])}
+            onConfirmAll={(paths) => void confirmPaths(paths)}
+            rows={products.map((product, index) => ({
+              path: `catalog.product.${product.sku.trim() || String(index + 1)}.name`,
+              title: product.name.trim(),
+              preview: product.price.trim(),
+              confirmed: product.source === "owner",
+            }))}
+          />
 
           {products.length === 0 ? null : (
             <>
@@ -1965,6 +2076,19 @@ export function TenantForm({
         className={panel === "policies" ? "space-y-6" : "hidden"}
       >
         <SettingsGroup title="Rules">
+          <CaptureConfirmList
+            pending={confirming}
+            onConfirm={(path) => void confirmPaths([path])}
+            onConfirmAll={(paths) => void confirmPaths(paths)}
+            rows={POLICY_FIELDS.filter((field) => policies[field.id].trim()).map((field) => ({
+              path: `policies.${field.id}`,
+              title: field.label,
+              preview: policies[field.id].trim(),
+              confirmed:
+                policies.provenance?.[field.id]?.source === "owner" ||
+                policies.provenance?.[field.id]?.confirmed === true,
+            }))}
+          />
           {vertical === "home_services" ? (
             <SettingsStack label="Coverage" htmlFor="policy-coverage">
               <CoverageAreaField
@@ -1990,9 +2114,17 @@ export function TenantForm({
               <PolicyTextarea
                 id={`policy-${field.id}`}
                 value={policies[field.id]}
-                onChange={(value) =>
-                  setPolicies((prev) => ({ ...prev, [field.id]: value }))
-                }
+                onChange={(value) => {
+                  if (value !== policies[field.id]) queueOwnerPath(`policies.${field.id}`);
+                  setPolicies((prev) => ({
+                    ...prev,
+                    [field.id]: value,
+                    provenance: {
+                      ...prev.provenance,
+                      [field.id]: { source: "owner", confirmed: true },
+                    },
+                  }));
+                }}
                 placeholder={
                   field.id === "delivery" && vertical === "home_services"
                     ? "Same day before 2pm"
@@ -2355,6 +2487,18 @@ export function TenantForm({
         </div>
 
         {faqs.length > 0 ? (
+        <>
+        <CaptureConfirmList
+          pending={confirming}
+          onConfirm={(path) => void confirmPaths([path])}
+          onConfirmAll={(paths) => void confirmPaths(paths)}
+          rows={faqs.map((faq, index) => ({
+            path: `faqs.${index + 1}`,
+            title: faq.question.trim(),
+            preview: faq.answer.trim(),
+            confirmed: faq.source === "owner",
+          }))}
+        />
         <div className="overflow-hidden rounded-xl border border-line">
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.75rem] items-center gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
             <span>Question</span>
@@ -2430,6 +2574,7 @@ export function TenantForm({
             onPage={setFaqPage}
           />
         </div>
+        </>
         ) : null}
       </section>
       </div>

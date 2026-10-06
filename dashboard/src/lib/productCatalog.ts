@@ -10,6 +10,12 @@ export type ProductItem = {
   notes: string;
   /** Alternate spoken names / spellings */
   aliases: string[];
+  /** fixed | from | range | ask. Omitted until the owner or import sets it. */
+  price_mode?: string;
+  /** Owner confirmed this row can be held. */
+  holdable?: boolean;
+  /** owner | seed | import | inferred | call_suggested */
+  source?: "owner" | "seed" | "import" | "inferred" | "call_suggested";
 };
 
 export const PRODUCT_CATALOG_MAX = 500;
@@ -90,6 +96,30 @@ export function normalizeProductCatalog(raw: unknown): ProductItem[] {
         notes: String(r.notes || "").trim().slice(0, 240),
         aliases: normalizeAliases(r.aliases ?? r.alias),
       };
+      const priceMode = String(r.price_mode || r.priceMode || "")
+        .trim()
+        .toLowerCase();
+      if (priceMode === "fixed" || priceMode === "from" || priceMode === "range" || priceMode === "ask") {
+        item.price_mode = priceMode;
+      }
+      const source = String(r.source || "").trim().toLowerCase();
+      if (
+        source === "owner" ||
+        source === "seed" ||
+        source === "import" ||
+        source === "inferred" ||
+        source === "call_suggested"
+      ) {
+        item.source = source;
+      }
+      // Absent holdable stays unset. Do not default it to false.
+      const holdRaw = r.holdable;
+      const holdText = String(holdRaw ?? "").trim().toLowerCase();
+      if (holdRaw === true || holdText === "true" || holdText === "yes" || holdText === "1") {
+        item.holdable = true;
+      } else if (holdRaw === false || holdText === "false" || holdText === "no" || holdText === "0") {
+        item.holdable = false;
+      }
       if (
         !item.name &&
         !item.sku &&
@@ -125,6 +155,8 @@ export function formatProductsForCompiler(products: ProductItem[]): string {
     if (p.category.trim()) bits.push(`category ${p.category.trim()}`);
     if (p.sku.trim()) bits.push(`sku ${p.sku.trim()}`);
     if (p.price.trim()) bits.push(`price ${p.price.trim()}`);
+    if (p.price_mode?.trim()) bits.push(`price mode ${p.price_mode.trim()}`);
+    if (p.holdable === true) bits.push("can be held");
     if (p.unit.trim()) bits.push(`unit ${p.unit.trim()}`);
     if (p.in_stock.trim()) bits.push(`in stock ${p.in_stock.trim()}`);
     if (p.aliases.length) bits.push(`also called ${p.aliases.join(", ")}`);

@@ -10,10 +10,26 @@ export type BusinessPolicies = {
   other: string;
   /** null until the owner saves the Coverage directory. */
   coverage_areas: string[] | null;
+  /** Per-field owner confirm. Not spoken. */
+  provenance?: Record<
+    string,
+    { source?: string; confirmed?: boolean; confirmed_by?: string; confirmed_at?: string }
+  >;
+  /** Nested hold rules. Round-tripped so a settings save does not drop them. */
+  holds?: unknown;
 };
 
+type PolicyTextId =
+  | "returns"
+  | "delivery"
+  | "payment"
+  | "deposit"
+  | "cancellation"
+  | "warranty"
+  | "other";
+
 export const POLICY_FIELDS: {
-  id: Exclude<keyof BusinessPolicies, "coverage_areas">;
+  id: PolicyTextId;
   label: string;
   placeholder: string;
 }[] = [
@@ -91,6 +107,10 @@ export function normalizeBusinessPolicies(raw: unknown): BusinessPolicies {
   base.coverage_areas = Array.isArray(obj.coverage_areas)
     ? parseCoverageAreas(obj.coverage_areas)
     : null;
+  if (obj.provenance && typeof obj.provenance === "object" && !Array.isArray(obj.provenance)) {
+    base.provenance = obj.provenance as BusinessPolicies["provenance"];
+  }
+  if (obj.holds !== undefined) base.holds = obj.holds;
   return base;
 }
 

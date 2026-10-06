@@ -9,6 +9,8 @@ import {
   TONE_LABELS,
 } from "@/lib/onboarding";
 import { persistTeamNotifyFlags } from "@/lib/teamNotify";
+import { clampFaq } from "@/lib/faqs";
+import type { FaqEntry } from "@/lib/supabase";
 
 /** Master instruction template for Gemini → voice-engine system prompt. */
 export const PROMPT_COMPILER_SYSTEM = `You write system prompts for a live Kenyan phone AI business assistant (Scalers).
@@ -264,6 +266,6 @@ export function parseFaqsField(raw: FormDataEntryValue | null): FaqItem[] {
     const question = String(row.question ?? "").trim().slice(0, 200);
     const answer = String(row.answer ?? "").trim().slice(0, 400);
     if (!question || !answer) return null;
-    return { question, answer };
+    return clampFaq({ ...(row as FaqEntry), question, answer });
   });
 }

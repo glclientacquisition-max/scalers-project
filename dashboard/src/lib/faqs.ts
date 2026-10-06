@@ -16,10 +16,25 @@ export function normalizeFaqKey(question: string): string {
 }
 
 export function clampFaq(entry: FaqEntry): FaqEntry {
-  return {
+  const next: FaqEntry = {
+    ...entry,
     question: String(entry.question || "").trim().slice(0, FAQ_QUESTION_MAX),
     answer: String(entry.answer || "").trim().slice(0, FAQ_ANSWER_MAX),
   };
+  const source = String(next.source || "").trim();
+  const status = String(next.status || "").trim();
+  if (source) next.source = source;
+  else delete next.source;
+  if (status) next.status = status;
+  else delete next.status;
+  const confirmedBy = String(next.confirmed_by || "").trim();
+  const confirmedAt = String(next.confirmed_at || "").trim();
+  if (confirmedBy) next.confirmed_by = confirmedBy.slice(0, 80);
+  else delete next.confirmed_by;
+  if (confirmedAt) next.confirmed_at = confirmedAt.slice(0, 40);
+  else delete next.confirmed_at;
+  if (next.confirmed !== true) delete next.confirmed;
+  return next;
 }
 
 export function isNearDuplicateFaq(question: string, existing: FaqEntry[]): boolean {

@@ -126,6 +126,13 @@ export type TeamDirectoryEntry = {
 export type FaqEntry = {
   question: string;
   answer: string;
+  /** owner | seed | import | inferred | call_suggested. Missing means seed. */
+  source?: string;
+  /** suggested | confirmed | golden. Missing means suggested. */
+  status?: string;
+  confirmed?: boolean;
+  confirmed_by?: string;
+  confirmed_at?: string;
 };
 
 export type ServiceCatalogEntry = {

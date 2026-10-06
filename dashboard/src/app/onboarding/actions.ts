@@ -13,9 +13,17 @@ import { ownerFacingError } from "@/lib/ownerFacingError";
 import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
 import { formatLocationsForCompiler } from "@/lib/businessLocations";
-import { formatPoliciesForCompiler } from "@/lib/businessPolicies";
-import { formatServicesForCompiler } from "@/lib/servicesCatalog";
-import { buildRetailOnboardingSeed } from "@/lib/retailOnboardingPack";
+import { formatHoursForCompiler } from "@/lib/hoursSchedule";
+import { formatProductsForCompiler, normalizeProductCatalog } from "@/lib/productCatalog";
+import { formatServicesForCompiler, normalizeServicesCatalog } from "@/lib/servicesCatalog";
+import { clampFaq } from "@/lib/faqs";
+import { seedOwnerCatchAllTeam } from "@/lib/retailOnboardingPack";
+import {
+  homeCatalogPasses,
+  parseCaptureHours,
+  shopCatalogPasses,
+} from "@/lib/outcomeGates";
+import { upsertTenantFieldMeta } from "@/lib/provenance";
 
 export type OnboardingState = {
   error?: string;
@@ -44,53 +52,73 @@ export async function completeOnboardingAction(
   }
 
   const vertical = parseVertical(formData.get("vertical"));
-  const servicesPricing = String(formData.get("services_pricing") || "").trim();
-  const hoursLocation = String(formData.get("hours_location") || "").trim();
+  const catalogSkipped = String(formData.get("catalog_skipped") || "") === "1";
+  const hoursSkipped = String(formData.get("hours_skipped") || "") === "1";
+  const hoursRaw = String(formData.get("hours_location") || "").trim();
   const landmark = String(formData.get("landmark") || "").trim();
   const directions = String(formData.get("directions") || "").trim();
   const tone = parseAgentTone(String(formData.get("tone") || ""));
   const handoffMode = parseHandoffMode(formData.get("handoff_mode"));
   const agentNameInput = String(formData.get("agent_name") || "").trim();
+  const products = catalogSkipped
+    ? []
+    : normalizeProductCatalog(safeJson(formData.get("product_catalog"))).map((row) => ({
+        ...row,
+        source: "owner" as const,
+      }));
+  const services = catalogSkipped
+    ? []
+    : normalizeServicesCatalog(safeJson(formData.get("services_catalog")))
+        .filter((row) => row.name)
+        .map((row) => ({ ...row, source: "owner" as const }));
+  const faqs = parseConfirmedFaqs(formData.get("faqs_json"));
 
-  if (servicesPricing.length < 12) {
-    return {
-      error: "Tell us what you offer and how pricing works (a few sentences).",
-      step: 1,
-    };
+  if (!catalogSkipped) {
+    if (vertical === "home_services" && !homeCatalogPasses(services)) {
+      return {
+        error: "Add three services with a price mode and a site visit, or skip.",
+        step: 1,
+      };
+    }
+    if (vertical !== "home_services" && !shopCatalogPasses(products)) {
+      return { error: "Add priced products, or skip.", step: 1 };
+    }
   }
-  if (hoursLocation.length < 8) {
-    return { error: "Add business hours and where you operate.", step: 2 };
+  const schedule = hoursSkipped ? null : parseCaptureHours(hoursRaw);
+  if (!hoursSkipped && !schedule) {
+    return { error: "Add opening hours, or skip.", step: 2 };
   }
   if (!tone) {
     return { error: "Pick a tone of voice.", step: 3 };
   }
 
-  const businessLocations = [
-    {
-      label: "Main",
-      address: landmark || hoursLocation.slice(0, 200),
-      landmark,
-      directions,
-      coverage_notes: "",
-    },
-  ];
+  const businessLocations =
+    landmark || directions
+      ? [
+          {
+            label: "Main",
+            address: landmark,
+            landmark,
+            directions,
+            coverage_notes: "",
+          },
+        ]
+      : [];
   const locationsText = formatLocationsForCompiler(businessLocations);
-  const seed = buildRetailOnboardingSeed({
-    vertical,
-    servicesPricing,
-    hoursLocation,
-    landmark,
+  const teamDirectory = seedOwnerCatchAllTeam({
     businessName: tenant.business_name,
     whatsapp: tenant.whatsapp_notification_number,
-    alertEmail: tenant.alert_email,
-    agentName: agentNameInput,
+    email: tenant.alert_email,
   });
+  const agentName = agentNameInput || "Receptionist";
   const servicesOffered =
-    formatServicesForCompiler(seed.servicesCatalog, servicesPricing) ||
-    servicesPricing;
-  const policiesText = seed.businessPolicies
-    ? formatPoliciesForCompiler(seed.businessPolicies)
-    : "";
+    vertical === "home_services"
+      ? formatServicesForCompiler(services, "")
+      : formatProductsForCompiler(products);
+  const servicesPricing = servicesOffered;
+  const hoursLocation = schedule ? formatHoursForCompiler(schedule) : "";
+  const unknownAnswerFallback = "I'll check with the owner.";
+  const productsText = formatProductsForCompiler(products);
 
   const answers: OnboardingAnswers = {
     servicesPricing: servicesOffered,
@@ -103,14 +131,15 @@ export async function completeOnboardingAction(
     servicesOffered,
     businessHours: hoursLocation,
     agentTone: tone,
-    agentName: seed.agentName,
+    agentName,
     vertical,
     handoffMode,
     locationsText,
-    policiesText,
-    faqs: seed.faqs,
-    unknownAnswerFallback: seed.unknownAnswerFallback || undefined,
-    teamDirectory: seed.teamDirectory,
+    policiesText: "",
+    productsText,
+    faqs,
+    unknownAnswerFallback,
+    teamDirectory,
   });
 
   if (!prompt || prompt.length < 80) {
@@ -120,14 +149,15 @@ export async function completeOnboardingAction(
   // Guard: compiled prompt must not look like the signup default.
   if (tenantNeedsOnboarding({ business_name: tenant.business_name, llm_system_prompt: prompt })) {
     prompt = compilePromptLocally(tenant.business_name, answers, {
-      agentName: seed.agentName,
-      faqs: seed.faqs,
-      unknownAnswerFallback: seed.unknownAnswerFallback || undefined,
-      teamDirectory: seed.teamDirectory,
+      agentName,
+      faqs,
+      unknownAnswerFallback,
+      teamDirectory,
       vertical,
       handoffMode,
       locationsText,
-      policiesText,
+      policiesText: "",
+      productsText,
     });
   }
 
@@ -138,29 +168,25 @@ export async function completeOnboardingAction(
 
   const patch: Record<string, unknown> = {
     services_offered: servicesOffered,
-    services_catalog: seed.servicesCatalog,
+    services_catalog: vertical === "home_services" ? services : [],
+    product_catalog: vertical === "home_services" ? [] : products,
     business_hours: hoursLocation,
     agent_tone: tone,
-    agent_name: seed.agentName,
+    agent_name: agentName,
     vertical,
     handoff_mode: handoffMode,
     business_locations: businessLocations,
-    faqs: seed.faqs,
+    faqs,
     llm_system_prompt: prompt,
-    agent_tools: seed.agentTools,
-    after_hours_mode: seed.afterHoursMode,
+    agent_tools: { escalate: true, end_call: true },
+    after_hours_mode: "serve",
+    unknown_answer_fallback: unknownAnswerFallback,
   };
-  if (seed.hoursSchedule) {
-    patch.hours_schedule = seed.hoursSchedule;
+  if (schedule) {
+    patch.hours_schedule = schedule;
   }
-  if (seed.teamDirectory.length) {
-    patch.team_directory = seed.teamDirectory;
-  }
-  if (seed.businessPolicies) {
-    patch.business_policies = seed.businessPolicies;
-  }
-  if (seed.unknownAnswerFallback) {
-    patch.unknown_answer_fallback = seed.unknownAnswerFallback;
+  if (teamDirectory.length) {
+    patch.team_directory = teamDirectory;
   }
 
   const { error } = await workspace.client
@@ -171,7 +197,7 @@ export async function completeOnboardingAction(
   if (error) {
     // Peel optional retail pack columns if migrations are not applied yet.
     if (
-      /faqs|business_policies|services_catalog|unknown_answer_fallback|column/i.test(
+      /faqs|business_policies|services_catalog|product_catalog|hours_schedule|unknown_answer_fallback|column/i.test(
         error.message
       )
     ) {
@@ -258,5 +284,90 @@ export async function completeOnboardingAction(
     };
   }
 
+  await recordCaptureMeta({
+    tenantId: tenant.id,
+    products,
+    services,
+    faqs,
+    hoursConfirmed: Boolean(schedule),
+  });
   redirect("/home");
+}
+
+function safeJson(raw: FormDataEntryValue | null): unknown {
+  const text = String(raw || "").trim();
+  if (!text) return [];
+  try {
+    return JSON.parse(text);
+  } catch {
+    return [];
+  }
+}
+
+function parseConfirmedFaqs(raw: FormDataEntryValue | null) {
+  const parsed = safeJson(raw);
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const record = row as { question?: unknown; answer?: unknown };
+      const entry = clampFaq({
+        question: String(record.question || ""),
+        answer: String(record.answer || ""),
+        source: "owner",
+        status: "confirmed",
+      });
+      return entry.question && entry.answer ? entry : null;
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+}
+
+async function recordCaptureMeta(input: {
+  tenantId: string;
+  products: Array<{ name: string; sku?: string }>;
+  services: Array<{ name: string }>;
+  faqs: Array<{ question: string }>;
+  hoursConfirmed: boolean;
+}) {
+  const writes: Array<{ fieldPath: string; newValue: string }> = [];
+  if (input.hoursConfirmed) {
+    writes.push({ fieldPath: "hours.weekly_grid", newValue: "owner" });
+  }
+  input.products.slice(0, 20).forEach((product, index) => {
+    const sku = String(product.sku || "").trim() || String(index + 1);
+    writes.push({ fieldPath: `catalog.product.${sku}.name`, newValue: product.name });
+  });
+  input.services.slice(0, 20).forEach((service, index) => {
+    writes.push({
+      fieldPath: `catalog.service.${index + 1}.name`,
+      newValue: service.name,
+    });
+  });
+  input.faqs.slice(0, 10).forEach((faq, index) => {
+    writes.push({ fieldPath: `faqs.${index + 1}`, newValue: faq.question });
+  });
+  if (!writes.length) return;
+  try {
+    const first = await upsertTenantFieldMeta({
+      tenantId: input.tenantId,
+      fieldPath: writes[0].fieldPath,
+      source: "owner",
+      actor: "desk",
+      newValue: writes[0].newValue,
+    });
+    if (first.error) return;
+    await Promise.all(
+      writes.slice(1).map((write) =>
+        upsertTenantFieldMeta({
+          tenantId: input.tenantId,
+          fieldPath: write.fieldPath,
+          source: "owner",
+          actor: "desk",
+          newValue: write.newValue,
+        })
+      )
+    );
+  } catch {
+    /* RPC is not on this database until Platform PR 570 is applied. */
+  }
 }
