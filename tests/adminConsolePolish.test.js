@@ -101,7 +101,8 @@ describe("admin console polish", () => {
     assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /<Button/);
     assert.match(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /<Button/);
     assert.doesNotMatch(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /btnPrimary/);
-    assert.match(read("dashboard/src/components/AdminVoicesManager.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/components/AdminVoicesManager.tsx"), /<Button/);
+    assert.doesNotMatch(read("dashboard/src/components/AdminVoicesManager.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/BuyNumberPanel.tsx"), /ConfirmSheet/);
   });
 
@@ -177,13 +178,29 @@ describe("admin console polish", () => {
     assert.doesNotMatch(panel, /—|–/);
   });
 
+  it("lists voices as ListRows with a sheet, Live, and confirmed remove", () => {
+    const panel = read("dashboard/src/components/AdminVoicesManager.tsx");
+    const page = read("dashboard/src/app/admin/(console)/voices/page.tsx");
+    assert.match(page, /AdminVoicesManager/);
+    assert.doesNotMatch(page, /deskListTitleClass/);
+    assert.match(panel, /ListRow/);
+    assert.match(panel, /<Sheet/);
+    assert.match(panel, /<Switch/);
+    assert.match(panel, /ConfirmSheet/);
+    assert.match(panel, /Add voice/);
+    assert.match(panel, /Needs you/);
+    assert.match(panel, /No voices\./);
+    assert.match(panel, /Add a voice for the desk/);
+    assert.match(panel, /Remove this voice\?/);
+    assert.doesNotMatch(panel, /Add Soniox|Soniox voice UUID/);
+    assert.doesNotMatch(panel, /btnPrimary/);
+    assert.doesNotMatch(panel, /AdminIdentityList/);
+    assert.doesNotMatch(panel, /<table/);
+  });
+
   it("uses the desk list title on admin list roots", () => {
-    for (const rel of [
-      "dashboard/src/app/admin/(console)/voices/page.tsx",
-    ]) {
-      const src = read(rel);
-      assert.match(src, /deskListTitleClass/);
-    }
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/voices/page.tsx"), /deskListTitleClass/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/voices/page.tsx"), /<h1/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /PageHeader/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/businesses/page.tsx"), /deskListTitleClass/);
