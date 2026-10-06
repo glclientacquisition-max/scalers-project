@@ -108,6 +108,8 @@ describe("dark palette", () => {
       css,
       /\.desk-drawer-backdrop \{[\s\S]*?background-color: var\(--scrim\);/,
     );
+    assert.match(css, /:root\[data-theme="dark"\] \.desk-drawer-backdrop/);
+    assert.match(css, /:root\[data-theme="light"\] \.desk-drawer-backdrop/);
     const explicit = css.match(/:root\[data-theme="dark"\]\s*\{[^}]+\}/s);
     assert.ok(explicit && /--scrim:\s*#000/.test(explicit[0]), "dark scrim stays black");
     assert.match(css, /--scrim:\s*#0a192f/);

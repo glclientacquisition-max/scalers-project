@@ -624,6 +624,21 @@ h3,
   transition: opacity var(--sheet-ms) var(--ease-out);
 }
 
+/*
+ * Portal carries .desk-theme / .admin-theme. Those set `background: var(--canvas)`
+ * at :root[data-theme] specificity and would wipe a lone background-color.
+ */
+:root[data-theme="dark"] .desk-drawer-backdrop,
+:root[data-theme="light"] .desk-drawer-backdrop {
+  background: var(--scrim);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .desk-drawer-backdrop {
+    background: var(--scrim);
+  }
+}
+
 .desk-drawer-backdrop[data-starting-style],
 .desk-drawer-backdrop[data-ending-style] {
   opacity: 0;
