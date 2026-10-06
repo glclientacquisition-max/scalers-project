@@ -26,6 +26,7 @@ export type AdminOverview = {
   totalBusinesses: number;
   activeBusinesses: number;
   waitingForNumber: number;
+  withoutPackage: number;
   availableDids: number;
   assignedDids: number;
   callsLast7Days: number;
@@ -180,13 +181,16 @@ export async function getAdminOverview(): Promise<AdminOverview> {
     totalBusinesses: businesses.length,
     activeBusinesses: businesses.filter((b) => b.status === "active").length,
     waitingForNumber: businesses.filter((b) => b.status === "waiting").length,
+    withoutPackage: businesses.filter((b) => b.status !== "archived" && !b.package_name).length,
     availableDids: pool.filter((p) => p.status === "available").length,
     assignedDids: pool.filter((p) => p.status === "assigned").length,
     callsLast7Days: callsRes.count || 0,
     pool,
     pendingBusinesses,
     businesses,
-    attention: businesses.filter((b) => b.status === "waiting" || b.status === "archived"),
+    attention: businesses.filter(
+      (b) => b.status === "waiting" || (b.status === "active" && !b.package_name),
+    ),
   };
 }
 

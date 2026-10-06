@@ -96,7 +96,7 @@ describe("admin console polish", () => {
       if (/bg-\[var\(--accent\)\]/.test(source)) offenders.push(rel);
     }
     assert.deepEqual(offenders, []);
-    assert.match(read("dashboard/src/app/admin/(console)/page.tsx"), /ButtonLink/);
+    assert.match(read("dashboard/src/components/AdminOverviewPanel.tsx"), /ButtonLink/);
     assert.match(read("dashboard/src/components/DidPoolManager.tsx"), /<Button/);
     assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /<Button/);
     assert.match(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /<Button/);
@@ -107,15 +107,26 @@ describe("admin console polish", () => {
 
   it("renders overview attention as ListRow work items", () => {
     const page = read("dashboard/src/app/admin/(console)/page.tsx");
-    assert.match(page, /lg:grid-cols-4/);
-    assert.match(page, /Needs you/);
-    assert.match(page, /ListRow/);
-    assert.match(page, /row\.href/);
-    assert.match(page, /Nothing waiting\./);
-    assert.match(page, /Add a number when a business needs one/);
-    assert.doesNotMatch(page, /<table/);
-    assert.doesNotMatch(page, /DeskRowHit/);
-    assert.doesNotMatch(page, /Manage →/);
+    const panel = read("dashboard/src/components/AdminOverviewPanel.tsx");
+    assert.match(page, /AdminOverviewPanel/);
+    assert.match(page, /packageName: b\.package_name/);
+    assert.match(page, /evaluatePlatformOps/);
+    assert.match(panel, /text-caption text-ink-3">Needs you/);
+    assert.match(panel, /text-caption text-ink-3">Glance/);
+    assert.match(panel, /ListRow/);
+    assert.match(panel, /row\.href/);
+    assert.match(panel, /Nothing waiting\./);
+    assert.match(panel, /Add a number when a business needs one/);
+    assert.match(panel, /Assign a package when a shop has none/);
+    assert.match(panel, /href="\/admin\/packages"/);
+    assert.match(panel, /title="Calls"/);
+    assert.doesNotMatch(page, /lg:grid-cols-4/);
+    assert.doesNotMatch(page, /function Kpi/);
+    assert.doesNotMatch(page, /<h2/);
+    assert.doesNotMatch(panel, /<table/);
+    assert.doesNotMatch(panel, /DeskRowHit/);
+    assert.doesNotMatch(panel, /Manage →/);
+    assert.doesNotMatch(panel, /wallet top-up/i);
   });
 
   it("lists businesses as ListRows with a shop sheet, assign, and confirmed release", () => {
@@ -207,9 +218,10 @@ describe("admin console polish", () => {
     assert.doesNotMatch(wallets, /AdminWalletsPanel/);
     assert.doesNotMatch(wallets, /deskListTitleClass/);
     const overview = read("dashboard/src/app/admin/(console)/page.tsx");
-    assert.match(overview, /Add number/);
-    assert.match(overview, /href="\/admin\/platform"/);
-    assert.doesNotMatch(overview, /href="\/admin\/packages"/);
+    const overviewPanel = read("dashboard/src/components/AdminOverviewPanel.tsx");
+    assert.match(overviewPanel, /Add number/);
+    assert.match(overviewPanel, /href="\/admin\/platform"/);
+    assert.match(overviewPanel, /href="\/admin\/packages"/);
     assert.match(overview, /evaluatePlatformOps/);
     assert.doesNotMatch(overview, /PlatformRunBoard/);
     assert.doesNotMatch(overview, /href="\/admin\/billing"/);
