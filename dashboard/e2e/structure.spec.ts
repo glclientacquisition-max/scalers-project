@@ -196,6 +196,9 @@ test.describe("/dev/kit interactions", () => {
     await page.getByRole("button", { name: "Open sheet" }).click();
     const dialog = page.getByRole("dialog", { name: "Archive this call?" });
     await expect(dialog).toBeVisible();
+    await expect
+      .poll(() => page.locator(".desk-drawer-backdrop").evaluate((el) => Number(getComputedStyle(el).opacity)))
+      .toBeGreaterThan(0.3);
     const measured = await dialog.evaluate((el) => {
       const probe = document.createElement("canvas").getContext("2d")!;
       const fill = (cssColor: string) => {
@@ -214,7 +217,7 @@ test.describe("/dev/kit interactions", () => {
         surface: fill(root.getPropertyValue("--surface").trim()),
         scrim: fill(scrim),
         scrimToken: fill(root.getPropertyValue("--scrim").trim()),
-        frame: fill(frame),
+        frameAlpha: Number((frame.match(/[\d.]+/g) || [])[3] ?? (frame === "transparent" ? 0 : 1)),
         backdropOpacity: backdrop ? Number(getComputedStyle(backdrop).opacity) : -1,
         backdropFilter: sheet.backdropFilter,
         themeColor: document.querySelector('meta[name="theme-color"]:not([media])')?.getAttribute("content")?.replace(/\s/g, "").toLowerCase(),
@@ -223,7 +226,7 @@ test.describe("/dev/kit interactions", () => {
     });
     expect(measured.sheet.slice(0, 3)).toEqual(measured.surface.slice(0, 3));
     expect(measured.scrim.slice(0, 3)).toEqual(measured.scrimToken.slice(0, 3));
-    expect(measured.frame[3]).toBe(0);
+    expect(measured.frameAlpha).toBe(0);
     expect(measured.backdropOpacity).toBeGreaterThan(0.3);
     expect(measured.backdropOpacity).toBeLessThan(0.5);
     expect(measured.backdropFilter === "none" || measured.backdropFilter === "").toBeTruthy();
