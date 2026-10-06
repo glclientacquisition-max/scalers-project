@@ -25,6 +25,8 @@ On apply, the script runs **`backfill_tenant_field_meta_seed()`** once (idempote
 
 Prefer stable `sku` when present; otherwise index (rewrite-sensitive).
 
+**JSON null guard:** `business_policies.coverage_areas` may be JSON `null` (not SQL NULL); use `jsonb_typeof(...) = 'array'` before `jsonb_array_length`.
+
 ## Envelope rules
 
 - **source:** `owner` \| `seed` \| `import` \| `inferred` \| `call_suggested`

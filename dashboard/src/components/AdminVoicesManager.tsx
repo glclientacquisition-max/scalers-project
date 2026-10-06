@@ -1,18 +1,45 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import {
-  AdminIdentityList,
-  AdminIdentityRow,
-  adminRowActionClass,
-  adminRowDangerClass,
-  adminRowMutedClass,
-} from "@/components/AdminIdentityList";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
-import { btnGhost, btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
 import { Empty } from "@/components/ui/Empty";
+import { Field, Input } from "@/components/ui/Field";
+import { ListRow } from "@/components/ui/ListRow";
+import { Sheet } from "@/components/ui/Sheet";
+import { Stamp } from "@/components/ui/Stamp";
+import { Switch } from "@/components/ui/Switch";
 import type { PlatformSonioxVoiceRow } from "@/lib/sonioxVoiceCatalog";
+
+function SheetNote({ error }: { error: string | null }) {
+  if (!error) return null;
+  return (
+    <p className="pb-3 text-body text-attention" role="alert">
+      {error}
+    </p>
+  );
+}
+
+function voiceTitle(voice: PlatformSonioxVoiceRow) {
+  return voice.description.trim() || "Untitled";
+}
+
+function voicePreview(voice: PlatformSonioxVoiceRow) {
+  if (voice.is_default) return "Default";
+  return voice.is_active ? "Live" : "Off";
+}
+
+function voiceStamp(voice: PlatformSonioxVoiceRow) {
+  if (voice.is_default) return { tone: "ok" as const, label: "Default" };
+  if (voice.is_active) return { tone: "live" as const, label: "Live" };
+  return { tone: "neutral" as const, label: "Off" };
+}
+
+function faceError(raw: string) {
+  if (/uuid/i.test(raw) || raw === "Voice id is not valid.") return "Voice id is not valid.";
+  return raw || "Could not save.";
+}
 
 export function AdminVoicesManager({
   initialVoices,
@@ -24,11 +51,14 @@ export function AdminVoicesManager({
   const [error, setError] = useState<string | null>(null);
   const [id, setId] = useState("");
   const [description, setDescription] = useState("");
-  const [sortOrder, setSortOrder] = useState("100");
   const [makeDefault, setMakeDefault] = useState(false);
+  const [live, setLive] = useState(true);
+  const [sheet, setSheet] = useState<"add" | "edit" | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const hasDefault = initialVoices.some((voice) => voice.is_default);
 
   async function run(body: Record<string, unknown>) {
     setError(null);
@@ -37,206 +67,210 @@ export function AdminVoicesManager({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const json = await res.json().catch(() => ({}));
+    const json = (await res.json().catch(() => ({}))) as { error?: string };
     if (!res.ok) {
-      setError(json.error || "Request failed");
-      return;
+      setError(faceError(json.error || ""));
+      return false;
     }
     startTransition(() => router.refresh());
+    return true;
+  }
+
+  function openAdd() {
+    setEditingId(null);
+    setId("");
+    setDescription("");
+    setMakeDefault(!hasDefault);
+    setLive(true);
+    setError(null);
+    setSheet("add");
+  }
+
+  function openEdit(voice: PlatformSonioxVoiceRow) {
+    setEditingId(voice.id);
+    setId(voice.id);
+    setDescription(voice.description || "");
+    setMakeDefault(Boolean(voice.is_default));
+    setLive(Boolean(voice.is_active));
+    setError(null);
+    setSheet("edit");
+  }
+
+  function closeSheet() {
+    if (pending) return;
+    setSheet(null);
+    setEditingId(null);
+    setError(null);
+  }
+
+  async function save() {
+    const ok = await run({
+      action: "upsert",
+      id,
+      description,
+      sort_order:
+        initialVoices.find((voice) => voice.id === (editingId || id))?.sort_order ?? 100,
+      is_default: makeDefault,
+      is_active: live,
+    });
+    if (ok) closeSheet();
   }
 
   async function removeVoice() {
     if (!deleteId) return;
     setDeleting(true);
-    await run({ action: "delete", id: deleteId });
+    const ok = await run({ action: "delete", id: deleteId });
     setDeleting(false);
-    setDeleteId(null);
-  }
-
-  function startEdit(voice: PlatformSonioxVoiceRow) {
-    setEditingId(voice.id);
-    setId(voice.id);
-    setDescription(voice.description || "");
-    setSortOrder(String(voice.sort_order ?? 100));
-    setMakeDefault(Boolean(voice.is_default));
-  }
-
-  function resetForm() {
-    setEditingId(null);
-    setId("");
-    setDescription("");
-    setSortOrder("100");
-    setMakeDefault(false);
+    if (ok) {
+      setDeleteId(null);
+      closeSheet();
+    }
   }
 
   return (
-    <div className="space-y-8">
-      <div className="border-b border-line/70 pb-6">
-        <h2 className="text-title font-medium text-ink">
-          {editingId ? "Edit voice" : "Add Soniox voice"}
-        </h2>
-        <form
-          className="mt-4 space-y-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run({
-              action: "upsert",
-              id,
-              description,
-              sort_order: Number(sortOrder) || 100,
-              is_default: makeDefault,
-              is_active: true,
-            }).then(() => resetForm());
-          }}
-        >
-          <label className="block text-sm">
-            <span className="font-medium">Soniox voice UUID</span>
-            <input
-              value={id}
-              onChange={(e) => setId(e.target.value)}
-              required
-              disabled={Boolean(editingId)}
-              className={`mt-1 font-mono ${deskFieldClass} disabled:opacity-60`}
-              placeholder="7b197f3c-84b4-4404-986f-114e4dac1432"
+    <>
+      {!hasDefault ? (
+        <section>
+          <p className="px-4 text-caption text-ink-3">Needs you</p>
+          {initialVoices.length === 0 ? (
+            <Empty
+              title="No voices."
+              line="Add a voice for the desk."
+              action={
+                <Button type="button" onClick={openAdd}>
+                  Add voice
+                </Button>
+              }
             />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium">Description (shown to owners)</span>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              maxLength={160}
-              className={`mt-1 ${deskFieldClass}`}
-              placeholder="Warm Kenyan receptionist tone"
-            />
-          </label>
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="block text-sm">
-              <span className="font-medium">Sort order</span>
-              <input
-                type="number"
-                min={0}
-                max={9999}
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-                className={`mt-1 w-28 ${deskFieldClass}`}
+          ) : (
+            <ul className="divide-y divide-hairline">
+              <ListRow
+                title="No default"
+                preview="The desk needs one"
+                unread
+                onOpen={() => openEdit(initialVoices[0])}
+                stamp={<Stamp tone="attention">None</Stamp>}
               />
-            </label>
-            <label className="flex items-center gap-2 pb-2 text-sm">
-              <input
-                type="checkbox"
-                checked={makeDefault}
-                onChange={(e) => setMakeDefault(e.target.checked)}
-              />
-              Platform default
-            </label>
-            <button
-              type="submit"
-              disabled={pending}
-              className={btnPrimary}
-            >
-              {editingId ? "Save changes" : "Add voice"}
-            </button>
-            {editingId ? (
-              <button
-                type="button"
-                onClick={resetForm}
-                className={btnGhost}
-              >
-                Cancel
-              </button>
-            ) : null}
-          </div>
-        </form>
-        {error ? (
-          <p className="mt-3 text-sm text-[var(--warn)]" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+            </ul>
+          )}
+        </section>
+      ) : null}
 
-      <div>
-        <h2 className="text-title font-medium text-ink">Catalog</h2>
-        <p className="mt-1 text-meta text-ink-2">
-          {initialVoices.length} voice{initialVoices.length === 1 ? "" : "s"} in the platform allowlist.
-        </p>
-        {!initialVoices.length ? (
-          <Empty title="No voices yet." line="Add a Soniox voice UUID above." />
-        ) : (
-          <AdminIdentityList label="Voices">
+      {initialVoices.length > 0 ? (
+        <section>
+          <p className="px-4 text-caption text-ink-3">Voices</p>
+          <ul className="divide-y divide-hairline">
             {initialVoices.map((voice) => {
-              const flags = [
-                voice.is_default ? "Default" : "",
-                voice.is_active ? "" : "Inactive",
-                `Sort ${voice.sort_order}`,
-              ]
-                .filter(Boolean)
-                .join(" · ");
+              const stamp = voiceStamp(voice);
               return (
-                <AdminIdentityRow
+                <ListRow
                   key={voice.id}
-                  title={voice.description || "Untitled voice"}
-                  line={voice.id}
-                  aside={flags}
+                  title={voiceTitle(voice)}
+                  preview={voicePreview(voice)}
+                  unread={voice.is_default}
+                  onOpen={() => openEdit(voice)}
+                  stamp={<Stamp tone={stamp.tone}>{stamp.label}</Stamp>}
                   actions={
-                    <>
-                      <button type="button" disabled={pending} onClick={() => startEdit(voice)} className={adminRowMutedClass}>
-                        Edit
-                      </button>
-                      {!voice.is_default ? (
-                        <button
-                          type="button"
-                          disabled={pending}
-                          onClick={() => void run({ action: "set_default", id: voice.id })}
-                          className={adminRowActionClass}
-                        >
-                          Make default
-                        </button>
-                      ) : null}
-                      <button
+                    !voice.is_default ? (
+                      <Button
                         type="button"
-                        disabled={pending}
-                        onClick={() =>
-                          void run({
-                            action: "set_active",
-                            id: voice.id,
-                            is_active: !voice.is_active,
-                          })
-                        }
-                        className={adminRowMutedClass}
+                        variant="tonal"
+                        size="sm"
+                        pending={pending}
+                        onClick={() => void run({ action: "set_default", id: voice.id })}
                       >
-                        {voice.is_active ? "Deactivate" : "Activate"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() => setDeleteId(voice.id)}
-                        className={adminRowDangerClass}
-                      >
-                        Delete
-                      </button>
-                    </>
+                        Default
+                      </Button>
+                    ) : undefined
                   }
                 />
               );
             })}
-          </AdminIdentityList>
-        )}
-      </div>
+          </ul>
+          <div className="px-4 pt-3">
+            <Button type="button" onClick={openAdd}>
+              Add voice
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
+      <Sheet
+        open={sheet !== null}
+        onOpenChange={(next) => {
+          if (!next) closeSheet();
+        }}
+        title={editingId ? "Voice" : "Add voice"}
+        theme="admin"
+        footer={
+          <>
+            {editingId ? (
+              <Button
+                type="button"
+                variant="danger"
+                block
+                disabled={pending}
+                onClick={() => setDeleteId(editingId)}
+              >
+                Remove
+              </Button>
+            ) : null}
+            <Button type="button" block pending={pending} disabled={!id.trim()} onClick={() => void save()}>
+              Save
+            </Button>
+          </>
+        }
+      >
+        <SheetNote error={error} />
+        <div className="space-y-4">
+          <Field id="voice-name" label="Name" hint="Shown on the desk.">
+            {(control) => (
+              <Input
+                {...control}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                maxLength={160}
+              />
+            )}
+          </Field>
+          <Field id="voice-id" label="Voice id">
+            {(control) => (
+              <Input
+                {...control}
+                value={id}
+                onChange={(event) => setId(event.target.value)}
+                required
+                disabled={Boolean(editingId)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            )}
+          </Field>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-body text-ink">Live</p>
+            <Switch label="Live" checked={live} onCheckedChange={setLive} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-body text-ink">Default</p>
+            <Switch label="Default" checked={makeDefault} onCheckedChange={setMakeDefault} />
+          </div>
+        </div>
+      </Sheet>
+
       <ConfirmSheet
         open={deleteId !== null}
         theme="admin"
         danger
         pending={deleting}
-        title="Remove this voice"
+        title="Remove this voice?"
         confirmLabel="Remove"
         onClose={() => {
           if (!deleting) setDeleteId(null);
         }}
         onConfirm={() => void removeVoice()}
       >
-        <p>Workspaces using it will fall back to the default.</p>
+        <p>The desk falls back to the default.</p>
       </ConfirmSheet>
-    </div>
+    </>
   );
 }

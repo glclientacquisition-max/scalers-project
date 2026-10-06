@@ -77,7 +77,8 @@ describe('server speech path', () => {
 
   it('cuts model text before the Soniox push and not the lookup sentence', () => {
     const chunk = body('onSpokenChunk', '      ');
-    assert.match(chunk, /text = cutNoAiSlop\(text\)/);
+    assert.match(chunk, /const text = cutNoAiSlop\(polished\)/);
+    assert.doesNotMatch(chunk, /\btext = cutNoAiSlop\(text\)/);
     assert.match(chunk, /session\.pushText\(text\)/);
     const lookupStart = source.indexOf('async function speakLookupSentence');
     const lookupEnd = source.indexOf('\n      let result;', lookupStart);

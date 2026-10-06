@@ -459,7 +459,10 @@ begin
     select t.id, 'policies.coverage_areas'
     from public.tenants t
     where coalesce(trim(t.business_policies ->> 'coverage_areas'), '') <> ''
-      or jsonb_array_length(coalesce(t.business_policies -> 'coverage_areas', '[]'::jsonb)) > 0
+      or (
+        jsonb_typeof(t.business_policies -> 'coverage_areas') = 'array'
+        and jsonb_array_length(t.business_policies -> 'coverage_areas') > 0
+      )
     union all
     select t.id, 'policies.' || k.key
     from public.tenants t
@@ -899,7 +902,10 @@ begin
     'locations.branches',
     jsonb_array_length(coalesce(t.business_locations, '[]'::jsonb)) > 0
       or coalesce(trim(t.business_policies ->> 'coverage_areas'), '') <> ''
-      or jsonb_array_length(coalesce(t.business_policies -> 'coverage_areas', '[]'::jsonb)) > 0
+      or (
+        jsonb_typeof(t.business_policies -> 'coverage_areas') = 'array'
+        and jsonb_array_length(t.business_policies -> 'coverage_areas') > 0
+      )
   ) * 100;
 
   v_payments := (

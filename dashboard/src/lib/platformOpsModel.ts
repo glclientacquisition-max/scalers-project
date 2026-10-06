@@ -327,7 +327,7 @@ export function opsMailSubject(kind: OpsNoticeKind, recovered = false): string {
 
 export function mergeQueueRows(input: {
   notices: Array<{ kind: OpsNoticeKind; detail: string | null; status: OpsNoticeStatus }>;
-  businesses: Array<{ id: string; name: string; status: string }>;
+  businesses: Array<{ id: string; name: string; status: string; packageName?: string | null }>;
 }): Array<{ key: string; title: string; detail: string; href: string; stamp: string }> {
   const rows: Array<{ key: string; title: string; detail: string; href: string; stamp: string }> = [];
   for (const notice of input.notices) {
@@ -340,14 +340,26 @@ export function mergeQueueRows(input: {
       stamp: "Open",
     });
   }
-  for (const business of input.businesses) {
-    const waiting = business.status === "waiting";
+  const waiting = input.businesses.filter((business) => business.status === "waiting");
+  const noPackage = input.businesses.filter(
+    (business) => business.status === "active" && !business.packageName,
+  );
+  for (const business of waiting) {
     rows.push({
       key: `biz-${business.id}`,
       title: business.name,
-      detail: waiting ? "Waiting for a number" : "Archived",
+      detail: "Waiting for a number",
       href: `/admin/businesses#biz-${business.id}`,
-      stamp: waiting ? "Waiting" : "Archived",
+      stamp: "Waiting",
+    });
+  }
+  for (const business of noPackage) {
+    rows.push({
+      key: `biz-${business.id}`,
+      title: business.name,
+      detail: "No package",
+      href: `/admin/businesses#biz-${business.id}`,
+      stamp: "Package",
     });
   }
   return rows;
