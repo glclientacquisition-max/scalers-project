@@ -10,10 +10,13 @@ import {
 } from "@/lib/adminBilling";
 import type { BillingMode } from "@/lib/adminWallets";
 import { adminTdClass } from "@/components/AdminIdentityList";
+import { Button } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
-import { btnGhost, btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
+import { btnGhost, deskFieldClass } from "@/components/ui/deskChrome";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
+import { Field, Input } from "@/components/ui/Field";
+import { Sheet } from "@/components/ui/Sheet";
 import {
   inboundKesPerMinute,
   outboundKesPerMinute,
@@ -29,6 +32,8 @@ const MODE_OPTIONS: { value: BillingMode; label: string }[] = [
   { value: "hard", label: "On-demand hard" },
 ];
 
+type BillingTask = "package" | "charging" | "grant" | "waive";
+
 function planConsequence(mode: BillingMode): string {
   if (mode === "off") {
     return "Beta: meter the package. On-demand ledger is not charged.";
@@ -39,9 +44,22 @@ function planConsequence(mode: BillingMode): string {
   return "On-demand past included debits the ops ledger when opted in. Inbound block at zero balance is not wired yet.";
 }
 
+function SheetNote({ error }: { error: string | null }) {
+  if (!error) return null;
+  return (
+    <p className="pb-3 text-body text-attention" role="alert">
+      {error}
+    </p>
+  );
+}
+
+const sheetLabelClass = "mb-1.5 block text-meta font-medium text-ink";
+
 export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClientDetail }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [task, setTask] = useState<BillingTask | null>(null);
+  const [busy, setBusy] = useState(false);
   const [chargeOpen, setChargeOpen] = useState(false);
   const [savingCharge, setSavingCharge] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +120,12 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
     }
   }
 
+  function openTask(next: BillingTask) {
+    setError(null);
+    setStatus(null);
+    setTask(next);
+  }
+
   async function post(body: Record<string, unknown>, okText: string) {
     setError(null);
     setStatus(null);
@@ -125,6 +149,32 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
     return true;
   }
 
+  async function submit(body: Record<string, unknown>, okText: string) {
+    setBusy(true);
+    const ok = await post(body, okText);
+    setBusy(false);
+    if (ok) setTask(null);
+  }
+
+  async function submitCharging() {
+    const graduating = row.billing_enforcement === "off" && mode !== "off";
+    if (graduating) {
+      setTask(null);
+      setChargeOpen(true);
+      return;
+    }
+    await submit(
+      {
+        action: "set_billing_mode",
+        business_id: row.id,
+        mode,
+        note: modeNote.trim(),
+        waive_negative: mode === "off" ? waiveNegative : false,
+      },
+      `Charging mode → ${chargingModeLabel(mode)}.`
+    );
+  }
+
   async function confirmCharge() {
     setSavingCharge(true);
     await post(
@@ -144,6 +194,7 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
   const row = detail.row;
   const rates = detail.rates;
   const minutesLine = usedOfIncluded(row.minutesUsed, row.minutesIncluded);
+  const nowPackage = `Now ${sub?.packageName || "none"}${sub?.period ? ` / ${sub.period}` : ""}`;
 
   return (
     <div className="space-y-8">
@@ -179,58 +230,10 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
 
       <section className="border-b border-line/70 pb-6">
         <h2 className="text-title font-medium text-ink">Package</h2>
-        <p className="mt-1 text-sm text-ink-2">
-          Now {sub?.packageName || "none"}
-          {sub?.period ? ` / ${sub.period}` : ""}
-        </p>
-        <form
-          className="mt-4 grid gap-4 sm:grid-cols-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void post(
-              {
-                action: "assign_package",
-                business_id: row.id,
-                package_id: packageId,
-                period,
-              },
-              "Package updated."
-            );
-          }}
-        >
-          <div className="text-sm sm:col-span-2">
-            <span className="font-medium text-ink">Package</span>
-            <DeskSelect
-              aria-label="Package"
-              className={`mt-2 ${deskFieldClass}`}
-              portalThemeClass="admin-theme"
-              value={packageId}
-              onChange={setPackageId}
-              options={detail.packages
-                .filter((p) => p.isActive || p.id === packageId)
-                .map((p) => ({ value: p.id, label: p.name }))}
-            />
-          </div>
-          <div className="text-sm">
-            <span className="font-medium text-ink">Period</span>
-            <DeskSelect
-              aria-label="Period"
-              className={`mt-2 ${deskFieldClass}`}
-              portalThemeClass="admin-theme"
-              value={period}
-              onChange={setPeriod}
-              options={[
-                { value: "month", label: "Month" },
-                { value: "year", label: "Year" },
-              ]}
-            />
-          </div>
-          <div className="sm:col-span-3">
-            <button type="submit" disabled={pending || !packageId} className={btnPrimary}>
-              Assign or change
-            </button>
-          </div>
-        </form>
+        <p className="mt-1 text-sm text-ink-2">{nowPackage}</p>
+        <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("package")}>
+          Assign or change
+        </Button>
       </section>
 
       <section className="border-b border-line/70 pb-6">
@@ -251,67 +254,10 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
 
       <section className="border-b border-line/70 pb-6">
         <h2 className="text-title font-medium text-ink">Charging</h2>
-        <p className="mt-1 text-sm text-ink-2">{planConsequence(mode)}</p>
-        <form
-          className="mt-4 grid gap-4 sm:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const graduating = detail.row.billing_enforcement === "off" && mode !== "off";
-            if (graduating) {
-              setChargeOpen(true);
-              return;
-            }
-            void post(
-              {
-                action: "set_billing_mode",
-                business_id: row.id,
-                mode,
-                note: modeNote.trim(),
-                waive_negative: mode === "off" ? waiveNegative : false,
-              },
-              `Charging mode → ${chargingModeLabel(mode)}.`
-            );
-          }}
-        >
-          <div className="text-sm">
-            <span className="font-medium text-ink">Mode</span>
-            <DeskSelect
-              aria-label="Charging mode"
-              className={`mt-2 ${deskFieldClass}`}
-              portalThemeClass="admin-theme"
-              value={mode}
-              onChange={setMode}
-              options={MODE_OPTIONS}
-            />
-          </div>
-          <label className="text-sm">
-            Reason (required)
-            <input
-              value={modeNote}
-              onChange={(e) => setModeNote(e.target.value)}
-              className={`mt-2 ${deskFieldClass}`}
-            />
-          </label>
-          {mode === "off" ? (
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input
-                type="checkbox"
-                checked={waiveNegative}
-                onChange={(e) => setWaiveNegative(e.target.checked)}
-              />
-              Waive negative on-demand balance when stopping charging
-            </label>
-          ) : null}
-          <div className="sm:col-span-2">
-            <button
-              type="submit"
-              disabled={pending || modeNote.trim().length < 3}
-              className={btnPrimary}
-            >
-              {mode === "off" ? "Stop charging" : "Save charging mode"}
-            </button>
-          </div>
-        </form>
+        <p className="mt-1 text-sm text-ink-2">{planConsequence(row.billing_enforcement)}</p>
+        <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("charging")}>
+          Change charging
+        </Button>
       </section>
 
       <section className="border-b border-line/70 pb-6">
@@ -319,51 +265,9 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
         <p className="mt-1 text-sm text-ink-2">
           Adds to included minutes for this period. Does not change on-demand ledger balance.
         </p>
-        <form
-          className="mt-4 grid gap-4 sm:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void post(
-              {
-                action: "grant_minutes",
-                business_id: row.id,
-                minutes: Math.floor(Number(grantMinutes)),
-                note: grantNote.trim(),
-                idempotency_key: crypto.randomUUID(),
-              },
-              "Minutes granted."
-            );
-          }}
-        >
-          <label className="text-sm">
-            Minutes
-            <input
-              type="number"
-              min={1}
-              value={grantMinutes}
-              onChange={(e) => setGrantMinutes(e.target.value)}
-              className={`mt-2 ${deskFieldClass}`}
-            />
-          </label>
-          <label className="text-sm">
-            Reason (required)
-            <input
-              value={grantNote}
-              onChange={(e) => setGrantNote(e.target.value)}
-              className={`mt-2 ${deskFieldClass}`}
-              placeholder="Beachhead comp, dispute, …"
-            />
-          </label>
-          <div className="sm:col-span-2">
-            <button
-              type="submit"
-              disabled={pending || grantNote.trim().length < 3}
-              className={btnPrimary}
-            >
-              Grant minutes
-            </button>
-          </div>
-        </form>
+        <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("grant")}>
+          Grant minutes
+        </Button>
       </section>
 
       <section className="border-b border-line/70 pb-6">
@@ -372,40 +276,15 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
           Clears negative on-demand ledger balance for this cycle (trial_credit). Current balance KES{" "}
           {row.wallet_balance_kes.toLocaleString("en-KE")}.
         </p>
-        <form
-          className="mt-4 grid gap-4 sm:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void post(
-              {
-                action: "waive_overage",
-                business_id: row.id,
-                note: waiveNote.trim(),
-                idempotency_key: crypto.randomUUID(),
-              },
-              "Overage waived when balance was negative."
-            );
-          }}
+        <Button
+          type="button"
+          variant="tonal"
+          className="mt-4"
+          disabled={row.wallet_balance_kes >= 0}
+          onClick={() => openTask("waive")}
         >
-          <label className="text-sm sm:col-span-2">
-            Reason (required)
-            <input
-              value={waiveNote}
-              onChange={(e) => setWaiveNote(e.target.value)}
-              className={`mt-2 ${deskFieldClass}`}
-              placeholder="Goodwill, billing error, …"
-            />
-          </label>
-          <div className="sm:col-span-2">
-            <button
-              type="submit"
-              disabled={pending || waiveNote.trim().length < 3 || row.wallet_balance_kes >= 0}
-              className={btnPrimary}
-            >
-              Waive overage
-            </button>
-          </div>
-        </form>
+          Waive overage
+        </Button>
       </section>
 
       {detail.ledgerRepairEnabled ? (
@@ -486,6 +365,223 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
           </ul>
         )}
       </section>
+
+      <Sheet
+        open={task === "package"}
+        onOpenChange={(next) => {
+          if (!next) setTask(null);
+        }}
+        title="Package"
+        description={nowPackage}
+        theme="admin"
+        footer={
+          <Button
+            type="button"
+            block
+            pending={busy}
+            disabled={!packageId}
+            onClick={() =>
+              void submit(
+                {
+                  action: "assign_package",
+                  business_id: row.id,
+                  package_id: packageId,
+                  period,
+                },
+                "Package updated."
+              )
+            }
+          >
+            Assign or change
+          </Button>
+        }
+      >
+        <SheetNote error={error} />
+        <div className="space-y-4">
+          <div>
+            <span className={sheetLabelClass}>Package</span>
+            <DeskSelect
+              aria-label="Package"
+              className={deskFieldClass}
+              portalThemeClass="admin-theme"
+              value={packageId}
+              onChange={setPackageId}
+              options={detail.packages
+                .filter((p) => p.isActive || p.id === packageId)
+                .map((p) => ({ value: p.id, label: p.name }))}
+            />
+          </div>
+          <div>
+            <span className={sheetLabelClass}>Period</span>
+            <DeskSelect
+              aria-label="Period"
+              className={deskFieldClass}
+              portalThemeClass="admin-theme"
+              value={period}
+              onChange={setPeriod}
+              options={[
+                { value: "month", label: "Month" },
+                { value: "year", label: "Year" },
+              ]}
+            />
+          </div>
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={task === "charging"}
+        onOpenChange={(next) => {
+          if (!next) setTask(null);
+        }}
+        title="Charging"
+        description={`Now ${chargingModeLabel(row.billing_enforcement)}`}
+        theme="admin"
+        footer={
+          <Button
+            type="button"
+            block
+            pending={busy}
+            disabled={modeNote.trim().length < 3}
+            onClick={() => void submitCharging()}
+          >
+            {mode === "off" ? "Stop charging" : "Save charging mode"}
+          </Button>
+        }
+      >
+        <SheetNote error={error} />
+        <div className="space-y-4">
+          <div>
+            <span className={sheetLabelClass}>Mode</span>
+            <DeskSelect
+              aria-label="Charging mode"
+              className={deskFieldClass}
+              portalThemeClass="admin-theme"
+              value={mode}
+              onChange={setMode}
+              options={MODE_OPTIONS}
+            />
+          </div>
+          <p className="text-meta text-ink-2">{planConsequence(mode)}</p>
+          <Field id="bill-mode-note" label="Reason" required>
+            {(props) => (
+              <Input {...props} value={modeNote} onChange={(e) => setModeNote(e.target.value)} />
+            )}
+          </Field>
+          {mode === "off" ? (
+            <label className="flex min-h-11 items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={waiveNegative}
+                onChange={(e) => setWaiveNegative(e.target.checked)}
+              />
+              Waive negative on-demand balance when stopping charging
+            </label>
+          ) : null}
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={task === "grant"}
+        onOpenChange={(next) => {
+          if (!next) setTask(null);
+        }}
+        title="Grant minutes"
+        description="Adds to included minutes for this period."
+        theme="admin"
+        footer={
+          <Button
+            type="button"
+            block
+            pending={busy}
+            disabled={grantNote.trim().length < 3}
+            onClick={() =>
+              void submit(
+                {
+                  action: "grant_minutes",
+                  business_id: row.id,
+                  minutes: Math.floor(Number(grantMinutes)),
+                  note: grantNote.trim(),
+                  idempotency_key: crypto.randomUUID(),
+                },
+                "Minutes granted."
+              )
+            }
+          >
+            Grant minutes
+          </Button>
+        }
+      >
+        <SheetNote error={error} />
+        <div className="space-y-4">
+          <Field id="bill-grant-minutes" label="Minutes" required>
+            {(props) => (
+              <Input
+                {...props}
+                type="number"
+                min={1}
+                inputMode="numeric"
+                className="tabular-nums"
+                value={grantMinutes}
+                onChange={(e) => setGrantMinutes(e.target.value)}
+              />
+            )}
+          </Field>
+          <Field id="bill-grant-note" label="Reason" required>
+            {(props) => (
+              <Input
+                {...props}
+                value={grantNote}
+                onChange={(e) => setGrantNote(e.target.value)}
+                placeholder="Beachhead comp, dispute, …"
+              />
+            )}
+          </Field>
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={task === "waive"}
+        onOpenChange={(next) => {
+          if (!next) setTask(null);
+        }}
+        title="Waive overage"
+        description={`Current balance KES ${row.wallet_balance_kes.toLocaleString("en-KE")}.`}
+        theme="admin"
+        footer={
+          <Button
+            type="button"
+            block
+            pending={busy}
+            disabled={waiveNote.trim().length < 3 || row.wallet_balance_kes >= 0}
+            onClick={() =>
+              void submit(
+                {
+                  action: "waive_overage",
+                  business_id: row.id,
+                  note: waiveNote.trim(),
+                  idempotency_key: crypto.randomUUID(),
+                },
+                "Overage waived when balance was negative."
+              )
+            }
+          >
+            Waive overage
+          </Button>
+        }
+      >
+        <SheetNote error={error} />
+        <Field id="bill-waive-note" label="Reason" required>
+          {(props) => (
+            <Input
+              {...props}
+              value={waiveNote}
+              onChange={(e) => setWaiveNote(e.target.value)}
+              placeholder="Goodwill, billing error, …"
+            />
+          )}
+        </Field>
+      </Sheet>
+
       <ConfirmSheet
         open={chargeOpen}
         theme="admin"
