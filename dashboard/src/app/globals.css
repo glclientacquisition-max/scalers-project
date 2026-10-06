@@ -86,11 +86,13 @@
   --motion-live: 1.4s;
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Glass chrome (tab bar, rail, sheets, menus, auth cards). Lists stay opaque. */
+  /* Glass chrome (tab bar, rail, menus, auth cards). Dark sheets stay opaque. */
   --surface-3: #ffffff;
   --glass: color-mix(in srgb, var(--surface) 78%, transparent);
   --glass-highlight: rgb(255 255 255 / 0.72);
   --glass-blur: 16px;
+  /* Overlay dim. Always a dark wash. Never --ink (ink flips pale in dark). */
+  --scrim: #0a192f;
 }
 
 /*
@@ -129,6 +131,7 @@
   --shadow-menu: 0 8px 24px -8px rgb(0 0 0 / 0.55);
   --glass: color-mix(in srgb, var(--surface) 58%, transparent);
   --glass-highlight: rgb(255 255 255 / 0.1);
+  --scrim: #000000;
   --tw-ring-offset-color: var(--surface);
 }
 
@@ -187,6 +190,7 @@
     --shadow-menu: 0 8px 24px -8px rgb(0 0 0 / 0.55);
     --glass: color-mix(in srgb, var(--surface) 58%, transparent);
     --glass-highlight: rgb(255 255 255 / 0.1);
+    --scrim: #000000;
     --tw-ring-offset-color: var(--surface);
   }
 
@@ -231,6 +235,24 @@
   .glass-chrome {
     background-color: var(--surface);
     box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/*
+ * Dark sheet is --surface. iOS Safari backdrop-filter milks 58% glass.
+ * Tab bar and rail keep frost. One frosted layer, not two.
+ */
+:root[data-theme="dark"] .desk-drawer.glass-chrome {
+  background-color: var(--surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .desk-drawer.glass-chrome {
+    background-color: var(--surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -597,7 +619,7 @@ h3,
 }
 
 .desk-drawer-backdrop {
-  background-color: var(--ink);
+  background-color: var(--scrim);
   opacity: calc(0.4 * (1 - var(--drawer-swipe-progress, 0)));
   transition: opacity var(--sheet-ms) var(--ease-out);
 }

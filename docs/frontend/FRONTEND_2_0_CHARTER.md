@@ -106,6 +106,7 @@ Semantic roles only. Raw values appear once, in `:root` and `[data-theme="dark"]
 ```
 Color roles
   --canvas          page background            #F4F7FB   dark #0B1220
+  --scrim           drawer overlay dim         #0A192F   dark #000000
   --surface         rows, sheets, fields       #FFFFFF   dark #121C2C
   --surface-2       pressed, hover, tonal bg   #E9EEF5   dark #1A2638
   --hairline        1px separators             #DDE4EE   dark #24324A

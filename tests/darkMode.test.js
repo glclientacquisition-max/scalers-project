@@ -32,6 +32,7 @@ const DARK_TOKENS = [
   "--brand:",
   "--glass:",
   "--ok:",
+  "--scrim:",
 ];
 
 describe("dark palette", () => {
@@ -83,6 +84,35 @@ describe("dark palette", () => {
     assert.match(sheet, /themeClass/);
   });
 
+  it("makes the dark sheet opaque surface so iOS backdrop-filter cannot milk it", () => {
+    assert.match(
+      css,
+      /:root\[data-theme="dark"\] \.desk-drawer\.glass-chrome \{[\s\S]*?background-color: var\(--surface\);[\s\S]*?backdrop-filter: none;/,
+    );
+    assert.match(
+      css,
+      /:root:not\(\[data-theme="light"\]\) \.desk-drawer\.glass-chrome \{[\s\S]*?background-color: var\(--surface\);[\s\S]*?backdrop-filter: none;/,
+    );
+    const nav = read("dashboard/src/components/DeskNav.tsx");
+    assert.match(nav, /glass-chrome/);
+    assert.doesNotMatch(nav, /desk-drawer/);
+  });
+
+  it("dims the drawer scrim with --scrim, never flipping --ink", () => {
+    assert.match(css, /:root \{[\s\S]*?--scrim:/);
+    assert.doesNotMatch(
+      css,
+      /\.desk-drawer-backdrop \{[\s\S]*?background-color: var\(--ink\);/,
+    );
+    assert.match(
+      css,
+      /\.desk-drawer-backdrop \{[\s\S]*?background-color: var\(--scrim\);/,
+    );
+    const explicit = css.match(/:root\[data-theme="dark"\]\s*\{[^}]+\}/s);
+    assert.ok(explicit && /--scrim:\s*#000/.test(explicit[0]), "dark scrim stays black");
+    assert.match(css, /--scrim:\s*#0a192f/);
+  });
+
   it("recomputes ink on the desk shell so typed text is not inherited navy", () => {
     assert.match(css, /\.desk-theme \{\s*color: var\(--ink\);\s*caret-color: var\(--ink\);/);
     assert.match(css, /\.desk-theme textarea,\s*\.desk-theme select \{\s*color: var\(--ink\);/);
@@ -110,10 +140,15 @@ describe("theme activation", () => {
     assert.match(layout, /style\.colorScheme=s/);
     assert.match(layout, /dark only/);
     assert.match(layout, /meta\[name="color-scheme"\]/);
+    assert.match(layout, /theme-color/);
+    assert.match(layout, /--canvas/);
     assert.match(layout, /dangerouslySetInnerHTML/);
     assert.doesNotMatch(layout, /cookies\(\)/);
     assert.match(layout, /dataset\.theme=t/);
     assert.match(layout, /DeskThemeProvider/);
+    assert.match(layout, /DESK_THEME_COLOR_LIGHT/);
+    assert.match(layout, /DESK_THEME_COLOR_DARK/);
+    assert.doesNotMatch(layout, /themeColor:\s*"#0096FF"/);
   });
 
   it("hydrates This device from the saved choice, not a System default", () => {
@@ -138,6 +173,10 @@ describe("theme activation", () => {
     assert.match(themeLib, /root\.style\.colorScheme = ""/);
     assert.match(themeLib, /document\.body\.style\.colorScheme/);
     assert.match(themeLib, /meta\[name="color-scheme"\]/);
+    assert.match(themeLib, /meta\[name="theme-color"\]/);
+    assert.match(themeLib, /getPropertyValue\("--canvas"\)/);
+    assert.match(themeLib, /DESK_THEME_COLOR_LIGHT/);
+    assert.match(themeLib, /DESK_THEME_COLOR_DARK/);
     assert.match(themeLib, /"dark only"/);
     assert.match(themeLib, /"light only"/);
     assert.match(css, /:root\[data-theme="dark"\] \{\s*color-scheme: dark only;/);
@@ -265,5 +304,8 @@ describe("desk token hygiene", () => {
     assert.match(master, /accent-on-fill/);
     assert.match(master, /entire platform/);
     assert.match(master, /glass-chrome/);
+    assert.match(master, /opaque/);
+    assert.match(master, /--scrim/);
+    assert.match(master, /theme-color/);
   });
 });

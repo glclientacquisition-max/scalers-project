@@ -5,6 +5,10 @@
 
 export const DESK_THEME_STORAGE_KEY = "scalers-desk-theme";
 
+/** Safari chrome. Must match `--canvas` in globals.css. Never brand. */
+export const DESK_THEME_COLOR_LIGHT = "#f4f7fb";
+export const DESK_THEME_COLOR_DARK = "#0b1220";
+
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 const COOKIE_PAIR = new RegExp(`(?:^|;\\s*)${DESK_THEME_STORAGE_KEY}=(light|dark)(?:;|$)`);
 
@@ -110,6 +114,28 @@ function syncColorSchemeMeta(choice: DeskTheme): void {
   meta.setAttribute("content", choice);
 }
 
+function syncThemeColorMeta(): void {
+  if (typeof document === "undefined") return;
+  const head = document.head;
+  if (!head) return;
+  const canvas = getComputedStyle(document.documentElement).getPropertyValue("--canvas").trim();
+  if (!canvas) return;
+  const metas = Array.from(head.querySelectorAll('meta[name="theme-color"]'));
+  let meta = metas.find((node) => !node.getAttribute("media"));
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.setAttribute("name", "theme-color");
+    head.insertBefore(meta, head.firstChild);
+  }
+  meta.setAttribute("content", canvas);
+}
+
+if (typeof window !== "undefined") {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (readDeskTheme() === "system") syncThemeColorMeta();
+  });
+}
+
 export function applyDeskTheme(choice: DeskTheme): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
@@ -125,4 +151,5 @@ export function applyDeskTheme(choice: DeskTheme): void {
     if (document.body) document.body.style.colorScheme = scheme;
   }
   syncColorSchemeMeta(choice);
+  syncThemeColorMeta();
 }
