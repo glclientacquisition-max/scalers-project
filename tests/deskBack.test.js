@@ -53,7 +53,7 @@ describe("DeskBack icon", () => {
   });
 
   it("is the settings mobile back primitive", () => {
-    assert.match(settings, /<DeskBack href="\/settings" className="lg:hidden">/);
+    assert.match(settings, /<DeskBack href="\/settings" className="md:hidden">/);
     assert.match(settings, /<DeskRecordLead/);
     assert.match(settings, />\s*Settings\s*</);
     assert.doesNotMatch(settings, />\s*Profile\s*</);
