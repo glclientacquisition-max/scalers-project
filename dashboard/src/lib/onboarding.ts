@@ -139,6 +139,8 @@ export type CompileExtras = {
   socialText?: string;
   productCatalog?: unknown;
   businessPolicies?: unknown;
+  fieldMeta?: unknown;
+  holdGate?: unknown;
 };
 
 /** Deterministic fallback if Gemini is unavailable. */
@@ -168,11 +170,13 @@ export function compilePromptLocally(
     servicesText: answers.servicesPricing,
     productCatalog: opts.productCatalog ?? null,
     businessPolicies: opts.businessPolicies ?? null,
+    fieldMeta: opts.fieldMeta ?? null,
+    holdGate: opts.holdGate ?? null,
   });
   const servicesBody = sections.servicesText.trim() || "(none confirmed)";
   const teamBlock = formatTeamDirectory(team);
   const holdsLine = sections.holdsAvailable
-    ? "Holds and orders are available for confirmed catalogue items when hold rules allow. Say held or reserved only after the tool result."
+    ? "Holds and orders are available for confirmed catalogue items when hold rules allow. Say held or reserved only after the tool result. During a hold, do not say a deposit amount or a payment number. The owner follows up."
     : "Holds and orders are not available. Take a message. Do not say held or reserved.";
   const slotLine = sections.confirmedSlotsAvailable
     ? "Confirmed booking slots are available from owner-confirmed rules. Say booked only after the tool result."

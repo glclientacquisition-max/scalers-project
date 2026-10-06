@@ -27,7 +27,7 @@ Requirements for the prompt you write:
 - If social/web handles are provided, include them so the assistant can share Instagram/WhatsApp/website when asked.
 - If confirmed FAQs are provided, include them as facts. Do not label seed or unconfirmed FAQs as GOLDEN. If an UNKNOWN list is provided, include it and instruct the assistant to say "Let me confirm with the owner." Do not state UNKNOWN topics as fact.
 - Enquiry and take-a-message always work, even when knowledge is incomplete. Do not block the line.
-- Speak prices and payment numbers only when they appear in the confirmed facts. A visit is a request unless the user message says confirmed slots are available.
+- Speak prices and payment numbers only when they appear in the confirmed facts. During a hold, do not say a deposit amount or a payment number. The owner follows up. A visit is a request unless the user message says confirmed slots are available.
 - If a team directory is provided AND escalation is enabled, include a TEAM DIRECTORY / ESCALATION section listing each person as Name, Role, Phone. Escalation is a last useful step: use it when the caller explicitly asks for a human, policy requires one, authority is missing, a tool fails, or repair repeatedly fails. Anger alone is not enough when the issue can be resolved.
 - Handoff mode is a preference, not proof that transfer works. Never promise or claim a live transfer; runtime authority decides actual capability.
 - If escalation is disabled, list the team for awareness but instruct the assistant to resolve what it can and offer a saved request only when useful.
@@ -112,6 +112,8 @@ export async function compileReceptionistPrompt(opts: {
   socialText?: string;
   productCatalog?: unknown;
   businessPolicies?: unknown;
+  fieldMeta?: unknown;
+  holdGate?: unknown;
 }): Promise<{ prompt: string; source: "gemini" | "local" }> {
   const answers: OnboardingAnswers = {
     servicesPricing: opts.servicesOffered.trim(),
@@ -136,6 +138,8 @@ export async function compileReceptionistPrompt(opts: {
     servicesText: answers.servicesPricing,
     productCatalog: opts.productCatalog ?? null,
     businessPolicies: opts.businessPolicies ?? null,
+    fieldMeta: opts.fieldMeta ?? null,
+    holdGate: opts.holdGate ?? null,
   });
   const extras = {
     agentName,
@@ -151,6 +155,8 @@ export async function compileReceptionistPrompt(opts: {
     socialText,
     productCatalog: opts.productCatalog ?? null,
     businessPolicies: opts.businessPolicies ?? null,
+    fieldMeta: opts.fieldMeta ?? null,
+    holdGate: opts.holdGate ?? null,
   };
 
   if (!process.env.GEMINI_API_KEY) {

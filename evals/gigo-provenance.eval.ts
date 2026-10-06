@@ -24,6 +24,7 @@ evalite("GIGO provenance", {
     { input: "seed-compile" },
     { input: "empty-hold" },
     { input: "incomplete-enquiry" },
+    { input: "hold-deposit" },
   ],
   task: async (input: string) => {
     if (input === "seed-faq") {
@@ -75,6 +76,24 @@ evalite("GIGO provenance", {
       });
       return { type: saved?.type || "", confirm, spoken };
     }
+    if (input === "hold-deposit") {
+      const spoken = guardSpokenReply(
+        "Okay, I've saved your request. The deposit is 2000 to till 555111.",
+        {
+          toolResults: [
+            { action: "create_service_request", status: "succeeded", requestType: "hold" },
+          ],
+          profile: {},
+        }
+      );
+      const onlyMoney = guardSpokenReply("Send the deposit of 2000 to till 555111.", {
+        toolResults: [
+          { action: "create_service_request", status: "succeeded", requestType: "hold" },
+        ],
+        profile: {},
+      });
+      return { spoken, onlyMoney };
+    }
     const prompt = buildSystemPrompt({
       businessName: "Westlands Gadgets",
       agentName: "Aisha",
@@ -108,6 +127,15 @@ evalite("GIGO provenance", {
         if (input === "empty-hold") {
           if (output.type !== "enquiry") return 0;
           if (/\bheld\b|\breserved\b/i.test(`${output.confirm} ${output.spoken}`)) return 0;
+          return 1;
+        }
+        if (input === "hold-deposit") {
+          const spoken = String(output.spoken || "");
+          const onlyMoney = String(output.onlyMoney || "");
+          if (/2000|555111|till|deposit/i.test(spoken)) return 0;
+          if (!/saved your request/i.test(spoken)) return 0;
+          if (onlyMoney !== "The owner will follow up.") return 0;
+          if (/2000|555111/.test(onlyMoney)) return 0;
           return 1;
         }
         const prompt = String(output.prompt || "");

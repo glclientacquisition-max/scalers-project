@@ -24,6 +24,10 @@ const SAVED_CLAIM =
 const HOLD_PROMISE =
   /\b(i(?:'ve| have|'ll| will) (?:held|reserved|hold)\b|we(?:'ve| have|'ll| will) (?:held|reserved|hold)\b|(?:is|are|been) (?:held|reserved|on hold)\b)/i;
 
+/** Deposit amount or payment number. Spoken only outside a hold until §10.3. */
+const HOLD_PAYMENT_LEAK =
+  /\bdeposit\b[^.]{0,48}\d|\d[^.]{0,32}\bdeposit\b|\b(till|pay\s*bill|paybill|business number|account number)\b[^.]{0,40}\d|\b(m-?pesa|mpesa)\b[^.]{0,24}\d{3,}/i;
+
 // Job is finished. Same rule as a saved claim: only after a tool succeeded.
 const JOB_CLOSE =
   /\b(all set|all done|taken care of|(?:you(?:'re| are)|we(?:'re| are)|that(?:'s| is)|it(?:'s| is)) (?:all )?(?:set|sorted)|see you (?:then|tomorrow|there)|we(?:'ll| will) be there|(?:we(?:'re| are)|i(?:'m| am)) (?:coming|on our way))\b/i;
@@ -231,7 +235,7 @@ function narratesInternalAction(text) {
 
 function filePriceAnswer(profile, callerText) {
   const ask = String(callerText || '').toLowerCase();
-  const rows = factServices(profile?.servicesCatalog);
+  const rows = factServices(profile?.servicesCatalog, profile?.fieldMeta || null);
   const hits = [];
   for (const row of rows) {
     const name = String(row?.name || '').trim();
@@ -330,6 +334,7 @@ function guardSpokenReply(text, ctx = {}) {
   const clocks = allowedClocks(ctx);
   const saved = toolSucceededThisTurn(ctx.toolResults);
   const holdOk = holdOrOrderSucceeded(ctx.toolResults);
+  let droppedHoldPayment = false;
   const transferOk = Boolean(ctx.capabilities?.liveTransfer || ctx.capabilities?.transfer);
   const missing = Array.isArray(ctx.state?.goal?.missingSlots) ? ctx.state.goal.missingSlots : [];
   const holdOpenSlot = !saved && missing.length > 0;
@@ -354,6 +359,10 @@ function guardSpokenReply(text, ctx = {}) {
     if (ACTION_NARRATION.test(sentence)) continue;
     if (!holdOk && HOLD_PROMISE.test(sentence)) {
       droppedJob = true;
+      continue;
+    }
+    if (holdOk && HOLD_PAYMENT_LEAK.test(sentence)) {
+      droppedHoldPayment = true;
       continue;
     }
     if (!saved && (SAVED_CLAIM.test(sentence) || JOB_CLOSE.test(sentence))) {
@@ -400,6 +409,7 @@ function guardSpokenReply(text, ctx = {}) {
     }
     return ctx.allowEmpty ? '' : slotLine;
   }
+  if (!out && droppedHoldPayment) return 'The owner will follow up.';
   if (ctx.allowEmpty && !askedNumber) return '';
   if (droppedNumber && NUMBER_ASK.test(lastCallerTurn)) {
     const priced = filePriceAnswer(ctx.profile, lastCallerTurn);

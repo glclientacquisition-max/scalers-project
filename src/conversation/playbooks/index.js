@@ -29,7 +29,7 @@ function formatPlaybookForPrompt(profile = {}) {
   if (vertical === 'home_services') {
     return formatHomeServicesPlaybookForPrompt({
       handoffMode,
-      confirmVisit: factServices(profile.servicesCatalog).length > 0,
+      confirmVisit: factServices(profile.servicesCatalog, profile.fieldMeta || null).length > 0,
       confirmedSlot: confirmedSlotEnabled(profile),
     });
   }

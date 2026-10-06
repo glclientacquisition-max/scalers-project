@@ -1115,11 +1115,13 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       handoffMode: 'callback',
       businessLocations: [],
       businessPolicies: {},
-      billingEnforcement: null,
-      walletBalanceKes: null,
-      openAppointments: [],
-    };
-  }
+    billingEnforcement: null,
+    walletBalanceKes: null,
+    openAppointments: [],
+    fieldMeta: null,
+    holdGate: null,
+  };
+}
 
   const { parseAgentTools } = require('./conversation/agentTools');
   const { parseLexiconOverrides } = require('./speech/pronunciationLexicon');
@@ -1168,7 +1170,18 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     walletBalanceKes:
       row.wallet_balance_kes != null ? Number(row.wallet_balance_kes) : null,
     openAppointments: await listOpenAppointments(row.id),
+    ...(await loadProvenanceForProfile(row.id)),
   };
+}
+
+async function loadProvenanceForProfile(tenantId) {
+  try {
+    const { loadProvenanceEnvelope } = require('./conversation/provenance');
+    return await loadProvenanceEnvelope(tenantId);
+  } catch (err) {
+    console.warn('[db] provenance envelope', err.message);
+    return { fieldMeta: null, holdGate: null };
+  }
 }
 
 async function listOpenAppointments(tenantId, { limit = 30 } = {}) {
@@ -2189,6 +2202,127 @@ async function consumeSmsUnits({ tenantId, units } = {}) {
   };
 }
 
+function provenanceRpcMissing(message) {
+  return /tenant_completeness_score|tenant_hold_gate|upsert_tenant_field_meta|confirm_tenant_field|tenant_field_meta|does not exist|schema cache/i.test(
+    message || ''
+  );
+}
+
+async function getTenantCompletenessScore(tenantId) {
+  if (!tenantId) return null;
+  const { data, error } = await supabase.rpc('tenant_completeness_score', {
+    p_tenant_id: tenantId,
+  });
+  if (error) {
+    if (provenanceRpcMissing(error.message)) {
+      console.warn(
+        '[db] tenant_completeness_score missing (apply docs/supabase/tenant_field_provenance.sql)'
+      );
+      return null;
+    }
+    throwIfError('getTenantCompletenessScore', error);
+  }
+  return data && typeof data === 'object' ? data : null;
+}
+
+async function getTenantHoldGate(tenantId) {
+  if (!tenantId) return { allowed: false, reasons: ['provenance_rpc_missing'] };
+  const { data, error } = await supabase.rpc('tenant_hold_gate', {
+    p_tenant_id: tenantId,
+  });
+  if (error) {
+    if (provenanceRpcMissing(error.message)) {
+      console.warn(
+        '[db] tenant_hold_gate missing (apply docs/supabase/tenant_field_provenance.sql)'
+      );
+      return { allowed: false, reasons: ['provenance_rpc_missing'] };
+    }
+    throwIfError('getTenantHoldGate', error);
+  }
+  const row = data && typeof data === 'object' ? data : {};
+  const reasons = Array.isArray(row.reasons) ? row.reasons.map(String) : [];
+  return {
+    allowed: row.allowed === true,
+    reasons,
+  };
+}
+
+async function listTenantFieldMeta(tenantId) {
+  if (!tenantId) return null;
+  const { data, error } = await supabase
+    .from('tenant_field_meta')
+    .select('field_path, source, confirmed_by, confirmed_at')
+    .eq('tenant_id', tenantId);
+  if (error) {
+    if (provenanceRpcMissing(error.message)) {
+      console.warn(
+        '[db] tenant_field_meta missing (apply docs/supabase/tenant_field_provenance.sql)'
+      );
+      return null;
+    }
+    throwIfError('listTenantFieldMeta', error);
+  }
+  return Array.isArray(data) ? data : [];
+}
+
+async function upsertTenantFieldMeta({
+  tenantId,
+  fieldPath,
+  source,
+  sourceRef = null,
+  confidence = null,
+  staleAfterDays = null,
+  actor = 'voice',
+  oldValue = null,
+  newValue = null,
+} = {}) {
+  if (!tenantId || !fieldPath || !source) {
+    throw new Error('[db] upsertTenantFieldMeta: tenantId, fieldPath, source required');
+  }
+  const { data, error } = await supabase.rpc('upsert_tenant_field_meta', {
+    p_tenant_id: tenantId,
+    p_field_path: fieldPath,
+    p_source: source,
+    p_source_ref: sourceRef,
+    p_confidence: confidence,
+    p_stale_after_days: staleAfterDays,
+    p_actor: actor,
+    p_old_value: oldValue,
+    p_new_value: newValue,
+  });
+  if (error) {
+    if (provenanceRpcMissing(error.message)) {
+      console.warn(
+        '[db] upsert_tenant_field_meta missing (apply docs/supabase/tenant_field_provenance.sql)'
+      );
+      return null;
+    }
+    throwIfError('upsertTenantFieldMeta', error);
+  }
+  return data || null;
+}
+
+async function confirmTenantField({ tenantId, fieldPath, userId = null } = {}) {
+  if (!tenantId || !fieldPath) {
+    throw new Error('[db] confirmTenantField: tenantId and fieldPath required');
+  }
+  const { data, error } = await supabase.rpc('confirm_tenant_field', {
+    p_tenant_id: tenantId,
+    p_field_path: fieldPath,
+    p_user_id: userId,
+  });
+  if (error) {
+    if (provenanceRpcMissing(error.message)) {
+      console.warn(
+        '[db] confirm_tenant_field missing (apply docs/supabase/tenant_field_provenance.sql)'
+      );
+      return null;
+    }
+    throwIfError('confirmTenantField', error);
+  }
+  return data || null;
+}
+
 module.exports = {
   upsertCall,
   saveCallerInfo,
@@ -2227,6 +2361,11 @@ module.exports = {
   persistWhatsAppStatus,
   getWhatsAppSession,
   consumeSmsUnits,
+  getTenantCompletenessScore,
+  getTenantHoldGate,
+  listTenantFieldMeta,
+  upsertTenantFieldMeta,
+  confirmTenantField,
   RECORDINGS_BUCKET,
   shapeCall,
   normalizeStoredPhone,

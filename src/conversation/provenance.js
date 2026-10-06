@@ -1,10 +1,13 @@
 // Provenance adapter for compile and live ground truth.
 //
-// Platform does not yet store tenant_field_meta. This module reads whatever
-// signal is already on the JSON value (source, status, confirmed_by,
-// confirmed_at, or a nested envelope) and otherwise treats an exact vertical
-// pack seed as source "seed". Unmarked text that is not a pack seed stays
-// owner so existing owner-typed rows keep working until Platform backfills.
+// When tenant_field_meta rows are loaded (profile.fieldMeta / compile fieldMeta),
+// that source wins for the field_path. Pack-text matching is only the fallback
+// for a path with no meta row, or when the table is absent (prod before the
+// Platform migration). Unmarked text that is not a pack seed stays owner on
+// that fallback so existing owner-typed rows keep working.
+//
+// Hold placement uses profile.holdGate from tenant_hold_gate when the RPC
+// answered. provenance_rpc_missing falls back to the catalogue + hold-rule check.
 //
 // Only owner, or an explicit confirm, is fact. seed and call_suggested cap at
 // suggested and never compile or speak as GOLDEN. import and inferred are not
@@ -191,13 +194,72 @@ function isPackService(row) {
 }
 
 /**
+ * Index rows from tenant_field_meta. Null means the table was not loaded
+ * (heuristic for every path). An empty byPath means the table answered and
+ * this tenant has no rows, so each missing path still uses the heuristic.
+ * @param {Array<{ field_path?: string, source?: string }>|null|undefined} rows
+ */
+function indexFieldMeta(rows) {
+  if (!Array.isArray(rows)) return null;
+  const byPath = {};
+  for (const row of rows) {
+    const path = String(row?.field_path || row?.fieldPath || '').trim();
+    const source = String(row?.source || '').trim().toLowerCase();
+    if (!path || !SOURCES.has(source)) continue;
+    byPath[path] = {
+      source,
+      confirmed_at: row.confirmed_at || row.confirmedAt || null,
+      confirmed_by: row.confirmed_by || row.confirmedBy || null,
+    };
+  }
+  return { loaded: true, byPath };
+}
+
+function lookupFieldMeta(fieldMeta, fieldPath) {
+  if (!fieldMeta || !fieldPath) return null;
+  const byPath = fieldMeta.byPath && typeof fieldMeta.byPath === 'object' ? fieldMeta.byPath : null;
+  if (!byPath) return null;
+  const hit = byPath[fieldPath];
+  if (!hit || !SOURCES.has(hit.source)) return null;
+  return hit;
+}
+
+function productFieldPath(row, index) {
+  const sku = String(row?.sku || '').trim();
+  return `catalog.product.${sku || String(index + 1)}.name`;
+}
+
+function serviceFieldPath(index) {
+  return `catalog.service.${index + 1}.name`;
+}
+
+function faqFieldPath(index) {
+  return `faqs.${index + 1}`;
+}
+
+/**
  * @returns {{ source: string, confirmed: boolean, fact: boolean, status: string }}
  * fact is only owner or an explicit confirm. seed and call_suggested are never fact.
+ * A tenant_field_meta row for fieldPath replaces the pack-text guess.
  */
-function classifyRecord(row, { packSeed = false } = {}) {
-  const confirmed = isConfirmed(row);
-  let source = readSource(row);
-  if (!source && packSeed) source = 'seed';
+function classifyRecord(row, { packSeed = false, fieldMeta = null, fieldPath = '' } = {}) {
+  const meta = lookupFieldMeta(fieldMeta, fieldPath);
+  let working = row;
+  let seed = packSeed;
+  if (meta) {
+    const metaConfirmed = meta.source === 'owner' || Boolean(meta.confirmed_at || meta.confirmed_by);
+    working = {
+      ...(row && typeof row === 'object' ? row : {}),
+      source: meta.source,
+      confirmed: metaConfirmed,
+      confirmed_at: meta.confirmed_at || undefined,
+      confirmed_by: meta.confirmed_by || undefined,
+    };
+    seed = false;
+  }
+  const confirmed = isConfirmed(working);
+  let source = readSource(working);
+  if (!source && seed) source = 'seed';
   if (!source && confirmed) source = 'owner';
   if (!source) source = 'owner';
 
@@ -207,25 +269,32 @@ function classifyRecord(row, { packSeed = false } = {}) {
 
   let status = 'suggested';
   if (fact) {
-    const raw = String(envelopeOf(row).status || '').trim().toLowerCase();
+    const raw = String(envelopeOf(working).status || '').trim().toLowerCase();
     status = raw === 'golden' && (source === 'owner' || confirmed) ? 'golden' : 'confirmed';
   }
   return { source, confirmed, fact, status };
 }
 
-function classifyFaq(faq) {
+function classifyFaq(faq, fieldMeta = null, fieldPath = '') {
   const question = String(faq?.question || '').trim();
   const answer = String(faq?.answer || '').trim();
   const packSeed = isPackFaq(question, answer);
-  const row = classifyRecord(faq, { packSeed });
+  const row = classifyRecord(faq, { packSeed, fieldMeta, fieldPath });
   return { ...row, question, answer };
 }
 
-function classifyPolicyValue(text, meta) {
+function classifyPolicyValue(text, meta, fieldMeta = null, fieldPath = '') {
   const value = String(text || '').trim();
   if (!value) return { source: '', confirmed: false, fact: false, status: 'suggested', empty: true };
   const packSeed = isPackPolicyText(value);
-  return { ...classifyRecord(meta || { source: packSeed ? 'seed' : '' }, { packSeed }), empty: false, text: value };
+  const base = meta && typeof meta === 'object' && Object.keys(meta).length
+    ? meta
+    : { source: packSeed ? 'seed' : '' };
+  return {
+    ...classifyRecord(base, { packSeed, fieldMeta, fieldPath }),
+    empty: false,
+    text: value,
+  };
 }
 
 function policyMeta(policies, key) {
@@ -238,13 +307,13 @@ function policyMeta(policies, key) {
   return {};
 }
 
-function factPolicyMap(policies) {
+function factPolicyMap(policies, fieldMeta = null) {
   const obj = asObject(policies);
   const out = {};
   const unknown = [];
   for (const [key, label] of Object.entries(POLICY_TOPICS)) {
     const text = String(obj[key] || '').trim();
-    const row = classifyPolicyValue(text, policyMeta(obj, key));
+    const row = classifyPolicyValue(text, policyMeta(obj, key), fieldMeta, `policies.${key}`);
     if (row.fact) out[key] = text;
     else unknown.push(label);
   }
@@ -254,54 +323,78 @@ function factPolicyMap(policies) {
 const HOLD_DENIAL =
   /\b(no holds?|do not hold|don't hold|cannot hold|can't hold|not holding|hatuweki|hatutoi hold)\b/i;
 
-function holdRulesAllow(policies) {
+function holdRulesAllow(policies, fieldMeta = null) {
   const obj = asObject(policies);
   const holds = obj.holds;
   if (holds && typeof holds === 'object') {
     const allowed = String(holds.allowed ?? holds.enabled ?? '').trim().toLowerCase();
-    const row = classifyRecord(holds, { packSeed: false });
+    const row = classifyRecord(holds, {
+      packSeed: false,
+      fieldMeta,
+      fieldPath: 'policies.holds',
+    });
     if (allowed === 'no' || allowed === 'false') return false;
     if ((allowed === 'yes' || allowed === 'true') && row.fact) return true;
   }
   const deposit = String(obj.deposit || '').trim();
-  const row = classifyPolicyValue(deposit, policyMeta(obj, 'deposit'));
+  const row = classifyPolicyValue(deposit, policyMeta(obj, 'deposit'), fieldMeta, 'policies.deposit');
   if (!row.fact) return false;
   if (HOLD_DENIAL.test(deposit)) return false;
   return true;
 }
 
-function factProducts(raw) {
-  return asArray(raw).filter((row) => {
+function factProducts(raw, fieldMeta = null) {
+  return asArray(raw).filter((row, index) => {
     if (!row || typeof row !== 'object') return false;
     if (!String(row.name || '').trim()) return false;
-    return classifyRecord(row, { packSeed: false }).fact;
+    return classifyRecord(row, {
+      packSeed: false,
+      fieldMeta,
+      fieldPath: productFieldPath(row, index),
+    }).fact;
   });
 }
 
-function factServices(raw) {
-  return asArray(raw).filter((row) => {
+function factServices(raw, fieldMeta = null) {
+  return asArray(raw).filter((row, index) => {
     if (!row || typeof row !== 'object') return false;
     if (!String(row.name || '').trim()) return false;
-    return classifyRecord(row, { packSeed: isPackService(row) }).fact;
+    return classifyRecord(row, {
+      packSeed: isPackService(row),
+      fieldMeta,
+      fieldPath: serviceFieldPath(index),
+    }).fact;
   });
 }
 
-function factFaqs(raw) {
+function factFaqs(raw, fieldMeta = null) {
   return asArray(raw)
-    .map(classifyFaq)
+    .map((faq, index) => classifyFaq(faq, fieldMeta, faqFieldPath(index)))
     .filter((row) => row.fact && row.question && row.answer);
 }
 
-function unknownFaqTopics(raw) {
+function unknownFaqTopics(raw, fieldMeta = null) {
   return asArray(raw)
-    .map(classifyFaq)
+    .map((faq, index) => classifyFaq(faq, fieldMeta, faqFieldPath(index)))
     .filter((row) => row.question && row.answer && !row.fact)
     .map((row) => `FAQ: ${row.question}`);
 }
 
+/** tenant_hold_gate result, or null when the RPC is not on this database. */
+function holdGateDecision(profile = {}) {
+  const gate = profile.holdGate;
+  if (!gate || typeof gate !== 'object' || typeof gate.allowed !== 'boolean') return null;
+  const reasons = Array.isArray(gate.reasons) ? gate.reasons.map(String) : [];
+  if (reasons.includes('provenance_rpc_missing')) return null;
+  return gate.allowed === true;
+}
+
 function holdOrdersEnabled(profile = {}) {
-  if (!factProducts(profile.productCatalog).length) return false;
-  return holdRulesAllow(profile.businessPolicies);
+  const fromRpc = holdGateDecision(profile);
+  if (fromRpc !== null) return fromRpc;
+  const fieldMeta = profile.fieldMeta || null;
+  if (!factProducts(profile.productCatalog, fieldMeta).length) return false;
+  return holdRulesAllow(profile.businessPolicies, fieldMeta);
 }
 
 function confirmedSlotEnabled(profile = {}) {
@@ -342,14 +435,18 @@ function buildCompileSections({
   servicesText = '',
   productCatalog = null,
   businessPolicies = null,
+  fieldMeta = null,
+  holdGate = null,
 } = {}) {
-  const faqRows = asArray(faqs).map(classifyFaq).filter((row) => row.question && row.answer);
+  const faqRows = asArray(faqs)
+    .map((faq, index) => classifyFaq(faq, fieldMeta, faqFieldPath(index)))
+    .filter((row) => row.question && row.answer);
   const factFaqs = faqRows.filter((row) => row.fact);
   const unknown = faqRows.filter((row) => !row.fact).map((row) => `FAQ: ${row.question}`);
 
   let policyBody = String(policiesText || '').trim();
   if (businessPolicies) {
-    const split = factPolicyMap(businessPolicies);
+    const split = factPolicyMap(businessPolicies, fieldMeta);
     const lines = [];
     for (const [key, label] of Object.entries(POLICY_TOPICS)) {
       if (split.policies[key]) lines.push(`- ${label}: ${split.policies[key]}`);
@@ -392,7 +489,7 @@ function buildCompileSections({
   let productsBody = String(productsText || '').trim();
   if (productCatalog) {
     const named = asArray(productCatalog).filter((row) => String(row?.name || '').trim());
-    const rows = factProducts(productCatalog);
+    const rows = factProducts(productCatalog, fieldMeta);
     if (named.length && !rows.length) {
       productsBody = '';
       if (!unknown.includes('Product catalogue')) unknown.push('Product catalogue');
@@ -421,6 +518,8 @@ function buildCompileSections({
     holdsAvailable: holdOrdersEnabled({
       productCatalog: productCatalog || [],
       businessPolicies: businessPolicies || {},
+      fieldMeta,
+      holdGate,
     }),
     confirmedSlotsAvailable: confirmedSlotEnabled({
       businessPolicies: businessPolicies || {},
@@ -429,18 +528,19 @@ function buildCompileSections({
 }
 
 function speechFactText(profile = {}) {
-  const policies = factPolicyMap(profile.businessPolicies).policies;
-  const products = factProducts(profile.productCatalog).map((row) => ({
+  const fieldMeta = profile.fieldMeta || null;
+  const policies = factPolicyMap(profile.businessPolicies, fieldMeta).policies;
+  const products = factProducts(profile.productCatalog, fieldMeta).map((row) => ({
     name: row.name,
     price: row.price || row.price_range || row.priceRange || '',
     notes: row.notes || '',
   }));
-  const services = factServices(profile.servicesCatalog).map((row) => ({
+  const services = factServices(profile.servicesCatalog, fieldMeta).map((row) => ({
     name: row.name,
     price_range: row.price_range || row.priceRange || '',
     notes: row.notes || '',
   }));
-  const faqs = factFaqs(profile.faqs).map((row) => ({
+  const faqs = factFaqs(profile.faqs, fieldMeta).map((row) => ({
     question: row.question,
     answer: row.answer,
   }));
@@ -459,10 +559,48 @@ function speechFactText(profile = {}) {
   });
 }
 
+/**
+ * Load tenant_field_meta and tenant_hold_gate through the Platform db helpers.
+ * Missing table or RPC leaves the fields null so callers keep the pack heuristic.
+ */
+async function loadProvenanceEnvelope(tenantId) {
+  if (!tenantId) return { fieldMeta: null, holdGate: null };
+  let db;
+  try {
+    db = require('../db');
+  } catch (err) {
+    console.warn('[provenance] db helpers unavailable', err.message);
+    return { fieldMeta: null, holdGate: null };
+  }
+  let fieldMeta = null;
+  let holdGate = null;
+  if (typeof db.listTenantFieldMeta === 'function') {
+    try {
+      fieldMeta = indexFieldMeta(await db.listTenantFieldMeta(tenantId));
+    } catch (err) {
+      console.warn('[provenance] listTenantFieldMeta', err.message);
+    }
+  }
+  if (typeof db.getTenantHoldGate === 'function') {
+    try {
+      const gate = await db.getTenantHoldGate(tenantId);
+      const reasons = Array.isArray(gate?.reasons) ? gate.reasons.map(String) : [];
+      if (gate && typeof gate.allowed === 'boolean' && !reasons.includes('provenance_rpc_missing')) {
+        holdGate = { allowed: gate.allowed === true, reasons };
+      }
+    } catch (err) {
+      console.warn('[provenance] getTenantHoldGate', err.message);
+    }
+  }
+  return { fieldMeta, holdGate };
+}
+
 module.exports = {
   PACK_POLICY_TEXTS,
   PACK_FAQ_PAIRS,
   norm,
+  indexFieldMeta,
+  loadProvenanceEnvelope,
   classifyRecord,
   classifyFaq,
   isPackFaq,

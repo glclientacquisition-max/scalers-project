@@ -23,7 +23,7 @@ function buildBrainCapabilities(profile = {}, runtime = {}) {
     // Holds/orders need an owner-confirmed catalogue and hold rules. Enquiry stays on.
     placeHold: holdOrdersEnabled(profile),
     // Seed-only services cannot confirm a visit. Unmarked owner services still can.
-    confirmVisit: factServices(profile.servicesCatalog).length > 0,
+    confirmVisit: factServices(profile.servicesCatalog, profile.fieldMeta || null).length > 0,
     confirmedSlot: confirmedSlotEnabled(profile),
     createAppointment: runtime.createAppointment !== false,
     updateAppointment: runtime.updateAppointment !== false,

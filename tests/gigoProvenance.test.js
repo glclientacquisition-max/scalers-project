@@ -8,6 +8,8 @@ const {
   buildCompileSections,
   holdOrdersEnabled,
   factFaqs,
+  factServices,
+  indexFieldMeta,
 } = require('../src/conversation/provenance');
 const { buildLiveGroundTruth } = require('../src/conversation/liveKnowledge');
 const {
@@ -149,5 +151,110 @@ process.stdout.write(JSON.stringify(buildCompileSections(fixture)));`,
     assert.doesNotMatch(prompt, /we will log a hold/);
     assert.equal(holdOrdersEnabled({ productCatalog: [], businessPolicies: {} }), false);
     assert.equal(factFaqs([SEED_FAQ]).length, 0);
+  });
+
+  it('prefers tenant_field_meta and falls back when a row is missing', () => {
+    const ownerFaq = { question: 'Where is the shop?', answer: 'Opposite Naivas, Westlands.' };
+    assert.equal(factFaqs([ownerFaq]).length, 1);
+    const seeded = indexFieldMeta([{ field_path: 'faqs.1', source: 'seed' }]);
+    assert.equal(factFaqs([ownerFaq], seeded).length, 0);
+    const sections = buildCompileSections({
+      businessPolicies: { payment: 'Till 999111 at the counter.' },
+      fieldMeta: indexFieldMeta([{ field_path: 'policies.payment', source: 'seed' }]),
+    });
+    assert.doesNotMatch(sections.policiesText, /999111/);
+    assert.match(sections.unknownBlock, /Payment/);
+    const unmarked = buildCompileSections({
+      businessPolicies: { payment: 'Till 999111 at the counter.' },
+    });
+    assert.match(unmarked.policiesText, /999111/);
+  });
+
+  it('treats the staging seed envelope as not fact and holds closed', () => {
+    const paths = [
+      'faqs.1',
+      'faqs.2',
+      'faqs.3',
+      'faqs.4',
+      'faqs.5',
+      'faqs.6',
+      'catalog.service.1.name',
+      'catalog.service.2.name',
+      'catalog.service.3.name',
+      'catalog.service.4.name',
+      'catalog.service.5.name',
+      'policies.payment',
+    ];
+    const fieldMeta = indexFieldMeta(paths.map((field_path) => ({ field_path, source: 'seed' })));
+    const faqs = paths
+      .filter((path) => path.startsWith('faqs.'))
+      .map((path, index) => ({ question: `Question ${index}`, answer: `Answer written for ${path}` }));
+    const services = [1, 2, 3, 4, 5].map((n) => ({
+      name: `Visit ${n}`,
+      price_range: 'KES 1500',
+      notes: 'Owner notes',
+    }));
+    assert.equal(factFaqs(faqs, fieldMeta).length, 0);
+    assert.equal(factServices(services, fieldMeta).length, 0);
+    assert.equal(
+      holdOrdersEnabled({
+        productCatalog: [{ name: 'Diary', holdable: true }],
+        businessPolicies: { deposit: 'Hold until 6pm with the caller name.' },
+        fieldMeta,
+        holdGate: {
+          allowed: false,
+          reasons: [
+            'Holds are not enabled in policies.',
+            'Need at least one holdable product with owner provenance in the catalog.',
+          ],
+        },
+      }),
+      false
+    );
+  });
+
+  it('uses tenant_hold_gate when the RPC answered', () => {
+    const profile = {
+      productCatalog: [{ name: 'Diary' }],
+      businessPolicies: { deposit: 'Hold until 6pm with the caller name.' },
+    };
+    assert.equal(holdOrdersEnabled(profile), true);
+    assert.equal(
+      holdOrdersEnabled({
+        ...profile,
+        holdGate: { allowed: false, reasons: ['Need a verified notify target.'] },
+      }),
+      false
+    );
+    assert.equal(
+      holdOrdersEnabled({
+        ...profile,
+        holdGate: { allowed: false, reasons: ['provenance_rpc_missing'] },
+      }),
+      true
+    );
+  });
+
+  it('does not speak a deposit amount or payment number during a hold', () => {
+    const toolResults = [
+      { action: 'create_service_request', status: 'succeeded', requestType: 'hold' },
+    ];
+    const mixed = guardSpokenReply(
+      "Okay, I've saved your request. The deposit is 2000 to till 555111.",
+      { toolResults, profile: {} }
+    );
+    assert.match(mixed, /saved your request/i);
+    assert.doesNotMatch(mixed, /2000|555111|till|deposit/i);
+    const onlyMoney = guardSpokenReply('Send the deposit of 2000 to till 555111.', {
+      toolResults,
+      profile: {},
+    });
+    assert.equal(onlyMoney, 'The owner will follow up.');
+    assert.doesNotMatch(onlyMoney, /2000|555111/);
+    const payAnswer = guardSpokenReply('Pay on till 555111.', {
+      toolResults: [],
+      profile: { businessPolicies: { payment: 'Pay on till 555111.' } },
+    });
+    assert.match(payAnswer, /555111/);
   });
 });

@@ -225,7 +225,7 @@ function formatRetailPlaybookForPrompt(opts = {}) {
     'Completion rules:',
     '- Enquiry and take-a-message always work, even when the file is incomplete. Do not block the line.',
     holdsOn
-      ? '- Holds and orders only for a confirmed catalogue item when hold rules allow. Say held or reserved only after the tool result.'
+      ? '- Holds and orders only for a confirmed catalogue item when hold rules allow. Say held or reserved only after the tool result. During a hold, do not say a deposit amount or a payment number. The owner follows up.'
       : '- Holds and orders are not available. Do not append create_service_request type hold or order. Do not say held or reserved.',
     '- Prefer resolving from LIVE GROUND TRUTH over promising a callback.',
     '- For hold_or_pickup / order_enquiry: only fire create_service_request after required slots are known.',

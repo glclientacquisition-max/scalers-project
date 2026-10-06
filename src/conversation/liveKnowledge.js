@@ -147,9 +147,10 @@ function buildLiveGroundTruth(profile = {}) {
     formatPoliciesBlock,
   } = require('./businessPolicies');
 
-  const services = normalizeServices(factServices(profile.servicesCatalog));
+  const fieldMeta = profile.fieldMeta || null;
+  const services = normalizeServices(factServices(profile.servicesCatalog, fieldMeta));
   const products = require('./productCatalog').normalizeProducts(
-    factProducts(profile.productCatalog)
+    factProducts(profile.productCatalog, fieldMeta)
   );
   const { formatProductsOverview } = require('./productCatalog');
   const { formatOpenVisitsForPrompt } = require('./visitCalendar');
@@ -161,15 +162,15 @@ function buildLiveGroundTruth(profile = {}) {
     formatSocialHandlesBlock,
   } = require('./socialHandles');
   const social = normalizeSocialHandles(profile.socialHandles);
-  const faqs = factFaqs(profile.faqs).map((row) => ({
+  const faqs = factFaqs(profile.faqs, fieldMeta).map((row) => ({
     question: row.question,
     answer: row.answer,
   }));
   const team = normalizeTeam(profile.teamDirectory);
   const locations = normalizeLocations(profile.businessLocations);
-  const policySplit = factPolicyMap(profile.businessPolicies);
+  const policySplit = factPolicyMap(profile.businessPolicies, fieldMeta);
   const policies = normalizePolicies(policySplit.policies);
-  const unknownTopics = [...policySplit.unknown, ...unknownFaqTopics(profile.faqs)];
+  const unknownTopics = [...policySplit.unknown, ...unknownFaqTopics(profile.faqs, fieldMeta)];
   const namedProducts = Array.isArray(profile.productCatalog)
     ? profile.productCatalog.some((row) => String(row?.name || '').trim())
     : false;

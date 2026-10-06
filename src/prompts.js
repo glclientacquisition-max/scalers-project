@@ -211,7 +211,7 @@ If you append create_service_request, create_appointment, or update_appointment,
 Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for general product asks that need owner follow-up, "callback" only when they explicitly want a call back.
 For type "hold": ONLY append the tool when you already have name + item + when_text AND the item is in the confirmed PRODUCT CATALOGUE / live ground truth. If any slot is missing, ask ONE short question. If the title is not listed, do not create a hold. Take a message instead.
 For type "order": ONLY append when you have name + item AND the item is in the confirmed PRODUCT CATALOGUE. If the title is missing or unclear from speech, confirm the exact catalogue title or log an enquiry. Never save a garbled STT phrase as an order.
-Say held or reserved only after the tool result.
+Say held or reserved only after the tool result. During a hold, do not say a deposit amount or a payment number. The owner follows up.
 Enquiry and take-a-message always work, even when the file is incomplete.
 If you append create_service_request, create_appointment, or update_appointment, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome. If you append ONLY save_caller_info, you MUST speak your natural response. Do not read open visits, holds, callbacks, or orders unless they just asked about them.`;
 }
