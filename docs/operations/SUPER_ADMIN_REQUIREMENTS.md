@@ -47,10 +47,10 @@ Business-owner nav stays: Calls · Business · Sign out.
 ## Module requirements
 
 ### 1. Overview (`/admin`)
-- Status strip: OK, Needs you, or Down. Opens `/admin/platform`.
-- KPI cards: total businesses, active businesses, businesses waiting for a number, available DIDs, assigned DIDs, calls (last 7 days).
-- Needs you: open staff notices plus businesses with a pending DID or inactive flag.
-- Primary CTA: Add number.
+- Tabs name the screen. No page title.
+- Needs you: open platform notices, shops waiting for a number, and live shops with no package. Archived shops stay off this pile. A row opens the shop or Platform escalate.
+- Glance: Platform, Businesses, Numbers, Packages, and Calls (7 days). Not KPI tiles.
+- Primary CTA: Add number when a shop is waiting or the pool is empty. Empty pile offers Add number or Packages, whichever is the next real job.
 
 ### 1b. Platform (`/admin/platform`)
 - Line: phone, speech, reasoning as list rows (money on the right). Numbers opens `/admin/numbers`.

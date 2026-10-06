@@ -13,6 +13,7 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
  */
 const routes: Array<{ path: string; strict: boolean }> = [
   { path: "/dev/kit", strict: true },
+  { path: "/dev/admin-overview", strict: true },
   { path: "/dev/admin-voices", strict: true },
   { path: "/dev/desk-shell", strict: false },
   { path: "/dev/home", strict: false },
