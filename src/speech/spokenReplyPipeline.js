@@ -123,6 +123,19 @@ function protectSentences(before, after, clearSentence) {
     pieces.push(sentence);
   }
   if (!pieces.length) return { text: String(after || '').trim(), restored };
+  // A stage may append a line that was not in the original (message-only
+  // callback). Keep it when nothing was restored. A restored answer must
+  // not also pick up a canned replacement of that answer.
+  if (!restored.length) {
+    for (const part of afterSentences) {
+      const already = pieces.some((piece) => {
+        const left = norm(piece);
+        const right = norm(part);
+        return left === right || left.includes(right) || right.includes(left);
+      });
+      if (!already) pieces.push(part);
+    }
+  }
   return { text: pieces.join(' ').replace(/\s+/g, ' ').trim(), restored };
 }
 

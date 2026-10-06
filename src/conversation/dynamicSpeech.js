@@ -796,6 +796,7 @@ module.exports = {
   looksLikePaceOnlyTurn,
   trimSpokenServiceDump,
   stripSpokenHedges,
+  stripPrematureOutcomeClaims,
   polishSpokenReply,
   looksLikeCallerName,
   callerNameFromUtterance,

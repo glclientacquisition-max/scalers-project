@@ -286,7 +286,7 @@ function sentenceHasExactUnboundPlace(sentence, allowedText) {
  */
 function sentenceGuardDropIsClear(sentence, ctx = {}) {
   const raw = String(sentence || '').trim();
-  if (!raw || isAnswerList(raw)) return false;
+  if (!raw) return false;
   const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
   if (sentenceIsSpeechSlop(raw, lastCallerTurn)) return true;
   if (ACTION_NARRATION.test(raw)) return true;
@@ -294,8 +294,16 @@ function sentenceGuardDropIsClear(sentence, ctx = {}) {
   if (!saved && (SAVED_CLAIM.test(raw) || JOB_CLOSE.test(raw))) return true;
   const transferOk = Boolean(ctx.capabilities?.liveTransfer || ctx.capabilities?.transfer);
   if (!transferOk && TRANSFER_CLAIM.test(raw)) return true;
-  if (messageOnlyOn(ctx) && collectsBookingSpeech(raw)) return true;
+  if (messageOnlyOn(ctx)) {
+    const callerText = String((ctx.callerTurns || []).slice(-1)[0] || '');
+    const kinds = callerTurnKinds(callerText);
+    // A booking with no fact question is replaced by the callback line.
+    if (kinds.booking && !kinds.knowledge && !sentenceAsksForCallerName(raw)) return true;
+    if (collectsBookingSpeech(raw)) return true;
+  }
   if (heldCallerName(ctx.state) && sentenceAsksForCallerName(raw)) return true;
+  // A catalogue stays. A close that mentions two job nouns is still a close.
+  if (isAnswerList(raw)) return false;
   const allowedPlaces = [
     (Array.isArray(ctx.callerTurns) ? ctx.callerTurns : []).join(' '),
     safeJson(ctx.profile),
