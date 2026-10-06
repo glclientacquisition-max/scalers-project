@@ -188,6 +188,41 @@ test.describe("/dev/kit interactions", () => {
     expect(dark).toBeLessThan(0.1);
   });
 
+  test("dark sheet is opaque surface, dimmed by --scrim, theme-color follows canvas", async ({ page }) => {
+    await page.goto("/dev/kit");
+    await settle(page);
+    await page.getByRole("radio", { name: "Dark" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await page.getByRole("button", { name: "Open sheet" }).click();
+    const dialog = page.getByRole("dialog", { name: "Archive this call?" });
+    await expect(dialog).toBeVisible();
+    const measured = await dialog.evaluate((el) => {
+      const probe = document.createElement("canvas").getContext("2d")!;
+      const fill = (cssColor: string) => {
+        probe.fillStyle = cssColor;
+        probe.fillRect(0, 0, 1, 1);
+        return [...probe.getImageData(0, 0, 1, 1).data];
+      };
+      const root = getComputedStyle(document.documentElement);
+      const sheet = getComputedStyle(el);
+      const backdrop = document.querySelector(".desk-drawer-backdrop");
+      const scrim = backdrop ? getComputedStyle(backdrop).backgroundColor : "";
+      return {
+        sheet: fill(sheet.backgroundColor),
+        surface: fill(root.getPropertyValue("--surface").trim()),
+        scrim: fill(scrim),
+        scrimToken: fill(root.getPropertyValue("--scrim").trim()),
+        backdropFilter: sheet.backdropFilter,
+        themeColor: document.querySelector('meta[name="theme-color"]:not([media])')?.getAttribute("content")?.replace(/\s/g, "").toLowerCase(),
+        canvas: root.getPropertyValue("--canvas").trim().replace(/\s/g, "").toLowerCase(),
+      };
+    });
+    expect(measured.sheet.slice(0, 3)).toEqual(measured.surface.slice(0, 3));
+    expect(measured.scrim.slice(0, 3)).toEqual(measured.scrimToken.slice(0, 3));
+    expect(measured.backdropFilter === "none" || measured.backdropFilter === "").toBeTruthy();
+    expect(measured.themeColor).toBe(measured.canvas);
+  });
+
   test("keeps This device pick after reload and on login", async ({ page, context }) => {
     await page.goto("/dev/kit");
     await settle(page);
