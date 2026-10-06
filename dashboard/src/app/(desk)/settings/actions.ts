@@ -279,6 +279,8 @@ export async function saveAndCompileSettings(
     policiesText,
     productsText: productsBlock,
     socialText: socialBlock,
+    productCatalog,
+    businessPolicies,
   });
 
   const workspace = await createWorkspaceDataClient();

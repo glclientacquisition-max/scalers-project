@@ -1,4 +1,5 @@
 import { defaultTenantLlmPrompt } from "@/lib/prompts";
+import { buildCompileSections } from "@/lib/provenance";
 
 export type OnboardingTone = "professional" | "warm";
 
@@ -42,6 +43,11 @@ export type TeamMember = {
 export type FaqItem = {
   question: string;
   answer: string;
+  source?: string;
+  status?: string;
+  confirmed?: boolean;
+  confirmed_by?: string;
+  confirmed_at?: string;
 };
 
 /** True when the tenant still has a blank or signup-default receptionist prompt. */
@@ -118,18 +124,6 @@ function formatTeamDirectory(members: TeamMember[]): string {
   return rows.length ? rows.join("\n") : "(none listed)";
 }
 
-function formatFaqs(faqs: FaqItem[]): string {
-  const rows = faqs
-    .map((f) => {
-      const q = f.question.trim();
-      const a = f.answer.trim();
-      if (!q || !a) return "";
-      return `Q: ${q}\nA: ${a}`;
-    })
-    .filter(Boolean);
-  return rows.length ? rows.join("\n\n") : "(none listed)";
-}
-
 export type CompileExtras = {
   agentName?: string;
   teamDirectory?: TeamMember[];
@@ -143,6 +137,8 @@ export type CompileExtras = {
   policiesText?: string;
   productsText?: string;
   socialText?: string;
+  productCatalog?: unknown;
+  businessPolicies?: unknown;
 };
 
 /** Deterministic fallback if Gemini is unavailable. */
@@ -164,11 +160,23 @@ export function compilePromptLocally(
   const vertical = String(opts.vertical || "general").trim() || "general";
   const handoffMode = String(opts.handoffMode || "callback").trim() || "callback";
   const locationsText = String(opts.locationsText || "").trim() || "(none listed)";
-  const policiesText = String(opts.policiesText || "").trim() || "(none listed)";
-  const productsText = String(opts.productsText || "").trim() || "(none listed)";
   const socialText = String(opts.socialText || "").trim() || "(none listed)";
+  const sections = buildCompileSections({
+    faqs,
+    policiesText: opts.policiesText || "",
+    productsText: opts.productsText || "",
+    servicesText: answers.servicesPricing,
+    productCatalog: opts.productCatalog ?? null,
+    businessPolicies: opts.businessPolicies ?? null,
+  });
+  const servicesBody = sections.servicesText.trim() || "(none confirmed)";
   const teamBlock = formatTeamDirectory(team);
-  const faqBlock = formatFaqs(faqs);
+  const holdsLine = sections.holdsAvailable
+    ? "Holds and orders are available for confirmed catalogue items when hold rules allow. Say held or reserved only after the tool result."
+    : "Holds and orders are not available. Take a message. Do not say held or reserved.";
+  const slotLine = sections.confirmedSlotsAvailable
+    ? "Confirmed booking slots are available from owner-confirmed rules. Say booked only after the tool result."
+    : "Confirmed booking slots are not available. A visit is a request.";
   const teamSection = escalateEnabled
     ? `TEAM DIRECTORY (escalation — you are the receptionist, not the expert):
 ${teamBlock}
@@ -189,21 +197,29 @@ BUSINESS KNOWLEDGE:
 - Vertical: ${vertical}
 - Handoff preference: ${handoffMode} (preference only; never claim a live transfer unless runtime confirms it)
 - Services & pricing:
-${answers.servicesPricing.trim()}
+${servicesBody}
 - Product catalogue:
-${productsText}
+${sections.productsText}
 - Hours & location:
 ${answers.hoursLocation.trim()}
 - Locations / landmarks / directions:
 ${locationsText}
 - Policies:
-${policiesText}
+${sections.policiesText}
 - Social & web:
 ${socialText}
 - Languages: English, Kiswahili, and Sheng (automatic, match the caller). Tone does not change language.
 
-GOLDEN FAQs (authoritative — answer these exactly when asked):
-${faqBlock}
+CAPABILITIES:
+- Enquiry and take-a-message always work, even when the file is incomplete.
+- ${holdsLine}
+- ${slotLine}
+- Speak prices and payment numbers only from the confirmed facts above.
+
+CONFIRMED FAQs (owner-confirmed facts only. Do not call unconfirmed answers GOLDEN):
+${sections.faqBlock}
+
+${sections.unknownBlock}
 
 ${teamSection}
 

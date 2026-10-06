@@ -1,5 +1,7 @@
 // Deterministic authority and capability policy for Brain decisions.
 
+const { holdOrdersEnabled, confirmedSlotEnabled, factServices } = require('./provenance');
+
 const ACTIONS = Object.freeze({
   ANSWER: 'ANSWER',
   ASK_CLARIFICATION: 'ASK_CLARIFICATION',
@@ -18,6 +20,11 @@ function buildBrainCapabilities(profile = {}, runtime = {}) {
     answerFromKnowledge: true,
     saveCallerInfo: true,
     createServiceRequest: runtime.createServiceRequest !== false,
+    // Holds/orders need an owner-confirmed catalogue and hold rules. Enquiry stays on.
+    placeHold: holdOrdersEnabled(profile),
+    // Seed-only services cannot confirm a visit. Unmarked owner services still can.
+    confirmVisit: factServices(profile.servicesCatalog).length > 0,
+    confirmedSlot: confirmedSlotEnabled(profile),
     createAppointment: runtime.createAppointment !== false,
     updateAppointment: runtime.updateAppointment !== false,
     notifyCallback: runtime.notifyCallback !== false,
@@ -55,6 +62,9 @@ function formatAuthorityPolicy(capabilities = {}) {
     '- Speak saved, booked, held, or serving them only from the backend tool result.',
     '- Resolve directly when the answer is known. Do not collect a name or create a callback for a fully answered question.',
     `- Create request: ${capabilities.createServiceRequest ? 'allowed' : 'not available'}.`,
+    '- Enquiry and take-a-message always work, even when the file is incomplete.',
+    `- Holds and orders: ${capabilities.placeHold ? 'allowed for a confirmed catalogue item when hold rules allow' : 'not available. Take a message. Do not say held or reserved.'}.`,
+    `- Confirmed booking slots: ${capabilities.confirmedSlot ? 'allowed' : 'not available. A visit is a request until the owner confirms slots.'}.`,
     `- Create appointment: ${capabilities.createAppointment ? 'allowed' : 'not available'}.`,
     `- Update appointment: ${capabilities.updateAppointment ? 'allowed' : 'not available'}.`,
     `- Callback notification: ${capabilities.notifyCallback ? 'available after a saved request' : 'not available'}.`,

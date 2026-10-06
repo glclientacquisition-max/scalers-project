@@ -2,6 +2,11 @@
 
 const { parseVertical } = require('../vertical');
 const { parseHandoffMode } = require('../handoffMode');
+const {
+  holdOrdersEnabled,
+  confirmedSlotEnabled,
+  factServices,
+} = require('../provenance');
 const { formatRetailPlaybookForPrompt } = require('./retail');
 const {
   formatHomeServicesPlaybookForPrompt,
@@ -16,10 +21,17 @@ function formatPlaybookForPrompt(profile = {}) {
   const handoffMode = parseHandoffMode(profile.handoffMode);
 
   if (vertical === 'retail') {
-    return formatRetailPlaybookForPrompt({ handoffMode });
+    return formatRetailPlaybookForPrompt({
+      handoffMode,
+      placeHold: holdOrdersEnabled(profile),
+    });
   }
   if (vertical === 'home_services') {
-    return formatHomeServicesPlaybookForPrompt({ handoffMode });
+    return formatHomeServicesPlaybookForPrompt({
+      handoffMode,
+      confirmVisit: factServices(profile.servicesCatalog).length > 0,
+      confirmedSlot: confirmedSlotEnabled(profile),
+    });
   }
 
   // Hospitality and general have no completion pack yet.

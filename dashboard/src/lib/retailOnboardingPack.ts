@@ -64,7 +64,7 @@ export function retailStarterPolicies(): BusinessPolicies {
 }
 
 export function retailUnknownFallback(): string {
-  return "I don't have that exact detail. I can note it for the team or log a hold/enquiry for you.";
+  return "I don't have that exact detail. I'll note it for the owner.";
 }
 
 /**
@@ -168,12 +168,14 @@ export function seedServicesFromOnboardingText(
       in_stock: "",
       category: "Delivery",
     },
-  ];
+  ].map((row) => ({ ...row, source: "seed" as const, status: "suggested" as const }));
 }
 
 export function seedFaqsForVertical(vertical: string): FaqEntry[] {
   if (vertical === "retail") {
-    return RETAIL_FAQ_STARTERS.map(clampFaq).slice(0, FAQ_MAX);
+    return RETAIL_FAQ_STARTERS.map((f) =>
+      clampFaq({ ...f, source: "seed", status: "suggested" })
+    ).slice(0, FAQ_MAX);
   }
   if (vertical === "home_services") {
     return seedHomeFaqs();
@@ -215,6 +217,8 @@ export function buildRetailOnboardingSeed(opts: {
         return clampFaq({
           question: f.question,
           answer: bits.join(". ").slice(0, 400),
+          source: "seed",
+          status: "suggested",
         });
       }
     }
@@ -222,6 +226,8 @@ export function buildRetailOnboardingSeed(opts: {
       return clampFaq({
         question: f.question,
         answer: opts.hoursLocation.slice(0, 400),
+        source: "seed",
+        status: "suggested",
       });
     }
     return f;
@@ -236,13 +242,10 @@ export function buildRetailOnboardingSeed(opts: {
     String(opts.agentName || "").trim() ||
     defaultAgentNameForBusiness();
 
-  let businessPolicies: BusinessPolicies | null = null;
   let unknownAnswerFallback: string | null = null;
   if (vertical === "retail") {
-    businessPolicies = retailStarterPolicies();
     unknownAnswerFallback = retailUnknownFallback();
   } else if (vertical === "home_services") {
-    businessPolicies = homeStarterPolicies();
     unknownAnswerFallback = homeUnknownFallback();
   }
 
@@ -252,7 +255,7 @@ export function buildRetailOnboardingSeed(opts: {
       vertical
     ),
     faqs,
-    businessPolicies,
+    businessPolicies: null,
     unknownAnswerFallback,
     hoursSchedule,
     teamDirectory: seedOwnerCatchAllTeam({

@@ -268,10 +268,12 @@ function canCompleteHomeIntent(intentId, slots = {}) {
 }
 
 /**
- * @param {{ handoffMode?: string }} [opts]
+ * @param {{ handoffMode?: string, confirmVisit?: boolean, confirmedSlot?: boolean }} [opts]
  */
 function formatHomeServicesPlaybookForPrompt(opts = {}) {
   const handoff = String(opts.handoffMode || 'callback').trim() || 'callback';
+  const visitsOn = opts.confirmVisit !== false;
+  const slotsOn = opts.confirmedSlot === true;
   const lines = [
     'HOME SERVICES PLAYBOOK (follow for this business — finish the caller job):',
     'On each turn: identify the intent below, collect only missing required slots (ONE question max), then complete.',
@@ -285,9 +287,16 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     const req = intent.requiredSlots.length
       ? `Required: ${intent.requiredSlots.join(', ')}.`
       : 'Required: none.';
-    const tool = intent.tool ? ` Tool: ${intent.tool}.` : '';
+    let completion = intent.completion;
+    let toolName = intent.tool;
+    if (!visitsOn && intent.id === 'book_visit') {
+      completion =
+        'Take a message with create_service_request type=enquiry. Do not append create_appointment. Do not say the visit is booked or the slot is confirmed.';
+      toolName = 'create_service_request';
+    }
+    const tool = toolName ? ` Tool: ${toolName}.` : '';
     lines.push(
-      `- ${intent.id} (${intent.label}): ${req} ${intent.completion}${tool}`
+      `- ${intent.id} (${intent.label}): ${req} ${completion}${tool}`
     );
   }
 
@@ -295,6 +304,13 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     `- other: clarify once if needed; otherwise answer from ground truth or log enquiry/callback.`,
     '',
     'Completion rules:',
+    '- Enquiry and take-a-message always work, even when the file is incomplete. Do not block the line.',
+    slotsOn
+      ? '- Confirmed slots are available only from owner-confirmed booking rules. Say booked only after the tool result.'
+      : '- A visit is a request. Confirmed booking slots are not available. Do not say a slot is confirmed.',
+    visitsOn
+      ? '- Book only with create_appointment after service, name, when, and location are known.'
+      : '- Owner-confirmed services are not on file. Do not append create_appointment. Take a message.',
     '- Prefer resolving from LIVE GROUND TRUTH over promising a callback.',
     '- CONTROL VOICE: name the job you have, then one question or silence for the tool. No holding lines.',
     '- VISIT SOP (think this; do not read it aloud): hear the ask; collect only missing slots in order (service, name, when, location); silently check hours (not a one-visit lock); same-hour visits are allowed; check POLICIES/LOCATIONS before create_appointment; fire the tool and speak nothing; never say booked, moved, or cancelled first. Never say landmark.',

@@ -14,6 +14,7 @@ import { formatHoursForCompiler, scheduleForForm } from "@/lib/hoursSchedule";
 import {
   FAQ_ANSWER_MAX,
   FAQ_QUESTION_MAX,
+  clampFaq,
   formatFaqMergeMessage,
   mergeFaqs,
 } from "@/lib/faqs";
@@ -58,13 +59,7 @@ function rateLimitSuggest(tenantId: string): string | null {
 function normalizeFaqs(raw: unknown): FaqEntry[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((row) => {
-      const r = (row || {}) as Record<string, unknown>;
-      return {
-        question: String(r.question || "").trim(),
-        answer: String(r.answer || "").trim(),
-      };
-    })
+    .map((row) => clampFaq((row || {}) as FaqEntry))
     .filter((f) => f.question && f.answer);
 }
 
@@ -172,12 +167,12 @@ export async function applyFaqSuggestionsAction(
     picked = raw
       .map((row) => {
         const r = (row || {}) as Record<string, unknown>;
-        return {
-          question: String(r.question || "")
-            .trim()
-            .slice(0, FAQ_QUESTION_MAX),
-          answer: String(r.answer || "").trim().slice(0, FAQ_ANSWER_MAX),
-        };
+        return clampFaq({
+          question: String(r.question || ""),
+          answer: String(r.answer || ""),
+          source: "call_suggested",
+          status: "suggested",
+        });
       })
       .filter((f) => f.question && f.answer);
   } catch {
