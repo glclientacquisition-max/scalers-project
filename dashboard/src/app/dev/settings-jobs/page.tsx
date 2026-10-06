@@ -31,6 +31,7 @@ const tenant = {
   hours_schedule: defaultHoursSchedule("Westlands"),
   agent_name: "Aisha",
   agent_tone: "warm",
+  soniox_voice_id: "7b197f3c-84b4-4404-986f-114e4dac1432",
   vertical: "retail",
   team_directory: [{ name: "Amina", role: "Desk", phone: "+254700000001" }],
   faqs: [],
@@ -52,6 +53,16 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
   const tab = parseBusinessSettingsTab(tabRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
 
+  const curatedVoices = [
+    {
+      id: "7b197f3c-84b4-4404-986f-114e4dac1432",
+      description: "Warm Kenyan receptionist tone",
+      default: true,
+    },
+    { id: "dev-voice-clear", description: "Clear and brief" },
+    { id: "dev-voice-calm", description: "Calm and slow" },
+  ];
+
   return (
     <div className={deskShellClass}>
       <DeskRail needsCount={0} homeHref="/dev/home" />
@@ -64,18 +75,10 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             tenant={tenant}
             tab={tab}
             trainPanel={trainPanel}
-            curatedVoices={[
-              {
-                id: "7b197f3c-84b4-4404-986f-114e4dac1432",
-                description: "Warm Kenyan receptionist tone",
-                default: true,
-              },
-              { id: "dev-voice-clear", description: "Clear and brief" },
-              { id: "dev-voice-calm", description: "Calm and slow" },
-            ]}
+            curatedVoices={curatedVoices}
             optionStatus={settingsIndexStatuses(
               tenant,
-              [],
+              curatedVoices,
               SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target))
             )}
           />

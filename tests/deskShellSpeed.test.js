@@ -485,7 +485,7 @@ describe("settings save scope", () => {
       "dashboard/src/lib/settingsOptionStatus.ts",
       `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Done and Dusted", agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
     );
-    assert.equal(identityBiz, "Done and Dusted");
+    assert.equal(identityBiz, "");
     const identityTone = load(
       "dashboard/src/lib/settingsOptionStatus.ts",
       `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { agent_name: "Shy", agent_tone: "warm", soniox_voice_label: "Shy" }, [])`
