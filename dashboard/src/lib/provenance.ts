@@ -1,4 +1,4 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Compile twin of src/conversation/provenance.js.
 // Next turbopack root is the dashboard package, so this file does not import
 // src/conversation or src/db. Keep behavior lockstep with the JS module.
@@ -24,7 +24,7 @@
 
 export const SOURCES = new Set(['owner', 'seed', 'import', 'inferred', 'call_suggested']);
 
-export function norm(value) {
+export function norm(value: any) {
   return String(value || '')
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
@@ -139,7 +139,7 @@ export const POLICY_TOPICS = {
   other: 'Other policy',
 };
 
-export function asArray(raw) {
+export function asArray(raw: any): any[] {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw;
   if (typeof raw === 'string') {
@@ -153,7 +153,7 @@ export function asArray(raw) {
   return [];
 }
 
-export function asObject(raw) {
+export function asObject(raw: any): Record<string, any> {
   if (!raw) return {};
   if (typeof raw === 'string') {
     try {
@@ -167,20 +167,20 @@ export function asObject(raw) {
   return {};
 }
 
-export function envelopeOf(row) {
+export function envelopeOf(row: any): Record<string, any> {
   if (!row || typeof row !== 'object') return {};
   const nested = row.envelope || row.field_meta || row.meta;
   if (nested && typeof nested === 'object' && !Array.isArray(nested)) return nested;
   return row;
 }
 
-export function readSource(row) {
+export function readSource(row: any) {
   const env = envelopeOf(row);
   const raw = String(env.source || env.provenance || '').trim().toLowerCase();
   return SOURCES.has(raw) ? raw : '';
 }
 
-export function isConfirmed(row) {
+export function isConfirmed(row: any) {
   const env = envelopeOf(row);
   if (env.confirmed === true) return true;
   if (env.confirmed_by) return true;
@@ -188,15 +188,15 @@ export function isConfirmed(row) {
   return false;
 }
 
-export function isPackFaq(question, answer) {
+export function isPackFaq(question: any, answer: any) {
   return PACK_FAQ_KEYS.has(`${norm(question)}\n${norm(answer)}`);
 }
 
-export function isPackPolicyText(text) {
+export function isPackPolicyText(text: any) {
   return PACK_POLICY_KEYS.has(norm(text));
 }
 
-export function isPackService(row) {
+export function isPackService(row: any) {
   if (!row || typeof row !== 'object') return false;
   const price = row.price_range || row.priceRange || row.price || '';
   return PACK_SERVICE_KEYS.has(`${norm(row.name)}\n${norm(price)}\n${norm(row.notes)}`);
@@ -208,9 +208,9 @@ export function isPackService(row) {
  * this tenant has no rows, so each missing path still uses the heuristic.
  * @param {Array<{ field_path?: string, source?: string }>|null|undefined} rows
  */
-export function indexFieldMeta(rows) {
+export function indexFieldMeta(rows: any) {
   if (!Array.isArray(rows)) return null;
-  const byPath = {};
+  const byPath: Record<string, any> = {};
   for (const row of rows) {
     const path = String(row?.field_path || row?.fieldPath || '').trim();
     const source = String(row?.source || '').trim().toLowerCase();
@@ -224,7 +224,7 @@ export function indexFieldMeta(rows) {
   return { loaded: true, byPath };
 }
 
-export function lookupFieldMeta(fieldMeta, fieldPath) {
+export function lookupFieldMeta(fieldMeta: any, fieldPath: any) {
   if (!fieldMeta || !fieldPath) return null;
   const byPath = fieldMeta.byPath && typeof fieldMeta.byPath === 'object' ? fieldMeta.byPath : null;
   if (!byPath) return null;
@@ -233,16 +233,16 @@ export function lookupFieldMeta(fieldMeta, fieldPath) {
   return hit;
 }
 
-export function productFieldPath(row, index) {
+export function productFieldPath(row: any, index: any) {
   const sku = String(row?.sku || '').trim();
   return `catalog.product.${sku || String(index + 1)}.name`;
 }
 
-export function serviceFieldPath(index) {
+export function serviceFieldPath(index: any) {
   return `catalog.service.${index + 1}.name`;
 }
 
-export function faqFieldPath(index) {
+export function faqFieldPath(index: any) {
   return `faqs.${index + 1}`;
 }
 
@@ -251,7 +251,7 @@ export function faqFieldPath(index) {
  * fact is only owner or an explicit confirm. seed and call_suggested are never fact.
  * A tenant_field_meta row for fieldPath replaces the pack-text guess.
  */
-export function classifyRecord(row, { packSeed = false, fieldMeta = null, fieldPath = '' } = {}) {
+export function classifyRecord(row: any, { packSeed = false, fieldMeta = null, fieldPath = '' }: any = {}) {
   const meta = lookupFieldMeta(fieldMeta, fieldPath);
   let working = row;
   let seed = packSeed;
@@ -284,7 +284,7 @@ export function classifyRecord(row, { packSeed = false, fieldMeta = null, fieldP
   return { source, confirmed, fact, status };
 }
 
-export function classifyFaq(faq, fieldMeta = null, fieldPath = '') {
+export function classifyFaq(faq: any, fieldMeta: any = null, fieldPath: any = '') {
   const question = String(faq?.question || '').trim();
   const answer = String(faq?.answer || '').trim();
   const packSeed = isPackFaq(question, answer);
@@ -292,7 +292,7 @@ export function classifyFaq(faq, fieldMeta = null, fieldPath = '') {
   return { ...row, question, answer };
 }
 
-export function classifyPolicyValue(text, meta, fieldMeta = null, fieldPath = '') {
+export function classifyPolicyValue(text: any, meta: any, fieldMeta: any = null, fieldPath: any = '') {
   const value = String(text || '').trim();
   if (!value) return { source: '', confirmed: false, fact: false, status: 'suggested', empty: true };
   const packSeed = isPackPolicyText(value);
@@ -306,7 +306,7 @@ export function classifyPolicyValue(text, meta, fieldMeta = null, fieldPath = ''
   };
 }
 
-export function policyMeta(policies, key) {
+export function policyMeta(policies: any, key: any) {
   const obj = asObject(policies);
   if (obj.provenance && typeof obj.provenance === 'object') return obj.provenance[key] || {};
   if (obj.field_meta && typeof obj.field_meta === 'object') return obj.field_meta[key] || {};
@@ -316,10 +316,10 @@ export function policyMeta(policies, key) {
   return {};
 }
 
-export function factPolicyMap(policies, fieldMeta = null) {
+export function factPolicyMap(policies: any, fieldMeta: any = null) {
   const obj = asObject(policies);
-  const out = {};
-  const unknown = [];
+  const out: Record<string, string> = {};
+  const unknown: string[] = [];
   for (const [key, label] of Object.entries(POLICY_TOPICS)) {
     const text = String(obj[key] || '').trim();
     const row = classifyPolicyValue(text, policyMeta(obj, key), fieldMeta, `policies.${key}`);
@@ -332,7 +332,7 @@ export function factPolicyMap(policies, fieldMeta = null) {
 const HOLD_DENIAL =
   /\b(no holds?|do not hold|don't hold|cannot hold|can't hold|not holding|hatuweki|hatutoi hold)\b/i;
 
-export function holdRulesAllow(policies, fieldMeta = null) {
+export function holdRulesAllow(policies: any, fieldMeta: any = null) {
   const obj = asObject(policies);
   const holds = obj.holds;
   if (holds && typeof holds === 'object') {
@@ -352,7 +352,7 @@ export function holdRulesAllow(policies, fieldMeta = null) {
   return true;
 }
 
-export function factProducts(raw, fieldMeta = null) {
+export function factProducts(raw: any, fieldMeta: any = null) {
   return asArray(raw).filter((row, index) => {
     if (!row || typeof row !== 'object') return false;
     if (!String(row.name || '').trim()) return false;
@@ -364,7 +364,7 @@ export function factProducts(raw, fieldMeta = null) {
   });
 }
 
-export function factServices(raw, fieldMeta = null) {
+export function factServices(raw: any, fieldMeta: any = null) {
   return asArray(raw).filter((row, index) => {
     if (!row || typeof row !== 'object') return false;
     if (!String(row.name || '').trim()) return false;
@@ -376,13 +376,13 @@ export function factServices(raw, fieldMeta = null) {
   });
 }
 
-export function factFaqs(raw, fieldMeta = null) {
+export function factFaqs(raw: any, fieldMeta: any = null) {
   return asArray(raw)
     .map((faq, index) => classifyFaq(faq, fieldMeta, faqFieldPath(index)))
     .filter((row) => row.fact && row.question && row.answer);
 }
 
-export function unknownFaqTopics(raw, fieldMeta = null) {
+export function unknownFaqTopics(raw: any, fieldMeta: any = null) {
   return asArray(raw)
     .map((faq, index) => classifyFaq(faq, fieldMeta, faqFieldPath(index)))
     .filter((row) => row.question && row.answer && !row.fact)
@@ -390,7 +390,7 @@ export function unknownFaqTopics(raw, fieldMeta = null) {
 }
 
 /** tenant_hold_gate result, or null when the RPC is not on this database. */
-export function holdGateDecision(profile = {}) {
+export function holdGateDecision(profile: any = {}) {
   const gate = profile.holdGate;
   if (!gate || typeof gate !== 'object' || typeof gate.allowed !== 'boolean') return null;
   const reasons = Array.isArray(gate.reasons) ? gate.reasons.map(String) : [];
@@ -398,7 +398,7 @@ export function holdGateDecision(profile = {}) {
   return gate.allowed === true;
 }
 
-export function holdOrdersEnabled(profile = {}) {
+export function holdOrdersEnabled(profile: any = {}) {
   const fromRpc = holdGateDecision(profile);
   if (fromRpc !== null) return fromRpc;
   const fieldMeta = profile.fieldMeta || null;
@@ -406,7 +406,7 @@ export function holdOrdersEnabled(profile = {}) {
   return holdRulesAllow(profile.businessPolicies, fieldMeta);
 }
 
-export function confirmedSlotEnabled(profile = {}) {
+export function confirmedSlotEnabled(profile: any = {}) {
   const obj = asObject(profile.businessPolicies);
   const mode = String(obj.booking_mode || obj.bookingMode || '').trim().toLowerCase();
   if (mode !== 'confirmed_slot') return false;
@@ -417,8 +417,8 @@ export function confirmedSlotEnabled(profile = {}) {
   ).fact;
 }
 
-export function formatUnknownSection(topics) {
-  const list = [...new Set((topics || []).map((t) => String(t || '').trim()).filter(Boolean))];
+export function formatUnknownSection(topics: any) {
+  const list = [...new Set((topics || []).map((t: any) => String(t || '').trim()).filter(Boolean))];
   const lines = [
     'UNKNOWN (not confirmed by the owner. Do not state these as fact. Say you will confirm with the owner):',
   ];
@@ -465,7 +465,7 @@ export function buildCompileSections({
   let policyBody = String(policiesText || '').trim();
   if (businessPolicies) {
     const split = factPolicyMap(businessPolicies, fieldMeta);
-    const lines = [];
+    const lines: string[] = [];
     for (const [key, label] of Object.entries(POLICY_TOPICS)) {
       if (split.policies[key]) lines.push(`- ${label}: ${split.policies[key]}`);
     }
@@ -474,7 +474,7 @@ export function buildCompileSections({
       if (!unknown.includes(topic)) unknown.push(topic);
     }
   } else if (policyBody) {
-    const kept = [];
+    const kept: string[] = [];
     for (const line of policyBody.split('\n')) {
       const match = line.match(/^-\s*([^:]+):\s*(.+)$/);
       if (match && isPackPolicyText(match[2])) {
@@ -489,7 +489,7 @@ export function buildCompileSections({
 
   let servicesBody = String(servicesText || '');
   if (servicesBody) {
-    const kept = [];
+    const kept: string[] = [];
     for (const line of servicesBody.split('\n')) {
       const seed = PACK_SERVICES.some(([name, , notes]) => {
         const hay = norm(line);
@@ -545,7 +545,7 @@ export function buildCompileSections({
   };
 }
 
-export function speechFactText(profile = {}) {
+export function speechFactText(profile: any = {}) {
   const fieldMeta = profile.fieldMeta || null;
   const policies = factPolicyMap(profile.businessPolicies, fieldMeta).policies;
   const products = factProducts(profile.productCatalog, fieldMeta).map((row) => ({
