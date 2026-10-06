@@ -939,10 +939,17 @@ begin
   v_faq_n := public._tenant_faq_confirmed_count(t.faqs);
   v_faqs := least(100, (v_faq_n::numeric / 3.0) * 100);
 
-  v_team := public._tenant_field_score(
-    p_tenant_id,
-    'team.notify',
-    public._tenant_has_verified_notify(t)
+  v_team := greatest(
+    public._tenant_field_score(
+      p_tenant_id,
+      'team.notify.whatsapp',
+      coalesce(trim(t.whatsapp_notification_number), '') <> ''
+    ),
+    public._tenant_field_score(
+      p_tenant_id,
+      'team.notify.email',
+      coalesce(trim(t.alert_email), '') <> ''
+    )
   ) * 100;
 
   v_assistant := (
