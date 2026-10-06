@@ -1,0 +1,15 @@
+{
+  "callSid": "HD_053dd373ee84",
+  "language": "sw",
+  "note": "Staging build 0590e5e. Gemini wrote 138 characters and TTS spoke 30: Ungependa tukuhudumie na gani?",
+  "turns": [
+    {
+      "caller": "Ni services gani mna offer?",
+      "gemini": "Huduma zetu ni usafi wa nyumba, usafi wa ofisi, fumigation, na carpet cleaning. Bei inaanzia elfu tano. Ungependa tukuhudumie na gani?",
+      "wasSpokenChars": 30,
+      "minRatio": 0.5,
+      "mustInclude": ["usafi wa nyumba", "fumigation", "carpet cleaning", "Ungependa tukuhudumie na gani"],
+      "mustNotEqual": "Ungependa tukuhudumie na gani?"
+    }
+  ]
+}

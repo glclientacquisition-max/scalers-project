@@ -1,6 +1,8 @@
 // src/conversation/language.js
 // Automatic caller-language detection for Kenya phone calls (EN / SW / Sheng).
 
+const { canned } = require('../speech/languages');
+
 const SWAHILI_MARKERS = [
   'habari',
   'sasa',
@@ -426,10 +428,7 @@ function resolveCallLanguage(previous, detected) {
 function pickFillerText(lang) {
   const env = process.env.VOICE_FILLER;
   if (env && env !== 'auto' && env !== 'off') return env;
-  const spoken = confirmationLanguage(lang);
-  if (spoken === 'sw') return 'Kidogo…';
-  if (spoken === 'sheng') return 'One sec…';
-  return 'One moment…';
+  return canned(lang, 'filler');
 }
 
 /**

@@ -5,6 +5,7 @@
 const { normalizeServices } = require('../conversation/liveKnowledge');
 const { normalizeLocations } = require('../conversation/businessLocations');
 const { isPlausibleCallerName } = require('../conversation/entityExtraction');
+const { recognitionPhrases } = require('./languages');
 
 /** Soft cap — Soniox context biasing degrades with huge unrelated term lists. */
 const MAX_STT_TERMS = Number(process.env.SONIOX_STT_CONTEXT_MAX_TERMS || 40);
@@ -232,6 +233,9 @@ function buildSttContext(tenant) {
   const terms = collectTenantTerms(tenant);
 
   if (!businessName && !terms.length) return null;
+  for (const phrase of recognitionPhrases()) {
+    if (!terms.some((term) => term.toLowerCase() === phrase.toLowerCase())) terms.push(phrase);
+  }
 
   const general = [
     {

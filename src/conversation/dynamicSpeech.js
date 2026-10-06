@@ -11,22 +11,15 @@ const {
   LANGUAGE_INVITE,
 } = require('./businessAssistantIntro');
 const { confirmationLanguage } = require('./language');
-const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
-const { prepareStreamedSpeech } = require('./callCorrectives');
-const { dropSpeechSlop, guardSpokenReply } = require('./speechGuard');
 const {
   fileReadLine,
-  fileRowsWereRead,
-  hasReadableFile,
   looksLikeOfferAsk,
-  nothingStillOpenLine,
-  presupposesSavedWork,
-  sanitizeSpokenFileClaim,
 } = require('./fileRead');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 const { looksLikeFileVisitTalk } = require('./visitTalk');
 const { detectSpeedRequest } = require('../speech/speedControl');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
+const { canned } = require('../speech/languages');
 
 /**
  * Instant greeting — brand-first English opener (see businessAssistantIntro.js).
@@ -317,19 +310,10 @@ function pickPhaticReply(opts = {}) {
   const lang = confirmationLanguage(opts.language);
   const card = opts.callerMemory;
   if (card && typeof card === 'object') {
-    if (!speakerKnownOnFile(card)) {
-      return lang === 'en'
-        ? "I'm well. Who is calling?"
-        : 'Nzuri. Ni nani anayepiga?';
-    }
-    if (card.nextAppointment && returningFileUsable(card)) {
-      return lang === 'en'
-        ? "I'm well. I have your visit on file. Is that why you called?"
-        : 'Nzuri. Una ziara kwenye faili. Nisaidie na hiyo?';
-    }
+    if (!speakerKnownOnFile(card)) return canned(lang, 'phaticWho');
+    if (card.nextAppointment && returningFileUsable(card)) return canned(lang, 'phaticFile');
   }
-  if (lang === 'sw' || lang === 'sheng') return 'Nzuri, asante. Naweza kusaidia?';
-  return "I'm well, thanks. How can I help?";
+  return canned(lang, 'phatic');
 }
 
 const SPOKEN_JOB_NOUNS =
@@ -363,11 +347,7 @@ function trimSpokenServiceDump(text, opts = {}) {
   );
   if (looksLikeOfferAsk(callerText)) return raw;
   if (!looksLikeSpokenServiceDump(raw)) return raw;
-  const lang = confirmationLanguage(opts.language);
-  if (lang === 'sw' || lang === 'sheng') {
-    return 'Tunaweza kusaidia. Unahitaji huduma gani?';
-  }
-  return 'We can help with that. What do you need done?';
+  return canned(opts.language, 'serviceDump');
 }
 
 const HEDGE_OPENER =
@@ -381,9 +361,7 @@ function stripSpokenHedges(text, opts = {}) {
   raw = raw.replace(HEDGE_OPENER, '');
   raw = raw.replace(HEDGE_PHRASE, '');
   raw = raw.replace(/\s+/g, ' ').replace(/^[,.]+\s*/, '').trim();
-  if (!raw) {
-    return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
-  }
+  if (!raw) return canned(opts.language, 'hedgeEmpty');
   return raw;
 }
 
@@ -395,9 +373,7 @@ function stripPrematureOutcomeClaims(text, opts = {}) {
   if (!raw) return raw;
   raw = raw.replace(PREMATURE_OUTCOME, '');
   raw = raw.replace(/\s+/g, ' ').replace(/^[,.]+\s*/, '').replace(/\s+[,.]+/g, '.').trim();
-  if (!raw) {
-    return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
-  }
+  if (!raw) return canned(opts.language, 'outcomeEmpty');
   return raw;
 }
 
@@ -407,39 +383,9 @@ function stripPrematureOutcomeClaims(text, opts = {}) {
  * no coverage flip, no transfer claim. See speechGuard.js.
  */
 function polishSpokenReply(text, opts = {}) {
-  let spoken = stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true });
-  // Guard whole sentences first. Stripping a verb phrase after the fact would
-  // leave a fragment ("that for you.") that the guard can no longer see.
-  if (opts.state || opts.profile) {
-    spoken = guardSpokenReply(spoken, {
-      callerTurns: opts.callerTurns || opts.state?.conversation?.answersReceived || [],
-      profile: opts.profile || {},
-      toolResults: opts.toolResults || [],
-      capabilities: opts.capabilities || {},
-      extra: JSON.stringify(opts.state?.entities || {}),
-      state: opts.state,
-      language: opts.language,
-      allowEmpty: true,
-    });
-  }
-  const callerText = String(
-    (opts.callerTurns || opts.state?.conversation?.answersReceived || []).slice(-1)[0] || ''
-  );
-  spoken = trimSpokenServiceDump(
-    stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts),
-    { ...opts, callerText }
-  );
-  const sanitized = sanitizeSpokenFileClaim(spoken, {
-    callerText,
-    state: opts.state,
-    language: opts.language,
-  });
-  if (!sanitized && !hasReadableFile(opts.state) && presupposesSavedWork(String(text || ''))) {
-    if (!fileRowsWereRead(opts.state)) return '';
-    return nothingStillOpenLine(opts.state, opts.language);
-  }
-  // Last mouth. A dump trim or a later prompt cannot put filler back.
-  return dropSpeechSlop(sanitized, callerText);
+  // Lazy so the pipeline can call the stage helpers in this file.
+  const { runSpokenReplyPipeline } = require('../speech/spokenReplyPipeline');
+  return runSpokenReplyPipeline(text, opts).text;
 }
 
 /**
@@ -450,28 +396,9 @@ function polishSpokenReply(text, opts = {}) {
  * @param {string} [lang]
  */
 function pickActionProgress(action, lang) {
-  const a = String(action || '').toUpperCase();
-  const spoken = confirmationLanguage(lang);
-  const sw = spoken === 'sw' || spoken === 'sheng';
-  if (sw) {
-    if (a === 'ESCALATE' || a === 'TRANSFER') return 'Sawa.';
-    if (a === 'CREATE_REQUEST') return 'Sawa.';
-    if (a === 'CAPTURE') return 'Sawa.';
-    return 'Sawa.';
-  }
-  if (a === 'ESCALATE') return 'Okay.';
-  if (a === 'TRANSFER') return 'Okay.';
-  if (a === 'CREATE_REQUEST') return 'Okay.';
-  if (a === 'CAPTURE') return 'Okay.';
-  return 'Okay.';
+  void action;
+  return canned(lang, 'actionProgress');
 }
-
-/**
- * Mid-call name ask used by human handoff and Gemini-down recovery.
- * One person: same sentence, not a new register.
- */
-const REACH_THEM_NAME_ASK_EN = 'May I have your name so I can reach them?';
-const REACH_THEM_NAME_ASK_SW = 'Niambie jina lako ndio niwasiliane nao.';
 
 /**
  * Immediate spoken line while Gemini thinks on clarification / handoff turns.
@@ -486,36 +413,20 @@ function pickClarifyProgress(opts = {}) {
   const slot = String(opts.slot || '').toLowerCase();
   const intent = String(opts.intent || '').toLowerCase();
   const lang = confirmationLanguage(opts.language);
-  const sw = lang === 'sw' || lang === 'sheng';
   const handoff =
     intent === 'human' || action === 'ESCALATE' || action === 'TRANSFER';
 
-  if (handoff && (slot === 'name' || !slot)) {
-    if (sw) return `Sawa. ${REACH_THEM_NAME_ASK_SW}`;
-    return `Okay. ${REACH_THEM_NAME_ASK_EN}`;
-  }
-  if (slot === 'name') {
-    if (sw) return 'Sawa. Niambie jina lako.';
-    return 'Okay. May I have your name?';
-  }
+  if (handoff && (slot === 'name' || !slot)) return canned(lang, 'clarifyHandoff');
+  if (slot === 'name') return canned(lang, 'clarifyName');
   if (slot === 'when' || slot === 'when_text' || slot === 'when_or_reference') {
-    if (sw) return 'Sawa. Niambie siku na saa.';
-    return 'Okay. What day and time works?';
+    return canned(lang, 'clarifyWhen');
   }
-  if (slot === 'location' || slot === 'landmark') {
-    if (sw) return 'Sawa. Tuje wapi?';
-    return 'Okay. Where should we come?';
-  }
-  if (slot === 'area') {
-    if (sw) return 'Sawa. Hiyo ni eneo gani?';
-    return 'Okay. Which area is that in?';
-  }
+  if (slot === 'location' || slot === 'landmark') return canned(lang, 'clarifyWhere');
+  if (slot === 'area') return canned(lang, 'clarifyArea');
   if (slot === 'service' || slot === 'subject' || slot === 'catalog_item') {
-    if (sw) return 'Sawa. Unahitaji huduma gani?';
-    return 'Okay. Which service do you need?';
+    return canned(lang, 'clarifyService');
   }
-  if (sw) return 'Sawa, nimekuelewa.';
-  return 'Okay.';
+  return canned(lang, 'clarifyDefault');
 }
 
 function callerNameAlreadyKnown({ brainState = {}, userText = '' } = {}) {
@@ -627,17 +538,11 @@ function pickSpeechGuaranteeLine({
 }
 
 function emptyTurnRepairLine(language) {
-  const lang = confirmationLanguage(language);
-  if (lang === 'sw' || lang === 'sheng') return 'Samahani, sema tena?';
-  return 'Sorry, say that again?';
+  return canned(language, 'repair');
 }
 
 function businessInfoFallbackLine(language) {
-  const lang = confirmationLanguage(language);
-  if (lang === 'sw' || lang === 'sheng') {
-    return 'Samahani, siwezi kufikia taarifa za biashara sasa hivi. Tafadhali jaribu tena.';
-  }
-  return "Sorry, I can't access the business information right now. Please try again.";
+  return canned(language, 'businessInfo');
 }
 
 /**
@@ -677,12 +582,12 @@ function planEmptyGeminiSpeech({
       line: pickLlmRecoveryLine({ language, alreadyOffered }),
     };
   }
-  if (alreadyOffered) return { speak: false, kind: 'quiet_continue', line: '' };
-  // A timeout still asks once. A clear held-then-completed turn does not:
-  // we heard them, so "say that again" must not replace the reply.
+  // A clear question is never silence and never "say that again".
+  // Speak whatever we have, or this short line in the call language.
   if (!modelMissed && callerTurnIsClear(userText)) {
-    return { speak: false, kind: 'clear_turn', line: '' };
+    return { speak: true, kind: 'clear_turn', line: canned(language, 'clearTurn') };
   }
+  if (alreadyOffered) return { speak: false, kind: 'quiet_continue', line: '' };
   return { speak: true, kind: 'hear_again', line: emptyTurnRepairLine(language) };
 }
 
@@ -694,13 +599,8 @@ function planEmptyGeminiSpeech({
  */
 function pickLlmRecoveryLine(opts = {}) {
   const lang = confirmationLanguage(opts.language);
-  const sw = lang === 'sw' || lang === 'sheng';
-  if (opts.alreadyOffered) {
-    if (sw) return `Sawa, bado siwezi kumaliza. ${REACH_THEM_NAME_ASK_SW}`;
-    return `Okay, I still can't finish that. ${REACH_THEM_NAME_ASK_EN}`;
-  }
-  if (sw) return `Sawa, siwezi kumaliza hiyo sasa hivi. ${REACH_THEM_NAME_ASK_SW}`;
-  return `Okay, I can't finish that just now. ${REACH_THEM_NAME_ASK_EN}`;
+  if (opts.alreadyOffered) return canned(lang, 'recoveryAgain');
+  return canned(lang, 'recovery');
 }
 
 /**
@@ -708,17 +608,11 @@ function pickLlmRecoveryLine(opts = {}) {
  * Local line, not a Gemini turn. English until the caller has spoken.
  */
 function pickIdleNudgeLine(opts = {}) {
-  const lang = confirmationLanguage(opts.language);
-  const sw = lang === 'sw' || lang === 'sheng';
-  if (sw) return 'Naweza kusaidia?';
-  return 'How can I help?';
+  return canned(opts.language, 'idleNudge');
 }
 
 function pickLlmRecoverySaved(opts = {}) {
-  const lang = confirmationLanguage(opts.language);
-  const sw = lang === 'sw' || lang === 'sheng';
-  if (sw) return 'Sawa, nimechukua jina lako. Nitawaambia timu wakupigie.';
-  return "Okay, I have your name. I'll have the team reach you.";
+  return canned(opts.language, 'recoverySaved');
 }
 
 function looksLikeCallerName(text) {

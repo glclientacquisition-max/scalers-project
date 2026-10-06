@@ -89,6 +89,10 @@ test('Kiswahili tails and a cutoff dash stay open', () => {
   assert.strictEqual(callerTurnIsClear('Niambie, like, the services you offer—'), true);
   assert.strictEqual(callerTurnIsClear("Yeah, I'm Alvin."), false);
   assert.strictEqual(callerTurnIsClear('sema tena'), false);
+  assert.strictEqual(utteranceLooksIncomplete('Ah, nilikuwa nauliza,'), true);
+  assert.strictEqual(utteranceLooksIncomplete('nilikuwa'), true);
+  assert.strictEqual(utteranceLooksIncomplete('nauliza'), true);
+  assert.strictEqual(utteranceLooksIncomplete('Sawa, nimehifadhi ombi lako.'), false);
 });
 test('Kiswahili continuation waits longer than a finished English sentence', () => {
   const held = adaptiveFlushMs({

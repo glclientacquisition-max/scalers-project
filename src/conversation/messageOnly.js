@@ -1,5 +1,6 @@
 const { isNameAffirmation, isPlausibleCallerName } = require('./entityExtraction');
 const { namesLikelySame } = require('./callerNameMatch');
+const { offerAskPattern } = require('../speech/languages');
 
 // Message only is a lock, not a suggestion.
 // tenants.after_hours_mode === 'message' may ask for a name, take a message,
@@ -50,8 +51,7 @@ function messageOnlyCallbackLine(language) {
   return "I'll take a message and have the team call you.";
 }
 
-const OFFER_ASK_RE =
-  /\b(what (?:do you (?:offer|do|sell|have)|services|can you do)|which services|what services|services (?:that |do )?you (?:have|offer)|tell me the services|uniambie (?:the )?services|huduma (?:gani|mnazo|mko))\b/i;
+const OFFER_ASK_RE = offerAskPattern();
 const HOURS_ASK_RE =
   /\b(are you open|you open now|opening hours|your hours|what are your hours|what time do you (?:open|close)|when do you (?:open|close)|mko wazi|mnafungua|mnafunga|saa ngapi mna(?:fungua|funga))\b/i;
 const PRICE_ASK_RE =

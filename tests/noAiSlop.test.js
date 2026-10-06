@@ -77,9 +77,15 @@ describe('server speech path', () => {
 
   it('cuts model text before the Soniox push and not the lookup sentence', () => {
     const chunk = body('onSpokenChunk', '      ');
-    assert.match(chunk, /const text = cutNoAiSlop\(polished\)/);
-    assert.doesNotMatch(chunk, /\btext = cutNoAiSlop\(text\)/);
+    assert.match(chunk, /runSpokenReplyPipeline\(/);
+    assert.match(chunk, /const text = spoken\.text/);
+    assert.doesNotMatch(chunk, /cutNoAiSlop/);
     assert.match(chunk, /session\.pushText\(text\)/);
+    const pipeline = fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'speech', 'spokenReplyPipeline.js'),
+      'utf8'
+    );
+    assert.match(pipeline, /cutNoAiSlop\(text\)/);
     const lookupStart = source.indexOf('async function speakLookupSentence');
     const lookupEnd = source.indexOf('\n      let result;', lookupStart);
     assert.ok(lookupStart > 0 && lookupEnd > lookupStart);

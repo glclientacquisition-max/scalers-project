@@ -1,8 +1,7 @@
 // Turn-taking helpers: adaptive end-of-utterance flush + barge-in decisions.
 // Caller-event policy lives in decideCallerEvent — one table, one outcome.
 
-const INCOMPLETE_TAIL =
-  /\b(and|but|so|because|or|then|also|with|for|to|from|of|na|lakini|kwa|sababu|ama|halafu|ya|wa|za|ni|kwamba|au|ili|kama|pia|nataka|nina|naomba|vya|cha|la|ku)\s*$/i;
+const { looksIncomplete, incompleteWaitMs } = require('./turnEndPolicy');
 
 const INTERRUPT_CUES =
   /\b(no|nope|wait|stop|hold on|actually|sorry|excuse me|hapana|simama|subiri|kusubiri|acha)\b/i;
@@ -148,43 +147,11 @@ function looksLikeEcho(callerText, agentText) {
 
 /**
  * True when the caller seems mid-thought (don't flush yet).
- * STT often sticks a period on trailing conjunctions ("room, and.") — strip that
- * before deciding the thought is complete.
+ * Trailing comma, dash, and language tails live in turnEndPolicy.
  * @param {string} text
  */
 function utteranceLooksIncomplete(text) {
-  const raw = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!raw) return false;
-
-  // Live call HD_0cdf315f02e9: "executive room,and." was flushed mid-thought.
-  // Soniox often cuts a live Kiswahili turn as "Hii ni Aris Specialist—".
-  if (/[\u2014\u2013-]\s*$/.test(raw)) return true;
-
-  const core = raw.replace(/[.!?,;:…]+$/g, '').trim();
-  if (!core) return false;
-
-  if (INCOMPLETE_TAIL.test(core) || INCOMPLETE_TAIL.test(raw)) return true;
-  // Trailing comma / "and," without finishing the clause.
-  if (/,\s*(and|but|so|or)?$/i.test(core)) return true;
-  // "my name is" / "jina langu ni" without the name yet.
-  if (/\b(my name is|i am|i'm|jina langu ni|ninaitwa)\s*$/i.test(core)) return true;
-  // Mid-thought cutoffs common on live Kenyan calls (HD_02bda14e6547).
-  if (
-    /\b(i want to|i'd like to|i would like to|ningetaka|naomba|can you tell|you can tell)\s*$/i.test(
-      core
-    )
-  ) {
-    return true;
-  }
-  if (/\b(that i'm|that i am|tell him that|tell her that)\s*$/i.test(core)) {
-    return true;
-  }
-  const norm = normalizeSpeech(core);
-  if (LET_ME_THINK_RE.test(norm)) return true;
-  if (/\b(let me think|i('m| am) thinking)\s*$/i.test(core)) return true;
-  if (/^(actually|i said)$/i.test(norm)) return true;
-  if (/\b(actually|i said)\s*$/i.test(core)) return true;
-  return false;
+  return looksIncomplete(text);
 }
 
 /**
@@ -745,8 +712,7 @@ function adaptiveFlushMs(opts = {}) {
   const awaiting = agentAwaitingReply(opts.lastAgentText);
 
   if (utteranceLooksIncomplete(text)) {
-    // Give the caller room to finish ("…and—" / "my name is—").
-    return clamp(Math.max(base + 450, min + 200), min, max);
+    return incompleteWaitMs({ baseMs: base, minMs: min, maxMs: max });
   }
 
   if (/[.!?]$/.test(text) && !utteranceLooksIncomplete(text)) {

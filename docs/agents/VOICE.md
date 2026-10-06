@@ -83,7 +83,8 @@ See `.env.example` — key ones:
 - `VOICE_LLM_STREAM`, `VOICE_STREAM_EARLY_CHARS` / `WORDS` (default 0: sentence-only TTS flush)
 - `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`, `VOICE_IDLE_NUDGE_MS` (default 10000; not armed until the caller has spoken)
 - `VOICE_BARGE_GRACE_MS`, `VOICE_BARGE_EARLY_MS`, `VOICE_BARGE_MIN_CHARS`
-- Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS` (default 700; incomplete Kiswahili tails hold locally up to `VOICE_FLUSH_MAX_MS`), `SONIOX_ENDPOINT_SENSITIVITY`, …
+- Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS` (default 700; an unfinished turn holds locally up to `VOICE_FLUSH_MAX_MS`). One policy: [`VOICE_TURN_END.md`](./VOICE_TURN_END.md). `SONIOX_ENDPOINT_SENSITIVITY`, …
+- Spoken reply: `src/speech/spokenReplyPipeline.js` is the only model-text path. Language tails, canned lines, and offer-ask phrases live in `src/speech/languages/`. Replay: `npm run test:replay` (inside `test:voice`).
 - `SONIOX_LANGUAGE_IDENTIFICATION` (default on). Language hints stay `en`+`sw`. Do not set `language_hints_strict`.
 
 ## Test gate (required before PR)
@@ -92,7 +93,7 @@ See `.env.example` — key ones:
 npm run test:voice
 ```
 
-Runs: TTS normalize → spoken stream buffer → turn-taking → wiring.
+Runs: TTS normalize → spoken stream buffer → turn-taking → wiring → call replay.
 
 For media/webhook local bring-up: `npm start` + `npm run tunnel:cloudflared` (see `docs/operations/WEBHOOK_TUNNEL.md`).
 

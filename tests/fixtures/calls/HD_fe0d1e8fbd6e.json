@@ -1,0 +1,34 @@
+{
+  "callSid": "HD_fe0d1e8fbd6e",
+  "language": "sw",
+  "note": "Production call. A trailing dash was spoken over, and a clear services question must not become silence or sema tena. The name check is Kiswahili.",
+  "turns": [
+    {
+      "caller": "Hii ni Aris Specialist—",
+      "incomplete": true,
+      "holdReason": "trailing_dash"
+    },
+    {
+      "caller": "Ah, nilikuwa nauliza,",
+      "incomplete": true,
+      "holdReason": "trailing_comma"
+    },
+    {
+      "caller": "Sawa, nimehifadhi ombi lako.",
+      "incomplete": false,
+      "completeFlush": true
+    },
+    {
+      "caller": "Niambie, like, the services you offer—",
+      "incomplete": true,
+      "holdReason": "trailing_dash",
+      "emptyGemini": true,
+      "expectKind": "clear_turn",
+      "expectLine": "Naweza kusaidia?"
+    },
+    {
+      "nameAsk": "Alvin",
+      "expectNameAsk": "Je, naongea na Alvin?"
+    }
+  ]
+}

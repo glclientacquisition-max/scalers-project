@@ -53,6 +53,11 @@ function countiesForToken(token) {
   return INDEX.places[key] || [];
 }
 
+/** Exact gazetteer hit. One-edit guesses ("huduma" → "huruma") are not exact. */
+function isExactPlaceName(token) {
+  return countiesForToken(token).length > 0;
+}
+
 function oneEditNames(key) {
   const names = [];
   for (const name of PLACE_KEYS) {
@@ -207,4 +212,5 @@ module.exports = {
   nearestAllowedPlace,
   countiesMentioned,
   countiesForPlace,
+  isExactPlaceName,
 };

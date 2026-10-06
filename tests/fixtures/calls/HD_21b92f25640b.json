@@ -1,0 +1,13 @@
+{
+  "callSid": "HD_21b92f25640b",
+  "language": "en",
+  "note": "A streamed English reply was dropped before TTS when onSpokenChunk reassigned a const. The full sentence has to survive.",
+  "turns": [
+    {
+      "caller": "What services do you offer?",
+      "gemini": "We can do the couch tomorrow morning. Bring it to the gate and I will take it from there when you are ready.",
+      "minRatio": 0.5,
+      "mustInclude": ["couch tomorrow morning", "Bring it to the gate"]
+    }
+  ]
+}

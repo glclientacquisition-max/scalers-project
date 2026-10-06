@@ -1,0 +1,14 @@
+{
+  "callSid": "HD_f32a2b7caafd",
+  "language": "sw",
+  "note": "Staging build 0590e5e. Gemini wrote 57 characters and TTS spoke 13.",
+  "turns": [
+    {
+      "caller": "Mnaofa services gani?",
+      "gemini": "Tuna usafi wa nyumba, ofisi, na fumigation leo.",
+      "wasSpokenChars": 13,
+      "minRatio": 0.5,
+      "mustInclude": ["usafi", "fumigation"]
+    }
+  ]
+}

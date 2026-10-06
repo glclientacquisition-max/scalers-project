@@ -272,9 +272,10 @@ const clearHeldTurn = planEmptyGeminiSpeech({
   userText: 'Niambie, like, the services you offer—',
   llmDown: false,
 });
-assert.equal(clearHeldTurn.speak, false);
+assert.equal(clearHeldTurn.speak, true);
 assert.equal(clearHeldTurn.kind, 'clear_turn');
-assert.equal(clearHeldTurn.line, '');
+assert.equal(clearHeldTurn.line, 'Naweza kusaidia?');
+assert.doesNotMatch(clearHeldTurn.line, /sema tena/i);
 const missedClearTurn = planEmptyGeminiSpeech({
   language: 'sw',
   userText: 'Niambie, like, the services you offer—',

@@ -103,8 +103,8 @@ assert.match(
 
 assert.match(
   source,
-  /polishSpokenReply\(String\(chunk \|\| ''\)/,
-  'streamed chunks must pass polish (speech guard, menu strip) before TTS'
+  /runSpokenReplyPipeline\(String\(chunk \|\| ''\)/,
+  'streamed chunks must pass the spoken-reply pipeline before TTS'
 );
 
 assert.match(
@@ -471,13 +471,18 @@ assert.match(
 );
 assert.match(
   source,
-  /const polished = polishSpokenReply\(/,
-  'onSpokenChunk polishes the chunk before the slop cut'
+  /runSpokenReplyPipeline\(/,
+  'onSpokenChunk runs the spoken-reply pipeline before TTS'
 );
 assert.match(
   source,
-  /const text = cutNoAiSlop\(polished\)/,
-  'onSpokenChunk assigns the slop cut to its own const'
+  /const text = spoken\.text/,
+  'onSpokenChunk speaks the pipeline result'
+);
+assert.match(
+  source,
+  /spoken_drop stage=/,
+  'every pipeline drop is logged with stage and reason'
 );
 assert.match(
   source,
@@ -574,8 +579,8 @@ assert.match(
 
 assert.match(
   source,
-  /utteranceLooksIncomplete\(pendingText\)/,
-  'a Soniox endpoint on an unfinished Kiswahili tail must not flush immediately'
+  /decideTurnEnd\(\{ event: evt\.type, text: pendingText \}\)/,
+  'a Soniox endpoint on an unfinished turn must hold instead of flushing'
 );
 
 assert.match(

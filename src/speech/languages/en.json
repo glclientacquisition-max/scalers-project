@@ -1,0 +1,76 @@
+{
+  "id": "en",
+  "tails": ["and", "but", "so", "because", "or", "then", "also", "with", "for", "to", "from", "of"],
+  "phrases": [
+    "my name is",
+    "i am",
+    "i'm",
+    "i want to",
+    "i'd like to",
+    "i would like to",
+    "can you tell",
+    "you can tell",
+    "that i'm",
+    "that i am",
+    "tell him that",
+    "tell her that",
+    "let me think",
+    "i'm thinking",
+    "i am thinking",
+    "actually",
+    "i said"
+  ],
+  "holdUtterances": [
+    "^(?:(?:please\\s+)?(?:let me think|let me see|i need to think|i'?m thinking)(?:\\s+about(?:\\s+it)?)?|hold that thought)$",
+    "^(?:actually|i said)$"
+  ],
+  "openers": ["I", "You", "It", "We", "He", "She", "They", "Take", "Thank"],
+  "fillerBanSources": ["\\bwe can help with that\\b"],
+  "fillerBanWhenAskedSources": [
+    "\\bwhat do you need done\\b",
+    "\\bhow can (?:we|i) help you today\\b",
+    "\\bnote (?:it|that|this) down for the team\\b"
+  ],
+  "callbackPitchSources": [
+    "\\bwould you like me to leave a message\\b",
+    "\\bleave a message for the team\\b"
+  ],
+  "offerAsk": [
+    "what (?:do you (?:offer|do|sell|have)|services|can you do)",
+    "which services",
+    "what services",
+    "services? do you (?:offer|do|have)",
+    "services (?:that |do )?you (?:have|offer)",
+    "tell me the services",
+    "list (?:for me )?(?:the )?services",
+    "what do you offer"
+  ],
+  "recognitionPhrases": ["what services", "which services"],
+  "canned": {
+    "repair": "Sorry, say that again?",
+    "clearTurn": "How can I help?",
+    "businessInfo": "Sorry, I can't access the business information right now. Please try again.",
+    "idleNudge": "How can I help?",
+    "hedgeEmpty": "Okay.",
+    "outcomeEmpty": "Okay.",
+    "actionProgress": "Okay.",
+    "phatic": "I'm well, thanks. How can I help?",
+    "phaticWho": "I'm well. Who is calling?",
+    "phaticFile": "I'm well. I have your visit on file. Is that why you called?",
+    "serviceDump": "We can help with that. What do you need done?",
+    "reachName": "May I have your name so I can reach them?",
+    "clarifyHandoff": "Okay. May I have your name so I can reach them?",
+    "clarifyName": "Okay. May I have your name?",
+    "clarifyWhen": "Okay. What day and time works?",
+    "clarifyWhere": "Okay. Where should we come?",
+    "clarifyArea": "Okay. Which area is that in?",
+    "clarifyService": "Okay. Which service do you need?",
+    "clarifyDefault": "Okay.",
+    "recovery": "Okay, I can't finish that just now. May I have your name so I can reach them?",
+    "recoveryAgain": "Okay, I still can't finish that. May I have your name so I can reach them?",
+    "recoverySaved": "Okay, I have your name. I'll have the team reach you.",
+    "filler": "One moment…",
+    "nameAsk": "Am I speaking with {name}?",
+    "nothingOpen": "Nothing is still open."
+  }
+}

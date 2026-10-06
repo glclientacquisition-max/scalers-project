@@ -210,7 +210,9 @@ describe('file read is not a new job', () => {
         language: 'en',
       }
     );
-    assert.doesNotMatch(menu, /carpet, couch, mattress/i);
+    assert.match(menu, /carpet/i);
+    assert.match(menu, /couch/i);
+    assert.match(menu, /mattress/i);
     assert.match(prepareStreamedSpeech('Areyou looking'), /Are you looking/);
 
     const invented = polishSpokenReply('Would you like to reschedule or cancel any of them?', {

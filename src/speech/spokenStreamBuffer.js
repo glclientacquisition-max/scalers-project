@@ -2,11 +2,7 @@
 // Holds back tool markers (###TOOL### / ###ENDCALL###) so they are never spoken.
 
 const { stripSpokenInstructionLeaks } = require('./spokenInstructionLeak');
-
-// Whole words the model sometimes glues to the next word ("I"+"can", "Sawa"+"tutakusaidiaje").
-// A mid-word slice does not end on one of these ("tutakusa"+"idiaje", "cle"+"aning").
-const DROPPED_SPACE_OPENER =
-  /(?:^|[\s.!?])(?:I|You|It|We|He|She|They|Take|Thank|Sawa|Pole|Asante|Habari|Samahani|Tafadhali|Naomba|Nataka|Ndiyo|Ndio|Hapana)$/i;
+const { openerPattern } = require('./languages');
 
 /**
  * Join Gemini stream pieces. A leading or trailing space is the provider's
@@ -23,7 +19,7 @@ function joinSpokenPieces(left, right) {
   if (!a) return b;
   if (/\s$/.test(a) || /^\s/.test(b)) return a + b;
   if (/[,:;.!?]$/.test(a) && /^[\p{L}]/u.test(b)) return `${a} ${b}`;
-  if (DROPPED_SPACE_OPENER.test(a) && /^[\p{L}]/u.test(b)) return `${a} ${b}`;
+  if (openerPattern().test(a) && /^[\p{L}]/u.test(b)) return `${a} ${b}`;
   return a + b;
 }
 

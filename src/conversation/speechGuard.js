@@ -11,10 +11,17 @@ const { canonicalPlaceName } = require('./kenyaPlaces');
 const { openSlotLine } = require('./callCorrectives');
 const {
   callerTurnKinds,
+  collectsBookingSpeech,
   isMessageOnlyMode,
   messageOnlyCallbackLine,
   shapeMessageOnlySpeech,
 } = require('./messageOnly');
+const {
+  callbackPitchPattern,
+  fillerBanPattern,
+  fillerBanWhenAskedPattern,
+} = require('../speech/languages');
+const { isExactPlaceName, normalizePlaceKey } = require('./kenyaPlaces');
 
 const SAVED_CLAIM =
   /\b(i(?:'ve| have) (?:saved|noted|booked|logged|recorded|sent|passed|forwarded|escalated|scheduled|submitted|placed|reserved|held)\b|(?:is|has been|are) (?:saved|noted|booked|logged|recorded|scheduled|confirmed|reserved|on hold|submitted)\b|(?:the )?team will (?:call|contact|reach|get back)|(?:someone|we|they) will (?:call|contact|reach|get back to) you|nimehifadhi|nimeandika|nimetuma|imehifadhiwa|imeandikwa|tutakupigia|watakupigia|nime-?save)/i;
@@ -37,14 +44,7 @@ const ACTION_NARRATION =
 const COVERAGE_CLAIM =
   /\b(?:[Ww]e|[Tt]una|[Tt]unaweza|[Tt]uta)(?:\s+\w+){0,2}?\s+(?:cover|serve|reach|come(?:\s+out)?\s+to|kuja|kufika)\s+(?:to\s+)?([A-Z][\w'’]*(?:\s+[A-Z][\w'’]*){0,2})/;
 
-// Filler that does not answer the caller. Dropped in the mouth, not by a
-// prompt line, so a later prompt cannot speak it. A real answer in the same
-// turn stays.
-const HELP_FILLER = /\bwe can help with that\b/i;
-const ALREADY_ANSWERED_FILLER =
-  /\bwhat do you need done\b|\bhow can (?:we|i) help you today\b|\bnote (?:it|that|this) down for the team\b/i;
-const CALLBACK_PITCH =
-  /\bwould you like me to leave a message\b|\bleave a message for the team\b/i;
+// Filler phrases live in the language packs. A real answer in the same turn stays.
 const CALLER_CALLBACK_ASK =
   /\b(call(?:\s+me)?\s*back|callback|leave (?:me )?a message|take a message|have (?:the team|someone) call)\b/i;
 const SPECIFIC_ASK_EXTRA =
@@ -109,9 +109,9 @@ function isProtectedSpeech(sentence) {
 function sentenceIsSpeechSlop(sentence, callerText) {
   const raw = String(sentence || '').trim();
   if (!raw || isProtectedSpeech(raw)) return false;
-  if (HELP_FILLER.test(raw)) return true;
-  if (callerAskedSpecificQuestion(callerText) && ALREADY_ANSWERED_FILLER.test(raw)) return true;
-  if (!callerAskedForCallback(callerText) && CALLBACK_PITCH.test(raw)) return true;
+  if (fillerBanPattern().test(raw)) return true;
+  if (callerAskedSpecificQuestion(callerText) && fillerBanWhenAskedPattern().test(raw)) return true;
+  if (!callerAskedForCallback(callerText) && callbackPitchPattern().test(raw)) return true;
   return false;
 }
 
@@ -253,6 +253,67 @@ function placeNamesIn(text) {
     if (name) found.add(name);
   }
   return found;
+}
+
+const ANSWER_LIST_NOUN =
+  /\b(carpet|couch|sofa|mattress|airbnb|upholstery|fumigation|plumbing|cleaning|usafi|huduma)\b/gi;
+
+/** A catalogue sentence. The pipeline must not drop it for a side-effect match. */
+function isAnswerList(sentence) {
+  const raw = String(sentence || '');
+  const nouns = [...raw.matchAll(ANSWER_LIST_NOUN)].map((row) => String(row[0] || '').toLowerCase());
+  const unique = new Set(nouns);
+  if (unique.size >= 2) return true;
+  return (raw.match(/,/g) || []).length >= 2 && unique.size >= 1;
+}
+
+function sentenceHasExactUnboundPlace(sentence, allowedText) {
+  const allowed = new Set();
+  for (const word of String(allowedText || '').toLowerCase().split(/[^a-z]+/)) {
+    if (isExactPlaceName(word)) allowed.add(normalizePlaceKey(word));
+  }
+  for (const word of String(sentence || '').toLowerCase().split(/[^a-z]+/)) {
+    if (!isExactPlaceName(word)) continue;
+    if (!allowed.has(normalizePlaceKey(word))) return true;
+  }
+  return false;
+}
+
+/**
+ * True when dropping this whole sentence is a clearly matched pattern
+ * (narration, unsourced number, exact place, saved claim). A service list
+ * is never a clear drop. A one-edit place guess is not either.
+ */
+function sentenceGuardDropIsClear(sentence, ctx = {}) {
+  const raw = String(sentence || '').trim();
+  if (!raw || isAnswerList(raw)) return false;
+  const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
+  if (sentenceIsSpeechSlop(raw, lastCallerTurn)) return true;
+  if (ACTION_NARRATION.test(raw)) return true;
+  const saved = toolSucceededThisTurn(ctx.toolResults);
+  if (!saved && (SAVED_CLAIM.test(raw) || JOB_CLOSE.test(raw))) return true;
+  const transferOk = Boolean(ctx.capabilities?.liveTransfer || ctx.capabilities?.transfer);
+  if (!transferOk && TRANSFER_CLAIM.test(raw)) return true;
+  if (messageOnlyOn(ctx) && collectsBookingSpeech(raw)) return true;
+  if (heldCallerName(ctx.state) && sentenceAsksForCallerName(raw)) return true;
+  const allowedPlaces = [
+    (Array.isArray(ctx.callerTurns) ? ctx.callerTurns : []).join(' '),
+    safeJson(ctx.profile),
+    safeJson(ctx.state?.entities || {}),
+    String(ctx.extra || ''),
+  ].join(' ');
+  if (sentenceHasExactUnboundPlace(raw, allowedPlaces)) return true;
+  if (sentenceHasNewNumber(raw, knownNumbers(ctx))) return true;
+  if (sentenceHasUnsaidClock(raw, allowedClocks(ctx))) return true;
+  const coverage = COVERAGE_CLAIM.exec(raw);
+  if (
+    coverage &&
+    assessCoverage(coverage[1], ctx.profile || {}) !== 'inside' &&
+    coverage[0].length / raw.length >= 0.45
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /** A locality the slot, the caller, and the file do not hold. */
@@ -398,6 +459,8 @@ module.exports = {
   guardSpokenReply,
   dropSpeechSlop,
   sentenceIsSpeechSlop,
+  sentenceGuardDropIsClear,
+  isAnswerList,
   knownNumbers,
   numbersIn,
   splitSentences,

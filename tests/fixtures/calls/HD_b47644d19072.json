@@ -1,0 +1,14 @@
+{
+  "callSid": "HD_b47644d19072",
+  "language": "sw",
+  "note": "Staging build 0590e5e. Gemini wrote 253 characters and TTS spoke 0.",
+  "turns": [
+    {
+      "caller": "Mna offer services gani?",
+      "gemini": "Huduma zetu ni usafi wa nyumba, usafi wa ofisi, fumigation, carpet cleaning, na upholstery. Tunafanya couch, sofa, na mattress cleaning pia. Bei ya usafi inaanzia elfu tano kwa nyumba ndogo. Ungependa tukuhudumie na gani leo?",
+      "wasSpokenChars": 0,
+      "minRatio": 0.5,
+      "mustInclude": ["usafi wa nyumba", "fumigation", "carpet cleaning", "upholstery", "Ungependa"]
+    }
+  ]
+}

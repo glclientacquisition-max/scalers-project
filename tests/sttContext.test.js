@@ -51,6 +51,11 @@ test('buildSttContext uses Soniox structured general + curated terms', () => {
   assert.ok(ctx.terms.includes('Executive Suite'));
   assert.ok(ctx.terms.includes('Wanjiku'));
   assert.ok(ctx.terms.includes('Ngong Road'));
+  assert.ok(ctx.terms.includes('services gani'));
+  assert.ok(ctx.terms.includes('huduma gani'));
+  assert.ok(ctx.terms.includes('mna offer'));
+  assert.ok(!ctx.terms.includes('gari'));
+  assert.ok(!ctx.terms.includes('gani'));
 });
 
 test('curateTerms caps and dedupes case-insensitively', () => {

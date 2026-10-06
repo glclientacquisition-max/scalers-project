@@ -233,7 +233,6 @@ const {
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
-const { narratesInternalAction } = require('./src/conversation/speechGuard');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
@@ -246,14 +245,14 @@ const {
   looksLikeEcho: turnLooksLikeEcho,
   classifyFinalDuringAgentSpeech,
   agentAwaitingReply,
-  utteranceLooksIncomplete,
 } = require('./src/speech/turnTaking');
+const { decideTurnEnd } = require('./src/speech/turnEndPolicy');
+const { runSpokenReplyPipeline } = require('./src/speech/spokenReplyPipeline');
 const {
   createSpokenStreamBuffer,
   joinSpokenPieces,
   speakPreparedSentences,
 } = require('./src/speech/spokenStreamBuffer');
-const { cutNoAiSlop } = require('./src/speech/noAiSlop');
 const {
   createOverlapHold,
   createAgentReplayMemory,
@@ -2921,6 +2920,24 @@ mediaWss.on('connection', (ws, req) => {
         return speakSession;
       }
 
+      function pipelineModelSpeech(raw, extra = {}) {
+        const spoken = runSpokenReplyPipeline(String(raw || ''), {
+          callerTurns: brainState.conversation?.answersReceived || [],
+          profile: brainProfile,
+          toolResults: extra.toolResults || [],
+          capabilities,
+          state: brainState,
+          language: callLanguage,
+          orphanOf: extra.orphanOf || '',
+          log(drop) {
+            console.log(
+              `[ws/media][${sidLabel()}] spoken_drop stage=${drop.stage} reason=${drop.reason} kept=${drop.kept ? 1 : 0} before=${drop.before} after=${drop.after} preview=${drop.preview}`
+            );
+          },
+        });
+        return spoken;
+      }
+
       async function onSpokenChunk(chunk) {
         // Visit, hold, and order lookups speak nameConfirmSpeech, not the model.
         if (suppressModelSpeech) return;
@@ -2929,29 +2946,32 @@ mediaWss.on('connection', (ws, req) => {
         // save comes from formatToolConfirmation after the tool result.
         // A sentence that narrates the send ("I've sent that to the team",
         // "I sent your name") is dropped. It must not become a repeat-ask.
-        const rawChunk = String(chunk || '');
-        const polished = polishSpokenReply(String(chunk || ''), {
+        // Model text only. Visit / hold / order lines go out through
+        // speakLookupSentence and must not pass through this pipeline.
+        const spoken = runSpokenReplyPipeline(String(chunk || ''), {
           callerTurns: brainState.conversation?.answersReceived || [],
           profile: brainProfile,
           toolResults: [],
           capabilities,
           state: brainState,
           language: callLanguage,
+          orphanOf: bargeCancelledText,
+          log(drop) {
+            console.log(
+              `[ws/media][${sidLabel()}] spoken_drop stage=${drop.stage} reason=${drop.reason} kept=${drop.kept ? 1 : 0} before=${drop.before} after=${drop.after} preview=${drop.preview}`
+            );
+          },
         });
-        if (!polished) {
-          if (rawChunk.trim() && narratesInternalAction(rawChunk)) hidInternalNarration = true;
+        if (spoken.hidNarration) hidInternalNarration = true;
+        const text = spoken.text;
+        if (!text) {
+          if (spoken.orphan) {
+            console.log(`[ws/media][${sidLabel()}] drop fragment restart after barge`);
+          }
           return;
         }
-        // Model text only. Visit / hold / order lines go out through
-        // speakLookupSentence and must not pass through this cut.
-        const text = cutNoAiSlop(polished);
-        if (!text) return;
         if (!tts) return;
         if (suppressReplyRemainder || bargeInActive) return;
-        if (isOrphanFragment(bargeCancelledText, text)) {
-          console.log(`[ws/media][${sidLabel()}] drop fragment restart after barge`);
-          return;
-        }
         firstSpokenChunk = true;
         spokeThisTurn = true;
         turnTiming.markFirstSpokenChunk();
@@ -3170,7 +3190,7 @@ mediaWss.on('connection', (ws, req) => {
               const missed = Boolean(result?.timedOut || result?.llmFailed);
               const reply = missed
                 ? await speechWhenModelMissed(result, clean)
-                : cutNoAiSlop(planned.reply);
+                : pipelineModelSpeech(planned.reply).text;
               if (reply) {
                 callTranscript.pushAgent(reply);
                 turnTiming.markFirstSpokenChunk();
@@ -3208,7 +3228,7 @@ mediaWss.on('connection', (ws, req) => {
             const missed = Boolean(result?.timedOut || result?.llmFailed);
             const reply = missed
               ? await speechWhenModelMissed(result, clean)
-              : cutNoAiSlop(planned.reply);
+              : pipelineModelSpeech(planned.reply).text;
             if (reply) {
               callTranscript.pushAgent(reply);
               turnTiming.markFirstSpokenChunk();
@@ -3242,7 +3262,7 @@ mediaWss.on('connection', (ws, req) => {
           }
           speakSession = null;
         }
-        const modelLine = result?.spokenText ? cutNoAiSlop(result.spokenText) : '';
+        const modelLine = result?.spokenText ? pipelineModelSpeech(result.spokenText).text : '';
         const reply =
           (result?.spokenText ? modelLine : '') ||
           (result?.actionConfirmation
@@ -3314,7 +3334,7 @@ mediaWss.on('connection', (ws, req) => {
         } else {
           const produced = String(result?.spokenText || '').trim();
           if (produced) {
-            const reply = cutNoAiSlop(produced);
+            const reply = pipelineModelSpeech(produced).text;
             if (reply) {
               console.log(
                 `[ws/media][${sidLabel()}] turn speech fallback action=${nextBestAction.action} reason=unstreamed_reply`
@@ -3563,12 +3583,13 @@ mediaWss.on('connection', (ws, req) => {
         utteranceParts.push(leftover);
       }
       const pendingText = utteranceParts.join('').replace(/\s+/g, ' ').trim();
-      // Soniox <end> at 700ms still cuts "…vya" / "Specialist—". Hold the
-      // local flush so the rest of the clause can arrive. A finished
-      // session and a complete English sentence flush immediately.
-      if (evt.type === 'endpoint' && utteranceLooksIncomplete(pendingText)) {
+      // Soniox <end> at 700ms still cuts "…vya" / "Specialist—" / "nauliza,".
+      // Hold the local flush so the rest of the clause can arrive. A finished
+      // session and a complete sentence flush immediately.
+      const turnEnd = decideTurnEnd({ event: evt.type, text: pendingText });
+      if (turnEnd.action === 'hold') {
         console.log(
-          `[ws/media][${sidLabel()}] endpoint held, utterance unfinished: ${pendingText.slice(0, 80)}`
+          `[ws/media][${sidLabel()}] endpoint held reason=${turnEnd.reason} waitMs=${turnEnd.waitMs}: ${pendingText.slice(0, 80)}`
         );
         scheduleUtteranceFlush();
         return;
@@ -5157,7 +5178,7 @@ async function runGeminiTurnStreaming(
         'Gemini stream'
       );
       console.log(
-        `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length}`
+        `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length} (before finish)`
       );
       break;
     } catch (err) {

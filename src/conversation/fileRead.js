@@ -8,6 +8,7 @@ const {
 } = require('./visitTalk');
 const { messageOnlyNoVisitLine } = require('./messageOnly');
 const { looksLikeCompliment } = require('./entityExtraction');
+const { canned, offerAskPattern } = require('../speech/languages');
 
 const FILE_READ_RE =
   /\b(what do i have|what have i got|which ones?(?:\s+do)? i have|which (?:booking|bookings|order|orders|hold|holds)|any (?:booking|bookings|order|orders|hold|holds)|is there any that i have|previous (?:booking|bookings|order|orders|hold)|my previous|check (?:for me )?(?:the |my )?(?:previous )?(?:booking|order|hold)|read (?:them|it|me|for me)|the one(?:s)? (?:that )?i have|ones i have|in place|bookings zangu|booking yangu|order yangu|hold yangu|oda yangu|niambie (?:booking|oda|order|hold)|what(?:'s| is) on hold|on hold for me|my (?:order|orders|hold|holds))\b/i;
@@ -15,8 +16,7 @@ const FILE_READ_RE =
 const NEW_WORK_RE =
   /\b(want to book|like to book|need to book|please book|book me|can you book|could you book|i want to order|i'd like to order|order \d+|buy \d+|nataka (?:cleaning|carpet|couch|sofa|mattress|kuweka)|naomba (?:cleaning|carpet))\b/i;
 
-const OFFER_ASK_RE =
-  /\b(what (?:do you (?:offer|do|sell|have)|services|can you do)|which services|what services|services (?:that |do )?you (?:have|offer)|tell me the services|uniambie (?:the )?services|services mko nayo|mnauza|huduma (?:gani|mnazo|mko)|what do you offer)\b/i;
+const OFFER_ASK_RE = offerAskPattern();
 
 const INVENTED_FILE_RE =
   /\b(reschedule or cancel|cancel or reschedule|keep or change (?:that|them|it)|proceed with them|any of them)\b/i;
@@ -71,10 +71,7 @@ function fileRowsWereRead(state) {
  * Swahili and Sheng are the existing translations of this one line.
  */
 function nothingStillOpenLine(state, language) {
-  const lang = String(language || state?.language?.current || 'en').toLowerCase();
-  if (lang === 'sw') return 'Hakuna kilicho wazi.';
-  if (lang === 'sheng') return 'Hakuna kitu iko open.';
-  return 'Nothing is still open.';
+  return canned(language || state?.language?.current, 'nothingOpen');
 }
 
 function nothingOnFileLine(state, language) {
