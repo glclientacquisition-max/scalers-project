@@ -424,6 +424,22 @@ test('HD_0ef68f8e7930 glued openers get a space before TTS', () => {
   );
 });
 
+test('punctuation is not voiced in English or Kiswahili', () => {
+  for (const callLanguage of ['en', 'sw']) {
+    const spoken = prepareForTts('Pay & go — wait... (today) *now* #one.', {
+      callLanguage,
+      avoidRespell: true,
+    }).text;
+    assert.equal(spoken.includes('&'), false);
+    assert.equal(spoken.includes('—'), false);
+    assert.equal(spoken.includes('...'), false);
+    assert.equal(spoken.includes('('), false);
+    assert.equal(spoken.includes('*'), false);
+    assert.equal(spoken.includes('#'), false);
+    assert.match(spoken, / and /);
+  }
+});
+
 test('and/or and ampersand speak as words', () => {
   assert.match(prepareForTts('Pay by M-Pesa and/or cash.', { callLanguage: 'en' }).text, /and or cash/);
   assert.match(prepareForTts('Done & Dusted.', { callLanguage: 'en' }).text, /Done and Dusted/);

@@ -6,8 +6,11 @@
 const { polishSpokenReply, planEmptyGeminiSpeech } = require('../conversation/dynamicSpeech');
 const { cutNoAiSlop } = require('./noAiSlop');
 const { prepareForTts } = require('./ttsNormalize');
-const { analyzeCallerLanguage, languageDirective } = require('../conversation/language');
+const { analyzeCallerLanguage, languageDirective, createLanguageState } = require('../conversation/language');
 const { SCHEMA, SCHEMA_VERSION } = require('./voiceTrace');
+const { structuredReplyEnabled } = require('./structuredReplyFlag');
+const { detectTurnLanguage, lockReplyLanguage } = require('./languageLock');
+const { speakStructuredTurn } = require('./structuredReplay');
 
 function initialState(fixture = {}) {
   const name = String(fixture.callerName || '').trim();
@@ -128,9 +131,23 @@ function replayTurn(turn, ctx) {
       ],
     };
   }
-  const evidence = analyzeCallerLanguage(caller);
-  const sticky =
-    evidence.language === 'unknown' ? ctx.language || 'unknown' : evidence.language;
+  const evidence = structuredReplyEnabled()
+    ? detectTurnLanguage({ text: caller, tokens: turn.tokens || [] })
+    : analyzeCallerLanguage(caller);
+  if (!ctx.languageState) ctx.languageState = createLanguageState();
+  if (structuredReplyEnabled()) {
+    ctx.languageState = lockReplyLanguage(ctx.languageState, evidence);
+  }
+  const sticky = structuredReplyEnabled()
+    ? ctx.languageState.reply
+    : evidence.language === 'unknown'
+      ? ctx.language || 'unknown'
+      : evidence.language;
+  const callerLanguage = structuredReplyEnabled()
+    ? evidence.language && evidence.language !== 'unknown'
+      ? evidence.language
+      : sticky
+    : evidence.language;
   const speech = speechContext(ctx.state, ctx.callerTurns.concat(caller), sticky, ctx.fixture);
   let modelText = turn.model && turn.model.outputText != null ? String(turn.model.outputText) : null;
   let provider = turn.model?.provider || 'recorded';
@@ -145,15 +162,24 @@ function replayTurn(turn, ctx) {
   }
   if (modelText == null) modelText = '';
 
-  const mouth = modelText
-    ? speakModelText(modelText, speech, caller)
-    : {
-        spoken: canned?.text || '',
-        ttsLanguage: speech.language,
-        stages: [],
-        canned,
-      };
-  if (!modelText && canned) {
+  const mouth = structuredReplyEnabled()
+    ? speakStructuredTurn({
+        caller,
+        recorded: modelText,
+        canned: canned?.text || '',
+        replyLang: sticky,
+        state: ctx.state,
+        fixture: ctx.fixture,
+      })
+    : modelText
+      ? speakModelText(modelText, speech, caller)
+      : {
+          spoken: canned?.text || '',
+          ttsLanguage: speech.language,
+          stages: [],
+          canned,
+        };
+  if (!structuredReplyEnabled() && !modelText && canned) {
     const prepared = prepareForTts(canned.text, { callLanguage: speech.language });
     mouth.spoken = prepared.text || canned.text;
     mouth.ttsLanguage = prepared.language || speech.language;
@@ -184,12 +210,12 @@ function replayTurn(turn, ctx) {
     {
       stage: 'model',
       phase: 'output',
-      provider,
+      provider: structuredReplyEnabled() ? 'structured' : provider,
       model: modelName,
-      promptId,
+      promptId: structuredReplyEnabled() ? 'voice.structured' : promptId,
       promptVersion,
       language: speech.language,
-      outputText: modelText,
+      outputText: mouth.outputText != null ? mouth.outputText : modelText,
       chars: turn.model?.chars ?? modelText.length,
       spokenEmitted: turn.model?.spokenEmitted ?? null,
     },
@@ -209,6 +235,7 @@ function replayTurn(turn, ctx) {
     stage: 'latency',
     callerStopToModelFirstTokenMs: turn.observed?.firstTokenMs ?? null,
     callerStopToFirstTtsPcmMs: turn.observed?.firstPcmMs ?? null,
+    structuredFirstSentenceMs: mouth.pipelineFirstSentenceMs ?? null,
   });
 
   ctx.callerTurns.push(caller);
@@ -228,7 +255,7 @@ function replayTurn(turn, ctx) {
     pii: 'transcript',
     caller: {
       text: caller,
-      language: evidence.language,
+      language: callerLanguage,
       confidence: evidence.confidence,
     },
     stages,
@@ -281,6 +308,7 @@ async function replayCall(fixture, opts = {}) {
     callerTurns: [],
     history: [],
     language: 'unknown',
+    languageState: createLanguageState(),
     turnIndex: 0,
     voiceId: fixture.voiceId || null,
   };

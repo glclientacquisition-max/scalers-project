@@ -81,6 +81,8 @@ See `.env.example` — key ones:
 - `VOICE_GREETING_MODE`, `VOICE_FILLER`, `VOICE_FILLER_DELAY_MS`, `VOICE_FILLER_CACHE`
 - `VOICE_PROFILE` (`balanced` | `snappy`), `VOICE_TTS_GAIN`, `SONIOX_TTS_SPEED`, `SONIOX_TTS_SPEED_EN`, `SONIOX_TTS_SPEED_SW`
 - `VOICE_LLM_STREAM`, `VOICE_STREAM_EARLY_CHARS` / `WORDS` (default 0: sentence-only TTS flush)
+- `VOICE_STRUCTURED_REPLY` (`auto` default: on in staging and local, off when the Railway environment name contains `prod`). Language-locked JSON replies. See [`VOICE_STRUCTURED_REPLY.md`](./VOICE_STRUCTURED_REPLY.md).
+- `GEMINI_STRUCTURED_MAX_OUTPUT_TOKENS` (default 384; the prose cap `GEMINI_MAX_OUTPUT_TOKENS` stays 256)
 - `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`, `VOICE_IDLE_NUDGE_MS` (default 10000; not armed until the caller has spoken)
 - `VOICE_BARGE_GRACE_MS`, `VOICE_BARGE_EARLY_MS`, `VOICE_BARGE_MIN_CHARS`
 - Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS`, `SONIOX_ENDPOINT_SENSITIVITY`, …
@@ -93,7 +95,7 @@ npm run test:voice
 
 Runs: TTS normalize → spoken stream buffer → turn-taking → wiring, then the voice eval gate (`npm run test:voice-eval`).
 
-Tracing and the regression scorecard: [`VOICE_TRACING_AND_EVAL.md`](./VOICE_TRACING_AND_EVAL.md). Apply [`docs/supabase/voice_turn_traces.sql`](../supabase/voice_turn_traces.sql) by hand on staging before traces persist. The writer does not throw if the table is missing.
+Tracing and the regression scorecard: [`VOICE_TRACING_AND_EVAL.md`](./VOICE_TRACING_AND_EVAL.md). Structured replies (phase 2): [`VOICE_STRUCTURED_REPLY.md`](./VOICE_STRUCTURED_REPLY.md). Apply [`docs/supabase/voice_turn_traces.sql`](../supabase/voice_turn_traces.sql) by hand on staging before traces persist. The writer does not throw if the table is missing.
 
 For media/webhook local bring-up: `npm start` + `npm run tunnel:cloudflared` (see `docs/operations/WEBHOOK_TUNNEL.md`).
 

@@ -3,6 +3,8 @@
 // Recorded mode is the CI gate. --live asks Gemini. --update-baseline rewrites
 // the committed scorecard after an intentional gain.
 
+process.env.VOICE_STRUCTURED_REPLY = 'on';
+
 const fs = require('fs');
 const path = require('path');
 const { replayCall } = require('../src/speech/replayVoice');

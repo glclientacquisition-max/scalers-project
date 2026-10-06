@@ -1,13 +1,13 @@
 {
   "schema": "scalers.voice.eval-baseline",
   "schemaVersion": 1,
-  "recordedAt": "2026-10-06T10:05:45.880Z",
+  "recordedAt": "2026-10-06T10:33:51.404Z",
   "calls": {
     "HD_053dd373ee84": {
-      "score": 82.5,
+      "score": 97.5,
       "checks": {
-        "languageMismatch": 1,
-        "incomplete": 2,
+        "languageMismatch": 0,
+        "incomplete": 0,
         "repeatedQuestion": 0,
         "silence": 0,
         "deletedAnswer": 0,
@@ -15,41 +15,41 @@
         "prematureTurn": 1,
         "slow": 0
       },
-      "nameAsks": 1
+      "nameAsks": 0
     },
     "HD_21b92f25640b": {
-      "score": 72.4,
+      "score": 92,
       "checks": {
-        "languageMismatch": 2,
+        "languageMismatch": 0,
         "incomplete": 0,
-        "repeatedQuestion": 3,
+        "repeatedQuestion": 1,
         "silence": 0,
         "deletedAnswer": 0,
         "respelling": 0,
         "prematureTurn": 0,
         "slow": 0
       },
-      "nameAsks": 4
+      "nameAsks": 2
     },
     "HD_48631816b68c": {
-      "score": 46.3,
+      "score": 94.7,
       "checks": {
-        "languageMismatch": 4,
-        "incomplete": 9,
-        "repeatedQuestion": 3,
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
         "silence": 0,
-        "deletedAnswer": 7,
-        "respelling": 3,
+        "deletedAnswer": 0,
+        "respelling": 0,
         "prematureTurn": 1,
         "slow": 9
       },
-      "nameAsks": 3
+      "nameAsks": 1
     },
     "HD_b47644d19072": {
-      "score": 90,
+      "score": 100,
       "checks": {
         "languageMismatch": 0,
-        "incomplete": 1,
+        "incomplete": 0,
         "repeatedQuestion": 0,
         "silence": 0,
         "deletedAnswer": 0,
@@ -57,16 +57,16 @@
         "prematureTurn": 0,
         "slow": 0
       },
-      "nameAsks": 1
+      "nameAsks": 0
     },
     "HD_f32a2b7caafd": {
-      "score": 81.7,
+      "score": 96.7,
       "checks": {
         "languageMismatch": 0,
-        "incomplete": 1,
+        "incomplete": 0,
         "repeatedQuestion": 0,
         "silence": 0,
-        "deletedAnswer": 1,
+        "deletedAnswer": 0,
         "respelling": 0,
         "prematureTurn": 1,
         "slow": 0
@@ -74,10 +74,10 @@
       "nameAsks": 1
     },
     "HD_fe0d1e8fbd6e": {
-      "score": 86,
+      "score": 98,
       "checks": {
-        "languageMismatch": 3,
-        "incomplete": 3,
+        "languageMismatch": 0,
+        "incomplete": 0,
         "repeatedQuestion": 0,
         "silence": 0,
         "deletedAnswer": 0,
@@ -85,7 +85,7 @@
         "prematureTurn": 2,
         "slow": 0
       },
-      "nameAsks": 1
+      "nameAsks": 0
     }
   }
 }

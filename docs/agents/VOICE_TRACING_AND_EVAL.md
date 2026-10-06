@@ -6,7 +6,7 @@ Later phases plug in here:
 
 | Phase | What changes | What stays |
 | --- | --- | --- |
-| 2. Structured Gemini output | `polishSpokenReply` and the other mouth filters shrink or go away. Replay still calls the mouth. Scores should rise. | Trace stages, fixtures, the gate |
+| 2. Structured Gemini output | Shipped behind `VOICE_STRUCTURED_REPLY`. Replay scores the structured mouth. See [`VOICE_STRUCTURED_REPLY.md`](./VOICE_STRUCTURED_REPLY.md). | Trace stages, fixtures, the gate |
 | 3. Tool state machine | Pass `respond` into `replayCall`. Recorded mode can keep the old model text. Live mode calls the new brain. | Same scorecard |
 | 4. Split `server.js` | Move the `voiceTrace.note*` calls with the stage they describe. The record shape does not change. | `createVoiceTrace` |
 | 5. Gemini Live | Add a `model` stage with `provider: 'gemini-live'`. Do not add a column. | JSON payload |
@@ -52,7 +52,7 @@ Turn record (`schema: scalers.voice.turn`):
 | `canned` | `path`, `text`. Paths include `greeting`, `file_name_ask`, `visit_read`, `hear_again`, `speech_repair`, `llm_recovery`. |
 | `tts` | `text` sent toward TTS, `before`, `language`, `voiceId` |
 | `barge_in` | `reason` |
-| `latency` | `callerStopToModelFirstTokenMs`, `callerStopToFirstTtsPcmMs` |
+| `latency` | `callerStopToModelFirstTokenMs`, `callerStopToFirstTtsPcmMs`, `structuredFirstSentenceMs` (parser time until the first JSON sentence, not network audio) |
 | `outcome` | `value` such as `ok`, `barge_in`, `speech_repair`, `early_return`, `unlogged` |
 
 Call record (`schema: scalers.voice.call`): `startedAt`, `endedAt`, `turnCount`, `voiceId`, `sttModel`, `ttsModel`, and greeting stages.
@@ -61,7 +61,7 @@ Prompt identity lives in `src/prompts.js` as `VOICE_SYSTEM_PROMPT_ID` (`voice.sy
 
 ## Replay
 
-`src/speech/replayVoice.js` does not load `server.js`. It runs the same mouth the call uses: `polishSpokenReply`, empty-turn repair, `cutNoAiSlop`, `prepareForTts`.
+`src/speech/replayVoice.js` does not load `server.js`. With `VOICE_STRUCTURED_REPLY` off it still runs `polishSpokenReply`, empty-turn repair, `cutNoAiSlop`, and `prepareForTts`. The eval script forces the flag on and runs `speakStructuredTurn` (`src/speech/structuredReplay.js`): a deterministic stand-in for Gemini JSON, then the same normalize-only mouth. It does not call the network. `--live` still asks Gemini.
 
 ```bash
 npm run voice:replay

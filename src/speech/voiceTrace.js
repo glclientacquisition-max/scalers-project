@@ -269,14 +269,14 @@ function createVoiceTrace(opts = {}) {
   function noteTransform(info = {}) {
     const before = String(info.before || '');
     const after = String(info.after || '');
-    if (before.trim() === after.trim()) return;
+    if (before.trim() === after.trim() && !info.force) return;
     pushStage({
       stage: 'transform',
       name: String(info.stage || info.name || 'speech'),
       reason: String(info.reason || (after.trim() ? 'rewritten' : 'dropped')),
       before: redactText(before),
       after: redactText(after),
-      dropped: !after.trim(),
+      dropped: typeof info.dropped === 'boolean' ? info.dropped : !after.trim(),
     });
   }
 
@@ -323,6 +323,7 @@ function createVoiceTrace(opts = {}) {
       stage: 'latency',
       callerStopToModelFirstTokenMs: firstTokenMs,
       callerStopToFirstTtsPcmMs: pcm == null || pcm < 0 ? null : pcm,
+      structuredFirstSentenceMs: extra.structuredFirstSentenceMs ?? null,
     });
     open.stages.push({ stage: 'outcome', value: String(extra.outcome || 'ok') });
     open.voiceId = voiceOf() || null;

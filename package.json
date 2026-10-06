@@ -16,7 +16,7 @@
     "test:idle-nudge": "node --test tests/idleNudge.test.js",
     "test:speed-control": "node tests/speedControl.test.js",
     "test:naturalness": "node tests/naturalnessScore.test.js",
-    "test:voice-eval": "node --test tests/voiceTrace.test.js tests/voiceScore.test.js && node scripts/replay-voice-suite.js",
+    "test:voice-eval": "node --test tests/voiceTrace.test.js tests/voiceScore.test.js tests/languageLock.test.js tests/structuredReply.test.js && node scripts/replay-voice-suite.js",
     "voice:score": "node scripts/score-voice-call.js",
     "voice:replay": "node scripts/replay-voice-suite.js",
     "score:naturalness": "node scripts/score-voice-naturalness.js",
