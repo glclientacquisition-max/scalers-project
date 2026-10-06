@@ -58,6 +58,7 @@ const BUSINESSES: AdminBusiness[] = [
     ai_wallet_balance_usd: 0,
     package_name: null,
     package_period: null,
+    billing_enforcement: "off",
     status: "waiting",
   },
   {
@@ -72,6 +73,7 @@ const BUSINESSES: AdminBusiness[] = [
     ai_wallet_balance_usd: 0,
     package_name: "Starter",
     package_period: "month",
+    billing_enforcement: "soft",
     status: "active",
   },
   {
@@ -86,6 +88,7 @@ const BUSINESSES: AdminBusiness[] = [
     ai_wallet_balance_usd: 0,
     package_name: null,
     package_period: null,
+    billing_enforcement: "off",
     status: "archived",
   },
   ...Array.from({ length: 24 }, (_, index) => ({
@@ -100,6 +103,7 @@ const BUSINESSES: AdminBusiness[] = [
     ai_wallet_balance_usd: 0,
     package_name: index % 2 === 0 ? "Starter" : null,
     package_period: index % 2 === 0 ? ("month" as const) : null,
+    billing_enforcement: "off" as const,
     status: "active" as const,
   })),
 ];

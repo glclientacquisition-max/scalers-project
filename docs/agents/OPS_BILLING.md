@@ -29,7 +29,7 @@ Use for packages catalog, on-demand rate card, wallet ledger (ops scaffolding), 
 
 ## Billing / ops invariants
 
-0. **Packages + on-demand (customer story)** — Owners buy a package SKU; past included usage uses on-demand rates when opted in. Super Admin **Packages** is the primary billing surface. **Ledger** is ops scaffolding, not the headline checkout path.
+0. **Packages + on-demand (customer story)** — Owners buy a package SKU; past included usage uses on-demand rates when opted in. Super Admin **Packages** is the catalog. Plan and charges live on the Businesses shop. The KES ledger is ops scaffolding, not a nav tab.
 1. **One KES ledger** — AI bundled into per-minute rate; no resurrecting dual USD/KES client wallets.
 2. Ledger is append-only; credits/debits via security-definer RPCs / service role only.
 3. `charge_call_to_wallet` (and JS wrapper) must stay **idempotent** per call.
