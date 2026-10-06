@@ -3,10 +3,9 @@
 -- Run after: product_catalog_and_social.sql (knowledge / catalog era).
 -- Do NOT apply to production ALCR until reviewed. Idempotent re-runs safe.
 --
--- Open decision: bulk backfill owner vs seed for existing tenant values is NOT
--- done here (except FAQ status/source demotion). Completeness treats missing
--- meta on a populated field as transitional import weight (50%) — see
--- docs/platform/TENANT_FIELD_PROVENANCE.md.
+-- Alvin decision roadmap §10.5: bulk backfill existing facts as source=seed
+-- (force re-confirm). FAQ JSON demotion aligns (status suggested, source seed).
+-- Missing meta scores 0 (same as seed). See TENANT_FIELD_PROVENANCE.md.
 
 -- ---------------------------------------------------------------------------
 -- Tables
@@ -152,8 +151,7 @@ begin
   limit 1;
 
   if v_source is null then
-    -- Transitional: legacy rows without meta (backfill TBD).
-    return 0.5;
+    return 0;
   end if;
 
   return public._tenant_field_source_weight(v_source);
@@ -418,6 +416,159 @@ as $$
     where val ? 'open'
   );
 $$;
+
+-- Bulk backfill §10.5: tag existing tenant values as seed (idempotent).
+create or replace function public.backfill_tenant_field_meta_seed()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_inserted integer;
+begin
+  with candidate_paths as (
+    select t.id as tenant_id, 'identity.business_name'::text as field_path
+    from public.tenants t
+    where coalesce(trim(t.business_name), '') <> ''
+    union all
+    select t.id, 'identity.vertical'
+    from public.tenants t
+    where coalesce(trim(t.vertical), '') <> ''
+    union all
+    select t.id, 'identity.primary_phone'
+    from public.tenants t
+    where coalesce(trim(t.sautikit_virtual_number), '') <> ''
+    union all
+    select t.id, 'identity.language'
+    from public.tenants t
+    where coalesce(array_length(t.voice_languages, 1), 0) > 0
+    union all
+    select t.id, 'identity.spoken_name'
+    from public.tenants t
+    where coalesce(trim(t.spoken_name), '') <> ''
+    union all
+    select t.id, 'hours.weekly_grid'
+    from public.tenants t
+    where public._tenant_has_structured_hours(t.hours_schedule)
+      or coalesce(trim(t.business_hours), '') <> ''
+    union all
+    select t.id, 'locations.branches'
+    from public.tenants t
+    where jsonb_array_length(coalesce(t.business_locations, '[]'::jsonb)) > 0
+    union all
+    select t.id, 'policies.coverage_areas'
+    from public.tenants t
+    where coalesce(trim(t.business_policies ->> 'coverage_areas'), '') <> ''
+      or jsonb_array_length(coalesce(t.business_policies -> 'coverage_areas', '[]'::jsonb)) > 0
+    union all
+    select t.id, 'policies.' || k.key
+    from public.tenants t
+    cross join lateral (
+      select key
+      from jsonb_object_keys(coalesce(t.business_policies, '{}'::jsonb)) as key
+      where key in (
+        'returns', 'delivery', 'payment', 'deposit', 'cancellation', 'warranty', 'other', 'holds'
+      )
+    ) k
+    where coalesce(trim(t.business_policies ->> k.key), '') <> ''
+      or (
+        jsonb_typeof(t.business_policies -> k.key) is not null
+        and (t.business_policies -> k.key) not in ('null'::jsonb, '""'::jsonb, '{}'::jsonb, '[]'::jsonb)
+      )
+    union all
+    select t.id, 'payments.methods'
+    from public.tenants t
+    where coalesce(trim(t.business_policies ->> 'payment'), '') <> ''
+      or coalesce(trim(t.business_policies ->> 'deposit'), '') <> ''
+    union all
+    select
+      t.id,
+      'catalog.product.'
+        || coalesce(nullif(trim(elem ->> 'sku'), ''), ord::text)
+        || '.name'
+    from public.tenants t
+    cross join jsonb_array_elements(coalesce(t.product_catalog, '[]'::jsonb))
+      with ordinality as x(elem, ord)
+    where coalesce(trim(elem ->> 'name'), '') <> ''
+    union all
+    select t.id, 'catalog.service.' || ord::text || '.name'
+    from public.tenants t
+    cross join jsonb_array_elements(coalesce(t.services_catalog, '[]'::jsonb))
+      with ordinality as x(elem, ord)
+    where coalesce(trim(elem ->> 'name'), '') <> ''
+    union all
+    select t.id, 'faqs.' || ord::text
+    from public.tenants t
+    cross join jsonb_array_elements(coalesce(t.faqs, '[]'::jsonb))
+      with ordinality as x(elem, ord)
+    where coalesce(trim(elem ->> 'question'), '') <> ''
+      and coalesce(trim(elem ->> 'answer'), '') <> ''
+    union all
+    select t.id, 'team.notify.whatsapp'
+    from public.tenants t
+    where coalesce(trim(t.whatsapp_notification_number), '') <> ''
+    union all
+    select t.id, 'team.notify.email'
+    from public.tenants t
+    where coalesce(trim(t.alert_email), '') <> ''
+    union all
+    select t.id, 'team.notify.channels'
+    from public.tenants t
+    where coalesce(t.notify_channels, '{}'::jsonb) <> '{}'::jsonb
+    union all
+    select t.id, 'assistant.agent_name'
+    from public.tenants t
+    where coalesce(trim(t.agent_name), '') <> ''
+    union all
+    select t.id, 'assistant.tone'
+    from public.tenants t
+    where coalesce(trim(t.agent_tone), '') <> ''
+    union all
+    select t.id, 'assistant.tools'
+    from public.tenants t
+    where t.agent_tools is not null and t.agent_tools <> '{}'::jsonb
+    union all
+    select t.id, 'bulletin.items'
+    from public.tenants t
+    where jsonb_array_length(coalesce(t.daily_bulletin, '[]'::jsonb)) > 0
+    union all
+    select t.id, 'identity.social_handles'
+    from public.tenants t
+    where coalesce(t.social_handles, '{}'::jsonb) <> '{}'::jsonb
+  )
+  insert into public.tenant_field_meta (
+    tenant_id,
+    field_path,
+    source,
+    source_ref,
+    confirmed_by,
+    confirmed_at,
+    last_verified_at
+  )
+  select
+    c.tenant_id,
+    c.field_path,
+    'seed',
+    'backfill:roadmap_10_5',
+    null,
+    null,
+    null
+  from candidate_paths c
+  where not exists (
+    select 1
+    from public.tenant_field_meta m
+    where m.tenant_id = c.tenant_id
+      and m.field_path = c.field_path
+  );
+
+  get diagnostics v_inserted = row_count;
+  return coalesce(v_inserted, 0);
+end;
+$$;
+
+revoke all on function public.backfill_tenant_field_meta_seed() from public;
+grant execute on function public.backfill_tenant_field_meta_seed() to service_role;
 
 create or replace function public._tenant_catalog_product_score(
   p_tenant_id uuid,
@@ -821,16 +972,17 @@ begin
   v_ready :=
     v_overall >= 70
     and v_any_owner
-    and v_faq_n >= 1
-    and public._tenant_has_verified_notify(t)
+    and v_faq_n >= 3
+    and v_team >= 50
     and v_catalog >= 40
-    and not exists (
+    and exists (
       select 1
       from public.tenant_field_meta m
       where m.tenant_id = p_tenant_id
-        and m.source = 'seed'
-        and m.field_path like 'identity.%'
-    );
+        and m.source = 'owner'
+        and m.field_path like 'team.notify.%'
+    )
+    and public._tenant_has_verified_notify(t);
 
   if v_catalog < 40 then
     v_gaps := v_gaps || jsonb_build_array(jsonb_build_object(
@@ -940,3 +1092,9 @@ comment on function public.tenant_completeness_score(uuid) is
   'GIGO P0: 10-domain completeness (0-100), ready_badge, next_gaps. Seeds score 0 via meta.';
 comment on function public.tenant_hold_gate(uuid) is
   'GIGO P0: outcome gate for place_hold — policies, owner holdable SKU, notify target.';
+
+comment on function public.backfill_tenant_field_meta_seed() is
+  'Roadmap §10.5: one-time-safe re-run inserts seed meta for populated tenant fields; skips existing paths.';
+
+-- Run backfill on apply (safe to re-run; does not overwrite existing meta).
+select public.backfill_tenant_field_meta_seed();
