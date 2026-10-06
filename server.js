@@ -214,6 +214,7 @@ const {
   createLanguageState,
   resolveLanguageState,
   languageDirective,
+  spokenTextDirective,
 } = require('./src/conversation/language');
 const {
   generateDynamicGreeting,
@@ -244,6 +245,7 @@ const {
   looksLikeEcho: turnLooksLikeEcho,
   classifyFinalDuringAgentSpeech,
   agentAwaitingReply,
+  utteranceLooksIncomplete,
 } = require('./src/speech/turnTaking');
 const {
   createSpokenStreamBuffer,
@@ -1732,6 +1734,8 @@ mediaWss.on('connection', (ws, req) => {
   let emptyRepairOffered = false;
   let turnBusy = false;
   let utteranceParts = [];
+  let utteranceTokenLanguages = { en: 0, sw: 0 };
+  let pendingTokenLanguages = { en: 0, sw: 0 };
   let utteranceTimer = null;
   /** Idle check-in only after the caller has actually spoken. */
   let heardCallerUtterance = false;
@@ -2462,11 +2466,25 @@ mediaWss.on('connection', (ws, req) => {
     return turnLooksLikeEcho(text, lastAgentText);
   }
 
+  function addTokenLanguages(target, counts) {
+    if (!counts) return;
+    target.en += Number(counts.en) || 0;
+    target.sw += Number(counts.sw) || 0;
+  }
+
+  function takeTokenLanguages(box) {
+    const snapshot = { en: box.en, sw: box.sw };
+    box.en = 0;
+    box.sw = 0;
+    return snapshot;
+  }
+
   function kickPendingTurn() {
     if (turnBusy || !pendingUtterance) return;
     const text = pendingUtterance;
+    const tokenLanguages = takeTokenLanguages(pendingTokenLanguages);
     pendingUtterance = null;
-    runCallerTurn(text).catch((err) => {
+    runCallerTurn(text, tokenLanguages).catch((err) => {
       console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
     });
   }
@@ -2530,13 +2548,14 @@ mediaWss.on('connection', (ws, req) => {
     return '';
   }
 
-  async function runCallerTurn(userText) {
+  async function runCallerTurn(userText, tokenLanguages) {
     const clean = String(userText || '').replace(/\s+/g, ' ').trim();
     if (!clean) return;
     idleNudge.clear();
     if (turnBusy) {
       // Merge continuation fragments into one pending utterance (don't drop context).
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${clean}` : clean;
+      addTokenLanguages(pendingTokenLanguages, tokenLanguages);
       return;
     }
     // A new caller turn may speak. The previous barge must not swallow it.
@@ -2572,7 +2591,7 @@ mediaWss.on('connection', (ws, req) => {
     activeTurnTiming = turnTiming;
 
     const callKey = sidLabel();
-    const languageEvidence = analyzeCallerLanguage(clean);
+    const languageEvidence = analyzeCallerLanguage(clean, { tokenLanguages });
     callLanguageState = resolveLanguageState(callLanguageState, languageEvidence);
     callLanguage = callLanguageState.current;
 
@@ -2669,6 +2688,7 @@ mediaWss.on('connection', (ws, req) => {
         catalog: brainProfile.productCatalog,
       }),
       languageDirective(callLanguage),
+      spokenTextDirective(),
     ]
       .filter(Boolean)
       .join('\n\n');
@@ -3365,6 +3385,7 @@ mediaWss.on('connection', (ws, req) => {
     }
     if (!utteranceParts.length) return;
     const text = utteranceParts.join('').replace(/\s+/g, ' ').trim();
+    const tokenLanguages = takeTokenLanguages(utteranceTokenLanguages);
     utteranceParts = [];
     if (!text) return;
     if (overlapHold.alreadyReleased(text)) {
@@ -3374,6 +3395,7 @@ mediaWss.on('connection', (ws, req) => {
     overlapHold.markReleased(text);
     if (turnBusy) {
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${text}` : text;
+      addTokenLanguages(pendingTokenLanguages, tokenLanguages);
       return;
     }
     console.log(`[ws/media][${sidLabel()}] caller_turn_processed`);
@@ -3388,7 +3410,7 @@ mediaWss.on('connection', (ws, req) => {
         });
       }
     }
-    runCallerTurn(text).catch((err) => {
+    runCallerTurn(text, tokenLanguages).catch((err) => {
       console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
     });
   }
@@ -3446,6 +3468,7 @@ mediaWss.on('connection', (ws, req) => {
       // Finals: one turn-taking decision, then act.
       interimBargeText = '';
       const decision = maybeBargeIn(text, 'final speech');
+      const tokenLanguages = evt.tokenLanguages;
 
       if (decision.reason === 'echo') {
         console.log(
@@ -3472,6 +3495,7 @@ mediaWss.on('connection', (ws, req) => {
       if (decision.action === 'ignore' || decision.action === 'skip') {
         if (decision.queue) {
           utteranceParts.push(text);
+          addTokenLanguages(utteranceTokenLanguages, tokenLanguages);
           if (!(speaking && !bargeInActive)) scheduleUtteranceFlush();
         }
         return;
@@ -3502,6 +3526,7 @@ mediaWss.on('connection', (ws, req) => {
       }
       overlapHold.consumeInterimIfMatches(text);
       utteranceParts.push(text);
+      addTokenLanguages(utteranceTokenLanguages, tokenLanguages);
       scheduleUtteranceFlush();
       return;
     }
@@ -3520,6 +3545,17 @@ mediaWss.on('connection', (ws, req) => {
       const leftover = overlapHold.takeAllInterims();
       if (leftover && !overlapHold.alreadyReleased(leftover)) {
         utteranceParts.push(leftover);
+      }
+      const pendingText = utteranceParts.join('').replace(/\s+/g, ' ').trim();
+      // Soniox <end> at 700ms still cuts "…vya" / "Specialist—". Hold the
+      // local flush so the rest of the clause can arrive. A finished
+      // session and a complete English sentence flush immediately.
+      if (evt.type === 'endpoint' && utteranceLooksIncomplete(pendingText)) {
+        console.log(
+          `[ws/media][${sidLabel()}] endpoint held, utterance unfinished: ${pendingText.slice(0, 80)}`
+        );
+        scheduleUtteranceFlush();
+        return;
       }
       flushUtterance();
     }
@@ -4594,6 +4630,7 @@ wss.on('connection', (ws) => {
             catalog: brainProfile.productCatalog,
           }),
           languageDirective(callLanguage),
+          spokenTextDirective(),
         ]
           .filter(Boolean)
           .join('\n\n');

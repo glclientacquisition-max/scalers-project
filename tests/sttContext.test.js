@@ -62,6 +62,22 @@ test('curateTerms caps and dedupes case-insensitively', () => {
   assert.ok(!terms.includes('A'));
 });
 
+test('pronunciation respellings are not recognition terms', () => {
+  const ctx = buildSttContext({
+    businessName: 'Nakuru Books',
+    agentName: 'Aisha',
+    ttsLexicon: [
+      { match: 'Nakuru', say: 'Na-koo-roo' },
+      { match: 'Aisha', say: 'Eye-sha' },
+      { match: 'Art n Soul', say: 'Art and Soul' },
+    ],
+  });
+  assert.ok(ctx.terms.includes('Nakuru'));
+  assert.ok(ctx.terms.includes('Art and Soul'));
+  assert.ok(!ctx.terms.includes('Na-koo-roo'));
+  assert.ok(!ctx.terms.includes('Eye-sha'));
+});
+
 test('skips regex-y lexicon matches', () => {
   const ctx = buildSttContext({
     businessName: 'Demo Co',

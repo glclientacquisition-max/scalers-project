@@ -2,7 +2,7 @@
 // Caller-event policy lives in decideCallerEvent — one table, one outcome.
 
 const INCOMPLETE_TAIL =
-  /\b(and|but|so|because|or|then|also|with|for|to|na|lakini|kwa|sababu|ama|halafu|then)\s*$/i;
+  /\b(and|but|so|because|or|then|also|with|for|to|from|of|na|lakini|kwa|sababu|ama|halafu|ya|wa|za|ni|kwamba|au|ili|kama|pia|nataka|nina|naomba|vya|cha|la|ku)\s*$/i;
 
 const INTERRUPT_CUES =
   /\b(no|nope|wait|stop|hold on|actually|sorry|excuse me|hapana|simama|subiri|kusubiri|acha)\b/i;
@@ -157,6 +157,9 @@ function utteranceLooksIncomplete(text) {
   if (!raw) return false;
 
   // Live call HD_0cdf315f02e9: "executive room,and." was flushed mid-thought.
+  // Soniox often cuts a live Kiswahili turn as "Hii ni Aris Specialist—".
+  if (/[\u2014\u2013-]\s*$/.test(raw)) return true;
+
   const core = raw.replace(/[.!?,;:…]+$/g, '').trim();
   if (!core) return false;
 

@@ -44,6 +44,21 @@ const SWAHILI_MARKERS = [
   'kuja',
   'ako',
   'siku',
+  'nahitaji',
+  'hitaji',
+  'vitabu',
+  'kitabu',
+  'kuandikia',
+  'kuandika',
+  'kuonyesha',
+  'onyesha',
+  'vya',
+  'hii',
+  'hizi',
+  'hiki',
+  'kwamba',
+  'kiswahili',
+  'swahili',
 ];
 
 const SHENG_MARKERS = [
@@ -87,6 +102,7 @@ const ENGLISH_CORE_MARKERS = [
   'no',
   'okay',
   'ok',
+  'english',
 ];
 
 /** English job nouns Kenyans keep inside Kiswahili. Do not treat as English. */
@@ -182,10 +198,10 @@ function countMarkers(raw, markers) {
 }
 
 /**
- * Evidence-bearing detection for stateful language policy.
+ * Keyword evidence. Used when Soniox did not tag the turn.
  * @param {string} text
  */
-function analyzeCallerLanguage(text) {
+function analyzeCallerLanguageKeywords(text) {
   const raw = String(text || '')
     .toLowerCase()
     .replace(/\s+/g, ' ')
@@ -239,6 +255,63 @@ function analyzeCallerLanguage(text) {
 }
 
 /**
+ * Soniox per-token language tags. Prefer these over the keyword list when
+ * they cover most of the turn. Sparse tags fall through to keywords.
+ * @param {string} text
+ * @param {{ en?: number, sw?: number }|null|undefined} tags character counts
+ */
+function languageFromTokenTags(text, tags) {
+  if (!tags || typeof tags !== 'object') return null;
+  const en = Number(tags.en) || 0;
+  const sw = Number(tags.sw) || 0;
+  const tagged = en + sw;
+  if (tagged < 4) return null;
+  const letters = String(text || '').replace(/[^\p{L}\p{N}]/gu, '').length;
+  if (letters >= 8 && tagged < letters * 0.45) return null;
+
+  const swRatio = sw / tagged;
+  const enRatio = en / tagged;
+  let language = 'mixed';
+  if (swRatio >= 0.72) language = 'sw';
+  else if (enRatio >= 0.72) language = 'en';
+  const margin = Math.abs(swRatio - enRatio);
+  const confidence =
+    language === 'mixed' ? 0.62 : Math.min(0.96, 0.8 + margin * 0.18);
+  return {
+    language,
+    confidence,
+    scores: {
+      en: enRatio > swRatio ? 3 : enRatio === swRatio ? 2 : 1,
+      sw: swRatio > enRatio ? 3 : swRatio === enRatio ? 2 : 1,
+      sheng: 0,
+    },
+  };
+}
+
+/**
+ * Evidence-bearing detection for stateful language policy.
+ * Soniox language tags win when they cover the turn. Keywords cover
+ * untagged audio and Sheng, which Soniox usually tags as Kiswahili.
+ * @param {string} text
+ * @param {{ tokenLanguages?: { en?: number, sw?: number } }} [opts]
+ */
+function analyzeCallerLanguage(text, opts = {}) {
+  const keyword = analyzeCallerLanguageKeywords(text);
+  if (keyword.language === 'sheng' && keyword.scores.sheng >= 2) return keyword;
+  const fromTags = languageFromTokenTags(text, opts.tokenLanguages);
+  if (!fromTags) return keyword;
+  return {
+    language: fromTags.language,
+    confidence: fromTags.confidence,
+    scores: {
+      en: Math.max(keyword.scores.en, fromTags.scores.en),
+      sw: Math.max(keyword.scores.sw, fromTags.scores.sw),
+      sheng: keyword.scores.sheng,
+    },
+  };
+}
+
+/**
  * @param {string} text
  * @returns {'en'|'sw'|'sheng'|'mixed'|'unknown'}
  */
@@ -269,6 +342,9 @@ function resolveLanguageState(previous, evidence) {
     confidence = Math.max(confidence, 0.82);
   } else if (detected === 'mixed' && enScore > swScore) {
     detected = 'en';
+    // A Kiswahili call must follow a real English turn on the first clear mix.
+    // A lone "okay" never reaches this branch.
+    confidence = Math.max(confidence, 0.82);
   }
   state.detected = detected;
 
@@ -400,7 +476,15 @@ function isBackchannel(text, opts = {}) {
 }
 
 /**
- * Light per-turn language hint — keep soft so Gemini stays fluent.
+ * Per-turn spoken-form cue. Tenant prompts already say "no markdown";
+ * this still reaches the model when a compiled prompt is stale.
+ */
+function spokenTextDirective() {
+  return 'Spoken form: plain words a person would say on a phone. No markdown, emoji, bullets, asterisks, slashes, dashes, or brackets. Do not write symbols. Start a new sentence instead of a comma or a dash. Prices, times, and phone numbers stay in spoken words.';
+}
+
+/**
+ * Light per-turn language hint. Keep it soft so Gemini stays fluent.
  * @param {'en'|'sw'|'sheng'|'mixed'|'unknown'|null} lang
  */
 function languageDirective(lang) {
@@ -430,4 +514,6 @@ module.exports = {
   ttsLanguageFor,
   isBackchannel,
   languageDirective,
+  spokenTextDirective,
+  analyzeCallerLanguageKeywords,
 };

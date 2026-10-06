@@ -25,6 +25,47 @@ const ENDPOINT_LATENCY_ADJ = Number(process.env.SONIOX_ENDPOINT_LATENCY_ADJ || 2
 const CONTEXT_WAIT_MS = Number(process.env.SONIOX_STT_CONTEXT_WAIT_MS || 800);
 
 /**
+ * Per-token language tags. Hints stay en+sw. Do not hard-restrict those
+ * hints: Soniox is less robust when two languages are locked to one set.
+ */
+function languageIdentificationEnabled() {
+  const raw = String(process.env.SONIOX_LANGUAGE_IDENTIFICATION ?? 'on')
+    .trim()
+    .toLowerCase();
+  return raw !== '0' && raw !== 'false' && raw !== 'off' && raw !== 'no';
+}
+
+/**
+ * @param {string|undefined} code
+ * @returns {'en'|'sw'|''}
+ */
+function normalizeTokenLanguage(code) {
+  const raw = String(code || '')
+    .toLowerCase()
+    .split(/[-_]/)[0];
+  if (raw === 'en' || raw === 'sw') return raw;
+  return '';
+}
+
+/**
+ * Character counts of finalized (or any) tokens by language.
+ * Spaces and endpoint markers do not count.
+ * @param {Array<{ text?: string, language?: string }>|null|undefined} tokens
+ * @returns {{ en: number, sw: number }}
+ */
+function summarizeTokenLanguages(tokens) {
+  const counts = { en: 0, sw: 0 };
+  for (const token of tokens || []) {
+    if (!token || typeof token.text !== 'string') continue;
+    const text = token.text.replace(/<\/?end>/gi, '').trim();
+    if (!text) continue;
+    const lang = normalizeTokenLanguage(token.language);
+    if (lang) counts[lang] += text.length;
+  }
+  return counts;
+}
+
+/**
  * Resolve optional context / contextPromise with a short timeout so early audio
  * is not blocked if tenant load is slow.
  * @param {{ context?: object|null, contextPromise?: Promise<object|null>|null }} opts
@@ -73,6 +114,7 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
       clearTimeout(timer);
       (async () => {
         const hints = sttLanguageHints();
+        const identifyLanguages = languageIdentificationEnabled();
         const resolved = await resolveSessionContext({ context, contextPromise });
         const config = {
           api_key: apiKey,
@@ -87,6 +129,7 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
           max_endpoint_delay_ms: MAX_ENDPOINT_DELAY_MS,
           endpoint_sensitivity: ENDPOINT_SENSITIVITY,
         };
+        if (identifyLanguages) config.enable_language_identification = true;
 
         const contextUsed = Boolean(
           resolved &&
@@ -107,6 +150,7 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
         console.log(
           `[soniox-stt][${callSid}] session open model=${SONIOX_MODEL} rate=${SAMPLE_RATE}` +
             ` hints=${hints.join('+')}` +
+            ` lang_id=${identifyLanguages}` +
             ` context_used=${contextUsed}` +
             ` terms=${termList.length}` +
             (termList.length ? ` term_list=${JSON.stringify(termList)}` : '') +
@@ -154,6 +198,10 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
         let interim = '';
         let finals = '';
         let sawEndpoint = false;
+        /** @type {object[]} */
+        const finalTokens = [];
+        /** @type {object[]} */
+        const interimTokens = [];
         for (const token of msg.tokens) {
           if (!token || typeof token.text !== 'string') continue;
           // Soniox endpoint marker when enable_endpoint_detection is on.
@@ -161,21 +209,44 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
             sawEndpoint = true;
             const cleaned = token.text.replace(/<\/?end>/g, '').replace(/\?/g, '').trim();
             if (cleaned) {
-              if (token.is_final) finals += cleaned;
-              else interim += cleaned;
+              const cleanedToken = { ...token, text: cleaned };
+              if (token.is_final) {
+                finals += cleaned;
+                finalTokens.push(cleanedToken);
+              } else {
+                interim += cleaned;
+                interimTokens.push(cleanedToken);
+              }
             }
             continue;
           }
-          if (token.is_final) finals += token.text;
-          else interim += token.text;
+          if (token.is_final) {
+            finals += token.text;
+            finalTokens.push(token);
+          } else {
+            interim += token.text;
+            interimTokens.push(token);
+          }
         }
         if (finals) {
           console.log(`[soniox-stt][${callSid}] FINAL: ${finals}`);
           noteSonioxProviderOk('stt');
-          onEvent({ type: 'transcript', text: finals, isFinal: true, raw: msg });
+          onEvent({
+            type: 'transcript',
+            text: finals,
+            isFinal: true,
+            tokenLanguages: summarizeTokenLanguages(finalTokens),
+            raw: msg,
+          });
         } else if (interim) {
           console.log(`[soniox-stt][${callSid}] interim: ${interim}`);
-          onEvent({ type: 'transcript', text: interim, isFinal: false, raw: msg });
+          onEvent({
+            type: 'transcript',
+            text: interim,
+            isFinal: false,
+            tokenLanguages: summarizeTokenLanguages(interimTokens),
+            raw: msg,
+          });
         }
         if (sawEndpoint) {
           console.log(`[soniox-stt][${callSid}] endpoint`);
@@ -244,5 +315,7 @@ module.exports = {
   isSonioxConfigured,
   buildSttContext,
   isSttContextEnabled,
+  languageIdentificationEnabled,
+  summarizeTokenLanguages,
   SAMPLE_RATE,
 };

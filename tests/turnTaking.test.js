@@ -75,6 +75,29 @@ test('complete sentences are complete', () => {
   assert.strictEqual(utteranceLooksIncomplete('I need a plumber.'), false);
   assert.strictEqual(utteranceLooksIncomplete('My name is John'), false);
 });
+test('Kiswahili tails and a cutoff dash stay open', () => {
+  assert.strictEqual(utteranceLooksIncomplete('vitabu vya'), true);
+  assert.strictEqual(utteranceLooksIncomplete('Nahitaji kwa'), true);
+  assert.strictEqual(utteranceLooksIncomplete('nataka'), true);
+  assert.strictEqual(utteranceLooksIncomplete('Hii ni Aris Specialist—'), true);
+  assert.strictEqual(utteranceLooksIncomplete('Hii ni Aris Specialist'), false);
+});
+test('Kiswahili continuation waits longer than a finished English sentence', () => {
+  const held = adaptiveFlushMs({
+    text: 'Nahitaji vitabu vya',
+    baseMs: 700,
+    minMs: 300,
+    maxMs: 1200,
+  });
+  const done = adaptiveFlushMs({
+    text: 'I need a plumber.',
+    baseMs: 700,
+    minMs: 300,
+    maxMs: 1200,
+  });
+  assert.ok(held > done, `held ${held} should exceed finished English ${done}`);
+  assert.ok(done <= 480);
+});
 
 console.log('isInterruptOnlyUtterance');
 test('detects wait/stop only turns', () => {

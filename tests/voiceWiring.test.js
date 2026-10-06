@@ -540,6 +540,30 @@ assert.match(
 );
 
 assert.match(
+  sttSource,
+  /enable_language_identification/,
+  'Soniox STT must request per-token language identification'
+);
+
+assert.doesNotMatch(
+  sttSource,
+  /language_hints_strict/,
+  'two-language strict hints are less robust than hints plus identification'
+);
+
+assert.match(
+  source,
+  /spokenTextDirective\(/,
+  'media turns must tell Gemini to speak plain words'
+);
+
+assert.match(
+  source,
+  /utteranceLooksIncomplete\(pendingText\)/,
+  'a Soniox endpoint on an unfinished Kiswahili tail must not flush immediately'
+);
+
+assert.match(
   source,
   /contextPromise:/,
   'media path must pass tenant STT contextPromise into createSonioxSttSession'

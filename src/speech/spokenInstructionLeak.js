@@ -14,6 +14,9 @@ const META_CLAUSES = [
   /\bVISIT COMMIT(?:\s*\([^)]*\))?:?\s*/gi,
   /\(?\s*think this;\s*never say it as a script\.?\s*\)?:?\s*/gi,
   /\b(?:the caller|the user)\s+said[,:]?\s*/gi,
+  // Not a Scalers filler. Gemini appended this English stock line on a
+  // Kiswahili reply (Oct 2026). Drop it in either language.
+  /\bI hear you loud and clear\.?\s*/gi,
 ];
 const INCOMPLETE_HOLD =
   /\b(?:ASR_?[A-Z_]*|RETO(?:TI?)?|NP_?(?:TRUE|FALSE|T|F)?|CONTROL[_\s-]?VOICE|NEXT[_\s-]?BEST[_\s-]?ACTION|VISIT\s*COMM?I?T?|Speak this spell(?:ing)?|the (?:caller|user)\s+sai)\s*$/i;

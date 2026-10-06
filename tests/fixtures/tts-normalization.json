@@ -82,7 +82,7 @@
       "text": "Price: 15,000",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Price: fifteen thousand"
+      "expectProductionText": "Price fifteen thousand"
     },
     {
       "id": "26-price-label-hundreds",
@@ -91,7 +91,7 @@
       "text": "Price: 900",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Price: nine hundred"
+      "expectProductionText": "Price nine hundred"
     },
     {
       "id": "27-price-label-range",
@@ -100,7 +100,7 @@
       "text": "Price: 1,500-2,000",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Price: one thousand five hundred to two thousand"
+      "expectProductionText": "Price one thousand five hundred to two thousand"
     },
     {
       "id": "28-price-label-with-quantity",
@@ -109,7 +109,7 @@
       "text": "Price: 15,000 for 3 books",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Price: fifteen thousand for 3 books"
+      "expectProductionText": "Price fifteen thousand for 3 books"
     },
     {
       "id": "05-phone-spaced-local",
@@ -183,7 +183,7 @@
       "text": "14:30",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "2:30 PM"
+      "expectProductionText": "2 30 PM"
     },
     {
       "id": "10-hours-line",
@@ -192,7 +192,7 @@
       "text": "Mon-Sat: 09:00-19:00 EAT",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Monday to Saturday: 9 AM to 7 PM EAT"
+      "expectProductionText": "Monday to Saturday 9 AM to 7 PM EAT"
     },
     {
       "id": "11-date-ordinal",
@@ -211,7 +211,7 @@
       "text": "August 12th, 2026",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "August 12th, 2026",
+      "expectProductionText": "August 12th 2026",
       "deprioritized": true
     },
     {
@@ -277,8 +277,8 @@
       "text": "Sofa cleaning - carpet cleaning - mattress cleaning.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Sofa cleaning, carpet cleaning, mattress cleaning.",
-      "source": "spaced hyphen list markers become commas so TTS never says hyphen"
+      "expectProductionText": "Sofa cleaning carpet cleaning mattress cleaning.",
+      "source": "spaced hyphen list markers become pauses so TTS never says hyphen"
     },
     {
       "id": "33-list-bullet-leak",
@@ -287,7 +287,7 @@
       "text": "Services: - Sofa - Carpets.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Services: Sofa, Carpets.",
+      "expectProductionText": "Services Sofa Carpets.",
       "source": "markdown bullet leak flattens to a spoken list"
     },
     {
@@ -327,8 +327,8 @@
       "text": "1. Book 2. Confirm.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "1, Book 2, Confirm.",
-      "source": "numbered-list markers become commas, not full stops"
+      "expectProductionText": "1 Book 2 Confirm.",
+      "source": "numbered-list markers become pauses, not full stops"
     },
     {
       "id": "38-identifier-till",
@@ -347,7 +347,7 @@
       "text": "Paybill 247247, account 10203040.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "pay bill 2 4 7 2 4 7, account 1 0 2 0 3 0 4 0.",
+      "expectProductionText": "pay bill 2 4 7 2 4 7 account 1 0 2 0 3 0 4 0.",
       "source": "paybill and account numbers read digit by digit"
     },
     {
@@ -476,7 +476,7 @@
       "text": "Ilikuwa ni usafishaji wa godoro (mattress cleaning) kesho saa nane mchana.",
       "callLanguage": "sw",
       "expectLanguage": "sw",
-      "expectProductionText": "Ilikuwa ni usafishaji wa godoro, mattress cleaning, kesho saa nane mchana."
+      "expectProductionText": "Ilikuwa ni usafishaji wa godoro mattress cleaning kesho saa nane mchana."
     },
     {
       "id": "19-lexicon-brand",
@@ -495,7 +495,7 @@
       "text": "Hello, you've reached ChapterOne Bookstore, this is Aisha speaking.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Hello, you've reached Chapter One Bookstore, this is Eye-sha speaking.",
+      "expectProductionText": "Hello you've reached Chapter One Bookstore this is Eye-sha speaking.",
       "source": "ChapterOne greeting — tenant lexicon example; swap business/agent for other tenants"
     }
   ]

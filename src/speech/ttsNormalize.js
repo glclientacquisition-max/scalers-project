@@ -20,6 +20,9 @@ function stripMarkup(text) {
   return stripSpokenInstructionLeaks(String(text || ''), { final: true })
     .replace(/###(?:ENDCALL|ENDTOOL|TOOL)###/gi, '')
     .replace(/[*_`#]+/g, '')
+    .replace(/[[\]{}<>]/g, ' ')
+    .replace(/[•·]/g, ' ')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '')
     .replace(/\bENDCALL\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -46,13 +49,13 @@ function polishPunctuation(text) {
   t = t.replace(/\.(?:\s*\.)+/g, '.');
   // A floating period ("Wait . let me") attaches to the previous word.
   t = t.replace(/\s+\.(?=\s|$)/g, '.');
-  // Em/en dash is a Gemini leak. Soniox may speak "dash" or restart the clause.
-  t = t.replace(/\s*[\u2014\u2013]\s*/g, ', ');
+  // Em/en dash is a Gemini leak. Soniox speaks the word "dash".
+  t = t.replace(/\s*[\u2014\u2013]\s*/g, ' ');
   // Spaced ASCII hyphen is a list/range marker the expanders did not claim.
   // Intra-word hyphens (M-Pesa, Roo-ee-roo) carry no spaces and must survive.
-  t = t.replace(/\s+-\s*|\s*-\s+/g, ', ');
+  t = t.replace(/\s+-\s*|\s*-\s+/g, ' ');
   // Parenthetical asides read as an aside, not "open parenthesis".
-  t = t.replace(/\s*\(([^()]*)\)\s*/g, ', $1, ');
+  t = t.replace(/\s*\(([^()]*)\)\s*/g, ' $1 ');
   t = t.replace(/([:;])\s*,\s*/g, '$1 ');
   t = t.replace(/,\s*,+/g, ',');
   t = t.replace(/^\s*,\s*/, '');
@@ -69,7 +72,68 @@ function polishPunctuation(text) {
   // Exclamation makes Soniox punch / strain on the phone. Period keeps pace even.
   t = t.replace(/!+/g, '.');
   t = t.replace(/\.{2,}/g, '.');
+  t = separateGluedOpeners(t);
+  t = silenceLexicalPunctuation(t);
   return t.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * "Sawa" + "tutakusaidiaje" and "Pole" + "sana" arrive as one token when
+ * the stream joiner never saw a boundary. Do not split Karibuni.
+ * @param {string} text
+ */
+function separateGluedOpeners(text) {
+  return String(text || '').replace(
+    /\b(sawa|pole|asante|habari|samahani|tafadhali|naomba|nataka|ndiyo|ndio|hapana)(?=[a-z]{3,})/gi,
+    (word) => `${word} `
+  );
+}
+
+/**
+ * Soniox TTS reads leftover symbols as words ("dash", "comma", "asterisk",
+ * "hashtag", "slash", "colon"). Sentence . and ? stay so the voice can fall
+ * and rise. Decimals, clock times, domains, slash dates, and lexicon
+ * hyphens are held aside first.
+ * @param {string} text
+ */
+function silenceLexicalPunctuation(text) {
+  let t = String(text || '');
+  t = t.replace(/(\d),(?=\d{3}\b)/g, '$1');
+  t = t.replace(/\b([\w.+-]+)@((?:[\w-]+\.)+[A-Za-z]{2,})\b/g, (_, user, host) => {
+    return `${user} at ${host.replace(/\./g, ' dot ')}`;
+  });
+  t = t.replace(/\b(?:https?:\/\/|www\.)(\S+)/gi, (_, rest) => {
+    const trimmed = rest.replace(/[.,!?;:]+$/g, '');
+    const tail = rest.slice(trimmed.length);
+    const spoken = trimmed.replace(/[/#?&=]+/g, ' ').replace(/\./g, ' dot ');
+    return `${spoken}${tail}`;
+  });
+
+  const saved = [];
+  const hold = (re) => {
+    t = t.replace(re, (match) => {
+      const token = `\uE000${saved.length}\uE001`;
+      saved.push(match);
+      return token;
+    });
+  };
+
+  hold(/\b[\w-]+(?:\.[\w-]+)+\.[A-Za-z]{2,}\b/g);
+  hold(/\b\d{1,4}\/\d{1,2}\/\d{2,4}\b/g);
+  t = t.replace(/\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b/g, (_, hour, mins, secs) => {
+    const head = `${Number(hour)} ${mins}`;
+    return secs ? `${head} ${secs}` : head;
+  });
+  hold(/\d+\.\d+/g);
+  hold(/\p{L}[\p{L}']*(?:-[\p{L}']+)+/gu);
+
+  t = t.replace(/[,:;]/g, ' ');
+  t = t.replace(/[/\\]/g, ' ');
+  t = t.replace(/[*#`_~|^+=<>[\]{}•·]+/g, '');
+  t = t.replace(/[“”«»„"]/g, '');
+  t = t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '');
+  t = t.replace(/\uE000(\d+)\uE001/g, (_, index) => saved[Number(index)] || '');
+  return t;
 }
 
 /**

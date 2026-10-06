@@ -3,9 +3,21 @@
 
 const { stripSpokenInstructionLeaks } = require('./spokenInstructionLeak');
 
+// Subword tails Gemini splits inside an English word ("cle" + "aning").
+// A new word in any language does not start with one of these.
+const MIDWORD_CONTINUATION =
+  /^(?:ing|ings|ed|ly|er|ers|est|tion|sion|ment|ments|ness|able|ible|ous|ful|less|aning|ening)\b/i;
+
+// Two-letter words that are their own tokens. Shorter tails ("es", "gs") stay glued
+// so a mid-word stream slice does not become "rang es".
+const SHORT_SPOKEN_WORD =
+  /^(?:ya|wa|za|ni|na|ku|au|to|of|in|on|at|or|is|it|we|he|be|do|so|if|my|am|an|as|up|no|ok)\b/i;
+
 /**
  * Gemini stream parts often omit the leading space on the next word.
- * Live HD_0ef68f8e7930 spoke "Ican" / "Youhave" / "Understood,Alvin".
+ * Live HD_0ef68f8e7930 spoke "Ican" / "Youhave". Kiswahili replies spoke
+ * "Sawatutakusaidiaje" and "Polesana" the same way.
+ * Mid-word slices ("cle" + "aning") stay glued.
  * @param {string} left
  * @param {string} right
  */
@@ -15,14 +27,15 @@ function joinSpokenPieces(left, right) {
   if (!b) return a;
   if (!a) return b;
   if (/\s$/.test(a) || /^\s/.test(b)) return a + b;
-  if (/[,:;]$/.test(a) && /^[A-Za-z]/.test(b)) return `${a} ${b}`;
-  // Only known openers. Mid-word stream slices ("cle" + "aning") stay glued.
-  if (
-    /(?:^|[\s.!?])(?:I|You|It|We|He|She|They|Take|Thank)$/.test(a) &&
-    /^[A-Za-z]/.test(b)
-  ) {
-    return `${a} ${b}`;
-  }
+  const rightStartsWord = /^[\p{L}]/u.test(b);
+  if (!rightStartsWord) return a + b;
+  if (/[,:;.!?]$/.test(a)) return `${a} ${b}`;
+  if (!/[\p{L}\p{N}]$/u.test(a)) return a + b;
+  if (MIDWORD_CONTINUATION.test(b)) return a + b;
+  const nextWord = b.match(/^[\p{L}']+/u);
+  const nextLen = nextWord ? nextWord[0].length : 0;
+  // "Sawa"+"tutakusaidiaje" and "I"+"can" need a space. "rang"+"es" does not.
+  if (nextLen >= 3 || SHORT_SPOKEN_WORD.test(b)) return `${a} ${b}`;
   return a + b;
 }
 

@@ -30,6 +30,14 @@ test('inserts a space when Gemini drops it between words', () => {
   assert.strictEqual(joinSpokenPieces('I ', 'can help'), 'I can help');
   assert.strictEqual(joinSpokenPieces('Hello.', ' How are you?'), 'Hello. How are you?');
   assert.strictEqual(joinSpokenPieces('Carpet cle', 'aning ranges'), 'Carpet cleaning ranges');
+  assert.strictEqual(
+    joinSpokenPieces('Sawa', 'tutakusaidiaje kengine leo?'),
+    'Sawa tutakusaidiaje kengine leo?'
+  );
+  assert.strictEqual(joinSpokenPieces('Pole', 'sana'), 'Pole sana');
+  assert.strictEqual(joinSpokenPieces('the', 'ring is gold'), 'the ring is gold');
+  assert.strictEqual(joinSpokenPieces('vitabu', 'ya kuandikia'), 'vitabu ya kuandikia');
+  assert.strictEqual(joinSpokenPieces('cleaning rang', 'es from'), 'cleaning ranges from');
 });
 
 test('HD_0ef68f8e7930 stream deltas speak with spaces', () => {

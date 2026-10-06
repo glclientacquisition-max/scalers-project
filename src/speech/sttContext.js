@@ -83,6 +83,26 @@ function callerHearingNames(tenant = {}) {
   return names;
 }
 
+const PHONETIC_BIT = /^(?:eye|ah|eh|ee|oo|oh|uh|au|ow|aye|igh)$/i;
+
+/**
+ * TTS say-forms like "Na-koo-roo" are pronunciation guides, not words
+ * callers say. Biasing Soniox STT toward them writes the respelling
+ * into the transcript.
+ * @param {string} value
+ */
+function isPhoneticRespelling(value) {
+  const term = cleanTerm(value);
+  if (!term || !term.includes('-')) return false;
+  const parts = term.split('-').filter(Boolean);
+  if (parts.length < 2) return false;
+  if (!parts.every((part) => /^[A-Za-z']{1,6}$/.test(part))) return false;
+  if (parts.length >= 3) return true;
+  return parts.some(
+    (part) => PHONETIC_BIT.test(part) || /(?:ee|oo|ah|eh)$/i.test(part)
+  );
+}
+
 function collectTenantTerms(tenant = {}) {
   const terms = [];
 
@@ -122,7 +142,9 @@ function collectTenantTerms(tenant = {}) {
     if (/[\\^$*+?()[\]{}|.]/.test(match)) continue;
     terms.push(match);
     const say = cleanTerm(entry?.say);
-    if (say && say !== match) terms.push(say);
+    if (say && say.toLowerCase() !== match.toLowerCase() && !isPhoneticRespelling(say)) {
+      terms.push(say);
+    }
   }
 
   // Hearing bias only. These terms do not decide that a span is the caller name.
@@ -194,6 +216,7 @@ module.exports = {
   callerHearingNames,
   collectTenantTerms,
   curateTerms,
+  isPhoneticRespelling,
   isSttContextEnabled,
   MAX_STT_TERMS,
 };

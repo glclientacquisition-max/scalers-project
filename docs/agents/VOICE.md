@@ -83,7 +83,8 @@ See `.env.example` — key ones:
 - `VOICE_LLM_STREAM`, `VOICE_STREAM_EARLY_CHARS` / `WORDS` (default 0: sentence-only TTS flush)
 - `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`, `VOICE_IDLE_NUDGE_MS` (default 10000; not armed until the caller has spoken)
 - `VOICE_BARGE_GRACE_MS`, `VOICE_BARGE_EARLY_MS`, `VOICE_BARGE_MIN_CHARS`
-- Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS`, `SONIOX_ENDPOINT_SENSITIVITY`, …
+- Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS` (default 700; incomplete Kiswahili tails hold locally up to `VOICE_FLUSH_MAX_MS`), `SONIOX_ENDPOINT_SENSITIVITY`, …
+- `SONIOX_LANGUAGE_IDENTIFICATION` (default on). Language hints stay `en`+`sw`. Do not set `language_hints_strict`.
 
 ## Test gate (required before PR)
 
