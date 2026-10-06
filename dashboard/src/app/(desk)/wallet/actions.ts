@@ -12,7 +12,7 @@ export type OnDemandUsageState = {
 };
 
 /**
- * Owner opt-in. Past included minutes and SMS, charge the wallet.
+ * Owner opt-in. Past included minutes and SMS are charged at the on-demand rates.
  * Requires docs/supabase/wallet_on_demand_alerts.sql.
  */
 export async function saveOnDemandUsage(

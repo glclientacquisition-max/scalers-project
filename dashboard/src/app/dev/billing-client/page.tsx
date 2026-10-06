@@ -19,7 +19,6 @@ const DETAIL: AdminBillingClientDetail = {
     minutesRemaining: 360,
     billing_enforcement: "off",
     on_demand_usage_enabled: false,
-    wallet_balance_kes: -420,
     status: "ok",
     statusLabel: "OK",
   },
@@ -82,7 +81,6 @@ const DETAIL: AdminBillingClientDetail = {
     },
     gap: null,
   },
-  ledgerRepairEnabled: true,
 };
 
 export default function DevBillingClientPage() {

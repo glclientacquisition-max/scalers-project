@@ -45,7 +45,7 @@ export function OnDemandUsagePanel({
             onChange={(e) => setEnabled(e.target.checked)}
           />
           <span className="text-ink">
-            Charge the wallet for minutes and SMS past included
+            Charge on-demand rates for minutes and SMS past included
           </span>
         </label>
 

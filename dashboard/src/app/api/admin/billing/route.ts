@@ -4,12 +4,10 @@ import {
   grantTenantPackageMinutes,
   loadAdminBillingOverview,
   loadBillingHistory,
-  waiveTenantOverage,
 } from "@/lib/adminBilling";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { assignBusinessPackage } from "@/lib/packageCatalog";
 import {
-  adjustTenantWalletSecure,
   setTenantBillingMode,
   type BillingMode,
 } from "@/lib/adminWallets";
@@ -74,19 +72,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, ...result });
     }
 
-    if (action === "waive_overage") {
-      if (note.length < 3) {
-        return NextResponse.json({ error: "Reason required (min 3 chars)" }, { status: 400 });
-      }
-      const result = await waiveTenantOverage({
-        businessId,
-        note,
-        actor,
-        idempotencyKey: String(body.idempotency_key || "").trim() || undefined,
-      });
-      return NextResponse.json({ ok: true, ...result });
-    }
-
     if (action === "assign_package") {
       const packageId = String(body.package_id || "");
       const period = String(body.period || "month");
@@ -113,29 +98,7 @@ export async function POST(request: Request) {
         mode,
         note,
         actor,
-        waiveNegative: Boolean(body.waive_negative),
         betaExpiresAt: body.beta_expires_at ? String(body.beta_expires_at) : null,
-      });
-      return NextResponse.json({ ok: true, ...result });
-    }
-
-    if (action === "ledger_repair_adjust") {
-      if (process.env.ADMIN_LEDGER_REPAIR !== "1") {
-        return NextResponse.json({ error: "Ledger repair is disabled" }, { status: 403 });
-      }
-      const deltaKes = Number(body.delta_kes || 0);
-      if (!Number.isFinite(deltaKes) || deltaKes === 0) {
-        return NextResponse.json({ error: "Enter a non-zero KES amount" }, { status: 400 });
-      }
-      if (note.length < 3) {
-        return NextResponse.json({ error: "Reason required (min 3 chars)" }, { status: 400 });
-      }
-      const result = await adjustTenantWalletSecure({
-        businessId,
-        deltaKes,
-        note,
-        actor,
-        idempotencyKey: String(body.idempotency_key || "").trim() || undefined,
       });
       return NextResponse.json({ ok: true, ...result });
     }

@@ -1,10 +1,10 @@
 # Ops & Billing lane contract
 
-**Mission:** Keep package + on-demand billing honest in product copy, DID inventory, ledger metering, and Super Admin ops correct, auditable, and hard to abuse.
+**Mission:** Keep package + on-demand billing honest in product copy, DID inventory, charge-line history, and Super Admin ops correct, auditable, and hard to abuse.
 
-Use for packages catalog, on-demand rate card, wallet ledger (ops scaffolding), DID pool assign/release, phone-line admin telecom actions, and beta billing enforcement.
+Use for packages catalog, on-demand rate card, DID pool assign/release, phone-line admin telecom actions, and beta billing enforcement.
 
-**Product lock (2026-10-02):** Customer billing = **packages + on-demand only**. No wallet top-up product. The KES ledger is internal scaffolding for metering and on-demand debits. Owner **package checkout** is not shipped.
+**Product lock (2026-10-06):** Customer billing = **packages + on-demand only**. No wallet top-up, no balance readout, no waive overage, no ledger repair, no ops wallet adjust. Charge lines (`wallet_ledger` rows) stay as usage history. Owner **package checkout** is not shipped. Platform still owns the SQL/RPC surface.
 
 ## Owns (edit freely)
 
@@ -17,7 +17,7 @@ Use for packages catalog, on-demand rate card, wallet ledger (ops scaffolding), 
 | `dashboard/src/app/api/admin/**`, `api/did-pool/**` | Ops APIs (service role) |
 | `dashboard/src/lib/admin.ts`, `adminWallets.ts`, `didPool.ts`, `wallet.ts`, `sautikit.ts` | Ops libraries |
 | `dashboard/src/components/Admin*.tsx`, `DidPoolManager.tsx`, `BuyNumberPanel.tsx`, `Sautikit*.tsx` | Ops UI |
-| `dashboard/src/app/(desk)/wallet/**` | Owner **Usage** view (route `/wallet`; display + lazy line rental trigger) |
+| `dashboard/src/app/(desk)/wallet/**` | Owner **Usage** view (route `/wallet`; package meter + charge history) |
 | Voice call sites of `chargeCallToWallet` | Metering hook only — do not redesign media loop |
 
 ## Do not touch
@@ -29,9 +29,9 @@ Use for packages catalog, on-demand rate card, wallet ledger (ops scaffolding), 
 
 ## Billing / ops invariants
 
-0. **Packages + on-demand (customer story)** — Owners buy a package SKU; past included usage uses on-demand rates when opted in. Super Admin **Packages** is the catalog. Plan and charges live on the Businesses shop. The KES ledger is ops scaffolding, not a nav tab.
-1. **One KES ledger** — AI bundled into per-minute rate; no resurrecting dual USD/KES client wallets.
-2. Ledger is append-only; credits/debits via security-definer RPCs / service role only.
+0. **Packages + on-demand (customer story)** — Owners buy a package SKU; past included usage uses on-demand rates when opted in. Super Admin **Packages** is the catalog. Plan and charges live on the Businesses shop. No balance or repair UI.
+1. **No dual wallets** — AI bundled into per-minute rate; do not resurrect USD/KES client wallets or a prepaid float.
+2. Charge lines are append-only; credits/debits via security-definer RPCs / service role only. Desk and Admin do not expose waive, repair, or adjust.
 3. `charge_call_to_wallet` (and JS wrapper) must stay **idempotent** per call.
 4. Live transfer outbound is a **second** call id. Never fold those minutes into the inbound row. Beta does not originate outbound PSTN unless ops sets the lab flag. See [`docs/product/LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) §8.
 5. Beta default: `billing_enforcement = off` → meter only, no charges (`docs/operations/BETA_WALLET_PROGRAM.md`).
@@ -52,7 +52,7 @@ Use for packages catalog, on-demand rate card, wallet ledger (ops scaffolding), 
 
 - SQL apply order per [`docs/supabase/README.md`](../supabase/README.md); no owner-forgable credit paths
 - Admin: seed DID → assign → release → remove business paths still work
-- Owner **Usage** page (`/wallet`): balance/ledger render; beta badge when enforcement off; automatic low-balance messaging; on-demand opt-in off by default; SMS used/included when `sms_allowance.sql` is applied
+- Owner **Usage** page (`/wallet`): package remaining, on-demand opt-in, charge history; beta badge when enforcement off
 - If touching voice charge hook: smoke a completed-call path without double-billing
 
 ## Chat starter
@@ -60,8 +60,8 @@ Use for packages catalog, on-demand rate card, wallet ledger (ops scaffolding), 
 ```
 You are the Scalers Ops & Billing lane agent.
 Follow docs/agents/OPS_BILLING.md and .cursor/rules/ops-billing.mdc.
-Own packages catalog, on-demand rate card, KES ledger scaffolding, DID pool, and Super Admin ops.
-Customer billing = packages + on-demand only; no wallet top-up product.
+Own packages catalog, on-demand rate card, DID pool, and Super Admin ops.
+Customer billing = packages + on-demand only; no wallet top-up, no balance, no ledger repair.
 Keep idempotent call charges and beta enforcement=off safe.
 Do not redesign voice media or marketing UI.
 Coordinate Platform before new SQL/RPC shapes.
@@ -71,8 +71,6 @@ Task: <one concrete billing or ops improvement>
 ## Good first tickets
 
 - BETA + lane SoT docs aligned to packages + on-demand (legacy float vocabulary stripped)
-- Admin Ledger plan toggle + enforcement copy (legacy top-up sell UI removed in #527)
 - DID assign/release edge cases (pending: user ids)
-- Hard inbound gate when on-demand off and ledger/package rules say block (product-approved; not shipped)
-- Line rental lazy apply correctness
+- Hard inbound gate when on-demand off and package rules say block (product-approved; not shipped)
 - SautiKit sync / buy-number failure messaging

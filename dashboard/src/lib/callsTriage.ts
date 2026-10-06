@@ -203,14 +203,3 @@ export function followUpWhatsAppMessage(opts: {
   return `Hi ${who}, this is ${biz}. Thanks for calling. How can we help you?`;
 }
 
-export function walletKes(tenant: {
-  wallet_balance_kes?: number | null;
-  telecom_wallet_balance_kes?: number | null;
-  ai_wallet_balance_usd?: number | null;
-}): number {
-  return Number(
-    tenant.wallet_balance_kes ??
-      (Number(tenant.telecom_wallet_balance_kes ?? 0) +
-        Math.round(Number(tenant.ai_wallet_balance_usd ?? 0) * 130))
-  );
-}

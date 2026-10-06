@@ -21,7 +21,7 @@ const createdLabel = new Intl.DateTimeFormat("en-KE", {
 });
 
 type ShopFilter = "all" | "waiting" | "active" | "archived";
-type SheetKind = "shop" | "assign" | "release" | "plan" | "charges" | "adjust" | "remove" | "package";
+type SheetKind = "shop" | "assign" | "release" | "plan" | "charges" | "remove" | "package";
 type PlanChoice = "beta" | "on";
 type PackOption = { id: string; name: string; isActive?: boolean };
 
@@ -52,11 +52,6 @@ function notifyLabel(raw: string) {
 function packLabel(b: AdminBusiness) {
   if (!b.package_name) return "None";
   return b.package_period === "year" ? `${b.package_name} / year` : b.package_name;
-}
-
-function moneyKes(b: AdminBusiness) {
-  const kes = Number(b.wallet_balance_kes ?? b.telecom_wallet_balance_kes ?? 0);
-  return `KES ${kes.toLocaleString("en-KE")}`;
 }
 
 function planLabel(b: AdminBusiness) {
@@ -119,8 +114,6 @@ export function AdminBusinessesPanel({
   const [status, setStatus] = useState("");
   const [sheet, setSheet] = useState<{ kind: SheetKind; id: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
-  const [deltaKes, setDeltaKes] = useState("1000");
-  const [adjustNote, setAdjustNote] = useState("Ops credit");
   const [plan, setPlan] = useState<PlanChoice>("beta");
   const [charges, setCharges] = useState<WalletLedgerRow[]>([]);
   const [packs, setPacks] = useState<PackOption[]>([]);
@@ -160,7 +153,7 @@ export function AdminBusinessesPanel({
   async function run(
     body: Record<string, unknown>,
     url = "/api/admin/businesses",
-    next: "shop" | "charges" | "close" = "shop",
+    next: "shop" | "close" = "shop",
   ) {
     const shopId = sheet?.id;
     setError("");
@@ -176,12 +169,7 @@ export function AdminBusinessesPanel({
       return false;
     }
     setConfirmText("");
-    if (next === "charges" && shopId) {
-      setSheet({ kind: "charges", id: shopId });
-      void loadCharges(shopId);
-    } else {
-      setSheet(next === "shop" && shopId ? { kind: "shop", id: shopId } : null);
-    }
+    setSheet(next === "shop" && shopId ? { kind: "shop", id: shopId } : null);
     setStatus("Saved.");
     startTransition(() => router.refresh());
     return true;
@@ -336,7 +324,6 @@ export function AdminBusinessesPanel({
                 id={`biz-${b.id}`}
                 title={b.business_name}
                 preview={previewLine(b)}
-                when={moneyKes(b)}
                 stamp={<Stamp tone={statusTone(b.status)}>{statusLabel(b.status)}</Stamp>}
                 onOpen={() => openShop(b.id)}
               />
@@ -403,7 +390,7 @@ export function AdminBusinessesPanel({
             />
             <ListRow
               title="Charges"
-              preview={moneyKes(open)}
+              preview="Calls and line fees"
               onOpen={() => {
                 openKind("charges", open.id);
                 void loadCharges(open.id);
@@ -534,7 +521,6 @@ export function AdminBusinessesPanel({
                   mode: plan === "on" ? "soft" : "off",
                   note: plan === "on" ? "On-demand" : "Beta",
                   actor: "ops",
-                  waive_negative: false,
                 },
                 "/api/admin/wallets",
               )
@@ -548,7 +534,7 @@ export function AdminBusinessesPanel({
         <p className="pb-3 text-body text-ink-2">
           {plan === "on"
             ? "Past included uses the rate card when the shop opted in."
-            : "Meter only. No ledger charge."}
+            : "Meter only. Not charged."}
         </p>
         <Segmented
           className="-mx-5 px-5 sm:-mx-6 sm:px-6"
@@ -568,23 +554,8 @@ export function AdminBusinessesPanel({
         }}
         title="Charges"
         theme="admin"
-        footer={
-          <Button
-            type="button"
-            variant="tonal"
-            block
-            onClick={() => {
-              setDeltaKes("1000");
-              setAdjustNote("Ops credit");
-              if (open) openKind("adjust", open.id);
-            }}
-          >
-            Adjust
-          </Button>
-        }
       >
         <SheetNote error={error} />
-        <p className="pb-3 text-body tabular-nums text-ink">{open ? moneyKes(open) : ""}</p>
         {charges.length === 0 ? (
           <Empty className="px-0 py-8" title="No charges." line="On-demand lines show up here." />
         ) : (
@@ -599,57 +570,6 @@ export function AdminBusinessesPanel({
             ))}
           </ul>
         )}
-      </Sheet>
-
-      <Sheet
-        open={sheet?.kind === "adjust"}
-        onOpenChange={(next) => {
-          if (!next) setSheet(open ? { kind: "charges", id: open.id } : null);
-        }}
-        title="Adjust"
-        theme="admin"
-        footer={
-          <Button
-            type="button"
-            block
-            pending={pending}
-            onClick={() =>
-              open &&
-              void run(
-                {
-                  action: "adjust_wallet",
-                  business_id: open.id,
-                  delta_kes: Number(deltaKes) || 0,
-                  note: adjustNote,
-                },
-                "/api/admin/businesses",
-                "charges",
-              )
-            }
-          >
-            Apply
-          </Button>
-        }
-      >
-        <SheetNote error={error} />
-        <div className="space-y-3">
-          <Field id="biz-delta" label="Amount" hint="KES. Plus credits, minus debits.">
-            {(props) => (
-              <Input
-                {...props}
-                className="tabular-nums"
-                inputMode="decimal"
-                value={deltaKes}
-                onChange={(event) => setDeltaKes(event.target.value)}
-              />
-            )}
-          </Field>
-          <Field id="biz-note" label="Note">
-            {(props) => (
-              <Input {...props} value={adjustNote} onChange={(event) => setAdjustNote(event.target.value)} />
-            )}
-          </Field>
-        </div>
       </Sheet>
 
       <Sheet

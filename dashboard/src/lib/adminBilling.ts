@@ -3,8 +3,6 @@ import {
   type BillingMode,
   listAdminWallets,
   listTenantLedger,
-  setTenantBillingMode,
-  adjustTenantWalletSecure,
 } from "@/lib/adminWallets";
 import {
   loadPackageCatalog,
@@ -14,7 +12,7 @@ import {
   type BillingRateCard,
   type TenantSubscriptionRow,
 } from "@/lib/packageCatalog";
-import { resolveWalletBalanceKes, type WalletLedgerRow } from "@/lib/wallet";
+import type { WalletLedgerRow } from "@/lib/wallet";
 
 export type AdminBillingStatus = "archived" | "ok" | "low_minutes" | "exhausted" | "charging";
 
@@ -30,7 +28,6 @@ export type AdminBillingRow = {
   minutesRemaining: number;
   billing_enforcement: BillingMode;
   on_demand_usage_enabled: boolean;
-  wallet_balance_kes: number;
   status: AdminBillingStatus;
   statusLabel: string;
 };
@@ -137,7 +134,6 @@ export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> 
       minutesRemaining,
       billing_enforcement: w.billing_enforcement,
       on_demand_usage_enabled: false,
-      wallet_balance_kes: w.wallet_balance_kes,
       status,
       statusLabel,
     };
@@ -186,7 +182,6 @@ export type AdminBillingClientDetail = {
   rates: BillingRateCard;
   packages: BillingPackage[];
   subscription: TenantSubscriptionRow | null;
-  ledgerRepairEnabled: boolean;
 };
 
 export async function loadAdminBillingClient(tenantId: string): Promise<AdminBillingClientDetail | null> {
@@ -200,16 +195,11 @@ export async function loadAdminBillingClient(tenantId: string): Promise<AdminBil
   const admin = getSupabaseAdmin();
   const { data: tenantExtra } = await admin
     .from("tenants")
-    .select("beta_notes, on_demand_usage_enabled, wallet_balance_kes, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active")
+    .select("beta_notes, on_demand_usage_enabled, is_active")
     .eq("id", tenantId)
     .maybeSingle();
 
   if (tenantExtra) {
-    row.wallet_balance_kes = resolveWalletBalanceKes({
-      walletKes: tenantExtra.wallet_balance_kes,
-      telecomKes: tenantExtra.telecom_wallet_balance_kes,
-      aiUsd: tenantExtra.ai_wallet_balance_usd,
-    });
     row.on_demand_usage_enabled = Boolean(tenantExtra.on_demand_usage_enabled);
   }
   const { status, statusLabel } = billingStatus({
@@ -228,7 +218,6 @@ export async function loadAdminBillingClient(tenantId: string): Promise<AdminBil
     rates: catalog.rates,
     packages: catalog.packages,
     subscription,
-    ledgerRepairEnabled: process.env.ADMIN_LEDGER_REPAIR === "1",
   };
 }
 
@@ -252,27 +241,6 @@ export async function grantTenantPackageMinutes(opts: {
   return {
     minutes_included: Number(row?.minutes_included ?? 0),
     minutes_granted: Number(row?.minutes_granted ?? 0),
-  };
-}
-
-export async function waiveTenantOverage(opts: {
-  businessId: string;
-  note: string;
-  actor?: string;
-  idempotencyKey?: string;
-}): Promise<{ wallet_balance_kes: number; waived_kes: number }> {
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.rpc("waive_tenant_overage", {
-    p_tenant_id: opts.businessId,
-    p_note: opts.note,
-    p_actor: opts.actor || "ops",
-    p_idempotency_key: opts.idempotencyKey || null,
-  });
-  if (error) throw error;
-  const row = Array.isArray(data) ? data[0] : data;
-  return {
-    wallet_balance_kes: Number(row?.wallet_balance_kes ?? 0),
-    waived_kes: Number(row?.waived_kes ?? 0),
   };
 }
 
@@ -307,7 +275,7 @@ function auditSummary(row: OpsAuditRow): string {
     const mode = row.detail?.mode;
     return typeof mode === "string" ? `Charging mode → ${mode}` : "Charging mode change";
   }
-  if (row.action === "adjust_wallet") return "Ledger adjustment";
+  if (row.action === "adjust_wallet") return "Balance adjustment";
   return row.action.replace(/_/g, " ");
 }
 
@@ -337,5 +305,3 @@ export async function loadBillingHistory(tenantId: string): Promise<BillingHisto
     .toSorted((a, b) => (a.created_at < b.created_at ? 1 : -1))
     .slice(0, 60);
 }
-
-export { setTenantBillingMode, adjustTenantWalletSecure };
