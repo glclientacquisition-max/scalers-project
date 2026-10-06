@@ -8,6 +8,7 @@ const {
   pickLlmRecoverySaved,
   pickSpeechGuaranteeLine,
   planEmptyGeminiSpeech,
+  businessInfoFallbackLine,
   shouldSpeakHandoffNameAsk,
   looksLikeCallerName,
   looksLikeBareCloser,
@@ -20,6 +21,30 @@ const {
   polishSpokenReply,
   looksLikePaceOnlyTurn,
 } = require('../src/conversation/dynamicSpeech');
+const { fileNameAskLine, planCallerModelTurn } = require('../src/conversation/turnPolicy');
+
+assert.equal(fileNameAskLine({ caller: { fileNameAsked: 'Alvin' } }), 'Am I speaking with Alvin?');
+assert.equal(
+  fileNameAskLine({ caller: { fileNameAsked: 'Alvin' } }, 'sw'),
+  'Je, naongea na Alvin?'
+);
+assert.equal(
+  fileNameAskLine({ caller: { fileNameAsked: 'Alvin' }, language: { current: 'sheng' } }),
+  'Je, naongea na Alvin?'
+);
+assert.equal(
+  planCallerModelTurn(
+    { caller: { fileNameAsked: 'Alvin' }, returning: {} },
+    { language: 'mixed' }
+  ).line,
+  'Je, naongea na Alvin?'
+);
+assert.equal(businessInfoFallbackLine('en'), "Sorry, I can't access the business information right now. Please try again.");
+assert.equal(
+  businessInfoFallbackLine('sw'),
+  'Samahani, siwezi kufikia taarifa za biashara sasa hivi. Tafadhali jaribu tena.'
+);
+assert.equal(businessInfoFallbackLine('mixed'), businessInfoFallbackLine('sw'));
 
 assert.strictEqual(pickActionProgress('CREATE_REQUEST', 'en'), 'Okay.');
 assert.strictEqual(pickActionProgress('CAPTURE', 'en'), 'Okay.');
@@ -242,6 +267,22 @@ const emptyAnswerAfterName = planEmptyGeminiSpeech({
 assert.equal(emptyAnswerAfterName.speak, true);
 assert.equal(emptyAnswerAfterName.kind, 'hear_again');
 assert.equal(emptyAnswerAfterName.line, 'Sorry, say that again?');
+const clearHeldTurn = planEmptyGeminiSpeech({
+  language: 'sw',
+  userText: 'Niambie, like, the services you offer—',
+  llmDown: false,
+});
+assert.equal(clearHeldTurn.speak, false);
+assert.equal(clearHeldTurn.kind, 'clear_turn');
+assert.equal(clearHeldTurn.line, '');
+const missedClearTurn = planEmptyGeminiSpeech({
+  language: 'sw',
+  userText: 'Niambie, like, the services you offer—',
+  llmDown: false,
+  modelMissed: true,
+});
+assert.equal(missedClearTurn.kind, 'hear_again');
+assert.equal(missedClearTurn.line, 'Samahani, sema tena?');
 assert.equal(
   pickSpeechGuaranteeLine({
     nextBestAction: { action: 'ANSWER' },

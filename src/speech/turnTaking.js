@@ -810,10 +810,33 @@ function classifyFinalDuringAgentSpeech(callerText, agentText, opts = {}) {
   return 'queue';
 }
 
+/**
+ * A Soniox endpoint can be held on a trailing dash and still be a clear
+ * request once the turn runs ("Niambie, like, the services you offer—").
+ * That hold must not become a "say that again" repair.
+ * Short name lines stay eligible for one repeat. The dash still counts as
+ * incomplete for flush timing.
+ * @param {string} text
+ */
+function callerTurnIsClear(text) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw || isHearAgainUtterance(raw)) return false;
+  const core = raw
+    .replace(/[\u2014\u2013-]+\s*$/g, '')
+    .replace(/[.!?,;:…]+$/g, '')
+    .trim();
+  if (!core || isHearAgainUtterance(core)) return false;
+  const kind = classifyCallerUtteranceKind(core);
+  if (kind !== 'speech') return false;
+  const words = core.split(/\s+/).filter(Boolean);
+  return words.length >= 4;
+}
+
 module.exports = {
   normalizeSpeech,
   looksLikeEcho,
   utteranceLooksIncomplete,
+  callerTurnIsClear,
   isInterruptOnlyUtterance,
   agentAwaitingReply,
   hasBargeContent,

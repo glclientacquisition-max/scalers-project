@@ -25,6 +25,7 @@ const {
 const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
 const { hoursAskLine, offerCatalogueLine } = require('./knownFacts');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
+const { confirmationLanguage } = require('./language');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
@@ -61,11 +62,13 @@ function classifyCallerTurn(text) {
  * Deterministic reply before Gemini. Returns null when Gemini should run.
  * @returns {{ outcome: string, line: string } | null}
  */
-function fileNameAskLine(state) {
+function fileNameAskLine(state, language) {
   if (state?.caller?.nameConfirmed === true) return '';
   if (state?.caller?.fileNameAskSpoken === true) return '';
   const pending = String(state?.caller?.fileNameAsked || '').trim();
   if (!pending) return '';
+  const lang = confirmationLanguage(language || state?.language?.current);
+  if (lang === 'sw' || lang === 'sheng') return `Je, naongea na ${pending}?`;
   return `Am I speaking with ${pending}?`;
 }
 
@@ -97,7 +100,7 @@ function planCallerModelTurn(state, opts = {}) {
     const who = String(state.returning.fileOwnerName || state.returning.name || '').trim();
     if (who) caller.fileNameAsked = who;
   }
-  const line = fileNameAskLine(state);
+  const line = fileNameAskLine(state, opts.language || state?.language?.current);
   if (line) return { runModel: false, line };
   return { runModel: true, line: '' };
 }

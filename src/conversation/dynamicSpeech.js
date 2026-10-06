@@ -1,6 +1,6 @@
 // Dynamic spoken lines — instant varied greeting; optional Gemini rewrite.
 
-const { decideCallerEvent, isInterruptOnlyUtterance } = require('../speech/turnTaking');
+const { decideCallerEvent, isInterruptOnlyUtterance, callerTurnIsClear } = require('../speech/turnTaking');
 const {
   eatTimeOfDay,
   composeBusinessAssistantIntro,
@@ -632,6 +632,14 @@ function emptyTurnRepairLine(language) {
   return 'Sorry, say that again?';
 }
 
+function businessInfoFallbackLine(language) {
+  const lang = confirmationLanguage(language);
+  if (lang === 'sw' || lang === 'sheng') {
+    return 'Samahani, siwezi kufikia taarifa za biashara sasa hivi. Tafadhali jaribu tena.';
+  }
+  return "Sorry, I can't access the business information right now. Please try again.";
+}
+
 /**
  * Gemini spoke nothing. A real outage still uses the downtime name-capture.
  * A successful empty turn asks them to say it again once, then stays quiet.
@@ -645,6 +653,7 @@ function planEmptyGeminiSpeech({
   userText = '',
   llmDown = false,
   alreadyOffered = false,
+  modelMissed = false,
 } = {}) {
   const savedForThem = fileReadLine({
     text: userText,
@@ -669,6 +678,11 @@ function planEmptyGeminiSpeech({
     };
   }
   if (alreadyOffered) return { speak: false, kind: 'quiet_continue', line: '' };
+  // A timeout still asks once. A clear held-then-completed turn does not:
+  // we heard them, so "say that again" must not replace the reply.
+  if (!modelMissed && callerTurnIsClear(userText)) {
+    return { speak: false, kind: 'clear_turn', line: '' };
+  }
   return { speak: true, kind: 'hear_again', line: emptyTurnRepairLine(language) };
 }
 
@@ -872,6 +886,7 @@ module.exports = {
   pickClarifyProgress,
   pickSpeechGuaranteeLine,
   planEmptyGeminiSpeech,
+  businessInfoFallbackLine,
   shouldSpeakHandoffNameAsk,
   pickLlmRecoveryLine,
   pickIdleNudgeLine,

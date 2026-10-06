@@ -5,6 +5,7 @@ const assert = require('assert');
 const {
   looksLikeEcho,
   utteranceLooksIncomplete,
+  callerTurnIsClear,
   isInterruptOnlyUtterance,
   adaptiveFlushMs,
   evaluateBargeIn,
@@ -81,6 +82,13 @@ test('Kiswahili tails and a cutoff dash stay open', () => {
   assert.strictEqual(utteranceLooksIncomplete('nataka'), true);
   assert.strictEqual(utteranceLooksIncomplete('Hii ni Aris Specialist—'), true);
   assert.strictEqual(utteranceLooksIncomplete('Hii ni Aris Specialist'), false);
+  assert.strictEqual(
+    utteranceLooksIncomplete('Niambie, like, the services you offer—'),
+    true
+  );
+  assert.strictEqual(callerTurnIsClear('Niambie, like, the services you offer—'), true);
+  assert.strictEqual(callerTurnIsClear("Yeah, I'm Alvin."), false);
+  assert.strictEqual(callerTurnIsClear('sema tena'), false);
 });
 test('Kiswahili continuation waits longer than a finished English sentence', () => {
   const held = adaptiveFlushMs({

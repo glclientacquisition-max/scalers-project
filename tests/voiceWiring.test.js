@@ -471,6 +471,16 @@ assert.match(
 );
 assert.match(
   source,
+  /let text = polishSpokenReply\(/,
+  'onSpokenChunk must reassign polished text after cutNoAiSlop'
+);
+assert.match(
+  source,
+  /reason=unstreamed_reply/,
+  'a produced reply that never streamed must be spoken before a hear-again repair'
+);
+assert.match(
+  source,
   /turn speech quiet/,
   'a second empty answer must log quiet continue instead of speaking the reach-them line'
 );

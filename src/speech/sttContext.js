@@ -4,6 +4,7 @@
 
 const { normalizeServices } = require('../conversation/liveKnowledge');
 const { normalizeLocations } = require('../conversation/businessLocations');
+const { isPlausibleCallerName } = require('../conversation/entityExtraction');
 
 /** Soft cap — Soniox context biasing degrades with huge unrelated term lists. */
 const MAX_STT_TERMS = Number(process.env.SONIOX_STT_CONTEXT_MAX_TERMS || 40);
@@ -75,6 +76,7 @@ function callerHearingNames(tenant = {}) {
   for (const value of values) {
     const term = cleanTerm(value);
     if (term.length < 2 || term.length > 80) continue;
+    if (!isPlausibleCallerName(term) || isJunkRecognitionTerm(term)) continue;
     const key = term.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -103,21 +105,76 @@ function isPhoneticRespelling(value) {
   );
 }
 
+// Lone words that bias Soniox toward everyday English, not a shop name.
+// "shy" showed up as a recognition term beside real names on HD_fe0d1e8fbd6e.
+const LONE_JUNK_TERMS = new Set([
+  'a',
+  'an',
+  'the',
+  'by',
+  'your',
+  'you',
+  'to',
+  'of',
+  'and',
+  'or',
+  'for',
+  'with',
+  'from',
+  'like',
+  'my',
+  'am',
+  'speak',
+  'speaking',
+  'impressed',
+  'shy',
+  'yes',
+  'no',
+  'okay',
+  'hello',
+  'hi',
+]);
+
+/**
+ * Sentence fragments that must not bias recognition.
+ * "impressed by your" and "Alvin speak" are truncated caller lines, not names.
+ * A shop whose name is one of the lone words is kept via `keep`.
+ * @param {string} value
+ * @param {{ keep?: string }} [opts]
+ */
+function isJunkRecognitionTerm(value, opts = {}) {
+  const term = cleanTerm(value);
+  if (!term) return true;
+  const lower = term.toLowerCase();
+  const keep = cleanTerm(opts.keep).toLowerCase();
+  if (keep && lower === keep) return false;
+  if (LONE_JUNK_TERMS.has(lower)) return true;
+  if (/\bimpressed by your\b/i.test(lower)) return true;
+  if (/\s/.test(lower) && /\b(?:speak|speaking)$/i.test(lower)) return true;
+  return false;
+}
+
 function collectTenantTerms(tenant = {}) {
   const terms = [];
 
   const businessName = cleanTerm(tenant.businessName || tenant.business_name);
   const agentName = cleanTerm(tenant.agentName || tenant.agent_name);
-  if (businessName) terms.push(businessName);
-  if (agentName) terms.push(agentName);
+  const keep = businessName;
+  function pushTerm(value) {
+    const term = cleanTerm(value);
+    if (!term || isJunkRecognitionTerm(term, { keep })) return;
+    terms.push(term);
+  }
+  if (businessName) pushTerm(businessName);
+  if (agentName) pushTerm(agentName);
 
   for (const svc of normalizeServices(tenant.servicesCatalog || tenant.services_catalog)) {
-    if (svc.name) terms.push(svc.name);
+    if (svc.name) pushTerm(svc.name);
   }
 
   for (const loc of normalizeLocations(tenant.businessLocations || tenant.business_locations)) {
-    if (loc.label) terms.push(loc.label);
-    if (loc.landmark) terms.push(loc.landmark);
+    if (loc.label) pushTerm(loc.label);
+    if (loc.landmark) pushTerm(loc.landmark);
   }
 
   const team = Array.isArray(tenant.teamDirectory)
@@ -127,7 +184,7 @@ function collectTenantTerms(tenant = {}) {
       : [];
   for (const member of team) {
     const name = cleanTerm(member?.name);
-    if (name) terms.push(name);
+    if (name) pushTerm(name);
   }
 
   // Tenant TTS lexicon match strings that look like plain phrases (not regex).
@@ -140,15 +197,15 @@ function collectTenantTerms(tenant = {}) {
     const match = cleanTerm(entry?.match);
     if (!match) continue;
     if (/[\\^$*+?()[\]{}|.]/.test(match)) continue;
-    terms.push(match);
+    pushTerm(match);
     const say = cleanTerm(entry?.say);
     if (say && say.toLowerCase() !== match.toLowerCase() && !isPhoneticRespelling(say)) {
-      terms.push(say);
+      pushTerm(say);
     }
   }
 
   // Hearing bias only. These terms do not decide that a span is the caller name.
-  for (const name of callerHearingNames(tenant)) terms.push(name);
+  for (const name of callerHearingNames(tenant)) pushTerm(name);
 
   return curateTerms(terms);
 }
@@ -164,7 +221,13 @@ function buildSttContext(tenant) {
   if (!tenant || typeof tenant !== 'object') return null;
 
   const businessName = cleanTerm(tenant.businessName || tenant.business_name);
-  const agentName = cleanTerm(tenant.agentName || tenant.agent_name) || 'Receptionist';
+  const namedAgent = cleanTerm(tenant.agentName || tenant.agent_name);
+  const agentName =
+    namedAgent && !isJunkRecognitionTerm(namedAgent, { keep: businessName })
+      ? namedAgent
+      : namedAgent
+        ? ''
+        : 'Receptionist';
   const vertical = cleanTerm(tenant.vertical) || 'general';
   const terms = collectTenantTerms(tenant);
 
@@ -217,6 +280,7 @@ module.exports = {
   collectTenantTerms,
   curateTerms,
   isPhoneticRespelling,
+  isJunkRecognitionTerm,
   isSttContextEnabled,
   MAX_STT_TERMS,
 };

@@ -221,6 +221,7 @@ const {
   pickContextualAck,
   pickActionProgress,
   planEmptyGeminiSpeech,
+  businessInfoFallbackLine,
   shouldSpeakHandoffNameAsk,
   pickLlmRecoveryLine,
   pickIdleNudgeLine,
@@ -2540,6 +2541,7 @@ mediaWss.on('connection', (ws, req) => {
       userText,
       llmDown: false,
       alreadyOffered: emptyRepairOffered,
+      modelMissed: true,
     });
     if (planned.speak && planned.line) {
       emptyRepairOffered = true;
@@ -2723,6 +2725,7 @@ mediaWss.on('connection', (ws, req) => {
       const nameGate = planCallerModelTurn(brainState, {
         greetingBarged: greetingInterrupted && !greetingSettled,
         fileNameAskCommitted: fileNameAsksCommitted > 0,
+        language: callLanguage,
       });
       const fileNameAsk = nameGate.line;
       if (!nameGate.runModel && fileNameAsk) {
@@ -2927,7 +2930,7 @@ mediaWss.on('connection', (ws, req) => {
         // A sentence that narrates the send ("I've sent that to the team",
         // "I sent your name") is dropped. It must not become a repeat-ask.
         const rawChunk = String(chunk || '');
-        const text = polishSpokenReply(String(chunk || ''), {
+        let text = polishSpokenReply(String(chunk || ''), {
           callerTurns: brainState.conversation?.answersReceived || [],
           profile: brainProfile,
           toolResults: [],
@@ -3051,10 +3054,7 @@ mediaWss.on('connection', (ws, req) => {
       let turnOutcome = 'ok';
       if (!process.env.GEMINI_API_KEY) {
         result = {
-          spokenText:
-            callLanguage === 'sw'
-              ? 'Samahani, siwezi kufikia taarifa za biashara sasa hivi. Tafadhali jaribu tena.'
-              : "Sorry, I can't access the business information right now. Please try again.",
+          spokenText: businessInfoFallbackLine(callLanguage),
           shouldEndCall: false,
         };
         stopFillerForReply();
@@ -3312,28 +3312,44 @@ mediaWss.on('connection', (ws, req) => {
             );
           }
         } else {
-          const planned = planEmptyGeminiSpeech({
-            brainState,
-            language: callLanguage,
-            userText: clean,
-            llmDown: false,
-            alreadyOffered: emptyRepairOffered,
-          });
-          if (planned.speak && planned.line) {
-            emptyRepairOffered = true;
-            console.warn(
-              `[ws/media][${sidLabel()}] turn speech repair action=${nextBestAction.action} kind=${planned.kind}`
-            );
-            callTranscript.pushAgent(planned.line);
-            turnTiming.markFirstSpokenChunk();
-            await speakText(planned.line);
-            spokeThisTurn = true;
-            turnOutcome = 'speech_repair';
-          } else {
-            console.log(
-              `[ws/media][${sidLabel()}] turn speech quiet action=${nextBestAction.action} reason=empty_answer`
-            );
-            turnOutcome = 'speech_quiet';
+          const produced = String(result?.spokenText || '').trim();
+          if (produced) {
+            const reply = cutNoAiSlop(produced);
+            if (reply) {
+              console.log(
+                `[ws/media][${sidLabel()}] turn speech fallback action=${nextBestAction.action} reason=unstreamed_reply`
+              );
+              callTranscript.pushAgent(reply);
+              turnTiming.markFirstSpokenChunk();
+              await speakText(reply);
+              spokeThisTurn = true;
+              turnOutcome = 'stream_fallback_full';
+            }
+          }
+          if (!spokeThisTurn) {
+            const planned = planEmptyGeminiSpeech({
+              brainState,
+              language: callLanguage,
+              userText: clean,
+              llmDown: false,
+              alreadyOffered: emptyRepairOffered,
+            });
+            if (planned.speak && planned.line) {
+              emptyRepairOffered = true;
+              console.warn(
+                `[ws/media][${sidLabel()}] turn speech repair action=${nextBestAction.action} kind=${planned.kind}`
+              );
+              callTranscript.pushAgent(planned.line);
+              turnTiming.markFirstSpokenChunk();
+              await speakText(planned.line);
+              spokeThisTurn = true;
+              turnOutcome = 'speech_repair';
+            } else {
+              console.log(
+                `[ws/media][${sidLabel()}] turn speech quiet action=${nextBestAction.action} reason=${planned.kind || 'empty_answer'}`
+              );
+              turnOutcome = 'speech_quiet';
+            }
           }
         }
       }
@@ -3641,7 +3657,7 @@ mediaWss.on('connection', (ws, req) => {
 
   function markGreetingFileNameAsk(line) {
     if (greetingInterrupted || fileNameAsksCommitted > 0) return;
-    if (!/Am I speaking with\s+\S/i.test(String(line || ''))) return;
+    if (!/(?:Am I speaking with|Je, naongea na)\s+\S/i.test(String(line || ''))) return;
     const state = sessionCallSid ? callBrainStates.get(sessionCallSid) : null;
     if (!state?.caller || state.caller.nameConfirmed === true) return;
     state.caller.fileNameAskSpoken = true;
@@ -4638,6 +4654,7 @@ wss.on('connection', (ws) => {
         const nameGate = planCallerModelTurn(brainState, {
           greetingBarged: false,
           fileNameAskCommitted: brainState?.caller?.fileNameAskSpoken === true,
+          language: callLanguage,
         });
         if (!nameGate.runModel && nameGate.line) {
           brainState.caller.fileNameAskSpoken = true;

@@ -78,6 +78,32 @@ test('pronunciation respellings are not recognition terms', () => {
   assert.ok(!ctx.terms.includes('Eye-sha'));
 });
 
+test('junk caller phrases are not recognition terms', () => {
+  const ctx = buildSttContext({
+    businessName: 'Done and Dusted',
+    agentName: 'Shy',
+    callerName: 'Alvin',
+    callerMemory: {
+      fileOwnerName: 'Alvin',
+      alternateNames: ['impressed by your', 'Alvin speak', 'Brian'],
+    },
+    ttsLexicon: [{ match: 'Nakuru', say: 'Na-koo-roo' }],
+  });
+  assert.ok(ctx.terms.includes('Done and Dusted'));
+  assert.ok(ctx.terms.includes('Alvin'));
+  assert.ok(ctx.terms.includes('Brian'));
+  assert.ok(ctx.terms.includes('Nakuru'));
+  assert.ok(!ctx.terms.includes('impressed by your'));
+  assert.ok(!ctx.terms.includes('Alvin speak'));
+  assert.ok(!ctx.terms.some((term) => term.toLowerCase() === 'shy'));
+  assert.ok(!ctx.general.some((row) => row.key === 'agent' && /shy/i.test(row.value)));
+  const participant = ctx.general.find((row) => row.key === 'participant');
+  assert.ok(participant);
+  assert.match(participant.value, /Alvin/);
+  assert.match(participant.value, /Brian/);
+  assert.doesNotMatch(participant.value, /impressed by your|Alvin speak/i);
+});
+
 test('skips regex-y lexicon matches', () => {
   const ctx = buildSttContext({
     businessName: 'Demo Co',

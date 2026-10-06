@@ -41,6 +41,10 @@ test('inserts a space when Gemini drops it between words', () => {
   assert.strictEqual(joinSpokenPieces('tutakusa', 'idiaje'), 'tutakusaidiaje');
   assert.strictEqual(joinSpokenPieces('nimehifa', 'dhi ombi'), 'nimehifadhi ombi');
   assert.strictEqual(joinSpokenPieces('kuandi', 'kia'), 'kuandikia');
+  // HD_fe0d1e8fbd6e heard "Un gependa", "t usaidie", "us afi".
+  assert.strictEqual(joinSpokenPieces('Un', 'gependa'), 'Ungependa');
+  assert.strictEqual(joinSpokenPieces('t', 'usaidie'), 'tusaidie');
+  assert.strictEqual(joinSpokenPieces('us', 'afi'), 'usafi');
 });
 
 test('Kiswahili mid-word slices stay one word', () => {
@@ -67,6 +71,18 @@ test('Kiswahili mid-word slices stay one word', () => {
     ...buf3.finish(),
   ];
   assert.deepStrictEqual(emitted3, ['Sawa tutakusaidiaje kengine leo?']);
+
+  const buf4 = createSpokenStreamBuffer();
+  const emitted4 = [
+    ...buf4.push('Un'),
+    ...buf4.push('gependa '),
+    ...buf4.push('t'),
+    ...buf4.push('usaidie '),
+    ...buf4.push('us'),
+    ...buf4.push('afi.'),
+    ...buf4.finish(),
+  ];
+  assert.deepStrictEqual(emitted4, ['Ungependa tusaidie usafi.']);
 });
 
 test('HD_0ef68f8e7930 stream deltas speak with spaces', () => {
