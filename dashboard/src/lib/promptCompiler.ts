@@ -9,6 +9,8 @@ import {
   TONE_LABELS,
 } from "@/lib/onboarding";
 import { persistTeamNotifyFlags } from "@/lib/teamNotify";
+import { clampFaq } from "@/lib/faqs";
+import type { FaqEntry } from "@/lib/supabase";
 import { buildCompileSections } from "@/lib/provenance";
 
 /** Master instruction template for Gemini → voice-engine system prompt. */
@@ -283,19 +285,6 @@ export function parseFaqsField(raw: FormDataEntryValue | null): FaqItem[] {
     const question = String(row.question ?? "").trim().slice(0, 200);
     const answer = String(row.answer ?? "").trim().slice(0, 400);
     if (!question || !answer) return null;
-    const source = String(row.source ?? "").trim().toLowerCase();
-    const status = String(row.status ?? "").trim().toLowerCase();
-    const allowed = new Set(["owner", "seed", "import", "inferred", "call_suggested"]);
-    const item: FaqItem = { question, answer };
-    if (allowed.has(source)) item.source = source;
-    if (status === "golden" || status === "confirmed" || status === "suggested") {
-      item.status = source === "seed" || source === "call_suggested" || source === "inferred" ? "suggested" : status;
-    }
-    if (row.confirmed === true) item.confirmed = true;
-    const confirmedBy = String(row.confirmed_by ?? "").trim();
-    const confirmedAt = String(row.confirmed_at ?? "").trim();
-    if (confirmedBy) item.confirmed_by = confirmedBy.slice(0, 80);
-    if (confirmedAt) item.confirmed_at = confirmedAt.slice(0, 40);
-    return item;
+    return clampFaq({ ...(row as FaqEntry), question, answer });
   });
 }

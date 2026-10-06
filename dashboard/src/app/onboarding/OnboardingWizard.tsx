@@ -19,6 +19,17 @@ import {
 } from "@/lib/handoffMode";
 import { compactTextareaExpandHandlers } from "@/components/settingsUi";
 import { btnPrimary, deskFieldClass, deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
+import { Button, buttonClass } from "@/components/ui/Button";
+import { Field, Input } from "@/components/ui/Field";
+import { BaStakesPreview } from "@/components/BaStakesPreview";
+import {
+  OnboardingCapture,
+  type ProductDraft,
+  type ServiceDraft,
+} from "@/components/OnboardingCapture";
+import { SUGGESTED_FAQ_CHIPS } from "@/lib/catalogSeeds";
+import { homeStakes, shopStakes } from "@/lib/baStakes";
+import { homeCatalogPasses, hoursCapturePasses, shopCatalogPasses } from "@/lib/outcomeGates";
 
 const STEPS = [
   "Business type",
@@ -41,7 +52,11 @@ const initial: OnboardingState = {};
 export function OnboardingWizard() {
   const [step, setStep] = useState(0);
   const [vertical, setVertical] = useState<BusinessVertical | "">(DEFAULT_VERTICAL);
-  const [servicesPricing, setServicesPricing] = useState("");
+  const [products, setProducts] = useState<ProductDraft[]>([]);
+  const [services, setServices] = useState<ServiceDraft[]>([]);
+  const [catalogSkipped, setCatalogSkipped] = useState(false);
+  const [hoursSkipped, setHoursSkipped] = useState(false);
+  const [faqAnswers, setFaqAnswers] = useState<Record<string, string>>({});
   const [hoursLocation, setHoursLocation] = useState("");
   const [landmark, setLandmark] = useState("");
   const [directions, setDirections] = useState("");
@@ -65,10 +80,34 @@ export function OnboardingWizard() {
     }, 160);
   }
 
+  const shop = vertical !== "home_services";
+  const gatedServices = services.map((row) => ({
+    name: row.name,
+    pricing_mode: row.pricing_mode,
+    site_visit_required:
+      row.site_visit === "yes" ? true : row.site_visit === "no" ? false : null,
+  }));
+  const catalogReady = shop
+    ? shopCatalogPasses(products)
+    : homeCatalogPasses(gatedServices);
+  const hoursReady = hoursCapturePasses(hoursLocation);
+  const confirmedFaqs = Object.entries(faqAnswers)
+    .filter(([, answer]) => answer.trim())
+    .map(([question, answer]) => ({
+      question,
+      answer: answer.trim(),
+      source: "owner",
+      status: "confirmed",
+    }));
+  const stakes =
+    vertical === "home_services"
+      ? homeStakes({ services: gatedServices, coverage: landmark })
+      : shopStakes({ products, hoursText: hoursLocation, holdsAllowed: false });
+
   function canAdvance(): boolean {
     if (step === 0) return Boolean(vertical);
-    if (step === 1) return servicesPricing.trim().length >= 12;
-    if (step === 2) return hoursLocation.trim().length >= 8;
+    if (step === 1) return catalogSkipped || catalogReady;
+    if (step === 2) return hoursSkipped || hoursReady;
     if (step === 3) return Boolean(tone);
     return false;
   }
@@ -121,8 +160,29 @@ export function OnboardingWizard() {
         ].join(" ")}
       >
         <input type="hidden" name="vertical" value={vertical} />
-        <input type="hidden" name="services_pricing" value={servicesPricing} />
+        <input type="hidden" name="services_pricing" value="" />
         <input type="hidden" name="hours_location" value={hoursLocation} />
+        <input type="hidden" name="catalog_skipped" value={catalogSkipped ? "1" : "0"} />
+        <input type="hidden" name="hours_skipped" value={hoursSkipped ? "1" : "0"} />
+        <input
+          type="hidden"
+          name="product_catalog"
+          value={JSON.stringify(
+            products.map((row) => ({ ...row, source: "owner" }))
+          )}
+        />
+        <input
+          type="hidden"
+          name="services_catalog"
+          value={JSON.stringify(
+            gatedServices.map((row, index) => ({
+              ...row,
+              notes: services[index]?.notes || "",
+              source: "owner",
+            }))
+          )}
+        />
+        <input type="hidden" name="faqs_json" value={JSON.stringify(confirmedFaqs)} />
         <input type="hidden" name="landmark" value={landmark} />
         <input type="hidden" name="directions" value={directions} />
         <input type="hidden" name="tone" value={tone} />
@@ -158,18 +218,18 @@ export function OnboardingWizard() {
             <h2 className="font-display text-2xl text-ink">
               {vertical === "retail" ? "Products & pricing" : "Services & pricing"}
             </h2>
-            <textarea
-              autoFocus
-              value={servicesPricing}
-              onChange={(e) => setServicesPricing(e.target.value)}
-              rows={2}
-              {...compactTextareaExpandHandlers}
-              placeholder={
-                vertical === "retail"
-                  ? "Phone accessories, chargers, and screen protectors.\nPricing: chargers from 500 KES. We can hold items with a name until evening. M-Pesa and cash."
-                  : "Plumbing repairs, electrical fixes, and deep cleaning across Nairobi.\nPricing: we quote after understanding the job. Call-out from KES 1,500. M-Pesa and cash."
-              }
-              className={`mt-5 leading-relaxed ${deskFieldClass}`}
+            <OnboardingCapture
+              vertical={vertical}
+              products={products}
+              services={services}
+              onProducts={(rows) => {
+                setCatalogSkipped(false);
+                setProducts(rows);
+              }}
+              onServices={(rows) => {
+                setCatalogSkipped(false);
+                setServices(rows);
+              }}
             />
           </div>
         ) : null}
@@ -177,17 +237,37 @@ export function OnboardingWizard() {
         {step === 2 ? (
           <div>
             <h2 className="font-display text-2xl text-ink">Hours & location</h2>
-            <textarea
-              autoFocus
-              value={hoursLocation}
-              onChange={(e) => setHoursLocation(e.target.value)}
-              rows={2}
-              {...compactTextareaExpandHandlers}
-              placeholder={
-                "Monday to Saturday: 9:00 AM to 7:00 PM. Sunday: Closed.\nWestlands, Nairobi."
-              }
-              className={`mt-5 leading-relaxed ${deskFieldClass}`}
-            />
+            <div className="mt-5 flex flex-wrap gap-2">
+              {["Mon-Sat 8-7", "Mon-Fri 9-5", "Mon-Sun 8-8"].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={buttonClass({
+                    variant: hoursLocation === preset ? "tonal" : "ghost",
+                    size: "sm",
+                    className: "!rounded-md",
+                  })}
+                  onClick={() => {
+                    setHoursSkipped(false);
+                    setHoursLocation(preset);
+                  }}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+            <Field id="hours_capture" label="Opening hours" className="mt-4">
+              {(props) => (
+                <Input
+                  {...props}
+                  value={hoursLocation}
+                  onChange={(event) => {
+                    setHoursSkipped(false);
+                    setHoursLocation(event.target.value);
+                  }}
+                />
+              )}
+            </Field>
             <label className="mt-4 block text-sm font-medium text-ink" htmlFor="landmark">
               Landmark (optional)
             </label>
@@ -275,6 +355,52 @@ export function OnboardingWizard() {
                 })}
               </div>
             </div>
+            <div className="mt-8">
+              <h3 className="text-sm font-medium text-ink">Answers you can confirm</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {SUGGESTED_FAQ_CHIPS.map((question) => {
+                  return (
+                    <button
+                      key={question}
+                      type="button"
+                      className={buttonClass({
+                        variant: faqAnswers[question]?.trim() ? "tonal" : "ghost",
+                        size: "sm",
+                        className: "!rounded-md",
+                      })}
+                      onClick={() => {
+                        setFaqAnswers((prev) => {
+                          if (Object.prototype.hasOwnProperty.call(prev, question)) {
+                            const next = { ...prev };
+                            delete next[question];
+                            return next;
+                          }
+                          return { ...prev, [question]: "" };
+                        });
+                      }}
+                    >
+                      {question}
+                    </button>
+                  );
+                })}
+              </div>
+              {SUGGESTED_FAQ_CHIPS.filter((question) =>
+                Object.prototype.hasOwnProperty.call(faqAnswers, question)
+              ).map((question, index) => (
+                <Field key={question} id={`faq-answer-${index}`} label={question} className="mt-3">
+                  {(props) => (
+                    <Input
+                      {...props}
+                      value={faqAnswers[question] || ""}
+                      onChange={(event) =>
+                        setFaqAnswers((prev) => ({ ...prev, [question]: event.target.value }))
+                      }
+                    />
+                  )}
+                </Field>
+              ))}
+            </div>
+            <BaStakesPreview title="What your BA will say" lines={stakes} />
           </div>
         ) : null}
 
@@ -297,6 +423,21 @@ export function OnboardingWizard() {
           ) : (
             <span />
           )}
+
+          {step === 1 || step === 2 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => {
+                if (step === 1) setCatalogSkipped(true);
+                if (step === 2) setHoursSkipped(true);
+                goTo(step + 1);
+              }}
+            >
+              Skip
+            </Button>
+          ) : null}
 
           {step < STEPS.length - 1 ? (
             <button

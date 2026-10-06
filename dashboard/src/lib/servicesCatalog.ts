@@ -6,6 +6,11 @@ export type ServiceItem = {
   /** yes | no | unknown | "" (unset) */
   in_stock: string;
   category: string;
+  /** fixed | from | range | ask, or another owner-set mode. */
+  pricing_mode?: string;
+  /** Required for a Home catalog row to count. Absent does not count. */
+  site_visit_required?: boolean;
+  /** owner | seed | import | inferred | call_suggested */
   source?: string;
   status?: string;
 };
@@ -44,24 +49,36 @@ export function normalizeServicesCatalog(raw: unknown): ServiceItem[] {
       const r = (row || {}) as Record<string, unknown>;
       const source = String(r.source || "").trim().toLowerCase();
       const status = String(r.status || "").trim().toLowerCase();
-      return {
+      const item: ServiceItem = {
         name: String(r.name || "").trim(),
         price_range: String(r.price_range || r.priceRange || "").trim(),
         notes: String(r.notes || "").trim(),
         out_of_scope: String(r.out_of_scope || r.outOfScope || "").trim(),
         in_stock: normalizeInStock(r.in_stock ?? r.inStock),
         category: String(r.category || "").trim(),
-        ...(source === "owner" ||
+      };
+      const mode = String(r.pricing_mode || r.pricingMode || "").trim();
+      if (mode) item.pricing_mode = mode.slice(0, 40);
+      const visit = r.site_visit_required ?? r.siteVisitRequired;
+      const visitText = String(visit ?? "").trim().toLowerCase();
+      if (visit === true || visitText === "true" || visitText === "yes") {
+        item.site_visit_required = true;
+      } else if (visit === false || visitText === "false" || visitText === "no") {
+        item.site_visit_required = false;
+      }
+      if (
+        source === "owner" ||
         source === "seed" ||
         source === "import" ||
         source === "inferred" ||
         source === "call_suggested"
-          ? { source }
-          : {}),
-        ...(status === "golden" || status === "confirmed" || status === "suggested"
-          ? { status: source === "seed" || source === "call_suggested" ? "suggested" : status }
-          : {}),
-      };
+      ) {
+        item.source = source;
+      }
+      if (status === "golden" || status === "confirmed" || status === "suggested") {
+        item.status = source === "seed" || source === "call_suggested" ? "suggested" : status;
+      }
+      return item;
     })
     .filter(
       (row) =>
@@ -94,6 +111,9 @@ export function formatServicesForCompiler(
     const bits = [`- ${s.name.trim()}`];
     if (s.category.trim()) bits.push(`category ${s.category.trim()}`);
     if (s.price_range.trim()) bits.push(`price ${s.price_range.trim()}`);
+    if (s.pricing_mode?.trim()) bits.push(`pricing ${s.pricing_mode.trim()}`);
+    if (s.site_visit_required === true) bits.push("site visit required");
+    else if (s.site_visit_required === false) bits.push("no site visit");
     if (s.in_stock.trim()) bits.push(`in stock ${s.in_stock.trim()}`);
     if (s.notes.trim()) bits.push(s.notes.trim());
     if (s.out_of_scope.trim()) bits.push(`out of scope: ${s.out_of_scope.trim()}`);
