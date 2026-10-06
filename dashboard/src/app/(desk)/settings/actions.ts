@@ -52,6 +52,7 @@ import {
   settingsFieldFromScope,
   settingsScopeValidationError,
 } from "@/lib/settingsSaveScope";
+import { loadCompileProvenance } from "@/lib/tenantFieldProvenance";
 
 export type SettingsCompileState = {
   error?: string;
@@ -263,6 +264,7 @@ export async function saveAndCompileSettings(
   });
   if (scopeError) return { error: scopeError };
 
+  const provenance = await loadCompileProvenance(tenant.id);
   const { prompt, source } = await compileReceptionistPrompt({
     businessName,
     servicesOffered,
@@ -279,6 +281,10 @@ export async function saveAndCompileSettings(
     policiesText,
     productsText: productsBlock,
     socialText: socialBlock,
+    productCatalog,
+    businessPolicies,
+    fieldMeta: provenance.fieldMeta,
+    holdGate: provenance.holdGate,
   });
 
   const workspace = await createWorkspaceDataClient();

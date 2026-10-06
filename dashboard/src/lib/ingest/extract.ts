@@ -296,7 +296,7 @@ function pushFaq(faqs: FaqEntry[], question: string, answer: string) {
   const a = answer.trim().slice(0, 400);
   if (!q || !a) return;
   if (faqs.some((f) => normalizeFaqKey(f.question) === normalizeFaqKey(q))) return;
-  faqs.push({ question: q, answer: a });
+  faqs.push({ question: q, answer: a, source: "import", status: "suggested" });
 }
 
 /** Local extractor tuned for business-overview briefs (not only menus). */

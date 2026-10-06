@@ -13,7 +13,7 @@ const {
 const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { prepareStreamedSpeech } = require('./callCorrectives');
-const { dropSpeechSlop, guardSpokenReply } = require('./speechGuard');
+const { dropSpeechSlop, guardSpokenReply, logSpokenFilterDrop } = require('./speechGuard');
 const {
   fileReadLine,
   fileRowsWereRead,
@@ -364,10 +364,12 @@ function trimSpokenServiceDump(text, opts = {}) {
   if (looksLikeOfferAsk(callerText)) return raw;
   if (!looksLikeSpokenServiceDump(raw)) return raw;
   const lang = confirmationLanguage(opts.language);
-  if (lang === 'sw' || lang === 'sheng') {
-    return 'Tunaweza kusaidia. Unahitaji huduma gani?';
-  }
-  return 'We can help with that. What do you need done?';
+  const line =
+    lang === 'sw' || lang === 'sheng'
+      ? 'Tunaweza kusaidia. Unahitaji huduma gani?'
+      : 'We can help with that. What do you need done?';
+  logSpokenFilterDrop('service_dump', raw);
+  return line;
 }
 
 const HEDGE_OPENER =

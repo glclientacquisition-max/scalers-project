@@ -5,6 +5,7 @@
 // flip coverage or claim a live transfer. Playbooks cannot bypass this.
 
 const { confirmationLanguage } = require('./language');
+const { factServices, speechFactText } = require('./provenance');
 const { numbersIn } = require('./numberWords');
 const { assessCoverage } = require('./visitLocation');
 const { canonicalPlaceName } = require('./kenyaPlaces');
@@ -18,6 +19,14 @@ const {
 
 const SAVED_CLAIM =
   /\b(i(?:'ve| have) (?:saved|noted|booked|logged|recorded|sent|passed|forwarded|escalated|scheduled|submitted|placed|reserved|held)\b|(?:is|has been|are) (?:saved|noted|booked|logged|recorded|scheduled|confirmed|reserved|on hold|submitted)\b|(?:the )?team will (?:call|contact|reach|get back)|(?:someone|we|they) will (?:call|contact|reach|get back to) you|nimehifadhi|nimeandika|nimetuma|imehifadhiwa|imeandikwa|tutakupigia|watakupigia|nime-?save)/i;
+
+/** Hold or reserve claims. A saved enquiry does not authorize these. Bare "a hold" does not match. */
+const HOLD_PROMISE =
+  /\b(i(?:'ve| have|'ll| will) (?:held|reserved|hold)\b|we(?:'ve| have|'ll| will) (?:held|reserved|hold)\b|(?:is|are|been) (?:held|reserved|on hold)\b)/i;
+
+/** Deposit amount or payment number. Spoken only outside a hold until §10.3. */
+const HOLD_PAYMENT_LEAK =
+  /\bdeposit\b[^.]{0,48}\d|\d[^.]{0,32}\bdeposit\b|\b(till|pay\s*bill|paybill|business number|account number)\b[^.]{0,40}\d|\b(m-?pesa|mpesa)\b[^.]{0,24}\d{3,}/i;
 
 // Job is finished. Same rule as a saved claim: only after a tool succeeded.
 const JOB_CLOSE =
@@ -119,7 +128,10 @@ function sentenceIsSpeechSlop(sentence, callerText) {
 function dropSpeechSlop(text, callerText) {
   const kept = [];
   for (const sentence of splitSentences(text)) {
-    if (sentenceIsSpeechSlop(sentence, callerText)) continue;
+    if (sentenceIsSpeechSlop(sentence, callerText)) {
+      logSpokenFilterDrop('slop', sentence);
+      continue;
+    }
     kept.push(sentence);
   }
   return kept.join(' ').trim();
@@ -140,9 +152,9 @@ function safeJson(value) {
   }
 }
 
-/** Profile hours are HH:MM. They do not authorize a spoken visit clock. */
+/** Owner-fact text only. Seed prices and payment numbers are not speakable. */
 function profileFacts(profile) {
-  return safeJson(profile).replace(/\b\d{1,2}:\d{2}\b/g, ' ');
+  return speechFactText(profile).replace(/\b\d{1,2}:\d{2}\b/g, ' ');
 }
 
 /** Numbers the agent may say: caller turns, business facts on file, tool results. */
@@ -208,6 +220,15 @@ function toolSucceededThisTurn(toolResults = []) {
   );
 }
 
+function holdOrOrderSucceeded(toolResults = []) {
+  return (Array.isArray(toolResults) ? toolResults : []).some((result) => {
+    if (!result || result.action !== 'create_service_request') return false;
+    if (result.status !== 'succeeded' && result.status !== 'updated') return false;
+    const type = String(result.requestType || result.value?.type || '').toLowerCase();
+    return type === 'hold' || type === 'order';
+  });
+}
+
 /** True when every sentence is the model describing its own send or handoff. */
 function narratesInternalAction(text) {
   const sentences = splitSentences(text);
@@ -217,7 +238,7 @@ function narratesInternalAction(text) {
 
 function filePriceAnswer(profile, callerText) {
   const ask = String(callerText || '').toLowerCase();
-  const rows = Array.isArray(profile?.servicesCatalog) ? profile.servicesCatalog : [];
+  const rows = factServices(profile?.servicesCatalog, profile?.fieldMeta || null);
   const hits = [];
   for (const row of rows) {
     const name = String(row?.name || '').trim();
@@ -244,6 +265,15 @@ function unknownFallback(language) {
 
 function ackFallback(language) {
   return confirmationLanguage(language) === 'en' ? 'Okay.' : 'Sawa.';
+}
+
+/** One line when a spoken filter removes text, so a silent drop shows up in call logs. */
+function logSpokenFilterDrop(reason, dropped) {
+  const text = String(dropped || '').replace(/\s+/g, ' ').trim();
+  if (!text) return;
+  console.warn(
+    `[speech-filter] drop reason=${reason} chars=${text.length} text=${JSON.stringify(text.slice(0, 180))}`
+  );
 }
 
 function placeNamesIn(text) {
@@ -315,6 +345,8 @@ function guardSpokenReply(text, ctx = {}) {
   const known = knownNumbers(ctx);
   const clocks = allowedClocks(ctx);
   const saved = toolSucceededThisTurn(ctx.toolResults);
+  const holdOk = holdOrOrderSucceeded(ctx.toolResults);
+  let droppedHoldPayment = false;
   const transferOk = Boolean(ctx.capabilities?.liveTransfer || ctx.capabilities?.transfer);
   const missing = Array.isArray(ctx.state?.goal?.missingSlots) ? ctx.state.goal.missingSlots : [];
   const holdOpenSlot = !saved && missing.length > 0;
@@ -333,23 +365,49 @@ function guardSpokenReply(text, ctx = {}) {
   for (const sentence of splitSentences(raw)) {
     if (heldName && sentenceAsksForCallerName(sentence)) {
       droppedNameAsk = true;
+      logSpokenFilterDrop('name_ask', sentence);
       continue;
     }
-    if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) continue;
-    if (ACTION_NARRATION.test(sentence)) continue;
+    if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) {
+      logSpokenFilterDrop('slop', sentence);
+      continue;
+    }
+    if (ACTION_NARRATION.test(sentence)) {
+      logSpokenFilterDrop('action_narration', sentence);
+      continue;
+    }
+    if (!holdOk && HOLD_PROMISE.test(sentence)) {
+      droppedJob = true;
+      logSpokenFilterDrop('hold_promise', sentence);
+      continue;
+    }
+    if (holdOk && HOLD_PAYMENT_LEAK.test(sentence)) {
+      droppedHoldPayment = true;
+      logSpokenFilterDrop('hold_payment', sentence);
+      continue;
+    }
     if (!saved && (SAVED_CLAIM.test(sentence) || JOB_CLOSE.test(sentence))) {
       droppedJob = true;
+      logSpokenFilterDrop('saved_claim', sentence);
       continue;
     }
-    if (!transferOk && TRANSFER_CLAIM.test(sentence)) continue;
+    if (!transferOk && TRANSFER_CLAIM.test(sentence)) {
+      logSpokenFilterDrop('transfer_claim', sentence);
+      continue;
+    }
     const coverage = COVERAGE_CLAIM.exec(sentence);
-    if (coverage && assessCoverage(coverage[1], ctx.profile || {}) !== 'inside') continue;
+    if (coverage && assessCoverage(coverage[1], ctx.profile || {}) !== 'inside') {
+      logSpokenFilterDrop('coverage', sentence);
+      continue;
+    }
     if (sentenceNamesUnboundPlace(sentence, allowedPlaces)) {
       droppedJob = true;
+      logSpokenFilterDrop('unbound_place', sentence);
       continue;
     }
     if (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known)) {
       droppedNumber = true;
+      logSpokenFilterDrop('unsaid_number', sentence);
       continue;
     }
     kept.push(sentence);
@@ -381,6 +439,7 @@ function guardSpokenReply(text, ctx = {}) {
     }
     return ctx.allowEmpty ? '' : slotLine;
   }
+  if (!out && droppedHoldPayment) return 'The owner will follow up.';
   if (ctx.allowEmpty && !askedNumber) return '';
   if (droppedNumber && NUMBER_ASK.test(lastCallerTurn)) {
     const priced = filePriceAnswer(ctx.profile, lastCallerTurn);
@@ -395,6 +454,7 @@ module.exports = {
   TRANSFER_CLAIM,
   ACTION_NARRATION,
   narratesInternalAction,
+  logSpokenFilterDrop,
   guardSpokenReply,
   dropSpeechSlop,
   sentenceIsSpeechSlop,

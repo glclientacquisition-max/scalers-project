@@ -65,6 +65,7 @@ const catalog = [
 const profile = {
   vertical: 'retail',
   productCatalog: catalog,
+  businessPolicies: { deposit: 'Hold until 6pm with the caller name.' },
   businessLocations: [
     { label: 'City Market', address: 'Muindi Mbingu Street', landmark: 'near City Market' },
   ],

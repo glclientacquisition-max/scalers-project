@@ -1,5 +1,14 @@
 // Format structured tenant knowledge for live call injection.
 
+const {
+  factProducts,
+  factServices,
+  factFaqs,
+  factPolicyMap,
+  unknownFaqTopics,
+  formatUnknownSection,
+} = require('./provenance');
+
 function asArray(raw) {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw;
@@ -138,9 +147,10 @@ function buildLiveGroundTruth(profile = {}) {
     formatPoliciesBlock,
   } = require('./businessPolicies');
 
-  const services = normalizeServices(profile.servicesCatalog);
+  const fieldMeta = profile.fieldMeta || null;
+  const services = normalizeServices(factServices(profile.servicesCatalog, fieldMeta));
   const products = require('./productCatalog').normalizeProducts(
-    profile.productCatalog
+    factProducts(profile.productCatalog, fieldMeta)
   );
   const { formatProductsOverview } = require('./productCatalog');
   const { formatOpenVisitsForPrompt } = require('./visitCalendar');
@@ -152,10 +162,27 @@ function buildLiveGroundTruth(profile = {}) {
     formatSocialHandlesBlock,
   } = require('./socialHandles');
   const social = normalizeSocialHandles(profile.socialHandles);
-  const faqs = normalizeFaqs(profile.faqs);
+  const faqs = factFaqs(profile.faqs, fieldMeta).map((row) => ({
+    question: row.question,
+    answer: row.answer,
+  }));
   const team = normalizeTeam(profile.teamDirectory);
   const locations = normalizeLocations(profile.businessLocations);
-  const policies = normalizePolicies(profile.businessPolicies);
+  const policySplit = factPolicyMap(profile.businessPolicies, fieldMeta);
+  const policies = normalizePolicies(policySplit.policies);
+  const unknownTopics = [...policySplit.unknown, ...unknownFaqTopics(profile.faqs, fieldMeta)];
+  const namedProducts = Array.isArray(profile.productCatalog)
+    ? profile.productCatalog.some((row) => String(row?.name || '').trim())
+    : false;
+  const namedServices = Array.isArray(profile.servicesCatalog)
+    ? profile.servicesCatalog.some((row) => String(row?.name || '').trim())
+    : false;
+  if (namedProducts && !products.length && !unknownTopics.includes('Product catalogue')) {
+    unknownTopics.push('Product catalogue');
+  }
+  if (namedServices && !services.length && !unknownTopics.includes('Services')) {
+    unknownTopics.push('Services');
+  }
   const unknown = String(profile.unknownAnswerFallback || '').trim();
   const extras = String(profile.servicesNotes || profile.servicesOffered || '').trim();
   const tools = parseAgentTools(profile.agentTools);
@@ -176,7 +203,8 @@ function buildLiveGroundTruth(profile = {}) {
     socialHandlesHaveContent(social) ||
     unknown ||
     extras ||
-    Boolean(openVisits);
+    Boolean(openVisits) ||
+    unknownTopics.length;
   if (!hasAny) return '';
 
   const parts = [
@@ -222,7 +250,13 @@ function buildLiveGroundTruth(profile = {}) {
 
   parts.push('', 'POLICIES:', formatPoliciesBlock(policies));
 
-  parts.push('', 'GOLDEN FAQs (answer these exactly when asked):', formatFaqsBlock(faqs));
+  parts.push('', formatUnknownSection(unknownTopics));
+
+  parts.push(
+    '',
+    'CONFIRMED FAQs (owner-confirmed facts. Answer these exactly when asked. Do not treat pack seeds as fact):',
+    faqs.length ? formatFaqsBlock(faqs) : '(none confirmed)'
+  );
 
   if (tools.escalate) {
     parts.push(

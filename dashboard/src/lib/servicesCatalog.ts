@@ -6,6 +6,8 @@ export type ServiceItem = {
   /** yes | no | unknown | "" (unset) */
   in_stock: string;
   category: string;
+  source?: string;
+  status?: string;
 };
 
 export function emptyService(): ServiceItem {
@@ -40,6 +42,8 @@ export function normalizeServicesCatalog(raw: unknown): ServiceItem[] {
   return raw
     .map((row) => {
       const r = (row || {}) as Record<string, unknown>;
+      const source = String(r.source || "").trim().toLowerCase();
+      const status = String(r.status || "").trim().toLowerCase();
       return {
         name: String(r.name || "").trim(),
         price_range: String(r.price_range || r.priceRange || "").trim(),
@@ -47,6 +51,16 @@ export function normalizeServicesCatalog(raw: unknown): ServiceItem[] {
         out_of_scope: String(r.out_of_scope || r.outOfScope || "").trim(),
         in_stock: normalizeInStock(r.in_stock ?? r.inStock),
         category: String(r.category || "").trim(),
+        ...(source === "owner" ||
+        source === "seed" ||
+        source === "import" ||
+        source === "inferred" ||
+        source === "call_suggested"
+          ? { source }
+          : {}),
+        ...(status === "golden" || status === "confirmed" || status === "suggested"
+          ? { status: source === "seed" || source === "call_suggested" ? "suggested" : status }
+          : {}),
       };
     })
     .filter(
