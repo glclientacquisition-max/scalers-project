@@ -178,7 +178,6 @@ describe("admin console polish", () => {
 
   it("uses the desk list title on admin list roots", () => {
     for (const rel of [
-      "dashboard/src/app/admin/(console)/packages/page.tsx",
       "dashboard/src/app/admin/(console)/voices/page.tsx",
     ]) {
       const src = read(rel);
@@ -187,6 +186,8 @@ describe("admin console polish", () => {
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /PageHeader/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/businesses/page.tsx"), /deskListTitleClass/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/packages/page.tsx"), /deskListTitleClass/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/wallets/page.tsx"), /deskListTitleClass/);
     const numbers = read("dashboard/src/app/admin/(console)/numbers/page.tsx");
     assert.doesNotMatch(numbers, /deskListTitleClass/);
     assert.doesNotMatch(numbers, /SautikitSyncButton/);
@@ -197,7 +198,7 @@ describe("admin console polish", () => {
   it("opens Packages with assign and sends old Ledger to Businesses", () => {
     const packages = read("dashboard/src/app/admin/(console)/packages/page.tsx");
     assert.match(packages, /loadPackageCatalog/);
-    assert.match(packages, /deskListTitleClass/);
+    assert.doesNotMatch(packages, /deskListTitleClass/);
     assert.doesNotMatch(packages, /catalogOnly/);
     assert.doesNotMatch(packages, /redirect\(/);
     const wallets = read("dashboard/src/app/admin/(console)/wallets/page.tsx");

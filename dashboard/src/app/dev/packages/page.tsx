@@ -111,7 +111,6 @@ export default function DevPackagesPage() {
         <AdminPhonePull />
       </Suspense>
       <div className="mx-auto max-w-5xl space-y-4">
-        <h1 className="font-display text-page">Packages</h1>
         <AdminPackagesPanel rates={RATES} packages={PACKAGES} businesses={BUSINESSES} />
       </div>
     </main>

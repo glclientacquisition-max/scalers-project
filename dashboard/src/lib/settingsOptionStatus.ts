@@ -81,7 +81,28 @@ function placeCount(rows: unknown): number {
   }).length;
 }
 
-function voiceStatus(
+/** Rail width fits about sixteen characters before the chevron. */
+const STATUS_MAX = 16;
+
+function countLabel(count: number, one: string, many: string): string {
+  if (!count) return "";
+  return count === 1 ? `1 ${one}` : `${count} ${many}`;
+}
+
+function fitsStatus(value: string): string {
+  const text = value.replace(/\s+/g, " ").trim();
+  if (text.length <= STATUS_MAX) return text;
+  const words = text.split(" ");
+  let phrase = words[0] || text.slice(0, STATUS_MAX);
+  for (let i = 1; i < words.length; i += 1) {
+    const next = `${phrase} ${words[i]}`;
+    if (next.length > STATUS_MAX) break;
+    phrase = next;
+  }
+  return phrase;
+}
+
+function voiceFull(
   tenant: SettingsStatusTenant,
   voices: SettingsStatusVoice[]
 ): string {
@@ -89,19 +110,19 @@ function voiceStatus(
   if (custom) return custom;
   const id = String(tenant.soniox_voice_id || "").trim();
   const match = voices.find((voice) => voice.id === id);
-  if (match?.description) return match.description;
-  return "";
+  return String(match?.description || "").trim();
 }
 
-/** Hub Identity meta: business / tone — never the same string Voice shows. */
-function identityStatus(
+function voiceStatus(
   tenant: SettingsStatusTenant,
   voices: SettingsStatusVoice[]
 ): string {
-  const business = String(tenant.business_name || "").trim();
-  if (business) return business;
+  return fitsStatus(voiceFull(tenant, voices));
+}
 
-  const tone = String(tenant.agent_tone || "")
+/** Same ids as onboarding TONE_LABELS. Older chips fold into Warm. */
+function toneLabel(raw: string): string {
+  const tone = String(raw || "")
     .trim()
     .toLowerCase();
   if (tone === "professional") return "Professional";
@@ -113,12 +134,22 @@ function identityStatus(
   ) {
     return "Warm";
   }
+  return "";
+}
+
+/** Tone, or the assistant name when it is not already the voice. */
+function identityStatus(
+  tenant: SettingsStatusTenant,
+  voices: SettingsStatusVoice[]
+): string {
+  const tone = toneLabel(String(tenant.agent_tone || ""));
+  if (tone) return tone;
 
   const name = String(tenant.agent_name || "").trim();
   if (!name || /^receptionist$/i.test(name)) return "";
-  const voice = voiceStatus(tenant, voices);
+  const voice = voiceFull(tenant, voices);
   if (voice && name.toLowerCase() === voice.toLowerCase()) return "";
-  return name;
+  return fitsStatus(name);
 }
 
 export function settingsOptionStatus(
@@ -131,9 +162,12 @@ export function settingsOptionStatus(
     return did && !/^pending:/i.test(did) ? "Line live" : "";
   }
   if (target.tab === "catalog") {
-    const count =
-      namedCount(tenant.services_catalog) + namedCount(tenant.product_catalog);
-    return count ? String(count) : "";
+    const services = namedCount(tenant.services_catalog);
+    const products = namedCount(tenant.product_catalog);
+    if (services && products) return countLabel(services + products, "item", "items");
+    if (services) return countLabel(services, "service", "services");
+    if (products) return countLabel(products, "product", "products");
+    return "";
   }
   if (target.tab !== "train") return "";
   switch (target.panel) {
@@ -143,39 +177,46 @@ export function settingsOptionStatus(
     }
     case "tools":
       return voiceStatus(tenant, voices);
-    case "faqs": {
-      const count = faqCount(tenant.faqs);
-      return count ? String(count) : "";
-    }
-    case "team": {
-      const count = namedCount(tenant.team_directory);
-      return count ? String(count) : "";
-    }
-    case "locations": {
-      const count = placeCount(tenant.business_locations);
-      return count ? String(count) : "";
-    }
+    case "faqs":
+      return countLabel(faqCount(tenant.faqs), "question", "questions");
+    case "team":
+      return countLabel(namedCount(tenant.team_directory), "person", "people");
+    case "locations":
+      return countLabel(placeCount(tenant.business_locations), "place", "places");
     case "identity":
       return identityStatus(tenant, voices);
-    case "pronunciation": {
-      const count = Array.isArray(tenant.tts_lexicon) ? tenant.tts_lexicon.length : 0;
-      return count ? String(count) : "";
-    }
+    case "pronunciation":
+      return countLabel(
+        Array.isArray(tenant.tts_lexicon) ? tenant.tts_lexicon.length : 0,
+        "word",
+        "words"
+      );
     default:
       return "";
   }
 }
 
-/** Short row statuses for the Settings list. One string per destination. */
+export type SettingsListStatus = {
+  text: string;
+  /** Full fact when the row shows a shorter voice or name. */
+  title: string;
+};
+
+/** Short row statuses for the Settings list. One fact per destination. */
 export function settingsIndexStatuses(
   tenant: SettingsStatusTenant,
   voices: SettingsStatusVoice[],
   targets: SettingsStatusTarget[]
-): Record<string, string> {
-  const out: Record<string, string> = {};
+): Record<string, SettingsListStatus> {
+  const out: Record<string, SettingsListStatus> = {};
   for (const target of targets) {
-    const status = settingsOptionStatus(target, tenant, voices);
-    if (status) out[settingsStatusKey(target)] = status;
+    const text = settingsOptionStatus(target, tenant, voices);
+    if (!text) continue;
+    const title =
+      target.tab === "train" && target.panel === "tools"
+        ? voiceFull(tenant, voices) || text
+        : text;
+    out[settingsStatusKey(target)] = { text, title };
   }
   return out;
 }

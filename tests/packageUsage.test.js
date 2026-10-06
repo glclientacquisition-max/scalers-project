@@ -105,8 +105,8 @@ describe("package usage meter", () => {
 
   it("previews landing prices and follows the selected business on Admin", () => {
     const panel = read("dashboard/src/components/AdminPackagesPanel.tsx");
+    const page = read("dashboard/src/app/admin/(console)/packages/page.tsx");
     assert.match(panel, /packagePriceLabel/);
-    assert.match(panel, />Landing</);
     assert.match(panel, /Per year/);
     assert.match(panel, /live on landing/);
     assert.match(panel, /Now \$\{selected\.packageName/);
@@ -117,7 +117,11 @@ describe("package usage meter", () => {
     assert.match(panel, /usedOfIncluded\(minutesUsedFromSeconds/);
     assert.match(panel, /row\.gap/);
     assert.match(panel, /Matches package/);
+    assert.match(panel, /ListRow/);
+    assert.match(panel, /Needs you/);
     assert.doesNotMatch(panel, /Most popular/);
+    assert.doesNotMatch(panel, /<table/);
+    assert.doesNotMatch(page, /deskListTitleClass/);
   });
 
   it("names when included amounts do not match the assigned package", async () => {
@@ -166,7 +170,7 @@ describe("package usage meter", () => {
     const billingDetail = read("dashboard/src/components/AdminBillingDetailPanel.tsx");
     const wallet = read("dashboard/src/lib/wallet.ts");
     assert.match(billingDetail, /Beta: meter the package\. On-demand ledger is not charged\./);
-    assert.match(billingDetail, /on-demand past included/);
+    assert.match(billingDetail, /On-demand past included/);
     assert.doesNotMatch(billingDetail, /line fees/);
     assert.doesNotMatch(billingDetail, /CREDIT_PRESETS/);
     assert.match(wallet, /shouldApplyLineRental/);
