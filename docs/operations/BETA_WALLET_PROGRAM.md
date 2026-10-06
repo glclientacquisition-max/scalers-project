@@ -12,7 +12,7 @@ Billing modes are **product controls** for metering and on-demand debits. They a
 
 New workspaces default to **`off`** (beta).
 
-Ops changes enforcement: Admin → **Ledger** (`/admin/wallets`) → Plan → `soft` or `hard`.
+Ops changes enforcement: Admin → Businesses → shop → Plan → Beta or On-demand. On-demand writes `soft`. Hard inbound block is not wired.
 The Plan panel confirms before leaving beta (real charges can start) and before waiving a negative balance on return to beta.
 
 When moving back to beta, ops can **waive negative balance** (trial credit) so on-demand-era debt disappears.

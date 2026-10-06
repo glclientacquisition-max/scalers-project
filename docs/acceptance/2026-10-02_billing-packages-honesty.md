@@ -6,9 +6,9 @@
 
 ## Check
 
-1. Super Admin nav lists **Packages** before **Ledger** (`/admin/wallets`).
-2. Ledger page title and intro say customer billing is packages + on-demand; link to Packages.
-3. Packages page intro states the same; Ledger is ops scaffolding.
+1. Super Admin nav lists **Packages**. There is no Ledger tab.
+2. Plan (beta or on-demand) and charges sit on the Businesses shop. `/admin/wallets` redirects to Businesses.
+3. Packages is the catalog. The KES ledger is ops scaffolding, not a checkout path.
 4. Overview CTA: "Packages and on-demand" and "Wallet ledger" (not "Manage wallets").
 5. Docs: `ONE_WALLET_BILLING.md`, `SUPER_ADMIN_REQUIREMENTS.md`, `docs/agents/OPS_BILLING.md` lead with packages + on-demand; wallet as ledger scaffolding.
 

@@ -135,7 +135,12 @@ describe("admin console polish", () => {
     assert.match(panel, /No numbers available/);
     assert.match(panel, /Release this number\?/);
     assert.match(panel, /returns to Available/);
-    assert.match(panel, /Adjust ledger/);
+    assert.match(panel, /title="Plan"/);
+    assert.match(panel, /title="Charges"/);
+    assert.match(panel, /set_billing_mode/);
+    assert.match(panel, /ledger_for/);
+    assert.match(panel, /Adjust/);
+    assert.doesNotMatch(panel, /title="Ledger"/);
     assert.match(panel, /b\.package_name/);
     assert.match(panel, /wallet_balance_kes/);
     assert.match(panel, /REMOVE/);
@@ -173,7 +178,6 @@ describe("admin console polish", () => {
 
   it("uses the desk list title on admin list roots", () => {
     for (const rel of [
-      "dashboard/src/app/admin/(console)/wallets/page.tsx",
       "dashboard/src/app/admin/(console)/packages/page.tsx",
       "dashboard/src/app/admin/(console)/voices/page.tsx",
     ]) {
@@ -190,17 +194,16 @@ describe("admin console polish", () => {
     assert.match(numbers, /DidPoolManager/);
   });
 
-  it("opens Packages with assign and Ledger with the wallets panel", () => {
+  it("opens Packages with assign and sends old Ledger to Businesses", () => {
     const packages = read("dashboard/src/app/admin/(console)/packages/page.tsx");
     assert.match(packages, /loadPackageCatalog/);
     assert.match(packages, /deskListTitleClass/);
     assert.doesNotMatch(packages, /catalogOnly/);
     assert.doesNotMatch(packages, /redirect\(/);
     const wallets = read("dashboard/src/app/admin/(console)/wallets/page.tsx");
-    assert.match(wallets, /AdminWalletsPanel/);
-    assert.match(wallets, /Ledger/);
-    assert.match(wallets, /deskListTitleClass/);
-    assert.doesNotMatch(wallets, /redirect\(/);
+    assert.match(wallets, /redirect\("\/admin\/businesses"\)/);
+    assert.doesNotMatch(wallets, /AdminWalletsPanel/);
+    assert.doesNotMatch(wallets, /deskListTitleClass/);
     const overview = read("dashboard/src/app/admin/(console)/page.tsx");
     assert.match(overview, /Add number/);
     assert.match(overview, /href="\/admin\/platform"/);

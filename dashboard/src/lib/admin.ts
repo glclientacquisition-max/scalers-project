@@ -18,6 +18,7 @@ export type AdminBusiness = {
   ai_wallet_balance_usd: number | null;
   package_name: string | null;
   package_period: "month" | "year" | null;
+  billing_enforcement: "off" | "soft" | "hard";
   status: "active" | "waiting" | "archived";
 };
 
@@ -55,12 +56,24 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
     wallet_balance_kes?: number | null;
     telecom_wallet_balance_kes?: number | null;
     ai_wallet_balance_usd?: number | null;
+    billing_enforcement?: string | null;
   };
 
   let data: BusinessRow[] | null = null;
   let error: { message: string } | null = null;
 
   {
+    const res = await admin
+      .from("tenants")
+      .select(
+        "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active, wallet_balance_kes, telecom_wallet_balance_kes, ai_wallet_balance_usd, billing_enforcement"
+      )
+      .order("created_at", { ascending: true });
+    data = (res.data as BusinessRow[] | null) || null;
+    error = res.error;
+  }
+
+  if (error && /billing_enforcement/i.test(error.message)) {
     const res = await admin
       .from("tenants")
       .select(
@@ -98,6 +111,10 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
       ai_wallet_balance_usd: 0,
       package_name: pack?.packageName || null,
       package_period: pack?.period || null,
+      billing_enforcement:
+        row.billing_enforcement === "soft" || row.billing_enforcement === "hard"
+          ? row.billing_enforcement
+          : "off",
       status: businessStatus(row),
     } as AdminBusiness;
   });
