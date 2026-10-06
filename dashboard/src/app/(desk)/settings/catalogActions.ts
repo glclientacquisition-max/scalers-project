@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
+import { inferPriceMode } from "@/lib/outcomeGates";
+import { recompileAfterCatalogImport, upsertTenantFieldMeta } from "@/lib/deskProvenance";
 import { fetchPublicUrlSafe } from "@/lib/ingest/ssrfFetch";
 import {
   htmlToPlainText,
@@ -214,8 +216,14 @@ export async function applyCatalogImportAction(
     }
   }
 
+  const confirm = String(formData.get("confirm") || "") === "1";
+  const stamped = products.map((product) => ({
+    ...product,
+    source: confirm ? ("owner" as const) : ("import" as const),
+    price_mode: product.price_mode || inferPriceMode(product.price) || undefined,
+  }));
   const existing = normalizeProductCatalog(tenant.product_catalog);
-  const merged = mergeProductCatalog(existing, products, mode);
+  const merged = mergeProductCatalog(existing, stamped, mode);
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return { error: "Not signed in." };
@@ -236,12 +244,49 @@ export async function applyCatalogImportAction(
     return ownerSaveFailed("catalog", error.message);
   }
 
-  // GIGO P0: import save alone does not recompile. After owner confirms the diff,
-  // call recompileAfterCatalogImport from @/lib/catalogImportRecompile.
+  let message = "Catalogue saved for the next call.";
+  if (confirm) {
+    try {
+      const compiled = await recompileAfterCatalogImport({
+        client: workspace.client,
+        tenant: { ...tenant, product_catalog: merged },
+        productCatalog: merged,
+      });
+      message = compiled.ok
+        ? "Live catalog updated."
+        : "Live catalog updated. Assistant refresh pending.";
+    } catch {
+      message = "Live catalog updated. Assistant refresh pending.";
+    }
+    const first = merged[0];
+    if (first?.name) {
+      const sku = first.sku.trim() || "1";
+      const meta = await upsertTenantFieldMeta({
+        tenantId: tenant.id,
+        fieldPath: `catalog.product.${sku}.name`,
+        source: "owner",
+        actor: "desk",
+        newValue: first.name,
+      }).catch(() => null);
+      if (meta && !meta.error) {
+        await Promise.all(
+          merged.slice(1, 40).map((product, index) =>
+            upsertTenantFieldMeta({
+              tenantId: tenant.id,
+              fieldPath: `catalog.product.${product.sku.trim() || String(index + 2)}.name`,
+              source: "owner",
+              actor: "desk",
+              newValue: product.name,
+            }).catch(() => null)
+          )
+        );
+      }
+    }
+  }
 
   revalidatePath("/settings");
   return {
     ok: true,
-    message: "Catalogue saved for the next call.",
+    message,
   };
 }

@@ -48,6 +48,7 @@ import {
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
+import { stampOwnerFieldPaths } from "@/app/(desk)/settings/provenanceActions";
 import {
   settingsFieldFromScope,
   settingsScopeValidationError,
@@ -324,6 +325,16 @@ export async function saveAndCompileSettings(
   if (error) {
     return ownerSaveFailed("settings.save", error.message);
   }
+
+  const ownerPaths = (() => {
+    try {
+      const parsed = JSON.parse(String(formData.get("owner_field_paths") || "[]"));
+      return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
+    } catch {
+      return [];
+    }
+  })();
+  await stampOwnerFieldPaths(tenant.id, ownerPaths);
 
   await getAuthUser();
 

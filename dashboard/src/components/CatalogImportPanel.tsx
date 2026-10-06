@@ -226,7 +226,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
             onChange={setMergeMode}
           />
 
-          <form action={applyAction} className="flex flex-wrap gap-2">
+          <form action={applyAction} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="tenant_id" value={tenant.id} />
             <input
               type="hidden"
@@ -244,10 +244,28 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
               name="include_social"
               value={includeSocial ? "1" : "0"}
             />
+            <p className="w-full text-sm text-ink">
+              {selectedProducts.length} products imported. Confirm all or review.
+            </p>
             <button
               type="submit"
+              name="confirm"
+              value="1"
               disabled={applyPending || selectedProducts.length === 0}
               className={settingsPrimaryButtonClass}
+            >
+              {applyPending
+                ? "Saving…"
+                : selected.size === products.length
+                  ? "Confirm all"
+                  : "Confirm selected"}
+            </button>
+            <button
+              type="submit"
+              name="confirm"
+              value="0"
+              disabled={applyPending || selectedProducts.length === 0}
+              className={settingsActionClass}
             >
               {applyPending ? "Saving…" : "Add to catalogue"}
             </button>

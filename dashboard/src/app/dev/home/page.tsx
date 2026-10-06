@@ -6,7 +6,9 @@ import { DeskPhonePull } from "@/components/PhonePullSurface";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { ThemePicker } from "@/components/ThemePicker";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
+import { HomeCapture } from "@/components/HomeCapture";
 import { LivePing } from "@/components/ui/deskRow";
+import { shopStakes } from "@/lib/baStakes";
 import type { TenantRow } from "@/lib/supabase";
 
 /**
@@ -48,6 +50,33 @@ export default function DevHomePage() {
                 </li>
               ))}
             </ul>
+            <HomeCapture
+              tenantId="dev-home"
+              vertical="retail"
+              score={{
+                overall: 18,
+                domains: {
+                  identity: 50,
+                  catalog: 0,
+                  hours: 0,
+                  locations: 0,
+                  payments: 0,
+                  policies: 0,
+                  faqs: 0,
+                  team_notify: 0,
+                  assistant: 50,
+                  bulletin: 0,
+                },
+                ready_badge: false,
+                next_gaps: [
+                  {
+                    domain: "catalog",
+                    action: "Add products or services with owner-confirmed names and prices.",
+                  },
+                ],
+              }}
+              stakes={shopStakes({ products: [], hoursText: "", holdsAllowed: false })}
+            />
           </section>
           <aside
             className="min-w-0 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1"
