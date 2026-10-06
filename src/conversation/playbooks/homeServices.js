@@ -290,8 +290,7 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     let completion = intent.completion;
     let toolName = intent.tool;
     if (!visitsOn && intent.id === 'book_visit') {
-      completion =
-        'Take a message with create_service_request type=enquiry. Do not append create_appointment. Do not say the visit is booked or the slot is confirmed.';
+      completion = `${intent.completion} Owner-confirmed services are not on file: take a message with create_service_request type=enquiry instead. Do not say the visit is booked or the slot is confirmed.`;
       toolName = 'create_service_request';
     }
     const tool = toolName ? ` Tool: ${toolName}.` : '';
