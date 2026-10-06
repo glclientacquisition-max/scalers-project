@@ -18,9 +18,7 @@ import { DeskHint } from "@/components/ui/DeskHint";
 import { IconButton } from "@/components/ui/IconButton";
 import { Menu, MenuItem } from "@/components/ui/Menu";
 import {
-  deskHitClass,
   deskShiftClass,
-  focusRingVisible,
   metaLabelClass,
 } from "@/components/ui/deskChrome";
 import {
