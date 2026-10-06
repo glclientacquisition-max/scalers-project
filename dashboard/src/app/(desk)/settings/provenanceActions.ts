@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
-import { confirmTenantField, persistOwnerConfirm, upsertTenantFieldMeta } from "@/lib/provenance";
+import { confirmTenantField, persistOwnerConfirm, upsertTenantFieldMeta } from "@/lib/deskProvenance";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 const PATH_OK =

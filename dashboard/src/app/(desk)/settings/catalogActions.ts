@@ -5,7 +5,7 @@ import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import { inferPriceMode } from "@/lib/outcomeGates";
-import { recompileAfterCatalogImport, upsertTenantFieldMeta } from "@/lib/provenance";
+import { recompileAfterCatalogImport, upsertTenantFieldMeta } from "@/lib/deskProvenance";
 import { fetchPublicUrlSafe } from "@/lib/ingest/ssrfFetch";
 import {
   htmlToPlainText,

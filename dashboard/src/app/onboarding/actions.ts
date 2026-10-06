@@ -23,7 +23,7 @@ import {
   parseCaptureHours,
   shopCatalogPasses,
 } from "@/lib/outcomeGates";
-import { upsertTenantFieldMeta } from "@/lib/provenance";
+import { upsertTenantFieldMeta } from "@/lib/deskProvenance";
 
 export type OnboardingState = {
   error?: string;

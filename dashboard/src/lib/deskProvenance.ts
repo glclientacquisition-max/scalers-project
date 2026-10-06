@@ -11,9 +11,9 @@ import "server-only";
  *
  * Live RPC reads depend on #570. Staging already exposes the four RPCs;
  * this module calls them and falls back to the local stub when a call
- * is missing (owner 100, import and seed 0). Brain #572 also wants
- * `dashboard/src/lib/provenance.ts` as a compile twin. Keep this adapter
- * here until that file can be split.
+ * is missing (owner 100, import and seed 0). This file is deskProvenance
+ * so it does not share a path with Brain #572's compile twin at
+ * dashboard/src/lib/provenance.ts.
  */
 
 import { parseAgentTools } from "@/lib/agentTools";
