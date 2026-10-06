@@ -69,10 +69,11 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Copy must say **business**, not tenant.
 
 ### 4. Packages (`/admin/packages`)
-- Same username + access code as the rest of Super Admin. No second door.
+- Same username + access code as the rest of Super Admin. No second door. Tabs name the screen. No page title.
+- Needs you: shops with no package. SKUs and shops are list rows. Rates, SKU edit, and assign open in sheets.
 - **Customer billing path:** assign Starter / Growth / Scale (included buckets + monthly KES). On-demand rates apply past included when the business opts in on the desk.
 - Edit on-demand rates (inbound/outbound as KES per minute, stored per second), WhatsApp, SMS, email, and annual discount %.
-- Edit Starter / Growth / Scale included buckets and monthly KES. Annual price is monthly x 12 x (1 - discount %).
+- Edit Starter / Growth / Scale included buckets and monthly KES. Annual price is monthly x 12 x (1 - discount %). Live is the landing switch.
 - Assign a package and period to a business. Does not turn on ledger enforcement. Use **Ledger** for beta vs enforcement mode.
 
 ### 5. Wallet ledger (`/admin/wallets`)

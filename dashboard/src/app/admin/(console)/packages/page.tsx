@@ -1,6 +1,5 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminPackagesPanel } from "@/components/AdminPackagesPanel";
-import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { logAdminError } from "@/lib/adminErrors";
 import { loadPackageCatalog } from "@/lib/packageCatalog";
 
@@ -17,7 +16,6 @@ export default async function AdminPackagesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className={deskListTitleClass}>Packages</h1>
       <AdminPackagesPanel {...catalog} />
     </div>
   );
