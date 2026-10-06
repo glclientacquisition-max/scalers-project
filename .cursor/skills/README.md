@@ -26,6 +26,8 @@ Imported and adapted (2026-09):
 | `/next-cache-components-adoption` | [vercel/next.js](https://github.com/vercel/next.js) | Turn on Cache Components and clear blocking routes. |
 | `/next-cache-components-optimizer` | [vercel/next.js](https://github.com/vercel/next.js) | Grow a route's static shell under Cache Components. |
 | `/no-ai-slop` | [petergyang/no-ai-slop](https://github.com/petergyang/no-ai-slop) | Edit or detect AI writing tells. Desk copy still follows the constitution. |
+| `/ui-taste` | [uizze.sh](https://uizze.sh/) | Hierarchy, layout, and polish for an existing screen. Charter, MASTER, and `desk-motion` win. |
+| `/ios-design` | [uizze.sh](https://uizze.sh/) | iPhone navigation reference (stack, sheet, tabs). Desk stays the web kit. |
 
 Superpowers ([obra/superpowers](https://github.com/obra/superpowers)): `using-superpowers`, `brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `using-git-worktrees`, `finishing-a-development-branch`, `subagent-driven-development`, `dispatching-parallel-agents`, `requesting-code-review`, `receiving-code-review`, `writing-skills`, `diagnosing-superpowers`. `using-superpowers` applies at the start of a chat. Scalers lane contracts and `AGENTS.md` still win when they conflict.
 

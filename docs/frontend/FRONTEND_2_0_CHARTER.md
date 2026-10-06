@@ -214,6 +214,7 @@ Canonical copies in `.agents/skills/`, linked into `.cursor/skills/`, pinned in 
 | `accessibility` (Addy Osmani) | Before marking a phase ready. |
 | `shadcn` | Component API shape and composition patterns. Patterns only; no runtime install. |
 | Already present: `web-design-guidelines`, `vercel-react-best-practices`, `next-best-practices`, `desk-motion`, `no-ai-slop`, `reticle`, `fixing-accessibility`, `baseline-ui`, `improve-ui` | As before. `desk-motion` still wins on motion vocabulary. |
+| `ui-taste`, `ios-design` ([uizze.sh](https://uizze.sh/)) | Hierarchy and iPhone navigation reference while polishing a screen. Tokens, `Sheet`, and `desk-motion` still win. |
 
 ---
 

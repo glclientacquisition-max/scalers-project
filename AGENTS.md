@@ -75,7 +75,7 @@ Distinguish documentation work from architectural rewrites. Governance PRs must 
 
 ## Agent skills
 
-Composable Matt Pocock skills in `.cursor/skills/` (grill-with-docs, wayfinder, tdd, code-review) plus **desk-motion**, **reticle**, **chisle**, and **ui-skills**. `npx skills` packs, including **no-ai-slop**, live in `.agents/skills/` and are linked from `.cursor/skills/`. They do **not** replace lanes. Index: [`.cursor/skills/README.md`](.cursor/skills/README.md).
+Composable Matt Pocock skills in `.cursor/skills/` (grill-with-docs, wayfinder, tdd, code-review) plus **desk-motion**, **reticle**, **chisle**, and **ui-skills**. `npx skills` packs, including **no-ai-slop**, **ui-taste**, and **ios-design**, live in `.agents/skills/` and are linked from `.cursor/skills/`. Charter, MASTER, and desk-motion win over those packs. They do **not** replace lanes. Index: [`.cursor/skills/README.md`](.cursor/skills/README.md).
 
 Before presenting desk or admin UI work, run `/impeccable` (`impeccable context`, then Operate: critique or detect) and `/no-ai-slop` on new strings. The Frontend 2.0 charter still wins over Impeccable taste.
 
