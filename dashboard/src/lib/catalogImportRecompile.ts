@@ -29,6 +29,7 @@ import {
 import type { FaqEntry, TenantRow } from "@/lib/supabase";
 import { clampFaq } from "@/lib/faqs";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
+import { loadCompileProvenance } from "@/lib/tenantFieldProvenance";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_AGENT_TONE } from "@/lib/onboarding";
 
@@ -37,11 +38,7 @@ function normalizeFaqs(raw: unknown): FaqEntry[] {
   return raw
     .map((row) => {
       if (!row || typeof row !== "object") return null;
-      const r = row as Record<string, unknown>;
-      const entry = clampFaq({
-        question: String(r.question || ""),
-        answer: String(r.answer || ""),
-      });
+      const entry = clampFaq(row as FaqEntry);
       return entry.question && entry.answer ? entry : null;
     })
     .filter((f): f is FaqEntry => Boolean(f));
@@ -74,6 +71,7 @@ export async function recompileAfterCatalogImport(opts: {
   const socialBlock = formatSocialHandlesForCompiler(
     normalizeSocialHandles(tenant.social_handles)
   );
+  const provenance = await loadCompileProvenance(tenant.id);
 
   const { prompt, source } = await compileReceptionistPrompt({
     businessName: tenant.business_name,
@@ -91,6 +89,10 @@ export async function recompileAfterCatalogImport(opts: {
     policiesText,
     productsText: productsBlock,
     socialText: socialBlock,
+    productCatalog,
+    businessPolicies: policies,
+    fieldMeta: provenance.fieldMeta,
+    holdGate: provenance.holdGate,
   });
 
   const { error } = await client
