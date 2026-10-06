@@ -73,6 +73,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (err) {
     logAdminError("voices", err);
-    return NextResponse.json({ error: adminFacingError(err) }, { status: 500 });
+    const message = err instanceof Error ? err.message : "";
+    const error = /Voice id must be a Soniox UUID/i.test(message)
+      ? "Voice id is not valid."
+      : adminFacingError(err);
+    return NextResponse.json({ error }, { status: 500 });
   }
 }
