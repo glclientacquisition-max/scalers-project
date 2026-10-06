@@ -480,7 +480,7 @@ function isBackchannel(text, opts = {}) {
  * this still reaches the model when a compiled prompt is stale.
  */
 function spokenTextDirective() {
-  return 'Spoken form: plain words a person would say on a phone. No markdown, emoji, bullets, asterisks, slashes, dashes, or brackets. Do not write symbols. Start a new sentence instead of a comma or a dash. Prices, times, and phone numbers stay in spoken words.';
+  return 'Spoken form: plain words a person would say on a phone, with normal commas. No markdown, emoji, bullets, asterisks, hashtags, or slashes. Prices, times, and phone numbers stay in spoken words.';
 }
 
 /**

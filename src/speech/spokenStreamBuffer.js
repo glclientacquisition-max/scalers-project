@@ -3,21 +3,16 @@
 
 const { stripSpokenInstructionLeaks } = require('./spokenInstructionLeak');
 
-// Subword tails Gemini splits inside an English word ("cle" + "aning").
-// A new word in any language does not start with one of these.
-const MIDWORD_CONTINUATION =
-  /^(?:ing|ings|ed|ly|er|ers|est|tion|sion|ment|ments|ness|able|ible|ous|ful|less|aning|ening)\b/i;
-
-// Two-letter words that are their own tokens. Shorter tails ("es", "gs") stay glued
-// so a mid-word stream slice does not become "rang es".
-const SHORT_SPOKEN_WORD =
-  /^(?:ya|wa|za|ni|na|ku|au|to|of|in|on|at|or|is|it|we|he|be|do|so|if|my|am|an|as|up|no|ok)\b/i;
+// Whole words the model sometimes glues to the next word ("I"+"can", "Sawa"+"tutakusaidiaje").
+// A mid-word slice does not end on one of these ("tutakusa"+"idiaje", "cle"+"aning").
+const DROPPED_SPACE_OPENER =
+  /(?:^|[\s.!?])(?:I|You|It|We|He|She|They|Take|Thank|Sawa|Pole|Asante|Habari|Samahani|Tafadhali|Naomba|Nataka|Ndiyo|Ndio|Hapana)$/i;
 
 /**
- * Gemini stream parts often omit the leading space on the next word.
- * Live HD_0ef68f8e7930 spoke "Ican" / "Youhave". Kiswahili replies spoke
- * "Sawatutakusaidiaje" and "Polesana" the same way.
- * Mid-word slices ("cle" + "aning") stay glued.
+ * Join Gemini stream pieces. A leading or trailing space is the provider's
+ * token boundary and must be kept. Otherwise concatenate: inventing a space
+ * from an English suffix list splits Kiswahili words ("tutakusa"+"idiaje").
+ * Space only after punctuation, or after a known opener the model glues shut.
  * @param {string} left
  * @param {string} right
  */
@@ -27,15 +22,8 @@ function joinSpokenPieces(left, right) {
   if (!b) return a;
   if (!a) return b;
   if (/\s$/.test(a) || /^\s/.test(b)) return a + b;
-  const rightStartsWord = /^[\p{L}]/u.test(b);
-  if (!rightStartsWord) return a + b;
-  if (/[,:;.!?]$/.test(a)) return `${a} ${b}`;
-  if (!/[\p{L}\p{N}]$/u.test(a)) return a + b;
-  if (MIDWORD_CONTINUATION.test(b)) return a + b;
-  const nextWord = b.match(/^[\p{L}']+/u);
-  const nextLen = nextWord ? nextWord[0].length : 0;
-  // "Sawa"+"tutakusaidiaje" and "I"+"can" need a space. "rang"+"es" does not.
-  if (nextLen >= 3 || SHORT_SPOKEN_WORD.test(b)) return `${a} ${b}`;
+  if (/[,:;.!?]$/.test(a) && /^[\p{L}]/u.test(b)) return `${a} ${b}`;
+  if (DROPPED_SPACE_OPENER.test(a) && /^[\p{L}]/u.test(b)) return `${a} ${b}`;
   return a + b;
 }
 

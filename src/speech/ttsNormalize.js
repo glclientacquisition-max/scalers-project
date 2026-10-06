@@ -20,7 +20,7 @@ function stripMarkup(text) {
   return stripSpokenInstructionLeaks(String(text || ''), { final: true })
     .replace(/###(?:ENDCALL|ENDTOOL|TOOL)###/gi, '')
     .replace(/[*_`#]+/g, '')
-    .replace(/[[\]{}<>]/g, ' ')
+    .replace(/[<>]/g, ' ')
     .replace(/[•·]/g, ' ')
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '')
     .replace(/\bENDCALL\b/gi, '')
@@ -49,15 +49,18 @@ function polishPunctuation(text) {
   t = t.replace(/\.(?:\s*\.)+/g, '.');
   // A floating period ("Wait . let me") attaches to the previous word.
   t = t.replace(/\s+\.(?=\s|$)/g, '.');
-  // Em/en dash is a Gemini leak. Soniox speaks the word "dash".
-  t = t.replace(/\s*[\u2014\u2013]\s*/g, ' ');
+  // Em/en dash is a Gemini leak. A comma is the breath; Soniox does not say "dash".
+  t = t.replace(/\s*[\u2014\u2013]\s*/g, ', ');
   // Spaced ASCII hyphen is a list/range marker the expanders did not claim.
   // Intra-word hyphens (M-Pesa, Roo-ee-roo) carry no spaces and must survive.
-  t = t.replace(/\s+-\s*|\s*-\s+/g, ' ');
-  // Parenthetical asides read as an aside, not "open parenthesis".
-  t = t.replace(/\s*\(([^()]*)\)\s*/g, ' $1 ');
+  t = t.replace(/\s+-\s*|\s*-\s+/g, ', ');
+  // Parentheses and brackets are a pause around the aside, not spoken names.
+  t = t.replace(/\s*\(([^()]*)\)\s*/g, ', $1, ');
+  t = t.replace(/\s*\[([^[\]]*)\]\s*/g, ', $1, ');
+  t = t.replace(/\s*\{([^{}]*)\}\s*/g, ', $1, ');
   t = t.replace(/([:;])\s*,\s*/g, '$1 ');
   t = t.replace(/,\s*,+/g, ',');
+  t = t.replace(/,\s*([.!?])/g, '$1');
   t = t.replace(/^\s*,\s*/, '');
   t = t.replace(/\s+,/g, ',');
   t = t.replace(/,([A-Za-z])/g, ', $1');
@@ -90,15 +93,14 @@ function separateGluedOpeners(text) {
 }
 
 /**
- * Soniox TTS reads leftover symbols as words ("dash", "comma", "asterisk",
- * "hashtag", "slash", "colon"). Sentence . and ? stay so the voice can fall
- * and rise. Decimals, clock times, domains, slash dates, and lexicon
- * hyphens are held aside first.
+ * Soniox reads *, #, /, emoji, and bullets as words. Commas, colons, and
+ * semicolons stay: they are the breath, and Soniox does not say their names.
+ * Dashes and brackets are already comma pauses. Decimals, domains, slash
+ * dates, and lexicon hyphens are held so a leftover slash strip cannot eat them.
  * @param {string} text
  */
 function silenceLexicalPunctuation(text) {
   let t = String(text || '');
-  t = t.replace(/(\d),(?=\d{3}\b)/g, '$1');
   t = t.replace(/\b([\w.+-]+)@((?:[\w-]+\.)+[A-Za-z]{2,})\b/g, (_, user, host) => {
     return `${user} at ${host.replace(/\./g, ' dot ')}`;
   });
@@ -120,17 +122,11 @@ function silenceLexicalPunctuation(text) {
 
   hold(/\b[\w-]+(?:\.[\w-]+)+\.[A-Za-z]{2,}\b/g);
   hold(/\b\d{1,4}\/\d{1,2}\/\d{2,4}\b/g);
-  t = t.replace(/\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b/g, (_, hour, mins, secs) => {
-    const head = `${Number(hour)} ${mins}`;
-    return secs ? `${head} ${secs}` : head;
-  });
   hold(/\d+\.\d+/g);
   hold(/\p{L}[\p{L}']*(?:-[\p{L}']+)+/gu);
 
-  t = t.replace(/[,:;]/g, ' ');
   t = t.replace(/[/\\]/g, ' ');
-  t = t.replace(/[*#`_~|^+=<>[\]{}•·]+/g, '');
-  t = t.replace(/[“”«»„"]/g, '');
+  t = t.replace(/[*#`_~|^+=<>•·]+/g, '');
   t = t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '');
   t = t.replace(/\uE000(\d+)\uE001/g, (_, index) => saved[Number(index)] || '');
   return t;

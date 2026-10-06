@@ -5,6 +5,7 @@ const {
   resolveLanguageState,
   createLanguageState,
   languageDirective,
+  spokenTextDirective,
   confirmationLanguage,
   pickFillerText,
 } = require('../src/conversation/language');
@@ -109,6 +110,15 @@ describe('caller language (Kiswahili)', () => {
     state = resolveLanguageState(state, analyzeCallerLanguage('sawa'));
     assert.equal(state.current, 'en');
     assert.equal(state.pending, 'sw');
+  });
+});
+
+describe('spokenTextDirective', () => {
+  it('asks for plain speech and keeps commas', () => {
+    const cue = spokenTextDirective();
+    assert.match(cue, /commas/i);
+    assert.doesNotMatch(cue, /Start a new sentence/i);
+    assert.doesNotMatch(cue, /instead of a comma/i);
   });
 });
 

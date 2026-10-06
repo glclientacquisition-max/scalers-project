@@ -118,7 +118,7 @@ test('swahili prices are words, with na between thousands and hundreds', () => {
   );
   assert.strictEqual(
     prepareForTts('The price is 3,000.', { callLanguage: 'en' }).text,
-    'The price is 3000.'
+    'The price is 3,000.'
   );
   assert.strictEqual(
     prepareForTts('Bei ni 1.5k.', { callLanguage: 'sw' }).text,
@@ -135,7 +135,7 @@ test('swahili prices are words, with na between thousands and hundreds', () => {
   );
   assert.match(
     prepareForTts('Paybill 247247, account 10203040.', { callLanguage: 'sw' }).text,
-    /pay bill 2 4 7 2 4 7 account 1 0 2 0 3 0 4 0/
+    /pay bill 2 4 7 2 4 7, account 1 0 2 0 3 0 4 0/
   );
   assert.strictEqual(
     prepareForTts('Order number 45678.', { callLanguage: 'sw' }).text,
@@ -277,7 +277,7 @@ test('prepareForTts drops ASR_CORRECTION_PROMPT and RETOTI before underscore str
     { callLanguage: 'sw' }
   );
   assert.doesNotMatch(prepared.text, /ASR|RETOTI|NPFALSE|truncated or quiet|repeat gently/i);
-  assert.match(prepared.text, /Sawa Alvin/);
+  assert.match(prepared.text, /Sawa, Alvin/);
 });
 
 test('prepareForTts drops a bare NP_FALSE token', () => {
@@ -325,28 +325,28 @@ test('exclamation becomes a period so TTS does not punch', () => {
   assert.match(prepared.text, /thank you\./);
 });
 
-test('em dash becomes a pause so TTS does not leak dash', () => {
+test('em dash becomes a comma so TTS does not leak dash', () => {
   const prepared = prepareForTts(
     "I don't have that exact detail — we specialize in couch cleaning."
   );
   assert.ok(!/[—–]/.test(prepared.text));
-  assert.match(prepared.text, /detail we specialize/);
+  assert.match(prepared.text, /detail, we specialize/);
 });
 
-test('spaced hyphens become pauses so TTS does not say hyphen', () => {
+test('spaced hyphens become commas so TTS does not say hyphen', () => {
   const prepared = prepareForTts(
     'We offer sofa cleaning - carpet cleaning - mattress cleaning.',
     { callLanguage: 'en' }
   );
   assert.ok(!prepared.text.includes('-'));
-  assert.match(prepared.text, /sofa cleaning carpet cleaning mattress cleaning/);
+  assert.match(prepared.text, /sofa cleaning, carpet cleaning, mattress cleaning/);
 });
 
 test('bullet leaks flatten to a spoken list', () => {
   const prepared = prepareForTts('Our services include: - Sofa cleaning - Carpet cleaning.', {
     callLanguage: 'en',
   });
-  assert.strictEqual(prepared.text, 'Our services include Sofa cleaning Carpet cleaning.');
+  assert.strictEqual(prepared.text, 'Our services include: Sofa cleaning, Carpet cleaning.');
 });
 
 test('intra-word hyphens survive (lexicon say-forms need them)', () => {
@@ -362,13 +362,13 @@ test('spaced dot chains collapse so TTS does not say full stop', () => {
 
 test('double period with a space collapses', () => {
   const prepared = prepareForTts('The price is 3,000. . Thank you.', { callLanguage: 'en' });
-  assert.strictEqual(prepared.text, 'The price is 3000. Thank you.');
+  assert.strictEqual(prepared.text, 'The price is 3,000. Thank you.');
 });
 
 test('12h time ranges expand both sides and drop the dash', () => {
   assert.strictEqual(
     prepareForTts('Visit: 3:00pm-4:00pm works.', { callLanguage: 'en' }).text,
-    'Visit 3 P M to 4 P M works.'
+    'Visit: 3 P M to 4 P M works.'
   );
   assert.strictEqual(
     prepareForTts('Open 3-4pm.', { callLanguage: 'en' }).text,
@@ -387,22 +387,22 @@ test('e.g. and i.e. are spoken, not spelled', () => {
   assert.match(prepareForTts('i.e. the red one.', { callLanguage: 'en' }).text, /that is the red one/);
 });
 
-test('numbered list markers become pauses, not full stops', () => {
+test('numbered list markers become commas, not full stops', () => {
   const prepared = prepareForTts('1. Tell me your estate 2. Pick a day.', { callLanguage: 'en' });
-  assert.strictEqual(prepared.text, '1 Tell me your estate 2 Pick a day.');
+  assert.strictEqual(prepared.text, '1, Tell me your estate 2, Pick a day.');
 });
 
 test('thousands and decimals are not list markers', () => {
   assert.strictEqual(
     prepareForTts('It is 15,000. Thank you.', { callLanguage: 'en' }).text,
-    'It is 15000. Thank you.'
+    'It is 15,000. Thank you.'
   );
 });
 
 test('HD_0ef68f8e7930 glued openers get a space before TTS', () => {
   assert.strictEqual(
     prepareForTts('Ican help with that, Alvin.', { callLanguage: 'en' }).text,
-    'I can help with that Alvin.'
+    'I can help with that, Alvin.'
   );
   assert.strictEqual(
     prepareForTts('Youhave a carpet cleaning visit requested for tomorrow at 8 AM.', {
@@ -412,15 +412,15 @@ test('HD_0ef68f8e7930 glued openers get a space before TTS', () => {
   );
   assert.strictEqual(
     prepareForTts('Understood,Alvin.', { callLanguage: 'en' }).text,
-    'Understood Alvin.'
+    'Understood, Alvin.'
   );
   assert.strictEqual(
     prepareForTts('Takeyour time, Alvin.', { callLanguage: 'en' }).text,
-    'Take your time Alvin.'
+    'Take your time, Alvin.'
   );
   assert.strictEqual(
     prepareForTts('Iam doing well, Alvin, thank you for asking.', { callLanguage: 'en' }).text,
-    'I am doing well Alvin thank you for asking.'
+    'I am doing well, Alvin, thank you for asking.'
   );
 });
 
@@ -436,7 +436,7 @@ test('till and paybill numbers speak digit by digit', () => {
   );
   assert.match(
     prepareForTts('Paybill 247247, account 10203040.', { callLanguage: 'en' }).text,
-    /pay bill 2 4 7 2 4 7 account 1 0 2 0 3 0 4 0/
+    /pay bill 2 4 7 2 4 7, account 1 0 2 0 3 0 4 0/
   );
 });
 
@@ -571,11 +571,11 @@ test('swahili numeric clock keeps its stated period, no doubled saa', () => {
 test('parenthetical asides become pauses, not spoken brackets', () => {
   assert.strictEqual(
     prepareForTts('Ilikuwa ni usafishaji wa godoro (mattress cleaning) kesho.', { callLanguage: 'sw' }).text,
-    'Ilikuwa ni usafishaji wa godoro mattress cleaning kesho.'
+    'Ilikuwa ni usafishaji wa godoro, mattress cleaning, kesho.'
   );
   assert.strictEqual(
     prepareForTts('We charge KSh 500 (per person) for that.', { callLanguage: 'en' }).text,
-    'We charge five hundred shillings per person for that.'
+    'We charge five hundred shillings, per person, for that.'
   );
 });
 
@@ -644,12 +644,18 @@ test('default speaking tempo is 1.0 when SONIOX_TTS_SPEED unset', () => {
 });
 
 test('Kiswahili and English replies do not speak punctuation names', () => {
+  assert.strictEqual(
+    prepareForTts('Sawa, nimehifadhi ombi lako.', { callLanguage: 'sw' }).text,
+    'Sawa, nimehifadhi ombi lako.'
+  );
   const sw = prepareForTts(
     '**Sawa** *sana* #bei / leo — vitabu (ya) [hapa] … 👍',
     { callLanguage: 'sw' }
   ).text;
-  assert.strictEqual(sw, 'Sawa sana bei leo vitabu ya hapa.');
-  assert.doesNotMatch(sw, /[*#/—–…👍[\]]/);
+  assert.strictEqual(sw, 'Sawa sana bei leo, vitabu, ya, hapa.');
+  assert.match(sw, /,/);
+  assert.doesNotMatch(sw, /[*#/—–…👍[\]{}]/);
+  assert.doesNotMatch(sw, /\b(dash|comma|asterisk|hashtag|slash|colon)\b/i);
 
   const en = prepareForTts(
     'Hello, Alvin: the price is KES 1,200.50. Call aisha@shop.co.ke or see https://shop.co.ke/books.',
@@ -658,8 +664,10 @@ test('Kiswahili and English replies do not speak punctuation names', () => {
   assert.match(en, /one thousand two hundred shillings and fifty cents/);
   assert.match(en, /Eye-sha at shop dot co dot ke/);
   assert.match(en, /shop dot co dot ke books/);
-  assert.doesNotMatch(en, /[*#@:/—–]/);
-  assert.match(en, /Hello Alvin/);
+  assert.match(en, /Hello, Alvin:/);
+  assert.match(en, /1,200|one thousand two hundred/);
+  assert.doesNotMatch(en, /[*#@/—–]/);
+  assert.doesNotMatch(en, /\b(dash|comma|asterisk|hashtag|slash)\b/i);
 });
 
 test('glued Kiswahili openers and the stray English closer', () => {
@@ -676,7 +684,7 @@ test('glued Kiswahili openers and the stray English closer', () => {
     { callLanguage: 'sw' }
   ).text;
   assert.doesNotMatch(mixed, /loud and clear/i);
-  assert.match(mixed, /Sawa tutakusaidia/);
+  assert.match(mixed, /Sawa, tutakusaidia/);
 });
 
 test('clock times, decimals, domains, and lexicon hyphens survive', () => {

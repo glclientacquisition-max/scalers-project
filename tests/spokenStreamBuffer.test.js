@@ -35,9 +35,38 @@ test('inserts a space when Gemini drops it between words', () => {
     'Sawa tutakusaidiaje kengine leo?'
   );
   assert.strictEqual(joinSpokenPieces('Pole', 'sana'), 'Pole sana');
-  assert.strictEqual(joinSpokenPieces('the', 'ring is gold'), 'the ring is gold');
-  assert.strictEqual(joinSpokenPieces('vitabu', 'ya kuandikia'), 'vitabu ya kuandikia');
+  assert.strictEqual(joinSpokenPieces('the', ' ring is gold'), 'the ring is gold');
+  assert.strictEqual(joinSpokenPieces('vitabu', ' vya kuandikia'), 'vitabu vya kuandikia');
   assert.strictEqual(joinSpokenPieces('cleaning rang', 'es from'), 'cleaning ranges from');
+  assert.strictEqual(joinSpokenPieces('tutakusa', 'idiaje'), 'tutakusaidiaje');
+  assert.strictEqual(joinSpokenPieces('nimehifa', 'dhi ombi'), 'nimehifadhi ombi');
+  assert.strictEqual(joinSpokenPieces('kuandi', 'kia'), 'kuandikia');
+});
+
+test('Kiswahili mid-word slices stay one word', () => {
+  const buf = createSpokenStreamBuffer();
+  const emitted = [
+    ...buf.push('Sawa, nimehifa'),
+    ...buf.push('dhi ombi lako.'),
+    ...buf.finish(),
+  ];
+  assert.deepStrictEqual(emitted, ['Sawa, nimehifadhi ombi lako.']);
+
+  const buf2 = createSpokenStreamBuffer();
+  const emitted2 = [
+    ...buf2.push('Sawa tutakusa'),
+    ...buf2.push('idiaje leo?'),
+    ...buf2.finish(),
+  ];
+  assert.deepStrictEqual(emitted2, ['Sawa tutakusaidiaje leo?']);
+
+  const buf3 = createSpokenStreamBuffer();
+  const emitted3 = [
+    ...buf3.push('Sawa'),
+    ...buf3.push('tutakusaidiaje kengine leo?'),
+    ...buf3.finish(),
+  ];
+  assert.deepStrictEqual(emitted3, ['Sawa tutakusaidiaje kengine leo?']);
 });
 
 test('HD_0ef68f8e7930 stream deltas speak with spaces', () => {
