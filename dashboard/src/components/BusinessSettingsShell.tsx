@@ -19,7 +19,10 @@ import {
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
-import { settingsStatusKey } from "@/lib/settingsOptionStatus";
+import {
+  settingsStatusKey,
+  type SettingsListStatus,
+} from "@/lib/settingsOptionStatus";
 import {
   SettingsPageHeader,
   settingsConsoleClass,
@@ -50,7 +53,7 @@ function SettingsMenu({
   tab: BusinessSettingsTab;
   trainPanel: SettingsPanel;
   variant: "index" | "rail";
-  optionStatus: Record<string, string>;
+  optionStatus: Record<string, SettingsListStatus>;
 }) {
   const isRail = variant === "rail";
   return (
@@ -68,7 +71,8 @@ function SettingsMenu({
             {section.items.map((item) => {
               const active = settingsNavItemActive(item.target, tab, trainPanel);
               const key = settingsStatusKey(item.target);
-              const status = optionStatus[key] || "";
+              const status = optionStatus[key];
+              const statusText = status?.text || "";
               return (
                 <li key={key} className="border-b border-hairline last:border-b-0">
                   <Link
@@ -82,12 +86,12 @@ function SettingsMenu({
                     ].join(" ")}
                   >
                     <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    {status ? (
+                    {statusText ? (
                       <span
-                        title={status}
-                        className="max-w-[45%] shrink-0 truncate text-meta font-normal text-ink-2"
+                        title={status?.title || statusText}
+                        className="max-w-[45%] shrink-0 truncate text-meta font-normal tabular-nums text-ink-2"
                       >
-                        {status}
+                        {statusText}
                       </span>
                     ) : null}
                     <SettingsChevron active={active} />
@@ -145,7 +149,7 @@ export function BusinessSettingsShell({
   tab: BusinessSettingsTab;
   trainPanel: SettingsPanel;
   curatedVoices?: CuratedSonioxVoice[];
-  optionStatus?: Record<string, string>;
+  optionStatus?: Record<string, SettingsListStatus>;
   liveTransferExecutor?: boolean;
 }) {
   const formPanel: SettingsPanel =
