@@ -96,25 +96,38 @@ describe("admin console polish", () => {
       if (/bg-\[var\(--accent\)\]/.test(source)) offenders.push(rel);
     }
     assert.deepEqual(offenders, []);
-    assert.match(read("dashboard/src/app/admin/(console)/page.tsx"), /ButtonLink/);
+    assert.match(read("dashboard/src/components/AdminOverviewPanel.tsx"), /ButtonLink/);
     assert.match(read("dashboard/src/components/DidPoolManager.tsx"), /<Button/);
     assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /<Button/);
-    assert.match(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /btnPrimary/);
-    assert.match(read("dashboard/src/components/AdminVoicesManager.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /<Button/);
+    assert.doesNotMatch(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/components/AdminVoicesManager.tsx"), /<Button/);
+    assert.doesNotMatch(read("dashboard/src/components/AdminVoicesManager.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/BuyNumberPanel.tsx"), /ConfirmSheet/);
   });
 
   it("renders overview attention as ListRow work items", () => {
     const page = read("dashboard/src/app/admin/(console)/page.tsx");
-    assert.match(page, /lg:grid-cols-4/);
-    assert.match(page, /Needs you/);
-    assert.match(page, /ListRow/);
-    assert.match(page, /row\.href/);
-    assert.match(page, /Nothing waiting\./);
-    assert.match(page, /Add a number when a business needs one/);
-    assert.doesNotMatch(page, /<table/);
-    assert.doesNotMatch(page, /DeskRowHit/);
-    assert.doesNotMatch(page, /Manage →/);
+    const panel = read("dashboard/src/components/AdminOverviewPanel.tsx");
+    assert.match(page, /AdminOverviewPanel/);
+    assert.match(page, /packageName: b\.package_name/);
+    assert.match(page, /evaluatePlatformOps/);
+    assert.match(panel, /text-caption text-ink-3">Needs you/);
+    assert.match(panel, /text-caption text-ink-3">Glance/);
+    assert.match(panel, /ListRow/);
+    assert.match(panel, /row\.href/);
+    assert.match(panel, /Nothing waiting\./);
+    assert.match(panel, /Add a number when a business needs one/);
+    assert.match(panel, /Assign a package when a shop has none/);
+    assert.match(panel, /href="\/admin\/packages"/);
+    assert.match(panel, /title="Calls"/);
+    assert.doesNotMatch(page, /lg:grid-cols-4/);
+    assert.doesNotMatch(page, /function Kpi/);
+    assert.doesNotMatch(page, /<h2/);
+    assert.doesNotMatch(panel, /<table/);
+    assert.doesNotMatch(panel, /DeskRowHit/);
+    assert.doesNotMatch(panel, /Manage →/);
+    assert.doesNotMatch(panel, /wallet top-up/i);
   });
 
   it("lists businesses as ListRows with a shop sheet, assign, and confirmed release", () => {
@@ -135,7 +148,12 @@ describe("admin console polish", () => {
     assert.match(panel, /No numbers available/);
     assert.match(panel, /Release this number\?/);
     assert.match(panel, /returns to Available/);
-    assert.match(panel, /Adjust ledger/);
+    assert.match(panel, /title="Plan"/);
+    assert.match(panel, /title="Charges"/);
+    assert.match(panel, /set_billing_mode/);
+    assert.match(panel, /ledger_for/);
+    assert.match(panel, /Adjust/);
+    assert.doesNotMatch(panel, /title="Ledger"/);
     assert.match(panel, /b\.package_name/);
     assert.match(panel, /wallet_balance_kes/);
     assert.match(panel, /REMOVE/);
@@ -171,18 +189,35 @@ describe("admin console polish", () => {
     assert.doesNotMatch(panel, /—|–/);
   });
 
+  it("lists voices as ListRows with a sheet, Live, and confirmed remove", () => {
+    const panel = read("dashboard/src/components/AdminVoicesManager.tsx");
+    const page = read("dashboard/src/app/admin/(console)/voices/page.tsx");
+    assert.match(page, /AdminVoicesManager/);
+    assert.doesNotMatch(page, /deskListTitleClass/);
+    assert.match(panel, /ListRow/);
+    assert.match(panel, /<Sheet/);
+    assert.match(panel, /<Switch/);
+    assert.match(panel, /ConfirmSheet/);
+    assert.match(panel, /Add voice/);
+    assert.match(panel, /Needs you/);
+    assert.match(panel, /No voices\./);
+    assert.match(panel, /Add a voice for the desk/);
+    assert.match(panel, /Remove this voice\?/);
+    assert.doesNotMatch(panel, /Add Soniox|Soniox voice UUID/);
+    assert.doesNotMatch(panel, /label="Order"|voice-order/);
+    assert.doesNotMatch(panel, /btnPrimary/);
+    assert.doesNotMatch(panel, /AdminIdentityList/);
+    assert.doesNotMatch(panel, /<table/);
+  });
+
   it("uses the desk list title on admin list roots", () => {
-    for (const rel of [
-      "dashboard/src/app/admin/(console)/wallets/page.tsx",
-      "dashboard/src/app/admin/(console)/voices/page.tsx",
-    ]) {
-      const src = read(rel);
-      assert.match(src, /deskListTitleClass/);
-    }
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/voices/page.tsx"), /deskListTitleClass/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/voices/page.tsx"), /<h1/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /PageHeader/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/businesses/page.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/packages/page.tsx"), /deskListTitleClass/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/wallets/page.tsx"), /deskListTitleClass/);
     const numbers = read("dashboard/src/app/admin/(console)/numbers/page.tsx");
     assert.doesNotMatch(numbers, /deskListTitleClass/);
     assert.doesNotMatch(numbers, /SautikitSyncButton/);
@@ -190,21 +225,21 @@ describe("admin console polish", () => {
     assert.match(numbers, /DidPoolManager/);
   });
 
-  it("opens Packages with assign and Ledger with the wallets panel", () => {
+  it("opens Packages with assign and sends old Ledger to Businesses", () => {
     const packages = read("dashboard/src/app/admin/(console)/packages/page.tsx");
     assert.match(packages, /loadPackageCatalog/);
     assert.doesNotMatch(packages, /deskListTitleClass/);
     assert.doesNotMatch(packages, /catalogOnly/);
     assert.doesNotMatch(packages, /redirect\(/);
     const wallets = read("dashboard/src/app/admin/(console)/wallets/page.tsx");
-    assert.match(wallets, /AdminWalletsPanel/);
-    assert.match(wallets, /Ledger/);
-    assert.match(wallets, /deskListTitleClass/);
-    assert.doesNotMatch(wallets, /redirect\(/);
+    assert.match(wallets, /redirect\("\/admin\/businesses"\)/);
+    assert.doesNotMatch(wallets, /AdminWalletsPanel/);
+    assert.doesNotMatch(wallets, /deskListTitleClass/);
     const overview = read("dashboard/src/app/admin/(console)/page.tsx");
-    assert.match(overview, /Add number/);
-    assert.match(overview, /href="\/admin\/platform"/);
-    assert.doesNotMatch(overview, /href="\/admin\/packages"/);
+    const overviewPanel = read("dashboard/src/components/AdminOverviewPanel.tsx");
+    assert.match(overviewPanel, /Add number/);
+    assert.match(overviewPanel, /href="\/admin\/platform"/);
+    assert.match(overviewPanel, /href="\/admin\/packages"/);
     assert.match(overview, /evaluatePlatformOps/);
     assert.doesNotMatch(overview, /PlatformRunBoard/);
     assert.doesNotMatch(overview, /href="\/admin\/billing"/);

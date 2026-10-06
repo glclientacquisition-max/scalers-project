@@ -8,10 +8,11 @@ export type ServiceItem = {
   category: string;
   /** fixed | from | range | ask, or another owner-set mode. */
   pricing_mode?: string;
-  /** Required for a Home catalog row to count. Null does not count. */
+  /** Required for a Home catalog row to count. Absent does not count. */
   site_visit_required?: boolean;
   /** owner | seed | import | inferred | call_suggested */
-  source?: "owner" | "seed" | "import" | "inferred" | "call_suggested";
+  source?: string;
+  status?: string;
 };
 
 export function emptyService(): ServiceItem {
@@ -46,6 +47,8 @@ export function normalizeServicesCatalog(raw: unknown): ServiceItem[] {
   return raw
     .map((row) => {
       const r = (row || {}) as Record<string, unknown>;
+      const source = String(r.source || "").trim().toLowerCase();
+      const status = String(r.status || "").trim().toLowerCase();
       const item: ServiceItem = {
         name: String(r.name || "").trim(),
         price_range: String(r.price_range || r.priceRange || "").trim(),
@@ -63,7 +66,6 @@ export function normalizeServicesCatalog(raw: unknown): ServiceItem[] {
       } else if (visit === false || visitText === "false" || visitText === "no") {
         item.site_visit_required = false;
       }
-      const source = String(r.source || "").trim().toLowerCase();
       if (
         source === "owner" ||
         source === "seed" ||
@@ -72,6 +74,9 @@ export function normalizeServicesCatalog(raw: unknown): ServiceItem[] {
         source === "call_suggested"
       ) {
         item.source = source;
+      }
+      if (status === "golden" || status === "confirmed" || status === "suggested") {
+        item.status = source === "seed" || source === "call_suggested" ? "suggested" : status;
       }
       return item;
     })

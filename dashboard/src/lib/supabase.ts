@@ -126,9 +126,9 @@ export type TeamDirectoryEntry = {
 export type FaqEntry = {
   question: string;
   answer: string;
-  /** owner | seed | import | inferred | call_suggested. Missing means seed. */
+  /** owner | seed | import | inferred | call_suggested. Optional until Platform stores tenant_field_meta. */
   source?: string;
-  /** suggested | confirmed | golden. Missing means suggested. */
+  /** golden | confirmed | suggested. Seed and call_suggested stay suggested. */
   status?: string;
   confirmed?: boolean;
   confirmed_by?: string;

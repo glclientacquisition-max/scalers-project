@@ -188,10 +188,11 @@ function canCompleteRetailIntent(intentId, slots = {}) {
 
 /**
  * Prompt block injected for retail tenants (live, highest-priority job map).
- * @param {{ handoffMode?: string }} [opts]
+ * @param {{ handoffMode?: string, placeHold?: boolean }} [opts]
  */
 function formatRetailPlaybookForPrompt(opts = {}) {
   const handoff = String(opts.handoffMode || 'callback').trim() || 'callback';
+  const holdsOn = opts.placeHold !== false;
   const lines = [
     'RETAIL PLAYBOOK (follow for this business — finish the caller job):',
     'On each turn: identify the intent below, collect only missing required slots (ONE question max), then complete.',
@@ -205,9 +206,16 @@ function formatRetailPlaybookForPrompt(opts = {}) {
     const req = intent.requiredSlots.length
       ? `Required: ${intent.requiredSlots.join(', ')}.`
       : 'Required: none.';
-    const tool = intent.tool ? ` Tool: ${intent.tool}.` : '';
+    let completion = intent.completion;
+    let toolName = intent.tool;
+    if (!holdsOn && (intent.id === 'hold_or_pickup' || intent.id === 'order_enquiry')) {
+      completion =
+        'Take a message with create_service_request type=enquiry. Answer what is known. Do not promise a hold, a reservation, or an order. Do not say held or reserved.';
+      toolName = 'create_service_request';
+    }
+    const tool = toolName ? ` Tool: ${toolName}.` : '';
     lines.push(
-      `- ${intent.id} (${intent.label}): ${req} ${intent.completion}${tool}`
+      `- ${intent.id} (${intent.label}): ${req} ${completion}${tool}`
     );
   }
 
@@ -215,6 +223,10 @@ function formatRetailPlaybookForPrompt(opts = {}) {
     `- other: clarify once if needed; otherwise answer from ground truth or log enquiry/callback.`,
     '',
     'Completion rules:',
+    '- Enquiry and take-a-message always work, even when the file is incomplete. Do not block the line.',
+    holdsOn
+      ? '- Holds and orders only for a confirmed catalogue item when hold rules allow. Say held or reserved only after the tool result. During a hold, do not say a deposit amount or a payment number. The owner follows up.'
+      : '- Holds and orders are not available. Do not append create_service_request type hold or order. Do not say held or reserved.',
     '- Prefer resolving from LIVE GROUND TRUTH over promising a callback.',
     '- For hold_or_pickup / order_enquiry: only fire create_service_request after required slots are known.',
     '- For hold_or_pickup: if refining pickup time on the same title+name, append create_service_request again with the fuller when_text — backend updates the same hold (do not create a second hold).',

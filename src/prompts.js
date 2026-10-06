@@ -17,6 +17,7 @@ const {
 } = require('./conversation/dailyBulletin');
 const { parseAgentTools } = require('./conversation/agentTools');
 const { formatPlaybookForPrompt } = require('./conversation/playbooks');
+const { holdOrdersEnabled } = require('./conversation/provenance');
 const { formatReturningCallerForPrompt } = require('./conversation/callerMemory');
 const {
   callerCardWithoutVisits,
@@ -192,6 +193,29 @@ function buildGreeting(businessName, opts = {}) {
  * @param {object} [profile.hoursSchedule]
  * @param {string} [profile.businessHours]
  */
+function serviceRequestToolBlock(holdsOn) {
+  if (!holdsOn) {
+    return `When logging a message, callback, or follow-up, also append:
+###TOOL###
+{"create_service_request":{"type":"enquiry|callback","name":"<caller name>","item":"<product or need>","quantity":"<optional>","when_text":"<pickup/visit time if any>","notes":"<short note>"}}
+###ENDTOOL###
+Use type "enquiry" to take a message and "callback" only when they explicitly want a call back.
+Holds and orders are not available. Do not use type "hold" or "order". Do not say held or reserved. Answer what is known, then take a message.
+Enquiry and take-a-message always work, even when the file is incomplete.
+If you append create_service_request, create_appointment, or update_appointment, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome. If you append ONLY save_caller_info, you MUST speak your natural response. Do not read open visits, holds, callbacks, or orders unless they just asked about them.`;
+  }
+  return `When the caller wants a hold, pickup, order note, or concrete follow-up request you can fulfill by logging it, also append:
+###TOOL###
+{"create_service_request":{"type":"hold|enquiry|order|callback","name":"<caller name>","item":"<product or need>","quantity":"<optional>","when_text":"<pickup/visit time if any>","notes":"<short note>"}}
+###ENDTOOL###
+Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for general product asks that need owner follow-up, "callback" only when they explicitly want a call back.
+For type "hold": ONLY append the tool when you already have name + item + when_text AND the item is in the confirmed PRODUCT CATALOGUE / live ground truth. If any slot is missing, ask ONE short question. If the title is not listed, do not create a hold. Take a message instead.
+For type "order": ONLY append when you have name + item AND the item is in the confirmed PRODUCT CATALOGUE. If the title is missing or unclear from speech, confirm the exact catalogue title or log an enquiry. Never save a garbled STT phrase as an order.
+Say held or reserved only after the tool result. During a hold, do not say a deposit amount or a payment number. The owner follows up.
+Enquiry and take-a-message always work, even when the file is incomplete.
+If you append create_service_request, create_appointment, or update_appointment, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome. If you append ONLY save_caller_info, you MUST speak your natural response. Do not read open visits, holds, callbacks, or orders unless they just asked about them.`;
+}
+
 function buildSystemPrompt(profile = {}) {
   const businessName =
     profile.businessName || process.env.BUSINESS_NAME || 'the business';
@@ -207,6 +231,7 @@ function buildSystemPrompt(profile = {}) {
   const playbook = formatPlaybookForPrompt(profile);
   const playbookBlock = playbook ? `\n\n${playbook}\n` : '\n';
   const tools = parseAgentTools(profile.agentTools);
+  const requestTools = serviceRequestToolBlock(holdOrdersEnabled(profile));
   const escalateTools = tools.escalate
     ? `Escalate only when the caller explicitly requests a human, policy requires one, you lack authority, a tool fails, or useful repair attempts fail. Anger alone is not enough if you can resolve the issue. When NEXT BEST ACTION is ESCALATE and the caller name is known, you MUST append the escalate marker in that turn — sharing a WhatsApp/phone number alone is not enough. Append:
 ###TOOL###
@@ -236,14 +261,7 @@ Whenever CALL STATE shows the caller name is confirmed, or they just corrected i
 ###TOOL###
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
-When the caller wants a hold, pickup, order note, or concrete follow-up request you can fulfill by logging it, also append:
-###TOOL###
-{"create_service_request":{"type":"hold|enquiry|order|callback","name":"<caller name>","item":"<product or need>","quantity":"<optional>","when_text":"<pickup/visit time if any>","notes":"<short note>"}}
-###ENDTOOL###
-Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for general product asks that need owner follow-up, "callback" only when they explicitly want a call back.
-For type "hold": ONLY append the tool when you already have name + item + when_text AND the item is in the PRODUCT CATALOGUE / live ground truth. If any slot is missing, ask ONE short question. If the title is not listed, do not create a hold — offer to log an enquiry or special-order quote instead.
-For type "order": ONLY append when you have name + item AND the item is in the PRODUCT CATALOGUE. If the title is missing or unclear from speech, confirm the exact catalogue title or log an enquiry/quote — never save a garbled STT phrase as an order.
-If you append create_service_request, create_appointment, or update_appointment, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome. If you append ONLY save_caller_info, you MUST speak your natural response. Do not read open visits, holds, callbacks, or orders unless they just asked about them.
+${requestTools}
 When booking a home-services visit, append:
 ###TOOL###
 {"create_appointment":{"service_name":"<service>","name":"<caller name>","when_text":"<time window>","location":"<where we should come>","notes":"<optional>"}}
@@ -288,14 +306,7 @@ Whenever CALL STATE shows the caller name is confirmed, or they just corrected i
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
 
-When logging a hold, pickup, order, or concrete request, also append:
-###TOOL###
-{"create_service_request":{"type":"hold|enquiry|order|callback","name":"<caller name>","item":"<product or need>","quantity":"<optional>","when_text":"<pickup/visit time if any>","notes":"<short note>"}}
-###ENDTOOL###
-Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for general product asks that need owner follow-up, "callback" only when they explicitly want a call back.
-For type "hold": ONLY append the tool when you already have name + item + when_text AND the item is in the PRODUCT CATALOGUE / live ground truth. If any slot is missing, ask ONE short question. If the title is not listed, do not create a hold — offer to log an enquiry or special-order quote instead.
-For type "order": ONLY append when you have name + item AND the item is in the PRODUCT CATALOGUE. If the title is missing or unclear from speech, confirm the exact catalogue title or log an enquiry/quote — never save a garbled STT phrase as an order.
-If you append create_service_request, create_appointment, or update_appointment, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome. If you append ONLY save_caller_info, you MUST speak your natural response. Do not read open visits, holds, callbacks, or orders unless they just asked about them.
+${requestTools}
 
 When booking a home-services visit, append:
 ###TOOL###

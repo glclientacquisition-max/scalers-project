@@ -63,7 +63,11 @@ export function homeStarterPolicies(): BusinessPolicies {
 }
 
 export function homeUnknownFallback(): string {
-  return "I don't have that exact detail. I can note it for the team or book a visit once I have the basics.";
+  return "I don't have that exact detail. I'll note it for the owner.";
+}
+
+function stampSeedService(row: ServiceItem): ServiceItem {
+  return { ...row, source: "seed", status: "suggested" };
 }
 
 export function homeDefaultServices(): ServiceItem[] {
@@ -108,9 +112,11 @@ export function homeDefaultServices(): ServiceItem[] {
       in_stock: "",
       category: "Assessment",
     },
-  ];
+  ].map(stampSeedService);
 }
 
 export function seedHomeFaqs(): FaqEntry[] {
-  return HOME_FAQ_STARTERS.map(clampFaq).slice(0, FAQ_MAX);
+  return HOME_FAQ_STARTERS.map((f) =>
+    clampFaq({ ...f, source: "seed", status: "suggested" })
+  ).slice(0, FAQ_MAX);
 }

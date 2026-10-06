@@ -63,6 +63,75 @@ function oneEditNames(key) {
   return names;
 }
 
+// Everyday words. A one-edit guess from these is not a place
+// ("huduma" is not Huruma, "nyumba" is not Ngumba, "hello" is not Hells).
+// Clipped place names stay fuzzy ("Ronga" -> Rongai, "rwaka" -> Ruaka).
+const SPOKEN_EVERYDAY = new Set([
+  'about',
+  'asante',
+  'clean',
+  'close',
+  'couch',
+  'could',
+  'elfu',
+  'habari',
+  'hapana',
+  'hello',
+  'house',
+  'huduma',
+  'kesho',
+  'kusafisha',
+  'kwaheri',
+  'leo',
+  'money',
+  'msaada',
+  'naomba',
+  'nataka',
+  'naweza',
+  'ndiyo',
+  'ninaomba',
+  'nisaidie',
+  'nyumba',
+  'ofisi',
+  'offer',
+  'phone',
+  'please',
+  'price',
+  'right',
+  'samahani',
+  'shida',
+  'should',
+  'start',
+  'still',
+  'tafadhali',
+  'tano',
+  'thanks',
+  'there',
+  'these',
+  'those',
+  'today',
+  'tuna',
+  'usafi',
+  'water',
+  'which',
+  'would',
+  'zetu',
+]);
+
+/**
+ * One-edit place, or nothing.
+ * Common Kiswahili and other short everyday words are never a fuzzy place.
+ * @param {string} key
+ * @returns {string}
+ */
+function oneEditPlaceName(key) {
+  if (SPOKEN_EVERYDAY.has(key)) return '';
+  const names = oneEditNames(key);
+  if (names.length === 1) return names[0];
+  const prefixed = names.filter((name) => name.startsWith(key) && name.length === key.length + 1);
+  return prefixed.length === 1 ? prefixed[0] : '';
+}
+
 /**
  * Exact place, or the one Kenya name a clipped token points at.
  * "Ronga" is a prefix of Rongai only, so the cut-off letter still binds.
@@ -73,10 +142,7 @@ function canonicalPlaceName(token) {
   const key = normalizePlaceKey(token);
   if (!key || key.includes(' ') || key.length < 5) return '';
   if (INDEX.places[key]) return key;
-  const names = oneEditNames(key);
-  if (names.length === 1) return names[0];
-  const prefixed = names.filter((name) => name.startsWith(key) && name.length === key.length + 1);
-  return prefixed.length === 1 ? prefixed[0] : '';
+  return oneEditPlaceName(key);
 }
 
 function editDistance(a, b) {
@@ -130,6 +196,7 @@ function placesInCounties(counties) {
 function nearestAllowedPlace(token, allowedNames) {
   const key = normalizePlaceKey(token);
   if (!key || key.includes(' ') || key.length < 5) return '';
+  if (SPOKEN_EVERYDAY.has(key) && !INDEX.places[key]) return '';
   const allowed = allowedNames instanceof Set ? allowedNames : new Set(allowedNames || []);
   const edits = oneEditNames(key);
   if (edits.length > 1) {

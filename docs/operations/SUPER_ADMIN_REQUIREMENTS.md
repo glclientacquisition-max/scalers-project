@@ -30,13 +30,13 @@ Requirements:
 /admin                 Overview: status strip, KPIs, needs-you queue
 /admin/platform        Provider cards, infrastructure signals, ops mail
 /admin/packages        Packages, on-demand rates, assign (customer billing)
-/admin/wallets         Wallet ledger: ops balance, credits, enforcement (not owner checkout)
+/admin/wallets         Redirects to Businesses. Plan and charges live on the shop.
 /admin/businesses      All businesses + actions
 /admin/numbers         Number pool (add / assign / release)
 /admin/voices          Voice catalog
 ```
 
-Nav label for ops: **Admin** (not “DID pool”). Primary billing work starts on **Packages**. **Ledger** is the nav label for `/admin/wallets` (same route).
+Nav label for ops: **Admin** (not “DID pool”). Primary billing work starts on **Packages**. There is no Ledger tab. Plan (beta or on-demand) and charges sit on the Businesses shop. `/admin/wallets` redirects there.
 
 Customer billing story: **packages + on-demand**. The wallet ledger is visible for ops metering and adjustments. Owner **package checkout** is not shipped.
 
@@ -47,10 +47,10 @@ Business-owner nav stays: Calls · Business · Sign out.
 ## Module requirements
 
 ### 1. Overview (`/admin`)
-- Status strip: OK, Needs you, or Down. Opens `/admin/platform`.
-- KPI cards: total businesses, active businesses, businesses waiting for a number, available DIDs, assigned DIDs, calls (last 7 days).
-- Needs you: open staff notices plus businesses with a pending DID or inactive flag.
-- Primary CTA: Add number.
+- Tabs name the screen. No page title.
+- Needs you: open platform notices, shops waiting for a number, and live shops with no package. Archived shops stay off this pile. A row opens the shop or Platform escalate.
+- Glance: Platform, Businesses, Numbers, Packages, and Calls (7 days). Not KPI tiles.
+- Primary CTA: Add number when a shop is waiting or the pool is empty. Empty pile offers Add number or Packages, whichever is the next real job.
 
 ### 1b. Platform (`/admin/platform`)
 - Line: phone, speech, reasoning as list rows (money on the right). Numbers opens `/admin/numbers`.
@@ -74,14 +74,20 @@ Business-owner nav stays: Calls · Business · Sign out.
 - **Customer billing path:** assign Starter / Growth / Scale (included buckets + monthly KES). On-demand rates apply past included when the business opts in on the desk.
 - Edit on-demand rates (inbound/outbound as KES per minute, stored per second), WhatsApp, SMS, email, and annual discount %.
 - Edit Starter / Growth / Scale included buckets and monthly KES. Annual price is monthly x 12 x (1 - discount %). Live is the landing switch.
-- Assign a package and period to a business. Does not turn on ledger enforcement. Use **Ledger** for beta vs enforcement mode.
+- Assign a package and period to a business. Does not turn on charging. Set Plan on the shop.
 
-### 5. Wallet ledger (`/admin/wallets`)
-- Ops scaffolding: KES ledger balance, manual credit/debit, append-only ledger view, beta vs enforcement mode.
-- Not the headline owner money path. No owner package checkout in this module.
-- Enforcement on: past included, on-demand debits the ledger when the business opted in. Beta: meter only, no charges.
+### 5. Shop plan and charges
+- On the Businesses shop: **Plan** is Beta or On-demand. **Charges** lists on-demand lines. Adjust is a confirm sheet.
+- The KES ledger stays in the database for metering. It is not a nav destination or owner checkout.
+- On-demand: past included debits the ledger when the business opted in. Beta: meter only, no charges.
 
-### 6. Platform teardown / demo reset (one-time ops)
+### 6. Voices (`/admin/voices`)
+- Tabs name the screen. No page title.
+- Needs you: no default voice, or an empty catalog.
+- List: name the desk hears, Live or Off, Default stamp. Voice id stays in the sheet.
+- Add and edit open a sheet (name, voice id, Live, Default). Remove confirms. Catalog rank stays in the database.
+
+### 7. Platform teardown / demo reset (one-time ops)
 - Ability to **remove Jirani Home Services** completely and leave `+254709221536` as **Available** in the pool for the next business.
 - Documented SQL + in-UI action with typed confirmation (`REMOVE`).
 

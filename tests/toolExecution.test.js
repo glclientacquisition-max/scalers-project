@@ -103,6 +103,7 @@ describe('validated tool execution', () => {
     const execution = await executeBrainTools({
       parsed,
       capabilities,
+      productCatalog: [{ name: 'Atomic Habits' }],
       handlers: {
         createServiceRequest: async () => {
           calls += 1;
@@ -297,24 +298,28 @@ describe('validated tool execution', () => {
     assert.match(formatToolConfirmation(execution.results, 'en'), /your name/i);
   });
 
-  it('rejects holds when no product catalogue is loaded', async () => {
-    let calls = 0;
+  it('takes a message when a hold is asked and no product catalogue is loaded', async () => {
+    let saved = null;
     const parsed = parseGeminiResponse(
-      '###TOOL###{"create_service_request":{"type":"hold","name":"Jane","item":"King Series","when_text":"tomorrow"}}###ENDTOOL###'
+      'I have held that for you. ###TOOL###{"create_service_request":{"type":"hold","name":"Jane","item":"King Series","when_text":"tomorrow"}}###ENDTOOL###'
     );
     const execution = await executeBrainTools({
       parsed,
       capabilities,
       productCatalog: [],
       handlers: {
-        createServiceRequest: async () => {
-          calls += 1;
-          return { id: 'should_not' };
+        createServiceRequest: async (request) => {
+          saved = request;
+          return { id: 'req_enquiry', request_type: request.type };
         },
       },
     });
-    assert.equal(calls, 0);
-    assert.equal(execution.results[0].code, 'catalog_required');
+    assert.equal(saved.type, 'enquiry');
+    assert.equal(execution.results[0].status, 'succeeded');
+    assert.equal(execution.results[0].requestType, 'enquiry');
+    const spoken = formatToolConfirmation(execution.results, 'en');
+    assert.match(spoken, /saved your request/i);
+    assert.doesNotMatch(spoken, /\bheld\b|\breserved\b/i);
   });
 
   it('rejects escalation when the caller name is the agent', async () => {
@@ -365,6 +370,7 @@ describe('validated tool execution', () => {
     const execution = await executeBrainTools({
       parsed,
       capabilities,
+      productCatalog: [{ name: 'Notebook' }],
       handlers: {
         createServiceRequest: async () => {
           calls += 1;

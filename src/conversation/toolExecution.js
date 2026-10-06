@@ -1,6 +1,7 @@
 // Validate and execute model-proposed actions, returning backend-confirmed outcomes.
 
 const { findProductMatch, normalizeProducts } = require('./productCatalog');
+const { factProducts } = require('./provenance');
 const {
   evaluateAppointmentHours,
   formatDayOnlyWhen,
@@ -186,7 +187,7 @@ function whenTextIsRefinement(previous, next) {
 
 function validateServiceRequest(
   raw,
-  { productCatalog, agentName = '', businessName = '', knownNames = [] } = {}
+  { productCatalog, agentName = '', businessName = '', knownNames = [], fieldMeta = null } = {}
 ) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing service request payload.' };
@@ -240,7 +241,7 @@ function validateServiceRequest(
         value,
       };
     }
-    const catalog = normalizeProducts(productCatalog);
+    const catalog = normalizeProducts(factProducts(productCatalog, fieldMeta));
     if (!catalog.length) {
       return {
         valid: false,
@@ -287,7 +288,7 @@ function validateServiceRequest(
         value,
       };
     }
-    const catalog = normalizeProducts(productCatalog);
+    const catalog = normalizeProducts(factProducts(productCatalog, fieldMeta));
     if (!catalog.length) {
       return {
         valid: false,
@@ -620,6 +621,7 @@ async function executeBrainTools({
   knownNames = [],
   businessPolicies = null,
   businessLocations = null,
+  fieldMeta = null,
 } = {}) {
   const held = clean(heldCallerName, 120);
   if (held) {
@@ -633,7 +635,7 @@ async function executeBrainTools({
   }
   const completed = new Set(completedFingerprints);
   const results = [];
-  const identityOpts = { productCatalog, agentName, businessName, knownNames };
+  const identityOpts = { productCatalog, agentName, businessName, knownNames, fieldMeta };
 
   if (Array.isArray(parsed?.errors)) {
     for (const error of parsed.errors) {
@@ -690,7 +692,36 @@ async function executeBrainTools({
     }
   }
 
+  if (capabilities.confirmVisit === false && parsed?.appointment) {
+    const appt = parsed.appointment;
+    if (!parsed.serviceRequest) {
+      const item = clean(
+        appt.service_name || appt.serviceName || appt.service || 'visit',
+        200
+      );
+      const notes = [appt.when_text || appt.whenText, appt.location || appt.landmark, appt.notes]
+        .map((part) => clean(part, 200))
+        .filter(Boolean)
+        .join('. ');
+      parsed.serviceRequest = {
+        type: 'enquiry',
+        name: appt.name || '',
+        item,
+        notes,
+      };
+    }
+    parsed = { ...parsed, appointment: undefined };
+  }
+
   if (parsed?.serviceRequest) {
+    const typeRaw = clean(parsed.serviceRequest.type || '', 40).toLowerCase();
+    const holdish = typeRaw === 'hold' || typeRaw === 'order' || typeRaw === 'hold_or_pickup';
+    const factCount = factProducts(productCatalog, fieldMeta).length;
+    const holdsLocked =
+      capabilities.placeHold === false || (capabilities.placeHold !== true && factCount === 0);
+    if (holdish && holdsLocked) {
+      parsed.serviceRequest = { ...parsed.serviceRequest, type: 'enquiry' };
+    }
     const validation = validateServiceRequest(parsed.serviceRequest, identityOpts);
     const fingerprint = validation.valid
       ? stableFingerprint('create_service_request', validation.value)
