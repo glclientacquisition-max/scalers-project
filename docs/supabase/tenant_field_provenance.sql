@@ -3,9 +3,9 @@
 -- Run after: product_catalog_and_social.sql (knowledge / catalog era).
 -- Do NOT apply to production ALCR until reviewed. Idempotent re-runs safe.
 --
--- Alvin decision roadmap §10.5: bulk backfill existing facts as source=seed
--- (force re-confirm). FAQ JSON demotion aligns (status suggested, source seed).
--- Missing meta scores 0 (same as seed). See TENANT_FIELD_PROVENANCE.md.
+-- Alvin §10.5: bulk backfill existing facts as source=seed (force re-confirm).
+-- Alvin §10.2: import counts 0% until owner confirm (then owner = 100%).
+-- Missing meta = 0%. FAQ demotion aligns (suggested + seed). See doc.
 
 -- ---------------------------------------------------------------------------
 -- Tables
@@ -104,7 +104,6 @@ immutable
 as $$
   select case coalesce(lower(trim(p_source)), '')
     when 'owner' then 1.0
-    when 'import' then 0.5
     else 0.0
   end;
 $$;
@@ -1096,7 +1095,7 @@ revoke all on function public.tenant_hold_gate(uuid) from public;
 grant execute on function public.tenant_hold_gate(uuid) to authenticated, service_role;
 
 comment on function public.tenant_completeness_score(uuid) is
-  'GIGO P0: 10-domain completeness (0-100), ready_badge, next_gaps. Seeds score 0 via meta.';
+  'GIGO P0: 10-domain completeness (0-100), ready_badge, next_gaps. Only owner meta counts; import/seed/missing = 0.';
 comment on function public.tenant_hold_gate(uuid) is
   'GIGO P0: outcome gate for place_hold — policies, owner holdable SKU, notify target.';
 

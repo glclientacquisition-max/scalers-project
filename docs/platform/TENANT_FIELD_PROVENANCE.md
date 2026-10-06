@@ -28,17 +28,23 @@ Prefer stable `sku` when present; otherwise index (rewrite-sensitive).
 ## Envelope rules
 
 - **source:** `owner` \| `seed` \| `import` \| `inferred` \| `call_suggested`
-- **Completeness weight:** owner 100%, import 50%, seed / inferred / call_suggested / **missing meta** 0%
-- **ready_badge:** requires owner-provenance rows (including `team.notify.*`), domain thresholds, and **never** true for seed-only backfill tenants
+- **Completeness weight:** **owner** (or post-confirm) 100%; **import** 0% until `confirm_tenant_field` (Alvin §10.2); seed / inferred / call_suggested / **missing meta** 0%
+- **ready_badge:** requires owner-provenance rows (including `team.notify.*`), domain thresholds; **never** true for seed-only or unconfirmed-import tenants
 - **Compile (Brain):** must emit only **owner** or **confirmed** values into `llm_system_prompt`. Seeds and unconfirmed imports belong in UNKNOWN. Compiler change is Brain-owned; Platform only documents the contract.
 
-## Alvin decision: roadmap §10.5 bulk backfill = seed
+## Alvin decisions
+
+### §10.5 bulk backfill = seed
 
 Existing non-empty tenant scalars and JSON leaves get **`tenant_field_meta` rows with `source=seed`**, `source_ref=backfill:roadmap_10_5`, `confirmed_*` and `last_verified_at` null. Inserts **only when the path is absent**; never overwrites existing owner / import / confirmed meta.
 
 Same posture as **FAQ demotion** (`status=suggested`, `source=seed` on legacy FAQ rows).
 
 Re-run safely: `select public.backfill_tenant_field_meta_seed();` (service role).
+
+### §10.2 import weight = 0% until confirm
+
+Desk/Platform tag fresh imports with `upsert_tenant_field_meta(..., source='import')`. They contribute **0** to `tenant_completeness_score` until the owner confirms; then `confirm_tenant_field` sets `source=owner` and the field counts at 100%.
 
 ## RPCs (stable names)
 
@@ -91,7 +97,6 @@ Expect the FAQ query to return **0** after migration.
 
 ## Open decisions (remaining)
 
-1. **Import weight:** unreviewed import still counts at **50%** until product says otherwise (roadmap §10 #2).
-2. **Structured payments / holds policy** shapes are P1; gate reads best-effort on today's `business_policies` JSON.
+1. **Structured payments / holds policy** shapes are P1; gate reads best-effort on today's `business_policies` JSON.
 
-**Decided:** bulk backfill = **seed** (§10.5). Hold deposit speak = Brain/product, not this PR.
+**Decided:** bulk backfill = **seed** (§10.5); import completeness = **0%** until confirm (§10.2). Hold deposit speak = Brain/product, not this PR.
