@@ -204,6 +204,7 @@ describe("admin console polish", () => {
     assert.match(panel, /Add a voice for the desk/);
     assert.match(panel, /Remove this voice\?/);
     assert.doesNotMatch(panel, /Add Soniox|Soniox voice UUID/);
+    assert.doesNotMatch(panel, /label="Order"|voice-order/);
     assert.doesNotMatch(panel, /btnPrimary/);
     assert.doesNotMatch(panel, /AdminIdentityList/);
     assert.doesNotMatch(panel, /<table/);

@@ -85,7 +85,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Tabs name the screen. No page title.
 - Needs you: no default voice, or an empty catalog.
 - List: name the desk hears, Live or Off, Default stamp. Voice id stays in the sheet.
-- Add and edit open a sheet (name, voice id, order, Live, Default). Remove confirms.
+- Add and edit open a sheet (name, voice id, Live, Default). Remove confirms. Catalog rank stays in the database.
 
 ### 7. Platform teardown / demo reset (one-time ops)
 - Ability to **remove Jirani Home Services** completely and leave `+254709221536` as **Available** in the pool for the next business.

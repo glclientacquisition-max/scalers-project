@@ -51,7 +51,6 @@ export function AdminVoicesManager({
   const [error, setError] = useState<string | null>(null);
   const [id, setId] = useState("");
   const [description, setDescription] = useState("");
-  const [sortOrder, setSortOrder] = useState("100");
   const [makeDefault, setMakeDefault] = useState(false);
   const [live, setLive] = useState(true);
   const [sheet, setSheet] = useState<"add" | "edit" | null>(null);
@@ -81,7 +80,6 @@ export function AdminVoicesManager({
     setEditingId(null);
     setId("");
     setDescription("");
-    setSortOrder("100");
     setMakeDefault(!hasDefault);
     setLive(true);
     setError(null);
@@ -92,7 +90,6 @@ export function AdminVoicesManager({
     setEditingId(voice.id);
     setId(voice.id);
     setDescription(voice.description || "");
-    setSortOrder(String(voice.sort_order ?? 100));
     setMakeDefault(Boolean(voice.is_default));
     setLive(Boolean(voice.is_active));
     setError(null);
@@ -111,7 +108,8 @@ export function AdminVoicesManager({
       action: "upsert",
       id,
       description,
-      sort_order: Number(sortOrder) || 100,
+      sort_order:
+        initialVoices.find((voice) => voice.id === (editingId || id))?.sort_order ?? 100,
       is_default: makeDefault,
       is_active: live,
     });
@@ -245,18 +243,6 @@ export function AdminVoicesManager({
                 disabled={Boolean(editingId)}
                 autoComplete="off"
                 spellCheck={false}
-              />
-            )}
-          </Field>
-          <Field id="voice-order" label="Order">
-            {(control) => (
-              <Input
-                {...control}
-                type="number"
-                min={0}
-                max={9999}
-                value={sortOrder}
-                onChange={(event) => setSortOrder(event.target.value)}
               />
             )}
           </Field>
