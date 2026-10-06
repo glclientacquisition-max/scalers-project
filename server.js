@@ -2907,7 +2907,7 @@ mediaWss.on('connection', (ws, req) => {
         // A sentence that narrates the send ("I've sent that to the team",
         // "I sent your name") is dropped. It must not become a repeat-ask.
         const rawChunk = String(chunk || '');
-        const text = polishSpokenReply(String(chunk || ''), {
+        const polished = polishSpokenReply(String(chunk || ''), {
           callerTurns: brainState.conversation?.answersReceived || [],
           profile: brainProfile,
           toolResults: [],
@@ -2915,13 +2915,13 @@ mediaWss.on('connection', (ws, req) => {
           state: brainState,
           language: callLanguage,
         });
-        if (!text) {
+        if (!polished) {
           if (rawChunk.trim() && narratesInternalAction(rawChunk)) hidInternalNarration = true;
           return;
         }
         // Model text only. Visit / hold / order lines go out through
         // speakLookupSentence and must not pass through this cut.
-        text = cutNoAiSlop(text);
+        const text = cutNoAiSlop(polished);
         if (!text) return;
         if (!tts) return;
         if (suppressReplyRemainder || bargeInActive) return;
