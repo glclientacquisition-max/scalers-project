@@ -1,0 +1,120 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "callId": "HD_fe0d1e8fbd6e",
+  "tenantId": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+  "businessName": "Done and Dusted",
+  "callerName": "Alvin",
+  "nameOnFile": true,
+  "source": "Railway staging 2026-10-06 08:04Z. Model text is the TTS original for each caller turn. Gemini character counts matched spokenEmitted, and the raw stream was not stored beyond these lines.",
+  "turns": [
+    {
+      "caller": "Nataka unisaidie kwa kuniambia vitu mnayofanya",
+      "flushed": true,
+      "canned": { "path": "file_name_ask", "text": "Am I speaking with Alvin?" },
+      "model": { "provider": "canned", "model": "file_name_ask", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null }
+    },
+    {
+      "caller": "Yeah, you do, you're speaking with Alvin.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "What do you need done?",
+        "chars": 22,
+        "spokenEmitted": 22
+      }
+    },
+    {
+      "caller": "Niambie, like, the services you offer—",
+      "flushed": true,
+      "canned": { "path": "hear_again", "text": "Samahani sema tena?" },
+      "model": { "provider": "gemini", "model": "recorded", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null }
+    },
+    {
+      "caller": "Services? Mnayo offer?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Unahitaji gani kati ya hizi?",
+        "chars": 28,
+        "spokenEmitted": 28
+      }
+    },
+    {
+      "caller": "Si uniambie tu kenye mko nayo, bwana.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Ungependa t usaidie na gani?",
+        "chars": 28,
+        "spokenEmitted": 28
+      }
+    },
+    {
+      "caller": "Fanya aje, Shy?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Naweza kusaidia aje leo Alvin? Ungependa kubook us afi gani?",
+        "chars": 60,
+        "spokenEmitted": 60
+      }
+    },
+    {
+      "caller": "Just tell me the services that you offer.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "We offer couch cleaning carpet cleaning mattress cleaning general cleaning for houses and Airbnbs and pet stain removal. Which service would you like today Alvin?",
+        "chars": 162,
+        "spokenEmitted": 162
+      }
+    },
+    {
+      "caller": "Nataka—",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Un gependa tusaidie na usafi gani Alvin?",
+        "chars": 40,
+        "spokenEmitted": 40
+      }
+    },
+    {
+      "caller": "Nataka uniambie kuhusu carpet.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Ungependa tukuhudumie siku gani na saa ngapi?",
+        "chars": 45,
+        "spokenEmitted": 45
+      }
+    },
+    {
+      "caller": "Ni pesa ngapi kwanza?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Ungependa tukutembelee lini?",
+        "chars": 28,
+        "spokenEmitted": 28
+      }
+    }
+  ]
+}

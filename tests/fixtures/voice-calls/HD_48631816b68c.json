@@ -1,0 +1,239 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "callId": "HD_48631816b68c",
+  "tenantId": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+  "businessName": "Done and Dusted",
+  "callerName": "Alvin",
+  "nameOnFile": true,
+  "source": "Railway staging 2026-10-06 09:11Z (12:11 EAT). Model text is the TTS original or the spoken_drop preview. The 202-char Gemini turn was not stored.",
+  "turns": [
+    {
+      "caller": "Nilikuwa nataka aje kujua service mna offer?",
+      "flushed": true,
+      "canned": { "path": "file_name_ask", "text": "Je, naongea na Alvin?" },
+      "model": { "provider": "canned", "model": "file_name_ask", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null },
+      "observed": { "firstPcmMs": 321 }
+    },
+    {
+      "caller": "Yeah. Unaongea na nani?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Tuna stua couch, mattress, carpet, pamoja na general cleaning ya nyumba na airbnb, plus pet stain removal. Ni Alvin ninaongea naye?",
+        "chars": 131,
+        "spokenEmitted": 131
+      },
+      "observed": { "firstPcmMs": 457 }
+    },
+    {
+      "caller": "Eeh, unaongea na Alvin.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sawa Alvin. Ni huduma gani kati ya hizo ungependa tusaidie nayo leo?",
+        "chars": 68,
+        "spokenEmitted": 68
+      },
+      "observed": { "firstPcmMs": 1485 }
+    },
+    {
+      "caller": "Ah, na mna- mna- mnafika wapi exactly?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Tunafika maeneo ya Nairobi, Kitengela, Kiambu, Juja, Ongata Rongai, na Syokimau. Ungependa tukutembelee wapi?",
+        "chars": 109,
+        "spokenEmitted": 109
+      },
+      "observed": { "firstPcmMs": 1603 }
+    },
+    {
+      "caller": "Mtafika kwangu kweli?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Kama upo ndani ya Nairobi, Kitengela, Kiambu, Juja, OngataRongai, au Syokimau, tutafika kwako. Upo eneo gani?",
+        "chars": 109,
+        "spokenEmitted": 109
+      }
+    },
+    {
+      "caller": "ni.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Tafadhali Alvin, unaweza kuniambia upo eneo gani ndio tuhakikishe?",
+        "chars": 66,
+        "spokenEmitted": 66
+      }
+    },
+    {
+      "caller": "Kwa mbali kidogo. Niko place inaitwa Nakuru.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Pole sana Alvin, eneo la Nakuru liko nje ya huduma zetu kwa sasa. Ungependa nikuwekee note kwa timu yetu?",
+        "chars": 105,
+        "spokenEmitted": 105
+      },
+      "observed": { "firstPcmMs": 1724 }
+    },
+    {
+      "caller": "Eeh, naweza ongea na nani? Naweza ongea na Alvin kweli?",
+      "flushed": true,
+      "canned": { "path": "handoff_name_ask", "text": "Niambie jina lako ndio niwasiliane na timu." },
+      "model": { "provider": "gemini", "model": "recorded", "promptId": "voice.system", "outputText": null, "chars": 202, "spokenEmitted": 0 },
+      "observed": { "firstPcmMs": 1685 }
+    },
+    {
+      "caller": "Jina langu tena?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Jina lako ni Alvin.",
+        "chars": 19,
+        "spokenEmitted": 19
+      },
+      "observed": { "firstPcmMs": 1444 }
+    },
+    {
+      "caller": "Unauliza jina langu?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Hapana Alvin, tayari najua jina lako. Kuna huduma nyingine au swali unaomba tukusaidie nayo?",
+        "chars": 92,
+        "spokenEmitted": 92
+      },
+      "observed": { "firstPcmMs": 1756 }
+    },
+    {
+      "caller": "Nadhani",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sawa Alvin. Kama hauna swali lingine kwa sasa, uwe na siku njema!",
+        "chars": 65,
+        "spokenEmitted": 65
+      },
+      "observed": { "firstPcmMs": 1670 }
+    },
+    {
+      "caller": "Implemented something of a name look-alike.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sawa Alvin, nimeelewa. Kuna huduma yoyote ya usafi ungependa tukusaidie nayo leo?",
+        "chars": 81,
+        "spokenEmitted": 81
+      }
+    },
+    {
+      "caller": "When you— when you",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Naam Alvin, niko hapa. Ungependa kusaidiwa na huduma gani ya usafi?",
+        "chars": 67,
+        "spokenEmitted": 67
+      }
+    },
+    {
+      "caller": "Can you look into this? And also, the Lexions, man.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sina maelezo kuhusu hilo, lakini naweza kukuandikia ujumbe ili timu yetu ikupigie simu baadaye.",
+        "chars": 95,
+        "spokenEmitted": 95
+      }
+    },
+    {
+      "caller": "Your spelling like Sokimau instead of Siokimau.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sawa, asante sana kwa kusahihisha jina la Syokimau, Alvin. Kuna huduma nyingine au usafi ungependa tuongelee?",
+        "chars": 109,
+        "spokenEmitted": 109
+      }
+    },
+    {
+      "caller": "Spelling Nakoro instead of Nakuru.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Asante kwa usahihisho huo wa Nakuru, Alvin. Eneo la Nakuru liko nje ya eneo letu la kazi, lakini naweza kukuandikia ujumbe kwa timu yetu.",
+        "chars": 137,
+        "spokenEmitted": 137
+      }
+    },
+    {
+      "caller": "Like, you're just doing things wrong in Swahili, man.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Poleni sana Alvin kwa makosa hayo ya Kiswahili. Nitajitahidi kurekebisha, lakini pia naweza kukusaidia kwa Kiingereza kama utapenda.",
+        "chars": 132,
+        "spokenEmitted": 132
+      }
+    },
+    {
+      "caller": "And also check— also cross-reference with English, you see?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sawa, nimeelewa kabisa Alvin. Nitazingatia hilo ili mawasiliano yawe wazi. Kuna huduma yoyote ya usafi ungependa kubook leo?",
+        "chars": 124,
+        "spokenEmitted": 124
+      },
+      "observed": { "firstPcmMs": 1729 }
+    },
+    {
+      "caller": "Eeh, unaongea na English by the way?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Yes Alvin, I can speak English as well. How can I help you with our cleaning services today?",
+        "chars": 92,
+        "spokenEmitted": 92
+      },
+      "observed": { "firstPcmMs": 1446 }
+    }
+  ]
+}
