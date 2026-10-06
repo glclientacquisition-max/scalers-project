@@ -105,8 +105,8 @@ describe("package usage meter", () => {
 
   it("previews landing prices and follows the selected business on Admin", () => {
     const panel = read("dashboard/src/components/AdminPackagesPanel.tsx");
+    const page = read("dashboard/src/app/admin/(console)/packages/page.tsx");
     assert.match(panel, /packagePriceLabel/);
-    assert.match(panel, />Landing</);
     assert.match(panel, /Per year/);
     assert.match(panel, /live on landing/);
     assert.match(panel, /Now \$\{selected\.packageName/);
@@ -117,7 +117,11 @@ describe("package usage meter", () => {
     assert.match(panel, /usedOfIncluded\(minutesUsedFromSeconds/);
     assert.match(panel, /row\.gap/);
     assert.match(panel, /Matches package/);
+    assert.match(panel, /ListRow/);
+    assert.match(panel, /Needs you/);
     assert.doesNotMatch(panel, /Most popular/);
+    assert.doesNotMatch(panel, /<table/);
+    assert.doesNotMatch(page, /deskListTitleClass/);
   });
 
   it("names when included amounts do not match the assigned package", async () => {
