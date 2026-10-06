@@ -170,7 +170,7 @@ describe("package usage meter", () => {
     const billingDetail = read("dashboard/src/components/AdminBillingDetailPanel.tsx");
     const wallet = read("dashboard/src/lib/wallet.ts");
     assert.match(billingDetail, /Beta: meter the package\. On-demand ledger is not charged\./);
-    assert.match(billingDetail, /on-demand past included/);
+    assert.match(billingDetail, /On-demand past included/);
     assert.doesNotMatch(billingDetail, /line fees/);
     assert.doesNotMatch(billingDetail, /CREDIT_PRESETS/);
     assert.match(wallet, /shouldApplyLineRental/);
