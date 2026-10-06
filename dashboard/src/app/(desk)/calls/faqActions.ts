@@ -12,8 +12,6 @@ import {
 } from "@/lib/servicesCatalog";
 import { formatHoursForCompiler, scheduleForForm } from "@/lib/hoursSchedule";
 import {
-  FAQ_ANSWER_MAX,
-  FAQ_QUESTION_MAX,
   clampFaq,
   formatFaqMergeMessage,
   mergeFaqs,

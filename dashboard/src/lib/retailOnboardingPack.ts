@@ -12,7 +12,6 @@ import type { TeamMember } from "@/lib/onboarding";
 import { CATCH_ALL_TEAM_NOTIFY_FLAGS } from "@/lib/teamNotify";
 import {
   homeDefaultServices,
-  homeStarterPolicies,
   homeUnknownFallback,
   seedHomeFaqs,
 } from "@/lib/homeServicesOnboardingPack";
