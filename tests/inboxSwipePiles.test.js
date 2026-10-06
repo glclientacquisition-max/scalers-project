@@ -262,7 +262,8 @@ describe("inbox swipe wiring", () => {
     assert.match(nav, /filterCachedPile/);
     assert.match(nav, /itemMatchesPurpose/);
     assert.match(nav, /router\.prefetch/);
-    assert.match(pills, /prefetch/);
+    assert.match(pills, /<Segmented/);
+    assert.match(read("dashboard/src/components/ui/Segmented.tsx"), /prefetch/);
     assert.match(toolbar, /useInboxPileNav/);
     assert.match(nav, /itemMatchesQuery/);
     assert.match(page, /items=\{assembled\}/);
@@ -273,13 +274,10 @@ describe("inbox swipe wiring", () => {
   });
 
   it("scrolls the active chip on a snap strip that never wraps", () => {
-    const chrome = read("dashboard/src/components/ui/deskChrome.ts");
-    assert.match(pills, /scrollIntoView/);
-    assert.match(pills, /deskRateCardRowClass/);
-    assert.match(chrome, /flex-nowrap/);
-    assert.match(chrome, /snap-x snap-mandatory/);
-    assert.match(chrome, /overflow-x-auto/);
-    assert.match(pills, /bg-gradient-to-l from-surface/);
+    const segmented = read("dashboard/src/components/ui/Segmented.tsx");
+    assert.match(segmented, /scrollIntoView/);
+    assert.match(segmented, /snap-x snap-mandatory/);
+    assert.match(segmented, /overflow-x-auto/);
     assert.doesNotMatch(pills, /md:flex-wrap|md:overflow-visible|max-md/);
     assert.match(toolbar, /inboxPileHref\(item\.id/);
     const purposeCall = toolbar.match(/<InboxFilterPills[\s\S]*?\/>/);

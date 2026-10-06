@@ -17,7 +17,7 @@ Owner switches All / Recents / Favourites / Saved / Unsaved on Contacts with the
 
 ## Acceptance (must ship)
 
-1. **Contacts list filters.** One `InboxFilterPills` row. Nouns: **All · Recents · Favourites · Saved · Unsaved**. Recents and Favourites live on that row. Unsaved once. Same pill DESIGN as Inbox purpose. Count badge only when a real count is already on the page load. Do not copy Inbox purpose nouns (Needs you / Visits / Holds / Human / Answered) onto Contacts. Do not add a second chip strip.
+1. **Contacts list filters.** One `InboxFilterPills` row (`Segmented` underline). Nouns: **All · Recents · Favourites · Saved · Unsaved**. Recents and Favourites live on that row. Unsaved once. Same filter DESIGN as Inbox purpose. Count badge only when a real count is already on the page load. Do not copy Inbox purpose nouns (Needs you / Visits / Holds / Human / Answered) onto Contacts. Do not add a second chip strip.
 2. **Sort stays underline.** Last call · Name remains the second `FilterTabs` row (`aria-label` Sort contacts). Same family as Inbox List / Work.
 3. **Person file header.** Keep top Call and WhatsApp icons (`CallLink` `tel:` + `WhatsAppLink` `wa.me`, `deskHitClass`). Remove the large labeled Call / WhatsApp pills. One reach row. Opened only. No write-back claims change.
 4. **#389 honesty stays.** History stamps, tap-through, and sourced KPI cards are unchanged. Layout may shift only to dock the icons in the header.

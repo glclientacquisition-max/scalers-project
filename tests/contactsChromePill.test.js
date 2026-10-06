@@ -32,7 +32,7 @@ describe("contacts chrome pill ACCEPT", () => {
     assert.match(master, /Contacts segments/);
   });
 
-  it("uses Inbox pill-chip DESIGN for All Saved Unsaved, not underline FilterTabs", () => {
+  it("uses Inbox Segmented DESIGN for All Saved Unsaved, not pill chips", () => {
     const purposeCall = page.match(/<InboxFilterPills[\s\S]*?\/>/);
     assert.ok(purposeCall, "Contacts segments are InboxFilterPills");
     assert.match(purposeCall[0], /label="Filter contacts"/);
@@ -51,11 +51,11 @@ describe("contacts chrome pill ACCEPT", () => {
     assert.doesNotMatch(purposeCall[0], /label: "VIP"/);
     assert.doesNotMatch(purposeCall[0], /label: "Cold"/);
     assert.doesNotMatch(page, /SEGMENT/);
-    const chrome = read("dashboard/src/components/ui/deskChrome.ts");
-    assert.match(pills, /deskRateCardClass/);
-    assert.match(chrome, /rounded-full/);
-    assert.match(chrome, /bg-accent text-accent-on/);
+    const segmented = read("dashboard/src/components/ui/Segmented.tsx");
+    assert.match(pills, /<Segmented/);
+    assert.match(segmented, /after:bg-brand/);
     assert.match(pills, /item\.count/);
+    assert.doesNotMatch(pills, /deskRateCardClass/);
     assert.doesNotMatch(pills, /filterTabClass/);
     assert.match(dev, /<InboxFilterPills/);
     assert.doesNotMatch(dev, /label: "Needs you"|label: "Visits"|label: "Holds"/);

@@ -225,7 +225,7 @@ async function ContactDetailBody({ params, searchParams }: ContactDetailPageProp
 
           {showLastReason && (latestCall?.ownerCard || lastReason) ? (
             <section className="rounded-2xl border border-line bg-surface p-5">
-              <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+              <h2 className="text-caption font-medium text-ink-2">
                 Last want
               </h2>
               <CallSummaryCard

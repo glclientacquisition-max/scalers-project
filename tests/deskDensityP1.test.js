@@ -94,7 +94,7 @@ describe("desk density P1", () => {
   });
 
   it("titles the two import routes differently", () => {
-    assert.match(importPage, />\s*Import Contacts\s*</);
+    assert.match(importPage, />\s*Import contacts\s*</);
     assert.match(nav, /Import Catalog/);
     assert.match(nav, /Import Knowledge/);
     assert.match(shell, /settingsPanelHeading\(tab, trainPanel, tenant\.vertical\)/);
@@ -103,7 +103,7 @@ describe("desk density P1", () => {
   it("keeps a 44px checkbox hit and a larger touch box", () => {
     assert.match(check, /inline-flex h-11 w-11/);
     assert.match(check, /h-6 w-6/);
-    assert.match(check, /lg:h-4 lg:w-4/);
+    assert.doesNotMatch(check, /lg:h-4 lg:w-4/);
     assert.match(board, /inline-flex h-11 w-11/);
     assert.match(board, /h-6 w-6/);
   });

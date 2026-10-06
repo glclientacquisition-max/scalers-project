@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { cx } from "@/lib/cx";
 
 export type SegmentedItem = {
@@ -42,11 +44,28 @@ export function Segmented({
   className?: string;
 }) {
   const asLinks = items.every((item) => item.href);
+  const activeKey = items.find((item) => item.active)?.key ?? null;
+
+  useEffect(() => {
+    if (!activeKey) return;
+    const node = document.querySelector(
+      `[data-segmented="${CSS.escape(label)}"] [data-segmented-active]`
+    );
+    if (!(node instanceof HTMLElement)) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({
+      inline: "nearest",
+      block: "nearest",
+      behavior: reduce ? "auto" : "smooth",
+    });
+  }, [activeKey, label]);
+
   return (
     <nav
       aria-label={label}
+      data-segmented={label}
       className={cx(
-        "-mx-4 flex snap-x overflow-x-auto border-b border-hairline px-4 [scrollbar-width:none] sm:-mx-6 sm:px-6 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden",
+        "-mx-4 flex snap-x snap-mandatory overflow-x-auto border-b border-hairline px-4 [scrollbar-width:none] sm:-mx-6 sm:px-6 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden",
         className,
       )}
     >
@@ -57,6 +76,8 @@ export function Segmented({
             <Link
               key={item.key}
               href={item.href}
+              prefetch
+              data-segmented-active={active ? "" : undefined}
               aria-current={active ? "page" : undefined}
               aria-disabled={item.disabled || undefined}
               className={cx(itemBase, itemState(active), item.disabled && "pointer-events-none opacity-50")}
@@ -70,6 +91,7 @@ export function Segmented({
           <button
             key={item.key}
             type="button"
+            data-segmented-active={active ? "" : undefined}
             aria-pressed={active}
             disabled={item.disabled}
             onClick={onSelect ? () => onSelect(item.key) : undefined}

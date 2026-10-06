@@ -150,7 +150,7 @@ describe("contacts list Phase 1 chrome", () => {
     assert.doesNotMatch(page, /Invite Friends/);
     assert.doesNotMatch(search, /Invite Friends/);
     assert.match(note, /All · Recents · Favourites · Saved · Unsaved/);
-    assert.match(accept, /pill-chip items/);
+    assert.match(accept, /Segmented underline/);
   });
 
   it("keeps dense Call + WhatsApp as opened-only when a phone exists", () => {

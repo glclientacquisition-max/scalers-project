@@ -20,7 +20,7 @@ export function ContactKpiStrip({
         const href = hrefs?.[card.id];
         const body = (
           <>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+            <p className="text-caption font-medium text-ink-2">
               {card.label}
             </p>
             <p className="mt-1 font-display text-xl tabular-nums leading-none text-ink">

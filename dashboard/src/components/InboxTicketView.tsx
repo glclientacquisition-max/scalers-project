@@ -770,7 +770,7 @@ export function InboxTicketView({
               type="button"
               onClick={jumpLatest}
               aria-label="Jump to latest"
-              className={`absolute right-4 bottom-3 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full bg-accent px-4 text-sm font-semibold text-accent-on shadow-lg ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-brand`}
+              className={`absolute right-4 bottom-3 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink shadow-md ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-brand`}
             >
               Jump to latest
             </button>

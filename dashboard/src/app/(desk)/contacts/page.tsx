@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { AddContactPanel } from "@/components/AddContactPanel";
 import { ContactsPullHost } from "@/components/ContactsEndlessList";
 import { ContactsSearch } from "@/components/ContactsSearch";
@@ -6,14 +5,10 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
+import { Empty } from "@/components/ui/Empty";
+import { ButtonLink } from "@/components/ui/Button";
 import { DEFAULT_PAGE_SIZE } from "@/lib/listPage";
-import {
-  btnGhost,
-  btnPrimary,
-  deskEmptyClass,
-  deskListTitleClass,
-  deskShiftClass,
-} from "@/components/ui/deskChrome";
+import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
@@ -123,27 +118,24 @@ async function ContactsBody({ searchParams }: ContactsPageProps) {
         sort={sort}
         q={q}
         empty={
-          <div className={deskEmptyClass}>
-            <p className="font-display text-2xl tracking-tight text-ink">
-              {emptyCopy(saved, q)}
-            </p>
-            {q ? (
-              <Link
-                href={contactsHref({ saved, sort })}
-                className={`mt-6 inline-flex min-h-11 items-center font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
-              >
-                Clear
-              </Link>
-            ) : saved !== "all" ? (
-              <Link href={contactsHref({ sort })} className={`${btnGhost} mt-6`}>
-                Show all
-              </Link>
-            ) : (
-              <Link href="/contacts/import" className={`${btnPrimary} mt-6`}>
-                Import
-              </Link>
-            )}
-          </div>
+          <Empty
+            title={emptyCopy(saved, q)}
+            action={
+              q ? (
+                <ButtonLink href={contactsHref({ saved, sort })} variant="ghost">
+                  Clear
+                </ButtonLink>
+              ) : saved !== "all" ? (
+                <ButtonLink href={contactsHref({ sort })} variant="ghost">
+                  Show all
+                </ButtonLink>
+              ) : (
+                <ButtonLink href="/contacts/import" variant="primary">
+                  Import
+                </ButtonLink>
+              )
+            }
+          />
         }
       />
     </div>
