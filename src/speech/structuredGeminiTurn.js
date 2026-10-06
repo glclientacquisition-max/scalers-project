@@ -30,6 +30,7 @@ const {
   repairLine,
   finishSentence,
 } = require('./structuredReply');
+const { createNameGate } = require('./turnMachine');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -112,8 +113,15 @@ async function runStructuredGeminiTurn({
   applyTools,
   callSid = 'voice',
   timeoutMs = 8000,
+  callerState = null,
 } = {}) {
   const locked = getLanguagePack(lockedLanguage).code;
+  const gate = createNameGate(callerState, locked);
+  async function emitSentence(sentence) {
+    const line = gate.consider(sentence);
+    if (!line || typeof onSentence !== 'function') return;
+    await onSentence(line);
+  }
   const primary = geminiPrimaryModel();
   const backup = geminiBackupModel();
   let model = primary;
@@ -131,7 +139,7 @@ async function runStructuredGeminiTurn({
       read = await withTimeout(
         (async () => {
           const stream = await openOnce({ startStream, model, config, timeoutMs });
-          return readStructuredStream(stream, { lockedLanguage: locked, onSentence, shouldAbort });
+          return readStructuredStream(stream, { lockedLanguage: locked, onSentence: emitSentence, shouldAbort });
         })(),
         timeoutMs,
         'Gemini structured stream'
@@ -186,7 +194,7 @@ async function runStructuredGeminiTurn({
       const second = await withTimeout(
         (async () => {
           const stream = await startStream(model, config);
-          return readStructuredStream(stream, { lockedLanguage: locked, onSentence, shouldAbort });
+          return readStructuredStream(stream, { lockedLanguage: locked, onSentence: emitSentence, shouldAbort });
         })(),
         timeoutMs,
         'Gemini structured regen'
@@ -200,7 +208,7 @@ async function runStructuredGeminiTurn({
         if (!second.emitted && checked.sentences.length) {
           for (const sentence of checked.sentences) {
             if (shouldAbort?.()) break;
-            if (typeof onSentence === 'function') await onSentence(sentence);
+            await emitSentence(sentence);
           }
         }
       }
@@ -217,11 +225,13 @@ async function runStructuredGeminiTurn({
   if (!read?.emitted && sentences.length && !regenerated) {
     for (const sentence of sentences) {
       if (shouldAbort?.()) break;
-      if (typeof onSentence === 'function') await onSentence(sentence);
+      await emitSentence(sentence);
     }
   }
   if (!sentences.length) sentences = [repairLine(locked)];
-  const spokenBody = sentences.join(' ');
+  gate.finish();
+  const gatedText = gate.spoken.join(' ').trim();
+  const spokenBody = gatedText || sentences.join(' ');
   const reconstructed = parsed.ok ? reconstructModelText({ ...value, spoken_sentences: sentences }) : spokenBody;
   const toolParsed = parseGeminiResponse(reconstructed);
   let execution = { results: [], shouldEndCall: false };
@@ -271,6 +281,7 @@ async function runStructuredGeminiTurn({
     regenerated,
     structured: true,
     replyLanguage: locked,
+    nameStages: gate.stages,
   };
 }
 

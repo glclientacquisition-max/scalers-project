@@ -82,6 +82,8 @@ See `.env.example` — key ones:
 - `VOICE_PROFILE` (`balanced` | `snappy`), `VOICE_TTS_GAIN`, `SONIOX_TTS_SPEED`, `SONIOX_TTS_SPEED_EN`, `SONIOX_TTS_SPEED_SW`
 - `VOICE_LLM_STREAM`, `VOICE_STREAM_EARLY_CHARS` / `WORDS` (default 0: sentence-only TTS flush)
 - `VOICE_STRUCTURED_REPLY` (`auto` default: on in staging and local, off when the Railway environment name contains `prod`). Language-locked JSON replies. See [`VOICE_STRUCTURED_REPLY.md`](./VOICE_STRUCTURED_REPLY.md).
+- `VOICE_ROLLOUT_TENANTS` (empty default). Comma-separated tenant ids. When set, only those tenants get the structured mouth and `VOICE_TRACE`, including in production. Empty keeps the auto rules.
+- `VOICE_GEMINI_LIVE` (default `off`). Trace seam only. When `on`, the model stage provider is `gemini-live`. It does not switch the call audio.
 - `GEMINI_STRUCTURED_MAX_OUTPUT_TOKENS` (default 384; the prose cap `GEMINI_MAX_OUTPUT_TOKENS` stays 256)
 - `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`, `VOICE_IDLE_NUDGE_MS` (default 10000; not armed until the caller has spoken)
 - `VOICE_BARGE_GRACE_MS`, `VOICE_BARGE_EARLY_MS`, `VOICE_BARGE_MIN_CHARS`

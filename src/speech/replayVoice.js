@@ -11,6 +11,7 @@ const { SCHEMA, SCHEMA_VERSION } = require('./voiceTrace');
 const { structuredReplyEnabled } = require('./structuredReplyFlag');
 const { detectTurnLanguage, lockReplyLanguage } = require('./languageLock');
 const { speakStructuredTurn } = require('./structuredReplay');
+const { modelStageProvider } = require('./geminiLive');
 
 function initialState(fixture = {}) {
   const name = String(fixture.callerName || '').trim();
@@ -210,7 +211,7 @@ function replayTurn(turn, ctx) {
     {
       stage: 'model',
       phase: 'output',
-      provider: structuredReplyEnabled() ? 'structured' : provider,
+      provider: modelStageProvider(structuredReplyEnabled() ? 'structured' : provider),
       model: modelName,
       promptId: structuredReplyEnabled() ? 'voice.structured' : promptId,
       promptVersion,
@@ -320,8 +321,10 @@ async function replayCall(fixture, opts = {}) {
       const live = await (opts.respond || liveGeminiText)({
         caller: turn.caller,
         history: ctx.history,
-        language: ctx.language,
+        language: ctx.languageState?.reply || ctx.language,
         fixture,
+        state: ctx.state,
+        replyLanguage: ctx.languageState?.reply || ctx.language,
       });
       next = {
         ...turn,

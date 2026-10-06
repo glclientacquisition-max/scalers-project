@@ -23,6 +23,7 @@ module.exports = {
   },
   complaint: 'Sorry. I understand you have a complaint. I can send it to the manager.',
   understand: 'Okay, I understand.',
+  ack: 'Okay.',
 };
 
 function joinList(items, andWord) {

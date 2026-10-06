@@ -7,10 +7,10 @@ Later phases plug in here:
 | Phase | What changes | What stays |
 | --- | --- | --- |
 | 2. Structured Gemini output | Shipped behind `VOICE_STRUCTURED_REPLY`. Replay scores the structured mouth. See [`VOICE_STRUCTURED_REPLY.md`](./VOICE_STRUCTURED_REPLY.md). | Trace stages, fixtures, the gate |
-| 3. Tool state machine | Pass `respond` into `replayCall`. Recorded mode can keep the old model text. Live mode calls the new brain. | Same scorecard |
-| 4. Split `server.js` | Move the `voiceTrace.note*` calls with the stage they describe. The record shape does not change. | `createVoiceTrace` |
-| 5. Gemini Live | Add a `model` stage with `provider: 'gemini-live'`. Do not add a column. | JSON payload |
-| 6. Per-tenant rollout | `VOICE_TRACE` stays on in staging. Production stays off until a tenant flag says otherwise. | The same table |
+| 3. Tool state machine | Shipped. `src/speech/turnMachine.js` drops a repeat name ask. A confirmed name is not asked again. An unknown name is asked once. A sentence that also carries the service or price answer keeps that answer. `replayCall(fixture, { mode: 'live', respond })` passes caller state into the brain. Recorded mode still starts from the fixture text, then the same gate. | Same scorecard. HD_21b92f25640b name asks 2 to 1, score 92 to 100. |
+| 4. Split `server.js` | Shipped. Stage notes live in `src/speech/turnTrace.js`. The structured sentence prep lives in `src/speech/structuredSpeak.js`. | `createVoiceTrace`. The record shape does not change. |
+| 5. Gemini Live | Shipped as a trace seam. `VOICE_GEMINI_LIVE` defaults off. When it is on, the model stage `provider` is `gemini-live`. The phone call still uses the structured Gemini mouth. No new column. | JSON payload |
+| 6. Per-tenant rollout | Shipped. `VOICE_ROLLOUT_TENANTS` is a comma-separated tenant id list. Empty keeps the auto rules: trace and structured replies on in staging, off in production. A non-empty list is the tenant flag, including in production. | The same table |
 
 ## Store
 
@@ -70,7 +70,7 @@ node scripts/replay-voice-suite.js --live
 
 `--live` needs `GEMINI_API_KEY`. CI uses recorded mode only. Recorded mode speaks `turns[].model.outputText`. A missing `outputText` with `canned.text` speaks that line. `unlogged: true` is a turn whose raw model text was never stored. It is omitted from the score so a missing log cannot fail the gate forever.
 
-A later brain passes `respond` to `replayCall(fixture, { mode: 'live', respond })`.
+`replayCall(fixture, { mode: 'live', respond })` passes caller text, history, language, and caller state into `respond`. The name gate still runs on that text. Recorded mode does not call `respond`.
 
 ## Score
 

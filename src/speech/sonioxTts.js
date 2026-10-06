@@ -312,7 +312,7 @@ function createSonioxTtsSession({
             callLanguage: opts.callLanguage,
             language: opts.language || language || undefined,
             extraLexicon: opts.extraLexicon,
-            avoidRespell: structuredReplyEnabled(),
+            avoidRespell: structuredReplyEnabled(opts.tenantId),
           });
       const clean = prepared.text;
       if (!clean) return { pushed: false, language: prepared.language };

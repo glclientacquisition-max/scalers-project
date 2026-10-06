@@ -73,7 +73,7 @@ const {
   VOICE_SYSTEM_PROMPT_ID,
   VOICE_SYSTEM_PROMPT_VERSION,
 } = require('./src/prompts');
-const { createVoiceTrace } = require('./src/speech/voiceTrace');
+const { createVoiceTrace, voiceTraceEnabledFor } = require('./src/speech/voiceTrace');
 const { openClosedStatus } = require('./src/conversation/businessHours');
 const { bulletinClosureNotice } = require('./src/conversation/dailyBulletin');
 const { parseAgentTools } = require('./src/conversation/agentTools');
@@ -262,11 +262,22 @@ const { detectTurnLanguage, lockReplyLanguage } = require('./src/speech/language
 const {
   STRUCTURED_PROMPT_ID,
   structuredSystemAddendum,
-  normalizeStructuredSentence,
-  protectSpokenAnswer,
   repairLine,
 } = require('./src/speech/structuredReply');
 const { runStructuredGeminiTurn } = require('./src/speech/structuredGeminiTurn');
+const { traceStructuredChunk } = require('./src/speech/structuredSpeak');
+const {
+  traceStt,
+  traceTurnEnd,
+  traceLanguage,
+  traceModelRequest,
+  traceModelOutput,
+  traceTransform,
+  traceCanned,
+  traceTts,
+  traceBarge,
+  traceCall,
+} = require('./src/speech/turnTrace');
 const {
   createOverlapHold,
   createAgentReplayMemory,
@@ -1872,6 +1883,7 @@ mediaWss.on('connection', (ws, req) => {
   let callLanguage = 'unknown';
   let callLanguageState = createLanguageState();
   let brainProfile = {};
+  const structuredOn = () => structuredReplyEnabled(brainProfile?.id);
   let fillerUsedThisCall = false;
   /** Caller-requested TTS speed scale for this call (1 = profile default). */
   let ttsSpeedScale = 1;
@@ -1902,6 +1914,7 @@ mediaWss.on('connection', (ws, req) => {
     callId: () => sidLabel(),
     tenantId: () => brainProfile?.id || null,
     voiceId: () => resolveSonioxVoice(tenantSonioxVoiceId),
+    enabled: () => voiceTraceEnabledFor(brainProfile?.id),
   });
 
   function publishSttContext(profile) {
@@ -2195,7 +2208,7 @@ mediaWss.on('connection', (ws, req) => {
       callLanguage,
       extraLexicon,
     });
-    voiceTrace.noteCall({
+    traceCall(voiceTrace, {
       stage: 'tts',
       path: 'greeting',
       text: prepared.text,
@@ -2210,6 +2223,7 @@ mediaWss.on('connection', (ws, req) => {
     let session = null;
     try {
       session = await tts.beginSpeak({
+        tenantId: brainProfile?.id,
         callLanguage,
         language: prepared.language,
         alreadyPrepared: true,
@@ -2322,10 +2336,10 @@ mediaWss.on('connection', (ws, req) => {
       callLanguage,
       language: opts.language,
       extraLexicon,
-      avoidRespell: structuredReplyEnabled(),
+      avoidRespell: structuredOn(),
     });
-    if (opts.tracePath) voiceTrace.noteCanned({ path: opts.tracePath, text });
-    voiceTrace.noteTts({
+    if (opts.tracePath) traceCanned(voiceTrace, { path: opts.tracePath, text });
+    traceTts(voiceTrace, {
       text: prepared.text,
       before: String(text),
       language: prepared.language,
@@ -2339,6 +2353,7 @@ mediaWss.on('connection', (ws, req) => {
     try {
       // beginSpeak so we can track/cancel this stream without killing a reply prefetch.
       session = await tts.beginSpeak({
+        tenantId: brainProfile?.id,
         language: prepared.language,
         callLanguage,
         alreadyPrepared: true,
@@ -2420,7 +2435,7 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   function cancelSpeech(reason) {
-    voiceTrace.noteBarge({ reason: String(reason || '') });
+    traceBarge(voiceTrace, { reason: String(reason || '') });
     const endingGen = activePlaybackGeneration;
     clearFillerTimer();
     idleNudge.clear();
@@ -2611,7 +2626,7 @@ mediaWss.on('connection', (ws, req) => {
     if (shouldSkipCallerTurn(clean, { lastAgentText })) {
       console.log(`[ws/media][${sidLabel()}] skip non-substantive turn: ${clean}`);
       voiceTrace.beginTurn({ callerText: clean });
-      voiceTrace.noteTurnEnd({ decision: 'skip', reason: 'non_substantive' });
+      traceTurnEnd(voiceTrace, { decision: 'skip', reason: 'non_substantive' });
       voiceTrace.commitTurn({ outcome: 'skip' });
       return;
     }
@@ -2623,10 +2638,10 @@ mediaWss.on('connection', (ws, req) => {
     activeTurnTiming = turnTiming;
 
     const callKey = sidLabel();
-    const languageEvidence = structuredReplyEnabled()
+    const languageEvidence = structuredOn()
       ? detectTurnLanguage({ text: clean, tokens: tokensForTurn })
       : analyzeCallerLanguage(clean);
-    if (structuredReplyEnabled()) {
+    if (structuredOn()) {
       callLanguageState = lockReplyLanguage(callLanguageState, languageEvidence);
       callLanguage = callLanguageState.reply || callLanguageState.current;
     } else {
@@ -2701,7 +2716,7 @@ mediaWss.on('connection', (ws, req) => {
     });
     voiceTrace.beginTurn({
       callerText: clean,
-      language: structuredReplyEnabled()
+      language: structuredOn()
         ? {
             current:
               languageEvidence.language && languageEvidence.language !== 'unknown'
@@ -2711,12 +2726,12 @@ mediaWss.on('connection', (ws, req) => {
           }
         : callLanguageState,
     });
-    voiceTrace.noteLanguage({
+    traceLanguage(voiceTrace, {
       detected: languageEvidence.language,
-      sticky: structuredReplyEnabled() ? callLanguageState.current : callLanguage,
+      sticky: structuredOn() ? callLanguageState.current : callLanguage,
       confidence: languageEvidence.confidence,
     });
-    voiceTrace.noteTurnEnd({ decision: 'flush', reason: 'caller_turn_processed' });
+    traceTurnEnd(voiceTrace, { decision: 'flush', reason: 'caller_turn_processed' });
     console.log(
       `[ws/media][${callKey}] caller turn lang=${callLanguage}` +
         ` detected=${languageEvidence.language} confidence=${languageEvidence.confidence}` +
@@ -2745,11 +2760,11 @@ mediaWss.on('connection', (ws, req) => {
         catalog: brainProfile.productCatalog,
       }),
       languageDirective(callLanguage),
-      structuredReplyEnabled() ? structuredSystemAddendum(callLanguage) : '',
+      structuredOn() ? structuredSystemAddendum(callLanguage) : '',
     ]
       .filter(Boolean)
       .join('\n\n');
-    const voicePromptVersion = structuredReplyEnabled()
+    const voicePromptVersion = structuredOn()
       ? `${VOICE_SYSTEM_PROMPT_VERSION}+structured`
       : VOICE_SYSTEM_PROMPT_VERSION;
 
@@ -2920,6 +2935,7 @@ mediaWss.on('connection', (ws, req) => {
       if (streamOn && tts) {
         speakSessionReady = tts
           .beginSpeak({
+            tenantId: brainProfile?.id,
             callLanguage,
             speedScale: ttsSpeedScale,
             extraLexicon: ttsLexiconOverrides,
@@ -2970,6 +2986,7 @@ mediaWss.on('connection', (ws, req) => {
           if (prefetched) return prefetched;
         }
         speakSession = await tts.beginSpeak({
+          tenantId: brainProfile?.id,
           callLanguage,
           speedScale: ttsSpeedScale,
           extraLexicon: ttsLexiconOverrides,
@@ -2979,20 +2996,14 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       async function speakStructuredChunk(chunk) {
-        const rawChunk = String(chunk || '');
-        const normalized = normalizeStructuredSentence(rawChunk, { language: callLanguage });
-        const guarded = protectSpokenAnswer(rawChunk, normalized.text);
-        const text = guarded.text;
-        if (typeof voiceTrace !== 'undefined' && voiceTrace) {
-          voiceTrace.noteTransform({
-            stage: guarded.restored ? 'no_silent_drop' : 'tts_normalize',
-            before: rawChunk,
-            after: text,
-            reason: guarded.reason || 'normalized',
-            dropped: false,
-            force: guarded.restored,
-          });
-        }
+        const prepared = traceStructuredChunk(chunk, {
+          language: callLanguage,
+          lexicon: typeof ttsLexiconOverrides !== 'undefined' ? ttsLexiconOverrides : [],
+          trace: typeof voiceTrace !== 'undefined' ? voiceTrace : null,
+          traceTransform,
+          traceTts,
+        });
+        const text = prepared.text;
         if (!text) return;
         if (!tts) return;
         if (suppressReplyRemainder || bargeInActive) return;
@@ -3023,18 +3034,6 @@ mediaWss.on('connection', (ws, req) => {
         activeOutboundStreamId = session.streamId;
         speaking = true;
         if (/[.!?]$/.test(text)) bargeCancelledText = '';
-        if (typeof voiceTrace !== 'undefined' && voiceTrace && typeof prepareForTts === 'function') {
-          const traced = prepareForTts(text, {
-            callLanguage,
-            extraLexicon: typeof ttsLexiconOverrides !== 'undefined' ? ttsLexiconOverrides : [],
-            avoidRespell: true,
-          });
-          voiceTrace.noteTts({
-            text: traced.text,
-            before: text,
-            language: traced.language,
-          });
-        }
         session.pushText(text);
         spokenChunks.push(text);
         lastAgentText = spokenChunks.join(' ');
@@ -3043,7 +3042,7 @@ mediaWss.on('connection', (ws, req) => {
       async function onSpokenChunk(chunk) {
         // Visit, hold, and order lookups speak nameConfirmSpeech, not the model.
         if (suppressModelSpeech) return;
-        if (typeof structuredReplyEnabled === 'function' && structuredReplyEnabled()) {
+        if (typeof structuredOn === 'function' && structuredOn()) {
           await speakStructuredChunk(chunk);
           return;
         }
@@ -3062,7 +3061,7 @@ mediaWss.on('connection', (ws, req) => {
           language: callLanguage,
         });
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
-          voiceTrace.noteTransform({
+          traceTransform(voiceTrace, {
             stage: 'polish',
             before: rawChunk,
             after: polished,
@@ -3077,7 +3076,7 @@ mediaWss.on('connection', (ws, req) => {
         // speakLookupSentence and must not pass through this cut.
         const text = cutNoAiSlop(polished);
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
-          voiceTrace.noteTransform({
+          traceTransform(voiceTrace, {
             stage: 'no_ai_slop',
             before: polished,
             after: text,
@@ -3124,7 +3123,7 @@ mediaWss.on('connection', (ws, req) => {
             callLanguage,
             extraLexicon: typeof ttsLexiconOverrides !== 'undefined' ? ttsLexiconOverrides : [],
           });
-          voiceTrace.noteTts({
+          traceTts(voiceTrace, {
             text: traced.text,
             before: text,
             language: traced.language,
@@ -3200,10 +3199,13 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       function traceModelResult(result) {
-        voiceTrace.noteModelOutput({
+        for (const stage of result?.nameStages || []) {
+          traceTransform(voiceTrace, stage);
+        }
+        traceModelOutput(voiceTrace, {
           provider: 'gemini',
           model: result?.model || geminiPrimaryModel(),
-          promptId: structuredReplyEnabled() ? STRUCTURED_PROMPT_ID : VOICE_SYSTEM_PROMPT_ID,
+          promptId: structuredOn() ? STRUCTURED_PROMPT_ID : VOICE_SYSTEM_PROMPT_ID,
           promptVersion: voicePromptVersion,
           language: callLanguage,
           outputText: result?.rawText || '',
@@ -3230,7 +3232,7 @@ mediaWss.on('connection', (ws, req) => {
               : "Sorry, I can't access the business information right now. Please try again.",
           model: 'canned',
         };
-        voiceTrace.noteCanned({ path: 'llm_unavailable', text: result.spokenText });
+        traceCanned(voiceTrace, { path: 'llm_unavailable', text: result.spokenText });
         traceModelResult(result);
         stopFillerForReply();
         if (speakSession) {
@@ -3254,10 +3256,10 @@ mediaWss.on('connection', (ws, req) => {
         }
       } else if (streamOn) {
         turnTiming.markLlmStart();
-        voiceTrace.noteModelRequest({
+        traceModelRequest(voiceTrace, {
           provider: 'gemini',
           model: geminiPrimaryModel(),
-          promptId: structuredReplyEnabled() ? STRUCTURED_PROMPT_ID : VOICE_SYSTEM_PROMPT_ID,
+          promptId: structuredOn() ? STRUCTURED_PROMPT_ID : VOICE_SYSTEM_PROMPT_ID,
           promptVersion: voicePromptVersion,
           language: callLanguage,
         });
@@ -3265,6 +3267,8 @@ mediaWss.on('connection', (ws, req) => {
           onSpokenChunk,
           shouldAbort: () => bargeInActive,
           lockedLanguage: callLanguage,
+          tenantId: brainProfile?.id,
+          callerState: brainState,
         });
         if (result?.firstSentenceMs != null) {
           turnTiming.structuredFirstSentenceMs = result.firstSentenceMs;
@@ -3355,14 +3359,14 @@ mediaWss.on('connection', (ws, req) => {
             speakSession = null;
             if (planned.speakNow && planned.reply && !bargeInActive) {
               const keptStructured =
-                structuredReplyEnabled() && !result?.llmHardDown
+                structuredOn() && !result?.llmHardDown
                   ? String(result?.spokenText || planned.reply || '').trim()
                   : '';
               const missed = !keptStructured && Boolean(result?.timedOut || result?.llmFailed);
               const reply = missed
                 ? await speechWhenModelMissed(result, clean)
                 : keptStructured ||
-                  (structuredReplyEnabled() ? repairLine(callLanguage) : cutNoAiSlop(planned.reply));
+                  (structuredOn() ? repairLine(callLanguage) : cutNoAiSlop(planned.reply));
               if (reply) {
                 callTranscript.pushAgent(reply);
                 turnTiming.markFirstSpokenChunk();
@@ -3398,14 +3402,14 @@ mediaWss.on('connection', (ws, req) => {
           });
           if (planned.speakNow && planned.reply) {
             const keptStructured =
-              structuredReplyEnabled() && !result?.llmHardDown
+              structuredOn() && !result?.llmHardDown
                 ? String(result?.spokenText || planned.reply || '').trim()
                 : '';
             const missed = !keptStructured && Boolean(result?.timedOut || result?.llmFailed);
             const reply = missed
               ? await speechWhenModelMissed(result, clean)
               : keptStructured ||
-                (structuredReplyEnabled() ? repairLine(callLanguage) : cutNoAiSlop(planned.reply));
+                (structuredOn() ? repairLine(callLanguage) : cutNoAiSlop(planned.reply));
             if (reply) {
               callTranscript.pushAgent(reply);
               turnTiming.markFirstSpokenChunk();
@@ -3429,15 +3433,17 @@ mediaWss.on('connection', (ws, req) => {
         }
       } else {
         turnTiming.markLlmStart();
-        voiceTrace.noteModelRequest({
+        traceModelRequest(voiceTrace, {
           provider: 'gemini',
           model: geminiPrimaryModel(),
-          promptId: structuredReplyEnabled() ? STRUCTURED_PROMPT_ID : VOICE_SYSTEM_PROMPT_ID,
+          promptId: structuredOn() ? STRUCTURED_PROMPT_ID : VOICE_SYSTEM_PROMPT_ID,
           promptVersion: voicePromptVersion,
           language: callLanguage,
         });
         result = await runGeminiTurn(messages, sidLabel(), turnSystemPrompt, {
           lockedLanguage: callLanguage,
+          tenantId: brainProfile?.id,
+          callerState: brainState,
         });
         traceModelResult(result);
         stopFillerForReply();
@@ -3450,7 +3456,7 @@ mediaWss.on('connection', (ws, req) => {
           speakSession = null;
         }
         const modelLine = result?.spokenText
-          ? structuredReplyEnabled()
+          ? structuredOn()
             ? result.spokenText
             : cutNoAiSlop(result.spokenText)
           : '';
@@ -3607,7 +3613,7 @@ mediaWss.on('connection', (ws, req) => {
     if (!text) return;
     if (overlapHold.alreadyReleased(text)) {
       callerLangTokens = [];
-      voiceTrace.noteTurnEnd({ decision: 'drop', reason: 'duplicate' });
+      traceTurnEnd(voiceTrace, { decision: 'drop', reason: 'duplicate' });
       console.log(`[ws/media][${sidLabel()}] caller_turn_duplicate_suppressed`);
       return;
     }
@@ -3668,7 +3674,7 @@ mediaWss.on('connection', (ws, req) => {
       function keepLangTokens() {
         if (finalTokens.length) callerLangTokens = callerLangTokens.concat(finalTokens);
       }
-      voiceTrace.noteStt({
+      traceStt(voiceTrace, {
         text,
         isFinal: Boolean(evt.isFinal),
         tokens: evt.tokens,
@@ -3700,7 +3706,7 @@ mediaWss.on('connection', (ws, req) => {
       const decision = maybeBargeIn(text, 'final speech');
 
       if (decision.reason === 'echo') {
-        voiceTrace.noteTurnEnd({ decision: 'drop', reason: 'echo' });
+        traceTurnEnd(voiceTrace, { decision: 'drop', reason: 'echo' });
         console.log(
           `[ws/media][${sidLabel()}] drop echo final while TTS: ${text.slice(0, 80)}`
         );
@@ -3708,7 +3714,7 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       if (decision.replay) {
-        voiceTrace.noteTurnEnd({ decision: 'replay', reason: decision.reason || 'replay' });
+        traceTurnEnd(voiceTrace, { decision: 'replay', reason: decision.reason || 'replay' });
         const replay = hearAgainReplayText();
         if (replay) {
           console.log(
@@ -3720,12 +3726,12 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       if (decision.action === 'barge_listen') {
-        voiceTrace.noteTurnEnd({ decision: 'hold', reason: 'barge_listen' });
+        traceTurnEnd(voiceTrace, { decision: 'hold', reason: 'barge_listen' });
         return;
       }
 
       if (decision.action === 'ignore' || decision.action === 'skip') {
-        voiceTrace.noteTurnEnd({
+        traceTurnEnd(voiceTrace, {
           decision: decision.action,
           reason: decision.reason || '',
         });
@@ -3750,7 +3756,7 @@ mediaWss.on('connection', (ws, req) => {
         }
         // Hold until this playback generation ends — do not Gemini while TTS is active.
         overlapHold.enqueue(text, activePlaybackGeneration);
-        voiceTrace.noteTurnEnd({ decision: 'queue', reason: 'agent_speaking' });
+        traceTurnEnd(voiceTrace, { decision: 'queue', reason: 'agent_speaking' });
         console.log(
           `[ws/media][${sidLabel()}] caller_turn_queued gen=${activePlaybackGeneration}`
         );
@@ -3758,7 +3764,7 @@ mediaWss.on('connection', (ws, req) => {
       }
       if (overlapHold.alreadyReleased(text)) {
         overlapHold.consumeInterimIfMatches(text);
-        voiceTrace.noteTurnEnd({ decision: 'drop', reason: 'duplicate' });
+        traceTurnEnd(voiceTrace, { decision: 'drop', reason: 'duplicate' });
         console.log(`[ws/media][${sidLabel()}] caller_turn_duplicate_suppressed`);
         return;
       }
@@ -3925,10 +3931,10 @@ mediaWss.on('connection', (ws, req) => {
         businessName,
         agentName,
       });
-      voiceTrace.noteCall({ stage: 'canned', path: 'greeting', text: greetingLine });
+      traceCall(voiceTrace, { stage: 'canned', path: 'greeting', text: greetingLine });
       if (found.pcm && isGreetingCacheEnabled()) {
         noteGreetingPcm({ cached: true });
-        voiceTrace.noteCall({
+        traceCall(voiceTrace, {
           stage: 'tts',
           path: 'greeting',
           text: greetingLine,
@@ -4918,7 +4924,10 @@ wss.on('connection', (ws) => {
           return;
         }
 
-        const reply = await runGeminiTurn(messages, callSid, turnPrompt);
+        const reply = await runGeminiTurn(messages, callSid, turnPrompt, {
+          tenantId: brainProfile?.id,
+          callerState: brainState,
+        });
         const replyText = [reply.spokenText, reply.actionConfirmation]
           .filter(Boolean)
           .join(' ');
@@ -5311,15 +5320,16 @@ async function runGeminiTurnStreaming(
   messages,
   callSid,
   systemPrompt = buildSystemPrompt(),
-  { onSpokenChunk, shouldAbort, lockedLanguage } = {}
+  { onSpokenChunk, shouldAbort, lockedLanguage, tenantId, callerState } = {}
 ) {
-  if (structuredReplyEnabled()) {
+  if (structuredReplyEnabled(tenantId)) {
     return runStructuredGeminiTurn({
       messages,
       systemPrompt,
       lockedLanguage: lockedLanguage || 'en',
       onSentence: onSpokenChunk,
       shouldAbort,
+      callerState,
       callSid,
       timeoutMs: geminiTurnTimeoutMs(),
       startStream: (model, config) =>
@@ -5517,13 +5527,14 @@ async function runGeminiTurnStreaming(
 // history and executing the caller-info / end-call signals via structured
 // markers returned in the model output.
 async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt(), opts = {}) {
-  if (structuredReplyEnabled()) {
+  if (structuredReplyEnabled(opts.tenantId)) {
     const fromState = callBrainStates.get(callSid)?.language;
     const locked = opts.lockedLanguage || fromState?.reply || fromState?.current || 'en';
     return runStructuredGeminiTurn({
       messages,
       systemPrompt,
       lockedLanguage: locked,
+      callerState: opts.callerState || callBrainStates.get(callSid),
       callSid,
       timeoutMs: geminiTurnTimeoutMs(),
       startStream: (model, config) =>

@@ -20,6 +20,7 @@ const {
   splitSentences,
   validateStructuredReply,
 } = require('./structuredReply');
+const { applyNameGate } = require('./turnMachine');
 
 const SERVICE_ASK =
   /\b(services?|huduma|mnafanya|mna\s*offer|mnaofa|mna\s*ofa|mnayofanya|unafanya|kenye mko|vitu mnayofanya|mnanifanya)\b/i;
@@ -328,7 +329,12 @@ function speakStructuredTurn({
       dropped: false,
     });
   }
-  const modelAnswer = checked.sentences.join(' ') || draft.spoken_sentences.join(' ');
+  const sourceSentences = (
+    checked.sentences && checked.sentences.length ? checked.sentences : draft.spoken_sentences
+  ).slice();
+  const gated = applyNameGate(sourceSentences, state, replyLang);
+  stages.push(...gated.stages);
+  const modelAnswer = gated.sentences.join(' ') || repairLine(replyLang);
   const normalized = normalizeStructuredSentence(modelAnswer, { language: replyLang });
   const guarded = protectSpokenAnswer(modelAnswer, normalized.text);
   if (guarded.restored) {

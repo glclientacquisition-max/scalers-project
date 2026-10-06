@@ -23,6 +23,7 @@ module.exports = {
   },
   complaint: 'Pole. Naelewa una lalamiko. Naweza kutuma kwa meneja.',
   understand: 'Sawa, nimeelewa.',
+  ack: 'Sawa.',
 };
 
 function joinList(items, andWord) {

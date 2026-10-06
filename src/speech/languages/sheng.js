@@ -15,4 +15,5 @@ module.exports = {
   nameConfirm: sw.nameConfirm,
   complaint: 'Pole. Naelewa uko na complaint. Naweza tuma kwa manager.',
   understand: 'Sawa, nimeelewa.',
+  ack: 'Sawa.',
 };

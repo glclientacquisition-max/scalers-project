@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { rolloutAllows } = require('./voiceRollout');
 
 const SCHEMA = 'scalers.voice.turn';
 const CALL_SCHEMA = 'scalers.voice.call';
@@ -27,6 +28,12 @@ function voiceTraceEnabled(env = process.env) {
   if (name.includes('stag') || name.includes('preview')) return true;
   if (String(env.NODE_ENV || '').toLowerCase() === 'production') return false;
   return true;
+}
+
+function voiceTraceEnabledFor(tenantId, env = process.env) {
+  const listed = rolloutAllows(tenantId, env);
+  if (listed != null) return listed;
+  return voiceTraceEnabled(env);
 }
 
 function clip(text, max = TEXT_CAP) {
@@ -136,8 +143,12 @@ function noopTrace() {
 }
 
 function createVoiceTrace(opts = {}) {
-  const enabled = opts.enabled != null ? Boolean(opts.enabled) : voiceTraceEnabled(opts.env);
-  if (!enabled) return noopTrace();
+  const enabledOf =
+    typeof opts.enabled === 'function'
+      ? opts.enabled
+      : () => (opts.enabled != null ? Boolean(opts.enabled) : voiceTraceEnabled(opts.env));
+  if (typeof opts.enabled !== 'function' && !enabledOf()) return noopTrace();
+  const enabled = () => enabledOf();
 
   const sink = opts.sink || resolveSink(opts.env);
   const callIdOf = typeof opts.callId === 'function' ? opts.callId : () => opts.callId;
@@ -181,6 +192,7 @@ function createVoiceTrace(opts = {}) {
   }
 
   function beginTurn({ callerText = '', language = null } = {}) {
+    if (!enabled()) return null;
     if (open) commitTurn({ outcome: 'superseded' });
     turnIndex += 1;
     const lang = language && typeof language === 'object' ? language : null;
@@ -204,6 +216,7 @@ function createVoiceTrace(opts = {}) {
   }
 
   function noteStt(evt = {}) {
+    if (!enabled()) return;
     const tokens = (Array.isArray(evt.tokens) ? evt.tokens : []).slice(0, TOKEN_CAP).map((token) => ({
       text: redactText(token?.text || ''),
       final: Boolean(token?.final),
@@ -221,6 +234,7 @@ function createVoiceTrace(opts = {}) {
   }
 
   function noteTurnEnd(info = {}) {
+    if (!enabled()) return;
     pushStage({
       stage: 'turn_end',
       decision: String(info.decision || 'flush'),
@@ -230,6 +244,7 @@ function createVoiceTrace(opts = {}) {
   }
 
   function noteLanguage(info = {}) {
+    if (!enabled()) return;
     pushStage({
       stage: 'language',
       detected: info.detected || null,
@@ -239,6 +254,7 @@ function createVoiceTrace(opts = {}) {
   }
 
   function noteModelRequest(info = {}) {
+    if (!enabled()) return;
     pushStage({
       stage: 'model',
       phase: 'request',
@@ -251,6 +267,7 @@ function createVoiceTrace(opts = {}) {
   }
 
   function noteModelOutput(info = {}) {
+    if (!enabled()) return;
     pendingFirstTokenAt = info.firstTokenAt || null;
     pushStage({
       stage: 'model',
@@ -267,6 +284,7 @@ function createVoiceTrace(opts = {}) {
   }
 
   function noteTransform(info = {}) {
+    if (!enabled()) return;
     const before = String(info.before || '');
     const after = String(info.after || '');
     if (before.trim() === after.trim() && !info.force) return;
@@ -281,6 +299,7 @@ function createVoiceTrace(opts = {}) {
   }
 
   function noteCanned(info = {}) {
+    if (!enabled()) return;
     pushStage({
       stage: 'canned',
       path: String(info.path || 'canned'),
@@ -289,6 +308,7 @@ function createVoiceTrace(opts = {}) {
   }
 
   function noteTts(info = {}) {
+    if (!enabled()) return;
     pushStage({
       stage: 'tts',
       text: redactText(info.text || ''),
@@ -299,6 +319,7 @@ function createVoiceTrace(opts = {}) {
   }
 
   function noteBarge(info = {}) {
+    if (!enabled()) return;
     pushStage({
       stage: 'barge_in',
       reason: String(info.reason || ''),
@@ -307,11 +328,13 @@ function createVoiceTrace(opts = {}) {
   }
 
   function noteCall(stage = {}) {
+    if (!enabled()) return;
     if (!stage || typeof stage !== 'object') return;
     callStages.push(stage);
   }
 
   function commitTurn(extra = {}) {
+    if (!enabled()) return null;
     if (!open) return null;
     const turnStartedAt = Number(extra.turnStartedAt || 0);
     const firstTokenMs =
@@ -340,6 +363,7 @@ function createVoiceTrace(opts = {}) {
   }
 
   async function finishCall() {
+    if (!enabled()) return null;
     if (open) commitTurn({ outcome: 'call_end' });
     if (pendingWrites.size) await Promise.all([...pendingWrites]);
     const record = {
@@ -435,6 +459,7 @@ module.exports = {
   CALL_SCHEMA,
   SCHEMA_VERSION,
   voiceTraceEnabled,
+  voiceTraceEnabledFor,
   redactText,
   createMemorySink,
   createJsonlSink,
