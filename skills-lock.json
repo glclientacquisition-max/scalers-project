@@ -85,6 +85,11 @@
       "skillPath": ".agents/skills/impeccable/SKILL.md",
       "computedHash": "f663c52fe49d805ed1b0d19e466a14034594130a4847e9726d8bfb8587c7186a"
     },
+    "ios-design": {
+      "source": "uizze.sh",
+      "sourceType": "well-known",
+      "computedHash": "6b92ffbe225bdd877e1245e843c5b79f1e37f7ab40d3f802937044f6aee29d20"
+    },
     "minimalist-ui": {
       "source": "leonxlnx/taste-skill",
       "sourceType": "github",
@@ -170,6 +175,11 @@
       "sourceType": "github",
       "skillPath": "skills/test-driven-development/SKILL.md",
       "computedHash": "3cfe4ebb6fa7288f668d87880d279c8e48f7a92b63415e296857060f5ce22e05"
+    },
+    "ui-taste": {
+      "source": "uizze.sh",
+      "sourceType": "well-known",
+      "computedHash": "9b73951ae54b7d1eb81e69bb2f47d1622b3813bbefbd6c0aaa36dfcf938f1f27"
     },
     "using-git-worktrees": {
       "source": "obra/superpowers",
