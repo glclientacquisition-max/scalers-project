@@ -99,7 +99,8 @@ describe("admin console polish", () => {
     assert.match(read("dashboard/src/app/admin/(console)/page.tsx"), /ButtonLink/);
     assert.match(read("dashboard/src/components/DidPoolManager.tsx"), /<Button/);
     assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /<Button/);
-    assert.match(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /<Button/);
+    assert.doesNotMatch(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/AdminVoicesManager.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/BuyNumberPanel.tsx"), /ConfirmSheet/);
   });
