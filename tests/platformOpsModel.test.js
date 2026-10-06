@@ -144,7 +144,12 @@ describe("platform ops model", () => {
             { kind: "pool_empty", detail: "1 business waiting. No numbers available.", status: "open" },
             { kind: "speech", detail: "ok", status: "acked" },
           ],
-          businesses: [{ id: "b1", name: "Waiting Co", status: "waiting" }],
+          businesses: [
+            { id: "b1", name: "Waiting Co", status: "waiting" },
+            { id: "b2", name: "Live Co", status: "active", packageName: null },
+            { id: "b3", name: "Old Co", status: "archived" },
+            { id: "b4", name: "Packed Co", status: "active", packageName: "Starter" },
+          ],
         }),
       }));
     `);
@@ -155,9 +160,13 @@ describe("platform ops model", () => {
     assert.equal(got.people[0].name, "Mercy");
     assert.equal(got.people[0].phone, "+254700000001");
     assert.equal(got.subject, "Scalers ops: Beta");
+    assert.equal(got.queue.length, 3);
     assert.equal(got.queue[0].href, "/admin/platform#escalate");
     assert.equal(got.queue[0].stamp, "Open");
     assert.equal(got.queue[1].href, "/admin/businesses#biz-b1");
     assert.equal(got.queue[1].stamp, "Waiting");
+    assert.equal(got.queue[2].href, "/admin/businesses#biz-b2");
+    assert.equal(got.queue[2].detail, "No package");
+    assert.equal(got.queue[2].stamp, "Package");
   });
 });
