@@ -902,7 +902,10 @@ begin
     'locations.branches',
     jsonb_array_length(coalesce(t.business_locations, '[]'::jsonb)) > 0
       or coalesce(trim(t.business_policies ->> 'coverage_areas'), '') <> ''
-      or jsonb_array_length(coalesce(t.business_policies -> 'coverage_areas', '[]'::jsonb)) > 0
+      or (
+        jsonb_typeof(t.business_policies -> 'coverage_areas') = 'array'
+        and jsonb_array_length(t.business_policies -> 'coverage_areas') > 0
+      )
   ) * 100;
 
   v_payments := (
