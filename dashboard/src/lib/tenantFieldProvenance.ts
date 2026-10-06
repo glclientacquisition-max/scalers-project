@@ -1,5 +1,4 @@
-// Platform desk client for tenant_field_meta RPCs (PR #570).
-// Voice uses the matching wrappers in src/db.js. No migration lives here.
+import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { indexFieldMeta } from "@/lib/provenance";
@@ -26,7 +25,9 @@ export type TenantFieldMetaRow = {
 function parseHoldGate(raw: unknown): TenantHoldGate {
   const row = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const reasonsRaw = row.reasons;
-  const reasons = Array.isArray(reasonsRaw) ? reasonsRaw.map((reason) => String(reason)) : [];
+  const reasons = Array.isArray(reasonsRaw)
+    ? reasonsRaw.map((r) => String(r))
+    : [];
   return {
     allowed: row.allowed === true,
     reasons,
@@ -49,12 +50,6 @@ function parseCompleteness(raw: unknown): TenantCompletenessScore | null {
   };
 }
 
-function rpcMissing(message: string) {
-  return /tenant_completeness_score|tenant_hold_gate|upsert_tenant_field_meta|confirm_tenant_field|tenant_field_meta|does not exist|schema cache/i.test(
-    message || ""
-  );
-}
-
 export async function getTenantCompletenessScore(
   tenantId: string
 ): Promise<TenantCompletenessScore | null> {
@@ -75,9 +70,6 @@ export async function getTenantHoldGate(tenantId: string): Promise<TenantHoldGat
     p_tenant_id: tenantId,
   });
   if (error) {
-    if (rpcMissing(error.message)) {
-      return { allowed: false, reasons: ["provenance_rpc_missing"] };
-    }
     console.warn("[tenantFieldProvenance] tenant_hold_gate", error.message);
     return null;
   }
@@ -93,7 +85,7 @@ export async function listTenantFieldMeta(tenantId: string): Promise<TenantField
     .select("field_path, source, confirmed_by, confirmed_at")
     .eq("tenant_id", tenantId);
   if (error) {
-    if (rpcMissing(error.message)) return null;
+    if (/tenant_field_meta|does not exist|schema cache/i.test(error.message || "")) return null;
     console.warn("[tenantFieldProvenance] tenant_field_meta", error.message);
     return null;
   }

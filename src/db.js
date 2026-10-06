@@ -1115,13 +1115,13 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       handoffMode: 'callback',
       businessLocations: [],
       businessPolicies: {},
-    billingEnforcement: null,
-    walletBalanceKes: null,
-    openAppointments: [],
-    fieldMeta: null,
-    holdGate: null,
-  };
-}
+      billingEnforcement: null,
+      walletBalanceKes: null,
+      openAppointments: [],
+      fieldMeta: null,
+      holdGate: null,
+    };
+  }
 
   const { parseAgentTools } = require('./conversation/agentTools');
   const { parseLexiconOverrides } = require('./speech/pronunciationLexicon');
@@ -2203,7 +2203,7 @@ async function consumeSmsUnits({ tenantId, units } = {}) {
 }
 
 function provenanceRpcMissing(message) {
-  return /tenant_completeness_score|tenant_hold_gate|upsert_tenant_field_meta|confirm_tenant_field|tenant_field_meta|does not exist|schema cache/i.test(
+  return /tenant_completeness_score|tenant_hold_gate|upsert_tenant_field_meta|confirm_tenant_field|does not exist|schema cache/i.test(
     message || ''
   );
 }
