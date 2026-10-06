@@ -9,6 +9,8 @@ Field map: see GIGO BI P0 Platform field map (tenant columns / JSON leaves; no p
 
 Run in Supabase SQL Editor **after** [`product_catalog_and_social.sql`](../supabase/product_catalog_and_social.sql). Do not apply to production ALCR until reviewed.
 
+On apply, the script runs **`backfill_tenant_field_meta_seed()`** once (idempotent re-runs skip existing paths).
+
 ## field_path conventions
 
 | Pattern | Example |
@@ -19,21 +21,24 @@ Run in Supabase SQL Editor **after** [`product_catalog_and_social.sql`](../supab
 | Catalog product leaf | `catalog.product.<sku_or_index>.name` |
 | Catalog service leaf | `catalog.service.<index>.name` |
 | FAQ row | `faqs.<index>` (status/source on the FAQ object in `tenants.faqs`) |
-| Notify | `team.notify.whatsapp`, `team.notify.email` |
+| Notify | `team.notify.whatsapp`, `team.notify.email`, `team.notify.channels` |
 
 Prefer stable `sku` when present; otherwise index (rewrite-sensitive).
 
 ## Envelope rules
 
 - **source:** `owner` \| `seed` \| `import` \| `inferred` \| `call_suggested`
-- **Completeness weight:** owner 100%, import 50%, seed / inferred / call_suggested 0%
-- **Missing meta** on a non-empty legacy field: transitional **50%** until bulk backfill (open decision: treat as owner vs seed)
-- **ready_badge:** never true on seed-only identity meta; needs owner meta somewhere, catalog depth, notify target, and overall score threshold (see RPC)
+- **Completeness weight:** owner 100%, import 50%, seed / inferred / call_suggested / **missing meta** 0%
+- **ready_badge:** requires owner-provenance rows (including `team.notify.*`), domain thresholds, and **never** true for seed-only backfill tenants
 - **Compile (Brain):** must emit only **owner** or **confirmed** values into `llm_system_prompt`. Seeds and unconfirmed imports belong in UNKNOWN. Compiler change is Brain-owned; Platform only documents the contract.
 
-## FAQ migration (same SQL file)
+## Alvin decision: roadmap §10.5 bulk backfill = seed
 
-Existing `{question, answer}` rows get `status=suggested`, `source=seed`. Rows already marked `golden` / `confirmed` without `source=owner` are demoted to `suggested`. **Default is seed for safety** (roadmap open decision #5 backfill).
+Existing non-empty tenant scalars and JSON leaves get **`tenant_field_meta` rows with `source=seed`**, `source_ref=backfill:roadmap_10_5`, `confirmed_*` and `last_verified_at` null. Inserts **only when the path is absent**; never overwrites existing owner / import / confirmed meta.
+
+Same posture as **FAQ demotion** (`status=suggested`, `source=seed` on legacy FAQ rows).
+
+Re-run safely: `select public.backfill_tenant_field_meta_seed();` (service role).
 
 ## RPCs (stable names)
 
@@ -43,6 +48,7 @@ Existing `{question, answer}` rows get `status=suggested`, `source=seed`. Rows a
 | `confirm_tenant_field(tenant_id, field_path, user_id)` | Sets `source=owner`, confirmation timestamps |
 | `tenant_completeness_score(tenant_id)` | `{ overall, domains, ready_badge, next_gaps }` |
 | `tenant_hold_gate(tenant_id)` | `{ allowed, reasons[] }` for place_hold |
+| `backfill_tenant_field_meta_seed()` | §10.5 seed backfill for populated fields |
 
 ## Hold gate (Platform read model)
 
@@ -52,7 +58,7 @@ Allowed only when all hold:
 2. At least one **holdable** `product_catalog` row with **owner** meta on `catalog.product.<sku>.name`
 3. Verified notify target: WhatsApp number + channel on, or alert email + channel on, or owner meta on `team.notify.whatsapp`
 
-Brain consumes `tenant_hold_gate`; voice/tools should not promise holds when `allowed` is false.
+Brain consumes `tenant_hold_gate`; voice/tools should not promise holds when `allowed` is false. **Hold deposit wording on calls** is Brain/product (roadmap §10 #3), not Platform.
 
 ## Thin clients
 
@@ -66,17 +72,8 @@ Brain consumes `tenant_hold_gate`; voice/tools should not promise holds when `al
 select public.tenant_completeness_score('00000000-0000-0000-0000-000000000001'::uuid);
 select public.tenant_hold_gate('00000000-0000-0000-0000-000000000001'::uuid);
 
-select public.upsert_tenant_field_meta(
-  '00000000-0000-0000-0000-000000000001'::uuid,
-  'identity.business_name',
-  'owner',
-  'desk:settings',
-  null,
-  null,
-  'smoke',
-  null,
-  null
-);
+-- After backfill only: expect low overall and ready_badge false until owner confirms
+select public.backfill_tenant_field_meta_seed();
 
 -- FAQ demotion check: no golden without owner source
 select count(*)
@@ -92,8 +89,9 @@ Expect the FAQ query to return **0** after migration.
 
 `applyCatalogImportAction` saves `product_catalog` only. After owner confirms an import diff, Desk should call `recompileAfterCatalogImport` in `dashboard/src/lib/catalogImportRecompile.ts` (Platform hook; wiring is Desk-owned).
 
-## Blockers / open decisions
+## Open decisions (remaining)
 
-1. **Bulk backfill:** existing column values → `owner` vs `seed` in `tenant_field_meta` (Alvin #5)
-2. **Import weight:** confirmed import flip to owner is Desk/Brain UX; Platform RPCs support `confirm_tenant_field`
-3. **Structured payments / holds policy** shapes are P1; gate reads best-effort on today's `business_policies` JSON
+1. **Import weight:** unreviewed import still counts at **50%** until product says otherwise (roadmap §10 #2).
+2. **Structured payments / holds policy** shapes are P1; gate reads best-effort on today's `business_policies` JSON.
+
+**Decided:** bulk backfill = **seed** (§10.5). Hold deposit speak = Brain/product, not this PR.
