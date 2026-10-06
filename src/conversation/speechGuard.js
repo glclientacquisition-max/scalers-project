@@ -119,7 +119,10 @@ function sentenceIsSpeechSlop(sentence, callerText) {
 function dropSpeechSlop(text, callerText) {
   const kept = [];
   for (const sentence of splitSentences(text)) {
-    if (sentenceIsSpeechSlop(sentence, callerText)) continue;
+    if (sentenceIsSpeechSlop(sentence, callerText)) {
+      logSpokenFilterDrop('slop', sentence);
+      continue;
+    }
     kept.push(sentence);
   }
   return kept.join(' ').trim();
@@ -246,6 +249,15 @@ function ackFallback(language) {
   return confirmationLanguage(language) === 'en' ? 'Okay.' : 'Sawa.';
 }
 
+/** One line when a spoken filter removes text, so a silent drop shows up in call logs. */
+function logSpokenFilterDrop(reason, dropped) {
+  const text = String(dropped || '').replace(/\s+/g, ' ').trim();
+  if (!text) return;
+  console.warn(
+    `[speech-filter] drop reason=${reason} chars=${text.length} text=${JSON.stringify(text.slice(0, 180))}`
+  );
+}
+
 function placeNamesIn(text) {
   const found = new Set();
   for (const word of String(text || '').toLowerCase().split(/[^a-z]+/)) {
@@ -333,23 +345,39 @@ function guardSpokenReply(text, ctx = {}) {
   for (const sentence of splitSentences(raw)) {
     if (heldName && sentenceAsksForCallerName(sentence)) {
       droppedNameAsk = true;
+      logSpokenFilterDrop('name_ask', sentence);
       continue;
     }
-    if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) continue;
-    if (ACTION_NARRATION.test(sentence)) continue;
+    if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) {
+      logSpokenFilterDrop('slop', sentence);
+      continue;
+    }
+    if (ACTION_NARRATION.test(sentence)) {
+      logSpokenFilterDrop('action_narration', sentence);
+      continue;
+    }
     if (!saved && (SAVED_CLAIM.test(sentence) || JOB_CLOSE.test(sentence))) {
       droppedJob = true;
+      logSpokenFilterDrop('saved_claim', sentence);
       continue;
     }
-    if (!transferOk && TRANSFER_CLAIM.test(sentence)) continue;
+    if (!transferOk && TRANSFER_CLAIM.test(sentence)) {
+      logSpokenFilterDrop('transfer_claim', sentence);
+      continue;
+    }
     const coverage = COVERAGE_CLAIM.exec(sentence);
-    if (coverage && assessCoverage(coverage[1], ctx.profile || {}) !== 'inside') continue;
+    if (coverage && assessCoverage(coverage[1], ctx.profile || {}) !== 'inside') {
+      logSpokenFilterDrop('coverage', sentence);
+      continue;
+    }
     if (sentenceNamesUnboundPlace(sentence, allowedPlaces)) {
       droppedJob = true;
+      logSpokenFilterDrop('unbound_place', sentence);
       continue;
     }
     if (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known)) {
       droppedNumber = true;
+      logSpokenFilterDrop('unsaid_number', sentence);
       continue;
     }
     kept.push(sentence);
@@ -395,6 +423,7 @@ module.exports = {
   TRANSFER_CLAIM,
   ACTION_NARRATION,
   narratesInternalAction,
+  logSpokenFilterDrop,
   guardSpokenReply,
   dropSpeechSlop,
   sentenceIsSpeechSlop,
