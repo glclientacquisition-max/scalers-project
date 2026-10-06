@@ -96,6 +96,12 @@ describe("dark palette", () => {
     const nav = read("dashboard/src/components/DeskNav.tsx");
     assert.match(nav, /glass-chrome/);
     assert.doesNotMatch(nav, /desk-drawer/);
+    const sheet = read("dashboard/src/components/ui/Sheet.tsx");
+    assert.match(sheet, /desk-drawer-viewport/);
+    assert.match(
+      css,
+      /:root\[data-theme="dark"\] \.desk-drawer-viewport,\s*:root\[data-theme="light"\] \.desk-drawer-viewport \{\s*background: transparent;/,
+    );
   });
 
   it("dims the drawer scrim with --scrim, never flipping --ink", () => {

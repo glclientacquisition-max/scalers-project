@@ -206,12 +206,16 @@ test.describe("/dev/kit interactions", () => {
       const root = getComputedStyle(document.documentElement);
       const sheet = getComputedStyle(el);
       const backdrop = document.querySelector(".desk-drawer-backdrop");
+      const viewport = document.querySelector(".desk-drawer-viewport");
       const scrim = backdrop ? getComputedStyle(backdrop).backgroundColor : "";
+      const frame = viewport ? getComputedStyle(viewport).backgroundColor : "";
       return {
         sheet: fill(sheet.backgroundColor),
         surface: fill(root.getPropertyValue("--surface").trim()),
         scrim: fill(scrim),
         scrimToken: fill(root.getPropertyValue("--scrim").trim()),
+        frame: fill(frame),
+        backdropOpacity: backdrop ? Number(getComputedStyle(backdrop).opacity) : -1,
         backdropFilter: sheet.backdropFilter,
         themeColor: document.querySelector('meta[name="theme-color"]:not([media])')?.getAttribute("content")?.replace(/\s/g, "").toLowerCase(),
         canvas: root.getPropertyValue("--canvas").trim().replace(/\s/g, "").toLowerCase(),
@@ -219,6 +223,9 @@ test.describe("/dev/kit interactions", () => {
     });
     expect(measured.sheet.slice(0, 3)).toEqual(measured.surface.slice(0, 3));
     expect(measured.scrim.slice(0, 3)).toEqual(measured.scrimToken.slice(0, 3));
+    expect(measured.frame[3]).toBe(0);
+    expect(measured.backdropOpacity).toBeGreaterThan(0.3);
+    expect(measured.backdropOpacity).toBeLessThan(0.5);
     expect(measured.backdropFilter === "none" || measured.backdropFilter === "").toBeTruthy();
     expect(measured.themeColor).toBe(measured.canvas);
   });

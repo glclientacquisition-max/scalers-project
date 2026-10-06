@@ -625,9 +625,24 @@ h3,
 }
 
 /*
- * Portal carries .desk-theme / .admin-theme. Those set `background: var(--canvas)`
- * at :root[data-theme] specificity and would wipe a lone background-color.
+ * Full-screen portal frames must stay see-through. Dark `.desk-theme` paints
+ * `--canvas` and would hide the faded page behind the scrim.
  */
+.desk-drawer-viewport {
+  background: transparent;
+}
+
+:root[data-theme="dark"] .desk-drawer-viewport,
+:root[data-theme="light"] .desk-drawer-viewport {
+  background: transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .desk-drawer-viewport {
+    background: transparent;
+  }
+}
+
 :root[data-theme="dark"] .desk-drawer-backdrop,
 :root[data-theme="light"] .desk-drawer-backdrop {
   background: var(--scrim);
