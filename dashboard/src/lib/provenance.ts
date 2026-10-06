@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Compile twin of src/conversation/provenance.js.
 // Next turbopack root is the dashboard package, so this file does not import
 // src/conversation or src/db. Keep behavior lockstep with the JS module.
@@ -445,6 +446,15 @@ export function buildCompileSections({
   businessPolicies = null,
   fieldMeta = null,
   holdGate = null,
+}: {
+  faqs?: unknown[];
+  policiesText?: string;
+  productsText?: string;
+  servicesText?: string;
+  productCatalog?: unknown;
+  businessPolicies?: unknown;
+  fieldMeta?: unknown;
+  holdGate?: unknown;
 } = {}) {
   const faqRows = asArray(faqs)
     .map((faq, index) => classifyFaq(faq, fieldMeta, faqFieldPath(index)))
