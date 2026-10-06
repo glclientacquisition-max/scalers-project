@@ -13,6 +13,7 @@ export function ConfirmSheet({
   title,
   children,
   confirmLabel,
+  cancelLabel = "Cancel",
   pending = false,
   danger = false,
   theme = "desk",
@@ -23,6 +24,7 @@ export function ConfirmSheet({
   title: string;
   children: ReactNode;
   confirmLabel: string;
+  cancelLabel?: string;
   pending?: boolean;
   danger?: boolean;
   theme?: "desk" | "admin";
@@ -41,7 +43,7 @@ export function ConfirmSheet({
       footer={
         <>
           <Button variant="ghost" size="md" onClick={onClose} disabled={pending}>
-            Cancel
+            {cancelLabel}
           </Button>
           <Button variant={danger ? "danger" : "primary"} size="md" pending={pending} onClick={onConfirm}>
             {confirmLabel}

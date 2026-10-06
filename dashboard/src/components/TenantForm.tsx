@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
   canonicalizeAgentTone,
@@ -95,7 +95,10 @@ import { CoverageAreaField } from "@/components/CoverageAreaField";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
 import { deskShiftClass } from "@/components/ui/deskChrome";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { notify } from "@/components/ui/DeskNotice";
+import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
+import { carrySavedRow, isSavedRow, markSavedRow } from "@/lib/savedRow";
 import { Pagination } from "@/components/ui/Pagination";
 import {
   ExpandTextarea,
@@ -305,15 +308,16 @@ export function TenantForm({
   );
   const [services, setServices] = useState<ServiceItem[]>(() => {
     const rows = normalizeServicesCatalog(tenant.services_catalog);
-    return rows.length ? rows : [emptyService()];
+    return rows.length ? rows.map((row) => markSavedRow(row)) : [emptyService()];
   });
   const [products, setProducts] = useState<ProductItem[]>(() => {
     const rows = normalizeProductCatalog(tenant.product_catalog);
-    return rows.length ? rows : [];
+    return rows.length ? rows.map((row) => markSavedRow(row)) : [];
   });
-  const [socialHandles, setSocialHandles] = useState<SocialHandles>(() =>
-    normalizeSocialHandles(tenant.social_handles)
-  );
+  const [socialHandles, setSocialHandles] = useState<SocialHandles>(() => {
+    const next = normalizeSocialHandles(tenant.social_handles);
+    return { channels: next.channels.map((row) => markSavedRow(row)) };
+  });
   const [bulkServicesText, setBulkServicesText] = useState("");
   const [bulkServicesError, setBulkServicesError] = useState<string | null>(null);
   const [bulkProductsText, setBulkProductsText] = useState("");
@@ -350,7 +354,7 @@ export function TenantForm({
   );
   const [locations, setLocations] = useState<BusinessLocation[]>(() => {
     const rows = normalizeBusinessLocations(tenant.business_locations);
-    return rows.length ? rows : [emptyLocation()];
+    return rows.length ? rows.map((row) => markSavedRow(row)) : [emptyLocation()];
   });
   const [openLocationIndexes, setOpenLocationIndexes] = useState<number[]>([]);
   const [policies, setPolicies] = useState<BusinessPolicies>(() =>
@@ -379,10 +383,12 @@ export function TenantForm({
       tenant.team_directory,
       tenant.whatsapp_notification_number
     );
-    return rows.length ? rows : [emptyMember()];
+    return rows.length ? rows.map((row) => markSavedRow(row)) : [emptyMember()];
   });
   const liveDest = firstDialableTeammate(team);
-  const [faqs, setFaqs] = useState<FaqEntry[]>(() => normalizeFaqs(tenant.faqs));
+  const [faqs, setFaqs] = useState<FaqEntry[]>(() =>
+    normalizeFaqs(tenant.faqs).map((row) => markSavedRow(row))
+  );
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
   );
@@ -553,19 +559,25 @@ export function TenantForm({
     value: string | boolean
   ) {
     setTeam((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
+      prev.map((row, i) =>
+        i === index ? carrySavedRow({ ...row, [key]: value }, row) : row
+      )
     );
   }
 
   function updateFaq(index: number, key: keyof FaqEntry, value: string) {
     setFaqs((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
+      prev.map((row, i) =>
+        i === index ? carrySavedRow({ ...row, [key]: value }, row) : row
+      )
     );
   }
 
   function updateService(index: number, key: keyof ServiceItem, value: string) {
     setServices((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
+      prev.map((row, i) =>
+        i === index ? carrySavedRow({ ...row, [key]: value }, row) : row
+      )
     );
   }
 
@@ -574,16 +586,19 @@ export function TenantForm({
       prev.map((row, i) => {
         if (i !== index) return row;
         if (key === "aliases") {
-          return {
-            ...row,
-            aliases: value
-              .split(/[,;|]/)
-              .map((a) => a.trim())
-              .filter(Boolean)
-              .slice(0, 8),
-          };
+          return carrySavedRow(
+            {
+              ...row,
+              aliases: value
+                .split(/[,;|]/)
+                .map((a) => a.trim())
+                .filter(Boolean)
+                .slice(0, 8),
+            },
+            row
+          );
         }
-        return { ...row, [key]: value };
+        return carrySavedRow({ ...row, [key]: value }, row);
       })
     );
   }
@@ -595,7 +610,7 @@ export function TenantForm({
   ) {
     setSocialHandles((prev) => ({
       channels: prev.channels.map((row, i) =>
-        i === index ? { ...row, [key]: value } : row
+        i === index ? carrySavedRow({ ...row, [key]: value }, row) : row
       ),
     }));
   }
@@ -643,7 +658,9 @@ export function TenantForm({
     value: string
   ) {
     setLocations((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
+      prev.map((row, i) =>
+        i === index ? carrySavedRow({ ...row, [key]: value }, row) : row
+      )
     );
   }
 
@@ -725,6 +742,59 @@ export function TenantForm({
   const firstPlaceLine = placeLocationLine(locations[0] || emptyLocation());
   const locationNotesField =
     panel === "locations" && firstPlaceLine ? firstPlaceLine : locationNotes;
+  const draftKey = [
+    businessName,
+    servicesOfferedSummary,
+    servicesJson,
+    productsJson,
+    socialJson,
+    servicesNotes,
+    businessHoursSummary,
+    hoursScheduleJson,
+    locationNotesField,
+    afterHoursMode,
+    vertical,
+    handoffMode,
+    locationsJson,
+    policiesJson,
+    agentName,
+    spokenName,
+    greetingInvite,
+    tone,
+    unknownFallback,
+    teamJson,
+    faqsJson,
+    agentTools.escalate ? "1" : "0",
+    agentTools.end_call ? "1" : "0",
+    sonioxVoiceId,
+    sonioxVoiceLabel,
+    ttsLexiconJson,
+  ].join("\u0001");
+  const [baseline, setBaseline] = useState(draftKey);
+  const formDirty = draftKey !== baseline;
+  const savedStateRef = useRef(state);
+  useEffect(() => {
+    if (!state.ok || savedStateRef.current === state) return;
+    savedStateRef.current = state;
+    setBaseline(draftKey);
+  }, [state, draftKey]);
+  useSettingsLeaveSource("form", formDirty);
+  const [removeAsk, setRemoveAsk] = useState<{
+    title: string;
+    body: string;
+    run: () => void;
+  } | null>(null);
+  const removeHeld = useRef(removeAsk);
+  if (removeAsk) removeHeld.current = removeAsk;
+  const removeView = removeAsk ?? removeHeld.current;
+
+  function requestRemove(row: object, title: string, body: string, run: () => void) {
+    if (!isSavedRow(row)) {
+      run();
+      return;
+    }
+    setRemoveAsk({ title, body, run });
+  }
 
   return (
     <form
@@ -961,7 +1031,14 @@ export function TenantForm({
                   </div>
                   <button
                     type="button"
-                    onClick={() => removeSocialChannel(index)}
+                    onClick={() =>
+                      requestRemove(
+                        channel,
+                        "Remove this contact?",
+                        "It leaves the public contacts when you save.",
+                        () => removeSocialChannel(index)
+                      )
+                    }
                     className={settingsTrashButtonClass}
                     aria-label={`Remove contact ${index + 1}`}
                   >
@@ -1053,7 +1130,14 @@ export function TenantForm({
                         <td className="px-2 py-1.5">
                           <button
                             type="button"
-                            onClick={() => removeSocialChannel(index)}
+                            onClick={() =>
+                              requestRemove(
+                                channel,
+                                "Remove this contact?",
+                                "It leaves the public contacts when you save.",
+                                () => removeSocialChannel(index)
+                              )
+                            }
                             className={settingsTrashButtonClass}
                             aria-label={`Remove contact ${index + 1}`}
                           >
@@ -1222,8 +1306,16 @@ export function TenantForm({
                   <button
                     type="button"
                     onClick={() =>
-                      setServices((prev) =>
-                        prev.length <= 1 ? [emptyService()] : prev.filter((_, i) => i !== index)
+                      requestRemove(
+                        service,
+                        `Remove ${service.name.trim() || "this service"}?`,
+                        "It leaves the catalog when you save.",
+                        () =>
+                          setServices((prev) =>
+                            prev.length <= 1
+                              ? [emptyService()]
+                              : prev.filter((_, i) => i !== index)
+                          )
                       )
                     }
                     className={settingsTrashButtonClass}
@@ -1331,10 +1423,16 @@ export function TenantForm({
                           <button
                             type="button"
                             onClick={() =>
-                              setServices((prev) =>
-                                prev.length <= 1
-                                  ? [emptyService()]
-                                  : prev.filter((_, i) => i !== index)
+                              requestRemove(
+                                service,
+                                `Remove ${service.name.trim() || "this service"}?`,
+                                "It leaves the catalog when you save.",
+                                () =>
+                                  setServices((prev) =>
+                                    prev.length <= 1
+                                      ? [emptyService()]
+                                      : prev.filter((_, i) => i !== index)
+                                  )
                               )
                             }
                             className={settingsTrashButtonClass}
@@ -1406,7 +1504,19 @@ export function TenantForm({
                       <label className="sr-only" htmlFor={`prod-price-m-${index}`}>Price</label>
                       <input id={`prod-price-m-${index}`} value={product.price} onChange={(e) => updateProduct(index, "price", e.target.value)} placeholder="2,500 KES" className={denseFieldClass} />
                     </div>
-                    <button type="button" onClick={() => setProducts((prev) => prev.filter((_, i) => i !== index))} className={settingsTrashButtonClass} aria-label={`Remove product ${index + 1}`}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        requestRemove(
+                          product,
+                          `Remove ${product.name.trim() || "this product"}?`,
+                          "It leaves the catalog when you save.",
+                          () => setProducts((prev) => prev.filter((_, i) => i !== index))
+                        )
+                      }
+                      className={settingsTrashButtonClass}
+                      aria-label={`Remove product ${index + 1}`}
+                    >
                       <TrashIcon className="h-4 w-4" />
                     </button>
                     <div className="min-w-0">
@@ -1524,7 +1634,12 @@ export function TenantForm({
                             <button
                               type="button"
                               onClick={() =>
-                                setProducts((prev) => prev.filter((_, i) => i !== index))
+                                requestRemove(
+                                  product,
+                                  `Remove ${product.name.trim() || "this product"}?`,
+                                  "It leaves the catalog when you save.",
+                                  () => setProducts((prev) => prev.filter((_, i) => i !== index))
+                                )
                               }
                               className={settingsTrashButtonClass}
                               aria-label={`Remove product ${index + 1}`}
@@ -1754,7 +1869,14 @@ export function TenantForm({
                   {locations.length > 1 ? (
                     <button
                       type="button"
-                      onClick={() => removeLocation(index)}
+                      onClick={() =>
+                        requestRemove(
+                          loc,
+                          `Remove ${loc.label.trim() || "this place"}?`,
+                          "It leaves the places when you save.",
+                          () => removeLocation(index)
+                        )
+                      }
                       className={settingsTrashButtonClass}
                       aria-label={`Remove location ${index + 1}`}
                     >
@@ -2185,8 +2307,16 @@ export function TenantForm({
                 <button
                   type="button"
                   onClick={() =>
-                    setTeam((prev) =>
-                      prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
+                    requestRemove(
+                      member,
+                      `Remove ${member.name.trim() || "this person"}?`,
+                      "They leave the team when you save.",
+                      () =>
+                        setTeam((prev) =>
+                          prev.length <= 1
+                            ? [emptyMember()]
+                            : prev.filter((_, i) => i !== index)
+                        )
                     )
                   }
                   className={settingsTrashButtonClass}
@@ -2276,7 +2406,12 @@ export function TenantForm({
                 <button
                   type="button"
                   onClick={() =>
-                    setFaqs((prev) => prev.filter((_, i) => i !== index))
+                    requestRemove(
+                      faq,
+                      "Remove this FAQ?",
+                      "It leaves the list when you save.",
+                      () => setFaqs((prev) => prev.filter((_, i) => i !== index))
+                    )
                   }
                   className={settingsTrashButtonClass}
                   aria-label={`Remove FAQ ${index + 1}`}
@@ -2301,6 +2436,20 @@ export function TenantForm({
 
         </div>
       </div>
+      <ConfirmSheet
+        open={removeAsk != null}
+        title={removeView?.title || "Remove?"}
+        confirmLabel="Remove"
+        danger
+        onClose={() => setRemoveAsk(null)}
+        onConfirm={() => {
+          const run = removeView?.run;
+          setRemoveAsk(null);
+          run?.();
+        }}
+      >
+        {removeView?.body}
+      </ConfirmSheet>
     </form>
   );
 }
