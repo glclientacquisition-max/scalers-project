@@ -51,8 +51,8 @@ export function Sheet({
     >
       <Drawer.VirtualKeyboardProvider>
         <Drawer.Portal>
-          <Drawer.Backdrop className={cx("desk-drawer-backdrop fixed inset-0 z-sheet motion-reduce:transition-none", themeClass)} />
-          <Drawer.Viewport className={cx("pointer-events-none fixed inset-0 z-sheet flex items-end justify-center", themeClass)}>
+          <Drawer.Backdrop className="desk-drawer-backdrop fixed inset-0 z-sheet motion-reduce:transition-none" />
+          <Drawer.Viewport className="desk-drawer-viewport pointer-events-none fixed inset-0 z-sheet flex items-end justify-center">
             <Drawer.Popup
               className={cx(
                 "desk-drawer glass-chrome pointer-events-auto flex max-h-[85dvh] w-full flex-col rounded-t-2xl text-ink shadow-sheet outline-none motion-reduce:transition-none",

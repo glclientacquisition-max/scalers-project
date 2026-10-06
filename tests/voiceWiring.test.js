@@ -471,8 +471,13 @@ assert.match(
 );
 assert.match(
   source,
-  /let text = polishSpokenReply\(/,
-  'onSpokenChunk must reassign polished text after cutNoAiSlop'
+  /const polished = polishSpokenReply\(/,
+  'onSpokenChunk polishes the chunk before the slop cut'
+);
+assert.match(
+  source,
+  /const text = cutNoAiSlop\(polished\)/,
+  'onSpokenChunk assigns the slop cut to its own const'
 );
 assert.match(
   source,

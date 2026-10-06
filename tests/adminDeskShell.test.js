@@ -21,6 +21,7 @@ function loadParents() {
       billingClient: adminParentTarget("/admin/billing/abc"),
       wallets: adminParentTarget("/admin/wallets"),
       ledgerNested: adminParentTarget("/admin/wallets/abc"),
+      businesses: adminParentTarget("/admin/businesses"),
       nested: adminParentTarget("/admin/businesses/abc"),
       unknown: adminParentTarget("/admin/ops/extra"),
       query: adminParentTarget("/admin/voices/1?x=1"),
@@ -75,14 +76,15 @@ describe("admin desk standard shell", () => {
     const got = loadParents();
     assert.equal(got.overview, null);
     assert.deepEqual(got.billingClient, { href: "/admin", label: "Overview" });
-    assert.equal(got.wallets, null);
-    assert.deepEqual(got.ledgerNested, { href: "/admin/wallets", label: "Ledger" });
+    assert.deepEqual(got.wallets, { href: "/admin", label: "Overview" });
+    assert.deepEqual(got.ledgerNested, { href: "/admin", label: "Overview" });
+    assert.equal(got.businesses, null);
     assert.deepEqual(got.nested, { href: "/admin/businesses", label: "Businesses" });
     assert.deepEqual(got.unknown, { href: "/admin", label: "Overview" });
     assert.deepEqual(got.query, { href: "/admin/voices", label: "Voices" });
     assert.ok(got.labels.includes("Packages"));
     assert.ok(got.labels.includes("Platform"));
-    assert.ok(got.labels.includes("Ledger"));
+    assert.ok(!got.labels.includes("Ledger"));
     assert.ok(!got.labels.includes("Billing"));
     for (const label of got.labels) {
       assert.notEqual(label, "Back");
