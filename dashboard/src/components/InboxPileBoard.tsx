@@ -40,7 +40,7 @@ function InboxHeaderCheck() {
         checked={allOn}
         onChange={() => (allOn ? ui.clear() : ui.replace(ids))}
         aria-label={allOn ? "Clear" : "Select all"}
-        className="h-6 w-6 shrink-0 accent-[#005CCC] focus:outline-none focus:ring-2 focus:ring-[#0096FF] lg:h-4 lg:w-4"
+        className="h-6 w-6 shrink-0 accent-accent focus:outline-none focus:ring-2 focus:ring-brand lg:h-4 lg:w-4"
       />
     </label>
   );

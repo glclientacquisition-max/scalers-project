@@ -38,10 +38,10 @@ export function ContactFavouriteButton({
         className={[
           "inline-flex min-h-11 items-center text-sm font-medium",
           deskShiftClass,
-          "focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
+          "focus:outline-none focus:ring-2 focus:ring-brand",
           favourite
-            ? "rounded-full bg-[#005CCC] px-3.5 text-white"
-            : "rounded-md text-[#005CCC] hover:underline",
+            ? "rounded-full bg-accent px-3.5 text-accent-on"
+            : "rounded-md text-accent hover:underline",
         ].join(" ")}
       >
         {pending ? (

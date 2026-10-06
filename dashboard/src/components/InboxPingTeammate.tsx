@@ -259,7 +259,7 @@ export function InboxPingTeammate({
             aria-label="Teammate"
             value={picked}
             disabled={pending}
-            className={`min-h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-sm text-ink ${focusRingVisible} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
+            className={`min-h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-sm text-ink ${focusRingVisible} focus:outline-none focus:ring-2 focus:ring-brand`}
             options={people.map((person) => ({
               value: person.name,
               label: person.role

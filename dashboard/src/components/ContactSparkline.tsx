@@ -14,7 +14,7 @@ export function ContactSparkline({
           <li
             key={day.day}
             title={`${day.day}: ${day.count}`}
-            className="min-w-0 flex-1 self-end rounded-sm bg-[#0096FF]"
+            className="min-w-0 flex-1 self-end rounded-sm bg-brand"
             style={{ height: `${Math.max(2, Math.round((day.count / max) * track))}px` }}
           />
         ))}

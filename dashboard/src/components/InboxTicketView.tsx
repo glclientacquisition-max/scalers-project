@@ -759,7 +759,7 @@ export function InboxTicketView({
                 type="button"
                 onClick={jumpLatest}
                 aria-label="Jump to latest"
-                className={`inline-flex h-12 w-12 items-center justify-center rounded-full border border-line bg-surface text-ink shadow-md ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
+                className={`inline-flex h-12 w-12 items-center justify-center rounded-full border border-line bg-surface text-ink shadow-md ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-brand`}
               >
                 <JumpGlyph />
                 <span className="sr-only">Jump to latest</span>
@@ -770,7 +770,7 @@ export function InboxTicketView({
               type="button"
               onClick={jumpLatest}
               aria-label="Jump to latest"
-              className={`absolute right-4 bottom-3 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full bg-[#005CCC] px-4 text-sm font-semibold text-white shadow-lg ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
+              className={`absolute right-4 bottom-3 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full bg-accent px-4 text-sm font-semibold text-accent-on shadow-lg ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-brand`}
             >
               Jump to latest
             </button>

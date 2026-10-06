@@ -175,7 +175,7 @@ describe("endless list slices", () => {
     const action = read("dashboard/src/lib/deskPullAction.ts");
     assert.match(read("dashboard/src/app/(desk)/layout.tsx"), /DeskPhonePull/);
     assert.match(read("dashboard/src/app/admin/(console)/layout.tsx"), /AdminPhonePull/);
-    assert.match(read("dashboard/src/app/admin/(console)/layout.tsx"), /data-admin-main/);
+    assert.match(read("dashboard/src/components/AdminNav.tsx"), /data-admin-main/);
     assert.match(surface, /router\.refresh\(\)/);
     assert.match(surface, /shellPullPlan/);
     assert.match(surface, /data-pull-dirty-guard/);

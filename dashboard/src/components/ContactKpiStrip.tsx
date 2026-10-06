@@ -33,7 +33,7 @@ export function ContactKpiStrip({
             key={card.id}
             href={href}
             data-contact-kpi={card.id}
-            className="min-w-0 min-h-11 flex-1 rounded-2xl border border-line bg-surface px-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+            className="min-w-0 min-h-11 flex-1 rounded-2xl border border-line bg-surface px-3 py-3 focus:outline-none focus:ring-2 focus:ring-brand"
           >
             {body}
           </Link>

@@ -110,7 +110,7 @@ export function DeskHint({
               aria-hidden="true"
               style={{ top: tip.top, left: tip.left, zIndex: 9999 }}
               className={[
-                "pointer-events-none fixed whitespace-nowrap rounded-lg bg-[#0A192F] px-2 py-1 text-xs font-medium text-white shadow-md",
+                "pointer-events-none fixed whitespace-nowrap rounded-lg bg-ink px-2 py-1 text-xs font-medium text-canvas shadow-md",
                 tip.side === "end" ? "-translate-y-1/2" : "-translate-x-1/2 -translate-y-full",
               ].join(" ")}
             >
