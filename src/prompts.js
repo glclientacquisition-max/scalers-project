@@ -23,6 +23,11 @@ const {
   isMessageOnlyMode,
 } = require('./conversation/messageOnly');
 
+// Identity only. The prompt body stays in buildSystemPrompt. A model change
+// bumps the version. Traces store these two fields, not the prompt text.
+const VOICE_SYSTEM_PROMPT_ID = 'voice.system';
+const VOICE_SYSTEM_PROMPT_VERSION = '2026-10-06';
+
 const DEFAULT_KNOWLEDGE = `No tenant-specific business knowledge is configured.
 Do not answer business-specific questions from model memory.
 Say the information is unavailable and offer only actions explicitly allowed by AUTHORITY / ACTION POLICY.`;
@@ -321,4 +326,6 @@ module.exports = {
   buildContextHeader,
   DEFAULT_KNOWLEDGE,
   CONVERSATION_RULES,
+  VOICE_SYSTEM_PROMPT_ID,
+  VOICE_SYSTEM_PROMPT_VERSION,
 };

@@ -1,0 +1,138 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "callId": "HD_21b92f25640b",
+  "tenantId": "c81b3480-0cc5-4224-b0e7-24c641d78db2",
+  "businessName": "Esga Stationery",
+  "callerName": "",
+  "nameOnFile": false,
+  "source": "Production Railway 2026-10-05 19:12Z. Model text is the TTS original paired to each caller turn.",
+  "turns": [
+    {
+      "caller": "Nothing that I trust more than a headset test.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "I hear you loud and clear. How can I help you with Esga Stationery today?",
+        "chars": 73,
+        "spokenEmitted": 73
+      }
+    },
+    {
+      "caller": "Halo.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Halo. How can I help you with Esga Stationery today?",
+        "chars": 52,
+        "spokenEmitted": 52
+      }
+    },
+    {
+      "caller": "Ah, nilikuwa nataka kuchukua counter books.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Tunauza counter books. Lakini kwa sasa duka limefungwa. Naweza kuchukua jina lako na idadi unayotaka ili timu yetu ikutumie bei rasmi kesho?",
+        "chars": 140,
+        "spokenEmitted": 140
+      }
+    },
+    {
+      "caller": "Saa ngapi kesho?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sina hiyo kwenye rekodi. Naweza kuandika kwa timu. Niandikishe jina lako na idadi ya counter books unazohitaji ili timu ikutafute asubuhi?",
+        "chars": 138,
+        "spokenEmitted": 138
+      }
+    },
+    {
+      "caller": "Hapana.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sawatutakusaidiaje kengine leo?",
+        "chars": 31,
+        "spokenEmitted": 31
+      }
+    },
+    {
+      "caller": "Kuuliza kesho saa ngapi?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sina hiyo kwenye rekodi. Naweza kuandika kwa timu. I hear you loud and clear.",
+        "chars": 77,
+        "spokenEmitted": 77
+      }
+    },
+    {
+      "caller": "You don't.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "My apologies for that. How else can I help you today?",
+        "chars": 53,
+        "spokenEmitted": 53
+      }
+    },
+    {
+      "caller": "Sawa.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Asante. Naweza kukusaidia na kitu kingine au tukamilishe hapa?",
+        "chars": 62,
+        "spokenEmitted": 62
+      }
+    },
+    {
+      "caller": "What do you mean how else?",
+      "flushed": true,
+      "canned": { "path": "hear_again", "text": "Sorry, say that again?" },
+      "model": { "provider": "canned", "model": "hear_again", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null }
+    },
+    {
+      "caller": "I already have a complaint.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Polisana. Naelewa uko na shikilio. Nipe jina lako na kinachokusumbua ili nitume maelezo haya kwa meneja wetu Chris akupigie simu?",
+        "chars": 129,
+        "spokenEmitted": 129
+      }
+    },
+    {
+      "caller": "And you're talking about something else.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Polisana. Naelewa vizuri uko na lalamiko na sijaishughulikia ipasavyo. Nipe jina lako na maelezo ya lalamiko lako ili nitumie meneja wetu Chris ashughulikie mara moja?",
+        "chars": 167,
+        "spokenEmitted": 167
+      }
+    }
+  ]
+}

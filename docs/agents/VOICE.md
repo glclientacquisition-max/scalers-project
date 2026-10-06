@@ -91,7 +91,9 @@ See `.env.example` — key ones:
 npm run test:voice
 ```
 
-Runs: TTS normalize → spoken stream buffer → turn-taking → wiring.
+Runs: TTS normalize → spoken stream buffer → turn-taking → wiring, then the voice eval gate (`npm run test:voice-eval`).
+
+Tracing and the regression scorecard: [`VOICE_TRACING_AND_EVAL.md`](./VOICE_TRACING_AND_EVAL.md). Apply [`docs/supabase/voice_turn_traces.sql`](../supabase/voice_turn_traces.sql) by hand on staging before traces persist. The writer does not throw if the table is missing.
 
 For media/webhook local bring-up: `npm start` + `npm run tunnel:cloudflared` (see `docs/operations/WEBHOOK_TUNNEL.md`).
 
