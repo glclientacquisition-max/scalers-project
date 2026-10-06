@@ -126,6 +126,13 @@ export type TeamDirectoryEntry = {
 export type FaqEntry = {
   question: string;
   answer: string;
+  /** owner | seed | import | inferred | call_suggested. Optional until Platform stores tenant_field_meta. */
+  source?: string;
+  /** golden | confirmed | suggested. Seed and call_suggested stay suggested. */
+  status?: string;
+  confirmed?: boolean;
+  confirmed_by?: string;
+  confirmed_at?: string;
 };
 
 export type ServiceCatalogEntry = {

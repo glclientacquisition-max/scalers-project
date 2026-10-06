@@ -367,6 +367,22 @@ function ensureRequiredCreateRequest(parsed, state = {}, capabilities = {}) {
   if (!REQUEST_INTENTS.has(intentId(state))) return next;
 
   if (isHomeVisit(state)) {
+    const cancelVisit =
+      intentId(state) === 'cancellation' ||
+      intentId(state) === 'cancel' ||
+      intentId(state) === 'reschedule';
+    if (capabilities.confirmVisit === false && !cancelVisit) {
+      if (next.appointment) delete next.appointment;
+      if (!capabilities.createServiceRequest || next.serviceRequest) return next;
+      const payload = buildAppointment(state);
+      next.serviceRequest = {
+        type: 'enquiry',
+        name: payload.name,
+        item: payload.serviceName,
+        notes: [payload.whenText, payload.landmark, payload.notes].filter(Boolean).join('. '),
+      };
+      return next;
+    }
     if (next.appointment || next.appointmentUpdate) return next;
     if (state.conversation?.timeWaived && intentId(state) === 'booking') {
       if (!capabilities.createServiceRequest || next.serviceRequest) return next;
@@ -388,9 +404,18 @@ function ensureRequiredCreateRequest(parsed, state = {}, capabilities = {}) {
   }
 
   if (!isShop(state)) return next;
+  if (next.serviceRequest && capabilities.placeHold === false) {
+    const locked = String(next.serviceRequest.type || '').toLowerCase();
+    if (locked === 'hold' || locked === 'order' || locked === 'hold_or_pickup') {
+      next.serviceRequest = { ...next.serviceRequest, type: 'enquiry' };
+    }
+  }
   if (next.serviceRequest) return next;
   if (!capabilities.createServiceRequest) return next;
   const payload = buildServiceRequest(state);
+  if (capabilities.placeHold === false && (payload.type === 'hold' || payload.type === 'order')) {
+    payload.type = 'enquiry';
+  }
   if (!holdReady(payload)) return next;
   next.serviceRequest = payload;
   return next;

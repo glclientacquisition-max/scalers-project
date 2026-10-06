@@ -43,6 +43,7 @@ const retail = {
     { name: 'Diary', aliases: ['diaries'], price: '350', in_stock: 'yes' },
     { name: 'HP Printer', price: '15,000', in_stock: 'yes' },
   ],
+  businessPolicies: { deposit: 'Hold until 6pm with the caller name.' },
   agentTools: { escalate: true, end_call: true },
 };
 

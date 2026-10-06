@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { indexFieldMeta } from "@/lib/provenance";
 
 export type TenantCompletenessScore = {
   overall: number;
@@ -12,6 +13,13 @@ export type TenantCompletenessScore = {
 export type TenantHoldGate = {
   allowed: boolean;
   reasons: string[];
+};
+
+export type TenantFieldMetaRow = {
+  field_path: string;
+  source: string;
+  confirmed_by?: string | null;
+  confirmed_at?: string | null;
 };
 
 function parseHoldGate(raw: unknown): TenantHoldGate {
@@ -68,6 +76,22 @@ export async function getTenantHoldGate(tenantId: string): Promise<TenantHoldGat
   return parseHoldGate(data);
 }
 
+/** Null when the table is not migrated yet. Empty array means no rows for this tenant. */
+export async function listTenantFieldMeta(tenantId: string): Promise<TenantFieldMetaRow[] | null> {
+  if (!tenantId) return null;
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("tenant_field_meta")
+    .select("field_path, source, confirmed_by, confirmed_at")
+    .eq("tenant_id", tenantId);
+  if (error) {
+    if (/tenant_field_meta|does not exist|schema cache/i.test(error.message || "")) return null;
+    console.warn("[tenantFieldProvenance] tenant_field_meta", error.message);
+    return null;
+  }
+  return Array.isArray(data) ? (data as TenantFieldMetaRow[]) : [];
+}
+
 export async function upsertTenantFieldMeta(input: {
   tenantId: string;
   fieldPath: string;
@@ -91,6 +115,22 @@ export async function upsertTenantFieldMeta(input: {
     p_old_value: input.oldValue ?? null,
     p_new_value: input.newValue ?? null,
   });
+}
+
+/** Index meta rows and the hold gate for compile. Null fields keep the pack heuristic. */
+export async function loadCompileProvenance(tenantId: string) {
+  if (!tenantId) return { fieldMeta: null, holdGate: null };
+  const [rows, gate] = await Promise.all([
+    listTenantFieldMeta(tenantId),
+    getTenantHoldGate(tenantId),
+  ]);
+  const fieldMeta = indexFieldMeta(rows);
+  const reasons = Array.isArray(gate?.reasons) ? gate.reasons.map((reason) => String(reason)) : [];
+  const holdGate =
+    gate && typeof gate.allowed === "boolean" && !reasons.includes("provenance_rpc_missing")
+      ? { allowed: gate.allowed === true, reasons }
+      : null;
+  return { fieldMeta, holdGate };
 }
 
 export async function confirmTenantField(input: {

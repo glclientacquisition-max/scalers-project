@@ -9,6 +9,7 @@ import {
   TONE_LABELS,
 } from "@/lib/onboarding";
 import { persistTeamNotifyFlags } from "@/lib/teamNotify";
+import { buildCompileSections } from "@/lib/provenance";
 
 /** Master instruction template for Gemini → voice-engine system prompt. */
 export const PROMPT_COMPILER_SYSTEM = `You write system prompts for a live Kenyan phone AI business assistant (Scalers).
@@ -19,12 +20,14 @@ Requirements for the prompt you write:
 - Start with: You are <Agent Name>, the live phone business assistant for <Business Name> in Kenya.
 - Include an IDENTITY section with: agent name, how to introduce on the first turn ("<Business>, this is <Agent>. How can I help?" — for home_services add "You can speak in English or Kiswahili." before How can I help), one steady persona for the whole call (do not switch character or recite a script), tone guidance matching the chosen manner (professional = calm and short; warm = helpful receptionist), and a mood rule (if the caller is frustrated or angry, drop cheerful filler and stay empathetic and concise). Tone is manner only. Do not treat Sheng or language as a tone. Always match EN/SW/Sheng. Retail: do not invite language on the first open. Home services: first open must include the English/Kiswahili invite. If they ask who you are, name plus shop only. Do not disclose AI unless they ask if you are a robot.
 - Include a BUSINESS KNOWLEDGE section with: business name, vertical (if given), services & pricing (as given), hours (as given), locations/landmarks/directions (as given), policies (as given), languages (English, Kiswahili, Sheng — match the caller).
-- If vertical is retail (owner label Shop), add a short RETAIL JOB section: fully assist hours, directions, product/price/stock from the PRODUCT CATALOGUE (not from services), holds/pickups (log create_service_request after name+item+when), policies, and social handles when asked; never invent stock/prices/quantities; prefer resolving over callback. Do not pitch an order or a WhatsApp number until the caller names an item. Then, Okay, and Sawa are not a quantity and not a yes.
+- If vertical is retail (owner label Shop), add a short RETAIL JOB section: fully assist hours, directions, product/price/stock from the confirmed PRODUCT CATALOGUE (not from services), policies, and social handles when asked; never invent stock/prices/quantities; prefer resolving over callback. Holds and orders only if the user message says holds are available. Otherwise take a message and do not say held or reserved. Do not pitch an order or a WhatsApp number until the caller names an item. Then, Okay, and Sawa are not a quantity and not a yes.
 - If vertical is home_services, add a short HOME SERVICES JOB section: fully assist hours, coverage/service area, service/price bands from SERVICES, book visits (create_appointment after service+name+when+landmark), reschedule/cancel via update_appointment. Cleaning jobs (house, carpet, couch, mattress, Airbnb) are visits, not emergencies — even if the caller says urgent, ASAP, or emergency. Visit SOP: do not say a time is booked or moved until the backend speaks; closed or outside hours, offer another time; same-hour visits are allowed unless policies say one at a time. Out of coverage: callback note only, never a calendar visit. In coverage: confirm service, day, time, and place, then the tool, then the same saved facts. Okay, Sawa, and leave it are not a yes. Escalate only for burst pipe, flooding, fire, gas leak, or electric shock (name+reason). Never invent plumber/repair/stock advice; use unknown fallback for out-of-scope asks. Contact urgent: name, then the need, then notify. Do not recite the catalogue unless they ask what you offer. Never invent prices, ETAs, or coverage areas; prefer resolving over callback.
 - If vertical is hospitality or general, do not add a RETAIL or HOME SERVICES JOB section. Hours, location, FAQs, and a saved message or escalate only. Never claim a room, table, hold, or visit is booked.
 - Keep SERVICES (delivery, sourcing, etc.) separate from PRODUCT CATALOGUE (individual titles/SKU rows).
 - If social/web handles are provided, include them so the assistant can share Instagram/WhatsApp/website when asked.
-- If golden FAQs are provided, include a GOLDEN FAQs section. Treat each Q/A as authoritative. The assistant must answer those questions from the given answers and must not invent alternatives.
+- If confirmed FAQs are provided, include them as facts. Do not label seed or unconfirmed FAQs as GOLDEN. If an UNKNOWN list is provided, include it and instruct the assistant to say "Let me confirm with the owner." Do not state UNKNOWN topics as fact.
+- Enquiry and take-a-message always work, even when knowledge is incomplete. Do not block the line.
+- Speak prices and payment numbers only when they appear in the confirmed facts. During a hold, do not say a deposit amount or a payment number. The owner follows up. A visit is a request unless the user message says confirmed slots are available.
 - If a team directory is provided AND escalation is enabled, include a TEAM DIRECTORY / ESCALATION section listing each person as Name, Role, Phone. Escalation is a last useful step: use it when the caller explicitly asks for a human, policy requires one, authority is missing, a tool fails, or repair repeatedly fails. Anger alone is not enough when the issue can be resolved.
 - Handoff mode is a preference, not proof that transfer works. Never promise or claim a live transfer; runtime authority decides actual capability.
 - If escalation is disabled, list the team for awareness but instruct the assistant to resolve what it can and offer a saved request only when useful.
@@ -85,13 +88,6 @@ function formatTeamForCompiler(members: TeamMember[]): string {
     .join("\n");
 }
 
-function formatFaqsForCompiler(faqs: FaqItem[]): string {
-  if (!faqs.length) return "(none)";
-  return faqs
-    .map((f, i) => `${i + 1}. Q: ${f.question.trim()}\n   A: ${f.answer.trim()}`)
-    .join("\n");
-}
-
 /**
  * Compile structured business fields into llm_system_prompt.
  * Uses Gemini when GEMINI_API_KEY is set; otherwise a local template.
@@ -114,6 +110,10 @@ export async function compileReceptionistPrompt(opts: {
   policiesText?: string;
   productsText?: string;
   socialText?: string;
+  productCatalog?: unknown;
+  businessPolicies?: unknown;
+  fieldMeta?: unknown;
+  holdGate?: unknown;
 }): Promise<{ prompt: string; source: "gemini" | "local" }> {
   const answers: OnboardingAnswers = {
     servicesPricing: opts.servicesOffered.trim(),
@@ -131,6 +131,16 @@ export async function compileReceptionistPrompt(opts: {
   const policiesText = String(opts.policiesText || "").trim();
   const productsText = String(opts.productsText || "").trim();
   const socialText = String(opts.socialText || "").trim();
+  const sections = buildCompileSections({
+    faqs,
+    policiesText,
+    productsText,
+    servicesText: answers.servicesPricing,
+    productCatalog: opts.productCatalog ?? null,
+    businessPolicies: opts.businessPolicies ?? null,
+    fieldMeta: opts.fieldMeta ?? null,
+    holdGate: opts.holdGate ?? null,
+  });
   const extras = {
     agentName,
     teamDirectory,
@@ -143,6 +153,10 @@ export async function compileReceptionistPrompt(opts: {
     policiesText,
     productsText,
     socialText,
+    productCatalog: opts.productCatalog ?? null,
+    businessPolicies: opts.businessPolicies ?? null,
+    fieldMeta: opts.fieldMeta ?? null,
+    holdGate: opts.holdGate ?? null,
   };
 
   if (!process.env.GEMINI_API_KEY) {
@@ -161,10 +175,10 @@ export async function compileReceptionistPrompt(opts: {
       `Handoff mode: ${handoffMode}`,
       "",
       "Services & pricing:",
-      answers.servicesPricing,
+      sections.servicesText.trim() || "(none confirmed)",
       "",
       "Product catalogue (individual items — separate from services):",
-      productsText || "(none listed)",
+      sections.productsText,
       "",
       "Social & web handles:",
       socialText || "(none listed)",
@@ -176,14 +190,19 @@ export async function compileReceptionistPrompt(opts: {
       locationsText || "(none listed)",
       "",
       "Policies:",
-      policiesText || "(none listed)",
+      sections.policiesText,
       "",
       "Team directory (Name | Role | Phone):",
       formatTeamForCompiler(teamDirectory),
       `Escalation tool: ${escalateEnabled ? "ENABLED" : "DISABLED — do not instruct escalate"}`,
       "",
-      "Golden FAQs:",
-      formatFaqsForCompiler(faqs),
+      "Confirmed FAQs (facts only, not GOLDEN seeds):",
+      sections.faqBlock,
+      "",
+      sections.unknownBlock,
+      "",
+      `Holds available: ${sections.holdsAvailable ? "yes" : "no"}.`,
+      `Confirmed slots available: ${sections.confirmedSlotsAvailable ? "yes" : "no"}.`,
       "",
       unknownLine
         ? `Unknown request line (preferred phrasing when asked for something outside knowledge — adapt to caller language): ${unknownLine}`
@@ -264,6 +283,19 @@ export function parseFaqsField(raw: FormDataEntryValue | null): FaqItem[] {
     const question = String(row.question ?? "").trim().slice(0, 200);
     const answer = String(row.answer ?? "").trim().slice(0, 400);
     if (!question || !answer) return null;
-    return { question, answer };
+    const source = String(row.source ?? "").trim().toLowerCase();
+    const status = String(row.status ?? "").trim().toLowerCase();
+    const allowed = new Set(["owner", "seed", "import", "inferred", "call_suggested"]);
+    const item: FaqItem = { question, answer };
+    if (allowed.has(source)) item.source = source;
+    if (status === "golden" || status === "confirmed" || status === "suggested") {
+      item.status = source === "seed" || source === "call_suggested" || source === "inferred" ? "suggested" : status;
+    }
+    if (row.confirmed === true) item.confirmed = true;
+    const confirmedBy = String(row.confirmed_by ?? "").trim();
+    const confirmedAt = String(row.confirmed_at ?? "").trim();
+    if (confirmedBy) item.confirmed_by = confirmedBy.slice(0, 80);
+    if (confirmedAt) item.confirmed_at = confirmedAt.slice(0, 40);
+    return item;
   });
 }

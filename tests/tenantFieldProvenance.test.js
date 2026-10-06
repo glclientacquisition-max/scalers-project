@@ -10,6 +10,7 @@ const db = require('../src/db');
 
 assert.strictEqual(typeof db.getTenantCompletenessScore, 'function');
 assert.strictEqual(typeof db.getTenantHoldGate, 'function');
+assert.strictEqual(typeof db.listTenantFieldMeta, 'function');
 assert.strictEqual(typeof db.upsertTenantFieldMeta, 'function');
 assert.strictEqual(typeof db.confirmTenantField, 'function');
 

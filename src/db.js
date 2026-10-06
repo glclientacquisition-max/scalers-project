@@ -1118,6 +1118,8 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       billingEnforcement: null,
       walletBalanceKes: null,
       openAppointments: [],
+      fieldMeta: null,
+      holdGate: null,
     };
   }
 
@@ -1168,7 +1170,18 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     walletBalanceKes:
       row.wallet_balance_kes != null ? Number(row.wallet_balance_kes) : null,
     openAppointments: await listOpenAppointments(row.id),
+    ...(await loadProvenanceForProfile(row.id)),
   };
+}
+
+async function loadProvenanceForProfile(tenantId) {
+  try {
+    const { loadProvenanceEnvelope } = require('./conversation/provenance');
+    return await loadProvenanceEnvelope(tenantId);
+  } catch (err) {
+    console.warn('[db] provenance envelope', err.message);
+    return { fieldMeta: null, holdGate: null };
+  }
 }
 
 async function listOpenAppointments(tenantId, { limit = 30 } = {}) {
@@ -2234,6 +2247,24 @@ async function getTenantHoldGate(tenantId) {
   };
 }
 
+async function listTenantFieldMeta(tenantId) {
+  if (!tenantId) return null;
+  const { data, error } = await supabase
+    .from('tenant_field_meta')
+    .select('field_path, source, confirmed_by, confirmed_at')
+    .eq('tenant_id', tenantId);
+  if (error) {
+    if (provenanceRpcMissing(error.message)) {
+      console.warn(
+        '[db] tenant_field_meta missing (apply docs/supabase/tenant_field_provenance.sql)'
+      );
+      return null;
+    }
+    throwIfError('listTenantFieldMeta', error);
+  }
+  return Array.isArray(data) ? data : [];
+}
+
 async function upsertTenantFieldMeta({
   tenantId,
   fieldPath,
@@ -2332,6 +2363,7 @@ module.exports = {
   consumeSmsUnits,
   getTenantCompletenessScore,
   getTenantHoldGate,
+  listTenantFieldMeta,
   upsertTenantFieldMeta,
   confirmTenantField,
   RECORDINGS_BUCKET,
