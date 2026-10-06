@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
+import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
 import { CallRecording } from "@/components/CallRecording";
 import { CallTranscript } from "@/components/CallTranscript";
 import { InboxHoldEditor } from "@/components/InboxHoldEditor";
@@ -15,6 +15,8 @@ import { InboxTicketActionDock } from "@/components/InboxTicketActionDock";
 import { ContactStrip } from "@/components/ContactStrip";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
+import { IconButton } from "@/components/ui/IconButton";
+import { Menu, MenuItem } from "@/components/ui/Menu";
 import {
   deskHitClass,
   deskShiftClass,
@@ -40,10 +42,6 @@ import {
   inboxTicketOverflowActions,
   type InboxListActionId,
 } from "@/lib/inboxListVerbs";
-import {
-  placeInboxOverflowMenu,
-  type InboxOverflowAnchor,
-} from "@/lib/inboxOverflowPlace";
 import type { InboxHold, InboxJob } from "@/lib/inboxPurpose";
 import type { TranscriptRow } from "@/lib/supabase";
 import { emptyInboxSmsFacts, type InboxSmsFacts } from "@/lib/polishInboxSms";
@@ -58,16 +56,6 @@ function JumpGlyph() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-    </svg>
-  );
-}
-
-function MoreGlyph() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-      <circle cx="8" cy="3.2" r="1.3" />
-      <circle cx="8" cy="8" r="1.3" />
-      <circle cx="8" cy="12.8" r="1.3" />
     </svg>
   );
 }
@@ -116,86 +104,19 @@ function InboxTicketMore({
   archived: boolean;
 }) {
   const router = useRouter();
-  const labelId = useId();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [anchor, setAnchor] = useState<InboxOverflowAnchor | null>(null);
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
-  const ignoreUntil = useRef(0);
+  const [pendingId, setPendingId] = useState<InboxListActionId | null>(null);
   const actions = inboxTicketOverflowActions({ archived });
-
-  function placeFromButton() {
-    const rect = btnRef.current?.getBoundingClientRect();
-    setAnchor(
-      rect
-        ? { x: rect.left, y: rect.top, w: rect.width, h: rect.height, align: "end" }
-        : { x: 8, y: 8, align: "point" }
-    );
-  }
-
-  useLayoutEffect(() => {
-    if (!open || !anchor) return;
-    const nextAnchor = anchor;
-    function place() {
-      const el = panelRef.current;
-      if (!el) return;
-      const view = window.visualViewport;
-      setPos(
-        placeInboxOverflowMenu(
-          { width: el.offsetWidth, height: el.offsetHeight },
-          nextAnchor,
-          {
-            width: view?.width ?? window.innerWidth,
-            height: view?.height ?? window.innerHeight,
-          }
-        )
-      );
-    }
-    place();
-    window.addEventListener("resize", place);
-    window.visualViewport?.addEventListener("resize", place);
-    return () => {
-      window.removeEventListener("resize", place);
-      window.visualViewport?.removeEventListener("resize", place);
-    };
-  }, [open, anchor, error, actions.length]);
-
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.activeElement as HTMLElement | null;
-    panelRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus();
-
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        if (!busy) setOpen(false);
-      }
-    }
-
-    function onPointer(event: MouseEvent) {
-      if (Date.now() < ignoreUntil.current) return;
-      if (panelRef.current && !panelRef.current.contains(event.target as Node) && !busy) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onPointer);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onPointer);
-      previous?.focus?.();
-    };
-  }, [open, busy]);
 
   async function run(id: InboxListActionId) {
     setBusy(true);
+    setPendingId(id);
     const next = id === "unarchive" || archived ? "new" : "archived";
     const res = await updateLeadStatus(callId, next);
     setBusy(false);
+    setPendingId(null);
     if (res.error) {
       setError(res.error);
       return;
@@ -208,67 +129,35 @@ function InboxTicketMore({
     router.refresh();
   }
 
-  const menu = (
-    <div
-      ref={panelRef}
-      role="menu"
-      aria-labelledby={labelId}
-      className="z-[60] max-h-[min(24rem,calc(100dvh-1rem))] min-w-[10rem] overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-xl"
-      style={{
-        position: "fixed",
-        top: pos?.top ?? 0,
-        left: pos?.left ?? 0,
-        visibility: pos ? "visible" : "hidden",
+  return (
+    <Menu
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && busy) return;
+        if (next) setError(null);
+        setOpen(next);
       }}
-      onClick={(event) => event.stopPropagation()}
+      trigger={
+        <IconButton label="More" size="sm">
+          <EllipsisVerticalIcon aria-hidden="true" />
+        </IconButton>
+      }
     >
-      <p id={labelId} className="sr-only">
-        More
-      </p>
       {actions.map((action) => (
-        <button
+        <MenuItem
           key={action.id}
-          type="button"
-          role="menuitem"
           disabled={busy}
-          className={`flex min-h-11 w-full items-center px-4 text-left text-sm text-ink ${focusRingVisible} hover:bg-surface-muted disabled:opacity-50`}
           onClick={() => void run(action.id)}
         >
-          {busy ? "Saving" : action.label}
-        </button>
+          {pendingId === action.id ? "Saving" : action.label}
+        </MenuItem>
       ))}
       {error ? (
-        <p className="px-4 py-2 text-xs text-warn" role="alert">
+        <p className="px-3 py-2 text-caption text-attention" role="alert">
           {error}
         </p>
       ) : null}
-    </div>
-  );
-
-  return (
-    <div className="relative">
-      <DeskHint label="More" side="top">
-        <button
-          ref={btnRef}
-          type="button"
-          aria-label="More"
-          aria-haspopup="menu"
-          aria-expanded={open}
-          className={`${deskHitClass} ${focusRingVisible} text-ink-soft hover:bg-surface-muted hover:text-ink`}
-          onClick={() => {
-            setError(null);
-            if (!open) {
-              ignoreUntil.current = Date.now() + 450;
-              placeFromButton();
-            }
-            setOpen((next) => !next);
-          }}
-        >
-          <MoreGlyph />
-        </button>
-      </DeskHint>
-      {open && typeof document !== "undefined" ? createPortal(<div className="desk-theme">{menu}</div>, document.body) : null}
-    </div>
+    </Menu>
   );
 }
 

@@ -5,13 +5,10 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useInboxRowUi } from "@/components/InboxRowUi";
 import { DeskRowHit, deskRowHitClass } from "@/components/ui/deskRowHit";
-import {
-  btnGhost,
-  btnPrimary,
-  deskHitClass,
-  deskShiftClass,
-  focusRingVisible,
-} from "@/components/ui/deskChrome";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { focusRingVisible } from "@/components/ui/deskChrome";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 import {
   inboxArchive,
   inboxConfirm,
@@ -22,26 +19,6 @@ import {
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import { inboxBulkActions, type InboxListActionId } from "@/lib/inboxListVerbs";
 import { itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
-
-const iconHit = [
-  deskHitClass,
-  deskShiftClass,
-  focusRingVisible,
-  "text-ink-soft hover:bg-surface-muted hover:text-ink disabled:opacity-50",
-].join(" ");
-
-function CloseGlyph() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M4 4l8 8M12 4l-8 8"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 /**
  * Select hit. From `md` up it stays in the row. Below `md` it stays in the
@@ -229,38 +206,41 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   }
 
   return (
-    <div className="sticky top-[var(--desk-header-h)] z-20 -mx-4 mt-0 flex min-h-12 flex-wrap items-center gap-1 border-b border-line bg-surface px-2 sm:-mx-6">
-      <button type="button" className={iconHit} disabled={busy} aria-label="Close" onClick={() => clear()}>
-        <CloseGlyph />
-      </button>
-      <button type="button" className={btnGhost} disabled={busy} onClick={() => clear()}>Cancel</button>
-      <p className="min-w-8 text-sm font-medium tabular-nums text-ink">{chosen.length}</p>
-      <button
+    <div className="sticky top-[var(--desk-header-h)] z-20 -mx-4 mt-0 flex min-h-12 flex-wrap items-center gap-1 border-b border-hairline bg-surface px-2 sm:-mx-6">
+      <IconButton label="Close" size="sm" disabled={busy} onClick={() => clear()}>
+        <XMarkIcon aria-hidden="true" />
+      </IconButton>
+      <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => clear()}>Cancel</Button>
+      <p className="min-w-8 text-body font-medium tabular-nums text-ink">{chosen.length}</p>
+      <Button
         type="button"
-        className={`${btnGhost} mr-auto`}
+        variant="ghost"
+        size="sm"
+        className="mr-auto"
         disabled={busy || pageIds.length === 0}
         aria-label={allOn ? "Clear" : "Select all"}
         onClick={() => (allOn ? clear() : replace(pageIds))}
       >
         {allOn ? "Clear" : "All"}
-      </button>
+      </Button>
       {actions.map((action) => {
-        const filled = action.id === "confirm" || action.id === "done";
+        const tonal = action.id === "confirm" || action.id === "done";
         return (
-          <button
+          <Button
             key={action.id}
             type="button"
-            className={filled ? btnPrimary : btnGhost}
+            variant={tonal ? "tonal" : "ghost"}
+            size="sm"
             disabled={busy}
             aria-label={action.label}
             onClick={() => run(action.id)}
           >
             {busy ? "Saving" : action.label}
-          </button>
+          </Button>
         );
       })}
       {error ? (
-        <p className="w-full text-xs text-warn" role="alert">
+        <p className="w-full text-caption text-attention" role="alert">
           {error}
         </p>
       ) : null}

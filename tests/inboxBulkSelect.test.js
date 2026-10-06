@@ -90,7 +90,7 @@ describe("inbox bulk select", () => {
     assert.match(select, /relative z-10 inline-flex h-11 w-11/);
     assert.match(select, /data-inbox-row-body=""/);
     assert.match(select, />\s*Cancel\s*</);
-    assert.match(select, /className=\{btnGhost\}/);
+    assert.match(select, /variant="ghost"/);
     assert.match(select, /aria-label=\{allOn \? "Clear" : "Select all"\}/);
     assert.doesNotMatch(read("dashboard/src/components/InboxToolbar.tsx"), /Select all/);
     assert.match(read("dashboard/src/components/InboxPileBoard.tsx"), /function InboxHeaderCheck/);
@@ -125,12 +125,12 @@ describe("inbox bulk select", () => {
     assert.match(actions, /status", "fulfilled"/);
     assert.match(select, />\s*Cancel\s*</);
     const cancelAt = select.indexOf(">Cancel<");
-    const cancelClass = select.lastIndexOf("btnGhost", cancelAt);
-    assert.ok(cancelClass > -1 && cancelAt - cancelClass < 80, "Cancel uses the ghost button");
+    const cancelClass = select.lastIndexOf('variant="ghost"', cancelAt);
+    assert.ok(cancelClass > -1 && cancelAt - cancelClass < 120, "Cancel uses the ghost button");
   });
 
   it("shows a header select bar with Close, count, and relevant verbs", () => {
-    assert.match(select, /aria-label="Close"/);
+    assert.match(select, /label="Close"/);
     assert.doesNotMatch(select, /aria-label="Back"/);
     assert.match(select, /aria-label=\{action\.label\}/);
     assert.doesNotMatch(select, /aria-label=\{allPinned/);

@@ -32,14 +32,14 @@ describe("ticket action dock", () => {
     assert.match(ping, />Ping</);
     assert.match(ping, /variant === "dock"/);
     assert.match(ping, /Ping teammate/);
-    assert.match(ping, /deskHitClass/);
+    assert.match(ping, /<IconButton/);
+    assert.match(ping, /<Sheet/);
     assert.doesNotMatch(dock, /[\u2014\u2013]/);
     assert.doesNotMatch(ping, /[\u2014\u2013]/);
     assert.match(dock, /pendingSpinnerInkClass/);
     assert.match(dock, /aria-busy=\{pending\}/);
     assert.doesNotMatch(dock, /useTransition/);
-    assert.match(ping, /pendingSpinnerInkClass/);
-    assert.match(ping, /aria-busy=\{pending\}/);
+    assert.match(ping, /pending=\{pending\}/);
     assert.match(ping, /Pinging/);
     assert.doesNotMatch(ping, /useTransition/);
     const escalate = read("dashboard/src/app/(desk)/calls/escalateActions.ts");
@@ -74,7 +74,7 @@ describe("ticket action dock", () => {
     const confirmAt = ticket.indexOf("canConfirm && job");
     const smsAt = ticket.indexOf("<InboxSmsDock");
     assert.ok(dockAt > 0 && confirmAt > dockAt && smsAt > confirmAt);
-    assert.match(ticket, /pb-\[calc\(var\(--desk-tabbar-h\)\+env\(safe-area-inset-bottom,0px\)\)\]/);
+    assert.match(ticket, /pb-\[env\(safe-area-inset-bottom,0px\)\]/);
     assert.match(dock, /deskHitClass/);
     assert.match(read("dashboard/src/components/ui/deskChrome.ts"), /h-12 w-12 min-h-12 min-w-12/);
     assert.match(detail, /Action dock/);

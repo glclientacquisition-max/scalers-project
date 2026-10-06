@@ -6,20 +6,18 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useId,
-  useLayoutEffect,
   useRef,
   useState,
   type ElementType,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
 import { DeskLandSurface } from "@/components/ui/DeskLand";
 import { useInboxRowLocal, useInboxRowUi } from "@/components/InboxRowUi";
-import { DeskHint } from "@/components/ui/DeskHint";
-import { deskHitClass, focusRingVisible } from "@/components/ui/deskChrome";
+import { IconButton } from "@/components/ui/IconButton";
+import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import {
   inboxArchive,
   inboxMarkDone,
@@ -30,36 +28,27 @@ import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import {
   inboxItemWithLocal,
   inboxOverflowActions,
-  type InboxListAction,
   type InboxListActionId,
 } from "@/lib/inboxListVerbs";
-import {
-  placeInboxOverflowMenu,
-  type InboxOverflowAnchor,
-} from "@/lib/inboxOverflowPlace";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
 const LONG_PRESS_MS = 400;
 const PRESS_HINT_MS = 100;
 const MOVE_CANCEL_PX = 12;
 
+type ActionId = InboxListActionId;
+
 const InboxRowMenuCtx = createContext<{
-  openAt: (anchor: InboxOverflowAnchor) => void;
   open: boolean;
+  setOpen: (open: boolean) => void;
+  run: (id: ActionId) => void;
+  busy: boolean;
+  pendingId: ActionId | null;
+  error: string | null;
 } | null>(null);
 
 export function useInboxRowMenu() {
   return useContext(InboxRowMenuCtx);
-}
-
-function MoreGlyph() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-      <circle cx="8" cy="3.2" r="1.3" />
-      <circle cx="8" cy="8" r="1.3" />
-      <circle cx="8" cy="12.8" r="1.3" />
-    </svg>
-  );
 }
 
 function isFinePointer() {
@@ -73,9 +62,6 @@ function isRowBodyPress(target: EventTarget | null, root: HTMLElement | null) {
   if (!interactive || interactive === root || !root.contains(interactive)) return true;
   return interactive.hasAttribute("data-inbox-row-body");
 }
-
-type ActionId = InboxListActionId;
-type OverflowAction = InboxListAction;
 
 export function InboxRowShell({
   item,
@@ -107,22 +93,10 @@ export function InboxRowShell({
   });
   const [pressing, setPressing] = useState(false);
   const [open, setOpen] = useState(false);
-  const [anchor, setAnchor] = useState<InboxOverflowAnchor>({ x: 0, y: 0, align: "point" });
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<ActionId | null>(null);
   const busyRef = useRef(false);
   const busy = pendingId !== null;
-
-  const close = useCallback(() => {
-    if (busyRef.current) return;
-    setOpen(false);
-  }, []);
-
-  const openAt = useCallback((next: InboxOverflowAnchor) => {
-    setError(null);
-    setAnchor(next);
-    setOpen(true);
-  }, []);
 
   const clearPress = useCallback(() => {
     if (pressRef.current.timer) {
@@ -170,12 +144,10 @@ export function InboxRowShell({
     router.refresh();
   };
 
-  const actions: OverflowAction[] = inboxOverflowActions(inboxItemWithLocal(item, local));
-
   if (local.hidden) return null;
 
   return (
-    <InboxRowMenuCtx.Provider value={{ openAt, open }}>
+    <InboxRowMenuCtx.Provider value={{ open, setOpen, run, busy, pendingId, error }}>
       <DeskLandSurface
         as={as}
         id={item.id}
@@ -203,11 +175,8 @@ export function InboxRowShell({
             ui?.enter(item.id);
             return;
           }
-          openAt({
-            x: event.clientX,
-            y: event.clientY,
-            align: "point",
-          });
+          setError(null);
+          setOpen(true);
         }}
         onPointerDown={(event: ReactPointerEvent) => {
           if (ui?.selecting) return;
@@ -238,18 +207,6 @@ export function InboxRowShell({
         onPointerCancel={clearPress}
       >
         {children}
-        {open ? (
-          <InboxOverflowSurface
-            item={item}
-            anchor={anchor}
-            actions={actions}
-            busy={busy}
-            pendingId={pendingId}
-            error={error}
-            onRun={run}
-            onClose={close}
-          />
-        ) : null}
       </DeskLandSurface>
     </InboxRowMenuCtx.Provider>
   );
@@ -259,177 +216,38 @@ export function InboxRowMore({ item }: { item: InboxItem }) {
   const menu = useInboxRowMenu();
   const ui = useInboxRowUi();
   const [local] = useInboxRowLocal(item.id);
-  const btnRef = useRef<HTMLButtonElement>(null);
   const actions = inboxOverflowActions(inboxItemWithLocal(item, local));
   if (!menu || ui?.selecting || actions.length === 0) return null;
+
   return (
-    <DeskHint label="More" side="top">
-      <button
-        ref={btnRef}
-        type="button"
-        aria-label={`More actions for ${item.callerName?.trim() || "Caller"}`}
-        aria-haspopup="menu"
-        aria-expanded={menu.open}
-        className={[
-          deskHitClass,
-          focusRingVisible,
-          "hidden md:inline-flex text-ink-soft hover:bg-surface-muted hover:text-ink",
-          menu.open
-            ? "opacity-100"
-            : "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100",
-        ].join(" ")}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const rect = btnRef.current?.getBoundingClientRect();
-          menu.openAt(
-            rect
-              ? { x: rect.left, y: rect.top, w: rect.width, h: rect.height, align: "end" }
-              : { x: event.clientX, y: event.clientY, align: "point" }
-          );
-        }}
-      >
-        <MoreGlyph />
-      </button>
-    </DeskHint>
-  );
-}
-
-function InboxOverflowSurface({
-  item,
-  anchor,
-  actions,
-  busy,
-  pendingId,
-  error,
-  onRun,
-  onClose,
-}: {
-  item: InboxItem;
-  anchor: InboxOverflowAnchor;
-  actions: OverflowAction[];
-  busy: boolean;
-  pendingId: ActionId | null;
-  error: string | null;
-  onRun: (id: ActionId) => void;
-  onClose: () => void;
-}) {
-  const labelId = useId();
-  const panelRef = useRef<HTMLDivElement>(null);
-  const ignoreUntil = useRef(Date.now() + 450);
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
-  const who = item.callerName?.trim() || "Caller";
-
-  useLayoutEffect(() => {
-    function place() {
-      const el = panelRef.current;
-      if (!el) return;
-      const view = window.visualViewport;
-      setPos(
-        placeInboxOverflowMenu(
-          { width: el.offsetWidth, height: el.offsetHeight },
-          anchor,
-          {
-            width: view?.width ?? window.innerWidth,
-            height: view?.height ?? window.innerHeight,
-          }
-        )
-      );
-    }
-    place();
-    window.addEventListener("resize", place);
-    window.visualViewport?.addEventListener("resize", place);
-    return () => {
-      window.removeEventListener("resize", place);
-      window.visualViewport?.removeEventListener("resize", place);
-    };
-  }, [anchor, error, actions.length]);
-
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const items = panelRef.current?.querySelectorAll<HTMLElement>("[role='menuitem']");
-    items?.[0]?.focus();
-
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        if (!busy) onClose();
-        return;
-      }
-      if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Home" && event.key !== "End") {
-        return;
-      }
-      const list = Array.from(panelRef.current?.querySelectorAll<HTMLElement>("[role='menuitem']") || []);
-      if (!list.length) return;
-      event.preventDefault();
-      const i = list.indexOf(document.activeElement as HTMLElement);
-      if (event.key === "Home") list[0].focus();
-      else if (event.key === "End") list[list.length - 1].focus();
-      else if (event.key === "ArrowDown") list[(i + 1 + list.length) % list.length].focus();
-      else list[(i - 1 + list.length) % list.length].focus();
-    }
-
-    function onPointer(event: MouseEvent) {
-      if (Date.now() < ignoreUntil.current) return;
-      if (panelRef.current && !panelRef.current.contains(event.target as Node) && !busy) {
-        onClose();
-      }
-    }
-
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onPointer);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onPointer);
-      previous?.focus?.();
-    };
-  }, [busy, onClose]);
-
-  const menu = (
-    <div
-      ref={panelRef}
-      role="menu"
-      aria-labelledby={labelId}
-      className="z-[60] max-h-[min(24rem,calc(100dvh-1rem))] min-w-[14rem] overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-xl"
-      style={{
-        position: "fixed",
-        top: pos?.top ?? 0,
-        left: pos?.left ?? 0,
-        visibility: pos ? "visible" : "hidden",
+    <Menu
+      open={menu.open}
+      onOpenChange={(next) => {
+        if (!next && menu.busy) return;
+        menu.setOpen(next);
       }}
-      onClick={(event) => event.stopPropagation()}
+      trigger={
+        <IconButton label={`More actions for ${item.callerName?.trim() || "Caller"}`} size="sm">
+          <EllipsisVerticalIcon aria-hidden="true" />
+        </IconButton>
+      }
     >
-      <p id={labelId} className="sr-only">
-        {who}
-      </p>
       {actions.map((action) => (
         <Fragment key={action.id}>
-          {action.divide ? <div role="separator" className="my-1 border-t border-line" /> : null}
-          <button
-            type="button"
-            role="menuitem"
-            disabled={busy}
-            onClick={() => onRun(action.id)}
-            className={[
-              "flex w-full items-center px-4 text-left text-sm text-ink",
-              "min-h-11",
-              focusRingVisible,
-              "hover:bg-surface-muted disabled:opacity-50",
-            ].join(" ")}
+          {action.divide ? <MenuSeparator /> : null}
+          <MenuItem
+            disabled={menu.busy}
+            onClick={() => void menu.run(action.id)}
           >
-            {pendingId === action.id ? "Saving" : action.label}
-          </button>
+            {menu.pendingId === action.id ? "Saving" : action.label}
+          </MenuItem>
         </Fragment>
       ))}
-      {error ? (
-        <p className="px-4 py-2 text-xs text-warn" role="alert">
-          {error}
+      {menu.error ? (
+        <p className="px-3 py-2 text-caption text-attention" role="alert">
+          {menu.error}
         </p>
       ) : null}
-    </div>
+    </Menu>
   );
-
-  if (typeof document === "undefined") return null;
-
-  return createPortal(<div className="desk-theme">{menu}</div>, document.body);
 }

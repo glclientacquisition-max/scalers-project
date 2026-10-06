@@ -45,8 +45,8 @@ describe("desk control craft", () => {
     assert.match(settings, /export const settingsPrimaryButtonClass = btnPrimary/);
   });
 
-  it("uses FilterTabs on Inbox sort and a Sort select on Contacts", () => {
-    assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /<FilterTabs/);
+  it("uses Segmented on Inbox sort and a Sort select on Contacts", () => {
+    assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /<Segmented/);
     assert.match(read("dashboard/src/app/(desk)/contacts/page.tsx"), /<ContactSortSelect/);
     assert.match(read("dashboard/src/app/(desk)/contacts/page.tsx"), /<InboxFilterPills/);
     assert.match(read("dashboard/src/components/ui/FilterTabs.tsx"), /filterTabClass/);

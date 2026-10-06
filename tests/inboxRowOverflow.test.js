@@ -7,43 +7,11 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
-function placeInboxOverflowMenu(panel, anchor, viewport) {
-  const pad = 8;
-  const gap = 4;
-  let left;
-  let top;
-  if (anchor.align === "end") {
-    const triggerRight = anchor.x + (anchor.w ?? 0);
-    const triggerBottom = anchor.y + (anchor.h ?? 0);
-    left = triggerRight - panel.width;
-    top = triggerBottom + gap;
-    const above = anchor.y - panel.height - gap;
-    if (top + panel.height > viewport.height - pad && above >= pad) {
-      top = above;
-    }
-  } else {
-    left = anchor.x;
-    top = anchor.y;
-    if (left + panel.width > viewport.width - pad) {
-      left = anchor.x - panel.width;
-    }
-    if (top + panel.height > viewport.height - pad) {
-      top = anchor.y - panel.height;
-    }
-  }
-  const maxLeft = Math.max(pad, viewport.width - panel.width - pad);
-  const maxTop = Math.max(pad, viewport.height - panel.height - pad);
-  left = Math.min(Math.max(left, pad), maxLeft);
-  top = Math.min(Math.max(top, pad), maxTop);
-  return { left, top };
-}
-
 describe("inbox row overflow menu", () => {
   const overflow = read("dashboard/src/components/InboxRowOverflow.tsx");
   const actions = read("dashboard/src/lib/inboxLeadActions.ts");
   const lead = read("dashboard/src/components/MarkLeadDoneButton.tsx");
   const row = read("dashboard/src/components/InboxItemRow.tsx");
-  const place = read("dashboard/src/lib/inboxOverflowPlace.ts");
 
   function inboxItemWithLocal(item, local) {
     if (local.pinnedAt === undefined) return item;
@@ -59,23 +27,26 @@ describe("inbox row overflow menu", () => {
     assert.match(overflow, /inboxTogglePin\(view\)/);
   });
 
-  it("opens a custom menu on md+ and selects on long-press, with no phone sheet", () => {
+  it("opens kit Menu from More, selects on long-press, with no phone sheet", () => {
     assert.match(overflow, /LONG_PRESS_MS = 400/);
     assert.match(overflow, /isRowBodyPress/);
     assert.match(overflow, /data-inbox-row-body/);
     assert.match(overflow, /opacity-80/);
     assert.doesNotMatch(overflow, /transition-all/);
-    assert.match(overflow, /role="menuitem"/);
-    assert.match(overflow, /aria-haspopup="menu"/);
+    assert.match(overflow, /<Menu/);
+    assert.match(overflow, /<MenuItem/);
+    assert.match(overflow, /<IconButton/);
     assert.match(overflow, /onContextMenu/);
     assert.match(overflow, /pointerType !== "touch"/);
     assert.match(overflow, /ui\?\.enter\(item\.id\)/);
     assert.match(overflow, /onClickCapture/);
-    assert.match(overflow, /hidden md:inline-flex/);
+    assert.doesNotMatch(overflow, /hidden md:inline-flex/);
     assert.doesNotMatch(overflow, /coarse \? "sheet" : "menu"/);
     assert.doesNotMatch(overflow, /role="dialog"/);
     assert.doesNotMatch(overflow, /mode === "sheet"/);
     assert.doesNotMatch(overflow, /onContextMenu=\{undefined\}/);
+    assert.doesNotMatch(overflow, /createPortal/);
+    assert.doesNotMatch(overflow, /placeInboxOverflowMenu/);
   });
 
   it("keeps the trailing dock and Pin, Mark done, Archive overflow", () => {
@@ -107,7 +78,6 @@ describe("inbox row overflow menu", () => {
   it("closes after a successful run and keeps the menu on desk tokens", () => {
     assert.match(overflow, /busyRef\.current = true/);
     assert.match(overflow, /setOpen\(false\)/);
-    assert.match(overflow, /createPortal\(<div className="desk-theme">\{menu\}<\/div>, document.body\)/);
     assert.match(overflow, /pendingId === action.id \? "Saving"/);
     assert.doesNotMatch(overflow, /\{busy \? "Saving" : action.label\}/);
     assert.doesNotMatch(overflow, /close\(\);\n    router.refresh/);
@@ -134,36 +104,11 @@ describe("inbox row overflow menu", () => {
     assert.equal(inboxItemWithLocal({ ...loose, pinnedAt: "x" }, { pinnedAt: null }).pinnedAt, null);
   });
 
-  it("right-aligns More to the trigger instead of covering Call and WhatsApp", () => {
-    assert.match(overflow, /placeInboxOverflowMenu/);
-    assert.match(overflow, /align: "end"/);
-    assert.match(overflow, /visualViewport/);
-    assert.match(overflow, /offsetHeight/);
-    assert.match(overflow, /inline-flex/);
-    assert.match(overflow, /max-h-\[min\(24rem/);
-    assert.doesNotMatch(overflow, /innerHeight - 320/);
-    assert.doesNotMatch(overflow, /max-h-\[80vh\]/);
-    assert.match(place, /triggerRight - panel.width/);
-    const panel = { width: 224, height: 248 };
-    const more = placeInboxOverflowMenu(
-      panel,
-      { x: 900, y: 200, w: 48, h: 48, align: "end" },
-      { width: 1280, height: 800 }
-    );
-    assert.equal(more.left, 724);
-    assert.equal(more.top, 252);
-    assert.ok(more.left + panel.width <= 900 + 48);
-    const low = placeInboxOverflowMenu(
-      panel,
-      { x: 900, y: 700, w: 48, h: 48, align: "end" },
-      { width: 1280, height: 800 }
-    );
-    assert.equal(low.top, 448);
-    const point = placeInboxOverflowMenu(
-      panel,
-      { x: 1200, y: 100, align: "point" },
-      { width: 1280, height: 800 }
-    );
-    assert.equal(point.left, 976);
+  it("lets kit Menu place More, always visible on phone", () => {
+    assert.match(overflow, /from "@\/components\/ui\/Menu"/);
+    assert.match(overflow, /from "@\/components\/ui\/IconButton"/);
+    assert.match(overflow, /EllipsisVerticalIcon/);
+    assert.doesNotMatch(overflow, /align: "end"/);
+    assert.doesNotMatch(overflow, /visualViewport/);
   });
 });

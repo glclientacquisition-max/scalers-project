@@ -29,7 +29,7 @@ describe("inbox filters and empty states", () => {
     assert.doesNotMatch(niche, /Assigned to me/);
     assert.match(toolbar, /<InboxFilterPills/);
     assert.match(toolbar, /label="Filter by purpose"/);
-    assert.match(toolbar, /<FilterTabs/);
+    assert.match(toolbar, /<Segmented/);
     assert.match(toolbar, /label="Visit sort"/);
     assert.match(toolbar, /archived \? null/);
     const entry = read("dashboard/src/components/InboxArchivedRow.tsx");

@@ -351,7 +351,7 @@ export function InboxPhoneRow({
   vertical?: string | null;
   ret?: InboxReturn;
 }) {
-  const { who, message, openHref, needed, visit, when, showJob, showHold, nextStep } =
+  const { who, message, openHref, needed, visit, when, showJob, showHold, nextStep, stamp } =
     inboxCopy(item, purpose, vertical, businessName, ret);
   const work = item.headline;
   const meta = showHold ? needed : showJob ? visit : when;
@@ -365,12 +365,15 @@ export function InboxPhoneRow({
         >
           {who}
         </InboxRowLabel>
-        <InboxWhenMeta
-          item={item}
-          text={meta}
-          className="flex min-w-0 items-center gap-1.5 text-xs text-ink-soft sm:max-w-[45%] sm:shrink-0 sm:justify-end"
-          textClassName="min-w-0 truncate"
-        />
+        <span className="flex min-w-0 items-center gap-2 sm:max-w-[45%] sm:shrink-0 sm:justify-end">
+          <InboxPurposeChip purpose={item.purpose} label={stamp} />
+          <InboxWhenMeta
+            item={item}
+            text={meta}
+            className="flex min-w-0 items-center gap-1.5 text-xs text-ink-soft"
+            textClassName="min-w-0 truncate"
+          />
+        </span>
       </div>
       <p className={`mt-0.5 text-sm ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
         {work}

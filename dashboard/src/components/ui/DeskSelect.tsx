@@ -7,7 +7,7 @@ import { cx } from "@/lib/cx";
 /**
  * Closed chrome matches desk field classes; open list is a themed popover
  * (bg-surface + text-ink) so dark mode never falls back to a light OS popup.
- * Portal content is wrapped in `.desk-theme` (same as InboxRowOverflow) so
+ * Portal content is wrapped in `.desk-theme` (same as Menu) so
  * dark CSS vars resolve when Select.Portal mounts under body.
  * Color-scheme pin on remaining native selects stays; this covers DoD paths.
  */
