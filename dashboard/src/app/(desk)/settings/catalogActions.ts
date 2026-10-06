@@ -236,6 +236,9 @@ export async function applyCatalogImportAction(
     return ownerSaveFailed("catalog", error.message);
   }
 
+  // GIGO P0: import save alone does not recompile. After owner confirms the diff,
+  // call recompileAfterCatalogImport from @/lib/catalogImportRecompile.
+
   revalidatePath("/settings");
   return {
     ok: true,
