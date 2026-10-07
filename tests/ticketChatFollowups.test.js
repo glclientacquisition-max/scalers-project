@@ -88,7 +88,7 @@ describe("ticket chat follow-ups", () => {
     assert.match(css, /data-desk-ticket-chat\] \[data-account-bar\]/);
     assert.match(css, /:not\(\[data-desk-route-ready\]\) \[data-account-bar\]/);
     assert.match(ticket, /safe-area-inset-top/);
-    assert.match(read("dashboard/src/components/ui/DeskBack.tsx"), /min-h-11 min-w-11/);
+    assert.match(read("dashboard/src/components/ui/IconButton.tsx"), /h-11 w-11/);
     assert.match(read("dashboard/src/components/DeskRouteChrome.tsx"), /isDeskTicketChatPath\(pathname\)/);
     assert.match(read("dashboard/src/components/DeskRouteChrome.tsx"), /data-desk-ticket-chat/);
     assert.match(callDetail, /account strip is off this route/);

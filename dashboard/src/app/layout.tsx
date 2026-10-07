@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DeskThemeProvider } from "@/components/DeskThemeProvider";
 import { NotifyHost } from "@/components/ui/DeskNotice";
+import { TooltipProvider } from "@/components/ui/Tooltip";
 import { DESK_MD_BOOT_SCRIPT } from "@/lib/deskMdBoot";
 import { DESK_THEME_COLOR_DARK, DESK_THEME_COLOR_LIGHT, DESK_THEME_STORAGE_KEY } from "@/lib/deskTheme";
 import "./globals.css";

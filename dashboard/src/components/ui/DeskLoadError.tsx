@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { btnPrimary, deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { DeskError } from "@/components/ui/DeskError";
 
 /** Load failure stays on the page. Retry re-runs the server render. */
@@ -23,16 +22,13 @@ export function DeskLoadError({
     <div>
       <DeskError>{children}</DeskError>
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => refresh()} className={btnPrimary}>
+        <Button type="button" onClick={() => refresh()}>
           Retry
-        </button>
+        </Button>
         {backHref && backLabel ? (
-          <Link
-            href={backHref}
-            className={`inline-flex min-h-11 items-center px-1 text-sm font-medium text-ink-soft ${deskShiftClass} hover:underline ${focusRingVisible}`}
-          >
+          <ButtonLink href={backHref} variant="ghost">
             {backLabel}
-          </Link>
+          </ButtonLink>
         ) : null}
       </div>
     </div>

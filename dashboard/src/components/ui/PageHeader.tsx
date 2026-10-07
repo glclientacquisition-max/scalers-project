@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { ChevronLeftIcon } from "@heroicons/react/24/outline";
 import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
+import { IconButtonLink } from "@/components/ui/IconButton";
 
 /**
  * The first row of every screen. Title on the baseline, optional Back on the start, one action on the end.
@@ -25,13 +25,9 @@ export function PageHeader({
   return (
     <header className={cx("flex min-h-11 items-center gap-2", className)}>
       {back ? (
-        <Link
-          href={back.href}
-          aria-label={back.label}
-          className="-ms-3 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-        >
-          <ChevronLeftIcon className="h-6 w-6" aria-hidden="true" />
-        </Link>
+        <IconButtonLink href={back.href} label={back.label} className="-ms-1" data-desk-back="">
+          <ChevronLeftIcon aria-hidden="true" />
+        </IconButtonLink>
       ) : null}
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-page text-ink">{title}</h1>

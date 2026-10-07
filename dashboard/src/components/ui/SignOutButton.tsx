@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import {
   btnPrimary,
   deskShiftClass,
-  focusRing,
   focusRingVisible,
 } from "@/components/ui/deskChrome";
+import { MenuItem } from "@/components/ui/Menu";
 
 const stayClass = [
   "inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft",
@@ -34,19 +34,9 @@ export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu
   if (!confirming) {
     if (layout === "menu") {
       return (
-        <button
-          type="button"
-          role="menuitem"
-          onClick={() => setConfirming(true)}
-          className={[
-            "flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-medium text-warn",
-            deskShiftClass,
-            "hover:bg-warn-soft active:bg-warn-soft",
-            focusRing,
-          ].join(" ")}
-        >
+        <MenuItem closeOnClick={false} tone="attention" onClick={() => setConfirming(true)}>
           Sign out
-        </button>
+        </MenuItem>
       );
     }
     return (

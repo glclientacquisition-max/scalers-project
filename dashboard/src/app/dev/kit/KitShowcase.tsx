@@ -66,6 +66,7 @@ export function KitShowcase() {
           <div className="mx-auto max-w-desk px-4 py-4 sm:px-6 sm:py-6">
             <PageHeader
               title="Kit"
+              back={{ href: "/home", label: "Home" }}
               meta="System font. Radii 6, 10, 16."
               action={
                 <SegmentedControl
