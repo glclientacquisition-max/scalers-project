@@ -216,7 +216,7 @@ describe("business settings craft", () => {
   it("labels Appearance as This device and persists with scalers-desk-theme", () => {
     const themeLib = read("dashboard/src/lib/deskTheme.ts");
     const layout = read("dashboard/src/app/layout.tsx");
-    assert.match(theme, /aria-label="This device"/);
+    assert.match(theme, /label="This device"/);
     assert.match(theme, /readDeskTheme/);
     assert.match(theme, /writeDeskTheme/);
     assert.match(themeLib, /export const DESK_THEME_STORAGE_KEY = "scalers-desk-theme"/);
@@ -317,8 +317,8 @@ describe("business settings craft", () => {
     assert.match(alerts, /<ToolSwitch/);
     assert.match(alerts, /ALERTS_SETTINGS_FORM_ID/);
     assert.match(alerts, /form=\{ALERTS_SETTINGS_FORM_ID\}/);
-    assert.match(theme, /role="radiogroup"/);
-    assert.match(theme, /aria-label="This device"/);
+    assert.match(theme, /<SegmentedControl/);
+    assert.match(theme, /label="This device"/);
     assert.match(theme, /data-theme-cluster=""/);
     assert.doesNotMatch(theme, /SettingsSegmented/);
     assert.match(ui, /deskRateCardClass/);

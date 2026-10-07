@@ -48,8 +48,8 @@ describe("desk account bar", () => {
   });
 
   it("shows a theme cluster on Appearance and keeps Line live off that control", () => {
-    assert.match(picker, /role="radiogroup"/);
-    assert.match(picker, /aria-label="This device"/);
+    assert.match(picker, /<SegmentedControl/);
+    assert.match(picker, /label="This device"/);
     assert.match(picker, /data-theme-cluster=""/);
     for (const label of ["System", "Light", "Dark"]) {
       assert.match(picker, new RegExp(`label: "${label}"`));
