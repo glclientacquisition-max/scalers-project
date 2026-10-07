@@ -1,0 +1,30 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "callId": "HD_b47644d19072",
+  "tenantId": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+  "businessName": "Done and Dusted",
+  "callerName": "Alvin",
+  "nameOnFile": true,
+  "source": "Railway staging 2026-10-06 08:36Z. TTS spoke the name ask, then the two English questions. A 138-char Gemini body was not stored.",
+  "turns": [
+    {
+      "caller": "I want to ask a just services gari mnaofa",
+      "flushed": true,
+      "canned": { "path": "file_name_ask", "text": "Am I speaking with Alvin?" },
+      "model": { "provider": "canned", "model": "file_name_ask", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null }
+    },
+    {
+      "caller": "Yeah,you are.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "What do you need done? How else can I help you, Alvin?",
+        "chars": 54,
+        "spokenEmitted": 54
+      }
+    }
+  ]
+}

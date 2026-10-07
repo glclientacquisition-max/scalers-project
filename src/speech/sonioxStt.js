@@ -154,32 +154,63 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
         let interim = '';
         let finals = '';
         let sawEndpoint = false;
+        const tokens = [];
         for (const token of msg.tokens) {
           if (!token || typeof token.text !== 'string') continue;
+          const language = token.language || token.language_code || null;
+          const startMs = token.start_ms ?? token.startMs ?? null;
+          const endMs = token.end_ms ?? token.endMs ?? null;
           // Soniox endpoint marker when enable_endpoint_detection is on.
           if (token.text.includes('<end>')) {
             sawEndpoint = true;
             const cleaned = token.text.replace(/<\/?end>/g, '').replace(/\?/g, '').trim();
             if (cleaned) {
+              tokens.push({
+                text: cleaned,
+                final: Boolean(token.is_final),
+                language,
+                startMs,
+                endMs,
+              });
               if (token.is_final) finals += cleaned;
               else interim += cleaned;
             }
             continue;
           }
+          tokens.push({
+            text: token.text,
+            final: Boolean(token.is_final),
+            language,
+            confidence: token.confidence ?? token.confidence_score ?? null,
+            startMs,
+            endMs,
+          });
           if (token.is_final) finals += token.text;
           else interim += token.text;
         }
         if (finals) {
           console.log(`[soniox-stt][${callSid}] FINAL: ${finals}`);
           noteSonioxProviderOk('stt');
-          onEvent({ type: 'transcript', text: finals, isFinal: true, raw: msg });
+          onEvent({
+            type: 'transcript',
+            text: finals,
+            isFinal: true,
+            raw: msg,
+            tokens: tokens.filter((token) => token.final),
+          });
         } else if (interim) {
           console.log(`[soniox-stt][${callSid}] interim: ${interim}`);
-          onEvent({ type: 'transcript', text: interim, isFinal: false, raw: msg });
+          onEvent({
+            type: 'transcript',
+            text: interim,
+            isFinal: false,
+            raw: msg,
+            tokens: tokens.filter((token) => !token.final),
+          });
         }
         if (sawEndpoint) {
           console.log(`[soniox-stt][${callSid}] endpoint`);
-          onEvent({ type: 'endpoint', raw: msg });
+          onEvent({ type: 'endpoint', raw: msg, tokens });
         }
       }
 

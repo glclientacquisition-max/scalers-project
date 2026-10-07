@@ -114,6 +114,44 @@ async function fetchCallRecording(callId, opts = {}) {
   };
 }
 
+const RECORDING_BACKOFF_MS = [800, 2400, 6000];
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * After hangup, the recording URL can 404 until SautiKit finishes the file.
+ * Retry with backoff. A final 404 is recording_status=missing. This does not
+ * throw, so the caller can run it off the hangup and wallet path.
+ *
+ * @param {string} callId
+ * @param {{ delays?: number[], sleep?: (ms: number) => Promise<void>, apiKey?: string, apiBase?: string, fetchImpl?: typeof fetch }} [opts]
+ */
+async function fetchCallRecordingWithBackoff(callId, opts = {}) {
+  const delays = Array.isArray(opts.delays) ? opts.delays : [0, ...RECORDING_BACKOFF_MS];
+  const wait = opts.sleep || sleep;
+  let last = { downloadUrl: null, sessionId: null, status: 'missing_id' };
+  for (let attempt = 0; attempt < delays.length; attempt += 1) {
+    if (delays[attempt]) await wait(delays[attempt]);
+    last = await fetchCallRecording(callId, opts);
+    if (last.downloadUrl) {
+      return { ...last, recordingStatus: 'ready', attempts: attempt + 1 };
+    }
+    if (last.status !== 404 && last.status !== 410 && last.status !== 202) {
+      return { ...last, recordingStatus: 'error', attempts: attempt + 1 };
+    }
+  }
+  return {
+    ...last,
+    downloadUrl: null,
+    recordingStatus: 'missing',
+    attempts: delays.length,
+  };
+}
+
 module.exports = {
   fetchCallRecording,
+  fetchCallRecordingWithBackoff,
+  RECORDING_BACKOFF_MS,
 };

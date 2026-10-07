@@ -7,6 +7,7 @@ const {
   utteranceLooksIncomplete,
   isInterruptOnlyUtterance,
   adaptiveFlushMs,
+  decideTurnEnd,
   evaluateBargeIn,
   hasBargeContent,
   agentAwaitingReply,
@@ -74,6 +75,37 @@ test('flags let-me-think and trailing correction stems', () => {
 test('complete sentences are complete', () => {
   assert.strictEqual(utteranceLooksIncomplete('I need a plumber.'), false);
   assert.strictEqual(utteranceLooksIncomplete('My name is John'), false);
+  assert.strictEqual(
+    utteranceLooksIncomplete('Ah, nilikuwa nataka kuchukua counter books.'),
+    false
+  );
+});
+test('Kiswahili unfinished phrases stay open', () => {
+  assert.strictEqual(utteranceLooksIncomplete('Nilikuwa nauliza,'), true);
+  assert.strictEqual(utteranceLooksIncomplete('Nilikuwa nauliza'), true);
+  assert.strictEqual(utteranceLooksIncomplete('Naomba um'), true);
+});
+test('endpoint waits out the cap on Nilikuwa nauliza', () => {
+  const held = decideTurnEnd({
+    text: 'Nilikuwa nauliza,',
+    endpoint: true,
+    waitedMs: 0,
+  });
+  assert.strictEqual(held.action, 'wait');
+  assert.strictEqual(held.reason, 'unfinished');
+  assert.ok(held.waitMs >= 700 && held.waitMs <= 900);
+  const flushed = decideTurnEnd({
+    text: 'Nilikuwa nauliza,',
+    endpoint: true,
+    waitedMs: 800,
+  });
+  assert.strictEqual(flushed.action, 'flush');
+  assert.strictEqual(flushed.reason, 'unfinished_cap');
+});
+test('a finished endpoint flushes immediately', () => {
+  const done = decideTurnEnd({ text: 'Ndiyo.', endpoint: true, waitedMs: 0 });
+  assert.strictEqual(done.action, 'flush');
+  assert.strictEqual(done.reason, 'endpoint');
 });
 
 console.log('isInterruptOnlyUtterance');

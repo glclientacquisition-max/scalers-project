@@ -443,8 +443,41 @@ function mergeIdentityLexicon(extra, identity = {}) {
   return [...extras, ...identityEntries];
 }
 
+const STACKED_HYPHEN = /\b[A-Za-z]{2,}(?:-[A-Za-z]{2,})+\b/;
+
+function lexiconSurface(match) {
+  const first = String(match || '').split('|')[0];
+  const plain = first
+    .replace(/\\s\+/g, ' ')
+    .replace(/\\b/g, '')
+    .replace(/\\/g, '')
+    .replace(/[()?*+^$]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain.replace(/(^|\s)\p{L}/gu, (letter) => letter.toUpperCase());
+}
+
+const SAY_TO_SURFACE = new Map();
+for (const entry of KENYA_LEXICON) {
+  if (!entry.say || !STACKED_HYPHEN.test(entry.say)) continue;
+  const surface = lexiconSurface(entry.match);
+  if (surface) SAY_TO_SURFACE.set(String(entry.say).toLowerCase(), surface);
+}
+
+/**
+ * Syllable-stack hyphens (Kee-ten-geh-la) make Soniox pause and fail the
+ * respelling check. Put the place name back.
+ * @param {string} text
+ */
+function undoStackedHyphens(text) {
+  return String(text || '').replace(new RegExp(STACKED_HYPHEN.source, 'g'), (token) => {
+    return SAY_TO_SURFACE.get(token.toLowerCase()) || token.replace(/-/g, '');
+  });
+}
+
 module.exports = {
   KENYA_LEXICON,
+  undoStackedHyphens,
   applyLexicon,
   listLexiconEntries,
   parseLexiconOverrides,

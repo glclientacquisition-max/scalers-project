@@ -1,0 +1,16 @@
+{
+  "callId": "HD_120c5b99e9e7",
+  "businessName": "Done and Dusted",
+  "from": "+254790381872",
+  "to": "+254709221537",
+  "replyLanguage": "sw",
+  "durationSeconds": 91,
+  "services": ["couch cleaning", "mattress cleaning", "carpet cleaning"],
+  "notes": [
+    "Swahili lock spoke an English name ask on turn 1.",
+    "Name confirm repeated Habari and the shop name.",
+    "Nilikuwa nauliza, flushed on the endpoint.",
+    "Happy? was treated as a goal.",
+    "The services list still has to be spoken."
+  ]
+}
