@@ -9,9 +9,11 @@ import {
   settingsWideDefaultHref,
 } from "@/lib/businessSettingsNav";
 import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
+import { serializeFieldMetaForClient } from "@/lib/fieldMetaAttestUi";
 import { settingsIndexStatuses } from "@/lib/settingsOptionStatus";
 import { tenantForSettingsView } from "@/lib/settingsPanelPayload";
 import { getCurrentTenant } from "@/lib/tenant";
+import { loadCompileProvenance } from "@/lib/tenantFieldProvenance";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
@@ -66,17 +68,18 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     }
   }
 
+  const { fieldMeta: fieldMetaRaw } = await loadCompileProvenance(tenant.id);
+  const fieldMeta = serializeFieldMetaForClient(fieldMetaRaw);
+  const navTargets = SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target));
+
   return (
     <BusinessSettingsShell
       tenant={tenantForSettingsView(tenant, tab, trainPanel)}
       tab={tab}
       trainPanel={trainPanel}
       curatedVoices={curatedVoices}
-      optionStatus={settingsIndexStatuses(
-        tenant,
-        curatedVoices,
-        SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target))
-      )}
+      fieldMeta={fieldMeta}
+      optionStatus={settingsIndexStatuses(tenant, curatedVoices, navTargets, fieldMeta)}
       liveTransferExecutor={deskLiveTransferExecutorEnabled()}
     />
   );

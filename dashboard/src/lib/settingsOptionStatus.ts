@@ -4,23 +4,34 @@ export type SettingsStatusVoice = {
   default?: boolean;
 };
 
+import {
+  countUnattestedForTarget,
+  type DeskFieldMetaClient,
+} from "@/lib/fieldMetaAttestUi";
+
 export type SettingsStatusTenant = {
   business_name?: string | null;
+  spoken_name?: string | null;
+  vertical?: string | null;
   agent_name?: string | null;
   agent_tone?: string | null;
   sautikit_virtual_number?: string | null;
+  whatsapp_notification_number?: string | null;
+  alert_email?: string | null;
+  social_handles?: unknown;
+  business_policies?: unknown;
+  product_catalog?: unknown;
   soniox_voice_id?: string | null;
   soniox_voice_label?: string | null;
   hours_schedule?: unknown;
   faqs?: unknown;
   services_catalog?: unknown;
-  product_catalog?: unknown;
   team_directory?: unknown;
   business_locations?: unknown;
   tts_lexicon?: unknown;
 };
 
-type SettingsStatusTarget =
+export type SettingsStatusTarget =
   | { tab: "catalog" | "import" | "test" | "alerts" }
   | { tab: "train"; panel: string };
 
@@ -206,17 +217,30 @@ export type SettingsListStatus = {
 export function settingsIndexStatuses(
   tenant: SettingsStatusTenant,
   voices: SettingsStatusVoice[],
-  targets: SettingsStatusTarget[]
+  targets: SettingsStatusTarget[],
+  fieldMeta?: DeskFieldMetaClient
 ): Record<string, SettingsListStatus> {
   const out: Record<string, SettingsListStatus> = {};
   for (const target of targets) {
+    const key = settingsStatusKey(target);
+    const attestCount = fieldMeta ? countUnattestedForTarget(target, fieldMeta, tenant) : 0;
+    const attestText =
+      attestCount > 0
+        ? attestCount === 1
+          ? "1 to confirm"
+          : `${attestCount} to confirm`
+        : "";
+    if (attestText) {
+      out[key] = { text: attestText, title: attestText };
+      continue;
+    }
     const text = settingsOptionStatus(target, tenant, voices);
     if (!text) continue;
     const title =
       target.tab === "train" && target.panel === "tools"
         ? voiceFull(tenant, voices) || text
         : text;
-    out[settingsStatusKey(target)] = { text, title };
+    out[key] = { text, title };
   }
   return out;
 }

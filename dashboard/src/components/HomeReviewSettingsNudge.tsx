@@ -3,47 +3,33 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { businessSettingsHref, type SettingsPanel } from "@/lib/businessSettingsNav";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import { reviewGapCopy, type CaptureScore } from "@/lib/completenessStub";
-
-function captureSettingsHref(domain: string | undefined): string {
-  if (domain === "catalog") return businessSettingsHref("catalog");
-  if (domain === "team_notify") return businessSettingsHref("alerts");
-  if (domain === "bulletin") return "/home#updates";
-  if (domain === "assistant") return businessSettingsHref("train", "tools");
-  if (domain === "payments" || domain === "policies") {
-    return businessSettingsHref("train", "policies");
-  }
-  const trainPanels = new Set<string>([
-    "identity",
-    "hours",
-    "locations",
-    "faqs",
-    "tools",
-  ]);
-  if (domain && trainPanels.has(domain)) {
-    return businessSettingsHref("train", domain as SettingsPanel);
-  }
-  return businessSettingsHref("train");
-}
+import { settingsHrefForGapDomain } from "@/lib/fieldMetaAttestUi";
 
 /** One-line nudge for live lines. Full Setup stays off Overview. */
 export function HomeReviewSettingsNudge({
   tenantId,
   vertical,
   score,
+  unattestedCount = 0,
 }: {
   tenantId: string;
   vertical: string | null | undefined;
   score: CaptureScore;
+  unattestedCount?: number;
 }) {
   const [dismissed, setDismissed] = useState(false);
   const storageKey = `scalers.captureNudge.${tenantId}`;
   const gap = score.next_gaps[0];
-  const href = captureSettingsHref(gap?.domain);
+  const href = settingsHrefForGapDomain(gap?.domain);
+  const gapLine = reviewGapCopy(gap?.action || "");
+  const countLine =
+    unattestedCount > 0
+      ? `${unattestedCount} fact${unattestedCount === 1 ? "" : "s"} still marked suggested. `
+      : "";
   const preview =
-    reviewGapCopy(gap?.action || "") || "Confirm what we have on file.";
+    `${countLine}${gapLine || "Confirm what we have on file."}`.trim();
 
   useEffect(() => {
     try {

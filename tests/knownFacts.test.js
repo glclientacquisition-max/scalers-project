@@ -95,6 +95,53 @@ describe('HD_ec64018de793 catalogue list', () => {
     assert.doesNotMatch(listed.line, /what do you need done|which service would you like|ungependa/i);
   });
 
+  it('joins Kiswahili and Sheng with na, and speaks the service name only', () => {
+    const catalog = {
+      servicesCatalog: [
+        { name: 'Couch cleaning', notes: 'includes cushions' },
+        { name: 'Mattress cleaning' },
+        { name: 'Carpet cleaning' },
+        { name: 'General cleaning (houses & air bnbs)' },
+        { name: 'Pet stain removal' },
+      ],
+    };
+    const sw = resolveLocalReply({
+      text: 'Niambie huduma zenu.',
+      state: state('Niambie huduma zenu.'),
+      language: 'sw',
+      profile: catalog,
+    });
+    assert.equal(sw.outcome, 'catalogue');
+    assert.equal(
+      sw.line,
+      'Tuna Couch cleaning, Mattress cleaning, Carpet cleaning, na General cleaning, na zingine. Unahitaji gani?'
+    );
+    assert.doesNotMatch(sw.line, /\band\b|\(|houses|cushions|air bnbs/i);
+
+    const sheng = resolveLocalReply({
+      text: 'Niambie huduma zenu.',
+      state: state('Niambie huduma zenu.'),
+      language: 'sheng',
+      profile: catalog,
+    });
+    assert.equal(
+      sheng.line,
+      'Tuna Couch cleaning, Mattress cleaning, Carpet cleaning, na General cleaning, na zingine. Unahitaji gani?'
+    );
+
+    const en = resolveLocalReply({
+      text: 'Which services do you offer?',
+      state: state('Which services do you offer?'),
+      language: 'en',
+      profile: catalog,
+    });
+    assert.equal(
+      en.line,
+      'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning, and more. Which one do you need?'
+    );
+    assert.doesNotMatch(en.line, /\(|houses|cushions|air bnbs/i);
+  });
+
   it('answers the pending services ask after name-confirm yes, and drops location over', () => {
     let brain = createBrainState(CHAPTER_ONE);
     brain = observeCallerTurn(brain, {

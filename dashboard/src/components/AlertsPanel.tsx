@@ -24,6 +24,9 @@ import {
 import { pendingSpinnerClass } from "@/components/ui/deskChrome";
 import { notify } from "@/components/ui/DeskNotice";
 import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
+import { CaptureConfirmList } from "@/components/CaptureConfirmList";
+import { confirmCaptureFields } from "@/app/(desk)/settings/provenanceActions";
+import { alertsConfirmRows, type DeskFieldMetaClient } from "@/lib/fieldMetaAttestUi";
 
 const initial: AlertsActionState = {};
 
@@ -32,11 +35,14 @@ export const ALERTS_SETTINGS_FORM_ID = "alerts-settings-form";
 export function AlertsPanel({
   tenant,
   businessName,
+  fieldMeta = null,
 }: {
   tenant: TenantRow;
   businessName: string;
+  fieldMeta?: DeskFieldMetaClient;
 }) {
   const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
   const [ownerWhatsapp, setOwnerWhatsapp] = useState(
     tenant.whatsapp_notification_number || ""
   );
@@ -76,6 +82,20 @@ export function AlertsPanel({
     notify(state.message || "Saved");
     router.refresh();
   }, [state, alertsDraft, router]);
+
+  const alertReviewRows = alertsConfirmRows(fieldMeta, ownerWhatsapp, alertEmail);
+
+  async function confirmAlertPaths(paths: string[]) {
+    const unique = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
+    if (!unique.length) return;
+    setConfirming(true);
+    try {
+      const result = await confirmCaptureFields(unique);
+      if (result.ok) router.refresh();
+    } finally {
+      setConfirming(false);
+    }
+  }
 
   return (
     <section className="min-w-0 w-full space-y-6">
@@ -119,6 +139,13 @@ export function AlertsPanel({
           type="hidden"
           name="notify_channels"
           value={JSON.stringify(notifyChannels)}
+        />
+
+        <CaptureConfirmList
+          pending={confirming}
+          onConfirm={(path) => void confirmAlertPaths([path])}
+          onConfirmAll={(paths) => void confirmAlertPaths(paths)}
+          rows={alertReviewRows}
         />
 
         <SettingsGroup title="Contact">

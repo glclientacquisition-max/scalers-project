@@ -14,6 +14,9 @@ import {
 } from "@/lib/dailyBulletin";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
+import { fieldPathsAttestedOnBulletinSave } from "@/lib/fieldPathsFromSettingsSave";
+import { ownerAttestFields } from "@/lib/ownerAttestFields";
+import { getAuthUser } from "@/lib/auth";
 
 export type BulletinActionState = {
   error?: string;
@@ -53,6 +56,14 @@ async function saveBulletin(
   if (error) {
     return ownerSaveFailed("bulletin", error.message);
   }
+
+  const user = await getAuthUser();
+  await ownerAttestFields(
+    tenantId,
+    fieldPathsAttestedOnBulletinSave(items.length > 0),
+    user?.id ?? null
+  );
+
   revalidatePath("/settings");
   revalidatePath("/home");
   return {};
