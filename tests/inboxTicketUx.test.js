@@ -89,24 +89,21 @@ describe("inbox ticket action chrome", () => {
     assert.match(dock, /name="reply_id"/);
     assert.match(ticket, /mode="thread"/);
     assert.doesNotMatch(notes, /caller_appointment_confirmed/);
-    assert.match(dock, /aria-label="Send"/);
-    assert.match(dock, /title="Send"/);
-    assert.match(dock, /SendGlyph/);
-    assert.match(dock, /min-h-11 min-w-11/);
-    assert.match(dock, /btnPrimaryFill/);
+    assert.match(dock, /label="Send"/);
+    assert.match(dock, /PaperAirplaneIcon/);
+    assert.match(dock, /tone="accent"/);
     assert.doesNotMatch(dock, /\{sendPending \? "Sending" : "Send"\}/);
   });
 
   it("puts a polish wand before Send on the SMS dock", () => {
     assert.match(dock, /wandLabel/);
-    assert.match(dock, /aria-label=\{wandLabel\}/);
-    assert.match(dock, /DeskHint label=\{wandLabel\}/);
+    assert.match(dock, /label=\{wandLabel\}/);
     assert.match(dock, /note\.trim\(\) \? "Polish" : "Suggest"/);
     assert.match(dock, /polishInboxSmsAction/);
-    assert.match(dock, /WandGlyph/);
+    assert.match(dock, /PencilSquareIcon/);
     assert.match(dock, /if \(polishState\.text\) setNote\(polishState\.text\)/);
-    assert.match(dock, /aria-label="Send"/);
-    assert.match(dock, /btnPrimaryFill/);
+    assert.match(dock, /label="Send"/);
+    assert.match(dock, /tone="accent"/);
     assert.match(dock, /disabled=\{sendPending \|\| !canSend\}/);
     assert.doesNotMatch(dock, /[\u2014\u2013]/);
   });

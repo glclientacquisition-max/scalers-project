@@ -5,7 +5,8 @@ import {
   updateServiceRequestSchedule,
   type RequestScheduleState,
 } from "@/app/(desk)/requests/actions";
-import { btnGhost, deskFieldClass } from "@/components/ui/deskChrome";
+import { Button } from "@/components/ui/Button";
+import { deskFieldClass } from "@/components/ui/deskChrome";
 
 const initial: RequestScheduleState = {};
 
@@ -37,13 +38,9 @@ export function InboxHoldEditor({
           placeholder="Today 5:00 PM"
           className={fieldClass}
         />
-        <button
-          type="submit"
-          disabled={pending}
-          className={`${btnGhost} w-full disabled:opacity-50`}
-        >
+        <Button type="submit" variant="ghost" size="md" block pending={pending}>
           {pending ? "Saving" : "Save"}
-        </button>
+        </Button>
         {state.error ? <p className="text-sm text-warn">Could not save.</p> : null}
       </form>
     </div>

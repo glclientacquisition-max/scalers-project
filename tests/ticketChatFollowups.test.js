@@ -123,7 +123,7 @@ describe("ticket chat follow-ups", () => {
     assert.doesNotMatch(ticket, /tenantId/);
     assert.doesNotMatch(dock, /sparkle/i);
     assert.match(dock, /polishInboxSmsAction/);
-    assert.match(dock, /WandGlyph/);
+    assert.match(dock, /PencilSquareIcon/);
     assert.match(callDetail, /No FAQ ideas/);
     assert.match(callDetail, /Empty wand Suggests one packaged SMS/);
     assert.match(callDetail, /filled wand Polishes/);

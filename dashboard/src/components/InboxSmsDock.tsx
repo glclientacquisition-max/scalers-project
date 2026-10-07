@@ -1,73 +1,20 @@
 "use client";
 
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
+import { PaperAirplaneIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import {
   polishInboxSmsAction,
   sendInboxReplySms,
   type PolishCallerNoteState,
   type SendCallerNoteState,
 } from "@/app/(desk)/calls/noteActions";
-import { DeskHint } from "@/components/ui/DeskHint";
-import {
-  btnPrimaryFill,
-  deskHitClass,
-  deskShiftClass,
-  focusRingVisible,
-  pendingSpinnerClass,
-  pendingSpinnerInkClass,
-} from "@/components/ui/deskChrome";
+import { IconButton } from "@/components/ui/IconButton";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 import type { InboxSmsFacts } from "@/lib/polishInboxSms";
 import { emptyInboxSmsFacts } from "@/lib/polishInboxSms";
 
 const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
-
-function SendGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M22 2 11 13"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M22 2 15 22l-4-9-9-4Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function WandGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M15 4.5 5.5 14 4 20l6-1.5 9.5-9.5"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M13.8 6.2 17.8 10.2"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-      <path
-        d="M16.5 3.2v2.6M15.2 4.5h2.6M20 9.2v2M19 10.2h2"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 export function InboxSmsDock({
   callId,
@@ -153,63 +100,50 @@ export function InboxSmsDock({
             el.style.height = "auto";
             el.style.height = `${el.scrollHeight}px`;
           }}
-          className={`min-h-11 max-h-40 w-full resize-none rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink ${deskShiftClass} placeholder:text-ink-soft/70 focus:outline-none focus:ring-2 focus:ring-brand`}
+          className={`min-h-11 max-h-40 w-full resize-none rounded-xl border border-hairline bg-surface px-3 py-2.5 text-body text-ink ${deskShiftClass} placeholder:text-ink-3 focus:outline-none focus:ring-2 focus:ring-brand`}
         />
         {callerPhone ? (
-          <DeskHint label={wandLabel} side="top">
-            <button
-              type="button"
-              aria-label={wandLabel}
-              title={wandLabel}
-              aria-busy={polishPending}
-              disabled={polishPending || sendPending}
-              className={`${deskHitClass} ${deskShiftClass} text-ink-soft hover:bg-surface-muted hover:text-ink ${focusRingVisible} disabled:opacity-50`}
-              onClick={() => {
-                if (polishPending || sendPending) return;
-                const fd = new FormData();
-                fillPolishForm(fd);
-                startTransition(() => {
-                  polishAction(fd);
-                });
-              }}
-            >
-              {polishPending ? (
-                <span aria-hidden="true" className={pendingSpinnerInkClass} />
-              ) : (
-                <WandGlyph />
-              )}
-            </button>
-          </DeskHint>
-        ) : null}
-        <DeskHint label="Send" side="top">
-          <button
-            type="submit"
-            aria-label="Send"
-            title="Send"
-            aria-busy={sendPending}
-            disabled={sendPending || !canSend}
-            className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl ${btnPrimaryFill} ${deskShiftClass} active:scale-[0.99] motion-reduce:active:scale-100 ${focusRingVisible}`}
+          <IconButton
+            type="button"
+            label={wandLabel}
+            size="sm"
+            pending={polishPending}
+            disabled={polishPending || sendPending}
+            onClick={() => {
+              if (polishPending || sendPending) return;
+              const fd = new FormData();
+              fillPolishForm(fd);
+              startTransition(() => {
+                polishAction(fd);
+              });
+            }}
           >
-            {sendPending ? (
-              <span aria-hidden="true" className={pendingSpinnerClass} />
-            ) : (
-              <SendGlyph />
-            )}
-          </button>
-        </DeskHint>
+            <PencilSquareIcon aria-hidden="true" />
+          </IconButton>
+        ) : null}
+        <IconButton
+          type="submit"
+          label="Send"
+          size="sm"
+          tone="accent"
+          pending={sendPending}
+          disabled={sendPending || !canSend}
+        >
+          <PaperAirplaneIcon aria-hidden="true" />
+        </IconButton>
       </form>
       {polishState.error ? (
-        <p className="mt-1 text-xs text-warn" role="status">
+        <p className="mt-1 text-caption text-attention" role="status">
           {polishState.error}
         </p>
       ) : null}
       {sendState.error ? (
-        <p className="mt-1 text-xs text-warn" role="alert">
+        <p className="mt-1 text-caption text-attention" role="alert">
           {sendState.error}
         </p>
       ) : null}
       {sendState.ok ? (
-        <p className="mt-1 text-xs text-ok" role="status">
+        <p className="mt-1 text-caption text-ok" role="status">
           Sent
         </p>
       ) : null}

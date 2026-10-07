@@ -21,8 +21,8 @@ describe("contact profile action dock", () => {
     assert.match(dock, /aria-label="Contact actions"/);
     assert.match(dock, /<CallLink number=\{number\} \/>/);
     assert.match(dock, /variant="icon"/);
-    assert.match(read("dashboard/src/components/CallLink.tsx"), /deskHitClass/);
-    assert.match(read("dashboard/src/components/WhatsAppLink.tsx"), /deskHitClass/);
+    assert.match(read("dashboard/src/components/CallLink.tsx"), /IconButtonAnchor/);
+    assert.match(read("dashboard/src/components/WhatsAppLink.tsx"), /IconButtonAnchor/);
     assert.doesNotMatch(dock, /flex w-16 flex-col items-center gap-1/);
     assert.doesNotMatch(dock, /label="Call"/);
     assert.doesNotMatch(dock, /label="WhatsApp"/);

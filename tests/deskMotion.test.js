@@ -221,10 +221,10 @@ describe("desk motion wiring", () => {
 
   it("spins Inbox SMS Send with pending", () => {
     const dock = read("dashboard/src/components/InboxSmsDock.tsx");
-    assert.match(dock, /pendingSpinnerClass/);
+    assert.match(dock, /pending=\{sendPending\}/);
     assert.match(dock, /sendPending/);
     assert.match(dock, /polishPending/);
-    assert.match(dock, /pendingSpinnerInkClass/);
+    assert.match(dock, /pending=\{polishPending\}/);
     assert.doesNotMatch(dock, /animate-pulse/);
   });
 

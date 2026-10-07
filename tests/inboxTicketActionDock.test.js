@@ -25,7 +25,7 @@ describe("ticket action dock", () => {
     assert.match(dock, /variant="icon"/);
     assert.match(dock, /callId=\{callId\}/);
     assert.match(dock, /variant="dock"/);
-    assert.match(dock, /deskHitClass/);
+    assert.match(dock, /<IconButton/);
     assert.match(dock, /label="Done"/);
     assert.match(dock, /label="Call"/);
     assert.match(dock, /label="WhatsApp"/);
@@ -36,8 +36,7 @@ describe("ticket action dock", () => {
     assert.match(ping, /<Sheet/);
     assert.doesNotMatch(dock, /[\u2014\u2013]/);
     assert.doesNotMatch(ping, /[\u2014\u2013]/);
-    assert.match(dock, /pendingSpinnerInkClass/);
-    assert.match(dock, /aria-busy=\{pending\}/);
+    assert.match(dock, /pending=\{pending\}/);
     assert.doesNotMatch(dock, /useTransition/);
     assert.match(ping, /pending=\{pending\}/);
     assert.match(ping, /Pinging/);
@@ -69,13 +68,13 @@ describe("ticket action dock", () => {
     assert.doesNotMatch(dock, /notifyChannels/);
   });
 
-  it("sits under the split, above Confirm and SMS, and uses 48px hits", () => {
+  it("sits under the split, above Confirm and SMS, and uses 44px hits", () => {
     const dockAt = ticket.indexOf("<InboxTicketActionDock");
     const confirmAt = ticket.indexOf("canConfirm && job");
     const smsAt = ticket.indexOf("<InboxSmsDock");
     assert.ok(dockAt > 0 && confirmAt > dockAt && smsAt > confirmAt);
     assert.match(ticket, /pb-\[env\(safe-area-inset-bottom,0px\)\]/);
-    assert.match(dock, /deskHitClass/);
+    assert.match(dock, /<IconButton/);
     assert.match(read("dashboard/src/components/ui/deskChrome.ts"), /h-12 w-12 min-h-12 min-w-12/);
     assert.match(detail, /Action dock/);
     assert.match(detail, /safe-area-inset-bottom/);

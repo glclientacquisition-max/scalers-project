@@ -142,7 +142,7 @@ describe("ticket chat display chrome", () => {
     assert.match(dock, /label="Done"/);
     assert.match(dock, /label="Call"/);
     assert.match(dock, /label="WhatsApp"/);
-    assert.match(dock, /deskHitClass/);
+    assert.match(dock, /<IconButton/);
     assert.match(read("dashboard/src/components/InboxPingTeammate.tsx"), /Ping teammate/);
 
     const strip = read("dashboard/src/components/ContactStrip.tsx");

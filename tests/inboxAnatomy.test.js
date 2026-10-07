@@ -116,8 +116,8 @@ describe("inbox outside and inside anatomy", () => {
     const editorHold = read("dashboard/src/components/InboxHoldEditor.tsx");
     const back = read("dashboard/src/components/ui/DeskBack.tsx");
     const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
-    assert.match(jobActions, /wide \? `\$\{btnPrimary\} w-full` : btnDock/);
-    assert.match(holdActions, /wide \? `\$\{btnPrimary\} w-full` : btnDock/);
+    assert.match(jobActions, /variant=\{wide \? "primary" : "tonal"\}/);
+    assert.match(holdActions, /variant=\{wide \? "primary" : "tonal"\}/);
     const fulfilled = holdActions.slice(
       holdActions.indexOf('{normalized === "fulfilled"'),
       holdActions.indexOf('{normalized === "cancelled"')
@@ -136,8 +136,8 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(ticket, /InboxJobActions/);
     assert.match(back, /min-h-11 min-w-11/);
     assert.match(contact, /<DeskBack/);
-    assert.match(jobActions, /pendingSpinnerClass/);
-    assert.match(holdActions, /pendingSpinnerClass/);
+    assert.match(jobActions, /pending=\{pending\}/);
+    assert.match(holdActions, /pending=\{pending\}/);
   });
 
   it("texts the caller on hold Done and Cancel when Text customers is on", () => {

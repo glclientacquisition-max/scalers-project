@@ -5,7 +5,8 @@ import {
   updateAppointmentSchedule,
   type AppointmentScheduleState,
 } from "@/app/(desk)/appointments/actions";
-import { btnGhost, deskFieldClass } from "@/components/ui/deskChrome";
+import { Button } from "@/components/ui/Button";
+import { deskFieldClass } from "@/components/ui/deskChrome";
 
 const initial: AppointmentScheduleState = {};
 
@@ -49,13 +50,9 @@ export function InboxJobEditor({
           placeholder="Runda"
           className={fieldClass}
         />
-        <button
-          type="submit"
-          disabled={pending}
-          className={`${btnGhost} w-full disabled:opacity-50`}
-        >
+        <Button type="submit" variant="ghost" size="md" block pending={pending}>
           {pending ? "Saving" : "Save"}
-        </button>
+        </Button>
         {state.error ? <p className="text-sm text-warn">Could not save.</p> : null}
       </form>
     </div>

@@ -5,16 +5,8 @@ import {
   updateAppointmentStatus,
   type AppointmentStatusState,
 } from "@/app/(desk)/appointments/actions";
-import {
-  btnDock,
-  btnDockDone,
-  btnDockGhost,
-  btnDone,
-  btnGhost,
-  btnPrimary,
-  pendingSpinnerClass,
-  pendingSpinnerInkClass,
-} from "@/components/ui/deskChrome";
+import { Button } from "@/components/ui/Button";
+import { Stamp } from "@/components/ui/Stamp";
 
 const initial: AppointmentStatusState = {};
 
@@ -54,95 +46,87 @@ export function InboxJobActions({
       <div className={stack}>
         {normalized === "requested" ? (
           <>
-            <button
+            <Button
               type="submit"
               name="status"
               value="confirmed"
-              disabled={pending}
-              className={wide ? `${btnPrimary} w-full` : btnDock}
+              pending={pending}
+              variant={wide ? "primary" : "tonal"}
+              size={wide ? "md" : "sm"}
+              block={wide}
               aria-label={pending ? "Saving" : "Confirm"}
             >
-              {pending ? (
-                wide ? (
-                  "Saving"
-                ) : (
-                  <span aria-hidden="true" className={pendingSpinnerClass} />
-                )
-              ) : (
-                "Confirm"
-              )}
-            </button>
+              {pending ? "Saving" : "Confirm"}
+            </Button>
             {extra && !banner ? (
-              <button
+              <Button
                 type="submit"
                 name="status"
                 value="cancelled"
                 disabled={pending}
-                className={extra ? `${btnGhost} w-full` : btnDockGhost}
+                variant="ghost"
+                size="md"
+                block
               >
                 Cancel
-              </button>
+              </Button>
             ) : null}
           </>
         ) : null}
         {normalized === "confirmed" ? (
           <>
-            <button
+            <Button
               type="submit"
               name="status"
               value="done"
-              disabled={pending}
-              className={wide ? `${btnDone} w-full` : btnDockDone}
+              pending={pending}
+              variant={wide ? "primary" : "tonal"}
+              size={wide ? "md" : "sm"}
+              block={wide}
               aria-label={pending ? "Saving" : "Done"}
             >
-              {pending ? (
-                wide ? (
-                  "Saving"
-                ) : (
-                  <span aria-hidden="true" className={pendingSpinnerInkClass} />
-                )
-              ) : (
-                "Done"
-              )}
-            </button>
+              {pending ? "Saving" : "Done"}
+            </Button>
             {extra && !banner ? (
-              <button
+              <Button
                 type="submit"
                 name="status"
                 value="cancelled"
                 disabled={pending}
-                className={extra ? `${btnGhost} w-full` : btnDockGhost}
+                variant="ghost"
+                size="md"
+                block
               >
                 Cancel
-              </button>
+              </Button>
             ) : null}
           </>
         ) : null}
         {normalized === "done" ? (
-          <span
-            className={
-              extra
-                ? "inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-ok-soft text-sm font-semibold text-ok"
-                : `${btnDock} pointer-events-none bg-ok-soft text-ok shadow-none`
-            }
-          >
-            Done
-          </span>
+          wide ? (
+            <div className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-ok-tonal">
+              <Stamp tone="ok">Done</Stamp>
+            </div>
+          ) : (
+            <Stamp tone="ok">Done</Stamp>
+          )
         ) : null}
         {normalized === "cancelled" ? (
-          <button
+          <Button
             type="submit"
             name="status"
             value="requested"
             disabled={pending}
-            className={extra ? `${btnGhost} w-full` : btnDockGhost}
+            variant="ghost"
+            size={wide ? "md" : "sm"}
+            block={Boolean(extra)}
           >
             Reopen
-          </button>
+          </Button>
         ) : null}
       </div>
       {err ? (
-        <p className="text-xs text-warn" role="alert">
+        <p className="text-caption text-attention" role="alert">
           {err}
         </p>
       ) : null}
