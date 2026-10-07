@@ -118,7 +118,7 @@ export function droppingVerdict(
 }
 
 export function releaseDeltasFromCalls(
-  calls: readonly Array<DroppingSample & { release: VoiceRelease | null }>,
+  calls: ReadonlyArray<DroppingSample & { release: VoiceRelease | null }>,
 ): ReleaseDelta[] {
   const sorted = calls.toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at));
   const runs: Array<Array<(typeof sorted)[number]>> = [];
@@ -141,7 +141,7 @@ export function releaseDeltasFromCalls(
 }
 
 export async function listBusinessQuality(range: QualityRange): Promise<BusinessQualityRow[]> {
-  const now = Date.now();
+  const now = await requestNow();
   const lookbackDays = Math.max(RANGE_DAYS[range], 14);
   const calls = await fetchCallSamples(new Date(now - lookbackDays * DAY_MS).toISOString());
   if (!calls) return [];
@@ -154,7 +154,7 @@ export async function getBusinessQuality(
 ): Promise<BusinessQualityDetail | null> {
   const id = businessId.trim();
   if (!id) return null;
-  const now = Date.now();
+  const now = await requestNow();
   const lookbackDays = Math.max(RANGE_DAYS[range], 14);
   const calls = await fetchCallSamples(new Date(now - lookbackDays * DAY_MS).toISOString(), id);
   if (!calls) return null;
@@ -224,7 +224,8 @@ export async function getCallTrace(callId: string): Promise<VoiceCallTrace | nul
 }
 
 export async function listReleaseDeltas(): Promise<ReleaseDelta[]> {
-  const since = new Date(Date.now() - RELEASE_LOOKBACK_DAYS * DAY_MS).toISOString();
+  const now = await requestNow();
+  const since = new Date(now - RELEASE_LOOKBACK_DAYS * DAY_MS).toISOString();
   const calls = await fetchCallSamples(since);
   if (!calls) return [];
   return releaseDeltasFromCalls(calls);
@@ -624,6 +625,15 @@ function httpUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+}
+
+/** Lets Date.now run at request time. Unit tests have no Next runtime. */
+async function requestNow(): Promise<number> {
+  if (process.env.NEXT_RUNTIME) {
+    const { connection } = await import("next/server");
+    await connection();
+  }
+  return Date.now();
 }
 
 function average(values: readonly number[]): number {
