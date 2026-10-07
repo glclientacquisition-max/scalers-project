@@ -96,8 +96,8 @@ function formatCatalogueMouthForPrompt(state) {
 }
 
 function countItems(text, items) {
-  const raw = String(text || '');
-  return items.filter((name) => name && raw.includes(name)).length;
+  const raw = String(text || '').toLowerCase();
+  return items.filter((name) => name && raw.includes(String(name).toLowerCase())).length;
 }
 
 function splitSentences(text) {
@@ -192,13 +192,34 @@ function isRelistSentence(sentence, items) {
   return !/\d/.test(sentence);
 }
 
+const FACT_WORD_SKIP = new Set([
+  'cleaning',
+  'service',
+  'services',
+  'general',
+  'house',
+  'houses',
+]);
+
+function serviceWordHit(text, name) {
+  const raw = String(text || '').toLowerCase();
+  const label = String(name || '').toLowerCase();
+  if (!label) return false;
+  if (raw.includes(label)) return true;
+  return label.split(/\s+/).some(
+    (word) => word.length > 3 && !FACT_WORD_SKIP.has(word) && raw.includes(word)
+  );
+}
+
 function serviceFactsLine(text, profile = {}, language = 'en') {
   if (!looksLikeServiceDetailAsk(text)) return '';
   const sw =
     String(language || '').toLowerCase() === 'sw' ||
     String(language || '').toLowerCase() === 'sheng';
   const items = catalogueItemNames(profile);
-  const named = items.find((name) => String(text || '').toLowerCase().includes(name.toLowerCase()));
+  const hits = items.filter((name) => serviceWordHit(text, name));
+  const named = hits.length === 1 ? hits[0] : '';
+  if (!named && !/\b(services?|huduma)\b/i.test(String(text || ''))) return '';
   const rows = normalizeServices(profile.servicesCatalog).filter((row) => {
     const name = mouthServiceName(row.name);
     return name && (!named || name.toLowerCase() === named.toLowerCase());

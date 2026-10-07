@@ -13,6 +13,7 @@
 // turn does not send it: Gemini is not the mouth.
 
 const { catalogueFileNames, offerCatalogueLine } = require('../conversation/knownFacts');
+const { catalogueAskInPlay } = require('../conversation/fileRead');
 
 function geminiCatalogueEnabled(env = process.env) {
   return String(env.VOICE_GEMINI_CATALOGUE || '').trim().toLowerCase() === 'on';
@@ -48,6 +49,9 @@ function brainCatalogueItems(localReply) {
  *   text?: string,
  *   profile?: object,
  *   language?: string,
+ *   state?: object,
+ *   callerTurns?: string[],
+ *   catalogueListed?: boolean,
  *   reasoningDown?: boolean,
  *   geminiCatalogue?: boolean,
  * }} [opts]
@@ -58,6 +62,12 @@ function brainCatalogueItems(localReply) {
  *   reason: '' | 'local_blend' | 'outage' | 'flag_off',
  * }}
  */
+function phase0CatalogueLine(text, profile, language) {
+  return String(offerCatalogueLine(text, profile, language) || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function planCatalogueMouth(opts = {}) {
   const localReply = opts.localReply;
   const fromReply =
@@ -65,14 +75,15 @@ function planCatalogueMouth(opts = {}) {
       ? String(localReply.line || '').replace(/\s+/g, ' ').trim()
       : '';
   // Another local outcome (hours, detail, coverage) keeps its own mouth.
-  // A missing reply is the Brain staging withhold: rebuild the Phase-0 line
-  // from the file. offerCatalogueLine is empty unless this turn is an offer ask.
+  // A missing reply is a Brain withhold, or a Yes after a services ask the
+  // name gate took. Rebuild the Phase-0 line from that ask unless this call
+  // already spoke the list.
   const withheld = !fromReply && (localReply == null || !localReply.outcome);
-  const rebuilt = withheld
-    ? String(offerCatalogueLine(opts.text, opts.profile, opts.language) || '')
-        .replace(/\s+/g, ' ')
-        .trim()
-    : '';
+  let rebuilt = '';
+  if (withheld && opts.catalogueListed !== true) {
+    const pending = catalogueAskInPlay(opts.text, opts.state, opts.callerTurns);
+    rebuilt = phase0CatalogueLine(pending || opts.text, opts.profile, opts.language);
+  }
   const line = fromReply || rebuilt;
   if (!line) {
     return { speakLocal: false, letGemini: false, line: '', reason: '' };

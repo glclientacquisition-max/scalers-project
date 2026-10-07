@@ -50,6 +50,8 @@ describe('mid-call one-shots do not speak-and-return', () => {
     assert.match(turn, /catalogue fallback reason=/);
     assert.match(turn, /catalogueMouth\.speakLocal && catalogueMouth\.line/);
     assert.match(turn, /text: clean/);
+    assert.match(turn, /catalogueListed/);
+    assert.match(turn, /groundFilePriceLine\(\{/);
     assert.match(turn, /catalogueBreath: catalogueMouth\.letGemini/);
     assert.doesNotMatch(serverSource, /fillerUsedThisCall/);
     const gate = turn.indexOf('planCatalogueMouth');

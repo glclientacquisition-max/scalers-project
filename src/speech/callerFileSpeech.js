@@ -94,8 +94,17 @@ const PUBLIC_ANSWER = new Set(['catalogue', 'hours', 'hours_ask', 'coverage', 'i
  * @param {{ outcome?: string, line?: string } | null} [localReply]
  */
 function answerBeforeNameAsk(localReply) {
-  if (!localReply || !PUBLIC_ANSWER.has(String(localReply.outcome || ''))) return '';
-  return String(localReply.line || '').replace(/\s+/g, ' ').trim();
+  if (!localReply) return '';
+  const outcome = String(localReply.outcome || '');
+  const line = String(localReply.line || '').replace(/\s+/g, ' ').trim();
+  if (!line) return '';
+  // A real on-file fact speaks before the name. The empty-detail fallback does not.
+  if (outcome === 'service_facts') {
+    if (/don't have more detail on file|sina maelezo zaidi/i.test(line)) return '';
+    return line;
+  }
+  if (!PUBLIC_ANSWER.has(outcome)) return '';
+  return line;
 }
 
 /**

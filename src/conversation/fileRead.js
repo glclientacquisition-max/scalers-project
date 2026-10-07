@@ -16,7 +16,7 @@ const NEW_WORK_RE =
   /\b(want to book|like to book|need to book|please book|book me|can you book|could you book|i want to order|i'd like to order|order \d+|buy \d+|nataka (?:cleaning|carpet|couch|sofa|mattress|kuweka)|naomba (?:cleaning|carpet))\b/i;
 
 const OFFER_ASK_RE =
-  /\b(what (?:do you (?:offer|do|sell|have)|services|can you do)|which services|what services|what are (?:your |the |our )?services|services (?:that |do )?you (?:have|offer|do)|tell me (?:your |the |our |about (?:your |the )?)?services|list (?:me )?(?:the |your |our )?services|uniambie (?:the )?services|niambie (?:the )?(?:services|huduma)|services mko nayo|mnauza|huduma (?:gani|mnazo|mko|zenu|yenu)|services gani|mnaofa|mna\s+offer|mnatoa|what do you offer)\b/i;
+  /\b(what (?:do you (?:offer|do|sell|have)|services|can you do)|which services|what services|which service(?:s)?(?:\s+(?:is|are|do))?(?:\s+you)?\s+(?:offer|have|do)|what are (?:your |the |our )?services|services (?:that |do |is |are )?you (?:have|offer|do)|tell me (?:your |the |our |about (?:your |the )?)?services|list (?:me )?(?:the |your |our )?services|uniambie (?:the )?services|niambie (?:the )?(?:services|huduma)|services mko nayo|mnauza|huduma (?:gani|mnazo|mko|zenu|yenu)|services gani|mnaofa|mna\s+offer|mnatoa|what do you offer)\b/i;
 
 // Facts about a service. Not a request to read the name list.
 const SERVICE_DETAIL_RE =
@@ -48,7 +48,7 @@ function looksLikeServiceDetailAsk(text) {
   ) {
     return false;
   }
-  return /\b(services?|huduma|cleaning|details?|maelezo|eleza|included)\b/i.test(raw);
+  return true;
 }
 
 function looksLikeOfferAsk(text) {

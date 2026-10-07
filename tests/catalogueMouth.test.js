@@ -141,6 +141,40 @@ describe('VOICE_GEMINI_CATALOGUE', () => {
     assert.equal(bare.line, '');
   });
 
+  it('speaks Phase-0 for a clear services ask and for Yes while that list is still pending', () => {
+    const ask = 'which service is you offer';
+    const local = resolveLocalReply({
+      text: ask,
+      state: state(ask),
+      language: 'en',
+      profile: FILE,
+    });
+    assert.equal(local.outcome, 'catalogue');
+    assert.match(local.line, /and General cleaning, and more/);
+    assert.doesNotMatch(local.line, /Couch cleaning\. Mattress/);
+    const pending = planCatalogueMouth({
+      localReply: null,
+      text: 'Yes.',
+      profile: FILE,
+      language: 'en',
+      callerTurns: [ask, 'Yes.'],
+      catalogueListed: false,
+    });
+    assert.equal(pending.speakLocal, true);
+    assert.equal(pending.letGemini, false);
+    assert.equal(pending.line, local.line);
+    const listed = planCatalogueMouth({
+      localReply: null,
+      text: 'Yes.',
+      profile: FILE,
+      language: 'en',
+      callerTurns: [ask, 'Yes.'],
+      catalogueListed: true,
+    });
+    assert.equal(listed.speakLocal, false);
+    assert.equal(listed.line, '');
+  });
+
   it('speaks the Phase-0 local line on a reasoning outage even when the flag is on', () => {
     const local = catalogueReply('sw');
     const mouth = planCatalogueMouth({
@@ -380,6 +414,8 @@ describe('catalogue grounding and no re-list', () => {
     assert.equal(looksLikeServiceDetailAsk('Tell me details about the services'), true);
     assert.equal(looksLikeOfferAsk('Tell me details about the services'), false);
     assert.equal(looksLikeOfferAsk('Which services do you offer?'), true);
+    assert.equal(looksLikeOfferAsk('which service is you offer'), true);
+    assert.equal(looksLikeServiceDetailAsk('tell me more about carpet'), true);
     const profile = {
       ...PROFILE,
       servicesCatalog: [

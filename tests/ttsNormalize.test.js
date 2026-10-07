@@ -280,6 +280,21 @@ test('prepareForTts drops ASR_CORRECTION_PROMPT and RETOTI before underscore str
   assert.match(prepared.text, /Sawa Alvin/);
 });
 
+test('prepareForTts drops a spaced CATALOGUE MOUTH label with or without a colon', () => {
+  const withColon = prepareForTts(
+    'CATALOGUE MOUTH: We offer couch cleaning, mattress cleaning, and carpet cleaning.',
+    { callLanguage: 'en' }
+  );
+  assert.doesNotMatch(withColon.text, /CATALOGUE|MOUTH/i);
+  assert.match(withColon.text, /couch cleaning/i);
+  const spaced = prepareForTts(
+    'CATALOGUE MOUTH We offer couch cleaning and mattress cleaning.',
+    { callLanguage: 'en' }
+  );
+  assert.doesNotMatch(spaced.text, /CATALOGUE|MOUTH/i);
+  assert.match(spaced.text, /couch cleaning/i);
+});
+
 test('prepareForTts drops a bare NP_FALSE token', () => {
   const prepared = prepareForTts('NP_FALSE', { callLanguage: 'en' });
   assert.strictEqual(prepared.text, '');
