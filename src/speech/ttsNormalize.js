@@ -4,6 +4,7 @@ const {
   applyLexicon,
   envLexiconOverrides,
   parseLexiconOverrides,
+  undoStackedHyphens,
 } = require('./pronunciationLexicon');
 const { expandPhones, expandSpokenForms } = require('./spokenForms');
 const { shouldRewriteSheng, rewriteShengForTts } = require('./shengRewrite');
@@ -143,7 +144,7 @@ function mergeExtraLexicon(extra) {
  * strip markup → Sheng rewrite → lexicon → money/time/days → phones → punctuation.
  *
  * @param {string} text
- * @param {{ callLanguage?: string, language?: string, extraLexicon?: unknown }} [opts]
+ * @param {{ callLanguage?: string, language?: string, extraLexicon?: unknown, avoidRespell?: boolean }} [opts]
  * @returns {{ original: string, text: string, language: 'en'|'sw' }}
  */
 function prepareForTts(text, opts = {}) {
@@ -163,6 +164,7 @@ function prepareForTts(text, opts = {}) {
   spoken = expandSpokenForms(spoken, language);
   spoken = expandPhones(spoken);
   spoken = polishPunctuation(spoken);
+  if (opts.avoidRespell) spoken = undoStackedHyphens(spoken);
 
   return { original, text: spoken, language };
 }

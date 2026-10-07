@@ -5,6 +5,7 @@ const WebSocket = require('ws');
 const { randomUUID } = require('crypto');
 
 const { prepareForTts } = require('./ttsNormalize');
+const { structuredReplyEnabled } = require('./structuredReplyFlag');
 const { resolveSonioxVoice, resolveSonioxTtsModel } = require('./sonioxVoice');
 const { classifySonioxError } = require('./sonioxErrors');
 const {
@@ -311,6 +312,7 @@ function createSonioxTtsSession({
             callLanguage: opts.callLanguage,
             language: opts.language || language || undefined,
             extraLexicon: opts.extraLexicon,
+            avoidRespell: structuredReplyEnabled(opts.tenantId),
           });
       const clean = prepared.text;
       if (!clean) return { pushed: false, language: prepared.language };
