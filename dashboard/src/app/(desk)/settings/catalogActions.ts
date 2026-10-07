@@ -12,6 +12,7 @@ import {
   looksLikeClientRenderedShell,
   normalizePasteText,
 } from "@/lib/ingest/sanitize";
+import { suggestImportedProducts } from "@/lib/catalogSuggest";
 import {
   mergeProductCatalog,
   normalizeProductCatalog,
@@ -73,7 +74,7 @@ async function extractProductsFromText(
   const social = normalizeSocialHandles({ channels });
 
   if (!process.env.GEMINI_API_KEY) {
-    return { products: localProducts, social };
+    return { products: suggestImportedProducts(localProducts), social };
   }
 
   try {
@@ -94,11 +95,11 @@ Rules: products are individual sellable items (books, SKUs), NOT services like "
       channels: [...social.channels, ...gemSocial.channels],
     });
     return {
-      products: products.length ? products : localProducts,
+      products: products.length ? suggestImportedProducts(products) : suggestImportedProducts(localProducts),
       social: mergedChannels,
     };
   } catch {
-    return { products: localProducts, social };
+    return { products: suggestImportedProducts(localProducts), social };
   }
 }
 
@@ -123,10 +124,11 @@ export async function previewCatalogImportAction(
         return { error: "Paste a product list or CSV first." };
       }
       // Prefer CSV parser when header-like or many commas
-      const products =
+      const rawProducts =
         mode === "csv" || /,|\t|\|/.test(sourceText)
           ? parseProductCsv(sourceText)
           : parseBulkProducts(sourceText);
+      const products = suggestImportedProducts(rawProducts);
       if (!products.length) {
         return {
           error:
@@ -156,7 +158,8 @@ export async function previewCatalogImportAction(
       if (sourceText.length < 40) {
         return { error: "Page had almost no text. Try a CSV export or paste." };
       }
-      const { products, social } = await extractProductsFromText(sourceText);
+      const { products: extracted, social } = await extractProductsFromText(sourceText);
+      const products = suggestImportedProducts(extracted);
       if (!products.length) {
         return {
           error:
@@ -217,7 +220,8 @@ export async function applyCatalogImportAction(
   }
 
   const confirm = String(formData.get("confirm") || "") === "1";
-  const stamped = products.map((product) => ({
+  const suggested = suggestImportedProducts(products);
+  const stamped = suggested.map((product) => ({
     ...product,
     source: confirm ? ("owner" as const) : ("import" as const),
     price_mode: product.price_mode || inferPriceMode(product.price) || undefined,

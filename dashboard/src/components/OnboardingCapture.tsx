@@ -7,6 +7,7 @@ import {
   HOME_SUGGESTED_SERVICES,
   SHOP_SUGGESTED_PRODUCTS,
 } from "@/lib/catalogSeeds";
+import { suggestImportedProducts, suggestImportedServices } from "@/lib/catalogSuggest";
 import { parseProductCsv, type ProductItem } from "@/lib/productCatalog";
 import { parseBulkServices } from "@/lib/servicesCatalog";
 import type { BusinessVertical } from "@/lib/vertical";
@@ -71,7 +72,7 @@ export function OnboardingCapture({
     if (!file) return;
     const text = await file.text();
     if (shop) {
-      const parsed = parseProductCsv(text);
+      const parsed = suggestImportedProducts(parseProductCsv(text));
       if (!parsed.length) return;
       onProducts([
         ...products,
@@ -84,13 +85,13 @@ export function OnboardingCapture({
       ]);
       return;
     }
-    const parsed = parseBulkServices(text);
+    const parsed = suggestImportedServices(parseBulkServices(text));
     if (!parsed.length) return;
     onServices([
       ...services,
       ...parsed.map((row) => ({
         name: row.name,
-        pricing_mode: "" as const,
+        pricing_mode: (row.pricing_mode || "") as ServiceDraft["pricing_mode"],
         site_visit: "" as const,
         notes: row.notes,
       })),

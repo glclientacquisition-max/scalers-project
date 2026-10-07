@@ -20,6 +20,7 @@ const routes: Array<{ path: string; strict: boolean }> = [
   { path: "/dev/inbox", strict: false },
   { path: "/dev/contacts", strict: false },
   { path: "/dev/pronunciation", strict: false },
+  { path: "/dev/settings-catalog", strict: false },
 ];
 
 const HARD_FLOOR = 24;
