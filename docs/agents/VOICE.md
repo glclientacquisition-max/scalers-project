@@ -85,6 +85,24 @@ See `.env.example` — key ones:
 - `VOICE_BARGE_GRACE_MS`, `VOICE_BARGE_EARLY_MS`, `VOICE_BARGE_MIN_CHARS`
 - Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS`, `SONIOX_ENDPOINT_SENSITIVITY`, …
 
+## Caller file on the call
+
+Voice does not own the caller file. Brain binds the speaker. Voice does four things on the media path.
+
+1. **Unfinished flush.** `decideTurnEnd` is the only end-of-turn rule. An open phrase (Kiswahili frame such as `Nilikuwa nataka kujua`, a trailing comma, or a trailing dash) waits one cap of about 700–900ms, including across a Soniox endpoint. `applyTurnEnd` then calls `flushUtterance(decision)` so `unfinished` is not dropped. The flush passes `unfinished`, `weak`, and `weakStt` into `observeCallerTurn` and into first-forward. Brain #586 honors those fields in `isRejectedGoalText`, so that text does not become the goal or `first_turn_goal`. If Brain exports `isUnfinishedCallerStem` or `isUnfinishedCallerUtterance`, Voice calls that. Voice does not write the goal.
+
+2. **Speak gate.** `gateCallerFileSpeech` runs before TTS. Open rows, a vocative file name, and `Yes, {name}` stay quiet until `caller.nameConfirmed` is true. A parallel `speaker` object does not override that flag. The identity ask may say the pending name, and `lockFileNameAsk` speaks it in the caller's current language. Voice does not set `nameConfirmed`. When the name ask takes the turn, `linesBeforeNameAsk` speaks a public local answer first (catalogue, hours, coverage, identity) and the name ask last. That answer is not dropped. A booking ladder and an open file row are not spoken there. Gemini still owns the catalogue when the name ask does not take the turn.
+
+3. **Punctuation.** `prepareForTts` strips commas, periods, question marks, dashes, and ellipses before Soniox chunks. Intra-word hyphens in say-forms stay. Soniox must not read those marks aloud in English or Kiswahili. A serial list (catalogue or any other tenant) is joined with `and` or `na` first, so stripping the commas does not turn the names into one run-on.
+
+4. **Tool hold.** A line from `src/speech/toolHold.js` plays only after a tool call has started. English and Kiswahili packs rotate from the call id and turn count. Each line is at most about five words and states no job status. After the tool returns, write tools still use the existing confirmation. A file read (`open_items`, `file_lookup`, `get_enquiry`) speaks that result, or the empty-file line when `nameConfirmed` is true and the result is empty. No tool means no hold. Barge-in cancels the hold follow-up.
+
+5. **Brain END.** When `nextBestAction` is `END`, `runBrainEndClose` in `src/speech/callClose.js` closes the idle nudge, speaks one farewell in the call language (`Asante. Kwaheri.` or `Thank you. Goodbye.`), then closes the media socket with `end_call`. `farewellHangupDelayMs` waits out PCM that is still queued on the bridge, so the last word is not cut. Gemini does not run on that turn. An idle nudge armed earlier does not fire. A later caller flush does not start another turn. Brain still decides when the action is `END`.
+
+6. **Line check.** While a question is still waiting (`lastAgentAskedQuestion`), a bare `hello` / `hi` / `hey` is `hear_again` in `decideCallerEvent`. The media path replays the committed ask. It is not a soft backchannel. The same words with no question waiting stay `backchannel` and `ignore`. `callerEventClearsIdle` leaves the idle nudge armed on an ignore or a skip that does not queue and does not replay. After a question replay, the nudge is armed again.
+
+Land this with Brain #586 (`cursor/caller-file-goal-summary-4c74`). Do not rewrite `docs/product/CALLER_FILE_MODEL.md` or `docs/agents/CALLER_IDENTITY_AND_SUMMARY.md` here. Stack with #584 if that pull request is still open. On merge, keep `flushUtterance(decision)` so `decision.unfinished` is not dropped.
+
 ## Test gate (required before PR)
 
 ```bash

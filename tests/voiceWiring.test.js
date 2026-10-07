@@ -145,6 +145,42 @@ assert.match(
 
 assert.match(
   source,
+  /if \(callerEventClearsIdle\(decision\)\) noteCallerSpeechForIdle\(text\);/,
+  'idle nudge must stay armed when a final is ignore with no queue'
+);
+
+assert.match(
+  source,
+  /agent_question_replay reason=\$\{decision\.reason\}[\s\S]*?idleNudge\.arm\(/,
+  'replaying a committed question must arm the idle nudge again'
+);
+
+assert.match(
+  source,
+  /planBrainEndClose\(\{[\s\S]*?action:\s*nextBestAction\.action/,
+  'Brain END must plan a farewell before Gemini on the media path'
+);
+
+assert.match(
+  source,
+  /playbackBytes = 0;[\s\S]*?await speakText\(line\);[\s\S]*?farewellHangupDelayMs\(\{[\s\S]*?bytes:\s*playbackBytes/,
+  'Brain END hangup must wait for the farewell PCM still queued, not a fixed 800ms'
+);
+
+assert.match(
+  source,
+  /!callEnding &&/,
+  'idle nudge must not fire after Brain END'
+);
+
+assert.match(
+  source,
+  /if \(callEnding \|\| turnBusy \|\| !pendingUtterance\) return;/,
+  'a queued caller turn must not start after Brain END'
+);
+
+assert.match(
+  source,
   /isReplay:\s*true/,
   'question replay must not commit as a newly generated question'
 );
@@ -660,6 +696,52 @@ assert.match(
   dbSource,
   /unassigned_did/,
   'tenant lookup must not fall through to another business'
+);
+
+assert.match(
+  source,
+  /function flushUtterance\(turnEnd\)/,
+  'flush must accept the turn-end decision so unfinished is not dropped'
+);
+assert.match(
+  source,
+  /flushUtterance\(decision\)/,
+  'applyTurnEnd must pass the unfinished decision into flush'
+);
+assert.match(
+  source,
+  /lockFileNameAsk\(/,
+  'the file name ask must lock to the caller language before it is spoken'
+);
+assert.match(
+  source,
+  /linesBeforeNameAsk\(\{[\s\S]*?nameAsk: fileNameAsk/,
+  'a public local answer is spoken before the name ask, not dropped'
+);
+assert.match(
+  source,
+  /observeCallerInput\(/,
+  'flushed caller text must enter Brain observe with the unfinished label'
+);
+assert.match(
+  source,
+  /weakStt: flushed\.weakStt/,
+  'flush must forward weakStt into Brain observe'
+);
+assert.match(
+  source,
+  /gateCallerFileSpeech\(/,
+  'file name and open rows must pass the speak gate before TTS'
+);
+assert.match(
+  source,
+  /applyToolsWithHold\(/,
+  'a tool call must be able to speak a hold while it is in flight'
+);
+assert.match(
+  source,
+  /onToolHold: speakToolHold/,
+  'barge-in during a tool hold must be able to cancel the follow-up'
 );
 
 console.log('Voice runtime wiring checks passed.');

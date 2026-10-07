@@ -235,8 +235,11 @@ describe('caller name stays the file name', () => {
     const end = server.indexOf('function flushUtterance', start);
     const turnSource = server.slice(start, end);
     assert.match(turnSource, /planCallerModelTurn\(brainState/);
-    assert.match(turnSource, /const fileNameAsk = nameGate\.line/);
-    assert.match(turnSource, /speakText\(fileNameAsk\)/);
+    assert.match(
+      turnSource,
+      /const fileNameAsk = lockFileNameAsk\(nameGate\.line, callLanguage\)/
+    );
+    assert.match(turnSource, /nameAsk: fileNameAsk[\s\S]*?await speakText\(line\)/);
     const gateAt = turnSource.indexOf('planCallerModelTurn');
     const modelAt = turnSource.indexOf('runGeminiTurn');
     assert.ok(gateAt >= 0 && modelAt > gateAt);

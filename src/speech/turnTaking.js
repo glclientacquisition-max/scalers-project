@@ -157,10 +157,23 @@ function utteranceLooksIncomplete(text) {
   if (!raw) return false;
 
   // Live call HD_0cdf315f02e9: "executive room,and." was flushed mid-thought.
-  const core = raw.replace(/[.!?,;:…]+$/g, '').trim();
+  // Trailing comma or dash means the caller has not finished the phrase.
+  if (/[,—–-]\s*$/.test(raw)) return true;
+
+  const core = raw.replace(/[.!?,;:…—–-]+$/g, '').trim();
   if (!core) return false;
 
   if (INCOMPLETE_TAIL.test(core) || INCOMPLETE_TAIL.test(raw)) return true;
+  // Open Kiswahili frame: the object is still missing.
+  // "Nilikuwa nataka kujua." / "Nilikuwa nauliza," must wait, not flush as a goal.
+  if (
+    /\b(?:nilikuwa(?:\s+(?:nauliza|nataka|ningetaka|ningependa|naomba))?|nauliza|ningetaka|ningependa|naomba|nataka)(?:\s+(?:kujua|kuuliza))?\s*$/i.test(
+      core
+    )
+  ) {
+    return true;
+  }
+  if (/\b(?:um+|uh+|ah+)\s*$/i.test(core)) return true;
   // Trailing comma / "and," without finishing the clause.
   if (/,\s*(and|but|so|or)?$/i.test(core)) return true;
   // "my name is" / "jina langu ni" without the name yet.
@@ -196,6 +209,11 @@ function isInterruptOnlyUtterance(text) {
 
 function isLetMeThinkUtterance(text) {
   return LET_ME_THINK_RE.test(normalizeSpeech(text));
+}
+
+function isLineCheckGreeting(text) {
+  const t = normalizeSpeech(text).replace(/\?/g, '').replace(/\s+/g, ' ').trim();
+  return t === 'hello' || t === 'hi' || t === 'hey';
 }
 
 function isHearAgainUtterance(text) {
@@ -333,10 +351,23 @@ function classifyCallerUtteranceKind(text, opts = {}) {
   }
   if (awaiting && CONFIRM_TOKENS.has(t) && !NO_TOKENS.has(t)) return 'yes';
   if (isBareNoUtterance(t)) return awaiting ? 'no' : 'no_unprompted';
+  // A bare hello while a question is still open is "say that again", not overlap.
+  if (awaiting && isLineCheckGreeting(t)) return 'hear_again';
   if (SOFT_BACKCHANNELS.has(t) || SOFT_BACKCHANNELS.has(raw.toLowerCase())) return 'backchannel';
   if (utteranceLooksIncomplete(raw) && /^(and|but|so|or|na)$/i.test(t)) return 'incomplete';
   if (t.length <= 2 && !NO_TOKENS.has(t)) return 'noise';
   return 'speech';
+}
+
+/**
+ * Idle nudge stays armed on a pure ignore. A replay, a queue, or a real turn clears it.
+ * @param {{ action?: string, queue?: boolean, replay?: boolean }} [decision]
+ */
+function callerEventClearsIdle(decision = {}) {
+  if (decision.replay || decision.queue) return true;
+  if (decision.action === 'ignore') return false;
+  if (decision.action === 'skip') return false;
+  return true;
 }
 
 function outcome(partial) {
@@ -761,6 +792,51 @@ function adaptiveFlushMs(opts = {}) {
   return clamp(base, min, max);
 }
 
+const TURN_END_CAP_MS = 800;
+
+function turnEndCapMs(opts = {}) {
+  const raw =
+    opts.capMs != null ? opts.capMs : process.env.VOICE_TURN_END_CAP_MS || TURN_END_CAP_MS;
+  return clamp(Number(raw) || TURN_END_CAP_MS, 700, 900);
+}
+
+/**
+ * One end-of-turn decision. An unfinished phrase waits out a single cap
+ * (about 700–900ms) and then flushes with unfinished still true.
+ * A Soniox endpoint does not cancel that wait.
+ *
+ * @param {{ text?: string, endpoint?: boolean, waitedMs?: number, lastAgentText?: string, capMs?: number, baseMs?: number, minMs?: number, maxMs?: number }} [opts]
+ * @returns {{ action: 'wait'|'flush'|'drop', waitMs: number, reason: string, unfinished: boolean }}
+ */
+function decideTurnEnd(opts = {}) {
+  const text = String(opts.text || '').replace(/\s+/g, ' ').trim();
+  const waited = Math.max(0, Number(opts.waitedMs) || 0);
+  const cap = turnEndCapMs(opts);
+  if (!text) return { action: 'drop', waitMs: 0, reason: 'empty', unfinished: false };
+  const unfinished = utteranceLooksIncomplete(text);
+  if (unfinished) {
+    if (waited < cap) {
+      return { action: 'wait', waitMs: cap - waited, reason: 'unfinished', unfinished: true };
+    }
+    return { action: 'flush', waitMs: 0, reason: 'unfinished_cap', unfinished: true };
+  }
+  if (opts.endpoint) return { action: 'flush', waitMs: 0, reason: 'endpoint', unfinished: false };
+  const adaptive = Math.min(
+    adaptiveFlushMs({
+      text,
+      lastAgentText: opts.lastAgentText,
+      baseMs: opts.baseMs,
+      minMs: opts.minMs,
+      maxMs: opts.maxMs,
+    }),
+    cap
+  );
+  if (waited < adaptive) {
+    return { action: 'wait', waitMs: adaptive - waited, reason: 'await_endpoint', unfinished: false };
+  }
+  return { action: 'flush', waitMs: 0, reason: 'ready', unfinished: false };
+}
+
 /**
  * Decide whether inbound speech should cancel TTS / in-flight LLM.
  * Thin wrapper over decideCallerEvent so existing barge callers stay valid.
@@ -815,8 +891,11 @@ module.exports = {
   agentAwaitingReply,
   hasBargeContent,
   adaptiveFlushMs,
+  turnEndCapMs,
+  decideTurnEnd,
   evaluateBargeIn,
   classifyFinalDuringAgentSpeech,
   classifyCallerUtteranceKind,
   decideCallerEvent,
+  callerEventClearsIdle,
 };

@@ -7,11 +7,13 @@ const {
   utteranceLooksIncomplete,
   isInterruptOnlyUtterance,
   adaptiveFlushMs,
+  decideTurnEnd,
   evaluateBargeIn,
   hasBargeContent,
   agentAwaitingReply,
   classifyFinalDuringAgentSpeech,
   decideCallerEvent,
+  callerEventClearsIdle,
 } = require('../src/speech/turnTaking');
 const { isBackchannel } = require('../src/conversation/language');
 const { shouldSkipCallerTurn } = require('../src/conversation/dynamicSpeech');
@@ -89,6 +91,22 @@ test('detects wait/stop only turns', () => {
 test('does not treat real requests as interrupt-only', () => {
   assert.strictEqual(isInterruptOnlyUtterance('Wait, my name is Ann'), false);
   assert.strictEqual(isInterruptOnlyUtterance('I need an executive room'), false);
+});
+
+console.log('decideTurnEnd');
+test('unfinished Kiswahili waits one cap then flushes with the flag', () => {
+  const text = 'Nilikuwa nataka kujua.';
+  const waiting = decideTurnEnd({ text, endpoint: true, waitedMs: 0 });
+  assert.strictEqual(waiting.action, 'wait');
+  assert.strictEqual(waiting.unfinished, true);
+  assert.ok(waiting.waitMs >= 700 && waiting.waitMs <= 900);
+  const flushed = decideTurnEnd({ text, endpoint: true, waitedMs: 800 });
+  assert.strictEqual(flushed.action, 'flush');
+  assert.strictEqual(flushed.unfinished, true);
+  assert.strictEqual(flushed.reason, 'unfinished_cap');
+  const done = decideTurnEnd({ text: 'I need a plumber.', endpoint: true, waitedMs: 0 });
+  assert.strictEqual(done.action, 'flush');
+  assert.strictEqual(done.unfinished, false);
 });
 
 console.log('adaptiveFlushMs');
@@ -207,6 +225,12 @@ test('mid-thought floor-manager ask is incomplete', () => {
     true
   );
   assert.strictEqual(utteranceLooksIncomplete('Ningetaka kuongea na Floor Manager'), false);
+  assert.strictEqual(
+    utteranceLooksIncomplete('Mm-hm. Namna gani, Shy? Nilikuwa nataka kujua.'),
+    true
+  );
+  assert.strictEqual(utteranceLooksIncomplete('Nilikuwa nauliza,'), true);
+  assert.strictEqual(utteranceLooksIncomplete('I was calling—'), true);
 });
 
 console.log('helpers');
@@ -835,6 +859,68 @@ test('false barge does not cancel a long reply; real barge clears and the next s
     if (prevWords == null) delete process.env.VOICE_STREAM_EARLY_WORDS;
     else process.env.VOICE_STREAM_EARLY_WORDS = prevWords;
   }
+});
+
+const NAME_ASK = 'Am I speaking with Alvin?';
+
+test('awaiting a name ask, Hello? replays that question', () => {
+  for (const text of ['Hello?', 'hello', 'Hi', 'hey']) {
+    const d = decideCallerEvent({
+      text,
+      speaking: false,
+      turnBusy: false,
+      lastAgentText: NAME_ASK,
+      lastAgentAskedQuestion: true,
+      replayText: NAME_ASK,
+      phase: 'idle',
+    });
+    assert.strictEqual(d.reason, 'hear_again', text);
+    assert.strictEqual(d.replay, true, text);
+    assert.strictEqual(d.action, 'skip', text);
+    assert.notStrictEqual(d.reason, 'backchannel', text);
+  }
+});
+
+test('hello stays a backchannel when nothing was asked', () => {
+  for (const text of ['Hello?', 'hello', 'hi', 'hey', 'hmm', 'okay']) {
+    const d = decideCallerEvent({
+      text,
+      speaking: false,
+      turnBusy: false,
+      lastAgentText: 'We can help tomorrow.',
+      lastAgentAskedQuestion: false,
+      phase: 'idle',
+    });
+    assert.strictEqual(d.action, 'ignore', text);
+    assert.strictEqual(d.reason, 'backchannel', text);
+    assert.strictEqual(callerEventClearsIdle(d), false, text);
+  }
+});
+
+test('an ignore with no queue does not clear idle; a line-check replay does', () => {
+  const ignored = decideCallerEvent({
+    text: 'hmm',
+    speaking: false,
+    turnBusy: false,
+    lastAgentText: NAME_ASK,
+    lastAgentAskedQuestion: true,
+    phase: 'idle',
+  });
+  assert.strictEqual(ignored.action, 'ignore');
+  assert.strictEqual(ignored.reason, 'backchannel');
+  assert.strictEqual(ignored.queue, false);
+  assert.strictEqual(callerEventClearsIdle(ignored), false);
+
+  const lineCheck = decideCallerEvent({
+    text: 'Hello?',
+    speaking: false,
+    turnBusy: false,
+    lastAgentText: NAME_ASK,
+    lastAgentAskedQuestion: true,
+    replayText: NAME_ASK,
+    phase: 'idle',
+  });
+  assert.strictEqual(callerEventClearsIdle(lineCheck), true);
 });
 
 if (process.exitCode) {

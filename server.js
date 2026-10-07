@@ -191,6 +191,9 @@ async function persistFirstForwardAcceptance(callSid, durationSeconds) {
     bargedJob: signals.bargedJob,
     bargeText: signals.bargeText,
     firstCallerTurn: signals.firstCallerTurn,
+    unfinished: signals.unfinished,
+    weak: signals.weak,
+    weakStt: signals.weakStt,
     connectToGreetingPcmMs: signals.connectToGreetingPcmMs,
   });
   try {
@@ -240,12 +243,28 @@ const {
   isOrphanFragment,
 } = require('./src/speech/outboundPcm');
 const {
-  adaptiveFlushMs,
+  decideTurnEnd,
   decideCallerEvent,
+  callerEventClearsIdle,
   looksLikeEcho: turnLooksLikeEcho,
   classifyFinalDuringAgentSpeech,
   agentAwaitingReply,
 } = require('./src/speech/turnTaking');
+const {
+  labelFlushedCallerTurn,
+  observeCallerInput,
+} = require('./src/speech/callerTurnLabel');
+const {
+  gateCallerFileSpeech,
+  linesBeforeNameAsk,
+  lockFileNameAsk,
+  speakerBound,
+} = require('./src/speech/callerFileSpeech');
+const {
+  createToolHoldSession,
+  fileReadFollowUp,
+  turnRequestsTool,
+} = require('./src/speech/toolHold');
 const {
   createSpokenStreamBuffer,
   joinSpokenPieces,
@@ -257,6 +276,7 @@ const {
   createAgentReplayMemory,
 } = require('./src/speech/overlapHold');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
+const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
 const {
   createVoiceTurnTiming,
   createCallTranscript,
@@ -1735,19 +1755,25 @@ mediaWss.on('connection', (ws, req) => {
   let tts = null;
   let speaking = false;
   let speakStartedAt = 0;
+  let playbackBytes = 0;
+  let playbackStartedAt = 0;
   let lastAgentText = '';
   let llmRecoveryOffered = false;
   let emptyRepairOffered = false;
   let turnBusy = false;
   let utteranceParts = [];
   let utteranceTimer = null;
+  let utteranceStartedAt = 0;
   /** Idle check-in only after the caller has actually spoken. */
   let heardCallerUtterance = false;
+  /** Brain END is in flight. No idle nudge and no next caller turn. */
+  let callEnding = false;
   const overlapHold = createOverlapHold();
   const agentReplay = createAgentReplayMemory();
   const idleNudge = createIdleNudgeController({
     canFire: () =>
       ws.readyState === WebSocket.OPEN &&
+      !callEnding &&
       !speaking &&
       !turnBusy &&
       !speechOutageStarted &&
@@ -1792,6 +1818,7 @@ mediaWss.on('connection', (ws, req) => {
   let playbackGeneration = 0;
   let activePlaybackGeneration = 0;
   let pendingUtterance = null;
+  let pendingTurnSignals = { unfinished: false, weak: false, weakStt: false };
   let systemPrompt = buildSystemPrompt();
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
@@ -2245,7 +2272,25 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
+  async function speakToolHold(spoken) {
+    if (!spoken?.speak || bargeInActive) return;
+    await speakText(spoken.line, {
+      isFiller: spoken.kind === 'hold',
+      skipFileGate: spoken.kind === 'hold',
+    });
+  }
+
   async function speakText(text, opts = {}) {
+    if (!opts.skipFileGate && !opts.isFiller && !opts.isReplay && !opts.isIdleNudge) {
+      const gated = gateCallerFileSpeech(text, callBrainStates.get(sidLabel()));
+      if (!gated.speak) {
+        console.log(
+          `[ws/media][${sidLabel()}] file speech held reason=${gated.reason}`
+        );
+        return { ok: false, gated: true };
+      }
+      text = gated.line;
+    }
     if (!text) return { ok: false };
     if (speechOutageStarted) return { ok: false, outage: true };
     // Greeting / early turns can race tenantWarm → TTS session create.
@@ -2471,10 +2516,12 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   function kickPendingTurn() {
-    if (turnBusy || !pendingUtterance) return;
+    if (callEnding || turnBusy || !pendingUtterance) return;
     const text = pendingUtterance;
+    const signals = pendingTurnSignals;
     pendingUtterance = null;
-    runCallerTurn(text).catch((err) => {
+    pendingTurnSignals = { unfinished: false, weak: false, weakStt: false };
+    runCallerTurn(text, signals).catch((err) => {
       console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
     });
   }
@@ -2538,13 +2585,25 @@ mediaWss.on('connection', (ws, req) => {
     return '';
   }
 
-  async function runCallerTurn(userText) {
+  async function runCallerTurn(userText, opts = {}) {
     const clean = String(userText || '').replace(/\s+/g, ' ').trim();
+    const flushed = labelFlushedCallerTurn({
+      text: clean,
+      turnEnd: {
+        ...(opts.turnEnd && typeof opts.turnEnd === 'object' ? opts.turnEnd : {}),
+        unfinished: opts.turnEnd?.unfinished === true || opts.unfinished === true,
+        weak: opts.turnEnd?.weak === true || opts.weak === true,
+        weakStt: opts.turnEnd?.weakStt === true || opts.weakStt === true,
+      },
+    });
     if (!clean) return;
     idleNudge.clear();
     if (turnBusy) {
       // Merge continuation fragments into one pending utterance (don't drop context).
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${clean}` : clean;
+      if (flushed.unfinished) pendingTurnSignals.unfinished = true;
+      if (flushed.weak) pendingTurnSignals.weak = true;
+      if (flushed.weakStt) pendingTurnSignals.weakStt = true;
       return;
     }
     // A new caller turn may speak. The previous barge must not swallow it.
@@ -2622,13 +2681,22 @@ mediaWss.on('connection', (ws, req) => {
     const fileStamp = liveCallerFileStamp(brainProfile?.callerMemory);
     let brainState = observeCallerTurn(
       previousBrainState,
-      {
-        text: clean,
-        languageState: callLanguageState,
-        entities,
-        profile: brainProfile,
-        lastAgentText,
-      }
+      observeCallerInput(
+        {
+          text: clean,
+          languageState: callLanguageState,
+          entities,
+          profile: brainProfile,
+          lastAgentText,
+        },
+        {
+          turnEnd: {
+            unfinished: flushed.unfinished,
+            weak: flushed.weak,
+            weakStt: flushed.weakStt,
+          },
+        }
+      )
     );
     if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
       systemPrompt = buildSystemPrompt(brainProfile);
@@ -2688,6 +2756,46 @@ mediaWss.on('connection', (ws, req) => {
     let suppressModelSpeech = false;
     let spokeLookupSentence = false;
     try {
+      const endClose = planBrainEndClose({
+        action: nextBestAction.action,
+        language: callLanguage,
+      });
+      if (endClose.close) {
+        callEnding = true;
+        console.log(
+          `[ws/media][${callKey}] brain-end farewell lang=${callLanguage}: ${endClose.line}`
+        );
+        await runBrainEndClose({
+          action: nextBestAction.action,
+          language: callLanguage,
+          idle: idleNudge,
+          speak: async (line) => {
+            bargeInActive = false;
+            suppressReplyRemainder = false;
+            callTranscript.pushAgent(line);
+            turnTiming.markFirstSpokenChunk();
+            playbackBytes = 0;
+            playbackStartedAt = 0;
+            await speakText(line);
+            spokeThisTurn = true;
+          },
+          hangup: () => {
+            const delay = farewellHangupDelayMs({
+              bytes: playbackBytes,
+              startedAt: playbackStartedAt,
+            });
+            console.log(`[ws/media][${sidLabel()}] brain-end hangup in ${delay}ms`);
+            setTimeout(() => {
+              try {
+                ws.close(1000, 'end_call');
+              } catch {
+                /* ignore */
+              }
+            }, delay);
+          },
+        });
+        return;
+      }
       // Local lines stay off the call. Catalogue, hours, pace, identity, and the
       // old booking denial must not speak-and-return. Gemini keeps the sentence
       // stream. A visit, hold, or order lookup is the exception below.
@@ -2712,18 +2820,30 @@ mediaWss.on('connection', (ws, req) => {
         greetingBarged: greetingInterrupted && !greetingSettled,
         fileNameAskCommitted: fileNameAsksCommitted > 0,
       });
-      const fileNameAsk = nameGate.line;
+      const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
       if (!nameGate.runModel && fileNameAsk) {
         brainState.caller.fileNameAskSpoken = true;
         fileNameAsksCommitted += 1;
         callBrainStates.set(callKey, brainState);
+        const nameAskLines = linesBeforeNameAsk({
+          localReply,
+          nameAsk: fileNameAsk,
+          state: brainState,
+        });
         console.log(`[ws/media][${callKey}] file name ask: ${fileNameAsk}`);
+        if (nameAskLines.length > 1) {
+          console.log(
+            `[ws/media][${callKey}] local answer before name ask: ${nameAskLines[0]}`
+          );
+        }
         bargeInActive = false;
         suppressReplyRemainder = false;
-        callTranscript.pushAgent(fileNameAsk);
-        turnTiming.markFirstSpokenChunk();
-        await speakText(fileNameAsk);
-        spokeThisTurn = true;
+        for (const line of nameAskLines) {
+          callTranscript.pushAgent(line);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(line);
+          spokeThisTurn = true;
+        }
         return;
       }
       speechHold = holdCallerSpeech(callKey, messages);
@@ -2929,7 +3049,14 @@ mediaWss.on('connection', (ws, req) => {
         }
         // Model text only. Visit / hold / order lines go out through
         // speakLookupSentence and must not pass through this cut.
-        const text = cutNoAiSlop(polished);
+        const gated = gateCallerFileSpeech(polished, brainState);
+        if (!gated.speak) {
+          console.log(
+            `[ws/media][${sidLabel()}] file speech held reason=${gated.reason}`
+          );
+          return;
+        }
+        const text = cutNoAiSlop(gated.line);
         if (!text) return;
         if (!tts) return;
         if (suppressReplyRemainder || bargeInActive) return;
@@ -2973,7 +3100,11 @@ mediaWss.on('connection', (ws, req) => {
 
       async function speakLookupSentence() {
         if (!suppressModelSpeech || spokeLookupSentence || bargeInActive) return false;
-        const sentence = String(nameConfirmSpeech(callKey) || '').trim();
+        const gatedLookup = gateCallerFileSpeech(
+          String(nameConfirmSpeech(callKey) || '').trim(),
+          callBrainStates.get(callKey)
+        );
+        const sentence = gatedLookup.speak ? gatedLookup.line : '';
         if (!sentence || !tts) {
           try {
             speakSession?.cancel();
@@ -3070,6 +3201,7 @@ mediaWss.on('connection', (ws, req) => {
         result = await runGeminiTurnStreaming(messages, sidLabel(), turnSystemPrompt, {
           onSpokenChunk,
           shouldAbort: () => bargeInActive,
+          onToolHold: speakToolHold,
         });
         stopFillerForReply();
 
@@ -3220,7 +3352,10 @@ mediaWss.on('connection', (ws, req) => {
         }
       } else {
         turnTiming.markLlmStart();
-        result = await runGeminiTurn(messages, sidLabel(), turnSystemPrompt);
+        result = await runGeminiTurn(messages, sidLabel(), turnSystemPrompt, {
+          shouldAbort: () => bargeInActive,
+          onToolHold: speakToolHold,
+        });
         stopFillerForReply();
         if (speakSession) {
           try {
@@ -3347,7 +3482,13 @@ mediaWss.on('connection', (ws, req) => {
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
-      if (!bargeInActive && !progressAlreadySpoken && !spokeThisTurn) {
+      if (callEnding) {
+        try {
+          ws.close(1000, 'end_call');
+        } catch {
+          /* ignore */
+        }
+      } else if (!bargeInActive && !progressAlreadySpoken && !spokeThisTurn) {
         const recovery = await resolveLlmRecoverySpeech(clean);
         callTranscript.pushAgent(recovery);
         await speakText(recovery);
@@ -3366,15 +3507,23 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
-  function flushUtterance() {
+  function flushUtterance(turnEnd) {
     if (utteranceTimer) {
       clearTimeout(utteranceTimer);
       utteranceTimer = null;
+    }
+    utteranceStartedAt = 0;
+    if (callEnding) {
+      utteranceParts = [];
+      return;
     }
     if (!utteranceParts.length) return;
     const text = utteranceParts.join('').replace(/\s+/g, ' ').trim();
     utteranceParts = [];
     if (!text) return;
+    // #584 decideTurnEnd passes { unfinished: true } into this flush.
+    // Do not drop that flag on the way to Brain observe.
+    const label = labelFlushedCallerTurn({ text, turnEnd });
     if (overlapHold.alreadyReleased(text)) {
       console.log(`[ws/media][${sidLabel()}] caller_turn_duplicate_suppressed`);
       return;
@@ -3382,6 +3531,9 @@ mediaWss.on('connection', (ws, req) => {
     overlapHold.markReleased(text);
     if (turnBusy) {
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${text}` : text;
+      if (label.unfinished) pendingTurnSignals.unfinished = true;
+      if (label.weak) pendingTurnSignals.weak = true;
+      if (label.weakStt) pendingTurnSignals.weakStt = true;
       return;
     }
     console.log(`[ws/media][${sidLabel()}] caller_turn_processed`);
@@ -3393,26 +3545,74 @@ mediaWss.on('connection', (ws, req) => {
         patchFirstForward(sessionCallSid, {
           hasStt: true,
           firstCallerTurn: text,
+          unfinished: label.unfinished,
+          weak: label.weak,
+          weakStt: label.weakStt,
         });
       }
     }
-    runCallerTurn(text).catch((err) => {
+    runCallerTurn(text, { unfinished: label.unfinished, turnEnd }).catch((err) => {
       console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
     });
   }
 
-  function scheduleUtteranceFlush() {
-    if (utteranceTimer) clearTimeout(utteranceTimer);
-    // Adaptive fallback if Soniox endpoint marker is delayed/missing.
-    const pendingText = utteranceParts.join('').replace(/\s+/g, ' ').trim();
-    const flushMs = adaptiveFlushMs({
-      text: pendingText,
-      lastAgentText,
-    });
-    console.log(
-      `[ws/media][${sidLabel()}] schedule flush in ${flushMs}ms chars=${pendingText.length}`
+  function pendingUtteranceText() {
+    return utteranceParts.join('').replace(/\s+/g, ' ').trim();
+  }
+
+  function noteUtteranceClock() {
+    if (!utteranceStartedAt && utteranceParts.length) utteranceStartedAt = Date.now();
+  }
+
+  function utteranceWaitedMs() {
+    if (!utteranceStartedAt) return 0;
+    return Date.now() - utteranceStartedAt;
+  }
+
+  function applyTurnEnd(decision) {
+    if (!decision || decision.action === 'drop') {
+      if (utteranceTimer) {
+        clearTimeout(utteranceTimer);
+        utteranceTimer = null;
+      }
+      return;
+    }
+    if (decision.action === 'wait') {
+      if (utteranceTimer) clearTimeout(utteranceTimer);
+      const waitMs = Math.max(0, Number(decision.waitMs) || 0);
+      console.log(
+        `[ws/media][${sidLabel()}] turn_end wait ${waitMs}ms reason=${decision.reason} unfinished=${decision.unfinished ? 1 : 0}`
+      );
+      utteranceTimer = setTimeout(() => {
+        utteranceTimer = null;
+        const again = decideTurnEnd({
+          text: pendingUtteranceText(),
+          endpoint: true,
+          waitedMs: utteranceWaitedMs(),
+          lastAgentText,
+        });
+        applyTurnEnd(again);
+      }, waitMs);
+      return;
+    }
+    // The decision, including unfinished, is the flush. Do not drop it.
+    flushUtterance(decision);
+  }
+
+  function considerTurnEnd(endpoint) {
+    noteUtteranceClock();
+    applyTurnEnd(
+      decideTurnEnd({
+        text: pendingUtteranceText(),
+        endpoint: Boolean(endpoint),
+        waitedMs: utteranceWaitedMs(),
+        lastAgentText,
+      })
     );
-    utteranceTimer = setTimeout(() => flushUtterance(), flushMs);
+  }
+
+  function scheduleUtteranceFlush() {
+    considerTurnEnd(false);
   }
 
   function onSttEvent(evt) {
@@ -3429,7 +3629,6 @@ mediaWss.on('connection', (ws, req) => {
     if (evt.type === 'transcript' && evt.text) {
       const text = String(evt.text).trim();
       if (!text) return;
-      noteCallerSpeechForIdle(text);
 
       const isInterim = !evt.isFinal;
 
@@ -3438,6 +3637,9 @@ mediaWss.on('connection', (ws, req) => {
         if (speaking || turnBusy) {
           interimBargeText = mergeInterimHypothesis(interimBargeText, text);
           const interimDecision = maybeBargeIn(interimBargeText, 'interim speech');
+          if (callerEventClearsIdle(interimDecision)) {
+            noteCallerSpeechForIdle(interimBargeText);
+          }
           if (
             speaking &&
             !interimDecision.interrupt &&
@@ -3446,6 +3648,16 @@ mediaWss.on('connection', (ws, req) => {
             overlapHold.noteInterim(interimBargeText, activePlaybackGeneration);
           }
         } else {
+          const idleInterim = decideCallerEvent({
+            text,
+            speaking: false,
+            turnBusy: false,
+            lastAgentText,
+            lastAgentAskedQuestion: lastAskedQuestion(),
+            replayText: hearAgainReplayText(),
+            phase: 'idle',
+          });
+          if (callerEventClearsIdle(idleInterim)) noteCallerSpeechForIdle(text);
           interimBargeText = '';
         }
         return;
@@ -3465,13 +3677,21 @@ mediaWss.on('connection', (ws, req) => {
       if (decision.replay) {
         const replay = hearAgainReplayText();
         if (replay) {
+          if (callerEventClearsIdle(decision)) noteCallerSpeechForIdle(text);
           console.log(
             `[ws/media][${sidLabel()}] agent_question_replay reason=${decision.reason}`
           );
-          void speakText(replay, { isReplay: true });
+          void speakText(replay, { isReplay: true }).then(() => {
+            if (callEnding) return;
+            if (agentAwaitingReply(replay)) {
+              idleNudge.arm({ skip: !heardCallerUtterance });
+            }
+          });
         }
         return;
       }
+
+      if (callerEventClearsIdle(decision)) noteCallerSpeechForIdle(text);
 
       if (decision.action === 'barge_listen') {
         return;
@@ -3529,7 +3749,7 @@ mediaWss.on('connection', (ws, req) => {
       if (leftover && !overlapHold.alreadyReleased(leftover)) {
         utteranceParts.push(leftover);
       }
-      flushUtterance();
+      considerTurnEnd(true);
     }
   }
 
@@ -3553,6 +3773,8 @@ mediaWss.on('connection', (ws, req) => {
         }
         if (activeTurnTiming) activeTurnTiming.markFirstPcm();
         if (greetingAwaitingFirstPcm) noteGreetingPcm({ cached: false });
+        if (!playbackStartedAt) playbackStartedAt = Date.now();
+        playbackBytes += pcm.length;
         if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
         // Live clone-voice audio means we can record downtime clips for the next outage.
         scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
@@ -3613,7 +3835,9 @@ mediaWss.on('connection', (ws, req) => {
 
   function markGreetingFileNameAsk(line) {
     if (greetingInterrupted || fileNameAsksCommitted > 0) return;
-    if (!/Am I speaking with\s+\S/i.test(String(line || ''))) return;
+    if (!/\b(?:am i speaking with|je,?\s*naongea na|naongea na)\s+\S/i.test(String(line || ''))) {
+      return;
+    }
     const state = sessionCallSid ? callBrainStates.get(sessionCallSid) : null;
     if (!state?.caller || state.caller.nameConfirmed === true) return;
     state.caller.fileNameAskSpoken = true;
@@ -4564,12 +4788,12 @@ wss.on('connection', (ws) => {
         const fileStamp = liveCallerFileStamp(brainProfile?.callerMemory);
         let brainState = observeCallerTurn(
           previousBrainState,
-          {
+          observeCallerInput({
             text: data.voicePrompt,
             languageState: callLanguageState,
             entities,
             profile: brainProfile,
-          }
+          })
         );
         if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
           systemPrompt = buildSystemPrompt(brainProfile);
@@ -4610,11 +4834,12 @@ wss.on('connection', (ws) => {
           greetingBarged: false,
           fileNameAskCommitted: brainState?.caller?.fileNameAskSpoken === true,
         });
-        if (!nameGate.runModel && nameGate.line) {
+        const relayNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
+        if (!nameGate.runModel && relayNameAsk) {
           brainState.caller.fileNameAskSpoken = true;
           callBrainStates.set(callSid, brainState);
-          transcriptLog.push(`Agent: ${nameGate.line}`);
-          ws.send(JSON.stringify({ type: 'text', token: nameGate.line, last: true }));
+          transcriptLog.push(`Agent: ${relayNameAsk}`);
+          ws.send(JSON.stringify({ type: 'text', token: relayNameAsk, last: true }));
           await db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') });
           return;
         }
@@ -4656,9 +4881,11 @@ wss.on('connection', (ws) => {
         }
 
         const reply = await runGeminiTurn(messages, callSid, turnPrompt);
-        const replyText = [reply.spokenText, reply.actionConfirmation]
+        const replyBody = [reply.spokenText, reply.actionConfirmation]
           .filter(Boolean)
           .join(' ');
+        const gatedReply = gateCallerFileSpeech(replyBody, brainState);
+        const replyText = gatedReply.speak ? gatedReply.line : '';
         if (replyText) {
           transcriptLog.push(`Agent: ${replyText}`);
           ws.send(JSON.stringify({ type: 'text', token: replyText, last: true }));
@@ -5044,11 +5271,55 @@ function nameConfirmSpeech(callSid) {
   });
 }
 
+async function applyToolsWithHold(callSid, parsed, hooks = {}) {
+  const shouldAbort = hooks.shouldAbort;
+  let session = null;
+  if (turnRequestsTool(parsed) && !shouldAbort?.()) {
+    const state = callBrainStates.get(callSid);
+    session = createToolHoldSession({
+      language: state?.language?.current || 'en',
+      seed: `${callSid}:${state?.conversation?.turnCount || 0}`,
+    });
+  }
+  if (session && shouldAbort?.()) session.cancel();
+  // Start the tool first. The hold covers that wait. It does not run before it.
+  const toolPromise = safeApplyGeminiTools(callSid, parsed);
+  let holdSpeech = Promise.resolve();
+  if (session && session.phase !== 'cancelled') {
+    const begun = session.begin();
+    if (begun.speak && typeof hooks.onToolHold === 'function') {
+      holdSpeech = Promise.resolve(hooks.onToolHold(begun));
+    }
+  }
+  const [execution] = await Promise.all([toolPromise, holdSpeech]);
+  let toolHoldCancelled = false;
+  if (session) {
+    const state = callBrainStates.get(callSid);
+    const fileRead = fileReadFollowUp(execution.results);
+    const follow = session.finish({
+      barge: Boolean(shouldAbort?.()),
+      bound: speakerBound(state),
+      fileFacts: Boolean(fileRead),
+      resultLine: fileRead?.resultLine || '',
+    });
+    toolHoldCancelled = follow.reason === 'barge';
+    if (
+      fileRead &&
+      follow.speak &&
+      !toolHoldCancelled &&
+      typeof hooks.onToolHold === 'function'
+    ) {
+      await hooks.onToolHold(follow);
+    }
+  }
+  return { execution, toolHoldCancelled };
+}
+
 async function runGeminiTurnStreaming(
   messages,
   callSid,
   systemPrompt = buildSystemPrompt(),
-  { onSpokenChunk, shouldAbort } = {}
+  { onSpokenChunk, shouldAbort, onToolHold } = {}
 ) {
   const primary = geminiPrimaryModel();
   const backup = geminiBackupModel();
@@ -5185,11 +5456,13 @@ async function runGeminiTurnStreaming(
   }
 
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
-  const execution = await safeApplyGeminiTools(callSid, parsed);
-  const actionConfirmation = formatToolConfirmation(
+  const heldTools = await applyToolsWithHold(callSid, parsed, { shouldAbort, onToolHold });
+  const execution = heldTools.execution;
+  let actionConfirmation = formatToolConfirmation(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
+  if (heldTools.toolHoldCancelled) actionConfirmation = '';
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({
@@ -5224,7 +5497,12 @@ async function runGeminiTurnStreaming(
 // Runs one turn of the conversation through Gemini, preserving the chat
 // history and executing the caller-info / end-call signals via structured
 // markers returned in the model output.
-async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt()) {
+async function runGeminiTurn(
+  messages,
+  callSid,
+  systemPrompt = buildSystemPrompt(),
+  hooks = {}
+) {
   const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
   const maxAttempts = Math.max(1, Number(process.env.GEMINI_MAX_RETRIES || 3));
   let response;
@@ -5280,11 +5558,13 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
 
   const outputText = extractGeminiText(response);
   const parsed = parseGeminiResponse(outputText);
-  const execution = await safeApplyGeminiTools(callSid, parsed);
-  const actionConfirmation = formatToolConfirmation(
+  const heldTools = await applyToolsWithHold(callSid, parsed, hooks);
+  const execution = heldTools.execution;
+  let actionConfirmation = formatToolConfirmation(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
+  if (heldTools.toolHoldCancelled) actionConfirmation = '';
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({

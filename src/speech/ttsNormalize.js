@@ -25,13 +25,60 @@ function stripMarkup(text) {
     .trim();
 }
 
+const LIST_ITEM = String.raw`\p{L}[\p{L}'’-]*(?:\s+\p{L}[\p{L}'’-]*){0,5}`;
+const OXFORD_LIST = new RegExp(
+  String.raw`(?:${LIST_ITEM},\s+){1,}${LIST_ITEM},\s+(and|na)\s+${LIST_ITEM}`,
+  'giu'
+);
+const BARE_LIST = new RegExp(String.raw`(?:${LIST_ITEM},\s+){2,}${LIST_ITEM}`, 'giu');
+
 /**
- * Punctuation polish for phone TTS (avoid stretched ellipsis, etc.).
- * Runs last in the pipeline, after money/time/day/phone expanders have
- * claimed their ranges, so any surviving dash or dot run is a leak.
+ * Commas are pause cues. stripSpokenPunctuation removes them so Soniox does
+ * not say "comma". A serial list then becomes one run-on. Join the items
+ * with the list's own conjunction (and / na) so every tenant's catalogue
+ * keeps a beat between names.
  * @param {string} text
+ * @param {'en'|'sw'|string} [language]
  */
-function polishPunctuation(text) {
+function paceSpokenLists(text, language) {
+  const fallback = language === 'sw' ? 'na' : 'and';
+  let t = String(text || '');
+  t = t.replace(OXFORD_LIST, (match) => speakSerialList(match, fallback, true));
+  t = t.replace(BARE_LIST, (match) => speakSerialList(match, fallback, false));
+  return t;
+}
+
+function speakSerialList(match, fallback, explicit) {
+  const oxford = String(match).match(/^(.*),\s+(and|na)\s+(\S.*)$/i);
+  let conj = fallback;
+  let parts;
+  if (oxford) {
+    conj = /^na$/i.test(oxford[2]) ? 'na' : 'and';
+    parts = [...oxford[1].split(/\s*,\s+/), oxford[3]];
+  } else {
+    parts = String(match).split(/\s*,\s+/);
+  }
+  const items = parts.map((item) => item.trim()).filter(Boolean);
+  if (items.length < 3) return match;
+  if (items.some((item) => /\d/.test(item) || item.split(/\s+/).length > 6)) return match;
+  // A bare comma run is a list only when every piece is a short name
+  // ("sofa cleaning, carpet cleaning"). A vocative or a parenthetical
+  // aside has a one-word name or a longer clause and stays a pause.
+  if (!explicit) {
+    const counts = items.map((item) => item.split(/\s+/).length);
+    if (counts.some((count) => count < 2 || count > 4)) return match;
+  }
+  return items.join(` ${conj} `);
+}
+
+/**
+ * Punctuation polish for phone TTS. Runs after money/time/day/phone
+ * expanders, so a surviving dash or dot run is a leak. List commas become
+ * spoken conjunctions before the marks are stripped.
+ * @param {string} text
+ * @param {'en'|'sw'|string} [language]
+ */
+function polishPunctuation(text, language) {
   let t = String(text || '');
   // Abbreviations the model leaks get spoken forms, not spelled-out dots.
   t = t.replace(/\be\.g\./gi, 'for example');
@@ -58,6 +105,7 @@ function polishPunctuation(text) {
   t = t.replace(/^\s*,\s*/, '');
   t = t.replace(/\s+,/g, ',');
   t = t.replace(/,([A-Za-z])/g, ', $1');
+  t = paceSpokenLists(t, language);
   // Stream leftover: first word glued to the next ("Ican", "Takeyour").
   t = t.replace(
     /\b(I|You|It|We|He|She|They)(can|have|is|am|are|will|would|do)\b/g,
@@ -69,6 +117,29 @@ function polishPunctuation(text) {
   // Exclamation makes Soniox punch / strain on the phone. Period keeps pace even.
   t = t.replace(/!+/g, '.');
   t = t.replace(/\.{2,}/g, '.');
+  t = stripSpokenPunctuation(t);
+  return t.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Soniox reads comma, period, question mark, dash, and ellipsis as words.
+ * Sentence marks are gone before a chunk is sent. Digits keep an internal
+ * decimal or thousands separator. Intra-word hyphens (M-Pesa) stay.
+ * @param {string} text
+ */
+function speakDomainDots(text) {
+  return String(text || '').replace(/\b((?:[a-z0-9-]+\.)+[a-z]{2,})\b/gi, (host) =>
+    host.replace(/\./g, ' dot ')
+  );
+}
+
+function stripSpokenPunctuation(text) {
+  let t = speakDomainDots(text);
+  while (/(\d),(\d)/.test(t)) t = t.replace(/(\d),(\d)/g, '$1$2');
+  t = t.replace(/(\d)\.(\d)/g, '$1\u0000$2');
+  t = t.replace(/[.!?…,;:]+/g, ' ');
+  t = t.replace(/[“”«»"]/g, ' ');
+  t = t.replace(/\u0000/g, '.');
   return t.replace(/\s+/g, ' ').trim();
 }
 
@@ -162,7 +233,7 @@ function prepareForTts(text, opts = {}) {
   spoken = applyLexicon(spoken, language, extras);
   spoken = expandSpokenForms(spoken, language);
   spoken = expandPhones(spoken);
-  spoken = polishPunctuation(spoken);
+  spoken = polishPunctuation(spoken, language);
 
   return { original, text: spoken, language };
 }
@@ -186,6 +257,7 @@ module.exports = {
   stripMarkup,
   expandPhones,
   polishPunctuation,
+  stripSpokenPunctuation,
   detectUtteranceTtsLang,
   resolveTtsLanguage,
   prepareForTts,

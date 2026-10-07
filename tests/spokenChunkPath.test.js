@@ -8,6 +8,7 @@ const path = require('path');
 const { createSpokenStreamBuffer } = require('../src/speech/spokenStreamBuffer');
 const { polishSpokenReply } = require('../src/conversation/dynamicSpeech');
 const { cutNoAiSlop } = require('../src/speech/noAiSlop');
+const { gateCallerFileSpeech } = require('../src/speech/callerFileSpeech');
 const { narratesInternalAction } = require('../src/conversation/speechGuard');
 const { isOrphanFragment } = require('../src/speech/outboundPcm');
 const { createBrainState } = require('../src/conversation/brainState');
@@ -29,6 +30,7 @@ function loadSpokenChunkRunner() {
         cutNoAiSlop,
         narratesInternalAction,
         isOrphanFragment,
+        gateCallerFileSpeech,
       } = deps;
       let {
         suppressModelSpeech,
@@ -75,6 +77,7 @@ function loadSpokenChunkRunner() {
     cutNoAiSlop,
     narratesInternalAction,
     isOrphanFragment,
+    gateCallerFileSpeech,
   });
 }
 
