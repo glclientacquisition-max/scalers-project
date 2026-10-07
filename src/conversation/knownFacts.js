@@ -120,18 +120,32 @@ function hoursAskLine(text, profile = {}, language = 'en', now = new Date()) {
 }
 
 /**
+ * Service names already on the file. Notes and parentheses stay off.
+ * The spoken catalogue uses the first four, then "and more" / "na zingine".
+ * Brain items[] (later PR) replaces this list. Do not invent names here.
+ * @param {object} [profile]
+ * @param {number} [limit]
+ * @returns {{ names: string[], more: boolean }}
+ */
+function catalogueFileNames(profile = {}, limit = 4) {
+  const rows = normalizeServices(profile.servicesCatalog);
+  const names = rows.map((row) => mouthServiceName(row.name)).filter(Boolean);
+  const cap = Number.isFinite(limit) && limit > 0 ? limit : names.length;
+  return { names: names.slice(0, cap), more: names.length > cap };
+}
+
+/**
  * Catalogue list when they asked what we offer. Does not include prices.
+ * Phase 0 join: na / and before the last name, one breath.
  */
 function offerCatalogueLine(text, profile = {}, language = 'en') {
   if (!looksLikeOfferAsk(text) || looksLikeNewWork(text)) return '';
   const sw = String(language || '').toLowerCase() === 'sw' || String(language || '').toLowerCase() === 'sheng';
-  const rows = normalizeServices(profile.servicesCatalog);
-  const names = rows.map((row) => mouthServiceName(row.name)).filter(Boolean).slice(0, 4);
+  const { names, more } = catalogueFileNames(profile);
   if (!names.length) {
     return sw ? 'Niambie unahitaji nini.' : 'Tell me what you need done.';
   }
   const list = joinSpoken(names, language);
-  const more = rows.length > 4;
   if (isMessageOnlyMode(profile.afterHoursMode)) {
     if (sw) return more ? `Tuna ${list}, na zingine.` : `Tuna ${list}.`;
     return more ? `We offer ${list}, and more.` : `We offer ${list}.`;
@@ -148,5 +162,6 @@ module.exports = {
   looksLikeHoursAsk,
   hoursAskLine,
   offerCatalogueLine,
+  catalogueFileNames,
   speakClock,
 };

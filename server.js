@@ -239,6 +239,13 @@ const { narratesInternalAction } = require('./src/conversation/speechGuard');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
+  catalogueGeminiDirective,
+  geminiCatalogueEnabled,
+  geminiReasoningDown,
+  planCatalogueMouth,
+  softenCataloguePunctuation,
+} = require('./src/speech/catalogueMouth');
+const {
   shouldForwardOutboundPcm,
   isOrphanFragment,
 } = require('./src/speech/outboundPcm');
@@ -2533,7 +2540,7 @@ mediaWss.on('connection', (ws, req) => {
     });
   }
 
-  async function resolveLlmRecoverySpeech(userText = '') {
+  async function resolveLlmRecoverySpeech(userText = '', opts = {}) {
     const health = getGeminiProviderHealth();
     if (!llmRecoveryOffered && (health.billingExhausted || health.denied)) {
       void noteSpeechOutage({ profile: brainProfile, kind: 'llm' }).catch((err) => {
@@ -2563,14 +2570,27 @@ mediaWss.on('connection', (ws, req) => {
         );
       }
     }
-    llmRecoveryOffered = true;
+    // A catalogue outage speaks the Phase-0 list and must not burn the
+    // name-ask offer. The next miss still asks for a name.
+    if (opts.consumeOffer !== false) llmRecoveryOffered = true;
     return planned.spoken;
   }
 
   // A demand spike or a broken stream asks them to repeat once.
   // The reach-them name line is only for credits or a denied project.
-  async function speechWhenModelMissed(result, userText) {
-    if (result?.llmHardDown) return resolveLlmRecoverySpeech(userText);
+  async function speechWhenModelMissed(result, userText, localReply) {
+    if (result?.llmHardDown) {
+      const mouth = planCatalogueMouth({
+        localReply,
+        reasoningDown: true,
+        geminiCatalogue: geminiCatalogueEnabled(),
+      });
+      if (mouth.speakLocal && mouth.line) {
+        await resolveLlmRecoverySpeech(userText, { consumeOffer: false });
+        return mouth.line;
+      }
+      return resolveLlmRecoverySpeech(userText);
+    }
     const planned = planEmptyGeminiSpeech({
       brainState,
       language: callLanguage,
@@ -2796,9 +2816,11 @@ mediaWss.on('connection', (ws, req) => {
         });
         return;
       }
-      // Local lines stay off the call. Catalogue, hours, pace, identity, and the
-      // old booking denial must not speak-and-return. Gemini keeps the sentence
-      // stream. A visit, hold, or order lookup is the exception below.
+      // Hours, pace, identity, and the old booking denial stay off this
+      // speak-and-return. The services catalogue is the exception in
+      // planCatalogueMouth: flag off or a reasoning outage speaks the Phase-0
+      // line once. VOICE_GEMINI_CATALOGUE=on lets Gemini speak that list
+      // (staging listen). A visit, hold, or order lookup is the exception below.
       const localReply = resolveLocalReply({
         text: clean,
         state: brainState,
@@ -2808,7 +2830,7 @@ mediaWss.on('connection', (ws, req) => {
         businessName,
         nextBestAction,
       });
-      if (localReply) {
+      if (localReply && localReply.outcome !== 'catalogue') {
         console.log(
           `[ws/media][${callKey}] ${localReply.outcome} local line not spoken lang=${callLanguage}: ${localReply.line}`
         );
@@ -2888,6 +2910,43 @@ mediaWss.on('connection', (ws, req) => {
         await speakText(visitRead.line);
         spokeThisTurn = true;
         return;
+      }
+      // Flag default off: local Phase-0 breath, Gemini does not take the list.
+      // Flag on and reasoning up: do not speak the local line. Gemini does.
+      // Flag on and reasoning down (credits, denied, or no key): local line.
+      // One speakText. Not one sentence per service.
+      const catalogueMouth = planCatalogueMouth({
+        localReply,
+        reasoningDown:
+          geminiReasoningDown(getGeminiProviderHealth()) ||
+          !String(process.env.GEMINI_API_KEY || '').trim(),
+        geminiCatalogue: geminiCatalogueEnabled(),
+      });
+      let catalogueSystemPrompt = turnSystemPrompt;
+      if (catalogueMouth.speakLocal && catalogueMouth.line && tts && !bargeInActive) {
+        if (catalogueMouth.reason === 'outage') {
+          await resolveLlmRecoverySpeech(clean, { consumeOffer: false });
+        }
+        console.log(
+          `[ws/media][${callKey}] catalogue fallback reason=${catalogueMouth.reason} lang=${callLanguage}: ${catalogueMouth.line}`
+        );
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(catalogueMouth.line);
+        turnTiming.markFirstSpokenChunk();
+        await speakText(catalogueMouth.line);
+        spokeThisTurn = true;
+        return;
+      }
+      if (catalogueMouth.letGemini) {
+        const note = catalogueGeminiDirective({
+          profile: brainProfile,
+          localReply,
+        });
+        if (note) catalogueSystemPrompt = `${turnSystemPrompt}\n\n${note}`;
+        console.log(
+          `[ws/media][${callKey}] catalogue gemini listen lang=${callLanguage}`
+        );
       }
       const bareCloser = looksLikeBareCloser(clean);
 
@@ -3192,16 +3251,21 @@ mediaWss.on('connection', (ws, req) => {
             await actionProgressSpeak;
             callTranscript.pushAgent(result.spokenText);
             turnTiming.markFirstSpokenChunk();
-            await speakText(result.spokenText);
+            await speakText(
+              catalogueMouth.letGemini
+                ? softenCataloguePunctuation(result.spokenText)
+                : result.spokenText
+            );
             spokeThisTurn = true;
           }
         }
       } else if (streamOn) {
         turnTiming.markLlmStart();
-        result = await runGeminiTurnStreaming(messages, sidLabel(), turnSystemPrompt, {
+        result = await runGeminiTurnStreaming(messages, sidLabel(), catalogueSystemPrompt, {
           onSpokenChunk,
           shouldAbort: () => bargeInActive,
           onToolHold: speakToolHold,
+          catalogueBreath: catalogueMouth.letGemini,
         });
         stopFillerForReply();
 
@@ -3289,8 +3353,10 @@ mediaWss.on('connection', (ws, req) => {
             if (planned.speakNow && planned.reply && !bargeInActive) {
               const missed = Boolean(result?.timedOut || result?.llmFailed);
               const reply = missed
-                ? await speechWhenModelMissed(result, clean)
-                : cutNoAiSlop(planned.reply);
+                ? await speechWhenModelMissed(result, clean, localReply)
+                : catalogueMouth.letGemini
+                  ? softenCataloguePunctuation(cutNoAiSlop(planned.reply))
+                  : cutNoAiSlop(planned.reply);
               if (reply) {
                 callTranscript.pushAgent(reply);
                 turnTiming.markFirstSpokenChunk();
@@ -3327,8 +3393,10 @@ mediaWss.on('connection', (ws, req) => {
           if (planned.speakNow && planned.reply) {
             const missed = Boolean(result?.timedOut || result?.llmFailed);
             const reply = missed
-              ? await speechWhenModelMissed(result, clean)
-              : cutNoAiSlop(planned.reply);
+              ? await speechWhenModelMissed(result, clean, localReply)
+              : catalogueMouth.letGemini
+                ? softenCataloguePunctuation(cutNoAiSlop(planned.reply))
+                : cutNoAiSlop(planned.reply);
             if (reply) {
               callTranscript.pushAgent(reply);
               turnTiming.markFirstSpokenChunk();
@@ -3352,7 +3420,7 @@ mediaWss.on('connection', (ws, req) => {
         }
       } else {
         turnTiming.markLlmStart();
-        result = await runGeminiTurn(messages, sidLabel(), turnSystemPrompt, {
+        result = await runGeminiTurn(messages, sidLabel(), catalogueSystemPrompt, {
           shouldAbort: () => bargeInActive,
           onToolHold: speakToolHold,
         });
@@ -3365,13 +3433,17 @@ mediaWss.on('connection', (ws, req) => {
           }
           speakSession = null;
         }
-        const modelLine = result?.spokenText ? cutNoAiSlop(result.spokenText) : '';
+        const modelLine = result?.spokenText
+          ? catalogueMouth.letGemini
+            ? softenCataloguePunctuation(cutNoAiSlop(result.spokenText))
+            : cutNoAiSlop(result.spokenText)
+          : '';
         const reply =
           (result?.spokenText ? modelLine : '') ||
           (result?.actionConfirmation
             ? ''
             : result?.timedOut || result?.llmFailed
-              ? await speechWhenModelMissed(result, clean)
+              ? await speechWhenModelMissed(result, clean, localReply)
               : '');
         if (bargeInActive) {
           console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
@@ -3418,7 +3490,7 @@ mediaWss.on('connection', (ws, req) => {
       // reach-them name line, once.
       if (!spokeThisTurn && !hidInternalNarration && !bargeInActive && tts) {
         if (result?.timedOut || result?.llmFailed) {
-          const guarantee = await speechWhenModelMissed(result, clean);
+          const guarantee = await speechWhenModelMissed(result, clean, localReply);
           if (guarantee) {
             console.warn(
               `[ws/media][${sidLabel()}] turn speech ${result?.llmHardDown ? 'guarantee' : 'repair'} action=${nextBestAction.action}` +
@@ -5319,13 +5391,14 @@ async function runGeminiTurnStreaming(
   messages,
   callSid,
   systemPrompt = buildSystemPrompt(),
-  { onSpokenChunk, shouldAbort, onToolHold } = {}
+  { onSpokenChunk, shouldAbort, onToolHold, catalogueBreath } = {}
 ) {
   const primary = geminiPrimaryModel();
   const backup = geminiBackupModel();
   const contents = buildGeminiContents(messages);
   let model = primary;
-  let buffer = createSpokenStreamBuffer();
+  const breath = catalogueBreath === true;
+  let buffer = createSpokenStreamBuffer({ catalogueBreath: breath });
   let fullText = '';
   let streamFailed = false;
   let streamErr = null;
@@ -5336,7 +5409,7 @@ async function runGeminiTurnStreaming(
 
   while (attempt < 3) {
     fullText = '';
-    buffer = createSpokenStreamBuffer();
+    buffer = createSpokenStreamBuffer({ catalogueBreath: breath });
     thoughtSignature = '';
     modelParts = [];
     streamErr = null;

@@ -2,6 +2,7 @@
 // Holds back tool markers (###TOOL### / ###ENDCALL###) so they are never spoken.
 
 const { stripSpokenInstructionLeaks } = require('./spokenInstructionLeak');
+const { softenCataloguePunctuation } = require('./catalogueMouth');
 
 /**
  * Gemini stream parts often omit the leading space on the next word.
@@ -87,6 +88,13 @@ function splitSpeakableChunks(text, opts = {}) {
   );
   const src = String(text || '').replace(/\s+/g, ' ').trim();
   if (!src) return { chunks: [], rest: '' };
+
+  // Catalogue listen: one breath. A period or question mark must not open
+  // another Soniox push (that is the staccato "reading punctuation").
+  if (opts.catalogueBreath) {
+    if (!final) return { chunks: [], rest: src };
+    return { chunks: [src], rest: '' };
+  }
 
   /** @type {string[]} */
   const chunks = [];
@@ -222,6 +230,7 @@ function createSpokenStreamBuffer(opts = {}) {
   let emittedSpoken = '';
   const earlyFlushChars = opts.earlyFlushChars;
   const earlyFlushWords = opts.earlyFlushWords;
+  const catalogueBreath = opts.catalogueBreath === true;
 
   /**
    * @param {string} delta
@@ -248,10 +257,12 @@ function createSpokenStreamBuffer(opts = {}) {
     const pending = findPendingText(speakable, emittedSpoken);
     if (!pending) return [];
 
-    const { chunks, rest } = splitSpeakableChunks(
-      pending,
-      { final, earlyFlushChars, earlyFlushWords }
-    );
+    const { chunks, rest } = splitSpeakableChunks(pending, {
+      final,
+      earlyFlushChars,
+      earlyFlushWords,
+      catalogueBreath,
+    });
 
     const out = [];
     for (const c of chunks) {
@@ -259,7 +270,8 @@ function createSpokenStreamBuffer(opts = {}) {
       if (!clean) continue;
       emittedSpoken = `${emittedSpoken} ${clean}`.replace(/\s+/g, ' ').trim();
       if (isOutcomeClaim(clean)) continue;
-      out.push(clean);
+      // Catalogue listen: one chunk, soft commas. Other turns keep the sentence.
+      out.push(catalogueBreath ? softenCataloguePunctuation(clean) : clean);
     }
 
     void rest;
