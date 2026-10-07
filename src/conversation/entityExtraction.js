@@ -267,21 +267,41 @@ function bareAskedFileName(text, pending) {
   return namesLikelySame(raw, asked);
 }
 
+const AFFIRM_LEAD =
+  /^(?:uh+|um+|ah+)?[, ]*(?:yes|yeah|yah|yea|yep|yup|nya|nia|ndiyo|ndio|sawa|okay|ok|eeh|ehe|ee|correct)\b/i;
+
+function escapeName(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** "speaking with Alvin" and pack echo "unaongea na Alvin" / "naongea na Alvin". */
+function spokenWithName(text, pending) {
+  const escaped = escapeName(pending);
+  if (!escaped) return false;
+  return new RegExp(
+    `\\b(?:speaking with|speaking to|talking with|talking to|unaongea na|naongea na|unazungumza na|niongee na)\\s+${escaped}\\b`,
+    'i'
+  ).test(String(text || ''));
+}
+
 function affirmsAskedFileName(text, pending, extracted) {
   const asked = String(pending || '').trim();
   if (!asked) return false;
   if (isNameAffirmation(text)) return true;
   const raw = String(text || '').trim();
-  if (!/^(?:yes|yeah|yep|yup|ndiyo|ndio)\b/i.test(raw)) return false;
+  if (!AFFIRM_LEAD.test(raw)) return false;
+  // Echo of the pack ask wins before a noisy lead token ("Nya") can look like a different name.
+  if (spokenWithName(raw, asked)) return true;
   if (extracted && !namesLikelySame(extracted, asked) && !isJunkCallerName(extracted)) {
     return false;
   }
-  const escaped = asked.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const speaking = new RegExp(
-    `\\b(?:speaking with|speaking to|talking with|talking to)\\s+${escaped}\\b`,
-    'i'
-  );
-  if (speaking.test(raw)) return true;
+  if (
+    /\b(?:speaking with|speaking to|talking with|talking to|unaongea na|naongea na|unazungumza na|niongee na)\s+[\p{L}'’-]+/iu.test(
+      raw
+    )
+  ) {
+    return false;
+  }
   const named = extractName(raw, { knownNames: [asked], preferKnown: true });
   return Boolean(named && namesLikelySame(named, asked));
 }
@@ -307,8 +327,11 @@ function agentAskedPendingName(lastAgentText, pendingName) {
   const asked = String(lastAgentText || '');
   const pending = String(pendingName || '').trim();
   if (!asked || !pending) return false;
-  const escaped = pending.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`am i speaking with\\s+${escaped}`, 'i').test(asked);
+  const escaped = escapeName(pending);
+  return new RegExp(
+    `\\b(?:am i speaking with|am i talking (?:with|to)|je,?\\s*naongea na|naongea na|unaongea na|unazungumza na|niongee na|ni wewe)\\s+${escaped}\\b`,
+    'i'
+  ).test(asked);
 }
 
 function applyCallerNameConfirmation(
@@ -387,18 +410,20 @@ function applyCallerNameConfirmation(
     );
   }
 
-  // A yes binds only the file name the code just asked. It does not confirm
-  // some other "I'm …" span, and it does not depend on the model inventing the ask.
-  // Yes binds only the file name the code just asked, including
-  // "Yes, you're speaking with Alvin". It does not bind a different name.
+  // A yes binds only the file name just asked, including pack language:
+  // "Eeh, unaongea na Alvin?" after "Je, naongea na Alvin?".
+  // It does not confirm some other "I'm …" span, and it does not bind a different name.
+  const pendingForAsk = String(opts.pendingFileName || '').trim();
+  const packAsked =
+    Boolean(opts.fileNameJustAsked) ||
+    Boolean(pendingForAsk && agentAskedPendingName(opts.lastAgentText, pendingForAsk));
   if (
     !prevConfirmed &&
-    opts.fileNameJustAsked &&
-    affirmsAskedFileName(text, opts.pendingFileName, extracted)
+    packAsked &&
+    affirmsAskedFileName(text, pendingForAsk, extracted)
   ) {
-    const pending = String(opts.pendingFileName || '').trim();
-    if (pending) {
-      const locked = fileLockedName(pending, knownNames) || pending;
+    if (pendingForAsk) {
+      const locked = fileLockedName(pendingForAsk, knownNames) || pendingForAsk;
       return done(locked, true, 'caller_file', 0.95);
     }
   }
@@ -627,6 +652,176 @@ function isBackchannelOrFragment(text) {
     return true;
   }
   return false;
+}
+
+// Open stems with no complement. "Nilikuwa nataka kujua" is unfinished even when
+// a greeting sits in front of it, and even when Voice has not passed a flag yet.
+const UNFINISHED_STEM =
+  /^(nilikuwa(?:\s+(?:nauliza|nataka|ningetaka|ningependa|naomba))?(?:\s+(?:kujua|kuuliza|kuomba))?|nauliza|nataka(?:\s+(?:kujua|kuuliza|kuomba))?|ningetaka(?:\s+(?:kujua|kuuliza))?|ningependa(?:\s+(?:kujua|kuuliza))?|naomba(?:\s+(?:kujua|kuuliza))?|i was (?:just )?asking|i wanted to (?:ask|know))\b[, ]*(.*)$/i;
+
+const LEADING_FILLER =
+  /^(?:uh+|um+|ah+|eeh|eh|like|so|well|actually|i mean|nya|nia|yah|yea|yeah|yes|yep|ndiyo|ndio|sawa|okay|ok|mm+|mhm|hmm+)[, ]+/i;
+
+const LEADING_GREETING =
+  /^(?:namna gani|habari(?:\s+yako)?|niaje|mambo|vipi|sasa|how are you(?: doing)?)(?:[, ]+[\p{L}'’-]+)?[, ]*/iu;
+
+function looksLikePhaticGoal(text) {
+  const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
+  return looksLikePhaticCallerTurn(text);
+}
+
+function callerAskSpecificity(text) {
+  const value = String(text || '').toLowerCase();
+  let score = 0;
+  if (
+    /\b(dishwash\w*|carpet|sofa|couch|mattress|upholstery|fumigation|plumb\w*|electric\w*)\b/.test(
+      value
+    )
+  ) {
+    score += 3;
+  }
+  if (
+    /\b(clean\w*|inquir\w*|enquir\w*|booking|appointment|hold|visit|order|price|bei|services?|huduma)\b/.test(
+      value
+    ) ||
+    /\boffer\b/.test(value)
+  ) {
+    score += 2;
+  }
+  if (/\b(request|previous|last time)\b/.test(value)) score += 1;
+  return score;
+}
+
+function isIdentityEchoOnly(text) {
+  const raw = String(text || '')
+    .trim()
+    .replace(
+      /^(?:uh+|um+|eeh|eh|ndiyo|ndio|yes|yeah|yah|yea|nya|nia|sawa|okay|ok)[,.\s]+/i,
+      ''
+    )
+    .replace(/[?.!]+$/g, '')
+    .trim();
+  return /^(?:je,?\s*)?(?:unaongea na|naongea na|unazungumza na|niongee na|speaking with|talking to|am i speaking with)\s+[\p{L}'’-]+$/iu.test(
+    raw
+  );
+}
+
+function isGreetingClause(text) {
+  const value = String(text || '')
+    .trim()
+    .replace(/[?.!,]+$/g, '')
+    .trim();
+  if (!value) return true;
+  if (
+    /^(?:mm+|mhm|mm-?hm|uh-?huh|uh huh|uh+|um+|ah+|hmm+|eeh|eh|nya|nia|yah|yea|yeah|yes|yep|ok|okay|sawa|ndiyo|ndio)$/i.test(
+      value
+    )
+  ) {
+    return true;
+  }
+  return /^(?:namna gani|habari(?:\s+yako)?|niaje|mambo|vipi|sasa|how are you(?: doing)?)(?:[, ]+[\p{L}'’-]+)?$/iu.test(
+    value
+  );
+}
+
+const GOAL_FUNCTION_WORD =
+  /^(?:kuhusu|about|if|whether|kama|that|the|a|an|ni|na|and|to|for|of|just|like|uh|um|so|well)$/i;
+
+function isNonActionableAsk(text) {
+  const value = String(text || '')
+    .trim()
+    .replace(/[?.!,]+$/g, '')
+    .trim();
+  if (!value) return true;
+  if (
+    /^(?:what else|anything else|and then|go on|continue|na nini|kisha|what about|how about)$/i.test(
+      value
+    )
+  ) {
+    return true;
+  }
+  const words = value.split(/[^\p{L}0-9]+/u).filter(Boolean);
+  return words.length > 0 && words.every((word) => GOAL_FUNCTION_WORD.test(word));
+}
+
+function peelGoalClause(clause) {
+  let value = String(clause || '').trim();
+  if (!value) return '';
+  if (
+    isGreetingClause(value) ||
+    isIdentityEchoOnly(value) ||
+    isBackchannelOrFragment(value) ||
+    looksLikePhaticGoal(value)
+  ) {
+    return '';
+  }
+  for (let i = 0; i < 6 && value; i += 1) {
+    const filler = value.replace(LEADING_FILLER, '').trim();
+    if (filler !== value) {
+      value = filler;
+      continue;
+    }
+    const greet = LEADING_GREETING.exec(value);
+    if (greet && greet[0].length < value.length) {
+      value = value.slice(greet[0].length).trim();
+      continue;
+    }
+    break;
+  }
+  if (
+    !value ||
+    isGreetingClause(value) ||
+    isIdentityEchoOnly(value) ||
+    isBackchannelOrFragment(value) ||
+    looksLikePhaticGoal(value)
+  ) {
+    return '';
+  }
+  const open = UNFINISHED_STEM.exec(value);
+  if (!open) return isNonActionableAsk(value) ? '' : value;
+  const stem = String(open[1] || '');
+  const rest = String(open[2] || '')
+    .replace(/^[, ]+/, '')
+    .trim();
+  const bareWant = /^(?:nataka|naomba|ningetaka|ningependa)$/i.test(stem);
+  if (bareWant && rest && !/^(?:kujua|kuuliza|kuomba)\b/i.test(rest)) {
+    return value;
+  }
+  if (!rest) return '';
+  return peelGoalClause(rest);
+}
+
+/**
+ * Actionable remainder of a caller turn. Unfinished stems, greetings, and
+ * identity echoes drop out. Empty means this turn is not a goal.
+ */
+function usableGoalRemainder(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return '';
+  const parts = raw.split(/[.?!]+/);
+  const kept = [];
+  for (const part of parts) {
+    const peeled = peelGoalClause(part);
+    if (!peeled || isNonActionableAsk(peeled)) continue;
+    kept.push(peeled);
+  }
+  return kept.join('. ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Goal text must be a grounded ask. Voice may pass unfinished/weak; the stem
+ * list still rejects when that flag is missing.
+ * @param {string} text
+ * @param {{ unfinished?: boolean, weak?: boolean }} [opts]
+ */
+function isRejectedGoalText(text, opts = {}) {
+  if (opts.unfinished === true || opts.weak === true) return true;
+  return !usableGoalRemainder(text);
+}
+
+function callerGoalText(text, opts = {}) {
+  if (opts.unfinished === true || opts.weak === true) return '';
+  return usableGoalRemainder(text);
 }
 
 function isPlausibleCallerName(value) {
@@ -960,6 +1155,10 @@ module.exports = {
   shortSlotAnswer,
   isHearAgainSignal,
   isBackchannelOrFragment,
+  isRejectedGoalText,
+  callerGoalText,
+  callerAskSpecificity,
+  agentAskedPendingName,
   isPlausibleCallerName,
   entityValue,
 };

@@ -184,6 +184,10 @@ describe('visit location ladder', () => {
       /outside our coverage/i
     );
     assert.equal(coverageAskSpeech('Do you do carpet cleaning?', profile, 'en'), '');
+    assert.equal(
+      coverageAskSpeech('Ah, nilikuwa nataka, like, to know which services do you do over', profile, 'en'),
+      ''
+    );
     assert.equal(coverageAskSpeech('Which team?', profile, 'en'), '');
     assert.equal(
       coverageAskSpeech('What about Rongai?', { vertical: 'retail', businessPolicies: { delivery: 'Nairobi' } }, 'en'),

@@ -6,7 +6,14 @@ what the Brain asks for and what it saves. They cannot change what it is
 allowed to say or when a tool may fire. The gates live in code, not in the
 prompt, so a model that leaks still cannot reach the caller or the database.
 How-are-you, Okay with no job open, and a bare name go to Gemini. The model
-answers the last thing said. Code still speaks the catalogue, hours, coverage,
+answers the last thing said. A which-services ask, in English, Kiswahili, or
+a mix, is the catalogue list. The yes after a name confirm still answers that
+ask. It does not open with which service, what they need done, or ungependa
+gani. Answering the catalogue leaves the call open. A name confirm after that
+answer binds and continues. It does not end the call. Farewell only when they
+say goodbye or they are done. Trailing noise such as "over" is not a visit
+place. Code still speaks
+the catalogue, hours, coverage,
 leave-it, the visit-time ladder, and tool results. A streamed 503 retries the
 same model once if nothing was spoken, then tries the backup model once.
 Credits and a denied project are not retried. A shared line does not order "ask who is
@@ -17,7 +24,7 @@ credits-down path. A file read ("which bookings", "previous booking",
 "read them", "what do I have on hold") is not a new booking. If this
 speaker has nothing saved, Voice says so and does not invent a visit,
 an order, or a service list. Home services and retail use the same gate.
-A bound file with a real visit or hold is still read by the model.
+A bound file with a real visit or hold is still read by the model. Caller file bind, goal quality, and the summary spine: [`CALLER_IDENTITY_AND_SUMMARY.md`](./CALLER_IDENTITY_AND_SUMMARY.md) and [`../product/CALLER_FILE_MODEL.md`](../product/CALLER_FILE_MODEL.md).
 
 Runtime: `server.js` media loop. Offline twin: `tests/helpers/brainSimulator.js`.
 Proof: `tests/brainSimulation.test.js` (in `npm run test:brain`).

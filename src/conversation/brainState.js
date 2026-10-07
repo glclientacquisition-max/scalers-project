@@ -4,6 +4,9 @@
 const {
   entityValue,
   isBackchannelOrFragment,
+  isRejectedGoalText,
+  callerGoalText,
+  callerAskSpecificity,
   isHearAgainSignal,
   applyCallerNameConfirmation,
 } = require('./entityExtraction');
@@ -56,6 +59,7 @@ const {
   decideVisitPlace,
   foldCanonicalPlace,
   isLocationRefusal,
+  isNoisePlace,
   preferVisitPlace,
 } = require('./visitLocation');
 const {
@@ -258,6 +262,7 @@ function createBrainState(profile = {}) {
       name: null,
       phone: null,
       nameConfirmed: false,
+      boundRole: null,
     },
     profile.callerMemory
   );
@@ -268,6 +273,8 @@ function createBrainState(profile = {}) {
       name: caller.name || null,
       phone: caller.phone || null,
       nameConfirmed: Boolean(caller.nameConfirmed),
+      nameJustConfirmed: false,
+      boundRole: caller.boundRole || null,
       nameCollision: Array.isArray(caller.nameCollision) ? caller.nameCollision : null,
       fileNameAsked: null,
       fileNameAskSpoken: false,
@@ -307,6 +314,7 @@ function createBrainState(profile = {}) {
       locationDetailAsked: false,
       areaAsked: false,
       locationRefusals: 0,
+      catalogueAnswered: false,
     },
     emotion: {
       state: 'neutral',
@@ -354,8 +362,40 @@ function createBrainState(profile = {}) {
   return state;
 }
 
+function promoteCallerGoal(next, text, input, previousIntent) {
+  const usable = callerGoalText(text, {
+    unfinished: input?.unfinished === true,
+    weak: input?.weak === true || input?.weakStt === true,
+  });
+  if (!usable) return;
+  const current = String(next.goal?.description || '').trim();
+  if (!current || isRejectedGoalText(current)) {
+    next.goal.description = usable;
+    return;
+  }
+  // After the file name is bound, the goal is the last actionable ask.
+  if (next.caller?.nameConfirmed) {
+    next.goal.description = usable;
+    return;
+  }
+  const nextScore = callerAskSpecificity(usable);
+  const currentScore = callerAskSpecificity(current);
+  if (nextScore > currentScore) {
+    next.goal.description = usable;
+    return;
+  }
+  const intentChanged =
+    previousIntent &&
+    previousIntent !== 'unknown' &&
+    previousIntent !== next.intent;
+  if (intentChanged && nextScore > 0 && nextScore >= currentScore) {
+    next.goal.description = usable;
+  }
+}
+
 function observeCallerTurn(state, input = {}) {
   let next = structuredClone(state || createBrainState(input.profile));
+  if (next.conversation) next.conversation.catalogueSpokenThisTurn = false;
   if (input.profile && input.profile.afterHoursMode != null) {
     next.messageOnly = isMessageOnlyMode(input.profile.afterHoursMode);
   }
@@ -441,20 +481,9 @@ function observeCallerTurn(state, input = {}) {
 
   next.intent = intent;
   next.goal.primary = GOAL_BY_INTENT[intent] || 'resolve_enquiry';
-  const usableGoalText =
-    text && !isBackchannelOrFragment(text) && !looksLikePhaticCallerTurn(text)
-      ? text
-      : '';
-  if (
-    usableGoalText &&
-    (!next.goal.description ||
-      next.goal.status === 'unknown' ||
-      (previousIntent !== 'unknown' &&
-        previousIntent !== intent &&
-        !isBackchannelOrFragment(next.goal.description || '')))
-  ) {
-    next.goal.description = usableGoalText;
-  }
+  // Voice may pass unfinished/weak. Open stems are rejected even when the flag is absent.
+  // TODO(Voice): pass unfinished and weakStt from flushUtterance, and consume nameConfirmed before TTS.
+  promoteCallerGoal(next, text, input, previousIntent);
   next.goal.status = 'active';
   next.handoff.requested = intent === 'human';
 
@@ -515,6 +544,7 @@ function observeCallerTurn(state, input = {}) {
     }
   );
   next.entities = { ...next.entities, ...nameResolution.entities };
+  const wasNameConfirmed = Boolean(state?.caller?.nameConfirmed);
   next.caller.name = nameResolution.name || null;
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
   next.caller.nameCollision = nameResolution.nameCollision || null;
@@ -536,7 +566,11 @@ function observeCallerTurn(state, input = {}) {
   } else if (!next.caller.name) {
     delete next.entities.name;
   }
+  next.caller.nameJustConfirmed = !wasNameConfirmed && next.caller.nameConfirmed === true;
   applyLiveCallerFile(input.profile, next);
+  next.caller.boundRole = next.caller.nameConfirmed
+    ? next.returning?.fileRole || null
+    : null;
   if (!next.messageOnly) {
     next.caller.fileNameAsked = ownedFileAsk(next.returning, next.caller);
   }
@@ -612,10 +646,14 @@ function observeCallerTurn(state, input = {}) {
       Number(next.conversation.locationRefusals || 0) + 1;
   }
   if (homeVertical) {
-    const incoming =
+    if (isNoisePlace(entityValue(next.entities?.location))) delete next.entities.location;
+    if (isNoisePlace(entityValue(next.entities?.landmark))) delete next.entities.landmark;
+    const incomingRaw =
       entityValue(next.entities?.location) || entityValue(next.entities?.landmark);
-    const previous =
+    const previousRaw =
       entityValue(state?.entities?.location) || entityValue(state?.entities?.landmark);
+    const incoming = isNoisePlace(incomingRaw) ? '' : incomingRaw;
+    const previous = isNoisePlace(previousRaw) ? '' : previousRaw;
     const lastAsk = (next.conversation.questionsAsked || []).slice(-1)[0];
     const place = foldCanonicalPlace(
       lastAsk === 'area' && previous && incoming && !/[\s,]/.test(incoming.trim())
@@ -635,6 +673,15 @@ function observeCallerTurn(state, input = {}) {
         next.intent = 'booking';
         next.goal.primary = 'make_booking_request';
       }
+    }
+    if (isNoisePlace(entityValue(next.entities?.location))) delete next.entities.location;
+    if (place && !isNoisePlace(place) && !entityValue(next.entities?.location)) {
+      next.entities.location = {
+        value: place,
+        source: 'caller_explicit',
+        confidence: 0.9,
+        confirmed: false,
+      };
     }
     if (next.intent === 'booking' || keptSpecific) {
       next.visitPlace = decideVisitPlace(place, {
@@ -853,6 +900,10 @@ function setNextBestAction(state, decision = {}) {
     next.conversation.stage = 'action';
   } else if (decision.action === 'ANSWER') {
     next.conversation.stage = 'resolution';
+    if (decision.resolves === true) {
+      next.resolution.status = 'resolved';
+      if (decision.catalogueAnswered === true) next.conversation.catalogueAnswered = true;
+    }
   } else if (decision.action === 'ASK_CLARIFICATION') {
     next.conversation.stage = 'discovery';
   } else if (decision.action === 'APOLOGIZE_AND_REPAIR') {
@@ -1152,6 +1203,9 @@ function formatBrainStateForPrompt(state) {
       ? ''
       : '- FILE: nothing is saved for this speaker. Do not talk as if a booking, order, or hold exists. If they ask again, or sound confused, repeat that nothing is saved. Do not offer to reschedule or cancel.',
     `- Handoff requested: ${value.handoff.requested ? 'yes' : 'no'}`,
+    value.resolution.status === 'resolved' && value.goal.status !== 'completed'
+      ? '- The last fact was answered. The call is still open. Do not say goodbye unless they sign off.'
+      : '',
     `- Resolution: ${value.resolution.status}`,
     `- NEXT BEST ACTION: ${value.resolution.nextBestAction} — ${value.resolution.reason}`,
   ]

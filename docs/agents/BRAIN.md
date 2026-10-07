@@ -88,7 +88,7 @@ Core runtime modules:
 
 ## Related
 
-Caller-experience excellence vs live gaps: [`CALLER_EXPERIENCE_EXCELLENCE.md`](./CALLER_EXPERIENCE_EXCELLENCE.md).
+Caller-experience excellence vs live gaps: [`CALLER_EXPERIENCE_EXCELLENCE.md`](./CALLER_EXPERIENCE_EXCELLENCE.md). Caller file model (A+B, locked): [`../product/CALLER_FILE_MODEL.md`](../product/CALLER_FILE_MODEL.md). Runtime identity and summary: [`CALLER_IDENTITY_AND_SUMMARY.md`](./CALLER_IDENTITY_AND_SUMMARY.md).
 
 ## Chat starter
 

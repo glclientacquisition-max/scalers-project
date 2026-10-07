@@ -521,7 +521,19 @@ function coverageAskPlace(text) {
     return '';
   }
   if (!placeWords(place).length) return '';
+  if (isNoisePlace(place)) return '';
   return place;
+}
+
+/** Trailing STT such as "over" is not a visit place. */
+function isNoisePlace(place) {
+  const words = String(place || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return false;
+  return words.every((word) => word.length < 3 || COVERAGE_STOP.has(word));
 }
 
 /**
@@ -592,5 +604,6 @@ module.exports = {
   visitBlockSpeech,
   coverageAskPlace,
   coverageAskSpeech,
+  isNoisePlace,
   appendVisitNotes,
 };

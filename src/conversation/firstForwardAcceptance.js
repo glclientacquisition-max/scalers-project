@@ -9,8 +9,7 @@
  * Judge the assistant on barged_job and first_turn_goal only.
  */
 
-const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
-const { isBackchannelOrFragment } = require('./entityExtraction');
+const { isRejectedGoalText } = require('./entityExtraction');
 
 const FLASH_SECONDS = 3;
 const GREETING_DROP_SECONDS = 15;
@@ -48,12 +47,18 @@ function looksLikeHangupOnly(text) {
   return Boolean(t) && HANGUP_ONLY.test(t);
 }
 
-function firstTurnHasGoal(text) {
+function firstTurnHasGoal(text, opts = {}) {
   const t = cleanTurn(text);
   if (!t) return false;
   if (looksLikeHangupOnly(t)) return false;
-  if (looksLikePhaticCallerTurn(t)) return false;
-  if (isBackchannelOrFragment(t)) return false;
+  if (
+    isRejectedGoalText(t, {
+      unfinished: opts.unfinished === true,
+      weak: opts.weak === true || opts.weakStt === true,
+    })
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -78,7 +83,10 @@ function classifyFirstForwardAcceptance(input = {}) {
   const firstCallerTurn = cleanTurn(input.firstCallerTurn);
   const bargeText = cleanTurn(input.bargeText || firstCallerTurn);
   const bargedJob = input.bargedJob === true && looksLikeJobNoun(bargeText);
-  const goal = firstTurnHasGoal(firstCallerTurn);
+  const goal = firstTurnHasGoal(firstCallerTurn, {
+    unfinished: input.unfinished === true,
+    weak: input.weak === true || input.weakStt === true,
+  });
 
   let bucket = null;
   if (durationSeconds != null && durationSeconds < FLASH_SECONDS && !hasStt) {

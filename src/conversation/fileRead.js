@@ -16,7 +16,10 @@ const NEW_WORK_RE =
   /\b(want to book|like to book|need to book|please book|book me|can you book|could you book|i want to order|i'd like to order|order \d+|buy \d+|nataka (?:cleaning|carpet|couch|sofa|mattress|kuweka)|naomba (?:cleaning|carpet))\b/i;
 
 const OFFER_ASK_RE =
-  /\b(what (?:do you (?:offer|do|sell|have)|services|can you do)|which services|what services|services (?:that |do )?you (?:have|offer)|tell me the services|uniambie (?:the )?services|services mko nayo|mnauza|huduma (?:gani|mnazo|mko)|services gani|mnaofa|mna\s+offer|mnatoa|what do you offer)\b/i;
+  /\b(what (?:do you (?:offer|do|sell|have)|services|can you do)|which services|what services|what are (?:your |the |our )?services|services (?:that |do )?you (?:have|offer|do)|tell me (?:your |the |our |about (?:your |the )?)?services|list (?:me )?(?:the |your |our )?services|uniambie (?:the )?services|niambie (?:the )?(?:services|huduma)|services mko nayo|mnauza|huduma (?:gani|mnazo|mko|zenu|yenu)|services gani|mnaofa|mna\s+offer|mnatoa|what do you offer)\b/i;
+
+const BARE_AFFIRMATION =
+  /^(?:(?:uh+|um+|ah+|eeh|eh)[, ]+)?(?:yes|yeah|yah|yea|yep|yup|nya|nia|ndiyo|ndio|sawa|okay|ok|eeh|ehe|ee|correct)$/i;
 
 const INVENTED_FILE_RE =
   /\b(reschedule or cancel|cancel or reschedule|keep or change (?:that|them|it)|proceed with them|any of them)\b/i;
@@ -34,6 +37,42 @@ function looksLikeNewWork(text) {
 
 function looksLikeOfferAsk(text) {
   return OFFER_ASK_RE.test(String(text || ''));
+}
+
+function bareAffirmation(text) {
+  const lower = String(text || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[?.!,]+$/g, '')
+    .trim();
+  return Boolean(lower) && BARE_AFFIRMATION.test(lower);
+}
+
+/**
+ * The catalogue-list ask on this turn, or the one still waiting after a
+ * name-confirm yes. A new booking is not a list ask.
+ * @returns {string}
+ */
+function catalogueAskInPlay(text, state, priorTurns) {
+  const current = String(text || '').trim();
+  if (current && looksLikeOfferAsk(current) && !looksLikeNewWork(current)) return current;
+  if (!bareAffirmation(current)) return '';
+  const candidates = [];
+  const goal = String(state?.goal?.description || '').trim();
+  if (goal) candidates.push(goal);
+  const fromState = Array.isArray(state?.conversation?.answersReceived)
+    ? state.conversation.answersReceived
+    : [];
+  const fromOpts = Array.isArray(priorTurns) ? priorTurns : [];
+  const rows = fromOpts.length ? fromOpts : fromState;
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const row = String(rows[i] || '').trim();
+    if (row && row.toLowerCase() !== current.toLowerCase()) candidates.push(row);
+  }
+  for (const row of candidates) {
+    if (looksLikeOfferAsk(row) && !looksLikeNewWork(row)) return row;
+  }
+  return '';
 }
 
 function looksLikeFileRead(text) {
@@ -273,6 +312,8 @@ module.exports = {
   looksLikeFileRead,
   looksLikeNewWork,
   looksLikeOfferAsk,
+  bareAffirmation,
+  catalogueAskInPlay,
   looksLikeServiceMenu,
   hasReadableFile,
   fileRowsWereRead,
