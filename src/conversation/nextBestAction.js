@@ -12,11 +12,12 @@ const { affirmsAskedFileName } = require('./entityExtraction');
 const {
   looksLikeFileRead,
   hasReadableFile,
-  catalogueAskInPlay,
   bareAffirmation,
   looksLikeNewWork,
   looksLikeOfferAsk,
+  looksLikeServiceDetailAsk,
 } = require('./fileRead');
+const { geminiCatalogueEnabled } = require('./catalogueMouth');
 const {
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
@@ -51,34 +52,18 @@ function callerSignedOff(text) {
   return /\bkwaheri\b/.test(raw) && raw.split(/\s+/).length <= 6;
 }
 
-function catalogueListDecision() {
+function catalogueListDecision(state) {
+  const items = Array.isArray(state?.catalogueItems) ? state.catalogueItems : [];
+  const gemini = geminiCatalogueEnabled() && items.length;
+  const mouth = gemini
+    ? ` Speak only these names, exactly, in this order: ${items.join('; ')}. Do not paraphrase or add a service. Wrapper only in the caller's language.`
+    : ' Speak that list from the file first. Do not ask which service, what they need done, or ungependa gani until the list is spoken.';
   return {
     action: ACTIONS.ANSWER,
     resolves: true,
     catalogueAnswered: true,
-    reason:
-      'They asked for the services catalogue. Speak that list from the file first. Do not ask which service, what they need done, or ungependa gani until the list is spoken.',
+    reason: `They asked for the services catalogue.${mouth}`,
   };
-}
-
-/** Earlier catalogue ask still waiting, including after a name-echo that is not a bare yes. */
-function pendingCatalogueAsk(text, state) {
-  const direct = catalogueAskInPlay(text, state);
-  if (direct) return direct;
-  const rows = [];
-  const goal = String(state?.goal?.description || '').trim();
-  if (goal) rows.push(goal);
-  const heard = Array.isArray(state?.conversation?.answersReceived)
-    ? state.conversation.answersReceived
-    : [];
-  for (let i = heard.length - 1; i >= 0; i -= 1) {
-    const row = String(heard[i] || '').trim();
-    if (row) rows.push(row);
-  }
-  for (const row of rows) {
-    if (looksLikeOfferAsk(row) && !looksLikeNewWork(row)) return row;
-  }
-  return '';
 }
 
 /**
@@ -205,13 +190,10 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
   }
 
   if (isIdentityConfirmOnly(latestUtterance, state)) {
-    if (!state?.conversation?.catalogueAnswered && pendingCatalogueAsk(latestUtterance, state)) {
-      return catalogueListDecision();
-    }
     return {
       action: ACTIONS.ANSWER,
       reason:
-        'They confirmed who is speaking. The call is still open. Ask which service they need, or answer what they already asked. Do not say goodbye. Do not end the call.',
+        'They confirmed who is speaking. The call is still open. Ask which service they need, or continue the booking. Do not read the catalogue again. Do not say goodbye. Do not end the call.',
     };
   }
 
@@ -261,12 +243,18 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
   const fileRead = visitFileReadDecision(state);
   if (fileRead) return fileRead;
 
-  const catalogueAsk = catalogueAskInPlay(latestUtterance, state);
-  if (catalogueAsk) {
-    const askedAgain =
-      looksLikeOfferAsk(latestUtterance) && !looksLikeNewWork(latestUtterance);
-    // A bare yes after the list is a slot answer, not another request for the list.
-    if (askedAgain || !state?.conversation?.catalogueAnswered) return catalogueListDecision();
+  if (looksLikeServiceDetailAsk(latestUtterance)) {
+    return {
+      action: ACTIONS.ANSWER,
+      resolves: true,
+      reason:
+        'They asked for service details. Say the price or note on file for that service. Do not read the full catalogue list.',
+    };
+  }
+
+  // A fresh list ask only. A name yes and a bare yes do not read the list again.
+  if (looksLikeOfferAsk(latestUtterance) && !looksLikeNewWork(latestUtterance)) {
+    return catalogueListDecision(state);
   }
 
   if (intent === 'unknown' || intent === 'general_enquiry') {
