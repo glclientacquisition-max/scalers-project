@@ -145,6 +145,24 @@ assert.match(
 
 assert.match(
   source,
+  /planBrainEndClose\(\{[\s\S]*?action:\s*nextBestAction\.action/,
+  'Brain END must plan a farewell before Gemini on the media path'
+);
+
+assert.match(
+  source,
+  /!callEnding &&/,
+  'idle nudge must not fire after Brain END'
+);
+
+assert.match(
+  source,
+  /if \(callEnding \|\| turnBusy \|\| !pendingUtterance\) return;/,
+  'a queued caller turn must not start after Brain END'
+);
+
+assert.match(
+  source,
   /isReplay:\s*true/,
   'question replay must not commit as a newly generated question'
 );

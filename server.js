@@ -274,6 +274,7 @@ const {
   createAgentReplayMemory,
 } = require('./src/speech/overlapHold');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
+const { planBrainEndClose, runBrainEndClose } = require('./src/speech/callClose');
 const {
   createVoiceTurnTiming,
   createCallTranscript,
@@ -1761,11 +1762,14 @@ mediaWss.on('connection', (ws, req) => {
   let utteranceStartedAt = 0;
   /** Idle check-in only after the caller has actually spoken. */
   let heardCallerUtterance = false;
+  /** Brain END is in flight. No idle nudge and no next caller turn. */
+  let callEnding = false;
   const overlapHold = createOverlapHold();
   const agentReplay = createAgentReplayMemory();
   const idleNudge = createIdleNudgeController({
     canFire: () =>
       ws.readyState === WebSocket.OPEN &&
+      !callEnding &&
       !speaking &&
       !turnBusy &&
       !speechOutageStarted &&
@@ -2508,7 +2512,7 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   function kickPendingTurn() {
-    if (turnBusy || !pendingUtterance) return;
+    if (callEnding || turnBusy || !pendingUtterance) return;
     const text = pendingUtterance;
     const signals = pendingTurnSignals;
     pendingUtterance = null;
@@ -2748,6 +2752,40 @@ mediaWss.on('connection', (ws, req) => {
     let suppressModelSpeech = false;
     let spokeLookupSentence = false;
     try {
+      const endClose = planBrainEndClose({
+        action: nextBestAction.action,
+        language: callLanguage,
+      });
+      if (endClose.close) {
+        callEnding = true;
+        console.log(
+          `[ws/media][${callKey}] brain-end farewell lang=${callLanguage}: ${endClose.line}`
+        );
+        await runBrainEndClose({
+          action: nextBestAction.action,
+          language: callLanguage,
+          idle: idleNudge,
+          speak: async (line) => {
+            bargeInActive = false;
+            suppressReplyRemainder = false;
+            callTranscript.pushAgent(line);
+            turnTiming.markFirstSpokenChunk();
+            await speakText(line);
+            spokeThisTurn = true;
+          },
+          hangup: () => {
+            console.log(`[ws/media][${sidLabel()}] brain-end hangup`);
+            setTimeout(() => {
+              try {
+                ws.close(1000, 'end_call');
+              } catch {
+                /* ignore */
+              }
+            }, 800);
+          },
+        });
+        return;
+      }
       // Local lines stay off the call. Catalogue, hours, pace, identity, and the
       // old booking denial must not speak-and-return. Gemini keeps the sentence
       // stream. A visit, hold, or order lookup is the exception below.
@@ -3422,7 +3460,13 @@ mediaWss.on('connection', (ws, req) => {
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
-      if (!bargeInActive && !progressAlreadySpoken && !spokeThisTurn) {
+      if (callEnding) {
+        try {
+          ws.close(1000, 'end_call');
+        } catch {
+          /* ignore */
+        }
+      } else if (!bargeInActive && !progressAlreadySpoken && !spokeThisTurn) {
         const recovery = await resolveLlmRecoverySpeech(clean);
         callTranscript.pushAgent(recovery);
         await speakText(recovery);
@@ -3447,6 +3491,10 @@ mediaWss.on('connection', (ws, req) => {
       utteranceTimer = null;
     }
     utteranceStartedAt = 0;
+    if (callEnding) {
+      utteranceParts = [];
+      return;
+    }
     if (!utteranceParts.length) return;
     const text = utteranceParts.join('').replace(/\s+/g, ' ').trim();
     utteranceParts = [];

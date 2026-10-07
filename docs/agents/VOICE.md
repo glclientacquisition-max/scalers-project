@@ -97,6 +97,8 @@ Voice does not own the caller file. Brain binds the speaker. Voice does four thi
 
 4. **Tool hold.** A line from `src/speech/toolHold.js` plays only after a tool call has started. English and Kiswahili packs rotate from the call id and turn count. Each line is at most about five words and states no job status. After the tool returns, write tools still use the existing confirmation. A file read (`open_items`, `file_lookup`, `get_enquiry`) speaks that result, or the empty-file line when `nameConfirmed` is true and the result is empty. No tool means no hold. Barge-in cancels the hold follow-up.
 
+5. **Brain END.** When `nextBestAction` is `END`, `runBrainEndClose` in `src/speech/callClose.js` closes the idle nudge, speaks one farewell in the call language (`Asante. Kwaheri.` or `Thank you. Goodbye.`), then closes the media socket with `end_call`. Gemini does not run on that turn. An idle nudge armed earlier does not fire. A later caller flush does not start another turn.
+
 Land this with Brain #586 (`cursor/caller-file-goal-summary-4c74`). Do not rewrite `docs/product/CALLER_FILE_MODEL.md` or `docs/agents/CALLER_IDENTITY_AND_SUMMARY.md` here. Stack with #584 if that pull request is still open. On merge, keep `flushUtterance(decision)` so `decision.unfinished` is not dropped.
 
 ## Test gate (required before PR)
