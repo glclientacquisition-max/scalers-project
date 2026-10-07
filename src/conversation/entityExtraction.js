@@ -268,7 +268,7 @@ function bareAskedFileName(text, pending) {
 }
 
 const AFFIRM_LEAD =
-  /^(?:uh+|um+|ah+)?[, ]*(?:yes|yeah|yah|yea|yep|yup|nya|ndiyo|ndio|sawa|okay|ok|eeh|ehe|ee|correct)\b/i;
+  /^(?:uh+|um+|ah+)?[, ]*(?:yes|yeah|yah|yea|yep|yup|nya|nia|ndiyo|ndio|sawa|okay|ok|eeh|ehe|ee|correct)\b/i;
 
 function escapeName(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -660,7 +660,7 @@ const UNFINISHED_STEM =
   /^(nilikuwa(?:\s+(?:nauliza|nataka|ningetaka|ningependa|naomba))?(?:\s+(?:kujua|kuuliza|kuomba))?|nauliza|nataka(?:\s+(?:kujua|kuuliza|kuomba))?|ningetaka(?:\s+(?:kujua|kuuliza))?|ningependa(?:\s+(?:kujua|kuuliza))?|naomba(?:\s+(?:kujua|kuuliza))?|i was (?:just )?asking|i wanted to (?:ask|know))\b[, ]*(.*)$/i;
 
 const LEADING_FILLER =
-  /^(?:uh+|um+|ah+|eeh|eh|like|so|well|actually|i mean|nya|yah|yea|yeah|yes|yep|ndiyo|ndio|sawa|okay|ok|mm+|mhm|hmm+)[, ]+/i;
+  /^(?:uh+|um+|ah+|eeh|eh|like|so|well|actually|i mean|nya|nia|yah|yea|yeah|yes|yep|ndiyo|ndio|sawa|okay|ok|mm+|mhm|hmm+)[, ]+/i;
 
 const LEADING_GREETING =
   /^(?:namna gani|habari(?:\s+yako)?|niaje|mambo|vipi|sasa|how are you(?: doing)?)(?:[, ]+[\p{L}'’-]+)?[, ]*/iu;
@@ -696,7 +696,7 @@ function isIdentityEchoOnly(text) {
   const raw = String(text || '')
     .trim()
     .replace(
-      /^(?:uh+|um+|eeh|eh|ndiyo|ndio|yes|yeah|yah|yea|nya|sawa|okay|ok)[,.\s]+/i,
+      /^(?:uh+|um+|eeh|eh|ndiyo|ndio|yes|yeah|yah|yea|nya|nia|sawa|okay|ok)[,.\s]+/i,
       ''
     )
     .replace(/[?.!]+$/g, '')
@@ -713,7 +713,7 @@ function isGreetingClause(text) {
     .trim();
   if (!value) return true;
   if (
-    /^(?:mm+|mhm|mm-?hm|uh-?huh|uh huh|uh+|um+|ah+|hmm+|eeh|eh|nya|yah|yea|yeah|yes|yep|ok|okay|sawa|ndiyo|ndio)$/i.test(
+    /^(?:mm+|mhm|mm-?hm|uh-?huh|uh huh|uh+|um+|ah+|hmm+|eeh|eh|nya|nia|yah|yea|yeah|yes|yep|ok|okay|sawa|ndiyo|ndio)$/i.test(
       value
     )
   ) {
@@ -724,15 +724,24 @@ function isGreetingClause(text) {
   );
 }
 
+const GOAL_FUNCTION_WORD =
+  /^(?:kuhusu|about|if|whether|kama|that|the|a|an|ni|na|and|to|for|of|just|like|uh|um|so|well)$/i;
+
 function isNonActionableAsk(text) {
   const value = String(text || '')
     .trim()
     .replace(/[?.!,]+$/g, '')
     .trim();
   if (!value) return true;
-  return /^(?:what else|anything else|and then|go on|continue|na nini|kisha|what about|how about)$/i.test(
-    value
-  );
+  if (
+    /^(?:what else|anything else|and then|go on|continue|na nini|kisha|what about|how about)$/i.test(
+      value
+    )
+  ) {
+    return true;
+  }
+  const words = value.split(/[^\p{L}0-9]+/u).filter(Boolean);
+  return words.length > 0 && words.every((word) => GOAL_FUNCTION_WORD.test(word));
 }
 
 function peelGoalClause(clause) {

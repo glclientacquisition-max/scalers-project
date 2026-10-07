@@ -162,7 +162,14 @@ describe('HD_39c40ec3ad1f caller file', () => {
   it('does not stamp an unfinished stem that ends on kujua as the goal', () => {
     assert.equal(callerGoalText(HD39_T1), '');
     assert.equal(callerGoalText('Nilikuwa nataka kujua'), '');
+    assert.equal(callerGoalText('nilikuwa nataka'), '');
+    assert.equal(callerGoalText('nataka kujua'), '');
     assert.equal(callerGoalText('Nilikuwa nauliza'), '');
+    assert.equal(callerGoalText('I wanted to know'), '');
+    assert.equal(callerGoalText('I wanted to know…'), '');
+    assert.equal(callerGoalText('I wanted to know about'), '');
+    assert.equal(callerGoalText('Nilikuwa nataka kujua kuhusu'), '');
+    assert.equal(callerGoalText('Nilikuwa nataka kujua bei'), 'bei');
 
     const state = say(createBrainState(profile), HD39_T1);
     assert.equal(state.goal.description, null);
@@ -212,11 +219,42 @@ describe('HD_39c40ec3ad1f caller file', () => {
     );
     assert.equal(yeah.nameConfirmed, true);
 
+    const nia = applyCallerNameConfirmation(
+      { caller: { nameConfirmed: false }, entities: {} },
+      'Nia, unaongea na Alvin?',
+      {},
+      {
+        pendingFileName: 'Alvin',
+        lastAgentText: 'Je, naongea na Alvin?',
+      }
+    );
+    assert.equal(nia.name, 'Alvin');
+    assert.equal(nia.nameConfirmed, true);
+
+    const niaBare = applyCallerNameConfirmation(
+      { caller: { nameConfirmed: false }, entities: {} },
+      'Nia unaongea na Alvin',
+      {},
+      {
+        pendingFileName: 'Alvin',
+        lastAgentText: 'Je, naongea na Alvin?',
+      }
+    );
+    assert.equal(niaBare.nameConfirmed, true);
+
     let state = say(createBrainState(profile), HD39_T1);
     state = say(state, HD39_T2, { lastAgentText: 'Am I speaking with Alvin?' });
     assert.equal(state.caller.name, 'Alvin');
     assert.equal(state.caller.nameConfirmed, true);
     assert.equal(state.caller.boundRole, 'primary');
+
+    const pack = say(createBrainState(profile), 'Nia, unaongea na Alvin?', {
+      lastAgentText: 'Je, naongea na Alvin?',
+    });
+    assert.equal(pack.caller.name, 'Alvin');
+    assert.equal(pack.caller.nameConfirmed, true);
+    assert.equal(pack.caller.boundRole, 'primary');
+    assert.equal(pack.goal.description, null);
 
     const other = applyCallerNameConfirmation(
       { caller: { nameConfirmed: false }, entities: {} },

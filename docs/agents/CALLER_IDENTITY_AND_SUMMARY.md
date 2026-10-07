@@ -81,7 +81,7 @@ resolution_note: string | null  // must match resolution class
 
 Reject at observe **and** at write. A greeting in front of the stem does not make it a goal (`Mm-hm. Namna gani, Shy? Nilikuwa nataka kujua.` is the same class as `Nilikuwa nauliza`).
 
-- Unfinished STT: open stems with no complement (`Nilikuwa nauliza`, `Nilikuwa nataka kujua`, `nataka kujua`, `nauliza`, `nilikuwa`, `ningetaka`, `naomba`, `I wanted to know`) including when they sit after phatic or backchannel. Voice `unfinished` / `weak` still rejects the whole turn even if a later clause looks complete.  
+- Unfinished STT: open stems with no complement (`Nilikuwa nauliza`, `Nilikuwa nataka kujua`, `nataka kujua`, `nilikuwa nataka`, `nauliza`, `nilikuwa`, `ningetaka`, `naomba`, `I wanted to know`, `I wanted to know…`) including when they sit after phatic or backchannel. A dangling `kuhusu` / `about` with no object is still unfinished. Voice `unfinished` / `weak` still rejects the whole turn even if a later clause looks complete. The stem list rejects on its own when Voice omits the flag.  
 - Non-actionable openers (`What else?`, how-are-you, `Namna gani`)  
 - Pure backchannel / hear-again  
 - Echo of the pack identity ask alone (`Je, naongea na {Name}?`, `Nya, unaongea na {Name}?`)  
@@ -120,7 +120,7 @@ Caller turns (ordered):
 Assertions:
 
 - After T1: `goal.description` null/rejected; summary must not contain `Goal: Nilikuwa nauliza`; first_forward not judged goal.  
-- After identity ask + T2: `nameConfirmed === true`, `boundRole === 'primary'`. Pack confirm includes `Eeh, unaongea na {Name}`, `Yeah, unaongea na {Name}`, and noisy STT `Nya, unaongea na {Name}` after `Je, naongea na {Name}?` or `Am I speaking with {Name}?`. A different echoed name does not bind. Bare yes before the ask does not bind.  
+- After identity ask + T2: `nameConfirmed === true`, `boundRole === 'primary'`. Pack confirm includes `Eeh`, `Yeah`, `Nya`, and `Nia` plus `unaongea na {Name}` / `naongea na {Name}`, with or without `?`, after `Je, naongea na {Name}?` or `Am I speaking with {Name}?`. A different echoed name does not bind. Bare yes before the ask does not bind.  
 - Before bind: no agent line with open-request facts or vocative file name (except the identity ask).  
 - After bind + file ask: file-read may speak open rows; NBA must not say name unconfirmed.  
 - Hangup: `summary.primary_intent` agrees with `calls.primary_intent` and the `Intent:` line; Goal reflects dishwashing / previous-request enquiry — not unfinished STT.
