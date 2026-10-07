@@ -10,7 +10,13 @@ const {
   labelFlushedCallerTurn,
   observeCallerInput,
 } = require('../src/speech/callerTurnLabel');
-const { gateCallerFileSpeech, lockFileNameAsk, speakerBound } = require('../src/speech/callerFileSpeech');
+const {
+  gateCallerFileSpeech,
+  linesBeforeNameAsk,
+  lockFileNameAsk,
+  speakerBound,
+} = require('../src/speech/callerFileSpeech');
+const { offerCatalogueLine } = require('../src/conversation/knownFacts');
 const { decideTurnEnd, utteranceLooksIncomplete } = require('../src/speech/turnTaking');
 const { classifyFirstForwardAcceptance } = require('../src/conversation/firstForwardAcceptance');
 const {
@@ -312,5 +318,52 @@ describe('tool hold', () => {
     const late = createToolHoldSession({ language: 'en', seed: 'call-5' });
     late.cancel();
     assert.equal(late.begin().speak, false);
+  });
+});
+
+describe('catalogue before the name ask', () => {
+  const services = {
+    servicesCatalog: [{ name: 'Carpet cleaning' }, { name: 'Sofa cleaning' }],
+  };
+
+  it('speaks the services list before the unbound name ask', () => {
+    const line = offerCatalogueLine('What services do you offer?', services, 'sw');
+    const state = {
+      caller: { nameConfirmed: false, fileNameAsked: 'Alvin' },
+      returning: { name: 'Alvin', fileOwnerName: 'Alvin' },
+    };
+    const spoken = linesBeforeNameAsk({
+      localReply: { outcome: 'catalogue', line },
+      nameAsk: lockFileNameAsk('Am I speaking with Alvin?', 'sw'),
+      state,
+    });
+    assert.equal(spoken.length, 2);
+    assert.match(spoken[0], /Carpet cleaning/);
+    assert.match(spoken[0], /Sofa cleaning/);
+    assert.equal(spoken[1], 'Je, naongea na Alvin?');
+    assert.equal(spoken[0].includes('Alvin'), false);
+  });
+
+  it('does not keep a booking ladder or an open file row', () => {
+    const state = {
+      caller: { nameConfirmed: false, fileNameAsked: 'Alvin' },
+      returning: { name: 'Alvin' },
+    };
+    const booking = linesBeforeNameAsk({
+      localReply: { outcome: 'visit_time', line: 'What time works?' },
+      nameAsk: 'Je, naongea na Alvin?',
+      state,
+    });
+    assert.deepEqual(booking, ['Je, naongea na Alvin?']);
+
+    const rows = linesBeforeNameAsk({
+      localReply: {
+        outcome: 'catalogue',
+        line: 'You have two open carpet cleaning requests.',
+      },
+      nameAsk: 'Am I speaking with Alvin?',
+      state,
+    });
+    assert.deepEqual(rows, ['Am I speaking with Alvin?']);
   });
 });

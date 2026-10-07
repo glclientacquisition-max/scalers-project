@@ -256,6 +256,7 @@ const {
 } = require('./src/speech/callerTurnLabel');
 const {
   gateCallerFileSpeech,
+  linesBeforeNameAsk,
   lockFileNameAsk,
   speakerBound,
 } = require('./src/speech/callerFileSpeech');
@@ -2816,13 +2817,25 @@ mediaWss.on('connection', (ws, req) => {
         brainState.caller.fileNameAskSpoken = true;
         fileNameAsksCommitted += 1;
         callBrainStates.set(callKey, brainState);
+        const nameAskLines = linesBeforeNameAsk({
+          localReply,
+          nameAsk: fileNameAsk,
+          state: brainState,
+        });
         console.log(`[ws/media][${callKey}] file name ask: ${fileNameAsk}`);
+        if (nameAskLines.length > 1) {
+          console.log(
+            `[ws/media][${callKey}] local answer before name ask: ${nameAskLines[0]}`
+          );
+        }
         bargeInActive = false;
         suppressReplyRemainder = false;
-        callTranscript.pushAgent(fileNameAsk);
-        turnTiming.markFirstSpokenChunk();
-        await speakText(fileNameAsk);
-        spokeThisTurn = true;
+        for (const line of nameAskLines) {
+          callTranscript.pushAgent(line);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(line);
+          spokeThisTurn = true;
+        }
         return;
       }
       speechHold = holdCallerSpeech(callKey, messages);

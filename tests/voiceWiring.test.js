@@ -709,6 +709,11 @@ assert.match(
 );
 assert.match(
   source,
+  /linesBeforeNameAsk\(\{[\s\S]*?nameAsk: fileNameAsk/,
+  'a public local answer is spoken before the name ask, not dropped'
+);
+assert.match(
+  source,
   /observeCallerInput\(/,
   'flushed caller text must enter Brain observe with the unfinished label'
 );

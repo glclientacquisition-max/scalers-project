@@ -86,6 +86,36 @@ function gateCallerFileSpeech(line, state) {
   return { speak: true, line: next, reason: blocked ? 'trimmed' : 'open' };
 }
 
+const PUBLIC_ANSWER = new Set(['catalogue', 'hours', 'hours_ask', 'coverage', 'identity']);
+
+/**
+ * A public answer prepared on this turn is spoken before the name ask.
+ * File rows stay on the speak-gate. Booking ladders are not this.
+ * @param {{ outcome?: string, line?: string } | null} [localReply]
+ */
+function answerBeforeNameAsk(localReply) {
+  if (!localReply || !PUBLIC_ANSWER.has(String(localReply.outcome || ''))) return '';
+  return String(localReply.line || '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Name-ask early return order: kept public answer, then the ask.
+ * The ask is last so it is the committed question.
+ * @param {{
+ *   localReply?: { outcome?: string, line?: string } | null,
+ *   nameAsk?: string,
+ *   state?: object,
+ * }} [opts]
+ */
+function linesBeforeNameAsk(opts = {}) {
+  const lines = [];
+  const ahead = gateCallerFileSpeech(answerBeforeNameAsk(opts.localReply), opts.state);
+  if (ahead.speak && ahead.line) lines.push(ahead.line);
+  const ask = String(opts.nameAsk || '').replace(/\s+/g, ' ').trim();
+  if (ask) lines.push(ask);
+  return lines;
+}
+
 /**
  * The file-name ask speaks in the caller's current language.
  * English and Kiswahili are the packs Brain already binds on.
@@ -111,5 +141,7 @@ function lockFileNameAsk(line, language) {
 module.exports = {
   speakerBound,
   gateCallerFileSpeech,
+  answerBeforeNameAsk,
+  linesBeforeNameAsk,
   lockFileNameAsk,
 };
