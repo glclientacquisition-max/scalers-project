@@ -386,6 +386,41 @@ test('a Kiswahili catalogue that already says and keeps that conjunction', () =>
   );
 });
 
+test('a Kiswahili catalogue line with na stays free of English and', () => {
+  const prepared = prepareForTts(
+    'Tuna Couch cleaning, Mattress cleaning, Carpet cleaning, na General cleaning, na zingine. Unahitaji gani?',
+    { callLanguage: 'sw' }
+  );
+  assert.equal(
+    prepared.text,
+    'Tuna Couch cleaning na Mattress cleaning na Carpet cleaning na General cleaning na zingine Unahitaji gani'
+  );
+  assert.doesNotMatch(prepared.text, /\band\b/i);
+});
+
+test('a Kiswahili catalogue closer is not an Oxford and', () => {
+  const prepared = prepareForTts('Tuna A, B, C, and D, na zingine.', { callLanguage: 'sw' });
+  assert.doesNotMatch(prepared.text, /\bna and\b/i);
+  assert.match(prepared.text, /\bna zingine\b/);
+  assert.match(prepared.text, /\bA and B and C and D\b/);
+});
+
+test('an English catalogue closer is not a second and', () => {
+  const prepared = prepareForTts('We offer A, B, C, and D, and more.', { callLanguage: 'en' });
+  assert.doesNotMatch(prepared.text, /\band and\b/i);
+  assert.match(prepared.text, /\band more\b/);
+  assert.match(prepared.text, /\bA and B and C and D\b/);
+});
+
+test('a parenthetical name does not glue na and before na zingine', () => {
+  const prepared = prepareForTts(
+    'Tuna Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning (houses & air bnbs), na zingine.',
+    { callLanguage: 'sw' }
+  );
+  assert.doesNotMatch(prepared.text, /\bna and\b/i);
+  assert.match(prepared.text, /\bna zingine\b/);
+});
+
 test('bullet leaks flatten to a spoken list', () => {
   const prepared = prepareForTts('Our services include: - Sofa cleaning - Carpet cleaning.', {
     callLanguage: 'en',

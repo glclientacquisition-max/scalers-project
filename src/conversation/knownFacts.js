@@ -48,10 +48,19 @@ function speakClock(hhmm) {
   return `${h12}:${String(minute).padStart(2, '0')} ${ap}`;
 }
 
-function joinSpoken(names) {
+function mouthServiceName(name) {
+  return String(name || '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function joinSpoken(names, language = 'en') {
+  const lang = String(language || '').toLowerCase();
+  const conj = lang === 'sw' || lang === 'sheng' ? 'na' : 'and';
   if (names.length <= 1) return names[0] || '';
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+  if (names.length === 2) return `${names[0]} ${conj} ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')}, ${conj} ${names[names.length - 1]}`;
 }
 
 function looksLikeHoursAsk(text) {
@@ -116,15 +125,13 @@ function hoursAskLine(text, profile = {}, language = 'en', now = new Date()) {
 function offerCatalogueLine(text, profile = {}, language = 'en') {
   if (!looksLikeOfferAsk(text) || looksLikeNewWork(text)) return '';
   const sw = String(language || '').toLowerCase() === 'sw' || String(language || '').toLowerCase() === 'sheng';
-  const names = normalizeServices(profile.servicesCatalog)
-    .map((row) => row.name)
-    .filter(Boolean)
-    .slice(0, 4);
+  const rows = normalizeServices(profile.servicesCatalog);
+  const names = rows.map((row) => mouthServiceName(row.name)).filter(Boolean).slice(0, 4);
   if (!names.length) {
     return sw ? 'Niambie unahitaji nini.' : 'Tell me what you need done.';
   }
-  const list = joinSpoken(names);
-  const more = normalizeServices(profile.servicesCatalog).length > 4;
+  const list = joinSpoken(names, language);
+  const more = rows.length > 4;
   if (isMessageOnlyMode(profile.afterHoursMode)) {
     if (sw) return more ? `Tuna ${list}, na zingine.` : `Tuna ${list}.`;
     return more ? `We offer ${list}, and more.` : `We offer ${list}.`;
