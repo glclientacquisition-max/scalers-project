@@ -8,6 +8,9 @@ const path = require('path');
 const { renderSpokenList, planSpokenSentences } = require('../src/speech/spokenList');
 const { prepareForTts } = require('../src/speech/ttsNormalize');
 const { offerCatalogueLine } = require('../src/conversation/knownFacts');
+const { looksLikeOfferAsk, looksLikeTruncatedOfferAsk } = require('../src/conversation/fileRead');
+const { resolveLocalReply } = require('../src/conversation/turnPolicy');
+const { createBrainState, observeCallerTurn } = require('../src/conversation/brainState');
 const { linesBeforeNameAsk, lockFileNameAsk } = require('../src/speech/callerFileSpeech');
 
 const SW_CATALOGUE =
@@ -186,9 +189,10 @@ describe('one session for the list and the ask', () => {
 
     const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
     const start = source.indexOf('const nameAskLines = linesBeforeNameAsk');
+    const catalogue = source.indexOf('if (catalogueLine)', start);
     const end = source.indexOf('speechHold = holdCallerSpeech', start);
-    assert.ok(start > 0 && end > start);
-    const block = source.slice(start, end);
+    assert.ok(start > 0 && catalogue > start && end > catalogue);
+    const block = source.slice(start, catalogue);
     assert.match(block, /sentenceBreaks:\s*true/);
     assert.match(block, /questionText/);
     assert.match(block, /await speakText\(nameAskLines\.join\(' '\)/);
@@ -203,5 +207,61 @@ describe('one session for the list and the ask', () => {
       'utf8'
     );
     assert.match(stream, /envInt\('VOICE_STREAM_EARLY_CHARS', 0\)/);
+  });
+
+  it('speaks a prepared catalogue local line, including a truncated offer ask', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    const turnStart = source.indexOf('async function runCallerTurn');
+    const turnEnd = source.indexOf('function flushUtterance', turnStart);
+    assert.ok(turnStart > 0 && turnEnd > turnStart);
+    const turn = source.slice(turnStart, turnEnd);
+    assert.match(turn, /if \(localReply && !catalogueLine\)/);
+    assert.match(turn, /local line not spoken/);
+    const spokenAt = turn.indexOf('catalogue spoken lang=');
+    const streamAt = turn.indexOf('const streamOn');
+    assert.ok(spokenAt > 0 && streamAt > spokenAt);
+    const override = turn.slice(spokenAt, streamAt);
+    assert.match(override, /await speakText\(catalogueLine,/);
+    assert.match(override, /sentenceBreaks:\s*true/);
+    assert.match(override, /return;/);
+    assert.doesNotMatch(override, /not spoken/);
+    assert.doesNotMatch(turn, /catalogue local line not spoken/);
+
+    const profile = {
+      servicesCatalog: SW_ITEMS.map((name) => ({ name })),
+    };
+    const asks = [
+      [
+        'Nilikuwa nataka kujua,',
+        'sw',
+        'Tuna Couch cleaning. Mattress cleaning. Carpet cleaning. Na General cleaning. Unahitaji gani?',
+      ],
+      [
+        'I wanted to know,',
+        'en',
+        'We offer Couch cleaning. Mattress cleaning. Carpet cleaning. And General cleaning. Which one do you need?',
+      ],
+      [
+        'what do you',
+        'en',
+        'We offer Couch cleaning. Mattress cleaning. Carpet cleaning. And General cleaning. Which one do you need?',
+      ],
+    ];
+    for (const [text, lang, expected] of asks) {
+      assert.equal(looksLikeTruncatedOfferAsk(text), true);
+      assert.equal(looksLikeOfferAsk(text), true);
+      const brain = observeCallerTurn(createBrainState({ vertical: 'home_services' }), {
+        text,
+        detectedLanguage: lang,
+        resolvedLanguage: lang,
+      });
+      const local = resolveLocalReply({ text, state: brain, language: lang, profile });
+      assert.equal(local && local.outcome, 'catalogue');
+      assert.equal(local.line, expected);
+    }
+    assert.equal(looksLikeOfferAsk('Nilikuwa nataka kujua bei'), false);
+    assert.equal(looksLikeOfferAsk('I wanted to know the price'), false);
+    assert.equal(looksLikeOfferAsk('I wanted to know your hours'), false);
+    assert.equal(looksLikeTruncatedOfferAsk('Nilikuwa nataka kujua kuhusu'), false);
   });
 });

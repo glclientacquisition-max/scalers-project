@@ -2832,9 +2832,10 @@ mediaWss.on('connection', (ws, req) => {
         });
         return;
       }
-      // Local lines stay off the call. Catalogue, hours, pace, identity, and the
-      // old booking denial must not speak-and-return. Gemini keeps the sentence
-      // stream. A visit, hold, or order lookup is the exception below.
+      // Hours, pace, identity, and the old booking denial stay off this
+      // speak-and-return. A prepared catalogue is spoken here. Gemini must not
+      // paraphrase that list on the same turn. A visit, hold, or order lookup
+      // is the exception below.
       const localReply = resolveLocalReply({
         text: clean,
         state: brainState,
@@ -2844,7 +2845,9 @@ mediaWss.on('connection', (ws, req) => {
         businessName,
         nextBestAction,
       });
-      if (localReply) {
+      const catalogueLine =
+        localReply?.outcome === 'catalogue' ? String(localReply.line || '').trim() : '';
+      if (localReply && !catalogueLine) {
         console.log(
           `[ws/media][${callKey}] ${localReply.outcome} local line not spoken lang=${callLanguage}: ${localReply.line}`
         );
@@ -2887,6 +2890,28 @@ mediaWss.on('connection', (ws, req) => {
         await speakText(nameAskLines.join(' '), {
           sentenceBreaks: true,
           questionText,
+        });
+        spokeThisTurn = true;
+        return;
+      }
+      // Name gate did not take the turn. The prepared list is still spoken.
+      // HD_dc0f94053875 logged this line and let Gemini run on instead.
+      if (catalogueLine) {
+        console.log(
+          `[ws/media][${callKey}] catalogue spoken lang=${callLanguage}: ${catalogueLine}`
+        );
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(catalogueLine);
+        turnTiming.markFirstSpokenChunk();
+        const catalogueQuestion =
+          catalogueLine
+            .split(/(?<=[.!?])\s+/)
+            .reverse()
+            .find((part) => part.includes('?')) || catalogueLine;
+        await speakText(catalogueLine, {
+          sentenceBreaks: true,
+          questionText: catalogueQuestion,
         });
         spokeThisTurn = true;
         return;
