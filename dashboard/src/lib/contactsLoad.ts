@@ -68,11 +68,30 @@ export type ContactSort = "recent" | "name";
 export function resolveContactSavedFilter(
   raw?: string | null
 ): ContactSavedFilter {
-  const value = String(raw || "all").toLowerCase();
-  if (value === "saved" || value === "unsaved" || value === "recent" || value === "favourite") {
+  if (!raw || !String(raw).trim()) return "recent";
+  const value = String(raw).toLowerCase();
+  if (
+    value === "all" ||
+    value === "saved" ||
+    value === "unsaved" ||
+    value === "recent" ||
+    value === "favourite"
+  ) {
     return value;
   }
-  return "all";
+  return "recent";
+}
+
+function appendContactsListQuery(
+  q: URLSearchParams,
+  opts: ContactsListReturn & { q?: string; page?: number }
+) {
+  if (opts.saved === "all") q.set("saved", "all");
+  else if (opts.saved && opts.saved !== "recent") q.set("saved", opts.saved);
+  if (opts.sort && opts.sort !== "recent") q.set("sort", opts.sort);
+  const query = sanitizeSearchQuery(opts.q);
+  if (query) q.set("q", query);
+  if (opts.page && opts.page > 1) q.set("page", String(opts.page));
 }
 
 export function resolveContactSort(raw?: string | null): ContactSort {
@@ -84,15 +103,40 @@ export function contactsHref(opts: {
   sort?: ContactSort;
   q?: string;
   page?: number;
+  id?: string;
 }): string {
   const q = new URLSearchParams();
-  if (opts.saved && opts.saved !== "all") q.set("saved", opts.saved);
-  if (opts.sort && opts.sort !== "recent") q.set("sort", opts.sort);
-  const query = sanitizeSearchQuery(opts.q);
-  if (query) q.set("q", query);
-  if (opts.page && opts.page > 1) q.set("page", String(opts.page));
+  appendContactsListQuery(q, opts);
+  if (opts.id) q.set("id", opts.id);
   const qs = q.toString();
   return qs ? `/contacts?${qs}` : "/contacts";
+}
+
+/** Desktop split pane selection on `/contacts`. Phone uses `contactProfileHref`. */
+export function contactsSplitHref(
+  id: string,
+  opts: ContactsListReturn & { q?: string; page?: number } = {}
+): string {
+  return contactsHref({ ...opts, id });
+}
+
+/** History chips while the person file sits in the `/contacts` split pane. */
+export function contactsSplitHistoryHref(
+  id: string,
+  opts: ContactsListReturn & {
+    q?: string;
+    page?: number;
+    history?: string;
+    hq?: string;
+  } = {}
+): string {
+  const q = new URLSearchParams();
+  appendContactsListQuery(q, opts);
+  q.set("id", id);
+  if (opts.history && opts.history !== "all") q.set("history", opts.history);
+  const hq = sanitizeSearchQuery(opts.hq);
+  if (hq) q.set("hq", hq);
+  return `/contacts?${q.toString()}`;
 }
 
 /** Recents filter. Same chip row as All. */
@@ -169,12 +213,50 @@ export function contactProfileHref(
 ): string {
   const q = new URLSearchParams();
   q.set("from", "contacts");
-  if (opts.saved && opts.saved !== "all") q.set("saved", opts.saved);
-  if (opts.sort && opts.sort !== "recent") q.set("sort", opts.sort);
-  const query = sanitizeSearchQuery(opts.q);
-  if (query) q.set("q", query);
-  if (opts.page && opts.page > 1) q.set("page", String(opts.page));
+  appendContactsListQuery(q, opts);
   return `/contacts/${id}?${q.toString()}`;
+}
+
+export function shouldPromoteUnsavedSection(saved: ContactSavedFilter): boolean {
+  return saved === "all" || saved === "recent" || saved === "favourite";
+}
+
+export type ContactListSection = {
+  key: string;
+  label: string;
+  rows: ContactListRow[];
+};
+
+/** iOS grouped list: unsaved bucket first when the active filter allows it. */
+export function contactListSections(
+  rows: ContactListRow[],
+  saved: ContactSavedFilter
+): ContactListSection[] {
+  if (rows.length === 0) return [];
+  if (saved === "unsaved") {
+    return [{ key: "needs-name", label: "Needs a name", rows }];
+  }
+  if (!shouldPromoteUnsavedSection(saved)) {
+    return [{ key: "people", label: "", rows }];
+  }
+  const needsName: ContactListRow[] = [];
+  const named: ContactListRow[] = [];
+  for (const row of rows) {
+    if (isUnsavedContactName(row.name)) needsName.push(row);
+    else named.push(row);
+  }
+  const sections: ContactListSection[] = [];
+  if (needsName.length) {
+    sections.push({ key: "needs-name", label: "Needs a name", rows: needsName });
+  }
+  if (named.length) {
+    sections.push({
+      key: "people",
+      label: needsName.length ? "Contacts" : "",
+      rows: named,
+    });
+  }
+  return sections;
 }
 
 /** Restore `/contacts` from a profile opened on the list. Inbox/call `from` values stay off this path. */

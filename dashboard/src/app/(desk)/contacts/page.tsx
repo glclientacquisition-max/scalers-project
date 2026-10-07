@@ -1,17 +1,21 @@
+import { Suspense } from "react";
 import { AddContactPanel } from "@/components/AddContactPanel";
 import { ContactsPullHost } from "@/components/ContactsEndlessList";
 import { ContactsSearch } from "@/components/ContactsSearch";
+import { ContactsMobileIdRedirect } from "@/components/ContactsMobileIdRedirect";
+import {
+  ContactPersonFilePane,
+  ContactsSplitPlaceholder,
+} from "@/components/ContactPersonFilePane";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { Empty } from "@/components/ui/Empty";
 import { ButtonLink } from "@/components/ui/Button";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { DEFAULT_PAGE_SIZE } from "@/lib/listPage";
-import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
-import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
-import { sanitizeSearchQuery } from "@/lib/callsTriage";
 import { ContactSortSelect } from "@/components/ContactSortSelect";
 import {
   contactFilterPills,
@@ -22,6 +26,7 @@ import {
   resolveContactSort,
   type ContactSavedFilter,
 } from "@/lib/contactsLoad";
+import { sanitizeSearchQuery } from "@/lib/callsTriage";
 
 import { DeskPageGate } from "@/components/DeskPageGate";
 
@@ -33,11 +38,19 @@ function emptyCopy(saved: ContactSavedFilter, q: string): string {
   if (saved === "unsaved") return "No unnamed callers";
   if (saved === "recent") return "No recent calls";
   if (saved === "favourite") return "No favourites";
-  return "No callers";
+  if (saved === "all") return "No callers";
+  return "No recent calls";
 }
 
 type ContactsPageProps = {
-  searchParams: Promise<{ saved?: string; sort?: string; q?: string }>;
+  searchParams: Promise<{
+    saved?: string;
+    sort?: string;
+    q?: string;
+    id?: string;
+    history?: string;
+    hq?: string;
+  }>;
 };
 
 export default function ContactsPage(props: ContactsPageProps) {
@@ -53,6 +66,7 @@ async function ContactsBody({ searchParams }: ContactsPageProps) {
   const saved = resolveContactSavedFilter(sp.saved);
   const sort = resolveContactSort(sp.sort);
   const q = sanitizeSearchQuery(sp.q);
+  const selectedId = String(sp.id || "").trim() || null;
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
@@ -76,40 +90,34 @@ async function ContactsBody({ searchParams }: ContactsPageProps) {
     return <DeskLoadError>Could not load contacts.</DeskLoadError>;
   }
 
-  return (
-    <div className="min-w-0 overflow-x-clip">
-      <header className="space-y-3">
-        <div className="flex min-w-0 items-end justify-between gap-3">
-          <h1 className={deskListTitleClass}>Contacts</h1>
-          <p className="pb-1 text-sm tabular-nums text-ink-soft">{total} people</p>
+  const listColumn = (
+    <div className="min-w-0 space-y-4">
+      <PageHeader
+        title="Contacts"
+        meta={`${total} people`}
+        action={<AddContactPanel />}
+      />
+      <div className="flex w-full min-w-0 flex-row items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <ContactsSearch q={q} saved={saved} sort={sort} selectedId={selectedId} />
         </div>
-        <DeskIndexLead>
-          <div className="flex w-full min-w-0 flex-row items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <ContactsSearch q={q} saved={saved} sort={sort} />
-            </div>
-            <div className="shrink-0">
-              <AddContactPanel />
-            </div>
-          </div>
-        </DeskIndexLead>
-        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <InboxFilterPills
-              label="Filter contacts"
-              active={saved}
-              items={contactFilterPills({
-                sort,
-                q: q || undefined,
-                recents: piles.recents,
-                favourites: piles.favourites,
-                unsaved: piles.unsaved,
-              })}
-            />
-          </div>
-          <ContactSortSelect saved={saved} sort={sort} q={q} />
+      </div>
+      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <InboxFilterPills
+            label="Filter contacts"
+            active={saved}
+            items={contactFilterPills({
+              sort,
+              q: q || undefined,
+              recents: piles.recents,
+              favourites: piles.favourites,
+              unsaved: piles.unsaved,
+            })}
+          />
         </div>
-      </header>
+        <ContactSortSelect saved={saved} sort={sort} q={q} selectedId={selectedId} />
+      </div>
 
       <ContactsPullHost
         seed={rows}
@@ -117,6 +125,7 @@ async function ContactsBody({ searchParams }: ContactsPageProps) {
         saved={saved}
         sort={sort}
         q={q}
+        selectedId={selectedId}
         empty={
           <Empty
             title={emptyCopy(saved, q)}
@@ -126,7 +135,7 @@ async function ContactsBody({ searchParams }: ContactsPageProps) {
                   Clear
                 </ButtonLink>
               ) : saved !== "all" ? (
-                <ButtonLink href={contactsHref({ sort })} variant="ghost">
+                <ButtonLink href={contactsHref({ saved: "all", sort })} variant="ghost">
                   Show all
                 </ButtonLink>
               ) : (
@@ -138,6 +147,38 @@ async function ContactsBody({ searchParams }: ContactsPageProps) {
           />
         }
       />
+    </div>
+  );
+
+  return (
+    <div className="min-w-0 overflow-x-clip bg-canvas">
+      {selectedId ? (
+        <ContactsMobileIdRedirect id={selectedId} saved={saved} sort={sort} q={q} />
+      ) : null}
+      <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-6">
+        <div className={selectedId ? "min-w-0 max-lg:hidden lg:col-span-5" : "min-w-0 lg:col-span-5"}>
+          {listColumn}
+        </div>
+        <div className="min-w-0 lg:col-span-7">
+          {selectedId ? (
+            <Suspense fallback={<ContactsSplitPlaceholder />}>
+              <ContactPersonFilePane
+                tenantId={tenant.id}
+                vertical={tenant.vertical}
+                client={workspace.client}
+                contactId={selectedId}
+                listSaved={sp.saved}
+                listSort={sp.sort}
+                listQ={sp.q}
+                historyRaw={sp.history}
+                hqRaw={sp.hq}
+              />
+            </Suspense>
+          ) : (
+            <ContactsSplitPlaceholder />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -227,7 +227,9 @@ export default function DevContactsPage() {
                 <ContactPhoneRow
                   key={row.id}
                   row={row}
-                  href="/dev/contacts/file"
+                  saved="all"
+                  sort="recent"
+                  q=""
                 />
               ))}
             </ul>
