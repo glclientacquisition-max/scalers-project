@@ -79,17 +79,66 @@ describe('VOICE_GEMINI_CATALOGUE', () => {
     assert.doesNotMatch(mouth.line, /Couch cleaning\. Mattress/);
   });
 
-  it('lets Gemini speak when the flag is on and reasoning is up', () => {
+  it('speaks the Phase-0 line when the flag is on and does not let Gemini re-list', () => {
     const local = catalogueReply('en');
     const mouth = planCatalogueMouth({
       localReply: local,
       reasoningDown: false,
       geminiCatalogue: true,
     });
-    assert.equal(mouth.speakLocal, false);
-    assert.equal(mouth.letGemini, true);
-    assert.equal(mouth.reason, 'gemini');
+    assert.equal(mouth.speakLocal, true);
+    assert.equal(mouth.letGemini, false);
+    assert.equal(mouth.reason, 'local_blend');
     assert.equal(mouth.line, local.line);
+    assert.doesNotMatch(mouth.line, /Couch cleaning\. Mattress/);
+  });
+
+  it('speaks the Phase-0 line when Brain withheld the local reply', () => {
+    const mouth = planCatalogueMouth({
+      localReply: null,
+      text: 'Which services do you offer?',
+      profile: FILE,
+      language: 'en',
+      reasoningDown: false,
+      geminiCatalogue: true,
+    });
+    assert.equal(mouth.speakLocal, true);
+    assert.equal(mouth.letGemini, false);
+    assert.equal(mouth.reason, 'local_blend');
+    assert.equal(
+      mouth.line,
+      'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning, and more. Which one do you need?'
+    );
+  });
+
+  it('does not speak the full list on a detail ask', () => {
+    const detail = resolveLocalReply({
+      text: 'More details on carpet cleaning',
+      state: state('More details on carpet cleaning'),
+      language: 'en',
+      profile: FILE,
+    });
+    const mouth = planCatalogueMouth({
+      localReply: detail,
+      text: 'More details on carpet cleaning',
+      profile: FILE,
+      language: 'en',
+      reasoningDown: false,
+      geminiCatalogue: true,
+    });
+    assert.notEqual(detail && detail.outcome, 'catalogue');
+    assert.equal(mouth.speakLocal, false);
+    assert.equal(mouth.letGemini, false);
+    assert.equal(mouth.line, '');
+    const bare = planCatalogueMouth({
+      localReply: null,
+      text: 'More details on carpet cleaning',
+      profile: FILE,
+      language: 'en',
+      geminiCatalogue: true,
+    });
+    assert.equal(bare.speakLocal, false);
+    assert.equal(bare.line, '');
   });
 
   it('speaks the Phase-0 local line on a reasoning outage even when the flag is on', () => {

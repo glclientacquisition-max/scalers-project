@@ -1890,7 +1890,6 @@ mediaWss.on('connection', (ws, req) => {
   let callLanguage = 'unknown';
   let callLanguageState = createLanguageState();
   let brainProfile = {};
-  let fillerUsedThisCall = false;
   /** Caller-requested TTS speed scale for this call (1 = profile default). */
   let ttsSpeedScale = 1;
   /** Soniox stream id for the in-flight thinking-ack (cancel this only — keep reply prefetch). */
@@ -2582,6 +2581,9 @@ mediaWss.on('connection', (ws, req) => {
     if (result?.llmHardDown) {
       const mouth = planCatalogueMouth({
         localReply,
+        text: userText,
+        profile: brainProfile,
+        language: callLanguage,
         reasoningDown: true,
         geminiCatalogue: geminiCatalogueEnabled(),
       });
@@ -2817,10 +2819,9 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
       // Hours, pace, identity, and the old booking denial stay off this
-      // speak-and-return. The services catalogue is the exception in
-      // planCatalogueMouth: flag off or a reasoning outage speaks the Phase-0
-      // line once. VOICE_GEMINI_CATALOGUE=on lets Gemini speak that list
-      // (staging listen). A visit, hold, or order lookup is the exception below.
+      // speak-and-return. A services ask speaks the Phase-0 line once and
+      // returns, flag on or off, so Gemini cannot re-list. A visit, hold, or
+      // order lookup is the exception below.
       const localReply = resolveLocalReply({
         text: clean,
         state: brainState,
@@ -2911,12 +2912,15 @@ mediaWss.on('connection', (ws, req) => {
         spokeThisTurn = true;
         return;
       }
-      // Flag default off: local Phase-0 breath, Gemini does not take the list.
-      // Flag on and reasoning up: do not speak the local line. Gemini does.
-      // Flag on and reasoning down (credits, denied, or no key): local line.
-      // One speakText. Not one sentence per service.
+      // Local Phase-0 breath owns first catalogue audio. One speakText, then
+      // return. Gemini does not speak the list on this turn. Flag on is the
+      // staging listen of that blend, including when Brain withheld the reply.
+      // Not one sentence per service.
       const catalogueMouth = planCatalogueMouth({
         localReply,
+        text: clean,
+        profile: brainProfile,
+        language: callLanguage,
         reasoningDown:
           geminiReasoningDown(getGeminiProviderHealth()) ||
           !String(process.env.GEMINI_API_KEY || '').trim(),
@@ -2938,6 +2942,7 @@ mediaWss.on('connection', (ws, req) => {
         spokeThisTurn = true;
         return;
       }
+      // letGemini is always false. A catalogue ask already returned above.
       if (catalogueMouth.letGemini) {
         const note = catalogueGeminiDirective({
           profile: brainProfile,
@@ -2977,14 +2982,14 @@ mediaWss.on('connection', (ws, req) => {
         );
       }
 
-      // VOICE_FILLER=auto (default): adaptive ack only if first spoken audio is slow.
+      // VOICE_FILLER=auto (default): adaptive ack on this turn if first audio is slow.
+      // Later turns may ack again. Do not latch the ack for the whole call.
       // ack → always schedule a tiny backchannel; off → silence; custom → fixed phrase.
       // Skip when we already spoke an action-progress line for this turn.
       const fillerMode = (process.env.VOICE_FILLER || 'auto').toLowerCase();
       const useFiller =
         Boolean(tts) &&
         fillerMode !== 'off' &&
-        !fillerUsedThisCall &&
         !needsImmediateProgress &&
         !bareCloser && shouldSpeakThinkingAck(clean);
       const fillerDelayMs = resolveVoiceProfile().fillerDelayMs;
@@ -3001,7 +3006,6 @@ mediaWss.on('connection', (ws, req) => {
           // Adaptive: skip if LLM→TTS already started (stream chunk or full reply).
           if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk) {
             fillerStarted = true;
-            fillerUsedThisCall = true;
             turnTiming.markFiller();
             console.log(
               `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`

@@ -1,17 +1,18 @@
 // First services catalogue.
 //
-// VOICE_GEMINI_CATALOGUE=on is a staging listen only. Gemini speaks the list
-// when reasoning is up. Tear it down after the score: unset the flag.
-// Default off keeps main on the local Phase-0 line (na/and, one breath).
+// Local Phase-0 (na/and, one breath) owns first audio on a services ask.
+// speakText returns before Gemini, so the model cannot re-list that turn.
+// VOICE_GEMINI_CATALOGUE=on is a staging listen of that blend, including when
+// Brain withheld the local reply. Tear the flag down after the score.
+// Default off is the same local line when Brain already returned it.
 //
-// Outage (credits, denied project, or no Gemini key) always uses that local
-// line. Never period-per-item. Never invent a service.
+// Outage (credits, denied project, or no Gemini key) uses that local line.
+// Never period-per-item. Never invent a service. Never let Gemini speak the list.
 //
-// Brain items[] and no-relist land in a later PR. When localReply.items is
-// present, the Gemini mouth reads those names and does not fill gaps from
-// anywhere else. Until then Voice reads catalogueFileNames / the prepared line.
+// catalogueGeminiDirective stays for a Brain items[] note. The live catalogue
+// turn does not send it: Gemini is not the mouth.
 
-const { catalogueFileNames } = require('../conversation/knownFacts');
+const { catalogueFileNames, offerCatalogueLine } = require('../conversation/knownFacts');
 
 function geminiCatalogueEnabled(env = process.env) {
   return String(env.VOICE_GEMINI_CATALOGUE || '').trim().toLowerCase() === 'on';
@@ -44,6 +45,9 @@ function brainCatalogueItems(localReply) {
  * Who speaks this catalogue turn.
  * @param {{
  *   localReply?: { outcome?: string, line?: string, items?: string[] } | null,
+ *   text?: string,
+ *   profile?: object,
+ *   language?: string,
  *   reasoningDown?: boolean,
  *   geminiCatalogue?: boolean,
  * }} [opts]
@@ -51,27 +55,32 @@ function brainCatalogueItems(localReply) {
  *   speakLocal: boolean,
  *   letGemini: boolean,
  *   line: string,
- *   reason: '' | 'gemini' | 'outage' | 'flag_off',
+ *   reason: '' | 'local_blend' | 'outage' | 'flag_off',
  * }}
  */
 function planCatalogueMouth(opts = {}) {
   const localReply = opts.localReply;
-  const line =
+  const fromReply =
     localReply?.outcome === 'catalogue'
       ? String(localReply.line || '').replace(/\s+/g, ' ').trim()
       : '';
+  // Another local outcome (hours, detail, coverage) keeps its own mouth.
+  // A missing reply is the Brain staging withhold: rebuild the Phase-0 line
+  // from the file. offerCatalogueLine is empty unless this turn is an offer ask.
+  const withheld = !fromReply && (localReply == null || !localReply.outcome);
+  const rebuilt = withheld
+    ? String(offerCatalogueLine(opts.text, opts.profile, opts.language) || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+    : '';
+  const line = fromReply || rebuilt;
   if (!line) {
     return { speakLocal: false, letGemini: false, line: '', reason: '' };
   }
-  if (opts.geminiCatalogue === true && !opts.reasoningDown) {
-    return { speakLocal: false, letGemini: true, line, reason: 'gemini' };
-  }
-  return {
-    speakLocal: true,
-    letGemini: false,
-    line,
-    reason: opts.reasoningDown ? 'outage' : 'flag_off',
-  };
+  let reason = 'flag_off';
+  if (opts.reasoningDown) reason = 'outage';
+  else if (rebuilt || opts.geminiCatalogue === true) reason = 'local_blend';
+  return { speakLocal: true, letGemini: false, line, reason };
 }
 
 /**
