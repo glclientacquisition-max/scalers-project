@@ -235,7 +235,10 @@ const {
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
-const { drainSpokenSpeakSlots } = require('./src/conversation/speakSlots');
+const {
+  drainSpokenSpeakSlots,
+  isSpeakSlotOutcome,
+} = require('./src/conversation/speakSlots');
 const { narratesInternalAction, groundFilePriceLine } = require('./src/conversation/speechGuard');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -2939,6 +2942,38 @@ mediaWss.on('connection', (ws, req) => {
           spokeThisTurn = true;
         }
         return;
+      }
+      // Name Yes: a public fact the name gate did not speak is still the answer.
+      // SpeakPacket already returned when it spoke the fact. This speaks a
+      // public slot that is still unanswered, then Voice drains that line.
+      if (
+        localReply &&
+        nameJustConfirmed &&
+        isSpeakSlotOutcome(localReply.outcome) &&
+        !speakCommit.wasSpoken(localReply.line)
+      ) {
+        const heldPacket = authorizeSpeak(localReply);
+        const catalogueAlready =
+          localReply.outcome === 'catalogue' &&
+          (brainState?.conversation?.catalogueListed === true ||
+            brainState?.conversation?.catalogueAnswered === true);
+        if (heldPacket && heldPacket.tier === 'public' && !catalogueAlready) {
+          const heldFact = heldPacket.text;
+          drainSpokenSpeakSlots(brainState, [heldFact]);
+          callBrainStates.set(callKey, brainState);
+          console.log(
+            `[ws/media][${callKey}] speak slot after name yes ${localReply.outcome} lang=${callLanguage}: ${heldFact}`
+          );
+          bargeInActive = false;
+          suppressReplyRemainder = false;
+          callTranscript.pushAgent(heldFact);
+          turnTiming.markFirstSpokenChunk();
+          playbackBytes = 0;
+          playbackStartedAt = 0;
+          await speakText(heldFact, { skipFileGate: true });
+          spokeThisTurn = true;
+          return;
+        }
       }
       speechHold = holdCallerSpeech(callKey, messages);
       const fileReadAsk = localReply?.outcome === 'file_read';

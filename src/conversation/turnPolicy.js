@@ -33,6 +33,7 @@ const {
 } = require('./catalogueMouth');
 const { catalogueAskInPlay } = require('./fileRead');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
+const { fillSpeakSlot, takePendingSpeakSlot } = require('./speakSlots');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
@@ -128,6 +129,17 @@ function resolveLocalReply({
   const clean = String(text || '').trim();
   if (!clean) return null;
 
+  // Hold a public fact while the file-name ask is still due. Voice drains
+  // the slot if it speaks the line. Name Yes reads whatever is still here.
+  const publish = (reply) => {
+    if (!reply) return null;
+    if (fileNameAskLine(state)) fillSpeakSlot(state, reply, language);
+    else if (state?.caller?.nameJustConfirmed && state.conversation) {
+      state.conversation.speakSlots = [];
+    }
+    return reply;
+  };
+
   if (looksLikeRobotQuestion(clean) || looksLikeIdentityQuestion(clean)) {
     return {
       outcome: 'identity',
@@ -143,10 +155,17 @@ function resolveLocalReply({
   // Do not speak them here. A local reply would end the turn before Gemini.
 
   const detailLine = serviceFactsLine(clean, profile, language);
-  if (detailLine) return { outcome: 'service_facts', line: detailLine };
+  if (detailLine) return publish({ outcome: 'service_facts', line: detailLine });
 
   const priceLine = fileServicePriceLine(clean, profile, language, state);
-  if (priceLine) return { outcome: 'price', line: priceLine };
+  if (priceLine) return publish({ outcome: 'price', line: priceLine });
+
+  // A name yes does not drop the fact the name gate has not spoken yet.
+  // A price or other fact wins over reading the catalogue again.
+  if (state?.caller?.nameJustConfirmed) {
+    const held = takePendingSpeakSlot(state);
+    if (held) return { outcome: held.outcome, line: held.line };
+  }
 
   // The list was asked and never marked answered. Hand that one list to the local mouth.
   // A yes after the list was already answered does not read it again.
@@ -170,11 +189,11 @@ function resolveLocalReply({
     !(geminiCatalogueEnabled() && catalogueItemNames(profile).length)
   ) {
     const offerLine = offerCatalogueLine(clean, profile, language);
-    if (offerLine) return { outcome: 'catalogue', line: offerLine };
+    if (offerLine) return publish({ outcome: 'catalogue', line: offerLine });
   }
 
   const coverageLine = coverageAskSpeech(clean, profile, language);
-  if (coverageLine) return { outcome: 'coverage', line: coverageLine };
+  if (coverageLine) return publish({ outcome: 'coverage', line: coverageLine });
 
   const placeBlockLine = visitBlockSpeech(state?.visitPlace?.blocked, language);
   if (placeBlockLine && looksLikeLeaveIt(clean)) {
@@ -185,14 +204,14 @@ function resolveLocalReply({
   }
 
   if (state?.conversation?.clockRefusedThisTurn) {
-    return {
+    return publish({
       outcome: 'hours',
       line: formatVisitTimeProblem(
         'outside_hours',
         state.conversation.hoursBlock || {},
         language
       ),
-    };
+    });
   }
 
   // Leave-it and urgent outrank the time ladder. Everything else on a time ask
@@ -223,7 +242,7 @@ function resolveLocalReply({
   }
 
   const hoursLine = hoursAskLine(clean, profile, language);
-  if (hoursLine) return { outcome: 'hours_ask', line: hoursLine };
+  if (hoursLine) return publish({ outcome: 'hours_ask', line: hoursLine });
 
   const correctiveLine = pickCorrectiveReply({ text: clean, state, language });
   if (correctiveLine) return { outcome: 'corrective', line: correctiveLine };

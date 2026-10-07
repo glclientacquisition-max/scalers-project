@@ -319,6 +319,7 @@ function createBrainState(profile = {}) {
       areaAsked: false,
       locationRefusals: 0,
       catalogueAnswered: false,
+      speakSlots: [],
     },
     emotion: {
       state: 'neutral',

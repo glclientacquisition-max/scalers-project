@@ -239,7 +239,10 @@ describe('caller name stays the file name', () => {
       turnSource,
       /const fileNameAsk = lockFileNameAsk\(nameGate\.line, callLanguage\)/
     );
-    assert.match(turnSource, /nameAsk: fileNameAsk[\s\S]*?await speakText\(line\)/);
+    assert.match(
+      turnSource,
+      /nameAsk: askingName \? fileNameAsk : ''[\s\S]*?await speakText\(line/
+    );
     const gateAt = turnSource.indexOf('planCallerModelTurn');
     const modelAt = turnSource.indexOf('runGeminiTurn');
     assert.ok(gateAt >= 0 && modelAt > gateAt);
@@ -252,6 +255,7 @@ describe('caller name stays the file name', () => {
     assert.match(turnSource, /shouldPublishOpenFileSentence\(speechHold, fileReadAsk\)/);
     assert.doesNotMatch(turnSource, /speechHold\.holdSpeech \|\| fileReadAsk/);
     assert.doesNotMatch(turnSource, /speakText\(localReply\.line\)/);
+    assert.match(turnSource, /speak slot after name yes/);
   });
 
 

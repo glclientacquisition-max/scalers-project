@@ -23,6 +23,7 @@ const {
   looksLikeNonConsentAck,
 } = require('./callCorrectives');
 const { callerTurnKinds } = require('./messageOnly');
+const { pendingSpeakSlot } = require('./speakSlots');
 const {
   looksLikeOpenVisitLookup,
   looksLikeVisitReviewMore,
@@ -190,6 +191,13 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
   }
 
   if (isIdentityConfirmOnly(latestUtterance, state)) {
+    if (pendingSpeakSlot(state)) {
+      return {
+        action: ACTIONS.ANSWER,
+        reason:
+          'They confirmed who is speaking. A file answer is still waiting. Say that answer. Do not ask who they are again. Do not say goodbye. Do not end the call.',
+      };
+    }
     return {
       action: ACTIONS.ANSWER,
       reason:
