@@ -18,8 +18,14 @@ It does not say the price is missing when the row has one. Nothing is invented.
 "Which service do you offer" is the same list ask as "which services".
 The yes after a name confirm continues: which service, or the booking, or
 one local file list if that list was still waiting. It does not end the
-call. Gemini does not read the catalogue again, and no control label is
-spoken. Answering the catalogue leaves
+call. A public fact (price, catalogue, hours, coverage, service facts)
+is a speak slot on call state: `conversation.speakSlots[]` with `outcome`,
+`line`, and `language`. Brain fills that slot when the fact is ready and
+the file-name ask is still due. Voice FactSpeakQueue drains a slot once
+that line is spoken. A slot still there after name Yes is unanswered.
+Brain hands that same file line back before Gemini runs. Identity alone
+does not end the call. Nothing in the slot is invented. Gemini does not
+read the catalogue again, and no control label is spoken. Answering the catalogue leaves
 the call open. Farewell only when they say goodbye or they are done. Trailing
 noise such as "over" is not a visit place. Code still speaks
 the catalogue (unless that flag is on), hours, coverage,
