@@ -32,16 +32,16 @@ const MODE_OPTIONS: { value: BillingMode; label: string }[] = [
   { value: "hard", label: "On-demand hard" },
 ];
 
-type BillingTask = "package" | "charging" | "grant" | "waive";
+type BillingTask = "package" | "charging" | "grant";
 
 function planConsequence(mode: BillingMode): string {
   if (mode === "off") {
-    return "Beta: meter the package. On-demand ledger is not charged.";
+    return "Beta: meter the package. On-demand is not charged.";
   }
   if (mode === "soft") {
-    return "On-demand past included debits the ops ledger when the business opted in. Calls still connect at zero balance.";
+    return "On-demand past included is charged at the rate card when the business opted in. Calls still connect.";
   }
-  return "On-demand past included debits the ops ledger when opted in. Inbound block at zero balance is not wired yet.";
+  return "On-demand past included is charged at the rate card when opted in. Inbound block is not wired yet.";
 }
 
 function SheetNote({ error }: { error: string | null }) {
@@ -57,7 +57,7 @@ const sheetLabelClass = "mb-1.5 block text-meta font-medium text-ink";
 
 export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClientDetail }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [task, setTask] = useState<BillingTask | null>(null);
   const [busy, setBusy] = useState(false);
   const [chargeOpen, setChargeOpen] = useState(false);
@@ -75,16 +75,11 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
 
   const [grantMinutes, setGrantMinutes] = useState("60");
   const [grantNote, setGrantNote] = useState("");
-  const [waiveNote, setWaiveNote] = useState("");
 
   const [mode, setMode] = useState<BillingMode>(detail.row.billing_enforcement);
   const [modeNote, setModeNote] = useState(
     detail.row.billing_enforcement === "off" ? detail.beta_notes || "Beta program" : `On-demand (${detail.row.billing_enforcement})`
   );
-  const [waiveNegative, setWaiveNegative] = useState(true);
-
-  const [repairDelta, setRepairDelta] = useState("");
-  const [repairNote, setRepairNote] = useState("");
 
   useEffect(() => {
     try {
@@ -169,7 +164,6 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
         business_id: row.id,
         mode,
         note: modeNote.trim(),
-        waive_negative: mode === "off" ? waiveNegative : false,
       },
       `Charging mode → ${chargingModeLabel(mode)}.`
     );
@@ -183,7 +177,6 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
         business_id: detail.row.id,
         mode,
         note: modeNote.trim(),
-        waive_negative: mode === "off" ? waiveNegative : false,
       },
       `Charging mode → ${chargingModeLabel(mode)}.`
     );
@@ -263,80 +256,12 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
       <section className="border-b border-line/70 pb-6">
         <h2 className="text-title font-medium text-ink">Grant minutes</h2>
         <p className="mt-1 text-sm text-ink-2">
-          Adds to included minutes for this period. Does not change on-demand ledger balance.
+          Adds to included minutes for this period.
         </p>
         <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("grant")}>
           Grant minutes
         </Button>
       </section>
-
-      <section className="border-b border-line/70 pb-6">
-        <h2 className="text-title font-medium text-ink">Waive overage</h2>
-        <p className="mt-1 text-sm text-ink-2">
-          Clears negative on-demand ledger balance for this cycle (trial_credit). Current balance KES{" "}
-          {row.wallet_balance_kes.toLocaleString("en-KE")}.
-        </p>
-        <Button
-          type="button"
-          variant="tonal"
-          className="mt-4"
-          disabled={row.wallet_balance_kes >= 0}
-          onClick={() => openTask("waive")}
-        >
-          Waive overage
-        </Button>
-      </section>
-
-      {detail.ledgerRepairEnabled ? (
-        <section className="border-b border-line/70 pb-6">
-          <h2 className="text-title font-medium text-ink">Ledger repair</h2>
-          <p className="mt-1 text-sm text-ink-2">
-            Super-admin only (ADMIN_LEDGER_REPAIR=1). Signed KES adjust via adjust_tenant_wallet.
-          </p>
-          <form
-            className="mt-4 grid gap-4 sm:grid-cols-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void post(
-                {
-                  action: "ledger_repair_adjust",
-                  business_id: row.id,
-                  delta_kes: Number(repairDelta),
-                  note: repairNote.trim(),
-                  idempotency_key: crypto.randomUUID(),
-                },
-                "Ledger adjusted."
-              );
-            }}
-          >
-            <label className="text-sm">
-              Amount Δ (KES)
-              <input
-                value={repairDelta}
-                onChange={(e) => setRepairDelta(e.target.value)}
-                className={`mt-2 ${deskFieldClass}`}
-              />
-            </label>
-            <label className="text-sm">
-              Reason
-              <input
-                value={repairNote}
-                onChange={(e) => setRepairNote(e.target.value)}
-                className={`mt-2 ${deskFieldClass}`}
-              />
-            </label>
-            <div className="sm:col-span-2">
-              <button
-                type="submit"
-                disabled={pending || repairNote.trim().length < 3}
-                className={btnGhost}
-              >
-                Apply repair adjust
-              </button>
-            </div>
-          </form>
-        </section>
-      ) : null}
 
       <section>
         <h2 className="text-title font-medium text-ink">History</h2>
@@ -467,16 +392,6 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
               <Input {...props} value={modeNote} onChange={(e) => setModeNote(e.target.value)} />
             )}
           </Field>
-          {mode === "off" ? (
-            <label className="flex min-h-11 items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={waiveNegative}
-                onChange={(e) => setWaiveNegative(e.target.checked)}
-              />
-              Waive negative on-demand balance when stopping charging
-            </label>
-          ) : null}
         </div>
       </Sheet>
 
@@ -537,49 +452,6 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
             )}
           </Field>
         </div>
-      </Sheet>
-
-      <Sheet
-        open={task === "waive"}
-        onOpenChange={(next) => {
-          if (!next) setTask(null);
-        }}
-        title="Waive overage"
-        description={`Current balance KES ${row.wallet_balance_kes.toLocaleString("en-KE")}.`}
-        theme="admin"
-        footer={
-          <Button
-            type="button"
-            block
-            pending={busy}
-            disabled={waiveNote.trim().length < 3 || row.wallet_balance_kes >= 0}
-            onClick={() =>
-              void submit(
-                {
-                  action: "waive_overage",
-                  business_id: row.id,
-                  note: waiveNote.trim(),
-                  idempotency_key: crypto.randomUUID(),
-                },
-                "Overage waived when balance was negative."
-              )
-            }
-          >
-            Waive overage
-          </Button>
-        }
-      >
-        <SheetNote error={error} />
-        <Field id="bill-waive-note" label="Reason" required>
-          {(props) => (
-            <Input
-              {...props}
-              value={waiveNote}
-              onChange={(e) => setWaiveNote(e.target.value)}
-              placeholder="Goodwill, billing error, …"
-            />
-          )}
-        </Field>
       </Sheet>
 
       <ConfirmSheet

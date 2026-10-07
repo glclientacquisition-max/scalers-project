@@ -61,15 +61,6 @@ export function packageUsageGap(input: {
   return gaps.length ? gaps.join(". ") : null;
 }
 
-/** The monthly package price includes the number. Do not also debit the old line fee. */
-export function shouldApplyLineRental(
-  enforcement: string | null | undefined,
-  hasPackage: boolean
-): boolean {
-  if ((enforcement || "off") === "off") return false;
-  return !hasPackage;
-}
-
 export function usedOfIncluded(used: number, included: number): string {
   const usedCount = Math.max(0, Math.floor(Number(used) || 0));
   const cap = Math.max(0, Math.floor(Number(included) || 0));

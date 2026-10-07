@@ -2,7 +2,6 @@ import { connection } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { listDidPool, listPendingTenants, type DidPoolRow, type PendingTenant } from "@/lib/didPool";
 import { loadBusinessPackageNames } from "@/lib/packageCatalog";
-import { resolveWalletBalanceKes } from "@/lib/wallet";
 
 export type AdminBusiness = {
   id: string;
@@ -11,11 +10,6 @@ export type AdminBusiness = {
   sautikit_virtual_number: string;
   whatsapp_notification_number: string;
   is_active: boolean | null;
-  wallet_balance_kes: number | null;
-  /** @deprecated */
-  telecom_wallet_balance_kes: number | null;
-  /** @deprecated */
-  ai_wallet_balance_usd: number | null;
   package_name: string | null;
   package_period: "month" | "year" | null;
   billing_enforcement: "off" | "soft" | "hard";
@@ -54,9 +48,6 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
     sautikit_virtual_number: string;
     whatsapp_notification_number: string;
     is_active: boolean | null;
-    wallet_balance_kes?: number | null;
-    telecom_wallet_balance_kes?: number | null;
-    ai_wallet_balance_usd?: number | null;
     billing_enforcement?: string | null;
   };
 
@@ -67,7 +58,7 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
     const res = await admin
       .from("tenants")
       .select(
-        "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active, wallet_balance_kes, telecom_wallet_balance_kes, ai_wallet_balance_usd, billing_enforcement"
+        "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active, billing_enforcement"
       )
       .order("created_at", { ascending: true });
     data = (res.data as BusinessRow[] | null) || null;
@@ -78,18 +69,7 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
     const res = await admin
       .from("tenants")
       .select(
-        "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active, wallet_balance_kes, telecom_wallet_balance_kes, ai_wallet_balance_usd"
-      )
-      .order("created_at", { ascending: true });
-    data = (res.data as BusinessRow[] | null) || null;
-    error = res.error;
-  }
-
-  if (error && /wallet_balance_kes/i.test(error.message)) {
-    const res = await admin
-      .from("tenants")
-      .select(
-        "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active, telecom_wallet_balance_kes, ai_wallet_balance_usd"
+        "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active"
       )
       .order("created_at", { ascending: true });
     data = (res.data as BusinessRow[] | null) || null;
@@ -99,17 +79,9 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
   if (error) throw error;
   const packages = await loadBusinessPackageNames();
   return (data || []).map((row) => {
-    const wallet = resolveWalletBalanceKes({
-      walletKes: row.wallet_balance_kes,
-      telecomKes: row.telecom_wallet_balance_kes,
-      aiUsd: row.ai_wallet_balance_usd,
-    });
     const pack = packages.get(String(row.id));
     return {
       ...row,
-      wallet_balance_kes: wallet,
-      telecom_wallet_balance_kes: wallet,
-      ai_wallet_balance_usd: 0,
       package_name: pack?.packageName || null,
       package_period: pack?.period || null,
       billing_enforcement:
@@ -119,44 +91,6 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
       status: businessStatus(row),
     } as AdminBusiness;
   });
-}
-
-export async function adjustTenantWallet(opts: {
-  businessId: string;
-  deltaKes: number;
-  note?: string;
-  actor?: string;
-  idempotencyKey?: string;
-}): Promise<{ wallet_balance_kes: number }> {
-  const admin = getSupabaseAdmin();
-  const note = (opts.note || "Wallet adjustment").trim();
-
-  const primary = await admin.rpc("adjust_tenant_wallet", {
-    p_tenant_id: opts.businessId,
-    p_delta_kes: opts.deltaKes,
-    p_note: note,
-    p_actor: opts.actor || "ops",
-    p_idempotency_key: opts.idempotencyKey || null,
-  });
-
-  if (!primary.error) {
-    const row = Array.isArray(primary.data) ? primary.data[0] : primary.data;
-    return { wallet_balance_kes: Number(row?.wallet_balance_kes ?? 0) };
-  }
-
-  const legacy = await admin.rpc("adjust_tenant_wallet", {
-    p_tenant_id: opts.businessId,
-    p_telecom_delta_kes: opts.deltaKes,
-    p_ai_delta_usd: 0,
-    p_note: note,
-  });
-  if (legacy.error) throw primary.error || legacy.error;
-  const row = Array.isArray(legacy.data) ? legacy.data[0] : legacy.data;
-  return {
-    wallet_balance_kes: Number(
-      row?.wallet_balance_kes ?? row?.telecom_wallet_balance_kes ?? 0
-    ),
-  };
 }
 
 export async function getAdminOverview(): Promise<AdminOverview> {

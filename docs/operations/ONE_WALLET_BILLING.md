@@ -4,7 +4,7 @@
 
 **What owners buy:** package subscription (included minutes, SMS, seats, one phone line) plus optional **on-demand** usage past included. Configure packages and on-demand rates in Super Admin → **Packages**.
 
-**What the wallet is:** an internal **KES ledger** for metering, on-demand debits, line rental, and ops adjustments. Customer money path is **packages + on-demand**; owner **package checkout** (M-Pesa/Paystack) is not shipped. The ledger stays ops scaffolding, not a float top-up product. Super Admin sets Plan and reviews Charges on the Businesses shop. `/admin/wallets` redirects there.
+**Desk and Admin (2026-10-06):** No wallet top-up, no balance readout, no waive overage, no ledger repair, no ops wallet adjust. Charge lines stay as usage history. Customer money path is **packages + on-demand**; owner **package checkout** (M-Pesa/Paystack) is not shipped. Super Admin sets Plan and reviews Charges on the Businesses shop. `/admin/wallets` redirects there. SQL/RPC (`wallet_ledger`, `adjust_tenant_wallet`, `waive_tenant_overage`, `apply_line_rental`) remain Platform/voice until a dedicated removal.
 
 ## Goal
 

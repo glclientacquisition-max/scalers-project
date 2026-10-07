@@ -23,14 +23,11 @@ const FILTER_OPTIONS: { value: BillingFilter; label: string }[] = [
   { value: "exhausted", label: "Exhausted" },
 ];
 
-function overageLine(row: AdminBillingRow): string {
-  if (row.wallet_balance_kes < 0) {
-    return `Overage KES ${Math.abs(row.wallet_balance_kes).toLocaleString("en-KE")}`;
-  }
+function onDemandLine(row: AdminBillingRow): string {
   if (row.billing_enforcement !== "off" && row.minutesRemaining <= 0 && row.on_demand_usage_enabled) {
-    return "On-demand active";
+    return "Active past included";
   }
-  return "—";
+  return "Off";
 }
 
 export function AdminBillingListPanel({ overview }: { overview: AdminBillingOverview }) {
@@ -66,7 +63,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
       </section>
 
       <p className="text-sm text-ink-2">
-        Observe every client: package minutes, on-demand charging mode, and overage. Edit SKUs, rates, and
+        Observe every client: package minutes and on-demand charging mode. Edit SKUs, rates, and
         assignments on{" "}
         <Link href="/admin/packages" className="font-medium text-accent underline-offset-2 hover:underline">
           Packages
@@ -105,7 +102,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
               <th className={adminThClass}>Package</th>
               <th className={adminThClass}>Minutes</th>
               <th className={adminThClass}>Charging</th>
-              <th className={adminThClass}>Overage</th>
+              <th className={adminThClass}>On-demand</th>
               <th className={adminThClass}>Status</th>
               <th className={adminThClass}>Actions</th>
             </tr>
@@ -134,7 +131,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
                   <td className={`${adminTdClass} text-meta text-ink-2`}>
                     {chargingModeLabel(r.billing_enforcement)}
                   </td>
-                  <td className={`${adminTdClass} text-meta text-ink-2`}>{overageLine(r)}</td>
+                  <td className={`${adminTdClass} text-meta text-ink-2`}>{onDemandLine(r)}</td>
                   <td className={`${adminTdClass} text-meta text-ink`}>{r.statusLabel}</td>
                   <td className={adminTdClass}>
                     <Link href={`/admin/billing/${r.id}`} className={adminRowActionClass}>

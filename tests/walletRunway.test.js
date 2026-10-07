@@ -7,41 +7,26 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
-describe("wallet runway", () => {
+describe("owner usage surface", () => {
   const wallet = read("dashboard/src/lib/wallet.ts");
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
-
-  it("keeps one runway math shared by Wallet and Home", () => {
-    assert.match(wallet, /export function runwayDaysAtPace/);
-    assert.match(wallet, /runwayDaysAtPace\(\{\s*minutesThisMonth,\s*dayOfMonth,\s*balanceKes: walletBalanceKes/);
-    assert.match(wallet, /export async function getWalletRunwayDays/);
-  });
-
-  it("reads only call durations for the light Home query", () => {
-    assert.match(wallet, /select\("duration_seconds, ai_processing_minutes"\)/);
-    const loader = wallet.slice(
-      wallet.indexOf("export async function getWalletRunwayDays"),
-      wallet.indexOf("export function walletRunwayLabel")
-    );
-    assert.ok(loader.length > 0);
-    assert.doesNotMatch(loader, /wallet_ledger/);
-  });
-
-  it("shows the caption only when it is decision-useful", () => {
-    assert.match(wallet, /days == null \|\| days <= 0 \|\| days > 90/);
-    assert.match(wallet, /at this pace/);
-  });
 
   it("keeps one beta rule for every surface", () => {
     assert.match(wallet, /export function isBetaBilling/);
     assert.match(wallet, /const isBeta = isBetaBilling\(billingEnforcement\)/);
   });
 
-  it("keeps prepaid runway math on the wallet helper only", () => {
+  it("keeps wallet balance math off Home", () => {
     assert.match(home, /isBetaBilling\(tenant\.billing_enforcement\)/);
     assert.doesNotMatch(home, /getWalletRunwayDays/);
     assert.doesNotMatch(home, /walletRunwayLabel/);
     assert.doesNotMatch(home, /lowWallet/);
+  });
+
+  it("keeps balance and runway helpers out of the wallet lib", () => {
+    assert.doesNotMatch(wallet, /runwayDaysAtPace|getWalletRunwayDays|walletRunwayLabel/);
+    assert.doesNotMatch(wallet, /resolveWalletBalanceKes|WALLET_LOW_BALANCE_KES/);
+    assert.doesNotMatch(wallet, /ensureLineRentalApplied|apply_line_rental/);
   });
 
   it("renders remaining minutes on Home from the package meter", () => {
@@ -51,7 +36,7 @@ describe("wallet runway", () => {
     assert.match(home, /aria-label="Usage"/);
   });
 
-  it("renders the owner ledger as a dense table", () => {
+  it("renders the owner charge lines as a dense table", () => {
     const page = read("dashboard/src/app/(desk)/wallet/page.tsx");
     assert.match(page, /recentLedger\.map/);
     assert.match(page, /<Pagination/);

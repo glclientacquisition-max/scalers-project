@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import {
-  adjustTenantWalletSecure,
   listAdminWallets,
   listTenantLedger,
   setTenantBillingMode,
@@ -51,24 +50,6 @@ export async function POST(request: Request) {
   const note = String(body.note || "").trim();
 
   try {
-    if (action === "adjust_wallet") {
-      const deltaKes = Number(body.delta_kes || 0);
-      if (!Number.isFinite(deltaKes) || deltaKes === 0) {
-        return NextResponse.json({ error: "Enter a non-zero KES amount" }, { status: 400 });
-      }
-      if (note.length < 3) {
-        return NextResponse.json({ error: "Note required (why you are adjusting)" }, { status: 400 });
-      }
-      const result = await adjustTenantWalletSecure({
-        businessId,
-        deltaKes,
-        note,
-        actor,
-        idempotencyKey: String(body.idempotency_key || "").trim() || undefined,
-      });
-      return NextResponse.json({ ok: true, ...result });
-    }
-
     if (action === "set_billing_mode") {
       const mode = String(body.mode || "") as BillingMode;
       if (mode !== "off" && mode !== "soft" && mode !== "hard") {
@@ -82,7 +63,6 @@ export async function POST(request: Request) {
         mode,
         note,
         actor,
-        waiveNegative: Boolean(body.waive_negative),
         betaExpiresAt: body.beta_expires_at ? String(body.beta_expires_at) : null,
       });
       return NextResponse.json({ ok: true, ...result });

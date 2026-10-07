@@ -65,9 +65,6 @@ async function WalletBody({ searchParams }: WalletPageProps) {
     usage = await getTenantUsageSummary(workspace.client, tenant.id, {
       ledgerPage: page,
       ledgerPageSize: DEFAULT_PAGE_SIZE,
-      walletKes: tenant.wallet_balance_kes,
-      telecomKes: tenant.telecom_wallet_balance_kes,
-      aiUsd: tenant.ai_wallet_balance_usd,
       billingEnforcement: tenant.billing_enforcement,
       softSpendLimitEnabled: tenant.soft_spend_limit_enabled,
       softSpendLimitKes: tenant.soft_spend_limit_kes,
@@ -205,7 +202,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
         <h2 className="px-4 pt-4 font-display text-xl tracking-tight text-ink">Activity</h2>
         {usage.recentLedger.length === 0 ? (
           <p className="px-4 py-3 text-sm text-ink-soft">
-            {usage.isBeta ? "No charges during beta." : "No ledger entries yet."}
+            {usage.isBeta ? "No charges during beta." : "No charges yet."}
           </p>
         ) : (
           <table className="mt-2 w-full text-left text-sm">

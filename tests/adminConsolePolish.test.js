@@ -152,12 +152,28 @@ describe("admin console polish", () => {
     assert.match(panel, /title="Charges"/);
     assert.match(panel, /set_billing_mode/);
     assert.match(panel, /ledger_for/);
-    assert.match(panel, /Adjust/);
+    assert.doesNotMatch(panel, /adjust_wallet/);
     assert.doesNotMatch(panel, /title="Ledger"/);
     assert.match(panel, /b\.package_name/);
-    assert.match(panel, /wallet_balance_kes/);
+    assert.doesNotMatch(panel, /wallet_balance_kes/);
     assert.match(panel, /REMOVE/);
     assert.doesNotMatch(panel, /disabled=\{pending \|\| availableDidCount === 0\}/);
+  });
+
+  it("keeps the removed ledger actions out of billing surfaces", () => {
+    const detail = read("dashboard/src/components/AdminBillingDetailPanel.tsx");
+    assert.doesNotMatch(detail, /waive_overage|ledger_repair|waive_negative/i);
+    assert.doesNotMatch(detail, /Waive|Ledger repair/);
+    const billingApi = read("dashboard/src/app/api/admin/billing/route.ts");
+    assert.doesNotMatch(billingApi, /waive_overage|ledger_repair|waive_negative/);
+    const walletsApi = read("dashboard/src/app/api/admin/wallets/route.ts");
+    assert.doesNotMatch(walletsApi, /adjust_wallet|adjustTenantWallet/);
+    const businessesApi = read("dashboard/src/app/api/admin/businesses/route.ts");
+    assert.doesNotMatch(businessesApi, /adjust_wallet|adjustTenantWallet/);
+    const billingLib = read("dashboard/src/lib/adminBilling.ts");
+    assert.doesNotMatch(billingLib, /waiveTenantOverage|adjustTenantWalletSecure|ledgerRepairEnabled/);
+    const walletsLib = read("dashboard/src/lib/adminWallets.ts");
+    assert.doesNotMatch(walletsLib, /adjustTenantWalletSecure|walletStatus|lowCount|overdrawnCount/);
   });
 
   it("lists DID pool as ListRows with assign, add, and a confirmed release", () => {

@@ -125,7 +125,7 @@ describe("package usage meter", () => {
   });
 
   it("names when included amounts do not match the assigned package", async () => {
-    const { packageUsageGap, shouldApplyLineRental, usedOfIncluded } = await import(
+    const { packageUsageGap, usedOfIncluded } = await import(
       "../dashboard/src/lib/packageUsageAlign.ts"
     );
     const starter = { minutes: 300, sms: 200, email: 100, staffWa: 200, seats: 2 };
@@ -163,27 +163,24 @@ describe("package usage meter", () => {
       "Package is not in the catalog"
     );
     assert.equal(usedOfIncluded(47, 200), "47 of 200");
-    assert.equal(shouldApplyLineRental("off", false), false);
-    assert.equal(shouldApplyLineRental("soft", true), false);
-    assert.equal(shouldApplyLineRental("hard", false), true);
 
     const billingDetail = read("dashboard/src/components/AdminBillingDetailPanel.tsx");
     const wallet = read("dashboard/src/lib/wallet.ts");
-    assert.match(billingDetail, /Beta: meter the package\. On-demand ledger is not charged\./);
+    assert.match(billingDetail, /Beta: meter the package\. On-demand is not charged\./);
     assert.match(billingDetail, /On-demand past included/);
     assert.doesNotMatch(billingDetail, /line fees/);
     assert.doesNotMatch(billingDetail, /CREDIT_PRESETS/);
-    assert.match(wallet, /shouldApplyLineRental/);
-    assert.match(wallet, /tenantHasAssignedPackage/);
+    assert.doesNotMatch(wallet, /ensureLineRentalApplied|apply_line_rental/);
   });
 
   it("opts into on-demand after included buckets hit zero", () => {
     const panel = read("dashboard/src/components/OnDemandUsagePanel.tsx");
     const actions = read("dashboard/src/app/(desk)/wallet/actions.ts");
-    assert.match(panel, /Charge the wallet for minutes and SMS past included/);
+    assert.match(panel, /Charge on-demand rates for minutes and SMS past included/);
     assert.doesNotMatch(panel, /prepaid minutes/);
     assert.doesNotMatch(panel, /Continue after included/);
-    assert.match(actions, /Past included minutes and SMS, charge the wallet/);
+    assert.doesNotMatch(panel, /the wallet/);
+    assert.match(actions, /Past included minutes and SMS are charged at the on-demand rates/);
   });
 
   it("says calls stop when included minutes are gone and on-demand is off", () => {

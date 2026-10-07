@@ -1,22 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { shouldApplyLineRental } from "@/lib/packageUsageAlign";
-import { getSupabaseAdmin } from "@/lib/supabase";
 
 /** Retail rate card (KES). AI usage is bundled into the per-minute rate. */
 export const WALLET_RATE_KES_PER_MINUTE = Number(
   process.env.WALLET_RATE_KES_PER_MINUTE || process.env.NEXT_PUBLIC_WALLET_RATE_KES_PER_MINUTE || 0
 );
-export const WALLET_TRANSFER_RATE_KES_PER_MINUTE = Number(
-  process.env.WALLET_TRANSFER_RATE_KES_PER_MINUTE ||
-    process.env.NEXT_PUBLIC_WALLET_TRANSFER_RATE_KES_PER_MINUTE ||
-    4
-);
-export const WALLET_LINE_FEE_KES_PER_MONTH = Number(
-  process.env.WALLET_LINE_FEE_KES_PER_MONTH ||
-    process.env.NEXT_PUBLIC_WALLET_LINE_FEE_KES_PER_MONTH ||
-    1000
-);
-export const WALLET_LOW_BALANCE_KES = 200;
 
 /** Owner soft spend budget presets (KES / calendar month UTC). Opt-in only. */
 export const SOFT_SPEND_LIMIT_PRESETS_KES = [2000, 5000, 10000, 20000] as const;
@@ -24,11 +11,6 @@ export const SOFT_SPEND_LIMIT_MIN_KES = 500;
 export const SOFT_SPEND_LIMIT_MAX_KES = 1_000_000;
 /** Soft warning thresholds (percent of monthly limit). Never blocks calls. */
 export const SOFT_SPEND_WARN_THRESHOLDS = [50, 80, 100] as const;
-
-/** @deprecated Use WALLET_RATE_KES_PER_MINUTE */
-export const BETA_RATE_KES_PER_MINUTE = WALLET_RATE_KES_PER_MINUTE;
-/** @deprecated Use WALLET_LINE_FEE_KES_PER_MONTH */
-export const BETA_LINE_FEE_KES_PER_MONTH = WALLET_LINE_FEE_KES_PER_MONTH;
 
 export type WalletLedgerRow = {
   id: string;
@@ -58,9 +40,6 @@ export type TenantUsageSummary = {
   estimatedCostKes: number;
   callChargesKes: number;
   lineFeeKes: number;
-  daysRemainingAtPace: number | null;
-  walletBalanceKes: number;
-  lowBalance: boolean;
   billingEnforcement: string;
   isBeta: boolean;
   recentLedger: WalletLedgerRow[];
@@ -128,26 +107,6 @@ function startOfMonthUtcIso(): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 }
 
-function currentPeriodUtc(): string {
-  const now = new Date();
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  return `${now.getUTCFullYear()}-${month}`;
-}
-
-/** Resolve balance from one-wallet column, with dual-wallet fallback pre-migration. */
-export function resolveWalletBalanceKes(wallets: {
-  walletKes?: number | null;
-  telecomKes?: number | null;
-  aiUsd?: number | null;
-}): number {
-  if (wallets.walletKes != null && Number.isFinite(Number(wallets.walletKes))) {
-    return Number(wallets.walletKes);
-  }
-  const telecom = Number(wallets.telecomKes ?? 0);
-  const aiUsd = Number(wallets.aiUsd ?? 0);
-  return telecom + Math.round(aiUsd * 130);
-}
-
 /** Beta workspaces are metered, never charged. One rule for every surface. */
 export function isBetaBilling(billingEnforcement?: string | null): boolean {
   return (billingEnforcement || "off") === "off";
@@ -178,93 +137,10 @@ function minutesFromCallRows(
   };
 }
 
-/** Days the prepaid balance lasts at the current call pace. Null when no pace or no balance. */
-export function runwayDaysAtPace(opts: {
-  minutesThisMonth: number;
-  dayOfMonth: number;
-  balanceKes: number;
-}): number | null {
-  const minutesPerDay = opts.minutesThisMonth / Math.max(1, opts.dayOfMonth);
-  if (minutesPerDay <= 0 || opts.balanceKes <= 0) return null;
-  const kesPerDay = minutesPerDay * WALLET_RATE_KES_PER_MINUTE;
-  return Math.max(0, Math.round(opts.balanceKes / kesPerDay));
-}
-
-async function tenantHasAssignedPackage(tenantId: string): Promise<boolean> {
-  const admin = getSupabaseAdmin();
-  const res = await admin
-    .from("tenant_subscriptions")
-    .select("package_id")
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-  if (res.error) return false;
-  return Boolean(res.data?.package_id);
-}
-
-/** Light runway read for surfaces that only need the pace caption (Home). One calls query. */
-export async function getWalletRunwayDays(
-  client: SupabaseClient,
-  tenantId: string,
-  balanceKes: number
-): Promise<number | null> {
-  if (balanceKes <= 0) return null;
-  const res = await client
-    .from("calls")
-    .select("duration_seconds, ai_processing_minutes")
-    .eq("tenant_id", tenantId)
-    .gte("created_at", startOfMonthUtcIso());
-  if (res.error) return null;
-  const { minutes } = minutesFromCallRows(res.data || []);
-  return runwayDaysAtPace({
-    minutesThisMonth: minutes,
-    dayOfMonth: new Date().getUTCDate(),
-    balanceKes,
-  });
-}
-
-/** Quiet pace caption. Shown only when the answer is decision-useful (1 to 90 days). */
-export function walletRunwayLabel(days: number | null): string | null {
-  if (days == null || days <= 0 || days > 90) return null;
-  if (days < 14) return `about ${days} day${days === 1 ? "" : "s"} at this pace`;
-  if (days < 56) {
-    const weeks = Math.round(days / 7);
-    return `about ${weeks} week${weeks === 1 ? "" : "s"} at this pace`;
-  }
-  const months = Math.round(days / 30);
-  return `about ${months} month${months === 1 ? "" : "s"} at this pace`;
-}
-
-/**
- * Lazy-apply monthly line rental via service role only (owners cannot choose amount).
- * No-op when workspace is on beta (`billing_enforcement = off`).
- */
-export async function ensureLineRentalApplied(
-  tenantId: string,
-  amountKes: number = WALLET_LINE_FEE_KES_PER_MONTH
-): Promise<number | null> {
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.rpc("apply_line_rental", {
-    p_tenant_id: tenantId,
-    p_period: currentPeriodUtc(),
-    p_amount_kes: amountKes,
-  });
-  if (error) {
-    if (/function|does not exist|schema cache|permission|not authorized/i.test(error.message)) {
-      return null;
-    }
-    throw error;
-  }
-  const row = Array.isArray(data) ? data[0] : data;
-  return row?.wallet_balance_kes != null ? Number(row.wallet_balance_kes) : null;
-}
-
 export async function getTenantUsageSummary(
   client: SupabaseClient,
   tenantId: string,
   wallets: {
-    walletKes?: number | null;
-    telecomKes?: number | null;
-    aiUsd?: number | null;
     billingEnforcement?: string | null;
     softSpendLimitEnabled?: boolean | null;
     softSpendLimitKes?: number | null;
@@ -272,22 +148,8 @@ export async function getTenantUsageSummary(
     ledgerPageSize?: number;
   }
 ): Promise<TenantUsageSummary> {
-  let walletBalanceKes = resolveWalletBalanceKes(wallets);
   const billingEnforcement = wallets.billingEnforcement || "off";
   const isBeta = isBetaBilling(billingEnforcement);
-
-  // A package price includes the number. The old line fee applies only to prepaid businesses with no package.
-  if (billingEnforcement !== "off") {
-    try {
-      const hasPackage = await tenantHasAssignedPackage(tenantId);
-      if (shouldApplyLineRental(billingEnforcement, hasPackage)) {
-        const applied = await ensureLineRentalApplied(tenantId);
-        if (applied != null) walletBalanceKes = applied;
-      }
-    } catch {
-      // Non-fatal: usage still loads.
-    }
-  }
 
   const since = startOfMonthUtcIso();
   const ledgerSize = Math.max(1, Math.floor(wallets.ledgerPageSize || 25));
@@ -333,13 +195,6 @@ export async function getTenantUsageSummary(
     }
   }
 
-  const dayOfMonth = Math.max(1, new Date().getUTCDate());
-  const daysRemainingAtPace = runwayDaysAtPace({
-    minutesThisMonth,
-    dayOfMonth,
-    balanceKes: walletBalanceKes,
-  });
-
   const ledgerTotal = !ledgerRes.error ? ledgerRes.count ?? (ledgerRes.data || []).length : 0;
   const recentLedger: WalletLedgerRow[] = !ledgerRes.error
     ? (ledgerRes.data || []).map((row) => ({
@@ -369,9 +224,6 @@ export async function getTenantUsageSummary(
     estimatedCostKes,
     callChargesKes,
     lineFeeKes,
-    daysRemainingAtPace,
-    walletBalanceKes,
-    lowBalance: !isBeta && walletBalanceKes < WALLET_LOW_BALANCE_KES,
     billingEnforcement,
     isBeta,
     recentLedger,

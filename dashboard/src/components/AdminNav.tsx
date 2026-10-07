@@ -37,15 +37,6 @@ function AdminIcon({ name }: { name: string }) {
       </svg>
     );
   }
-  if (name === "Wallets" || name === "Ledger") {
-    return (
-      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
-        <rect x="3" y="5" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M3 8.5h14" stroke="currentColor" strokeWidth="1.5" />
-        <circle cx="13.5" cy="12" r="0.8" fill="currentColor" />
-      </svg>
-    );
-  }
   if (name === "Packages") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
