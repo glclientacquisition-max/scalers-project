@@ -83,7 +83,7 @@ Staging is defined. See [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md) f
 | Voice | `https://scalers-staging-staging.up.railway.app` (Railway env `staging`, branch `cursor/staging-voice-468b`) |
 | Desk | `https://scalers-staging.vercel.app` (Vercel project `scalers-staging`, same branch). Production builds from any other branch are ignored. Why the URL used to flip: [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md). |
 | Git branch | **`cursor/staging-voice-468b`**. Every open pull request is merged onto this branch for testing, including one that targets another feature branch. Open the pull request into `main` so the rebuild starts immediately. A stacked pull request joins on the next rebuild. Promote by squash-merging that tested pull request into `main`. |
-| SautiKit | Test DID `+254709221536` pointing at staging voice URL |
+| SautiKit | Test DID `+254709221537` (Done and Dusted, agent Shy) pointing at staging voice URL |
 
 ### Hold staging Voice
 
