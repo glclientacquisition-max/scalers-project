@@ -127,9 +127,14 @@ describe('voice trace session', () => {
       diagnosis: call.diagnosis,
       release: call.release,
     });
-    assert.deepEqual(callTraceColumns(sink.records[0]), {
-      score: null,
-      checks: null,
+    const turnRow = sink.records[0];
+    assert.equal(turnRow.score, 100);
+    assert.equal(turnRow.checks.repeatedQuestion, 0);
+    assert.equal(turnRow.caller.language, 'en');
+    assert.equal(turnRow.caller.sticky, 'en');
+    assert.deepEqual(callTraceColumns(turnRow), {
+      score: 100,
+      checks: turnRow.checks,
       diagnosis: null,
       release: null,
     });
@@ -144,6 +149,13 @@ describe('voice trace session', () => {
     const sink = createMemorySink();
     const trace = createVoiceTrace({ enabled: true, sink, callId: 'HD_speak' });
     trace.beginTurn({ callerText: 'Huduma gani?', language: { current: 'sw' } });
+    trace.noteLanguage({ detected: 'unknown', sticky: 'sw', soniox: 'sw', confidence: 0.4 });
+    trace.noteFiller({ text: 'Mm-hmm', before: 'Mm-hmm.', language: 'sw' });
+    trace.noteTool({
+      name: 'save_caller_info',
+      status: 'succeeded',
+      args: 'name=Alvin reason=Service inquiry',
+    });
     trace.noteSpeakSlots({
       action: 'enqueue',
       slots: [{ outcome: 'catalogue', line: 'Tuna usafi.', language: 'sw' }],
@@ -165,6 +177,17 @@ describe('voice trace session', () => {
     assert.equal(packet.outcome, 'catalogue');
     assert.equal(packet.committed, true);
     assert.deepEqual(slots.map((row) => row.action), ['enqueue', 'drain']);
+    assert.equal(turn.caller.detected, 'unknown');
+    assert.equal(turn.caller.sticky, 'sw');
+    assert.equal(turn.caller.soniox, 'sw');
+    assert.equal(turn.stages.find((row) => row.stage === 'language').soniox, 'sw');
+    assert.equal(turn.caller.language, 'sw');
+    const filler = turn.stages.find((row) => row.stage === 'filler');
+    const tool = turn.stages.find((row) => row.stage === 'tool');
+    assert.equal(filler.text, 'Mm-hmm');
+    assert.equal(tool.name, 'save_caller_info');
+    assert.equal(tool.status, 'succeeded');
+    assert.match(tool.args, /name=Alvin/);
     await trace.finishCall();
   });
 

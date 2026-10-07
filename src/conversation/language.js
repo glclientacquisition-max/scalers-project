@@ -202,6 +202,26 @@ function countMarkers(raw, markers) {
   );
 }
 
+/**
+ * One Soniox language for a turn. Empty tags return null so the keyword
+ * fallback can run. A tie is mixed. Keywords are not added here.
+ * @param {string[]} [tags]
+ * @returns {'en'|'sw'|'sheng'|'mixed'|null}
+ */
+function dominantSonioxLanguage(tags) {
+  const counts = { en: 0, sw: 0, sheng: 0 };
+  for (const tag of Array.isArray(tags) ? tags : []) {
+    const bucket = languageTagBucket(tag);
+    if (bucket && Object.prototype.hasOwnProperty.call(counts, bucket)) counts[bucket] += 1;
+  }
+  const ranked = Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1]);
+  if (!ranked.length) return null;
+  if (ranked.length > 1 && ranked[1][1] === ranked[0][1]) return 'mixed';
+  return ranked[0][0];
+}
+
 /** Soniox language tag, or empty. sw / swh, en, sheng. */
 function languageTagBucket(tag) {
   const raw = String(tag || '')
@@ -463,6 +483,7 @@ function languageDirective(lang) {
 
 module.exports = {
   analyzeCallerLanguage,
+  dominantSonioxLanguage,
   detectCallerLanguage,
   createLanguageState,
   resolveLanguageState,

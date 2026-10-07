@@ -146,6 +146,252 @@ describe('voice score', () => {
     assert.equal(card.checks.silence, 0);
   });
 
+  it('scores the whole reply, not the last sentence', () => {
+    const card = scoreTurns([
+      {
+        turnIndex: 4,
+        caller: { text: 'Could you tell me the sizes you offer?', language: 'en' },
+        stages: [
+          { stage: 'language', detected: 'en', sticky: 'en' },
+          {
+            stage: 'model',
+            phase: 'output',
+            outputText:
+              "I don't have the exact details on carpet or mattress sizes, but I can note your request for the team. Would you like me to log that for you, Alvin?",
+          },
+          {
+            stage: 'tts',
+            text: "I don't have the exact details on carpet or mattress sizes but I can note your request for the team",
+            before:
+              "I don't have the exact details on carpet or mattress sizes, but I can note your request for the team.",
+            language: 'en',
+          },
+          {
+            stage: 'tts',
+            text: 'Would you like me to log that for you Alvin',
+            before: 'Would you like me to log that for you, Alvin?',
+            language: 'en',
+          },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(card.checks.deletedAnswer, 0);
+    assert.equal(card.checks.incomplete, 0);
+  });
+
+  it('counts a model question that was removed from the spoken reply', () => {
+    const card = scoreTurns([
+      {
+        turnIndex: 9,
+        caller: { text: 'Eeh, mimi naishi Kilicho though.', detected: 'unknown', language: 'en' },
+        stages: [
+          { stage: 'language', detected: 'unknown', sticky: 'en' },
+          {
+            stage: 'model',
+            phase: 'output',
+            outputText:
+              'Kilicho iko outside our standard Nairobi coverage area, so we cannot book a direct visit right now. Would you like me to log a callback for the team to check if we can reach you?',
+          },
+          {
+            stage: 'transform',
+            name: 'polish',
+            dropped: true,
+            before: 'Would you like me to log a callback for the team to check if we can reach you?',
+            after: '',
+          },
+          {
+            stage: 'tts',
+            text: 'Kilicho iko outside our standard Nairobi coverage area so we cannot book a direct visit right now',
+            before:
+              'Kilicho iko outside our standard Nairobi coverage area, so we cannot book a direct visit right now.',
+            language: 'en',
+          },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(card.checks.deletedAnswer, 1);
+    assert.equal(card.checks.languageMismatch, 0);
+  });
+
+  it('finds a repeated question in pre-TTS text after question marks are stripped', () => {
+    const card = scoreTurns([
+      {
+        turnIndex: 2,
+        caller: { text: 'Yes.', language: 'en' },
+        stages: [
+          {
+            stage: 'model',
+            phase: 'output',
+            outputText: 'Which service do you need?',
+          },
+          { stage: 'tts', text: 'Which service do you need', before: 'Which service do you need?', language: 'en' },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+      {
+        turnIndex: 6,
+        caller: { text: 'The sizes.', language: 'en' },
+        stages: [
+          { stage: 'tts', text: 'Which service do you need', before: 'Which service do you need?', language: 'en' },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.ok(card.checks.repeatedQuestion >= 1);
+  });
+
+  it('scores slowness on the reply, and does not call a barge over filler silence', () => {
+    const slow = scoreTurns([
+      {
+        turnIndex: 2,
+        caller: { text: 'Yes.', language: 'en' },
+        stages: [
+          { stage: 'filler', text: 'Mm-hmm', before: 'Mm-hmm.' },
+          { stage: 'tts', text: 'Which service do you need', before: 'Which service do you need?', language: 'en' },
+          { stage: 'outcome', value: 'ok' },
+          { stage: 'latency', callerStopToFirstTtsPcmMs: 452, firstReplyPcmMs: 1355 },
+        ],
+      },
+    ]);
+    assert.equal(slow.checks.slow, 1);
+    assert.equal(slow.checks.silence, 0);
+    const barge = scoreTurns([
+      {
+        turnIndex: 3,
+        caller: { text: 'Right.', language: 'en' },
+        stages: [
+          { stage: 'filler', text: 'Mm-hmm', before: 'Mm-hmm.' },
+          { stage: 'outcome', value: 'barge_in' },
+          { stage: 'latency', callerStopToFirstTtsPcmMs: 402, firstReplyPcmMs: null },
+        ],
+      },
+    ]);
+    assert.equal(barge.checks.silence, 0);
+    assert.equal(barge.checks.slow, 0);
+  });
+
+  it('uses detected language, then the caller text, and ignores a sticky mismatch', () => {
+    const card = scoreTurns([
+      {
+        turnIndex: 8,
+        caller: {
+          text: 'Wewe unafanya vitu za BNB?',
+          language: 'en',
+          sticky: 'en',
+          detected: 'unknown',
+        },
+        stages: [
+          { stage: 'language', detected: 'unknown', sticky: 'en' },
+          {
+            stage: 'tts',
+            text: 'Ndiyo Alvin tunafanya general cleaning ya nyumba na AirBnB',
+            before: 'Ndiyo, Alvin, tunafanya general cleaning ya nyumba na AirBnB.',
+            language: 'sw',
+          },
+          {
+            stage: 'tts',
+            text: 'Ungetaka tukuwekee visit lini na sehemu gani',
+            before: 'Ungetaka tukuwekee visit lini na sehemu gani?',
+            language: 'en',
+          },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(card.checks.languageMismatch, 0);
+    assert.equal(card.checks.deletedAnswer, 0);
+    assert.equal(card.checks.incomplete, 0);
+  });
+
+  it('scores Soniox language once and skips the keyword fallback when tags exist', () => {
+    const card = scoreTurns([
+      {
+        turnIndex: 4,
+        caller: {
+          text: 'What do you offer?',
+          language: 'en',
+          sticky: 'en',
+          detected: 'en',
+          soniox: 'sw',
+        },
+        stages: [
+          { stage: 'language', detected: 'en', sticky: 'en', soniox: 'sw' },
+          {
+            stage: 'stt',
+            kind: 'final',
+            text: 'What do you offer?',
+            tokens: [
+              { text: ' What', language: 'sw', final: true },
+              { text: ' do', language: 'sw', final: true },
+              { text: ' you', language: 'en', final: true },
+            ],
+          },
+          {
+            stage: 'tts',
+            text: 'Tunafanya usafi wa nyumba',
+            before: 'Tunafanya usafi wa nyumba.',
+            language: 'sw',
+          },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(card.checks.languageMismatch, 0);
+
+    const miss = scoreTurns([
+      {
+        turnIndex: 5,
+        caller: {
+          text: 'What do you offer?',
+          detected: 'en',
+          soniox: 'sw',
+        },
+        stages: [
+          { stage: 'language', detected: 'en', soniox: 'sw' },
+          {
+            stage: 'stt',
+            tokens: [{ text: 'offer', language: 'sw', final: true }],
+          },
+          {
+            stage: 'tts',
+            text: 'We offer couch cleaning',
+            before: 'We offer couch cleaning.',
+            language: 'en',
+          },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(miss.checks.languageMismatch, 1);
+
+    const tokensOnly = scoreTurns([
+      {
+        turnIndex: 6,
+        caller: { text: 'What do you offer?', detected: 'en' },
+        stages: [
+          { stage: 'language', detected: 'en', soniox: null },
+          {
+            stage: 'stt',
+            tokens: [
+              { text: ' What', language: 'swh', final: true },
+              { text: ' offer', language: 'sw', final: true },
+            ],
+          },
+          {
+            stage: 'tts',
+            text: 'Tunafanya usafi wa nyumba',
+            before: 'Tunafanya usafi wa nyumba.',
+            language: 'sw',
+          },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(tokensOnly.checks.languageMismatch, 0);
+  });
+
   it('replays a fixture into a scorecard shape', async () => {
     const replay = await replayCall({
       callId: 'HD_shape',

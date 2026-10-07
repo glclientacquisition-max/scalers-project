@@ -13,6 +13,7 @@ const timing = createVoiceTurnTiming('sid-1', { turnStartedAt: t0 });
 timing.markLlmStart();
 timing.markFirstSpokenChunk();
 timing.markFirstPcm();
+timing.markFirstReplyPcm();
 timing.markFiller();
 
 const summary = timing.summary({ outcome: 'ok' });
@@ -21,7 +22,11 @@ assert.strictEqual(summary.filler, 1);
 assert.ok(summary.turn_ms >= 50);
 assert.ok(summary.first_chunk_ms != null);
 assert.ok(summary.first_pcm_ms != null);
+assert.ok(summary.first_reply_pcm_ms != null);
 assert.strictEqual(summary.outcome, 'ok');
+const fillerOnly = createVoiceTurnTiming('sid-filler', { turnStartedAt: t0 });
+fillerOnly.markFirstPcm();
+assert.strictEqual(fillerOnly.summary().first_reply_pcm_ms, null);
 
 console.log('voiceTiming markers ok.');
 

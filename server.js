@@ -74,6 +74,65 @@ const {
   VOICE_SYSTEM_PROMPT_VERSION,
 } = require('./src/prompts');
 const { createVoiceTrace } = require('./src/speech/voiceTrace');
+const voiceTraceBySid = new Map();
+
+function bindVoiceTrace(callSid, trace) {
+  if (!callSid || !trace) return;
+  voiceTraceBySid.set(String(callSid), trace);
+}
+
+function forgetVoiceTrace(callSid) {
+  if (callSid) voiceTraceBySid.delete(String(callSid));
+}
+
+const TOOL_ARG_KEYS = ['name', 'reason', 'type', 'item', 'serviceName', 'whenText', 'quantity'];
+const TRACE_TOOL_FIELDS = [
+  ['serviceRequest', 'create_service_request'],
+  ['appointment', 'create_appointment'],
+  ['appointmentUpdate', 'update_appointment'],
+  ['escalate', 'escalate'],
+  ['openItems', 'open_items'],
+  ['fileLookup', 'file_lookup'],
+  ['getEnquiry', 'get_enquiry'],
+];
+
+function summarizeToolArgs(value) {
+  if (!value || typeof value !== 'object') return '';
+  const parts = [];
+  for (const key of TOOL_ARG_KEYS) {
+    if (value[key] == null || value[key] === '') continue;
+    parts.push(`${key}=${String(value[key]).replace(/\s+/g, ' ').slice(0, 80)}`);
+  }
+  return parts.join(' ');
+}
+
+function noteTracedGeminiTools(callSid, before, after, results) {
+  const trace = voiceTraceBySid.get(String(callSid || ''));
+  if (!trace || typeof trace.noteTool !== 'function') return;
+  const seen = new Set();
+  for (const result of results || []) {
+    const name = String(result?.action || '');
+    if (!name || name === 'tool_request') continue;
+    seen.add(name);
+    const argsSource = result.value && typeof result.value === 'object' ? result.value : result;
+    trace.noteTool({
+      name,
+      status: result.status || null,
+      args: summarizeToolArgs(argsSource),
+    });
+  }
+  if (after?.consentBlocked || after?.needsVisitTime) {
+    const status = after.consentBlocked ? 'consent_blocked' : 'needs_visit_time';
+    for (const [field, name] of TRACE_TOOL_FIELDS) {
+      if (!before?.[field] || seen.has(name)) continue;
+      trace.noteTool({
+        name,
+        status,
+        args: summarizeToolArgs(before[field]),
+      });
+    }
+  }
+}
 const { openClosedStatus } = require('./src/conversation/businessHours');
 const { bulletinClosureNotice } = require('./src/conversation/dailyBulletin');
 const { parseAgentTools } = require('./src/conversation/agentTools');
@@ -221,6 +280,7 @@ const providerCallIdBySid = new Map();
 const recordingFetchScheduled = new Set();
 const {
   analyzeCallerLanguage,
+  dominantSonioxLanguage,
   createLanguageState,
   resolveLanguageState,
   languageDirective,
@@ -1957,6 +2017,11 @@ mediaWss.on('connection', (ws, req) => {
     tenantId: () => brainProfile?.id || null,
     voiceId: () => resolveSonioxVoice(tenantSonioxVoiceId),
   });
+  function publishVoiceTrace() {
+    bindVoiceTrace(sessionCallSid, voiceTrace);
+    bindVoiceTrace(sidLabel(), voiceTrace);
+  }
+  publishVoiceTrace();
 
   function publishSttContext(profile) {
     if (!profile) {
@@ -2116,7 +2181,7 @@ mediaWss.on('connection', (ws, req) => {
     return waitMs;
   }
 
-  async function playCachedFillerPcm(pcm, { text } = {}) {
+  async function playCachedFillerPcm(pcm, { text, trace = true } = {}) {
     if (!pcm || !pcm.length) return { ok: false, empty: true };
     const streamId = newCachedFillerStreamId();
     bargeInActive = false;
@@ -2128,6 +2193,9 @@ mediaWss.on('connection', (ws, req) => {
     fillerStreamId = streamId;
     activeOutboundStreamId = streamId;
     if (activeTurnTiming) activeTurnTiming.markFirstPcm();
+    if (trace) {
+      voiceTrace.noteFiller({ text: String(text || ''), before: String(text || ''), language: callLanguage });
+    }
     if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
     const waitMs = pcmDurationMs(pcm, 16000);
     await sleep(waitMs);
@@ -2395,12 +2463,20 @@ mediaWss.on('connection', (ws, req) => {
       language: opts.language,
       extraLexicon,
     });
-    if (opts.tracePath) voiceTrace.noteCanned({ path: opts.tracePath, text });
-    voiceTrace.noteTts({
-      text: prepared.text,
-      before: String(text),
-      language: prepared.language,
-    });
+    if (opts.isFiller) {
+      voiceTrace.noteFiller({
+        text: prepared.text,
+        before: String(text),
+        language: prepared.language,
+      });
+    } else {
+      if (opts.tracePath) voiceTrace.noteCanned({ path: opts.tracePath, text });
+      voiceTrace.noteTts({
+        text: prepared.text,
+        before: String(text),
+        language: prepared.language,
+      });
+    }
     console.log(
       `[ws/media][${sidLabel()}] tts prep lang=${prepared.language}` +
         ` original=${JSON.stringify(prepared.original)}` +
@@ -2822,6 +2898,7 @@ mediaWss.on('connection', (ws, req) => {
     voiceTrace.noteLanguage({
       detected: languageEvidence.language,
       sticky: callLanguage,
+      soniox: dominantSonioxLanguage(opts.tokenLanguages),
       confidence: languageEvidence.confidence,
     });
     voiceTrace.noteTurnEnd({ decision: 'flush', reason: 'caller_turn_processed' });
@@ -4201,7 +4278,11 @@ mediaWss.on('connection', (ws, req) => {
         ) {
           return;
         }
-        if (activeTurnTiming) activeTurnTiming.markFirstPcm();
+        if (activeTurnTiming) {
+          activeTurnTiming.markFirstPcm();
+          const fillerAudio = Boolean(fillerStreamId && meta.streamId === fillerStreamId);
+          if (!fillerAudio) activeTurnTiming.markFirstReplyPcm();
+        }
         if (greetingAwaitingFirstPcm) noteGreetingPcm({ cached: false });
         if (!playbackStartedAt) playbackStartedAt = Date.now();
         playbackBytes += pcm.length;
@@ -4333,7 +4414,7 @@ mediaWss.on('connection', (ws, req) => {
           text: greetingLine,
           language: callLanguage,
         });
-        await playCachedFillerPcm(found.pcm, { text: greetingLine });
+        await playCachedFillerPcm(found.pcm, { text: greetingLine, trace: false });
         callTranscript.pushAgent(greetingLine);
         messages.push({ role: 'assistant', content: greetingLine, local: true });
         if (!greetingInterrupted) markGreetingFileNameAsk(greetingLine);
@@ -4470,6 +4551,7 @@ mediaWss.on('connection', (ws, req) => {
             if (maybeSid && !sessionCallSid) {
               sessionCallSid = String(maybeSid);
               ttsSpeedScale = 1;
+              publishVoiceTrace();
               console.log(`[ws/media] bound session callSid=${sessionCallSid}`);
               ensureTenantPrompt().catch(() => {});
             }
@@ -5355,6 +5437,8 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     console.log(`[${callSid || 'unknown'}] WebSocket closed`);
     if (callSid) {
+      forgetVoiceTrace(callSid);
+      forgetVoiceTrace(sidLabel());
       db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') }).catch((err) => {
         console.error(`[${callSid}] Failed to flush transcript on close:`, err?.message || err);
       });
@@ -5666,6 +5750,7 @@ async function applyGeminiTools(callSid, parsed) {
         (result.reason ? ` reason=${result.reason}` : '')
     );
   }
+  noteTracedGeminiTools(callSid, parsed, enforcedParsed, execution.results);
   return execution;
 }
 
