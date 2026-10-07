@@ -1,0 +1,95 @@
+// Speak gate for the caller file. Brain owns bind. Voice reads it.
+// `speaker.bound` / `speaker.nameConfirmed` win when Brain has set them.
+// Otherwise `caller.nameConfirmed`. Voice does not write either flag.
+
+const IDENTITY_ASK_RE =
+  /\b(?:am i speaking with|je,?\s+naongea na|naongea na|unaongea na)\b/i;
+
+const OPEN_ROW_RE =
+  /\b(?:open (?:carpet |cleaning )?(?:request|requests|visit|visits|booking|bookings)|carpet cleaning requests?|two open|requests? (?:are )?open|on (?:your|the) file)\b/i;
+
+function speakerBound(state) {
+  const speaker = state?.speaker;
+  if (speaker && typeof speaker === 'object') {
+    if (typeof speaker.bound === 'boolean') return speaker.bound;
+    if (typeof speaker.nameConfirmed === 'boolean') return speaker.nameConfirmed;
+  }
+  return state?.caller?.nameConfirmed === true;
+}
+
+function escapeName(name) {
+  return String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function fileNames(state) {
+  const speaker = state?.speaker;
+  const raw = [
+    speaker?.pendingName,
+    speaker?.name,
+    state?.caller?.fileNameAsked,
+    state?.returning?.fileOwnerName,
+    state?.returning?.boundName,
+    state?.returning?.name,
+  ];
+  const names = [];
+  for (const value of raw) {
+    const name = String(value || '').trim();
+    if (name.length < 2 || names.some((row) => row.toLowerCase() === name.toLowerCase())) {
+      continue;
+    }
+    names.push(name);
+  }
+  return names;
+}
+
+function sentenceUsesFileName(sentence, names) {
+  for (const name of names) {
+    const re = new RegExp(`\\b${escapeName(name)}\\b`, 'i');
+    if (re.test(sentence)) return true;
+  }
+  return false;
+}
+
+function splitSentences(text) {
+  const parts = String(text || '')
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length ? parts : [];
+}
+
+/**
+ * Drop vocative file name and open-row claims until the speaker is bound.
+ * The identity ask itself may say the pending name.
+ * @returns {{ speak: boolean, line: string, reason: string }}
+ */
+function gateCallerFileSpeech(line, state) {
+  const text = String(line || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return { speak: false, line: '', reason: 'empty' };
+  if (speakerBound(state)) return { speak: true, line: text, reason: 'bound' };
+
+  const names = fileNames(state);
+  const kept = [];
+  let blocked = false;
+  for (const sentence of splitSentences(text)) {
+    if (IDENTITY_ASK_RE.test(sentence)) {
+      kept.push(sentence);
+      continue;
+    }
+    if ((names.length > 0 && sentenceUsesFileName(sentence, names)) || OPEN_ROW_RE.test(sentence)) {
+      blocked = true;
+      continue;
+    }
+    kept.push(sentence);
+  }
+  const next = kept.join(' ').trim();
+  if (!next) return { speak: false, line: '', reason: blocked ? 'unbound' : 'empty' };
+  return { speak: true, line: next, reason: blocked ? 'trimmed' : 'open' };
+}
+
+module.exports = {
+  speakerBound,
+  gateCallerFileSpeech,
+};

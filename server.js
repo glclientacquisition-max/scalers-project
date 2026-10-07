@@ -247,6 +247,19 @@ const {
   agentAwaitingReply,
 } = require('./src/speech/turnTaking');
 const {
+  labelFlushedCallerTurn,
+  observeCallerInput,
+} = require('./src/speech/callerTurnLabel');
+const {
+  gateCallerFileSpeech,
+  speakerBound,
+} = require('./src/speech/callerFileSpeech');
+const {
+  createToolHoldSession,
+  fileReadFollowUp,
+  turnRequestsTool,
+} = require('./src/speech/toolHold');
+const {
   createSpokenStreamBuffer,
   joinSpokenPieces,
   speakPreparedSentences,
@@ -1792,6 +1805,7 @@ mediaWss.on('connection', (ws, req) => {
   let playbackGeneration = 0;
   let activePlaybackGeneration = 0;
   let pendingUtterance = null;
+  let pendingUtteranceUnfinished = false;
   let systemPrompt = buildSystemPrompt();
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
@@ -2245,7 +2259,25 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
+  async function speakToolHold(spoken) {
+    if (!spoken?.speak || bargeInActive) return;
+    await speakText(spoken.line, {
+      isFiller: spoken.kind === 'hold',
+      skipFileGate: spoken.kind === 'hold',
+    });
+  }
+
   async function speakText(text, opts = {}) {
+    if (!opts.skipFileGate && !opts.isFiller && !opts.isReplay && !opts.isIdleNudge) {
+      const gated = gateCallerFileSpeech(text, callBrainStates.get(sidLabel()));
+      if (!gated.speak) {
+        console.log(
+          `[ws/media][${sidLabel()}] file speech held reason=${gated.reason}`
+        );
+        return { ok: false, gated: true };
+      }
+      text = gated.line;
+    }
     if (!text) return { ok: false };
     if (speechOutageStarted) return { ok: false, outage: true };
     // Greeting / early turns can race tenantWarm → TTS session create.
@@ -2473,8 +2505,10 @@ mediaWss.on('connection', (ws, req) => {
   function kickPendingTurn() {
     if (turnBusy || !pendingUtterance) return;
     const text = pendingUtterance;
+    const unfinished = pendingUtteranceUnfinished;
     pendingUtterance = null;
-    runCallerTurn(text).catch((err) => {
+    pendingUtteranceUnfinished = false;
+    runCallerTurn(text, { unfinished }).catch((err) => {
       console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
     });
   }
@@ -2538,13 +2572,18 @@ mediaWss.on('connection', (ws, req) => {
     return '';
   }
 
-  async function runCallerTurn(userText) {
+  async function runCallerTurn(userText, opts = {}) {
     const clean = String(userText || '').replace(/\s+/g, ' ').trim();
+    const flushed = labelFlushedCallerTurn({
+      text: clean,
+      turnEnd: opts.turnEnd || (opts.unfinished === true ? { unfinished: true } : undefined),
+    });
     if (!clean) return;
     idleNudge.clear();
     if (turnBusy) {
       // Merge continuation fragments into one pending utterance (don't drop context).
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${clean}` : clean;
+      if (flushed.unfinished) pendingUtteranceUnfinished = true;
       return;
     }
     // A new caller turn may speak. The previous barge must not swallow it.
@@ -2622,13 +2661,16 @@ mediaWss.on('connection', (ws, req) => {
     const fileStamp = liveCallerFileStamp(brainProfile?.callerMemory);
     let brainState = observeCallerTurn(
       previousBrainState,
-      {
-        text: clean,
-        languageState: callLanguageState,
-        entities,
-        profile: brainProfile,
-        lastAgentText,
-      }
+      observeCallerInput(
+        {
+          text: clean,
+          languageState: callLanguageState,
+          entities,
+          profile: brainProfile,
+          lastAgentText,
+        },
+        { turnEnd: flushed.unfinished ? { unfinished: true } : undefined }
+      )
     );
     if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
       systemPrompt = buildSystemPrompt(brainProfile);
@@ -2929,7 +2971,14 @@ mediaWss.on('connection', (ws, req) => {
         }
         // Model text only. Visit / hold / order lines go out through
         // speakLookupSentence and must not pass through this cut.
-        const text = cutNoAiSlop(polished);
+        const gated = gateCallerFileSpeech(polished, brainState);
+        if (!gated.speak) {
+          console.log(
+            `[ws/media][${sidLabel()}] file speech held reason=${gated.reason}`
+          );
+          return;
+        }
+        const text = cutNoAiSlop(gated.line);
         if (!text) return;
         if (!tts) return;
         if (suppressReplyRemainder || bargeInActive) return;
@@ -2973,7 +3022,11 @@ mediaWss.on('connection', (ws, req) => {
 
       async function speakLookupSentence() {
         if (!suppressModelSpeech || spokeLookupSentence || bargeInActive) return false;
-        const sentence = String(nameConfirmSpeech(callKey) || '').trim();
+        const gatedLookup = gateCallerFileSpeech(
+          String(nameConfirmSpeech(callKey) || '').trim(),
+          callBrainStates.get(callKey)
+        );
+        const sentence = gatedLookup.speak ? gatedLookup.line : '';
         if (!sentence || !tts) {
           try {
             speakSession?.cancel();
@@ -3070,6 +3123,7 @@ mediaWss.on('connection', (ws, req) => {
         result = await runGeminiTurnStreaming(messages, sidLabel(), turnSystemPrompt, {
           onSpokenChunk,
           shouldAbort: () => bargeInActive,
+          onToolHold: speakToolHold,
         });
         stopFillerForReply();
 
@@ -3220,7 +3274,10 @@ mediaWss.on('connection', (ws, req) => {
         }
       } else {
         turnTiming.markLlmStart();
-        result = await runGeminiTurn(messages, sidLabel(), turnSystemPrompt);
+        result = await runGeminiTurn(messages, sidLabel(), turnSystemPrompt, {
+          shouldAbort: () => bargeInActive,
+          onToolHold: speakToolHold,
+        });
         stopFillerForReply();
         if (speakSession) {
           try {
@@ -3366,7 +3423,7 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
-  function flushUtterance() {
+  function flushUtterance(turnEnd) {
     if (utteranceTimer) {
       clearTimeout(utteranceTimer);
       utteranceTimer = null;
@@ -3375,6 +3432,9 @@ mediaWss.on('connection', (ws, req) => {
     const text = utteranceParts.join('').replace(/\s+/g, ' ').trim();
     utteranceParts = [];
     if (!text) return;
+    // #584 decideTurnEnd passes { unfinished: true } into this flush.
+    // Do not drop that flag on the way to Brain observe.
+    const label = labelFlushedCallerTurn({ text, turnEnd });
     if (overlapHold.alreadyReleased(text)) {
       console.log(`[ws/media][${sidLabel()}] caller_turn_duplicate_suppressed`);
       return;
@@ -3382,6 +3442,7 @@ mediaWss.on('connection', (ws, req) => {
     overlapHold.markReleased(text);
     if (turnBusy) {
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${text}` : text;
+      if (label.unfinished) pendingUtteranceUnfinished = true;
       return;
     }
     console.log(`[ws/media][${sidLabel()}] caller_turn_processed`);
@@ -3396,7 +3457,7 @@ mediaWss.on('connection', (ws, req) => {
         });
       }
     }
-    runCallerTurn(text).catch((err) => {
+    runCallerTurn(text, { unfinished: label.unfinished, turnEnd }).catch((err) => {
       console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
     });
   }
@@ -4564,12 +4625,12 @@ wss.on('connection', (ws) => {
         const fileStamp = liveCallerFileStamp(brainProfile?.callerMemory);
         let brainState = observeCallerTurn(
           previousBrainState,
-          {
+          observeCallerInput({
             text: data.voicePrompt,
             languageState: callLanguageState,
             entities,
             profile: brainProfile,
-          }
+          })
         );
         if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
           systemPrompt = buildSystemPrompt(brainProfile);
@@ -4656,9 +4717,11 @@ wss.on('connection', (ws) => {
         }
 
         const reply = await runGeminiTurn(messages, callSid, turnPrompt);
-        const replyText = [reply.spokenText, reply.actionConfirmation]
+        const replyBody = [reply.spokenText, reply.actionConfirmation]
           .filter(Boolean)
           .join(' ');
+        const gatedReply = gateCallerFileSpeech(replyBody, brainState);
+        const replyText = gatedReply.speak ? gatedReply.line : '';
         if (replyText) {
           transcriptLog.push(`Agent: ${replyText}`);
           ws.send(JSON.stringify({ type: 'text', token: replyText, last: true }));
@@ -5044,11 +5107,55 @@ function nameConfirmSpeech(callSid) {
   });
 }
 
+async function applyToolsWithHold(callSid, parsed, hooks = {}) {
+  const shouldAbort = hooks.shouldAbort;
+  let session = null;
+  if (turnRequestsTool(parsed) && !shouldAbort?.()) {
+    const state = callBrainStates.get(callSid);
+    session = createToolHoldSession({
+      language: state?.language?.current || 'en',
+      seed: `${callSid}:${state?.conversation?.turnCount || 0}`,
+    });
+  }
+  if (session && shouldAbort?.()) session.cancel();
+  // Start the tool first. The hold covers that wait. It does not run before it.
+  const toolPromise = safeApplyGeminiTools(callSid, parsed);
+  let holdSpeech = Promise.resolve();
+  if (session && session.phase !== 'cancelled') {
+    const begun = session.begin();
+    if (begun.speak && typeof hooks.onToolHold === 'function') {
+      holdSpeech = Promise.resolve(hooks.onToolHold(begun));
+    }
+  }
+  const [execution] = await Promise.all([toolPromise, holdSpeech]);
+  let toolHoldCancelled = false;
+  if (session) {
+    const state = callBrainStates.get(callSid);
+    const fileRead = fileReadFollowUp(execution.results);
+    const follow = session.finish({
+      barge: Boolean(shouldAbort?.()),
+      bound: speakerBound(state),
+      fileFacts: Boolean(fileRead),
+      resultLine: fileRead?.resultLine || '',
+    });
+    toolHoldCancelled = follow.reason === 'barge';
+    if (
+      fileRead &&
+      follow.speak &&
+      !toolHoldCancelled &&
+      typeof hooks.onToolHold === 'function'
+    ) {
+      await hooks.onToolHold(follow);
+    }
+  }
+  return { execution, toolHoldCancelled };
+}
+
 async function runGeminiTurnStreaming(
   messages,
   callSid,
   systemPrompt = buildSystemPrompt(),
-  { onSpokenChunk, shouldAbort } = {}
+  { onSpokenChunk, shouldAbort, onToolHold } = {}
 ) {
   const primary = geminiPrimaryModel();
   const backup = geminiBackupModel();
@@ -5185,11 +5292,13 @@ async function runGeminiTurnStreaming(
   }
 
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
-  const execution = await safeApplyGeminiTools(callSid, parsed);
-  const actionConfirmation = formatToolConfirmation(
+  const heldTools = await applyToolsWithHold(callSid, parsed, { shouldAbort, onToolHold });
+  const execution = heldTools.execution;
+  let actionConfirmation = formatToolConfirmation(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
+  if (heldTools.toolHoldCancelled) actionConfirmation = '';
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({
@@ -5224,7 +5333,12 @@ async function runGeminiTurnStreaming(
 // Runs one turn of the conversation through Gemini, preserving the chat
 // history and executing the caller-info / end-call signals via structured
 // markers returned in the model output.
-async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt()) {
+async function runGeminiTurn(
+  messages,
+  callSid,
+  systemPrompt = buildSystemPrompt(),
+  hooks = {}
+) {
   const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
   const maxAttempts = Math.max(1, Number(process.env.GEMINI_MAX_RETRIES || 3));
   let response;
@@ -5280,11 +5394,13 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
 
   const outputText = extractGeminiText(response);
   const parsed = parseGeminiResponse(outputText);
-  const execution = await safeApplyGeminiTools(callSid, parsed);
-  const actionConfirmation = formatToolConfirmation(
+  const heldTools = await applyToolsWithHold(callSid, parsed, hooks);
+  const execution = heldTools.execution;
+  let actionConfirmation = formatToolConfirmation(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
+  if (heldTools.toolHoldCancelled) actionConfirmation = '';
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({
