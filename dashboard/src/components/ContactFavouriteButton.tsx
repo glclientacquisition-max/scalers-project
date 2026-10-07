@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateContactFavourite } from "@/app/(desk)/contacts/actions";
-import { deskShiftClass, pendingSpinnerInkClass } from "@/components/ui/deskChrome";
+import { Button } from "@/components/ui/Button";
+import { pendingSpinnerInkClass } from "@/components/ui/deskChrome";
 
 export function ContactFavouriteButton({
   contactId,
@@ -30,29 +31,23 @@ export function ContactFavouriteButton({
 
   return (
     <div data-contact-favourite="">
-      <button
+      <Button
         type="button"
         disabled={pending}
         onClick={toggle}
         aria-pressed={favourite}
-        className={[
-          "inline-flex min-h-11 items-center text-sm font-medium",
-          deskShiftClass,
-          "focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
-          favourite
-            ? "rounded-full bg-[#005CCC] px-3.5 text-white"
-            : "rounded-md text-[#005CCC] hover:underline",
-        ].join(" ")}
+        variant={favourite ? "tonal" : "ghost"}
+        size="md"
+        leading={
+          pending ? (
+            <span aria-hidden="true" className={pendingSpinnerInkClass} />
+          ) : (
+            <span aria-hidden="true">★</span>
+          )
+        }
       >
-        {pending ? (
-          <span aria-hidden="true" className={`${pendingSpinnerInkClass} mr-2`} />
-        ) : (
-          <span aria-hidden="true" className="mr-1.5">
-            ★
-          </span>
-        )}
         {favourite ? "Favourited" : "Add to Favourites"}
-      </button>
+      </Button>
       {error ? <p className="mt-2 text-sm text-warn">{error}</p> : null}
     </div>
   );

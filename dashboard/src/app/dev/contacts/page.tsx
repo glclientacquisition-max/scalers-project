@@ -68,7 +68,7 @@ function ProfileLead({
           <Link
             href={threadsHref}
             data-contact-inbox-threads=""
-            className={`text-sm font-medium text-[#005CCC] ${deskShiftClass} hover:underline`}
+            className={`text-sm font-medium text-accent ${deskShiftClass} hover:underline`}
           >
             Inbox threads
           </Link>

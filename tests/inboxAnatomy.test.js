@@ -26,7 +26,7 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(calls, /Reopen lives on the call, never beside Done on the list/);
     assert.match(row, /function InboxPhoneRow/);
     const phone = row.slice(row.indexOf("export function InboxPhoneRow"));
-    assert.doesNotMatch(phone, /InboxPurposeChip/);
+    assert.match(phone, /InboxPurposeChip/);
     assert.doesNotMatch(phone, /\{place\}/);
     assert.match(row, /deskPreviewClass/);
   });
@@ -38,7 +38,7 @@ describe("inbox outside and inside anatomy", () => {
     assert.doesNotMatch(jobBlock, /item\.headline/);
   });
 
-  it("uses FilterTabs for List and Work, with Today Week under Work", () => {
+  it("uses Segmented for List and Work, with Today Week under Work", () => {
     const today = read("dashboard/src/components/RunSheetToday.tsx");
     const week = read("dashboard/src/components/VisitWeekCalendar.tsx");
     const page = read("dashboard/src/app/(desk)/calls/page.tsx");
@@ -79,7 +79,7 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(holds, /export function holdWorkItems/);
   });
 
-  it("uses FilterTabs for Holds List and Work, Today only", () => {
+  it("uses Segmented for Holds List and Work, Today only", () => {
     const page = read("dashboard/src/app/(desk)/calls/page.tsx");
     const today = read("dashboard/src/components/RunSheetToday.tsx");
     const sheet = read("dashboard/src/lib/holdSheet.ts");

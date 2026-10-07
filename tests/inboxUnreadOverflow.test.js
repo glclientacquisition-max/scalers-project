@@ -358,15 +358,14 @@ describe("inbox unread and Needs you are two signals", () => {
 });
 
 describe("inbox ticket overflow menu", () => {
-  it("portals a 44px Archive or Unarchive menu aligned to More", () => {
+  it("opens a kit Menu for Archive or Unarchive on More", () => {
     const ticket = read("dashboard/src/components/InboxTicketView.tsx");
     const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
-    assert.match(ticket, /createPortal/);
-    assert.match(ticket, /document\.body/);
-    assert.match(ticket, /placeInboxOverflowMenu/);
-    assert.match(ticket, /position: "fixed"/);
-    assert.match(ticket, /min-h-11/);
-    assert.match(ticket, /z-\[60\]/);
+    assert.match(ticket, /<Menu/);
+    assert.match(ticket, /<MenuItem/);
+    assert.match(ticket, /label="More"/);
+    assert.doesNotMatch(ticket, /placeInboxOverflowMenu/);
+    assert.doesNotMatch(ticket, /createPortal/);
     assert.match(verbs, /export function inboxTicketOverflowActions/);
     assert.match(ticket, /inboxTicketOverflowActions\(\{ archived \}\)/);
     assert.match(ticket, /action\.label/);
@@ -374,7 +373,6 @@ describe("inbox ticket overflow menu", () => {
     assert.doesNotMatch(ticket, /id: "unread"/);
     assert.doesNotMatch(ticket, /id: "snooze"/);
     assert.doesNotMatch(ticket, /label: "Select"/);
-    assert.doesNotMatch(ticket, /role="dialog"/);
     assert.doesNotMatch(ticket, /setSheet|mode === "sheet"|coarse \? "sheet"/);
     assert.doesNotMatch(ticket, /Mark unread/);
     assert.doesNotMatch(ticket, /["']Snooze["']/);
@@ -384,16 +382,16 @@ describe("inbox ticket overflow menu", () => {
     assert.match(verbs, /Mark done lives on the action dock/);
   });
 
-  it("list overflow stays Pin, Mark done, Archive on md+", () => {
+  it("list overflow stays Pin, Mark done, Archive on kit Menu", () => {
     const overflow = read("dashboard/src/components/InboxRowOverflow.tsx");
     const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
     assert.match(overflow, /inboxOverflowActions\(inboxItemWithLocal\(item, local\)\)/);
-    assert.match(overflow, /placeInboxOverflowMenu/);
-    assert.match(overflow, /createPortal/);
-    assert.match(overflow, /document\.body/);
-    assert.match(overflow, /hidden md:inline-flex/);
-    assert.match(overflow, /min-h-11/);
-    assert.match(overflow, /z-\[60\]/);
+    assert.match(overflow, /<Menu/);
+    assert.match(overflow, /<MenuItem/);
+    assert.match(overflow, /<IconButton/);
+    assert.doesNotMatch(overflow, /placeInboxOverflowMenu/);
+    assert.doesNotMatch(overflow, /createPortal/);
+    assert.doesNotMatch(overflow, /hidden md:inline-flex/);
     assert.match(verbs, /label: "Pin"/);
     assert.match(verbs, /Mark done/);
     assert.match(verbs, /label: "Archive"/);

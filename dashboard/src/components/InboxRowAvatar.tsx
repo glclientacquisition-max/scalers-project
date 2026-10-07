@@ -63,7 +63,7 @@ export function InboxRowAvatar({
       >
         <RowIdentity name={name} />
         {selected ? (
-          <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#005CCC] text-white">
+          <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-accent-on">
             <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" aria-hidden="true">
               <path d="M3.4 8.2 6.4 11.2 12.6 4.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>

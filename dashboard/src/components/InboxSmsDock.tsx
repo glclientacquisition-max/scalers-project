@@ -153,7 +153,7 @@ export function InboxSmsDock({
             el.style.height = "auto";
             el.style.height = `${el.scrollHeight}px`;
           }}
-          className={`min-h-11 max-h-40 w-full resize-none rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink ${deskShiftClass} placeholder:text-ink-soft/70 focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
+          className={`min-h-11 max-h-40 w-full resize-none rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink ${deskShiftClass} placeholder:text-ink-soft/70 focus:outline-none focus:ring-2 focus:ring-brand`}
         />
         {callerPhone ? (
           <DeskHint label={wandLabel} side="top">

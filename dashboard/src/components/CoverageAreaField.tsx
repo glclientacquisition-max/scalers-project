@@ -51,7 +51,7 @@ export function CoverageAreaField({
                 <button
                   type="button"
                   onClick={() => removeArea(areaId)}
-                  className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                  className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   aria-label={`Remove ${label}`}
                 >
                   <span className="min-w-0 truncate">{label}</span>
@@ -144,7 +144,7 @@ export function CoverageAreaField({
                   aria-selected={index === activeIndex}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => addArea(area.id)}
-                  className={`flex min-h-11 w-full items-center px-3 text-left text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] ${
+                  className={`flex min-h-11 w-full items-center px-3 text-left text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
                     index === activeIndex ? "bg-line" : ""
                   }`}
                 >

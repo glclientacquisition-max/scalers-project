@@ -7,7 +7,7 @@
 ## Product lock (binding, 2026-09-21)
 
 - Contacts segment **nouns** stay **All · Recents · Favourites · Saved · Unsaved** on one `InboxFilterPills` row. Sort stays `ContactSortSelect` (Last call · Name).
-- Segment **chrome** is the Inbox purpose pill-chip (`InboxFilterPills`) per `CONTACTS_CHROME_PILL_ACCEPT.md`. Do **not** copy Inbox purpose nouns (Needs you / Visits / Holds / …). Those stay Inbox-only.
+- Segment **chrome** is the Inbox purpose `Segmented` (`InboxFilterPills`) per `CONTACTS_CHROME_PILL_ACCEPT.md`. Do **not** copy Inbox purpose nouns (Needs you / Visits / Holds / …). Those stay Inbox-only.
 - Critic: PASS if chrome-only. Hard bans: no Online, last seen, or presence; Call/WA opened never delivered; no `lead_status` invent.
 
 ---
@@ -34,7 +34,7 @@ Owner switches Contacts piles with the same filled-pill chrome as Inbox purpose.
 
 ### A. One segment pattern (desk-wide)
 
-1. Contacts filters use the **same pill-chip DESIGN** as the Inbox purpose row (`InboxFilterPills`). Nouns stay **All · Recents · Favourites · Saved · Unsaved**. Not a slider skin. Not Inbox purpose nouns.  
+1. Contacts filters use the **same Segmented DESIGN** as the Inbox purpose row (`InboxFilterPills`). Nouns stay **All · Recents · Favourites · Saved · Unsaved**. Not a slider skin. Not Inbox purpose nouns.  
 2. Contacts segment set: one row. Unsaved once. No second pile strip.  
 3. Copy: aria/label plain (“Filter contacts”), no em dashes, no “last seen” / Online.  
 4. Sort (Last call / Name) if present: same FilterTabs family; must not invent presence.
@@ -84,5 +84,5 @@ If Contacts gets a second segment skin, Inbox purpose nouns, Online/last-seen, o
 
 ## Verify (TEST)
 
-Contacts All/Saved/Unsaved use Inbox pill-chip chrome → switch piles → open contact → Call/WA opened only → Name this caller works → back keeps segment → check three widths. No Needs you / Visits / Holds nouns on Contacts.
+Contacts All/Saved/Unsaved use Inbox Segmented chrome → switch piles → open contact → Call/WA opened only → Name this caller works → back keeps segment → check three widths. No Needs you / Visits / Holds nouns on Contacts.
 

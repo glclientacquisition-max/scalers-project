@@ -29,7 +29,7 @@ describe("inbox filters and empty states", () => {
     assert.doesNotMatch(niche, /Assigned to me/);
     assert.match(toolbar, /<InboxFilterPills/);
     assert.match(toolbar, /label="Filter by purpose"/);
-    assert.match(toolbar, /<FilterTabs/);
+    assert.match(toolbar, /<Segmented/);
     assert.match(toolbar, /label="Visit sort"/);
     assert.match(toolbar, /archived \? null/);
     const entry = read("dashboard/src/components/InboxArchivedRow.tsx");
@@ -85,17 +85,14 @@ describe("inbox filters and empty states", () => {
     assert.match(toolbar, /inboxPileHref\(item\.id/);
   });
 
-  it("renders the six purpose piles as snap-scrolling pill chips", () => {
+  it("renders the six purpose piles as underline Segmented tabs", () => {
     const pills = read("dashboard/src/components/InboxFilterPills.tsx");
-    const chrome = read("dashboard/src/components/ui/deskChrome.ts");
-    assert.match(pills, /deskRateCardRowClass/);
-    assert.match(pills, /snap-start/);
-    assert.match(pills, /deskRateCardClass/);
-    assert.match(chrome, /rounded-full/);
-    assert.match(chrome, /bg-\[#005CCC\] text-white/);
-    assert.match(pills, /bg-gradient-to-l from-surface/);
+    const segmented = read("dashboard/src/components/ui/Segmented.tsx");
+    assert.match(pills, /<Segmented/);
     assert.match(pills, /item\.count/);
-    assert.doesNotMatch(pills, /border-b-2/);
+    assert.match(segmented, /after:bg-brand/);
+    assert.match(segmented, /min-h-11/);
+    assert.doesNotMatch(pills, /deskRateCardClass/);
     assert.doesNotMatch(pills, /filterTabClass/);
     assert.match(toolbar, /<InboxFilterPills/);
     assert.match(toolbar, /label="Filter by purpose"/);

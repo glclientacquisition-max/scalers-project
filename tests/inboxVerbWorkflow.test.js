@@ -467,11 +467,12 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.doesNotMatch(select, /inboxTogglePin/);
     assert.match(select, /inboxMarkDone/);
     assert.doesNotMatch(select, /aria-label=\{allPinned/);
-    assert.match(select, /aria-label="Close"/);
+    assert.match(select, /label="Close"/);
     assert.doesNotMatch(select, /aria-label="Back"/);
     assert.doesNotMatch(overflow, /role="dialog"/);
     assert.doesNotMatch(overflow, /coarse \? "sheet"/);
-    assert.match(overflow, /hidden md:inline-flex/);
+    assert.match(overflow, /<Menu/);
+    assert.doesNotMatch(overflow, /hidden md:inline-flex/);
     assert.doesNotMatch(select, /Mark unread|Snooze/);
   });
 
@@ -488,7 +489,7 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.match(dock, /updateLeadStatus\(callId, "resolved"\)/);
   });
 
-  it("FilterTabs have no Unread or Snoozed. Archived is a folder row", () => {
+  it("Segmented filters have no Unread or Snoozed. Archived is a folder row", () => {
     const niche = read("dashboard/src/lib/inboxNiche.ts");
     const page = read("dashboard/src/app/(desk)/calls/page.tsx");
     const board = read("dashboard/src/components/InboxPileBoard.tsx");

@@ -112,7 +112,7 @@ describe("contacts segment filter chrome", () => {
     assert.match(tabs, /overflow-x-auto/);
     assert.match(chrome, /export function filterTabClass/);
     assert.match(chrome, /min-h-11/);
-    assert.match(inboxTabs, /<FilterTabs/);
+    assert.match(inboxTabs, /<Segmented/);
     assert.match(inboxTabs, /label="Visit sort"/);
     assert.match(inboxTabs, /label="Work date"/);
     assert.match(page, /<InboxFilterPills/);

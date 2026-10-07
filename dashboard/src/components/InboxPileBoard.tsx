@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRef } from "react";
 import { EndlessSentinel } from "@/components/EndlessList";
 import { PullRefreshMark, pullRootVisible, usePhoneListPull, usePhoneTabRefresh } from "@/components/PhonePullRefresh";
@@ -22,7 +21,9 @@ import { InboxPileSwipe } from "@/components/InboxPileSwipe";
 import { useInboxPileNav } from "@/components/InboxPileNav";
 import { useInboxRowUi } from "@/components/InboxRowUi";
 import { DeskLandScope } from "@/components/ui/DeskLand";
-import { btnGhost, btnPrimary, deskEmptyClass, deskShiftClass, pendingSpinnerInkClass } from "@/components/ui/deskChrome";
+import { Empty } from "@/components/ui/Empty";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { pendingSpinnerInkClass } from "@/components/ui/deskChrome";
 
 function InboxHeaderCheck() {
   const nav = useInboxPileNav();
@@ -40,7 +41,7 @@ function InboxHeaderCheck() {
         checked={allOn}
         onChange={() => (allOn ? ui.clear() : ui.replace(ids))}
         aria-label={allOn ? "Clear" : "Select all"}
-        className="h-6 w-6 shrink-0 accent-[#005CCC] focus:outline-none focus:ring-2 focus:ring-[#0096FF] lg:h-4 lg:w-4"
+        className="h-6 w-6 shrink-0 accent-accent focus:outline-none focus:ring-2 focus:ring-brand"
       />
     </label>
   );
@@ -66,25 +67,20 @@ function EmptyInbox({
   const query = (nav?.q ?? q).trim();
   if (query) {
     return (
-      <div className={deskEmptyClass}>
-        <p className="font-display text-2xl tracking-tight text-ink">No matches</p>
-        {nav ? (
-          <button
-            type="button"
-            onClick={() => nav.setQuery("")}
-            className={`mt-6 inline-flex min-h-11 items-center font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
-          >
-            Clear
-          </button>
-        ) : (
-          <Link
-            href={callsHref({ purpose })}
-            className={`mt-6 inline-flex min-h-11 items-center font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
-          >
-            Clear
-          </Link>
-        )}
-      </div>
+      <Empty
+        title="No matches"
+        action={
+          nav ? (
+            <Button type="button" variant="ghost" onClick={() => nav.setQuery("")}>
+              Clear
+            </Button>
+          ) : (
+            <ButtonLink href={callsHref({ purpose })} variant="ghost">
+              Clear
+            </ButtonLink>
+          )
+        }
+      />
     );
   }
 
@@ -100,45 +96,47 @@ function EmptyInbox({
               ? "None archived"
               : "Nothing in this filter";
     return (
-      <div className={deskEmptyClass}>
-        <p className="font-display text-2xl tracking-tight text-ink">{emptyLabel}</p>
-        <Link
-          href={callsHref({ purpose: "all" })}
-          className={`${btnGhost} mt-6`}
-        >
-          Show all
-        </Link>
-      </div>
+      <Empty
+        title={emptyLabel}
+        action={
+          <ButtonLink href={callsHref({ purpose: "all" })} variant="ghost">
+            Show all
+          </ButtonLink>
+        }
+      />
     );
   }
 
   if (pendingDid) {
     return (
-      <div className="mt-8 border-y border-accent/30 bg-accent/5 py-12 text-center">
-        <p className="font-display text-2xl tracking-tight text-ink">Number being assigned</p>
-        <Link
-          href={businessSettingsHref("train")}
-          className={`${btnPrimary} mt-6 px-5`}
-        >
-          Train
-        </Link>
-      </div>
+      <Empty
+        title="Number being assigned"
+        line="Train the line while the number lands."
+        action={
+          <ButtonLink href={businessSettingsHref("train")} variant="primary">
+            Train
+          </ButtonLink>
+        }
+      />
     );
   }
 
   return (
-    <div className={deskEmptyClass}>
-      <p className="font-display text-2xl tracking-tight text-ink">Inbox is empty</p>
-      {did ? (
-        <a href={`tel:${did}`} className={`${btnGhost} mt-6`}>
-          {did}
-        </a>
-      ) : (
-        <Link href={businessSettingsHref("test")} className={`${btnGhost} mt-6`}>
-          Test line
-        </Link>
-      )}
-    </div>
+    <Empty
+      title="Inbox is empty"
+      line="Calls land here."
+      action={
+        did ? (
+          <ButtonLink href={`tel:${did}`} variant="ghost">
+            {did}
+          </ButtonLink>
+        ) : (
+          <ButtonLink href={businessSettingsHref("test")} variant="ghost">
+            Test line
+          </ButtonLink>
+        )
+      }
+    />
   );
 }
 
@@ -195,7 +193,7 @@ export function InboxPileBoard({
           hrefs={pileHrefs}
           enabled={purpose !== "archived"}
         >
-          <div className={deskEmptyClass}>
+          <div className="flex items-center justify-center py-12">
             <span aria-hidden="true" className={pendingSpinnerInkClass} />
           </div>
         </InboxPileSwipe>

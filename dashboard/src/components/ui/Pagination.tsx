@@ -139,7 +139,7 @@ export function Pagination({
               min={1}
               max={totalPages}
               defaultValue={safePage}
-              className={`h-11 w-14 rounded-lg border border-line bg-surface px-2 text-center text-sm tabular-nums text-ink-soft ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
+              className={`h-11 w-14 rounded-lg border border-line bg-surface px-2 text-center text-sm tabular-nums text-ink-soft ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-brand`}
             />
             <button
               type="submit"

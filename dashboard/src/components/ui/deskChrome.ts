@@ -99,7 +99,7 @@ export const deskListTitleClass =
   "font-display text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-4xl";
 
 /** Corner overlay on the Inbox nav icon. 16px, not a second 44px control.
- * Ribbon wash matches the S mark: accent `#0096FF` → accent-fill `#005CCC`. */
+ * Ribbon wash matches the S mark: brand → accent-fill. */
 export const deskNavBadgeClass =
   "pointer-events-none absolute -top-1 -end-1 z-20 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-fill px-0.5 text-[9px] font-semibold leading-none tabular-nums text-accent-on-fill";
 
@@ -131,7 +131,7 @@ export function deskRateCardClass(active: boolean) {
 export function deskRateCardCountClass(active: boolean) {
   return [
     "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-xs tabular-nums",
-    active ? "bg-white/20 text-white" : "bg-surface text-ink-soft",
+    active ? "bg-accent-on/20 text-accent-on" : "bg-surface text-ink-soft",
   ].join(" ");
 }
 

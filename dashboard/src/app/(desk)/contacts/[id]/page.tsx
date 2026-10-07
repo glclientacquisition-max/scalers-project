@@ -211,7 +211,7 @@ async function ContactDetailBody({ params, searchParams }: ContactDetailPageProp
                 <Link
                   href={threadsHref}
                   data-contact-inbox-threads=""
-                  className={`text-sm font-medium text-[#005CCC] ${deskShiftClass} hover:underline focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
+                  className={`text-sm font-medium text-accent ${deskShiftClass} hover:underline focus:outline-none focus:ring-2 focus:ring-brand`}
                 >
                   Inbox threads
                 </Link>
@@ -225,7 +225,7 @@ async function ContactDetailBody({ params, searchParams }: ContactDetailPageProp
 
           {showLastReason && (latestCall?.ownerCard || lastReason) ? (
             <section className="rounded-2xl border border-line bg-surface p-5">
-              <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+              <h2 className="text-caption font-medium text-ink-2">
                 Last want
               </h2>
               <CallSummaryCard

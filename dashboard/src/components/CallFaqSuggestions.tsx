@@ -146,7 +146,7 @@ export function CallFaqSuggestions({
             aria-describedby={!hasTranscript ? "call-faq-no-transcript" : undefined}
             className={
               thread
-                ? "min-h-11 text-xs font-medium text-ink-soft focus:outline-none focus:ring-2 focus:ring-[#0096FF] disabled:opacity-50"
+                ? "min-h-11 text-xs font-medium text-ink-soft focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-50"
                 : btnPrimary
             }
           >

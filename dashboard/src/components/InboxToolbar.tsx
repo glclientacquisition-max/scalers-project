@@ -11,7 +11,7 @@ import {
   pageTitleClass,
 } from "@/components/ui/deskChrome";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
-import { FilterTabs } from "@/components/ui/FilterTabs";
+import { Segmented } from "@/components/ui/Segmented";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 
@@ -126,17 +126,17 @@ export function InboxToolbar({
       )}
 
       {current === "job" ? (
-        <FilterTabs
+        <Segmented
           label="Visit sort"
-          active={workView ? "work" : "list"}
           items={[
             {
-              id: "list",
+              key: "list",
               label: "List",
               href: callsHref({ purpose: "job", q: query || undefined }),
+              active: !workView,
             },
             {
-              id: "work",
+              key: "work",
               label: "Work",
               href: callsHref({
                 purpose: "job",
@@ -145,23 +145,24 @@ export function InboxToolbar({
                 week: weekView ? week : undefined,
                 day: weekView ? undefined : day,
               }),
+              active: workView,
             },
           ]}
         />
       ) : null}
 
       {current === "hold" ? (
-        <FilterTabs
+        <Segmented
           label="Hold sort"
-          active={holdToday ? "work" : "list"}
           items={[
             {
-              id: "list",
+              key: "list",
               label: "List",
               href: callsHref({ purpose: "hold", q: query || undefined }),
+              active: !holdToday,
             },
             {
-              id: "work",
+              key: "work",
               label: "Work",
               href: callsHref({
                 purpose: "hold",
@@ -169,18 +170,18 @@ export function InboxToolbar({
                 view: "today",
                 day,
               }),
+              active: holdToday,
             },
           ]}
         />
       ) : null}
 
       {current === "job" && workView ? (
-        <FilterTabs
+        <Segmented
           label="Work date"
-          active={weekView ? "week" : "today"}
           items={[
             {
-              id: "today",
+              key: "today",
               label: "Today",
               href: callsHref({
                 purpose: "job",
@@ -188,9 +189,10 @@ export function InboxToolbar({
                 view: "today",
                 day,
               }),
+              active: !weekView,
             },
             {
-              id: "week",
+              key: "week",
               label: "Week",
               href: callsHref({
                 purpose: "job",
@@ -198,6 +200,7 @@ export function InboxToolbar({
                 view: "week",
                 week,
               }),
+              active: weekView,
             },
           ]}
         />
