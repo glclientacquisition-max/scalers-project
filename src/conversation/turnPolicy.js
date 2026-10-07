@@ -24,6 +24,7 @@ const {
 } = require('./callCorrectives');
 const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
 const { hoursAskLine, offerCatalogueLine } = require('./knownFacts');
+const { catalogueAskInPlay } = require('./fileRead');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
@@ -128,7 +129,10 @@ function resolveLocalReply({
   // Visit, hold, and order words are on conversation.fileReadSentence for Voice.
   // Do not speak them here. A local reply would end the turn before Gemini.
 
-  const offerLine = offerCatalogueLine(clean, profile, language);
+  const offerSource = catalogueAskInPlay(clean, state);
+  const offerLine = offerSource
+    ? offerCatalogueLine(offerSource, profile, language)
+    : '';
   if (offerLine) return { outcome: 'catalogue', line: offerLine };
 
   const coverageLine = coverageAskSpeech(clean, profile, language);

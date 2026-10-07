@@ -6,7 +6,11 @@ what the Brain asks for and what it saves. They cannot change what it is
 allowed to say or when a tool may fire. The gates live in code, not in the
 prompt, so a model that leaks still cannot reach the caller or the database.
 How-are-you, Okay with no job open, and a bare name go to Gemini. The model
-answers the last thing said. Code still speaks the catalogue, hours, coverage,
+answers the last thing said. A which-services ask, in English, Kiswahili, or
+a mix, is the catalogue list. The yes after a name confirm still answers that
+ask. It does not open with which service, what they need done, or ungependa
+gani. Trailing noise such as "over" is not a visit place. Code still speaks
+the catalogue, hours, coverage,
 leave-it, the visit-time ladder, and tool results. A streamed 503 retries the
 same model once if nothing was spoken, then tries the backup model once.
 Credits and a denied project are not retried. A shared line does not order "ask who is

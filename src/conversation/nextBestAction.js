@@ -8,7 +8,7 @@ const {
   looksLikePastBookingTalk,
 } = require('./visitTalk');
 const { looksLikePaceOnlyTurn } = require('./dynamicSpeech');
-const { looksLikeFileRead, hasReadableFile } = require('./fileRead');
+const { looksLikeFileRead, hasReadableFile, catalogueAskInPlay } = require('./fileRead');
 const {
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
@@ -175,6 +175,16 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
 
   const fileRead = visitFileReadDecision(state);
   if (fileRead) return fileRead;
+
+  const catalogueAsk = catalogueAskInPlay(latestUtterance, state);
+  if (catalogueAsk) {
+    return {
+      action: ACTIONS.ANSWER,
+      resolves: true,
+      reason:
+        'They asked for the services catalogue. Speak that list from the file first. Do not ask which service, what they need done, or ungependa gani until the list is spoken.',
+    };
+  }
 
   if (intent === 'unknown' || intent === 'general_enquiry') {
     const returning = state?.returning;

@@ -59,6 +59,7 @@ const {
   decideVisitPlace,
   foldCanonicalPlace,
   isLocationRefusal,
+  isNoisePlace,
   preferVisitPlace,
 } = require('./visitLocation');
 const {
@@ -392,6 +393,7 @@ function promoteCallerGoal(next, text, input, previousIntent) {
 
 function observeCallerTurn(state, input = {}) {
   let next = structuredClone(state || createBrainState(input.profile));
+  if (next.conversation) next.conversation.catalogueSpokenThisTurn = false;
   if (input.profile && input.profile.afterHoursMode != null) {
     next.messageOnly = isMessageOnlyMode(input.profile.afterHoursMode);
   }
@@ -640,10 +642,14 @@ function observeCallerTurn(state, input = {}) {
       Number(next.conversation.locationRefusals || 0) + 1;
   }
   if (homeVertical) {
-    const incoming =
+    if (isNoisePlace(entityValue(next.entities?.location))) delete next.entities.location;
+    if (isNoisePlace(entityValue(next.entities?.landmark))) delete next.entities.landmark;
+    const incomingRaw =
       entityValue(next.entities?.location) || entityValue(next.entities?.landmark);
-    const previous =
+    const previousRaw =
       entityValue(state?.entities?.location) || entityValue(state?.entities?.landmark);
+    const incoming = isNoisePlace(incomingRaw) ? '' : incomingRaw;
+    const previous = isNoisePlace(previousRaw) ? '' : previousRaw;
     const lastAsk = (next.conversation.questionsAsked || []).slice(-1)[0];
     const place = foldCanonicalPlace(
       lastAsk === 'area' && previous && incoming && !/[\s,]/.test(incoming.trim())
@@ -663,6 +669,15 @@ function observeCallerTurn(state, input = {}) {
         next.intent = 'booking';
         next.goal.primary = 'make_booking_request';
       }
+    }
+    if (isNoisePlace(entityValue(next.entities?.location))) delete next.entities.location;
+    if (place && !isNoisePlace(place) && !entityValue(next.entities?.location)) {
+      next.entities.location = {
+        value: place,
+        source: 'caller_explicit',
+        confidence: 0.9,
+        confirmed: false,
+      };
     }
     if (next.intent === 'booking' || keptSpecific) {
       next.visitPlace = decideVisitPlace(place, {
@@ -881,6 +896,7 @@ function setNextBestAction(state, decision = {}) {
     next.conversation.stage = 'action';
   } else if (decision.action === 'ANSWER') {
     next.conversation.stage = 'resolution';
+    if (decision.resolves === true) next.resolution.status = 'resolved';
   } else if (decision.action === 'ASK_CLARIFICATION') {
     next.conversation.stage = 'discovery';
   } else if (decision.action === 'APOLOGIZE_AND_REPAIR') {
