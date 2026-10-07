@@ -301,12 +301,15 @@ describe("inbox unread since last customer event", () => {
     const load = read("dashboard/src/lib/inboxLoad.ts");
     const layout = read("dashboard/src/app/(desk)/layout.tsx");
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
+    const pileNav = read("dashboard/src/components/InboxPileNav.tsx");
     assert.match(load, /countInboxPurposes\(inbox\.items\)\.needs/);
     assert.match(layout, /loadCachedInboxNeedsCount/);
     assert.match(purpose, /export function itemInNeedsYouPile/);
     assert.match(purpose, /if \(itemInNeedsYouPile\(item\)\) counts\.needs \+= 1/);
+    assert.doesNotMatch(load, /countInboxPurposes\(inbox\.items\)\.all/);
     assert.doesNotMatch(load, /countInboxPurposes\(inbox\.items\)\.unread/);
     assert.doesNotMatch(load, /items\.filter\(\(item\) => item\.unread\)/);
+    assert.match(pileNav, /setNeedsCount\(counts\.needs\)/);
   });
 });
 

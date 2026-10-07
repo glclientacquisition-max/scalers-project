@@ -25,6 +25,7 @@ import {
 import { orderHoldList } from "@/lib/holdSheet";
 import { orderVisitList } from "@/lib/runSheet";
 import { refreshInboxList } from "@/app/(desk)/calls/listActions";
+import { useDeskSetNeedsCount } from "@/components/DeskNavState";
 import { scrollDeskWellToTop } from "@/components/EndlessList";
 import { listAfterPullRefresh, nextShown } from "@/lib/endlessList";
 import { DEFAULT_PAGE_SIZE } from "@/lib/listPage";
@@ -284,6 +285,11 @@ export function InboxPileNavProvider({
   }, [source, localQ]);
 
   const counts = useMemo(() => countInboxPurposes(searched), [searched]);
+  const setNeedsCount = useDeskSetNeedsCount();
+
+  useEffect(() => {
+    setNeedsCount(counts.needs);
+  }, [counts.needs, setNeedsCount]);
 
   const { rows, paint } = useMemo(
     () =>

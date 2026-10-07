@@ -87,6 +87,11 @@ export function useDeskNeedsCount(): number {
   return useContext(NeedsCountContext);
 }
 
+/** Push a fresh Needs you count into the tab bar and rail badge. */
+export function useDeskSetNeedsCount(): Dispatch<SetStateAction<number>> {
+  return useContext(SetNeedsCountContext);
+}
+
 export function useDeskPendingHref(): string | null {
   return useContext(PendingHrefContext);
 }
