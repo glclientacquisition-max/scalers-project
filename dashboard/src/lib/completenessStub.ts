@@ -74,7 +74,7 @@ function fieldScore(
 /** Calm copy when Platform still returns the pre-confirm gap strings. */
 const GAP_REVIEW: Record<string, string> = {
   "Add products or services with owner-confirmed names and prices.":
-    "Review and confirm your catalogue.",
+    "Add your catalogue, then save.",
   "Confirm at least three FAQs with owner source (not seed).":
     "Review and confirm your answers.",
   "Set a WhatsApp or email alert and confirm notify routing.":
@@ -355,7 +355,7 @@ export function scoreCaptureTenant(
     gaps.push({
       domain: "catalog",
       action: namedCatalog
-        ? "Review and confirm your catalogue."
+        ? "Add your catalogue, then save."
         : "Add products or services with prices.",
     });
   }

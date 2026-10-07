@@ -7,6 +7,7 @@ import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/component
 import { ThemePicker } from "@/components/ThemePicker";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { HomeCapture } from "@/components/HomeCapture";
+import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { LivePing } from "@/components/ui/deskRow";
 import { shopStakes } from "@/lib/baStakes";
 import type { TenantRow } from "@/lib/supabase";
@@ -76,6 +77,32 @@ export default function DevHomePage() {
                 ],
               }}
               stakes={shopStakes({ products: [], hoursText: "", holdsAllowed: false })}
+            />
+            <HomeReviewSettingsNudge
+              tenantId="dev-home-live-nudge"
+              vertical="retail"
+              score={{
+                overall: 42,
+                domains: {
+                  identity: 100,
+                  catalog: 0,
+                  hours: 50,
+                  locations: 50,
+                  payments: 0,
+                  policies: 0,
+                  faqs: 0,
+                  team_notify: 50,
+                  assistant: 100,
+                  bulletin: 0,
+                },
+                ready_badge: false,
+                next_gaps: [
+                  {
+                    domain: "catalog",
+                    action: "Add products or services with names and prices.",
+                  },
+                ],
+              }}
             />
           </section>
           <aside

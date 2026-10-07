@@ -60,12 +60,12 @@ describe("contacts ops workflow ACCEPT", () => {
     assert.match(page, /<AddContactPanel/);
     assert.doesNotMatch(page, /Import CSV/);
     assert.doesNotMatch(page, /PhonebookImportButton/);
-    assert.match(page, /flex-row items-center gap-2/);
+    assert.match(page, /<PageHeader/);
     assert.match(add, /data-contact-add/);
     assert.match(add, />\s*Add\s*</);
     assert.match(add, />\s*New\s*</);
     assert.match(add, /href="\/contacts\/import"/);
-    assert.match(add, />\s*CSV\s*</);
+    assert.match(add, />\s*Import\s*</);
     assert.match(add, /From this phone/);
     assert.match(add, /pickerOn/);
     assert.match(add, /stashPhonebookCsv/);
@@ -125,10 +125,10 @@ describe("contacts ops workflow ACCEPT", () => {
   it("makes the person-file History phone-safe without a 560px table floor", () => {
     const timeline = read("dashboard/src/components/ContactHistory.tsx");
     assert.match(profile, /<ContactHistory/);
-    assert.match(timeline, /md:hidden/);
-    assert.match(timeline, /hidden min-w-0 overflow-x-auto[\s\S]*md:block/);
+    assert.match(timeline, /<ListRow/);
+    assert.doesNotMatch(timeline, /<table/);
     assert.doesNotMatch(timeline, /min-w-\[560px\]/);
-    assert.match(timeline, /deskPreviewClass|ContactTimelineWhat/);
+    assert.match(timeline, /ContactTimelineWhat/);
     assert.match(note, /Phone is the list row/);
   });
 });

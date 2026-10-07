@@ -4,11 +4,6 @@ export type SettingsStatusVoice = {
   default?: boolean;
 };
 
-import {
-  countUnattestedForTarget,
-  type DeskFieldMetaClient,
-} from "@/lib/fieldMetaAttestUi";
-
 export type SettingsStatusTenant = {
   business_name?: string | null;
   spoken_name?: string | null;
@@ -26,7 +21,6 @@ export type SettingsStatusTenant = {
   hours_schedule?: unknown;
   faqs?: unknown;
   services_catalog?: unknown;
-  product_catalog?: unknown;
   team_directory?: unknown;
   business_locations?: unknown;
   tts_lexicon?: unknown;
@@ -218,23 +212,11 @@ export type SettingsListStatus = {
 export function settingsIndexStatuses(
   tenant: SettingsStatusTenant,
   voices: SettingsStatusVoice[],
-  targets: SettingsStatusTarget[],
-  fieldMeta?: DeskFieldMetaClient
+  targets: SettingsStatusTarget[]
 ): Record<string, SettingsListStatus> {
   const out: Record<string, SettingsListStatus> = {};
   for (const target of targets) {
     const key = settingsStatusKey(target);
-    const attestCount = fieldMeta ? countUnattestedForTarget(target, fieldMeta, tenant) : 0;
-    const attestText =
-      attestCount > 0
-        ? attestCount === 1
-          ? "1 to confirm"
-          : `${attestCount} to confirm`
-        : "";
-    if (attestText) {
-      out[key] = { text: attestText, title: attestText };
-      continue;
-    }
     const text = settingsOptionStatus(target, tenant, voices);
     if (!text) continue;
     const title =

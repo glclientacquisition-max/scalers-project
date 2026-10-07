@@ -9,9 +9,18 @@ function read(rel) {
 
 /** Lockstep with dashboard/src/lib/contactsLoad.ts query helpers. */
 function resolveContactSavedFilter(raw) {
-  const value = String(raw || "all").toLowerCase();
-  if (value === "saved" || value === "unsaved" || value === "recent") return value;
-  return "all";
+  if (!raw || !String(raw).trim()) return "recent";
+  const value = String(raw).toLowerCase();
+  if (
+    value === "all" ||
+    value === "saved" ||
+    value === "unsaved" ||
+    value === "recent" ||
+    value === "favourite"
+  ) {
+    return value;
+  }
+  return "recent";
 }
 
 function resolveContactSort(raw) {
@@ -20,7 +29,8 @@ function resolveContactSort(raw) {
 
 function contactsHref(opts) {
   const q = new URLSearchParams();
-  if (opts.saved && opts.saved !== "all") q.set("saved", opts.saved);
+  if (opts.saved === "all") q.set("saved", "all");
+  else if (opts.saved && opts.saved !== "recent") q.set("saved", opts.saved);
   if (opts.sort && opts.sort !== "recent") q.set("sort", opts.sort);
   const query = String(opts.q || "").trim();
   if (query) q.set("q", query);
@@ -75,7 +85,8 @@ function paginateContactRows(rows, page, pageSize) {
 describe("contacts list Phase 1 helpers", () => {
   it("resolves search, sort, Recent calls, and Unsaved without inventing presence", () => {
     assert.equal(resolveContactSavedFilter("recent"), "recent");
-    assert.equal(resolveContactSavedFilter("online"), "all");
+    assert.equal(resolveContactSavedFilter("online"), "recent");
+    assert.equal(resolveContactSavedFilter(undefined), "recent");
     assert.equal(resolveContactSort("name"), "name");
     assert.equal(resolveContactSort(""), "recent");
     assert.equal(
@@ -111,7 +122,8 @@ describe("contacts list Phase 1 helpers", () => {
     );
     assert.doesNotMatch(sublineFn, /lastReason|Online|last seen|active now/i);
     assert.match(src, /export function resolveContactSavedFilter/);
-    assert.match(src, /value === "saved" \|\| value === "unsaved" \|\| value === "recent"/);
+    assert.match(src, /value === "all"/);
+    assert.match(src, /export function contactListSections/);
     assert.match(src, /export function resolveContactSort/);
     assert.match(src, /export function contactsHref/);
     assert.match(src, /export function contactMatchesQuery/);
@@ -132,9 +144,11 @@ describe("contacts list Phase 1 chrome", () => {
   const dock = read("dashboard/src/components/ContactActionDock.tsx");
 
   it("ships search and Last call / Name sort on the existing contacts list", () => {
+    assert.match(page, /<PageHeader/);
     assert.match(page, /<ContactsSearch/);
     assert.match(search, /type="search"/);
     assert.match(search, /Name or number/);
+    assert.match(search, /from "@\/components\/ui\/Field"/);
     assert.match(page, /<ContactSortSelect/);
     assert.match(page, /<InboxFilterPills/);
     assert.match(load, /resolveContactSort/);
@@ -154,6 +168,7 @@ describe("contacts list Phase 1 chrome", () => {
   });
 
   it("keeps dense Call + WhatsApp as opened-only when a phone exists", () => {
+    assert.match(row, /<ListRow/);
     assert.match(row, /<CallLink number=\{number\} \/>/);
     assert.match(row, /variant="icon"/);
     assert.doesNotMatch(row, /callId=/);

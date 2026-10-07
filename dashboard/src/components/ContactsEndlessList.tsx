@@ -12,15 +12,55 @@ import { contactsSliceOutcome } from "@/lib/deskFresh";
 import {
   appendUniqueById,
   listAfterPullRefresh,
-  listWindowClass,
 } from "@/lib/endlessList";
 import { DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 import {
-  contactProfileHref,
+  contactListSections,
   type ContactListRow,
   type ContactSavedFilter,
   type ContactSort,
 } from "@/lib/contactsLoad";
+
+function ContactsGroupedList({
+  rows,
+  saved,
+  sort,
+  q,
+  selectedId,
+}: {
+  rows: ContactListRow[];
+  saved: ContactSavedFilter;
+  sort: ContactSort;
+  q: string;
+  selectedId?: string | null;
+}) {
+  const sections = contactListSections(rows, saved);
+  return (
+    <div className="space-y-6">
+      {sections.map((section) => (
+        <section key={section.key} aria-label={section.label || "Contacts"}>
+          {section.label ? (
+            <h2 className="mb-2 px-4 text-meta font-medium uppercase tracking-wide text-ink-3 lg:px-0">
+              {section.label}
+            </h2>
+          ) : null}
+          <ul className="divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
+            {section.rows.map((row) => (
+              <ContactPhoneRow
+                key={row.id}
+                row={row}
+                saved={saved}
+                sort={sort}
+                q={q}
+                selectedId={selectedId}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
 
 export function ContactsEndlessList({
   rows,
@@ -29,6 +69,7 @@ export function ContactsEndlessList({
   sort,
   q,
   epoch = 0,
+  selectedId,
 }: {
   rows: ContactListRow[];
   total: number;
@@ -36,6 +77,7 @@ export function ContactsEndlessList({
   sort: ContactSort;
   q: string;
   epoch?: number;
+  selectedId?: string | null;
 }) {
   const [extra, setExtra] = useState<ContactListRow[]>([]);
   const [page, setPage] = useState(1);
@@ -116,17 +158,13 @@ export function ContactsEndlessList({
   return (
     <>
       <DeskLandScope ids={merged.map((row) => row.id)} scopeKey={`${saved}:${sort}:${q}`}>
-        <ul
-          className={`mt-8 list-none overflow-hidden rounded-2xl border border-line bg-surface ${listWindowClass}`}
-        >
-          {merged.map((row) => (
-            <ContactPhoneRow
-              key={row.id}
-              row={row}
-              href={contactProfileHref(row.id, { saved, sort, q: q || undefined })}
-            />
-          ))}
-        </ul>
+        <ContactsGroupedList
+          rows={merged}
+          saved={saved}
+          sort={sort}
+          q={q}
+          selectedId={selectedId}
+        />
       </DeskLandScope>
       {error ? (
         <div className="mt-4">
@@ -152,6 +190,7 @@ export function ContactsPullHost({
   sort,
   q,
   empty,
+  selectedId,
 }: {
   seed: ContactListRow[];
   total: number;
@@ -159,6 +198,7 @@ export function ContactsPullHost({
   sort: ContactSort;
   q: string;
   empty: ReactNode;
+  selectedId?: string | null;
 }) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -239,6 +279,7 @@ export function ContactsPullHost({
           sort={sort}
           q={q}
           epoch={epoch}
+          selectedId={selectedId}
         />
       )}
     </div>

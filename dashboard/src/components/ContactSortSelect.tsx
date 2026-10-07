@@ -1,48 +1,68 @@
 "use client";
 
+import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import { useRouter } from "next/navigation";
-import { DeskSelect } from "@/components/ui/DeskSelect";
-import { deskFieldClass } from "@/components/ui/deskChrome";
+import { buttonClass } from "@/components/ui/Button";
+import { Menu, MenuItem } from "@/components/ui/Menu";
 import {
   contactsHref,
   type ContactSavedFilter,
   type ContactSort,
 } from "@/lib/contactsLoad";
 
-const SORT_OPTIONS = [
-  { value: "recent" as const, label: "Last call" },
-  { value: "name" as const, label: "Name" },
+const SORT_OPTIONS: Array<{ value: ContactSort; label: string }> = [
+  { value: "recent", label: "Last call" },
+  { value: "name", label: "Name" },
 ];
 
 export function ContactSortSelect({
   saved,
   sort,
   q,
+  selectedId,
 }: {
   saved: ContactSavedFilter;
   sort: ContactSort;
   q: string;
+  selectedId?: string | null;
 }) {
   const router = useRouter();
+  const active = SORT_OPTIONS.find((row) => row.value === sort)?.label ?? "Last call";
+
+  function pick(next: ContactSort) {
+    router.replace(
+      contactsHref({
+        saved,
+        sort: next,
+        q: q || undefined,
+        id: selectedId || undefined,
+      })
+    );
+  }
 
   return (
-    <label className="inline-flex min-h-11 min-w-0 items-center gap-2 text-sm text-ink-soft">
-      <span className="shrink-0">Sort</span>
-      <DeskSelect
-        aria-label="Sort contacts"
-        value={sort}
-        className={`${deskFieldClass} w-auto min-w-[8.5rem] py-1.5`}
-        options={SORT_OPTIONS}
-        onChange={(next) => {
-          router.replace(
-            contactsHref({
-              saved,
-              sort: next,
-              q: q || undefined,
-            })
-          );
-        }}
-      />
-    </label>
+    <Menu
+      trigger={
+        <button
+          type="button"
+          aria-label="Sort contacts"
+          className={buttonClass({ variant: "ghost", size: "md", className: "gap-1 px-3 text-ink-2" })}
+        >
+          <span className="text-meta text-ink-3">Sort</span>
+          <span className="text-body text-ink">{active}</span>
+          <ChevronDownIcon aria-hidden className="size-4 text-ink-3" />
+        </button>
+      }
+    >
+      {SORT_OPTIONS.map((option) => (
+        <MenuItem
+          key={option.value}
+          onClick={() => pick(option.value)}
+          aria-current={sort === option.value ? "true" : undefined}
+        >
+          {option.label}
+        </MenuItem>
+      ))}
+    </Menu>
   );
 }

@@ -64,11 +64,12 @@ describe("universal row anatomy", () => {
     const endless = read("dashboard/src/components/ContactsEndlessList.tsx");
     const inbox = read("dashboard/src/components/InboxItemRow.tsx");
     const phone = inbox.slice(inbox.indexOf("export function InboxPhoneRow"));
-    const uses = list.match(/RowIdentity/g) || [];
-    assert.ok(uses.length >= 2, `import + row, got ${uses.length}`);
+    assert.match(list, /<Avatar/);
+    assert.match(list, /<ListRow/);
     assert.match(endless, /<ContactPhoneRow/);
+    assert.match(endless, /contactListSections/);
     assert.doesNotMatch(endless, /ContactTableRow|DeskDataTable/);
-    assert.match(list, /gap-3 overflow-hidden border-t border-line\/70 px-4 py-3/);
+    assert.match(endless, /divide-hairline/);
     assert.match(phone, /gap-3 overflow-hidden border-t border-line\/70 px-4 py-3/);
     assert.doesNotMatch(list, /RowStateDot|InboxRowCheck|break-words|overflow-wrap/);
   });

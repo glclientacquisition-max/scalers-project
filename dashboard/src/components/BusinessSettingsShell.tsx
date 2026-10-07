@@ -31,7 +31,6 @@ import {
   settingsRailWrapClass,
 } from "@/components/settingsUi";
 import { deskShiftClass } from "@/components/ui/deskChrome";
-import type { DeskFieldMetaClient } from "@/lib/fieldMetaAttestUi";
 
 function SettingsChevron({ active }: { active: boolean }) {
   return (
@@ -144,7 +143,6 @@ export function BusinessSettingsShell({
   trainPanel,
   curatedVoices = [],
   optionStatus = {},
-  fieldMeta = null,
   liveTransferExecutor = false,
 }: {
   tenant: TenantRow;
@@ -152,7 +150,6 @@ export function BusinessSettingsShell({
   trainPanel: SettingsPanel;
   curatedVoices?: CuratedSonioxVoice[];
   optionStatus?: Record<string, SettingsListStatus>;
-  fieldMeta?: DeskFieldMetaClient;
   liveTransferExecutor?: boolean;
 }) {
   const formPanel: SettingsPanel =
@@ -225,7 +222,6 @@ export function BusinessSettingsShell({
           tenant={tenant}
           panel={formPanel}
           curatedVoices={curatedVoices}
-          fieldMeta={fieldMeta}
           heading={heading}
           sidebar={rail}
           liveTransferExecutor={liveTransferExecutor}
@@ -235,7 +231,7 @@ export function BusinessSettingsShell({
           {rail}
           <div className={settingsPanelClass}>
             {tab === "alerts" ? (
-              <AlertsPanel tenant={tenant} businessName={businessName} fieldMeta={fieldMeta} />
+              <AlertsPanel tenant={tenant} businessName={businessName} />
             ) : (
               <>
                 <SettingsPageHeader

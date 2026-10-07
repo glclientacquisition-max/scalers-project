@@ -1,7 +1,7 @@
 import { ContactImportForm } from "@/components/ContactImportForm";
-import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskPageGate } from "@/components/DeskPageGate";
 
@@ -26,12 +26,11 @@ async function ContactImportBody() {
 
   return (
     <div className="max-w-3xl" data-desk-nested="">
-      <DeskRecordLead back={<DeskBack href="/contacts">Contacts</DeskBack>}>
-        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-          Import contacts
-        </h1>
-        <p className="mt-2 text-sm text-ink-soft">CSV. Max 500 rows.</p>
-      </DeskRecordLead>
+      <PageHeader
+        title="Import contacts"
+        meta="CSV. Max 500 rows."
+        back={{ href: "/contacts", label: "Contacts" }}
+      />
       <div className="mt-8">
         <ContactImportForm />
       </div>
