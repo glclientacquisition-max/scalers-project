@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FailChips, LatencyBar, StruckDrop, TurnFact, formatCallWhen } from "@/components/admin/QualityBits";
+import { FailChips, LatencyBar, StruckDrop, TurnFact, Unlogged, formatCallWhen } from "@/components/admin/QualityBits";
 import { SaveAsTest } from "@/components/admin/SaveAsTest";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
@@ -35,16 +35,18 @@ function TurnTimeline({ turn }: { turn: VoiceTurnTrace }) {
         {failed.length > 0 ? <FailChips checks={turn.checks} /> : null}
       </header>
       <dl className="mt-3 space-y-3">
-        <TurnFact label="Caller said">{turn.caller.text || "None"}</TurnFact>
+        <TurnFact label="Caller said">{turn.caller.text || <Unlogged />}</TurnFact>
         <TurnFact label="STT heard">
-          {heard.heard || "None"}
+          {heard.heard || <Unlogged />}
           {heard.language ? <span className="ms-2 text-meta text-ink-3">{heard.language}</span> : null}
         </TurnFact>
-        <TurnFact label="Language">{languageLine(turn)}</TurnFact>
-        <TurnFact label="Gemini">{raw || "None"}</TurnFact>
+        <TurnFact label="Language">
+          {languageLine(turn) === "Not logged" ? <Unlogged /> : languageLine(turn)}
+        </TurnFact>
+        <TurnFact label="Gemini">{raw || <Unlogged />}</TurnFact>
         <TurnFact label="Transforms">
           {transforms.length === 0 ? (
-            "None"
+            <Unlogged />
           ) : (
             <ul className="space-y-3">
               {transforms.map((row, index) => (
@@ -59,7 +61,7 @@ function TurnTimeline({ turn }: { turn: VoiceTurnTrace }) {
                   </p>
                   <p className="mt-1">
                     <span className="text-caption text-ink-3">After </span>
-                    {row.after || "None"}
+                    {row.after || <Unlogged />}
                   </p>
                 </li>
               ))}
@@ -67,7 +69,7 @@ function TurnTimeline({ turn }: { turn: VoiceTurnTrace }) {
           )}
         </TurnFact>
         <TurnFact label="Spoken">
-          <p>{spoken.text || "None"}</p>
+          <p>{spoken.text || <Unlogged />}</p>
           {spoken.cannedPath ? (
             <p className="mt-1 text-meta text-ink-2">
               Canned {cannedLabel(spoken.cannedPath)}
@@ -75,7 +77,7 @@ function TurnTimeline({ turn }: { turn: VoiceTurnTrace }) {
             </p>
           ) : null}
         </TurnFact>
-        <TurnFact label="Barge-in">{barge || "None"}</TurnFact>
+        <TurnFact label="Barge-in">{barge || <Unlogged>No</Unlogged>}</TurnFact>
         <TurnFact label="Latency">
           <LatencyBar ms={latency.firstAudio} />
           {latency.firstToken != null ? (
@@ -97,28 +99,42 @@ function TurnTimeline({ turn }: { turn: VoiceTurnTrace }) {
   );
 }
 
+const crumbClass =
+  "inline-flex min-h-11 items-center rounded-md text-ink-2 outline-none focus-visible:ring-2 focus-visible:ring-brand";
+
 export function QualityCall({
   trace,
   businessHref,
+  listHref,
 }: {
   trace: VoiceCallTrace;
   businessHref: string;
+  listHref: string;
 }) {
   const turns = trace.turns.toSorted((a, b) => a.turnIndex - b.turnIndex);
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={trace.callId}
-        meta={
-          <Link href={businessHref} className="inline-flex min-h-11 items-center rounded-md text-ink-2 outline-none focus-visible:ring-2 focus-visible:ring-brand">
-            {trace.businessName}
-          </Link>
-        }
-        action={<SaveAsTest call={trace} />}
-      />
+      <nav aria-label="Breadcrumb">
+        <ol className="flex flex-wrap items-center gap-x-2 text-meta">
+          <li>
+            <Link href={listHref} className={crumbClass}>
+              Quality
+            </Link>
+          </li>
+          <li aria-hidden="true" className="text-ink-3">
+            /
+          </li>
+          <li>
+            <Link href={businessHref} className={crumbClass}>
+              {trace.businessName}
+            </Link>
+          </li>
+        </ol>
+      </nav>
+      <PageHeader title={trace.callId} action={<SaveAsTest call={trace} />} />
       <div className="flex flex-wrap items-center gap-3">
-        <p className="text-title tabular-nums text-ink">{formatScore(trace.score)}</p>
+        <p className="text-title tabular-nums text-ink">{trace.score == null ? <Unlogged /> : formatScore(trace.score)}</p>
         <FailChips checks={trace.checks} />
       </div>
       <p className="text-body text-ink [overflow-wrap:anywhere]">{diagnosisLine(trace)}</p>

@@ -5,7 +5,9 @@ import { ButtonLink } from "@/components/ui/Button";
 import { parseQualityRange } from "@/lib/adminQualityModel";
 import { fixtureBusiness } from "../fixtures";
 
-/** Business quality fixture. DASHBOARD_OPEN=true only. */
+/** Business quality fixture. DASHBOARD_OPEN=true only. Blocking so params do not trip the dev overlay. */
+export const instant = false;
+
 export default async function DevQualityBusinessPage({
   params,
   searchParams,
@@ -17,15 +19,9 @@ export default async function DevQualityBusinessPage({
   const { business } = await params;
   const range = parseQualityRange((await searchParams).range);
   const detail = fixtureBusiness(decodeURIComponent(business), range);
-  return (
-    <main className="admin-theme min-h-screen bg-canvas px-4 py-6 text-ink sm:px-6">
-      <div className="mx-auto min-w-0 max-w-desk">
-        {detail ? (
-          <QualityBusiness detail={detail} range={range} base="/dev/quality" />
-        ) : (
-          <QualityEmpty title="No traced calls yet." action={<ButtonLink href="/dev/quality">Quality</ButtonLink>} />
-        )}
-      </div>
-    </main>
+  return detail ? (
+    <QualityBusiness detail={detail} range={range} base="/dev/quality" />
+  ) : (
+    <QualityEmpty title="No traced calls yet." action={<ButtonLink href="/dev/quality">Quality</ButtonLink>} />
   );
 }

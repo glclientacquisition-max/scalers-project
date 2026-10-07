@@ -263,7 +263,48 @@ export const OK_CALL: VoiceCallTrace = {
   ],
 };
 
-const CALLS = [LOW_CALL, MID_CALL, OK_CALL];
+function stubCall(
+  callId: string,
+  businessId: string,
+  businessName: string,
+  score: number,
+  at: string,
+): VoiceCallTrace {
+  return {
+    schema: "scalers.voice.call",
+    schemaVersion: 1,
+    callId,
+    tenantId: TENANT,
+    businessId,
+    businessName,
+    startedAt: at,
+    endedAt: at,
+    turnCount: 1,
+    voiceId: null,
+    sttModel: null,
+    ttsModel: null,
+    greeting: [],
+    score,
+    checks: checks(),
+    diagnosis: "No failing checks",
+    release: null,
+    turns: [turn(callId, 0, "Habari.", {}, [{ stage: "outcome", value: "ok" }])],
+  };
+}
+
+const CALLS = [
+  LOW_CALL,
+  MID_CALL,
+  OK_CALL,
+  stubCall("HD_dev_d3", "biz-dusted", "Done and Dusted", 52, "2026-10-04T10:00:00.000Z"),
+  stubCall("HD_dev_d4", "biz-dusted", "Done and Dusted", 61, "2026-10-03T10:00:00.000Z"),
+  stubCall("HD_dev_d5", "biz-dusted", "Done and Dusted", 70, "2026-10-02T10:00:00.000Z"),
+  stubCall("HD_dev_c1", "biz-chapter", "Chapter One", 48, "2026-09-20T11:00:00.000Z"),
+  stubCall("HD_dev_c2", "biz-chapter", "Chapter One", 55, "2026-09-19T11:00:00.000Z"),
+  stubCall("HD_dev_c3", "biz-chapter", "Chapter One", 64, "2026-09-18T11:00:00.000Z"),
+  stubCall("HD_dev_c4", "biz-chapter", "Chapter One", 71, "2026-09-17T11:00:00.000Z"),
+  stubCall("HD_dev_c5", "biz-chapter", "Chapter One", 80, "2026-09-16T11:00:00.000Z"),
+];
 
 const DUSTED: BusinessQualityRow = {
   businessId: "biz-dusted",
@@ -273,7 +314,7 @@ const DUSTED: BusinessQualityRow = {
   topFailure: "incomplete",
   dropping: true,
   droppingReason: "Score fell 22 points in 7 days",
-  callsTraced: 2,
+  callsTraced: 5,
   lastCallAt: "2026-10-06T09:11:00.000Z",
 };
 
@@ -281,7 +322,7 @@ const ESGA: BusinessQualityRow = {
   businessId: "biz-esga",
   name: "Esga Stationery",
   score: 91,
-  trend: [90, 91, 86, 91],
+  trend: [91, 90],
   topFailure: null,
   dropping: false,
   droppingReason: "",
@@ -293,11 +334,11 @@ const CHAPTER: BusinessQualityRow = {
   businessId: "biz-chapter",
   name: "Chapter One",
   score: 64,
-  trend: [80, 77, 70, 64],
+  trend: [80, 74, 70, 66, 64],
   topFailure: "slow",
   dropping: true,
-  droppingReason: "First audio past 1200 ms on 4 calls",
-  callsTraced: 4,
+  droppingReason: "First audio past 1200 ms on 5 calls",
+  callsTraced: 5,
   lastCallAt: "2026-09-20T11:00:00.000Z",
 };
 

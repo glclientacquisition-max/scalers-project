@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DroppingMark, FailChips, QualitySpark, formatCallWhen } from "@/components/admin/QualityBits";
+import { DroppingMark, FailChips, QualitySpark, Unlogged, formatCallWhen } from "@/components/admin/QualityBits";
 import { ListRow } from "@/components/ui/ListRow";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Segmented } from "@/components/ui/Segmented";
@@ -32,7 +32,7 @@ export function QualityBusiness({
       <header className="space-y-3">
         <PageHeader title={detail.name} />
         <div className="flex flex-wrap items-center gap-3 px-0">
-          <p className="text-title tabular-nums text-ink">{formatScore(detail.score)}</p>
+          <p className="text-title tabular-nums text-ink">{detail.score == null ? <Unlogged /> : formatScore(detail.score)}</p>
           <QualitySpark points={detail.trend} dropping={detail.dropping} />
           <DroppingMark dropping={detail.dropping} reason={detail.droppingReason} />
         </div>
@@ -84,12 +84,12 @@ export function QualityBusiness({
                           {call.callId}
                         </Link>
                       </Td>
-                      <Td num>{formatScore(call.score)}</Td>
+                      <Td num>{call.score == null ? <Unlogged /> : formatScore(call.score)}</Td>
                       <Td>
                         <FailChips checks={call.checks} />
                       </Td>
-                      <Td num>{formatDuration(call.durationSec)}</Td>
-                      <Td className="tabular-nums text-ink-2">{formatCallWhen(call.at)}</Td>
+                      <Td num>{call.durationSec == null ? <Unlogged /> : formatDuration(call.durationSec)}</Td>
+                      <Td className="tabular-nums text-ink-2">{call.at ? formatCallWhen(call.at) : <Unlogged />}</Td>
                     </tr>
                   ))}
                 </Tbody>
@@ -98,7 +98,7 @@ export function QualityBusiness({
             <ul className="mt-2 divide-y divide-hairline md:hidden">
               {calls.map((call) => {
                 const failed = failingChecks(call.checks);
-                const failure = failed.length > 0 ? failed.map((check) => checkLabel(check)).join(", ") : "No failing checks";
+                const failure = failed.length > 0 ? failed.map((check) => checkLabel(check)).join(", ") : "No failures";
                 return (
                   <ListRow
                     key={call.callId}

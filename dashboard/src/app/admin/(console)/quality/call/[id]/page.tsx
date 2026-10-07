@@ -4,7 +4,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { getCallTrace } from "@/lib/adminQuality";
 import { logAdminError } from "@/lib/adminErrors";
-import { qualityBusinessHref } from "@/lib/adminQualityModel";
+import { qualityBusinessHref, qualityListHref } from "@/lib/adminQualityModel";
 
 export const instant = false;
 
@@ -21,7 +21,11 @@ export default async function AdminQualityCallPage({ params }: { params: Promise
       );
     }
     return (
-      <QualityCall trace={trace} businessHref={qualityBusinessHref("/admin/quality", trace.businessId, "7d")} />
+      <QualityCall
+        trace={trace}
+        listHref={qualityListHref("/admin/quality", "7d")}
+        businessHref={qualityBusinessHref("/admin/quality", trace.businessId, "7d")}
+      />
     );
   } catch (err) {
     logAdminError("quality-call", err);

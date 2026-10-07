@@ -2,7 +2,7 @@
 
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { AdminAccountMenu } from "@/components/AdminAccountMenu";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { DeskBack } from "@/components/ui/DeskBack";
@@ -16,6 +16,38 @@ import {
   adminShellClass,
 } from "@/lib/adminLinks";
 import { PHONE_TAB_REFRESH_EVENT } from "@/lib/endlessList";
+
+type AdminChrome = {
+  path: string;
+  href: (href: string) => string;
+};
+
+const AdminChromeContext = createContext<AdminChrome | null>(null);
+
+/**
+ * Harness only. Production Admin uses the live path and the real hrefs.
+ * `path` maps the browser path onto an admin route so Quality stays active.
+ */
+export function AdminChromeProvider({
+  path,
+  href,
+  children,
+}: {
+  path: (pathname: string) => string;
+  href: (href: string) => string;
+  children: ReactNode;
+}) {
+  const pathname = usePathname();
+  const value = useMemo(() => ({ path: path(pathname), href }), [href, path, pathname]);
+  return <AdminChromeContext.Provider value={value}>{children}</AdminChromeContext.Provider>;
+}
+
+function useAdminChrome(): AdminChrome {
+  const pathname = usePathname();
+  const chrome = useContext(AdminChromeContext);
+  if (!chrome) return { path: pathname, href: (link) => link };
+  return chrome;
+}
 
 function AdminIcon({ name }: { name: string }) {
   const cls = "h-5 w-5";
@@ -128,13 +160,13 @@ function AdminDestinationLink({
   labelClassName: string;
   onRetap?: () => void;
 }) {
-  const pathname = usePathname();
-  const current = adminRouteActive(pathname, href, exact);
+  const { path, href: mapHref } = useAdminChrome();
+  const current = adminRouteActive(path, href, exact);
   const active = pendingHref ? pendingHref === href : current;
 
   return (
     <Link
-      href={href}
+      href={mapHref(href)}
       scroll={false}
       aria-current={active ? "page" : undefined}
       aria-label={label}
@@ -212,9 +244,9 @@ function retapAdminTab() {
 
 /** Phone destinations. Hidden on a nested admin screen so the parent control owns the thumb zone. */
 export function AdminTabBar() {
-  const pathname = usePathname();
+  const { path } = useAdminChrome();
   const { pendingHref, setPendingHref } = useAdminPending();
-  if (adminParentTarget(pathname)) return null;
+  if (adminParentTarget(path)) return null;
 
   return (
     <nav
@@ -246,13 +278,13 @@ export function AdminTabBar() {
 
 /** One control back to the parent admin list. The destination name is the accessible label. */
 export function AdminNestedBack() {
-  const pathname = usePathname();
-  const parent = adminParentTarget(pathname);
+  const { path, href } = useAdminChrome();
+  const parent = adminParentTarget(path);
   if (!parent) return null;
 
   return (
     <div className="mb-3">
-      <DeskBack href={parent.href}>{parent.label}</DeskBack>
+      <DeskBack href={href(parent.href)}>{parent.label}</DeskBack>
     </div>
   );
 }
@@ -264,8 +296,8 @@ export function AdminShell({
   operatorName: string;
   children: ReactNode;
 }) {
-  const pathname = usePathname();
-  const nested = Boolean(adminParentTarget(pathname));
+  const { path } = useAdminChrome();
+  const nested = Boolean(adminParentTarget(path));
 
   return (
     <div data-admin-shell="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>

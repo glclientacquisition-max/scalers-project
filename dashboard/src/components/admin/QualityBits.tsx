@@ -4,10 +4,28 @@ import { cx } from "@/lib/cx";
 import {
   checkLabel,
   failingChecks,
+  formatDelta,
   formatScore,
   LATENCY_BUDGET_MS,
   type VoiceCheckCounts,
 } from "@/lib/adminQualityModel";
+
+/** Fixed scale so the 1200 ms budget tick stays in the same place on every turn. */
+const LATENCY_SCALE_MS = LATENCY_BUDGET_MS * 2;
+
+export function Unlogged({ children = "Not logged" }: { children?: ReactNode }) {
+  return <span className="text-meta text-ink-3">{children}</span>;
+}
+
+/** Score up is better. Check counts pass `lowerIsBetter` because a drop is better. */
+export function DeltaMark({ delta, lowerIsBetter = false }: { delta: number | null; lowerIsBetter?: boolean }) {
+  const text = formatDelta(delta);
+  if (delta == null || !Number.isFinite(delta) || delta === 0) {
+    return <span className="tabular-nums text-ink-3">{text}</span>;
+  }
+  const improved = lowerIsBetter ? delta < 0 : delta > 0;
+  return <span className={cx("tabular-nums", improved ? "text-ok" : "text-attention")}>{text}</span>;
+}
 
 const callWhen = new Intl.DateTimeFormat("en-KE", {
   day: "numeric",
@@ -19,14 +37,16 @@ const callWhen = new Intl.DateTimeFormat("en-KE", {
 });
 
 export function formatCallWhen(iso: string | null): string {
-  if (!iso) return "None";
+  if (!iso) return "Not logged";
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "None";
+  if (Number.isNaN(date.getTime())) return "Not logged";
   return callWhen.format(date);
 }
 
 export function QualitySpark({ points, dropping = false }: { points: number[]; dropping?: boolean }) {
-  if (points.length === 0) return <span className="text-meta text-ink-3">None</span>;
+  if (points.length < 3) {
+    return <span className="block w-16 text-caption leading-tight text-ink-3">Too few calls</span>;
+  }
   const width = 64;
   const height = 20;
   const pad = 2;
@@ -61,7 +81,7 @@ export function QualitySpark({ points, dropping = false }: { points: number[]; d
 
 export function FailChips({ checks }: { checks: VoiceCheckCounts }) {
   const names = failingChecks(checks);
-  if (names.length === 0) return <span className="text-meta text-ink-3">None</span>;
+  if (names.length === 0) return <Unlogged>No failures</Unlogged>;
   return (
     <span className="flex flex-wrap gap-1.5">
       {names.map((name) => (
@@ -89,28 +109,45 @@ export function DroppingMark({ dropping, reason }: { dropping: boolean; reason: 
 
 export function LatencyBar({ ms }: { ms: number | null }) {
   if (ms == null || !Number.isFinite(ms)) {
-    return <span className="text-meta text-ink-3">No latency</span>;
+    return <Unlogged />;
   }
-  const scale = Math.max(ms, LATENCY_BUDGET_MS);
-  const bar = Math.min(100, (ms / scale) * 100);
-  const line = (LATENCY_BUDGET_MS / scale) * 100;
-  const over = ms > LATENCY_BUDGET_MS;
   const shown = Math.round(ms).toLocaleString("en-KE");
+  const valuePct = Math.min(100, (Math.max(0, ms) / LATENCY_SCALE_MS) * 100);
+  const budgetPct = (LATENCY_BUDGET_MS / LATENCY_SCALE_MS) * 100;
+  const okPct = Math.min(valuePct, budgetPct);
+  const overPct = Math.max(0, valuePct - budgetPct);
+  const over = ms > LATENCY_BUDGET_MS;
   return (
     <div>
       <div
         className="relative h-2 rounded-full bg-surface-2"
         role="img"
-        aria-label={over ? `${shown} ms, past the 1200 ms budget` : `${shown} ms of 1200 ms`}
+        aria-label={over ? `${shown} ms, past the 1200 ms budget` : `${shown} ms, under the 1200 ms budget`}
       >
-        <div
-          className={cx("absolute inset-y-0 start-0 rounded-full", over ? "bg-attention" : "bg-ink")}
-          style={{ width: `${bar}%` }}
-        />
-        <div className="absolute inset-y-0 w-0.5 bg-ink" style={{ left: `${line}%` }} />
+        {okPct > 0 ? (
+          <div
+            className={cx("absolute inset-y-0 start-0 bg-ok", overPct > 0 ? "rounded-s-full" : "rounded-full")}
+            style={{ width: `${okPct}%` }}
+          />
+        ) : null}
+        {overPct > 0 ? (
+          <div
+            className="absolute inset-y-0 rounded-e-full bg-attention"
+            style={{ left: `${budgetPct}%`, width: `${overPct}%` }}
+          />
+        ) : null}
+        <div className="absolute inset-y-0 w-px bg-ink" style={{ left: `${budgetPct}%` }} />
       </div>
-      <p className="mt-1 text-caption tabular-nums text-ink-2">
-        {over ? `${shown} ms, past the 1200 ms budget` : `${shown} ms of 1200 ms`}
+      <div className="relative mt-1 h-4">
+        <span
+          className="absolute -translate-x-1/2 text-caption tabular-nums text-ink-3"
+          style={{ left: `${budgetPct}%` }}
+        >
+          1200 ms
+        </span>
+      </div>
+      <p className="text-caption tabular-nums text-ink-2">
+        {over ? `${shown} ms, past the 1200 ms budget` : `${shown} ms`}
       </p>
     </div>
   );

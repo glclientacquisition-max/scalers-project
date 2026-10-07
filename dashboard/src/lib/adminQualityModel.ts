@@ -278,13 +278,13 @@ export function diagnosisLine(call: { diagnosis: string | null; checks: VoiceChe
 }
 
 export function formatScore(score: number | null): string {
-  if (score == null || !Number.isFinite(score)) return "None";
+  if (score == null || !Number.isFinite(score)) return "Not logged";
   const rounded = Math.round(score * 10) / 10;
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
 export function formatDelta(delta: number | null): string {
-  if (delta == null || !Number.isFinite(delta)) return "None";
+  if (delta == null || !Number.isFinite(delta)) return "Not logged";
   const rounded = Math.round(delta * 10) / 10;
   const body = Number.isInteger(rounded) ? String(Math.abs(rounded)) : Math.abs(rounded).toFixed(1);
   if (rounded > 0) return `+${body}`;
@@ -293,7 +293,7 @@ export function formatDelta(delta: number | null): string {
 }
 
 export function formatDuration(sec: number | null): string {
-  if (sec == null || !Number.isFinite(sec)) return "None";
+  if (sec == null || !Number.isFinite(sec)) return "Not logged";
   const total = Math.max(0, Math.round(sec));
   const minutes = Math.floor(total / 60);
   const seconds = total % 60;
@@ -303,7 +303,7 @@ export function formatDuration(sec: number | null): string {
 
 export function shortSha(sha: string): string {
   const clean = sha.trim();
-  if (!clean) return "None";
+  if (!clean) return "Not logged";
   return clean.length <= 7 ? clean : clean.slice(0, 7);
 }
 
@@ -430,7 +430,7 @@ export function finalStt(turn: VoiceTurnTrace): { heard: string; language: strin
 
 export function languageLine(turn: VoiceTurnTrace): string {
   const row = lastStage(turn.stages, "language");
-  if (!row) return "None";
+  if (!row) return "Not logged";
   return `Detected ${row.detected}. Sticky ${row.sticky}.`;
 }
 

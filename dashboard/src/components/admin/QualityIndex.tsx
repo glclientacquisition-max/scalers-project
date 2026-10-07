@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { QualityEmpty } from "@/components/admin/QualityEmpty";
-import { DroppingMark, QualitySpark, formatCallWhen } from "@/components/admin/QualityBits";
+import { DeltaMark, DroppingMark, QualitySpark, Unlogged, formatCallWhen } from "@/components/admin/QualityBits";
 import { ButtonLink } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
 import { Input } from "@/components/ui/Field";
@@ -13,7 +13,6 @@ import { Stamp } from "@/components/ui/Stamp";
 import { Table, Tbody, Td, Th, Thead } from "@/components/ui/Table";
 import {
   checkLabel,
-  formatDelta,
   formatScore,
   qualityBusinessHref,
   qualityListHref,
@@ -26,19 +25,24 @@ import {
 } from "@/lib/adminQualityModel";
 
 function phonePreview(row: BusinessQualityRow): string {
-  const failure = row.topFailure ? checkLabel(row.topFailure) : "No failing check";
+  const failure = row.topFailure ? checkLabel(row.topFailure) : "No failures";
   const calls = `${row.callsTraced} calls`;
   if (row.dropping) return `${calls}. ${failure}. ${row.droppingReason}`;
   return `${calls}. ${failure}`;
 }
 
-function checkLines(delta: ReleaseDelta): string[] {
+function checkRows(delta: ReleaseDelta) {
   return VOICE_CHECKS.flatMap((check) => {
     const before = delta.before.checks[check] || 0;
     const after = delta.after.checks[check] || 0;
     if (before === 0 && after === 0) return [];
-    return [`${checkLabel(check)} ${before} to ${after} (${formatDelta(after - before)})`];
+    return [{ check, before, after, delta: after - before }];
   });
+}
+
+function ScoreText({ score }: { score: number | null }) {
+  if (score == null) return <Unlogged />;
+  return formatScore(score);
 }
 
 export function QualityIndex({
@@ -62,7 +66,10 @@ export function QualityIndex({
   return (
     <div className="space-y-8">
       <section>
-        <h1 className="sr-only">Quality</h1>
+        <header className="px-4 pb-3">
+          <h1 className="text-page text-ink">Quality</h1>
+          <p className="mt-0.5 text-meta text-ink-2">Traced calls, worst first.</p>
+        </header>
         <div className="px-4 pb-2">
           <Input
             id="quality-search"
@@ -115,16 +122,20 @@ export function QualityIndex({
                             {row.name}
                           </Link>
                         </Td>
-                        <Td num>{formatScore(row.score)}</Td>
+                        <Td num>
+                          <ScoreText score={row.score} />
+                        </Td>
                         <Td>
                           <QualitySpark points={row.trend} dropping={row.dropping} />
                         </Td>
-                        <Td>{row.topFailure ? checkLabel(row.topFailure) : "None"}</Td>
+                        <Td>{row.topFailure ? checkLabel(row.topFailure) : <Unlogged>No failures</Unlogged>}</Td>
                         <Td>
                           <DroppingMark dropping={row.dropping} reason={row.droppingReason} />
                         </Td>
                         <Td num>{row.callsTraced}</Td>
-                        <Td className="tabular-nums text-ink-2">{formatCallWhen(row.lastCallAt)}</Td>
+                        <Td className="tabular-nums text-ink-2">
+                          {row.lastCallAt ? formatCallWhen(row.lastCallAt) : <Unlogged />}
+                        </Td>
                       </tr>
                     );
                   })}
@@ -139,7 +150,7 @@ export function QualityIndex({
                   leading={<QualitySpark points={row.trend} dropping={row.dropping} />}
                   title={row.name}
                   preview={phonePreview(row)}
-                  when={formatScore(row.score)}
+                  when={row.score == null ? undefined : formatScore(row.score)}
                   stamp={
                     row.dropping ? (
                       <Stamp tone="attention">Dropping</Stamp>
@@ -184,14 +195,21 @@ export function QualityIndex({
                           <span className="block font-medium text-ink">{row.release.label}</span>
                           <span className="text-caption tabular-nums text-ink-3">{shortSha(row.release.gitSha)}</span>
                         </Td>
-                        <Td num>{formatScore(row.before.avgScore)}</Td>
-                        <Td num>{formatScore(row.after.avgScore)}</Td>
-                        <Td num>{formatDelta(delta)}</Td>
+                        <Td num>
+                          <ScoreText score={row.before.avgScore} />
+                        </Td>
+                        <Td num>
+                          <ScoreText score={row.after.avgScore} />
+                        </Td>
+                        <Td num>
+                          <DeltaMark delta={delta} />
+                        </Td>
                         <Td>
                           <ul className="space-y-1">
-                            {checkLines(row).map((line) => (
-                              <li key={line} className="text-meta tabular-nums text-ink-2">
-                                {line}
+                            {checkRows(row).map((line) => (
+                              <li key={line.check} className="text-meta tabular-nums text-ink-2">
+                                {checkLabel(line.check)} {line.before} to {line.after} (
+                                <DeltaMark delta={line.delta} lowerIsBetter />)
                               </li>
                             ))}
                           </ul>
@@ -215,12 +233,14 @@ export function QualityIndex({
                       <span className="shrink-0 text-caption tabular-nums text-ink-3">{shortSha(row.release.gitSha)}</span>
                     </p>
                     <p className="text-meta tabular-nums text-ink-2">
-                      Score {formatScore(row.before.avgScore)} to {formatScore(row.after.avgScore)} ({formatDelta(delta)})
+                      Score <ScoreText score={row.before.avgScore} /> to <ScoreText score={row.after.avgScore} /> (
+                      <DeltaMark delta={delta} />)
                     </p>
                     <ul className="space-y-0.5">
-                      {checkLines(row).map((line) => (
-                        <li key={line} className="text-meta tabular-nums text-ink-2">
-                          {line}
+                      {checkRows(row).map((line) => (
+                        <li key={line.check} className="text-meta tabular-nums text-ink-2">
+                          {checkLabel(line.check)} {line.before} to {line.after} (
+                          <DeltaMark delta={line.delta} lowerIsBetter />)
                         </li>
                       ))}
                     </ul>

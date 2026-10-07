@@ -92,7 +92,7 @@ describe("admin desk standard shell", () => {
     assert.equal(got.nested.label === "Back", false);
     assert.doesNotMatch(adminNav, />Back</);
     assert.match(adminNav, /adminParentTarget/);
-    assert.match(adminNav, /<DeskBack href=\{parent\.href\}>\{parent\.label\}<\/DeskBack>/);
+    assert.match(adminNav, /<DeskBack href=\{href\(parent\.href\)\}>\{parent\.label\}<\/DeskBack>/);
     assert.doesNotMatch(adminNav, /BackChevron/);
   });
 
