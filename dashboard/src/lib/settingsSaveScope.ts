@@ -63,6 +63,11 @@ function scopeOwns(scope: string, field: string): boolean {
   return owned.includes(field);
 }
 
+/** Whether this panel save may overwrite and attest the given form field. */
+export function settingsScopeIncludes(scope: string, field: string): boolean {
+  return scopeOwns(scope, field);
+}
+
 /** Errors for fields this scope owns. Other panels' fields do not fail the save. */
 export function settingsScopeValidationError(
   scope: string,

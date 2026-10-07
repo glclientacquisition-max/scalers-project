@@ -48,7 +48,9 @@ import {
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
-import { stampOwnerFieldPaths } from "@/app/(desk)/settings/provenanceActions";
+import { ownerAttestFields } from "@/lib/ownerAttestFields";
+import { fieldPathsAttestedOnSettingsSave } from "@/lib/fieldPathsFromSettingsSave";
+import { cleanFieldPaths } from "@/lib/fieldPathRegistry";
 import {
   settingsFieldFromScope,
   settingsScopeValidationError,
@@ -326,7 +328,7 @@ export async function saveAndCompileSettings(
     return ownerSaveFailed("settings.save", error.message);
   }
 
-  const ownerPaths = (() => {
+  const ownerPathsFromForm = (() => {
     try {
       const parsed = JSON.parse(String(formData.get("owner_field_paths") || "[]"));
       return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
@@ -334,9 +336,37 @@ export async function saveAndCompileSettings(
       return [];
     }
   })();
-  await stampOwnerFieldPaths(tenant.id, ownerPaths);
 
-  await getAuthUser();
+  const socialChannels = socialHandles?.channels;
+  const hasSocialHandles =
+    Array.isArray(socialChannels) &&
+    socialChannels.some((row) => row && String(row.value || "").trim());
+
+  const pathsFromSave = fieldPathsAttestedOnSettingsSave({
+    scope,
+    businessName,
+    vertical,
+    spokenName,
+    agentName,
+    agentTone,
+    agentTools,
+    hasStructuredHours: Boolean(scheduleForSave),
+    businessHoursLength: businessHours.length,
+    businessLocationsCount: businessLocations.length,
+    businessPolicies,
+    productCatalog,
+    servicesCatalog,
+    faqs,
+    hasSocialHandles,
+    lineNumber: String(tenant.sautikit_virtual_number || "").trim(),
+  });
+
+  const user = await getAuthUser();
+  await ownerAttestFields(
+    tenant.id,
+    cleanFieldPaths([...pathsFromSave, ...ownerPathsFromForm]),
+    user?.id ?? null
+  );
 
   revalidatePath("/settings");
 
