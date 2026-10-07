@@ -12,6 +12,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { Stamp } from "@/components/ui/Stamp";
 import { Table, Tbody, Td, Th, Thead } from "@/components/ui/Table";
 import {
+  callCountLabel,
   checkLabel,
   formatScore,
   qualityBusinessHref,
@@ -26,7 +27,7 @@ import {
 
 function phonePreview(row: BusinessQualityRow): string {
   const failure = row.topFailure ? checkLabel(row.topFailure) : "No failures";
-  const calls = `${row.callsTraced} calls`;
+  const calls = callCountLabel(row.callsTraced);
   if (row.dropping) return `${calls}. ${failure}. ${row.droppingReason}`;
   return `${calls}. ${failure}`;
 }
@@ -155,7 +156,7 @@ export function QualityIndex({
                     row.dropping ? (
                       <Stamp tone="attention">Dropping</Stamp>
                     ) : (
-                      <Stamp tone="neutral">{row.callsTraced}</Stamp>
+                      <span className="text-meta text-ink-3">Steady</span>
                     )
                   }
                 />

@@ -15,7 +15,7 @@ function read(rel) {
 
 function loadParents() {
   const script = `
-    import { adminParentTarget, ADMIN_LINKS } from ${JSON.stringify(linksPath)};
+    import { adminParentTarget, adminPhoneMore, adminPhoneTabs, ADMIN_LINKS } from ${JSON.stringify(linksPath)};
     const cases = {
       overview: adminParentTarget("/admin"),
       billingClient: adminParentTarget("/admin/billing/abc"),
@@ -26,6 +26,8 @@ function loadParents() {
       unknown: adminParentTarget("/admin/ops/extra"),
       query: adminParentTarget("/admin/voices/1?x=1"),
       labels: ADMIN_LINKS.map((item) => item.label),
+      phoneTabs: adminPhoneTabs().map((item) => item.label),
+      phoneMore: adminPhoneMore().map((item) => item.label),
     };
     console.log(JSON.stringify(cases));
   `;
@@ -66,6 +68,12 @@ describe("admin desk standard shell", () => {
     assert.match(adminNav, /md:flex/);
     assert.match(adminNav, /md:hidden/);
     assert.match(adminNav, /min-h-12/);
+    assert.match(adminNav, /adminPhoneTabs\(\)/);
+    assert.match(adminNav, />More</);
+    assert.doesNotMatch(adminNav, /overflow-x-auto/);
+    assert.doesNotMatch(adminNav, /w-\[4\.5rem\]/);
+    assert.deepEqual(loadParents().phoneTabs, ["Overview", "Businesses", "Quality", "Numbers"]);
+    assert.deepEqual(loadParents().phoneMore, ["Platform", "Packages", "Voices"]);
     assert.match(links, /safe-area-inset-top/);
     assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/(desk)/loading.tsx")), false);
     assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/admin/loading.tsx")), false);

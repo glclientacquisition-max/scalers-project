@@ -19,6 +19,23 @@ export const ADMIN_LINKS: readonly AdminLink[] = [
   { href: "/admin/voices", label: "Voices", exact: false },
 ];
 
+/** Phone bar. Seven labels do not fit at 360 without clipping, so the rest live under More. */
+const PHONE_TAB_HREFS = ["/admin", "/admin/businesses", "/admin/quality", "/admin/numbers"] as const;
+
+export function adminPhoneTabs(): AdminLink[] {
+  const byHref = new Map(ADMIN_LINKS.map((item) => [item.href, item]));
+  return PHONE_TAB_HREFS.map((href) => {
+    const item = byHref.get(href);
+    if (!item) throw new Error(`Missing admin phone tab ${href}`);
+    return item;
+  });
+}
+
+export function adminPhoneMore(): AdminLink[] {
+  const shown = new Set<string>(PHONE_TAB_HREFS);
+  return ADMIN_LINKS.filter((item) => !shown.has(item.href));
+}
+
 export const adminShellClass =
   "admin-theme fixed inset-0 flex min-w-0 overflow-hidden bg-canvas text-ink pt-[env(safe-area-inset-top,0px)]";
 

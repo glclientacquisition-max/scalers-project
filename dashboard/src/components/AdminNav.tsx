@@ -7,11 +7,14 @@ import { AdminAccountMenu } from "@/components/AdminAccountMenu";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
+import { Menu, MenuLinkItem } from "@/components/ui/Menu";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   ADMIN_LINKS,
   adminMainClass,
   adminParentTarget,
+  adminPhoneMore,
+  adminPhoneTabs,
   adminRouteActive,
   adminShellClass,
 } from "@/lib/adminLinks";
@@ -104,6 +107,15 @@ function AdminIcon({ name }: { name: string }) {
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
         <rect x="6" y="2.5" width="8" height="15" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
         <path d="M9 15h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === "More") {
+    return (
+      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className={cls}>
+        <circle cx="4.5" cy="10" r="1.25" />
+        <circle cx="10" cy="10" r="1.25" />
+        <circle cx="15.5" cy="10" r="1.25" />
       </svg>
     );
   }
@@ -242,6 +254,54 @@ function retapAdminTab() {
   window.dispatchEvent(new Event(PHONE_TAB_REFRESH_EVENT));
 }
 
+const phoneTabClass =
+  "flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 pt-1.5";
+const phoneLabelClass = "max-w-full truncate text-center text-caption leading-none";
+
+/** Platform, Packages, and Voices. The bar itself stays five items wide. */
+function AdminPhoneMore() {
+  const { path, href: mapHref } = useAdminChrome();
+  const more = adminPhoneMore();
+  const active = more.some((item) => adminRouteActive(path, item.href, item.exact));
+
+  return (
+    <Menu
+      side="top"
+      align="end"
+      trigger={
+        <button
+          type="button"
+          aria-label="More"
+          className={[
+            phoneTabClass,
+            deskShiftClass,
+            focusRingVisible,
+            active ? "font-semibold text-accent-deep" : "font-medium text-ink-soft",
+          ].join(" ")}
+        >
+          <AdminIcon name="More" />
+          <span className={phoneLabelClass}>More</span>
+        </button>
+      }
+    >
+      {more.map((item) => {
+        const current = adminRouteActive(path, item.href, item.exact);
+        return (
+          <MenuLinkItem
+            key={item.href}
+            href={mapHref(item.href)}
+            aria-current={current ? "page" : undefined}
+            className={current ? "font-semibold text-accent-deep" : undefined}
+          >
+            <AdminIcon name={item.label} />
+            {item.label}
+          </MenuLinkItem>
+        );
+      })}
+    </Menu>
+  );
+}
+
 /** Phone destinations. Hidden on a nested admin screen so the parent control owns the thumb zone. */
 export function AdminTabBar() {
   const { path } = useAdminChrome();
@@ -252,11 +312,11 @@ export function AdminTabBar() {
     <nav
       data-admin-tabbar=""
       aria-label="Super Admin"
-      className="glass-chrome fixed inset-x-0 bottom-0 z-50 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-x-auto border-t border-line/80 pb-[env(safe-area-inset-bottom)] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"
+      className="glass-chrome fixed inset-x-0 bottom-0 z-tabbar isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-hidden border-t border-line/80 pb-[env(safe-area-inset-bottom)] md:hidden"
     >
-      <ul className="flex w-max min-w-full">
-        {ADMIN_LINKS.map((item) => (
-          <li key={item.href} className="w-[4.5rem] shrink-0 overflow-visible">
+      <ul className="flex w-full">
+        {adminPhoneTabs().map((item) => (
+          <li key={item.href} className="min-w-0 flex-1">
             <AdminDestinationLink
               href={item.href}
               label={item.label}
@@ -264,13 +324,16 @@ export function AdminTabBar() {
               pendingHref={pendingHref}
               setPendingHref={setPendingHref}
               onRetap={retapAdminTab}
-              className="flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 overflow-visible px-0.5 pt-1.5 text-[10px] leading-tight"
+              className={phoneTabClass}
               activeClassName="font-semibold text-accent-deep"
               idleClassName="font-medium text-ink-soft"
-              labelClassName="max-w-full whitespace-nowrap text-center"
+              labelClassName={phoneLabelClass}
             />
           </li>
         ))}
+        <li className="min-w-0 flex-1">
+          <AdminPhoneMore />
+        </li>
       </ul>
     </nav>
   );

@@ -277,6 +277,12 @@ export function diagnosisLine(call: { diagnosis: string | null; checks: VoiceChe
   return top ? checkLabel(top) : "No failing checks";
 }
 
+/** 0 calls, 1 call, 2 calls. */
+export function callCountLabel(count: number): string {
+  const n = Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
+  return `${n} ${n === 1 ? "call" : "calls"}`;
+}
+
 export function formatScore(score: number | null): string {
   if (score == null || !Number.isFinite(score)) return "Not logged";
   const rounded = Math.round(score * 10) / 10;

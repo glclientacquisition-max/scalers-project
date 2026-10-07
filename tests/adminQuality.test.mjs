@@ -6,7 +6,7 @@ const modelUrl = new URL("../dashboard/src/lib/adminQualityModel.ts", import.met
 
 const { listBusinessQuality, getBusinessQuality, getCallTrace, listReleaseDeltas, qualityBadges } =
   await import(qualityUrl.href);
-const { couldntAnswerQuestions, callToFixture, diagnosisLine, droppingAttentionRows, emptyChecks } =
+const { callCountLabel, couldntAnswerQuestions, callToFixture, diagnosisLine, droppingAttentionRows, emptyChecks } =
   await import(modelUrl.href);
 
 function checks(partial = {}) {
@@ -37,6 +37,12 @@ describe("admin quality seam", () => {
     assert.equal(await getCallTrace("HD_dev_low"), null);
     assert.deepEqual(await listReleaseDeltas(), []);
     assert.deepEqual(await qualityBadges(), {});
+  });
+
+  it("pluralizes a traced-call count", () => {
+    assert.equal(callCountLabel(0), "0 calls");
+    assert.equal(callCountLabel(1), "1 call");
+    assert.equal(callCountLabel(5), "5 calls");
   });
 
   it("dedupes Couldn't answer by caller question", () => {
