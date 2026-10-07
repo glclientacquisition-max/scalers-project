@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FailChips, LatencyBar, StruckDrop, TurnFact, Unlogged, formatCallWhen } from "@/components/admin/QualityBits";
+import { QualityRecording } from "@/components/admin/QualityRecording";
 import { SaveAsTest } from "@/components/admin/SaveAsTest";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
@@ -18,21 +19,30 @@ import {
   type VoiceTurnTrace,
 } from "@/lib/adminQualityModel";
 
-function TurnTimeline({ turn }: { turn: VoiceTurnTrace }) {
+function turnTitle(turn: VoiceTurnTrace, turns: readonly VoiceTurnTrace[]): string {
+  let min = turn.turnIndex;
+  for (const row of turns) {
+    if (row.turnIndex < min) min = row.turnIndex;
+  }
+  const number = min >= 1 ? turn.turnIndex : turn.turnIndex + 1;
+  return `Turn ${number}`;
+}
+
+function TurnTimeline({ turn, turns }: { turn: VoiceTurnTrace; turns: readonly VoiceTurnTrace[] }) {
   const heard = finalStt(turn);
   const spoken = spokenLine(turn);
   const raw = geminiRaw(turn);
   const transforms = transformRows(turn);
   const latency = latencyMs(turn);
   const barge = bargeReason(turn);
-  const failed = failingChecks(turn.checks);
+  const failed = turn.checks ? failingChecks(turn.checks) : [];
 
   return (
     <article className="border-b border-hairline py-4">
       <header className="flex flex-wrap items-center gap-2">
-        <h3 className="text-body font-medium text-ink">Turn {turn.turnIndex + 1}</h3>
+        <h3 className="text-body font-medium text-ink">{turnTitle(turn, turns)}</h3>
         <span className="text-caption tabular-nums text-ink-3">{formatCallWhen(turn.at)}</span>
-        {failed.length > 0 ? <FailChips checks={turn.checks} /> : null}
+        {turn.checks && failed.length > 0 ? <FailChips checks={turn.checks} /> : null}
       </header>
       <dl className="mt-3 space-y-3">
         <TurnFact label="Caller said">{turn.caller.text || <Unlogged />}</TurnFact>
@@ -92,7 +102,7 @@ function TurnTimeline({ turn }: { turn: VoiceTurnTrace }) {
           Raw
         </summary>
         <pre className="mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-xl bg-surface-2 p-3 text-caption text-ink-2">
-          {JSON.stringify(turn.stages, null, 2)}
+          {JSON.stringify(turn.rawStages ?? turn.stages, null, 2)}
         </pre>
       </details>
     </article>
@@ -106,10 +116,13 @@ export function QualityCall({
   trace,
   businessHref,
   listHref,
+  showRecording = false,
 }: {
   trace: VoiceCallTrace;
   businessHref: string;
   listHref: string;
+  /** Live calls always pass this. Fixtures omit it. */
+  showRecording?: boolean;
 }) {
   const turns = trace.turns.toSorted((a, b) => a.turnIndex - b.turnIndex);
 
@@ -138,10 +151,16 @@ export function QualityCall({
         <FailChips checks={trace.checks} />
       </div>
       <p className="text-body text-ink [overflow-wrap:anywhere]">{diagnosisLine(trace)}</p>
+      {showRecording ? (
+        <section className="space-y-2">
+          <h2 className="text-title text-ink">Recording</h2>
+          <QualityRecording src={trace.recordingUrl ?? null} />
+        </section>
+      ) : null}
       <ol>
         {turns.map((turn) => (
           <li key={turn.turnIndex}>
-            <TurnTimeline turn={turn} />
+            <TurnTimeline turn={turn} turns={turns} />
           </li>
         ))}
       </ol>

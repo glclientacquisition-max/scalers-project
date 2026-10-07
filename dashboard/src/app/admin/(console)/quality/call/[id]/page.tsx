@@ -25,6 +25,7 @@ export default async function AdminQualityCallPage({ params }: { params: Promise
         trace={trace}
         listHref={qualityListHref("/admin/quality", "7d")}
         businessHref={qualityBusinessHref("/admin/quality", trace.businessId, "7d")}
+        showRecording
       />
     );
   } catch (err) {

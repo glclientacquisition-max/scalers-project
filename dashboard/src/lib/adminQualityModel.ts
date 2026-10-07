@@ -1,9 +1,9 @@
 /**
  * Voice quality view model for Super Admin.
  * Shape follows trace schema v1 (`scalers.voice.turn` / `scalers.voice.call`)
- * plus the fields Platform still has to persist: call score, per-check counts,
- * diagnosis, release, and per-turn check hits. Business rows add `dropping`
- * and `droppingReason`.
+ * plus the call row: score, per-check counts, diagnosis, and release.
+ * Per-turn `checks` are optional until Voice persists them. Business rows add
+ * `dropping` and `droppingReason`, computed in `adminQuality.ts`.
  *
  * Reads live in `adminQuality.ts` (server-only). This file is pure so the
  * desk, the dev harness, and tests can share it.
@@ -27,6 +27,12 @@ export type VoiceCheckCounts = Record<VoiceCheckName, number>;
 export type QualityRange = "7d" | "30d";
 
 export const LATENCY_BUDGET_MS = 1200;
+
+/**
+ * Caller outcomes that count as Couldn't answer.
+ * Match is case-insensitive. Brain confirms these literals.
+ */
+export const COULDNT_ANSWER_OUTCOMES = ["unknown", "escalation"] as const;
 
 /** Higher impact first. Ties in `topCheck` break toward this order. */
 const CHECK_SEVERITY: readonly VoiceCheckName[] = [
@@ -114,10 +120,13 @@ export type VoiceTurnTrace = {
   caller: { text: string; language: string; confidence: number | null };
   stages: VoiceStage[];
   /**
-   * Per-turn check hits. Not a column on schema v1. Platform fills this from
-   * the scorer so the timeline can pin a failing check without rescoring.
+   * Per-turn check hits. Not stored yet. Present only when the turn payload
+   * or turn row actually carries `checks`. Absent means the timeline does not
+   * pin a check.
    */
-  checks: VoiceCheckCounts;
+  checks?: VoiceCheckCounts;
+  /** Persisted stage list, including stages the timeline does not render. */
+  rawStages?: unknown;
 };
 
 export type VoiceRelease = {
@@ -147,6 +156,11 @@ export type VoiceCallTrace = {
   /** Persisted one-line read. Null until the scorer stores one. */
   diagnosis: string | null;
   release: VoiceRelease | null;
+  /**
+   * Playable recording, or null when the call has none.
+   * Omitted on fixtures. A 403 or 404 is stored as null.
+   */
+  recordingUrl?: string | null;
 };
 
 export type BusinessQualityRow = {
@@ -252,7 +266,8 @@ export function cannedLabel(path: string): string {
   return CANNED_LABELS[path] || path.replaceAll("_", " ");
 }
 
-export function failingChecks(checks: VoiceCheckCounts): VoiceCheckName[] {
+export function failingChecks(checks: VoiceCheckCounts | null | undefined): VoiceCheckName[] {
+  if (!checks) return [];
   return CHECK_SEVERITY.filter((check) => (checks[check] || 0) > 0);
 }
 
@@ -343,16 +358,19 @@ function questionKey(text: string): string {
     .replace(/\s+/g, " ");
 }
 
+function isCouldntAnswerOutcome(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return (COULDNT_ANSWER_OUTCOMES as readonly string[]).includes(normalized);
+}
+
 function turnMissed(turn: VoiceTurnTrace): boolean {
-  if ((turn.checks.incomplete || 0) > 0) return true;
-  if ((turn.checks.silence || 0) > 0) return true;
-  if ((turn.checks.deletedAnswer || 0) > 0) return true;
+  const checks = turn.checks;
+  if (checks && ((checks.incomplete || 0) > 0 || (checks.silence || 0) > 0 || (checks.deletedAnswer || 0) > 0)) {
+    return true;
+  }
   for (const stage of turn.stages) {
     if (stage.stage === "canned" && stage.path === "llm_recovery") return true;
-    if (stage.stage === "outcome") {
-      const value = stage.value.trim().toLowerCase();
-      if (value === "unknown" || value === "escalation") return true;
-    }
+    if (stage.stage === "outcome" && isCouldntAnswerOutcome(stage.value)) return true;
   }
   return false;
 }
@@ -436,7 +454,7 @@ export function finalStt(turn: VoiceTurnTrace): { heard: string; language: strin
 
 export function languageLine(turn: VoiceTurnTrace): string {
   const row = lastStage(turn.stages, "language");
-  if (!row) return "Not logged";
+  if (!row || (!row.detected && !row.sticky)) return "Not logged";
   return `Detected ${row.detected}. Sticky ${row.sticky}.`;
 }
 

@@ -4,10 +4,17 @@ import { describe, it } from "node:test";
 const qualityUrl = new URL("../dashboard/src/lib/adminQuality.ts", import.meta.url);
 const modelUrl = new URL("../dashboard/src/lib/adminQualityModel.ts", import.meta.url);
 
-const { listBusinessQuality, getBusinessQuality, getCallTrace, listReleaseDeltas, qualityBadges } =
+const { listBusinessQuality, getBusinessQuality, getCallTrace, listReleaseDeltas, qualityBadges, droppingVerdict, releaseDeltasFromCalls } =
   await import(qualityUrl.href);
-const { callCountLabel, couldntAnswerQuestions, callToFixture, diagnosisLine, droppingAttentionRows, emptyChecks } =
-  await import(modelUrl.href);
+const {
+  callCountLabel,
+  couldntAnswerQuestions,
+  callToFixture,
+  diagnosisLine,
+  droppingAttentionRows,
+  emptyChecks,
+  COULDNT_ANSWER_OUTCOMES,
+} = await import(modelUrl.href);
 
 function checks(partial = {}) {
   return { ...emptyChecks(), ...partial };
@@ -29,8 +36,26 @@ function turn({ text, hit = {}, stages = [], turnIndex = 0 }) {
   };
 }
 
+const NOW = Date.parse("2026-10-07T12:00:00.000Z");
+const DAY = 24 * 60 * 60 * 1000;
+
+function sample(daysAgo, score, partial = {}) {
+  return { at: new Date(NOW - daysAgo * DAY).toISOString(), score, checks: checks(partial) };
+}
+
+function fill(daysAgo, score, count, partial = {}) {
+  return Array.from({ length: count }, (_, index) => sample(daysAgo + index * 0.05, score, partial));
+}
+
 describe("admin quality seam", () => {
-  it("returns empty reads until Platform wires service-role traces", async () => {
+  it("returns empty reads when the service-role client is not configured", async (t) => {
+    const configured = Boolean(
+      process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+    );
+    if (configured) {
+      t.skip("service-role client is configured");
+      return;
+    }
     assert.deepEqual(await listBusinessQuality("7d"), []);
     assert.deepEqual(await listBusinessQuality("30d"), []);
     assert.equal(await getBusinessQuality("biz-dusted", "7d"), null);
@@ -39,10 +64,97 @@ describe("admin quality seam", () => {
     assert.deepEqual(await qualityBadges(), {});
   });
 
+  it("marks dropping when the 7-day average falls at least 10 with five scored calls each side", () => {
+    const dropped = droppingVerdict([...fill(1, 70, 5), ...fill(8, 85, 5)], NOW);
+    assert.equal(dropped.dropping, true);
+    assert.equal(dropped.droppingReason, "Score fell 15 points in 7 days");
+
+    const exact = droppingVerdict([...fill(1, 70, 5), ...fill(8, 80, 5)], NOW);
+    assert.equal(exact.dropping, true);
+    assert.equal(exact.droppingReason, "Score fell 10 points in 7 days");
+
+    const small = droppingVerdict([...fill(1, 76, 5), ...fill(8, 85, 5)], NOW);
+    assert.equal(small.dropping, false);
+
+    const thin = droppingVerdict([...fill(1, 50, 4), ...fill(8, 90, 5)], NOW);
+    assert.equal(thin.dropping, false);
+
+    const unscored = droppingVerdict(
+      [...fill(1, 50, 4), sample(1.4, null), ...fill(8, 90, 5)],
+      NOW,
+    );
+    assert.equal(unscored.dropping, false);
+  });
+
+  it("marks dropping when a check missing from the prior 7 days hits three calls", () => {
+    const fresh = droppingVerdict(
+      [...fill(1, 80, 3, { silence: 1 }), ...fill(1.5, 80, 2), ...fill(8, 80, 5)],
+      NOW,
+    );
+    assert.equal(fresh.dropping, true);
+    assert.equal(fresh.droppingReason, "Silence on 3 calls");
+
+    const alreadyThere = droppingVerdict(
+      [...fill(1, 80, 3, { silence: 1 }), ...fill(8, 80, 1, { silence: 1 }), ...fill(9, 80, 4)],
+      NOW,
+    );
+    assert.equal(alreadyThere.dropping, false);
+
+    const two = droppingVerdict(
+      [...fill(1, 80, 2, { silence: 1 }), ...fill(8, 80, 5)],
+      NOW,
+    );
+    assert.equal(two.dropping, false);
+
+    const scoreWins = droppingVerdict(
+      [...fill(1, 60, 5, { silence: 1 }), ...fill(8, 80, 5)],
+      NOW,
+    );
+    assert.equal(scoreWins.droppingReason, "Score fell 20 points in 7 days");
+  });
+
+  it("compares a release with the calls on the side before it", () => {
+    const deltas = releaseDeltasFromCalls([
+      {
+        at: "2026-10-01T00:00:00.000Z",
+        score: 40,
+        checks: checks({ silence: 2 }),
+        release: { gitSha: "aaa", branch: "main", label: "Before" },
+      },
+      {
+        at: "2026-10-02T00:00:00.000Z",
+        score: 60,
+        checks: checks({ silence: 1 }),
+        release: { gitSha: "bbb", branch: "main", label: "After" },
+      },
+    ]);
+    assert.equal(deltas.length, 1);
+    assert.equal(deltas[0].release.label, "After");
+    assert.equal(deltas[0].before.avgScore, 40);
+    assert.equal(deltas[0].after.avgScore, 60);
+    assert.equal(deltas[0].before.checks.silence, 2);
+    assert.equal(deltas[0].after.checks.silence, 1);
+    assert.deepEqual(
+      releaseDeltasFromCalls([
+        {
+          at: "2026-10-07T00:00:00.000Z",
+          score: 66.5,
+          checks: checks(),
+          release: { gitSha: "only", branch: "main", label: "" },
+        },
+      ]),
+      [],
+    );
+  });
+
   it("pluralizes a traced-call count", () => {
     assert.equal(callCountLabel(0), "0 calls");
     assert.equal(callCountLabel(1), "1 call");
     assert.equal(callCountLabel(5), "5 calls");
+  });
+
+  it("keeps Couldn't answer outcomes behind one constant", () => {
+    assert.deepEqual(COULDNT_ANSWER_OUTCOMES, ["unknown", "escalation"]);
   });
 
   it("dedupes Couldn't answer by caller question", () => {
@@ -83,9 +195,17 @@ describe("admin quality seam", () => {
         stages: [{ stage: "canned", path: "greeting", text: "Habari." }],
         turnIndex: 6,
       }),
+      {
+        ...turn({
+          text: "Bei gani?",
+          stages: [{ stage: "outcome", value: "unknown" }],
+          turnIndex: 7,
+        }),
+        checks: undefined,
+      },
     ]);
 
-    assert.deepEqual(questions, ["Unafanya huduma gani?", "Naweza kuja kesho?", "Ni Alvin."]);
+    assert.deepEqual(questions, ["Unafanya huduma gani?", "Naweza kuja kesho?", "Ni Alvin.", "Bei gani?"]);
   });
 
   it("uses the persisted diagnosis, then the top check", () => {
