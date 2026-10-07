@@ -30,7 +30,7 @@ const {
   repairLine,
   finishSentence,
 } = require('./structuredReply');
-const { createNameGate } = require('./turnMachine');
+const { createNameGate, guardStageSentence } = require('./turnMachine');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -60,10 +60,6 @@ async function readStructuredStream(stream, { lockedLanguage, onSentence, should
     if (tick.language) language = tick.language;
     if (language && language !== lockedLanguage) mismatch = true;
     if (mismatch) continue;
-    if (!language) {
-      held.push(...tick.sentences);
-      continue;
-    }
     const ready = held.splice(0, held.length).concat(tick.sentences);
     for (const sentence of ready) {
       if (shouldAbort?.()) break;
@@ -84,6 +80,7 @@ async function readStructuredStream(stream, { lockedLanguage, onSentence, should
     modelParts,
     thoughtSignature,
     firstTokenAt,
+    firstSentenceAt,
     firstSentenceMs: firstSentenceAt ? firstSentenceAt - started : null,
   };
 }
@@ -118,7 +115,14 @@ async function runStructuredGeminiTurn({
   const locked = getLanguagePack(lockedLanguage).code;
   const gate = createNameGate(callerState, locked);
   async function emitSentence(sentence) {
-    const line = gate.consider(sentence);
+    const guarded = guardStageSentence(sentence, {
+      greetingPlayed: callerState?.voice?.greetingPlayed === true,
+      businessName: callerState?.voice?.businessName || '',
+      replyLanguage: locked,
+      stage: callerState?.voice?.stage || '',
+      catalog: callerState?.voice?.catalog || null,
+    });
+    const line = gate.consider(guarded);
     if (!line || typeof onSentence !== 'function') return;
     await onSentence(line);
   }
@@ -269,6 +273,7 @@ async function runStructuredGeminiTurn({
     rawText: read?.raw || reconstructed,
     firstTokenAt: read?.firstTokenAt || null,
     spokenEmitted: read?.emitted || (hardDown ? 0 : sentences.length),
+    firstSentenceAt: read?.firstSentenceAt || null,
     firstSentenceMs: read?.firstSentenceMs ?? null,
     model,
     actionConfirmation,

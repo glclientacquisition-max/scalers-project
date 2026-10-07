@@ -1,6 +1,13 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { scoreTurns, compareToBaseline, languagesMatch, cutoffIndicator } = require('../src/speech/voiceScore');
+const {
+  scoreTurns,
+  compareToBaseline,
+  languagesMatch,
+  cutoffIndicator,
+  firstPcmRegression,
+  FIRST_PCM_P50_TARGET_MS,
+} = require('../src/speech/voiceScore');
 const { replayCall } = require('../src/speech/replayVoice');
 
 function turn(caller, spoken, extra = {}) {
@@ -120,5 +127,16 @@ describe('voice score', () => {
     assert.equal(replay.turns.length, 1);
     assert.equal(replay.turns[0].schemaVersion, 1);
     assert.ok(replay.turns[0].stages.some((row) => row.stage === 'tts'));
+  });
+});
+
+describe('first pcm regression', () => {
+  it('fails only when measured p50 is more than 200ms slower', () => {
+    assert.equal(FIRST_PCM_P50_TARGET_MS, 1200);
+    assert.equal(firstPcmRegression([], 1603).regression, false);
+    assert.equal(firstPcmRegression([1603], 1603).regression, false);
+    assert.equal(firstPcmRegression([1803], 1603).regression, false);
+    assert.equal(firstPcmRegression([1804], 1603).regression, true);
+    assert.equal(firstPcmRegression([1603], 1603).overTarget, true);
   });
 });

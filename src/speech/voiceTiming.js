@@ -9,6 +9,12 @@ function createVoiceTurnTiming(callSid, opts = {}) {
   /** @type {number|null} */
   let llmStartedAt = null;
   /** @type {number|null} */
+  let languageLockedAt = null;
+  /** @type {number|null} */
+  let firstTokenAt = null;
+  /** @type {number|null} */
+  let sentenceClosedAt = null;
+  /** @type {number|null} */
   let firstChunkAt = null;
   /** @type {number|null} */
   let firstPcmAt = null;
@@ -16,6 +22,18 @@ function createVoiceTurnTiming(callSid, opts = {}) {
 
   function markLlmStart() {
     if (llmStartedAt == null) llmStartedAt = Date.now();
+  }
+
+  function markLanguageLock(at) {
+    if (languageLockedAt == null) languageLockedAt = Number(at) || Date.now();
+  }
+
+  function markFirstToken(at) {
+    if (firstTokenAt == null) firstTokenAt = Number(at) || Date.now();
+  }
+
+  function markSentenceClose(at) {
+    if (sentenceClosedAt == null) sentenceClosedAt = Number(at) || Date.now();
   }
 
   function markFirstSpokenChunk() {
@@ -41,6 +59,10 @@ function createVoiceTurnTiming(callSid, opts = {}) {
       callSid: String(callSid || 'unknown'),
       turn_ms: msFrom(turnStartedAt, endedAt),
       endpoint_to_llm_ms: msFrom(turnStartedAt, llmStartedAt),
+      endpoint_to_language_ms: msFrom(turnStartedAt, languageLockedAt),
+      language_to_token_ms: msFrom(languageLockedAt, firstTokenAt),
+      token_to_sentence_ms: msFrom(firstTokenAt, sentenceClosedAt),
+      sentence_to_pcm_ms: msFrom(sentenceClosedAt, firstPcmAt),
       first_chunk_ms: msFrom(turnStartedAt, firstChunkAt),
       first_pcm_ms: msFrom(turnStartedAt, firstPcmAt),
       chunk_to_pcm_ms: msFrom(firstChunkAt, firstPcmAt),
@@ -55,6 +77,10 @@ function createVoiceTurnTiming(callSid, opts = {}) {
       `[voice-timing][${s.callSid}]` +
         ` turn_ms=${s.turn_ms}` +
         ` endpoint_to_llm_ms=${s.endpoint_to_llm_ms ?? '-'}` +
+        ` endpoint_to_language_ms=${s.endpoint_to_language_ms ?? '-'}` +
+        ` language_to_token_ms=${s.language_to_token_ms ?? '-'}` +
+        ` token_to_sentence_ms=${s.token_to_sentence_ms ?? '-'}` +
+        ` sentence_to_pcm_ms=${s.sentence_to_pcm_ms ?? '-'}` +
         ` first_chunk_ms=${s.first_chunk_ms ?? '-'}` +
         ` first_pcm_ms=${s.first_pcm_ms ?? '-'}` +
         ` chunk_to_pcm_ms=${s.chunk_to_pcm_ms ?? '-'}` +
@@ -66,6 +92,9 @@ function createVoiceTurnTiming(callSid, opts = {}) {
 
   return {
     markLlmStart,
+    markLanguageLock,
+    markFirstToken,
+    markSentenceClose,
     markFirstSpokenChunk,
     markFirstPcm,
     markFiller,

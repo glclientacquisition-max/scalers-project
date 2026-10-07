@@ -66,3 +66,14 @@ const connect = logConnectToGreetingPcm({
 assert.strictEqual(connect.connect_to_greeting_pcm_ms, 840);
 assert.strictEqual(connect.cached, 1);
 console.log('connect_to_greeting_pcm_ms logs answer-to-first-greeting PCM.');
+
+const staged = createVoiceTurnTiming('sid-stage', { turnStartedAt: 1_000 });
+staged.markLanguageLock(1_100);
+staged.markFirstToken(1_400);
+staged.markSentenceClose(1_550);
+const stagedSummary = staged.summary();
+assert.strictEqual(stagedSummary.endpoint_to_language_ms, 100);
+assert.strictEqual(stagedSummary.language_to_token_ms, 300);
+assert.strictEqual(stagedSummary.token_to_sentence_ms, 150);
+assert.strictEqual(stagedSummary.sentence_to_pcm_ms, null);
+console.log('voiceTiming stage marks ok.');

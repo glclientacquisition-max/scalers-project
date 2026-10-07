@@ -236,7 +236,7 @@ describe('caller name stays the file name', () => {
     const turnSource = server.slice(start, end);
     assert.match(turnSource, /planCallerModelTurn\(brainState/);
     assert.match(turnSource, /const fileNameAsk = nameGate\.line/);
-    assert.match(turnSource, /speakText\(fileNameAsk\)/);
+    assert.match(turnSource, /speakText\(fileNameAsk,/);
     const gateAt = turnSource.indexOf('planCallerModelTurn');
     const modelAt = turnSource.indexOf('runGeminiTurn');
     assert.ok(gateAt >= 0 && modelAt > gateAt);

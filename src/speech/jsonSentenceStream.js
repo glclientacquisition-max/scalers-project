@@ -1,6 +1,8 @@
 // Pull completed spoken_sentences out of a Gemini JSON stream.
 // A sentence is emitted when its closing quote arrives, before the
 // rest of the object, so TTS can start on a whole sentence.
+// The caller already locked the reply language, so the sentence does
+// not wait for the reply_language field.
 
 function readJsonStringAt(raw, startQuote) {
   let i = startQuote + 1;

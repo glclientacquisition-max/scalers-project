@@ -23,6 +23,7 @@ Use this when the task is about audio path, latency, barge-in, fillers, TTS pron
 | `.env.example` | Voice/Soniox/turn-taking env knobs only |
 | `docs/operations/WEBHOOK_TUNNEL.md` | Local tunnel for SautiKit media |
 | `docs/agents/VOICE_DOWNTIME_AT_SCALE.md` | Multi-tenant speech-outage contract |
+| `docs/agents/VOICE_HARDENING.md` | Language lock, stages, turn end, first audio, recording 404 |
 | `docs/agents/VOICE_NATURALNESS.md` | Live DID roboticness eval (pass/fail, freeze SHA) |
 | `docs/product/CALL_MESSAGE_CONTRACT.md` | Owner vs caller post-call message contract |
 | `docs/product/CALL_MESSAGE_GAP.md` | Live owner SMS vs excellence bar |

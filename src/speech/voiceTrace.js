@@ -347,6 +347,10 @@ function createVoiceTrace(opts = {}) {
       callerStopToModelFirstTokenMs: firstTokenMs,
       callerStopToFirstTtsPcmMs: pcm == null || pcm < 0 ? null : pcm,
       structuredFirstSentenceMs: extra.structuredFirstSentenceMs ?? null,
+      endpointToLanguageMs: extra.latency?.endpoint_to_language_ms ?? null,
+      languageToTokenMs: extra.latency?.language_to_token_ms ?? null,
+      tokenToSentenceMs: extra.latency?.token_to_sentence_ms ?? null,
+      sentenceToPcmMs: extra.latency?.sentence_to_pcm_ms ?? null,
     });
     open.stages.push({ stage: 'outcome', value: String(extra.outcome || 'ok') });
     open.voiceId = voiceOf() || null;

@@ -2,7 +2,12 @@ module.exports = {
   code: 'en',
   tts: 'en',
   repair: 'Sorry, say that again?',
+  unclear: 'Sorry, say that again?',
   silence: 'Sorry, I missed that.',
+  filler: 'Okay.',
+  howHelp: 'How can I help?',
+  closing: 'Thank you. Goodbye.',
+  nameAsk: 'May I have your name?',
   directive:
     'Reply in clear Kenyan English only. Short spoken sentences. Job words stay easy to say on a phone.',
   services(items) {

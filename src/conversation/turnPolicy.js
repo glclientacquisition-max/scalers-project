@@ -25,6 +25,15 @@ const {
 const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
 const { hoursAskLine, offerCatalogueLine } = require('./knownFacts');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
+const { getLanguagePack } = require('../speech/languages');
+
+function spokenReplyLanguage(state) {
+  const lang = state?.language;
+  if (!lang || typeof lang !== 'object') return 'en';
+  if (lang.reply) return lang.reply;
+  if (lang.current && lang.current !== 'unknown') return lang.current;
+  return 'en';
+}
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
@@ -66,7 +75,7 @@ function fileNameAskLine(state) {
   if (state?.caller?.fileNameAskSpoken === true) return '';
   const pending = String(state?.caller?.fileNameAsked || '').trim();
   if (!pending) return '';
-  return `Am I speaking with ${pending}?`;
+  return getLanguagePack(spokenReplyLanguage(state)).nameConfirm(pending);
 }
 
 /**

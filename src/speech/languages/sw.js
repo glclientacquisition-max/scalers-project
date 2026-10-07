@@ -2,7 +2,12 @@ module.exports = {
   code: 'sw',
   tts: 'sw',
   repair: 'Samahani, sema tena?',
+  unclear: 'Samahani, hurudia?',
   silence: 'Samahani, sikusikia.',
+  filler: 'Sawa.',
+  howHelp: 'Nikusaidie vipi?',
+  closing: 'Asante. Kwaheri.',
+  nameAsk: 'Jina lako nani?',
   directive:
     'Reply in natural Kiswahili only. Job nouns such as couch, carpet, mattress, or Airbnb may stay in English. Short spoken sentences.',
   services(items) {

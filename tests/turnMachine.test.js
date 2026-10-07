@@ -10,8 +10,18 @@ after(() => {
   else process.env.VOICE_STRUCTURED_REPLY = prev;
 });
 
-const { applyNameGate, isNameAsk } = require('../src/speech/turnMachine');
+const {
+  applyNameGate,
+  isNameAsk,
+  planStageSpeech,
+  guardStageSentence,
+  classifyOpeningStt,
+} = require('../src/speech/turnMachine');
+const { fileNameAskLine } = require('../src/conversation/turnPolicy');
+const { readStructuredStream } = require('../src/speech/structuredGeminiTurn');
 const { replayCall } = require('../src/speech/replayVoice');
+const fs = require('fs');
+const path = require('path');
 
 describe('name state machine', () => {
   it('does not ask again when the name is already confirmed', () => {
@@ -91,5 +101,120 @@ describe('replay respond hook', () => {
     assert.match(spoken[0], /name/i);
     assert.match(spoken[1], /couch cleaning/);
     assert.doesNotMatch(spoken[1], /may i have your name/i);
+  });
+});
+
+describe('HD_120c5b99e9e7', () => {
+  const fixture = JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, 'fixtures', 'voice-hardening', 'HD_120c5b99e9e7.json'),
+      'utf8'
+    )
+  );
+
+  it('asks the name in the locked language and does not greet the shop again', () => {
+    assert.equal(fixture.callId, 'HD_120c5b99e9e7');
+    const state = {
+      caller: { fileNameAsked: 'Alvin', nameConfirmed: false },
+      language: { reply: 'sw' },
+      voice: { greetingPlayed: true, stage: 'identity', businessName: fixture.businessName },
+    };
+    assert.equal(
+      fileNameAskLine(state),
+      'Je, naongea na Alvin?'
+    );
+    const plan = planStageSpeech({
+      state,
+      replyLanguage: 'sw',
+      callerText: 'Niko hapa',
+      greetingPlayed: true,
+      businessName: fixture.businessName,
+      firstCallerTurn: false,
+    });
+    assert.equal(plan.stage, 'identity');
+    assert.equal(plan.runModel, false);
+    assert.equal(plan.line, 'Je, naongea na Alvin?');
+    assert.doesNotMatch(plan.line, /Done and Dusted|Habari/);
+    assert.equal(state.voice.stage, 'serve');
+    const guarded = guardStageSentence(
+      'Habari Alvin, Done and Dusted. Nikusaidie vipi leo?',
+      {
+        greetingPlayed: true,
+        businessName: fixture.businessName,
+        replyLanguage: 'sw',
+      }
+    );
+    assert.equal(guarded, 'Nikusaidie vipi?');
+  });
+
+  it('does not make a goal or a name ask from Happy?', () => {
+    const heard = classifyOpeningStt('Happy?', { firstCallerTurn: true });
+    assert.equal(heard.weak, true);
+    const state = {
+      caller: { fileNameAsked: 'Alvin', nameConfirmed: false },
+      voice: { greetingPlayed: true, stage: 'identity' },
+    };
+    const plan = planStageSpeech({
+      state,
+      replyLanguage: 'sw',
+      callerText: 'Happy?',
+      greetingPlayed: true,
+      businessName: fixture.businessName,
+      firstCallerTurn: true,
+    });
+    assert.equal(plan.setGoal, false);
+    assert.equal(plan.runModel, false);
+    assert.equal(plan.line, 'Samahani, hurudia?');
+    assert.notEqual(state.caller.fileNameAskSpoken, true);
+    const quiet = planStageSpeech({
+      state,
+      replyLanguage: 'sw',
+      callerText: 'Happy?',
+      greetingPlayed: true,
+      businessName: fixture.businessName,
+      firstCallerTurn: true,
+    });
+    assert.equal(quiet.reason, 'weak_stt_quiet');
+    assert.equal(quiet.line, '');
+  });
+
+  it('speaks the services list from the pack without the shop name', () => {
+    const state = {
+      caller: { fileNameAsked: 'Alvin', fileNameAskSpoken: true, nameConfirmed: true },
+      voice: { greetingPlayed: true, identitySpoken: true, stage: 'serve' },
+    };
+    const plan = planStageSpeech({
+      state,
+      replyLanguage: 'sw',
+      callerText: 'Mnafanya huduma gani?',
+      greetingPlayed: true,
+      businessName: fixture.businessName,
+      catalog: fixture.services,
+      firstCallerTurn: false,
+    });
+    assert.equal(plan.reason, 'services_template');
+    assert.match(plan.line, /couch cleaning/);
+    assert.match(plan.line, /mattress cleaning/);
+    assert.match(plan.line, /carpet cleaning/);
+    assert.doesNotMatch(plan.line, /Done and Dusted/);
+  });
+
+  it('emits the first sentence before reply_language arrives', async () => {
+    const spoken = [];
+    let spokenBeforeLanguage = null;
+    async function* stream() {
+      yield { text: '{"spoken_sentences":["Tuna huduma za couch cleaning."]' };
+      spokenBeforeLanguage = spoken.length;
+      yield { text: ',"reply_language":"sw"}' };
+    }
+    await readStructuredStream(stream(), {
+      lockedLanguage: 'sw',
+      extractText: (chunk) => chunk.text,
+      onSentence: async (line) => {
+        spoken.push(line);
+      },
+    });
+    assert.equal(spokenBeforeLanguage, 1);
+    assert.match(spoken[0], /couch cleaning/);
   });
 });

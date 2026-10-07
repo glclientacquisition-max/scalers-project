@@ -2,6 +2,8 @@
   "schema": "scalers.voice.eval-baseline",
   "schemaVersion": 1,
   "recordedAt": "2026-10-06T11:40:00.000Z",
+  "firstPcmP50": 1603,
+  "firstPcmP50TargetMs": 1200,
   "calls": {
     "HD_053dd373ee84": {
       "score": 97.5,

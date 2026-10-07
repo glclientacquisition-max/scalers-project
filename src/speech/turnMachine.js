@@ -136,6 +136,234 @@ function createNameGate(state, language) {
   return { consider, finish, spoken, stages };
 }
 
+const CALL_STAGES = ['greeting', 'identity', 'serve', 'closing'];
+
+const SERVICE_ASK =
+  /\b(services?|huduma|mnafanya|mna\s*offer|mnaofa|mna\s*ofa|mnayofanya|unafanya|what do you offer|what do you do)\b/i;
+const SERVICE_NOUN =
+  /\b(clean(?:ing)?|usafi|fumig\w*|carpet|couch|sofa|mattress|upholstery|counter\s+books?|stationery|kitabu|vitabu|airbnb)\b/i;
+const SHOP_GREETING =
+  /\b(habari|hello|good\s+(?:morning|afternoon|evening)|karibu|nikusaidie|how can i help|this is)\b/i;
+
+const KNOWN_SHORT = new Set([
+  'yes',
+  'no',
+  'yeah',
+  'yep',
+  'ndiyo',
+  'ndio',
+  'sawa',
+  'okay',
+  'ok',
+  'poa',
+  'habari',
+  'hello',
+  'hi',
+  'hey',
+  'asante',
+  'bye',
+  'goodbye',
+  'kwaheri',
+]);
+
+function voiceOf(state) {
+  if (!state || typeof state !== 'object') return {};
+  if (!state.voice || typeof state.voice !== 'object') state.voice = {};
+  return state.voice;
+}
+
+function normalizeOpening(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[?!.,]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function meanTokenConfidence(tokens) {
+  const nums = [];
+  for (const token of Array.isArray(tokens) ? tokens : []) {
+    const n = Number(token?.confidence);
+    if (Number.isFinite(n)) nums.push(n);
+  }
+  if (!nums.length) return null;
+  return nums.reduce((sum, n) => sum + n, 0) / nums.length;
+}
+
+/**
+ * A short or low-confidence first final is not a goal and not an identity turn.
+ * "Happy?" is the live case. A reply to a question, a known ack, or a name stays.
+ */
+function classifyOpeningStt(text, opts = {}) {
+  const raw = String(text || '').trim();
+  const norm = normalizeOpening(raw);
+  if (!norm) return { weak: false, reason: 'empty' };
+  if (opts.awaitingReply) return { weak: false, reason: 'awaiting_reply' };
+  if (KNOWN_SHORT.has(norm)) return { weak: false, reason: 'known' };
+  const opening =
+    opts.firstCallerTurn === true ||
+    (opts.firstCallerTurn !== false && (opts.turnCount == null || Number(opts.turnCount) === 0));
+  if (!opening) return { weak: false, reason: 'later_turn' };
+  if (!/\?/.test(raw) && /^[A-Z][a-z]{2,}$/.test(raw.replace(/[!.,]+$/g, ''))) {
+    return { weak: false, reason: 'name' };
+  }
+  const words = norm.split(' ').filter(Boolean);
+  const confidence = opts.confidence == null ? null : Number(opts.confidence);
+  const low = confidence != null && confidence < 0.45;
+  const short = words.length <= 2 && raw.length <= 16;
+  if (/^happy\??$/i.test(raw)) return { weak: true, reason: 'weak_stt' };
+  if (short && (low || (words.length === 1 && /\?/.test(raw)))) {
+    return { weak: true, reason: low ? 'low_confidence' : 'weak_stt' };
+  }
+  return { weak: false, reason: 'usable' };
+}
+
+function looksLikeCallClose(text) {
+  const norm = normalizeOpening(text);
+  return /^(bye|goodbye|good bye|kwaheri|that'?s all|that is all|asante kwaheri)$/.test(norm);
+}
+
+function catalogNames(catalog) {
+  const rows = Array.isArray(catalog) ? catalog : [];
+  const names = [];
+  for (const row of rows) {
+    const name = typeof row === 'string' ? row : row?.name || row?.title;
+    const clean = String(name || '').trim();
+    if (clean) names.push(clean);
+  }
+  return names;
+}
+
+function reintroducesShop(sentence, businessName) {
+  const raw = String(sentence || '');
+  const shop = String(businessName || '').trim();
+  if (!shop || shop.length < 3) return false;
+  if (!raw.toLowerCase().includes(shop.toLowerCase())) return false;
+  return SHOP_GREETING.test(raw);
+}
+
+/**
+ * After the opener has played, a later sentence must not greet the shop again.
+ * A services answer keeps its list. A pure re-greeting becomes the help line.
+ */
+function guardStageSentence(sentence, opts = {}) {
+  const line = String(sentence || '').trim();
+  if (!line || opts.greetingPlayed !== true) return line;
+  if (!reintroducesShop(line, opts.businessName)) return line;
+  const pack = getLanguagePack(opts.replyLanguage);
+  if (SERVICE_NOUN.test(line)) {
+    const shop = String(opts.businessName || '').trim();
+    let kept = line;
+    if (shop) {
+      const re = new RegExp(shop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
+      kept = kept.replace(re, ' ');
+    }
+    kept = kept
+      .replace(/^(?:habari|hello|good morning|good afternoon|good evening)[,.]?\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+([,.?])/g, '$1')
+      .trim();
+    if (SERVICE_NOUN.test(kept) && !reintroducesShop(kept, opts.businessName)) return kept;
+    if (SERVICE_NOUN.test(kept)) return pack.services(catalogNames(opts.catalog).length ? opts.catalog : []);
+  }
+  return pack.howHelp;
+}
+
+function ensureVoice(state, { greetingPlayed, businessName } = {}) {
+  const voice = voiceOf(state);
+  if (greetingPlayed) voice.greetingPlayed = true;
+  if (businessName) voice.businessName = businessName;
+  if (!CALL_STAGES.includes(voice.stage)) {
+    voice.stage = voice.greetingPlayed ? 'identity' : 'greeting';
+  }
+  return voice;
+}
+
+/**
+ * greeting → identity → serve → closing.
+ * Identity is one language-pack confirm. It does not say the shop again.
+ * Known services and closings speak the pack immediately.
+ */
+function planStageSpeech(opts = {}) {
+  const state = opts.state && typeof opts.state === 'object' ? opts.state : {};
+  const replyLanguage = opts.replyLanguage || 'en';
+  const pack = getLanguagePack(replyLanguage);
+  const voice = ensureVoice(state, opts);
+  const opening = classifyOpeningStt(opts.callerText, {
+    confidence: opts.confidence,
+    firstCallerTurn: opts.firstCallerTurn,
+    turnCount: opts.turnCount,
+    awaitingReply: opts.awaitingReply,
+  });
+  if (opening.weak) {
+    if (voice.repairSpoken) {
+      return {
+        stage: voice.stage,
+        line: '',
+        runModel: false,
+        weak: true,
+        reason: 'weak_stt_quiet',
+        setGoal: false,
+      };
+    }
+    voice.repairSpoken = true;
+    return {
+      stage: voice.stage,
+      line: pack.unclear,
+      runModel: false,
+      weak: true,
+      reason: 'weak_stt',
+      setGoal: false,
+    };
+  }
+  if (opts.closing || looksLikeCallClose(opts.callerText)) {
+    voice.stage = 'closing';
+    return {
+      stage: 'closing',
+      line: pack.closing,
+      runModel: false,
+      weak: false,
+      reason: 'closing',
+      setGoal: true,
+    };
+  }
+  const pending = String(state?.caller?.fileNameAsked || '').trim();
+  const confirmed = state?.caller?.nameConfirmed === true;
+  const asked = state?.caller?.fileNameAskSpoken === true || voice.identitySpoken === true;
+  if (!confirmed && pending && !asked && (voice.stage === 'greeting' || voice.stage === 'identity')) {
+    voice.stage = 'identity';
+    voice.identitySpoken = true;
+    if (state.caller && typeof state.caller === 'object') {
+      state.caller.fileNameAskSpoken = true;
+      state.caller.fileNameAsked = pending;
+    }
+    voice.stage = 'serve';
+    return {
+      stage: 'identity',
+      line: pack.nameConfirm(pending),
+      runModel: false,
+      weak: false,
+      reason: 'identity',
+      setGoal: true,
+    };
+  }
+  if (voice.stage === 'greeting' || voice.stage === 'identity') voice.stage = 'serve';
+  const names = catalogNames(opts.catalog);
+  if (SERVICE_ASK.test(String(opts.callerText || '')) && names.length) {
+    voice.stage = 'serve';
+    return {
+      stage: 'serve',
+      line: pack.services(names),
+      runModel: false,
+      weak: false,
+      reason: 'services_template',
+      setGoal: true,
+    };
+  }
+  voice.stage = 'serve';
+  return { stage: 'serve', line: '', runModel: true, weak: false, reason: 'serve', setGoal: true };
+}
+
 function applyNameGate(sentences, state, language) {
   const gate = createNameGate(state, language);
   const kept = [];
@@ -150,7 +378,14 @@ function applyNameGate(sentences, state, language) {
 
 module.exports = {
   NAME_ASK,
+  CALL_STAGES,
   createNameGate,
   applyNameGate,
   isNameAsk,
+  classifyOpeningStt,
+  looksLikeCallClose,
+  catalogNames,
+  guardStageSentence,
+  planStageSpeech,
+  meanTokenConfidence,
 };

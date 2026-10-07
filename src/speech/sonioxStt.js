@@ -181,6 +181,7 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
             text: token.text,
             final: Boolean(token.is_final),
             language,
+            confidence: token.confidence ?? token.confidence_score ?? null,
             startMs,
             endMs,
           });

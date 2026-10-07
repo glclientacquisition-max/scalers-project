@@ -7,7 +7,10 @@ const {
   extractRecordingFields,
   isRecordingEvent,
 } = require('../src/sautikit/recordingEvents');
-const { fetchCallRecording } = require('../src/sautikit/recordingFetch');
+const {
+  fetchCallRecording,
+  fetchCallRecordingWithBackoff,
+} = require('../src/sautikit/recordingFetch');
 
 describe('SautiKit recording.ready payloads', () => {
   it('reads kind, call_id, and download_url from the documented envelope', () => {
@@ -122,5 +125,55 @@ describe('fetchCallRecording', () => {
     });
     assert.equal(out.downloadUrl, null);
     assert.equal(out.status, 'not_configured');
+  });
+
+  it('retries a 404 and reports missing without throwing', async () => {
+    const sleeps = [];
+    let calls = 0;
+    const out = await fetchCallRecordingWithBackoff('call-uuid', {
+      apiKey: 'test-key',
+      delays: [0, 10, 20],
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+      fetchImpl: async () => {
+        calls += 1;
+        return {
+          status: 404,
+          ok: false,
+          headers: { get: () => null },
+          json: async () => ({ error: { code: 'calls.recording_not_found' } }),
+        };
+      },
+    });
+    assert.equal(out.recordingStatus, 'missing');
+    assert.equal(out.downloadUrl, null);
+    assert.equal(calls, 3);
+    assert.deepEqual(sleeps, [10, 20]);
+  });
+
+  it('stops backoff when the recording URL is ready', async () => {
+    let calls = 0;
+    const out = await fetchCallRecordingWithBackoff('call-uuid', {
+      apiKey: 'test-key',
+      delays: [0, 50, 50],
+      sleep: async () => {
+        throw new Error('should not wait');
+      },
+      fetchImpl: async () => {
+        calls += 1;
+        return {
+          status: 302,
+          ok: false,
+          headers: {
+            get: (name) => (String(name).toLowerCase() === 'location' ? 'https://files.example/a.wav' : ''),
+          },
+          json: async () => ({}),
+        };
+      },
+    });
+    assert.equal(out.recordingStatus, 'ready');
+    assert.equal(out.downloadUrl, 'https://files.example/a.wav');
+    assert.ok(calls <= 2);
   });
 });

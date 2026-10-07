@@ -5,6 +5,8 @@ const { analyzeCallerLanguage } = require('../conversation/language');
 const { utteranceLooksIncomplete } = require('./turnTaking');
 
 const LATENCY_BUDGET_MS = 1200;
+const FIRST_PCM_P50_TARGET_MS = 1200;
+const FIRST_PCM_REGRESSION_MS = 200;
 
 const SERVICE_ASK =
   /\b(services?|huduma|mnafanya|mna\s*offer|mnaofa|mna\s*ofa|offer|unafanya|mnayofanya)\b/i;
@@ -233,6 +235,40 @@ function scoreFixtureReplay(replay, fixture) {
   };
 }
 
+function percentile(values, p) {
+  const nums = (Array.isArray(values) ? values : [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  if (!nums.length) return null;
+  const rank = (p / 100) * (nums.length - 1);
+  const low = Math.floor(rank);
+  const high = Math.ceil(rank);
+  if (low === high) return nums[low];
+  return nums[low] + (nums[high] - nums[low]) * (rank - low);
+}
+
+/**
+ * Historical first-PCM samples. Target p50 is 1200ms. A measured card
+ * fails when its p50 is more than 200ms slower than the stored baseline.
+ * Missing samples are not a failure.
+ */
+function firstPcmRegression(samples, baselineP50) {
+  const p50 = percentile(samples, 50);
+  const base = baselineP50 == null ? null : Number(baselineP50);
+  if (p50 == null || base == null || !Number.isFinite(base)) {
+    return { p50, baselineP50: base, delta: null, overTarget: false, regression: false };
+  }
+  const delta = p50 - base;
+  return {
+    p50,
+    baselineP50: base,
+    delta,
+    overTarget: p50 > FIRST_PCM_P50_TARGET_MS,
+    regression: delta > FIRST_PCM_REGRESSION_MS,
+  };
+}
+
 function compareToBaseline(scorecard, baseline) {
   const failures = [];
   const calls = scorecard.calls || [];
@@ -283,6 +319,10 @@ function formatSummary(scorecard) {
 
 module.exports = {
   LATENCY_BUDGET_MS,
+  FIRST_PCM_P50_TARGET_MS,
+  FIRST_PCM_REGRESSION_MS,
+  percentile,
+  firstPcmRegression,
   scoreTurn,
   scoreTurns,
   scoreFixtureReplay,
