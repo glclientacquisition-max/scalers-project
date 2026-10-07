@@ -85,6 +85,32 @@ Staging is defined. See [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md) f
 | Git branch | **`cursor/staging-voice-468b`**. Every open pull request is merged onto this branch for testing, including one that targets another feature branch. Open the pull request into `main` so the rebuild starts immediately. A stacked pull request joins on the next rebuild. Promote by squash-merging that tested pull request into `main`. |
 | SautiKit | Test DID `+254709221536` pointing at staging voice URL |
 
+### Hold staging Voice
+
+Stage-PR (`.github/workflows/stage-pull-request.yml`) force-pushes `cursor/staging-voice-468b`, then calls Railway `serviceConnect` on **scalers staging** Voice with that branch and no commit SHA. Railway autodeploys a push to the connected branch. A commit pin ignores later pushes, so `serviceConnect` is what clears the pin and makes Voice follow the branch again. A hold skips the push and that connect. Nothing in this workflow re-points or redeploys Railway staging while the hold is on. The desk alias step is skipped too, because it reads the rebuild result. The next run with no hold rebuilds the branch, connects Voice, and assigns the desk host as usual.
+
+Either switch is enough. The workflow reads both when it runs. Set the hold before the listen. Adding the label does not start a run by itself, and a run already past the hold check still finishes.
+
+**Repository variable.** Settings, Secrets and variables, Actions, Variables. Name `STAGE_PR_HOLD`. Values `1`, `true`, and `on` hold (any case, surrounding space ignored). Empty, unset, `0`, `false`, and `off` do not. Other values do not. Delete the variable, or set `0`, `false`, or `off`, to clear it.
+
+**Label.** Add `hold-staging` to any open pull request. The check is every open pull request, not only the one that triggered the run. Remove the label, or close that pull request, to clear this switch on the next run.
+
+Create the label once if it is missing:
+
+```bash
+gh label create hold-staging --repo glclientacquisition-max/scalers-project --description "Skip Stage-PR Railway staging re-point" --color B60205
+```
+
+Add it with `gh pr edit NUMBER --add-label hold-staging`. Remove it with `gh pr edit NUMBER --remove-label hold-staging`.
+
+**While held.** The log and the job summary include a line like:
+
+`Stage-PR hold active (STAGE_PR_HOLD=1 / label hold-staging on #NNN): skipping staging re-point`
+
+The parenthetical names only the switch that fired. `cursor/staging-voice-468b` is not updated. Railway `serviceConnect` does not run. The desk alias does not run. Closing a pull request during a hold does not take it off the branch until the next run with no hold.
+
+**After the listen.** Clear the variable and remove the label. Re-run the latest Stage pull request workflow, or wait for the next pull request event against `main` or the next push to `main`. That run connects Voice to `cursor/staging-voice-468b` again with no commit SHA.
+
 Validate database changes on staging before production. Never use production credentials for staging tests.
 
 **Promote to production:** [`STAGING_TO_PRODUCTION.md`](./STAGING_TO_PRODUCTION.md)
