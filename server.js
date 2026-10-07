@@ -1797,7 +1797,7 @@ mediaWss.on('connection', (ws, req) => {
   let playbackGeneration = 0;
   let activePlaybackGeneration = 0;
   let pendingUtterance = null;
-  let pendingUtteranceUnfinished = false;
+  let pendingTurnSignals = { unfinished: false, weak: false, weakStt: false };
   let systemPrompt = buildSystemPrompt();
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
@@ -2497,10 +2497,10 @@ mediaWss.on('connection', (ws, req) => {
   function kickPendingTurn() {
     if (turnBusy || !pendingUtterance) return;
     const text = pendingUtterance;
-    const unfinished = pendingUtteranceUnfinished;
+    const signals = pendingTurnSignals;
     pendingUtterance = null;
-    pendingUtteranceUnfinished = false;
-    runCallerTurn(text, { unfinished }).catch((err) => {
+    pendingTurnSignals = { unfinished: false, weak: false, weakStt: false };
+    runCallerTurn(text, signals).catch((err) => {
       console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
     });
   }
@@ -2568,14 +2568,21 @@ mediaWss.on('connection', (ws, req) => {
     const clean = String(userText || '').replace(/\s+/g, ' ').trim();
     const flushed = labelFlushedCallerTurn({
       text: clean,
-      turnEnd: opts.turnEnd || (opts.unfinished === true ? { unfinished: true } : undefined),
+      turnEnd: {
+        ...(opts.turnEnd && typeof opts.turnEnd === 'object' ? opts.turnEnd : {}),
+        unfinished: opts.turnEnd?.unfinished === true || opts.unfinished === true,
+        weak: opts.turnEnd?.weak === true || opts.weak === true,
+        weakStt: opts.turnEnd?.weakStt === true || opts.weakStt === true,
+      },
     });
     if (!clean) return;
     idleNudge.clear();
     if (turnBusy) {
       // Merge continuation fragments into one pending utterance (don't drop context).
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${clean}` : clean;
-      if (flushed.unfinished) pendingUtteranceUnfinished = true;
+      if (flushed.unfinished) pendingTurnSignals.unfinished = true;
+      if (flushed.weak) pendingTurnSignals.weak = true;
+      if (flushed.weakStt) pendingTurnSignals.weakStt = true;
       return;
     }
     // A new caller turn may speak. The previous barge must not swallow it.
@@ -2661,7 +2668,13 @@ mediaWss.on('connection', (ws, req) => {
           profile: brainProfile,
           lastAgentText,
         },
-        { turnEnd: flushed.unfinished ? { unfinished: true } : undefined }
+        {
+          turnEnd: {
+            unfinished: flushed.unfinished,
+            weak: flushed.weak,
+            weakStt: flushed.weakStt,
+          },
+        }
       )
     );
     if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
@@ -3434,7 +3447,9 @@ mediaWss.on('connection', (ws, req) => {
     overlapHold.markReleased(text);
     if (turnBusy) {
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${text}` : text;
-      if (label.unfinished) pendingUtteranceUnfinished = true;
+      if (label.unfinished) pendingTurnSignals.unfinished = true;
+      if (label.weak) pendingTurnSignals.weak = true;
+      if (label.weakStt) pendingTurnSignals.weakStt = true;
       return;
     }
     console.log(`[ws/media][${sidLabel()}] caller_turn_processed`);

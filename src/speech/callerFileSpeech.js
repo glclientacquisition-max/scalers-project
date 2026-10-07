@@ -1,6 +1,6 @@
-// Speak gate for the caller file. Brain owns bind. Voice reads it.
-// `speaker.bound` / `speaker.nameConfirmed` win when Brain has set them.
-// Otherwise `caller.nameConfirmed`. Voice does not write either flag.
+// Speak gate for the caller file. Brain owns bind.
+// The flag is `caller.nameConfirmed` (Brain PR #586). A parallel `speaker`
+// object does not open or close the mouth. Voice does not write the flag.
 
 const IDENTITY_ASK_RE =
   /\b(?:am i speaking with|je,?\s+naongea na|naongea na|unaongea na)\b/i;
@@ -9,11 +9,6 @@ const OPEN_ROW_RE =
   /\b(?:open (?:carpet |cleaning )?(?:request|requests|visit|visits|booking|bookings)|carpet cleaning requests?|two open|requests? (?:are )?open|on (?:your|the) file)\b/i;
 
 function speakerBound(state) {
-  const speaker = state?.speaker;
-  if (speaker && typeof speaker === 'object') {
-    if (typeof speaker.bound === 'boolean') return speaker.bound;
-    if (typeof speaker.nameConfirmed === 'boolean') return speaker.nameConfirmed;
-  }
   return state?.caller?.nameConfirmed === true;
 }
 

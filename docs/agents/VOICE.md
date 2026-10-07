@@ -89,13 +89,13 @@ See `.env.example` — key ones:
 
 Voice does not own the caller file. Brain binds the speaker. Voice does three things on the media path.
 
-1. **Unfinished flush.** `flushUtterance(turnEnd)` labels the turn with `labelFlushedCallerTurn` and passes `unfinished` into `observeCallerTurn`. A turn-end decision that already set `unfinished: true` (including #584 `decideTurnEnd`) is forwarded. When Brain exports `isUnfinishedCallerUtterance` from `src/conversation/unfinishedUtterance.js`, Voice uses that. Voice does not keep a second Kiswahili stem list and does not write the goal.
+1. **Unfinished flush.** `flushUtterance(turnEnd)` labels the turn with `labelFlushedCallerTurn` and passes `unfinished`, `weak`, and `weakStt` into `observeCallerTurn`. Brain #586 honors those three fields in `isRejectedGoalText`, so an unfinished or weak flush does not become the goal. A turn-end decision that already set them (including #584 `decideTurnEnd`) is forwarded. If Brain exports `isUnfinishedCallerStem` or `isUnfinishedCallerUtterance`, Voice calls that. Voice does not keep a second Kiswahili stem list and does not write the goal.
 
-2. **Speak gate.** `gateCallerFileSpeech` runs before TTS. The file name and open rows stay quiet until `speaker.bound` or `speaker.nameConfirmed` is true. If Brain has not set `speaker` yet, Voice reads `caller.nameConfirmed`. The identity ask may say the pending name. Voice does not set a second bound flag.
+2. **Speak gate.** `gateCallerFileSpeech` runs before TTS. Open rows, a vocative file name, and `Yes, {name}` stay quiet until `caller.nameConfirmed` is true. A parallel `speaker` object does not override that flag. The identity ask may say the pending name. Voice does not set `nameConfirmed`.
 
-3. **Tool hold.** A line from `src/speech/toolHold.js` plays only after a tool call has started. English and Kiswahili packs rotate from the call id and turn count. Each line is at most about five words and states no job status. After the tool returns, write tools still use the existing confirmation. A file read (`open_items`, `file_lookup`, `get_enquiry`) speaks that result, or the empty-file line when the speaker is bound and the result is empty. No tool means no hold. Barge-in cancels the hold follow-up.
+3. **Tool hold.** A line from `src/speech/toolHold.js` plays only after a tool call has started. English and Kiswahili packs rotate from the call id and turn count. Each line is at most about five words and states no job status. After the tool returns, write tools still use the existing confirmation. A file read (`open_items`, `file_lookup`, `get_enquiry`) speaks that result, or the empty-file line when `nameConfirmed` is true and the result is empty. No tool means no hold. Barge-in cancels the hold follow-up.
 
-Stack this with Brain PR1 (goal reject, speaker flag, Kiswahili confirm) and with #584 if that pull request is still open. On merge, keep `flushUtterance(decision)` so `decision.unfinished` is not dropped.
+Land this with Brain #586 (`cursor/caller-file-goal-summary-4c74`). Do not rewrite `docs/product/CALLER_FILE_MODEL.md` or `docs/agents/CALLER_IDENTITY_AND_SUMMARY.md` here. Stack with #584 if that pull request is still open. On merge, keep `flushUtterance(decision)` so `decision.unfinished` is not dropped.
 
 ## Test gate (required before PR)
 

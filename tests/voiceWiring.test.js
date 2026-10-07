@@ -674,6 +674,11 @@ assert.match(
 );
 assert.match(
   source,
+  /weakStt: flushed\.weakStt/,
+  'flush must forward weakStt into Brain observe'
+);
+assert.match(
+  source,
   /gateCallerFileSpeech\(/,
   'file name and open rows must pass the speak gate before TTS'
 );
