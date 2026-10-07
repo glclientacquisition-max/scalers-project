@@ -35,8 +35,54 @@ function looksLikeNewWork(text) {
   return NEW_WORK_RE.test(String(text || ''));
 }
 
+const NON_CATALOGUE_TOPIC_RE =
+  /\b(?:bei|price|prices|how much|ngapi|cost|costs|hours|saa|fungua|fungwa|wazi|open|closed|wapi|where|address|location|book(?:ing)?|appointment|visit)\b/i;
+
+// Open "I wanted to know" frame. The live miss is STT cut at the comma:
+// "Nilikuwa nataka kujua," / "I wanted to know,".
+const BARE_OFFER_FRAME =
+  /^(?:nilikuwa\s+nataka\s+kujua|nilikuwa\s+nauliza|nilikuwa\s+ningetaka(?:\s+kujua)?|nilikuwa\s+ningependa(?:\s+kujua)?|nataka\s+kujua|i wanted to (?:know|ask)|i was (?:just )?asking)$/i;
+
+const OFFER_FRAME_PREFIX =
+  /^(?:nilikuwa\s+nataka\s+kujua|nilikuwa\s+nauliza|nataka\s+kujua|i wanted to (?:know|ask)|i was (?:just )?asking)\b/i;
+
+const CUT_OFFER_PREFIX =
+  /^(?:what do you(?:\s+off\w*)?|which\s+serv\w*|what\s+serv\w*|huduma\s+gan\w*|services\s+gan\w*|mna\s*off\w*|tell me(?:\s+(?:your|the))?\s+serv\w*)$/i;
+
+function offerAskCore(text) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  const parts = raw.split(/(?<=[.!?])\s+/).map((part) => part.trim()).filter(Boolean);
+  let value = parts.length ? parts[parts.length - 1] : raw;
+  for (let i = 0; i < 4 && value; i += 1) {
+    const next = value.replace(/^(?:uh+|um+|ah+|eeh|eh|like|so|well)[, ]+/i, '').trim();
+    if (next === value) break;
+    value = next;
+  }
+  return value.replace(/[.!?,;:…—–-]+$/g, '').trim();
+}
+
+/**
+ * A services ask whose STT stopped mid-phrase. A price, hours, or place
+ * complement is not this. A full offer ask is looksLikeOfferAsk via OFFER_ASK_RE.
+ */
+function looksLikeTruncatedOfferAsk(text) {
+  const core = offerAskCore(text);
+  if (!core || looksLikeNewWork(core)) return false;
+  if (NON_CATALOGUE_TOPIC_RE.test(core)) return false;
+  if (BARE_OFFER_FRAME.test(core) || CUT_OFFER_PREFIX.test(core)) return true;
+  const framed = OFFER_FRAME_PREFIX.exec(core);
+  if (!framed) return false;
+  const rest = core.slice(framed[0].length).replace(/^[\s,:-]+/, '').trim();
+  if (!rest) return true;
+  return /^(?:(?:the|your|our|about|kuhusu|gani|which|what)\s+)*(?:services?|huduma|offer|mnaofa|mnatoa)(?:\s+(?:gani|mnaofa|mnatoa|do you(?:\s+do)?|you(?:\s+do)?))?$/i.test(
+    rest
+  );
+}
+
 function looksLikeOfferAsk(text) {
-  return OFFER_ASK_RE.test(String(text || ''));
+  const raw = String(text || '');
+  return OFFER_ASK_RE.test(raw) || looksLikeTruncatedOfferAsk(raw);
 }
 
 function bareAffirmation(text) {
@@ -312,6 +358,7 @@ module.exports = {
   looksLikeFileRead,
   looksLikeNewWork,
   looksLikeOfferAsk,
+  looksLikeTruncatedOfferAsk,
   bareAffirmation,
   catalogueAskInPlay,
   looksLikeServiceMenu,

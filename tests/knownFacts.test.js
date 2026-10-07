@@ -28,7 +28,7 @@ describe('known facts stay off Gemini', () => {
       },
     });
     assert.equal(local.outcome, 'catalogue');
-    assert.match(local.line, /Couch cleaning and Carpet cleaning/);
+    assert.match(local.line, /Couch cleaning\. And Carpet cleaning/);
     assert.doesNotMatch(local.line, /shilling|price/i);
   });
 
@@ -90,7 +90,7 @@ describe('HD_ec64018de793 catalogue list', () => {
     assert.equal(listed.outcome, 'catalogue');
     assert.match(
       listed.line,
-      /^We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning/
+      /^We offer Couch cleaning\. Mattress cleaning\. Carpet cleaning\. And General cleaning/
     );
     assert.doesNotMatch(listed.line, /what do you need done|which service would you like|ungependa/i);
   });
@@ -114,7 +114,7 @@ describe('HD_ec64018de793 catalogue list', () => {
     assert.equal(sw.outcome, 'catalogue');
     assert.equal(
       sw.line,
-      'Tuna Couch cleaning, Mattress cleaning, Carpet cleaning, na General cleaning, na zingine. Unahitaji gani?'
+      'Tuna Couch cleaning. Mattress cleaning. Carpet cleaning. Na General cleaning. Na zingine. Unahitaji gani?'
     );
     assert.doesNotMatch(sw.line, /\band\b|\(|houses|cushions|air bnbs/i);
 
@@ -126,7 +126,7 @@ describe('HD_ec64018de793 catalogue list', () => {
     });
     assert.equal(
       sheng.line,
-      'Tuna Couch cleaning, Mattress cleaning, Carpet cleaning, na General cleaning, na zingine. Unahitaji gani?'
+      'Tuna Couch cleaning. Mattress cleaning. Carpet cleaning. Na General cleaning. Na zingine. Unahitaji gani?'
     );
 
     const en = resolveLocalReply({
@@ -137,7 +137,7 @@ describe('HD_ec64018de793 catalogue list', () => {
     });
     assert.equal(
       en.line,
-      'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning, and more. Which one do you need?'
+      'We offer Couch cleaning. Mattress cleaning. Carpet cleaning. And General cleaning. And more. Which one do you need?'
     );
     assert.doesNotMatch(en.line, /\(|houses|cushions|air bnbs/i);
   });

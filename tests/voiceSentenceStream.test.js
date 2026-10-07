@@ -34,17 +34,25 @@ function runCallerTurnSource() {
 describe('mid-call one-shots do not speak-and-return', () => {
   const turn = runCallerTurnSource();
 
-  it('does not speak a catalogue, hours, pace, or replay line and return', () => {
+  it('speaks a prepared catalogue and leaves hours, pace, and replay on the stream', () => {
+    assert.match(turn, /speakText\(catalogueLine/);
     assert.doesNotMatch(turn, /speakText\(localReply\.line\)/);
     assert.doesNotMatch(turn, /speakText\(paceLine\)/);
     assert.doesNotMatch(turn, /speakText\(replayLine/);
     assert.doesNotMatch(turn, /I don't have a booking for you/);
+    assert.match(turn, /if \(localReply && !catalogueLine\)/);
     assert.match(turn, /local line not spoken/);
+    assert.match(turn, /catalogue spoken/);
+    assert.doesNotMatch(turn, /catalogue local line not spoken/);
     assert.match(turn, /pace-only stays on sentence stream/);
     assert.match(turn, /resolveLocalReply\(\{/);
+    const spokenAt = turn.indexOf('catalogue spoken');
+    const streamAt = turn.indexOf('const streamOn');
+    assert.ok(spokenAt > 0 && streamAt > spokenAt);
+    assert.match(turn.slice(spokenAt, streamAt), /return;/);
   });
 
-  it('keeps catalogue and hours lines off the early return', () => {
+  it('prepares catalogue and hours lines without treating them as a file read', () => {
     const profile = {
       servicesCatalog: [{ name: 'Couch cleaning' }, { name: 'Carpet cleaning' }],
       hoursSchedule: defaultHoursSchedule(),
@@ -75,7 +83,7 @@ describe('mid-call one-shots do not speak-and-return', () => {
       }),
       null
     );
-    // Those outcomes are not the lookup exception, so the model keeps the stream.
+    // Hours stay on the Gemini stream. A prepared catalogue is spoken above.
     assert.doesNotMatch(turn, /speakText\(progressLine\)/);
     assert.match(turn, /const needsImmediateProgress = actionMayExecute;/);
     assert.doesNotMatch(turn, /needsImmediateProgress = actionMayExecute \|\| handoffNameAsk/);

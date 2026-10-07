@@ -269,6 +269,7 @@ const {
   createSpokenStreamBuffer,
   joinSpokenPieces,
   speakPreparedSentences,
+  splitSpeakableChunks,
 } = require('./src/speech/spokenStreamBuffer');
 const { cutNoAiSlop } = require('./src/speech/noAiSlop');
 const {
@@ -2320,7 +2321,8 @@ mediaWss.on('connection', (ws, req) => {
     if (/[.!?]$/.test(String(text).trim())) bargeCancelledText = '';
     lastAgentText = String(text);
     if (!opts.isFiller && !opts.isReplay) {
-      agentReplay.beginSpeech(text);
+      // A bundled list keeps the follow-up question as the committed ask.
+      agentReplay.beginSpeech(opts.questionText || text);
     }
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
@@ -2335,16 +2337,35 @@ mediaWss.on('connection', (ws, req) => {
     const extraLexicon = Array.isArray(opts.extraLexicon)
       ? opts.extraLexicon
       : mergeIdentityLexicon(ttsLexiconOverrides, { businessName, agentName });
-    const prepared = prepareForTts(text, {
+    const prepOpts = {
       callLanguage,
       language: opts.language,
       extraLexicon,
-    });
-    console.log(
-      `[ws/media][${sidLabel()}] tts prep lang=${prepared.language}` +
-        ` original=${JSON.stringify(prepared.original)}` +
-        ` spoken=${JSON.stringify(prepared.text)}`
+    };
+    // Sentence breaks split BEFORE punct strip. One push per sentence is the
+    // beat Soniox keeps after prepareForTts removes the periods.
+    const pieces = opts.sentenceBreaks
+      ? splitSpeakableChunks(text, { final: true }).chunks
+      : [text];
+    let preparedPieces = (pieces.length ? pieces : [text]).map((piece) =>
+      prepareForTts(piece, prepOpts)
     );
+    if (opts.sentenceBreaks) preparedPieces = preparedPieces.filter((row) => row.text);
+    const prepared = preparedPieces[0] || prepareForTts(text, prepOpts);
+    if (opts.sentenceBreaks) {
+      console.log(
+        `[ws/media][${sidLabel()}] tts prep lang=${prepared.language}` +
+          ` sentences=${preparedPieces.length}` +
+          ` original=${JSON.stringify(text)}` +
+          ` spoken=${JSON.stringify(preparedPieces.map((row) => row.text).join(' | '))}`
+      );
+    } else {
+      console.log(
+        `[ws/media][${sidLabel()}] tts prep lang=${prepared.language}` +
+          ` original=${JSON.stringify(prepared.original)}` +
+          ` spoken=${JSON.stringify(prepared.text)}`
+      );
+    }
     let session = null;
     try {
       // beginSpeak so we can track/cancel this stream without killing a reply prefetch.
@@ -2375,8 +2396,23 @@ mediaWss.on('connection', (ws, req) => {
       }
       activeOutboundStreamId = session.streamId;
       if (opts.isFiller) fillerStreamId = session.streamId;
-      const pushed = session.pushText(prepared.text);
-      if (!pushed.pushed) {
+      let pushedAny = false;
+      for (const row of preparedPieces) {
+        if (bargeInActive || activePlaybackGeneration !== gen) {
+          try {
+            session.cancel();
+          } catch {
+            /* ignore */
+          }
+          if (activePlaybackGeneration === gen) {
+            activePlaybackGeneration = ++playbackGeneration;
+          }
+          return { ok: false, cancelled: true };
+        }
+        const pushed = session.pushText(row.text);
+        if (pushed.pushed) pushedAny = true;
+      }
+      if (!pushedAny) {
         session.cancel();
         return { ok: false, empty: true };
       }
@@ -2796,9 +2832,10 @@ mediaWss.on('connection', (ws, req) => {
         });
         return;
       }
-      // Local lines stay off the call. Catalogue, hours, pace, identity, and the
-      // old booking denial must not speak-and-return. Gemini keeps the sentence
-      // stream. A visit, hold, or order lookup is the exception below.
+      // Hours, pace, identity, and the old booking denial stay off this
+      // speak-and-return. A prepared catalogue is spoken here. Gemini must not
+      // paraphrase that list on the same turn. A visit, hold, or order lookup
+      // is the exception below.
       const localReply = resolveLocalReply({
         text: clean,
         state: brainState,
@@ -2808,7 +2845,9 @@ mediaWss.on('connection', (ws, req) => {
         businessName,
         nextBestAction,
       });
-      if (localReply) {
+      const catalogueLine =
+        localReply?.outcome === 'catalogue' ? String(localReply.line || '').trim() : '';
+      if (localReply && !catalogueLine) {
         console.log(
           `[ws/media][${callKey}] ${localReply.outcome} local line not spoken lang=${callLanguage}: ${localReply.line}`
         );
@@ -2840,10 +2879,41 @@ mediaWss.on('connection', (ws, req) => {
         suppressReplyRemainder = false;
         for (const line of nameAskLines) {
           callTranscript.pushAgent(line);
-          turnTiming.markFirstSpokenChunk();
-          await speakText(line);
-          spokeThisTurn = true;
         }
+        turnTiming.markFirstSpokenChunk();
+        // List and name ask share one session. A second speakText reopens
+        // Soniox after a dead beat.
+        const questionText =
+          [...nameAskLines].reverse().find((line) => line.includes('?')) ||
+          nameAskLines[nameAskLines.length - 1] ||
+          fileNameAsk;
+        await speakText(nameAskLines.join(' '), {
+          sentenceBreaks: true,
+          questionText,
+        });
+        spokeThisTurn = true;
+        return;
+      }
+      // Name gate did not take the turn. The prepared list is still spoken.
+      // HD_dc0f94053875 logged this line and let Gemini run on instead.
+      if (catalogueLine) {
+        console.log(
+          `[ws/media][${callKey}] catalogue spoken lang=${callLanguage}: ${catalogueLine}`
+        );
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(catalogueLine);
+        turnTiming.markFirstSpokenChunk();
+        const catalogueQuestion =
+          catalogueLine
+            .split(/(?<=[.!?])\s+/)
+            .reverse()
+            .find((part) => part.includes('?')) || catalogueLine;
+        await speakText(catalogueLine, {
+          sentenceBreaks: true,
+          questionText: catalogueQuestion,
+        });
+        spokeThisTurn = true;
         return;
       }
       speechHold = holdCallerSpeech(callKey, messages);
