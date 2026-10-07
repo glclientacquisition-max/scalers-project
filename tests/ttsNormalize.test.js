@@ -340,7 +340,50 @@ test('spaced hyphens are not spoken', () => {
     { callLanguage: 'en' }
   );
   assert.ok(!prepared.text.includes('-'));
-  assert.match(prepared.text, /sofa cleaning carpet cleaning mattress cleaning/);
+  assert.equal(
+    prepared.text,
+    'We offer sofa cleaning and carpet cleaning and mattress cleaning'
+  );
+});
+
+test('a catalogue list is spoken with and between items, not one run-on', () => {
+  const prepared = prepareForTts(
+    'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning. Which one do you need?',
+    { callLanguage: 'en' }
+  );
+  assert.equal(
+    prepared.text,
+    'We offer Couch cleaning and Mattress cleaning and Carpet cleaning and General cleaning Which one do you need'
+  );
+  assert.ok(!/[,.!?]/.test(prepared.text));
+});
+
+test('a Kiswahili list keeps na between every item', () => {
+  const prepared = prepareForTts('Tunasafisha sofa, godoro, na kapeti.', { callLanguage: 'sw' });
+  assert.equal(prepared.text, 'Tunasafisha sofa na godoro na kapeti');
+  assert.ok(!/[,.]/.test(prepared.text));
+});
+
+test('a single clause comma is not turned into and', () => {
+  const prepared = prepareForTts("I'm doing well, thank you.", { callLanguage: 'en' });
+  assert.match(prepared.text, /doing well thank you/);
+  assert.ok(!/\band thank you\b/.test(prepared.text));
+});
+
+test('a vocative is not a spoken list', () => {
+  const prepared = prepareForTts('Yes, Alvin, thank you.', { callLanguage: 'en' });
+  assert.ok(!/\band Alvin\b/.test(prepared.text));
+});
+
+test('a Kiswahili catalogue that already says and keeps that conjunction', () => {
+  const prepared = prepareForTts(
+    'Tuna Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning. Unahitaji gani?',
+    { callLanguage: 'sw' }
+  );
+  assert.equal(
+    prepared.text,
+    'Tuna Couch cleaning and Mattress cleaning and Carpet cleaning and General cleaning Unahitaji gani'
+  );
 });
 
 test('bullet leaks flatten to a spoken list', () => {

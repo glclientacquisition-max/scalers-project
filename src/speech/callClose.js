@@ -18,6 +18,22 @@ function planBrainEndClose({ action, language } = {}) {
 }
 
 /**
+ * Hang up only after the farewell PCM still queued on the bridge has played.
+ * Synthesis often finishes before the caller hears the last word. A fixed
+ * 800ms after speak() returns clips that tail.
+ * 16 kHz mono s16le is 32 bytes per millisecond.
+ * @param {{ bytes?: number, startedAt?: number, now?: number, padMs?: number, maxMs?: number }} [opts]
+ */
+function farewellHangupDelayMs({ bytes = 0, startedAt = 0, now = 0, padMs = 400, maxMs = 8000 } = {}) {
+  const durationMs = Math.ceil(Math.max(0, Number(bytes) || 0) / 32);
+  const started = Number(startedAt) || 0;
+  const at = Number(now) || Date.now();
+  const elapsed = started > 0 ? Math.max(0, at - started) : 0;
+  const remaining = Math.max(0, durationMs - elapsed);
+  return Math.min(maxMs, remaining + padMs);
+}
+
+/**
  * Close the idle nudge first, then speak, then hang up.
  * A nudge armed before END must not speak during the farewell.
  * @param {{
@@ -40,4 +56,5 @@ async function runBrainEndClose(opts = {}) {
 module.exports = {
   planBrainEndClose,
   runBrainEndClose,
+  farewellHangupDelayMs,
 };

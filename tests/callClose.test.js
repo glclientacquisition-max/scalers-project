@@ -4,7 +4,11 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { createIdleNudgeController } = require('../src/speech/idleNudge');
-const { planBrainEndClose, runBrainEndClose } = require('../src/speech/callClose');
+const {
+  planBrainEndClose,
+  runBrainEndClose,
+  farewellHangupDelayMs,
+} = require('../src/speech/callClose');
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -26,6 +30,31 @@ describe('planBrainEndClose', () => {
     });
     assert.equal(planBrainEndClose({ action: 'ANSWER', language: 'sw' }).close, false);
     assert.equal(planBrainEndClose({ action: '', language: 'en' }).line, '');
+  });
+});
+
+describe('farewellHangupDelayMs', () => {
+  it('waits out audio that was synthesized faster than playback', () => {
+    const delay = farewellHangupDelayMs({
+      bytes: 64000,
+      startedAt: 1000,
+      now: 1200,
+    });
+    assert.equal(delay, 2200);
+    assert.ok(delay > 800);
+  });
+
+  it('only pads the tail once the farewell has already played', () => {
+    const delay = farewellHangupDelayMs({
+      bytes: 64000,
+      startedAt: 1000,
+      now: 3200,
+    });
+    assert.equal(delay, 400);
+  });
+
+  it('does not hold the line when no farewell audio arrived', () => {
+    assert.equal(farewellHangupDelayMs({ bytes: 0, startedAt: 0, now: 5000 }), 400);
   });
 });
 

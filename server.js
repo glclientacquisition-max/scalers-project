@@ -276,7 +276,7 @@ const {
   createAgentReplayMemory,
 } = require('./src/speech/overlapHold');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
-const { planBrainEndClose, runBrainEndClose } = require('./src/speech/callClose');
+const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
 const {
   createVoiceTurnTiming,
   createCallTranscript,
@@ -1755,6 +1755,8 @@ mediaWss.on('connection', (ws, req) => {
   let tts = null;
   let speaking = false;
   let speakStartedAt = 0;
+  let playbackBytes = 0;
+  let playbackStartedAt = 0;
   let lastAgentText = '';
   let llmRecoveryOffered = false;
   let emptyRepairOffered = false;
@@ -2772,18 +2774,24 @@ mediaWss.on('connection', (ws, req) => {
             suppressReplyRemainder = false;
             callTranscript.pushAgent(line);
             turnTiming.markFirstSpokenChunk();
+            playbackBytes = 0;
+            playbackStartedAt = 0;
             await speakText(line);
             spokeThisTurn = true;
           },
           hangup: () => {
-            console.log(`[ws/media][${sidLabel()}] brain-end hangup`);
+            const delay = farewellHangupDelayMs({
+              bytes: playbackBytes,
+              startedAt: playbackStartedAt,
+            });
+            console.log(`[ws/media][${sidLabel()}] brain-end hangup in ${delay}ms`);
             setTimeout(() => {
               try {
                 ws.close(1000, 'end_call');
               } catch {
                 /* ignore */
               }
-            }, 800);
+            }, delay);
           },
         });
         return;
@@ -3765,6 +3773,8 @@ mediaWss.on('connection', (ws, req) => {
         }
         if (activeTurnTiming) activeTurnTiming.markFirstPcm();
         if (greetingAwaitingFirstPcm) noteGreetingPcm({ cached: false });
+        if (!playbackStartedAt) playbackStartedAt = Date.now();
+        playbackBytes += pcm.length;
         if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
         // Live clone-voice audio means we can record downtime clips for the next outage.
         scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });

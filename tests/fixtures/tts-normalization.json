@@ -277,8 +277,8 @@
       "text": "Sofa cleaning - carpet cleaning - mattress cleaning.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Sofa cleaning carpet cleaning mattress cleaning",
-      "source": "spaced hyphen list markers become commas so TTS never says hyphen"
+      "expectProductionText": "Sofa cleaning and carpet cleaning and mattress cleaning",
+      "source": "spaced hyphen list markers become and so TTS never says hyphen and the names stay separate"
     },
     {
       "id": "33-list-bullet-leak",

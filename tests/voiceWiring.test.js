@@ -163,6 +163,12 @@ assert.match(
 
 assert.match(
   source,
+  /playbackBytes = 0;[\s\S]*?await speakText\(line\);[\s\S]*?farewellHangupDelayMs\(\{[\s\S]*?bytes:\s*playbackBytes/,
+  'Brain END hangup must wait for the farewell PCM still queued, not a fixed 800ms'
+);
+
+assert.match(
+  source,
   /!callEnding &&/,
   'idle nudge must not fire after Brain END'
 );
