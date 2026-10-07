@@ -1,0 +1,505 @@
+// Text replay for the speak-DNA fails.
+// HD_ad735: a file price was grounded, then the name ask was the only line.
+// HD_993: "which service is you offer" must speak the Phase-0 list, not a label.
+// HD_c705 / HD_708: name Yes after a public answer continues. It does not END
+// and it does not re-list.
+// Deterministic. No model judge.
+// Run: node --test tests/hdSpeakReplay.test.js
+
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+const { resolveLocalReply, planCallerModelTurn } = require('../src/conversation/turnPolicy');
+const {
+  createBrainState,
+  observeCallerTurn,
+  setNextBestAction,
+} = require('../src/conversation/brainState');
+const { determineNextBestAction } = require('../src/conversation/nextBestAction');
+const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+const { planCatalogueMouth } = require('../src/speech/catalogueMouth');
+const { lockFileNameAsk } = require('../src/speech/callerFileSpeech');
+const { drainSpokenSpeakSlots } = require('../src/conversation/speakSlots');
+const {
+  authorizeSpeak,
+  createSpeakCommit,
+  commitTurnFacts,
+  commitReadySpeakSlots,
+} = require('../src/speech/speakPacket');
+
+const PRICE_SW = 'Carpet cleaning ni Ksh 1500-2000.';
+const PRICE_EN = 'Carpet cleaning is Ksh 1500-2000.';
+
+const PRICE_FILE = {
+  vertical: 'home_services',
+  servicesCatalog: [
+    { name: 'Couch cleaning', price_range: '800-1200' },
+    { name: 'Carpet cleaning', price_range: 'Ksh 1500-2000', notes: 'per room' },
+    { name: 'Sofa cleaning' },
+    { name: 'General cleaning' },
+  ],
+};
+
+const LIST_FILE = {
+  vertical: 'home_services',
+  servicesCatalog: [
+    { name: 'Couch cleaning' },
+    { name: 'Mattress cleaning' },
+    { name: 'Carpet cleaning' },
+    { name: 'General cleaning' },
+  ],
+  callerMemory: {
+    name: 'Alvin',
+    fileOwnerName: 'Alvin',
+    sharedLine: true,
+  },
+};
+
+function unboundAlvin(state) {
+  state.caller.nameConfirmed = false;
+  state.caller.nameJustConfirmed = false;
+  state.caller.fileNameAsked = 'Alvin';
+  state.caller.fileNameAskSpoken = false;
+  state.returning = {
+    ...(state.returning || {}),
+    name: 'Alvin',
+    fileOwnerName: 'Alvin',
+  };
+  return state;
+}
+
+function hear(state, text, profile, language) {
+  return observeCallerTurn(state, {
+    text,
+    detectedLanguage: language,
+    resolvedLanguage: language,
+    profile,
+    entities: extractConversationEntities(text, { profile, state }),
+  });
+}
+
+function nameAskFor(state, language) {
+  const gate = planCallerModelTurn(state, {
+    fileNameAskCommitted: state?.caller?.fileNameAskSpoken === true,
+  });
+  if (gate.runModel || !gate.line) return '';
+  return lockFileNameAsk(gate.line, language);
+}
+
+function playTurn({ commit, text, state, profile, language, endAction }) {
+  const localReply = resolveLocalReply({
+    text,
+    state,
+    profile,
+    language,
+  });
+  const mouth = planCatalogueMouth({
+    localReply,
+    text,
+    profile,
+    language,
+    state,
+    callerTurns: state?.conversation?.answersReceived,
+    catalogueListed: state?.conversation?.catalogueListed === true,
+    reasoningDown: false,
+    geminiCatalogue: false,
+  });
+  const nameJustConfirmed = state?.caller?.nameJustConfirmed === true;
+  const nameAsk = nameJustConfirmed ? '' : nameAskFor(state, language);
+  commitTurnFacts(commit, {
+    localReply,
+    catalogueLine: mouth.speakLocal ? mouth.line : '',
+    catalogueListed: state?.conversation?.catalogueListed === true,
+  });
+  if (nameAsk || nameJustConfirmed || String(endAction || '').toUpperCase() === 'END') {
+    commitReadySpeakSlots(commit, state, {
+      nameJustConfirmed: nameJustConfirmed || String(endAction || '').toUpperCase() === 'END',
+      catalogueListed: state?.conversation?.catalogueListed === true,
+    });
+  }
+  const planned = commit.planCommittedSpeech({
+    endAction,
+    nameAsk,
+    nameJustConfirmed,
+    state,
+  });
+  drainSpokenSpeakSlots(state, planned.lines);
+  if (
+    mouth.speakLocal &&
+    mouth.line &&
+    planned.lines.includes(mouth.line) &&
+    state.conversation
+  ) {
+    state.conversation.catalogueListed = true;
+  }
+  if (nameAsk && planned.lines.includes(nameAsk)) {
+    state.caller.fileNameAskSpoken = true;
+  }
+  return { localReply, mouth, planned, nameAsk };
+}
+
+describe('SpeakPacket tiers', () => {
+  it('authorizes public facts once and leaves private text uncommitted', () => {
+    assert.equal(authorizeSpeak({ outcome: 'price', line: PRICE_SW }).tier, 'public');
+    assert.equal(authorizeSpeak({ outcome: 'catalogue', line: 'We offer Carpet cleaning.' }).tier, 'public');
+    assert.equal(authorizeSpeak({ outcome: 'hours', line: 'We are open until 6.' }).tier, 'public');
+    assert.equal(authorizeSpeak({ outcome: 'hours_ask', line: 'We open at 8.' }).tier, 'public');
+    assert.equal(authorizeSpeak({ outcome: 'coverage', line: 'We cover Westlands.' }).tier, 'public');
+    assert.equal(
+      authorizeSpeak({ outcome: 'service_facts', line: PRICE_EN }).tier,
+      'public'
+    );
+    assert.equal(authorizeSpeak({ outcome: 'identity', line: 'I am the assistant.' }).tier, 'step_up');
+    assert.equal(authorizeSpeak({ outcome: 'visit_time', line: 'What time works?' }), null);
+    assert.equal(
+      authorizeSpeak({
+        outcome: 'service_facts',
+        line: "I don't have more detail on file.",
+      }),
+      null
+    );
+    assert.equal(
+      authorizeSpeak({
+        outcome: 'catalogue',
+        line: 'You have two open carpet cleaning requests.',
+      }),
+      null
+    );
+    assert.equal(
+      authorizeSpeak({
+        outcome: 'price',
+        line: 'You have two open carpet cleaning requests.',
+      }),
+      null
+    );
+    const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'speech', 'speakPacket.js'), 'utf8');
+    assert.doesNotMatch(source, /PUBLIC_ANSWER/);
+  });
+
+  it('speaks a committed public price before the name, and identity trails', () => {
+    const state = unboundAlvin(createBrainState(PRICE_FILE));
+    const commit = createSpeakCommit();
+    commit.commit(authorizeSpeak({ outcome: 'price', line: PRICE_SW }));
+    commit.commit(authorizeSpeak({ outcome: 'identity', line: 'I am the assistant.' }));
+    const lines = commit.drain({
+      nameAsk: 'Je, naongea na Alvin?',
+      state,
+    });
+    assert.deepEqual(lines, [PRICE_SW, 'I am the assistant.', 'Je, naongea na Alvin?']);
+    assert.equal(lines.join(' ').includes('CATALOGUE MOUTH'), false);
+  });
+
+  it('keeps a committed public price when the file gate would drop the name in it', () => {
+    const state = unboundAlvin(createBrainState(PRICE_FILE));
+    const price = 'Carpet cleaning for Alvin is Ksh 1500-2000.';
+    const commit = createSpeakCommit();
+    commit.commit(authorizeSpeak({ outcome: 'price', line: price }));
+    const lines = commit.drain({
+      nameAsk: 'Je, naongea na Alvin?',
+      state,
+    });
+    assert.equal(lines[0], price);
+    assert.equal(lines[1], 'Je, naongea na Alvin?');
+  });
+
+  it('flushes an unsaid public packet on name yes and does not ask the name again', () => {
+    const commit = createSpeakCommit();
+    commit.commit(authorizeSpeak({ outcome: 'price', line: PRICE_SW }));
+    const planned = commit.planCommittedSpeech({
+      endAction: 'ANSWER',
+      nameAsk: 'Je, naongea na Alvin?',
+      nameJustConfirmed: true,
+      state: {
+        caller: { nameConfirmed: true, nameJustConfirmed: true, fileNameAsked: 'Alvin' },
+      },
+    });
+    assert.equal(planned.farewell, false);
+    assert.deepEqual(planned.lines, [PRICE_SW]);
+  });
+
+  it('speaks a Brain speak slot before the name ask and removes it once spoken', () => {
+    const state = unboundAlvin(createBrainState(PRICE_FILE));
+    state.conversation.speakSlots = [{ outcome: 'price', line: PRICE_SW, language: 'sw' }];
+    const commit = createSpeakCommit();
+    const turn = playTurn({
+      commit,
+      text: 'Ni pesa ngapi?',
+      state,
+      profile: PRICE_FILE,
+      language: 'sw',
+      endAction: 'ANSWER',
+    });
+    assert.equal(turn.planned.lines[0], PRICE_SW);
+    assert.equal(turn.planned.lines[1], 'Je, naongea na Alvin?');
+    assert.equal(turn.planned.lines.join(' ').includes('CATALOGUE MOUTH'), false);
+    assert.deepEqual(state.conversation.speakSlots, []);
+  });
+
+  it('leaves an unspoken price slot when only the name ask was spoken', () => {
+    const state = unboundAlvin(createBrainState(PRICE_FILE));
+    state.conversation.speakSlots = [
+      { outcome: 'price', line: PRICE_SW, language: 'sw' },
+      { outcome: 'catalogue', line: 'We offer Couch cleaning and Carpet cleaning.', language: 'en' },
+    ];
+    drainSpokenSpeakSlots(state, ['Je, naongea na Alvin?']);
+    assert.equal(state.conversation.speakSlots.length, 2);
+    const yes = createSpeakCommit();
+    state.caller.nameConfirmed = true;
+    state.caller.nameJustConfirmed = true;
+    state.caller.fileNameAskSpoken = true;
+    const flushed = playTurn({
+      commit: yes,
+      text: 'Eeh',
+      state,
+      profile: PRICE_FILE,
+      language: 'sw',
+      endAction: 'ANSWER',
+    });
+    assert.equal(flushed.planned.lines[0], PRICE_SW);
+    assert.equal(flushed.planned.lines.includes('Je, naongea na Alvin?'), false);
+    assert.doesNotMatch(flushed.planned.lines.join(' '), /Couch cleaning/);
+    assert.equal(
+      state.conversation.speakSlots.some((slot) => slot.outcome === 'price'),
+      false
+    );
+  });
+
+  it('does not farewell while a public packet is still unsaid', () => {
+    const pending = createSpeakCommit();
+    pending.commit(authorizeSpeak({ outcome: 'price', line: PRICE_SW }));
+    const held = pending.planCommittedSpeech({
+      endAction: 'END',
+      nameAsk: 'Je, naongea na Alvin?',
+      state: unboundAlvin(createBrainState(PRICE_FILE)),
+    });
+    assert.equal(held.farewell, false);
+    assert.deepEqual(held.lines, [PRICE_SW]);
+
+    const clear = createSpeakCommit();
+    const bye = clear.planCommittedSpeech({ endAction: 'END' });
+    assert.equal(bye.farewell, true);
+    assert.deepEqual(bye.lines, []);
+  });
+});
+
+describe('HD_ad735 price then name, then yes', () => {
+  it('speaks the Kiswahili file price before Je, naongea na Alvin', () => {
+    let state = createBrainState(PRICE_FILE);
+    state = hear(state, 'Carpet cleaning', PRICE_FILE, 'en');
+    state = hear(state, 'Ni pesa ngapi?', PRICE_FILE, 'sw');
+    unboundAlvin(state);
+    const decision = determineNextBestAction({ state });
+    assert.notEqual(decision.action, 'END');
+    state = setNextBestAction(state, decision);
+    const commit = createSpeakCommit();
+    const turn = playTurn({
+      commit,
+      text: 'Ni pesa ngapi?',
+      state,
+      profile: PRICE_FILE,
+      language: 'sw',
+      endAction: decision.action,
+    });
+    assert.equal(turn.localReply.outcome, 'price');
+    assert.equal(turn.localReply.line, PRICE_SW);
+    assert.equal(turn.planned.lines[0], PRICE_SW);
+    assert.equal(turn.planned.lines[1], 'Je, naongea na Alvin?');
+    assert.equal(turn.planned.lines.join(' ').includes('CATALOGUE MOUTH'), false);
+    assert.equal(turn.mouth.letGemini, false);
+  });
+
+  it('name yes does not end, re-ask the name, or re-list', () => {
+    let state = createBrainState(PRICE_FILE);
+    state = hear(state, 'Carpet cleaning', PRICE_FILE, 'en');
+    state = hear(state, 'Ni pesa ngapi?', PRICE_FILE, 'sw');
+    unboundAlvin(state);
+    const commit = createSpeakCommit();
+    const priced = playTurn({
+      commit,
+      text: 'Ni pesa ngapi?',
+      state,
+      profile: PRICE_FILE,
+      language: 'sw',
+      endAction: 'ANSWER',
+    });
+    assert.equal(priced.planned.lines[0], PRICE_SW);
+    state = observeCallerTurn(state, {
+      text: 'Eeh, unaongea na Alvin?',
+      detectedLanguage: 'sw',
+      resolvedLanguage: 'sw',
+      profile: PRICE_FILE,
+      lastAgentText: 'Je, naongea na Alvin?',
+    });
+    const decision = determineNextBestAction({ state });
+    assert.equal(decision.action, 'ANSWER');
+    assert.notEqual(decision.action, 'END');
+    state = setNextBestAction(state, decision);
+    const yes = playTurn({
+      commit,
+      text: 'Eeh, unaongea na Alvin?',
+      state,
+      profile: PRICE_FILE,
+      language: 'sw',
+      endAction: decision.action,
+    });
+    assert.equal(yes.planned.lines.includes('Je, naongea na Alvin?'), false);
+    assert.equal(yes.planned.lines.includes(PRICE_SW), false);
+    assert.doesNotMatch(yes.planned.lines.join(' '), /Couch cleaning/);
+    assert.equal(yes.planned.lines.join(' ').includes('CATALOGUE MOUTH'), false);
+  });
+});
+
+describe('HD_993 local catalogue, detail, and price', () => {
+  it('speaks the Phase-0 list first for which service is you offer', () => {
+    let state = createBrainState(PRICE_FILE);
+    state = hear(state, 'which service is you offer', PRICE_FILE, 'en');
+    unboundAlvin(state);
+    const decision = determineNextBestAction({ state });
+    state = setNextBestAction(state, decision);
+    const commit = createSpeakCommit();
+    const turn = playTurn({
+      commit,
+      text: 'which service is you offer',
+      state,
+      profile: PRICE_FILE,
+      language: 'en',
+      endAction: decision.action,
+    });
+    assert.equal(turn.mouth.speakLocal, true);
+    assert.equal(turn.mouth.letGemini, false);
+    assert.match(turn.planned.lines[0], /Couch cleaning/);
+    assert.match(turn.planned.lines[0], /Carpet cleaning/);
+    assert.match(turn.planned.lines[0], /\band\b/);
+    assert.doesNotMatch(turn.planned.lines[0], /CATALOGUE MOUTH/);
+    assert.equal(turn.planned.lines.at(-1), 'Am I speaking with Alvin?');
+    assert.notEqual(turn.planned.lines[0], turn.planned.lines.at(-1));
+  });
+
+  it('does not re-list on a carpet detail, and speaks the file price for how much', () => {
+    let state = createBrainState(PRICE_FILE);
+    state = hear(state, 'which service is you offer', PRICE_FILE, 'en');
+    unboundAlvin(state);
+    const commit = createSpeakCommit();
+    const listed = playTurn({
+      commit,
+      text: 'which service is you offer',
+      state,
+      profile: PRICE_FILE,
+      language: 'en',
+      endAction: 'ANSWER',
+    });
+    assert.equal(state.conversation.catalogueListed, true);
+    state.caller.fileNameAskSpoken = true;
+    state.caller.nameConfirmed = true;
+    state.caller.nameJustConfirmed = false;
+    state = hear(state, 'tell me more about carpet', PRICE_FILE, 'en');
+    state.caller.nameConfirmed = true;
+    state.caller.fileNameAskSpoken = true;
+    const detail = playTurn({
+      commit,
+      text: 'tell me more about carpet',
+      state,
+      profile: PRICE_FILE,
+      language: 'en',
+      endAction: 'ANSWER',
+    });
+    assert.notEqual(detail.localReply && detail.localReply.outcome, 'catalogue');
+    assert.doesNotMatch(detail.planned.lines.join(' '), /Couch cleaning/);
+    assert.doesNotMatch(detail.planned.lines.join(' '), /CATALOGUE MOUTH/);
+    assert.match(detail.planned.lines.join(' '), /Carpet cleaning/);
+    state = hear(state, 'How much is it?', PRICE_FILE, 'en');
+    state.caller.nameConfirmed = true;
+    state.caller.fileNameAskSpoken = true;
+    const price = playTurn({
+      commit,
+      text: 'How much is it?',
+      state,
+      profile: PRICE_FILE,
+      language: 'en',
+      endAction: 'ANSWER',
+    });
+    assert.equal(price.localReply.outcome, 'price');
+    assert.equal(price.planned.lines[0], PRICE_EN);
+    assert.doesNotMatch(price.planned.lines.join(' '), /Couch cleaning/);
+    assert.equal(listed.mouth.speakLocal, true);
+  });
+});
+
+describe('HD_c705 and HD_708 name yes continues', () => {
+  it('Eeh and Yes after the list are ANSWER, not END, and do not re-list', () => {
+    for (const text of ['Eeh, unaongea na Alvin?', 'Yes.']) {
+      let state = createBrainState(LIST_FILE);
+      state = hear(state, 'Tell me your services, man.', LIST_FILE, 'en');
+      unboundAlvin(state);
+      const listed = determineNextBestAction({ state });
+      assert.equal(listed.action, 'ANSWER');
+      state = setNextBestAction(state, listed);
+      const commit = createSpeakCommit();
+      const first = playTurn({
+        commit,
+        text: 'Tell me your services, man.',
+        state,
+        profile: LIST_FILE,
+        language: 'en',
+        endAction: listed.action,
+      });
+      assert.match(first.planned.lines[0], /Couch cleaning/);
+      assert.equal(first.mouth.letGemini, false);
+      assert.equal(state.conversation.catalogueListed, true);
+      state = observeCallerTurn(state, {
+        text,
+        detectedLanguage: 'sw',
+        resolvedLanguage: 'sw',
+        profile: LIST_FILE,
+        lastAgentText: 'Je, naongea na Alvin?',
+      });
+      const decision = determineNextBestAction({ state });
+      assert.equal(decision.action, 'ANSWER');
+      assert.notEqual(decision.action, 'END');
+      state = setNextBestAction(state, decision);
+      const yes = playTurn({
+        commit,
+        text,
+        state,
+        profile: LIST_FILE,
+        language: 'sw',
+        endAction: decision.action,
+      });
+      assert.equal(yes.planned.farewell, false);
+      assert.equal(yes.planned.lines.includes('Je, naongea na Alvin?'), false);
+      assert.doesNotMatch(yes.planned.lines.join(' '), /Couch cleaning/);
+      assert.doesNotMatch(yes.planned.lines.join(' '), /CATALOGUE MOUTH/);
+    }
+  });
+
+  it('a detail after the public list does not speak the list again', () => {
+    let state = createBrainState(LIST_FILE);
+    state = hear(state, 'Tell me your services, man.', LIST_FILE, 'en');
+    const listed = determineNextBestAction({ state });
+    state = setNextBestAction(state, listed);
+    const commit = createSpeakCommit();
+    playTurn({
+      commit,
+      text: 'Tell me your services, man.',
+      state,
+      profile: LIST_FILE,
+      language: 'en',
+      endAction: 'ANSWER',
+    });
+    state.caller.nameConfirmed = true;
+    state.caller.fileNameAskSpoken = true;
+    state = hear(state, 'tell me more about carpet', LIST_FILE, 'en');
+    state.caller.nameConfirmed = true;
+    const detail = playTurn({
+      commit,
+      text: 'tell me more about carpet',
+      state,
+      profile: LIST_FILE,
+      language: 'en',
+      endAction: 'ANSWER',
+    });
+    assert.doesNotMatch(detail.planned.lines.join(' '), /Mattress cleaning/);
+    assert.doesNotMatch(detail.planned.lines.join(' '), /CATALOGUE MOUTH/);
+  });
+});

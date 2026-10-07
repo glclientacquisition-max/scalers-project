@@ -5,7 +5,9 @@
 // flip coverage or claim a live transfer. Playbooks cannot bypass this.
 
 const { confirmationLanguage } = require('./language');
-const { factServices, speechFactText } = require('./provenance');
+const { factServices, factProducts, speechFactText } = require('./provenance');
+const { entityValue, findCatalogMatch } = require('./entityExtraction');
+const { looksLikeOfferAsk } = require('./fileRead');
 const { fileServicePriceLine } = require('./catalogueMouth');
 const { numbersIn } = require('./numberWords');
 const { assessCoverage } = require('./visitLocation');
@@ -64,6 +66,8 @@ const SPECIFIC_ASK_EXTRA =
 // an honest line, not by silence.
 const NUMBER_ASK =
   /\b(how much|how many|price|prices|cost|costs|charge|charges|rate|rates|bei|pesa ngapi|ngapi|what time|saa ngapi|when do you (?:open|close)|hours)\b/i;
+const PRICE_ASK =
+  /\b(how much|price|prices|cost|costs|charge|charges|rate|rates|bei|gharama|pesa ngapi|pesa gani)\b/i;
 
 function callerAskedSpecificQuestion(text) {
   const raw = String(text || '');
@@ -283,29 +287,127 @@ function narratesInternalAction(text) {
 }
 
 
+const PRICE_NAME_SKIP = new Set([
+  'cleaning',
+  'service',
+  'services',
+  'general',
+  'house',
+  'houses',
+]);
+
+function pricedRows(profile) {
+  const fieldMeta = profile?.fieldMeta || null;
+  const rows = [];
+  for (const row of factServices(profile?.servicesCatalog, fieldMeta)) {
+    const name = String(row?.name || '')
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const price = String(row?.price_range || row?.priceRange || '').trim();
+    if (name && price && /\d/.test(price)) rows.push({ name, price });
+  }
+  for (const row of factProducts(profile?.productCatalog, fieldMeta)) {
+    const name = String(row?.name || '')
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const price = String(row?.price || row?.price_range || row?.priceRange || '').trim();
+    if (name && price && /\d/.test(price)) rows.push({ name, price });
+  }
+  return rows;
+}
+
+function priceHits(profile, ask) {
+  const blob = String(ask || '').toLowerCase();
+  if (!blob.trim()) return [];
+  const hits = [];
+  for (const row of pricedRows(profile)) {
+    const nameHit = row.name
+      .toLowerCase()
+      .split(/\s+/)
+      .some((word) => word.length > 3 && !PRICE_NAME_SKIP.has(word) && blob.includes(word));
+    const seatHit = /\b(seats?|kiti|viti)\b/i.test(blob) && /\bper seat\b/i.test(row.price);
+    if (nameHit || seatHit) hits.push(row);
+  }
+  return hits;
+}
+
+function formatFilePrice(hit, language) {
+  const lang = confirmationLanguage(language);
+  if (lang === 'sw' || lang === 'sheng') return `${hit.name} ni ${hit.price}.`;
+  return `${hit.name} is ${hit.price}.`;
+}
+
+function filePriceAnswer(profile, callerText, language = 'en') {
+  const hits = priceHits(profile, callerText);
+  if (hits.length !== 1) return '';
+  return formatFilePrice(hits[0], language);
+}
+
+/**
+ * On-file price for this ask. A bare "how much" / "pesa ngapi" uses the one
+ * service already named in an earlier caller turn or in Brain's entity.
+ * More than one match stays quiet. Nothing here is invented.
+ * @param {{
+ *   profile?: object,
+ *   text?: string,
+ *   callerTurns?: string[],
+ *   state?: object,
+ *   language?: string,
+ * }} [opts]
+ * @returns {string}
+ */
+function groundFilePriceLine(opts = {}) {
+  const text = String(opts.text || '').replace(/\s+/g, ' ').trim();
+  if (!text || !PRICE_ASK.test(text) || looksLikeOfferAsk(text)) return '';
+  const profile = opts.profile || {};
+  const language = opts.language || opts.state?.language?.current || 'en';
+  const direct = filePriceAnswer(profile, text, language);
+  if (direct) return direct;
+  const turns = Array.isArray(opts.callerTurns) ? opts.callerTurns : [];
+  for (let i = turns.length - 1; i >= 0; i -= 1) {
+    const turn = String(turns[i] || '').trim();
+    if (!turn || turn.toLowerCase() === text.toLowerCase()) continue;
+    const hits = priceHits(profile, turn);
+    if (hits.length === 1) return formatFilePrice(hits[0], language);
+  }
+  const named = [
+    entityValue(opts.state?.entities?.service),
+    entityValue(opts.state?.entities?.product),
+    entityValue(opts.state?.entities?.requestedItem),
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const fromEntity = priceHits(profile, named);
+  if (fromEntity.length === 1) return formatFilePrice(fromEntity[0], language);
+  return '';
+}
+
 const NOT_ON_FILE =
   /don'?t have that on file|not on file|don'?t have that detail|sina hiyo|siko na hiyo|sina maelezo/i;
 
-function filePriceAnswer(profile, callerText, state = null, language = 'en') {
-  const grounded = fileServicePriceLine(callerText, profile, language, state);
-  if (grounded) return grounded;
-  const ask = String(callerText || '').toLowerCase();
-  const rows = factServices(profile?.servicesCatalog, profile?.fieldMeta || null);
-  const hits = [];
-  for (const row of rows) {
-    const name = String(row?.name || '').trim();
-    const price = String(row?.price_range || row?.priceRange || '').trim();
-    if (!name || !price || !/\d/.test(price)) continue;
-    const generic = new Set(['cleaning', 'service', 'services', 'general']);
-    const nameHit = name
-      .toLowerCase()
-      .split(/\s+/)
-      .some((word) => word.length > 3 && !generic.has(word) && ask.includes(word));
-    const seatHit = /\b(seats?|kiti|viti)\b/i.test(ask) && /\bper seat\b/i.test(price);
-    if (nameHit || seatHit) hits.push({ name, price });
-  }
-  if (hits.length !== 1) return '';
-  return `${hits[0].name} is ${hits[0].price}.`;
+/** A named catalogue row with no number. Do not borrow another service's price. */
+function catalogueRowNamedWithoutPrice(text, profile) {
+  const hit = findCatalogMatch(text, profile || {});
+  if (!hit || hit.kind !== 'service') return false;
+  const want = String(hit.canonical || '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (!want) return false;
+  const row = factServices(profile?.servicesCatalog, profile?.fieldMeta || null).find((item) => {
+    const name = String(item?.name || '')
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    return name && name === want;
+  });
+  if (!row) return false;
+  const price = String(row.price_range || row.priceRange || row.price || '');
+  return !/\d/.test(price);
 }
 
 function unknownFallback(language) {
@@ -472,22 +574,35 @@ function guardSpokenReply(text, ctx = {}) {
   }
   let out = kept.join(' ').trim();
   if (holdOpenSlot && droppedJob && BARE_CLOSER.test(out)) out = '';
-  const groundedPrice = fileServicePriceLine(
+  const cataloguePrice = fileServicePriceLine(
     lastCallerTurn,
     ctx.profile,
     ctx.language,
     ctx.state
   );
+  const speechPrice =
+    cataloguePrice || catalogueRowNamedWithoutPrice(lastCallerTurn, ctx.profile)
+      ? ''
+      : groundFilePriceLine({
+          profile: ctx.profile,
+          text: lastCallerTurn,
+          callerTurns: ctx.callerTurns,
+          state: ctx.state,
+          language: ctx.language,
+        });
+  const groundedPrice = cataloguePrice || speechPrice;
   if (groundedPrice) {
     const digit = String(groundedPrice).match(/\d[\d,]*/);
-    const already = digit && out.includes(digit[0]);
-    if (!already) out = !out || NOT_ON_FILE.test(out) ? groundedPrice : `${groundedPrice} ${out}`;
+    const already = Boolean(digit && out.includes(digit[0]));
+    if (!already) {
+      out = !out || NOT_ON_FILE.test(out) ? groundedPrice : `${groundedPrice} ${out}`;
+    }
   }
-  const askedNumber = droppedNumber && NUMBER_ASK.test(lastCallerTurn);
-  const priced =
-    askedNumber && !groundedPrice ? filePriceAnswer(ctx.profile, lastCallerTurn, ctx.state, ctx.language) : '';
+  const askedNumber = NUMBER_ASK.test(lastCallerTurn);
+  const priced = groundedPrice;
   if (out) {
-    const lead = priced || (askedNumber ? unknownFallback(ctx.language) : '');
+    const lead =
+      !groundedPrice && askedNumber && droppedNumber ? unknownFallback(ctx.language) : '';
     return withMessageOnlyCallback(lead ? `${lead} ${out}` : out, ctx, appendCallback);
   }
   if (priced) return withMessageOnlyCallback(priced, ctx, appendCallback);
@@ -512,10 +627,7 @@ function guardSpokenReply(text, ctx = {}) {
   }
   if (!out && droppedHoldPayment) return 'The owner will follow up.';
   if (ctx.allowEmpty && !askedNumber) return '';
-  if (droppedNumber && NUMBER_ASK.test(lastCallerTurn)) {
-    const priced = filePriceAnswer(ctx.profile, lastCallerTurn, ctx.state, ctx.language);
-    if (priced) return withMessageOnlyCallback(priced, ctx, appendCallback);
-  }
+  if (askedNumber && priced) return withMessageOnlyCallback(priced, ctx, appendCallback);
   return droppedNumber ? unknownFallback(ctx.language) : ackFallback(ctx.language);
 }
 
@@ -527,6 +639,7 @@ module.exports = {
   narratesInternalAction,
   logSpokenFilterDrop,
   guardSpokenReply,
+  groundFilePriceLine,
   dropSpeechSlop,
   sentenceIsSpeechSlop,
   knownNumbers,

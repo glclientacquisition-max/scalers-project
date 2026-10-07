@@ -86,16 +86,55 @@ function gateCallerFileSpeech(line, state) {
   return { speak: true, line: next, reason: blocked ? 'trimmed' : 'open' };
 }
 
-const PUBLIC_ANSWER = new Set(['catalogue', 'hours', 'hours_ask', 'coverage', 'identity']);
+const { authorizeSpeak, createSpeakCommit } = require('./speakPacket');
+
+function lineIsOpenFileRow(line) {
+  return OPEN_ROW_RE.test(String(line || ''));
+}
 
 /**
- * A public answer prepared on this turn is spoken before the name ask.
- * File rows stay on the speak-gate. Booking ladders are not this.
+ * Text of a public or step-up packet. Private replies are empty.
+ * The name ask is not included here.
  * @param {{ outcome?: string, line?: string } | null} [localReply]
  */
 function answerBeforeNameAsk(localReply) {
-  if (!localReply || !PUBLIC_ANSWER.has(String(localReply.outcome || ''))) return '';
-  return String(localReply.line || '').replace(/\s+/g, ' ').trim();
+  const packet = authorizeSpeak(localReply);
+  return packet ? packet.text : '';
+}
+
+/**
+ * A file price the name gate did not speak. Cleared when that line is in the
+ * spoken lines. A later name Yes reads it back.
+ * @param {object} state
+ * @param {{ outcome?: string, line?: string } | null} [localReply]
+ * @param {string[]} [spokenLines]
+ * @returns {string}
+ */
+function rememberUnspokenPrice(state, localReply, spokenLines) {
+  if (!state || typeof state !== 'object') return '';
+  if (!state.conversation || typeof state.conversation !== 'object') {
+    state.conversation = {};
+  }
+  const line = String(localReply?.line || '').replace(/\s+/g, ' ').trim();
+  if (String(localReply?.outcome || '') !== 'price' || !line) {
+    return String(state.conversation.pendingFilePrice || '').trim();
+  }
+  const spoken = (Array.isArray(spokenLines) ? spokenLines : []).some(
+    (row) => String(row || '').replace(/\s+/g, ' ').trim() === line
+  );
+  state.conversation.pendingFilePrice = spoken ? '' : line;
+  return state.conversation.pendingFilePrice;
+}
+
+/**
+ * The file price still waiting after they confirm the name. Empty once spoken,
+ * and empty on any later turn.
+ * @param {object} [state]
+ * @returns {string}
+ */
+function pendingPriceAfterNameYes(state) {
+  if (state?.caller?.nameJustConfirmed !== true) return '';
+  return String(state?.conversation?.pendingFilePrice || '').replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -108,12 +147,14 @@ function answerBeforeNameAsk(localReply) {
  * }} [opts]
  */
 function linesBeforeNameAsk(opts = {}) {
-  const lines = [];
-  const ahead = gateCallerFileSpeech(answerBeforeNameAsk(opts.localReply), opts.state);
-  if (ahead.speak && ahead.line) lines.push(ahead.line);
-  const ask = String(opts.nameAsk || '').replace(/\s+/g, ' ').trim();
-  if (ask) lines.push(ask);
-  return lines;
+  const commit = createSpeakCommit();
+  const packet = authorizeSpeak(opts.localReply);
+  if (packet) commit.commit(packet);
+  return commit.drain({
+    nameAsk: opts.nameAsk,
+    nameJustConfirmed: opts.nameJustConfirmed === true,
+    state: opts.state,
+  });
 }
 
 /**
@@ -141,7 +182,10 @@ function lockFileNameAsk(line, language) {
 module.exports = {
   speakerBound,
   gateCallerFileSpeech,
+  lineIsOpenFileRow,
   answerBeforeNameAsk,
   linesBeforeNameAsk,
   lockFileNameAsk,
+  rememberUnspokenPrice,
+  pendingPriceAfterNameYes,
 };

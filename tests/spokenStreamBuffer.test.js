@@ -107,6 +107,30 @@ test('holds Sure. so it is not its own TTS utterance', () => {
   assert.strictEqual(rest, 'Sure.');
 });
 
+test('a catalogue breath does not split on periods or question marks', () => {
+  const mid = splitSpeakableChunks(
+    'We offer Couch cleaning. Mattress cleaning. Carpet cleaning?',
+    { catalogueBreath: true }
+  );
+  assert.deepStrictEqual(mid.chunks, []);
+  assert.match(mid.rest, /Couch cleaning\. Mattress cleaning/);
+
+  const done = splitSpeakableChunks(
+    'We offer Couch cleaning. Mattress cleaning. Carpet cleaning?',
+    { catalogueBreath: true, final: true }
+  );
+  assert.equal(done.chunks.length, 1);
+  assert.match(done.chunks[0], /Couch cleaning\. Mattress cleaning\. Carpet cleaning\?/);
+
+  const buf = createSpokenStreamBuffer({ catalogueBreath: true });
+  assert.deepStrictEqual(buf.push('We offer Couch cleaning. '), []);
+  assert.deepStrictEqual(buf.push('Mattress cleaning. Carpet cleaning?'), []);
+  const finished = buf.finish();
+  assert.equal(finished.length, 1);
+  assert.equal(finished[0], 'We offer Couch cleaning, Mattress cleaning, Carpet cleaning,');
+  assert.doesNotMatch(finished[0], /[.!?]/);
+});
+
 test('joins Sure. onto the following question', () => {
   const { chunks } = splitSpeakableChunks(
     'Sure. Are you looking to clean a couch?',

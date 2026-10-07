@@ -34,17 +34,43 @@ function runCallerTurnSource() {
 describe('mid-call one-shots do not speak-and-return', () => {
   const turn = runCallerTurnSource();
 
-  it('does not speak a catalogue, hours, pace, or replay line and return', () => {
+  it('does not force a period-paced catalogue ahead of Gemini', () => {
     assert.doesNotMatch(turn, /speakText\(localReply\.line\)/);
     assert.doesNotMatch(turn, /speakText\(paceLine\)/);
     assert.doesNotMatch(turn, /speakText\(replayLine/);
     assert.doesNotMatch(turn, /I don't have a booking for you/);
+    assert.doesNotMatch(turn, /sentenceBreaks/);
+    assert.doesNotMatch(turn, /renderSpokenList/);
+    assert.doesNotMatch(turn, /catalogue spoken/);
     assert.match(turn, /local line not spoken/);
     assert.match(turn, /pace-only stays on sentence stream/);
     assert.match(turn, /resolveLocalReply\(\{/);
+    assert.match(turn, /planCatalogueMouth\(\{/);
+    assert.match(turn, /geminiCatalogueEnabled\(\)/);
+    assert.match(turn, /catalogue fallback reason=/);
+    assert.match(turn, /catalogueMouth\.speakLocal && catalogueMouth\.line/);
+    assert.match(turn, /text: clean/);
+    assert.match(turn, /catalogueListed/);
+    assert.match(turn, /groundFilePriceLine\(\{/);
+    assert.match(turn, /authorizeSpeak\(/);
+    assert.match(turn, /commitTurnFacts\(speakCommit/);
+    assert.match(turn, /commitReadySpeakSlots\(speakCommit/);
+    assert.match(turn, /drainSpokenSpeakSlots\(brainState, planned\.lines\)/);
+    assert.match(turn, /planCommittedSpeech\(\{/);
+    assert.ok(turn.indexOf('commitReadySpeakSlots') < turn.indexOf('planCommittedSpeech'));
+    assert.ok(turn.indexOf('planCommittedSpeech') < turn.indexOf('drainSpokenSpeakSlots'));
+    assert.match(turn, /skipFileGate: true/);
+    assert.doesNotMatch(turn, /pendingPriceAfterNameYes/);
+    assert.doesNotMatch(turn, /outcome !== 'price'/);
+    assert.match(turn, /catalogueBreath: catalogueMouth\.letGemini/);
+    assert.ok(turn.indexOf('commitTurnFacts') < turn.indexOf('planBrainEndClose'));
+    assert.doesNotMatch(serverSource, /fillerUsedThisCall/);
+    const gate = turn.indexOf('planCatalogueMouth');
+    const stream = turn.indexOf('const streamOn');
+    assert.ok(gate > 0 && stream > gate);
   });
 
-  it('keeps catalogue and hours lines off the early return', () => {
+  it('prepares catalogue and hours lines without treating them as a file read', () => {
     const profile = {
       servicesCatalog: [{ name: 'Couch cleaning' }, { name: 'Carpet cleaning' }],
       hoursSchedule: defaultHoursSchedule(),
@@ -75,7 +101,8 @@ describe('mid-call one-shots do not speak-and-return', () => {
       }),
       null
     );
-    // Those outcomes are not the lookup exception, so the model keeps the stream.
+    // A public fact is a SpeakPacket and speaks before Gemini.
+    // A catalogue still goes through planCatalogueMouth.
     assert.doesNotMatch(turn, /speakText\(progressLine\)/);
     assert.match(turn, /const needsImmediateProgress = actionMayExecute;/);
     assert.doesNotMatch(turn, /needsImmediateProgress = actionMayExecute \|\| handoffNameAsk/);

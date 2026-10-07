@@ -106,8 +106,8 @@ function stripControlLabel(text) {
 }
 
 function countItems(text, items) {
-  const raw = String(text || '');
-  return items.filter((name) => name && raw.includes(name)).length;
+  const raw = String(text || '').toLowerCase();
+  return items.filter((name) => name && raw.includes(String(name).toLowerCase())).length;
 }
 
 function splitSentences(text) {

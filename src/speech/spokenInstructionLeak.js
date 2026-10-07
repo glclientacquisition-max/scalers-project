@@ -4,6 +4,9 @@
 const KNOWN_LABEL =
   /\b(?:ASR_CORRECTION_PROMPT|RETOTI|CONTROL[_\s-]?VOICE|NEXT[_\s-]?BEST[_\s-]?ACTION)\s*:\s*/gi;
 const SNAKE_LABEL = /\b[A-Z]{2,}(?:_[A-Z0-9]+)+\s*:\s*/g;
+// Spaced control labels, with or without a colon. "CATALOGUE MOUTH:" was spoken
+// after the colon was the only thing the punctuation stripper removed.
+const SPACED_LABEL = /\b[A-Z]{3,}(?:[ \t]+[A-Z]{3,}){1,4}[ \t]*:?[ \t]*/g;
 const NP_TOKEN = /\bNP_(?:TRUE|FALSE)\b/gi;
 const META_CLAUSES = [
   /\bThe user's input seems truncated or quiet\.?\s*/gi,
@@ -16,7 +19,7 @@ const META_CLAUSES = [
   /\b(?:the caller|the user)\s+said[,:]?\s*/gi,
 ];
 const INCOMPLETE_HOLD =
-  /\b(?:ASR_?[A-Z_]*|RETO(?:TI?)?|NP_?(?:TRUE|FALSE|T|F)?|CONTROL[_\s-]?VOICE|NEXT[_\s-]?BEST[_\s-]?ACTION|VISIT\s*COMM?I?T?|Speak this spell(?:ing)?|the (?:caller|user)\s+sai)\s*$/i;
+  /\b(?:ASR_?[A-Z_]*|RETO(?:TI?)?|NP_?(?:TRUE|FALSE|T|F)?|CONTROL[_\s-]?VOICE|NEXT[_\s-]?BEST[_\s-]?ACTION|CATALOGUE(?:[ \t]+MOUTH)?|VISIT\s*COMM?I?T?|Speak this spell(?:ing)?|the (?:caller|user)\s+sai)\s*$/i;
 const NAME_SAID =
   /\b(?!You\b)(?!I\b)([A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20}){0,2})\s+said[,:]?\s+/g;
 
@@ -39,6 +42,7 @@ function stripSpokenInstructionLeaks(raw, opts = {}) {
   s = s.replace(resetGlobal(NP_TOKEN), ' ');
   s = s.replace(resetGlobal(KNOWN_LABEL), ' ');
   s = s.replace(resetGlobal(SNAKE_LABEL), ' ');
+  s = s.replace(resetGlobal(SPACED_LABEL), ' ');
   for (const re of META_CLAUSES) {
     s = s.replace(resetGlobal(re), ' ');
   }

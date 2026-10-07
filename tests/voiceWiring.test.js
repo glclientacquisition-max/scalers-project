@@ -715,8 +715,8 @@ assert.match(
 );
 assert.match(
   source,
-  /linesBeforeNameAsk\(\{[\s\S]*?nameAsk: fileNameAsk/,
-  'a public local answer is spoken before the name ask, not dropped'
+  /planCommittedSpeech\(\{[\s\S]*?nameAsk: askingName \? fileNameAsk : ''/,
+  'a committed public fact is spoken before the name ask, not dropped'
 );
 assert.match(
   source,

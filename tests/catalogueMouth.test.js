@@ -1,6 +1,12 @@
+// Catalogue mouth: both staging listens are opt-in.
+// Voice: VOICE_GEMINI_CATALOGUE. Brain: BRAIN_GEMINI_CATALOGUE.
+// Default is the Phase-0 local line.
+// Run: node --test tests/catalogueMouth.test.js
+
 const { describe, it, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { resolveLocalReply, planCallerModelTurn } = require('../src/conversation/turnPolicy');
+const { catalogueFileNames } = require('../src/conversation/knownFacts');
 const {
   createBrainState,
   observeCallerTurn,
@@ -11,8 +17,259 @@ const { determineNextBestAction } = require('../src/conversation/nextBestAction'
 const { polishSpokenReply } = require('../src/conversation/dynamicSpeech');
 const { looksLikeOfferAsk, looksLikeServiceDetailAsk } = require('../src/conversation/fileRead');
 const { groundCatalogueSpeech } = require('../src/conversation/catalogueMouth');
+const { prepareForTts } = require('../src/speech/ttsNormalize');
+const { linesBeforeNameAsk } = require('../src/speech/callerFileSpeech');
+const {
+  catalogueGeminiDirective,
+  geminiCatalogueEnabled,
+  planCatalogueMouth,
+  softenCataloguePunctuation,
+} = require('../src/speech/catalogueMouth');
 const { buildSystemPrompt } = require('../src/prompts');
 const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+
+const FILE = {
+  servicesCatalog: [
+    { name: 'Couch cleaning', notes: 'includes cushions' },
+    { name: 'Mattress cleaning' },
+    { name: 'Carpet cleaning' },
+    { name: 'General cleaning (houses & air bnbs)' },
+    { name: 'Pet stain removal' },
+  ],
+};
+
+function state(text) {
+  return observeCallerTurn(createBrainState({ vertical: 'home_services' }), {
+    text,
+    detectedLanguage: 'en',
+    resolvedLanguage: 'en',
+  });
+}
+
+function catalogueReply(language) {
+  return resolveLocalReply({
+    text: language === 'en' ? 'Which services do you offer?' : 'Niambie huduma zenu.',
+    state: state(language === 'en' ? 'Which services do you offer?' : 'Niambie huduma zenu.'),
+    language,
+    profile: FILE,
+  });
+}
+
+describe('VOICE_GEMINI_CATALOGUE', () => {
+  it('defaults the Gemini catalogue listen off', () => {
+    assert.equal(geminiCatalogueEnabled({}), false);
+    assert.equal(geminiCatalogueEnabled({ VOICE_GEMINI_CATALOGUE: '' }), false);
+    assert.equal(geminiCatalogueEnabled({ VOICE_GEMINI_CATALOGUE: 'off' }), false);
+    assert.equal(geminiCatalogueEnabled({ VOICE_GEMINI_CATALOGUE: 'on' }), true);
+    assert.equal(geminiCatalogueEnabled({ VOICE_GEMINI_CATALOGUE: 'ON' }), true);
+  });
+
+  it('speaks the Phase-0 local line when the flag is off', () => {
+    const local = catalogueReply('en');
+    const mouth = planCatalogueMouth({
+      localReply: local,
+      reasoningDown: false,
+      geminiCatalogue: false,
+    });
+    assert.equal(local.outcome, 'catalogue');
+    assert.equal(mouth.speakLocal, true);
+    assert.equal(mouth.letGemini, false);
+    assert.equal(mouth.reason, 'flag_off');
+    assert.equal(
+      mouth.line,
+      'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning, and more. Which one do you need?'
+    );
+    assert.doesNotMatch(mouth.line, /Couch cleaning\. Mattress/);
+  });
+
+  it('speaks the Phase-0 line when the flag is on and does not let Gemini re-list', () => {
+    const local = catalogueReply('en');
+    const mouth = planCatalogueMouth({
+      localReply: local,
+      reasoningDown: false,
+      geminiCatalogue: true,
+    });
+    assert.equal(mouth.speakLocal, true);
+    assert.equal(mouth.letGemini, false);
+    assert.equal(mouth.reason, 'local_blend');
+    assert.equal(mouth.line, local.line);
+    assert.doesNotMatch(mouth.line, /Couch cleaning\. Mattress/);
+  });
+
+  it('speaks the Phase-0 line when Brain withheld the local reply', () => {
+    const mouth = planCatalogueMouth({
+      localReply: null,
+      text: 'Which services do you offer?',
+      profile: FILE,
+      language: 'en',
+      reasoningDown: false,
+      geminiCatalogue: true,
+    });
+    assert.equal(mouth.speakLocal, true);
+    assert.equal(mouth.letGemini, false);
+    assert.equal(mouth.reason, 'local_blend');
+    assert.equal(
+      mouth.line,
+      'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning, and more. Which one do you need?'
+    );
+  });
+
+  it('does not speak the full list on a detail ask', () => {
+    const detail = resolveLocalReply({
+      text: 'More details on carpet cleaning',
+      state: state('More details on carpet cleaning'),
+      language: 'en',
+      profile: FILE,
+    });
+    const mouth = planCatalogueMouth({
+      localReply: detail,
+      text: 'More details on carpet cleaning',
+      profile: FILE,
+      language: 'en',
+      reasoningDown: false,
+      geminiCatalogue: true,
+    });
+    assert.notEqual(detail && detail.outcome, 'catalogue');
+    assert.equal(mouth.speakLocal, false);
+    assert.equal(mouth.letGemini, false);
+    assert.equal(mouth.line, '');
+    const bare = planCatalogueMouth({
+      localReply: null,
+      text: 'More details on carpet cleaning',
+      profile: FILE,
+      language: 'en',
+      geminiCatalogue: true,
+    });
+    assert.equal(bare.speakLocal, false);
+    assert.equal(bare.line, '');
+  });
+
+  it('speaks Phase-0 for a clear services ask and for Yes while that list is still pending', () => {
+    const ask = 'which service is you offer';
+    const local = resolveLocalReply({
+      text: ask,
+      state: state(ask),
+      language: 'en',
+      profile: FILE,
+    });
+    assert.equal(local.outcome, 'catalogue');
+    assert.match(local.line, /and General cleaning, and more/);
+    assert.doesNotMatch(local.line, /Couch cleaning\. Mattress/);
+    const pending = planCatalogueMouth({
+      localReply: null,
+      text: 'Yes.',
+      profile: FILE,
+      language: 'en',
+      callerTurns: [ask, 'Yes.'],
+      catalogueListed: false,
+    });
+    assert.equal(pending.speakLocal, true);
+    assert.equal(pending.letGemini, false);
+    assert.equal(pending.line, local.line);
+    const listed = planCatalogueMouth({
+      localReply: null,
+      text: 'Yes.',
+      profile: FILE,
+      language: 'en',
+      callerTurns: [ask, 'Yes.'],
+      catalogueListed: true,
+    });
+    assert.equal(listed.speakLocal, false);
+    assert.equal(listed.line, '');
+  });
+
+  it('speaks the Phase-0 local line on a reasoning outage even when the flag is on', () => {
+    const local = catalogueReply('sw');
+    const mouth = planCatalogueMouth({
+      localReply: local,
+      reasoningDown: true,
+      geminiCatalogue: true,
+    });
+    assert.equal(mouth.speakLocal, true);
+    assert.equal(mouth.letGemini, false);
+    assert.equal(mouth.reason, 'outage');
+    assert.equal(
+      mouth.line,
+      'Tuna Couch cleaning, Mattress cleaning, Carpet cleaning, na General cleaning, na zingine. Unahitaji gani?'
+    );
+    const prepared = prepareForTts(mouth.line, { callLanguage: 'sw' });
+    assert.doesNotMatch(prepared.text, /\bna and\b/i);
+    assert.doesNotMatch(prepared.text, /\bperiod\b/i);
+    assert.match(prepared.text, /na General cleaning na zingine/);
+    assert.doesNotMatch(prepared.text, /[.?]/);
+  });
+
+  it('does not steal an hours line', () => {
+    const hours = resolveLocalReply({
+      text: 'Are you open?',
+      state: state('Are you open?'),
+      language: 'en',
+      profile: FILE,
+    });
+    const mouth = planCatalogueMouth({
+      localReply: hours,
+      reasoningDown: true,
+      geminiCatalogue: false,
+    });
+    assert.equal(mouth.speakLocal, false);
+    assert.equal(mouth.line, '');
+  });
+});
+
+describe('catalogue file names', () => {
+  it('uses the file and drops notes', () => {
+    const file = catalogueFileNames(FILE);
+    assert.deepEqual(file.names, [
+      'Couch cleaning',
+      'Mattress cleaning',
+      'Carpet cleaning',
+      'General cleaning',
+    ]);
+    assert.equal(file.more, true);
+  });
+
+  it('tells Gemini the file names and no others', () => {
+    const local = catalogueReply('en');
+    const note = catalogueGeminiDirective({ profile: FILE, localReply: local });
+    assert.match(note, /Couch cleaning; Mattress cleaning; Carpet cleaning; General cleaning/);
+    assert.match(note, /Do not add, rename, or drop one/);
+    assert.match(note, /More are on file/);
+    assert.doesNotMatch(note, /Pet stain|Window washing|cushions|air bnbs/i);
+  });
+
+  it('prefers Brain items[] when that field is present', () => {
+    const note = catalogueGeminiDirective({
+      profile: FILE,
+      localReply: {
+        outcome: 'catalogue',
+        line: 'We offer Couch cleaning.',
+        items: ['Sofa wash', 'Rug wash'],
+      },
+    });
+    assert.match(note, /Sofa wash; Rug wash/);
+    assert.doesNotMatch(note, /Couch cleaning/);
+    assert.doesNotMatch(note, /More are on file/);
+  });
+});
+
+describe('catalogue TTS is one breath', () => {
+  it('turns periods and question marks into commas and does not say period', () => {
+    const softened = softenCataloguePunctuation(
+      'We offer Couch cleaning. Mattress cleaning. Carpet cleaning?'
+    );
+    assert.equal(
+      softened,
+      'We offer Couch cleaning, Mattress cleaning, Carpet cleaning,'
+    );
+    assert.doesNotMatch(softened, /[.!?]/);
+    const prepared = prepareForTts(softened, { callLanguage: 'en' });
+    assert.doesNotMatch(prepared.text, /\bperiod\b/i);
+    assert.match(
+      prepared.text,
+      /Couch cleaning and Mattress cleaning and Carpet cleaning/
+    );
+  });
+});
 
 const ITEMS = [
   { name: 'Couch cleaning' },
@@ -52,10 +309,10 @@ describe('catalogue mouth flag', () => {
 
   it('keeps the local file list when the flag is off', () => {
     delete process.env.BRAIN_GEMINI_CATALOGUE;
-    const state = brainFor('Which services do you offer?');
+    const brain = brainFor('Which services do you offer?');
     const local = resolveLocalReply({
       text: 'Which services do you offer?',
-      state,
+      state: brain,
       language: 'en',
       profile: PROFILE,
     });
@@ -63,32 +320,32 @@ describe('catalogue mouth flag', () => {
     assert.match(local.line, /Couch cleaning/);
     assert.match(local.line, /General cleaning/);
     assert.doesNotMatch(local.line, /houses|air bnbs/);
-    const gate = planCallerModelTurn(state);
+    const gate = planCallerModelTurn(brain);
     assert.equal(gate.runModel, false);
-    assert.match(formatBrainStateForPrompt(state), /^((?!CATALOGUE MOUTH).)*$/s);
+    assert.match(formatBrainStateForPrompt(brain), /^((?!CATALOGUE MOUTH).)*$/s);
   });
 
   it('lets Gemini run on the first services ask when the flag is on', () => {
     process.env.BRAIN_GEMINI_CATALOGUE = 'on';
-    const state = brainFor('Which services do you offer?');
+    const brain = brainFor('Which services do you offer?');
     const local = resolveLocalReply({
       text: 'Which services do you offer?',
-      state,
+      state: brain,
       language: 'en',
       profile: PROFILE,
     });
     assert.equal(local, null);
-    const gate = planCallerModelTurn(state);
+    const gate = planCallerModelTurn(brain);
     assert.equal(gate.runModel, true);
     assert.equal(gate.line, '');
-    const decision = determineNextBestAction({ state });
+    const decision = determineNextBestAction({ state: brain });
     assert.equal(decision.action, 'ANSWER');
     assert.match(decision.reason, /Couch cleaning/);
     assert.match(decision.reason, /Mattress cleaning/);
     assert.match(decision.reason, /Carpet cleaning/);
     assert.match(decision.reason, /General cleaning/);
     assert.doesNotMatch(decision.reason, /houses|air bnbs|Window/);
-    const prompted = setNextBestAction(state, decision);
+    const prompted = setNextBestAction(brain, decision);
     const block = formatBrainStateForPrompt(prompted);
     assert.match(block, /Exact service names/);
     assert.doesNotMatch(block, /CATALOGUE MOUTH/);
@@ -161,6 +418,8 @@ describe('catalogue grounding and no re-list', () => {
     assert.equal(looksLikeServiceDetailAsk('Tell me details about the services'), true);
     assert.equal(looksLikeOfferAsk('Tell me details about the services'), false);
     assert.equal(looksLikeOfferAsk('Which services do you offer?'), true);
+    assert.equal(looksLikeOfferAsk('which service is you offer'), true);
+    assert.equal(looksLikeServiceDetailAsk('tell me more about carpet'), true);
     const profile = {
       ...PROFILE,
       servicesCatalog: [
@@ -170,12 +429,12 @@ describe('catalogue grounding and no re-list', () => {
         { name: 'General cleaning' },
       ],
     };
-    const state = brainFor('Tell me details about the services', profile);
-    const decision = determineNextBestAction({ state });
+    const brain = brainFor('Tell me details about the services', profile);
+    const decision = determineNextBestAction({ state: brain });
     assert.match(decision.reason, /do not read the full catalogue/i);
     const local = resolveLocalReply({
       text: 'Tell me details about the services',
-      state,
+      state: brain,
       language: 'en',
       profile,
     });
@@ -187,7 +446,7 @@ describe('catalogue grounding and no re-list', () => {
     const relist = polishSpokenReply(
       'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning.',
       {
-        state,
+        state: brain,
         callerTurns: ['Tell me details about the services'],
         profile,
         language: 'en',
@@ -199,23 +458,23 @@ describe('catalogue grounding and no re-list', () => {
   });
 
   it('after name yes continues and does not re-list', () => {
-    let state = brainFor('Which services do you offer?');
-    state = setNextBestAction(state, determineNextBestAction({ state }));
-    state = observeCallerTurn(state, {
+    let brain = brainFor('Which services do you offer?');
+    brain = setNextBestAction(brain, determineNextBestAction({ state: brain }));
+    brain = observeCallerTurn(brain, {
       text: 'Yes.',
       detectedLanguage: 'en',
       resolvedLanguage: 'en',
       profile: PROFILE,
       lastAgentText: 'Am I speaking with Alvin?',
     });
-    assert.equal(state.caller.nameJustConfirmed, true);
-    const decision = determineNextBestAction({ state });
+    assert.equal(brain.caller.nameJustConfirmed, true);
+    const decision = determineNextBestAction({ state: brain });
     assert.equal(decision.action, 'ANSWER');
     assert.notEqual(decision.action, 'END');
     assert.doesNotMatch(decision.reason, /Speak that list|Speak only these names/i);
     const local = resolveLocalReply({
       text: 'Yes.',
-      state,
+      state: brain,
       profile: PROFILE,
       language: 'en',
     });
@@ -223,7 +482,7 @@ describe('catalogue grounding and no re-list', () => {
     const spoken = polishSpokenReply(
       'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning.',
       {
-        state,
+        state: brain,
         callerTurns: ['Yes.'],
         profile: PROFILE,
         language: 'en',
@@ -231,7 +490,7 @@ describe('catalogue grounding and no re-list', () => {
     );
     assert.equal(spoken, 'Which service do you need?');
     const bye = determineNextBestAction({
-      state: observeCallerTurn(state, {
+      state: observeCallerTurn(brain, {
         text: 'Kwaheri',
         detectedLanguage: 'en',
         resolvedLanguage: 'en',
@@ -290,6 +549,19 @@ describe('catalogue grounding and no re-list', () => {
     });
     assert.equal(local.outcome, 'price');
     assert.equal(local.line, 'Carpet cleaning is Ksh 1500-2000.');
+    const beforeName = linesBeforeNameAsk({
+      localReply: local,
+      nameAsk: 'Je, naongea na Alvin?',
+      state: {
+        caller: { nameConfirmed: false, fileNameAsked: 'Alvin' },
+        returning: { name: 'Alvin', fileOwnerName: 'Alvin' },
+      },
+    });
+    assert.deepEqual(beforeName, [
+      'Carpet cleaning is Ksh 1500-2000.',
+      'Je, naongea na Alvin?',
+    ]);
+    assert.doesNotMatch(beforeName.join(' '), /CATALOGUE MOUTH/);
     const spoken = polishSpokenReply(
       "I don't have that on file. I can note it for the team.",
       {
@@ -314,6 +586,27 @@ describe('catalogue grounding and no re-list', () => {
       language: 'sw',
     });
     assert.equal(sw, 'Carpet cleaning ni Ksh 1500-2000.');
+    const swLocal = resolveLocalReply({
+      text: 'Ni pesa ngapi?',
+      state: swState,
+      profile,
+      language: 'sw',
+    });
+    assert.equal(swLocal.outcome, 'price');
+    assert.equal(swLocal.line, 'Carpet cleaning ni Ksh 1500-2000.');
+    const swBeforeName = linesBeforeNameAsk({
+      localReply: swLocal,
+      nameAsk: 'Je, naongea na Alvin?',
+      state: {
+        caller: { nameConfirmed: false, fileNameAsked: 'Alvin' },
+        returning: { name: 'Alvin', fileOwnerName: 'Alvin' },
+      },
+    });
+    assert.deepEqual(swBeforeName, [
+      'Carpet cleaning ni Ksh 1500-2000.',
+      'Je, naongea na Alvin?',
+    ]);
+    assert.doesNotMatch(swBeforeName.join(' '), /CATALOGUE MOUTH/);
     const missing = resolveLocalReply({
       text: 'How much is sofa cleaning?',
       state,
