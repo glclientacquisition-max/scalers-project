@@ -38,4 +38,14 @@ describe("GIGO owner attest wiring", () => {
     assert.match(builder, /settingsScopeIncludes/);
     assert.match(builder, /fieldPathsAttestedOnAlertsSave/);
   });
+
+  it("settings and home expose confirm UI from field meta", () => {
+    const form = read("dashboard/src/components/TenantForm.tsx");
+    const alerts = read("dashboard/src/components/AlertsPanel.tsx");
+    const home = read("dashboard/src/app/(desk)/home/page.tsx");
+    assert.match(form, /identityConfirmRows/);
+    assert.match(alerts, /alertsConfirmRows/);
+    assert.match(home, /HomeReviewSettingsNudge/);
+    assert.match(home, /line !== "live"/);
+  });
 });
