@@ -264,6 +264,8 @@ const {
 const {
   gateCallerFileSpeech,
   linesBeforeNameAsk,
+  rememberUnspokenPrice,
+  pendingPriceAfterNameYes,
   lockFileNameAsk,
   speakerBound,
 } = require('./src/speech/callerFileSpeech');
@@ -2834,7 +2836,8 @@ mediaWss.on('connection', (ws, req) => {
       if (
         localReply &&
         localReply.outcome !== 'catalogue' &&
-        localReply.outcome !== 'service_facts'
+        localReply.outcome !== 'service_facts' &&
+        localReply.outcome !== 'price'
       ) {
         console.log(
           `[ws/media][${callKey}] ${localReply.outcome} local line not spoken lang=${callLanguage}: ${localReply.line}`
@@ -2884,6 +2887,8 @@ mediaWss.on('connection', (ws, req) => {
           nameAsk: fileNameAsk,
           state: brainState,
         });
+        rememberUnspokenPrice(brainState, localReply, nameAskLines);
+        callBrainStates.set(callKey, brainState);
         if (catalogueMouth.speakLocal && catalogueMouth.line) {
           if (catalogueMouth.reason === 'outage') {
             await resolveLlmRecoverySpeech(clean, { consumeOffer: false });
@@ -2952,6 +2957,25 @@ mediaWss.on('connection', (ws, req) => {
         spokeThisTurn = true;
         return;
       }
+      // A price the name gate did not speak. This Yes says it. The name is not asked again.
+      const heldPrice = pendingPriceAfterNameYes(brainState);
+      if (heldPrice && tts && !bargeInActive) {
+        if (!brainState.conversation || typeof brainState.conversation !== 'object') {
+          brainState.conversation = {};
+        }
+        brainState.conversation.pendingFilePrice = '';
+        callBrainStates.set(callKey, brainState);
+        console.log(
+          `[ws/media][${callKey}] pending price after name lang=${callLanguage}: ${heldPrice}`
+        );
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(heldPrice);
+        turnTiming.markFirstSpokenChunk();
+        await speakText(heldPrice);
+        spokeThisTurn = true;
+        return;
+      }
       // One speakText of the Phase-0 line, then return. Gemini does not own the list.
       let catalogueSystemPrompt = turnSystemPrompt;
       if (catalogueMouth.speakLocal && catalogueMouth.line && tts && !bargeInActive) {
@@ -2986,6 +3010,22 @@ mediaWss.on('connection', (ws, req) => {
         callTranscript.pushAgent(factLine);
         turnTiming.markFirstSpokenChunk();
         await speakText(factLine);
+        spokeThisTurn = true;
+        return;
+      }
+      const localPrice =
+        localReply?.outcome === 'price'
+          ? String(localReply.line || '').replace(/\s+/g, ' ').trim()
+          : '';
+      if (localPrice && tts && !bargeInActive) {
+        console.log(
+          `[ws/media][${callKey}] file price before model lang=${callLanguage}: ${localPrice}`
+        );
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(localPrice);
+        turnTiming.markFirstSpokenChunk();
+        await speakText(localPrice);
         spokeThisTurn = true;
         return;
       }

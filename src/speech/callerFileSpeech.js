@@ -86,11 +86,19 @@ function gateCallerFileSpeech(line, state) {
   return { speak: true, line: next, reason: blocked ? 'trimmed' : 'open' };
 }
 
-const PUBLIC_ANSWER = new Set(['catalogue', 'hours', 'hours_ask', 'coverage', 'identity']);
+const PUBLIC_ANSWER = new Set([
+  'catalogue',
+  'hours',
+  'hours_ask',
+  'coverage',
+  'identity',
+  'price',
+]);
 
 /**
  * A public answer prepared on this turn is spoken before the name ask.
- * File rows stay on the speak-gate. Booking ladders are not this.
+ * That includes a file-grounded price. File rows stay on the speak-gate.
+ * Booking ladders are not this.
  * @param {{ outcome?: string, line?: string } | null} [localReply]
  */
 function answerBeforeNameAsk(localReply) {
@@ -105,6 +113,41 @@ function answerBeforeNameAsk(localReply) {
   }
   if (!PUBLIC_ANSWER.has(outcome)) return '';
   return line;
+}
+
+/**
+ * A file price the name gate did not speak. Cleared when that line is in the
+ * spoken lines. A later name Yes reads it back.
+ * @param {object} state
+ * @param {{ outcome?: string, line?: string } | null} [localReply]
+ * @param {string[]} [spokenLines]
+ * @returns {string}
+ */
+function rememberUnspokenPrice(state, localReply, spokenLines) {
+  if (!state || typeof state !== 'object') return '';
+  if (!state.conversation || typeof state.conversation !== 'object') {
+    state.conversation = {};
+  }
+  const line = String(localReply?.line || '').replace(/\s+/g, ' ').trim();
+  if (String(localReply?.outcome || '') !== 'price' || !line) {
+    return String(state.conversation.pendingFilePrice || '').trim();
+  }
+  const spoken = (Array.isArray(spokenLines) ? spokenLines : []).some(
+    (row) => String(row || '').replace(/\s+/g, ' ').trim() === line
+  );
+  state.conversation.pendingFilePrice = spoken ? '' : line;
+  return state.conversation.pendingFilePrice;
+}
+
+/**
+ * The file price still waiting after they confirm the name. Empty once spoken,
+ * and empty on any later turn.
+ * @param {object} [state]
+ * @returns {string}
+ */
+function pendingPriceAfterNameYes(state) {
+  if (state?.caller?.nameJustConfirmed !== true) return '';
+  return String(state?.conversation?.pendingFilePrice || '').replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -153,4 +196,6 @@ module.exports = {
   answerBeforeNameAsk,
   linesBeforeNameAsk,
   lockFileNameAsk,
+  rememberUnspokenPrice,
+  pendingPriceAfterNameYes,
 };

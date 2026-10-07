@@ -15,6 +15,9 @@ const {
   linesBeforeNameAsk,
   lockFileNameAsk,
   speakerBound,
+  answerBeforeNameAsk,
+  rememberUnspokenPrice,
+  pendingPriceAfterNameYes,
 } = require('../src/speech/callerFileSpeech');
 const { offerCatalogueLine } = require('../src/conversation/knownFacts');
 const { decideTurnEnd, utteranceLooksIncomplete } = require('../src/speech/turnTaking');
@@ -365,5 +368,62 @@ describe('catalogue before the name ask', () => {
       state,
     });
     assert.deepEqual(rows, ['Am I speaking with Alvin?']);
+  });
+
+  it('speaks a Kiswahili file price before the name ask', () => {
+    const price = 'Carpet cleaning ni Ksh 1500-2000.';
+    const state = {
+      caller: { nameConfirmed: false, fileNameAsked: 'Alvin' },
+      returning: { name: 'Alvin', fileOwnerName: 'Alvin' },
+    };
+    assert.equal(answerBeforeNameAsk({ outcome: 'price', line: price }), price);
+    const spoken = linesBeforeNameAsk({
+      localReply: { outcome: 'price', line: price },
+      nameAsk: lockFileNameAsk('Am I speaking with Alvin?', 'sw'),
+      state,
+    });
+    assert.deepEqual(spoken, [price, 'Je, naongea na Alvin?']);
+    assert.equal(spoken.join(' ').includes('CATALOGUE MOUTH'), false);
+    rememberUnspokenPrice(state, { outcome: 'price', line: price }, spoken);
+    assert.equal(state.conversation.pendingFilePrice, '');
+  });
+
+  it('keeps an unspoken price for the name yes', () => {
+    const price = 'Carpet cleaning ni Ksh 1500-2000.';
+    const asking = {
+      caller: { nameConfirmed: false, fileNameAsked: 'Alvin' },
+      returning: { name: 'Alvin', fileOwnerName: 'Alvin' },
+      conversation: {},
+    };
+    const dropped = linesBeforeNameAsk({
+      localReply: {
+        outcome: 'price',
+        line: 'You have two open carpet cleaning requests.',
+      },
+      nameAsk: 'Je, naongea na Alvin?',
+      state: asking,
+    });
+    assert.deepEqual(dropped, ['Je, naongea na Alvin?']);
+    rememberUnspokenPrice(
+      asking,
+      { outcome: 'price', line: price },
+      dropped
+    );
+    assert.equal(asking.conversation.pendingFilePrice, price);
+    const yes = {
+      caller: {
+        nameConfirmed: true,
+        nameJustConfirmed: true,
+        fileNameAsked: 'Alvin',
+        fileNameAskSpoken: true,
+      },
+      conversation: { pendingFilePrice: price },
+    };
+    assert.equal(pendingPriceAfterNameYes(yes), price);
+    assert.equal(pendingPriceAfterNameYes({
+      caller: { nameConfirmed: true, nameJustConfirmed: false },
+      conversation: { pendingFilePrice: price },
+    }), '');
+    assert.equal(yes.conversation.pendingFilePrice.includes('CATALOGUE MOUTH'), false);
   });
 });

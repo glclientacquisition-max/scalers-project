@@ -18,6 +18,7 @@ const { polishSpokenReply } = require('../src/conversation/dynamicSpeech');
 const { looksLikeOfferAsk, looksLikeServiceDetailAsk } = require('../src/conversation/fileRead');
 const { groundCatalogueSpeech } = require('../src/conversation/catalogueMouth');
 const { prepareForTts } = require('../src/speech/ttsNormalize');
+const { linesBeforeNameAsk } = require('../src/speech/callerFileSpeech');
 const {
   catalogueGeminiDirective,
   geminiCatalogueEnabled,
@@ -548,6 +549,19 @@ describe('catalogue grounding and no re-list', () => {
     });
     assert.equal(local.outcome, 'price');
     assert.equal(local.line, 'Carpet cleaning is Ksh 1500-2000.');
+    const beforeName = linesBeforeNameAsk({
+      localReply: local,
+      nameAsk: 'Je, naongea na Alvin?',
+      state: {
+        caller: { nameConfirmed: false, fileNameAsked: 'Alvin' },
+        returning: { name: 'Alvin', fileOwnerName: 'Alvin' },
+      },
+    });
+    assert.deepEqual(beforeName, [
+      'Carpet cleaning is Ksh 1500-2000.',
+      'Je, naongea na Alvin?',
+    ]);
+    assert.doesNotMatch(beforeName.join(' '), /CATALOGUE MOUTH/);
     const spoken = polishSpokenReply(
       "I don't have that on file. I can note it for the team.",
       {
@@ -572,6 +586,27 @@ describe('catalogue grounding and no re-list', () => {
       language: 'sw',
     });
     assert.equal(sw, 'Carpet cleaning ni Ksh 1500-2000.');
+    const swLocal = resolveLocalReply({
+      text: 'Ni pesa ngapi?',
+      state: swState,
+      profile,
+      language: 'sw',
+    });
+    assert.equal(swLocal.outcome, 'price');
+    assert.equal(swLocal.line, 'Carpet cleaning ni Ksh 1500-2000.');
+    const swBeforeName = linesBeforeNameAsk({
+      localReply: swLocal,
+      nameAsk: 'Je, naongea na Alvin?',
+      state: {
+        caller: { nameConfirmed: false, fileNameAsked: 'Alvin' },
+        returning: { name: 'Alvin', fileOwnerName: 'Alvin' },
+      },
+    });
+    assert.deepEqual(swBeforeName, [
+      'Carpet cleaning ni Ksh 1500-2000.',
+      'Je, naongea na Alvin?',
+    ]);
+    assert.doesNotMatch(swBeforeName.join(' '), /CATALOGUE MOUTH/);
     const missing = resolveLocalReply({
       text: 'How much is sofa cleaning?',
       state,

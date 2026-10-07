@@ -52,6 +52,9 @@ describe('mid-call one-shots do not speak-and-return', () => {
     assert.match(turn, /text: clean/);
     assert.match(turn, /catalogueListed/);
     assert.match(turn, /groundFilePriceLine\(\{/);
+    assert.match(turn, /pendingPriceAfterNameYes/);
+    assert.match(turn, /rememberUnspokenPrice/);
+    assert.match(turn, /outcome !== 'price'/);
     assert.match(turn, /catalogueBreath: catalogueMouth\.letGemini/);
     assert.doesNotMatch(serverSource, /fillerUsedThisCall/);
     const gate = turn.indexOf('planCatalogueMouth');
