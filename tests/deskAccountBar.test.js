@@ -19,7 +19,7 @@ describe("desk account bar", () => {
     assert.doesNotMatch(bar, /<p[\s>]/);
     assert.match(menu, /data-account-bar=""/);
     assert.match(menu, /from "@\/components\/ui\/Menu"/);
-    assert.match(menu, /<IconButton label=\{name\}>/);
+    assert.match(menu, /<button type="button" aria-label=\{name\} className=\{iconButtonClass\(\)\}>/);
     assert.match(menu, /h-7 w-7/);
     assert.match(menu, /bg-accent text-xs font-semibold text-accent-on/);
     assert.match(menu, /ring-2 ring-accent ring-offset-2 ring-offset-surface/);

@@ -71,7 +71,9 @@ export default function RootLayout({
           }}
         />
         <script dangerouslySetInnerHTML={{ __html: DESK_MD_BOOT_SCRIPT }} />
-        <DeskThemeProvider initial="system">{children}</DeskThemeProvider>
+        <DeskThemeProvider initial="system">
+          <TooltipProvider>{children}</TooltipProvider>
+        </DeskThemeProvider>
         <NotifyHost />
       </body>
     </html>

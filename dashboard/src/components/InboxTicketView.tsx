@@ -15,7 +15,7 @@ import { InboxTicketActionDock } from "@/components/InboxTicketActionDock";
 import { ContactStrip } from "@/components/ContactStrip";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
-import { IconButton } from "@/components/ui/IconButton";
+import { IconButton, iconButtonClass } from "@/components/ui/IconButton";
 import { Menu, MenuItem } from "@/components/ui/Menu";
 import {
   deskShiftClass,
@@ -136,9 +136,9 @@ function InboxTicketMore({
         setOpen(next);
       }}
       trigger={
-        <IconButton label="More" size="sm">
+        <button type="button" aria-label="More" className={iconButtonClass({ size: "sm" })}>
           <EllipsisVerticalIcon aria-hidden="true" />
-        </IconButton>
+        </button>
       }
     >
       {actions.map((action) => (

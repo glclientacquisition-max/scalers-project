@@ -4,7 +4,7 @@ import { useState } from "react";
 import { switchDeskTenant } from "@/app/(desk)/tenantActions";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { ThemePicker } from "@/components/ThemePicker";
-import { IconButton } from "@/components/ui/IconButton";
+import { iconButtonClass } from "@/components/ui/IconButton";
 import { Menu, MenuGroup, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import { cx } from "@/lib/cx";
@@ -45,14 +45,13 @@ export function DeskAccountMenu({
         />
       </div>
       <Menu
-        open={open}
         onOpenChange={(next) => {
           setOpen(next);
           if (!next) setThemeOpen(false);
         }}
         popupClassName={themeOpen ? "w-[min(22rem,calc(100vw-1.5rem))]" : undefined}
         trigger={
-          <IconButton label={name}>
+          <button type="button" aria-label={name} className={iconButtonClass()}>
             <span
               className={cx(
                 "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-on",
@@ -61,7 +60,7 @@ export function DeskAccountMenu({
             >
               {initials}
             </span>
-          </IconButton>
+          </button>
         }
       >
         <div data-account-menu="">

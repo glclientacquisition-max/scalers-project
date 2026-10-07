@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ComponentProps, type ReactNode } from "react";
 import { cx } from "@/lib/cx";
 import { pendingDotClass } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -52,20 +52,14 @@ type IconButtonProps = Common &
     pending?: boolean;
   };
 
-export function IconButton({
-  label,
-  tone,
-  size,
-  pending = false,
-  className,
-  children,
-  disabled,
-  type = "button",
-  ...rest
-}: IconButtonProps) {
+export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
+  { label, tone, size, pending = false, className, children, disabled, type = "button", ...rest },
+  ref,
+) {
   return (
     <Tooltip label={label}>
       <button
+        ref={ref}
         type={type}
         aria-label={label}
         aria-busy={pending || undefined}
@@ -77,34 +71,33 @@ export function IconButton({
       </button>
     </Tooltip>
   );
-}
+});
 
 type IconButtonLinkProps = Common & Omit<ComponentProps<typeof Link>, "children" | "aria-label">;
 
-export function IconButtonLink({ label, tone, size, className, children, ...rest }: IconButtonLinkProps) {
+export const IconButtonLink = forwardRef<HTMLAnchorElement, IconButtonLinkProps>(function IconButtonLink(
+  { label, tone, size, className, children, ...rest },
+  ref,
+) {
   return (
     <Tooltip label={label}>
-      <Link aria-label={label} className={iconButtonClass({ tone, size, className })} {...rest}>
+      <Link ref={ref} aria-label={label} className={iconButtonClass({ tone, size, className })} {...rest}>
         {children}
       </Link>
     </Tooltip>
   );
-}
+});
 
 /** Plain anchor for `tel:` and `https://wa.me` targets, which must not go through the Next router. */
-export function IconButtonAnchor({
-  label,
-  tone,
-  size,
-  className,
-  children,
-  ...rest
-}: Common & Omit<ComponentProps<"a">, "children" | "aria-label">) {
+export const IconButtonAnchor = forwardRef<
+  HTMLAnchorElement,
+  Common & Omit<ComponentProps<"a">, "children" | "aria-label">
+>(function IconButtonAnchor({ label, tone, size, className, children, ...rest }, ref) {
   return (
     <Tooltip label={label}>
-      <a aria-label={label} className={iconButtonClass({ tone, size, className })} {...rest}>
+      <a ref={ref} aria-label={label} className={iconButtonClass({ tone, size, className })} {...rest}>
         {children}
       </a>
     </Tooltip>
   );
-}
+});
