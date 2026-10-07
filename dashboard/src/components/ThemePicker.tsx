@@ -2,7 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 import { useDeskThemeInitial } from "@/components/DeskThemeProvider";
-import { deskShiftClass, focusRing, focusRingVisible } from "@/components/ui/deskChrome";
+import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
+import { SegmentedControl } from "@/components/ui/Segmented";
 import {
   applyDeskTheme,
   readDeskTheme,
@@ -100,35 +101,19 @@ export function ThemeDock({ tone = "ink" }: { tone?: "ink" | "onDark" }) {
   );
 }
 
-/** Device theme. Instant apply. Never a tenant setting. */
+/** Device theme. Instant apply. Never a tenant setting. iOS segmented: System, Light, Dark. */
 export function ThemePicker() {
   const { choice, pick } = useThemeChoice();
 
   return (
-    <div role="radiogroup" aria-label="This device" data-theme-cluster="" className="grid grid-cols-3 gap-2">
-      {CHOICES.map((opt) => {
-        const selected = choice === opt.id;
-        return (
-          <button
-            key={opt.id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            onClick={() => pick(opt.id)}
-            className={[
-              "flex min-h-[4.75rem] flex-col items-center justify-center gap-2 rounded-xl border px-2 text-sm font-medium text-ink",
-              deskShiftClass,
-              focusRing,
-              selected
-                ? "border-accent bg-accent/10"
-                : "border-line bg-surface hover:bg-accent/[0.04] active:bg-accent/[0.08]",
-            ].join(" ")}
-          >
-            <ThemeMark id={opt.id} />
-            {opt.label}
-          </button>
-        );
-      })}
+    <div data-theme-cluster="">
+      <SegmentedControl
+        label="This device"
+        value={choice}
+        onChange={(value) => pick(value as DeskTheme)}
+        className="grid w-full [&_button]:min-h-11"
+        items={CHOICES.map((opt) => ({ value: opt.id, label: opt.label }))}
+      />
     </div>
   );
 }
