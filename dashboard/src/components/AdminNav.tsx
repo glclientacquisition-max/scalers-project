@@ -11,6 +11,7 @@ import { Menu, MenuLinkItem } from "@/components/ui/Menu";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   ADMIN_LINKS,
+  adminHidesShellBack,
   adminMainClass,
   adminParentTarget,
   adminPhoneMore,
@@ -343,7 +344,7 @@ export function AdminTabBar() {
 export function AdminNestedBack() {
   const { path, href } = useAdminChrome();
   const parent = adminParentTarget(path);
-  if (!parent) return null;
+  if (!parent || adminHidesShellBack(path)) return null;
 
   return (
     <div className="mb-3">

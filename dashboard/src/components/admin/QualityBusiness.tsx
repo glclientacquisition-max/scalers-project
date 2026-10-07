@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DroppingMark, FailChips, QualitySpark, Unlogged, formatCallWhen } from "@/components/admin/QualityBits";
+import { DroppingMark, FailChips, QualityCrumbs, QualitySpark, Unlogged, formatCallWhen } from "@/components/admin/QualityBits";
 import { ListRow } from "@/components/ui/ListRow";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Segmented } from "@/components/ui/Segmented";
@@ -11,6 +11,7 @@ import {
   formatScore,
   qualityBusinessHref,
   qualityCallHref,
+  qualityListHref,
   sortWorstFirst,
   type BusinessQualityDetail,
   type QualityRange,
@@ -30,6 +31,7 @@ export function QualityBusiness({
   return (
     <div className="space-y-8">
       <header className="space-y-3">
+        <QualityCrumbs items={[{ href: qualityListHref(base, range), label: "Quality" }]} />
         <PageHeader title={detail.name} />
         <div className="flex flex-wrap items-center gap-3 px-0">
           <p className="text-title tabular-nums text-ink">{detail.score == null ? <Unlogged /> : formatScore(detail.score)}</p>

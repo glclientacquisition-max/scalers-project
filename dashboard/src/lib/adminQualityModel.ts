@@ -487,14 +487,17 @@ export function toolResultWord(status: string | null | undefined): "Ok" | "Faile
   return TOOL_OK.has(value) ? "Ok" : "Failed";
 }
 
-export function toolLines(turn: VoiceTurnTrace): string[] {
+export type ToolFact = { name: string; result: "Ok" | "Failed" | "Not logged" };
+
+export function toolFacts(turn: VoiceTurnTrace): ToolFact[] {
   return turn.stages.flatMap((stage) => {
     if (stage.stage !== "tool") return [];
-    const name = stage.name.trim();
-    const word = toolResultWord(stage.status);
-    if (!name) return [word || "Not logged"];
-    return [`${name}. ${word || "Not logged"}`];
+    return [{ name: stage.name.trim(), result: toolResultWord(stage.status) ?? "Not logged" }];
   });
+}
+
+export function toolLines(turn: VoiceTurnTrace): string[] {
+  return toolFacts(turn).map((fact) => (fact.name ? `${fact.name}. ${fact.result}` : fact.result));
 }
 
 export function fillerLines(turn: VoiceTurnTrace): string[] {

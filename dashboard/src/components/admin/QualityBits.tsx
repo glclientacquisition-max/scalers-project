@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { Stamp } from "@/components/ui/Stamp";
 import { cx } from "@/lib/cx";
@@ -15,6 +16,40 @@ const LATENCY_SCALE_MS = LATENCY_BUDGET_MS * 2;
 
 export function Unlogged({ children = "Not logged" }: { children?: ReactNode }) {
   return <span className="text-meta text-ink-3">{children}</span>;
+}
+
+/** Same mark on the call and on a turn, so the number is a score and not part of the title. */
+export function ScoreMark({ score }: { score: number | null }) {
+  return (
+    <span className="inline-flex items-baseline gap-1 text-body text-ink">
+      <span className="text-ink-3">Score</span>
+      {score == null ? <Unlogged /> : <span className="tabular-nums">{formatScore(score)}</span>}
+    </span>
+  );
+}
+
+const crumbClass =
+  "inline-flex min-h-11 items-center rounded-md text-ink-2 outline-none focus-visible:ring-2 focus-visible:ring-brand";
+
+export function QualityCrumbs({ items }: { items: readonly { href: string; label: string }[] }) {
+  return (
+    <nav aria-label="Breadcrumb">
+      <ol className="flex flex-wrap items-center gap-x-2 text-meta">
+        {items.map((item, index) => (
+          <li key={item.href} className="flex items-center gap-x-2">
+            {index > 0 ? (
+              <span aria-hidden="true" className="text-ink-3">
+                /
+              </span>
+            ) : null}
+            <Link href={item.href} className={crumbClass}>
+              {item.label}
+            </Link>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
 }
 
 /** Score up is better. Check counts pass `lowerIsBetter` because a drop is better. */

@@ -47,6 +47,11 @@ function pathOnly(pathname: string) {
   return bare;
 }
 
+/** Quality nested screens carry a breadcrumb, so the shell chevron stays off. Phone tabs still hide. */
+export function adminHidesShellBack(pathname: string): boolean {
+  return pathOnly(pathname).startsWith("/admin/quality/");
+}
+
 /** List root for a nested admin path. Null on a destination itself. Label is the parent list, never a generic back word. */
 export function adminParentTarget(pathname: string): { href: string; label: string } | null {
   const path = pathOnly(pathname);
