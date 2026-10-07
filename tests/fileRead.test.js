@@ -195,7 +195,7 @@ describe('file read is not a new job', () => {
     assert.equal(local.outcome, 'catalogue');
     assert.equal(
       local.line,
-      'We offer Couch cleaning, Mattress cleaning, and Carpet cleaning. Which one do you need?'
+      'We offer Couch cleaning. Mattress cleaning. And Carpet cleaning. Which one do you need?'
     );
     assert.equal(looksLikeOffer('Maybe you can tell me the services that you have'), true);
     assert.equal(looksLikeOffer('So uniambie services mko nayo'), true);

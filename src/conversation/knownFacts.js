@@ -2,6 +2,7 @@
 // A capacity spike must not be what answers the catalogue or the hours.
 
 const { normalizeServices } = require('./liveKnowledge');
+const { renderSpokenList } = require('../speech/spokenList');
 const {
   parseHoursSchedule,
   openClosedStatus,
@@ -53,14 +54,6 @@ function mouthServiceName(name) {
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-function joinSpoken(names, language = 'en') {
-  const lang = String(language || '').toLowerCase();
-  const conj = lang === 'sw' || lang === 'sheng' ? 'na' : 'and';
-  if (names.length <= 1) return names[0] || '';
-  if (names.length === 2) return `${names[0]} ${conj} ${names[1]}`;
-  return `${names.slice(0, -1).join(', ')}, ${conj} ${names[names.length - 1]}`;
 }
 
 function looksLikeHoursAsk(text) {
@@ -130,18 +123,15 @@ function offerCatalogueLine(text, profile = {}, language = 'en') {
   if (!names.length) {
     return sw ? 'Niambie unahitaji nini.' : 'Tell me what you need done.';
   }
-  const list = joinSpoken(names, language);
   const more = rows.length > 4;
-  if (isMessageOnlyMode(profile.afterHoursMode)) {
-    if (sw) return more ? `Tuna ${list}, na zingine.` : `Tuna ${list}.`;
-    return more ? `We offer ${list}, and more.` : `We offer ${list}.`;
-  }
-  if (sw) {
-    return more ? `Tuna ${list}, na zingine. Unahitaji gani?` : `Tuna ${list}. Unahitaji gani?`;
-  }
-  return more
-    ? `We offer ${list}, and more. Which one do you need?`
-    : `We offer ${list}. Which one do you need?`;
+  const messageOnly = isMessageOnlyMode(profile.afterHoursMode);
+  return renderSpokenList({
+    items: names,
+    lang: language,
+    more,
+    lead: sw ? 'Tuna' : 'We offer',
+    closer: messageOnly ? '' : sw ? 'Unahitaji gani?' : 'Which one do you need?',
+  });
 }
 
 module.exports = {
