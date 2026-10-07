@@ -26,13 +26,12 @@ export type SettingsStatusTenant = {
   hours_schedule?: unknown;
   faqs?: unknown;
   services_catalog?: unknown;
-  product_catalog?: unknown;
   team_directory?: unknown;
   business_locations?: unknown;
   tts_lexicon?: unknown;
 };
 
-type SettingsStatusTarget =
+export type SettingsStatusTarget =
   | { tab: "catalog" | "import" | "test" | "alerts" }
   | { tab: "train"; panel: string };
 
