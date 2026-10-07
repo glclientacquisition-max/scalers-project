@@ -5,6 +5,7 @@
 const assert = require('assert');
 const { describe, it } = require('node:test');
 const { nothingStillOpenLine } = require('../src/conversation/fileRead');
+const { createBrainState, observeCallerTurn } = require('../src/conversation/brainState');
 const {
   labelFlushedCallerTurn,
   observeCallerInput,
@@ -44,10 +45,38 @@ describe('unfinished flush label', () => {
       { turnEnd: { unfinished: true, reason: 'unfinished_cap' } }
     );
     assert.equal(input.unfinished, true);
+    assert.equal(input.weak, false);
+    assert.equal(input.weakStt, false);
     assert.equal(input.text, 'Nilikuwa nauliza');
     assert.equal(input.languageState.current, 'sw');
     assert.equal(input.lastAgentText, 'Je, naongea na Alvin?');
     assert.equal(Object.hasOwn(input, 'goal'), false);
+
+    const observed = observeCallerTurn(createBrainState({}), input);
+    assert.equal(observed.goal.description, null);
+  });
+
+  it('forwards weak and weakStt and does not invent them', () => {
+    const weak = observeCallerInput(
+      { text: 'I need a plumber.' },
+      { turnEnd: { weak: true, weakStt: true, reason: 'low_confidence' } }
+    );
+    assert.equal(weak.unfinished, false);
+    assert.equal(weak.weak, true);
+    assert.equal(weak.weakStt, true);
+    assert.equal(Object.hasOwn(weak, 'goal'), false);
+    const rejected = observeCallerTurn(createBrainState({}), weak);
+    assert.equal(rejected.goal.description, null);
+
+    const finished = observeCallerInput(
+      { text: 'I need a plumber.' },
+      { turnEnd: { unfinished: false, reason: 'endpoint' } }
+    );
+    assert.equal(finished.unfinished, false);
+    assert.equal(finished.weak, false);
+    assert.equal(finished.weakStt, false);
+    const kept = observeCallerTurn(createBrainState({}), finished);
+    assert.match(String(kept.goal.description), /plumber/i);
   });
 
   it('labels an incomplete English tail and leaves a finished sentence', () => {
@@ -96,31 +125,38 @@ describe('caller file speak gate', () => {
     const englishAsk = gateCallerFileSpeech('Am I speaking with Alvin?', unbound);
     assert.equal(englishAsk.speak, true);
 
+    const boundState = {
+      caller: { nameConfirmed: true, fileNameAsked: 'Alvin' },
+    };
+    assert.equal(speakerBound(boundState), true);
     const bound = gateCallerFileSpeech(
       'Yes, Alvin. You have two open carpet cleaning requests.',
-      {
-        speaker: { nameConfirmed: true, pendingName: 'Alvin', name: 'Alvin' },
-        caller: { nameConfirmed: false, fileNameAsked: 'Alvin' },
-      }
+      boundState
     );
-    assert.equal(speakerBound(bound && {
-      speaker: { nameConfirmed: true },
-      caller: { nameConfirmed: false },
-    }), true);
     assert.equal(bound.speak, true);
     assert.match(bound.line, /Alvin/);
     assert.match(bound.line, /carpet/);
   });
 
-  it('lets a speaker SSOT false beat a parallel caller.nameConfirmed', () => {
-    const state = {
+  it('uses caller.nameConfirmed and ignores a parallel speaker flag', () => {
+    const confirmed = {
       speaker: { bound: false, nameConfirmed: false, pendingName: 'Alvin' },
-      caller: { nameConfirmed: true, name: 'Alvin' },
+      caller: { nameConfirmed: true, name: 'Alvin', fileNameAsked: 'Alvin' },
     };
-    assert.equal(speakerBound(state), false);
-    const gated = gateCallerFileSpeech('Yes, Alvin.', state);
-    assert.equal(gated.speak, false);
-    assert.equal(gated.line, '');
+    assert.equal(speakerBound(confirmed), true);
+    const spoken = gateCallerFileSpeech('Yes, Alvin.', confirmed);
+    assert.equal(spoken.speak, true);
+    assert.equal(spoken.line, 'Yes, Alvin.');
+
+    const ahead = {
+      speaker: { bound: true, nameConfirmed: true, pendingName: 'Alvin', name: 'Alvin' },
+      caller: { nameConfirmed: false, fileNameAsked: 'Alvin' },
+    };
+    assert.equal(speakerBound(ahead), false);
+    const blocked = gateCallerFileSpeech('Yes, Alvin.', ahead);
+    assert.equal(blocked.speak, false);
+    assert.equal(blocked.line, '');
+    assert.equal(blocked.reason, 'unbound');
   });
 });
 
