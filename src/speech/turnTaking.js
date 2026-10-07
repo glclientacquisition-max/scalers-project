@@ -211,6 +211,11 @@ function isLetMeThinkUtterance(text) {
   return LET_ME_THINK_RE.test(normalizeSpeech(text));
 }
 
+function isLineCheckGreeting(text) {
+  const t = normalizeSpeech(text).replace(/\?/g, '').replace(/\s+/g, ' ').trim();
+  return t === 'hello' || t === 'hi' || t === 'hey';
+}
+
 function isHearAgainUtterance(text) {
   const t = normalizeSpeech(text)
     .replace(/\?+/g, ' ')
@@ -346,10 +351,23 @@ function classifyCallerUtteranceKind(text, opts = {}) {
   }
   if (awaiting && CONFIRM_TOKENS.has(t) && !NO_TOKENS.has(t)) return 'yes';
   if (isBareNoUtterance(t)) return awaiting ? 'no' : 'no_unprompted';
+  // A bare hello while a question is still open is "say that again", not overlap.
+  if (awaiting && isLineCheckGreeting(t)) return 'hear_again';
   if (SOFT_BACKCHANNELS.has(t) || SOFT_BACKCHANNELS.has(raw.toLowerCase())) return 'backchannel';
   if (utteranceLooksIncomplete(raw) && /^(and|but|so|or|na)$/i.test(t)) return 'incomplete';
   if (t.length <= 2 && !NO_TOKENS.has(t)) return 'noise';
   return 'speech';
+}
+
+/**
+ * Idle nudge stays armed on a pure ignore. A replay, a queue, or a real turn clears it.
+ * @param {{ action?: string, queue?: boolean, replay?: boolean }} [decision]
+ */
+function callerEventClearsIdle(decision = {}) {
+  if (decision.replay || decision.queue) return true;
+  if (decision.action === 'ignore') return false;
+  if (decision.action === 'skip') return false;
+  return true;
 }
 
 function outcome(partial) {
@@ -879,4 +897,5 @@ module.exports = {
   classifyFinalDuringAgentSpeech,
   classifyCallerUtteranceKind,
   decideCallerEvent,
+  callerEventClearsIdle,
 };

@@ -13,6 +13,7 @@ const {
   agentAwaitingReply,
   classifyFinalDuringAgentSpeech,
   decideCallerEvent,
+  callerEventClearsIdle,
 } = require('../src/speech/turnTaking');
 const { isBackchannel } = require('../src/conversation/language');
 const { shouldSkipCallerTurn } = require('../src/conversation/dynamicSpeech');
@@ -858,6 +859,68 @@ test('false barge does not cancel a long reply; real barge clears and the next s
     if (prevWords == null) delete process.env.VOICE_STREAM_EARLY_WORDS;
     else process.env.VOICE_STREAM_EARLY_WORDS = prevWords;
   }
+});
+
+const NAME_ASK = 'Am I speaking with Alvin?';
+
+test('awaiting a name ask, Hello? replays that question', () => {
+  for (const text of ['Hello?', 'hello', 'Hi', 'hey']) {
+    const d = decideCallerEvent({
+      text,
+      speaking: false,
+      turnBusy: false,
+      lastAgentText: NAME_ASK,
+      lastAgentAskedQuestion: true,
+      replayText: NAME_ASK,
+      phase: 'idle',
+    });
+    assert.strictEqual(d.reason, 'hear_again', text);
+    assert.strictEqual(d.replay, true, text);
+    assert.strictEqual(d.action, 'skip', text);
+    assert.notStrictEqual(d.reason, 'backchannel', text);
+  }
+});
+
+test('hello stays a backchannel when nothing was asked', () => {
+  for (const text of ['Hello?', 'hello', 'hi', 'hey', 'hmm', 'okay']) {
+    const d = decideCallerEvent({
+      text,
+      speaking: false,
+      turnBusy: false,
+      lastAgentText: 'We can help tomorrow.',
+      lastAgentAskedQuestion: false,
+      phase: 'idle',
+    });
+    assert.strictEqual(d.action, 'ignore', text);
+    assert.strictEqual(d.reason, 'backchannel', text);
+    assert.strictEqual(callerEventClearsIdle(d), false, text);
+  }
+});
+
+test('an ignore with no queue does not clear idle; a line-check replay does', () => {
+  const ignored = decideCallerEvent({
+    text: 'hmm',
+    speaking: false,
+    turnBusy: false,
+    lastAgentText: NAME_ASK,
+    lastAgentAskedQuestion: true,
+    phase: 'idle',
+  });
+  assert.strictEqual(ignored.action, 'ignore');
+  assert.strictEqual(ignored.reason, 'backchannel');
+  assert.strictEqual(ignored.queue, false);
+  assert.strictEqual(callerEventClearsIdle(ignored), false);
+
+  const lineCheck = decideCallerEvent({
+    text: 'Hello?',
+    speaking: false,
+    turnBusy: false,
+    lastAgentText: NAME_ASK,
+    lastAgentAskedQuestion: true,
+    replayText: NAME_ASK,
+    phase: 'idle',
+  });
+  assert.strictEqual(callerEventClearsIdle(lineCheck), true);
 });
 
 if (process.exitCode) {

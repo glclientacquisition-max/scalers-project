@@ -99,6 +99,8 @@ Voice does not own the caller file. Brain binds the speaker. Voice does four thi
 
 5. **Brain END.** When `nextBestAction` is `END`, `runBrainEndClose` in `src/speech/callClose.js` closes the idle nudge, speaks one farewell in the call language (`Asante. Kwaheri.` or `Thank you. Goodbye.`), then closes the media socket with `end_call`. Gemini does not run on that turn. An idle nudge armed earlier does not fire. A later caller flush does not start another turn.
 
+6. **Line check.** While a question is still waiting (`lastAgentAskedQuestion`), a bare `hello` / `hi` / `hey` is `hear_again` in `decideCallerEvent`. The media path replays the committed ask. It is not a soft backchannel. The same words with no question waiting stay `backchannel` and `ignore`. `callerEventClearsIdle` leaves the idle nudge armed on an ignore or a skip that does not queue and does not replay. After a question replay, the nudge is armed again.
+
 Land this with Brain #586 (`cursor/caller-file-goal-summary-4c74`). Do not rewrite `docs/product/CALLER_FILE_MODEL.md` or `docs/agents/CALLER_IDENTITY_AND_SUMMARY.md` here. Stack with #584 if that pull request is still open. On merge, keep `flushUtterance(decision)` so `decision.unfinished` is not dropped.
 
 ## Test gate (required before PR)

@@ -145,6 +145,18 @@ assert.match(
 
 assert.match(
   source,
+  /if \(callerEventClearsIdle\(decision\)\) noteCallerSpeechForIdle\(text\);/,
+  'idle nudge must stay armed when a final is ignore with no queue'
+);
+
+assert.match(
+  source,
+  /agent_question_replay reason=\$\{decision\.reason\}[\s\S]*?idleNudge\.arm\(/,
+  'replaying a committed question must arm the idle nudge again'
+);
+
+assert.match(
+  source,
   /planBrainEndClose\(\{[\s\S]*?action:\s*nextBestAction\.action/,
   'Brain END must plan a farewell before Gemini on the media path'
 );

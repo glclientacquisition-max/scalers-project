@@ -245,6 +245,7 @@ const {
 const {
   decideTurnEnd,
   decideCallerEvent,
+  callerEventClearsIdle,
   looksLikeEcho: turnLooksLikeEcho,
   classifyFinalDuringAgentSpeech,
   agentAwaitingReply,
@@ -3607,7 +3608,6 @@ mediaWss.on('connection', (ws, req) => {
     if (evt.type === 'transcript' && evt.text) {
       const text = String(evt.text).trim();
       if (!text) return;
-      noteCallerSpeechForIdle(text);
 
       const isInterim = !evt.isFinal;
 
@@ -3616,6 +3616,9 @@ mediaWss.on('connection', (ws, req) => {
         if (speaking || turnBusy) {
           interimBargeText = mergeInterimHypothesis(interimBargeText, text);
           const interimDecision = maybeBargeIn(interimBargeText, 'interim speech');
+          if (callerEventClearsIdle(interimDecision)) {
+            noteCallerSpeechForIdle(interimBargeText);
+          }
           if (
             speaking &&
             !interimDecision.interrupt &&
@@ -3624,6 +3627,16 @@ mediaWss.on('connection', (ws, req) => {
             overlapHold.noteInterim(interimBargeText, activePlaybackGeneration);
           }
         } else {
+          const idleInterim = decideCallerEvent({
+            text,
+            speaking: false,
+            turnBusy: false,
+            lastAgentText,
+            lastAgentAskedQuestion: lastAskedQuestion(),
+            replayText: hearAgainReplayText(),
+            phase: 'idle',
+          });
+          if (callerEventClearsIdle(idleInterim)) noteCallerSpeechForIdle(text);
           interimBargeText = '';
         }
         return;
@@ -3643,13 +3656,21 @@ mediaWss.on('connection', (ws, req) => {
       if (decision.replay) {
         const replay = hearAgainReplayText();
         if (replay) {
+          if (callerEventClearsIdle(decision)) noteCallerSpeechForIdle(text);
           console.log(
             `[ws/media][${sidLabel()}] agent_question_replay reason=${decision.reason}`
           );
-          void speakText(replay, { isReplay: true });
+          void speakText(replay, { isReplay: true }).then(() => {
+            if (callEnding) return;
+            if (agentAwaitingReply(replay)) {
+              idleNudge.arm({ skip: !heardCallerUtterance });
+            }
+          });
         }
         return;
       }
+
+      if (callerEventClearsIdle(decision)) noteCallerSpeechForIdle(text);
 
       if (decision.action === 'barge_listen') {
         return;
