@@ -138,7 +138,10 @@ const {
   noteGeminiProviderOk,
   getGeminiProviderHealth,
 } = require('./src/conversation/geminiProviderHealth');
-const { getTelephonyProviderHealth } = require('./src/sautikit/telephonyProviderHealth');
+const {
+  getTelephonyProviderHealth,
+  telephonyBillingRejectXml,
+} = require('./src/sautikit/telephonyProviderHealth');
 const {
   startTelephonyWalletProbe,
   probeSautikitWallet,
@@ -1243,6 +1246,14 @@ async function handleVoiceIncoming(req, res) {
       return res
         .type('text/xml')
         .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
+
+    // Prepaid SautiKit balance empty or 402. Reject before Stream so the leg
+    // never reaches /ws/media. Probe HTTP errors (403) do not set this flag.
+    const telephonyReject = telephonyBillingRejectXml();
+    if (telephonyReject) {
+      console.warn(`[${callSid}] telephony wallet exhausted — reject`);
+      return res.type('text/xml').send(telephonyReject);
     }
 
     const preTerminal = detectCallTermination(req.body, callSessionState).terminal;

@@ -1,4 +1,7 @@
-// Probe SautiKit prepaid wallet. Telephony degrades when balance is empty or API returns 402.
+// Probe SautiKit prepaid wallet. Empty balance or HTTP 402 marks billing
+// exhausted, and POST /voice/incoming then returns <Reject/> before Stream.
+// Other probe HTTP errors (including 403) do not. The probe key must be able
+// to read GET /v1/wallet or that gate never fires.
 
 const DEFAULT_API_BASE = 'https://api.sautikit.com';
 const {
@@ -40,6 +43,8 @@ function classifyWalletResponse(status, json, text) {
       message: String(json?.message || text || 'payment required').slice(0, 200),
     };
   }
+  // Auth and other probe failures stay "not exhausted". A 403 must not Reject
+  // every DID; fix the probe key so empty/402 can be seen.
   if (!status || status < 200 || status >= 300) {
     return {
       billingExhausted: false,
