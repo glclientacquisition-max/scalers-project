@@ -10,17 +10,17 @@ const {
   rollupBusinesses,
 } = require("../dashboard/src/lib/quality/rollup");
 const {
-  scoreTraceRows,
+  callsFromRows,
   listBusinessQuality,
   getBusinessQuality,
   getCallTrace,
+  listReleaseDeltasFromRows,
   interpretTraceQuery,
   isMissingScoreColumn,
   RELEASE_GAP,
   parseWindowDays,
   parseCallLimit,
 } = require("../dashboard/src/lib/quality/assemble");
-const { loadVoiceScore, voiceScoreOrigin } = require("../dashboard/src/lib/quality/loadVoiceScore");
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.parse("2026-10-07T12:00:00.000Z");
@@ -43,77 +43,6 @@ function turn(caller, spoken, extra = {}) {
     ],
   };
 }
-
-describe("quality score snapshot", () => {
-  const { scoreTurns, cutoffIndicator } = loadVoiceScore();
-
-  it("uses the dashboard snapshot until Voice ships voiceScore.js", () => {
-    const origin = voiceScoreOrigin();
-    const live = path.join(__dirname, "../src/speech/voiceScore.js");
-    if (fs.existsSync(live)) {
-      assert.equal(origin.kind, "live");
-    } else {
-      assert.equal(origin.kind, "snapshot");
-    }
-  });
-
-  it("matches the phase 1 scorecard on known turns", () => {
-    const bad = scoreTurns([
-      turn(
-        "What services do you offer?",
-        "Sawa Alvin, nimeelewa. Kuna huduma yoyote ya usafi ungependa tukusaidie nayo leo?",
-        { callerLang: "en", ttsLang: "sw" },
-      ),
-    ]);
-    assert.equal(bad.score, 80);
-    assert.equal(bad.checks.languageMismatch, 1);
-
-    const good = scoreTurns([
-      turn("Ni huduma gani?", "Tuna usafi wa nyumba.", { callerLang: "sw", ttsLang: "sw" }),
-    ]);
-    assert.equal(good.score, 100);
-    assert.equal(good.checks.languageMismatch, 0);
-    assert.equal(good.checks.incomplete, 0);
-
-    const dropped = scoreTurns([
-      turn("Jina langu tena?", "", {
-        model: "Jina lako ni Alvin.",
-        stages: [
-          {
-            stage: "transform",
-            name: "polish",
-            dropped: true,
-            before: "Jina lako ni Alvin.",
-            after: "",
-          },
-        ],
-      }),
-    ]);
-    assert.equal(dropped.score, 45);
-    assert.equal(dropped.checks.deletedAnswer, 1);
-    assert.equal(dropped.checks.silence, 1);
-
-    const services = scoreTurns([
-      turn("Ni services gani mna offer?", "Ungependa tukuhudumie na gani?", { callerLang: "sw" }),
-    ]);
-    assert.equal(services.score, 80);
-    assert.equal(services.checks.incomplete, 1);
-
-    const names = scoreTurns([
-      turn("a", "Je, naongea na Alvin?", { pcm: 400, turnIndex: 1 }),
-      turn("b", "Niambie jina lako.", { pcm: 1500, turnIndex: 2 }),
-    ]);
-    assert.equal(names.nameAsks, 2);
-    assert.equal(names.checks.repeatedQuestion, 1);
-    assert.equal(names.checks.slow, 1);
-    assert.equal(names.score, 87);
-
-    assert.equal(cutoffIndicator("Nataka—"), "trailing_dash");
-    const cut = scoreTurns([turn("Nataka—", "Sawa.", { callerLang: "sw" })]);
-    assert.equal(cut.checks.prematureTurn, 1);
-    assert.equal(cut.score, 90);
-  });
-});
 
 describe("quality rollup", () => {
   it("prefers release.gitSha and otherwise buckets by Nairobi day", () => {
@@ -304,7 +233,6 @@ describe("quality rollup", () => {
 });
 
 describe("quality trace assembly", () => {
-  const { scoreTurns } = loadVoiceScore();
   const tenant = "df4ad9d8-28ff-4810-b1e6-94f5495472b0";
 
   function row(partial) {
@@ -319,91 +247,27 @@ describe("quality trace assembly", () => {
     };
   }
 
-  it("scores stored turns without stripping caller names", () => {
-    const spoken = "Tuna usafi wa nyumba.";
-    const caller = "Ni huduma gani, Alvin?";
-    const rows = [
-      row({
-        kind: "call",
-        createdAt: "2026-10-07T09:00:00.000Z",
-        callId: "HD_shape",
-        payload: {
-          schema: "scalers.voice.call",
-          callId: "HD_shape",
-          tenantId: tenant,
-          startedAt: "2026-10-07T08:59:00.000Z",
-          endedAt: "2026-10-07T09:00:00.000Z",
-          turnCount: 1,
-          voiceId: "voice-1",
-          sttModel: "stt-rt-v5",
-          ttsModel: "tts-rt-v2",
-          pii: "transcript",
-          stages: [{ stage: "canned", path: "greeting", text: "Habari Alvin" }],
-        },
-      }),
-      row({
-        kind: "turn",
-        turnIndex: 1,
-        createdAt: "2026-10-07T08:59:30.000Z",
-        callId: "HD_shape",
-        payload: turn(caller, spoken, { callerLang: "sw", ttsLang: "sw" }),
-      }),
-    ];
-
-    const scored = scoreTraceRows(rows, scoreTurns);
-    assert.equal(scored.length, 1);
-    assert.equal(scored[0].score, 100);
-    assert.equal(scored[0].release.source, "day");
-    assert.equal(scored[0].release.key, "2026-10-07");
-
-    const timeline = getCallTrace({ rows, scoreTurns, diagnoseCall: loadVoiceScore().diagnoseCall });
-    assert.equal(timeline.call.score, 100);
-    assert.equal(timeline.call.stages[0].text, "Habari Alvin");
-    assert.equal(timeline.turns[0].caller.text, caller);
-    assert.equal(timeline.turns[0].spoken, spoken);
-    assert.equal(timeline.turns[0].outcome, "replay");
-    assert.equal(timeline.turns[0].latency.callerStopToFirstTtsPcmMs, null);
-    assert.equal(timeline.turns[0].stages.some((stage) => stage.stage === "tts"), true);
-
-    const home = listBusinessQuality({
-      rows,
-      names: { [tenant]: "Done and Dusted" },
-      now: NOW,
-      windowDays: 7,
-      truncated: false,
-      scoreTurns,
-      diagnoseCall: loadVoiceScore().diagnoseCall,
-    });
-    assert.equal(home.ready, true);
-    assert.equal(home.businesses[0].businessName, "Done and Dusted");
-    assert.equal(home.businesses[0].currentScore, 100);
-    assert.match(home.release.gap, /git SHA/);
-
-    const list = getBusinessQuality({
-      rows,
-      businessId: tenant,
-      businessName: "Done and Dusted",
-      limit: 30,
-      now: NOW,
-      scoreTurns,
-      diagnoseCall: loadVoiceScore().diagnoseCall,
-    });
-    assert.equal(list.calls[0].callId, "HD_shape");
-    assert.equal(list.calls[0].score, 100);
-    assert.equal(list.calls[0].scoreSource, "scored");
-    assert.equal(list.dropping, false);
-  });
-
-  it("keeps a stored call score when the turns would score higher", () => {
-    const spoken = "Tuna usafi wa nyumba.";
+  it("reads call rows and leaves empty turn scores alone", () => {
+    const spoken = "Sawa Alvin, nimeelewa. Kuna huduma yoyote ya usafi ungependa tukusaidie nayo leo?";
+    const caller = "What services do you offer?";
     const rows = [
       {
         ...row({
           kind: "call",
           createdAt: "2026-10-07T09:00:00.000Z",
-          callId: "HD_stored",
+          callId: "HD_shape",
           payload: {
+            schema: "scalers.voice.call",
+            callId: "HD_shape",
+            tenantId: tenant,
             startedAt: "2026-10-07T08:59:00.000Z",
+            endedAt: "2026-10-07T09:00:00.000Z",
+            turnCount: 1,
+            voiceId: "voice-1",
+            sttModel: "stt-rt-v5",
+            ttsModel: "tts-rt-v2",
+            pii: "transcript",
+            stages: [{ stage: "canned", path: "greeting", text: "Habari Alvin" }],
             score: 100,
             checks: { slow: 9 },
             diagnosis: "payload diagnosis",
@@ -414,22 +278,117 @@ describe("quality trace assembly", () => {
         diagnosis: "Silence after a caller turn (turns 1)",
         release: { gitSha: "deadbeef", branch: "main", label: "staging" },
       },
+      {
+        ...row({
+          kind: "turn",
+          turnIndex: 1,
+          createdAt: "2026-10-07T08:59:30.000Z",
+          callId: "HD_shape",
+          payload: turn(caller, spoken, { callerLang: "en", ttsLang: "sw", pcm: 900 }),
+        }),
+        score: null,
+        checks: null,
+      },
       row({
-        kind: "turn",
-        turnIndex: 1,
-        createdAt: "2026-10-07T08:59:30.000Z",
-        callId: "HD_stored",
-        payload: turn("Ni huduma gani?", spoken, { callerLang: "sw", ttsLang: "sw" }),
+        kind: "call",
+        createdAt: "2026-10-07T08:00:00.000Z",
+        callId: "HD_empty",
+        payload: {
+          startedAt: "2026-10-07T07:59:00.000Z",
+          turnCount: 0,
+        },
       }),
     ];
-    const scored = scoreTraceRows(rows, scoreTurns, loadVoiceScore().diagnoseCall);
-    assert.equal(scored[0].score, 41);
-    assert.equal(scored[0].scoreSource, "stored");
-    assert.equal(scored[0].checks.silence, 2);
-    assert.equal(scored[0].diagnosis, "Silence after a caller turn (turns 1)");
-    assert.equal(scored[0].release.key, "deadbeef");
-    assert.equal(scored[0].release.source, "release");
-    assert.equal(scored[0].release.branch, "main");
+
+    const calls = callsFromRows(rows);
+    assert.equal(calls.length, 2);
+    const stored = calls.find((call) => call.callId === "HD_shape");
+    assert.equal(stored.score, 41);
+    assert.equal(stored.scoreSource, "stored");
+    assert.equal(stored.checks.silence, 2);
+    assert.equal(stored.diagnosis, "Silence after a caller turn (turns 1)");
+    assert.equal(stored.release.key, "deadbeef");
+    assert.equal(stored.release.source, "release");
+    assert.equal(stored.release.branch, "main");
+    assert.equal(calls.find((call) => call.callId === "HD_empty").score, null);
+
+    const timeline = getCallTrace({ rows });
+    assert.equal(timeline.call.score, 41);
+    assert.equal(timeline.call.scoreSource, "stored");
+    assert.equal(timeline.call.checks.silence, 2);
+    assert.equal(timeline.call.stages[0].text, "Habari Alvin");
+    assert.equal(timeline.turns.length, 1);
+    assert.equal(timeline.turns[0].caller.text, caller);
+    assert.equal(timeline.turns[0].spoken, spoken);
+    assert.equal(timeline.turns[0].outcome, "replay");
+    assert.equal(timeline.turns[0].score, null);
+    assert.deepEqual(timeline.turns[0].checks, {});
+    assert.equal(timeline.turns[0].latency.callerStopToFirstTtsPcmMs, 900);
+    assert.equal(timeline.turns[0].stages.some((stage) => stage.stage === "tts"), true);
+    assert.equal("omit" in timeline.turns[0], false);
+    assert.equal("notes" in timeline.turns[0], false);
+
+    const home = listBusinessQuality({
+      rows,
+      names: { [tenant]: "Done and Dusted" },
+      now: NOW,
+      windowDays: 7,
+      truncated: false,
+    });
+    assert.equal(home.ready, true);
+    assert.equal(home.businesses.length, 1);
+    assert.equal(home.businesses[0].businessName, "Done and Dusted");
+    assert.equal(home.businesses[0].currentScore, 41);
+    assert.equal(home.businesses[0].callCount, 1);
+    assert.match(home.release.gap, /git SHA/);
+
+    const list = getBusinessQuality({
+      rows,
+      businessId: tenant,
+      businessName: "Done and Dusted",
+      limit: 30,
+      now: NOW,
+    });
+    assert.equal(list.calls.length, 2);
+    assert.equal(list.calls[0].callId, "HD_shape");
+    assert.equal(list.calls[0].score, 41);
+    assert.equal(list.calls[0].scoreSource, "stored");
+    assert.equal(list.calls[1].callId, "HD_empty");
+    assert.equal(list.calls[1].score, null);
+    assert.equal(list.calls[1].scoreSource, null);
+    assert.equal(list.dropping, false);
+    assert.equal(list.callCount, 1);
+
+    const deltas = listReleaseDeltasFromRows({ rows, businessId: tenant });
+    assert.deepEqual(
+      deltas.map((bucket) => bucket.key),
+      ["deadbeef"],
+    );
+    assert.equal(deltas[0].score, 41);
+    assert.equal(deltas[0].callCount, 1);
+  });
+
+  it("passes through a per-turn score when Voice has stored one", () => {
+    const rows = [
+      {
+        ...row({
+          kind: "turn",
+          turnIndex: 1,
+          createdAt: "2026-10-07T08:59:30.000Z",
+          callId: "HD_turn_score",
+          payload: turn("Ni huduma gani?", "Tuna usafi wa nyumba.", { callerLang: "sw", pcm: 400 }),
+        }),
+        score: 70,
+        checks: { slow: 1 },
+      },
+    ];
+    const timeline = getCallTrace({ rows });
+    assert.equal(timeline.call.score, null);
+    assert.equal(timeline.call.scoreSource, null);
+    assert.equal(timeline.turns[0].score, 70);
+    assert.equal(timeline.turns[0].checks.slow, 1);
+    assert.equal(timeline.turns[0].spoken, "Tuna usafi wa nyumba.");
+    assert.equal(callsFromRows(rows).length, 0);
   });
 
   it("treats a missing trace table as an empty ready flag", () => {
@@ -484,6 +443,7 @@ describe("quality admin routes", () => {
     const call = read("dashboard/src/app/api/admin/quality/calls/[callId]/route.ts");
     const releases = read("dashboard/src/app/api/admin/quality/releases/route.ts");
     const reader = read("dashboard/src/lib/quality/readQuality.ts");
+    const assemble = read("dashboard/src/lib/quality/assemble.js");
     for (const source of [home, business, call, releases]) {
       assert.match(source, /isLegacyAuthenticated/);
       assert.match(source, /ops_only/);
@@ -500,7 +460,12 @@ describe("quality admin routes", () => {
     assert.match(reader, /export async function listReleaseDeltas/);
     assert.match(reader, /getSupabaseAdmin/);
     assert.match(reader, /voice_turn_traces/);
+    assert.equal(reader.match(/\.eq\("record_kind", "call"\)/g).length, 3);
+    assert.doesNotMatch(reader, /scoreTurns|diagnoseCall|loadVoiceScore|voiceScoreSnapshot/);
+    assert.doesNotMatch(assemble, /scoreTurns|diagnoseCall|loadVoiceScore|voiceScoreSnapshot/);
     assert.equal(fs.existsSync(path.join(root, "dashboard/src/app/admin/quality/page.tsx")), false);
-    assert.doesNotMatch(read("dashboard/src/lib/quality/voiceScoreSnapshot.js"), /SUPABASE_SERVICE_ROLE_KEY/);
+    assert.equal(fs.existsSync(path.join(root, "dashboard/src/lib/quality/voiceScoreSnapshot.js")), false);
+    assert.equal(fs.existsSync(path.join(root, "dashboard/src/lib/quality/loadVoiceScore.js")), false);
+    assert.equal(fs.existsSync(path.join(root, "src/speech/voiceScore.js")), true);
   });
 });

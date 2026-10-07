@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 // Turn voice_turn_traces rows into the Quality JSON Desk renders.
-// A stored call score wins over a rescore. Payloads stay as the writer stored them.
+// Rollups read call rows only. Turn score and checks stay as Voice stored them.
 
 const { releaseKeyFromCall, rollupBusiness, rollupBusinesses, listReleaseDeltas, topFailureFromChecks } = require("./rollup");
 
@@ -101,68 +101,41 @@ function stage(turn, name) {
   return rows[rows.length - 1] || null;
 }
 
-function scoreTraceRows(rows, scoreTurns, diagnoseCall) {
+function callFromRow(row) {
+  if (row?.record_kind !== "call") return null;
+  const callId = String(row.call_id || "").trim();
+  if (!callId) return null;
+  const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
+  const score = finiteScore(row.score) ?? finiteScore(payload.score);
+  const atIso = payload.startedAt || payload.endedAt || row.created_at || null;
+  const at = Date.parse(atIso);
+  const columnRelease = asObject(row.release);
+  return {
+    callId,
+    tenantId: row.tenant_id || payload.tenantId || null,
+    at: Number.isFinite(at) ? at : 0,
+    atIso,
+    turnCount: payload.turnCount ?? null,
+    release: releaseKeyFromCall(columnRelease ? { ...payload, release: columnRelease } : payload, atIso),
+    score,
+    checks: checksOf(row.checks, payload.checks) || {},
+    diagnosis: textOf(row.diagnosis, payload.diagnosis),
+    scoreSource: score != null ? "stored" : null,
+  };
+}
+
+function callsFromRows(rows) {
   const byCall = new Map();
   for (const row of rows || []) {
-    const callId = String(row?.call_id || "").trim();
-    if (!callId) continue;
-    let bucket = byCall.get(callId);
-    if (!bucket) {
-      bucket = { callId, tenantId: row.tenant_id || null, call: null, turns: [] };
-      byCall.set(callId, bucket);
-    }
-    if (row.tenant_id) bucket.tenantId = row.tenant_id;
-    if (row.record_kind === "call") bucket.call = row;
-    else if (row.record_kind === "turn") bucket.turns.push(row);
+    const call = callFromRow(row);
+    if (!call) continue;
+    if (!byCall.has(call.callId)) byCall.set(call.callId, call);
   }
+  return [...byCall.values()];
+}
 
-  const calls = [];
-  for (const bucket of byCall.values()) {
-    const turnPayloads = bucket.turns
-      .slice()
-      .sort((a, b) => Number(a.turn_index ?? 0) - Number(b.turn_index ?? 0))
-      .map((row) => row.payload)
-      .filter(Boolean);
-    const payload = bucket.call?.payload && typeof bucket.call.payload === "object" ? bucket.call.payload : {};
-    const storedScore = finiteScore(bucket.call?.score) ?? finiteScore(payload.score);
-    const atIso = payload.startedAt || payload.endedAt || bucket.call?.created_at || bucket.turns[0]?.created_at || null;
-    const at = Date.parse(atIso);
-    const columnRelease = asObject(bucket.call?.release);
-    const releasePayload = columnRelease ? { ...payload, release: columnRelease } : payload;
-    const base = {
-      callId: bucket.callId,
-      tenantId: bucket.tenantId || payload.tenantId || null,
-      at: Number.isFinite(at) ? at : 0,
-      atIso,
-      turnCount: payload.turnCount ?? turnPayloads.length,
-      release: releaseKeyFromCall(releasePayload, atIso),
-    };
-
-    if (storedScore != null) {
-      calls.push({
-        ...base,
-        score: storedScore,
-        checks: checksOf(bucket.call?.checks, payload.checks) || {},
-        nameAsks: 0,
-        diagnosis: textOf(bucket.call?.diagnosis, payload.diagnosis),
-        scoreSource: "stored",
-      });
-      continue;
-    }
-
-    if (!turnPayloads.length) continue;
-    const scored = scoreTurns(turnPayloads);
-    if (scored?.score == null) continue;
-    calls.push({
-      ...base,
-      score: scored.score,
-      checks: scored.checks || {},
-      nameAsks: scored.nameAsks || 0,
-      diagnosis: typeof diagnoseCall === "function" ? diagnoseCall(scored) : null,
-      scoreSource: "scored",
-    });
-  }
-  return calls;
+function scoredCalls(calls) {
+  return calls.filter((call) => call.score != null);
 }
 
 function callListItem(call) {
@@ -173,15 +146,14 @@ function callListItem(call) {
     checks: call.checks,
     diagnosis: call.diagnosis || null,
     scoreSource: call.scoreSource,
-    nameAsks: call.nameAsks,
     turnCount: call.turnCount,
     topFailure: topFailureFromChecks(call.checks),
     release: call.release,
   };
 }
 
-function listBusinessQuality({ rows, names, now, windowDays, truncated, scoreTurns, diagnoseCall }) {
-  const scored = scoreTraceRows(rows, scoreTurns, diagnoseCall);
+function listBusinessQuality({ rows, names, now, windowDays, truncated }) {
+  const scored = scoredCalls(callsFromRows(rows));
   const businesses = rollupBusinesses(scored, now, windowDays * DAY_MS).map((business) => ({
     ...business,
     businessName: names?.[business.businessId] || null,
@@ -196,9 +168,9 @@ function listBusinessQuality({ rows, names, now, windowDays, truncated, scoreTur
   };
 }
 
-function getBusinessQuality({ rows, businessId, businessName, limit, now, scoreTurns, diagnoseCall }) {
-  const mine = scoreTraceRows(rows, scoreTurns, diagnoseCall).filter((call) => call.tenantId === businessId);
-  const summary = rollupBusiness(mine, now, 7 * DAY_MS);
+function getBusinessQuality({ rows, businessId, businessName, limit, now }) {
+  const mine = callsFromRows(rows).filter((call) => call.tenantId === businessId);
+  const summary = rollupBusiness(scoredCalls(mine), now, 7 * DAY_MS);
   const calls = mine
     .slice()
     .sort((a, b) => b.at - a.at)
@@ -214,7 +186,31 @@ function getBusinessQuality({ rows, businessId, businessName, limit, now, scoreT
   };
 }
 
-function getCallTrace({ rows, scoreTurns, diagnoseCall }) {
+function turnFromRow(row) {
+  const payload = row?.payload && typeof row.payload === "object" ? row.payload : {};
+  const latency = stage(payload, "latency");
+  const outcome = stage(payload, "outcome");
+  const tts = stage(payload, "tts");
+  return {
+    turnIndex: payload.turnIndex ?? row.turn_index ?? null,
+    at: payload.at || row.created_at || null,
+    caller: {
+      text: payload.caller?.text || "",
+      language: payload.caller?.language || null,
+    },
+    spoken: typeof tts?.text === "string" ? tts.text : "",
+    outcome: outcome?.value || null,
+    score: finiteScore(row.score) ?? finiteScore(payload.score),
+    checks: checksOf(row.checks, payload.checks) || {},
+    latency: {
+      callerStopToModelFirstTokenMs: latency?.callerStopToModelFirstTokenMs ?? null,
+      callerStopToFirstTtsPcmMs: latency?.callerStopToFirstTtsPcmMs ?? null,
+    },
+    stages: Array.isArray(payload.stages) ? payload.stages : [],
+  };
+}
+
+function getCallTrace({ rows }) {
   const list = rows || [];
   if (!list.length) return null;
   const callRow = list.find((row) => row.record_kind === "call") || null;
@@ -222,15 +218,11 @@ function getCallTrace({ rows, scoreTurns, diagnoseCall }) {
     .filter((row) => row.record_kind === "turn")
     .slice()
     .sort((a, b) => Number(a.turn_index ?? 0) - Number(b.turn_index ?? 0));
-  const turns = turnRows.map((row) => row.payload).filter(Boolean);
-  const scored = turns.length ? scoreTurns(turns) : null;
-  const byIndex = new Map((scored?.turns || []).map((turn) => [turn.turnIndex, turn]));
   const payload = callRow?.payload && typeof callRow.payload === "object" ? callRow.payload : {};
-  const storedScore = finiteScore(callRow?.score) ?? finiteScore(payload.score);
+  const score = callRow ? finiteScore(callRow.score) ?? finiteScore(payload.score) : null;
+  const checks = callRow ? checksOf(callRow.checks, payload.checks) || {} : {};
   const atIso = payload.startedAt || callRow?.created_at || turnRows[0]?.created_at || null;
   const columnRelease = asObject(callRow?.release);
-  const score = storedScore != null ? storedScore : scored?.score ?? null;
-  const checks = storedScore != null ? checksOf(callRow?.checks, payload.checks) || {} : scored?.checks || {};
   return {
     ok: true,
     ready: true,
@@ -239,55 +231,25 @@ function getCallTrace({ rows, scoreTurns, diagnoseCall }) {
       tenantId: callRow?.tenant_id || payload.tenantId || turnRows[0]?.tenant_id || null,
       startedAt: payload.startedAt || null,
       endedAt: payload.endedAt || null,
-      turnCount: payload.turnCount ?? turns.length,
+      turnCount: payload.turnCount ?? turnRows.length,
       voiceId: payload.voiceId || null,
       sttModel: payload.sttModel || null,
       ttsModel: payload.ttsModel || null,
       pii: payload.pii || callRow?.pii || "transcript",
       score,
       checks,
-      diagnosis:
-        storedScore != null
-          ? textOf(callRow?.diagnosis, payload.diagnosis)
-          : typeof diagnoseCall === "function" && scored
-            ? diagnoseCall(scored)
-            : null,
-      scoreSource: storedScore != null ? "stored" : scored ? "scored" : null,
-      nameAsks: scored?.nameAsks || 0,
+      diagnosis: callRow ? textOf(callRow.diagnosis, payload.diagnosis) : null,
+      scoreSource: score != null ? "stored" : null,
       topFailure: topFailureFromChecks(checks),
       release: releaseKeyFromCall(columnRelease ? { ...payload, release: columnRelease } : payload, atIso),
       stages: Array.isArray(payload.stages) ? payload.stages : [],
     },
-    turns: turns.map((turn) => {
-      const card = byIndex.get(turn.turnIndex) || null;
-      const latency = stage(turn, "latency");
-      const outcome = stage(turn, "outcome");
-      const tts = stage(turn, "tts");
-      return {
-        turnIndex: turn.turnIndex ?? null,
-        at: turn.at || null,
-        caller: {
-          text: turn.caller?.text || "",
-          language: turn.caller?.language || null,
-        },
-        spoken: tts?.text || card?.spoken || "",
-        outcome: outcome?.value || null,
-        score: card ? card.score : null,
-        omit: Boolean(card?.omit),
-        checks: card?.checks || {},
-        notes: card?.notes || [],
-        latency: {
-          callerStopToModelFirstTokenMs: latency?.callerStopToModelFirstTokenMs ?? null,
-          callerStopToFirstTtsPcmMs: latency?.callerStopToFirstTtsPcmMs ?? null,
-        },
-        stages: Array.isArray(turn.stages) ? turn.stages : [],
-      };
-    }),
+    turns: turnRows.map(turnFromRow),
   };
 }
 
-function listReleaseDeltasFromRows({ rows, scoreTurns, diagnoseCall, businessId }) {
-  let calls = scoreTraceRows(rows, scoreTurns, diagnoseCall);
+function listReleaseDeltasFromRows({ rows, businessId }) {
+  let calls = scoredCalls(callsFromRows(rows));
   if (businessId) calls = calls.filter((call) => call.tenantId === businessId);
   return listReleaseDeltas(calls);
 }
@@ -348,7 +310,7 @@ module.exports = {
   isMissingTraceTable,
   isMissingScoreColumn,
   interpretTraceQuery,
-  scoreTraceRows,
+  callsFromRows,
   listBusinessQuality,
   getBusinessQuality,
   getCallTrace,

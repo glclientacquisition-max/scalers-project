@@ -11,8 +11,6 @@ import {
   listBusinessQuality as shapeBusinessList,
   listReleaseDeltasFromRows,
 } from "@/lib/quality/assemble";
-import { loadVoiceScore } from "@/lib/quality/loadVoiceScore";
-
 const MAX_ROWS = 2000;
 const TRACE_COLUMNS =
   "call_id,tenant_id,turn_index,record_kind,pii,payload,score,checks,diagnosis,release,created_at";
@@ -36,31 +34,6 @@ type TraceQuery = {
   data: TraceRow[] | null;
   error: { message?: string; code?: string } | null;
 };
-
-type ScoreFns = {
-  scoreTurns: (turns: unknown[]) => {
-    score: number | null;
-    checks: Record<string, number>;
-    nameAsks: number;
-    turns: Array<{
-      turnIndex: number;
-      score: number | null;
-      omit?: boolean;
-      checks: Record<string, number>;
-      notes?: string[];
-      spoken?: string;
-    }>;
-  };
-  diagnoseCall: (card: unknown) => string | null;
-};
-
-function scorers(): ScoreFns {
-  const loaded = loadVoiceScore();
-  return {
-    scoreTurns: loaded.scoreTurns,
-    diagnoseCall: loaded.diagnoseCall,
-  };
-}
 
 function lookbackDays(windowDays: number): number {
   return Math.max(windowDays, 7) * 2;
@@ -115,6 +88,7 @@ export async function listBusinessQuality(opts: { windowDays: number; now?: numb
     admin
       .from("voice_turn_traces")
       .select(columns)
+      .eq("record_kind", "call")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(MAX_ROWS),
@@ -126,15 +100,12 @@ export async function listBusinessQuality(opts: { windowDays: number; now?: numb
     admin,
     rows.map((row) => String(row.tenant_id || "")),
   );
-  const { scoreTurns, diagnoseCall } = scorers();
   return shapeBusinessList({
     rows,
     names,
     now,
     windowDays: opts.windowDays,
     truncated: rows.length >= MAX_ROWS,
-    scoreTurns,
-    diagnoseCall,
   });
 }
 
@@ -147,6 +118,7 @@ export async function getBusinessQuality(opts: { businessId: string; limit: numb
       admin
         .from("voice_turn_traces")
         .select(columns)
+        .eq("record_kind", "call")
         .eq("tenant_id", opts.businessId)
         .gte("created_at", since)
         .order("created_at", { ascending: false })
@@ -158,15 +130,12 @@ export async function getBusinessQuality(opts: { businessId: string; limit: numb
   if (!interpreted.ready) return emptyBusiness(opts.businessId);
   const rows = interpreted.rows as TraceRow[];
   if (!business.found && rows.length === 0) return null;
-  const { scoreTurns, diagnoseCall } = scorers();
   return shapeBusinessQuality({
     rows,
     businessId: opts.businessId,
     businessName: business.name,
     limit: opts.limit,
     now,
-    scoreTurns,
-    diagnoseCall,
   });
 }
 
@@ -182,12 +151,7 @@ export async function getCallTrace(callId: string) {
   );
   const interpreted = interpretTraceQuery(query);
   if (!interpreted.ready) return emptyCall();
-  const { scoreTurns, diagnoseCall } = scorers();
-  return shapeCallTrace({
-    rows: interpreted.rows as TraceRow[],
-    scoreTurns,
-    diagnoseCall,
-  });
+  return shapeCallTrace({ rows: interpreted.rows as TraceRow[] });
 }
 
 export async function listReleaseDeltas(opts: {
@@ -200,14 +164,17 @@ export async function listReleaseDeltas(opts: {
   const since = sinceIso(now, lookbackDays(opts.windowDays));
   const businessId = opts.businessId || "";
   const query = await selectTraces((columns) => {
-    const next = admin.from("voice_turn_traces").select(columns).gte("created_at", since);
+    const next = admin
+      .from("voice_turn_traces")
+      .select(columns)
+      .eq("record_kind", "call")
+      .gte("created_at", since);
     const scoped = businessId ? next.eq("tenant_id", businessId) : next;
     return scoped.order("created_at", { ascending: false }).limit(MAX_ROWS);
   });
   const interpreted = interpretTraceQuery(query);
   if (!interpreted.ready) return emptyReleases(opts.windowDays);
   const rows = interpreted.rows as TraceRow[];
-  const { scoreTurns, diagnoseCall } = scorers();
   return {
     ok: true,
     ready: true,
@@ -217,8 +184,6 @@ export async function listReleaseDeltas(opts: {
     release: emptyReleases(opts.windowDays).release,
     releases: listReleaseDeltasFromRows({
       rows,
-      scoreTurns,
-      diagnoseCall,
       businessId: opts.businessId || null,
     }),
   };

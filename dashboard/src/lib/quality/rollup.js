@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-// Pure Quality rollup. Scores come from the phase 1 voice scorecard.
+// Pure Quality rollup. Scores are the numbers Voice stored on call rows.
 // Release keys prefer release.gitSha on the call row. An empty git SHA
 // falls back to the Africa/Nairobi calendar day.
 

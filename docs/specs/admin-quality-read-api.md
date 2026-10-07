@@ -19,17 +19,17 @@ Desk imports these from `@/lib/quality/readQuality`:
 
 Row cap is 2000 traces. `truncated: true` when the cap is hit.
 
-## Stored score first
+## Call rows only
 
-Voice PR #582 (`ed1f0a93`) writes these on the call row at hangup, both as columns and inside the call payload: `score`, `checks`, `diagnosis`, and `release` `{ gitSha, branch, label }`. Turn rows leave the columns null.
+Voice writes `score`, `checks`, `diagnosis`, and `release` `{ gitSha, branch, label }` on the `record_kind = 'call'` row at hangup, both as columns and inside the call payload. `src/speech/voiceScore.js` is the writer. This API does not import it and does not rescore.
 
-When `score` is a number on the column, that value wins. If the column is null, `payload.score` wins. Checks and diagnosis follow the same order. The API does not rescore those calls. `scoreSource` is `"stored"`.
+`listBusinessQuality`, `getBusinessQuality`, `listReleaseDeltas`, and the dropping rule read call rows only. The column wins. If the column is null, the same field on the call payload wins. `scoreSource` is `"stored"` when that score is a number, and `null` when it is not. A call with a null score stays on the business call list and stays out of averages, `callCount`, dropping, top failure, and release deltas.
 
-When both are null, the API scores the turn payloads with `scoreTurns` and `diagnoseCall` from `src/speech/voiceScore.js` (the same module #582 uses). The desk image does not include the voice tree, so `loadVoiceScore` uses that file when it is on disk and otherwise `voiceScoreSnapshot.js`, a copy of `ed1f0a93`. `scoreSource` is `"scored"`. Do not add a second set of checks.
+Turn rows currently store null `score` and empty `checks`. Per-turn check hits are pending. Voice will persist them in a follow-up. Until then, `getCallTrace` returns each turn's stages, caller text, spoken line, outcome, and latency from the payload, and copies `score` and `checks` from the turn row when they are present. Empty stays `score: null` and `checks: {}`. The timeline does not run `scoreTurns`, so a spoken line that would fail a check does not change the call score or invent a per-turn hit.
 
-If the score columns are not on the table yet, the read retries without them and scores from turns.
+If the score columns are not on the table yet, the read retries without them and uses the payload copies. It still does not score turns.
 
-`diagnosis` is the one line Voice stored, for example `Name asked 3 times (turns 4, 7, 9)` or `No failed checks.`
+`diagnosis` is the one line Voice stored on the call row, for example `Name asked 3 times (turns 4, 7, 9)` or `No failed checks.`
 
 ## Dropping
 
@@ -37,7 +37,7 @@ If the score columns are not on the table yet, the read retries without them and
 
 `dropping` is true when either rule hits:
 
-- The last 7 days' average is at least 10 points below the prior 7 days, and each window has at least 5 traced calls.
+- The last 7 days' average is at least 10 points below the prior 7 days, and each window has at least 5 call rows with a numeric score.
 - A check that was not hit in the prior 7 days shows up on at least 3 calls in the last 7.
 
 Reason copy:
@@ -90,7 +90,7 @@ Both sentences are joined with a space when both rules hit. Check names are the 
 }
 ```
 
-`currentScore` is the mean of scored calls in the recent `windowDays`, one decimal, same rounding as the voice scorecard. `priorScore` is the previous window of the same length. `trend` is `currentScore - priorScore`. It is `null` when either window has no scored calls. `trendDirection` is `up`, `down`, `flat`, or `unknown`.
+`currentScore` is the mean of call rows with a numeric score in the recent `windowDays`, one decimal, same rounding as the voice scorecard. `priorScore` is the previous window of the same length. `trend` is `currentScore - priorScore`. It is `null` when either window has no scored calls. `trendDirection` is `up`, `down`, `flat`, or `unknown`. `callCount` counts those scored call rows, not turns and not unscored calls. A business with only unscored call rows is left off the home list.
 
 `topFailure` is the check with the highest count in the recent trend window. Ties go to the heavier check: silence, deletedAnswer, languageMismatch, incomplete, repeatedQuestion, respelling, prematureTurn, slow. `null` when every recent count is 0.
 
@@ -114,7 +114,6 @@ Same rollup fields as one home row, plus `calls` (newest first, within the last 
   "checks": { "silence": 2 },
   "diagnosis": "Silence after a caller turn (turns 1)",
   "scoreSource": "stored",
-  "nameAsks": 0,
   "turnCount": 1,
   "topFailure": { "check": "silence", "count": 2 },
   "release": {
@@ -148,11 +147,10 @@ Unknown business and no traces: `404` `{ "error": "No business." }`. Known busin
     "ttsModel": "tts-rt-v2",
     "pii": "transcript",
     "score": 41,
-    "checks": {},
+    "checks": { "silence": 2 },
     "diagnosis": "Silence after a caller turn (turns 1)",
     "scoreSource": "stored",
-    "nameAsks": 0,
-    "topFailure": null,
+    "topFailure": { "check": "silence", "count": 2 },
     "release": { "key": "deadbeef", "source": "release", "gitSha": "deadbeef", "branch": "main", "label": null },
     "stages": [{ "stage": "canned", "path": "greeting", "text": "Habari" }]
   },
@@ -163,10 +161,8 @@ Unknown business and no traces: `404` `{ "error": "No business." }`. Known busin
       "caller": { "text": "Ni huduma gani?", "language": "sw" },
       "spoken": "Tuna usafi wa nyumba.",
       "outcome": "ok",
-      "score": 100,
-      "omit": false,
+      "score": null,
       "checks": {},
-      "notes": [],
       "latency": {
         "callerStopToModelFirstTokenMs": null,
         "callerStopToFirstTtsPcmMs": 900
@@ -177,7 +173,7 @@ Unknown business and no traces: `404` `{ "error": "No business." }`. Known busin
 }
 ```
 
-The call header uses the stored score. Turn rows still carry per-turn scores from `scoreTurns` so the timeline can show where a check landed. `stages` is the writer payload, unchanged. `pii` is `transcript`. Names stay. The writer already redacts emails and phone numbers of 8 digits or more. This API does not redact again.
+The call header uses the call row. Per-turn `score` and `checks` are pending: today they are null and `{}` unless Voice has already written them on that turn row. `stages` is the writer payload, unchanged. `pii` is `transcript`. Names stay. The writer already redacts emails and phone numbers of 8 digits or more. This API does not redact again.
 
 No rows for that call: `404` `{ "error": "No trace for that call." }`. Missing table: `ready: false`, `call: null`, `turns: []`.
 
@@ -187,7 +183,11 @@ No rows for that call: `404` `{ "error": "No trace for that call." }`. Missing t
 
 ## Checks
 
-Same names as the voice scorecard: `languageMismatch`, `incomplete`, `repeatedQuestion`, `silence`, `deletedAnswer`, `respelling`, `prematureTurn`, `slow`. A turn with outcome `unlogged` is left out of a recomputed call average.
+Same names as the voice scorecard, read from the call row: `languageMismatch`, `incomplete`, `repeatedQuestion`, `silence`, `deletedAnswer`, `respelling`, `prematureTurn`, `slow`. Per-turn hits of those checks are pending. This API does not recompute a call average from turn payloads.
+
+## Per-turn checks
+
+Pending. Turn rows have null `score` and empty `checks` until Voice persists per-turn hits. `getCallTrace` must keep returning the turn timeline from `payload.stages` in the meantime, and must not fill those fields by scoring the spoken text.
 
 ## Staging SQL
 
