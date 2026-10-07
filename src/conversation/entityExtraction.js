@@ -268,7 +268,7 @@ function bareAskedFileName(text, pending) {
 }
 
 const AFFIRM_LEAD =
-  /^(?:uh+|um+|ah+)?[, ]*(?:yes|yeah|yep|yup|ndiyo|ndio|sawa|okay|ok|eeh|ehe|ee|correct)\b/i;
+  /^(?:uh+|um+|ah+)?[, ]*(?:yes|yeah|yah|yea|yep|yup|nya|ndiyo|ndio|sawa|okay|ok|eeh|ehe|ee|correct)\b/i;
 
 function escapeName(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -290,10 +290,11 @@ function affirmsAskedFileName(text, pending, extracted) {
   if (isNameAffirmation(text)) return true;
   const raw = String(text || '').trim();
   if (!AFFIRM_LEAD.test(raw)) return false;
+  // Echo of the pack ask wins before a noisy lead token ("Nya") can look like a different name.
+  if (spokenWithName(raw, asked)) return true;
   if (extracted && !namesLikelySame(extracted, asked) && !isJunkCallerName(extracted)) {
     return false;
   }
-  if (spokenWithName(raw, asked)) return true;
   if (
     /\b(?:speaking with|speaking to|talking with|talking to|unaongea na|naongea na|unazungumza na|niongee na)\s+[\p{L}'’-]+/iu.test(
       raw
@@ -653,13 +654,16 @@ function isBackchannelOrFragment(text) {
   return false;
 }
 
-// Open Kiswahili stems Voice already treats as unfinished. Rejected as a goal
-// even when the flush does not pass unfinished/weak yet.
-const UNFINISHED_GOAL_ONLY =
-  /^(?:(?:uh+|um+|ah+|eeh|eh|like|so|well|actually|i mean)[, ]+)*(?:nilikuwa(?:\s+nauliza)?|nauliza|ningetaka|ningependa|naomba|nataka|i was (?:just )?asking|i wanted to ask)(?:\s*[?.!,])*$/i;
+// Open stems with no complement. "Nilikuwa nataka kujua" is unfinished even when
+// a greeting sits in front of it, and even when Voice has not passed a flag yet.
+const UNFINISHED_STEM =
+  /^(nilikuwa(?:\s+(?:nauliza|nataka|ningetaka|ningependa|naomba))?(?:\s+(?:kujua|kuuliza|kuomba))?|nauliza|nataka(?:\s+(?:kujua|kuuliza|kuomba))?|ningetaka(?:\s+(?:kujua|kuuliza))?|ningependa(?:\s+(?:kujua|kuuliza))?|naomba(?:\s+(?:kujua|kuuliza))?|i was (?:just )?asking|i wanted to (?:ask|know))\b[, ]*(.*)$/i;
 
-const UNFINISHED_GOAL_TAIL =
-  /\b(?:nauliza|nilikuwa|ningetaka|ningependa|naomba|nataka)\b(?:\s*[?.!,])*$/i;
+const LEADING_FILLER =
+  /^(?:uh+|um+|ah+|eeh|eh|like|so|well|actually|i mean|nya|yah|yea|yeah|yes|yep|ndiyo|ndio|sawa|okay|ok|mm+|mhm|hmm+)[, ]+/i;
+
+const LEADING_GREETING =
+  /^(?:namna gani|habari(?:\s+yako)?|niaje|mambo|vipi|sasa|how are you(?: doing)?)(?:[, ]+[\p{L}'’-]+)?[, ]*/iu;
 
 function looksLikePhaticGoal(text) {
   const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
@@ -677,9 +681,10 @@ function callerAskSpecificity(text) {
     score += 3;
   }
   if (
-    /\b(clean\w*|inquir\w*|enquir\w*|booking|appointment|hold|visit|order|price|bei)\b/.test(
+    /\b(clean\w*|inquir\w*|enquir\w*|booking|appointment|hold|visit|order|price|bei|services?|huduma)\b/.test(
       value
-    )
+    ) ||
+    /\boffer\b/.test(value)
   ) {
     score += 2;
   }
@@ -690,7 +695,10 @@ function callerAskSpecificity(text) {
 function isIdentityEchoOnly(text) {
   const raw = String(text || '')
     .trim()
-    .replace(/^(?:uh+|um+|eeh|eh|ndiyo|ndio|yes|yeah|sawa|okay|ok)[,.\s]+/i, '')
+    .replace(
+      /^(?:uh+|um+|eeh|eh|ndiyo|ndio|yes|yeah|yah|yea|nya|sawa|okay|ok)[,.\s]+/i,
+      ''
+    )
     .replace(/[?.!]+$/g, '')
     .trim();
   return /^(?:je,?\s*)?(?:unaongea na|naongea na|unazungumza na|niongee na|speaking with|talking to|am i speaking with)\s+[\p{L}'’-]+$/iu.test(
@@ -698,17 +706,97 @@ function isIdentityEchoOnly(text) {
   );
 }
 
-function isUnfinishedCallerStem(text) {
-  const value = String(text || '').trim();
-  if (!value) return false;
-  if (UNFINISHED_GOAL_ONLY.test(value)) return true;
-  const words = value.split(/\s+/).filter(Boolean);
-  return (
-    words.length > 0 &&
-    words.length <= 6 &&
-    UNFINISHED_GOAL_TAIL.test(value) &&
-    callerAskSpecificity(value) === 0
+function isGreetingClause(text) {
+  const value = String(text || '')
+    .trim()
+    .replace(/[?.!,]+$/g, '')
+    .trim();
+  if (!value) return true;
+  if (
+    /^(?:mm+|mhm|mm-?hm|uh-?huh|uh huh|uh+|um+|ah+|hmm+|eeh|eh|nya|yah|yea|yeah|yes|yep|ok|okay|sawa|ndiyo|ndio)$/i.test(
+      value
+    )
+  ) {
+    return true;
+  }
+  return /^(?:namna gani|habari(?:\s+yako)?|niaje|mambo|vipi|sasa|how are you(?: doing)?)(?:[, ]+[\p{L}'’-]+)?$/iu.test(
+    value
   );
+}
+
+function isNonActionableAsk(text) {
+  const value = String(text || '')
+    .trim()
+    .replace(/[?.!,]+$/g, '')
+    .trim();
+  if (!value) return true;
+  return /^(?:what else|anything else|and then|go on|continue|na nini|kisha|what about|how about)$/i.test(
+    value
+  );
+}
+
+function peelGoalClause(clause) {
+  let value = String(clause || '').trim();
+  if (!value) return '';
+  if (
+    isGreetingClause(value) ||
+    isIdentityEchoOnly(value) ||
+    isBackchannelOrFragment(value) ||
+    looksLikePhaticGoal(value)
+  ) {
+    return '';
+  }
+  for (let i = 0; i < 6 && value; i += 1) {
+    const filler = value.replace(LEADING_FILLER, '').trim();
+    if (filler !== value) {
+      value = filler;
+      continue;
+    }
+    const greet = LEADING_GREETING.exec(value);
+    if (greet && greet[0].length < value.length) {
+      value = value.slice(greet[0].length).trim();
+      continue;
+    }
+    break;
+  }
+  if (
+    !value ||
+    isGreetingClause(value) ||
+    isIdentityEchoOnly(value) ||
+    isBackchannelOrFragment(value) ||
+    looksLikePhaticGoal(value)
+  ) {
+    return '';
+  }
+  const open = UNFINISHED_STEM.exec(value);
+  if (!open) return isNonActionableAsk(value) ? '' : value;
+  const stem = String(open[1] || '');
+  const rest = String(open[2] || '')
+    .replace(/^[, ]+/, '')
+    .trim();
+  const bareWant = /^(?:nataka|naomba|ningetaka|ningependa)$/i.test(stem);
+  if (bareWant && rest && !/^(?:kujua|kuuliza|kuomba)\b/i.test(rest)) {
+    return value;
+  }
+  if (!rest) return '';
+  return peelGoalClause(rest);
+}
+
+/**
+ * Actionable remainder of a caller turn. Unfinished stems, greetings, and
+ * identity echoes drop out. Empty means this turn is not a goal.
+ */
+function usableGoalRemainder(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return '';
+  const parts = raw.split(/[.?!]+/);
+  const kept = [];
+  for (const part of parts) {
+    const peeled = peelGoalClause(part);
+    if (!peeled || isNonActionableAsk(peeled)) continue;
+    kept.push(peeled);
+  }
+  return kept.join('. ').replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -719,32 +807,12 @@ function isUnfinishedCallerStem(text) {
  */
 function isRejectedGoalText(text, opts = {}) {
   if (opts.unfinished === true || opts.weak === true) return true;
-  const value = String(text || '').trim();
-  if (!value) return true;
-  if (isBackchannelOrFragment(value)) return true;
-  if (looksLikePhaticGoal(value)) return true;
-  if (isIdentityEchoOnly(value)) return true;
-  if (isUnfinishedCallerStem(value)) return true;
-  return false;
-}
-
-function stripUnfinishedGoalNoise(text) {
-  let value = String(text || '');
-  value = value.replace(
-    /(?:^|[.?!]\s*)(?:uh+|um+|eeh|eh|ndiyo|ndio|yes|yeah|sawa|okay|ok)[, ]+(?:unaongea na|naongea na|unazungumza na|niongee na|speaking with|talking to)\s+[\p{L}'’-]+[?.!]*/giu,
-    ' '
-  );
-  value = value.replace(/\bnilikuwa\s+nauliza\b[?.!,]*/gi, ' ');
-  return value.replace(/\s+/g, ' ').replace(/^[,.\s]+/, '').replace(/[,.\s]+$/, '').trim();
+  return !usableGoalRemainder(text);
 }
 
 function callerGoalText(text, opts = {}) {
-  const raw = String(text || '').trim();
-  if (!raw || isRejectedGoalText(raw, opts)) return '';
-  const stripped = stripUnfinishedGoalNoise(raw);
-  if (!stripped || stripped === raw) return isRejectedGoalText(raw) ? '' : raw;
-  if (isRejectedGoalText(stripped)) return '';
-  return stripped;
+  if (opts.unfinished === true || opts.weak === true) return '';
+  return usableGoalRemainder(text);
 }
 
 function isPlausibleCallerName(value) {

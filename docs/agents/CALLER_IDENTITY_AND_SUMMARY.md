@@ -79,21 +79,21 @@ resolution_note: string | null  // must match resolution class
 
 ### Never allowed as `goal.text`
 
-Reject at observe **and** at write:
+Reject at observe **and** at write. A greeting in front of the stem does not make it a goal (`Mm-hm. Namna gani, Shy? Nilikuwa nataka kujua.` is the same class as `Nilikuwa nauliza`).
 
-- Unfinished STT (trailing open stems: `nauliza`, `nilikuwa`, `ningetaka`, `naomba`, … / Voice `unfinished` label)  
-- Weak opening STT  
-- Pure backchannel / phatic / hear-again  
-- Echo of agent identity ask alone  
-- Raw first_forward text unless it passes the same filter  
+- Unfinished STT: open stems with no complement (`Nilikuwa nauliza`, `Nilikuwa nataka kujua`, `nataka kujua`, `nauliza`, `nilikuwa`, `ningetaka`, `naomba`, `I wanted to know`) including when they sit after phatic or backchannel. Voice `unfinished` / `weak` still rejects the whole turn even if a later clause looks complete.  
+- Non-actionable openers (`What else?`, how-are-you, `Namna gani`)  
+- Pure backchannel / hear-again  
+- Echo of the pack identity ask alone (`Je, naongea na {Name}?`, `Nya, unaongea na {Name}?`)  
+- Raw first_forward text unless the same filter leaves an actionable ask  
 
 ### Write rules
 
 1. `observeCallerTurn` must not set `goal.description` from rejected text.  
-2. Later grounded turns may upgrade goal once.  
-3. Hangup `deriveCallSummary` rebuilds from final state; if goal still null → intent-only / `Caller called.` — never invent from garbage.  
-4. Transcript review, if it changes resolution/intent, **must** rewrite the same summary spine fields in one path (no split brain with hangup).  
-5. `first_forward.first_turn` may store raw STT for ops; `bucket=first_turn_goal` / judge only if text passes the goal filter.
+2. Goal is the last actionable ask after `nameConfirmed`. Before bind, a vaguer line does not replace a more specific ask. Unfinished turns never stamp a goal, even when Voice has not passed the flag yet.  
+3. Hangup has one writer: `deriveCallSummary`. `calls.primary_intent`, `summary.primary_intent`, and the `Intent:` line are that object's `primaryIntent`. Resolution class still comes from `deriveCallResolution` on the same state.  
+4. Transcript review, if it changes resolution/intent, rewrites that same spine (Intent line, brain_summary, column) under the same write lock as hangup so a late hangup merge cannot leave the column on one intent and the summary on another.  
+5. `first_forward.first_turn` may store raw STT for ops; `bucket=first_turn_goal` / judge only if the goal filter leaves an actionable ask.
 
 ---
 
@@ -120,10 +120,12 @@ Caller turns (ordered):
 Assertions:
 
 - After T1: `goal.description` null/rejected; summary must not contain `Goal: Nilikuwa nauliza`; first_forward not judged goal.  
-- After identity ask + T2: `nameConfirmed === true`, `boundRole === 'primary'`.  
+- After identity ask + T2: `nameConfirmed === true`, `boundRole === 'primary'`. Pack confirm includes `Eeh, unaongea na {Name}`, `Yeah, unaongea na {Name}`, and noisy STT `Nya, unaongea na {Name}` after `Je, naongea na {Name}?` or `Am I speaking with {Name}?`. A different echoed name does not bind. Bare yes before the ask does not bind.  
 - Before bind: no agent line with open-request facts or vocative file name (except the identity ask).  
 - After bind + file ask: file-read may speak open rows; NBA must not say name unconfirmed.  
-- Hangup: `summary.primary_intent` agrees with `calls.primary_intent` and `resolution`; Goal reflects dishwashing / previous-request enquiry — not unfinished STT.
+- Hangup: `summary.primary_intent` agrees with `calls.primary_intent` and the `Intent:` line; Goal reflects dishwashing / previous-request enquiry — not unfinished STT.
+
+HD_39c40ec3ad1f (same contracts): T1 `Mm-hm. Namna gani, Shy? Nilikuwa nataka kujua.` is not Goal, not the summary Goal line, and not `first_turn_goal`. T2 `Nya, unaongea na Alvin?` after `Am I speaking with Alvin?` sets `nameConfirmed`. T3 `Eeh, nilikuwa nataka kujua, ni services gani mna-offer?` becomes the goal (the services ask), not the T1 stem.
 
 ---
 

@@ -675,6 +675,36 @@ describe('mergeTranscriptReview', () => {
     assert.match(spine.resolutionNote, /dishwashing/i);
   });
 
+  it('keeps the column intent on the same spine when a services FAQ replaces general_enquiry', () => {
+    const summary = {
+      text: 'Intent: general_enquiry. Goal: Mm-hm. Namna gani, Shy? Nilikuwa nataka kujua',
+      primaryIntent: 'general_enquiry',
+    };
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'general_enquiry', resolution: 'resolved' },
+      summary,
+      toolFlags: emptyFlags,
+      review: {
+        reason: 'Caller asked which cleaning services are offered.',
+        primary_intent: 'product_inquiry',
+        needs_human: false,
+        needs_owner: false,
+        confidence: 0.9,
+      },
+    });
+    const spine = alignSummarySpine({
+      summary,
+      merged,
+      derived: { primaryIntent: 'general_enquiry', resolution: 'resolved' },
+    });
+    assert.equal(merged.applied.intent, true);
+    assert.equal(merged.primaryIntent, 'product_inquiry');
+    assert.equal(spine.primary_intent, merged.primaryIntent);
+    assert.match(spine.brain_summary, /Intent:\s*product_inquiry/);
+    assert.doesNotMatch(spine.brain_summary, /general_enquiry/);
+    assert.doesNotMatch(spine.brain_summary, /Nilikuwa nataka kujua/);
+  });
+
   it('does not upgrade to needs_human below confidence', () => {
     const merged = mergeTranscriptReview({
       derived: { primaryIntent: 'general_enquiry', resolution: 'unresolved' },

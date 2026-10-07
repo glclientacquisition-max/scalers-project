@@ -115,6 +115,7 @@ const { deriveCallSummary } = require('./src/conversation/callSummary');
 const {
   schedulePostCallTranscriptReview,
   toolFlagsFromBrain,
+  withSummaryWriteLock,
 } = require('./src/conversation/callTranscriptReview');
 const {
   extractGeminiText,
@@ -1011,6 +1012,12 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
   if (!callSid) return null;
   const brainState = callBrainStates.get(callSid);
   if (!brainState) return null;
+  return withSummaryWriteLock(callSid, () =>
+    writeHangupSummary(callSid, source, opts, brainState)
+  );
+}
+
+async function writeHangupSummary(callSid, source, opts, brainState) {
   try {
     const call = await db.getCall(callSid);
     const derived = deriveCallResolution({
@@ -1018,10 +1025,11 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
       callId: call?.id || null,
     });
     const summary = deriveCallSummary({ brainState });
+    const primaryIntent = summary.primaryIntent || null;
     const saved = await db.setCallResolution({
       callSid,
       resolution: derived.resolution,
-      primaryIntent: derived.primaryIntent || summary.primaryIntent,
+      primaryIntent,
       resolutionNote: derived.resolutionNote,
     });
     try {
@@ -1031,7 +1039,7 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
           text: summary.text,
           brain_summary: summary.text,
           reason: summary.reason,
-          primary_intent: derived.primaryIntent || summary.primaryIntent,
+          primary_intent: primaryIntent,
           products: summary.products,
           actions: summary.actions,
           instructions: summary.instructions,
@@ -1059,7 +1067,7 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
     if (saved) {
       console.log(
         `[${source}] call resolution ${callSid} → ${derived.resolution}` +
-          (derived.primaryIntent ? ` intent=${derived.primaryIntent}` : '')
+          (primaryIntent ? ` intent=${primaryIntent}` : '')
       );
     }
     return saved;

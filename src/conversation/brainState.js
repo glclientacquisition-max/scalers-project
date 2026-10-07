@@ -370,6 +370,11 @@ function promoteCallerGoal(next, text, input, previousIntent) {
     next.goal.description = usable;
     return;
   }
+  // After the file name is bound, the goal is the last actionable ask.
+  if (next.caller?.nameConfirmed) {
+    next.goal.description = usable;
+    return;
+  }
   const nextScore = callerAskSpecificity(usable);
   const currentScore = callerAskSpecificity(current);
   if (nextScore > currentScore) {

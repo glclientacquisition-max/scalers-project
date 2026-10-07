@@ -1055,7 +1055,27 @@ function alignSummarySpine({ summary, merged, derived } = {}) {
   };
 }
 
+const summaryWriteTails = new Map();
+
+function withSummaryWriteLock(callSid, fn) {
+  const key = String(callSid || '').trim();
+  if (!key) return Promise.resolve().then(fn);
+  const prev = summaryWriteTails.get(key) || Promise.resolve();
+  const run = prev.catch(() => {}).then(() => fn());
+  const tracked = run.finally(() => {
+    if (summaryWriteTails.get(key) === tracked) summaryWriteTails.delete(key);
+  });
+  summaryWriteTails.set(key, tracked);
+  return run;
+}
+
 async function defaultSave({ callSid, merged, review, derived, summary }) {
+  return withSummaryWriteLock(callSid, () =>
+    writeReviewedSummary({ callSid, merged, review, derived, summary })
+  );
+}
+
+async function writeReviewedSummary({ callSid, merged, review, derived, summary }) {
   const db = require('../db');
   const spine = alignSummarySpine({ summary, merged, derived });
   const patch = {
@@ -1093,8 +1113,8 @@ async function defaultSave({ callSid, merged, review, derived, summary }) {
   ) {
     await db.setCallResolution({
       callSid,
-      resolution: merged.resolution,
-      primaryIntent: merged.primaryIntent,
+      resolution: spine?.resolution || merged.resolution,
+      primaryIntent: spine?.primary_intent || merged.primaryIntent,
       resolutionNote: spine?.resolutionNote || derived?.resolutionNote || null,
     });
   }
@@ -1311,6 +1331,7 @@ function resetTranscriptReviewScheduleForTests() {
     if (entry?.timer) clearTimeout(entry.timer);
   }
   pendingReviews.clear();
+  summaryWriteTails.clear();
 }
 
 module.exports = {
@@ -1322,6 +1343,7 @@ module.exports = {
   formatTranscriptForReview,
   isReviewEnabled,
   alignSummarySpine,
+  withSummaryWriteLock,
   mergeTranscriptReview,
   normalizeMood,
   parseExtractedCallerName,
