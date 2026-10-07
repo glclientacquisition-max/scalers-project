@@ -39,13 +39,6 @@ import { Stamp } from "@/components/ui/Stamp";
 import { HomeCapture } from "@/components/HomeCapture";
 import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { getTenantCompletenessScore, getTenantHoldGate } from "@/lib/deskProvenance";
-import {
-  serializeFieldMetaForClient,
-  totalUnattestedCount,
-} from "@/lib/fieldMetaAttestUi";
-import { SETTINGS_NAV } from "@/lib/businessSettingsNav";
-import { listTenantFieldMeta } from "@/lib/tenantFieldProvenance";
-import { indexFieldMeta } from "@/lib/provenance";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
 import { parseHoursSchedule } from "@/lib/hoursSchedule";
 import { isBetaBilling } from "@/lib/wallet";
@@ -103,8 +96,7 @@ async function HomeOverviewBody() {
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const navTargets = SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target));
-  const [todayRes, inbox, pack, score, hold, metaRows] = await Promise.all([
+  const [todayRes, inbox, pack, score, hold] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
@@ -114,10 +106,7 @@ async function HomeOverviewBody() {
     loadOwnerPackageMeter(tenant.id),
     getTenantCompletenessScore(tenant.id),
     getTenantHoldGate(tenant.id),
-    listTenantFieldMeta(tenant.id),
   ]);
-  const fieldMeta = serializeFieldMetaForClient(indexFieldMeta(metaRows));
-  const unattestedCount = totalUnattestedCount(fieldMeta, tenant, navTargets);
   timer.mark("data");
   console.info(timer.line("home"));
   if (inbox.error) {
@@ -432,7 +421,6 @@ async function HomeOverviewBody() {
             tenantId={tenant.id}
             vertical={vertical}
             score={score}
-            unattestedCount={unattestedCount}
           />
         ) : null}
         </div>

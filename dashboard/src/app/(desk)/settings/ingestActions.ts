@@ -13,6 +13,7 @@ import {
   formatServicesForCompiler,
   normalizeServicesCatalog,
 } from "@/lib/servicesCatalog";
+import { suggestImportedServices } from "@/lib/catalogSuggest";
 import {
   formatHoursForCompiler,
   parseHoursSchedule,
@@ -269,8 +270,9 @@ export async function applyIngestAction(
   });
 
   if (merged.touched.services) {
-    merged.services = merged.services.filter(
-      (s) => s.name && !isProseServiceName(s.name)
+    merged.services = suggestImportedServices(
+      merged.services.filter((s) => s.name && !isProseServiceName(s.name)),
+      parseVertical(tenant.vertical)
     );
   }
 

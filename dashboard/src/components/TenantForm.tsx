@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
   canonicalizeAgentTone,
@@ -44,6 +43,14 @@ import {
   type ProductItem,
 } from "@/lib/productCatalog";
 import {
+  previewSuggestedProducts,
+  previewSuggestedServices,
+  suggestImportedProducts,
+  suggestImportedServices,
+} from "@/lib/catalogSuggest";
+import { CatalogImportSheet } from "@/components/settings/catalog/CatalogImportSheet";
+import { CatalogSectionShell } from "@/components/settings/catalog/CatalogSectionShell";
+import {
   emptySocialChannel,
   normalizeSocialHandles,
   SOCIAL_CHANNEL_KINDS,
@@ -62,15 +69,6 @@ import {
   clampFaq,
   normalizeFaqKey,
 } from "@/lib/faqs";
-import { CaptureConfirmList } from "@/components/CaptureConfirmList";
-import { confirmCaptureFields } from "@/app/(desk)/settings/provenanceActions";
-import {
-  type DeskFieldMetaClient,
-  hoursConfirmRows,
-  identityConfirmRows,
-  locationsConfirmRows,
-  pathConfirmed,
-} from "@/lib/fieldMetaAttestUi";
 import { SERVICES_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
 import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import {
@@ -121,7 +119,6 @@ import {
   SettingsStack,
   ToolSwitch,
   TrashIcon,
-  compactTextareaExpandHandlers,
   settingsBlockTitleClass,
   settingsConsoleClass,
   settingsFormBodyClass,
@@ -301,19 +298,16 @@ export function TenantForm({
   heading = null,
   sidebar = null,
   liveTransferExecutor = false,
-  fieldMeta = null,
   showBack = true,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
   curatedVoices?: CuratedSonioxVoice[];
-  fieldMeta?: DeskFieldMetaClient;
   heading?: string | null;
   sidebar?: ReactNode;
   liveTransferExecutor?: boolean;
   showBack?: boolean;
 }) {
-  const router = useRouter();
   const voiceOptions =
     curatedVoices && curatedVoices.length
       ? curatedVoices
@@ -336,6 +330,8 @@ export function TenantForm({
   });
   const [bulkServicesText, setBulkServicesText] = useState("");
   const [bulkServicesError, setBulkServicesError] = useState<string | null>(null);
+  const [servicesImportOpen, setServicesImportOpen] = useState(false);
+  const [productsImportOpen, setProductsImportOpen] = useState(false);
   const [bulkProductsText, setBulkProductsText] = useState("");
   const [bulkProductsError, setBulkProductsError] = useState<string | null>(null);
   const [servicePage, setServicePage] = useState(0);
@@ -404,7 +400,6 @@ export function TenantForm({
   const liveDest = firstDialableTeammate(team);
   const [faqs, setFaqs] = useState<FaqEntry[]>(() => normalizeFaqs(tenant.faqs));
   const [ownerPaths, setOwnerPaths] = useState<string[]>([]);
-  const [confirming, setConfirming] = useState(false);
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
   );
@@ -653,95 +648,6 @@ export function TenantForm({
     );
   }
 
-  async function confirmPaths(paths: string[]) {
-    const unique = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
-    if (!unique.length) return;
-    const wanted = new Set(unique);
-    setFaqs((prev) =>
-      prev.map((row, index) => {
-        if (!wanted.has(`faqs.${index + 1}`)) return row;
-        const keepGolden = row.source === "owner" && row.status === "golden";
-        return {
-          ...row,
-          source: "owner",
-          status: keepGolden ? "golden" : "confirmed",
-          confirmed: true,
-        };
-      })
-    );
-    setServices((prev) =>
-      prev.map((row, index) =>
-        wanted.has(`catalog.service.${index + 1}.name`) ? { ...row, source: "owner" } : row
-      )
-    );
-    setProducts((prev) =>
-      prev.map((row, index) => {
-        const sku = row.sku.trim() || String(index + 1);
-        return wanted.has(`catalog.product.${sku}.name`) ? { ...row, source: "owner" } : row;
-      })
-    );
-    setPolicies((prev) => {
-      const provenance = { ...prev.provenance };
-      let changed = false;
-      for (const path of unique) {
-        const match = path.match(/^policies\.(payment|deposit|returns|delivery|cancellation|warranty|other)$/);
-        if (!match) continue;
-        provenance[match[1]] = { source: "owner", confirmed: true };
-        changed = true;
-      }
-      return changed ? { ...prev, provenance } : prev;
-    });
-    unique.forEach(queueOwnerPath);
-    setConfirming(true);
-    try {
-      const result = await confirmCaptureFields(unique);
-      if (result.ok) router.refresh();
-    } finally {
-      setConfirming(false);
-    }
-  }
-
-  const compiledHoursPreview = useMemo(
-    () => formatHoursForCompiler(hoursSchedule),
-    [hoursSchedule]
-  );
-
-  const identityReviewRows = useMemo(
-    () =>
-      identityConfirmRows(fieldMeta, {
-        businessName,
-        vertical,
-        spokenName,
-        agentName,
-        agentTone: tone,
-        socialHandles,
-      }),
-    [fieldMeta, businessName, vertical, spokenName, agentName, tone, socialHandles]
-  );
-
-  const hoursReviewRows = useMemo(
-    () => hoursConfirmRows(fieldMeta, hoursSchedule, compiledHoursPreview),
-    [fieldMeta, hoursSchedule, compiledHoursPreview]
-  );
-
-  const filledLocations = useMemo(
-    () =>
-      locations.filter(
-        (loc) => String(loc.label || "").trim() || String(loc.address || "").trim()
-      ),
-    [locations]
-  );
-
-  const locationsReviewRows = useMemo(
-    () =>
-      locationsConfirmRows(
-        fieldMeta,
-        filledLocations.length,
-        filledLocations[0]?.label || filledLocations[0]?.address || ""
-      ),
-    [fieldMeta, filledLocations]
-  );
-
   function updateSocialChannel(
     index: number,
     key: keyof SocialChannel,
@@ -804,23 +710,16 @@ export function TenantForm({
   }
 
   const bulkPreview = useMemo(
-    () => parseBulkServices(bulkServicesText),
-    [bulkServicesText]
+    () => previewSuggestedServices(parseBulkServices(bulkServicesText), vertical),
+    [bulkServicesText, vertical]
   );
   const bulkProductPreview = useMemo(
-    () => parseBulkProducts(bulkProductsText),
+    () => previewSuggestedProducts(parseBulkProducts(bulkProductsText)),
     [bulkProductsText]
   );
 
-  function addBlankServiceRows(count: number) {
-    setServices((prev) => [
-      ...prev,
-      ...Array.from({ length: count }, () => emptyService()),
-    ]);
-  }
-
   function applyBulkServices() {
-    const parsed = parseBulkServices(bulkServicesText);
+    const parsed = suggestImportedServices(parseBulkServices(bulkServicesText), vertical);
     if (!parsed.length) {
       setBulkServicesError(
         "Add at least one service name. Example: Same-day Nairobi delivery"
@@ -836,7 +735,7 @@ export function TenantForm({
   }
 
   function applyBulkProducts() {
-    const parsed = parseBulkProducts(bulkProductsText);
+    const parsed = suggestImportedProducts(parseBulkProducts(bulkProductsText));
     if (!parsed.length) {
       setBulkProductsError(
         "Add at least one product. Example: Atomic Habits - 2,500 KES"
@@ -998,12 +897,6 @@ export function TenantForm({
       <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
       <section className={panel === "identity" ? "space-y-3" : "hidden"}>
-        <CaptureConfirmList
-          pending={confirming}
-          onConfirm={(path) => void confirmPaths([path])}
-          onConfirmAll={(paths) => void confirmPaths(paths)}
-          rows={identityReviewRows}
-        />
         <SettingsGroup title="Assistant">
           <SettingsRow label="Assistant name" htmlFor="agent_name">
             <input
@@ -1302,10 +1195,23 @@ export function TenantForm({
       </section>
 
       <section className={panel === "catalog" ? "space-y-4" : "hidden"}>
+        <CatalogSectionShell
+          vertical={vertical}
+          title="Catalogue"
+          emptyTitle="No services yet"
+          isEmpty={false}
+        >
         <div className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <p className={settingsBlockTitleClass}>Services</p>
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setServicesImportOpen(true)}
+                className={settingsGhostButtonClass}
+              >
+                Paste list
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -1319,137 +1225,26 @@ export function TenantForm({
             </div>
           </div>
 
-          <details className="rounded-xl border border-line bg-surface">
-            <summary
-              className={`flex min-h-11 cursor-pointer list-none items-center px-3 text-sm font-medium text-ink ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
-            >
-              Paste list
-            </summary>
-            <div className="space-y-3 border-t border-line p-3">
-              <button
-                type="button"
-                onClick={() => addBlankServiceRows(3)}
-                title="Add 3 blank rows"
-                className={settingsGhostButtonClass}
-              >
-                Add 3 blank rows
-              </button>
-              <label className="sr-only" htmlFor="bulk_services">
-                Paste list
-              </label>
-              <textarea
-                id="bulk_services"
-                value={bulkServicesText}
-                onChange={(e) => {
-                  setBulkServicesText(e.target.value);
-                  if (bulkServicesError) setBulkServicesError(null);
-                }}
-                rows={2}
-                {...compactTextareaExpandHandlers}
-                placeholder={servicesPasteExample}
-                className={`${denseFieldClass} text-sm leading-relaxed`}
-              />
-              <details className="text-xs text-ink-soft">
-                <summary className="cursor-pointer font-medium text-ink">
-                  Spreadsheet format
-                </summary>
-                <p className="mt-2 leading-relaxed">
-                  Columns:{" "}
-                  <span className="font-medium text-ink">
-                    name | price | notes | out of scope
-                  </span>
-                </p>
-              </details>
-
-              {bulkPreview.length > 0 ? (
-                <div className="rounded-xl border border-line bg-surface px-3 py-2">
-                  <p className="text-xs font-medium text-ink">
-                    Ready to add {bulkPreview.length} service
-                    {bulkPreview.length === 1 ? "" : "s"}
-                  </p>
-                  <ul className="mt-2 space-y-1 text-sm text-ink-soft">
-                    {bulkPreview.slice(0, 8).map((row, i) => (
-                      <li key={`${row.name}-${i}`}>
-                        <span className="font-medium text-ink">{row.name}</span>
-                        {row.price_range ? ` · ${row.price_range}` : ""}
-                      </li>
-                    ))}
-                    {bulkPreview.length > 8 ? (
-                      <li>+{bulkPreview.length - 8} more</li>
-                    ) : null}
-                  </ul>
-                </div>
-              ) : null}
-
-              {bulkServicesError ? (
-                <p className="text-sm text-warn" role="alert">
-                  {bulkServicesError}
-                </p>
-              ) : null}
-              <button
-                type="button"
-                onClick={applyBulkServices}
-                disabled={!bulkPreview.length}
-                className={settingsGhostButtonClass}
-              >
-                Add to services
-              </button>
-
-              {vertical === "home_services" ? null : (
-                <div className="space-y-3 border-t border-line pt-3">
-                  <label className="block text-sm font-medium" htmlFor="bulk_products">
-                    Paste products
-                  </label>
-                  <textarea
-                    id="bulk_products"
-                    value={bulkProductsText}
-                    onChange={(e) => {
-                      setBulkProductsText(e.target.value);
-                      if (bulkProductsError) setBulkProductsError(null);
-                    }}
-                    rows={2}
-                    {...compactTextareaExpandHandlers}
-                    placeholder={
-                      "name,price,category,in_stock\nAtomic Habits,2500 KES,Self-help,yes\n\nOr:\nAtomic Habits - 2,500 KES"
-                    }
-                    className={`${denseFieldClass} text-sm leading-relaxed`}
-                  />
-                  {bulkProductPreview.length ? (
-                    <p className="text-xs text-ink-soft">
-                      Ready to add {bulkProductPreview.length} product
-                      {bulkProductPreview.length === 1 ? "" : "s"}
-                    </p>
-                  ) : null}
-                  {bulkProductsError ? (
-                    <p className="text-sm text-warn">{bulkProductsError}</p>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={applyBulkProducts}
-                    disabled={!bulkProductPreview.length}
-                    className={settingsGhostButtonClass}
-                  >
-                    Add to catalogue
-                  </button>
-                </div>
-              )}
-            </div>
-          </details>
-
-          <CaptureConfirmList
-            pending={confirming}
-            onConfirm={(path) => void confirmPaths([path])}
-            onConfirmAll={(paths) => void confirmPaths(paths)}
-            rows={services.map((service, index) => {
-              const path = `catalog.service.${index + 1}.name`;
-              return {
-                path,
-                title: service.name.trim(),
-                preview: service.price_range.trim() || service.notes.trim(),
-                confirmed: pathConfirmed(fieldMeta, path, service.source === "owner"),
-              };
-            })}
+          <CatalogImportSheet
+            open={servicesImportOpen}
+            onOpenChange={setServicesImportOpen}
+            title="Paste services"
+            description="One line per service. We suggest cleaner names before you add."
+            placeholder={servicesPasteExample}
+            text={bulkServicesText}
+            onTextChange={(value) => {
+              setBulkServicesText(value);
+              if (bulkServicesError) setBulkServicesError(null);
+            }}
+            previewRows={bulkPreview}
+            onApply={applyBulkServices}
+            applyLabel="Add to services"
           />
+          {bulkServicesError ? (
+            <p className="text-sm text-warn" role="alert">
+              {bulkServicesError}
+            </p>
+          ) : null}
 
           <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
             {visibleServices.map((service, localIndex) => {
@@ -1639,6 +1434,13 @@ export function TenantForm({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
+                onClick={() => setProductsImportOpen(true)}
+                className={settingsGhostButtonClass}
+              >
+                Paste list
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setProducts((prev) => [...prev, emptyProduct()]);
                   setProductPage(Math.floor(products.length / PRODUCT_PAGE_SIZE));
@@ -1650,20 +1452,28 @@ export function TenantForm({
             </div>
           </div>
 
-          <CaptureConfirmList
-            pending={confirming}
-            onConfirm={(path) => void confirmPaths([path])}
-            onConfirmAll={(paths) => void confirmPaths(paths)}
-            rows={products.map((product, index) => {
-              const path = `catalog.product.${product.sku.trim() || String(index + 1)}.name`;
-              return {
-                path,
-                title: product.name.trim(),
-                preview: product.price.trim(),
-                confirmed: pathConfirmed(fieldMeta, path, product.source === "owner"),
-              };
-            })}
+          <CatalogImportSheet
+            open={productsImportOpen}
+            onOpenChange={setProductsImportOpen}
+            title="Paste products"
+            description="CSV or one name per line. We suggest cleaner titles before you add."
+            placeholder={
+              "name,price,category,in_stock\nAtomic Habits,2500 KES,Self-help,yes\n\nOr:\nAtomic Habits - 2,500 KES"
+            }
+            text={bulkProductsText}
+            onTextChange={(value) => {
+              setBulkProductsText(value);
+              if (bulkProductsError) setBulkProductsError(null);
+            }}
+            previewRows={bulkProductPreview}
+            onApply={applyBulkProducts}
+            applyLabel="Add to catalogue"
           />
+          {bulkProductsError ? (
+            <p className="text-sm text-warn" role="alert">
+              {bulkProductsError}
+            </p>
+          ) : null}
 
           {products.length === 0 ? null : (
             <>
@@ -1841,15 +1651,10 @@ export function TenantForm({
           )}
         </div>
         )}
+        </CatalogSectionShell>
       </section>
 
       <section className={panel === "hours" ? "space-y-6" : "hidden"}>
-        <CaptureConfirmList
-          pending={confirming}
-          onConfirm={(path) => void confirmPaths([path])}
-          onConfirmAll={(paths) => void confirmPaths(paths)}
-          rows={hoursReviewRows}
-        />
         <SettingsGroup title="Hours">
           <div className="hidden bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-500 lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
             <span>Day</span>
@@ -1951,12 +1756,6 @@ export function TenantForm({
       <section
         className={panel === "locations" ? "space-y-3" : "hidden"}
       >
-        <CaptureConfirmList
-          pending={confirming}
-          onConfirm={(path) => void confirmPaths([path])}
-          onConfirmAll={(paths) => void confirmPaths(paths)}
-          rows={locationsReviewRows}
-        />
         <div className="flex flex-wrap items-end justify-between gap-3">
           <p className={settingsBlockTitleClass}>Places</p>
           <button
@@ -2153,23 +1952,6 @@ export function TenantForm({
         className={panel === "policies" ? "space-y-6" : "hidden"}
       >
         <SettingsGroup title="Rules">
-          <CaptureConfirmList
-            pending={confirming}
-            onConfirm={(path) => void confirmPaths([path])}
-            onConfirmAll={(paths) => void confirmPaths(paths)}
-            rows={POLICY_FIELDS.filter((field) => policies[field.id].trim()).map((field) => {
-              const path = `policies.${field.id}`;
-              const jsonOwner =
-                policies.provenance?.[field.id]?.source === "owner" ||
-                policies.provenance?.[field.id]?.confirmed === true;
-              return {
-                path,
-                title: field.label,
-                preview: policies[field.id].trim(),
-                confirmed: pathConfirmed(fieldMeta, path, jsonOwner),
-              };
-            })}
-          />
           {vertical === "home_services" ? (
             <SettingsStack label="Coverage" htmlFor="policy-coverage">
               <CoverageAreaField
@@ -2569,20 +2351,6 @@ export function TenantForm({
 
         {faqs.length > 0 ? (
         <>
-        <CaptureConfirmList
-          pending={confirming}
-          onConfirm={(path) => void confirmPaths([path])}
-          onConfirmAll={(paths) => void confirmPaths(paths)}
-          rows={faqs.map((faq, index) => {
-            const path = `faqs.${index + 1}`;
-            return {
-              path,
-              title: faq.question.trim(),
-              preview: faq.answer.trim(),
-              confirmed: pathConfirmed(fieldMeta, path, faq.source === "owner"),
-            };
-          })}
-        />
         <div className="overflow-hidden rounded-xl border border-line">
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.75rem] items-center gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
             <span>Question</span>

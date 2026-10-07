@@ -106,9 +106,9 @@ export function HomeCapture({
       {!score.ready_badge && !dismissed ? (
         <div className="mt-3 flex items-start justify-between gap-3 rounded-2xl border border-hairline bg-surface px-4 py-3">
           <div className="min-w-0">
-            <p className="text-body text-ink">Review and confirm</p>
+            <p className="text-body text-ink">Finish setup</p>
             <p className="mt-0.5 text-meta text-ink-2">
-              {nudge || "Confirm what is already on file."}
+              {nudge || "Add what is missing, then save in Settings."}
             </p>
           </div>
           <Button type="button" variant="ghost" size="sm" onClick={dismiss}>
