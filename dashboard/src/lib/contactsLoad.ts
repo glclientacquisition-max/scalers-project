@@ -172,7 +172,7 @@ export function contactFilterPills(opts: {
 }> {
   const query = { sort: opts.sort, q: opts.q };
   return [
-    { id: "all", label: "All", href: contactsHref(query) },
+    { id: "all", label: "All", href: contactsHref({ ...query, saved: "all" }) },
     {
       id: "recent",
       label: "Recents",

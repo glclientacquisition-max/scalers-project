@@ -90,6 +90,12 @@ describe("contacts segment workflow helpers", () => {
       contactsHref({ saved: "unsaved", sort: "name", q: "Amina", page: 2 }),
       "/contacts?saved=unsaved&sort=name&q=Amina&page=2"
     );
+    assert.equal(contactsHref({ saved: "all" }), "/contacts?saved=all");
+    assert.equal(
+      resolveContactSavedFilter("all"),
+      "all"
+    );
+    assert.equal(resolveContactSavedFilter(undefined), "recent");
     const src = read("dashboard/src/lib/contactsLoad.ts");
     assert.match(src, /export function contactProfileHref/);
     assert.match(src, /export function contactsReturnHref/);
@@ -142,6 +148,7 @@ describe("contacts segment filter chrome", () => {
     assert.match(page, /active=\{saved\}/);
     const load = read("dashboard/src/lib/contactsLoad.ts");
     assert.match(load, /label: "All"/);
+    assert.match(load, /saved: "all"/);
     assert.match(load, /label: "Saved"/);
     assert.match(load, /label: "Unsaved"/);
     assert.match(load, /label: "Recents"/);
