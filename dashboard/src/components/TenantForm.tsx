@@ -34,7 +34,6 @@ import {
   type ServiceItem,
 } from "@/lib/servicesCatalog";
 import {
-  emptyProduct,
   formatProductsForCompiler,
   normalizeProductCatalog,
   type ProductItem,
@@ -117,7 +116,6 @@ import {
   settingsFieldClass,
   settingsGhostButtonClass,
   settingsPanelClass,
-  settingsTableFieldClass,
   settingsTrashButtonClass,
 } from "@/components/settingsUi";
 import {
@@ -221,14 +219,7 @@ function placeLocationLine(loc: Pick<BusinessLocation, "label" | "address" | "la
 const initial: SettingsCompileState = {};
 
 const fieldClass = settingsFieldClass;
-const tableFieldClass = settingsTableFieldClass;
 const denseFieldClass = settingsDenseFieldClass;
-
-const STOCK_OPTIONS = [
-  { value: "yes", label: "In stock" },
-  { value: "no", label: "Out of stock" },
-  { value: "unknown", label: "Unknown" },
-] as const;
 
 function PolicyTextarea({
   id,
