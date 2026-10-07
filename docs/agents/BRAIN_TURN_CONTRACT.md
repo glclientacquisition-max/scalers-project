@@ -7,13 +7,28 @@ allowed to say or when a tool may fire. The gates live in code, not in the
 prompt, so a model that leaks still cannot reach the caller or the database.
 How-are-you, Okay with no job open, and a bare name go to Gemini. The model
 answers the last thing said. A which-services ask, in English, Kiswahili, or
-a mix, is the catalogue list. The yes after a name confirm still answers that
-ask. It does not open with which service, what they need done, or ungependa
-gani. Answering the catalogue leaves the call open. A name confirm after that
-answer binds and continues. It does not end the call. Farewell only when they
-say goodbye or they are done. Trailing noise such as "over" is not a visit
-place. Code still speaks
-the catalogue, hours, coverage,
+a mix, is the catalogue list. `BRAIN_GEMINI_CATALOGUE` defaults off: code
+speaks that list from the file. Set it to `on` for a staging listen only.
+Gemini then speaks, and the names must be the exact `items[]`. Flip the env
+off to revert that mouth. A detail ask (details, more about, what is included)
+gets the price or note on file. It does not read the full list. A price ask
+for a catalogue service, including "how much is it?" or "ni pesa ngapi?"
+after that service is already confirmed, speaks the price or note on file.
+It does not say the price is missing when the row has one. Nothing is invented.
+"Which service do you offer" is the same list ask as "which services".
+The yes after a name confirm continues: which service, or the booking, or
+one local file list if that list was still waiting. It does not end the
+call. A public fact (price, catalogue, hours, coverage, service facts)
+is a speak slot on call state: `conversation.speakSlots[]` with `outcome`,
+`line`, and `language`. Brain fills that slot when the fact is ready and
+the file-name ask is still due. Voice FactSpeakQueue drains a slot once
+that line is spoken. A slot still there after name Yes is unanswered.
+Brain hands that same file line back before Gemini runs. Identity alone
+does not end the call. Nothing in the slot is invented. Gemini does not
+read the catalogue again, and no control label is spoken. Answering the catalogue leaves
+the call open. Farewell only when they say goodbye or they are done. Trailing
+noise such as "over" is not a visit place. Code still speaks
+the catalogue (unless that flag is on), hours, coverage,
 leave-it, the visit-time ladder, and tool results. A streamed 503 retries the
 same model once if nothing was spoken, then tries the backup model once.
 Credits and a denied project are not retried. A shared line does not order "ask who is

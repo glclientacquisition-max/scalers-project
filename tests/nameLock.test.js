@@ -252,6 +252,7 @@ describe('caller name stays the file name', () => {
     assert.match(turnSource, /shouldPublishOpenFileSentence\(speechHold, fileReadAsk\)/);
     assert.doesNotMatch(turnSource, /speechHold\.holdSpeech \|\| fileReadAsk/);
     assert.doesNotMatch(turnSource, /speakText\(localReply\.line\)/);
+    assert.match(turnSource, /speak slot after name yes/);
   });
 
 

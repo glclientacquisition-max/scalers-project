@@ -24,8 +24,16 @@ const {
 } = require('./callCorrectives');
 const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
 const { hoursAskLine, offerCatalogueLine } = require('./knownFacts');
+const {
+  catalogueItemNames,
+  fileServicePriceLine,
+  freshCatalogueAsk,
+  geminiCatalogueEnabled,
+  serviceFactsLine,
+} = require('./catalogueMouth');
 const { catalogueAskInPlay } = require('./fileRead');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
+const { fillSpeakSlot, takePendingSpeakSlot } = require('./speakSlots');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
@@ -99,6 +107,12 @@ function planCallerModelTurn(state, opts = {}) {
     if (who) caller.fileNameAsked = who;
   }
   const line = fileNameAskLine(state);
+  const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
+  // Staging listen: Gemini speaks the catalogue even when a file name is pending.
+  // The name ask stays for the next turn. Flag off keeps the name-ask early return.
+  if (line && geminiCatalogueEnabled() && freshCatalogueAsk(latest)) {
+    return { runModel: true, line: '' };
+  }
   if (line) return { runModel: false, line };
   return { runModel: true, line: '' };
 }
@@ -115,6 +129,17 @@ function resolveLocalReply({
   const clean = String(text || '').trim();
   if (!clean) return null;
 
+  // Hold a public fact while the file-name ask is still due. Voice drains
+  // the slot if it speaks the line. Name Yes reads whatever is still here.
+  const publish = (reply) => {
+    if (!reply) return null;
+    if (fileNameAskLine(state)) fillSpeakSlot(state, reply, language);
+    else if (state?.caller?.nameJustConfirmed && state.conversation) {
+      state.conversation.speakSlots = [];
+    }
+    return reply;
+  };
+
   if (looksLikeRobotQuestion(clean) || looksLikeIdentityQuestion(clean)) {
     return {
       outcome: 'identity',
@@ -129,14 +154,46 @@ function resolveLocalReply({
   // Visit, hold, and order words are on conversation.fileReadSentence for Voice.
   // Do not speak them here. A local reply would end the turn before Gemini.
 
-  const offerSource = catalogueAskInPlay(clean, state);
-  const offerLine = offerSource
-    ? offerCatalogueLine(offerSource, profile, language)
-    : '';
-  if (offerLine) return { outcome: 'catalogue', line: offerLine };
+  const detailLine = serviceFactsLine(clean, profile, language);
+  if (detailLine) return publish({ outcome: 'service_facts', line: detailLine });
+
+  const priceLine = fileServicePriceLine(clean, profile, language, state);
+  if (priceLine) return publish({ outcome: 'price', line: priceLine });
+
+  // A name yes does not drop the fact the name gate has not spoken yet.
+  // A price or other fact wins over reading the catalogue again.
+  if (state?.caller?.nameJustConfirmed) {
+    const held = takePendingSpeakSlot(state);
+    if (held) return { outcome: held.outcome, line: held.line };
+  }
+
+  // The list was asked and never marked answered. Hand that one list to the local mouth.
+  // A yes after the list was already answered does not read it again.
+  const pendingList = catalogueAskInPlay(clean, state);
+  if (
+    state?.caller?.nameJustConfirmed &&
+    pendingList &&
+    state?.conversation?.catalogueAnswered !== true
+  ) {
+    const held = offerCatalogueLine(pendingList, profile, language);
+    if (held && !/what you need done|unahitaji nini/i.test(held)) {
+      return { outcome: 'catalogue', line: held };
+    }
+  }
+
+  // A name yes is not another catalogue. A detail ask is not the name list.
+  // Gemini mouth (staging flag) leaves the first list to the model.
+  if (
+    freshCatalogueAsk(clean) &&
+    !state?.caller?.nameJustConfirmed &&
+    !(geminiCatalogueEnabled() && catalogueItemNames(profile).length)
+  ) {
+    const offerLine = offerCatalogueLine(clean, profile, language);
+    if (offerLine) return publish({ outcome: 'catalogue', line: offerLine });
+  }
 
   const coverageLine = coverageAskSpeech(clean, profile, language);
-  if (coverageLine) return { outcome: 'coverage', line: coverageLine };
+  if (coverageLine) return publish({ outcome: 'coverage', line: coverageLine });
 
   const placeBlockLine = visitBlockSpeech(state?.visitPlace?.blocked, language);
   if (placeBlockLine && looksLikeLeaveIt(clean)) {
@@ -147,14 +204,14 @@ function resolveLocalReply({
   }
 
   if (state?.conversation?.clockRefusedThisTurn) {
-    return {
+    return publish({
       outcome: 'hours',
       line: formatVisitTimeProblem(
         'outside_hours',
         state.conversation.hoursBlock || {},
         language
       ),
-    };
+    });
   }
 
   // Leave-it and urgent outrank the time ladder. Everything else on a time ask
@@ -185,13 +242,14 @@ function resolveLocalReply({
   }
 
   const hoursLine = hoursAskLine(clean, profile, language);
-  if (hoursLine) return { outcome: 'hours_ask', line: hoursLine };
+  if (hoursLine) return publish({ outcome: 'hours_ask', line: hoursLine });
 
   const correctiveLine = pickCorrectiveReply({ text: clean, state, language });
   if (correctiveLine) return { outcome: 'corrective', line: correctiveLine };
 
   // How-are-you, Okay, and a bare name go to Gemini. Identity, hours,
-  // the catalogue, coverage, leave-it, and the visit-time ladder stay fixed lines.
+  // coverage, leave-it, and the visit-time ladder stay fixed lines.
+  // The catalogue list is a fixed line unless BRAIN_GEMINI_CATALOGUE is on.
   return null;
 }
 

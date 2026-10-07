@@ -268,7 +268,7 @@ function bareAskedFileName(text, pending) {
 }
 
 const AFFIRM_LEAD =
-  /^(?:uh+|um+|ah+)?[, ]*(?:yes|yeah|yah|yea|yep|yup|nya|nia|ndiyo|ndio|sawa|okay|ok|eeh|ehe|ee|correct)\b/i;
+  /^(?:uh+|um+|ah+)?[, ]*(?:yes|yeah|yah|yea|yep|yup|nya|nia|ndiyo|ndio|sawa|okay|ok|eeh|ehe|eh|ee|correct)\b/i;
 
 function escapeName(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

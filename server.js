@@ -235,6 +235,10 @@ const {
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
+const {
+  drainSpokenSpeakSlots,
+  isSpeakSlotOutcome,
+} = require('./src/conversation/speakSlots');
 const { narratesInternalAction } = require('./src/conversation/speechGuard');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -2830,6 +2834,8 @@ mediaWss.on('connection', (ws, req) => {
           nameAsk: fileNameAsk,
           state: brainState,
         });
+        drainSpokenSpeakSlots(brainState, nameAskLines);
+        callBrainStates.set(callKey, brainState);
         console.log(`[ws/media][${callKey}] file name ask: ${fileNameAsk}`);
         if (nameAskLines.length > 1) {
           console.log(
@@ -2844,6 +2850,28 @@ mediaWss.on('connection', (ws, req) => {
           await speakText(line);
           spokeThisTurn = true;
         }
+        return;
+      }
+      // Name Yes: a public fact the name gate did not speak is still the answer.
+      // Voice drains speak slots it already said. This speaks whatever is left.
+      if (
+        localReply &&
+        brainState?.caller?.nameJustConfirmed === true &&
+        isSpeakSlotOutcome(localReply.outcome)
+      ) {
+        const heldFact = localReply.line;
+        callBrainStates.set(callKey, brainState);
+        console.log(
+          `[ws/media][${callKey}] speak slot after name yes ${localReply.outcome} lang=${callLanguage}: ${heldFact}`
+        );
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(heldFact);
+        turnTiming.markFirstSpokenChunk();
+        playbackBytes = 0;
+        playbackStartedAt = 0;
+        await speakText(heldFact);
+        spokeThisTurn = true;
         return;
       }
       speechHold = holdCallerSpeech(callKey, messages);

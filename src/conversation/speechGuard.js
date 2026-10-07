@@ -6,6 +6,7 @@
 
 const { confirmationLanguage } = require('./language');
 const { factServices, speechFactText } = require('./provenance');
+const { fileServicePriceLine } = require('./catalogueMouth');
 const { numbersIn } = require('./numberWords');
 const { assessCoverage } = require('./visitLocation');
 const { canonicalPlaceName } = require('./kenyaPlaces');
@@ -282,7 +283,12 @@ function narratesInternalAction(text) {
 }
 
 
-function filePriceAnswer(profile, callerText) {
+const NOT_ON_FILE =
+  /don'?t have that on file|not on file|don'?t have that detail|sina hiyo|siko na hiyo|sina maelezo/i;
+
+function filePriceAnswer(profile, callerText, state = null, language = 'en') {
+  const grounded = fileServicePriceLine(callerText, profile, language, state);
+  if (grounded) return grounded;
   const ask = String(callerText || '').toLowerCase();
   const rows = factServices(profile?.servicesCatalog, profile?.fieldMeta || null);
   const hits = [];
@@ -466,8 +472,20 @@ function guardSpokenReply(text, ctx = {}) {
   }
   let out = kept.join(' ').trim();
   if (holdOpenSlot && droppedJob && BARE_CLOSER.test(out)) out = '';
+  const groundedPrice = fileServicePriceLine(
+    lastCallerTurn,
+    ctx.profile,
+    ctx.language,
+    ctx.state
+  );
+  if (groundedPrice) {
+    const digit = String(groundedPrice).match(/\d[\d,]*/);
+    const already = digit && out.includes(digit[0]);
+    if (!already) out = !out || NOT_ON_FILE.test(out) ? groundedPrice : `${groundedPrice} ${out}`;
+  }
   const askedNumber = droppedNumber && NUMBER_ASK.test(lastCallerTurn);
-  const priced = askedNumber ? filePriceAnswer(ctx.profile, lastCallerTurn) : '';
+  const priced =
+    askedNumber && !groundedPrice ? filePriceAnswer(ctx.profile, lastCallerTurn, ctx.state, ctx.language) : '';
   if (out) {
     const lead = priced || (askedNumber ? unknownFallback(ctx.language) : '');
     return withMessageOnlyCallback(lead ? `${lead} ${out}` : out, ctx, appendCallback);
@@ -495,7 +513,7 @@ function guardSpokenReply(text, ctx = {}) {
   if (!out && droppedHoldPayment) return 'The owner will follow up.';
   if (ctx.allowEmpty && !askedNumber) return '';
   if (droppedNumber && NUMBER_ASK.test(lastCallerTurn)) {
-    const priced = filePriceAnswer(ctx.profile, lastCallerTurn);
+    const priced = filePriceAnswer(ctx.profile, lastCallerTurn, ctx.state, ctx.language);
     if (priced) return withMessageOnlyCallback(priced, ctx, appendCallback);
   }
   return droppedNumber ? unknownFallback(ctx.language) : ackFallback(ctx.language);

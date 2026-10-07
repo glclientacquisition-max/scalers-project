@@ -20,11 +20,12 @@ const {
   fileRowsWereRead,
   hasReadableFile,
   looksLikeOfferAsk,
+  looksLikeServiceDetailAsk,
   nothingStillOpenLine,
   presupposesSavedWork,
   sanitizeSpokenFileClaim,
 } = require('./fileRead');
-const { offerCatalogueLine } = require('./knownFacts');
+const { shapeCatalogueMouth } = require('./catalogueMouth');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 const { looksLikeFileVisitTalk } = require('./visitTalk');
 const { detectSpeedRequest } = require('../speech/speedControl');
@@ -365,6 +366,8 @@ function trimSpokenServiceDump(text, opts = {}) {
   );
   if (
     looksLikeOfferAsk(callerText) ||
+    looksLikeServiceDetailAsk(callerText) ||
+    opts.state?.caller?.nameJustConfirmed ||
     catalogueAskInPlay(callerText, opts.state, opts.callerTurns)
   ) {
     return raw;
@@ -448,52 +451,10 @@ function polishSpokenReply(text, opts = {}) {
     return nothingStillOpenLine(opts.state, opts.language);
   }
   // Last mouth. A dump trim or a later prompt cannot put filler back.
-  return ensureSpokenCatalogue(dropSpeechSlop(sanitized, callerText), {
+  return shapeCatalogueMouth(dropSpeechSlop(sanitized, callerText), {
     ...opts,
     callerText,
   });
-}
-
-const SPOKEN_JOB =
-  /\b(carpet|couch|sofa|mattress|cleaning|fumigation|upholstery|airbnb|huduma|usafi)\b/i;
-
-const CATALOGUE_FUNNEL =
-  /\b(what do you need done|which service would you like|which one do you need|what can i help|how can i help|unahitaji gani|unahitaji huduma|ungependa|tusaidie na gani|gani leo|tunaweza kusaidia|we can help with that)\b/i;
-
-function isCatalogueFunnelText(text) {
-  const raw = String(text || '').trim();
-  if (!raw) return true;
-  if (SPOKEN_JOB.test(raw)) return false;
-  const parts = raw.split(/(?<=[.!?])\s+/).filter(Boolean);
-  if (!parts.length) return true;
-  return parts.every(
-    (part) => CATALOGUE_FUNNEL.test(part) || /^(?:okay|ok|sawa|alright)[.!]?$/i.test(part)
-  );
-}
-
-/**
- * A catalogue-list ask is answered with the list. A booking funnel with no
- * service names is not that answer. A yes after the ask still counts.
- */
-function ensureSpokenCatalogue(text, opts = {}) {
-  const state = opts.state;
-  const callerText = String(opts.callerText || '');
-  const ask = catalogueAskInPlay(callerText, state, opts.callerTurns);
-  if (!ask) return text;
-  if (SPOKEN_JOB.test(text)) {
-    if (state?.conversation) state.conversation.catalogueSpokenThisTurn = true;
-    return text;
-  }
-  if (!isCatalogueFunnelText(text)) return text;
-  if (state?.conversation?.catalogueSpokenThisTurn) return '';
-  const line = offerCatalogueLine(
-    ask,
-    opts.profile || {},
-    opts.language || state?.language?.current || 'en'
-  );
-  if (!line || /what you need done|unahitaji nini/i.test(line)) return text;
-  if (state?.conversation) state.conversation.catalogueSpokenThisTurn = true;
-  return line;
 }
 
 /**

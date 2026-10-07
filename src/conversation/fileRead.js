@@ -18,6 +18,10 @@ const NEW_WORK_RE =
 const OFFER_ASK_RE =
   /\b(what (?:do you (?:offer|do|sell|have)|services|can you do)|which services|what services|what are (?:your |the |our )?services|services (?:that |do )?you (?:have|offer|do)|tell me (?:your |the |our |about (?:your |the )?)?services|list (?:me )?(?:the |your |our )?services|uniambie (?:the )?services|niambie (?:the )?(?:services|huduma)|services mko nayo|mnauza|huduma (?:gani|mnazo|mko|zenu|yenu)|services gani|mnaofa|mna\s+offer|mnatoa|what do you offer)\b/i;
 
+// Facts about a service. Not a request to read the name list.
+const SERVICE_DETAIL_RE =
+  /\b(?:details?|maelezo|eleza|more about|what(?:'s| is) included|included in|break ?down)\b/i;
+
 const BARE_AFFIRMATION =
   /^(?:(?:uh+|um+|ah+|eeh|eh)[, ]+)?(?:yes|yeah|yah|yea|yep|yup|nya|nia|ndiyo|ndio|sawa|okay|ok|eeh|ehe|ee|correct)$/i;
 
@@ -35,8 +39,24 @@ function looksLikeNewWork(text) {
   return NEW_WORK_RE.test(String(text || ''));
 }
 
+function looksLikeServiceDetailAsk(text) {
+  const raw = String(text || '');
+  if (!SERVICE_DETAIL_RE.test(raw)) return false;
+  if (
+    /\b(hours|open|closed|location|where are you|masaa)\b/i.test(raw) &&
+    !/\b(services?|huduma)\b/i.test(raw)
+  ) {
+    return false;
+  }
+  return /\b(services?|huduma|cleaning|details?|maelezo|eleza|included)\b/i.test(raw);
+}
+
 function looksLikeOfferAsk(text) {
-  return OFFER_ASK_RE.test(String(text || ''));
+  const raw = String(text || '');
+  if (looksLikeServiceDetailAsk(raw)) return false;
+  if (OFFER_ASK_RE.test(raw)) return true;
+  // "which service is you offer" is the same list ask as "which services do you offer".
+  return /\b(?:which|what)\s+services?\b[^?.!]{0,40}\boffer\b/i.test(raw);
 }
 
 function bareAffirmation(text) {
@@ -312,6 +332,7 @@ module.exports = {
   looksLikeFileRead,
   looksLikeNewWork,
   looksLikeOfferAsk,
+  looksLikeServiceDetailAsk,
   bareAffirmation,
   catalogueAskInPlay,
   looksLikeServiceMenu,
