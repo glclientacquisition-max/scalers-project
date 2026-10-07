@@ -4,6 +4,7 @@ import { CallLink } from "@/components/CallLink";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { ContactNameForm } from "@/components/ContactNameForm";
 import { Avatar } from "@/components/ui/Avatar";
+import { deskPreviewClass } from "@/components/ui/deskChrome";
 import { ListRow } from "@/components/ui/ListRow";
 import { formatCallWhenRelative } from "@/lib/callsTriage";
 import { cx } from "@/lib/cx";
@@ -93,11 +94,11 @@ export function ContactPhoneRow({
       preview={
         unsaved ? (
           <span className="flex min-w-0 flex-col gap-2">
-            <span className="truncate">{subline}</span>
+            <span className={deskPreviewClass}>{subline}</span>
             <ContactNameForm contactId={row.id} initialName={row.name} variant="row" />
           </span>
         ) : (
-          subline
+          <span className={deskPreviewClass}>{subline}</span>
         )
       }
       when={lastCall}

@@ -72,7 +72,8 @@ describe("desk preview truncate", () => {
     assert.match(contact, /<ContactHistory/);
     assert.match(timeline, /ContactTimelineWhat/);
     assert.doesNotMatch(timeline, /min-w-\[560px\]/);
-    assert.match(timeline, /md:hidden/);
+    assert.match(timeline, /ListRow/);
+    assert.doesNotMatch(timeline, /DeskDataTable|<table/i);
     assert.match(what, /deskPreviewClass/);
     assert.match(what, /deskRowActionClass/);
     assert.match(what, /aria-expanded/);
