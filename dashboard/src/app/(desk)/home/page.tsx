@@ -37,6 +37,7 @@ import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/
 import { LivePing } from "@/components/ui/deskRow";
 import { Stamp } from "@/components/ui/Stamp";
 import { HomeCapture } from "@/components/HomeCapture";
+import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { getTenantCompletenessScore, getTenantHoldGate } from "@/lib/deskProvenance";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
 import { parseHoursSchedule } from "@/lib/hoursSchedule";
@@ -413,6 +414,13 @@ async function HomeOverviewBody() {
                     holdsAllowed: Boolean(hold?.allowed),
                   })
             }
+          />
+        ) : null}
+        {score && line === "live" && !score.ready_badge ? (
+          <HomeReviewSettingsNudge
+            tenantId={tenant.id}
+            vertical={vertical}
+            score={score}
           />
         ) : null}
         </div>
