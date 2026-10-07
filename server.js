@@ -191,6 +191,9 @@ async function persistFirstForwardAcceptance(callSid, durationSeconds) {
     bargedJob: signals.bargedJob,
     bargeText: signals.bargeText,
     firstCallerTurn: signals.firstCallerTurn,
+    unfinished: signals.unfinished,
+    weak: signals.weak,
+    weakStt: signals.weakStt,
     connectToGreetingPcmMs: signals.connectToGreetingPcmMs,
   });
   try {
@@ -240,7 +243,7 @@ const {
   isOrphanFragment,
 } = require('./src/speech/outboundPcm');
 const {
-  adaptiveFlushMs,
+  decideTurnEnd,
   decideCallerEvent,
   looksLikeEcho: turnLooksLikeEcho,
   classifyFinalDuringAgentSpeech,
@@ -252,6 +255,7 @@ const {
 } = require('./src/speech/callerTurnLabel');
 const {
   gateCallerFileSpeech,
+  lockFileNameAsk,
   speakerBound,
 } = require('./src/speech/callerFileSpeech');
 const {
@@ -1754,6 +1758,7 @@ mediaWss.on('connection', (ws, req) => {
   let turnBusy = false;
   let utteranceParts = [];
   let utteranceTimer = null;
+  let utteranceStartedAt = 0;
   /** Idle check-in only after the caller has actually spoken. */
   let heardCallerUtterance = false;
   const overlapHold = createOverlapHold();
@@ -2767,7 +2772,7 @@ mediaWss.on('connection', (ws, req) => {
         greetingBarged: greetingInterrupted && !greetingSettled,
         fileNameAskCommitted: fileNameAsksCommitted > 0,
       });
-      const fileNameAsk = nameGate.line;
+      const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
       if (!nameGate.runModel && fileNameAsk) {
         brainState.caller.fileNameAskSpoken = true;
         fileNameAsksCommitted += 1;
@@ -3441,6 +3446,7 @@ mediaWss.on('connection', (ws, req) => {
       clearTimeout(utteranceTimer);
       utteranceTimer = null;
     }
+    utteranceStartedAt = 0;
     if (!utteranceParts.length) return;
     const text = utteranceParts.join('').replace(/\s+/g, ' ').trim();
     utteranceParts = [];
@@ -3469,6 +3475,9 @@ mediaWss.on('connection', (ws, req) => {
         patchFirstForward(sessionCallSid, {
           hasStt: true,
           firstCallerTurn: text,
+          unfinished: label.unfinished,
+          weak: label.weak,
+          weakStt: label.weakStt,
         });
       }
     }
@@ -3477,18 +3486,63 @@ mediaWss.on('connection', (ws, req) => {
     });
   }
 
-  function scheduleUtteranceFlush() {
-    if (utteranceTimer) clearTimeout(utteranceTimer);
-    // Adaptive fallback if Soniox endpoint marker is delayed/missing.
-    const pendingText = utteranceParts.join('').replace(/\s+/g, ' ').trim();
-    const flushMs = adaptiveFlushMs({
-      text: pendingText,
-      lastAgentText,
-    });
-    console.log(
-      `[ws/media][${sidLabel()}] schedule flush in ${flushMs}ms chars=${pendingText.length}`
+  function pendingUtteranceText() {
+    return utteranceParts.join('').replace(/\s+/g, ' ').trim();
+  }
+
+  function noteUtteranceClock() {
+    if (!utteranceStartedAt && utteranceParts.length) utteranceStartedAt = Date.now();
+  }
+
+  function utteranceWaitedMs() {
+    if (!utteranceStartedAt) return 0;
+    return Date.now() - utteranceStartedAt;
+  }
+
+  function applyTurnEnd(decision) {
+    if (!decision || decision.action === 'drop') {
+      if (utteranceTimer) {
+        clearTimeout(utteranceTimer);
+        utteranceTimer = null;
+      }
+      return;
+    }
+    if (decision.action === 'wait') {
+      if (utteranceTimer) clearTimeout(utteranceTimer);
+      const waitMs = Math.max(0, Number(decision.waitMs) || 0);
+      console.log(
+        `[ws/media][${sidLabel()}] turn_end wait ${waitMs}ms reason=${decision.reason} unfinished=${decision.unfinished ? 1 : 0}`
+      );
+      utteranceTimer = setTimeout(() => {
+        utteranceTimer = null;
+        const again = decideTurnEnd({
+          text: pendingUtteranceText(),
+          endpoint: true,
+          waitedMs: utteranceWaitedMs(),
+          lastAgentText,
+        });
+        applyTurnEnd(again);
+      }, waitMs);
+      return;
+    }
+    // The decision, including unfinished, is the flush. Do not drop it.
+    flushUtterance(decision);
+  }
+
+  function considerTurnEnd(endpoint) {
+    noteUtteranceClock();
+    applyTurnEnd(
+      decideTurnEnd({
+        text: pendingUtteranceText(),
+        endpoint: Boolean(endpoint),
+        waitedMs: utteranceWaitedMs(),
+        lastAgentText,
+      })
     );
-    utteranceTimer = setTimeout(() => flushUtterance(), flushMs);
+  }
+
+  function scheduleUtteranceFlush() {
+    considerTurnEnd(false);
   }
 
   function onSttEvent(evt) {
@@ -3605,7 +3659,7 @@ mediaWss.on('connection', (ws, req) => {
       if (leftover && !overlapHold.alreadyReleased(leftover)) {
         utteranceParts.push(leftover);
       }
-      flushUtterance();
+      considerTurnEnd(true);
     }
   }
 
@@ -3689,7 +3743,9 @@ mediaWss.on('connection', (ws, req) => {
 
   function markGreetingFileNameAsk(line) {
     if (greetingInterrupted || fileNameAsksCommitted > 0) return;
-    if (!/Am I speaking with\s+\S/i.test(String(line || ''))) return;
+    if (!/\b(?:am i speaking with|je,?\s*naongea na|naongea na)\s+\S/i.test(String(line || ''))) {
+      return;
+    }
     const state = sessionCallSid ? callBrainStates.get(sessionCallSid) : null;
     if (!state?.caller || state.caller.nameConfirmed === true) return;
     state.caller.fileNameAskSpoken = true;
@@ -4686,11 +4742,12 @@ wss.on('connection', (ws) => {
           greetingBarged: false,
           fileNameAskCommitted: brainState?.caller?.fileNameAskSpoken === true,
         });
-        if (!nameGate.runModel && nameGate.line) {
+        const relayNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
+        if (!nameGate.runModel && relayNameAsk) {
           brainState.caller.fileNameAskSpoken = true;
           callBrainStates.set(callSid, brainState);
-          transcriptLog.push(`Agent: ${nameGate.line}`);
-          ws.send(JSON.stringify({ type: 'text', token: nameGate.line, last: true }));
+          transcriptLog.push(`Agent: ${relayNameAsk}`);
+          ws.send(JSON.stringify({ type: 'text', token: relayNameAsk, last: true }));
           await db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') });
           return;
         }

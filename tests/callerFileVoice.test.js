@@ -10,7 +10,9 @@ const {
   labelFlushedCallerTurn,
   observeCallerInput,
 } = require('../src/speech/callerTurnLabel');
-const { gateCallerFileSpeech, speakerBound } = require('../src/speech/callerFileSpeech');
+const { gateCallerFileSpeech, lockFileNameAsk, speakerBound } = require('../src/speech/callerFileSpeech');
+const { decideTurnEnd, utteranceLooksIncomplete } = require('../src/speech/turnTaking');
+const { classifyFirstForwardAcceptance } = require('../src/conversation/firstForwardAcceptance');
 const {
   TOOL_HOLD_PACKS,
   pickToolHoldLine,
@@ -88,6 +90,59 @@ describe('unfinished flush label', () => {
       }).unfinished,
       false
     );
+  });
+});
+
+describe('unfinished Kiswahili stem', () => {
+  const text = 'Mm-hm. Namna gani, Shy? Nilikuwa nataka kujua.';
+
+  it('waits one cap, then flushes with unfinished still set', () => {
+    assert.equal(utteranceLooksIncomplete(text), true);
+    assert.equal(utteranceLooksIncomplete('Nilikuwa nataka kujua,'), true);
+    assert.equal(utteranceLooksIncomplete('I need help—'), true);
+    assert.equal(
+      utteranceLooksIncomplete('Eeh, nilikuwa nataka kujua, ni services gani mna-offer?'),
+      false
+    );
+
+    const waiting = decideTurnEnd({ text, endpoint: true, waitedMs: 0 });
+    assert.equal(waiting.action, 'wait');
+    assert.equal(waiting.unfinished, true);
+    assert.equal(waiting.reason, 'unfinished');
+    assert.ok(waiting.waitMs >= 700 && waiting.waitMs <= 900);
+
+    const flushed = decideTurnEnd({ text, endpoint: true, waitedMs: waiting.waitMs });
+    assert.equal(flushed.action, 'flush');
+    assert.equal(flushed.reason, 'unfinished_cap');
+    assert.equal(flushed.unfinished, true);
+  });
+
+  it('does not become the goal or first_turn_goal when that text is the only turn', () => {
+    const flushed = decideTurnEnd({ text, endpoint: true, waitedMs: 900 });
+    const input = observeCallerInput({ text }, { turnEnd: flushed });
+    assert.equal(input.unfinished, true);
+    assert.equal(Object.hasOwn(input, 'goal'), false);
+
+    const next = observeCallerTurn(createBrainState({}), input);
+    assert.equal(next.goal.description, null);
+
+    const forward = classifyFirstForwardAcceptance({
+      durationSeconds: 51,
+      greetingPlayed: true,
+      hasStt: true,
+      firstCallerTurn: text,
+      unfinished: input.unfinished,
+    });
+    assert.notEqual(forward.bucket, 'first_turn_goal');
+  });
+});
+
+describe('language-locked name ask', () => {
+  it('asks in Kiswahili on a sw turn and English on an en turn', () => {
+    assert.equal(lockFileNameAsk('Am I speaking with Alvin?', 'sw'), 'Je, naongea na Alvin?');
+    assert.equal(lockFileNameAsk('Am I speaking with Alvin?', 'sheng'), 'Je, naongea na Alvin?');
+    assert.equal(lockFileNameAsk('Je, naongea na Alvin?', 'en'), 'Am I speaking with Alvin?');
+    assert.equal(lockFileNameAsk('We are open Saturday.', 'sw'), 'We are open Saturday.');
   });
 });
 

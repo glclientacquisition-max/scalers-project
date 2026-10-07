@@ -7,6 +7,7 @@ const {
   utteranceLooksIncomplete,
   isInterruptOnlyUtterance,
   adaptiveFlushMs,
+  decideTurnEnd,
   evaluateBargeIn,
   hasBargeContent,
   agentAwaitingReply,
@@ -89,6 +90,22 @@ test('detects wait/stop only turns', () => {
 test('does not treat real requests as interrupt-only', () => {
   assert.strictEqual(isInterruptOnlyUtterance('Wait, my name is Ann'), false);
   assert.strictEqual(isInterruptOnlyUtterance('I need an executive room'), false);
+});
+
+console.log('decideTurnEnd');
+test('unfinished Kiswahili waits one cap then flushes with the flag', () => {
+  const text = 'Nilikuwa nataka kujua.';
+  const waiting = decideTurnEnd({ text, endpoint: true, waitedMs: 0 });
+  assert.strictEqual(waiting.action, 'wait');
+  assert.strictEqual(waiting.unfinished, true);
+  assert.ok(waiting.waitMs >= 700 && waiting.waitMs <= 900);
+  const flushed = decideTurnEnd({ text, endpoint: true, waitedMs: 800 });
+  assert.strictEqual(flushed.action, 'flush');
+  assert.strictEqual(flushed.unfinished, true);
+  assert.strictEqual(flushed.reason, 'unfinished_cap');
+  const done = decideTurnEnd({ text: 'I need a plumber.', endpoint: true, waitedMs: 0 });
+  assert.strictEqual(done.action, 'flush');
+  assert.strictEqual(done.unfinished, false);
 });
 
 console.log('adaptiveFlushMs');
@@ -207,6 +224,12 @@ test('mid-thought floor-manager ask is incomplete', () => {
     true
   );
   assert.strictEqual(utteranceLooksIncomplete('Ningetaka kuongea na Floor Manager'), false);
+  assert.strictEqual(
+    utteranceLooksIncomplete('Mm-hm. Namna gani, Shy? Nilikuwa nataka kujua.'),
+    true
+  );
+  assert.strictEqual(utteranceLooksIncomplete('Nilikuwa nauliza,'), true);
+  assert.strictEqual(utteranceLooksIncomplete('I was calling—'), true);
 });
 
 console.log('helpers');

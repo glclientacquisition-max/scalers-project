@@ -669,6 +669,16 @@ assert.match(
 );
 assert.match(
   source,
+  /flushUtterance\(decision\)/,
+  'applyTurnEnd must pass the unfinished decision into flush'
+);
+assert.match(
+  source,
+  /lockFileNameAsk\(/,
+  'the file name ask must lock to the caller language before it is spoken'
+);
+assert.match(
+  source,
   /observeCallerInput\(/,
   'flushed caller text must enter Brain observe with the unfinished label'
 );

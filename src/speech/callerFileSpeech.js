@@ -1,3 +1,5 @@
+const { confirmationLanguage } = require('../conversation/language');
+
 // Speak gate for the caller file. Brain owns bind.
 // The flag is `caller.nameConfirmed` (Brain PR #586). A parallel `speaker`
 // object does not open or close the mouth. Voice does not write the flag.
@@ -84,7 +86,30 @@ function gateCallerFileSpeech(line, state) {
   return { speak: true, line: next, reason: blocked ? 'trimmed' : 'open' };
 }
 
+/**
+ * The file-name ask speaks in the caller's current language.
+ * English and Kiswahili are the packs Brain already binds on.
+ * @param {string} line
+ * @param {string} [language]
+ */
+function lockFileNameAsk(line, language) {
+  const text = String(line || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+  const match = text.match(
+    /^(?:am i speaking with|je,?\s*naongea na|naongea na|unaongea na)\s+(.+?)\s*\??$/i
+  );
+  if (!match) return text;
+  const who = match[1].replace(/[?.!,]+$/g, '').trim();
+  if (!who) return text;
+  const lang = confirmationLanguage(language);
+  if (lang === 'sw' || lang === 'sheng') return `Je, naongea na ${who}?`;
+  return `Am I speaking with ${who}?`;
+}
+
 module.exports = {
   speakerBound,
   gateCallerFileSpeech,
+  lockFileNameAsk,
 };

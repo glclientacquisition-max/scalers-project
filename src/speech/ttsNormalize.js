@@ -69,6 +69,29 @@ function polishPunctuation(text) {
   // Exclamation makes Soniox punch / strain on the phone. Period keeps pace even.
   t = t.replace(/!+/g, '.');
   t = t.replace(/\.{2,}/g, '.');
+  t = stripSpokenPunctuation(t);
+  return t.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Soniox reads comma, period, question mark, dash, and ellipsis as words.
+ * Sentence marks are gone before a chunk is sent. Digits keep an internal
+ * decimal or thousands separator. Intra-word hyphens (M-Pesa) stay.
+ * @param {string} text
+ */
+function speakDomainDots(text) {
+  return String(text || '').replace(/\b((?:[a-z0-9-]+\.)+[a-z]{2,})\b/gi, (host) =>
+    host.replace(/\./g, ' dot ')
+  );
+}
+
+function stripSpokenPunctuation(text) {
+  let t = speakDomainDots(text);
+  while (/(\d),(\d)/.test(t)) t = t.replace(/(\d),(\d)/g, '$1$2');
+  t = t.replace(/(\d)\.(\d)/g, '$1\u0000$2');
+  t = t.replace(/[.!?…,;:]+/g, ' ');
+  t = t.replace(/[“”«»"]/g, ' ');
+  t = t.replace(/\u0000/g, '.');
   return t.replace(/\s+/g, ' ').trim();
 }
 
@@ -186,6 +209,7 @@ module.exports = {
   stripMarkup,
   expandPhones,
   polishPunctuation,
+  stripSpokenPunctuation,
   detectUtteranceTtsLang,
   resolveTtsLanguage,
   prepareForTts,

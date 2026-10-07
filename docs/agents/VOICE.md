@@ -87,13 +87,15 @@ See `.env.example` — key ones:
 
 ## Caller file on the call
 
-Voice does not own the caller file. Brain binds the speaker. Voice does three things on the media path.
+Voice does not own the caller file. Brain binds the speaker. Voice does four things on the media path.
 
-1. **Unfinished flush.** `flushUtterance(turnEnd)` labels the turn with `labelFlushedCallerTurn` and passes `unfinished`, `weak`, and `weakStt` into `observeCallerTurn`. Brain #586 honors those three fields in `isRejectedGoalText`, so an unfinished or weak flush does not become the goal. A turn-end decision that already set them (including #584 `decideTurnEnd`) is forwarded. If Brain exports `isUnfinishedCallerStem` or `isUnfinishedCallerUtterance`, Voice calls that. Voice does not keep a second Kiswahili stem list and does not write the goal.
+1. **Unfinished flush.** `decideTurnEnd` is the only end-of-turn rule. An open phrase (Kiswahili frame such as `Nilikuwa nataka kujua`, a trailing comma, or a trailing dash) waits one cap of about 700–900ms, including across a Soniox endpoint. `applyTurnEnd` then calls `flushUtterance(decision)` so `unfinished` is not dropped. The flush passes `unfinished`, `weak`, and `weakStt` into `observeCallerTurn` and into first-forward. Brain #586 honors those fields in `isRejectedGoalText`, so that text does not become the goal or `first_turn_goal`. If Brain exports `isUnfinishedCallerStem` or `isUnfinishedCallerUtterance`, Voice calls that. Voice does not write the goal.
 
-2. **Speak gate.** `gateCallerFileSpeech` runs before TTS. Open rows, a vocative file name, and `Yes, {name}` stay quiet until `caller.nameConfirmed` is true. A parallel `speaker` object does not override that flag. The identity ask may say the pending name. Voice does not set `nameConfirmed`.
+2. **Speak gate.** `gateCallerFileSpeech` runs before TTS. Open rows, a vocative file name, and `Yes, {name}` stay quiet until `caller.nameConfirmed` is true. A parallel `speaker` object does not override that flag. The identity ask may say the pending name, and `lockFileNameAsk` speaks it in the caller's current language. Voice does not set `nameConfirmed`.
 
-3. **Tool hold.** A line from `src/speech/toolHold.js` plays only after a tool call has started. English and Kiswahili packs rotate from the call id and turn count. Each line is at most about five words and states no job status. After the tool returns, write tools still use the existing confirmation. A file read (`open_items`, `file_lookup`, `get_enquiry`) speaks that result, or the empty-file line when `nameConfirmed` is true and the result is empty. No tool means no hold. Barge-in cancels the hold follow-up.
+3. **Punctuation.** `prepareForTts` strips commas, periods, question marks, dashes, and ellipses before Soniox chunks. Intra-word hyphens in say-forms stay. Soniox must not read those marks aloud in English or Kiswahili.
+
+4. **Tool hold.** A line from `src/speech/toolHold.js` plays only after a tool call has started. English and Kiswahili packs rotate from the call id and turn count. Each line is at most about five words and states no job status. After the tool returns, write tools still use the existing confirmation. A file read (`open_items`, `file_lookup`, `get_enquiry`) speaks that result, or the empty-file line when `nameConfirmed` is true and the result is empty. No tool means no hold. Barge-in cancels the hold follow-up.
 
 Land this with Brain #586 (`cursor/caller-file-goal-summary-4c74`). Do not rewrite `docs/product/CALLER_FILE_MODEL.md` or `docs/agents/CALLER_IDENTITY_AND_SUMMARY.md` here. Stack with #584 if that pull request is still open. On merge, keep `flushUtterance(decision)` so `decision.unfinished` is not dropped.
 
