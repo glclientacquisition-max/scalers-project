@@ -52,10 +52,18 @@ describe('mid-call one-shots do not speak-and-return', () => {
     assert.match(turn, /text: clean/);
     assert.match(turn, /catalogueListed/);
     assert.match(turn, /groundFilePriceLine\(\{/);
-    assert.match(turn, /pendingPriceAfterNameYes/);
-    assert.match(turn, /rememberUnspokenPrice/);
-    assert.match(turn, /outcome !== 'price'/);
+    assert.match(turn, /authorizeSpeak\(/);
+    assert.match(turn, /commitTurnFacts\(speakCommit/);
+    assert.match(turn, /commitReadySpeakSlots\(speakCommit/);
+    assert.match(turn, /drainSpokenSpeakSlots\(brainState, planned\.lines\)/);
+    assert.match(turn, /planCommittedSpeech\(\{/);
+    assert.ok(turn.indexOf('commitReadySpeakSlots') < turn.indexOf('planCommittedSpeech'));
+    assert.ok(turn.indexOf('planCommittedSpeech') < turn.indexOf('drainSpokenSpeakSlots'));
+    assert.match(turn, /skipFileGate: true/);
+    assert.doesNotMatch(turn, /pendingPriceAfterNameYes/);
+    assert.doesNotMatch(turn, /outcome !== 'price'/);
     assert.match(turn, /catalogueBreath: catalogueMouth\.letGemini/);
+    assert.ok(turn.indexOf('commitTurnFacts') < turn.indexOf('planBrainEndClose'));
     assert.doesNotMatch(serverSource, /fillerUsedThisCall/);
     const gate = turn.indexOf('planCatalogueMouth');
     const stream = turn.indexOf('const streamOn');
@@ -93,7 +101,8 @@ describe('mid-call one-shots do not speak-and-return', () => {
       }),
       null
     );
-    // Hours stay on the Gemini stream. A catalogue speaks only through planCatalogueMouth.
+    // A public fact is a SpeakPacket and speaks before Gemini.
+    // A catalogue still goes through planCatalogueMouth.
     assert.doesNotMatch(turn, /speakText\(progressLine\)/);
     assert.match(turn, /const needsImmediateProgress = actionMayExecute;/);
     assert.doesNotMatch(turn, /needsImmediateProgress = actionMayExecute \|\| handoffNameAsk/);

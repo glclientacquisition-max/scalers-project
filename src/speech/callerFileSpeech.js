@@ -86,33 +86,20 @@ function gateCallerFileSpeech(line, state) {
   return { speak: true, line: next, reason: blocked ? 'trimmed' : 'open' };
 }
 
-const PUBLIC_ANSWER = new Set([
-  'catalogue',
-  'hours',
-  'hours_ask',
-  'coverage',
-  'identity',
-  'price',
-]);
+const { authorizeSpeak, createSpeakCommit } = require('./speakPacket');
+
+function lineIsOpenFileRow(line) {
+  return OPEN_ROW_RE.test(String(line || ''));
+}
 
 /**
- * A public answer prepared on this turn is spoken before the name ask.
- * That includes a file-grounded price. File rows stay on the speak-gate.
- * Booking ladders are not this.
+ * Text of a public or step-up packet. Private replies are empty.
+ * The name ask is not included here.
  * @param {{ outcome?: string, line?: string } | null} [localReply]
  */
 function answerBeforeNameAsk(localReply) {
-  if (!localReply) return '';
-  const outcome = String(localReply.outcome || '');
-  const line = String(localReply.line || '').replace(/\s+/g, ' ').trim();
-  if (!line) return '';
-  // A real on-file fact speaks before the name. The empty-detail fallback does not.
-  if (outcome === 'service_facts') {
-    if (/don't have more detail on file|sina maelezo zaidi/i.test(line)) return '';
-    return line;
-  }
-  if (!PUBLIC_ANSWER.has(outcome)) return '';
-  return line;
+  const packet = authorizeSpeak(localReply);
+  return packet ? packet.text : '';
 }
 
 /**
@@ -160,12 +147,14 @@ function pendingPriceAfterNameYes(state) {
  * }} [opts]
  */
 function linesBeforeNameAsk(opts = {}) {
-  const lines = [];
-  const ahead = gateCallerFileSpeech(answerBeforeNameAsk(opts.localReply), opts.state);
-  if (ahead.speak && ahead.line) lines.push(ahead.line);
-  const ask = String(opts.nameAsk || '').replace(/\s+/g, ' ').trim();
-  if (ask) lines.push(ask);
-  return lines;
+  const commit = createSpeakCommit();
+  const packet = authorizeSpeak(opts.localReply);
+  if (packet) commit.commit(packet);
+  return commit.drain({
+    nameAsk: opts.nameAsk,
+    nameJustConfirmed: opts.nameJustConfirmed === true,
+    state: opts.state,
+  });
 }
 
 /**
@@ -193,6 +182,7 @@ function lockFileNameAsk(line, language) {
 module.exports = {
   speakerBound,
   gateCallerFileSpeech,
+  lineIsOpenFileRow,
   answerBeforeNameAsk,
   linesBeforeNameAsk,
   lockFileNameAsk,
