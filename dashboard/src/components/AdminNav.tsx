@@ -59,6 +59,14 @@ function AdminIcon({ name }: { name: string }) {
       </svg>
     );
   }
+  if (name === "Quality") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <path d="M3.5 13.5 7.5 9l2.5 2.5L16.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M12.5 5H16.5V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
   if (name === "Numbers") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
@@ -212,11 +220,11 @@ export function AdminTabBar() {
     <nav
       data-admin-tabbar=""
       aria-label="Super Admin"
-      className="glass-chrome fixed inset-x-0 bottom-0 z-50 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-visible border-t border-line/80 pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="glass-chrome fixed inset-x-0 bottom-0 z-50 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-x-auto border-t border-line/80 pb-[env(safe-area-inset-bottom)] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"
     >
-      <ul className="flex">
+      <ul className="flex w-max min-w-full">
         {ADMIN_LINKS.map((item) => (
-          <li key={item.href} className="min-w-0 flex-1 overflow-visible">
+          <li key={item.href} className="w-[4.5rem] shrink-0 overflow-visible">
             <AdminDestinationLink
               href={item.href}
               label={item.label}

@@ -1,24 +1,37 @@
 import { notFound } from "next/navigation";
 import { AdminOverviewPanel } from "@/components/AdminOverviewPanel";
+import { droppingAttentionRows } from "@/lib/adminQualityModel";
 import { mergeQueueRows } from "@/lib/platformOpsModel";
 
 /**
  * Super Admin Overview fixture. DASHBOARD_OPEN=true only.
  */
-const WORK_QUEUE = mergeQueueRows({
-  notices: [
+const WORK_QUEUE = [
+  ...mergeQueueRows({
+    notices: [
+      {
+        kind: "pool_empty",
+        detail: "1 business waiting. No numbers available.",
+        status: "open",
+      },
+    ],
+    businesses: [
+      { id: "biz-waiting", name: "Waiting Co", status: "waiting" },
+      { id: "biz-live", name: "Sample Shop", status: "active", packageName: null },
+      { id: "biz-old", name: "Old Co", status: "archived" },
+    ],
+  }),
+  ...droppingAttentionRows(
     {
-      kind: "pool_empty",
-      detail: "1 business waiting. No numbers available.",
-      status: "open",
+      "biz-dusted": {
+        score: 38,
+        dropping: true,
+        droppingReason: "Score fell 22 points in 7 days",
+      },
     },
-  ],
-  businesses: [
-    { id: "biz-waiting", name: "Waiting Co", status: "waiting" },
-    { id: "biz-live", name: "Sample Shop", status: "active", packageName: null },
-    { id: "biz-old", name: "Old Co", status: "archived" },
-  ],
-});
+    [{ id: "biz-dusted", name: "Done and Dusted" }],
+  ),
+];
 
 export default function DevAdminOverviewPage() {
   if (process.env.DASHBOARD_OPEN !== "true") {
