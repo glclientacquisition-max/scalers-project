@@ -54,7 +54,9 @@ function looksLikeServiceDetailAsk(text) {
 function looksLikeOfferAsk(text) {
   const raw = String(text || '');
   if (looksLikeServiceDetailAsk(raw)) return false;
-  return OFFER_ASK_RE.test(raw);
+  if (OFFER_ASK_RE.test(raw)) return true;
+  // "which service is you offer" is the same list ask as "which services do you offer".
+  return /\b(?:which|what)\s+services?\b[^?.!]{0,40}\boffer\b/i.test(raw);
 }
 
 function bareAffirmation(text) {

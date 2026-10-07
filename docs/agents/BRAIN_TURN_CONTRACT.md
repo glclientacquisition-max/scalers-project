@@ -11,9 +11,15 @@ a mix, is the catalogue list. `BRAIN_GEMINI_CATALOGUE` defaults off: code
 speaks that list from the file. Set it to `on` for a staging listen only.
 Gemini then speaks, and the names must be the exact `items[]`. Flip the env
 off to revert that mouth. A detail ask (details, more about, what is included)
-gets the price or note on file. It does not read the full list. The yes after
-a name confirm continues: which service, or the booking. It does not end the
-call and it does not read the catalogue again. Answering the catalogue leaves
+gets the price or note on file. It does not read the full list. A price ask
+for a catalogue service, including "how much is it?" or "ni pesa ngapi?"
+after that service is already confirmed, speaks the price or note on file.
+It does not say the price is missing when the row has one. Nothing is invented.
+"Which service do you offer" is the same list ask as "which services".
+The yes after a name confirm continues: which service, or the booking, or
+one local file list if that list was still waiting. It does not end the
+call. Gemini does not read the catalogue again, and no control label is
+spoken. Answering the catalogue leaves
 the call open. Farewell only when they say goodbye or they are done. Trailing
 noise such as "over" is not a visit place. Code still speaks
 the catalogue (unless that flag is on), hours, coverage,

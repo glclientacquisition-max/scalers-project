@@ -4,7 +4,9 @@
 // Detail asks and the yes after a name confirm never re-list, flag on or off.
 
 const { normalizeServices } = require('./liveKnowledge');
+const { factServices } = require('./provenance');
 const { offerCatalogueLine } = require('./knownFacts');
+const { findCatalogMatch, entityValue } = require('./entityExtraction');
 const {
   looksLikeNewWork,
   looksLikeOfferAsk,
@@ -87,12 +89,20 @@ function formatCatalogueMouthForPrompt(state) {
       ? `If you cannot say them all, say the first four exact names, then "${wrap.more}". Do not invent the rest.`
       : 'Say every name.';
   return [
-    'CATALOGUE MOUTH (speak it; do not read this label):',
+    'Exact service names for this turn. Do not speak a heading.',
     `items: ${JSON.stringify(items)}`,
     'Say these names exactly, in this order. Do not paraphrase, translate, or add a service.',
     `Wrapper only, locked to this call: opener "${wrap.opener}", closer "${wrap.closer}".`,
     cap,
   ].join('\n');
+}
+
+/** Drop a control heading before any sentence is allowed to be spoken. */
+function stripControlLabel(text) {
+  return String(text || '')
+    .replace(/\bCATALOGUE\s+MOUTH\b\s*:?\s*/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function countItems(text, items) {
@@ -192,24 +202,106 @@ function isRelistSentence(sentence, items) {
   return !/\d/.test(sentence);
 }
 
+const FACT_STOP = new Set([
+  'how', 'much', 'what', 'whats', 'price', 'prices', 'cost', 'costs', 'charge',
+  'charges', 'rate', 'rates', 'bei', 'pesa', 'ngapi', 'ksh', 'kes', 'shilling',
+  'shillings', 'shilingi', 'about', 'more', 'tell', 'please', 'this', 'that',
+  'your', 'does', 'want', 'need', 'like', 'from', 'with', 'have', 'service',
+  'services', 'cleaning', 'huduma', 'gani', 'kuhusu', 'maelezo',
+]);
+
+function catalogueFactRows(profile = {}) {
+  return factServices(profile.servicesCatalog, profile.fieldMeta || null)
+    .map((row) => ({
+      name: mouthServiceName(row.name),
+      price: String(row.price_range || row.priceRange || row.price || '').trim(),
+      notes: String(row.notes || '').replace(/\s+/g, ' ').trim(),
+    }))
+    .filter((row) => row.name);
+}
+
+function rowByName(rows, canonical) {
+  const want = mouthServiceName(canonical).toLowerCase();
+  if (!want) return null;
+  return rows.find((row) => row.name.toLowerCase() === want) || null;
+}
+
+function confirmedServiceName(state) {
+  const raw = state?.entities?.service;
+  if (raw && typeof raw === 'object' && raw.confirmed === false) return '';
+  return entityValue(raw);
+}
+
+function unmatchedFactWord(text, rows) {
+  const blob = rows.map((row) => row.name.toLowerCase()).join(' ');
+  const words = String(text || '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 4 && !FACT_STOP.has(word));
+  return words.some((word) => !blob.includes(word));
+}
+
+/**
+ * The one catalogue row this utterance names, or the confirmed service when
+ * the utterance is only "how much is it?" / "ni pesa ngapi?".
+ */
+function resolveSpokenService(text, profile = {}, state = null) {
+  const rows = catalogueFactRows(profile);
+  if (!rows.length) return null;
+  const hit = findCatalogMatch(text, profile);
+  if (hit?.kind === 'service') {
+    const named = rowByName(rows, hit.canonical);
+    if (named) return named;
+  }
+  if (unmatchedFactWord(text, rows)) return null;
+  return rowByName(rows, confirmedServiceName(state));
+}
+
+function looksLikePriceAsk(text) {
+  return /\b(?:how much|prices?|costs?|charges?|rates?|bei|pesa ngapi)\b/i.test(String(text || ''));
+}
+
+function swahili(language) {
+  const lang = String(language || '').toLowerCase();
+  return lang === 'sw' || lang === 'sheng';
+}
+
+function speakRowFact(row, language) {
+  if (!row) return '';
+  const sw = swahili(language);
+  if (row.price && /\d/.test(row.price)) {
+    return sw ? `${row.name} ni ${row.price}.` : `${row.name} is ${row.price}.`;
+  }
+  if (row.notes) return `${row.name}: ${row.notes}.`;
+  return '';
+}
+
+/**
+ * On-file price, or the note when the row has no numeric price.
+ * Empty when the caller did not ask, or the file has neither.
+ */
+function fileServicePriceLine(text, profile = {}, language = 'en', state = null) {
+  if (!looksLikePriceAsk(text)) return '';
+  return speakRowFact(resolveSpokenService(text, profile, state), language);
+}
+
+function detailAboutNamedService(text, profile) {
+  if (!/\b(?:more about|details?|maelezo|eleza|included|break ?down)\b/i.test(String(text || ''))) {
+    return null;
+  }
+  return resolveSpokenService(text, profile, null);
+}
+
 function serviceFactsLine(text, profile = {}, language = 'en') {
-  if (!looksLikeServiceDetailAsk(text)) return '';
-  const sw =
-    String(language || '').toLowerCase() === 'sw' ||
-    String(language || '').toLowerCase() === 'sheng';
-  const items = catalogueItemNames(profile);
-  const named = items.find((name) => String(text || '').toLowerCase().includes(name.toLowerCase()));
-  const rows = normalizeServices(profile.servicesCatalog).filter((row) => {
-    const name = mouthServiceName(row.name);
-    return name && (!named || name.toLowerCase() === named.toLowerCase());
-  });
+  const general = looksLikeServiceDetailAsk(text);
+  const named = detailAboutNamedService(text, profile);
+  if (!general && !named) return '';
+  const sw = swahili(language);
+  const rows = named ? [named] : catalogueFactRows(profile);
   const facts = [];
   for (const row of rows) {
-    const name = mouthServiceName(row.name);
-    const price = String(row.price_range || row.priceRange || '').trim();
-    const notes = String(row.notes || '').replace(/\s+/g, ' ').trim();
-    if (price) facts.push(sw ? `${name} ni ${price}.` : `${name} is ${price}.`);
-    else if (notes) facts.push(`${name}: ${notes}.`);
+    const line = speakRowFact(row, language);
+    if (line) facts.push(line);
   }
   if (!facts.length) {
     return sw
@@ -223,10 +315,23 @@ function serviceFactsLine(text, profile = {}, language = 'en') {
   return shown.join(' ');
 }
 
+function catalogueShaped(sentence, items) {
+  const raw = stripControlLabel(sentence);
+  if (/\bCATALOGUE\s+MOUTH\b/i.test(sentence)) return true;
+  if (/\b(?:we offer|tunatoa|tuna)\b/i.test(raw) && /,/.test(raw)) return true;
+  const lower = raw.toLowerCase();
+  const hits = (Array.isArray(items) ? items : []).filter(
+    (name) => name && lower.includes(String(name).toLowerCase())
+  ).length;
+  return hits >= 3 && !/\d/.test(raw);
+}
+
 function speechAfterNameYes(text, items, language) {
-  const kept = splitSentences(text).filter((part) => !isRelistSentence(part, items));
-  const joined = groundCatalogueSpeech(kept.join(' '), items, { listTurn: false });
-  if (!joined || countItems(joined, items) >= 3) return whichServiceLine(language);
+  const kept = splitSentences(text).filter((part) => !catalogueShaped(part, items) && !isRelistSentence(part, items));
+  const joined = groundCatalogueSpeech(stripControlLabel(kept.join(' ')), items, { listTurn: false });
+  if (!joined || countItems(joined, items) >= 3 || catalogueShaped(joined, items)) {
+    return whichServiceLine(language);
+  }
   return joined;
 }
 
@@ -265,12 +370,12 @@ function shapeCatalogueMouth(text, opts = {}) {
   const profile = opts.profile || {};
   const language = opts.language || state?.language?.current || 'en';
   const items = itemsFrom(profile, state);
-  const raw = String(text || '').trim();
+  const raw = stripControlLabel(text);
 
   if (state?.caller?.nameJustConfirmed) {
     return speechAfterNameYes(raw, items, language);
   }
-  if (looksLikeServiceDetailAsk(callerText)) {
+  if (looksLikeServiceDetailAsk(callerText) || detailAboutNamedService(callerText, profile)) {
     return speechForServiceDetails(raw, callerText, profile, language, items);
   }
   if (!freshCatalogueAsk(callerText) || !items.length) {
@@ -298,7 +403,9 @@ module.exports = {
   formatCatalogueMouthForPrompt,
   groundCatalogueSpeech,
   serviceFactsLine,
+  fileServicePriceLine,
   shapeCatalogueMouth,
   whichServiceLine,
   freshCatalogueAsk,
+  stripControlLabel,
 };

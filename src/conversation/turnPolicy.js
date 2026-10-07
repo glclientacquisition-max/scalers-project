@@ -26,10 +26,12 @@ const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
 const { hoursAskLine, offerCatalogueLine } = require('./knownFacts');
 const {
   catalogueItemNames,
+  fileServicePriceLine,
   freshCatalogueAsk,
   geminiCatalogueEnabled,
   serviceFactsLine,
 } = require('./catalogueMouth');
+const { catalogueAskInPlay } = require('./fileRead');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
@@ -142,6 +144,23 @@ function resolveLocalReply({
 
   const detailLine = serviceFactsLine(clean, profile, language);
   if (detailLine) return { outcome: 'service_facts', line: detailLine };
+
+  const priceLine = fileServicePriceLine(clean, profile, language, state);
+  if (priceLine) return { outcome: 'price', line: priceLine };
+
+  // The list was asked and never marked answered. Hand that one list to the local mouth.
+  // A yes after the list was already answered does not read it again.
+  const pendingList = catalogueAskInPlay(clean, state);
+  if (
+    state?.caller?.nameJustConfirmed &&
+    pendingList &&
+    state?.conversation?.catalogueAnswered !== true
+  ) {
+    const held = offerCatalogueLine(pendingList, profile, language);
+    if (held && !/what you need done|unahitaji nini/i.test(held)) {
+      return { outcome: 'catalogue', line: held };
+    }
+  }
 
   // A name yes is not another catalogue. A detail ask is not the name list.
   // Gemini mouth (staging flag) leaves the first list to the model.
