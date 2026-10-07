@@ -48,25 +48,43 @@ function paceSpokenLists(text, language) {
   return t;
 }
 
+const LIST_CLOSER = /^(.*),\s+(na zingine|and more)$/i;
+const LIST_HAS_CONJ = /,\s+(?:and|na)\b/i;
+const LEADING_CONJ = /^(?:and|na)\s+/i;
+const ITEM_HAS_CONJ = /\b(?:and|na)\b/i;
+
 function speakSerialList(match, fallback, explicit) {
-  const oxford = String(match).match(/^(.*),\s+(and|na)\s+(\S.*)$/i);
+  const raw = String(match).trim();
+  // ", na zingine" / ", and more" is the catalogue closer, not the list's
+  // own conjunction. A list that already says ", and" or ", na" keeps that
+  // join. Swallowing the closer leaves the English word inside an item
+  // ("na and").
+  const closer = raw.match(LIST_CLOSER);
+  if (closer && LIST_HAS_CONJ.test(closer[1])) {
+    return `${speakSerialList(closer[1], fallback, explicit)}, ${closer[2]}`;
+  }
+
+  const oxford = raw.match(/^(.*),\s+(and|na)\s+(\S.*)$/i);
   let conj = fallback;
   let parts;
   if (oxford) {
     conj = /^na$/i.test(oxford[2]) ? 'na' : 'and';
     parts = [...oxford[1].split(/\s*,\s+/), oxford[3]];
   } else {
-    parts = String(match).split(/\s*,\s+/);
+    parts = raw.split(/\s*,\s+/);
   }
-  const items = parts.map((item) => item.trim()).filter(Boolean);
-  if (items.length < 3) return match;
-  if (items.some((item) => /\d/.test(item) || item.split(/\s+/).length > 6)) return match;
+  const items = parts
+    .map((item) => item.trim().replace(LEADING_CONJ, '').trim())
+    .filter(Boolean);
+  if (items.length < 3) return raw;
+  if (items.some((item) => ITEM_HAS_CONJ.test(item))) return raw;
+  if (items.some((item) => /\d/.test(item) || item.split(/\s+/).length > 6)) return raw;
   // A bare comma run is a list only when every piece is a short name
   // ("sofa cleaning, carpet cleaning"). A vocative or a parenthetical
   // aside has a one-word name or a longer clause and stays a pause.
   if (!explicit) {
     const counts = items.map((item) => item.split(/\s+/).length);
-    if (counts.some((count) => count < 2 || count > 4)) return match;
+    if (counts.some((count) => count < 2 || count > 4)) return raw;
   }
   return items.join(` ${conj} `);
 }
