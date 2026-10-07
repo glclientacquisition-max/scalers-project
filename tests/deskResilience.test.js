@@ -84,9 +84,9 @@ describe("desk resilience and anti-slop", () => {
   it("keeps one filled primary on visit and hold editors", () => {
     const hold = read("dashboard/src/components/InboxHoldEditor.tsx");
     const job = read("dashboard/src/components/InboxJobEditor.tsx");
-    assert.match(hold, /btnGhost/);
-    assert.doesNotMatch(hold, /btnPrimary/);
-    assert.match(job, /btnGhost/);
-    assert.doesNotMatch(job, /btnPrimary/);
+    assert.match(hold, /variant="ghost"/);
+    assert.doesNotMatch(hold, /variant="primary"/);
+    assert.match(job, /variant="ghost"/);
+    assert.doesNotMatch(job, /variant="primary"/);
   });
 });

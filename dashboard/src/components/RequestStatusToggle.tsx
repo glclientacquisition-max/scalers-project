@@ -5,7 +5,8 @@ import {
   updateServiceRequestStatus,
   type RequestStatusState,
 } from "@/app/(desk)/requests/actions";
-import { btnDock, btnDockGhost, btnGhost, btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
+import { Button } from "@/components/ui/Button";
+import { Stamp } from "@/components/ui/Stamp";
 
 const initial: RequestStatusState = {};
 
@@ -44,82 +45,80 @@ export function RequestStatusToggle({
       <div className={stack}>
         {normalized === "open" ? (
           <>
-            <button
+            <Button
               type="submit"
               name="status"
               value="fulfilled"
-              disabled={pending}
-              className={wide ? `${btnPrimary} w-full` : btnDock}
+              pending={pending}
+              variant={wide ? "primary" : "tonal"}
+              size={wide ? "md" : "sm"}
+              block={wide}
               aria-label={pending ? "Saving" : holdDoneLabel}
             >
-              {pending ? (
-                wide ? (
-                  "Saving"
-                ) : (
-                  <span aria-hidden="true" className={pendingSpinnerClass} />
-                )
-              ) : (
-                holdDoneLabel
-              )}
-            </button>
+              {pending ? "Saving" : holdDoneLabel}
+            </Button>
             {extra && !banner ? (
-              <button
+              <Button
                 type="submit"
                 name="status"
                 value="cancelled"
                 disabled={pending}
-                className={`${btnGhost} w-full`}
+                variant="ghost"
+                size="md"
+                block
               >
                 Cancel
-              </button>
+              </Button>
             ) : null}
           </>
         ) : null}
         {normalized === "fulfilled" ? (
           <>
-            <span
-              className={
-                extra
-                  ? "inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-ok-soft text-sm font-semibold text-ok"
-                  : `${btnDock} pointer-events-none bg-ok-soft text-ok shadow-none`
-              }
-            >
-              Done
-            </span>
+            {wide ? (
+              <div className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-ok-tonal">
+                <Stamp tone="ok">Done</Stamp>
+              </div>
+            ) : (
+              <Stamp tone="ok">Done</Stamp>
+            )}
             {extra ? (
-              <button
+              <Button
                 type="submit"
                 name="status"
                 value="open"
                 disabled={pending}
-                className={`${btnGhost} w-full`}
+                variant="ghost"
+                size="md"
+                block
               >
                 Reopen
-              </button>
+              </Button>
             ) : null}
           </>
         ) : null}
         {normalized === "cancelled" ? (
           <>
             {extra ? (
-              <span className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-surface-muted text-sm font-medium text-ink-soft">
+              <span className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-surface-2 text-body font-medium text-ink-2">
                 Cancelled
               </span>
             ) : null}
-            <button
+            <Button
               type="submit"
               name="status"
               value="open"
               disabled={pending}
-              className={extra ? `${btnGhost} w-full` : btnDockGhost}
+              variant="ghost"
+              size={wide ? "md" : "sm"}
+              block={Boolean(extra)}
             >
               Reopen
-            </button>
+            </Button>
           </>
         ) : null}
       </div>
       {err ? (
-        <p className="text-xs text-warn" role="alert">
+        <p className="text-caption text-attention" role="alert">
           {err}
         </p>
       ) : null}

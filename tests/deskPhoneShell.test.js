@@ -82,7 +82,7 @@ describe("desk phone shell", () => {
       jobActions.indexOf('value="confirmed"') < jobActions.indexOf('value="cancelled"'),
       "call Confirm sits above Cancel"
     );
-    assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnDock/);
+    assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /variant=\{wide \? "primary" : "tonal"\}/);
     assert.match(root, /viewportFit:\s*"cover"/);
     assert.match(css, /--desk-tabbar-h:\s*4rem/);
     assert.match(css, /--desk-header-h:\s*0px/);

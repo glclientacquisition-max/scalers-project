@@ -5,8 +5,8 @@
 
 "use client";
 
-import { DeskHint } from "@/components/ui/DeskHint";
-import { btnGhost, btnPrimary, deskHitClass, deskShiftClass } from "@/components/ui/deskChrome";
+import { buttonClass } from "@/components/ui/Button";
+import { IconButtonAnchor } from "@/components/ui/IconButton";
 import { logWhatsAppFollowUp } from "@/app/(desk)/calls/actions";
 
 export function waMeHref(rawNumber: string, message?: string): string | null {
@@ -66,23 +66,18 @@ export function WhatsAppLink({
 
   if (variant === "icon") {
     return (
-      <DeskHint label="WhatsApp" side="top">
-        <a
-          href={href}
-          target="_blank"
-          rel="noreferrer"
-          title="WhatsApp"
-          aria-label={`WhatsApp ${number}`}
-          onClick={onOpen}
-          className={[
-            `${deskHitClass} border border-whatsapp bg-whatsapp text-white`,
-            `${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
-            className,
-          ].join(" ")}
-        >
-          <WhatsAppIcon className="h-5 w-5" />
-        </a>
-      </DeskHint>
+      <IconButtonAnchor
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        label={`WhatsApp ${number}`}
+        tone="whatsapp"
+        size="sm"
+        onClick={onOpen}
+        className={className}
+      >
+        <WhatsAppIcon className="h-5 w-5" />
+      </IconButtonAnchor>
     );
   }
 
@@ -113,7 +108,7 @@ export function WhatsAppLink({
         rel="noreferrer"
         aria-label={`WhatsApp ${number}`}
         onClick={onOpen}
-        className={[btnPrimary, "gap-2", className].join(" ")}
+        className={buttonClass({ variant: "primary", size: "md", className })}
       >
         <WhatsAppIcon className="h-4 w-4 text-accent-on-fill" />
         {label || "WhatsApp"}
@@ -129,7 +124,7 @@ export function WhatsAppLink({
         rel="noreferrer"
         aria-label={`WhatsApp ${number}`}
         onClick={onOpen}
-        className={[btnGhost, "gap-2", className].join(" ")}
+        className={buttonClass({ variant: "ghost", size: "md", className })}
       >
         <WhatsAppIcon className="h-4 w-4 text-whatsapp" />
         {label || "WhatsApp"}
@@ -137,36 +132,27 @@ export function WhatsAppLink({
     );
   }
 
-  if (compact) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        title={`Chat with ${number} on WhatsApp`}
-        aria-label={`Chat with ${number} on WhatsApp`}
-        onClick={onOpen}
-        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white ${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
-      >
-        <WhatsAppIcon className="h-4 w-4" />
-      </a>
-    );
-  }
+  const icon = (
+    <IconButtonAnchor
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      label={`WhatsApp ${number}`}
+      tone="whatsapp"
+      size="sm"
+      onClick={onOpen}
+      className={className}
+    >
+      <WhatsAppIcon className="h-5 w-5" />
+    </IconButtonAnchor>
+  );
+
+  if (compact) return icon;
 
   return (
     <span className="inline-flex items-center gap-2">
       <span className="font-medium">{text}</span>
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        title={`Chat with ${number} on WhatsApp`}
-        aria-label={`Chat with ${number} on WhatsApp`}
-        onClick={onOpen}
-        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white ${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
-      >
-        <WhatsAppIcon className="h-3.5 w-3.5" />
-      </a>
+      {icon}
     </span>
   );
 }

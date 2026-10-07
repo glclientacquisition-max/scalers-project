@@ -90,11 +90,11 @@ describe("inbox call action", () => {
   });
 
   it("is a muted 44px icon button, never filled", () => {
-    assert.match(call, /deskHitClass/);
+    assert.match(call, /IconButtonAnchor/);
     assert.match(read("dashboard/src/components/ui/deskChrome.ts"), /h-12 w-12/);
-    assert.match(call, /aria-label=\{`Call \$\{number\}`\}/);
+    assert.match(call, /label=\{`Call \$\{number\}`\}/);
     assert.match(call, /data-icon="handset"/);
-    assert.match(call, /stroke="currentColor"/);
+    assert.match(call, /PhoneIcon/);
     assert.doesNotMatch(call, /M1\.5 4\.5a3 3 0 0 1 3-3h1\.372/);
     assert.doesNotMatch(call, /bg-\[#0096FF\]|bg-whatsapp/);
   });
@@ -115,9 +115,9 @@ describe("inbox call action", () => {
     assert.ok(recipeAt > -1 && confirmAt > recipeAt && holdAt > confirmAt && phoneAt > holdAt);
     assert.doesNotMatch(inbox.slice(actionFn, actionFn + 1600), /Send SMS|mailto:/);
     assert.match(inbox, /flex shrink-0 items-center justify-end gap-2/);
-    assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /btnDock/);
-    assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnDock/);
-    assert.match(call, /DeskHint label="Call"/);
-    assert.match(read("dashboard/src/components/WhatsAppLink.tsx"), /DeskHint label="WhatsApp"/);
+    assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /variant=\{wide \? "primary" : "tonal"\}/);
+    assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /variant=\{wide \? "primary" : "tonal"\}/);
+    assert.match(call, /label=\{`Call \$\{number\}`\}/);
+    assert.match(read("dashboard/src/components/WhatsAppLink.tsx"), /tone="whatsapp"/);
   });
 });

@@ -2,32 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { CheckIcon } from "@heroicons/react/24/outline";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import { CallLink } from "@/components/CallLink";
 import { InboxPingTeammate, type InboxPingPerson } from "@/components/InboxPingTeammate";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
-import { DeskHint } from "@/components/ui/DeskHint";
-import {
-  deskHitClass,
-  deskShiftClass,
-  focusRingVisible,
-  pendingSpinnerInkClass,
-} from "@/components/ui/deskChrome";
-
-function DoneGlyph() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-      className="h-5 w-5"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4 10-10" />
-    </svg>
-  );
-}
+import { IconButton } from "@/components/ui/IconButton";
 
 function DockSlot({
   label,
@@ -39,7 +19,7 @@ function DockSlot({
   return (
     <div className="flex w-16 flex-col items-center gap-1">
       {children}
-      <span className="text-[11px] font-medium leading-none text-ink-soft">{label}</span>
+      <span className="text-caption font-medium leading-none text-ink-2">{label}</span>
     </div>
   );
 }
@@ -53,46 +33,32 @@ function DockMarkDone({ callId }: { callId: string }) {
 
   return (
     <DockSlot label="Done">
-      <DeskHint label="Mark done" side="top">
-        <button
-          type="button"
-          disabled={pending || done}
-          aria-busy={pending}
-          aria-label={name}
-          title={name}
-          onClick={() => {
-            if (pending || done) return;
-            setError(null);
-            setPending(true);
-            void (async () => {
-              const res = await updateLeadStatus(callId, "resolved");
-              setPending(false);
-              if (!res.ok) {
-                setError(res.error || "Could not mark done.");
-                return;
-              }
-              setDone(true);
-              router.refresh();
-            })();
-          }}
-          className={[
-            deskHitClass,
-            "border border-line bg-surface text-ink",
-            deskShiftClass,
-            focusRingVisible,
-            "hover:border-accent disabled:opacity-50",
-            done ? "border-ok/40 bg-ok-soft text-ok" : "",
-          ].join(" ")}
-        >
-          {pending ? (
-            <span aria-hidden="true" className={pendingSpinnerInkClass} />
-          ) : (
-            <DoneGlyph />
-          )}
-        </button>
-      </DeskHint>
+      <IconButton
+        label={name}
+        size="sm"
+        tone={done ? "ok" : "neutral"}
+        pending={pending}
+        disabled={pending || done}
+        onClick={() => {
+          if (pending || done) return;
+          setError(null);
+          setPending(true);
+          void (async () => {
+            const res = await updateLeadStatus(callId, "resolved");
+            setPending(false);
+            if (!res.ok) {
+              setError(res.error || "Could not mark done.");
+              return;
+            }
+            setDone(true);
+            router.refresh();
+          })();
+        }}
+      >
+        <CheckIcon aria-hidden="true" />
+      </IconButton>
       {error ? (
-        <span className="max-w-[6.5rem] text-center text-[11px] text-warn" role="alert">
+        <span className="max-w-[6.5rem] text-center text-caption text-attention" role="alert">
           {error}
         </span>
       ) : null}
@@ -124,7 +90,7 @@ export function InboxTicketActionDock({
     <nav
       data-ticket-action-dock=""
       aria-label="Call actions"
-      className="shrink-0 border-t border-line bg-surface px-4 py-2"
+      className="shrink-0 border-t border-hairline bg-surface px-4 py-2"
     >
       <div className="flex items-start justify-center gap-3">
         {showDone ? <DockMarkDone callId={callId} /> : null}
