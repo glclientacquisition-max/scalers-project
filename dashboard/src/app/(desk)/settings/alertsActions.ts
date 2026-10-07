@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isAuthenticated } from "@/lib/auth";
+import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import { parseNotifyChannelsField } from "@/lib/notifyChannels";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { alertPhoneWrite, alertsPersistMatchesSubmit } from "@/lib/alertsSave";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
+import { fieldPathsAttestedOnAlertsSave } from "@/lib/fieldPathsFromSettingsSave";
+import { ownerAttestFields } from "@/lib/ownerAttestFields";
 
 export type AlertsActionState = {
   error?: string;
@@ -73,6 +75,17 @@ export async function saveAlertsAction(
   if (error) {
     return ownerSaveFailed("alerts.save", error.message);
   }
+
+  const user = await getAuthUser();
+  await ownerAttestFields(
+    tenant.id,
+    fieldPathsAttestedOnAlertsSave({
+      whatsappNumber: writtenPhone,
+      alertEmail: writtenEmail,
+      hasNotifyChannels: Object.keys(notifyChannels || {}).length > 0,
+    }),
+    user?.id ?? null
+  );
 
   revalidatePath("/settings");
   return { ok: true, message: "Saved" };
