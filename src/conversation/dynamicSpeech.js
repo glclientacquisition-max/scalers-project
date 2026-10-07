@@ -12,7 +12,7 @@ const {
 } = require('./businessAssistantIntro');
 const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
-const { prepareStreamedSpeech } = require('./callCorrectives');
+const { prepareStreamedSpeech, looksLikeShortAffirmation } = require('./callCorrectives');
 const { dropSpeechSlop, guardSpokenReply, logSpokenFilterDrop } = require('./speechGuard');
 const {
   catalogueAskInPlay,
@@ -660,6 +660,7 @@ function planEmptyGeminiSpeech({
   userText = '',
   llmDown = false,
   alreadyOffered = false,
+  toolResults = [],
 } = {}) {
   const savedForThem = fileReadLine({
     text: userText,
@@ -684,7 +685,32 @@ function planEmptyGeminiSpeech({
     };
   }
   if (alreadyOffered) return { speak: false, kind: 'quiet_continue', line: '' };
+  const outcome = spokenToolOutcome(toolResults, language, userText);
+  if (outcome) return { speak: true, kind: 'tool_outcome', line: outcome };
   return { speak: true, kind: 'hear_again', line: emptyTurnRepairLine(language) };
+}
+
+/**
+ * Tool-only Gemini turns speak the tool line. A short yes to a saved
+ * callback also gets the farewell. This does not hang up the socket.
+ */
+function spokenToolOutcome(toolResults, language, userText) {
+  const rows = Array.isArray(toolResults) ? toolResults : [];
+  if (!rows.length) return '';
+  const { toolOutcomeLine } = require('./toolExecution');
+  const { planBrainEndClose } = require('../speech/callClose');
+  const line = toolOutcomeLine(rows, language);
+  if (!line) return '';
+  const saved = rows.some(
+    (row) =>
+      row &&
+      row.action === 'create_service_request' &&
+      (row.status === 'succeeded' || row.status === 'updated')
+  );
+  if (!saved || !looksLikeShortAffirmation(userText)) return line;
+  const farewell = planBrainEndClose({ action: 'END', language });
+  if (!farewell.line || line.includes(farewell.line)) return line;
+  return `${line} ${farewell.line}`;
 }
 
 /**

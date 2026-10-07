@@ -44,6 +44,27 @@ const SWAHILI_MARKERS = [
   'kuja',
   'ako',
   'siku',
+  'mimi',
+  'wewe',
+  'yeye',
+  'sisi',
+  'ninyi',
+  'nyinyi',
+  'nilikuwa',
+  'nauliza',
+  'ninauliza',
+  'unafanya',
+  'mnafanya',
+  'naishi',
+  'ninaishi',
+  'vitu',
+  'niko',
+  'uko',
+  'iko',
+  'hapa',
+  'huko',
+  'mnatoa',
+  'tunatoa',
 ];
 
 const SHENG_MARKERS = [
@@ -181,11 +202,25 @@ function countMarkers(raw, markers) {
   );
 }
 
+/** Soniox language tag, or empty. sw / swh, en, sheng. */
+function languageTagBucket(tag) {
+  const raw = String(tag || '')
+    .toLowerCase()
+    .trim();
+  if (!raw) return '';
+  if (raw === 'sw' || raw === 'swh' || raw.startsWith('sw-') || raw.startsWith('sw_')) return 'sw';
+  if (raw === 'en' || raw.startsWith('en-') || raw.startsWith('en_')) return 'en';
+  if (raw.includes('sheng')) return 'sheng';
+  return '';
+}
+
 /**
  * Evidence-bearing detection for stateful language policy.
+ * Soniox per-token tags outweigh keywords. Empty tags use the keyword list.
  * @param {string} text
+ * @param {{ tokenLanguages?: string[] }} [opts]
  */
-function analyzeCallerLanguage(text) {
+function analyzeCallerLanguage(text, opts = {}) {
   const raw = String(text || '')
     .toLowerCase()
     .replace(/\s+/g, ' ')
@@ -201,7 +236,14 @@ function analyzeCallerLanguage(text) {
   let swHits = countMarkers(raw, SWAHILI_MARKERS);
   let enHits = countMarkers(raw, ENGLISH_CORE_MARKERS);
   const loanHits = countMarkers(raw, ENGLISH_JOB_LOANWORDS);
-  const shengHits = countMarkers(raw, SHENG_MARKERS);
+  let shengHits = countMarkers(raw, SHENG_MARKERS);
+  const tags = Array.isArray(opts.tokenLanguages) ? opts.tokenLanguages : [];
+  for (const tag of tags) {
+    const bucket = languageTagBucket(tag);
+    if (bucket === 'sw') swHits += 3;
+    else if (bucket === 'en') enHits += 3;
+    else if (bucket === 'sheng') shengHits += 3;
+  }
   if (swHits === 0) enHits += loanHits;
 
   if (

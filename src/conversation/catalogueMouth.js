@@ -11,6 +11,7 @@ const {
   looksLikeNewWork,
   looksLikeOfferAsk,
   looksLikeServiceDetailAsk,
+  catalogueAskInPlay,
 } = require('./fileRead');
 
 const STOP = new Set([
@@ -326,11 +327,58 @@ function catalogueShaped(sentence, items) {
   return hits >= 3 && !/\d/.test(raw);
 }
 
-function speechAfterNameYes(text, items, language) {
+function catalogueAlreadySpoken(state) {
+  return (
+    state?.conversation?.catalogueListed === true ||
+    state?.conversation?.catalogueAnswered === true
+  );
+}
+
+/**
+ * The file list for a catalogue ask that has not been spoken yet.
+ * Empty once that list is already on the call, so a later mouth cannot re-list.
+ */
+function pendingCatalogueAsk(callerText, state) {
+  const direct = catalogueAskInPlay(callerText, state);
+  if (direct) return direct;
+  const rows = Array.isArray(state?.conversation?.answersReceived)
+    ? state.conversation.answersReceived
+    : [];
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const row = String(rows[i] || '').trim();
+    if (row && looksLikeOfferAsk(row) && !looksLikeNewWork(row)) return row;
+  }
+  return '';
+}
+
+function unsaidPublicCatalogue(callerText, state, profile, language) {
+  if (catalogueAlreadySpoken(state)) return '';
+  const pending = pendingCatalogueAsk(callerText, state);
+  if (!pending) return '';
+  const line = offerCatalogueLine(pending, profile, language);
+  if (!line || /what you need done|unahitaji nini/i.test(line)) return '';
+  return line;
+}
+
+function speechAfterNameYes(text, items, language, opts = {}) {
+  const fileLine = unsaidPublicCatalogue(
+    opts.callerText,
+    opts.state,
+    opts.profile,
+    language
+  );
+  const raw = String(text || '');
+  // An unsaid public list is the file line. A closer cannot replace it.
+  if (
+    fileLine &&
+    (raw.trim() === fileLine || catalogueShaped(raw, items) || countItems(raw, items) >= 3)
+  ) {
+    return fileLine;
+  }
   const kept = splitSentences(text).filter((part) => !catalogueShaped(part, items) && !isRelistSentence(part, items));
   const joined = groundCatalogueSpeech(stripControlLabel(kept.join(' ')), items, { listTurn: false });
   if (!joined || countItems(joined, items) >= 3 || catalogueShaped(joined, items)) {
-    return whichServiceLine(language);
+    return fileLine || whichServiceLine(language);
   }
   return joined;
 }
@@ -373,7 +421,13 @@ function shapeCatalogueMouth(text, opts = {}) {
   const raw = stripControlLabel(text);
 
   if (state?.caller?.nameJustConfirmed) {
-    return speechAfterNameYes(raw, items, language);
+    const fileLine = unsaidPublicCatalogue(callerText, state, profile, language);
+    if (fileLine && stripControlLabel(raw).trim() === fileLine) return fileLine;
+    return speechAfterNameYes(raw, items, language, {
+      callerText,
+      state,
+      profile,
+    });
   }
   if (looksLikeServiceDetailAsk(callerText) || detailAboutNamedService(callerText, profile)) {
     return speechForServiceDetails(raw, callerText, profile, language, items);

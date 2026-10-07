@@ -100,9 +100,54 @@ function looksLikeNonConsentAck(text) {
  * filler. Leave it is never consent.
  * @param {string[]} questionsAsked  slots asked before this caller turn
  */
+const SHORT_AFFIRMATION =
+  /^(?:yes|yeah|yah|yea|yep|yup|ok|okay|sawa|ndio|ndiyo|eeh|ehe|poa|correct|sure)$/i;
+
+/** yes, sawa, ok, ndio. Not a leave-it, and not a turn that names a job. */
+function looksLikeShortAffirmation(text) {
+  if (looksLikeLeaveIt(text)) return false;
+  const t = normalizeAckText(text);
+  if (!t || t.split(' ').length > 3) return false;
+  const core = t.replace(/^(?:uh|um|ah|eeh|eh|mm)\s+/, '').trim();
+  return Boolean(core) && SHORT_AFFIRMATION.test(core);
+}
+
+const SPOKEN_OFFER =
+  /\b(?:would you like|shall i|should i|do you want|want me to|log a callback|note that|take a message|ungependa|nikuhifadhi|niandike|nipigie|nikupigie|callback)\b/i;
+
+function lineIsIdentityAsk(line) {
+  return /\bam i speaking with\b|\b(?:je,?\s*)?(?:naongea na|unaongea na)\b/i.test(
+    String(line || '')
+  );
+}
+
+/**
+ * A spoken offer becomes the pending ask. The next short yes resolves it.
+ * A name ask is not an offer, so "Yes" after "Am I speaking with Alvin?" stays a name confirm.
+ */
+function noteSpokenPendingAsk(state, line) {
+  const raw = String(line || '').trim();
+  if (!state || !raw || lineIsIdentityAsk(raw) || !SPOKEN_OFFER.test(raw)) return state;
+  if (!state.conversation || typeof state.conversation !== 'object') {
+    state.conversation = {};
+  }
+  const asked = Array.isArray(state.conversation.questionsAsked)
+    ? state.conversation.questionsAsked
+    : [];
+  if (asked[asked.length - 1] !== 'offer') asked.push('offer');
+  state.conversation.questionsAsked = asked.slice(-8);
+  state.conversation.pendingAsk = { kind: 'offer', line: raw };
+  return state;
+}
+
 function ackIsConsent(questionsAsked, text) {
+  if (looksLikeLeaveIt(text)) return false;
   const lastAsk = (Array.isArray(questionsAsked) ? questionsAsked : []).slice(-1)[0];
-  return lastAsk === 'confirm' && looksLikeNonConsentAck(text) && !looksLikeLeaveIt(text);
+  if (lastAsk === 'confirm' && looksLikeNonConsentAck(text)) return true;
+  if (lastAsk === 'offer' && (looksLikeShortAffirmation(text) || looksLikeNonConsentAck(text))) {
+    return true;
+  }
+  return false;
 }
 
 function looksLikeUrgentContact(text) {
@@ -342,6 +387,8 @@ function openSlotLine(state, language) {
 
 module.exports = {
   ackIsConsent,
+  looksLikeShortAffirmation,
+  noteSpokenPendingAsk,
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
   looksLikeUrgentContact,

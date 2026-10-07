@@ -166,9 +166,31 @@ function unboundFileFallback(language) {
  * "What do you need done" and an unasked callback pitch drop only when they
  * do not answer what the caller just said.
  */
+function sentenceIsIdentityAsk(sentence) {
+  const raw = String(sentence || '').trim();
+  if (!raw) return false;
+  if (/\bam i speaking with\b/i.test(raw)) return true;
+  if (/\b(?:je,?\s*)?(?:naongea na|unaongea na|niongee na|ni wewe)\b/i.test(raw)) return true;
+  return sentenceAsksForCallerName(raw);
+}
+
+/**
+ * A spoken offer or a real question stays. Filler closers and the name ask do not.
+ * The place filter must not delete "Would you like me to log a callback?".
+ */
+function sentenceIsKeptOffer(sentence) {
+  const raw = String(sentence || '').trim();
+  if (!raw || sentenceIsIdentityAsk(raw)) return false;
+  if (HELP_FILLER.test(raw) || ALREADY_ANSWERED_FILLER.test(raw)) return false;
+  if (raw.includes('?')) return true;
+  return /\b(?:would you like|shall i|should i|do you want|want me to|log a callback|ungependa|nikuhifadhi|niandike|nipigie|nikupigie)\b/i.test(
+    raw
+  );
+}
+
 function sentenceIsSpeechSlop(sentence, callerText) {
   const raw = String(sentence || '').trim();
-  if (!raw || isProtectedSpeech(raw)) return false;
+  if (!raw || isProtectedSpeech(raw) || sentenceIsKeptOffer(raw)) return false;
   if (HELP_FILLER.test(raw)) return true;
   if (callerAskedSpecificQuestion(callerText) && ALREADY_ANSWERED_FILLER.test(raw)) return true;
   if (!callerAskedForCallback(callerText) && CALLBACK_PITCH.test(raw)) return true;
@@ -526,6 +548,10 @@ function guardSpokenReply(text, ctx = {}) {
     if (sentenceLeaksUnboundFile(sentence, ctx.state)) {
       droppedUnboundFile = true;
       logSpokenFilterDrop('unbound_file', sentence);
+      continue;
+    }
+    if (sentenceIsKeptOffer(sentence)) {
+      kept.push(sentence);
       continue;
     }
     if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) {

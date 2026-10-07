@@ -258,7 +258,7 @@ describe('HD_c7053f88314d name confirm after a public answer', () => {
     }
   });
 
-  it('does not re-list the catalogue when the name echo arrives before the list is marked answered', () => {
+  it('speaks the file list when name yes arrives before that list was spoken', () => {
     let brain = createBrainState(CHAPTER_ONE);
     brain = observeCallerTurn(brain, {
       text: 'Tell me your services, man.',
@@ -282,8 +282,9 @@ describe('HD_c7053f88314d name confirm after a public answer', () => {
         language: 'en',
       }
     );
-    assert.doesNotMatch(spoken, /Couch cleaning/);
-    assert.match(spoken, /Which service do you need|Which service do you need\?/);
+    assert.match(spoken, /Couch cleaning/);
+    assert.match(spoken, /Which one do you need/);
+    assert.doesNotMatch(spoken, /Which service do you need\?[\s\S]*Which service do you need/);
   });
 
   it('name yes after any resolved public answer does not end', () => {

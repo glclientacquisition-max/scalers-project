@@ -97,6 +97,7 @@ const SPOKEN_EVERYDAY = new Set([
   'phone',
   'please',
   'price',
+  'reach',
   'right',
   'samahani',
   'shida',

@@ -246,6 +246,7 @@ const {
   isSpeakSlotOutcome,
 } = require('./src/conversation/speakSlots');
 const { narratesInternalAction, groundFilePriceLine } = require('./src/conversation/speechGuard');
+const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
@@ -1784,6 +1785,7 @@ mediaWss.on('connection', (ws, req) => {
   let emptyRepairOffered = false;
   let turnBusy = false;
   let utteranceParts = [];
+  let utteranceLanguages = [];
   let utteranceTimer = null;
   let utteranceStartedAt = 0;
   /** Idle check-in only after the caller has actually spoken. */
@@ -1817,6 +1819,12 @@ mediaWss.on('connection', (ws, req) => {
     const pendingQuestion = Boolean(agentReplay.snapshot().pendingIsQuestion);
     const committed = agentReplay.commitPlayback();
     if (pendingQuestion) {
+      const spokenAsk = committed.lastAgentQuestion || lastAgentText;
+      const brain = callBrainStates.get(sidLabel());
+      if (brain && spokenAsk) {
+        noteSpokenPendingAsk(brain, spokenAsk);
+        callBrainStates.set(sidLabel(), brain);
+      }
       console.log(`[ws/media][${sidLabel()}] agent_question_committed`);
       // Do not poke "still there?" after the greeting. Wait until the caller has spoken.
       idleNudge.arm({
@@ -1841,7 +1849,12 @@ mediaWss.on('connection', (ws, req) => {
   let playbackGeneration = 0;
   let activePlaybackGeneration = 0;
   let pendingUtterance = null;
-  let pendingTurnSignals = { unfinished: false, weak: false, weakStt: false };
+  let pendingTurnSignals = {
+    unfinished: false,
+    weak: false,
+    weakStt: false,
+    tokenLanguages: [],
+  };
   let systemPrompt = buildSystemPrompt();
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
@@ -2566,7 +2579,12 @@ mediaWss.on('connection', (ws, req) => {
     const text = pendingUtterance;
     const signals = pendingTurnSignals;
     pendingUtterance = null;
-    pendingTurnSignals = { unfinished: false, weak: false, weakStt: false };
+    pendingTurnSignals = {
+      unfinished: false,
+      weak: false,
+      weakStt: false,
+      tokenLanguages: [],
+    };
     runCallerTurn(text, signals).catch((err) => {
       console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
     });
@@ -2639,6 +2657,7 @@ mediaWss.on('connection', (ws, req) => {
       userText,
       llmDown: false,
       alreadyOffered: emptyRepairOffered,
+      toolResults: result?.toolResults,
     });
     if (planned.speak && planned.line) {
       emptyRepairOffered = true;
@@ -2666,6 +2685,11 @@ mediaWss.on('connection', (ws, req) => {
       if (flushed.unfinished) pendingTurnSignals.unfinished = true;
       if (flushed.weak) pendingTurnSignals.weak = true;
       if (flushed.weakStt) pendingTurnSignals.weakStt = true;
+      if (Array.isArray(opts.tokenLanguages) && opts.tokenLanguages.length) {
+        pendingTurnSignals.tokenLanguages = (pendingTurnSignals.tokenLanguages || []).concat(
+          opts.tokenLanguages
+        );
+      }
       return;
     }
     // A new caller turn may speak. The previous barge must not swallow it.
@@ -2704,7 +2728,9 @@ mediaWss.on('connection', (ws, req) => {
     activeTurnTiming = turnTiming;
 
     const callKey = sidLabel();
-    const languageEvidence = analyzeCallerLanguage(clean);
+    const languageEvidence = analyzeCallerLanguage(clean, {
+      tokenLanguages: opts.tokenLanguages,
+    });
     callLanguageState = resolveLanguageState(callLanguageState, languageEvidence);
     callLanguage = callLanguageState.current;
 
@@ -3793,6 +3819,7 @@ mediaWss.on('connection', (ws, req) => {
             userText: clean,
             llmDown: false,
             alreadyOffered: emptyRepairOffered,
+            toolResults: result?.toolResults,
           });
           if (planned.speak && planned.line) {
             emptyRepairOffered = true;
@@ -3867,11 +3894,14 @@ mediaWss.on('connection', (ws, req) => {
     utteranceStartedAt = 0;
     if (callEnding) {
       utteranceParts = [];
+      utteranceLanguages = [];
       return;
     }
     if (!utteranceParts.length) return;
     const text = utteranceParts.join('').replace(/\s+/g, ' ').trim();
+    const tokenLanguages = utteranceLanguages.slice();
     utteranceParts = [];
+    utteranceLanguages = [];
     if (!text) return;
     // #584 decideTurnEnd passes { unfinished: true } into this flush.
     // Do not drop that flag on the way to Brain observe.
@@ -3887,6 +3917,11 @@ mediaWss.on('connection', (ws, req) => {
       if (label.unfinished) pendingTurnSignals.unfinished = true;
       if (label.weak) pendingTurnSignals.weak = true;
       if (label.weakStt) pendingTurnSignals.weakStt = true;
+      if (tokenLanguages.length) {
+        pendingTurnSignals.tokenLanguages = (pendingTurnSignals.tokenLanguages || []).concat(
+          tokenLanguages
+        );
+      }
       return;
     }
     console.log(`[ws/media][${sidLabel()}] caller_turn_processed`);
@@ -3904,7 +3939,7 @@ mediaWss.on('connection', (ws, req) => {
         });
       }
     }
-    runCallerTurn(text, { unfinished: label.unfinished, turnEnd }).catch((err) => {
+    runCallerTurn(text, { unfinished: label.unfinished, turnEnd, tokenLanguages }).catch((err) => {
       console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
     });
   }
@@ -3987,6 +4022,14 @@ mediaWss.on('connection', (ws, req) => {
         isFinal: Boolean(evt.isFinal),
         tokens: evt.tokens,
       });
+      if (evt.isFinal) {
+        const tags = Array.isArray(evt.tokenLanguages)
+          ? evt.tokenLanguages
+          : (Array.isArray(evt.tokens) ? evt.tokens : [])
+              .map((token) => token && token.language)
+              .filter(Boolean);
+        if (tags.length) utteranceLanguages.push(...tags);
+      }
 
       const isInterim = !evt.isFinal;
 

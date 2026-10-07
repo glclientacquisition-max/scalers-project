@@ -1177,6 +1177,27 @@ function formatVisitTimeProblem(code, hours, language) {
 const DAY_CUE =
   /\b(today|tomorrow|tonight|leo|kesho|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili)\b/i;
 
+/**
+ * Spoken line for a tool-only turn. A succeeded write uses the confirmation.
+ * A name save with no write still speaks. Any tool result speaks something,
+ * so the turn does not fall through to "say that again".
+ */
+function toolOutcomeLine(results = [], language = 'en') {
+  const confirmed = formatToolConfirmation(results, language);
+  if (confirmed) return confirmed;
+  const rows = Array.isArray(results) ? results : [];
+  if (!rows.length) return '';
+  const lang = confirmationLanguage(language);
+  const sw = lang === 'sw' || lang === 'sheng';
+  const savedName = rows.some(
+    (row) => row && row.action === 'save_caller_info' && row.status === 'succeeded'
+  );
+  if (savedName) {
+    return sw ? 'Sawa, nimehifadhi jina lako.' : "Okay, I've saved your name.";
+  }
+  return sw ? 'Sawa.' : 'Okay.';
+}
+
 function formatToolConfirmation(results = [], language = 'en') {
   const meaningful = results.find((result) =>
     [
@@ -1407,5 +1428,6 @@ module.exports = {
   validateUpdateAppointment,
   executeBrainTools,
   formatToolConfirmation,
+  toolOutcomeLine,
   formatVisitTimeProblem,
 };

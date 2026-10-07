@@ -19,6 +19,10 @@ const {
 const { determineNextBestAction } = require('../src/conversation/nextBestAction');
 const { extractConversationEntities } = require('../src/conversation/entityExtraction');
 const { planCatalogueMouth } = require('../src/speech/catalogueMouth');
+const { polishSpokenReply, planEmptyGeminiSpeech } = require('../src/conversation/dynamicSpeech');
+const { guardSpokenReply } = require('../src/conversation/speechGuard');
+const { noteSpokenPendingAsk } = require('../src/conversation/callCorrectives');
+const { analyzeCallerLanguage, resolveLanguageState, createLanguageState } = require('../src/conversation/language');
 const { lockFileNameAsk } = require('../src/speech/callerFileSpeech');
 const { drainSpokenSpeakSlots } = require('../src/conversation/speakSlots');
 const {
@@ -501,5 +505,144 @@ describe('HD_c705 and HD_708 name yes continues', () => {
     });
     assert.doesNotMatch(detail.planned.lines.join(' '), /Mattress cleaning/);
     assert.doesNotMatch(detail.planned.lines.join(' '), /CATALOGUE MOUTH/);
+  });
+});
+
+describe('HD_0789461c5319 catalogue, callback, and Kiswahili', () => {
+  const ASK = 'Ah, mimi nilikuwa nauliza what you guys offer';
+
+  it('speaks the catalogue with the name ask on the mixed offer turn', () => {
+    const evidence = analyzeCallerLanguage(ASK);
+    const sticky = resolveLanguageState(createLanguageState(), evidence);
+    assert.equal(sticky.current, 'sw');
+    let state = createBrainState(LIST_FILE);
+    state = hear(state, ASK, LIST_FILE, sticky.current);
+    unboundAlvin(state);
+    const decision = determineNextBestAction({ state });
+    assert.notEqual(decision.action, 'END');
+    state = setNextBestAction(state, decision);
+    const turn = playTurn({
+      commit: createSpeakCommit(),
+      text: ASK,
+      state,
+      profile: LIST_FILE,
+      language: sticky.current,
+      endAction: decision.action,
+    });
+    assert.equal(turn.mouth.speakLocal, true);
+    assert.equal(turn.mouth.letGemini, false);
+    const spoken = turn.planned.lines.join(' ');
+    assert.match(spoken, /Couch cleaning/);
+    assert.match(spoken, /Mattress cleaning/);
+    assert.match(spoken, /Carpet cleaning/);
+    assert.match(spoken, /General cleaning/);
+    assert.match(spoken, /Am I speaking with Alvin\?|Je, naongea na Alvin\?/);
+    assert.notEqual(turn.planned.lines[0], turn.planned.lines.at(-1));
+    assert.doesNotMatch(spoken, /CATALOGUE MOUTH/);
+    assert.equal(state.conversation.catalogueListed, true);
+  });
+
+  it('does not ask which service twice after the list', () => {
+    let state = createBrainState(LIST_FILE);
+    state = hear(state, ASK, LIST_FILE, 'sw');
+    unboundAlvin(state);
+    const commit = createSpeakCommit();
+    playTurn({
+      commit,
+      text: ASK,
+      state,
+      profile: LIST_FILE,
+      language: 'sw',
+      endAction: 'ANSWER',
+    });
+    state = observeCallerTurn(state, {
+      text: 'Yes.',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile: LIST_FILE,
+      lastAgentText: 'Je, naongea na Alvin?',
+    });
+    const yes = playTurn({
+      commit,
+      text: 'Yes.',
+      state,
+      profile: LIST_FILE,
+      language: 'en',
+      endAction: 'ANSWER',
+    });
+    assert.equal(yes.planned.farewell, false);
+    assert.doesNotMatch(yes.planned.lines.join(' '), /Couch cleaning/);
+    const polished = polishSpokenReply(
+      'We offer couch cleaning, carpet cleaning, mattress cleaning, and general cleaning. Which service would you like to book, Alvin?',
+      {
+        state,
+        profile: LIST_FILE,
+        callerTurns: ['Yes.'],
+        language: 'en',
+      }
+    );
+    const questions = polished
+      .split(/(?<=[.?!])\s+/)
+      .filter((part) => /which service|which one|unahitaji/i.test(part));
+    assert.ok(questions.length <= 1, polished);
+    assert.doesNotMatch(polished, /Which service do you need\?.*Which service would you like/s);
+  });
+
+  it('keeps the callback offer, and Sawa resolves it into a farewell', () => {
+    const offered = guardSpokenReply(
+      'Kilicho iko outside our standard Nairobi coverage area, so we cannot book a direct visit right now. Would you like me to log a callback for the team to check if we can reach you?',
+      {
+        callerTurns: ['Eeh, mimi naishi Kilicho though.'],
+        profile: { coverage: 'Nairobi' },
+        state: {
+          caller: { nameConfirmed: true, name: 'Alvin' },
+          conversation: { answersReceived: ['Eeh, mimi naishi Kilicho though.'] },
+        },
+        language: 'en',
+        allowEmpty: true,
+      }
+    );
+    assert.match(offered, /cannot book a direct visit/);
+    assert.match(offered, /Would you like me to log a callback/);
+    let state = createBrainState(LIST_FILE);
+    noteSpokenPendingAsk(state, 'Would you like me to log a callback?');
+    for (const text of ['Sawa.', 'Yes.', 'ok', 'ndio']) {
+      const next = observeCallerTurn(state, {
+        text,
+        detectedLanguage: 'sw',
+        resolvedLanguage: 'sw',
+        profile: LIST_FILE,
+      });
+      assert.equal(next.conversation.consentAck, true, text);
+      assert.equal(next.conversation.nonConsentAck, false, text);
+    }
+    const planned = planEmptyGeminiSpeech({
+      language: 'sw',
+      userText: 'Sawa.',
+      toolResults: [{ action: 'create_service_request', status: 'succeeded' }],
+    });
+    assert.notEqual(planned.kind, 'hear_again');
+    assert.match(planned.line, /nimehifadhi|saved/i);
+    assert.match(planned.line, /Asante\. Kwaheri\./);
+    const repair = planEmptyGeminiSpeech({ language: 'en', userText: 'Sawa.' });
+    assert.equal(repair.kind, 'hear_again');
+  });
+
+  it('reads Kiswahili from keywords when Soniox tags are empty, and from tags when they exist', () => {
+    const bnb = analyzeCallerLanguage('Wewe unafanya vitu za BNB?');
+    assert.equal(bnb.language, 'sw');
+    assert.ok(bnb.confidence >= 0.82);
+    const fromEn = resolveLanguageState(
+      { ...createLanguageState(), current: 'en', confidence: 0.9 },
+      bnb
+    );
+    assert.equal(fromEn.current, 'sw');
+    const home = analyzeCallerLanguage('Eeh, mimi naishi Kilicho though.');
+    assert.equal(home.language, 'sw');
+    assert.notEqual(home.language, 'unknown');
+    const bare = analyzeCallerLanguage('Wewe unafanya vitu za BNB?', { tokenLanguages: [] });
+    assert.equal(bare.language, 'sw');
+    const tagged = analyzeCallerLanguage('offer please', { tokenLanguages: ['sw', 'sw', 'sw'] });
+    assert.equal(tagged.language, 'sw');
   });
 });
