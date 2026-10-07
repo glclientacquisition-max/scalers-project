@@ -662,4 +662,30 @@ assert.match(
   'tenant lookup must not fall through to another business'
 );
 
+assert.match(
+  source,
+  /function flushUtterance\(turnEnd\)/,
+  'flush must accept the turn-end decision so unfinished is not dropped'
+);
+assert.match(
+  source,
+  /observeCallerInput\(/,
+  'flushed caller text must enter Brain observe with the unfinished label'
+);
+assert.match(
+  source,
+  /gateCallerFileSpeech\(/,
+  'file name and open rows must pass the speak gate before TTS'
+);
+assert.match(
+  source,
+  /applyToolsWithHold\(/,
+  'a tool call must be able to speak a hold while it is in flight'
+);
+assert.match(
+  source,
+  /onToolHold: speakToolHold/,
+  'barge-in during a tool hold must be able to cancel the follow-up'
+);
+
 console.log('Voice runtime wiring checks passed.');
