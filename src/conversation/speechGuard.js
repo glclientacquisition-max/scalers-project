@@ -107,7 +107,53 @@ function isProtectedSpeech(sentence) {
   if (/^i['’]?ll take a message and have the team call you[.!?]?$/i.test(raw)) return true;
   if (/^nitachukua ujumbe na timu itakupigia[.!?]?$/i.test(raw)) return true;
   if (/\bam i speaking with\b/i.test(raw)) return true;
+  if (/\b(?:je,?\s*)?(?:naongea na|unaongea na|niongee na|ni wewe)\b/i.test(raw)) return true;
   return false;
+}
+
+function pendingUnboundName(state) {
+  if (!state || state.caller?.nameConfirmed === true) return '';
+  return String(
+    state.caller?.fileNameAsked || state.returning?.fileOwnerName || ''
+  ).trim();
+}
+
+const UNBOUND_FILE_ROW =
+  /\b(?:open (?:requests?|visits?|bookings?|holds?)|(?:you have|una) (?:an |a )?(?:\d+|two|three|several)|previous (?:request|booking|visit)|on (?:your|this) file|on this number|carpet cleaning requests?)\b/i;
+
+function isPackIdentityAsk(sentence, name) {
+  const raw = String(sentence || '').trim();
+  if (!raw || UNBOUND_FILE_ROW.test(raw)) return false;
+  if (/^am i speaking with\b/i.test(raw)) return true;
+  if (!name) return false;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(
+    `^(?:je,?\\s*)?(?:naongea na|unaongea na|unazungumza na|niongee na|ni wewe)\\s+${escaped}\\b`,
+    'i'
+  ).test(raw);
+}
+
+/**
+ * Drop vocative file name and file-row claims until nameConfirmed.
+ * TODO(Voice speak-gate): consume the same flag before TTS. This is the Brain mouth filter until that PR.
+ */
+function sentenceLeaksUnboundFile(sentence, state) {
+  const name = pendingUnboundName(state);
+  if (!name) return false;
+  if (isPackIdentityAsk(sentence, name)) return false;
+  if (UNBOUND_FILE_ROW.test(sentence)) return true;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (new RegExp(`^(?:yes|yeah|sawa|eeh|okay|ok)[, ]+${escaped}\\b`, 'i').test(sentence)) {
+    return true;
+  }
+  if (new RegExp(`^${escaped}[,!]`, 'i').test(sentence)) return true;
+  return false;
+}
+
+function unboundFileFallback(language) {
+  const lang = confirmationLanguage(language);
+  if (lang === 'sw' || lang === 'sheng') return 'Nahitaji kuthibitisha ninazungumza na nani.';
+  return 'I need to confirm who I am speaking with.';
 }
 
 /**
@@ -359,6 +405,7 @@ function guardSpokenReply(text, ctx = {}) {
   const kept = [];
   let droppedNumber = false;
   let droppedJob = false;
+  let droppedUnboundFile = false;
   const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
   const heldName = heldCallerName(ctx.state);
   let droppedNameAsk = false;
@@ -366,6 +413,11 @@ function guardSpokenReply(text, ctx = {}) {
     if (heldName && sentenceAsksForCallerName(sentence)) {
       droppedNameAsk = true;
       logSpokenFilterDrop('name_ask', sentence);
+      continue;
+    }
+    if (sentenceLeaksUnboundFile(sentence, ctx.state)) {
+      droppedUnboundFile = true;
+      logSpokenFilterDrop('unbound_file', sentence);
       continue;
     }
     if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) {
@@ -425,6 +477,7 @@ function guardSpokenReply(text, ctx = {}) {
   if (!out && heldName && callerAsksRememberedName(lastCallerTurn)) {
     return `Yes, you are ${heldName}.`;
   }
+  if (!out && droppedUnboundFile) return unboundFileFallback(ctx.language);
   if (!out && droppedNameAsk) {
     if (holdOpenSlot && droppedJob) {
       const slotLine = openSlotLine(ctx.state, ctx.language);

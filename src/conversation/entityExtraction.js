@@ -267,21 +267,40 @@ function bareAskedFileName(text, pending) {
   return namesLikelySame(raw, asked);
 }
 
+const AFFIRM_LEAD =
+  /^(?:uh+|um+|ah+)?[, ]*(?:yes|yeah|yep|yup|ndiyo|ndio|sawa|okay|ok|eeh|ehe|ee|correct)\b/i;
+
+function escapeName(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** "speaking with Alvin" and pack echo "unaongea na Alvin" / "naongea na Alvin". */
+function spokenWithName(text, pending) {
+  const escaped = escapeName(pending);
+  if (!escaped) return false;
+  return new RegExp(
+    `\\b(?:speaking with|speaking to|talking with|talking to|unaongea na|naongea na|unazungumza na|niongee na)\\s+${escaped}\\b`,
+    'i'
+  ).test(String(text || ''));
+}
+
 function affirmsAskedFileName(text, pending, extracted) {
   const asked = String(pending || '').trim();
   if (!asked) return false;
   if (isNameAffirmation(text)) return true;
   const raw = String(text || '').trim();
-  if (!/^(?:yes|yeah|yep|yup|ndiyo|ndio)\b/i.test(raw)) return false;
+  if (!AFFIRM_LEAD.test(raw)) return false;
   if (extracted && !namesLikelySame(extracted, asked) && !isJunkCallerName(extracted)) {
     return false;
   }
-  const escaped = asked.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const speaking = new RegExp(
-    `\\b(?:speaking with|speaking to|talking with|talking to)\\s+${escaped}\\b`,
-    'i'
-  );
-  if (speaking.test(raw)) return true;
+  if (spokenWithName(raw, asked)) return true;
+  if (
+    /\b(?:speaking with|speaking to|talking with|talking to|unaongea na|naongea na|unazungumza na|niongee na)\s+[\p{L}'’-]+/iu.test(
+      raw
+    )
+  ) {
+    return false;
+  }
   const named = extractName(raw, { knownNames: [asked], preferKnown: true });
   return Boolean(named && namesLikelySame(named, asked));
 }
@@ -307,8 +326,11 @@ function agentAskedPendingName(lastAgentText, pendingName) {
   const asked = String(lastAgentText || '');
   const pending = String(pendingName || '').trim();
   if (!asked || !pending) return false;
-  const escaped = pending.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`am i speaking with\\s+${escaped}`, 'i').test(asked);
+  const escaped = escapeName(pending);
+  return new RegExp(
+    `\\b(?:am i speaking with|am i talking (?:with|to)|je,?\\s*naongea na|naongea na|unaongea na|unazungumza na|niongee na|ni wewe)\\s+${escaped}\\b`,
+    'i'
+  ).test(asked);
 }
 
 function applyCallerNameConfirmation(
@@ -387,18 +409,20 @@ function applyCallerNameConfirmation(
     );
   }
 
-  // A yes binds only the file name the code just asked. It does not confirm
-  // some other "I'm …" span, and it does not depend on the model inventing the ask.
-  // Yes binds only the file name the code just asked, including
-  // "Yes, you're speaking with Alvin". It does not bind a different name.
+  // A yes binds only the file name just asked, including pack language:
+  // "Eeh, unaongea na Alvin?" after "Je, naongea na Alvin?".
+  // It does not confirm some other "I'm …" span, and it does not bind a different name.
+  const pendingForAsk = String(opts.pendingFileName || '').trim();
+  const packAsked =
+    Boolean(opts.fileNameJustAsked) ||
+    Boolean(pendingForAsk && agentAskedPendingName(opts.lastAgentText, pendingForAsk));
   if (
     !prevConfirmed &&
-    opts.fileNameJustAsked &&
-    affirmsAskedFileName(text, opts.pendingFileName, extracted)
+    packAsked &&
+    affirmsAskedFileName(text, pendingForAsk, extracted)
   ) {
-    const pending = String(opts.pendingFileName || '').trim();
-    if (pending) {
-      const locked = fileLockedName(pending, knownNames) || pending;
+    if (pendingForAsk) {
+      const locked = fileLockedName(pendingForAsk, knownNames) || pendingForAsk;
       return done(locked, true, 'caller_file', 0.95);
     }
   }
@@ -627,6 +651,100 @@ function isBackchannelOrFragment(text) {
     return true;
   }
   return false;
+}
+
+// Open Kiswahili stems Voice already treats as unfinished. Rejected as a goal
+// even when the flush does not pass unfinished/weak yet.
+const UNFINISHED_GOAL_ONLY =
+  /^(?:(?:uh+|um+|ah+|eeh|eh|like|so|well|actually|i mean)[, ]+)*(?:nilikuwa(?:\s+nauliza)?|nauliza|ningetaka|ningependa|naomba|nataka|i was (?:just )?asking|i wanted to ask)(?:\s*[?.!,])*$/i;
+
+const UNFINISHED_GOAL_TAIL =
+  /\b(?:nauliza|nilikuwa|ningetaka|ningependa|naomba|nataka)\b(?:\s*[?.!,])*$/i;
+
+function looksLikePhaticGoal(text) {
+  const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
+  return looksLikePhaticCallerTurn(text);
+}
+
+function callerAskSpecificity(text) {
+  const value = String(text || '').toLowerCase();
+  let score = 0;
+  if (
+    /\b(dishwash\w*|carpet|sofa|couch|mattress|upholstery|fumigation|plumb\w*|electric\w*)\b/.test(
+      value
+    )
+  ) {
+    score += 3;
+  }
+  if (
+    /\b(clean\w*|inquir\w*|enquir\w*|booking|appointment|hold|visit|order|price|bei)\b/.test(
+      value
+    )
+  ) {
+    score += 2;
+  }
+  if (/\b(request|previous|last time)\b/.test(value)) score += 1;
+  return score;
+}
+
+function isIdentityEchoOnly(text) {
+  const raw = String(text || '')
+    .trim()
+    .replace(/^(?:uh+|um+|eeh|eh|ndiyo|ndio|yes|yeah|sawa|okay|ok)[,.\s]+/i, '')
+    .replace(/[?.!]+$/g, '')
+    .trim();
+  return /^(?:je,?\s*)?(?:unaongea na|naongea na|unazungumza na|niongee na|speaking with|talking to|am i speaking with)\s+[\p{L}'’-]+$/iu.test(
+    raw
+  );
+}
+
+function isUnfinishedCallerStem(text) {
+  const value = String(text || '').trim();
+  if (!value) return false;
+  if (UNFINISHED_GOAL_ONLY.test(value)) return true;
+  const words = value.split(/\s+/).filter(Boolean);
+  return (
+    words.length > 0 &&
+    words.length <= 6 &&
+    UNFINISHED_GOAL_TAIL.test(value) &&
+    callerAskSpecificity(value) === 0
+  );
+}
+
+/**
+ * Goal text must be a grounded ask. Voice may pass unfinished/weak; the stem
+ * list still rejects when that flag is missing.
+ * @param {string} text
+ * @param {{ unfinished?: boolean, weak?: boolean }} [opts]
+ */
+function isRejectedGoalText(text, opts = {}) {
+  if (opts.unfinished === true || opts.weak === true) return true;
+  const value = String(text || '').trim();
+  if (!value) return true;
+  if (isBackchannelOrFragment(value)) return true;
+  if (looksLikePhaticGoal(value)) return true;
+  if (isIdentityEchoOnly(value)) return true;
+  if (isUnfinishedCallerStem(value)) return true;
+  return false;
+}
+
+function stripUnfinishedGoalNoise(text) {
+  let value = String(text || '');
+  value = value.replace(
+    /(?:^|[.?!]\s*)(?:uh+|um+|eeh|eh|ndiyo|ndio|yes|yeah|sawa|okay|ok)[, ]+(?:unaongea na|naongea na|unazungumza na|niongee na|speaking with|talking to)\s+[\p{L}'’-]+[?.!]*/giu,
+    ' '
+  );
+  value = value.replace(/\bnilikuwa\s+nauliza\b[?.!,]*/gi, ' ');
+  return value.replace(/\s+/g, ' ').replace(/^[,.\s]+/, '').replace(/[,.\s]+$/, '').trim();
+}
+
+function callerGoalText(text, opts = {}) {
+  const raw = String(text || '').trim();
+  if (!raw || isRejectedGoalText(raw, opts)) return '';
+  const stripped = stripUnfinishedGoalNoise(raw);
+  if (!stripped || stripped === raw) return isRejectedGoalText(raw) ? '' : raw;
+  if (isRejectedGoalText(stripped)) return '';
+  return stripped;
 }
 
 function isPlausibleCallerName(value) {
@@ -960,6 +1078,10 @@ module.exports = {
   shortSlotAnswer,
   isHearAgainSignal,
   isBackchannelOrFragment,
+  isRejectedGoalText,
+  callerGoalText,
+  callerAskSpecificity,
+  agentAskedPendingName,
   isPlausibleCallerName,
   entityValue,
 };

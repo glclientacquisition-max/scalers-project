@@ -2,7 +2,11 @@
 // Hangup must stay instant: Brain persist first, this run is fire-and-forget.
 // Gemini never hears live audio. Transcript text is untrusted.
 
-const { entityValue, isPlausibleCallerName } = require('./entityExtraction');
+const {
+  entityValue,
+  isPlausibleCallerName,
+  isRejectedGoalText,
+} = require('./entityExtraction');
 const {
   VISIT_REQUESTED_NOTE,
   HOLD_OPEN_NOTE,
@@ -992,8 +996,68 @@ async function defaultLoadTurns(callSid) {
   return db.listTranscriptTurns(callSid);
 }
 
-async function defaultSave({ callSid, merged, review, derived }) {
+function replaceIntentLabel(text, primaryIntent) {
+  const intent = String(primaryIntent || '').trim();
+  if (!intent) return String(text || '').trim();
+  const body = String(text || '').trim();
+  if (/Intent:\s*[^.]*/i.test(body)) {
+    return body.replace(/Intent:\s*[^.]*/i, `Intent: ${intent}`);
+  }
+  return body ? `Intent: ${intent}. ${body}` : `Intent: ${intent}.`;
+}
+
+function stripRejectedGoalClauses(text) {
+  return String(text || '')
+    .replace(
+      /(^|\.\s+)Goal:\s*([\s\S]*?)(?=(?:\.\s+(?:Caller|Products|Actions|Instructions|Intent):)|$)/gi,
+      (full, _lead, goal) => {
+        const body = String(goal || '')
+          .replace(/[.\s]+$/g, '')
+          .trim();
+        if (!body || isRejectedGoalText(body)) return '';
+        return full;
+      }
+    )
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+\./g, '.')
+    .trim();
+}
+
+/**
+ * When review changes intent or resolution, rewrite the same summary spine
+ * the hangup writer stored. Desk columns and summary JSON stay on one write.
+ */
+function alignSummarySpine({ summary, merged, derived } = {}) {
+  const intentChanged = merged?.applied?.intent === true;
+  const resolutionChanged = merged?.applied?.resolution === true;
+  if (!intentChanged && !resolutionChanged) return null;
+  const primaryIntent = merged.primaryIntent || derived?.primaryIntent || null;
+  const resolution = merged.resolution || derived?.resolution || null;
+  let text = stripRejectedGoalClauses(replaceIntentLabel(summary?.text || '', primaryIntent));
+  text = text.replace(/\s{2,}/g, ' ').trim();
+  let resolutionNote = derived?.resolutionNote || null;
+  if (resolutionChanged) {
+    const reason = cleanReason(merged?.reason || '');
+    if (resolution === 'needs_human') {
+      resolutionNote = reason || 'Caller needed a person to call back.';
+    } else if (resolution === 'resolved') {
+      resolutionNote = reason || 'Answered.';
+    } else if (reason) {
+      resolutionNote = reason;
+    }
+  }
+  return {
+    primary_intent: primaryIntent,
+    resolution,
+    brain_summary: text,
+    text,
+    resolutionNote,
+  };
+}
+
+async function defaultSave({ callSid, merged, review, derived, summary }) {
   const db = require('../db');
+  const spine = alignSummarySpine({ summary, merged, derived });
   const patch = {
     owner_review: {
       reason: merged.reason || null,
@@ -1014,6 +1078,13 @@ async function defaultSave({ callSid, merged, review, derived }) {
     patch.reason = merged.reason;
     patch.text = merged.reason;
   }
+  if (spine) {
+    patch.primary_intent = spine.primary_intent;
+    patch.resolution = spine.resolution;
+    patch.brain_summary = spine.brain_summary;
+    patch.text = spine.text;
+    if (spine.resolutionNote) patch.resolution_note = spine.resolutionNote;
+  }
   await db.mergeCallSummaryMeta({ callSid, patch });
   if (
     merged.applied.intent ||
@@ -1024,7 +1095,7 @@ async function defaultSave({ callSid, merged, review, derived }) {
       callSid,
       resolution: merged.resolution,
       primaryIntent: merged.primaryIntent,
-      resolutionNote: derived?.resolutionNote || null,
+      resolutionNote: spine?.resolutionNote || derived?.resolutionNote || null,
     });
   }
 }
@@ -1126,6 +1197,7 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
           primaryIntent: ctx.derived?.primaryIntent || null,
           resolutionNote: null,
         },
+        summary: ctx.summary,
       });
       return { ok: true, merged, silence: true };
     }
@@ -1177,7 +1249,7 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
     return { ok: true, skipped: true, merged, review };
   }
 
-  await save({ callSid, merged, review, derived: ctx.derived });
+  await save({ callSid, merged, review, derived: ctx.derived, summary: ctx.summary });
   return { ok: true, merged, review };
 }
 
@@ -1249,6 +1321,7 @@ module.exports = {
   extractCallerNameFromTranscript,
   formatTranscriptForReview,
   isReviewEnabled,
+  alignSummarySpine,
   mergeTranscriptReview,
   normalizeMood,
   parseExtractedCallerName,

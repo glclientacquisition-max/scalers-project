@@ -93,7 +93,7 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       return {
         action: ACTIONS.ANSWER,
         reason:
-          'Name is not confirmed. Requested rows are already on this number. Do not say nothing is saved. Do not start a new booking. Confirm the name before reading the file.',
+          'Name is not confirmed. Say only that you need to confirm who is speaking. Do not mention open visits, holds, history, or rows on this number. Do not start a new booking.',
       };
     }
     return {

@@ -17,7 +17,7 @@ credits-down path. A file read ("which bookings", "previous booking",
 "read them", "what do I have on hold") is not a new booking. If this
 speaker has nothing saved, Voice says so and does not invent a visit,
 an order, or a service list. Home services and retail use the same gate.
-A bound file with a real visit or hold is still read by the model.
+A bound file with a real visit or hold is still read by the model. Caller file bind, goal quality, and the summary spine: [`CALLER_IDENTITY_AND_SUMMARY.md`](./CALLER_IDENTITY_AND_SUMMARY.md) and [`../product/CALLER_FILE_MODEL.md`](../product/CALLER_FILE_MODEL.md).
 
 Runtime: `server.js` media loop. Offline twin: `tests/helpers/brainSimulator.js`.
 Proof: `tests/brainSimulation.test.js` (in `npm run test:brain`).

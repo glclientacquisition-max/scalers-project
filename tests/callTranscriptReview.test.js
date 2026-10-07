@@ -1,6 +1,7 @@
 const { afterEach, describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  alignSummarySpine,
   extractCallerNameFromTranscript,
   formatTranscriptForReview,
   isReviewEnabled,
@@ -645,6 +646,33 @@ describe('mergeTranscriptReview', () => {
     assert.equal(merged.resolution, 'needs_human');
     assert.equal(merged.applied.intent, true);
     assert.equal(merged.applied.resolution, true);
+  });
+
+  it('rewrites summary intent and drops an unfinished goal when review upgrades', () => {
+    const spine = alignSummarySpine({
+      summary: {
+        text: 'Intent: general_enquiry. Goal: Nilikuwa nauliza',
+      },
+      merged: {
+        primaryIntent: 'human',
+        resolution: 'needs_human',
+        reason: 'Alvin asked about a previous dishwashing inquiry.',
+        applied: { intent: true, resolution: true },
+      },
+      derived: {
+        primaryIntent: 'general_enquiry',
+        resolution: 'resolved',
+        resolutionNote:
+          'Resolve from knowledge; clarify once only if a specific fact is missing.',
+      },
+    });
+    assert.equal(spine.primary_intent, 'human');
+    assert.equal(spine.resolution, 'needs_human');
+    assert.match(spine.brain_summary, /Intent: human/);
+    assert.doesNotMatch(spine.brain_summary, /Goal:\s*Nilikuwa nauliza/);
+    assert.doesNotMatch(spine.brain_summary, /general_enquiry/);
+    assert.doesNotMatch(spine.resolutionNote, /Resolve from knowledge/);
+    assert.match(spine.resolutionNote, /dishwashing/i);
   });
 
   it('does not upgrade to needs_human below confidence', () => {

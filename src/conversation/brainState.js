@@ -4,6 +4,9 @@
 const {
   entityValue,
   isBackchannelOrFragment,
+  isRejectedGoalText,
+  callerGoalText,
+  callerAskSpecificity,
   isHearAgainSignal,
   applyCallerNameConfirmation,
 } = require('./entityExtraction');
@@ -258,6 +261,7 @@ function createBrainState(profile = {}) {
       name: null,
       phone: null,
       nameConfirmed: false,
+      boundRole: null,
     },
     profile.callerMemory
   );
@@ -268,6 +272,7 @@ function createBrainState(profile = {}) {
       name: caller.name || null,
       phone: caller.phone || null,
       nameConfirmed: Boolean(caller.nameConfirmed),
+      boundRole: caller.boundRole || null,
       nameCollision: Array.isArray(caller.nameCollision) ? caller.nameCollision : null,
       fileNameAsked: null,
       fileNameAskSpoken: false,
@@ -352,6 +357,32 @@ function createBrainState(profile = {}) {
     }
   }
   return state;
+}
+
+function promoteCallerGoal(next, text, input, previousIntent) {
+  const usable = callerGoalText(text, {
+    unfinished: input?.unfinished === true,
+    weak: input?.weak === true || input?.weakStt === true,
+  });
+  if (!usable) return;
+  const current = String(next.goal?.description || '').trim();
+  if (!current || isRejectedGoalText(current)) {
+    next.goal.description = usable;
+    return;
+  }
+  const nextScore = callerAskSpecificity(usable);
+  const currentScore = callerAskSpecificity(current);
+  if (nextScore > currentScore) {
+    next.goal.description = usable;
+    return;
+  }
+  const intentChanged =
+    previousIntent &&
+    previousIntent !== 'unknown' &&
+    previousIntent !== next.intent;
+  if (intentChanged && nextScore > 0 && nextScore >= currentScore) {
+    next.goal.description = usable;
+  }
 }
 
 function observeCallerTurn(state, input = {}) {
@@ -441,20 +472,9 @@ function observeCallerTurn(state, input = {}) {
 
   next.intent = intent;
   next.goal.primary = GOAL_BY_INTENT[intent] || 'resolve_enquiry';
-  const usableGoalText =
-    text && !isBackchannelOrFragment(text) && !looksLikePhaticCallerTurn(text)
-      ? text
-      : '';
-  if (
-    usableGoalText &&
-    (!next.goal.description ||
-      next.goal.status === 'unknown' ||
-      (previousIntent !== 'unknown' &&
-        previousIntent !== intent &&
-        !isBackchannelOrFragment(next.goal.description || '')))
-  ) {
-    next.goal.description = usableGoalText;
-  }
+  // Voice may pass unfinished/weak. Open stems are rejected even when the flag is absent.
+  // TODO(Voice): pass unfinished and weakStt from flushUtterance, and consume nameConfirmed before TTS.
+  promoteCallerGoal(next, text, input, previousIntent);
   next.goal.status = 'active';
   next.handoff.requested = intent === 'human';
 
@@ -537,6 +557,9 @@ function observeCallerTurn(state, input = {}) {
     delete next.entities.name;
   }
   applyLiveCallerFile(input.profile, next);
+  next.caller.boundRole = next.caller.nameConfirmed
+    ? next.returning?.fileRole || null
+    : null;
   if (!next.messageOnly) {
     next.caller.fileNameAsked = ownedFileAsk(next.returning, next.caller);
   }

@@ -10,7 +10,7 @@ const {
 } = require('./callResolution');
 const {
   entityValue,
-  isBackchannelOrFragment,
+  callerGoalText,
   isPlausibleCallerName,
 } = require('./entityExtraction');
 
@@ -27,8 +27,8 @@ function safeCallerName(state) {
 }
 
 function safeGoalDescription(raw) {
-  const goal = clean(raw, 160);
-  if (!goal || isBackchannelOrFragment(goal)) return '';
+  const goal = clean(callerGoalText(raw), 160);
+  if (!goal) return '';
   return goal;
 }
 
@@ -172,7 +172,7 @@ function buildOwnerReason({ callerName, primaryIntent, goal, products, results }
     return clean(`${who} needs you to return the call.`, 220);
   }
   if (goal) {
-    return clean(`${who} asked about ${goal.replace(/\.$/, '')}.`, 220);
+    return clean(`${who} asked about ${goal.replace(/[.?]+$/g, '')}.`, 220);
   }
   if (primaryIntent === 'hours_open') {
     return clean(`${who} asked about hours.`, 220);
