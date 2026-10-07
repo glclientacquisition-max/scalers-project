@@ -379,7 +379,7 @@ async function HomeOverviewBody() {
             </>
           ) : null}
         </section>
-        {score ? (
+        {score && line !== "live" ? (
           <HomeCapture
             tenantId={tenant.id}
             vertical={vertical}

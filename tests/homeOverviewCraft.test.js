@@ -136,6 +136,14 @@ describe("home overview craft", () => {
     assert.match(page, /\+254 \$1 \$2 \$3/);
   });
 
+  it("shows Setup capture only before the line is live", () => {
+    assert.match(page, /score && line !== "live"/);
+    assert.match(page, /<HomeCapture/);
+    const note = read("docs/frontend/design-system/pages/home.md");
+    assert.doesNotMatch(note, /Setup/);
+    assert.doesNotMatch(note, /HomeCapture/);
+  });
+
   it("renders the day digest only from a complete window", () => {
     assert.match(page, /homeDigestLine\(inbox\.items, dayStart, vertical\)/);
     assert.match(page, /inbox\.callsTruncated/);
