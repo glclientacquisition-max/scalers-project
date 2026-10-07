@@ -46,7 +46,7 @@ export function ContactSortSelect({
         <button
           type="button"
           aria-label="Sort contacts"
-          className={buttonClass({ variant: "ghost", size: "sm", className: "gap-1 text-ink-2" })}
+          className={buttonClass({ variant: "ghost", size: "md", className: "gap-1 px-3 text-ink-2" })}
         >
           <span className="text-meta text-ink-3">Sort</span>
           <span className="text-body text-ink">{active}</span>
