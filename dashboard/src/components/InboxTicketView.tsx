@@ -15,7 +15,7 @@ import { InboxTicketActionDock } from "@/components/InboxTicketActionDock";
 import { ContactStrip } from "@/components/ContactStrip";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
-import { IconButton, iconButtonClass } from "@/components/ui/IconButton";
+import { iconButtonClass } from "@/components/ui/IconButton";
 import { Menu, MenuItem } from "@/components/ui/Menu";
 import {
   deskShiftClass,

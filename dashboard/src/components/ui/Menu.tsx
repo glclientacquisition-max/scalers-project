@@ -31,10 +31,9 @@ export function Menu({
   onOpenChange?: (open: boolean) => void;
   popupClassName?: string;
 }) {
-  const { className, children: triggerChildren, type: _type, ...triggerProps } = trigger.props as {
+  const { className, children: triggerChildren, ...triggerProps } = trigger.props as {
     className?: string;
     children?: ReactNode;
-    type?: string;
   } & Record<string, unknown>;
   return (
     <BaseMenu.Root {...(typeof open === "boolean" ? { open } : {})} onOpenChange={onOpenChange}>
