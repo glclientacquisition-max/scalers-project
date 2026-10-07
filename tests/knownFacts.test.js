@@ -168,19 +168,17 @@ describe('HD_ec64018de793 catalogue list', () => {
       profile: CHAPTER_ONE,
       language: 'sw',
     });
-    assert.equal(local.outcome, 'catalogue');
-    assert.match(local.line, /^Tuna Couch cleaning/);
-    assert.match(local.line, /Mattress cleaning/);
-    assert.match(local.line, /Carpet cleaning/);
-    assert.match(local.line, /General cleaning/);
-    assert.doesNotMatch(local.line, /ungependa|what do you need|which service would you like/i);
+    assert.notEqual(local && local.outcome, 'catalogue');
 
     const decision = determineNextBestAction({ state: brain });
     assert.equal(decision.action, 'ANSWER');
-    assert.equal(decision.resolves, true);
-    assert.match(decision.reason, /catalogue/i);
+    assert.notEqual(decision.action, 'END');
+    assert.notEqual(decision.resolves, true);
+    assert.match(decision.reason, /which service|still open/i);
+    assert.doesNotMatch(decision.reason, /Speak that list|Speak only these names/i);
     const resolved = setNextBestAction(brain, decision);
-    assert.equal(resolved.resolution.status, 'resolved');
+    assert.notEqual(resolved.resolution.nextBestAction, 'END');
+    assert.notEqual(resolved.goal.status, 'completed');
 
     const spoken = polishSpokenReply('Ungependa tusaidie na gani leo?', {
       state: brain,
@@ -188,8 +186,9 @@ describe('HD_ec64018de793 catalogue list', () => {
       profile: CHAPTER_ONE,
       language: 'sw',
     });
-    assert.match(spoken, /^Tuna Couch cleaning/);
-    assert.doesNotMatch(spoken, /ungependa|gani leo/i);
+    assert.doesNotMatch(spoken, /Couch cleaning/);
+    assert.doesNotMatch(spoken, /Mattress cleaning/);
+    assert.match(spoken, /Ungependa|huduma gani/i);
 
     const crystal = polishSpokenReply('What do you need done? Which service would you like?', {
       state: state('Tell me your services, man.'),
@@ -257,7 +256,7 @@ describe('HD_c7053f88314d name confirm after a public answer', () => {
     }
   });
 
-  it('still lists the catalogue when the echo arrives before the list is marked answered', () => {
+  it('does not re-list the catalogue when the name echo arrives before the list is marked answered', () => {
     let brain = createBrainState(CHAPTER_ONE);
     brain = observeCallerTurn(brain, {
       text: 'Tell me your services, man.',
@@ -268,8 +267,21 @@ describe('HD_c7053f88314d name confirm after a public answer', () => {
     brain = confirmName(brain, 'Eeh, unaongea na Alvin?');
     const decision = determineNextBestAction({ state: brain });
     assert.equal(decision.action, 'ANSWER');
-    assert.equal(decision.resolves, true);
-    assert.match(decision.reason, /catalogue/i);
+    assert.notEqual(decision.action, 'END');
+    assert.notEqual(decision.resolves, true);
+    assert.match(decision.reason, /which service|booking/i);
+    assert.doesNotMatch(decision.reason, /Speak that list|Speak only these names/i);
+    const spoken = polishSpokenReply(
+      'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning. Which service do you need?',
+      {
+        state: brain,
+        callerTurns: ['Eeh, unaongea na Alvin?'],
+        profile: CHAPTER_ONE,
+        language: 'en',
+      }
+    );
+    assert.doesNotMatch(spoken, /Couch cleaning/);
+    assert.match(spoken, /Which service do you need|Which service do you need\?/);
   });
 
   it('name yes after any resolved public answer does not end', () => {

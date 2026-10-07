@@ -24,7 +24,12 @@ const {
 } = require('./callCorrectives');
 const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
 const { hoursAskLine, offerCatalogueLine } = require('./knownFacts');
-const { catalogueAskInPlay } = require('./fileRead');
+const {
+  catalogueItemNames,
+  freshCatalogueAsk,
+  geminiCatalogueEnabled,
+  serviceFactsLine,
+} = require('./catalogueMouth');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
@@ -99,6 +104,12 @@ function planCallerModelTurn(state, opts = {}) {
     if (who) caller.fileNameAsked = who;
   }
   const line = fileNameAskLine(state);
+  const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
+  // Staging listen: Gemini speaks the catalogue even when a file name is pending.
+  // The name ask stays for the next turn. Flag off keeps the name-ask early return.
+  if (line && geminiCatalogueEnabled() && freshCatalogueAsk(latest)) {
+    return { runModel: true, line: '' };
+  }
   if (line) return { runModel: false, line };
   return { runModel: true, line: '' };
 }
@@ -129,11 +140,19 @@ function resolveLocalReply({
   // Visit, hold, and order words are on conversation.fileReadSentence for Voice.
   // Do not speak them here. A local reply would end the turn before Gemini.
 
-  const offerSource = catalogueAskInPlay(clean, state);
-  const offerLine = offerSource
-    ? offerCatalogueLine(offerSource, profile, language)
-    : '';
-  if (offerLine) return { outcome: 'catalogue', line: offerLine };
+  const detailLine = serviceFactsLine(clean, profile, language);
+  if (detailLine) return { outcome: 'service_facts', line: detailLine };
+
+  // A name yes is not another catalogue. A detail ask is not the name list.
+  // Gemini mouth (staging flag) leaves the first list to the model.
+  if (
+    freshCatalogueAsk(clean) &&
+    !state?.caller?.nameJustConfirmed &&
+    !(geminiCatalogueEnabled() && catalogueItemNames(profile).length)
+  ) {
+    const offerLine = offerCatalogueLine(clean, profile, language);
+    if (offerLine) return { outcome: 'catalogue', line: offerLine };
+  }
 
   const coverageLine = coverageAskSpeech(clean, profile, language);
   if (coverageLine) return { outcome: 'coverage', line: coverageLine };
@@ -191,7 +210,8 @@ function resolveLocalReply({
   if (correctiveLine) return { outcome: 'corrective', line: correctiveLine };
 
   // How-are-you, Okay, and a bare name go to Gemini. Identity, hours,
-  // the catalogue, coverage, leave-it, and the visit-time ladder stay fixed lines.
+  // coverage, leave-it, and the visit-time ladder stay fixed lines.
+  // The catalogue list is a fixed line unless BRAIN_GEMINI_CATALOGUE is on.
   return null;
 }
 

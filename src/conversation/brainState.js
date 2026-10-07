@@ -14,6 +14,10 @@ const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForProm
 const { looksLikePhaticCallerTurn, looksLikePaceOnlyTurn } = require('./dynamicSpeech');
 const { looksLikeFileRead, hasReadableFile, spokenFileRead } = require('./fileRead');
 const {
+  catalogueItemNames,
+  formatCatalogueMouthForPrompt,
+} = require('./catalogueMouth');
+const {
   ackIsConsent,
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
@@ -346,6 +350,7 @@ function createBrainState(profile = {}) {
       refusedPlaces: [],
     },
     messageOnly: isMessageOnlyMode(profile.afterHoursMode),
+    catalogueItems: catalogueItemNames(profile),
   };
   if (state.messageOnly) {
     const owner = messageFileOwnerName(profile, state.returning);
@@ -396,6 +401,9 @@ function promoteCallerGoal(next, text, input, previousIntent) {
 function observeCallerTurn(state, input = {}) {
   let next = structuredClone(state || createBrainState(input.profile));
   if (next.conversation) next.conversation.catalogueSpokenThisTurn = false;
+  if (input.profile && Object.prototype.hasOwnProperty.call(input.profile, 'servicesCatalog')) {
+    next.catalogueItems = catalogueItemNames(input.profile);
+  }
   if (input.profile && input.profile.afterHoursMode != null) {
     next.messageOnly = isMessageOnlyMode(input.profile.afterHoursMode);
   }
@@ -1207,6 +1215,7 @@ function formatBrainStateForPrompt(state) {
       ? '- The last fact was answered. The call is still open. Do not say goodbye unless they sign off.'
       : '',
     `- Resolution: ${value.resolution.status}`,
+    formatCatalogueMouthForPrompt(value),
     `- NEXT BEST ACTION: ${value.resolution.nextBestAction} — ${value.resolution.reason}`,
   ]
     .filter(Boolean)
