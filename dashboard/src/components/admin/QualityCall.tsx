@@ -111,7 +111,7 @@ export function QualityCall({
       <PageHeader
         title={trace.callId}
         meta={
-          <Link href={businessHref} className="text-ink-2 outline-none focus-visible:ring-2 focus-visible:ring-brand">
+          <Link href={businessHref} className="inline-flex min-h-11 items-center rounded-md text-ink-2 outline-none focus-visible:ring-2 focus-visible:ring-brand">
             {trace.businessName}
           </Link>
         }

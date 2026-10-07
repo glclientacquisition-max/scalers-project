@@ -110,7 +110,7 @@ export function QualityIndex({
                         <Td>
                           <Link
                             href={href}
-                            className="rounded-md font-medium text-ink outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-brand"
+                            className="inline-flex min-h-11 items-center rounded-md font-medium text-ink outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-brand"
                           >
                             {row.name}
                           </Link>

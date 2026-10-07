@@ -79,7 +79,7 @@ export function QualityBusiness({
                       <Td>
                         <Link
                           href={qualityCallHref(base, call.callId)}
-                          className="rounded-md font-medium text-ink outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-brand"
+                          className="inline-flex min-h-11 items-center rounded-md font-medium text-ink outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-brand"
                         >
                           {call.callId}
                         </Link>
