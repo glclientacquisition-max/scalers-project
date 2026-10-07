@@ -168,7 +168,9 @@ describe('HD_ec64018de793 catalogue list', () => {
       profile: CHAPTER_ONE,
       language: 'sw',
     });
-    assert.notEqual(local && local.outcome, 'catalogue');
+    assert.equal(local.outcome, 'catalogue');
+    assert.match(local.line, /Couch cleaning/);
+    assert.doesNotMatch(local.line, /CATALOGUE MOUTH/i);
 
     const decision = determineNextBestAction({ state: brain });
     assert.equal(decision.action, 'ANSWER');

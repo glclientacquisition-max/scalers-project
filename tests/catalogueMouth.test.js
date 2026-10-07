@@ -24,6 +24,8 @@ const {
   planCatalogueMouth,
   softenCataloguePunctuation,
 } = require('../src/speech/catalogueMouth');
+const { buildSystemPrompt } = require('../src/prompts');
+const { extractConversationEntities } = require('../src/conversation/entityExtraction');
 
 const FILE = {
   servicesCatalog: [
@@ -344,7 +346,8 @@ describe('catalogue mouth flag', () => {
     assert.doesNotMatch(decision.reason, /houses|air bnbs|Window/);
     const prompted = setNextBestAction(brain, decision);
     const block = formatBrainStateForPrompt(prompted);
-    assert.match(block, /CATALOGUE MOUTH/);
+    assert.match(block, /Exact service names/);
+    assert.doesNotMatch(block, /CATALOGUE MOUTH/);
     assert.match(block, /"Couch cleaning"/);
     assert.match(block, /"General cleaning"/);
     assert.doesNotMatch(block, /houses & air bnbs/);
@@ -494,6 +497,154 @@ describe('catalogue grounding and no re-list', () => {
       }),
     });
     assert.equal(bye.action, 'END');
+  });
+
+  it('treats a singular offer ask as the file list', () => {
+    assert.equal(looksLikeOfferAsk('which service is you offer'), true);
+    assert.equal(looksLikeOfferAsk('which service do you offer'), true);
+    assert.equal(looksLikeOfferAsk('which service would you like'), false);
+    const state = brainFor('which service is you offer.');
+    const local = resolveLocalReply({
+      text: 'which service is you offer.',
+      state,
+      profile: PROFILE,
+      language: 'en',
+    });
+    assert.equal(local.outcome, 'catalogue');
+    assert.match(local.line, /Carpet cleaning/);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /CATALOGUE MOUTH/);
+    assert.doesNotMatch(buildSystemPrompt({ vertical: 'home_services' }), /CATALOGUE MOUTH/);
+  });
+
+  it('speaks the on-file price for the confirmed service', () => {
+    const profile = {
+      ...PROFILE,
+      servicesCatalog: [
+        { name: 'Couch cleaning', price_range: '800-1200' },
+        { name: 'Carpet cleaning', price_range: 'Ksh 1500-2000', notes: 'per room' },
+        { name: 'Sofa cleaning' },
+      ],
+    };
+    let state = createBrainState(profile);
+    state = observeCallerTurn(state, {
+      text: 'Carpet cleaning',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+      entities: extractConversationEntities('Carpet cleaning', { profile, state }),
+    });
+    state = observeCallerTurn(state, {
+      text: 'How much is it?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+      entities: extractConversationEntities('How much is it?', { profile, state }),
+    });
+    const local = resolveLocalReply({
+      text: 'How much is it?',
+      state,
+      profile,
+      language: 'en',
+    });
+    assert.equal(local.outcome, 'price');
+    assert.equal(local.line, 'Carpet cleaning is Ksh 1500-2000.');
+    const spoken = polishSpokenReply(
+      "I don't have that on file. I can note it for the team.",
+      {
+        state,
+        callerTurns: ['How much is it?'],
+        profile,
+        language: 'en',
+      }
+    );
+    assert.equal(spoken, 'Carpet cleaning is Ksh 1500-2000.');
+    assert.doesNotMatch(spoken, /on file/i);
+    const swState = observeCallerTurn(state, {
+      text: 'Ni pesa ngapi?',
+      detectedLanguage: 'sw',
+      resolvedLanguage: 'sw',
+      profile,
+    });
+    const sw = polishSpokenReply('Sina hiyo kwenye rekodi. Naweza kuandika kwa timu.', {
+      state: swState,
+      callerTurns: ['Ni pesa ngapi?'],
+      profile,
+      language: 'sw',
+    });
+    assert.equal(sw, 'Carpet cleaning ni Ksh 1500-2000.');
+    const missing = resolveLocalReply({
+      text: 'How much is sofa cleaning?',
+      state,
+      profile,
+      language: 'en',
+    });
+    assert.equal(missing, null);
+    const honest = polishSpokenReply("I don't have that on file. I can note it for the team.", {
+      state,
+      callerTurns: ['How much is sofa cleaning?'],
+      profile,
+      language: 'en',
+    });
+    assert.match(honest, /don't have that on file/i);
+    assert.doesNotMatch(honest, /1500/);
+  });
+
+  it('speaks the carpet note or price on a more-about ask', () => {
+    const profile = {
+      ...PROFILE,
+      servicesCatalog: [
+        { name: 'Carpet cleaning', price_range: 'Ksh 1500-2000' },
+        { name: 'Mattress cleaning', notes: 'both sides' },
+      ],
+    };
+    const state = brainFor('tell me more about carpet', profile);
+    const local = resolveLocalReply({
+      text: 'tell me more about carpet',
+      state,
+      profile,
+      language: 'en',
+    });
+    assert.equal(local.outcome, 'service_facts');
+    assert.equal(local.line, 'Carpet cleaning is Ksh 1500-2000.');
+    const booked = polishSpokenReply('Would you like to book a cleaning visit for your carpet?', {
+      state,
+      callerTurns: ['tell me more about carpet'],
+      profile,
+      language: 'en',
+    });
+    assert.match(booked, /Carpet cleaning is Ksh 1500-2000/);
+    assert.doesNotMatch(booked, /don't have that on file/i);
+  });
+
+  it('drops a Gemini catalogue label after name yes', () => {
+    let state = brainFor('which service is you offer.');
+    state = setNextBestAction(state, determineNextBestAction({ state }));
+    state = observeCallerTurn(state, {
+      text: 'Yes.',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile: PROFILE,
+      lastAgentText: 'Am I speaking with Alvin?',
+    });
+    const local = resolveLocalReply({
+      text: 'Yes.',
+      state,
+      profile: PROFILE,
+      language: 'en',
+    });
+    assert.notEqual(local && local.outcome, 'catalogue');
+    const spoken = polishSpokenReply(
+      'CATALOGUE MOUTH: We offer couch cleaning, mattress cleaning, carpet cleaning, general cleaning for houses and Airbnbs, and pet stain removal.',
+      {
+        state,
+        callerTurns: ['Yes.'],
+        profile: PROFILE,
+        language: 'en',
+      }
+    );
+    assert.equal(spoken, 'Which service do you need?');
+    assert.doesNotMatch(spoken, /CATALOGUE MOUTH/i);
+    assert.doesNotMatch(spoken, /couch cleaning/i);
   });
 
   it('grounds a list without calling the model wrapper', () => {

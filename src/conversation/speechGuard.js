@@ -6,8 +6,9 @@
 
 const { confirmationLanguage } = require('./language');
 const { factServices, factProducts, speechFactText } = require('./provenance');
-const { entityValue } = require('./entityExtraction');
+const { entityValue, findCatalogMatch } = require('./entityExtraction');
 const { looksLikeOfferAsk } = require('./fileRead');
+const { fileServicePriceLine } = require('./catalogueMouth');
 const { numbersIn } = require('./numberWords');
 const { assessCoverage } = require('./visitLocation');
 const { canonicalPlaceName } = require('./kenyaPlaces');
@@ -384,7 +385,30 @@ function groundFilePriceLine(opts = {}) {
 }
 
 const NOT_ON_FILE =
-  /don't have that on file|sina hiyo kwenye rekodi|siko na hiyo kwenye file/i;
+  /don'?t have that on file|not on file|don'?t have that detail|sina hiyo|siko na hiyo|sina maelezo/i;
+
+/** A named catalogue row with no number. Do not borrow another service's price. */
+function catalogueRowNamedWithoutPrice(text, profile) {
+  const hit = findCatalogMatch(text, profile || {});
+  if (!hit || hit.kind !== 'service') return false;
+  const want = String(hit.canonical || '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (!want) return false;
+  const row = factServices(profile?.servicesCatalog, profile?.fieldMeta || null).find((item) => {
+    const name = String(item?.name || '')
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    return name && name === want;
+  });
+  if (!row) return false;
+  const price = String(row.price_range || row.priceRange || row.price || '');
+  return !/\d/.test(price);
+}
 
 function unknownFallback(language) {
   const lang = confirmationLanguage(language);
@@ -550,22 +574,35 @@ function guardSpokenReply(text, ctx = {}) {
   }
   let out = kept.join(' ').trim();
   if (holdOpenSlot && droppedJob && BARE_CLOSER.test(out)) out = '';
-  const askedNumber = NUMBER_ASK.test(lastCallerTurn);
-  const priced = askedNumber
-    ? groundFilePriceLine({
-        profile: ctx.profile,
-        text: lastCallerTurn,
-        callerTurns: ctx.callerTurns,
-        state: ctx.state,
-        language: ctx.language,
-      })
-    : '';
-  if (out && priced && (NOT_ON_FILE.test(out) || !/\d/.test(out))) {
-    const rest = NOT_ON_FILE.test(out) ? '' : ` ${out}`;
-    return withMessageOnlyCallback(`${priced}${rest}`.trim(), ctx, appendCallback);
+  const cataloguePrice = fileServicePriceLine(
+    lastCallerTurn,
+    ctx.profile,
+    ctx.language,
+    ctx.state
+  );
+  const speechPrice =
+    cataloguePrice || catalogueRowNamedWithoutPrice(lastCallerTurn, ctx.profile)
+      ? ''
+      : groundFilePriceLine({
+          profile: ctx.profile,
+          text: lastCallerTurn,
+          callerTurns: ctx.callerTurns,
+          state: ctx.state,
+          language: ctx.language,
+        });
+  const groundedPrice = cataloguePrice || speechPrice;
+  if (groundedPrice) {
+    const digit = String(groundedPrice).match(/\d[\d,]*/);
+    const already = Boolean(digit && out.includes(digit[0]));
+    if (!already) {
+      out = !out || NOT_ON_FILE.test(out) ? groundedPrice : `${groundedPrice} ${out}`;
+    }
   }
+  const askedNumber = NUMBER_ASK.test(lastCallerTurn);
+  const priced = groundedPrice;
   if (out) {
-    const lead = priced && droppedNumber ? priced : askedNumber && droppedNumber ? unknownFallback(ctx.language) : '';
+    const lead =
+      !groundedPrice && askedNumber && droppedNumber ? unknownFallback(ctx.language) : '';
     return withMessageOnlyCallback(lead ? `${lead} ${out}` : out, ctx, appendCallback);
   }
   if (priced) return withMessageOnlyCallback(priced, ctx, appendCallback);
