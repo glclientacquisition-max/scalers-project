@@ -21,6 +21,7 @@ export function Menu({
   align = "end",
   open,
   onOpenChange,
+  popupClassName,
 }: {
   trigger: ReactElement;
   children: ReactNode;
@@ -28,13 +29,20 @@ export function Menu({
   align?: "start" | "center" | "end";
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  popupClassName?: string;
 }) {
+  const { className, children: triggerChildren, ...triggerProps } = trigger.props as {
+    className?: string;
+    children?: ReactNode;
+  } & Record<string, unknown>;
   return (
-    <BaseMenu.Root open={open} onOpenChange={onOpenChange}>
-      <BaseMenu.Trigger render={trigger} />
+    <BaseMenu.Root {...(typeof open === "boolean" ? { open } : {})} onOpenChange={onOpenChange}>
+      <BaseMenu.Trigger className={className} {...triggerProps}>
+        {triggerChildren}
+      </BaseMenu.Trigger>
       <BaseMenu.Portal>
         <BaseMenu.Positioner side={side} align={align} sideOffset={6} collisionPadding={12} className="z-menu">
-          <BaseMenu.Popup className={popupClass}>{children}</BaseMenu.Popup>
+          <BaseMenu.Popup className={cx(popupClass, popupClassName)}>{children}</BaseMenu.Popup>
         </BaseMenu.Positioner>
       </BaseMenu.Portal>
     </BaseMenu.Root>

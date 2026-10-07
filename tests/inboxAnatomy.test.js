@@ -114,7 +114,6 @@ describe("inbox outside and inside anatomy", () => {
   it("makes Confirm and Done full width on the call, dock-sized on the list", () => {
     const editorJob = read("dashboard/src/components/InboxJobEditor.tsx");
     const editorHold = read("dashboard/src/components/InboxHoldEditor.tsx");
-    const back = read("dashboard/src/components/ui/DeskBack.tsx");
     const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
     assert.match(jobActions, /variant=\{wide \? "primary" : "tonal"\}/);
     assert.match(holdActions, /variant=\{wide \? "primary" : "tonal"\}/);
@@ -134,7 +133,7 @@ describe("inbox outside and inside anatomy", () => {
     const ticket = read("dashboard/src/components/InboxTicketView.tsx");
     assert.match(ticket, /<DeskBack/);
     assert.match(ticket, /InboxJobActions/);
-    assert.match(back, /min-h-11 min-w-11/);
+    assert.match(read("dashboard/src/components/ui/IconButton.tsx"), /h-11 w-11/);
     assert.match(contact, /<DeskBack/);
     assert.match(jobActions, /pending=\{pending\}/);
     assert.match(holdActions, /pending=\{pending\}/);

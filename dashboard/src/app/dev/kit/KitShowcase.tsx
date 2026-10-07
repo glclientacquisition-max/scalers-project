@@ -18,7 +18,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
 import { Field, Input, Select, Textarea } from "@/components/ui/Field";
-import { IconButton, IconButtonAnchor } from "@/components/ui/IconButton";
+import { IconButton, IconButtonAnchor, iconButtonClass } from "@/components/ui/IconButton";
 import { ListRow } from "@/components/ui/ListRow";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -66,6 +66,7 @@ export function KitShowcase() {
           <div className="mx-auto max-w-desk px-4 py-4 sm:px-6 sm:py-6">
             <PageHeader
               title="Kit"
+              back={{ href: "/home", label: "Home" }}
               meta="System font. Radii 6, 10, 16."
               action={
                 <SegmentedControl
@@ -173,9 +174,9 @@ export function KitShowcase() {
                   </IconButton>
                   <Menu
                     trigger={
-                      <IconButton label="More">
+                      <button type="button" aria-label="More" className={iconButtonClass()}>
                         <EllipsisHorizontalIcon aria-hidden="true" />
-                      </IconButton>
+                      </button>
                     }
                   >
                     <MenuItem onClick={() => undefined}>

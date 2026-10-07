@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
 import { DeskLandSurface } from "@/components/ui/DeskLand";
 import { useInboxRowLocal, useInboxRowUi } from "@/components/InboxRowUi";
-import { IconButton } from "@/components/ui/IconButton";
+import { iconButtonClass } from "@/components/ui/IconButton";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import {
   inboxArchive,
@@ -227,9 +227,13 @@ export function InboxRowMore({ item }: { item: InboxItem }) {
         menu.setOpen(next);
       }}
       trigger={
-        <IconButton label={`More actions for ${item.callerName?.trim() || "Caller"}`} size="sm">
+        <button
+          type="button"
+          aria-label={`More actions for ${item.callerName?.trim() || "Caller"}`}
+          className={iconButtonClass({ size: "sm" })}
+        >
           <EllipsisVerticalIcon aria-hidden="true" />
-        </IconButton>
+        </button>
       }
     >
       {actions.map((action) => (

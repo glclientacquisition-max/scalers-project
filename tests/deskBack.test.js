@@ -9,26 +9,35 @@ function read(rel) {
 
 describe("DeskBack icon", () => {
   const back = read("dashboard/src/components/ui/DeskBack.tsx");
+  const header = read("dashboard/src/components/ui/PageHeader.tsx");
   const ticket = read("dashboard/src/components/InboxTicketView.tsx");
   const detail = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
   const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
   const settings = read("dashboard/src/components/settingsUi.tsx");
+  const icon = read("dashboard/src/components/ui/IconButton.tsx");
 
   it("renders a chevron without the visible word Inbox", () => {
-    const icon = back.slice(
+    const fn = back.slice(
       back.indexOf("export function DeskBack"),
       back.indexOf("export function DeskRecordLead")
     );
-    assert.match(icon, /DeskHint label=\{children\}/);
-    assert.match(icon, /aria-label=\{children\}/);
-    assert.match(icon, /title=\{children\}/);
-    assert.match(icon, /min-h-11 min-w-11/);
-    assert.match(icon, /<BackChevron/);
-    assert.match(back, /<svg viewBox="0 0 16 16"/);
-    assert.doesNotMatch(icon, />\{children\}</);
-    assert.doesNotMatch(icon, /hover:underline/);
-    assert.doesNotMatch(icon, /bg-accent-fill/);
-    assert.match(icon, /text-ink-soft/);
+    assert.match(fn, /IconButtonLink href=\{href\} label=\{children\}/);
+    assert.match(fn, /ChevronLeftIcon/);
+    assert.match(fn, /data-desk-back=""/);
+    assert.doesNotMatch(fn, />\{children\}</);
+    assert.doesNotMatch(fn, /hover:underline/);
+    assert.doesNotMatch(fn, /bg-accent-fill/);
+    assert.doesNotMatch(fn, /<svg viewBox="0 0 16 16"/);
+    assert.doesNotMatch(fn, /DeskHint/);
+    assert.match(icon, /rounded-full/);
+    assert.match(icon, /h-11 w-11/);
+    assert.match(icon, /focus-visible:ring-brand/);
+  });
+
+  it("shares the same Back disc on PageHeader", () => {
+    assert.match(header, /IconButtonLink href=\{back\.href\} label=\{back\.label\}/);
+    assert.match(header, /ChevronLeftIcon/);
+    assert.match(header, /data-desk-back=""/);
   });
 
   it("keeps ticket and archived href as deep links", () => {
@@ -43,12 +52,12 @@ describe("DeskBack icon", () => {
   });
 
   it("sits in the ticket header row instead of a text Inbox row", () => {
-    const header = ticket.slice(ticket.indexOf("<header"), ticket.indexOf("</header>"));
-    assert.match(header, /DeskBack href=\{backHref\}/);
-    assert.match(header, /"Home" : "Inbox"/);
-    assert.match(header, /<DeskRecordLead/);
-    assert.match(header, /align="center"/);
-    assert.doesNotMatch(header, /mt-2 flex items-center gap-2/);
+    const ticketHeader = ticket.slice(ticket.indexOf("<header"), ticket.indexOf("</header>"));
+    assert.match(ticketHeader, /DeskBack href=\{backHref\}/);
+    assert.match(ticketHeader, /"Home" : "Inbox"/);
+    assert.match(ticketHeader, /<DeskRecordLead/);
+    assert.match(ticketHeader, /align="center"/);
+    assert.doesNotMatch(ticketHeader, /mt-2 flex items-center gap-2/);
     assert.doesNotMatch(ticket, />\s*Back to Inbox\s*</);
   });
 
@@ -71,6 +80,7 @@ describe("DeskBack icon", () => {
     assert.match(contact, /<DeskRecordLead/);
     assert.match(imported, /<DeskRecordLead/);
     assert.match(toolbar, /<DeskRecordLead/);
+    assert.match(read("dashboard/src/components/AdminNav.tsx"), /<DeskBack href=\{parent\.href\}>/);
     assert.match(constitution, /Back never owns its own row/);
     assert.doesNotMatch(contact, /<DeskBack[\s\S]{0,80}<\/DeskBack>\s*<div className="mt-6 grid/);
     assert.doesNotMatch(imported, /<DeskBack[\s\S]{0,80}<\/DeskBack>\s*<h1 className="mt-4/);

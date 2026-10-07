@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { AdminAccountMenu } from "@/components/AdminAccountMenu";
 import { BrandLockup } from "@/components/brand/BrandMark";
+import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
@@ -235,40 +236,16 @@ export function AdminTabBar() {
   );
 }
 
-function BackChevron() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M10.2 3.2 5.4 8l4.8 4.8"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/** One control back to the parent admin list. The visible name is that list. */
+/** One control back to the parent admin list. The destination name is the accessible label. */
 export function AdminNestedBack() {
   const pathname = usePathname();
   const parent = adminParentTarget(pathname);
   if (!parent) return null;
 
   return (
-    <Link
-      href={parent.href}
-      aria-label={parent.label}
-      className={[
-        "mb-3 inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-body font-medium text-ink",
-        deskShiftClass,
-        focusRingVisible,
-        "hover:bg-surface-2",
-      ].join(" ")}
-    >
-      <BackChevron />
-      {parent.label}
-    </Link>
+    <div className="mb-3">
+      <DeskBack href={parent.href}>{parent.label}</DeskBack>
+    </div>
   );
 }
 
