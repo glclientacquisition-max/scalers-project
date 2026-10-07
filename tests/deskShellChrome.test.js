@@ -115,7 +115,7 @@ describe("desk shell chrome", () => {
     assert.match(toolbar, /<h1 className=\{deskListTitleClass\}>Inbox<\/h1>/);
     assert.doesNotMatch(toolbar, /pageTitleClass.*Inbox|Inbox.*pageTitleClass/);
     assert.match(toolbar, /<h1 className=\{pageTitleClass\}>Archived<\/h1>/);
-    assert.match(contacts, /<h1 className=\{deskListTitleClass\}>Contacts<\/h1>/);
+    assert.match(contacts, /<PageHeader[\s\S]*title="Contacts"/);
     assert.match(wallet, /<h1 className=\{deskListTitleClass\}>Usage<\/h1>/);
     assert.doesNotMatch(wallet, /<h1 className=\{deskListTitleClass\}>Wallet<\/h1>/);
     assert.doesNotMatch(home, />Overview</);
@@ -152,7 +152,7 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(contactFile, /BrandLockup|BrandWordmark/);
 
     const contactImport = read("dashboard/src/app/(desk)/contacts/import/page.tsx");
-    assert.match(contactImport, /<DeskBack href="\/contacts">Contacts<\/DeskBack>/);
+    assert.match(contactImport, /<PageHeader[\s\S]*back=\{\{ href: "\/contacts", label: "Contacts" \}\}/);
     assert.doesNotMatch(contactImport, /deskListTitleClass/);
     assert.doesNotMatch(contactImport, /<h1[\s\S]{0,120}>Contacts<\/h1>/);
   });

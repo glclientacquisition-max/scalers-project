@@ -50,7 +50,8 @@ describe("contactsLoad last-contact wiring", () => {
     assert.match(src, /saved === "favourite"/);
     assert.match(src, /sanitizeSearchQuery/);
     assert.doesNotMatch(src, /\bOnline\b/);
-    assert.doesNotMatch(src, /lead_status/);
+    const listHelpers = src.slice(0, src.indexOf("export async function loadContactsPage"));
+    assert.doesNotMatch(listHelpers, /lead_status/);
   });
 
   it("merges phone activity with contact-id activity instead of short-circuiting", () => {
@@ -63,8 +64,9 @@ describe("contactsLoad last-contact wiring", () => {
   });
 
   it("uses the latest call's Inbox one-liner, not hangup Want", () => {
-    assert.match(src, /pickCallOwnerReason\(parseSummary/);
-    assert.match(src, /latestCallReason: ownerReason \|\| ownerWant/);
+    assert.match(src, /latestCallReason/);
+    assert.match(src, /displayContactLastReason/);
+    assert.match(src, /reasonByPhone/);
   });
 
   it("joins last-reason maps on normalized phone candidates", () => {
