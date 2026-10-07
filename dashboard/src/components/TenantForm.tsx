@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
   canonicalizeAgentTone,
@@ -62,15 +61,6 @@ import {
   clampFaq,
   normalizeFaqKey,
 } from "@/lib/faqs";
-import { CaptureConfirmList } from "@/components/CaptureConfirmList";
-import { confirmCaptureFields } from "@/app/(desk)/settings/provenanceActions";
-import {
-  type DeskFieldMetaClient,
-  hoursConfirmRows,
-  identityConfirmRows,
-  locationsConfirmRows,
-  pathConfirmed,
-} from "@/lib/fieldMetaAttestUi";
 import { SERVICES_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
 import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import {
@@ -301,19 +291,16 @@ export function TenantForm({
   heading = null,
   sidebar = null,
   liveTransferExecutor = false,
-  fieldMeta = null,
   showBack = true,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
   curatedVoices?: CuratedSonioxVoice[];
-  fieldMeta?: DeskFieldMetaClient;
   heading?: string | null;
   sidebar?: ReactNode;
   liveTransferExecutor?: boolean;
   showBack?: boolean;
 }) {
-  const router = useRouter();
   const voiceOptions =
     curatedVoices && curatedVoices.length
       ? curatedVoices
@@ -404,7 +391,6 @@ export function TenantForm({
   const liveDest = firstDialableTeammate(team);
   const [faqs, setFaqs] = useState<FaqEntry[]>(() => normalizeFaqs(tenant.faqs));
   const [ownerPaths, setOwnerPaths] = useState<string[]>([]);
-  const [confirming, setConfirming] = useState(false);
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
   );
@@ -652,95 +638,6 @@ export function TenantForm({
       })
     );
   }
-
-  async function confirmPaths(paths: string[]) {
-    const unique = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
-    if (!unique.length) return;
-    const wanted = new Set(unique);
-    setFaqs((prev) =>
-      prev.map((row, index) => {
-        if (!wanted.has(`faqs.${index + 1}`)) return row;
-        const keepGolden = row.source === "owner" && row.status === "golden";
-        return {
-          ...row,
-          source: "owner",
-          status: keepGolden ? "golden" : "confirmed",
-          confirmed: true,
-        };
-      })
-    );
-    setServices((prev) =>
-      prev.map((row, index) =>
-        wanted.has(`catalog.service.${index + 1}.name`) ? { ...row, source: "owner" } : row
-      )
-    );
-    setProducts((prev) =>
-      prev.map((row, index) => {
-        const sku = row.sku.trim() || String(index + 1);
-        return wanted.has(`catalog.product.${sku}.name`) ? { ...row, source: "owner" } : row;
-      })
-    );
-    setPolicies((prev) => {
-      const provenance = { ...prev.provenance };
-      let changed = false;
-      for (const path of unique) {
-        const match = path.match(/^policies\.(payment|deposit|returns|delivery|cancellation|warranty|other)$/);
-        if (!match) continue;
-        provenance[match[1]] = { source: "owner", confirmed: true };
-        changed = true;
-      }
-      return changed ? { ...prev, provenance } : prev;
-    });
-    unique.forEach(queueOwnerPath);
-    setConfirming(true);
-    try {
-      const result = await confirmCaptureFields(unique);
-      if (result.ok) router.refresh();
-    } finally {
-      setConfirming(false);
-    }
-  }
-
-  const compiledHoursPreview = useMemo(
-    () => formatHoursForCompiler(hoursSchedule),
-    [hoursSchedule]
-  );
-
-  const identityReviewRows = useMemo(
-    () =>
-      identityConfirmRows(fieldMeta, {
-        businessName,
-        vertical,
-        spokenName,
-        agentName,
-        agentTone: tone,
-        socialHandles,
-      }),
-    [fieldMeta, businessName, vertical, spokenName, agentName, tone, socialHandles]
-  );
-
-  const hoursReviewRows = useMemo(
-    () => hoursConfirmRows(fieldMeta, hoursSchedule, compiledHoursPreview),
-    [fieldMeta, hoursSchedule, compiledHoursPreview]
-  );
-
-  const filledLocations = useMemo(
-    () =>
-      locations.filter(
-        (loc) => String(loc.label || "").trim() || String(loc.address || "").trim()
-      ),
-    [locations]
-  );
-
-  const locationsReviewRows = useMemo(
-    () =>
-      locationsConfirmRows(
-        fieldMeta,
-        filledLocations.length,
-        filledLocations[0]?.label || filledLocations[0]?.address || ""
-      ),
-    [fieldMeta, filledLocations]
-  );
 
   function updateSocialChannel(
     index: number,
@@ -998,12 +895,6 @@ export function TenantForm({
       <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
       <section className={panel === "identity" ? "space-y-3" : "hidden"}>
-        <CaptureConfirmList
-          pending={confirming}
-          onConfirm={(path) => void confirmPaths([path])}
-          onConfirmAll={(paths) => void confirmPaths(paths)}
-          rows={identityReviewRows}
-        />
         <SettingsGroup title="Assistant">
           <SettingsRow label="Assistant name" htmlFor="agent_name">
             <input
@@ -1436,21 +1327,6 @@ export function TenantForm({
             </div>
           </details>
 
-          <CaptureConfirmList
-            pending={confirming}
-            onConfirm={(path) => void confirmPaths([path])}
-            onConfirmAll={(paths) => void confirmPaths(paths)}
-            rows={services.map((service, index) => {
-              const path = `catalog.service.${index + 1}.name`;
-              return {
-                path,
-                title: service.name.trim(),
-                preview: service.price_range.trim() || service.notes.trim(),
-                confirmed: pathConfirmed(fieldMeta, path, service.source === "owner"),
-              };
-            })}
-          />
-
           <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
             {visibleServices.map((service, localIndex) => {
               const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
@@ -1650,21 +1526,6 @@ export function TenantForm({
             </div>
           </div>
 
-          <CaptureConfirmList
-            pending={confirming}
-            onConfirm={(path) => void confirmPaths([path])}
-            onConfirmAll={(paths) => void confirmPaths(paths)}
-            rows={products.map((product, index) => {
-              const path = `catalog.product.${product.sku.trim() || String(index + 1)}.name`;
-              return {
-                path,
-                title: product.name.trim(),
-                preview: product.price.trim(),
-                confirmed: pathConfirmed(fieldMeta, path, product.source === "owner"),
-              };
-            })}
-          />
-
           {products.length === 0 ? null : (
             <>
             <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
@@ -1844,12 +1705,6 @@ export function TenantForm({
       </section>
 
       <section className={panel === "hours" ? "space-y-6" : "hidden"}>
-        <CaptureConfirmList
-          pending={confirming}
-          onConfirm={(path) => void confirmPaths([path])}
-          onConfirmAll={(paths) => void confirmPaths(paths)}
-          rows={hoursReviewRows}
-        />
         <SettingsGroup title="Hours">
           <div className="hidden bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-500 lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
             <span>Day</span>
@@ -1951,12 +1806,6 @@ export function TenantForm({
       <section
         className={panel === "locations" ? "space-y-3" : "hidden"}
       >
-        <CaptureConfirmList
-          pending={confirming}
-          onConfirm={(path) => void confirmPaths([path])}
-          onConfirmAll={(paths) => void confirmPaths(paths)}
-          rows={locationsReviewRows}
-        />
         <div className="flex flex-wrap items-end justify-between gap-3">
           <p className={settingsBlockTitleClass}>Places</p>
           <button
@@ -2153,23 +2002,6 @@ export function TenantForm({
         className={panel === "policies" ? "space-y-6" : "hidden"}
       >
         <SettingsGroup title="Rules">
-          <CaptureConfirmList
-            pending={confirming}
-            onConfirm={(path) => void confirmPaths([path])}
-            onConfirmAll={(paths) => void confirmPaths(paths)}
-            rows={POLICY_FIELDS.filter((field) => policies[field.id].trim()).map((field) => {
-              const path = `policies.${field.id}`;
-              const jsonOwner =
-                policies.provenance?.[field.id]?.source === "owner" ||
-                policies.provenance?.[field.id]?.confirmed === true;
-              return {
-                path,
-                title: field.label,
-                preview: policies[field.id].trim(),
-                confirmed: pathConfirmed(fieldMeta, path, jsonOwner),
-              };
-            })}
-          />
           {vertical === "home_services" ? (
             <SettingsStack label="Coverage" htmlFor="policy-coverage">
               <CoverageAreaField
@@ -2569,20 +2401,6 @@ export function TenantForm({
 
         {faqs.length > 0 ? (
         <>
-        <CaptureConfirmList
-          pending={confirming}
-          onConfirm={(path) => void confirmPaths([path])}
-          onConfirmAll={(paths) => void confirmPaths(paths)}
-          rows={faqs.map((faq, index) => {
-            const path = `faqs.${index + 1}`;
-            return {
-              path,
-              title: faq.question.trim(),
-              preview: faq.answer.trim(),
-              confirmed: pathConfirmed(fieldMeta, path, faq.source === "owner"),
-            };
-          })}
-        />
         <div className="overflow-hidden rounded-xl border border-line">
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.75rem] items-center gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
             <span>Question</span>

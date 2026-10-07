@@ -31,7 +31,7 @@ async function attestOne(
 
 /**
  * Mark field paths as owner-confirmed (meta + JSON rows where applicable).
- * Safe to call after Settings / Alerts / Bulletin saves.
+ * Settings Save is the owner approval step — call after every successful save.
  */
 export async function ownerAttestFields(
   tenantId: string,

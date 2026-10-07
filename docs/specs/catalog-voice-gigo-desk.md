@@ -30,13 +30,14 @@
 **Branch:** `cursor/gigo-owner-attest-scale-b27a` (draft PR)  
 **Mostly done:** save attestation, meta-driven confirm lists, Home nudge, settings nav counts.
 
+**Owner approval model:** Save on Settings / Alerts / Bulletin runs `ownerAttestFields` for that scope. There is no separate Confirm control in the desk UI.
+
 **Remaining before merge:**
 
 | Task | Owner | Done when |
 | --- | --- | --- |
 | CI green on PR | Desk | lint, build, desk tests |
-| Spot-check Settings confirm + save clears meta gaps | Desk | manual / Playwright fixture tenant |
-| Document owner flow in PR body | Desk | one paragraph for reviewers |
+| Spot-check Save attests import rows on catalog panel | Desk | meta `source=owner` after save |
 
 **Do not block Track B on merge**, but **Track C stamps** should read the same `fieldMeta` this PR wires.
 
@@ -148,10 +149,10 @@ Replace catalog `<details>` bulk blocks with:
 
 Motion: desk-motion Sheet only; no new motion library.
 
-### C5. Confirm alignment
+### C5. Save is approval
 
-- `CaptureConfirmList` stays for batch “Suggested facts”; list rows show same state via Stamp.
-- Tapping Confirm on row calls existing `confirmPaths([path])` from GIGO UI helpers.
+- No separate Confirm control in Settings. Successful **Save** calls `ownerAttestFields` for every path in that panel’s scope (plus `owner_field_paths` for edited rows).
+- Optional Stamp “Suggested” on list rows is display-only until the owner saves that section.
 
 ### C6. Proof
 

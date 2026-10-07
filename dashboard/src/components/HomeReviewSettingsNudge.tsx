@@ -5,31 +5,24 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import { reviewGapCopy, type CaptureScore } from "@/lib/completenessStub";
-import { settingsHrefForGapDomain } from "@/lib/fieldMetaAttestUi";
+import { settingsHrefForGapDomain } from "@/lib/settingsGapNav";
 
 /** One-line nudge for live lines. Full Setup stays off Overview. */
 export function HomeReviewSettingsNudge({
   tenantId,
   vertical,
   score,
-  unattestedCount = 0,
 }: {
   tenantId: string;
   vertical: string | null | undefined;
   score: CaptureScore;
-  unattestedCount?: number;
 }) {
   const [dismissed, setDismissed] = useState(false);
   const storageKey = `scalers.captureNudge.${tenantId}`;
   const gap = score.next_gaps[0];
   const href = settingsHrefForGapDomain(gap?.domain);
   const gapLine = reviewGapCopy(gap?.action || "");
-  const countLine =
-    unattestedCount > 0
-      ? `${unattestedCount} fact${unattestedCount === 1 ? "" : "s"} still marked suggested. `
-      : "";
-  const preview =
-    `${countLine}${gapLine || "Confirm what we have on file."}`.trim();
+  const preview = (gapLine || "Add what's missing, then save.").trim();
 
   useEffect(() => {
     try {
@@ -75,7 +68,7 @@ export function HomeReviewSettingsNudge({
               focusRingVisible,
             ].join(" ")}
           >
-            Review settings
+            Open settings
           </Link>
         </p>
         <Button type="button" variant="ghost" size="sm" onClick={dismiss}>
