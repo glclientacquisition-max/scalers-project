@@ -61,13 +61,13 @@ describe("contacts chrome pill ACCEPT", () => {
     assert.doesNotMatch(dev, /label: "Needs you"|label: "Visits"|label: "Holds"/);
   });
 
-  it("keeps Last call and Name as a labeled Sort select", () => {
+  it("keeps Last call and Name as a labeled Sort menu", () => {
     assert.match(page, /<ContactSortSelect/);
     const sort = read("dashboard/src/components/ContactSortSelect.tsx");
     assert.match(sort, /aria-label="Sort contacts"/);
     assert.match(sort, /Last call/);
     assert.match(sort, /Name/);
-    assert.match(sort, /DeskSelect/);
+    assert.match(sort, /from "@\/components\/ui\/Menu"/);
   });
 
   it("keeps one opened-only Call and WhatsApp pair as top icons on the person file", () => {

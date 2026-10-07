@@ -41,10 +41,10 @@ describe("DeskSelect primitive", () => {
 });
 
 describe("DoD path swaps", () => {
-  it("Contacts Sort uses DeskSelect, not a native option list", () => {
+  it("Contacts Sort uses Menu, not a native option list", () => {
     const sort = read("dashboard/src/components/ContactSortSelect.tsx");
-    assert.match(sort, /from "@\/components\/ui\/DeskSelect"/);
-    assert.match(sort, /<DeskSelect/);
+    assert.match(sort, /from "@\/components\/ui\/Menu"/);
+    assert.match(sort, /<Menu/);
     assert.match(sort, /aria-label="Sort contacts"/);
     assert.match(sort, /label: "Last call"/);
     assert.match(sort, /label: "Name"/);

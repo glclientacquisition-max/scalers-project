@@ -8,9 +8,18 @@ function read(rel) {
 }
 
 function resolveContactSavedFilter(raw) {
-  const value = String(raw || "all").toLowerCase();
-  if (value === "saved" || value === "unsaved" || value === "recent") return value;
-  return "all";
+  if (!raw || !String(raw).trim()) return "recent";
+  const value = String(raw).toLowerCase();
+  if (
+    value === "all" ||
+    value === "saved" ||
+    value === "unsaved" ||
+    value === "recent" ||
+    value === "favourite"
+  ) {
+    return value;
+  }
+  return "recent";
 }
 
 function resolveContactSort(raw) {
@@ -19,7 +28,8 @@ function resolveContactSort(raw) {
 
 function contactsHref(opts) {
   const q = new URLSearchParams();
-  if (opts.saved && opts.saved !== "all") q.set("saved", opts.saved);
+  if (opts.saved === "all") q.set("saved", "all");
+  else if (opts.saved && opts.saved !== "recent") q.set("saved", opts.saved);
   if (opts.sort && opts.sort !== "recent") q.set("sort", opts.sort);
   const query = String(opts.q || "").trim();
   if (query) q.set("q", query);
@@ -31,7 +41,8 @@ function contactsHref(opts) {
 function contactProfileHref(id, opts = {}) {
   const q = new URLSearchParams();
   q.set("from", "contacts");
-  if (opts.saved && opts.saved !== "all") q.set("saved", opts.saved);
+  if (opts.saved === "all") q.set("saved", "all");
+  else if (opts.saved && opts.saved !== "recent") q.set("saved", opts.saved);
   if (opts.sort && opts.sort !== "recent") q.set("sort", opts.sort);
   const query = String(opts.q || "").trim();
   if (query) q.set("q", query);
@@ -62,7 +73,7 @@ describe("contacts segment workflow helpers", () => {
       }),
       "/contacts/ct-2?from=contacts&saved=unsaved&sort=name&q=Amina&page=2"
     );
-    assert.equal(contactProfileHref("ct-3", { saved: "recent" }), "/contacts/ct-3?from=contacts&saved=recent");
+    assert.equal(contactProfileHref("ct-3", { saved: "recent" }), "/contacts/ct-3?from=contacts");
     assert.equal(
       contactsReturnHref({
         from: "contacts",
@@ -79,6 +90,12 @@ describe("contacts segment workflow helpers", () => {
       contactsHref({ saved: "unsaved", sort: "name", q: "Amina", page: 2 }),
       "/contacts?saved=unsaved&sort=name&q=Amina&page=2"
     );
+    assert.equal(contactsHref({ saved: "all" }), "/contacts?saved=all");
+    assert.equal(
+      resolveContactSavedFilter("all"),
+      "all"
+    );
+    assert.equal(resolveContactSavedFilter(undefined), "recent");
     const src = read("dashboard/src/lib/contactsLoad.ts");
     assert.match(src, /export function contactProfileHref/);
     assert.match(src, /export function contactsReturnHref/);
@@ -131,6 +148,7 @@ describe("contacts segment filter chrome", () => {
     assert.match(page, /active=\{saved\}/);
     const load = read("dashboard/src/lib/contactsLoad.ts");
     assert.match(load, /label: "All"/);
+    assert.match(load, /saved: "all"/);
     assert.match(load, /label: "Saved"/);
     assert.match(load, /label: "Unsaved"/);
     assert.match(load, /label: "Recents"/);
@@ -150,9 +168,10 @@ describe("contacts segment filter chrome", () => {
   });
 
   it("opens the profile from the row and Back restores the Contacts segment", () => {
-    assert.match(row, /DeskRowHit href=\{href\}/);
-    assert.match(page, /ContactsEndlessList/);
-    assert.match(read("dashboard/src/components/ContactsEndlessList.tsx"), /contactProfileHref/);
+    assert.match(row, /contactProfileHref/);
+    assert.match(row, /contactsSplitHref/);
+    assert.match(page, /ContactsPullHost/);
+    assert.match(read("dashboard/src/components/ContactsEndlessList.tsx"), /ContactPhoneRow/);
     assert.match(profile, /contactsReturnHref/);
     assert.match(load, /export function contactProfileHref/);
     assert.match(load, /export function contactsReturnHref/);

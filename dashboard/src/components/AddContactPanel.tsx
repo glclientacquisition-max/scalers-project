@@ -125,7 +125,7 @@ export function AddContactPanel() {
                 className={`${settingsActionClass} w-full`}
                 onClick={() => setOpen(false)}
               >
-                CSV
+                Import
               </Link>
               {pickerOn ? (
                 <button

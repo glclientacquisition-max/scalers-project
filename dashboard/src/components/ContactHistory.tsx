@@ -6,8 +6,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ContactTimelineWhat } from "@/components/ContactTimelineWhat";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
-import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
-import { btnGhost, deskFieldClass, deskPreviewCellClass, deskShiftClass } from "@/components/ui/deskChrome";
+import { Field, Input } from "@/components/ui/Field";
+import { ListRow } from "@/components/ui/ListRow";
+import { btnGhost } from "@/components/ui/deskChrome";
 import { formatCallWhen } from "@/lib/callsTriage";
 import {
   CONTACT_HISTORY_PAGE,
@@ -19,51 +20,15 @@ import {
 } from "@/lib/contactHistoryView";
 import type { ContactTimelineEntry } from "@/lib/contactPersonFile";
 
-function TimelineRowHit({ entry }: { entry: ContactTimelineEntry }) {
-  return entry.href ? <DeskRowHit href={entry.href} label="Conversation" /> : null;
-}
-
-function SinglePhone({ entry }: { entry: ContactTimelineEntry }) {
+function HistoryListRow({ entry }: { entry: ContactTimelineEntry }) {
   return (
-    <li
-      className={[
-        "relative min-w-0 px-3 py-3",
-        entry.href ? "cursor-pointer" : "",
-      ].join(" ")}
-    >
-      <TimelineRowHit entry={entry} />
-      <div className={`${deskRowMutedClass} flex min-w-0 items-baseline justify-between gap-2`}>
-        <p className="truncate text-xs tabular-nums text-ink-soft">
-          {formatCallWhen(entry.createdAt)}
-        </p>
-        <InboxPurposeChip purpose={entry.purpose} label={entry.stamp} />
-      </div>
-      <div className={`${deskRowActionClass} mt-1 min-w-0`}>
-        <ContactTimelineWhat headline={entry.headline} detail={entry.detail} />
-      </div>
-    </li>
-  );
-}
-
-function SingleTable({ entry }: { entry: ContactTimelineEntry }) {
-  return (
-    <tr
-      className={[
-        "relative border-t border-line/50",
-        entry.href ? "cursor-pointer hover:bg-accent/[0.04]" : "",
-      ].join(" ")}
-    >
-      <td className={`${deskRowMutedClass} whitespace-nowrap px-3 py-2 text-ink-soft`}>
-        <TimelineRowHit entry={entry} />
-        {formatCallWhen(entry.createdAt)}
-      </td>
-      <td className={`${deskRowMutedClass} px-3 py-2`}>
-        <InboxPurposeChip purpose={entry.purpose} label={entry.stamp} />
-      </td>
-      <td className={`${deskPreviewCellClass} px-3 py-2`}>
-        <ContactTimelineWhat headline={entry.headline} detail={entry.detail} />
-      </td>
-    </tr>
+    <ListRow
+      href={entry.href || undefined}
+      ariaLabel="Conversation"
+      title={formatCallWhen(entry.createdAt)}
+      preview={<ContactTimelineWhat headline={entry.headline} detail={entry.detail} />}
+      stamp={<InboxPurposeChip purpose={entry.purpose} label={entry.stamp} />}
+    />
   );
 }
 
@@ -102,25 +67,23 @@ export function ContactHistory({
 
   return (
     <section data-contact-history="">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="font-display text-2xl tracking-tight text-ink">History</h2>
-      </div>
+      <h2 className="text-title text-ink">History</h2>
       <div className="mt-3">
-        <label className="sr-only" htmlFor="contact-history-search">
-          Search
-        </label>
-        <input
-          id="contact-history-search"
-          type="search"
-          value={value}
-          placeholder="Search"
-          className={deskFieldClass}
-          onChange={(event) => {
-            const next = event.currentTarget.value.slice(0, 64);
-            setValue(next);
-            syncQuery(next);
-          }}
-        />
+        <Field id="contact-history-search" label="Search history">
+          {(props) => (
+            <Input
+              {...props}
+              type="search"
+              value={value}
+              placeholder="Search"
+              onChange={(event) => {
+                const next = event.currentTarget.value.slice(0, 64);
+                setValue(next);
+                syncQuery(next);
+              }}
+            />
+          )}
+        </Field>
       </div>
       <div className="mt-3">
         <InboxFilterPills
@@ -134,8 +97,8 @@ export function ContactHistory({
         />
       </div>
       {rows.length === 0 ? (
-        <div className="mt-8 border-y border-line py-8 text-center">
-          <p className="font-display text-2xl tracking-tight text-ink">
+        <div className="mt-8 border-y border-hairline py-8 text-center">
+          <p className="text-title text-ink">
             {q.trim() ? "No matches" : filter === "all" ? "No calls or jobs yet" : "Nothing in this filter"}
           </p>
           {q.trim() ? (
@@ -157,12 +120,12 @@ export function ContactHistory({
         </div>
       ) : (
         <>
-          <ul className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+          <ul className="mt-4 divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
             {visible.map((row) =>
               row.kind === "single" ? (
-                <SinglePhone key={row.entry.id} entry={row.entry} />
+                <HistoryListRow key={row.entry.id} entry={row.entry} />
               ) : (
-                <GroupPhone
+                <GroupHistoryRow
                   key={row.group.id}
                   row={row}
                   open={Boolean(openIds[row.group.id])}
@@ -176,53 +139,8 @@ export function ContactHistory({
               )
             )}
           </ul>
-          <div className="mt-4 hidden min-w-0 overflow-x-auto rounded-2xl border border-line bg-surface md:block">
-            <table className="w-full min-w-0 text-left text-sm">
-              <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
-                  >
-                    When
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
-                  >
-                    Type
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
-                  >
-                    What
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((row) =>
-                  row.kind === "single" ? (
-                    <SingleTable key={row.entry.id} entry={row.entry} />
-                  ) : (
-                    <GroupTable
-                      key={row.group.id}
-                      row={row}
-                      open={Boolean(openIds[row.group.id])}
-                      onToggle={() =>
-                        setOpenIds((prev) => ({
-                          ...prev,
-                          [row.group.id]: !prev[row.group.id],
-                        }))
-                      }
-                    />
-                  )
-                )}
-              </tbody>
-            </table>
-          </div>
           {rows.length > CONTACT_HISTORY_PAGE ? (
-            <p className="mt-3 text-sm text-ink-soft">
+            <p className="mt-3 text-meta text-ink-2">
               1-{visible.length} of {rows.length}
             </p>
           ) : null}
@@ -242,7 +160,7 @@ export function ContactHistory({
   );
 }
 
-function GroupPhone({
+function GroupHistoryRow({
   row,
   open,
   onToggle,
@@ -253,51 +171,23 @@ function GroupPhone({
 }) {
   const copy = contactHistoryGroupCopy(row.group);
   return (
-    <li className="border-t border-line/70 first:border-t-0">
+    <li className="bg-surface">
       <button
         type="button"
         aria-expanded={open}
         onClick={onToggle}
-        className={`flex min-h-11 w-full min-w-0 items-center justify-between gap-2 px-3 py-3 text-left ${deskShiftClass}`}
+        className="flex min-h-11 w-full min-w-0 items-center justify-between gap-2 px-4 py-3 text-start"
       >
-        <span className="min-w-0 text-sm text-ink">{copy}</span>
+        <span className="min-w-0 text-body text-ink">{copy}</span>
         <InboxPurposeChip purpose={row.group.purpose} label={row.group.stamp} />
       </button>
-      {open
-        ? row.group.entries.map((entry) => <SinglePhone key={entry.id} entry={entry} />)
-        : null}
+      {open ? (
+        <ul className="divide-y divide-hairline border-t border-hairline">
+          {row.group.entries.map((entry) => (
+            <HistoryListRow key={entry.id} entry={entry} />
+          ))}
+        </ul>
+      ) : null}
     </li>
-  );
-}
-
-function GroupTable({
-  row,
-  open,
-  onToggle,
-}: {
-  row: Extract<ContactHistoryRow, { kind: "group" }>;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  const copy = contactHistoryGroupCopy(row.group);
-  return (
-    <>
-      <tr className="border-t border-line/70">
-        <td colSpan={3} className="p-0">
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={onToggle}
-            className={`flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left ${deskShiftClass}`}
-          >
-            <span className="min-w-0 text-sm text-ink">{copy}</span>
-            <InboxPurposeChip purpose={row.group.purpose} label={row.group.stamp} />
-          </button>
-        </td>
-      </tr>
-      {open
-        ? row.group.entries.map((entry) => <SingleTable key={entry.id} entry={entry} />)
-        : null}
-    </>
   );
 }
