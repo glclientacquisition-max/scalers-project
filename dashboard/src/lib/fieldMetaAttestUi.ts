@@ -5,7 +5,7 @@ import type { ProductItem } from "@/lib/productCatalog";
 import type { SettingsStatusTarget } from "@/lib/settingsOptionStatus";
 import { openDayCount } from "@/lib/settingsOptionStatus";
 import type { SocialHandles } from "@/lib/socialHandles";
-import { businessSettingsHref } from "@/lib/businessSettingsNav";
+import { businessSettingsHref, type SettingsPanel } from "@/lib/businessSettingsNav";
 
 /** Client-safe provenance index (sources only). */
 export type DeskFieldMetaClient = {
@@ -277,26 +277,19 @@ export function settingsAttestNavLabel(
 }
 
 export function settingsHrefForGapDomain(domain: string | undefined): string {
-  switch (domain) {
-    case "catalog":
-      return businessSettingsHref("catalog");
-    case "faqs":
-      return businessSettingsHref("train", "faqs");
-    case "team_notify":
-      return businessSettingsHref("alerts");
-    case "payments":
-    case "policies":
-      return businessSettingsHref("train", "policies");
-    case "hours":
-      return businessSettingsHref("train", "hours");
-    case "locations":
-      return businessSettingsHref("train", "locations");
-    case "identity":
-    case "assistant":
-      return businessSettingsHref("train", "identity");
-    default:
-      return businessSettingsHref("train", "identity");
+  if (domain === "catalog") return businessSettingsHref("catalog");
+  if (domain === "team_notify") return businessSettingsHref("alerts");
+  if (domain === "bulletin") return "/home#updates";
+  if (domain === "assistant") return businessSettingsHref("train", "tools");
+  if (domain === "payments" || domain === "policies") {
+    return businessSettingsHref("train", "policies");
   }
+  const trainPanels = new Set<string>(["identity", "hours", "locations", "faqs", "tools"]);
+  if (domain && trainPanels.has(domain)) {
+    return businessSettingsHref("train", domain as SettingsPanel);
+  }
+  if (domain === "faqs") return businessSettingsHref("train", "faqs");
+  return businessSettingsHref("train");
 }
 
 export function totalUnattestedCount(

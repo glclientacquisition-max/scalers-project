@@ -1,10 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Button, ButtonLink } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
+import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import { reviewGapCopy, type CaptureScore } from "@/lib/completenessStub";
 import { settingsHrefForGapDomain } from "@/lib/fieldMetaAttestUi";
 
+/** One-line nudge for live lines. Full Setup stays off Overview. */
 export function HomeReviewSettingsNudge({
   tenantId,
   vertical,
@@ -21,6 +24,12 @@ export function HomeReviewSettingsNudge({
   const gap = score.next_gaps[0];
   const href = settingsHrefForGapDomain(gap?.domain);
   const gapLine = reviewGapCopy(gap?.action || "");
+  const countLine =
+    unattestedCount > 0
+      ? `${unattestedCount} fact${unattestedCount === 1 ? "" : "s"} still marked suggested. `
+      : "";
+  const preview =
+    `${countLine}${gapLine || "Confirm what we have on file."}`.trim();
 
   useEffect(() => {
     try {
@@ -50,27 +59,29 @@ export function HomeReviewSettingsNudge({
 
   if (score.ready_badge || dismissed) return null;
 
-  const countLine =
-    unattestedCount > 0
-      ? `${unattestedCount} fact${unattestedCount === 1 ? "" : "s"} still marked suggested`
-      : null;
-
   return (
-    <div className="mt-4 flex items-start justify-between gap-3 rounded-2xl border border-hairline bg-surface px-4 py-3">
-      <div className="min-w-0">
-        <p className="text-body text-ink">Review settings</p>
-        <p className="mt-0.5 text-meta text-ink-2">
-          {countLine || gapLine || "Confirm what is on file so the score matches your shop."}
+    <section
+      className="mt-3 rounded-2xl border border-hairline bg-surface px-4 py-3"
+      aria-label="Settings review"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 text-sm text-ink-2">
+          {preview}{" "}
+          <Link
+            href={href}
+            className={[
+              "font-medium text-accent-deep underline-offset-2 hover:underline",
+              deskShiftClass,
+              focusRingVisible,
+            ].join(" ")}
+          >
+            Review settings
+          </Link>
         </p>
-      </div>
-      <div className="flex shrink-0 flex-col items-end gap-2">
-        <ButtonLink href={href} variant="tonal" size="sm">
-          Open
-        </ButtonLink>
         <Button type="button" variant="ghost" size="sm" onClick={dismiss}>
           Dismiss
         </Button>
       </div>
-    </div>
+    </section>
   );
 }
