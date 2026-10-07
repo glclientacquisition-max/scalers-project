@@ -2,7 +2,8 @@
  * Voice quality view model for Super Admin.
  * Shape follows trace schema v1 (`scalers.voice.turn` / `scalers.voice.call`)
  * plus the call row: score, per-check counts, diagnosis, and release.
- * Per-turn `checks` are optional until Voice persists them. Business rows add
+ * A turn score, per-turn checks, detected language, tool stages, and filler
+ * stages are optional. Older calls omit them. Business rows add
  * `dropping` and `droppingReason`, computed in `adminQuality.ts`.
  *
  * Reads live in `adminQuality.ts` (server-only). This file is pure so the
@@ -100,6 +101,8 @@ export type VoiceStage =
   | { stage: "transform"; name: string; reason: string; before: string; after: string; dropped: string }
   | { stage: "canned"; path: string; text: string }
   | { stage: "tts"; text: string; before: string; language: string; voiceId: string | null }
+  | { stage: "filler"; text: string; before: string; language: string; played?: boolean }
+  | { stage: "tool"; name: string; status: string; args: string }
   | { stage: "barge_in"; reason: string }
   | {
       stage: "latency";
@@ -117,14 +120,26 @@ export type VoiceTurnTrace = {
   pii: "transcript";
   at: string;
   voiceId: string | null;
-  caller: { text: string; language: string; confidence: number | null };
+  caller: {
+    text: string;
+    language: string;
+    confidence: number | null;
+    /** Persisted detection. Absent on calls from before that field. */
+    detected?: string;
+    /** Persisted sticky language. Absent on older calls. */
+    sticky?: string;
+  };
   stages: VoiceStage[];
   /**
-   * Per-turn check hits. Not stored yet. Present only when the turn payload
-   * or turn row actually carries `checks`. Absent means the timeline does not
-   * pin a check.
+   * Per-turn check hits. Present only when the turn payload or turn row
+   * carries `checks`. Absent means the timeline does not pin a check.
    */
   checks?: VoiceCheckCounts;
+  /**
+   * Per-turn score. Present only when the turn row stores `score`, including
+   * an explicit null. Absent on calls from before that write.
+   */
+  score?: number | null;
   /** Persisted stage list, including stages the timeline does not render. */
   rawStages?: unknown;
 };
@@ -454,8 +469,41 @@ export function finalStt(turn: VoiceTurnTrace): { heard: string; language: strin
 
 export function languageLine(turn: VoiceTurnTrace): string {
   const row = lastStage(turn.stages, "language");
+  const detected = turn.caller.detected?.trim() || "";
+  if (detected) {
+    const sticky = (turn.caller.sticky || row?.sticky || turn.caller.language || "").trim();
+    return sticky ? `Detected ${detected}. Sticky ${sticky}.` : `Detected ${detected}.`;
+  }
   if (!row || (!row.detected && !row.sticky)) return "Not logged";
   return `Detected ${row.detected}. Sticky ${row.sticky}.`;
+}
+
+const TOOL_OK = new Set(["succeeded", "ok", "success", "updated"]);
+
+/** Ok, Failed, or null when the trace stored no status. */
+export function toolResultWord(status: string | null | undefined): "Ok" | "Failed" | null {
+  const value = (status || "").trim().toLowerCase();
+  if (!value) return null;
+  return TOOL_OK.has(value) ? "Ok" : "Failed";
+}
+
+export function toolLines(turn: VoiceTurnTrace): string[] {
+  return turn.stages.flatMap((stage) => {
+    if (stage.stage !== "tool") return [];
+    const name = stage.name.trim();
+    const word = toolResultWord(stage.status);
+    if (!name) return [word || "Not logged"];
+    return [`${name}. ${word || "Not logged"}`];
+  });
+}
+
+export function fillerLines(turn: VoiceTurnTrace): string[] {
+  return turn.stages.flatMap((stage) => {
+    if (stage.stage !== "filler") return [];
+    const head = stage.played === false ? "Not played" : "Played";
+    const text = stage.text.trim();
+    return [text ? `${head}. ${text}` : head];
+  });
 }
 
 export function geminiRaw(turn: VoiceTurnTrace): string | null {

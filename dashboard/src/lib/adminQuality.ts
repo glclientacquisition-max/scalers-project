@@ -40,7 +40,8 @@ export type {
 /**
  * Super Admin quality reads. Service role only, behind the admin layout guard.
  * `public.voice_turn_traces` holds call rows (score, checks, diagnosis, release)
- * and turn rows. Per-turn checks are not stored. Dropping is computed here.
+ * and turn rows. A turn score and turn checks are read only when that row
+ * stores them. Dropping is computed here.
  * A missing client or a missing table returns empty. Other query errors throw.
  */
 
@@ -362,7 +363,7 @@ async function fetchTurns(callIds: readonly string[]): Promise<VoiceTurnTrace[]>
   if (!admin) return [];
   const { data, error } = await admin
     .from("voice_turn_traces")
-    .select("call_id, tenant_id, turn_index, payload, checks, created_at")
+    .select("call_id, tenant_id, turn_index, payload, score, checks, created_at")
     .eq("record_kind", "turn")
     .in("call_id", ids)
     .order("turn_index", { ascending: true })
@@ -409,12 +410,24 @@ function toTurn(row: TraceRow): VoiceTurnTrace {
       text: typeof caller.text === "string" ? caller.text : "",
       language: typeof caller.language === "string" ? caller.language : "",
       confidence: finiteNumber(caller.confidence),
+      ...(typeof caller.detected === "string" && caller.detected.trim() ? { detected: caller.detected } : {}),
+      ...(typeof caller.sticky === "string" && caller.sticky.trim() ? { sticky: caller.sticky } : {}),
     },
     stages: parseStages(payload.stages),
     rawStages: Array.isArray(payload.stages) ? payload.stages : [],
   };
   if (checks) turn.checks = checks;
+  const score = readTurnScore(payload, row.score);
+  if (score !== undefined) turn.score = score;
   return turn;
+}
+
+/** Undefined when the turn row has no score field. Null when it stored null. */
+export function readTurnScore(payload: Record<string, unknown>, column: unknown): number | null | undefined {
+  const columnScore = finiteNumber(column);
+  const payloadHasScore = Object.prototype.hasOwnProperty.call(payload, "score");
+  if (columnScore == null && !payloadHasScore) return undefined;
+  return columnScore ?? finiteNumber(payload.score);
 }
 
 type CallMedia = { durationSec: number | null; recordingUrl: string | null };
@@ -561,6 +574,23 @@ function parseStage(value: unknown): VoiceStage | null {
       before: textOr(row.before, ""),
       language: textOr(row.language, ""),
       voiceId: typeof row.voiceId === "string" ? row.voiceId : null,
+    };
+  }
+  if (stage === "filler") {
+    return {
+      stage: "filler",
+      text: textOr(row.text, ""),
+      before: textOr(row.before, ""),
+      language: textOr(row.language, ""),
+      ...(typeof row.played === "boolean" ? { played: row.played } : {}),
+    };
+  }
+  if (stage === "tool") {
+    return {
+      stage: "tool",
+      name: textOr(row.name, ""),
+      status: typeof row.status === "string" ? row.status : "",
+      args: textOr(row.args, ""),
     };
   }
   if (stage === "barge_in") {

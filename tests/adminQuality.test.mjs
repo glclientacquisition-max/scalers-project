@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 const qualityUrl = new URL("../dashboard/src/lib/adminQuality.ts", import.meta.url);
 const modelUrl = new URL("../dashboard/src/lib/adminQualityModel.ts", import.meta.url);
 
-const { listBusinessQuality, getBusinessQuality, getCallTrace, listReleaseDeltas, qualityBadges, droppingVerdict, releaseDeltasFromCalls } =
+const { listBusinessQuality, getBusinessQuality, getCallTrace, listReleaseDeltas, qualityBadges, droppingVerdict, releaseDeltasFromCalls, readTurnScore } =
   await import(qualityUrl.href);
 const {
   callCountLabel,
@@ -13,6 +13,9 @@ const {
   diagnosisLine,
   droppingAttentionRows,
   emptyChecks,
+  fillerLines,
+  languageLine,
+  toolLines,
   COULDNT_ANSWER_OUTCOMES,
 } = await import(modelUrl.href);
 
@@ -281,5 +284,52 @@ describe("admin quality seam", () => {
     assert.deepEqual(fixture.turns[0].canned, { path: "llm_recovery", text: "Sema tena." });
     assert.deepEqual(fixture.turns[0].observed, { firstPcmMs: 1640 });
     assert.equal("stages" in fixture.turns[0], false);
+  });
+
+  it("reads a turn score only when the row stores the field", () => {
+    assert.equal(readTurnScore({}, null), undefined);
+    assert.equal(readTurnScore({}, undefined), undefined);
+    assert.equal(readTurnScore({ score: null }, null), null);
+    assert.equal(readTurnScore({}, "66.5"), 66.5);
+    assert.equal(readTurnScore({ score: 40 }, null), 40);
+  });
+
+  it("prefers persisted detected language and falls back to the language stage", () => {
+    const staged = turn({
+      text: "Habari",
+      stages: [{ stage: "language", detected: "unknown", sticky: "en", confidence: 0.4 }],
+    });
+    assert.equal(languageLine(staged), "Detected unknown. Sticky en.");
+    assert.equal(
+      languageLine({
+        ...staged,
+        caller: { ...staged.caller, detected: "sw", sticky: "en" },
+      }),
+      "Detected sw. Sticky en.",
+    );
+    const bare = turn({ text: "Habari", stages: [] });
+    delete bare.checks;
+    assert.equal(languageLine(bare), "Not logged");
+    assert.deepEqual(fillerLines(bare), []);
+    assert.deepEqual(toolLines(bare), []);
+  });
+
+  it("names a tool ok or failed, and a filler played or not", () => {
+    const pinned = turn({
+      text: "Mnatosha nyumba?",
+      stages: [
+        { stage: "filler", text: "Mm-hmm", before: "Mm-hmm.", language: "sw" },
+        { stage: "filler", text: "", before: "", language: "sw", played: false },
+        { stage: "tool", name: "save_caller_info", status: "succeeded", args: "name=Alvin" },
+        { stage: "tool", name: "create_service_request", status: "consent_blocked", args: "" },
+        { stage: "tool", name: "file_lookup", status: "", args: "" },
+      ],
+    });
+    assert.deepEqual(fillerLines(pinned), ["Played. Mm-hmm", "Not played"]);
+    assert.deepEqual(toolLines(pinned), [
+      "save_caller_info. Ok",
+      "create_service_request. Failed",
+      "file_lookup. Not logged",
+    ]);
   });
 });

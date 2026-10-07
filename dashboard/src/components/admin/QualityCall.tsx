@@ -8,12 +8,14 @@ import {
   cannedLabel,
   diagnosisLine,
   failingChecks,
+  fillerLines,
   finalStt,
   formatScore,
   geminiRaw,
   languageLine,
   latencyMs,
   spokenLine,
+  toolLines,
   transformRows,
   type VoiceCallTrace,
   type VoiceTurnTrace,
@@ -36,11 +38,20 @@ function TurnTimeline({ turn, turns }: { turn: VoiceTurnTrace; turns: readonly V
   const latency = latencyMs(turn);
   const barge = bargeReason(turn);
   const failed = turn.checks ? failingChecks(turn.checks) : [];
+  const tools = toolLines(turn);
+  const fillers = fillerLines(turn);
 
   return (
     <article className="border-b border-hairline py-4">
       <header className="flex flex-wrap items-center gap-2">
         <h3 className="text-body font-medium text-ink">{turnTitle(turn, turns)}</h3>
+        {"score" in turn ? (
+          turn.score == null ? (
+            <Unlogged />
+          ) : (
+            <span className="text-body tabular-nums text-ink">{formatScore(turn.score)}</span>
+          )
+        ) : null}
         <span className="text-caption tabular-nums text-ink-3">{formatCallWhen(turn.at)}</span>
         {turn.checks && failed.length > 0 ? <FailChips checks={turn.checks} /> : null}
       </header>
@@ -52,6 +63,28 @@ function TurnTimeline({ turn, turns }: { turn: VoiceTurnTrace; turns: readonly V
         </TurnFact>
         <TurnFact label="Language">
           {languageLine(turn) === "Not logged" ? <Unlogged /> : languageLine(turn)}
+        </TurnFact>
+        <TurnFact label="Tool">
+          {tools.length === 0 ? (
+            <Unlogged />
+          ) : (
+            <ul className="space-y-1">
+              {tools.map((line, index) => (
+                <li key={`${line}-${index}`}>{line}</li>
+              ))}
+            </ul>
+          )}
+        </TurnFact>
+        <TurnFact label="Filler">
+          {fillers.length === 0 ? (
+            <Unlogged />
+          ) : (
+            <ul className="space-y-1">
+              {fillers.map((line, index) => (
+                <li key={`${line}-${index}`}>{line}</li>
+              ))}
+            </ul>
+          )}
         </TurnFact>
         <TurnFact label="Gemini">{raw || <Unlogged />}</TurnFact>
         <TurnFact label="Transforms">

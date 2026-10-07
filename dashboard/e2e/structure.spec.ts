@@ -18,6 +18,7 @@ const routes: Array<{ path: string; strict: boolean }> = [
   { path: "/dev/quality", strict: true },
   { path: "/dev/quality/biz-dusted", strict: true },
   { path: "/dev/quality/call/HD_dev_low", strict: true },
+  { path: "/dev/quality/call/HD_dev_pins", strict: true },
   { path: "/dev/quality/empty", strict: true },
   { path: "/dev/desk-shell", strict: false },
   { path: "/dev/home", strict: false },

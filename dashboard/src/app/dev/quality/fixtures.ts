@@ -361,7 +361,96 @@ export function fixtureReleases(): ReleaseDelta[] {
   ];
 }
 
+/** Pins, a turn score, detected language, a tool, and a played filler. */
+export const PINS_CALL: VoiceCallTrace = {
+  schema: "scalers.voice.call",
+  schemaVersion: 1,
+  callId: "HD_dev_pins",
+  tenantId: TENANT,
+  businessId: "biz-dusted",
+  businessName: "Done and Dusted",
+  startedAt: "2026-10-07T20:49:00.000Z",
+  endedAt: "2026-10-07T20:51:05.000Z",
+  turnCount: 2,
+  voiceId: "ke-receptionist",
+  sttModel: "soniox",
+  ttsModel: "soniox",
+  greeting: [],
+  score: 54,
+  checks: checks({ silence: 1, deletedAnswer: 1 }),
+  diagnosis: "A correct answer was deleted (turn 1)",
+  release: { gitSha: "59af35d9", branch: "main", label: "" },
+  turns: [
+    {
+      schema: "scalers.voice.turn",
+      schemaVersion: 1,
+      callId: "HD_dev_pins",
+      tenantId: TENANT,
+      turnIndex: 0,
+      pii: "transcript",
+      at: "2026-10-07T20:49:20.000Z",
+      voiceId: "ke-receptionist",
+      score: 40,
+      checks: checks({ silence: 1, deletedAnswer: 1 }),
+      caller: {
+        text: "Mnatosha nyumba?",
+        language: "en",
+        detected: "sw",
+        sticky: "en",
+        confidence: 0.62,
+      },
+      stages: [
+        {
+          stage: "stt",
+          kind: "final",
+          text: "Mnatosha nyumba?",
+          tokens: [{ text: "Mnatosha nyumba?", final: true, language: "", startMs: 0, endMs: 900 }],
+        },
+        { stage: "language", detected: "unknown", sticky: "en", confidence: 0.4 },
+        { stage: "filler", text: "Mm-hmm", before: "Mm-hmm.", language: "sw" },
+        {
+          stage: "tool",
+          name: "save_caller_info",
+          status: "succeeded",
+          args: "name=Alvin",
+        },
+        {
+          stage: "tool",
+          name: "create_service_request",
+          status: "consent_blocked",
+          args: "type=cleaning",
+        },
+        {
+          stage: "model",
+          phase: "output",
+          outputText: "Tunaosha nyumba.",
+          chars: 18,
+          spokenEmitted: null,
+        },
+        { stage: "outcome", value: "ok" },
+      ],
+    },
+    {
+      schema: "scalers.voice.turn",
+      schemaVersion: 1,
+      callId: "HD_dev_pins",
+      tenantId: TENANT,
+      turnIndex: 1,
+      pii: "transcript",
+      at: "2026-10-07T20:50:10.000Z",
+      voiceId: "ke-receptionist",
+      caller: { text: "Sawa.", language: "sw", confidence: 0.8 },
+      stages: [
+        { stage: "language", detected: "sw", sticky: "sw", confidence: 0.8 },
+        { stage: "tts", text: "Sawa.", before: "Sawa.", language: "sw", voiceId: null },
+        { stage: "outcome", value: "ok" },
+      ],
+    },
+  ],
+};
+
 export function fixtureCall(callId: string): VoiceCallTrace | null {
+  if (callId === PINS_CALL.callId) return PINS_CALL;
   return CALLS.find((call) => call.callId === callId) || null;
 }
 
