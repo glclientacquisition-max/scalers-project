@@ -9,7 +9,10 @@ How-are-you, Okay with no job open, and a bare name go to Gemini. The model
 answers the last thing said. A which-services ask, in English, Kiswahili, or
 a mix, is the catalogue list. The yes after a name confirm still answers that
 ask. It does not open with which service, what they need done, or ungependa
-gani. Trailing noise such as "over" is not a visit place. Code still speaks
+gani. Answering the catalogue leaves the call open. A name confirm after that
+answer binds and continues. It does not end the call. Farewell only when they
+say goodbye or they are done. Trailing noise such as "over" is not a visit
+place. Code still speaks
 the catalogue, hours, coverage,
 leave-it, the visit-time ladder, and tool results. A streamed 503 retries the
 same model once if nothing was spoken, then tries the backup model once.

@@ -273,6 +273,7 @@ function createBrainState(profile = {}) {
       name: caller.name || null,
       phone: caller.phone || null,
       nameConfirmed: Boolean(caller.nameConfirmed),
+      nameJustConfirmed: false,
       boundRole: caller.boundRole || null,
       nameCollision: Array.isArray(caller.nameCollision) ? caller.nameCollision : null,
       fileNameAsked: null,
@@ -313,6 +314,7 @@ function createBrainState(profile = {}) {
       locationDetailAsked: false,
       areaAsked: false,
       locationRefusals: 0,
+      catalogueAnswered: false,
     },
     emotion: {
       state: 'neutral',
@@ -542,6 +544,7 @@ function observeCallerTurn(state, input = {}) {
     }
   );
   next.entities = { ...next.entities, ...nameResolution.entities };
+  const wasNameConfirmed = Boolean(state?.caller?.nameConfirmed);
   next.caller.name = nameResolution.name || null;
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
   next.caller.nameCollision = nameResolution.nameCollision || null;
@@ -563,6 +566,7 @@ function observeCallerTurn(state, input = {}) {
   } else if (!next.caller.name) {
     delete next.entities.name;
   }
+  next.caller.nameJustConfirmed = !wasNameConfirmed && next.caller.nameConfirmed === true;
   applyLiveCallerFile(input.profile, next);
   next.caller.boundRole = next.caller.nameConfirmed
     ? next.returning?.fileRole || null
@@ -896,7 +900,10 @@ function setNextBestAction(state, decision = {}) {
     next.conversation.stage = 'action';
   } else if (decision.action === 'ANSWER') {
     next.conversation.stage = 'resolution';
-    if (decision.resolves === true) next.resolution.status = 'resolved';
+    if (decision.resolves === true) {
+      next.resolution.status = 'resolved';
+      if (decision.catalogueAnswered === true) next.conversation.catalogueAnswered = true;
+    }
   } else if (decision.action === 'ASK_CLARIFICATION') {
     next.conversation.stage = 'discovery';
   } else if (decision.action === 'APOLOGIZE_AND_REPAIR') {
@@ -1196,6 +1203,9 @@ function formatBrainStateForPrompt(state) {
       ? ''
       : '- FILE: nothing is saved for this speaker. Do not talk as if a booking, order, or hold exists. If they ask again, or sound confused, repeat that nothing is saved. Do not offer to reschedule or cancel.',
     `- Handoff requested: ${value.handoff.requested ? 'yes' : 'no'}`,
+    value.resolution.status === 'resolved' && value.goal.status !== 'completed'
+      ? '- The last fact was answered. The call is still open. Do not say goodbye unless they sign off.'
+      : '',
     `- Resolution: ${value.resolution.status}`,
     `- NEXT BEST ACTION: ${value.resolution.nextBestAction} — ${value.resolution.reason}`,
   ]

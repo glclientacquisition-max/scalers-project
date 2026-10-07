@@ -7,8 +7,16 @@ const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
 } = require('./visitTalk');
-const { looksLikePaceOnlyTurn } = require('./dynamicSpeech');
-const { looksLikeFileRead, hasReadableFile, catalogueAskInPlay } = require('./fileRead');
+const { looksLikeBareCloser, looksLikePaceOnlyTurn } = require('./dynamicSpeech');
+const { affirmsAskedFileName } = require('./entityExtraction');
+const {
+  looksLikeFileRead,
+  hasReadableFile,
+  catalogueAskInPlay,
+  bareAffirmation,
+  looksLikeNewWork,
+  looksLikeOfferAsk,
+} = require('./fileRead');
 const {
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
@@ -28,6 +36,63 @@ const DIRECT_ANSWER_INTENTS = new Set([
 ]);
 
 const REQUEST_INTENTS = new Set(['hold', 'order', 'booking', 'cancellation']);
+
+const SIGN_OFF =
+  /^(?:bye|goodbye|good bye|kwaheri|tutaonana|that'?s all|thats all|that is all|no thanks|no thank you|nothing else|i'?m done|im done|that'?s it|thats it|hakuna kingine|see you)$/i;
+
+function callerSignedOff(text) {
+  const raw = String(text || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[?.!,]+$/g, '')
+    .trim();
+  if (!raw) return false;
+  if (SIGN_OFF.test(raw)) return true;
+  return /\bkwaheri\b/.test(raw) && raw.split(/\s+/).length <= 6;
+}
+
+function catalogueListDecision() {
+  return {
+    action: ACTIONS.ANSWER,
+    resolves: true,
+    catalogueAnswered: true,
+    reason:
+      'They asked for the services catalogue. Speak that list from the file first. Do not ask which service, what they need done, or ungependa gani until the list is spoken.',
+  };
+}
+
+/** Earlier catalogue ask still waiting, including after a name-echo that is not a bare yes. */
+function pendingCatalogueAsk(text, state) {
+  const direct = catalogueAskInPlay(text, state);
+  if (direct) return direct;
+  const rows = [];
+  const goal = String(state?.goal?.description || '').trim();
+  if (goal) rows.push(goal);
+  const heard = Array.isArray(state?.conversation?.answersReceived)
+    ? state.conversation.answersReceived
+    : [];
+  for (let i = heard.length - 1; i >= 0; i -= 1) {
+    const row = String(heard[i] || '').trim();
+    if (row) rows.push(row);
+  }
+  for (const row of rows) {
+    if (looksLikeOfferAsk(row) && !looksLikeNewWork(row)) return row;
+  }
+  return '';
+}
+
+/**
+ * This turn only confirmed the file name. A later yes to a slot is not this.
+ * A public answer already given does not make this turn the end of the call.
+ */
+function isIdentityConfirmOnly(text, state) {
+  if (!state?.caller?.nameJustConfirmed) return false;
+  if (looksLikeNewWork(text) || looksLikeOfferAsk(text)) return false;
+  if (looksLikeBareCloser(text)) return false;
+  const name = String(state?.caller?.name || state?.caller?.fileNameAsked || '').trim();
+  if (name && affirmsAskedFileName(text, name)) return true;
+  return bareAffirmation(text);
+}
 
 function visitFileReadDecision(state) {
   const returning = state?.returning;
@@ -132,10 +197,30 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     };
   }
 
-  if (state?.resolution?.status === 'resolved' || state?.goal?.status === 'completed') {
+  if (callerSignedOff(latestUtterance)) {
     return {
       action: ACTIONS.END,
-      reason: 'The caller goal is complete; close naturally without adding another task.',
+      reason: 'The caller said goodbye. Close with a short farewell.',
+    };
+  }
+
+  if (isIdentityConfirmOnly(latestUtterance, state)) {
+    if (!state?.conversation?.catalogueAnswered && pendingCatalogueAsk(latestUtterance, state)) {
+      return catalogueListDecision();
+    }
+    return {
+      action: ACTIONS.ANSWER,
+      reason:
+        'They confirmed who is speaking. The call is still open. Ask which service they need, or answer what they already asked. Do not say goodbye. Do not end the call.',
+    };
+  }
+
+  const answerStanding =
+    state?.resolution?.status === 'resolved' || state?.goal?.status === 'completed';
+  if (answerStanding && looksLikeBareCloser(latestUtterance)) {
+    return {
+      action: ACTIONS.END,
+      reason: 'The caller is done. Close with a short farewell.',
     };
   }
 
@@ -178,12 +263,10 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
 
   const catalogueAsk = catalogueAskInPlay(latestUtterance, state);
   if (catalogueAsk) {
-    return {
-      action: ACTIONS.ANSWER,
-      resolves: true,
-      reason:
-        'They asked for the services catalogue. Speak that list from the file first. Do not ask which service, what they need done, or ungependa gani until the list is spoken.',
-    };
+    const askedAgain =
+      looksLikeOfferAsk(latestUtterance) && !looksLikeNewWork(latestUtterance);
+    // A bare yes after the list is a slot answer, not another request for the list.
+    if (askedAgain || !state?.conversation?.catalogueAnswered) return catalogueListDecision();
   }
 
   if (intent === 'unknown' || intent === 'general_enquiry') {
