@@ -9,6 +9,7 @@ const path = require('path');
 const { synthesizeTtsPreview } = require('../src/speech/ttsPreview');
 const { pickSpeechOutageLine } = require('../src/speech/outageCopy');
 const { isSonioxTtsConfigured } = require('../src/speech/sonioxTts');
+const { assessPackagedClip } = require('./check-outage-clips');
 
 const OUT_DIR = path.join(__dirname, '../src/speech/pcm');
 
@@ -22,7 +23,13 @@ async function renderLang(lang) {
   });
   const dest = path.join(OUT_DIR, `downtime-${lang}.wav`);
   fs.writeFileSync(dest, result.wav);
-  console.log(`[render-outage-clips] wrote ${dest} bytes=${result.wav.length}`);
+  const check = assessPackagedClip(dest);
+  if (!check.ok) {
+    throw new Error(`downtime-${lang}.wav ${check.reason}`);
+  }
+  console.log(
+    `[render-outage-clips] wrote ${dest} bytes=${result.wav.length} pcmMs=${check.ms}`
+  );
 }
 
 async function main() {

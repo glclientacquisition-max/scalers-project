@@ -119,6 +119,24 @@ function voiceStatus(voiceId) {
   };
 }
 
+function fileExists(filePath) {
+  try {
+    return fs.existsSync(filePath);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Git WAVs for the default clone. Independent of the warm memory cache so
+ * /healthz still shows a missing package after a healthy boot.
+ */
+function packagedOnDisk() {
+  const en = fileExists(packagedPath('en'));
+  const sw = fileExists(packagedPath('sw'));
+  return { en, sw, missing: !(en && sw) };
+}
+
 /** Cheap /healthz snapshot. Does not decode WAV. */
 function getOutageClipStatus() {
   const defaultVoice = getDefaultVoiceId();
@@ -133,6 +151,7 @@ function getOutageClipStatus() {
     en: def.en,
     sw: def.sw,
     source: def.source,
+    packaged: packagedOnDisk(),
     voices,
   };
 }
@@ -199,7 +218,6 @@ async function warmOutageClips(opts = {}) {
         if (packaged) {
           cacheClip(lang, packaged, 'packaged', id);
           warmed.push(lang);
-          continue;
         }
       }
       try {
@@ -212,7 +230,7 @@ async function warmOutageClips(opts = {}) {
         const pcm = wavBytesTo16kPcm(result.wav);
         if (pcm?.length) {
           cacheClip(lang, pcm, 'soniox', id);
-          warmed.push(lang);
+          if (!warmed.includes(lang)) warmed.push(lang);
           console.log(
             `[outage-clip] warmed clone-voice downtime clip voice=${id} lang=${lang} bytes=${pcm.length}`
           );
@@ -261,6 +279,7 @@ module.exports = {
   scheduleOutageClipWarm,
   resetOutageClipCache,
   getOutageClipStatus,
+  packagedOnDisk,
   packagedPath,
   tmpPath,
   voiceKey,

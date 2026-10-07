@@ -400,6 +400,24 @@ assert.match(
 
 assert.match(
   source,
+  /planSpeechOutagePlayback\(\{[\s\S]*skipGemini: billing/,
+  'billing speech-down must skip Gemini TTS and play clip or espeak before hangup'
+);
+
+assert.match(
+  source,
+  /if \(waitMs > 0\) \{\s*callTranscript\.pushAgent\(plan\.line\)/,
+  'speech-down must not log a spoken line unless PCM was sent'
+);
+
+assert.match(
+  source,
+  /logPackagedOutageClips\(\)/,
+  'boot must report packaged downtime WAVs without waiting for a Soniox warm'
+);
+
+assert.match(
+  source,
   /lastError: getSonioxProviderHealth\(\)/,
   'healthz must expose last Soniox STT/TTS error so 402 billing is visible without log tailing'
 );
