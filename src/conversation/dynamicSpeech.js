@@ -435,6 +435,8 @@ function polishSpokenDetail(text, opts = {}) {
       language: opts.language,
       allowEmpty: true,
       dropReasons,
+      replyPartial: Boolean(opts.replyPartial),
+      priorReply: String(opts.priorReply || ''),
     });
   }
   const callerText = String(

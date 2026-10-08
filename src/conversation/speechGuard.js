@@ -10,7 +10,19 @@ const { entityValue, findCatalogMatch } = require('./entityExtraction');
 const { looksLikeOfferAsk } = require('./fileRead');
 const { fileServicePriceLine } = require('./catalogueMouth');
 const { numbersIn } = require('./numberWords');
-const { assessCoverage, groundFalseOutsideClaim } = require('./visitLocation');
+const {
+  assessCoverage,
+  coverageNextStepQuestion,
+  groundFalseOutsideClaim,
+} = require('./visitLocation');
+
+function lastSpokenSentence(text) {
+  const parts = String(text || '')
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts[parts.length - 1] || '';
+}
 const { bindSpokenPlace } = require('./kenyaPlaces');
 const { offerActOf } = require('../speech/offerAct');
 const { openSlotLine } = require('./callCorrectives');
@@ -563,6 +575,7 @@ function guardSpokenReply(text, ctx = {}) {
   const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
   const heldName = heldCallerName(ctx.state);
   let droppedNameAsk = false;
+  let groundedCoverage = false;
   for (const sentence of splitSentences(raw)) {
     if (heldName && sentenceAsksForCallerName(sentence)) {
       droppedNameAsk = true;
@@ -609,13 +622,18 @@ function guardSpokenReply(text, ctx = {}) {
       noteDrop(ctx, 'transfer_claim', sentence);
       continue;
     }
-    const groundedOutside = groundFalseOutsideClaim(
-      sentence,
-      ctx.profile || {},
-      ctx.language
-    );
-    if (groundedOutside) {
-      kept.push(groundedOutside);
+    // A covered town the model called outside. The previous sentence is the
+    // last one kept in this text, or the last one already spoken this reply.
+    const keptBefore = kept.length ? kept[kept.length - 1] : '';
+    const grounded = groundFalseOutsideClaim(sentence, ctx.profile || {}, ctx.language, {
+      previous: keptBefore || lastSpokenSentence(ctx.priorReply),
+      mergeable: Boolean(keptBefore),
+    });
+    if (grounded) {
+      noteDrop(ctx, 'coverage_grounded', sentence);
+      groundedCoverage = true;
+      if (grounded.replacesPrevious) kept.pop();
+      if (grounded.line) kept.push(grounded.line);
       continue;
     }
     const coveragePlace = positiveCoveragePlace(sentence);
@@ -636,6 +654,11 @@ function guardSpokenReply(text, ctx = {}) {
     kept.push(sentence);
   }
   let out = kept.join(' ').trim();
+  // A corrected coverage line must not end the turn without a next step.
+  // Streamed pieces wait: the finished reply decides, so it is asked once.
+  if (groundedCoverage && out && !ctx.replyPartial && !out.includes('?') && !String(ctx.priorReply || '').includes('?')) {
+    out = `${out} ${coverageNextStepQuestion(ctx.language, ctx.state)}`;
+  }
   if (holdOpenSlot && droppedJob && BARE_CLOSER.test(out)) out = '';
   const cataloguePrice = fileServicePriceLine(
     lastCallerTurn,

@@ -3488,6 +3488,8 @@ mediaWss.on('connection', (ws, req) => {
           language: callLanguage,
           // The note offer is decided on the finished reply, not on each sentence.
           replyPartial: true,
+          // What this reply already said, so a correction continues it.
+          priorReply: spokenChunks.join(' '),
         });
         const polished = polishedDetail.text;
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
@@ -3811,7 +3813,8 @@ mediaWss.on('connection', (ws, req) => {
             const offerTail = coverageOfferToSpeak(
               result?.spokenText,
               planned.reply,
-              callLanguage
+              callLanguage,
+              callBrainStates.get(callKey)
             );
             if (offerTail && !bargeInActive) {
               callTranscript.pushAgent(offerTail);

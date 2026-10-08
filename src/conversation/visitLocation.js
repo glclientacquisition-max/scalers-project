@@ -12,6 +12,7 @@ const {
   countiesForPlace,
   nearestAllowedPlace,
   placesInCounties,
+  normalizePlaceKey,
 } = require('./kenyaPlaces');
 const { offerActOf } = require('../speech/offerAct');
 const { coveredByAreas, readCoverageAreas } = require('./coverageAreas');
@@ -685,9 +686,19 @@ function outsideClaimPlaces(sentence) {
   return found;
 }
 
-function coverageFactLine(inside, outside, language) {
+function swahiliLike(language) {
   const lang = String(language || 'en').toLowerCase();
-  const sw = lang === 'sw' || lang.startsWith('swahili') || lang === 'sheng';
+  return lang === 'sw' || lang.startsWith('swahili') || lang === 'sheng';
+}
+
+/**
+ * @param {string[]} inside
+ * @param {string[]} outside
+ * @param {string} language
+ * @param {{ answer?: boolean }} [opts] answer: a reply to "do you cover X?" may open with "Yes,".
+ */
+function coverageFactLine(inside, outside, language, opts = {}) {
+  const sw = swahiliLike(language);
   const covered = joinPlaceNames(inside, language);
   const uncovered = joinPlaceNames(outside, language);
   if (inside.length && outside.length) {
@@ -695,26 +706,88 @@ function coverageFactLine(inside, outside, language) {
       ? `Tunafika ${covered}, lakini hatufiki ${uncovered}.`
       : `We cover ${covered}, but we don't cover ${uncovered}.`;
   }
-  if (inside.length) return sw ? `Tunafika ${covered}.` : `Yes, we cover ${covered}.`;
+  if (inside.length) {
+    if (sw) return `Tunafika ${covered}.`;
+    return opts.answer === false ? `We cover ${covered}.` : `Yes, we cover ${covered}.`;
+  }
   return sw ? `Hatufiki ${uncovered}.` : `We don't cover ${uncovered}.`;
+}
+
+/** A sentence that states where we go, such as "We cover Nairobi and its close surroundings." */
+const POSITIVE_COVERAGE_SENTENCE =
+  /^(?:(?:yes|yeah|ndiyo|sawa)\s*,?\s*)?(?:we (?:also )?(?:cover|serve|reach|come to|go to|work in)|tunafika|tunahudumia|tunakuja|tunaenda|pia tunafika)\b/i;
+
+function lastSentenceOf(text) {
+  const parts = String(text || '')
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts[parts.length - 1] || '';
+}
+
+function namesPlaceIn(sentence, place) {
+  const hay = ` ${normalizePlaceKey(sentence)} `;
+  const needle = normalizePlaceKey(place);
+  return Boolean(needle) && hay.includes(` ${needle} `);
+}
+
+/**
+ * The next step after a corrected coverage line, in the caller's language.
+ * The open visit slot when the call has one, else when we should come.
+ */
+function coverageNextStepQuestion(language = 'en', state = null) {
+  const sw = swahiliLike(language);
+  const missing = Array.isArray(state?.goal?.missingSlots) ? state.goal.missingSlots : [];
+  const needsWhen = missing.some((slot) => /^(?:when|when_text|time)$/.test(slot));
+  const needsPlace = missing.some((slot) => /^(?:location|landmark|area)$/.test(slot));
+  if (needsPlace && !needsWhen) return sw ? 'Tuje wapi?' : 'Where should we come?';
+  return sw ? 'Ungependa tuje lini?' : 'When would you like us to come?';
 }
 
 /**
  * A sentence that says a covered town is outside becomes the grounded line.
  * A true outside town stays. An empty result means the sentence is left as said.
+ *
+ * opts.previous is the sentence just before it in this reply (kept or already
+ * spoken). A covered town that sentence already names is not said again. When
+ * that sentence states coverage and was not spoken yet (opts.mergeable), the
+ * town joins it: "We cover Nairobi and its close surroundings, and Kitengela
+ * too." When it was already spoken, the line continues it: "We also cover
+ * Kitengela." The line never opens with "Yes," because nobody asked it here.
+ *
+ * @returns {string | { line: string, replacesPrevious: boolean, grounded: true }}
+ *   A string when opts is omitted (legacy callers), else the detail object.
  */
-function groundFalseOutsideClaim(sentence, profile = {}, language = 'en') {
+function groundFalseOutsideClaim(sentence, profile = {}, language = 'en', opts = null) {
   const claimed = outsideClaimPlaces(sentence);
   if (!claimed.length) return '';
   const rated = claimed.map((raw) => speakableCoverageName(raw, profile));
-  const inside = uniquePlaceNames(
+  const previous = String(opts?.previous || '').trim();
+  let inside = uniquePlaceNames(
     rated.filter((row) => row.rating === 'inside').map((row) => row.speak)
   );
   if (!inside.length) return '';
   const outside = uniquePlaceNames(
     rated.filter((row) => row.rating === 'outside').map((row) => row.speak)
   );
-  return coverageFactLine(inside, outside, language);
+  const detail = (line, replacesPrevious = false) =>
+    opts ? { line, replacesPrevious, grounded: true } : line;
+  const previousCovers = POSITIVE_COVERAGE_SENTENCE.test(previous);
+  if (previousCovers) inside = inside.filter((place) => !namesPlaceIn(previous, place));
+  const sw = swahiliLike(language);
+  if (!inside.length) {
+    // The town was already said as covered. Only a true outside town remains.
+    return detail(outside.length ? coverageFactLine([], outside, language) : '');
+  }
+  if (previousCovers && !outside.length) {
+    const covered = joinPlaceNames(inside, language);
+    if (opts?.mergeable) {
+      const head = previous.replace(/[.!?\s]+$/, '');
+      return detail(sw ? `${head}, na pia ${covered}.` : `${head}, and ${covered} too.`, true);
+    }
+    return detail(sw ? `Pia tunafika ${covered}.` : `We also cover ${covered}.`);
+  }
+  return detail(coverageFactLine(inside, outside, language, { answer: false }));
 }
 
 function uniquePlaceNames(names) {
@@ -730,9 +803,10 @@ function uniquePlaceNames(names) {
 
 /**
  * Each named town is judged on its own. Covered towns and uncovered towns
- * are both spoken. The note offer is added only when a town is uncovered.
+ * are both spoken. The note offer is added when a town is uncovered, else
+ * the visit next step.
  */
-function coverageAskSpeech(text, profile = {}, language = 'en') {
+function coverageAskSpeech(text, profile = {}, language = 'en', state = null) {
   if (String(profile?.vertical || '').toLowerCase() !== 'home_services') return '';
   const rawPlaces = coverageAskPlaces(text);
   if (!rawPlaces.length) return '';
@@ -748,7 +822,9 @@ function coverageAskSpeech(text, profile = {}, language = 'en') {
     return visitBlockSpeech('unknown_coverage', language);
   }
   const fact = coverageFactLine(inside, outside, language);
-  if (!outside.length) return fact;
+  // Every coverage answer ends on a next step: the visit when all towns are
+  // covered, else the note offer for the town we do not reach.
+  if (!outside.length) return `${fact} ${coverageNextStepQuestion(language, state)}`;
   return `${fact} ${coverageNoteQuestion(language)}`;
 }
 
@@ -793,14 +869,17 @@ function ensureCoverageOffer(text, language = 'en', opts = {}) {
  * The whole reply earned the note question after the sentences were already
  * spoken. Return that question so the next speak slot can say it once.
  */
-function coverageOfferToSpeak(polished, heard, language = 'en') {
+function coverageOfferToSpeak(polished, heard, language = 'en', state = null) {
   const whole = String(polished || '').replace(/\s+/g, ' ').trim();
   const prior = String(heard || '').replace(/\s+/g, ' ').trim();
-  const ask = coverageNoteQuestion(language);
-  if (!whole.endsWith(ask)) return '';
-  const bare = ask.replace(/\?/g, '').trim().toLowerCase();
-  if (prior.toLowerCase().includes(bare)) return '';
-  return ask;
+  for (const ask of [coverageNoteQuestion(language), coverageNextStepQuestion(language, state)]) {
+    if (!whole.endsWith(ask)) continue;
+    const bare = ask.replace(/\?/g, '').trim().toLowerCase();
+    if (prior.toLowerCase().includes(bare)) return '';
+    if (prior.includes('?')) return '';
+    return ask;
+  }
+  return '';
 }
 
 function coverageNoteQuestion(language = 'en') {
@@ -880,6 +959,7 @@ module.exports = {
   coverageAskSpeech,
   ensureCoverageOffer,
   coverageOfferToSpeak,
+  coverageNextStepQuestion,
   offerStillPending,
   groundFalseOutsideClaim,
   statesOutOfArea,

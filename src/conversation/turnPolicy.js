@@ -205,7 +205,7 @@ function resolveLocalReply({
     if (offerLine) return publish({ outcome: 'catalogue', line: offerLine });
   }
 
-  const coverageLine = coverageAskSpeech(clean, profile, language);
+  const coverageLine = coverageAskSpeech(clean, profile, language, state);
   if (coverageLine) return publish({ outcome: 'coverage', line: coverageLine });
 
   const placeBlockLine = visitBlockSpeech(state?.visitPlace?.blocked, language);

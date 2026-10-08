@@ -32,7 +32,7 @@
     "test:stt-context": "node tests/sttContext.test.js",
     "test:gemini-voice": "node --test tests/geminiVoice.test.js tests/geminiProviderHealth.test.js tests/spokenChunkPath.test.js",
     "test:live-transfer": "node --test tests/liveTransferXml.test.js tests/liveTransferLegs.test.js",
-    "test:caller-file-voice": "node --test tests/callerFileVoice.test.js tests/hdSpeakReplay.test.js",
+    "test:caller-file-voice": "node --test tests/callerFileVoice.test.js tests/hdSpeakReplay.test.js tests/hd48e5Replay.test.js",
     "test:prompt-facts": "node --test tests/tenantPromptFacts.test.js",
     "test:catalogue-mouth": "node --test tests/catalogueMouth.test.js tests/voiceSentenceStream.test.js",
     "test:call-close": "node --test tests/callClose.test.js",
