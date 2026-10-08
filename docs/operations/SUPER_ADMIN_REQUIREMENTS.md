@@ -32,6 +32,9 @@ Requirements:
 /admin/packages        Packages, on-demand rates, assign (customer billing)
 /admin/wallets         Redirects to Businesses. Plan and charges live on the shop.
 /admin/businesses      All businesses + actions
+/admin/quality         Call quality. Worst first. Empty until traces are read.
+/admin/quality/[business]  One business: calls, repeat failures, missed questions
+/admin/quality/call/[id]   One traced call
 /admin/numbers         Number pool (add / assign / release)
 /admin/voices          Voice catalog
 ```
@@ -48,7 +51,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 
 ### 1. Overview (`/admin`)
 - Tabs name the screen. No page title.
-- Needs you: open platform notices, shops waiting for a number, and live shops with no package. Archived shops stay off this pile. A row opens the shop or Platform escalate.
+- Needs you: open platform notices, shops waiting for a number, live shops with no package, and businesses whose quality is dropping (the reason is the row text). Archived shops stay off this pile. A row opens the shop, Platform escalate, or that business on Quality.
 - Glance: Platform, Businesses, Numbers, Packages, and Calls (7 days). Not KPI tiles.
 - Primary CTA: Add number when a shop is waiting or the pool is empty. Empty pile offers Add number or Packages, whichever is the next real job.
 

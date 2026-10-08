@@ -15,6 +15,11 @@ const routes: Array<{ path: string; strict: boolean }> = [
   { path: "/dev/kit", strict: true },
   { path: "/dev/admin-overview", strict: true },
   { path: "/dev/admin-voices", strict: true },
+  { path: "/dev/quality", strict: true },
+  { path: "/dev/quality/biz-dusted", strict: true },
+  { path: "/dev/quality/call/HD_dev_low", strict: true },
+  { path: "/dev/quality/call/HD_dev_pins", strict: true },
+  { path: "/dev/quality/empty", strict: true },
   { path: "/dev/desk-shell", strict: false },
   { path: "/dev/home", strict: false },
   { path: "/dev/inbox", strict: false },
@@ -251,4 +256,18 @@ test.describe("/dev/kit interactions", () => {
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(page.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
   });
+});
+
+test("More opens from the keyboard and Escape returns focus", async ({ page }) => {
+  const width = page.viewportSize()?.width ?? 0;
+  test.skip(width >= 768, "phone tab bar only");
+  await page.goto("/dev/quality");
+  await settle(page);
+  const more = page.getByRole("button", { name: "More" });
+  await more.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(more).toBeFocused();
 });
