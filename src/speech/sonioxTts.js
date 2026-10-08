@@ -6,6 +6,8 @@ const { randomUUID } = require('crypto');
 
 const { prepareForTts } = require('./ttsNormalize');
 const { wireTextForPiece } = require('./ttsBoundary');
+const { structuredOutputEnabled } = require('./structured/flag');
+const { prepareStructuredPiece } = require('./structured/speechBoundary');
 const { resolveSonioxVoice, resolveSonioxTtsModel } = require('./sonioxVoice');
 const { classifySonioxError } = require('./sonioxErrors');
 const {
@@ -261,6 +263,11 @@ function createSonioxTtsSession({
     let ended = false;
     // Pieces already sent on this stream. Every later piece opens with a space.
     let piecesSent = 0;
+    // VOICE_STRUCTURED_OUTPUT=on: every piece goes through the one structured
+    // boundary (src/speech/structured/speechBoundary.js). Off: prepareForTts as before.
+    const structuredBoundary =
+      !opts.alreadyPrepared && (opts.structured === true || (opts.structured !== false && structuredOutputEnabled()));
+    let structuredPieces = 0;
 
     const waiter = {
       cancelled: false,
@@ -302,8 +309,9 @@ function createSonioxTtsSession({
      * Push one text chunk into the open stream.
      * @param {string} text
      */
-    function pushText(text) {
+    function pushText(text, pieceOpts = {}) {
       if (ended || closed) return { pushed: false };
+      if (structuredBoundary) return pushStructuredText(text, pieceOpts);
       const prepared = opts.alreadyPrepared
         ? {
             original: String(text || ''),
@@ -329,6 +337,38 @@ function createSonioxTtsSession({
           ` original=${JSON.stringify(prepared.original)} spoken=${JSON.stringify(wire)}`
       );
       return { pushed: true, language: prepared.language, text: clean };
+    }
+
+    function pushStructuredText(text, pieceOpts) {
+      const prepared = prepareStructuredPiece(text, {
+        callLanguage: opts.callLanguage,
+        language: pieceOpts.language || opts.lockedLanguage || undefined,
+        extraLexicon: opts.extraLexicon,
+        first: structuredPieces === 0,
+      });
+      if (typeof opts.onPiece === 'function') {
+        try {
+          opts.onPiece({ ...prepared, streamId, piece: structuredPieces + (prepared.wire ? 1 : 0) });
+        } catch {
+          /* tap only */
+        }
+      }
+      if (!prepared.wire) return { pushed: false, language: prepared.language, refused: prepared.refused };
+      // A stream speaks in one language. The first piece decides it.
+      ensureConfigured(prepared.language);
+      sendJson({ text: prepared.wire, text_end: false, stream_id: streamId });
+      structuredPieces += 1;
+      console.log(
+        `[soniox-tts][${callSid}] chunk stream=${streamId} piece=${structuredPieces} boundary=structured` +
+          ` original=${JSON.stringify(prepared.original)} wire=${JSON.stringify(prepared.wire)}`
+      );
+      return {
+        pushed: true,
+        language: prepared.language,
+        text: prepared.text,
+        wire: prepared.wire,
+        piece: structuredPieces,
+      };
     }
 
     /**
