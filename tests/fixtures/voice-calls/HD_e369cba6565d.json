@@ -1,0 +1,492 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "callId": "HD_e369cba6565d",
+  "tenantId": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+  "businessName": "Done and Dusted",
+  "callerName": "Alvin",
+  "nameOnFile": true,
+  "vertical": "home_services",
+  "servicesCatalog": [
+    {
+      "name": "Couch cleaning",
+      "price_range": "Ksh 600 per seat"
+    },
+    {
+      "name": "Mattress cleaning",
+      "price_range": "Ksh 800-1200",
+      "notes": "Vary by size"
+    },
+    {
+      "name": "Carpet cleaning",
+      "price_range": "Ksh 1500-2000"
+    },
+    {
+      "name": "General cleaning (houses & air bnbs)",
+      "price_range": "On quotation"
+    },
+    {
+      "name": "Pet stain removal",
+      "price_range": "On quotation"
+    }
+  ],
+  "businessPolicies": {
+    "coverage_areas": [
+      "county:nairobi",
+      "county:kiambu",
+      "place:kitengela",
+      "place:juja",
+      "place:ongata rongai",
+      "place:syokimau"
+    ]
+  },
+  "socialHandles": {
+    "main": "0790381872"
+  },
+  "source": "Staging voice_turn_traces 2026-10-08 07:05Z (10:05 EAT), release efb691b8. Free caller (Alvin). Live defects: the note offer twice (t2), kitengele called outside (t12), replies to fragments (t13, t18, t19), the bnb price spoke the carpet row (t9), the save line lost to a barge-in (t20), and \"tuje\" split to \"tu je\" (t20). Recorded model text replays through the current mouth. A barged reply keeps its recorded model text and replays as spoken (liveOutcome barge_in), so the mouth is still gated on it.",
+  "turns": [
+    {
+      "caller": "Nilikuwa nataka kujua kama mnafika Kisumu",
+      "soniox": "sw",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "Hatufiki Kisumu. Naweza kukuachia ujumbe kwa timu yetu? Je, naongea na Alvin?"
+      },
+      "model": {
+        "provider": "canned",
+        "model": "speak_packet",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "outcome": "early_return",
+      "observed": {
+        "firstPcmMs": 317,
+        "firstReplyPcmMs": 317
+      }
+    },
+    {
+      "caller": "Yeah, unaongea na Alvin.",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Alvin, huduma zetu ni za Nairobi na maeneo ya karibu pekee, kwa hivyo hatufiki Kisumu. Unaweza kupenda nikuandikishe ujumbe kwa timu yetu?",
+        "chars": 138,
+        "spokenEmitted": 138
+      },
+      "filler": "Mm.",
+      "observed": {
+        "firstPcmMs": 666,
+        "firstReplyPcmMs": 1812,
+        "firstTokenMs": 1092
+      }
+    },
+    {
+      "caller": "Nilikuwa nataka kujua.",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sawa Alvin. Kama kuna huduma nyingine au swali lolote ungependa kusaidiwa nalo Nairobi, niambie tu.",
+        "chars": 99,
+        "spokenEmitted": 99
+      },
+      "filler": "Sawa.",
+      "observed": {
+        "firstPcmMs": 404,
+        "firstReplyPcmMs": 1459,
+        "firstTokenMs": 1017
+      },
+      "liveOutcome": "barge_in"
+    },
+    {
+      "caller": "Nilikuwa nataka.",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "filler": "Sawa.",
+      "outcome": "barge_in",
+      "observed": {
+        "firstPcmMs": 404
+      }
+    },
+    {
+      "caller": "Kujua if",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Ndiyo Alvin, ulikuwa unataka kujua nini kingine?",
+        "chars": 48,
+        "spokenEmitted": 48
+      },
+      "filler": "Mm.",
+      "observed": {
+        "firstPcmMs": 403,
+        "firstReplyPcmMs": 1350,
+        "firstTokenMs": 1009
+      },
+      "liveOutcome": "barge_in"
+    },
+    {
+      "caller": "In any case.",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sawa Alvin, niko hapa kusaidia. Kuna huduma yoyote ya usafishaji ungependa kuitisha Nairobi?",
+        "chars": 92,
+        "spokenEmitted": 92
+      },
+      "filler": "Mm.",
+      "observed": {
+        "firstPcmMs": 403,
+        "firstReplyPcmMs": 1414,
+        "firstTokenMs": 945
+      },
+      "liveOutcome": "barge_in"
+    },
+    {
+      "caller": "You guys do carpet cleaning.",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Ndiyo Alvin, tunasafisha kapeti. Ungetaka tukutembelee siku gani na saa ngapi?",
+        "chars": 78,
+        "spokenEmitted": 78
+      },
+      "filler": "Mm.",
+      "observed": {
+        "firstPcmMs": 405,
+        "firstReplyPcmMs": 1522,
+        "firstTokenMs": 1061
+      }
+    },
+    {
+      "caller": "Ni how much?",
+      "soniox": "sw",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "Carpet cleaning ni Ksh 1500-2000."
+      },
+      "model": {
+        "provider": "canned",
+        "model": "speak_packet",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "outcome": "early_return",
+      "observed": {
+        "firstPcmMs": 355,
+        "firstReplyPcmMs": 355
+      }
+    },
+    {
+      "caller": "Na kuwasha bnb mna-charge how much?",
+      "soniox": "sw",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "Carpet cleaning ni Ksh 1500-2000."
+      },
+      "model": {
+        "provider": "canned",
+        "model": "speak_packet",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "outcome": "early_return",
+      "observed": {
+        "firstPcmMs": 244,
+        "firstReplyPcmMs": 244
+      }
+    },
+    {
+      "caller": "Na- na kuwasha bnb?",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Kusafisha kapeti ni shilingi 1500 hadi 2000 kulingana na ukubwa. Usafishaji wa nyumba na Airbnb ni kwa nukuu (quotation). Ungetaka tuje wapi na lini?",
+        "chars": 149,
+        "spokenEmitted": 149
+      },
+      "filler": "Sawa.",
+      "observed": {
+        "firstPcmMs": 403,
+        "firstReplyPcmMs": 1806,
+        "firstTokenMs": 1348
+      }
+    },
+    {
+      "caller": "And na mattress, unaniambia kuhusu mattress?",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Kusafisha matresi ni shilingi 800 hadi 1200 kulingana na ukubwa. Ungetaka tukuhudumie lini na wapi Nairobi?",
+        "chars": 107,
+        "spokenEmitted": 107
+      },
+      "filler": "Sawa.",
+      "observed": {
+        "firstPcmMs": 403,
+        "firstReplyPcmMs": 1650,
+        "firstTokenMs": 1104
+      }
+    },
+    {
+      "caller": "A-ah, ni Nairobi pekee. Na water bowl kitengele ndio ngapi. Do you guys cover that?",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Kitengela iko nje ya eneo letu la huduma kwa sasa kwani tunahudumia Nairobi na maeneo ya karibu pekee. Una eneo lingine Nairobi ungependa tusafishe?",
+        "chars": 148,
+        "spokenEmitted": 148
+      },
+      "filler": "Sawa.",
+      "observed": {
+        "firstPcmMs": 404,
+        "firstReplyPcmMs": 1782,
+        "firstTokenMs": 1118
+      }
+    },
+    {
+      "caller": "A-ah,",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sawa Alvin. Ukihitaji huduma zetu za usafishaji Nairobi wakati wowote, utatujulisha. Siku njema!",
+        "chars": 96,
+        "spokenEmitted": 96
+      },
+      "filler": "Mm.",
+      "observed": {
+        "firstPcmMs": 401,
+        "firstReplyPcmMs": 3998,
+        "firstTokenMs": 3376
+      },
+      "liveOutcome": "barge_in"
+    },
+    {
+      "caller": "Na nini, like, water bowl ndio ngapi?",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sina maelezo kuhusu water bowl. Naweza kukuandikia ujumbe kwa timu yetu ili wakupigie simu wakikueleza zaidi?",
+        "chars": 109,
+        "spokenEmitted": 109
+      },
+      "filler": "Sawa.",
+      "observed": {
+        "firstPcmMs": 403,
+        "firstReplyPcmMs": 1606,
+        "firstTokenMs": 1101
+      },
+      "liveOutcome": "barge_in"
+    },
+    {
+      "caller": "Ndio ngapi, I mean, ndio ngapi?",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sina bei ya hiyo detail kwa sasa, naweza kuandikia timu yetu ujumbe ili wakufahamishe?",
+        "chars": 86,
+        "spokenEmitted": 86
+      },
+      "filler": "Sawa.",
+      "observed": {
+        "firstPcmMs": 404,
+        "firstReplyPcmMs": 1513,
+        "firstTokenMs": 1048
+      },
+      "liveOutcome": "barge_in"
+    },
+    {
+      "caller": "Like, do you do you cover ndio ngapi?",
+      "soniox": "sw",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "Sina uhakika kama tunafika hapo. Naweza kukuachia ujumbe kwa timu yetu?"
+      },
+      "model": {
+        "provider": "canned",
+        "model": "speak_packet",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "outcome": "early_return",
+      "observed": {
+        "firstPcmMs": 395,
+        "firstReplyPcmMs": 395
+      }
+    },
+    {
+      "caller": "Okay.",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "filler": "Nipe sekunde.",
+      "outcome": "barge_in",
+      "observed": {
+        "firstPcmMs": 2205
+      }
+    },
+    {
+      "caller": "And, uh, let's say",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "I zo maelezo sina kwa sasa, naweza kukuchukulia ujumbe timu wakupigie simu?",
+        "chars": 75,
+        "spokenEmitted": 75
+      },
+      "filler": "Mm.",
+      "observed": {
+        "firstPcmMs": 403,
+        "firstReplyPcmMs": 3402,
+        "firstTokenMs": 2862
+      },
+      "liveOutcome": "barge_in"
+    },
+    {
+      "caller": "Let's say",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Ungetaka tusafishe godoro au kapeti siku gani na wapi hapa Nairobi?",
+        "chars": 67,
+        "spokenEmitted": 67
+      },
+      "filler": "Mm.",
+      "observed": {
+        "firstPcmMs": 403,
+        "firstReplyPcmMs": 1458,
+        "firstTokenMs": 924
+      },
+      "liveOutcome": "barge_in"
+    },
+    {
+      "caller": "Are two, I have to book with you.",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "###TOOL###\n{\"save_caller_info\":{\"name\":\"Alvin\",\"reason\":\"Mattress cleaning booking enquiry\"}}\n###ENDTOOL###\nSawa Alvin, tutasafisha matresi mawili. Ungetaka tuje siku gani na saa ngapi, na wapi hapa Nairobi?",
+        "chars": 207,
+        "spokenEmitted": 100
+      },
+      "filler": "Mm.",
+      "observed": {
+        "firstPcmMs": 403,
+        "firstReplyPcmMs": 2344,
+        "firstTokenMs": 1424
+      },
+      "liveOutcome": "barge_in"
+    },
+    {
+      "caller": "At what time at what time do you close?",
+      "soniox": "sw",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "Tuko wazi mpaka 6 PM."
+      },
+      "model": {
+        "provider": "canned",
+        "model": "speak_packet",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "outcome": "early_return",
+      "observed": {
+        "firstPcmMs": 224,
+        "firstReplyPcmMs": 224
+      }
+    },
+    {
+      "caller": "Okay.",
+      "soniox": "sw",
+      "flushed": true,
+      "canned": {
+        "path": "brain_end",
+        "text": "Asante. Kwaheri."
+      },
+      "model": {
+        "provider": "canned",
+        "model": "brain_end",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "outcome": "early_return",
+      "observed": {
+        "firstPcmMs": 218,
+        "firstReplyPcmMs": 218
+      }
+    }
+  ]
+}

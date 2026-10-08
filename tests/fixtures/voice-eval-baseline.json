@@ -73,6 +73,20 @@
       },
       "nameAsks": 2
     },
+    "HD_48e5ce069c12": {
+      "score": 83.3,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 1,
+        "repeatedQuestion": 0,
+        "silence": 0,
+        "deletedAnswer": 2,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 3
+      },
+      "nameAsks": 1
+    },
     "HD_b47644d19072": {
       "score": 90,
       "checks": {
@@ -84,6 +98,20 @@
         "respelling": 0,
         "prematureTurn": 0,
         "slow": 0
+      },
+      "nameAsks": 1
+    },
+    "HD_e369cba6565d": {
+      "score": 79.7,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 1,
+        "repeatedQuestion": 1,
+        "silence": 0,
+        "deletedAnswer": 2,
+        "respelling": 3,
+        "prematureTurn": 3,
+        "slow": 14
       },
       "nameAsks": 1
     },
