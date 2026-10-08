@@ -3,7 +3,7 @@
 // huduma/nyumba were fuzzy places, and the Kiswahili services ask was not an offer ask.
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { canonicalPlaceName } = require('../src/conversation/kenyaPlaces');
+const { bindSpokenPlace, canonicalPlaceName } = require('../src/conversation/kenyaPlaces');
 const { looksLikeOfferAsk } = require('../src/conversation/fileRead');
 const { polishSpokenReply, trimSpokenServiceDump } = require('../src/conversation/dynamicSpeech');
 const { createBrainState } = require('../src/conversation/brainState');
@@ -53,6 +53,21 @@ describe('place names stay exact for Kiswahili and short words', () => {
     assert.equal(canonicalPlaceName('ngumba'), 'ngumba');
     assert.equal(canonicalPlaceName('Ronga'), 'rongai');
     assert.equal(canonicalPlaceName('Rungai'), 'rongai');
+    assert.equal(canonicalPlaceName('ndani'), '');
+    assert.equal(canonicalPlaceName('kwako'), '');
+    assert.equal(canonicalPlaceName('kwangu'), '');
+    assert.equal(canonicalPlaceName('kilicho'), '');
+    assert.equal(canonicalPlaceName('ndanai'), 'ndanai');
+    assert.deepEqual(bindSpokenPlace('OngataRongai'), ['ongata rongai']);
+    assert.deepEqual(bindSpokenPlace('na kuru'), ['nakuru']);
+    assert.deepEqual(bindSpokenPlace('Nairobini'), ['nairobi']);
+    assert.deepEqual(bindSpokenPlace('Nakuruni'), ['nakuru']);
+    assert.deepEqual(bindSpokenPlace('mara moja', { fuzzy: true }), []);
+    assert.deepEqual(bindSpokenPlace('Kilicho iko outside Nairobi', { fuzzy: true }), ['nairobi']);
+    assert.deepEqual(
+      bindSpokenPlace('Kama upo ndani ya Nairobi, tutafika kwako.', { fuzzy: true }),
+      ['nairobi']
+    );
   });
 });
 

@@ -92,7 +92,7 @@ describe('speech slop gate', () => {
     assert.match(hours, /don't have that on file/);
   });
 
-  it('drops an unasked callback pitch after a catalogue', () => {
+  it('keeps a spoken callback offer and drops a statement pitch', () => {
     const out = guardSpokenReply(
       `${catalogue} Would you like me to leave a message for the team about any of those services?`,
       {
@@ -100,7 +100,8 @@ describe('speech slop gate', () => {
         callerTurns: ['List for me the services you offer.'],
       }
     );
-    assert.equal(out, catalogue);
+    assert.match(out, /couches/);
+    assert.match(out, /Would you like me to leave a message/);
     const callYou = guardSpokenReply(
       `${catalogue} I can leave a message for the team to call you.`,
       {

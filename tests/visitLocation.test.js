@@ -134,6 +134,12 @@ describe('visit location ladder', () => {
     assert.equal(foldCanonicalPlace('Lurungai, Rungai', dusted), 'Rongai');
     assert.equal(foldCanonicalPlace('rongae', dusted), 'rongae');
     assert.equal(foldCanonicalPlace('Ronga', nairobi), 'Rongai');
+    assert.equal(foldCanonicalPlace('OngataRongai', dusted), 'Ongata Rongai');
+    assert.equal(foldCanonicalPlace('Nairobini', nairobi), 'Nairobi');
+    assert.equal(foldCanonicalPlace('Nakuruni', dusted), 'Nakuru');
+    assert.equal(foldCanonicalPlace('Kilicho', dusted), 'Kilicho');
+    assert.equal(assessCoverage('OngataRongai', dusted), 'outside');
+    assert.equal(assessCoverage('Nairobini', nairobi), 'inside');
     assert.equal(foldCanonicalPlace('The grace apartments, Rongai', dusted), 'The grace apartments, Rongai');
     assert.match(
       coverageAskSpeech('What about Runda?', { vertical: 'home_services', ...nairobi }, 'en'),

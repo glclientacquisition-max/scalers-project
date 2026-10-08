@@ -103,8 +103,8 @@ assert.match(
 
 assert.match(
   source,
-  /polishSpokenReply\(String\(chunk \|\| ''\)/,
-  'streamed chunks must pass polish (speech guard, menu strip) before TTS'
+  /polishSpokenDetail\(String\(chunk \|\| ''\)/,
+  'streamed chunks must pass polish (speech guard, menu strip) before TTS and keep the drop reason'
 );
 
 assert.match(

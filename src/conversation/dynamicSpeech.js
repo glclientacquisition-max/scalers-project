@@ -12,7 +12,7 @@ const {
 } = require('./businessAssistantIntro');
 const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
-const { prepareStreamedSpeech } = require('./callCorrectives');
+const { prepareStreamedSpeech, looksLikeShortAffirmation } = require('./callCorrectives');
 const { dropSpeechSlop, guardSpokenReply, logSpokenFilterDrop } = require('./speechGuard');
 const {
   catalogueAskInPlay,
@@ -418,7 +418,8 @@ function stripPrematureOutcomeClaims(text, opts = {}) {
  * speech guard runs too: no new numbers, no saved claim without a tool result,
  * no coverage flip, no transfer claim. See speechGuard.js.
  */
-function polishSpokenReply(text, opts = {}) {
+function polishSpokenDetail(text, opts = {}) {
+  const dropReasons = [];
   let spoken = stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true });
   // Guard whole sentences first. Stripping a verb phrase after the fact would
   // leave a fragment ("that for you.") that the guard can no longer see.
@@ -432,6 +433,7 @@ function polishSpokenReply(text, opts = {}) {
       state: opts.state,
       language: opts.language,
       allowEmpty: true,
+      dropReasons,
     });
   }
   const callerText = String(
@@ -446,15 +448,28 @@ function polishSpokenReply(text, opts = {}) {
     state: opts.state,
     language: opts.language,
   });
+  let out = sanitized;
   if (!sanitized && !hasReadableFile(opts.state) && presupposesSavedWork(String(text || ''))) {
-    if (!fileRowsWereRead(opts.state)) return '';
-    return nothingStillOpenLine(opts.state, opts.language);
+    if (!fileRowsWereRead(opts.state)) out = '';
+    else out = nothingStillOpenLine(opts.state, opts.language);
+  } else {
+    // Last mouth. A dump trim or a later prompt cannot put filler back.
+    out = shapeCatalogueMouth(dropSpeechSlop(sanitized, callerText, dropReasons), {
+      ...opts,
+      callerText,
+    });
   }
-  // Last mouth. A dump trim or a later prompt cannot put filler back.
-  return shapeCatalogueMouth(dropSpeechSlop(sanitized, callerText), {
-    ...opts,
-    callerText,
-  });
+  const before = String(text || '').trim();
+  const after = String(out || '').trim();
+  let reason = '';
+  if (dropReasons.length) reason = dropReasons[0];
+  else if (!after) reason = 'dropped';
+  else if (after !== before) reason = 'rewritten';
+  return { text: out, reason, dropReasons };
+}
+
+function polishSpokenReply(text, opts = {}) {
+  return polishSpokenDetail(text, opts).text;
 }
 
 /**
@@ -660,6 +675,7 @@ function planEmptyGeminiSpeech({
   userText = '',
   llmDown = false,
   alreadyOffered = false,
+  toolResults = [],
 } = {}) {
   const savedForThem = fileReadLine({
     text: userText,
@@ -684,7 +700,32 @@ function planEmptyGeminiSpeech({
     };
   }
   if (alreadyOffered) return { speak: false, kind: 'quiet_continue', line: '' };
+  const outcome = spokenToolOutcome(toolResults, language, userText);
+  if (outcome) return { speak: true, kind: 'tool_outcome', line: outcome };
   return { speak: true, kind: 'hear_again', line: emptyTurnRepairLine(language) };
+}
+
+/**
+ * Tool-only Gemini turns speak the tool line. A short yes to a saved
+ * callback also gets the farewell. This does not hang up the socket.
+ */
+function spokenToolOutcome(toolResults, language, userText) {
+  const rows = Array.isArray(toolResults) ? toolResults : [];
+  if (!rows.length) return '';
+  const { toolOutcomeLine } = require('./toolExecution');
+  const { planBrainEndClose } = require('../speech/callClose');
+  const line = toolOutcomeLine(rows, language);
+  if (!line) return '';
+  const saved = rows.some(
+    (row) =>
+      row &&
+      row.action === 'create_service_request' &&
+      (row.status === 'succeeded' || row.status === 'updated')
+  );
+  if (!saved || !looksLikeShortAffirmation(userText)) return line;
+  const farewell = planBrainEndClose({ action: 'END', language });
+  if (!farewell.line || line.includes(farewell.line)) return line;
+  return `${line} ${farewell.line}`;
 }
 
 /**
@@ -841,9 +882,16 @@ function looksLikeNamePrompt(agentText) {
  * Keeps barge-in filters separate — short names and yes/no must reach the model
  * when the agent just asked for a name or confirmation.
  */
+function offerIsPending(opts = {}) {
+  if (opts.pendingAsk && opts.pendingAsk.kind === 'offer') return true;
+  const asked = opts.questionsAsked;
+  return Array.isArray(asked) && asked[asked.length - 1] === 'offer';
+}
+
 function shouldSkipCallerTurn(text, opts = {}) {
   const t = normalizeCallerText(text);
   if (!t) return true;
+  if (offerIsPending(opts) && looksLikeShortAffirmation(text)) return false;
 
   const lastAgent = String(opts.lastAgentText || '');
   const awaiting = looksLikeAwaitingCallerReply(lastAgent);
@@ -903,6 +951,7 @@ module.exports = {
   trimSpokenServiceDump,
   stripSpokenHedges,
   polishSpokenReply,
+  polishSpokenDetail,
   looksLikeCallerName,
   callerNameFromUtterance,
   cleanSpokenLine,

@@ -12,6 +12,7 @@ function createVoiceTurnTiming(callSid, opts = {}) {
   let firstChunkAt = null;
   /** @type {number|null} */
   let firstPcmAt = null;
+  let firstReplyPcmAt = null;
   let fillerUsed = false;
 
   function markLlmStart() {
@@ -24,6 +25,10 @@ function createVoiceTurnTiming(callSid, opts = {}) {
 
   function markFirstPcm() {
     if (firstPcmAt == null) firstPcmAt = Date.now();
+  }
+
+  function markFirstReplyPcm() {
+    if (firstReplyPcmAt == null) firstReplyPcmAt = Date.now();
   }
 
   function markFiller() {
@@ -43,6 +48,7 @@ function createVoiceTurnTiming(callSid, opts = {}) {
       endpoint_to_llm_ms: msFrom(turnStartedAt, llmStartedAt),
       first_chunk_ms: msFrom(turnStartedAt, firstChunkAt),
       first_pcm_ms: msFrom(turnStartedAt, firstPcmAt),
+      first_reply_pcm_ms: msFrom(turnStartedAt, firstReplyPcmAt),
       chunk_to_pcm_ms: msFrom(firstChunkAt, firstPcmAt),
       filler: fillerUsed ? 1 : 0,
       ...extra,
@@ -68,6 +74,7 @@ function createVoiceTurnTiming(callSid, opts = {}) {
     markLlmStart,
     markFirstSpokenChunk,
     markFirstPcm,
+    markFirstReplyPcm,
     markFiller,
     summary,
     log,

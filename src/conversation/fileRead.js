@@ -56,7 +56,16 @@ function looksLikeOfferAsk(text) {
   if (looksLikeServiceDetailAsk(raw)) return false;
   if (OFFER_ASK_RE.test(raw)) return true;
   // "which service is you offer" is the same list ask as "which services do you offer".
-  return /\b(?:which|what)\s+services?\b[^?.!]{0,40}\boffer\b/i.test(raw);
+  if (/\b(?:which|what)\s+services?\b[^?.!]{0,40}\boffer\b/i.test(raw)) return true;
+  // A closer is not a catalogue ask. "Which service do you need?" stays a closer.
+  if (/\b(?:would you like|do you need|you need|unahitaji)\b/i.test(raw)) return false;
+  // Mixed sw/en still asks for the list: "mimi nilikuwa nauliza what you guys offer".
+  const frame =
+    /\b(?:what|which|nauliza|ninauliza|niulize|uliza|niambie|uniambie|tell me|gani)\b/i.test(
+      raw
+    );
+  const offer = /\b(?:offers?|offering|services?|huduma|mnatoa|mnaofa|tunatoa)\b/i.test(raw);
+  return frame && offer;
 }
 
 function bareAffirmation(text) {

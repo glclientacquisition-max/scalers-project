@@ -3,6 +3,7 @@
 
 const { confirmationLanguage } = require('./language');
 const { visitBlockSpeech } = require('./visitLocation');
+const { offerActOf } = require('../speech/offerAct');
 
 const FILLER_WORDS = new Set([
   'uh',
@@ -100,9 +101,61 @@ function looksLikeNonConsentAck(text) {
  * filler. Leave it is never consent.
  * @param {string[]} questionsAsked  slots asked before this caller turn
  */
+const SHORT_AFFIRMATION =
+  /^(?:yes|yeah|yah|yea|yep|yup|ok|okay|sawa|ndio|ndiyo|eeh|ehe|poa|correct|sure)$/i;
+
+/** yes, sawa, ok, ndio. Not a leave-it, and not a turn that names a job. */
+function looksLikeShortAffirmation(text) {
+  if (looksLikeLeaveIt(text)) return false;
+  const t = normalizeAckText(text);
+  if (!t || t.split(' ').length > 3) return false;
+  const core = t.replace(/^(?:uh|um|ah|eeh|eh|mm)\s+/, '').trim();
+  return Boolean(core) && SHORT_AFFIRMATION.test(core);
+}
+
+function lineIsIdentityAsk(line) {
+  return /\bam i speaking with\b|\b(?:je,?\s*)?(?:naongea na|unaongea na)\b/i.test(
+    String(line || '')
+  );
+}
+
+/**
+ * A spoken offer becomes the pending ask. The act is the SpeakPacket offer,
+ * in any supported language. A later slot question replaces it. A name ask
+ * is not an offer, so "Yes" after "Am I speaking with Alvin?" stays a name confirm.
+ */
+function noteSpokenPendingAsk(state, line) {
+  const raw = String(line || '').trim();
+  if (!state || !raw || lineIsIdentityAsk(raw)) return state;
+  if (!state.conversation || typeof state.conversation !== 'object') {
+    state.conversation = {};
+  }
+  const act = offerActOf(raw);
+  const asked = Array.isArray(state.conversation.questionsAsked)
+    ? state.conversation.questionsAsked
+    : [];
+  if (!act) {
+    if (raw.includes('?') && state.conversation.pendingAsk?.kind === 'offer') {
+      state.conversation.pendingAsk = null;
+      if (asked[asked.length - 1] === 'offer') asked.pop();
+      state.conversation.questionsAsked = asked.slice(-8);
+    }
+    return state;
+  }
+  if (asked[asked.length - 1] !== 'offer') asked.push('offer');
+  state.conversation.questionsAsked = asked.slice(-8);
+  state.conversation.pendingAsk = { kind: 'offer', act: act.act, line: raw };
+  return state;
+}
+
 function ackIsConsent(questionsAsked, text) {
+  if (looksLikeLeaveIt(text)) return false;
   const lastAsk = (Array.isArray(questionsAsked) ? questionsAsked : []).slice(-1)[0];
-  return lastAsk === 'confirm' && looksLikeNonConsentAck(text) && !looksLikeLeaveIt(text);
+  if (lastAsk === 'confirm' && looksLikeNonConsentAck(text)) return true;
+  if (lastAsk === 'offer' && (looksLikeShortAffirmation(text) || looksLikeNonConsentAck(text))) {
+    return true;
+  }
+  return false;
 }
 
 function looksLikeUrgentContact(text) {
@@ -342,6 +395,8 @@ function openSlotLine(state, language) {
 
 module.exports = {
   ackIsConsent,
+  looksLikeShortAffirmation,
+  noteSpokenPendingAsk,
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
   looksLikeUrgentContact,
