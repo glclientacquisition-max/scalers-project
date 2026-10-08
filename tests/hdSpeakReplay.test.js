@@ -31,9 +31,11 @@ const {
   planEmptyGeminiSpeech,
   shouldSkipCallerTurn,
   withCallbackFarewell,
+  trimSpokenServiceDump,
 } = require('../src/conversation/dynamicSpeech');
 const { guardSpokenReply } = require('../src/conversation/speechGuard');
 const { noteSpokenPendingAsk, ackIsConsent } = require('../src/conversation/callCorrectives');
+const { isCatalogueAsk } = require('../src/conversation/fileRead');
 const { numbersIn } = require('../src/conversation/numberWords');
 const {
   coverageAskSpeech,
@@ -752,11 +754,11 @@ describe('HD_e3fb94e1bd0d prices, offer consent, and Nakuru', () => {
   it('binds na kuru to Nakuru and does not say the coverage list is missing', () => {
     assert.match(foldCanonicalPlace('na kuru', DUSTED), /Nakuru/);
     const sw = coverageAskSpeech('Like, mnafika na kuru?', DUSTED, 'sw');
-    assert.match(sw, /nje/);
+    assert.match(sw, /Hatufiki Nakuru/);
     assert.match(sw, /Naweza kukuachia ujumbe kwa timu yetu\?/);
     assert.doesNotMatch(sw, /orodha|don't have our coverage list/i);
     const en = coverageAskSpeech('Like, do you cover na kuru?', DUSTED, 'en');
-    assert.match(en, /outside our coverage/);
+    assert.match(en, /don't cover Nakuru/);
     assert.match(en, /Should I note it for the team\?/);
     assert.doesNotMatch(en, /don't have our coverage list/i);
     assert.equal(visitBlockSpeech('outside', 'en'), 'That area is outside our coverage.');
@@ -1009,7 +1011,8 @@ describe('HD_6a759704f507 coverage, name, and the save farewell', () => {
     const places = coverageAskPlaces(ask);
     assert.deepEqual(places, ['Kericho', 'Nakuru']);
     const line = coverageAskSpeech(ask, DUSTED, 'sw');
-    assert.match(line, /nje/);
+    assert.match(line, /Hatufiki Kericho na Nakuru/);
+    assert.doesNotMatch(line, /Eneo hilo liko nje/);
     assert.match(line, /kukuachia ujumbe/);
     const gemini =
       'Kwa sasa tunatoa huduma Nairobi na maeneo ya karibu pekee, kwa hivyo hatutaweza kufika huko.';
@@ -1022,6 +1025,47 @@ describe('HD_6a759704f507 coverage, name, and the save farewell', () => {
     assert.match(polished.text, /kukuachia ujumbe/);
     assert.equal(offerActOf('Nani anapiga simu tafadhali?'), null);
     assert.equal(coverageAskSpeech('which services do you do over', DUSTED, 'en'), '');
+    const kept = guardSpokenReply(line, {
+      callerTurns: [ask],
+      profile: DUSTED,
+      language: 'sw',
+      allowEmpty: true,
+    });
+    assert.match(kept, /Kericho/);
+    assert.match(kept, /Nakuru/);
+    assert.match(kept, /kukuachia ujumbe/);
+  });
+
+  it('names each town: covered, uncovered, and a mix', () => {
+    const cases = [
+      ['Mnafika Kitengela na Juja?', 'sw', /Tunafika Kitengela na Juja\./, false],
+      ['Do you cover Kitengela and Juja?', 'en', /Yes, we cover Kitengela and Juja\./, false],
+      ['Mnafika hadi Kericho na Nakuru?', 'sw', /Hatufiki Kericho na Nakuru\./, true],
+      ['Do you cover Kericho and Nakuru?', 'en', /We don't cover Kericho and Nakuru\./, true],
+      ['Mnafika Kitengela na Nakuru?', 'sw', /Tunafika Kitengela, lakini hatufiki Nakuru\./, true],
+      [
+        'Do you cover Kitengela and Nakuru?',
+        'en',
+        /We cover Kitengela, but we don't cover Nakuru\./,
+        true,
+      ],
+    ];
+    for (const [ask, language, fact, offer] of cases) {
+      const line = coverageAskSpeech(ask, DUSTED, language);
+      assert.match(line, fact, ask);
+      if (offer) {
+        assert.match(line, language === 'en' ? /Should I note it for the team\?/ : /kukuachia ujumbe/);
+      } else {
+        assert.doesNotMatch(line, /kukuachia ujumbe|Should I note it for the team/);
+      }
+      const spoken = guardSpokenReply(line, {
+        callerTurns: [ask],
+        profile: DUSTED,
+        language,
+        allowEmpty: true,
+      });
+      assert.match(spoken, fact, `gate ${ask}`);
+    }
   });
 
   it('treats Nikujulishe as the pending offer a short yes can accept', () => {
@@ -1090,6 +1134,43 @@ describe('HD_6a759704f507 coverage, name, and the save farewell', () => {
       'Ni pesa ngapi kuosha carpet.'
     );
     assert.equal(looksLikeEcho('Al.', 'Je, naongea na Alvin?'), false);
+  });
+
+  it('treats everyday services asks as the catalogue, in the packet and the dump filter', () => {
+    const phrases = [
+      'Mnafanya nini?',
+      'Mnafanya kazi gani?',
+      'Mnashughulika na nini?',
+      'Mnauza nini?',
+      'What do you do?',
+      'What do you offer?',
+      'Ni services gani mna offer?',
+    ];
+    const dump =
+      'Tuna couch cleaning, carpet cleaning, mattress cleaning, na general cleaning.';
+    for (const phrase of phrases) {
+      assert.equal(isCatalogueAsk(phrase), true, phrase);
+      const reply = resolveLocalReply({
+        text: phrase,
+        state: createBrainState(DUSTED),
+        profile: DUSTED,
+        language: /[?]/.test(phrase) && /[A-Z]/.test(phrase[0]) && phrase.startsWith('W') ? 'en' : 'sw',
+      });
+      assert.equal(reply && reply.outcome, 'catalogue', phrase);
+      assert.match(reply.line, /Couch cleaning/);
+      assert.equal(
+        trimSpokenServiceDump(dump, { callerText: phrase, language: 'sw' }),
+        dump,
+        phrase
+      );
+    }
+    assert.equal(isCatalogueAsk('Nani anapiga simu?'), false);
+    assert.equal(isCatalogueAsk('Which service do you need?'), false);
+    const replaced = trimSpokenServiceDump(dump, {
+      callerText: 'Hujambo',
+      language: 'sw',
+    });
+    assert.match(replaced, /Unahitaji huduma gani/);
   });
 
   it('speaks the farewell on the callback save and leaves a hold alone', () => {

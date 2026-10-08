@@ -147,7 +147,7 @@ describe('visit location ladder', () => {
     );
     assert.match(
       coverageAskSpeech('What about Ruaka?', { vertical: 'home_services', ...nairobi }, 'en'),
-      /outside our coverage/i
+      /don't cover Ruaka/i
     );
   });
 
@@ -171,7 +171,7 @@ describe('visit location ladder', () => {
     };
     assert.match(
       coverageAskSpeech('Do you guys— do you guys do Rongai?', profile, 'en'),
-      /outside our coverage/i
+      /don't cover Rongai/i
     );
     assert.match(
       coverageAskSpeech('What about Westlands?', profile, 'en'),
@@ -183,11 +183,11 @@ describe('visit location ladder', () => {
     );
     assert.match(
       coverageAskSpeech('What about Ruaka?', profile, 'en'),
-      /outside our coverage/i
+      /don't cover Ruaka/i
     );
     assert.match(
       coverageAskSpeech('Do you do kitengele?', profile, 'en'),
-      /outside our coverage/i
+      /don't cover/i
     );
     assert.equal(coverageAskSpeech('Do you do carpet cleaning?', profile, 'en'), '');
     assert.equal(

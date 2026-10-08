@@ -15,8 +15,42 @@ const FILE_READ_RE =
 const NEW_WORK_RE =
   /\b(want to book|like to book|need to book|please book|book me|can you book|could you book|i want to order|i'd like to order|order \d+|buy \d+|nataka (?:cleaning|carpet|couch|sofa|mattress|kuweka)|naomba (?:cleaning|carpet))\b/i;
 
-const OFFER_ASK_RE =
-  /\b(what (?:do you (?:offer|do|sell|have)|services|can you do)|which services|what services|which service(?:s)?(?:\s+(?:is|are|do))?(?:\s+you)?\s+(?:offer|have|do)|what are (?:your |the |our )?services|services (?:that |do |is |are )?you (?:have|offer|do)|tell me (?:your |the |our |about (?:your |the )?)?services|list (?:me )?(?:the |your |our )?services|uniambie (?:the )?services|niambie (?:the )?(?:services|huduma)|services mko nayo|mnauza|huduma (?:gani|mnazo|mko|zenu|yenu)|services gani|mnaofa|mna\s+offer|mnatoa|what do you offer)\b/i;
+// One catalogue-ask table. The SpeakPacket and the service-dump filter both
+// call isCatalogueAsk, so a phrasing cannot open one mouth and miss the other.
+const CATALOGUE_ASK_BY_LANGUAGE = {
+  en: [
+    /\bwhat do you (?:offer|do|sell|have)\b/i,
+    /\bwhat can you do\b/i,
+    /\bwhich services\b/i,
+    /\bwhat services\b/i,
+    /\bwhich service(?:s)?(?:\s+(?:is|are|do))?(?:\s+you)?\s+(?:offer|have|do)\b/i,
+    /\bwhat are (?:your |the |our )?services\b/i,
+    /\bservices (?:that |do |is |are )?you (?:have|offer|do)\b/i,
+    /\btell me (?:your |the |our |about (?:your |the )?)?services\b/i,
+    /\blist (?:me )?(?:the |your |our )?services\b/i,
+    /\b(?:which|what)\s+services?\b[^?.!]{0,40}\boffer\b/i,
+  ],
+  sw: [
+    /\bmnafanya\s+nini\b/i,
+    /\bmnafanya\s+kazi\s+gani\b/i,
+    /\bmnashughulika\s+na\s+nini\b/i,
+    /\bmnauza(?:\s+nini)?\b/i,
+    /\buniambie (?:the )?services\b/i,
+    /\bniambie (?:the )?(?:services|huduma)\b/i,
+    /\bservices mko nayo\b/i,
+    /\bhuduma (?:gani|mnazo|mko|zenu|yenu)\b/i,
+    /\bservices gani\b/i,
+    /\bmnaofa\b/i,
+    /\bmna\s+offer\b/i,
+    /\bmnatoa\b/i,
+  ],
+  sheng: [/\bmnauza(?:\s+nini)?\b/i, /\bmnaofa\b/i, /\bmna\s+offer\b/i],
+};
+
+const CATALOGUE_ASK_PATTERNS = Object.values(CATALOGUE_ASK_BY_LANGUAGE).flat();
+
+const CATALOGUE_CLOSER =
+  /\b(?:would you like|do you need|you need|unahitaji)\b/i;
 
 // Facts about a service. Not a request to read the name list.
 const SERVICE_DETAIL_RE =
@@ -51,14 +85,10 @@ function looksLikeServiceDetailAsk(text) {
   return true;
 }
 
-function looksLikeOfferAsk(text) {
+function catalogueAskHit(text) {
   const raw = String(text || '');
-  if (looksLikeServiceDetailAsk(raw)) return false;
-  if (OFFER_ASK_RE.test(raw)) return true;
-  // "which service is you offer" is the same list ask as "which services do you offer".
-  if (/\b(?:which|what)\s+services?\b[^?.!]{0,40}\boffer\b/i.test(raw)) return true;
-  // A closer is not a catalogue ask. "Which service do you need?" stays a closer.
-  if (/\b(?:would you like|do you need|you need|unahitaji)\b/i.test(raw)) return false;
+  if (!raw) return false;
+  if (CATALOGUE_ASK_PATTERNS.some((pattern) => pattern.test(raw))) return true;
   // Mixed sw/en still asks for the list: "mimi nilikuwa nauliza what you guys offer".
   const frame =
     /\b(?:what|which|nauliza|ninauliza|niulize|uliza|niambie|uniambie|tell me|gani)\b/i.test(
@@ -66,6 +96,22 @@ function looksLikeOfferAsk(text) {
     );
   const offer = /\b(?:offers?|offering|services?|huduma|mnatoa|mnaofa|tunatoa)\b/i.test(raw);
   return frame && offer;
+}
+
+/**
+ * Services-list ask. Detail and a booking closer are not the list.
+ * @param {string} text
+ */
+function isCatalogueAsk(text) {
+  const raw = String(text || '');
+  if (!raw || looksLikeServiceDetailAsk(raw)) return false;
+  // "Which service do you need?" stays a closer.
+  if (CATALOGUE_CLOSER.test(raw)) return false;
+  return catalogueAskHit(raw);
+}
+
+function looksLikeOfferAsk(text) {
+  return isCatalogueAsk(text);
 }
 
 function bareAffirmation(text) {
@@ -341,6 +387,8 @@ module.exports = {
   looksLikeFileRead,
   looksLikeNewWork,
   looksLikeOfferAsk,
+  isCatalogueAsk,
+  CATALOGUE_ASK_BY_LANGUAGE,
   looksLikeServiceDetailAsk,
   bareAffirmation,
   catalogueAskInPlay,

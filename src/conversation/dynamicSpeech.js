@@ -16,10 +16,10 @@ const { prepareStreamedSpeech, looksLikeShortAffirmation } = require('./callCorr
 const { dropSpeechSlop, guardSpokenReply, logSpokenFilterDrop } = require('./speechGuard');
 const {
   catalogueAskInPlay,
+  isCatalogueAsk,
   fileReadLine,
   fileRowsWereRead,
   hasReadableFile,
-  looksLikeOfferAsk,
   looksLikeServiceDetailAsk,
   nothingStillOpenLine,
   presupposesSavedWork,
@@ -366,7 +366,7 @@ function trimSpokenServiceDump(text, opts = {}) {
     opts.callerText || (opts.callerTurns || []).slice(-1)[0] || ''
   );
   if (
-    looksLikeOfferAsk(callerText) ||
+    isCatalogueAsk(callerText) ||
     looksLikeServiceDetailAsk(callerText) ||
     opts.state?.caller?.nameJustConfirmed ||
     catalogueAskInPlay(callerText, opts.state, opts.callerTurns)

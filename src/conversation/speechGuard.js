@@ -50,6 +50,16 @@ const ACTION_NARRATION =
 const COVERAGE_CLAIM =
   /\b(?:[Ww]e|[Tt]una|[Tt]unaweza|[Tt]uta)(?:\s+\w+){0,2}?\s+(?:cover|serve|reach|come(?:\s+out)?\s+to|kuja|kufika)\s+(?:to\s+)?([A-Z][\w'’]*(?:\s+[A-Z][\w'’]*){0,2})/;
 
+/** A positive "we cover X". "We don't cover X" is the uncovered fact, not a claim to drop. */
+function positiveCoveragePlace(sentence) {
+  const match = COVERAGE_CLAIM.exec(String(sentence || ''));
+  if (!match) return '';
+  if (/\b(?:don't|do not|cannot|can't|not|never|hatufiki|hatuwezi|hatutaweza)\b/i.test(match[0])) {
+    return '';
+  }
+  return match[1];
+}
+
 // Filler that does not answer the caller. Dropped in the mouth, not by a
 // prompt line, so a later prompt cannot speak it. A real answer in the same
 // turn stays.
@@ -586,8 +596,8 @@ function guardSpokenReply(text, ctx = {}) {
       noteDrop(ctx, 'transfer_claim', sentence);
       continue;
     }
-    const coverage = COVERAGE_CLAIM.exec(sentence);
-    if (coverage && assessCoverage(coverage[1], ctx.profile || {}) !== 'inside') {
+    const coveragePlace = positiveCoveragePlace(sentence);
+    if (coveragePlace && assessCoverage(coveragePlace, ctx.profile || {}) !== 'inside') {
       noteDrop(ctx, 'coverage', sentence);
       continue;
     }

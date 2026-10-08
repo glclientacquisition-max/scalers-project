@@ -609,24 +609,59 @@ function joinPlaceNames(places, language) {
   return `${names.slice(0, -1).join(', ')} ${conj} ${names[names.length - 1]}`;
 }
 
+function speakableCoverageName(raw, profile) {
+  const folded = foldCanonicalPlace(raw, profile) || String(raw || '').trim();
+  const bound = bindSpokenPlace(folded);
+  const speak = bound.length === 1 ? displayPlaceName(bound[0]) : folded;
+  return { speak, rating: assessCoverage(folded || raw, profile) };
+}
+
+function uniquePlaceNames(names) {
+  const out = [];
+  for (const name of names) {
+    const clean = String(name || '').trim();
+    if (!clean) continue;
+    if (out.some((have) => have.toLowerCase() === clean.toLowerCase())) continue;
+    out.push(clean);
+  }
+  return out;
+}
+
+/**
+ * Each named town is judged on its own. Covered towns and uncovered towns
+ * are both spoken. The note offer is added only when a town is uncovered.
+ */
 function coverageAskSpeech(text, profile = {}, language = 'en') {
   if (String(profile?.vertical || '').toLowerCase() !== 'home_services') return '';
   const rawPlaces = coverageAskPlaces(text);
   if (!rawPlaces.length) return '';
-  const places = rawPlaces.map((raw) => foldCanonicalPlace(raw, profile) || raw);
-  const ratings = places.map((place) => assessCoverage(place, profile));
-  const lang = String(language || 'en').toLowerCase();
-  const sw = lang === 'sw' || lang.startsWith('swahili');
-  const sheng = lang === 'sheng';
-  if (ratings.some((rating) => rating === 'outside')) return outsideCoverageSpeech(language);
-  if (ratings.every((rating) => rating === 'inside')) {
-    const list = joinPlaceNames(places, language);
-    if (sw) return `Ndiyo, tunafika ${list}.`;
-    if (sheng) return `Ndio, tunafika ${list}.`;
-    return `Yes, we cover ${list}.`;
+  const rated = rawPlaces.map((raw) => speakableCoverageName(raw, profile));
+  const inside = uniquePlaceNames(
+    rated.filter((row) => row.rating === 'inside').map((row) => row.speak)
+  );
+  const outside = uniquePlaceNames(
+    rated.filter((row) => row.rating === 'outside').map((row) => row.speak)
+  );
+  if (!inside.length && !outside.length) {
+    if (hasCoverageText(profile)) return unsureCoverageSpeech(language);
+    return visitBlockSpeech('unknown_coverage', language);
   }
-  if (hasCoverageText(profile)) return unsureCoverageSpeech(language);
-  return visitBlockSpeech('unknown_coverage', language);
+  const lang = String(language || 'en').toLowerCase();
+  const sw = lang === 'sw' || lang.startsWith('swahili') || lang === 'sheng';
+  const covered = joinPlaceNames(inside, language);
+  const uncovered = joinPlaceNames(outside, language);
+  let fact = '';
+  if (inside.length && outside.length) {
+    fact = sw
+      ? `Tunafika ${covered}, lakini hatufiki ${uncovered}.`
+      : `We cover ${covered}, but we don't cover ${uncovered}.`;
+  } else if (inside.length) {
+    fact = sw ? `Tunafika ${covered}.` : `Yes, we cover ${covered}.`;
+  } else {
+    fact = sw ? `Hatufiki ${uncovered}.` : `We don't cover ${uncovered}.`;
+  }
+  if (!outside.length) return fact;
+  return `${fact} ${coverageNoteQuestion(language)}`;
 }
 
 function statesOutOfArea(text) {

@@ -114,13 +114,20 @@ describe('fetchCallRecording', () => {
   });
 
   it('skips the network when no API key is configured', async () => {
-    const out = await fetchCallRecording('call-uuid', {
-      apiKey: '',
-      fetchImpl: async () => {
-        throw new Error('should not fetch');
-      },
-    });
-    assert.equal(out.downloadUrl, null);
-    assert.equal(out.status, 'not_configured');
+    const prev = process.env.SAUTIKIT_API_KEY;
+    delete process.env.SAUTIKIT_API_KEY;
+    try {
+      const out = await fetchCallRecording('call-uuid', {
+        apiKey: '',
+        fetchImpl: async () => {
+          throw new Error('should not fetch');
+        },
+      });
+      assert.equal(out.downloadUrl, null);
+      assert.equal(out.status, 'not_configured');
+    } finally {
+      if (prev == null) delete process.env.SAUTIKIT_API_KEY;
+      else process.env.SAUTIKIT_API_KEY = prev;
+    }
   });
 });
