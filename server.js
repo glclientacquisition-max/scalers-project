@@ -2034,6 +2034,9 @@ mediaWss.on('connection', (ws, req) => {
       vertical: profile.vertical || 'general',
       servicesCatalog: profile.servicesCatalog || [],
       businessLocations: profile.businessLocations || [],
+      // Coverage towns bias hearing too. HD_015bae4a4af2 heard "Kitengele"
+      // because the snapshot never carried coverage_areas.
+      businessPolicies: profile.businessPolicies || {},
       teamDirectory: profile.teamDirectory || [],
       ttsLexicon: Array.isArray(profile.ttsLexicon) ? profile.ttsLexicon : [],
       callerMemory: profile.callerMemory
