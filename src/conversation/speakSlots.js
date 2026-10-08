@@ -117,8 +117,33 @@ function takePendingSpeakSlot(state) {
  * A tool outcome that landed after barge-in. The barged turn does not speak
  * it. The next turn that is allowed to reply does.
  */
-function queueToolOutcome(state, line) {
+// A goodbye belongs to the Brain END close, which speaks it once.
+// A queued outcome is spoken on the next mid-call reply, so it never carries one.
+const FAREWELL_SENTENCE =
+  /\b(?:kwaheri|kwa heri|goodbye|good-?bye|bye(?:\s+bye)?|siku njema|kuwa na siku njema|have a (?:good|great|nice) (?:day|evening|one)|take care|thank(?:s| you) for calling|asante kwa kupiga)\b/i;
+const BARE_THANKS = /^(?:asante(?: sana)?|thank you(?: so much| very much)?|thanks(?: a lot)?)$/i;
+
+function isFarewellSentence(sentence) {
+  const words = String(sentence || '')
+    .replace(/[.!?,;:…\s]+$/g, '')
+    .trim();
+  if (!words) return true;
+  return FAREWELL_SENTENCE.test(words) || BARE_THANKS.test(words);
+}
+
+/** Drop a trailing farewell ("Asante. Kwaheri.", "Thank you. Goodbye."). */
+function withoutTrailingFarewell(line) {
   const text = slotLine(line);
+  if (!text) return '';
+  const sentences = text.match(/[^.!?]+(?:[.!?]+|$)/g) || [text];
+  while (sentences.length && isFarewellSentence(sentences[sentences.length - 1])) {
+    sentences.pop();
+  }
+  return slotLine(sentences.join(' '));
+}
+
+function queueToolOutcome(state, line) {
+  const text = withoutTrailingFarewell(line);
   if (!state || !text) return '';
   if (!state.conversation || typeof state.conversation !== 'object') {
     state.conversation = {};
@@ -153,4 +178,5 @@ module.exports = {
   drainSpokenSpeakSlots,
   queueToolOutcome,
   takeToolOutcome,
+  withoutTrailingFarewell,
 };

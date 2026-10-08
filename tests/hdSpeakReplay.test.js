@@ -1513,4 +1513,39 @@ describe('HD_e369cba6565d free caller', () => {
     });
     assert.equal(beside.checks.deletedAnswer, 1);
   });
+
+  it('queues a save without a farewell and says goodbye once on close', () => {
+    const state = createBrainState(DUSTED);
+    state.caller.name = 'Alvin';
+    state.caller.nameConfirmed = true;
+    const results = [{ action: 'create_service_request', status: 'succeeded', requestType: 'callback' }];
+    const sw = withCallbackFarewell('Sawa, nimehifadhi ombi lako.', results, 'sw');
+    assert.equal(sw, 'Sawa, nimehifadhi ombi lako. Asante. Kwaheri.');
+    assert.equal(queueToolOutcome(state, 'Sawa, nimehifadhi ombi lako. Asante. Kwaheri.'), 'Sawa, nimehifadhi ombi lako.');
+    assert.equal(takeToolOutcome(state), 'Sawa, nimehifadhi ombi lako.');
+    queueToolOutcome(state, sw);
+    assert.doesNotMatch(state.conversation.pendingToolOutcome, /Asante\.|Kwaheri/);
+    assert.equal(
+      queueToolOutcome(state, 'Okay, I have saved your request. Thank you. Goodbye.'),
+      'Okay, I have saved your request.'
+    );
+    assert.equal(queueToolOutcome(state, 'Asante. Kwaheri.'), '');
+    assert.equal(
+      queueToolOutcome(state, 'Asante, nimehifadhi ombi lako.'),
+      'Asante, nimehifadhi ombi lako.'
+    );
+
+    // Mid-call: the owed save speaks with no goodbye.
+    queueToolOutcome(state, 'Sawa, nimehifadhi ombi lako. Asante. Kwaheri.');
+    const midCall = takeToolOutcome(state);
+    assert.doesNotMatch(midCall, /Kwaheri|Goodbye|Siku njema/i);
+
+    // Closing turn: owed save, then the Brain END farewell. One goodbye.
+    queueToolOutcome(state, 'Sawa, nimehifadhi ombi lako. Asante. Kwaheri.');
+    const close = planBrainEndClose({ action: 'END', language: 'sw' });
+    const closing = [takeToolOutcome(state), close.line].join(' ');
+    assert.equal(closing, 'Sawa, nimehifadhi ombi lako. Asante. Kwaheri.');
+    assert.equal((closing.match(/Kwaheri/g) || []).length, 1);
+    assert.equal((closing.match(/Asante/g) || []).length, 1);
+  });
 });
