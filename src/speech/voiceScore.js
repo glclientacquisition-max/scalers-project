@@ -1,7 +1,12 @@
 // Score a voice trace. Checks are counts. A later phase improves the
 // committed baseline by making these counts fall. Missing latency is skipped.
 
-const { analyzeCallerLanguage } = require('../conversation/language');
+const {
+  analyzeCallerLanguage,
+  dominantSonioxLanguage,
+  isBackchannel,
+  ENGLISH_JOB_LOANWORDS,
+} = require('../conversation/language');
 const { utteranceLooksIncomplete } = require('./turnTaking');
 
 const LATENCY_BUDGET_MS = 1200;
@@ -17,17 +22,186 @@ const NAME_ASK =
 const RESPELL = /\b[A-Za-z]{2,}(?:-[A-Za-z]{2,})+\b/g;
 const NEUTRAL_ACK = /^(?:sawa|poa|asante|ndio|ndiyo|haya|okay|ok|yes|alright)[.!]?$/i;
 
-function stage(turn, name, phase) {
+function stages(turn, name, phase) {
   const rows = (turn?.stages || []).filter((row) => row.stage === name);
-  if (!phase) return rows[rows.length - 1] || null;
-  return rows.filter((row) => row.phase === phase).pop() || rows[rows.length - 1] || null;
+  if (!phase) return rows;
+  const phased = rows.filter((row) => row.phase === phase);
+  return phased.length ? phased : rows;
+}
+
+function stage(turn, name, phase) {
+  const rows = stages(turn, name, phase);
+  return rows[rows.length - 1] || null;
+}
+
+function modelProse(text) {
+  return String(text || '')
+    .replace(/###TOOL###[\s\S]*?###ENDTOOL###/gi, ' ')
+    .replace(/###ENDCALL###/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function spokenText(turn) {
+  return stages(turn, 'tts')
+    .filter((row) => row.filler !== true)
+    .map((row) => String(row.text || '').trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+function normalizeSpeech(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function questionSources(turn) {
+  const blobs = [];
+  const spokenNorm = normalizeSpeech(spokenText(turn));
+  const prose = modelProse(stage(turn, 'model', 'output')?.outputText || '');
+  if (prose && spokenNorm) {
+    const kept = questionsOf(prose).filter((question) =>
+      spokenNorm.includes(normalizeSpeech(question))
+    );
+    if (kept.length) blobs.push(kept.join(' '));
+  }
+  for (const row of stages(turn, 'tts')) {
+    if (row.before) blobs.push(String(row.before));
+  }
+  if (!blobs.length) {
+    const spoken = spokenText(turn);
+    if (spoken) blobs.push(spoken);
+  }
+  return blobs;
+}
+
+function uniqueQuestions(turn) {
+  const seen = new Set();
+  const out = [];
+  for (const blob of questionSources(turn)) {
+    for (const question of questionsOf(blob)) {
+      if (NAME_ASK.test(question)) continue;
+      const key = normalizeSpeech(question);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(key);
+    }
+  }
+  return out;
+}
+
+function asksName(turn) {
+  return questionSources(turn).some((blob) => NAME_ASK.test(blob));
+}
+
+function sonioxTags(turn) {
+  const tags = [];
+  for (const row of stages(turn, 'stt')) {
+    for (const token of row.tokens || []) {
+      if (token?.language) tags.push(token.language);
+    }
+  }
+  return tags;
+}
+
+function callerLanguage(turn) {
+  // Soniox wins when any tag is present. Do not also run the keyword fallback.
+  const stored = turn?.caller?.soniox || stage(turn, 'language')?.soniox || null;
+  if (stored && stored !== 'unknown') return stored;
+  const voted = dominantSonioxLanguage(sonioxTags(turn));
+  if (voted) return voted;
+  const explicit = turn?.caller?.detected;
+  const stageDetected = stage(turn, 'language')?.detected;
+  const detected = explicit || stageDetected || null;
+  if (detected && detected !== 'unknown') return detected;
+  if (detected === 'unknown') {
+    const analyzed = analyzeCallerLanguage(String(turn?.caller?.text || '')).language;
+    return analyzed && analyzed !== 'unknown' ? analyzed : 'unknown';
+  }
+  const recorded = turn?.caller?.language;
+  if (recorded && recorded !== 'unknown') return recorded;
+  return analyzeCallerLanguage(String(turn?.caller?.text || '')).language;
+}
+
+function questionMissing(modelText, spoken) {
+  const spokenNorm = normalizeSpeech(spoken);
+  return questionsOf(modelProse(modelText)).some((question) => {
+    const body = normalizeSpeech(question);
+    return body.length > 0 && !spokenNorm.includes(body);
+  });
+}
+
+function replyLatencyMs(turn, latency) {
+  if (!latency) return null;
+  if (latency.firstReplyPcmMs != null && Number.isFinite(Number(latency.firstReplyPcmMs))) {
+    return Number(latency.firstReplyPcmMs);
+  }
+  const hasFiller = (turn?.stages || []).some((row) => row.stage === 'filler');
+  const spoken = spokenText(turn);
+  if (hasFiller && !spoken.trim()) return null;
+  const pcm = latency.callerStopToFirstTtsPcmMs;
+  return pcm == null || !Number.isFinite(Number(pcm)) ? null : Number(pcm);
+}
+
+function stripJobLoanwords(text) {
+  let raw = String(text || '');
+  for (const word of ENGLISH_JOB_LOANWORDS) {
+    const escaped = String(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    raw = raw.replace(new RegExp(`\\b${escaped}\\b`, 'ig'), ' ');
+  }
+  return raw.replace(/\s+/g, ' ').trim();
 }
 
 function replyLanguage(text) {
   const raw = String(text || '').trim();
   if (!raw) return 'unknown';
   if (NEUTRAL_ACK.test(raw)) return 'neutral';
-  return analyzeCallerLanguage(raw).language;
+  const analyzed = analyzeCallerLanguage(raw);
+  if (analyzed.language !== 'en') return analyzed.language;
+  // One English loanword does not make a Kiswahili reply English.
+  const residue = stripJobLoanwords(raw);
+  const residueWords = residue.split(/\s+/).filter((word) => word.length > 1);
+  if (!residueWords.length) return 'unknown';
+  const rest = analyzeCallerLanguage(residue);
+  if (rest.language === 'unknown' && !(rest.scores && rest.scores.en > 0)) return 'sw';
+  return 'en';
+}
+
+const FACT_DROP_REASONS = new Set(['unbound_place', 'unsaid_number']);
+
+function factSentenceDropped(turn) {
+  return (turn?.stages || []).some((row) => {
+    if (row.stage !== 'transform') return false;
+    if (FACT_DROP_REASONS.has(row.reason)) return true;
+    return (Array.isArray(row.dropReasons) ? row.dropReasons : []).some((reason) =>
+      FACT_DROP_REASONS.has(reason)
+    );
+  });
+}
+
+function lateTokenCut(turn) {
+  const late = (turn?.stages || []).some(
+    (row) =>
+      row.stage === 'turn_end' &&
+      ((row.decision === 'ignore' && row.reason === 'grace') ||
+        (row.decision === 'hold' && row.reason === 'late_final'))
+  );
+  if (!late) return null;
+  const caller = normalizeSpeech(turn?.caller?.text);
+  const extras = [];
+  for (const row of stages(turn, 'stt')) {
+    if (row.kind !== 'final') continue;
+    const text = normalizeSpeech(row.text);
+    if (text && !caller.includes(text)) extras.push(String(row.text || '').trim());
+  }
+  if (extras.length) return extras[extras.length - 1];
+  const merged = (turn?.stages || []).some(
+    (row) => row.stage === 'turn_end' && row.reason === 'late_final'
+  );
+  return merged ? 'late token' : null;
 }
 
 function languagesMatch(callerLang, spokenLang) {
@@ -50,7 +224,7 @@ function cutoffIndicator(text) {
 
 function questionsOf(text) {
   return String(text || '')
-    .split(/(?<=[?？])\s+/)
+    .split(/(?<=[.!?？])\s+/)
     .map((part) => part.trim().toLowerCase().replace(/\s+/g, ' '))
     .filter((part) => part.endsWith('?') || part.endsWith('？'));
 }
@@ -92,16 +266,19 @@ function scoreTurn(turn) {
   const checks = emptyChecks();
   const notes = [];
   const caller = String(turn?.caller?.text || '');
-  const detected = turn?.caller?.language;
-  const callerLang =
-    detected && detected !== 'unknown' ? detected : analyzeCallerLanguage(caller).language;
+  const callerLang = callerLanguage(turn);
   const model = stage(turn, 'model', 'output');
-  const tts = stage(turn, 'tts');
-  const end = stage(turn, 'turn_end');
+  const ttsRows = stages(turn, 'tts').filter((row) => row.filler !== true);
+  const tts = ttsRows[ttsRows.length - 1] || null;
   const latency = stage(turn, 'latency');
-  const spoken = String(tts?.text || '');
-  const modelText = String(model?.outputText || '');
-  const held = end?.decision === 'hold';
+  const outcome = stage(turn, 'outcome')?.value || '';
+  const spoken = spokenText(turn);
+  const modelText = modelProse(model?.outputText || '');
+  const turnEnds = stages(turn, 'turn_end');
+  const flushed = turnEnds.some((row) => row.decision === 'flush');
+  const held =
+    !flushed &&
+    turnEnds.some((row) => row.decision === 'hold' && row.reason !== 'late_final');
 
   const spokenLang = replyLanguage(spoken);
   if (spoken && !languagesMatch(callerLang, spokenLang)) {
@@ -121,7 +298,17 @@ function scoreTurn(turn) {
     notes.push('services question not answered');
   }
 
-  if (!held && caller.trim().length >= 2 && !spoken.trim()) {
+  const skipped =
+    outcome === 'skip' ||
+    (turn.stages || []).some((row) => row.stage === 'turn_end' && row.decision === 'skip');
+  if (
+    !held &&
+    !skipped &&
+    !isBackchannel(caller) &&
+    outcome !== 'barge_in' &&
+    caller.trim().length >= 2 &&
+    !spoken.trim()
+  ) {
     checks.silence = 1;
     notes.push('silence after caller turn');
   }
@@ -129,11 +316,16 @@ function scoreTurn(turn) {
   const droppedAnswer = (turn.stages || []).some(
     (row) => row.stage === 'transform' && row.dropped && looksLikeKeptAnswer(row.before)
   );
+  const droppedQuestion = (turn.stages || []).some(
+    (row) => row.stage === 'transform' && row.dropped && questionMissing(row.before, spoken)
+  );
   const modelAnswerMissing =
     looksLikeKeptAnswer(modelText) && !looksLikeKeptAnswer(spoken) && modelText.trim() !== spoken.trim();
-  if (!held && (droppedAnswer || modelAnswerMissing)) {
+  const modelQuestionMissing = questionMissing(model?.outputText || '', spoken);
+  const droppedFact = factSentenceDropped(turn);
+  if (!held && (droppedAnswer || droppedQuestion || modelAnswerMissing || modelQuestionMissing || droppedFact)) {
     checks.deletedAnswer = 1;
-    notes.push('correct answer deleted');
+    notes.push(droppedFact ? 'coverage or price sentence deleted' : 'correct answer deleted');
   }
 
   const ttsLang = tts?.language || '';
@@ -145,15 +337,17 @@ function scoreTurn(turn) {
   }
 
   const cutoff = cutoffIndicator(caller);
-  if (!held && cutoff) {
+  const lateToken = lateTokenCut(turn);
+  if (!held && (cutoff || lateToken)) {
     checks.prematureTurn = 1;
-    notes.push(`turn end ${cutoff}`);
+    if (lateToken) notes.push(`late token ${lateToken}`);
+    else notes.push(`turn end ${cutoff}`);
   }
 
-  const pcm = latency?.callerStopToFirstTtsPcmMs;
+  const pcm = replyLatencyMs(turn, latency);
   if (pcm != null && pcm > LATENCY_BUDGET_MS) {
     checks.slow = 1;
-    notes.push(`first pcm ${pcm}ms`);
+    notes.push(`first reply pcm ${pcm}ms`);
   }
 
   appendSpeakNotes(turn, notes);
@@ -195,12 +389,11 @@ function scoreTurns(turns = []) {
   const nameAskTurns = [];
   let nameAsks = 0;
   for (const turn of turns) {
-    const spoken = String(stage(turn, 'tts')?.text || '');
-    if (NAME_ASK.test(spoken)) {
+    if (asksName(turn)) {
       nameAsks += 1;
       if (turn.turnIndex != null) nameAskTurns.push(turn.turnIndex);
     }
-    for (const question of questionsOf(spoken)) asked.push(question);
+    for (const question of uniqueQuestions(turn)) asked.push(question);
   }
   if (nameAsks > 1) checks.repeatedQuestion += nameAsks - 1;
   const seen = new Map();

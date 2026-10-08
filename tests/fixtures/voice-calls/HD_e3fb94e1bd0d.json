@@ -1,0 +1,153 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "callId": "HD_e3fb94e1bd0d",
+  "tenantId": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+  "businessName": "Done and Dusted",
+  "callerName": "Alvin",
+  "nameOnFile": false,
+  "vertical": "home_services",
+  "servicesCatalog": [
+    { "name": "Couch cleaning", "price_range": "Ksh 800-1200" },
+    { "name": "Mattress cleaning", "price_range": "Ksh 800-1200" },
+    { "name": "Carpet cleaning", "price_range": "Ksh 1500-2000" },
+    { "name": "General cleaning" }
+  ],
+  "businessPolicies": {
+    "coverage_areas": ["county:nairobi", "kiambu", "kitengela", "juja", "ongata rongai", "syokimau"]
+  },
+  "socialHandles": { "main": "0790381872" },
+  "source": "Staging voice_turn_traces 2026-10-08 00:39Z (03:39 EAT), release 0d783143. Live mouth dropped price and Nakuru sentences. Replay uses the #608 mouth, which keeps a grounded price and binds na kuru to Nakuru. The scorer still counts unbound_place and unsaid_number when a trace records them.",
+  "turns": [
+    {
+      "caller": "Uh, this is one back room joining. Which cleaning services can you mnafanya?",
+      "soniox": "en",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning, and more. Which one do you need?"
+      },
+      "model": { "provider": "canned", "model": "speak_packet", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null },
+      "outcome": "early_return",
+      "observed": { "firstPcmMs": 309, "firstReplyPcmMs": 309 }
+    },
+    {
+      "caller": "how much.",
+      "soniox": "en",
+      "flushed": true,
+      "filler": "Alright.",
+      "outcome": "barge_in",
+      "model": { "provider": "gemini", "model": "recorded", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null },
+      "observed": { "firstPcmMs": 436 }
+    },
+    {
+      "caller": "For carpet cleaning?",
+      "soniox": "en",
+      "flushed": true,
+      "filler": "Alright.",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "For carpet cleaning, it is Ksh 1500 to 2000 depending on the size. When would you like us to come?",
+        "chars": 96,
+        "spokenEmitted": 32
+      },
+      "observed": { "firstPcmMs": 405, "firstReplyPcmMs": 1396, "firstTokenMs": 988 }
+    },
+    {
+      "caller": "Like, how much for carpet cleaning?",
+      "soniox": "en",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "Carpet cleaning is Ksh 1500-2000."
+      },
+      "model": { "provider": "canned", "model": "speak_packet", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null },
+      "outcome": "early_return",
+      "observed": { "firstPcmMs": 247, "firstReplyPcmMs": 247 }
+    },
+    {
+      "caller": "Okay.",
+      "flushed": true,
+      "outcome": "skip",
+      "model": { "provider": "recorded", "model": "recorded", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null }
+    },
+    {
+      "caller": "And, and, and phone any?",
+      "soniox": "en",
+      "flushed": true,
+      "filler": "Alright.",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Carpet cleaning costs Ksh 1500 to 2000 depending on the size. You can also reach us on 0790381872. Would you like to book a visit?",
+        "chars": 139,
+        "spokenEmitted": 31
+      },
+      "observed": { "firstPcmMs": 404, "firstReplyPcmMs": 1531, "firstTokenMs": 897 }
+    },
+    {
+      "caller": "For mattress cleaning, how much?",
+      "soniox": "en",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "Mattress cleaning is Ksh 800-1200."
+      },
+      "model": { "provider": "canned", "model": "speak_packet", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null },
+      "outcome": "early_return",
+      "observed": { "firstPcmMs": 388, "firstReplyPcmMs": 388 }
+    },
+    {
+      "caller": "Oh. Na mnafika, mnafikana.",
+      "soniox": "sw",
+      "flushed": true,
+      "lateFinal": "Kuru?",
+      "filler": "Mm",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Mattress cleaning costs Ksh 800 to 1200 depending on the size, na tunafanya door to door Nairobi na karibu nayo. Tuje lini kukufanyia cleaning?",
+        "chars": 139,
+        "spokenEmitted": 32
+      },
+      "observed": { "firstPcmMs": 636, "firstReplyPcmMs": 1526, "firstTokenMs": 975 }
+    },
+    {
+      "caller": "Like, mnafika na kuru?",
+      "soniox": "sw",
+      "flushed": true,
+      "filler": "Sawa.",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Nakuru iko nje ya area yetu ya huduma kwani tunafanya Nairobi na maeneo ya karibu pekee. Naweza kukuachia ujumbe kwa timu yetu?",
+        "chars": 126,
+        "spokenEmitted": 40
+      },
+      "observed": { "firstPcmMs": 401, "firstReplyPcmMs": 2154, "firstTokenMs": 1541 }
+    },
+    {
+      "caller": "Like, do you cover na kuru?",
+      "soniox": "en",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "I don't have our coverage list on file. I can note this for the team."
+      },
+      "model": { "provider": "canned", "model": "speak_packet", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null },
+      "outcome": "early_return",
+      "observed": { "firstPcmMs": 357, "firstReplyPcmMs": 357 }
+    },
+    {
+      "caller": "Okay.",
+      "flushed": true,
+      "outcome": "skip",
+      "model": { "provider": "recorded", "model": "recorded", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null }
+    }
+  ]
+}
