@@ -72,6 +72,21 @@ test('skips regex-y lexicon matches', () => {
   assert.ok(!ctx.terms.some((t) => t.includes('?')));
 });
 
+test('coverage towns and service names are hearing terms', () => {
+  const ctx = buildSttContext({
+    businessName: 'Done and Dusted',
+    agentName: 'Shy',
+    servicesCatalog: [{ name: 'General cleaning (houses & air bnbs)' }],
+    businessPolicies: {
+      coverage_areas: ['place:kitengela', 'county:nairobi', 'place:juja'],
+    },
+  });
+  assert.ok(ctx.terms.includes('Kitengela'));
+  assert.ok(ctx.terms.includes('Nairobi'));
+  assert.ok(ctx.terms.includes('Juja'));
+  assert.ok(ctx.terms.includes('General cleaning (houses & air bnbs)'));
+});
+
 test('null tenant → null context', () => {
   assert.strictEqual(buildSttContext(null), null);
   assert.strictEqual(buildSttContext({}), null);

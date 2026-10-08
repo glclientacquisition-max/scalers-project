@@ -38,6 +38,7 @@ const { noteSpokenPendingAsk, ackIsConsent } = require('../src/conversation/call
 const { isCatalogueAsk } = require('../src/conversation/fileRead');
 const { numbersIn } = require('../src/conversation/numberWords');
 const {
+  assessCoverage,
   coverageAskSpeech,
   coverageAskPlaces,
   coverageOfferToSpeak,
@@ -1248,7 +1249,7 @@ describe('HD_e369cba6565d free caller', () => {
       {
         sentences: turn12,
         caller: 'A-ah, ni Nairobi pekee. Na water bowl kitengele ndio ngapi.',
-        keep: /Kitengela iko nje/i,
+        keep: /Tunafika Kitengela/,
       },
     ];
     for (const { sentences, caller, keep } of calls) {
@@ -1297,5 +1298,49 @@ describe('HD_e369cba6565d free caller', () => {
     );
     assert.equal((asked.match(/kukuachia ujumbe/g) || []).length, 0);
     assert.match(asked, /nikuandikishe/);
+  });
+
+  it('rates kitengele as Kitengela and does not treat ndio ngapi as a place', () => {
+    assert.equal(assessCoverage('kitengele', DUSTED), 'inside');
+    assert.equal(assessCoverage('Kisumu', DUSTED), 'outside');
+    assert.deepEqual(coverageAskPlaces('Like, do you do you cover ndio ngapi?'), []);
+    assert.equal(coverageAskSpeech('Like, do you cover ndio ngapi?', DUSTED, 'sw'), '');
+    const state = createBrainState(DUSTED);
+    state.caller.name = 'Alvin';
+    state.caller.nameConfirmed = true;
+    const falseOutside = polishSpokenReply(
+      'Kitengela iko nje ya eneo letu la huduma kwa sasa kwani tunahudumia Nairobi na maeneo ya karibu pekee. Una eneo lingine Nairobi ungependa tusafishe?',
+      {
+        profile: DUSTED,
+        language: 'sw',
+        state,
+        callerTurns: ['A-ah, ni Nairobi pekee. Na water bowl kitengele ndio ngapi. Do you guys cover that?'],
+      }
+    );
+    assert.match(falseOutside, /Tunafika Kitengela/);
+    assert.doesNotMatch(falseOutside, /iko nje/);
+    assert.doesNotMatch(falseOutside, /kukuachia ujumbe/);
+    const english = polishSpokenReply("We don't cover Kitengela.", {
+      profile: DUSTED,
+      language: 'en',
+      state,
+      callerTurns: ['Do you cover Kitengela?'],
+    });
+    assert.match(english, /we cover Kitengela/i);
+    assert.doesNotMatch(english, /don't cover Kitengela/i);
+    const mix = polishSpokenReply('Hatufiki Kitengela na Nakuru.', {
+      profile: DUSTED,
+      language: 'sw',
+      state,
+      callerTurns: ['Mnafika Kitengela na Nakuru?'],
+    });
+    assert.match(mix, /Tunafika Kitengela, lakini hatufiki Nakuru/);
+    const kisumu = polishSpokenReply('Hatufiki Kisumu.', {
+      profile: DUSTED,
+      language: 'sw',
+      callerTurns: ['Mnafika Kisumu?'],
+    });
+    assert.match(kisumu, /Hatufiki Kisumu/);
+    assert.match(kisumu, /kukuachia ujumbe/);
   });
 });

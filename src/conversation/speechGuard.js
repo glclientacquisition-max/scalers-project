@@ -10,7 +10,7 @@ const { entityValue, findCatalogMatch } = require('./entityExtraction');
 const { looksLikeOfferAsk } = require('./fileRead');
 const { fileServicePriceLine } = require('./catalogueMouth');
 const { numbersIn } = require('./numberWords');
-const { assessCoverage } = require('./visitLocation');
+const { assessCoverage, groundFalseOutsideClaim } = require('./visitLocation');
 const { bindSpokenPlace } = require('./kenyaPlaces');
 const { offerActOf } = require('../speech/offerAct');
 const { openSlotLine } = require('./callCorrectives');
@@ -594,6 +594,15 @@ function guardSpokenReply(text, ctx = {}) {
     }
     if (!transferOk && TRANSFER_CLAIM.test(sentence)) {
       noteDrop(ctx, 'transfer_claim', sentence);
+      continue;
+    }
+    const groundedOutside = groundFalseOutsideClaim(
+      sentence,
+      ctx.profile || {},
+      ctx.language
+    );
+    if (groundedOutside) {
+      kept.push(groundedOutside);
       continue;
     }
     const coveragePlace = positiveCoveragePlace(sentence);

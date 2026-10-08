@@ -128,6 +128,18 @@ const COVERAGE_STOP = new Set([
   'block',
   'door',
   'wing',
+  'ndio',
+  'ndiyo',
+  'ngapi',
+  'gani',
+  'bei',
+  'pesa',
+  'much',
+  'many',
+  'price',
+  'cost',
+  'charge',
+  'charges',
 ]);
 
 function cleanPlace(value, max = 240) {
@@ -219,22 +231,30 @@ function settingsCountyText(profile = {}) {
  * outside: coverage text exists and neither the place nor its county matches.
  * The office address can match a written name. It does not expand a county.
  */
+function coverageRatingText(text, profile) {
+  const raw = cleanPlace(text, 240);
+  if (!raw) return raw;
+  return foldCanonicalPlace(raw, profile) || raw;
+}
+
 function assessCoverage(text, profile = {}) {
+  const rated = coverageRatingText(text, profile);
   const selected = readCoverageAreas(profile.businessPolicies);
-  const mentioned = coverageTokens(text);
+  const mentioned = coverageTokens(rated);
   // Outside means the place is known and sits elsewhere. A landmark nobody
   // can place ("near Naivas") is unknown; the ladder confirms, never refuses.
+  // The rating uses the canonical place, so "kitengele" is judged as Kitengela.
   if (selected) {
     if (!mentioned.length || !selected.length) return 'unknown';
-    if (coveredByAreas(text, selected)) return 'inside';
-    return countiesForPlace(text).length ? 'outside' : 'unknown';
+    if (coveredByAreas(rated, selected)) return 'inside';
+    return countiesForPlace(rated).length ? 'outside' : 'unknown';
   }
   const covered = coverageCorpus(profile);
   if (!covered.size) return 'unknown';
   if (!mentioned.length) return 'unknown';
   if (mentioned.some((token) => covered.has(token))) return 'inside';
   const allowed = countiesMentioned(settingsCountyText(profile));
-  const placeCounties = countiesForPlace(text);
+  const placeCounties = countiesForPlace(rated);
   if (!placeCounties.length) return 'unknown';
   if (placeCounties.some((county) => allowed.has(county))) return 'inside';
   return 'outside';
@@ -616,6 +636,87 @@ function speakableCoverageName(raw, profile) {
   return { speak, rating: assessCoverage(folded || raw, profile) };
 }
 
+const OUTSIDE_CLAIM_SKIP = new Set([
+  'eneo',
+  'huduma',
+  'area',
+  'that',
+  'this',
+  'hapo',
+  'hiyo',
+  'there',
+  'here',
+  'nje',
+  'the',
+  'our',
+]);
+
+function splitClaimPlaces(blob) {
+  return String(blob || '')
+    .split(/\s*,\s*|\s+\b(?:na|and|au|or)\b\s+/i)
+    .map((part) => part.replace(/^(?:the|to)\s+/i, '').trim())
+    .filter((part) => part && !OUTSIDE_CLAIM_SKIP.has(part.toLowerCase()) && part.split(/\s+/).length <= 3);
+}
+
+/** The places a sentence says are outside. A town named only as the area served is not one of them. */
+function outsideClaimPlaces(sentence) {
+  const raw = String(sentence || '');
+  const patterns = [
+    /\b([A-Za-z][\w'’-]{2,}(?:\s+[A-Za-z][\w'’-]{2,})?)\s+iko nje\b/gi,
+    /\b([A-Za-z][\w'’-]{2,}(?:\s+[A-Za-z][\w'’-]{2,})?)\s+liko nje\b/gi,
+    /\bhatufiki\s+([^.,!?]+)/gi,
+    /\bhatuwezi kufika\s+([^.,!?]+)/gi,
+    /\b(?:we (?:do not|don't)|we cannot|we can't)\s+cover\s+([^.,!?]+)/gi,
+    /\b([A-Za-z][\w'’-]{2,}(?:\s+[A-Za-z][\w'’-]{2,})?)\s+is outside\b/gi,
+  ];
+  const found = [];
+  const seen = new Set();
+  for (const re of patterns) {
+    let match;
+    while ((match = re.exec(raw))) {
+      for (const place of splitClaimPlaces(match[1])) {
+        const key = place.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        found.push(place);
+      }
+    }
+  }
+  return found;
+}
+
+function coverageFactLine(inside, outside, language) {
+  const lang = String(language || 'en').toLowerCase();
+  const sw = lang === 'sw' || lang.startsWith('swahili') || lang === 'sheng';
+  const covered = joinPlaceNames(inside, language);
+  const uncovered = joinPlaceNames(outside, language);
+  if (inside.length && outside.length) {
+    return sw
+      ? `Tunafika ${covered}, lakini hatufiki ${uncovered}.`
+      : `We cover ${covered}, but we don't cover ${uncovered}.`;
+  }
+  if (inside.length) return sw ? `Tunafika ${covered}.` : `Yes, we cover ${covered}.`;
+  return sw ? `Hatufiki ${uncovered}.` : `We don't cover ${uncovered}.`;
+}
+
+/**
+ * A sentence that says a covered town is outside becomes the grounded line.
+ * A true outside town stays. An empty result means the sentence is left as said.
+ */
+function groundFalseOutsideClaim(sentence, profile = {}, language = 'en') {
+  const claimed = outsideClaimPlaces(sentence);
+  if (!claimed.length) return '';
+  const rated = claimed.map((raw) => speakableCoverageName(raw, profile));
+  const inside = uniquePlaceNames(
+    rated.filter((row) => row.rating === 'inside').map((row) => row.speak)
+  );
+  if (!inside.length) return '';
+  const outside = uniquePlaceNames(
+    rated.filter((row) => row.rating === 'outside').map((row) => row.speak)
+  );
+  return coverageFactLine(inside, outside, language);
+}
+
 function uniquePlaceNames(names) {
   const out = [];
   for (const name of names) {
@@ -646,20 +747,7 @@ function coverageAskSpeech(text, profile = {}, language = 'en') {
     if (hasCoverageText(profile)) return unsureCoverageSpeech(language);
     return visitBlockSpeech('unknown_coverage', language);
   }
-  const lang = String(language || 'en').toLowerCase();
-  const sw = lang === 'sw' || lang.startsWith('swahili') || lang === 'sheng';
-  const covered = joinPlaceNames(inside, language);
-  const uncovered = joinPlaceNames(outside, language);
-  let fact = '';
-  if (inside.length && outside.length) {
-    fact = sw
-      ? `Tunafika ${covered}, lakini hatufiki ${uncovered}.`
-      : `We cover ${covered}, but we don't cover ${uncovered}.`;
-  } else if (inside.length) {
-    fact = sw ? `Tunafika ${covered}.` : `Yes, we cover ${covered}.`;
-  } else {
-    fact = sw ? `Hatufiki ${uncovered}.` : `We don't cover ${uncovered}.`;
-  }
+  const fact = coverageFactLine(inside, outside, language);
   if (!outside.length) return fact;
   return `${fact} ${coverageNoteQuestion(language)}`;
 }
@@ -793,6 +881,7 @@ module.exports = {
   ensureCoverageOffer,
   coverageOfferToSpeak,
   offerStillPending,
+  groundFalseOutsideClaim,
   statesOutOfArea,
   isNoisePlace,
   appendVisitNotes,

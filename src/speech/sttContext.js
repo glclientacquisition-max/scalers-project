@@ -4,6 +4,7 @@
 
 const { normalizeServices } = require('../conversation/liveKnowledge');
 const { normalizeLocations } = require('../conversation/businessLocations');
+const { readCoverageAreas } = require('../conversation/coverageAreas');
 
 /** Soft cap — Soniox context biasing degrades with huge unrelated term lists. */
 const MAX_STT_TERMS = Number(process.env.SONIOX_STT_CONTEXT_MAX_TERMS || 40);
@@ -93,6 +94,15 @@ function collectTenantTerms(tenant = {}) {
 
   for (const svc of normalizeServices(tenant.servicesCatalog || tenant.services_catalog)) {
     if (svc.name) terms.push(svc.name);
+  }
+
+  const areas = readCoverageAreas(tenant.businessPolicies || tenant.business_policies);
+  for (const id of areas || []) {
+    const name = id.slice(id.indexOf(':') + 1);
+    const titled = name.replace(/\b[a-z]+/g, (word) =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    );
+    if (titled) terms.push(titled);
   }
 
   for (const loc of normalizeLocations(tenant.businessLocations || tenant.business_locations)) {
