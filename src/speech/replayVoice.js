@@ -199,6 +199,7 @@ function replayTurn(turn, ctx) {
       stage: 'language',
       detected: evidence.language,
       sticky: speech.language,
+      soniox: turn.soniox || null,
       confidence: evidence.confidence,
     },
     {
@@ -217,6 +218,19 @@ function replayTurn(turn, ctx) {
   ];
   if (canned && !mouth.stages.some((row) => row.stage === 'canned')) {
     stages.push({ stage: 'canned', path: canned.path, text: canned.text });
+  }
+  if (turn.lateFinal) {
+    stages.push({
+      stage: 'stt',
+      kind: 'final',
+      text: String(turn.lateFinal),
+      tokens: [],
+    });
+    stages.push({
+      stage: 'turn_end',
+      decision: turn.lateFinalMerged ? 'hold' : 'ignore',
+      reason: turn.lateFinalMerged ? 'late_final' : 'grace',
+    });
   }
   if (turn.filler) {
     stages.push({
@@ -267,6 +281,7 @@ function replayTurn(turn, ctx) {
       language: evidence.language,
       sticky,
       detected: evidence.language,
+      soniox: turn.soniox || null,
       confidence: evidence.confidence,
     },
     stages,

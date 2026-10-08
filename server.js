@@ -3413,6 +3413,7 @@ mediaWss.on('connection', (ws, req) => {
             before: rawChunk,
             after: polished,
             reason: polishedDetail.reason || (polished.trim() ? 'rewritten' : 'dropped'),
+            dropReasons: polishedDetail.dropReasons,
           });
         }
         if (!polished) {

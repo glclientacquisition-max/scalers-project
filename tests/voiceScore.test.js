@@ -392,6 +392,116 @@ describe('voice score', () => {
     assert.equal(tokensOnly.checks.languageMismatch, 0);
   });
 
+  it('does not call a Kiswahili reply English because it contains cleaning', () => {
+    const card = scoreTurns([
+      {
+        turnIndex: 8,
+        caller: { text: 'Oh. Na mnafika, mnafikana.', soniox: 'sw', detected: 'sw', language: 'sw' },
+        stages: [
+          { stage: 'language', detected: 'sw', soniox: 'sw', sticky: 'sw' },
+          {
+            stage: 'tts',
+            text: 'Tuje lini kukufanyia cleaning',
+            before: 'Tuje lini kukufanyia cleaning?',
+            language: 'sw',
+          },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(card.checks.languageMismatch, 0);
+  });
+
+  it('does not call an Okay backchannel silence', () => {
+    const card = scoreTurns([
+      {
+        turnIndex: 5,
+        caller: { text: 'Okay.' },
+        stages: [
+          { stage: 'turn_end', decision: 'skip', reason: 'non_substantive' },
+          { stage: 'outcome', value: 'skip' },
+        ],
+      },
+    ]);
+    assert.equal(card.checks.silence, 0);
+    assert.equal(card.turns[0].notes.some((note) => note.includes('silence')), false);
+  });
+
+  it('counts an unbound place or unsaid number drop as a deleted answer', () => {
+    const card = scoreTurns([
+      {
+        turnIndex: 9,
+        caller: { text: 'Like, mnafika na kuru?', soniox: 'sw', detected: 'sw' },
+        stages: [
+          { stage: 'language', detected: 'sw', soniox: 'sw' },
+          {
+            stage: 'model',
+            phase: 'output',
+            outputText:
+              'Nakuru iko nje ya area yetu ya huduma kwani tunafanya Nairobi na maeneo ya karibu pekee. Naweza kukuachia ujumbe kwa timu yetu?',
+          },
+          {
+            stage: 'transform',
+            name: 'polish',
+            reason: 'unbound_place',
+            dropReasons: ['unbound_place'],
+            before:
+              'Nakuru iko nje ya area yetu ya huduma kwani tunafanya Nairobi na maeneo ya karibu pekee.',
+            after: '',
+            dropped: true,
+          },
+          {
+            stage: 'tts',
+            text: 'Naweza kukuachia ujumbe kwa timu yetu',
+            before: 'Naweza kukuachia ujumbe kwa timu yetu?',
+            language: 'sw',
+          },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(card.checks.deletedAnswer, 1);
+    assert.equal(card.turns[0].notes.some((note) => note.includes('deleted')), true);
+  });
+
+  it('flags a late token dropped or merged after the turn closed', () => {
+    const dropped = scoreTurns([
+      {
+        turnIndex: 8,
+        caller: { text: 'Oh. Na mnafika, mnafikana.', soniox: 'sw', detected: 'sw' },
+        stages: [
+          { stage: 'turn_end', decision: 'flush', reason: 'caller_turn_processed' },
+          { stage: 'stt', kind: 'final', text: 'Kuru?' },
+          { stage: 'turn_end', decision: 'ignore', reason: 'grace' },
+          {
+            stage: 'tts',
+            text: 'Tuje lini kukufanyia cleaning',
+            before: 'Tuje lini kukufanyia cleaning?',
+            language: 'sw',
+          },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(dropped.checks.prematureTurn, 1);
+    assert.equal(dropped.checks.languageMismatch, 0);
+    assert.match(dropped.turns[0].notes.join(' '), /Kuru/);
+
+    const merged = scoreTurns([
+      {
+        turnIndex: 8,
+        caller: { text: 'Oh. Na mnafika, mnafikana.' },
+        stages: [
+          { stage: 'turn_end', decision: 'flush', reason: 'recorded_flush' },
+          { stage: 'turn_end', decision: 'hold', reason: 'late_final' },
+          { stage: 'tts', text: 'Sawa', before: 'Sawa.', language: 'sw' },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(merged.checks.prematureTurn, 1);
+  });
+
   it('replays a fixture into a scorecard shape', async () => {
     const replay = await replayCall({
       callId: 'HD_shape',

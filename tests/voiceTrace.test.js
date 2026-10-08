@@ -130,6 +130,7 @@ describe('voice trace session', () => {
     const turnRow = sink.records[0];
     assert.equal(turnRow.score, 100);
     assert.equal(turnRow.checks.repeatedQuestion, 0);
+    assert.ok(Array.isArray(turnRow.notes));
     assert.equal(turnRow.caller.language, 'en');
     assert.equal(turnRow.caller.sticky, 'en');
     assert.deepEqual(callTraceColumns(turnRow), {

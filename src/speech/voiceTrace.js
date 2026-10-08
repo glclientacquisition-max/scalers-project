@@ -381,6 +381,9 @@ function createVoiceTrace(opts = {}) {
       stage: 'transform',
       name: String(info.stage || info.name || 'speech'),
       reason: String(info.reason || (after.trim() ? 'rewritten' : 'dropped')),
+      dropReasons: (Array.isArray(info.dropReasons) ? info.dropReasons : [])
+        .map((reason) => String(reason || ''))
+        .filter(Boolean),
       before: redactText(before),
       after: redactText(after),
       dropped: !after.trim(),
@@ -508,6 +511,7 @@ function createVoiceTrace(opts = {}) {
         if (!row) continue;
         turn.score = row.omit ? null : row.score ?? null;
         turn.checks = row.checks ?? null;
+        turn.notes = Array.isArray(row.notes) ? row.notes.slice() : [];
         if (typeof sink.update === 'function') {
           const update = Promise.resolve(sink.update(turn)).catch((err) => {
             console.warn('[voice-trace] turn score update failed:', err?.message || err);

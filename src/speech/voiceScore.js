@@ -1,7 +1,12 @@
 // Score a voice trace. Checks are counts. A later phase improves the
 // committed baseline by making these counts fall. Missing latency is skipped.
 
-const { analyzeCallerLanguage, dominantSonioxLanguage } = require('../conversation/language');
+const {
+  analyzeCallerLanguage,
+  dominantSonioxLanguage,
+  isBackchannel,
+  ENGLISH_JOB_LOANWORDS,
+} = require('../conversation/language');
 const { utteranceLooksIncomplete } = require('./turnTaking');
 
 const LATENCY_BUDGET_MS = 1200;
@@ -141,11 +146,62 @@ function replyLatencyMs(turn, latency) {
   return pcm == null || !Number.isFinite(Number(pcm)) ? null : Number(pcm);
 }
 
+function stripJobLoanwords(text) {
+  let raw = String(text || '');
+  for (const word of ENGLISH_JOB_LOANWORDS) {
+    const escaped = String(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    raw = raw.replace(new RegExp(`\\b${escaped}\\b`, 'ig'), ' ');
+  }
+  return raw.replace(/\s+/g, ' ').trim();
+}
+
 function replyLanguage(text) {
   const raw = String(text || '').trim();
   if (!raw) return 'unknown';
   if (NEUTRAL_ACK.test(raw)) return 'neutral';
-  return analyzeCallerLanguage(raw).language;
+  const analyzed = analyzeCallerLanguage(raw);
+  if (analyzed.language !== 'en') return analyzed.language;
+  // One English loanword does not make a Kiswahili reply English.
+  const residue = stripJobLoanwords(raw);
+  const residueWords = residue.split(/\s+/).filter((word) => word.length > 1);
+  if (!residueWords.length) return 'unknown';
+  const rest = analyzeCallerLanguage(residue);
+  if (rest.language === 'unknown' && !(rest.scores && rest.scores.en > 0)) return 'sw';
+  return 'en';
+}
+
+const FACT_DROP_REASONS = new Set(['unbound_place', 'unsaid_number']);
+
+function factSentenceDropped(turn) {
+  return (turn?.stages || []).some((row) => {
+    if (row.stage !== 'transform') return false;
+    if (FACT_DROP_REASONS.has(row.reason)) return true;
+    return (Array.isArray(row.dropReasons) ? row.dropReasons : []).some((reason) =>
+      FACT_DROP_REASONS.has(reason)
+    );
+  });
+}
+
+function lateTokenCut(turn) {
+  const late = (turn?.stages || []).some(
+    (row) =>
+      row.stage === 'turn_end' &&
+      ((row.decision === 'ignore' && row.reason === 'grace') ||
+        (row.decision === 'hold' && row.reason === 'late_final'))
+  );
+  if (!late) return null;
+  const caller = normalizeSpeech(turn?.caller?.text);
+  const extras = [];
+  for (const row of stages(turn, 'stt')) {
+    if (row.kind !== 'final') continue;
+    const text = normalizeSpeech(row.text);
+    if (text && !caller.includes(text)) extras.push(String(row.text || '').trim());
+  }
+  if (extras.length) return extras[extras.length - 1];
+  const merged = (turn?.stages || []).some(
+    (row) => row.stage === 'turn_end' && row.reason === 'late_final'
+  );
+  return merged ? 'late token' : null;
 }
 
 function languagesMatch(callerLang, spokenLang) {
@@ -214,12 +270,15 @@ function scoreTurn(turn) {
   const model = stage(turn, 'model', 'output');
   const ttsRows = stages(turn, 'tts').filter((row) => row.filler !== true);
   const tts = ttsRows[ttsRows.length - 1] || null;
-  const end = stage(turn, 'turn_end');
   const latency = stage(turn, 'latency');
   const outcome = stage(turn, 'outcome')?.value || '';
   const spoken = spokenText(turn);
   const modelText = modelProse(model?.outputText || '');
-  const held = end?.decision === 'hold';
+  const turnEnds = stages(turn, 'turn_end');
+  const flushed = turnEnds.some((row) => row.decision === 'flush');
+  const held =
+    !flushed &&
+    turnEnds.some((row) => row.decision === 'hold' && row.reason !== 'late_final');
 
   const spokenLang = replyLanguage(spoken);
   if (spoken && !languagesMatch(callerLang, spokenLang)) {
@@ -239,7 +298,17 @@ function scoreTurn(turn) {
     notes.push('services question not answered');
   }
 
-  if (!held && outcome !== 'barge_in' && caller.trim().length >= 2 && !spoken.trim()) {
+  const skipped =
+    outcome === 'skip' ||
+    (turn.stages || []).some((row) => row.stage === 'turn_end' && row.decision === 'skip');
+  if (
+    !held &&
+    !skipped &&
+    !isBackchannel(caller) &&
+    outcome !== 'barge_in' &&
+    caller.trim().length >= 2 &&
+    !spoken.trim()
+  ) {
     checks.silence = 1;
     notes.push('silence after caller turn');
   }
@@ -253,9 +322,10 @@ function scoreTurn(turn) {
   const modelAnswerMissing =
     looksLikeKeptAnswer(modelText) && !looksLikeKeptAnswer(spoken) && modelText.trim() !== spoken.trim();
   const modelQuestionMissing = questionMissing(model?.outputText || '', spoken);
-  if (!held && (droppedAnswer || droppedQuestion || modelAnswerMissing || modelQuestionMissing)) {
+  const droppedFact = factSentenceDropped(turn);
+  if (!held && (droppedAnswer || droppedQuestion || modelAnswerMissing || modelQuestionMissing || droppedFact)) {
     checks.deletedAnswer = 1;
-    notes.push('correct answer deleted');
+    notes.push(droppedFact ? 'coverage or price sentence deleted' : 'correct answer deleted');
   }
 
   const ttsLang = tts?.language || '';
@@ -267,9 +337,11 @@ function scoreTurn(turn) {
   }
 
   const cutoff = cutoffIndicator(caller);
-  if (!held && cutoff) {
+  const lateToken = lateTokenCut(turn);
+  if (!held && (cutoff || lateToken)) {
     checks.prematureTurn = 1;
-    notes.push(`turn end ${cutoff}`);
+    if (lateToken) notes.push(`late token ${lateToken}`);
+    else notes.push(`turn end ${cutoff}`);
   }
 
   const pcm = replyLatencyMs(turn, latency);

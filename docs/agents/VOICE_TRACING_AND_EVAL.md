@@ -71,7 +71,7 @@ Call record (`schema: scalers.voice.call`): `startedAt`, `endedAt`, `turnCount`,
 
 The worst check is the one that costs the most points on this call (silence 30, a deleted answer 25, language or completeness 20, a repeated question up to 30, respelling capped at 3, a cut-off or a slow first audio 10). A scoring error logs `[voice-trace] score failed` once per process and leaves the three fields null. The call row is still written.
 
-`finishCall` writes the call score onto the call row, then writes each turn's own `score` and `checks` onto that turn row (payload and columns). Diagnosis and release stay on the call row. Turn rows leave `diagnosis` and `release` null. The Admin Quality tab reads the columns. The payload has the same fields.
+`finishCall` writes the call score onto the call row, then writes each turn's own `score`, `checks`, and `notes` onto that turn row. `score` and `checks` are columns and payload. `notes` are the reason strings for that turn, on the payload. Diagnosis and release stay on the call row. Turn rows leave `diagnosis` and `release` null. The Admin Quality tab reads the columns. The payload has the same score and checks.
 
 Soniox realtime sessions send `enable_language_identification: true`. Per-token tags are `sw`, `en`, or `sheng`. Language hints alone do not fill `token.language`. HD_0789461c5319 had `language: null` on every token because that flag was off. The trace stores the Soniox language on `caller.soniox` and the language stage, next to the keyword `detected` value and the sticky language. The scorer uses the Soniox language when any tag is present. It uses the keyword fallback only when every tag is empty. It does not count both.
 
@@ -96,13 +96,13 @@ A later brain passes `respond` to `replayCall(fixture, { mode: 'live', respond }
 
 | Check | When it counts |
 | --- | --- |
-| `languageMismatch` | The whole spoken reply is not the caller's language. When Soniox tagged the turn (`caller.soniox`, the language stage, or STT token languages), that language is the caller language and the keyword fallback is not also checked. When every tag is empty, the caller language is `caller.detected` or the language stage, then the caller text. It does not use the sticky language. `mixed` matches either side. Sheng matches Kiswahili. A bare sawa or okay is neutral. One mismatch per turn. |
+| `languageMismatch` | The whole spoken reply is not the caller's language. When Soniox tagged the turn (`caller.soniox`, the language stage, or STT token languages), that language is the caller language and the keyword fallback is not also checked. When every tag is empty, the caller language is `caller.detected` or the language stage, then the caller text. It does not use the sticky language. A reply is not English just because it contains one job loanword such as cleaning. `mixed` matches either side. Sheng matches Kiswahili. A bare sawa or okay is neutral. One mismatch per turn. |
 | `incomplete` | Spoken characters are under half the model prose (model at least 40 characters), or the caller asked for services and the spoken reply has no service noun. Tool marker blocks are not prose. |
 | `repeatedQuestion` | Name or identity asked more than once, or the same question appears again. Questions are read from the model prose or from `tts.before`, where the question mark is still present. A name ask is not also counted as a question. Call-level. |
-| `silence` | Caller text and no spoken reply, and the turn was not held and did not end in `barge_in`. A filler is not a reply. |
-| `deletedAnswer` | A transform dropped a service or name line, or the model prose named one and the spoken reply does not, or a question in the model prose (or a dropped transform) is missing from the whole spoken reply. |
+| `silence` | Caller text and no spoken reply, and the turn was not held, skipped, or a backchannel such as Okay, and did not end in `barge_in`. A filler is not a reply. |
+| `deletedAnswer` | A transform dropped a service or name line, or the model prose named one and the spoken reply does not, or a question in the model prose (or a dropped transform) is missing from the whole spoken reply, or a sentence was dropped with reason `unbound_place` or `unsaid_number`. |
 | `respelling` | Hyphenated English-style spellings on a Kiswahili mouth (`Kee-ten-geh-la`). |
-| `prematureTurn` | Caller text ended on a dash or comma, or was cut mid-phrase, and the turn flushed. |
+| `prematureTurn` | Caller text ended on a dash or comma, or was cut mid-phrase, and the turn flushed. A late token dropped (`turn_end` grace/ignore) or merged after the turn closed (`late_final`) counts as a cut. |
 | `slow` | `firstReplyPcmMs` later than 1200 ms. When that field is absent, the scorer uses `callerStopToFirstTtsPcmMs`, which is the reply on older fixtures. A filler with no reply is not slow. Missing latency is skipped. |
 
 Call score is the average turn score, minus up to 30 for repeated questions. A turn marked `unlogged` is left out of the average.

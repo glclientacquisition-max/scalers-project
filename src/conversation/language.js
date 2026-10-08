@@ -484,6 +484,7 @@ function languageDirective(lang) {
 module.exports = {
   analyzeCallerLanguage,
   dominantSonioxLanguage,
+  ENGLISH_JOB_LOANWORDS,
   detectCallerLanguage,
   createLanguageState,
   resolveLanguageState,
