@@ -1,0 +1,30 @@
+{
+  "name": "HD_015bae4a4af2 TTS wire (turns 2 and 9)",
+  "note": "pieces are the exact prepared pieces sent live on staging 2026-10-08 12:52 EAT. raw = old glued wire, production = M0 word gap.",
+  "cases": [
+    {
+      "id": "hd015b-t2",
+      "group": "hd015b-wire",
+      "category": "piece-gap",
+      "callLanguage": "en",
+      "text": "Yes we cover Kee-ten-geh-la Interior window cleaning is two hundred shillings per window What day and time would work for you",
+      "pieces": [
+        "Yes we cover Kee-ten-geh-la",
+        "Interior window cleaning is two hundred shillings per window",
+        "What day and time would work for you"
+      ]
+    },
+    {
+      "id": "hd015b-t9",
+      "group": "hd015b-wire",
+      "category": "piece-gap",
+      "callLanguage": "en",
+      "text": "My apologies for that What do you need done What would you like done",
+      "pieces": [
+        "My apologies for that",
+        "What do you need done",
+        "What would you like done"
+      ]
+    }
+  ]
+}
