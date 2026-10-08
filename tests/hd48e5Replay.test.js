@@ -101,3 +101,35 @@ describe('HD_48e5 T5 corrected coverage line', () => {
     );
   });
 });
+
+describe('HD_48e5 T5 coverage ask is answered locally', () => {
+  const { createBrainState, observeCallerTurn } = require('../src/conversation/brainState');
+  const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+  const { resolveLocalReply } = require('../src/conversation/turnPolicy');
+
+  function local(text, language) {
+    let state = createBrainState(DUSTED);
+    state = observeCallerTurn(state, {
+      text,
+      detectedLanguage: language,
+      resolvedLanguage: language,
+      profile: DUSTED,
+      entities: extractConversationEntities(text, { profile: DUSTED, state }),
+    });
+    return resolveLocalReply({ text, state, profile: DUSTED, language });
+  }
+
+  it('hears "do you have Nairobi and Kitengela" as a coverage ask', () => {
+    assert.deepEqual(local('Uh, do you have, like, Nairobi and Kitengela or something?', 'en'), {
+      outcome: 'coverage',
+      line: 'Yes, we cover Nairobi and Kitengela. When would you like us to come?',
+    });
+  });
+
+  it('splits a covered and an uncovered town in Kiswahili', () => {
+    assert.deepEqual(local('Mnafika Kitengela na Nakuru?', 'sw'), {
+      outcome: 'coverage',
+      line: 'Tunafika Kitengela, lakini hatufiki Nakuru. Naweza kukuachia ujumbe kwa timu yetu?',
+    });
+  });
+});

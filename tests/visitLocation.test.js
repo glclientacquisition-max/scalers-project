@@ -307,3 +307,20 @@ describe('visit location ladder', () => {
     assert.doesNotMatch(home, /LOCATIONS landmark\/directions/);
   });
 });
+
+describe('wider coverage asks', () => {
+  it('hears do you have / are you in / mnafika / mko / mnapatikana', () => {
+    const { coverageAskPlaces } = require('../src/conversation/visitLocation');
+    assert.deepEqual(coverageAskPlaces('Uh, do you have, like, Nairobi and Kitengela or something?'), [
+      'Nairobi',
+      'Kitengela',
+    ]);
+    assert.deepEqual(coverageAskPlaces('Do you reach Juja?'), ['Juja']);
+    assert.deepEqual(coverageAskPlaces('Are you in Rongai?'), ['Rongai']);
+    assert.deepEqual(coverageAskPlaces('Do you serve Kiambu?'), ['Kiambu']);
+    assert.deepEqual(coverageAskPlaces('Mnafika Kitengela na Nakuru?'), ['Kitengela', 'Nakuru']);
+    assert.deepEqual(coverageAskPlaces('Mko Syokimau?'), ['Syokimau']);
+    assert.deepEqual(coverageAskPlaces('Mnapatikana Westlands?'), ['Westlands']);
+    assert.deepEqual(coverageAskPlaces('Do you have carpet cleaning?'), []);
+  });
+});

@@ -62,6 +62,10 @@ const PLACE_NOISE = new Set([
 ]);
 
 const COVERAGE_STOP = new Set([
+  'like',
+  'something',
+  'somewhere',
+  'maybe',
   'cover',
   'covers',
   'covered',
@@ -587,19 +591,35 @@ function coverageAskPlaces(text) {
     .replace(/\s+/g, ' ')
     .trim();
   value = value.replace(/^(?:(?:like|eh|eeh|oh|ah|uh|um|halafu)\s*,?\s*)+/i, '');
-  value = value.replace(/^(?:(?:do you(?: guys)?|can you)\s+)+/i, 'do you ');
+  value = value.replace(/^(?:(?:do you(?: guys)?|can you|are you(?: guys)?)\s+)+/i, (m) =>
+    /^are you/i.test(m) ? 'are you ' : 'do you '
+  );
   const about = /^(?:what|how) about\s+(.+)$/i.exec(value);
   if (about) return splitPlaceList(about[1]);
+  // Coverage asks in English and Kiswahili. "Do you have X" is a place ask
+  // when X is a town; a service noun is filtered in takeCoveragePlace.
   const verb =
-    /\b(?:do you\s+(?:do|cover|service|serve|come to|go to)|mnafika|mnaja|mnafanyia)\b/i.exec(
+    /\b(?:do you\s+(?:do|have|cover|service|serve|reach|come to|go to)|are you\s+(?:in|at|around|near)|mnafika|mnaja|mnafanyia|mnapatikana|mko)\b/i.exec(
       value
     );
   if (!verb) return [];
   const tail = value
     .slice(verb.index + verb[0].length)
-    .replace(/^(?:\s+(?:hadi|mpaka|until|to|the|in|at))+/i, '')
+    .replace(/^(?:\s+(?:hadi|mpaka|until|to|the|in|at|like))+/i, '')
     .trim();
-  return splitPlaceList(tail);
+  const places = splitPlaceList(tail);
+  // "Do you have time", "mko wapi": the wide verbs ask about a place only
+  // when what follows is a Kenyan place we know.
+  if (/^(?:do you have|are you|mko|mnapatikana)\b/i.test(verb[0])) {
+    return places.filter(knownKenyanPlace);
+  }
+  return places;
+}
+
+function knownKenyanPlace(raw) {
+  return Boolean(
+    canonicalPlaceName(raw) || bindSpokenPlace(raw).length || countiesForPlace(raw).length
+  );
 }
 
 function coverageAskPlace(text) {
