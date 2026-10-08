@@ -121,6 +121,22 @@ function speakModelText(modelText, ctx, caller) {
   };
 }
 
+// A final the live call ignored after a barge (HD_015b t6). The legacy checks
+// do not read these rows; the mouth check lostTurn does.
+function lostFinalStages(turn) {
+  if (!turn?.lostFinal) return [];
+  return [
+    { stage: 'stt', kind: 'final', text: String(turn.lostFinal), tokens: [] },
+    {
+      stage: 'turn_end',
+      decision: 'ignore',
+      reason: turn.lostFinalReason || 'thinking_continuation',
+      text: String(turn.lostFinal),
+      queued: false,
+    },
+  ];
+}
+
 function replayTurn(turn, ctx) {
   const caller = String(turn.caller || '');
   const missingModel = turn.model?.outputText == null || turn.model.outputText === '';
@@ -144,6 +160,7 @@ function replayTurn(turn, ctx) {
           chars: turn.model?.chars ?? 0,
           spokenEmitted: turn.model?.spokenEmitted ?? null,
         },
+        ...lostFinalStages(turn),
         { stage: 'outcome', value: 'unlogged' },
       ],
     };
@@ -242,6 +259,7 @@ function replayTurn(turn, ctx) {
       language: speech.language,
     });
   }
+  stages.push(...lostFinalStages(turn));
   const barged = turn.outcome === 'barge_in';
   // Voice speaks the coverage next step after a model coverage answer (server.js).
   if (modelText && !barged && mouth.spoken) {
@@ -263,6 +281,16 @@ function replayTurn(turn, ctx) {
         dropped: false,
       });
     }
+  }
+  if (barged && mouth.spoken) {
+    // What played before the barge. Legacy checks ignore this row.
+    stages.push({
+      stage: 'played',
+      text: mouth.spoken,
+      before: mouth.before || mouth.spoken,
+      barged: true,
+      durationMs: turn.observed?.playedMs ?? null,
+    });
   }
   if (!barged) {
     stages.push({

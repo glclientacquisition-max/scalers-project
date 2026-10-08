@@ -25,6 +25,7 @@ function baselineShape(calls) {
     out[call.callId] = {
       score: call.score,
       checks: call.checks,
+      mouth: call.mouth,
       nameAsks: call.nameAsks,
     };
   }

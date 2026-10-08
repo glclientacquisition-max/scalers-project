@@ -4394,6 +4394,8 @@ mediaWss.on('connection', (ws, req) => {
         voiceTrace.noteTurnEnd({
           decision: decision.action,
           reason: decision.reason || '',
+          text,
+          queued: Boolean(decision.queue),
         });
         if (decision.queue) {
           appendFinalPart(utteranceParts, evt.text);
