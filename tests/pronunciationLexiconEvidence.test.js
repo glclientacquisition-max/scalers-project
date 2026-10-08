@@ -91,11 +91,11 @@ describe('place names are spoken as written', () => {
     it(`${town} reaches Soniox unchanged`, () => {
       assert.equal(applyLexicon(`Yes we cover ${town} too`, 'en'), `Yes we cover ${town} too`);
       const prepared = prepareForTts(`Yes, we cover ${town}.`, { callLanguage: 'en' }).text;
-      assert.equal(prepared, `Yes we cover ${town}`);
+      assert.equal(prepared, `Yes, we cover ${town}.`);
     });
   }
 
   it('Westlands keeps its verified respelling', () => {
-    assert.equal(prepareForTts('Yes, we cover Westlands.', { callLanguage: 'en' }).text, 'Yes we cover West-lands');
+    assert.equal(prepareForTts('Yes, we cover Westlands.', { callLanguage: 'en' }).text, 'Yes, we cover West-lands.');
   });
 });

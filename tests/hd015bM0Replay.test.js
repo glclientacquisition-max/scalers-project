@@ -111,6 +111,20 @@ describe('S2: the Soniox wire', () => {
     assert.doesNotMatch(heard, /laInterior|windowWhat|[a-z][A-Z]/, `glued: ${JSON.stringify(heard)}`);
   });
 
+  it('t2 and t9 keep sentence punctuation on the wire (listen fixture)', async () => {
+    // HD_72ab69cbab2b: the stripped wire was one run-on with no question rise.
+    const listen = require('./fixtures/hd015b-tts-wire-listen.json');
+    const t2 = turn(2).model.outputText.match(/[^.!?]+[.!?]/g).map((s) => s.trim());
+    const wire = await wirePieces(t2);
+    const fixtureT2 = listen.cases.find((c) => c.id === 'hd015b-t2');
+    assert.deepEqual(wire.map((piece) => piece.trim()), fixtureT2.pieces);
+    assert.equal(wire.join(''), fixtureT2.text);
+    for (const c of listen.cases) {
+      for (const piece of c.pieces) assert.match(piece, /[.?]$/, `${c.id}: ${piece}`);
+      assert.doesNotMatch(c.text, /[!;:…—–]/, c.id);
+    }
+  });
+
   it('a letterless piece is never sent', async () => {
     const wire = await wirePieces(['Sure.', ',', ' - ', '...', 'What day works?']);
     assert.deepEqual(wire.length, 2);

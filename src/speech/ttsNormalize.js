@@ -33,10 +33,10 @@ const OXFORD_LIST = new RegExp(
 const BARE_LIST = new RegExp(String.raw`(?:${LIST_ITEM},\s+){2,}${LIST_ITEM}`, 'giu');
 
 /**
- * Commas are pause cues. stripSpokenPunctuation removes them so Soniox does
- * not say "comma". A serial list then becomes one run-on. Join the items
- * with the list's own conjunction (and / na) so every tenant's catalogue
- * keeps a beat between names.
+ * Commas are pause cues and reach Soniox. A bare serial list of short names
+ * ("sofa cleaning, carpet cleaning, window cleaning") gets the list's own
+ * conjunction (and / na) before its last name, so every tenant's catalogue
+ * is heard as one list with a beat between names.
  * @param {string} text
  * @param {'en'|'sw'|string} [language]
  */
@@ -86,13 +86,18 @@ function speakSerialList(match, fallback, explicit) {
     const counts = items.map((item) => item.split(/\s+/).length);
     if (counts.some((count) => count < 2 || count > 4)) return raw;
   }
-  return items.join(` ${conj} `);
+  // Punctuation reaches Soniox, so each comma is a real pause. The list's
+  // conjunction goes once, before the last name, not between every pair.
+  const last = items[items.length - 1];
+  return `${items.slice(0, -1).join(', ')}, ${conj} ${last}`;
 }
 
 /**
  * Punctuation polish for phone TTS. Runs after money/time/day/phone
  * expanders, so a surviving dash or dot run is a leak. List commas become
- * spoken conjunctions before the marks are stripped.
+ * spoken conjunctions. Sentence punctuation is kept: Soniox tts-rt-v2 does
+ * not voice it, and it gives real comma and stop pauses and the yes/no
+ * question rise (staging A/B, /workspace/punct-ab/results.md, 2026-10-08).
  * @param {string} text
  * @param {'en'|'sw'|string} [language]
  */
@@ -135,14 +140,13 @@ function polishPunctuation(text, language) {
   // Exclamation makes Soniox punch / strain on the phone. Period keeps pace even.
   t = t.replace(/!+/g, '.');
   t = t.replace(/\.{2,}/g, '.');
-  t = stripSpokenPunctuation(t);
+  t = keepSpokenPunctuation(t);
   return t.replace(/\s+/g, ' ').trim();
 }
 
 /**
- * Soniox reads comma, period, question mark, dash, and ellipsis as words.
- * Sentence marks are gone before a chunk is sent. Digits keep an internal
- * decimal or thousands separator. Intra-word hyphens (M-Pesa) stay.
+ * A domain is spoken with "dot" ("scalers dot co dot ke"), so its dots are
+ * never read as sentence stops.
  * @param {string} text
  */
 function speakDomainDots(text) {
@@ -151,6 +155,33 @@ function speakDomainDots(text) {
   );
 }
 
+/**
+ * The TTS boundary keeps sentence punctuation (. , ?) so Soniox pauses and
+ * lifts a question. Domains are spoken with "dot". A thousands separator
+ * between digits is dropped ("15,000" -> "15000") so it is one number, not a
+ * pause; a decimal point (3.5) and an intra-word hyphen (M-Pesa, 1-Bedroom)
+ * stay. Semicolons and colons become a comma pause, quotes go, and a piece
+ * never opens on a mark.
+ * @param {string} text
+ */
+function keepSpokenPunctuation(text) {
+  let t = speakDomainDots(text);
+  while (/(\d),(\d{3})(?!\d)/.test(t)) t = t.replace(/(\d),(\d{3})(?!\d)/g, '$1$2');
+  t = t.replace(/(?<!\d)\s*[;:]\s*|\s*[;:]\s*(?!\d)/g, ', ');
+  t = t.replace(/[“”«»"]/g, ' ');
+  t = t.replace(/\s+([.,?])/g, '$1');
+  t = t.replace(/,\s*([.?])/g, '$1');
+  t = t.replace(/([.?])\s*,/g, '$1');
+  t = t.replace(/,(?:\s*,)+/g, ',');
+  t = t.replace(/^[\s.,?;:]+/, '');
+  return t.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Legacy: every sentence mark removed. Not used on the call path since the
+ * punctuation A/B; kept for offline comparisons and the listen harness.
+ * @param {string} text
+ */
 function stripSpokenPunctuation(text) {
   let t = speakDomainDots(text);
   while (/(\d),(\d)/.test(t)) t = t.replace(/(\d),(\d)/g, '$1$2');
@@ -276,6 +307,8 @@ module.exports = {
   expandPhones,
   polishPunctuation,
   stripSpokenPunctuation,
+  keepSpokenPunctuation,
+  speakDomainDots,
   detectUtteranceTtsLang,
   resolveTtsLanguage,
   prepareForTts,

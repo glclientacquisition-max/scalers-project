@@ -2,7 +2,10 @@
 // trimmed pieces with no gap, so the voice heard "Kee-ten-geh-laInterior" and
 // "windowWhat". The caller said "Pardon me?" and reported punctuation read
 // aloud. Locks the TTS wire: a word gap between pieces and no letterless piece.
-// Punctuation stripping is prepareForTts's job and is unchanged here.
+// Since HD_72ab69cbab2b and the staging punctuation A/B (2026-10-08), sentence
+// punctuation is kept on the wire: Soniox voices none of it, and it gives real
+// comma and stop pauses and the yes/no question rise. No "!", dash, ellipsis,
+// semicolon or colon reaches Soniox.
 // Run: node tests/ttsBoundary.test.js
 
 const assert = require('assert');
@@ -81,7 +84,8 @@ async function main() {
   assert.equal(sent.length, 3, 'the lone comma piece is never sent');
   for (const msg of sent) {
     assert.match(msg.text, /[\p{L}\p{N}]/u, `piece without a letter: ${JSON.stringify(msg.text)}`);
-    assert.doesNotMatch(msg.text, /[,.;:!?…]/, `mark on the wire: ${JSON.stringify(msg.text)}`);
+    assert.doesNotMatch(msg.text, /[;:!…—–]/, `leaked mark on the wire: ${JSON.stringify(msg.text)}`);
+    assert.match(msg.text, /[.?]$/, `piece keeps its sentence mark: ${JSON.stringify(msg.text)}`);
   }
   assert.doesNotMatch(sent[0].text, /^\s/, 'first piece opens the stream with no space');
   for (const msg of sent.slice(1)) {
@@ -90,8 +94,9 @@ async function main() {
   const heard = sent.map((m) => m.text).join('');
   assert.equal(
     heard,
-    'Yes we cover Kitengela Interior window cleaning is two hundred shillings per window What day and time would work for you'
+    'Yes, we cover Kitengela. Interior window cleaning is two hundred shillings per window. What day and time would work for you?'
   );
+  assert.match(sent[2].text, /\?$/, 'the question keeps its mark for the rise');
   assert.doesNotMatch(heard, /[a-z][A-Z]/, 'no glued words across pieces');
   t2.cancel();
 
