@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const {
   STAGING_ALIAS,
   STAGING_BRANCH,
@@ -74,11 +75,18 @@ describe("pickReadyDeployment", () => {
 });
 
 describe("stagingProjectPinBody", () => {
-  it("ignores main builds and does not auto-assign the alias", () => {
+  it("builds only the staging branch and does not auto-assign the alias", () => {
     const body = stagingProjectPinBody();
     assert.equal(body.autoAssignCustomDomains, false);
-    assert.match(body.commandForIgnoringBuildStep, /VERCEL_GIT_COMMIT_REF/);
-    assert.match(body.commandForIgnoringBuildStep, /main/);
+    assert.ok(body.commandForIgnoringBuildStep.length <= 256);
+    const run = (ref) =>
+      spawnSync("sh", ["-c", body.commandForIgnoringBuildStep], {
+        env: { ...process.env, VERCEL_GIT_COMMIT_REF: ref },
+      }).status;
+    assert.equal(run(STAGING_BRANCH), 1, "staging branch builds");
+    assert.equal(run("main"), 0, "main is skipped");
+    assert.equal(run("cursor/some-feature-1234"), 0, "feature branches are skipped");
+    assert.equal(run(""), 0, "unnamed ref is skipped");
   });
 });
 
