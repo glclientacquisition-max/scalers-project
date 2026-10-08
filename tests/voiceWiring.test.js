@@ -810,4 +810,10 @@ assert.match(
   'Gemini history must store the guarded spoken text, not the raw model text'
 );
 
+assert.match(
+  source,
+  /const idlePlan = idleArmAfterAgentLine\(\{\s*text: spokenAsk,\s*isQuestion: snap\.pendingIsQuestion,\s*\}\);[\s\S]{0,400}?if \(idlePlan\.arm\) \{\s*idleNudge\.arm\(\{[\s\S]{0,160}?afterStatement: idlePlan\.afterStatement,\s*delayMs: idlePlan\.delayMs,/,
+  'an agent statement without a question must arm the idle check-in too (HD_48e5ce069c12)'
+);
+
 console.log('Voice runtime wiring checks passed.');

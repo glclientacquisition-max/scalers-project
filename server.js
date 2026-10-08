@@ -313,7 +313,7 @@ const {
   takeToolOutcome,
 } = require('./src/conversation/speakSlots');
 const { narratesInternalAction, groundFilePriceLine } = require('./src/conversation/speechGuard');
-const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
+const { noteSpokenPendingAsk, openSlotLine } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
@@ -366,7 +366,7 @@ const {
   createAgentReplayMemory,
 } = require('./src/speech/overlapHold');
 const { createLateFinalHold, joinCallerFragments } = require('./src/speech/lateFinal');
-const { createIdleNudgeController } = require('./src/speech/idleNudge');
+const { createIdleNudgeController, idleArmAfterAgentLine } = require('./src/speech/idleNudge');
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
 const {
@@ -1874,9 +1874,18 @@ mediaWss.on('connection', (ws, req) => {
       !speechOutageStarted &&
       !utteranceParts.length &&
       !pendingUtterance,
-    speak: () => {
-      const line = pickIdleNudgeLine({ language: callLanguage });
-      console.log(`[ws/media][${sidLabel()}] idle_nudge`);
+    speak: (context = {}) => {
+      const brain = callBrainStates.get(sidLabel());
+      const slotLine = context.afterStatement ? openSlotLine(brain, callLanguage) : '';
+      const line = pickIdleNudgeLine({
+        language: callLanguage,
+        afterStatement: context.afterStatement === true,
+        // Never a name ask from the nudge: the file name gate owns that.
+        slotLine: /name|jina/i.test(slotLine) ? '' : slotLine,
+      });
+      console.log(
+        `[ws/media][${sidLabel()}] idle_nudge${context.afterStatement ? ' after_statement' : ''}`
+      );
       return speakText(line, { isIdleNudge: true }).then((spoken) => {
         if (spoken?.ok) {
           callTranscript.pushAgent(line);
@@ -1914,11 +1923,21 @@ mediaWss.on('connection', (ws, req) => {
       noteSpokenPendingAsk(brain, spokenAsk);
       callBrainStates.set(sidLabel(), brain);
     }
+    // A question or a plain statement both arm the check-in, so a turn that
+    // ends without a question cannot become dead air. Not after the greeting
+    // (wait until the caller has spoken), not after goodbye.
+    const idlePlan = idleArmAfterAgentLine({
+      text: spokenAsk,
+      isQuestion: snap.pendingIsQuestion,
+    });
     if (snap.pendingIsQuestion) {
       console.log(`[ws/media][${sidLabel()}] agent_question_committed`);
-      // Do not poke "still there?" after the greeting. Wait until the caller has spoken.
+    }
+    if (idlePlan.arm) {
       idleNudge.arm({
         skip: Boolean(opts.isIdleNudge) || !heardCallerUtterance,
+        afterStatement: idlePlan.afterStatement,
+        delayMs: idlePlan.delayMs,
       });
     }
     return committed;

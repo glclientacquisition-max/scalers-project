@@ -90,3 +90,52 @@ describe('createIdleNudgeController', () => {
     assert.equal(idle.arm(), false);
   });
 });
+
+describe('idle check-in after an agent statement (HD_48e5ce069c12)', () => {
+  const {
+    idleArmAfterAgentLine,
+    idleStatementDelayMs,
+    DEFAULT_STATEMENT_DELAY_MS,
+  } = require('../src/speech/idleNudge');
+
+  it('arms after a statement sooner than after a question, never after goodbye', () => {
+    assert.equal(DEFAULT_STATEMENT_DELAY_MS, 4000);
+    assert.deepEqual(idleArmAfterAgentLine({ text: 'When would you like us to come?', isQuestion: true }), {
+      arm: true,
+      afterStatement: false,
+    });
+    assert.deepEqual(
+      idleArmAfterAgentLine({ text: 'We cover Nairobi and its close surroundings. Yes, we cover Kitengela.' }, {}),
+      { arm: true, afterStatement: true, delayMs: 4000 }
+    );
+    assert.equal(idleArmAfterAgentLine({ text: 'Thank you for calling. Goodbye.' }).arm, false);
+    assert.equal(idleArmAfterAgentLine({ text: 'Asante, kwaheri.' }).arm, false);
+    assert.equal(idleArmAfterAgentLine({ text: '' }).arm, false);
+    assert.equal(idleStatementDelayMs({ VOICE_IDLE_STATEMENT_MS: '3000' }), 3000);
+    assert.equal(idleStatementDelayMs({ VOICE_IDLE_STATEMENT_MS: '20000' }), 4000);
+  });
+
+  it('fires before the 7.2 s HD_48e5 silence and offers the next step', async () => {
+    const heard = [];
+    const idle = createIdleNudgeController({
+      delayMs: 200,
+      canFire: () => true,
+      speak: (context) => heard.push(context),
+    });
+    idle.arm({ afterStatement: true, delayMs: 20 });
+    await wait(40);
+    assert.deepEqual(heard, [{ afterStatement: true }]);
+    assert.equal(
+      pickIdleNudgeLine({ language: 'en', afterStatement: true, slotLine: 'What day and time works?' }),
+      'What day and time works?'
+    );
+    assert.equal(
+      pickIdleNudgeLine({ language: 'en', afterStatement: true }),
+      'Is there anything else I can help with?'
+    );
+    assert.equal(
+      pickIdleNudgeLine({ language: 'sw', afterStatement: true }),
+      'Kuna kingine naweza kukusaidia?'
+    );
+  });
+});

@@ -781,9 +781,19 @@ function pickLlmRecoveryLine(opts = {}) {
  * After a committed agent question, if the caller stays silent.
  * Local line, not a Gemini turn. English until the caller has spoken.
  */
+/**
+ * @param {{ language?: string, afterStatement?: boolean, slotLine?: string }} [opts]
+ *   afterStatement: the agent's last line asked nothing. Offer the next step:
+ *   the open visit slot when Brain has one, else anything else.
+ */
 function pickIdleNudgeLine(opts = {}) {
   const lang = confirmationLanguage(opts.language);
   const sw = lang === 'sw' || lang === 'sheng';
+  if (opts.afterStatement) {
+    const slot = String(opts.slotLine || '').trim();
+    if (slot && slot.endsWith('?')) return slot;
+    return sw ? 'Kuna kingine naweza kukusaidia?' : 'Is there anything else I can help with?';
+  }
   if (sw) return 'Naweza kusaidia?';
   return 'How can I help?';
 }

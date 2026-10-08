@@ -81,7 +81,7 @@ See `.env.example` — key ones:
 - `VOICE_GREETING_MODE`, `VOICE_FILLER`, `VOICE_FILLER_DELAY_MS`, `VOICE_FILLER_CACHE`
 - `VOICE_PROFILE` (`balanced` | `snappy`), `VOICE_TTS_GAIN`, `SONIOX_TTS_SPEED`, `SONIOX_TTS_SPEED_EN`, `SONIOX_TTS_SPEED_SW`
 - `VOICE_LLM_STREAM`, `VOICE_STREAM_EARLY_CHARS` / `WORDS` (default 0: sentence-only TTS flush)
-- `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`, `VOICE_IDLE_NUDGE_MS` (default 10000; not armed until the caller has spoken)
+- `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`, `VOICE_IDLE_NUDGE_MS` (default 10000 after an agent question; not armed until the caller has spoken), `VOICE_IDLE_STATEMENT_MS` (default 4000, 2500-8000, after an agent statement with no question; not after goodbye)
 - `VOICE_BARGE_GRACE_MS`, `VOICE_BARGE_EARLY_MS`, `VOICE_BARGE_MIN_CHARS`
 - Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS`, `SONIOX_ENDPOINT_SENSITIVITY`, …
 
