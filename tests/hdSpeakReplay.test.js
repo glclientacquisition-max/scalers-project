@@ -36,6 +36,7 @@ const {
   unsureCoverageSpeech,
 } = require('../src/conversation/visitLocation');
 const { ensureRequiredCreateRequest } = require('../src/conversation/requiredCreateRequest');
+const { replayCall } = require('../src/speech/replayVoice');
 const { analyzeCallerLanguage, resolveLanguageState, createLanguageState } = require('../src/conversation/language');
 const { lockFileNameAsk } = require('../src/speech/callerFileSpeech');
 const { drainSpokenSpeakSlots } = require('../src/conversation/speakSlots');
@@ -618,6 +619,8 @@ describe('HD_0789461c5319 catalogue, callback, and Kiswahili', () => {
     );
     assert.match(offered, /cannot book a direct visit/);
     assert.match(offered, /Would you like me to log a callback/);
+    assert.match(offered, /Kilicho/);
+    assert.doesNotMatch(offered, /Kilimani/);
     let state = createBrainState(LIST_FILE);
     noteSpokenPendingAsk(state, 'Would you like me to log a callback?');
     for (const text of ['Sawa.', 'Yes.', 'ok', 'ndio']) {
@@ -862,5 +865,104 @@ describe('HD_e3fb94e1bd0d prices, offer consent, and Nakuru', () => {
       allowEmpty: true,
     });
     assert.match(kept, /note this for the team/i);
+  });
+});
+
+describe('HD_0789 and HD_486 coverage lines stay in the replay', () => {
+  const COVERAGE = {
+    businessName: 'Done and Dusted',
+    businessPolicies: {
+      coverage_areas: [
+        'county:nairobi',
+        'county:kiambu',
+        'place:kitengela',
+        'place:juja',
+        'place:ongata rongai',
+        'place:syokimau',
+      ],
+    },
+  };
+
+  function ttsText(turn) {
+    const row = (turn.stages || []).find((stage) => stage.stage === 'tts');
+    return String(row?.text || '');
+  }
+
+  it('keeps the Kilicho line and the callback question', async () => {
+    const line =
+      'Kilicho iko outside our standard Nairobi coverage area, so we cannot book a direct visit right now. Would you like me to log a callback for the team to check if we can reach you?';
+    const replay = await replayCall({
+      callId: 'HD_0789461c5319',
+      ...COVERAGE,
+      callerName: 'Alvin',
+      nameOnFile: true,
+      turns: [
+        {
+          caller: 'Eeh, mimi naishi Kilicho though.',
+          flushed: true,
+          model: {
+            provider: 'gemini',
+            model: 'recorded',
+            promptId: 'voice.system',
+            outputText: line,
+          },
+        },
+      ],
+    });
+    const spoken = ttsText(replay.turns[0]);
+    assert.match(spoken, /Kilicho iko outside/);
+    assert.match(spoken, /Nairobi/);
+    assert.match(spoken, /log a callback/);
+    assert.doesNotMatch(spoken, /Kilimani/);
+    assert.equal(
+      replay.turns[0].stages.some((row) => row.reason === 'unbound_place'),
+      false
+    );
+  });
+
+  it('keeps both HD_486 coverage lines, and an out-of-area answer keeps the question', async () => {
+    const fixture = JSON.parse(
+      fs.readFileSync(
+        path.join(__dirname, 'fixtures/voice-calls/HD_48631816b68c.json'),
+        'utf8'
+      )
+    );
+    fixture.businessPolicies = COVERAGE.businessPolicies;
+    const replay = await replayCall(fixture);
+    const turn4 = ttsText(replay.turns[3]);
+    const turn5 = ttsText(replay.turns[4]);
+    const turn7 = ttsText(replay.turns[6]);
+    assert.match(turn4, /Nairobi/);
+    assert.match(turn4, /Kee-ten-geh-la/);
+    assert.match(turn4, /Kee-ahm-boo/);
+    assert.match(turn4, /Joo-jah/);
+    assert.match(turn4, /Ongata Rongai/);
+    assert.match(turn4, /Shyo-kee-mau/);
+    assert.match(turn4, /tukutembelee wapi/);
+    assert.match(turn5, /ndani ya Nairobi/);
+    assert.match(turn5, /OngataRongai/);
+    assert.match(turn5, /kwako/);
+    assert.match(turn5, /Upo eneo gani/);
+    assert.doesNotMatch(`${turn4} ${turn5}`, /Ndanai|\bKako\b/);
+    assert.match(turn7, /Nah-koo-roo|Nakuru/);
+    assert.match(turn7, /note kwa timu/);
+    for (const index of [3, 4]) {
+      assert.equal(
+        replay.turns[index].stages.some((row) => row.reason === 'unbound_place'),
+        false,
+        `turn ${index + 1}`
+      );
+    }
+    const outside = guardSpokenReply(
+      'Pole sana Alvin, eneo la Nakuru liko nje ya huduma zetu kwa sasa. Ungependa nikuwekee note kwa timu yetu?',
+      {
+        callerTurns: ['Mtafika kwangu kweli?'],
+        profile: COVERAGE,
+        language: 'sw',
+        allowEmpty: true,
+      }
+    );
+    assert.match(outside, /note kwa timu/);
+    assert.doesNotMatch(outside, /Nakuru/);
   });
 });

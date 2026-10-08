@@ -458,11 +458,16 @@ function foldCanonicalPlace(place, profile) {
         .filter(Boolean);
       const joined = words.join('');
       const spaced = words.join(' ');
-      if (
-        names.length === 1 &&
-        (names[0] === joined || names[0] === spaced)
-      ) {
-        return { text: displayPlaceName(names[0]), bound: true };
+      if (names.length === 1) {
+        const compactName = names[0].replace(/\s+/g, '');
+        if (
+          names[0] === joined ||
+          names[0] === spaced ||
+          compactName === joined ||
+          `${compactName}ni` === joined
+        ) {
+          return { text: displayPlaceName(names[0]), bound: true };
+        }
       }
       if (/\s/.test(token)) return { text: token, bound: false };
       const name =

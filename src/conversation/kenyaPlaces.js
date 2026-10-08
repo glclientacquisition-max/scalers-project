@@ -7,6 +7,36 @@ const INDEX = require('./data/kenyaPlaceCounties.json');
 const PLACE_KEYS = Object.keys(INDEX.places);
 const COUNTIES = INDEX.counties.slice().sort((a, b) => b.length - a.length);
 
+// "OngataRongai" is the spaced place with the gap removed. Two places that
+// compact to the same token stay unbound.
+const JOINED_PLACES = new Map();
+for (const name of PLACE_KEYS) {
+  if (!name.includes(' ')) continue;
+  const compact = name.replace(/\s+/g, '');
+  if (!compact || INDEX.places[compact]) continue;
+  JOINED_PLACES.set(compact, JOINED_PLACES.has(compact) ? '' : name);
+}
+
+function joinedPlaceName(word) {
+  if (!word || word.length < 6) return '';
+  return JOINED_PLACES.get(word) || '';
+}
+
+// "Nairobini" / "Nakuruni" are the place plus the locative -ni.
+// A 4-letter stem stays out, so "mara" is not read out of "marani".
+function locativePlaceName(word) {
+  if (!word || !word.endsWith('ni') || word.length < 7 || INDEX.places[word]) return '';
+  const stem = word.slice(0, -2);
+  if (stem.length >= 5 && INDEX.places[stem]) return stem;
+  return joinedPlaceName(stem);
+}
+
+function exactSpokenPlace(word) {
+  if (!word) return '';
+  if (word.length >= 5 && INDEX.places[word]) return word;
+  return joinedPlaceName(word) || locativePlaceName(word);
+}
+
 function normalizePlaceKey(value) {
   return String(value || '')
     .toLowerCase()
@@ -64,7 +94,8 @@ function oneEditNames(key) {
 }
 
 // Everyday words. A one-edit guess from these is not a place
-// ("huduma" is not Huruma, "nyumba" is not Ngumba, "hello" is not Hells).
+// ("huduma" is not Huruma, "nyumba" is not Ngumba, "hello" is not Hells,
+// "ndani" is not Ndanai, "kwako" is not Kako).
 // Clipped place names stay fuzzy ("Ronga" -> Rongai, "rwaka" -> Ruaka).
 const SPOKEN_EVERYDAY = new Set([
   'about',
@@ -80,6 +111,8 @@ const SPOKEN_EVERYDAY = new Set([
   'house',
   'huduma',
   'kesho',
+  'kwako',
+  'kwangu',
   'kwani',
   'kusafisha',
   'kwaheri',
@@ -89,6 +122,7 @@ const SPOKEN_EVERYDAY = new Set([
   'naomba',
   'nataka',
   'naweza',
+  'ndani',
   'ndiyo',
   'ninaomba',
   'nisaidie',
@@ -246,11 +280,13 @@ function countiesMentioned(text) {
 }
 
 /**
- * Place names in speech, including a Kiswahili split ("na kuru" is Nakuru)
- * and a joined form. Everyday words stay out. This does not fuzzy-match them.
+ * Place names in speech. A Kiswahili split ("na kuru" is Nakuru), a joined
+ * token ("OngataRongai" is Ongata Rongai), and a locative -ni ("Nairobini")
+ * bind to the place. Everyday words stay out. This does not fuzzy-match them.
  * @param {string} text
  * @param {{ fuzzy?: boolean }} [opts] fuzzy is the speech-guard word pass.
  * Coverage uses the exact join only, so "stage" does not become State.
+ * A 4-letter county ("mara", and the tenant place Juja) stays off this pass.
  * @returns {string[]}
  */
 function bindSpokenPlace(text, opts = {}) {
@@ -271,17 +307,17 @@ function bindSpokenPlace(text, opts = {}) {
         span = len;
         break;
       }
-      if (INDEX.places[joined]) {
-        hit = joined;
+      const compact = exactSpokenPlace(joined);
+      if (compact) {
+        hit = compact;
         span = len;
         break;
       }
     }
     if (!hit) {
-      // A 4-letter county ("mara") is also ordinary Kiswahili ("mara moja").
-      // Exact one-word places follow the same 5-letter floor as the old pass.
-      if (words[i].length >= 5 && INDEX.places[words[i]]) {
-        hit = words[i];
+      const exact = exactSpokenPlace(words[i]);
+      if (exact) {
+        hit = exact;
         span = 1;
       } else if (fuzzy) {
         const one = canonicalPlaceName(words[i]);
