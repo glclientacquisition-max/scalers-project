@@ -883,7 +883,27 @@ function classifyFinalDuringAgentSpeech(callerText, agentText, opts = {}) {
   return 'queue';
 }
 
+/**
+ * Phase inputs for a caller event. Once a barge has cancelled the in-flight
+ * reply (bargeInActive), a final transcript starts the next turn: it must not
+ * be ignored as a "thinking continuation" of the turn it just cancelled
+ * (HD_015bae4a4af2 t6 lost "How much is it?" and left 9 s of silence).
+ * Interims keep the live phase, so barge rules are unchanged.
+ * @param {{ speaking?: boolean, turnBusy?: boolean, bargeInActive?: boolean, isFinal?: boolean }} s
+ * @returns {{ speaking: boolean, turnBusy: boolean }}
+ */
+function bargePhaseInputs({
+  speaking = false,
+  turnBusy = false,
+  bargeInActive = false,
+  isFinal = false,
+} = {}) {
+  if (isFinal && bargeInActive) return { speaking: false, turnBusy: false };
+  return { speaking: Boolean(speaking), turnBusy: Boolean(turnBusy) };
+}
+
 module.exports = {
+  bargePhaseInputs,
   normalizeSpeech,
   looksLikeEcho,
   utteranceLooksIncomplete,

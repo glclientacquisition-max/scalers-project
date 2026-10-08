@@ -324,6 +324,7 @@ const {
 const {
   decideTurnEnd,
   decideCallerEvent,
+  bargePhaseInputs,
   callerEventClearsIdle,
   looksLikeEcho: turnLooksLikeEcho,
   classifyFinalDuringAgentSpeech,
@@ -2608,10 +2609,18 @@ mediaWss.on('connection', (ws, req) => {
 
   let lastBargeSkipLogAt = 0;
   function maybeBargeIn(text, source) {
-    const decision = decideCallerEvent({
-      text,
+    // After a barge has cancelled the reply, the caller's final is the next
+    // turn, not a continuation of the cancelled one (HD_015bae4a4af2 t6).
+    const phaseInputs = bargePhaseInputs({
       speaking,
       turnBusy,
+      bargeInActive,
+      isFinal: String(source || '').startsWith('final'),
+    });
+    const decision = decideCallerEvent({
+      text,
+      speaking: phaseInputs.speaking,
+      turnBusy: phaseInputs.turnBusy,
       speakStartedAt,
       lastAgentText,
       lastAgentAskedQuestion: lastAskedQuestion(),
