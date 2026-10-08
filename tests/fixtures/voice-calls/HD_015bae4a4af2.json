@@ -1,0 +1,366 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "tenantId": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+  "businessName": "Done and Dusted",
+  "callerName": "Alvin",
+  "nameOnFile": true,
+  "vertical": "home_services",
+  "servicesCatalog": [
+    {
+      "name": "Mattress cleaning",
+      "notes": "Vary by size",
+      "category": "Cleaning",
+      "price_range": "Ksh 800-1200"
+    },
+    {
+      "name": "1-Bedroom Apartment (Standard)",
+      "notes": "Dusting, vacuuming, mopping, bathroom sanitation, kitchen surfaces",
+      "price_range": "KSh 3,000 flat"
+    },
+    {
+      "name": "2-Bedroom Apartment (Standard)",
+      "notes": "Dusting, vacuuming, mopping, up to 2 bathrooms, kitchen surfaces",
+      "price_range": "KSh 4,500 flat"
+    },
+    {
+      "name": "3-Bedroom House (Standard)",
+      "notes": "Full house vacuum/mop, dust all rooms, up to 2.5 bathrooms, kitchen counters",
+      "price_range": "KSh 6,000 flat"
+    },
+    {
+      "name": "Hourly Housekeeping",
+      "notes": "Custom chores: laundry, dishwashing, organizing",
+      "price_range": "KSh 500 per hour (min 3 hours)"
+    },
+    {
+      "name": "Deep Cleaning Package (add-on)",
+      "notes": "Inside oven, fridge, baseboards, interior windows, light fixtures",
+      "price_range": "Base + KSh 3,000 to 6,000"
+    },
+    {
+      "name": "Move-In / Move-Out Clean",
+      "notes": "Empty premises, cabinets/drawers, doors and windows",
+      "price_range": "KSh 5,000 flat (2-bed unit)"
+    },
+    {
+      "name": "Post-Construction Clean",
+      "notes": "Dust mitigation, paint/sticker removal, high-pile vacuum, site sanitation",
+      "price_range": "KSh 40 per sq ft"
+    },
+    {
+      "name": "Small Office (up to 1,500 sq ft)",
+      "notes": "Trash, desk dusting, restrooms, breakroom, floors",
+      "price_range": "KSh 15,000 per visit"
+    },
+    {
+      "name": "Medium Office (1,501-3,500 sq ft)",
+      "notes": "Workspace sanitation, common areas, conference rooms, floors",
+      "price_range": "KSh 25,000 per visit"
+    },
+    {
+      "name": "Large Commercial Contract",
+      "notes": "Daily or weekly custodians, windows, floor buffing",
+      "price_range": "Custom quote (KSh 35-150 per sq m per month)"
+    },
+    {
+      "name": "Sofa Cleaning (per seat)",
+      "price_range": "KSh 800 per seat"
+    },
+    {
+      "name": "Carpet Cleaning (per room)",
+      "price_range": "KSh 2,000 per room"
+    },
+    {
+      "name": "Interior Window Cleaning",
+      "price_range": "KSh 200 per window"
+    },
+    {
+      "name": "Refrigerator Internal Deep Clean",
+      "price_range": "KSh 1,000 per unit"
+    },
+    {
+      "name": "Oven Internal Deep Clean",
+      "price_range": "KSh 1,200 per unit"
+    }
+  ],
+  "businessPolicies": {
+    "coverage_areas": [
+      "county:nairobi",
+      "place:kitengela",
+      "county:kiambu",
+      "place:juja",
+      "place:ongata rongai",
+      "place:syokimau"
+    ]
+  },
+  "socialHandles": {
+    "main": "0790381872"
+  },
+  "callId": "HD_015bae4a4af2",
+  "source": "Staging voice_turn_traces + Railway logs 2026-10-08 09:52Z (12:52 EAT), release 1faba375 (#609), the real 16-service Done and Dusted file. Alvin: \"it sounds off\", \"it even read punctuations the comma\". No comma reached Soniox; one stream got trimmed pieces with no gap (\"Kee-ten-geh-la\"+\"Interior\", \"window\"+\"What\"), caller said \"Pardon me?\". t5 price \"6,000\" spaced to \"6, 000\" and dropped as unsaid_number; t4/t8 \"what else can you do\" read the visit file (\"Nothing further back\", then 8 rows for 30 s); t6 final after barge ignored as thinking_continuation (9 s silence); t9 the services answer deleted by service_dump plus a stacked question. Phase 2 acceptance fixture.",
+  "ttsWire": [
+    [
+      "Done and Dusted this is Shy You can speak in English or Kiswahili Tukusaidie vipi"
+    ],
+    [
+      "Mm-hmm"
+    ],
+    [
+      "Alright"
+    ],
+    [
+      "Mm"
+    ],
+    [
+      "Sawa"
+    ],
+    [
+      "Poa"
+    ],
+    [
+      "Am I speaking with Alvin"
+    ],
+    [
+      "Yes we cover Kee-ten-geh-la",
+      "Interior window cleaning is two hundred shillings per window",
+      "What day and time would work for you"
+    ],
+    [
+      "Yes we cover Kee-ten-geh-la Interior window cleaning is two hundred shillings per window What day and time would work for you"
+    ],
+    [
+      "Nothing further back"
+    ],
+    [
+      "Would you like to book a visit for that or window cleaning"
+    ],
+    [
+      "3-Bedroom House is six thousand shillings flat"
+    ],
+    [
+      "Is there anything else I can help with"
+    ],
+    [
+      "You have Couch cleaning Monday 5 October 2026 morning West-lands ABC You have Couch cleaning Monday 5 October 2026 8 A M West-lands You have Carpet cleaning Tomorrow at 9 A M West-lands near ABC You have Carpet cleaning Monday 5 October 2026 9 A M West-lands ABC You have Carpet cleaning Monday 5 October 2026 9 A M West-lands near ABC You have Carpet cleaning tomorrow at 9 A M West-lands ABC You have Carpet cleaning Tomorrow morning West-lands ABC You have Carpet cleaning Tomorrow morning West-lands What would you like to do"
+    ],
+    [
+      "My apologies for that",
+      "What do you need done",
+      "What would you like done"
+    ]
+  ],
+  "turns": [
+    {
+      "caller": "h, I wanted to know if you— if you guys can come to Kitengele at my home to clean up my windows.",
+      "soniox": "en",
+      "flushed": true,
+      "canned": {
+        "path": "file_name_ask",
+        "text": "Am I speaking with Alvin?"
+      },
+      "model": {
+        "provider": "canned",
+        "model": "file_name_ask",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "observed": {
+        "firstPcmMs": 340,
+        "firstReplyPcmMs": 340
+      },
+      "outcome": "early_return",
+      "liveTts": [
+        "Am I speaking with Alvin"
+      ]
+    },
+    {
+      "caller": "Yeah.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Yes, we cover Kitengela! Interior window cleaning is KSh 200 per window. What day and time would work for you?",
+        "chars": 110,
+        "spokenEmitted": 110
+      },
+      "filler": "Mm-hmm.",
+      "observed": {
+        "firstPcmMs": 442,
+        "firstReplyPcmMs": 1494,
+        "firstTokenMs": 1039
+      },
+      "liveOutcome": "ok",
+      "liveTts": [
+        "Yes we cover Kee-ten-geh-la",
+        "Interior window cleaning is two hundred shillings per window",
+        "What day and time would work for you"
+      ]
+    },
+    {
+      "caller": "And what else can you do? Can— how much is cleaning for For.",
+      "soniox": null,
+      "flushed": false,
+      "model": {
+        "provider": "none",
+        "model": "none",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "observed": {},
+      "outcome": "hold",
+      "liveTts": [],
+      "unlogged": true,
+      "holdReason": "unfinished"
+    },
+    {
+      "caller": "And what else can you do? Can— how much is cleaning for For.",
+      "soniox": "en",
+      "flushed": true,
+      "canned": {
+        "path": "visit_read",
+        "text": "Nothing further back."
+      },
+      "model": {
+        "provider": "canned",
+        "model": "visit_read",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "observed": {
+        "firstPcmMs": 568,
+        "firstReplyPcmMs": 568
+      },
+      "liveTts": [
+        "Nothing further back"
+      ],
+      "outcome": "barge_in"
+    },
+    {
+      "caller": "For a 3-bedroom— 3-bedroom apartment?",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "A standard 3-bedroom house clean is 6,000 shillings flat. Would you like to book a visit for that or window cleaning?",
+        "chars": 117,
+        "spokenEmitted": 117
+      },
+      "filler": "Alright.",
+      "observed": {
+        "firstPcmMs": 409,
+        "firstReplyPcmMs": 1587,
+        "firstTokenMs": 991
+      },
+      "liveOutcome": "ok",
+      "liveTts": [
+        "Would you like to book a visit for that or window cleaning"
+      ]
+    },
+    {
+      "caller": "Like, a 3-bedroom apartment cleaning.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": 0
+      },
+      "filler": "Mm-hmm.",
+      "observed": {
+        "firstPcmMs": 435
+      },
+      "liveTts": [],
+      "unlogged": true,
+      "outcome": "barge_in"
+    },
+    {
+      "caller": "How much is it?",
+      "soniox": "en",
+      "flushed": true,
+      "canned": {
+        "path": "price",
+        "text": "3-Bedroom House is KSh 6,000 flat."
+      },
+      "model": {
+        "provider": "canned",
+        "model": "speak_packet",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "observed": {
+        "firstPcmMs": 297,
+        "firstReplyPcmMs": 297
+      },
+      "outcome": "early_return",
+      "liveTts": [
+        "3-Bedroom House is six thousand shillings flat"
+      ]
+    },
+    {
+      "caller": "What else can you do?",
+      "soniox": "en",
+      "flushed": true,
+      "canned": {
+        "path": "visit_read",
+        "text": "You have Couch cleaning, Monday 5 October 2026, morning, Westlands, ABC. You have Couch cleaning, Monday 5 October 2026, 8 AM, Westlands. You have Carpet cleaning, Tomorrow at 9 a.m., Westlands, near ABC. You have Carpet cleaning, Monday 5 October 2026, 9 AM, Westlands ABC. You have Carpet cleaning, Monday 5 October 2026, 9 AM, Westlands, near ABC. You have Carpet cleaning, tomorrow at 9 AM, Westlands, ABC. You have Carpet cleaning, Tomorrow morning, Westlands, ABC. You have Carpet cleaning, Tomorrow morning, Westlands. What would you like to do?"
+      },
+      "model": {
+        "provider": "canned",
+        "model": "visit_read",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "observed": {
+        "firstPcmMs": 606,
+        "firstReplyPcmMs": 606
+      },
+      "liveTts": [
+        "You have Couch cleaning Monday 5 October 2026 morning West-lands ABC You have Couch cleaning Monday 5 October 2026 8 A M West-lands You have Carpet cleaning Tomorrow at 9 A M West-lands near ABC You have Carpet cleaning Monday 5 October 2026 9 A M West-lands ABC You have Carpet cleaning Monday 5 October 2026 9 A M West-lands near ABC You have Carpet cleaning tomorrow at 9 A M West-lands ABC You have Carpet cleaning Tomorrow morning West-lands ABC You have Carpet cleaning Tomorrow morning West-lands What would you like to do"
+      ],
+      "outcome": "barge_in"
+    },
+    {
+      "caller": "Okay, stop.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "My apologies for that. Beyond house and window cleaning, we offer sofa, carpet, mattress, move-in, deep cleaning, and office cleaning. What would you like done?",
+        "chars": 160,
+        "spokenEmitted": 160
+      },
+      "filler": "Mm-hmm.",
+      "observed": {
+        "firstPcmMs": 404,
+        "firstReplyPcmMs": 1700,
+        "firstTokenMs": 1022
+      },
+      "liveTts": [
+        "My apologies for that",
+        "What do you need done",
+        "What would you like done"
+      ],
+      "outcome": "call_end"
+    }
+  ]
+}

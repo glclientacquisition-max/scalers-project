@@ -305,6 +305,7 @@ const {
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
+const { unfinishedTurnHold } = require('./src/conversation/unfinishedTurn');
 const {
   drainSpokenSpeakSlots,
   isSpeakSlotOutcome,
@@ -327,6 +328,7 @@ const {
 const {
   decideTurnEnd,
   decideCallerEvent,
+  bargePhaseInputs,
   callerEventClearsIdle,
   looksLikeEcho: turnLooksLikeEcho,
   classifyFinalDuringAgentSpeech,
@@ -364,6 +366,8 @@ const {
 } = require('./src/speech/overlapHold');
 const { createLateFinalHold } = require('./src/speech/lateFinal');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
+const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
+const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
 const {
   createVoiceTurnTiming,
@@ -1336,6 +1340,7 @@ async function handleVoiceIncoming(req, res) {
       }
       const termination = detectCallTermination(req.body, callSessionState);
       if (termination.terminal) {
+        noteCallTerminal(sid, { source: 'voice/incoming', status: termination.status });
         // Fire-and-forget so we still return TwiML immediately.
         markCallTerminalFromWebhook({
           callSid: sid,
@@ -1678,6 +1683,9 @@ app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
 
     if (termination.terminal && callSid) {
       const terminalSid = sidByProviderCallId.get(callSid) || callSid;
+      // The media socket may stay open a few seconds after this. Its timers
+      // (idle nudge, held-turn reply) must not speak into an ended call.
+      noteCallTerminal(terminalSid, { source: 'voice/events', status: termination.status });
       await markCallTerminalFromWebhook({
         callSid: terminalSid,
         status: termination.status,
@@ -1871,6 +1879,19 @@ mediaWss.on('connection', (ws, req) => {
   const lateFinals = createLateFinalHold();
   const agentReplay = createAgentReplayMemory();
   const speakCommit = createSpeakCommit();
+  // The carrier said the call ended (Completed webhook) or the socket closed.
+  // Nothing more is spoken: no idle nudge, no held-turn reply.
+  function callIsOver() {
+    if (ws.readyState !== WebSocket.OPEN) return true;
+    const ended = callTerminalSince(sidLabel(), connectedAt);
+    if (ended) {
+      console.log(
+        `[ws/media][${sidLabel()}] call already ended (${ended.source || 'webhook'} ${ended.status || ''}), nothing more spoken`
+      );
+      return true;
+    }
+    return false;
+  }
   const idleNudge = createIdleNudgeController({
     canFire: () =>
       ws.readyState === WebSocket.OPEN &&
@@ -1879,8 +1900,11 @@ mediaWss.on('connection', (ws, req) => {
       !turnBusy &&
       !speechOutageStarted &&
       !utteranceParts.length &&
-      !pendingUtterance,
+      !pendingUtterance &&
+      !callIsOver(),
     speak: () => {
+      // Re-checked at speak time: the end can land between fire and speak.
+      if (callIsOver()) return null;
       const line = pickIdleNudgeLine({ language: callLanguage });
       console.log(`[ws/media][${sidLabel()}] idle_nudge`);
       return speakText(line, { isIdleNudge: true }).then((spoken) => {
@@ -1888,6 +1912,28 @@ mediaWss.on('connection', (ws, req) => {
           callTranscript.pushAgent(line);
           messages.push({ role: 'assistant', content: line, local: true });
         }
+      });
+    },
+  });
+  // An unfinished caller turn ("Nilikuwa nauliza,") is held, not answered.
+  // New caller words merge with it. If the caller stays quiet for the hold
+  // window, it is answered by the model (holdTimedOut), never by an
+  // early-return line such as the file-name ask.
+  const unfinishedHold = createUnfinishedHold({
+    delayMs: unfinishedHoldMs(),
+    canFire: () =>
+      ws.readyState === WebSocket.OPEN &&
+      !speaking &&
+      !turnBusy &&
+      !utteranceParts.length &&
+      !pendingUtterance,
+    onTimeout: (text, signals) => {
+      if (callEnding || callIsOver()) return;
+      console.log(
+        `[ws/media][${sidLabel()}] unfinished hold timed out after ${unfinishedHold.delayMs}ms, replying: ${text}`
+      );
+      runCallerTurn(text, { ...signals, holdTimedOut: true }).catch((err) => {
+        console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
       });
     },
   });
@@ -2047,6 +2093,9 @@ mediaWss.on('connection', (ws, req) => {
       vertical: profile.vertical || 'general',
       servicesCatalog: profile.servicesCatalog || [],
       businessLocations: profile.businessLocations || [],
+      // Coverage towns bias hearing too. HD_015bae4a4af2 heard "Kitengele"
+      // because the snapshot never carried coverage_areas.
+      businessPolicies: profile.businessPolicies || {},
       teamDirectory: profile.teamDirectory || [],
       ttsLexicon: Array.isArray(profile.ttsLexicon) ? profile.ttsLexicon : [],
       callerMemory: profile.callerMemory
@@ -2249,6 +2298,7 @@ mediaWss.on('connection', (ws, req) => {
   async function handleSpeechProviderOutage(reason) {
     if (speechOutageStarted) return { ok: false, outage: true };
     speechOutageStarted = true;
+    unfinishedHold.close();
     greetingStarted = true;
     idleNudge.close();
     const clip = loadOutageClip(callLanguage, { voiceId: tenantSonioxVoiceId });
@@ -2618,10 +2668,18 @@ mediaWss.on('connection', (ws, req) => {
 
   let lastBargeSkipLogAt = 0;
   function maybeBargeIn(text, source) {
-    const decision = decideCallerEvent({
-      text,
+    // After a barge has cancelled the reply, the caller's final is the next
+    // turn, not a continuation of the cancelled one (HD_015bae4a4af2 t6).
+    const phaseInputs = bargePhaseInputs({
       speaking,
       turnBusy,
+      bargeInActive,
+      isFinal: String(source || '').startsWith('final'),
+    });
+    const decision = decideCallerEvent({
+      text,
+      speaking: phaseInputs.speaking,
+      turnBusy: phaseInputs.turnBusy,
       speakStartedAt,
       lastAgentText,
       lastAgentAskedQuestion: lastAskedQuestion(),
@@ -2759,16 +2817,18 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   async function runCallerTurn(userText, opts = {}) {
-    const clean = String(userText || '').replace(/\s+/g, ' ').trim();
-    const flushed = labelFlushedCallerTurn({
-      text: clean,
-      turnEnd: {
-        ...(opts.turnEnd && typeof opts.turnEnd === 'object' ? opts.turnEnd : {}),
-        unfinished: opts.turnEnd?.unfinished === true || opts.unfinished === true,
-        weak: opts.turnEnd?.weak === true || opts.weak === true,
-        weakStt: opts.turnEnd?.weakStt === true || opts.weakStt === true,
-      },
-    });
+    let clean = String(userText || '').replace(/\s+/g, ' ').trim();
+    const labelTurn = (text) =>
+      labelFlushedCallerTurn({
+        text,
+        turnEnd: {
+          ...(opts.turnEnd && typeof opts.turnEnd === 'object' ? opts.turnEnd : {}),
+          unfinished: opts.turnEnd?.unfinished === true || opts.unfinished === true,
+          weak: opts.turnEnd?.weak === true || opts.weak === true,
+          weakStt: opts.turnEnd?.weakStt === true || opts.weakStt === true,
+        },
+      });
+    let flushed = labelTurn(clean);
     if (!clean) return;
     idleNudge.clear();
     if (turnBusy) {
@@ -2783,6 +2843,12 @@ mediaWss.on('connection', (ws, req) => {
         );
       }
       return;
+    }
+    // A held unfinished turn joins these words, and its timer stops.
+    if (unfinishedHold.pending()) {
+      clean = unfinishedHold.take(clean);
+      flushed = labelTurn(clean);
+      console.log(`[ws/media][${sidLabel()}] unfinished hold merged: ${clean}`);
     }
     // A new caller turn may speak. The previous barge must not swallow it.
     suppressReplyRemainder = false;
@@ -2827,6 +2893,35 @@ mediaWss.on('connection', (ws, req) => {
     activeTurnTiming = turnTiming;
 
     const callKey = sidLabel();
+    // An unfinished caller turn is held before Brain observes it, so the
+    // merged words are observed once. Every reply waits, the file-name ask
+    // and local lines included. The hold timer answers it if the caller stays
+    // quiet (holdTimedOut), and the idle nudge stays armed as a second net.
+    const unfinishedGate = unfinishedTurnHold(callBrainStates.get(callKey) || null, {
+      text: clean,
+      profile: brainProfile,
+      agentAwaitingReply: Boolean(lastAskedQuestion()),
+      holdTimedOut: opts.holdTimedOut === true,
+    });
+    if (unfinishedGate) {
+      console.log(
+        `[ws/media][${callKey}] unfinished turn, reply waits ${unfinishedHold.delayMs}ms lang=${callLanguage}: ${clean}`
+      );
+      voiceTrace.beginTurn({ callerText: clean, language: callLanguageState });
+      voiceTrace.noteTurnEnd({ decision: 'hold', reason: 'unfinished' });
+      voiceTrace.commitTurn({ outcome: 'hold' });
+      unfinishedHold.hold(clean, {
+        unfinished: true,
+        weak: flushed.weak,
+        weakStt: flushed.weakStt,
+        tokenLanguages: opts.tokenLanguages,
+      });
+      idleNudge.arm({ skip: !heardCallerUtterance });
+      if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+      turnBusy = false;
+      kickPendingTurn();
+      return;
+    }
     const languageEvidence = analyzeCallerLanguage(clean, {
       tokenLanguages: opts.tokenLanguages,
     });
@@ -3064,10 +3159,17 @@ mediaWss.on('connection', (ws, req) => {
       // ask as if the name were missing, and do not attach visits.
       // A greeting barge reaches this gate before Gemini. The model does not run.
       // A committed public fact still speaks before that ask.
+      // The unfinished hold was decided before Brain observed this turn. A
+      // held fragment that timed out is answered by the model, not the ask.
       const nameGate = planCallerModelTurn(brainState, {
         greetingBarged: greetingInterrupted && !greetingSettled,
         fileNameAskCommitted: fileNameAsksCommitted > 0,
+        unfinishedDecided: true,
+        holdTimedOut: opts.holdTimedOut === true,
       });
+      if (nameGate.nameAskDeferred) {
+        console.log(`[ws/media][${callKey}] name ask deferred: held fragment timed out, model replies`);
+      }
       const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
       const nameJustConfirmed = brainState?.caller?.nameJustConfirmed === true;
       const askingName = !nameGate.runModel && Boolean(fileNameAsk) && !nameJustConfirmed;
@@ -3091,6 +3193,7 @@ mediaWss.on('connection', (ws, req) => {
       });
       if (planned.farewell) {
         callEnding = true;
+        unfinishedHold.close();
         console.log(
           `[ws/media][${callKey}] brain-end farewell lang=${callLanguage}: ${endClose.line}`
         );
@@ -4137,6 +4240,11 @@ mediaWss.on('connection', (ws, req) => {
 
       const isInterim = !evt.isFinal;
 
+      // Any caller words keep a held unfinished turn waiting for its final,
+      // even one short word the idle rules ignore (HD_015bae4a4af2 answered
+      // "For" mid-sentence). The hold caps how long postpones can stretch it.
+      if (unfinishedHold.pending() && !looksLikeEcho(text)) unfinishedHold.postpone(text);
+
       // Instant barge-in on accumulated interim tokens while TTS/LLM is busy.
       if (isInterim) {
         if (speaking || turnBusy) {
@@ -4608,6 +4716,7 @@ mediaWss.on('connection', (ws, req) => {
     clearFillerTimer();
     speakCommit.clear();
     idleNudge.close();
+    unfinishedHold.close();
     if (utteranceTimer) {
       clearTimeout(utteranceTimer);
       utteranceTimer = null;

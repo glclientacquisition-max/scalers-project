@@ -59,6 +59,11 @@ function readCoverageAreas(policies) {
   return parseCoverageAreas(obj.coverage_areas);
 }
 
+/** Spoken town names of the configured coverage, e.g. ["Kitengela", "Nairobi"]. */
+function coverageAreaNames(policies) {
+  return (readCoverageAreas(policies) || []).map((id) => titleName(id.slice(id.indexOf(':') + 1)));
+}
+
 function formatCoverageList(areas) {
   return parseCoverageAreas(areas)
     .map((id) => titleName(id.slice(id.indexOf(':') + 1)))
@@ -95,6 +100,7 @@ function coveredByAreas(text, areas) {
 module.exports = {
   parseCoverageAreas,
   readCoverageAreas,
+  coverageAreaNames,
   formatCoverageList,
   coveredByAreas,
 };

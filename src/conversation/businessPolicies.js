@@ -43,12 +43,31 @@ function normalizePolicies(raw) {
   if (Array.isArray(obj.coverage_areas)) {
     out.coverage_areas = parseCoverageAreas(obj.coverage_areas);
   }
+  // Any other text the owner saved (for example a minimum notice rule).
+  // Metadata and gated keys stay out; provenance decides the rest upstream.
+  const { isPolicyMetaKey, policyKeyLabel } = require('./provenance');
+  const extra = {};
+  if (obj.extra && typeof obj.extra === 'object' && !Array.isArray(obj.extra)) {
+    for (const [label, raw] of Object.entries(obj.extra)) {
+      const text = String(raw || '').trim();
+      if (text) extra[label] = text;
+    }
+  }
+  for (const [key, raw] of Object.entries(obj)) {
+    if (key === 'extra') continue;
+    if (Object.prototype.hasOwnProperty.call(empty, key) || isPolicyMetaKey(key)) continue;
+    if (typeof raw !== 'string' && typeof raw !== 'number') continue;
+    const text = String(raw).trim();
+    if (text) extra[policyKeyLabel(key)] = text;
+  }
+  if (Object.keys(extra).length) out.extra = extra;
   return out;
 }
 
 function policiesHaveContent(policies) {
   const p = normalizePolicies(policies);
   if (Array.isArray(p.coverage_areas) && p.coverage_areas.length) return true;
+  if (p.extra && Object.keys(p.extra).length) return true;
   return Object.entries(POLICY_LABELS).some(([key]) => Boolean(p[key]));
 }
 
@@ -56,7 +75,11 @@ function formatPoliciesBlock(policies) {
   const p = normalizePolicies(policies);
   const lines = [];
   let anyContent = false;
-  for (const [key, label] of Object.entries(POLICY_LABELS)) {
+  const hasCoverage = Array.isArray(p.coverage_areas) && p.coverage_areas.length > 0;
+  for (const [key, baseLabel] of Object.entries(POLICY_LABELS)) {
+    // With a Coverage list, Delivery is timing only. Its empty line must not
+    // read as "service area unknown".
+    const label = key === 'delivery' && hasCoverage ? 'Delivery' : baseLabel;
     if (p[key]) {
       anyContent = true;
       lines.push(`- ${label}: ${p[key]}`);
@@ -66,12 +89,16 @@ function formatPoliciesBlock(policies) {
       );
     }
   }
+  for (const [label, text] of Object.entries(p.extra || {})) {
+    anyContent = true;
+    lines.push(`- ${label}: ${text}`);
+  }
   if (Array.isArray(p.coverage_areas)) {
     lines.push(
       `- Coverage: ${formatCoverageList(p.coverage_areas) || '(none listed)'}`
     );
     lines.push(
-      'COVERAGE RULE: The Coverage line is the only service area. Delivery text is timing and other instructions.'
+      'COVERAGE RULE: The Coverage line is the only service area. A county on it covers every town in that county. Delivery text is timing and other instructions.'
     );
   }
   if (!anyContent && !Array.isArray(p.coverage_areas)) {
