@@ -114,6 +114,13 @@ export default function DevAdminOpsPage() {
             businesses={BUSINESSES}
             pendingBusinesses={PENDING}
             availableDids={AVAILABLE_DIDS}
+            badges={{
+              "biz-live": {
+                score: 38,
+                dropping: true,
+                droppingReason: "Score fell 22 points in 7 days",
+              },
+            }}
           />
         </section>
       </div>
