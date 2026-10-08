@@ -2,7 +2,7 @@
 -- Purpose: persist Scalers platform two-way WhatsApp (SautiKit stores nothing).
 -- Identity: Meta phone_number_id 1237105982825100 / SautiKit number
 -- 81424fbd-8f4c-459a-858d-98ced4393df6 / E.164 +254709221536 is Scalers chat.
--- Voice on that DID still maps to Done and Dusted until Phase 2 (second DID).
+-- Staging voice is +254709221537 (Done and Dusted). Prod voice on +254709221536 is Aris Kenya.
 -- Inbound routing is phone_number_id, never tenants.sautikit_virtual_number.
 -- Phase 1 tables are platform inbox: no owner RLS (shop owners must not
 -- read other tenants' support chat). Voice writes via service_role.
