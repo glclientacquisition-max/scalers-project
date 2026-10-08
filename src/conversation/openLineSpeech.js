@@ -60,8 +60,11 @@ const LOOKUP_RE =
   /\b(?:inquire about (?:my |our )?(?:bookings?|visits?|appointments?)|(?:my|our) bookings?|do i have (?:a |any )?(?:visits?|bookings?|appointments?)|what are my (?:bookings?|visits?|appointments?)|what (?:bookings?|visits?|appointments?) do i have|what do i have|check (?:on )?(?:my |our )?(?:bookings?|visits?|appointments?)|(?:just |please )?(?:list them|list my (?:bookings?|visits?|appointments?)|listed)|update me (?:about|on) what i have|tell me what i have|bookings zangu|booking yangu|ziara zangu|nini niko nayo|nilicho nacho|orodhesha|niambie (?:ziara|bookings))\b/i;
 
 // A later page of the same file. Not a new booking and not the first list.
+// "What else" alone is not a file ask: HD_015bae4a4af2 "What else can you do?"
+// read eight old visits for 30 s. It pages the file only when it names the
+// caller's own rows.
 const REVIEW_MORE_RE =
-  /\b(?:older ones?|the rest|previous ones?|the previous|show me more|what else(?: do i have)?|more of them|and the rest|za zamani|zilizobaki|zingine|nyingine)\b/i;
+  /\b(?:older ones?|the rest|previous ones?|the previous|show me more|what else (?:do i have|have i (?:got|booked)|is (?:there )?(?:on (?:my|the) file|open|booked))|more of them|and the rest|za zamani|zilizobaki|zingine|nyingine)\b/i;
 
 const HISTORY_RE =
   /\b(?:my history|booking history|visit history|appointment history|past (?:bookings?|visits?|appointments?)|historia(?: yangu)?)\b/i;
