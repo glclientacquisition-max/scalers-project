@@ -87,6 +87,20 @@
       },
       "nameAsks": 0
     },
+    "HD_ee813bcf6248": {
+      "score": 82.5,
+      "checks": {
+        "languageMismatch": 2,
+        "incomplete": 1,
+        "repeatedQuestion": 0,
+        "silence": 0,
+        "deletedAnswer": 2,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 10
+      },
+      "nameAsks": 1
+    },
     "HD_f32a2b7caafd": {
       "score": 96.7,
       "checks": {
