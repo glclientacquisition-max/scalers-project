@@ -451,6 +451,16 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     };
   }
 
+  // The escalation already went through on this call. Asking again gets the
+  // callback line, not a second escalate (HD_ee813bcf6248 duplicate escalates).
+  if (intent === 'human' && state?.handoff?.completed === true && !state?.handoff?.requested) {
+    return {
+      action: ACTIONS.ANSWER,
+      reason:
+        'A teammate already has this call and will call back. Say so once, then help with anything else.',
+    };
+  }
+
   if (intent === 'human' || state?.handoff?.requested) {
     const transfer = authorizeAction(ACTIONS.TRANSFER, capabilities);
     if (transfer.allowed) {

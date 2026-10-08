@@ -9,6 +9,7 @@ const { cutNoAiSlop } = require('./noAiSlop');
 const { prepareForTts } = require('./ttsNormalize');
 const { analyzeCallerLanguage, languageDirective } = require('../conversation/language');
 const { SCHEMA, SCHEMA_VERSION } = require('./voiceTrace');
+const { coverageNextStepFor } = require('../conversation/coverageNextStep');
 
 function initialState(fixture = {}) {
   const name = String(fixture.callerName || '').trim();
@@ -41,6 +42,7 @@ function speechContext(state, callerTurns, language, fixture) {
       servicesCatalog: fixture.servicesCatalog || [],
       ...(fixture.vertical ? { vertical: fixture.vertical } : {}),
       ...(fixture.businessPolicies ? { businessPolicies: fixture.businessPolicies } : {}),
+      ...(fixture.hoursSchedule ? { hoursSchedule: fixture.hoursSchedule } : {}),
       ...(fixture.socialHandles || fixture.social_handles
         ? {
             socialHandles: fixture.socialHandles || fixture.social_handles,
@@ -241,6 +243,27 @@ function replayTurn(turn, ctx) {
     });
   }
   const barged = turn.outcome === 'barge_in';
+  // Voice speaks the coverage next step after a model coverage answer (server.js).
+  if (modelText && !barged && mouth.spoken) {
+    const next = coverageNextStepFor(mouth.spoken, {
+      profile: speech.profile,
+      language: speech.language,
+      state: ctx.state,
+    });
+    if (next) {
+      const before = mouth.spoken;
+      const ask = prepareForTts(next, { callLanguage: speech.language }).text || next;
+      mouth.spoken = `${mouth.spoken} ${ask}`;
+      stages.push({
+        stage: 'transform',
+        name: 'coverage_next_step',
+        reason: 'appended',
+        before,
+        after: mouth.spoken,
+        dropped: false,
+      });
+    }
+  }
   if (!barged) {
     stages.push({
       stage: 'tts',

@@ -494,7 +494,8 @@ function observeCallerTurn(state, input = {}) {
   // TODO(Voice): pass unfinished and weakStt from flushUtterance, and consume nameConfirmed before TTS.
   promoteCallerGoal(next, text, input, previousIntent);
   next.goal.status = 'active';
-  next.handoff.requested = intent === 'human';
+  // A completed handoff is not re-opened by a repeat ask; nextBestAction answers it.
+  next.handoff.requested = intent === 'human' && next.handoff.completed !== true;
 
   if (input.entities && typeof input.entities === 'object') {
     next.entities = { ...next.entities, ...input.entities };
@@ -1056,6 +1057,18 @@ function recordActionResults(state, results = []) {
       next.resolution.status = 'resolved';
       next.goal.status = 'completed';
       next.conversation.stage = 'confirmation';
+    }
+    // A handoff that went through is done. Keeping `requested` on made every
+    // later turn ESCALATE again (HD_ee813bcf6248 t5-t12: coverage, price, and
+    // carpet questions went down the escalate path with duplicate tool calls).
+    if (
+      (result.action === 'escalate' || result.action === 'transfer') &&
+      (result.status === 'succeeded' || result.status === 'updated' || result.status === 'duplicate')
+    ) {
+      if (!next.handoff || typeof next.handoff !== 'object') next.handoff = {};
+      next.handoff.requested = false;
+      next.handoff.required = false;
+      next.handoff.completed = true;
     }
   }
   next.actions.completedFingerprints = next.actions.completedFingerprints.slice(-20);

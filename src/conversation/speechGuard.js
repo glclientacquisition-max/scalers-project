@@ -9,6 +9,8 @@ const { factServices, factProducts, speechFactText } = require('./provenance');
 const { entityValue, findCatalogMatch } = require('./entityExtraction');
 const { looksLikeOfferAsk } = require('./fileRead');
 const { fileServicePriceLine } = require('./catalogueMouth');
+const { hoursAskLine, looksLikeHoursAsk } = require('./knownFacts');
+const { parseHoursSchedule } = require('./businessHours');
 const { numbersIn } = require('./numberWords');
 const { assessCoverage } = require('./visitLocation');
 const { bindSpokenPlace } = require('./kenyaPlaces');
@@ -281,6 +283,52 @@ function sentenceHasUnsaidClock(sentence, allowed) {
   return false;
 }
 
+/**
+ * Clocks and numbers that state the business's own hours on file: the 12-hour
+ * clock ("8am", "6pm"), the 24-hour hour, and the Kiswahili hour ("saa mbili"
+ * is 8 AM, "saa kumi na mbili" is 6 PM). Only used when the caller asked the
+ * hours, so a visit clock is still never authorized by the hours (#489).
+ */
+function fileHoursFacts(profile = {}) {
+  const parsed = parseHoursSchedule(profile?.hoursSchedule);
+  const clocks = new Set();
+  const numbers = new Set(['0']);
+  if (!parsed) return null;
+  for (const day of Object.values(parsed.days || {})) {
+    if (!day) continue;
+    for (const hhmm of [day.open, day.close]) {
+      const [hRaw, mRaw] = String(hhmm || '').split(':');
+      const h24 = Number(hRaw);
+      const minute = Number(mRaw || 0);
+      if (!Number.isFinite(h24)) continue;
+      const h12 = h24 % 12 || 12;
+      const ap = h24 < 12 ? 'am' : 'pm';
+      clocks.add(clockKey(h12, minute ? String(minute) : '', ap));
+      numbers.add(String(h24));
+      numbers.add(String(h12));
+      if (minute) numbers.add(String(minute));
+      const swHour = (h12 + 6) % 12 || 12;
+      numbers.add(String(swHour));
+      if (swHour > 10) {
+        numbers.add('10');
+        numbers.add(String(swHour - 10));
+      }
+    }
+  }
+  return clocks.size ? { clocks, numbers } : null;
+}
+
+/** An answer to an hours ask whose clocks and numbers are all the hours on file. */
+function sentenceStatesFileHours(sentence, hoursFacts) {
+  if (!hoursFacts) return false;
+  const clocks = clockKeys(sentence);
+  const numbers = numbersIn(sentence);
+  if (!clocks.size && !numbers.size) return false;
+  for (const key of clocks) if (!hoursFacts.clocks.has(key)) return false;
+  for (const number of numbers) if (!hoursFacts.numbers.has(number)) return false;
+  return true;
+}
+
 function sentenceHasNewNumber(sentence, known) {
   for (const number of numbersIn(sentence)) {
     if (!known.has(number)) return true;
@@ -542,6 +590,7 @@ function guardSpokenReply(text, ctx = {}) {
   let droppedJob = false;
   let droppedUnboundFile = false;
   const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
+  const hoursFacts = looksLikeHoursAsk(lastCallerTurn) ? fileHoursFacts(ctx.profile || {}) : null;
   const heldName = heldCallerName(ctx.state);
   let droppedNameAsk = false;
   for (const sentence of splitSentences(raw)) {
@@ -596,7 +645,10 @@ function guardSpokenReply(text, ctx = {}) {
       noteDrop(ctx, 'unbound_place', sentence);
       continue;
     }
-    if (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known)) {
+    if (
+      !sentenceStatesFileHours(sentence, hoursFacts) &&
+      (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known))
+    ) {
       droppedNumber = true;
       noteDrop(ctx, 'unsaid_number', sentence);
       continue;
@@ -629,11 +681,21 @@ function guardSpokenReply(text, ctx = {}) {
       out = !out || NOT_ON_FILE.test(out) ? groundedPrice : `${groundedPrice} ${out}`;
     }
   }
+  // The caller asked the hours and the model's clock sentence was dropped
+  // (hours on file do not authorize a model clock, #489). Speak the file's
+  // hours line instead of "not on file" or a bare "Okay." (HD_ee813bcf6248).
+  const groundedHours =
+    !groundedPrice && droppedNumber ? hoursAskLine(lastCallerTurn, ctx.profile || {}, ctx.language) : '';
+  if (groundedHours) {
+    out = !out || NOT_ON_FILE.test(out) ? groundedHours : `${groundedHours} ${out}`;
+  }
   const askedNumber = NUMBER_ASK.test(lastCallerTurn);
   const priced = groundedPrice;
   if (out) {
     const lead =
-      !groundedPrice && askedNumber && droppedNumber ? unknownFallback(ctx.language) : '';
+      !groundedPrice && !groundedHours && askedNumber && droppedNumber
+        ? unknownFallback(ctx.language)
+        : '';
     return withMessageOnlyCallback(lead ? `${lead} ${out}` : out, ctx, appendCallback);
   }
   if (priced) return withMessageOnlyCallback(priced, ctx, appendCallback);

@@ -352,8 +352,13 @@ const {
 const {
   createToolHoldSession,
   fileReadFollowUp,
+  holdSpeaksAfterAck,
+  trimAckLead,
   turnRequestsTool,
 } = require('./src/speech/toolHold');
+const { appendFinalPart, joinUtteranceParts } = require('./src/speech/utteranceJoin');
+const { queueToolOutcome, takeToolOutcome } = require('./src/conversation/toolOutcomeQueue');
+const { coverageNextStepFor } = require('./src/conversation/coverageNextStep');
 const {
   createSpokenStreamBuffer,
   joinSpokenPieces,
@@ -2059,6 +2064,12 @@ mediaWss.on('connection', (ws, req) => {
   });
   /** @type {ReturnType<typeof createVoiceTurnTiming>|null} */
   let activeTurnTiming = null;
+  // The turn whose thinking-ack started last, and when. A tool hold on that
+  // same turn is skipped while the ack is recent (HD_c98820e579e1 t10).
+  let thinkingAckTurn = null;
+  let thinkingAckAtMs = 0;
+  // An ack or a hold played on this turn: a tool outcome drops its "Okay." lead.
+  let ackPlayedTurn = null;
   /** Rolling interim hypothesis while agent is busy (for barge-in). */
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
@@ -2460,6 +2471,18 @@ mediaWss.on('connection', (ws, req) => {
 
   async function speakToolHold(spoken) {
     if (!spoken?.speak || bargeInActive) return;
+    if (
+      spoken.kind === 'hold' &&
+      thinkingAckTurn &&
+      thinkingAckTurn === activeTurnTiming &&
+      !holdSpeaksAfterAck({ kind: spoken.kind, ackAtMs: thinkingAckAtMs })
+    ) {
+      console.log(
+        `[ws/media][${sidLabel()}] tool hold skipped after thinking-ack ${Date.now() - thinkingAckAtMs}ms: ${spoken.line}`
+      );
+      return;
+    }
+    if (spoken.kind === 'hold') ackPlayedTurn = activeTurnTiming;
     await speakText(spoken.line, {
       isFiller: spoken.kind === 'hold',
       skipFileGate: spoken.kind === 'hold',
@@ -3090,6 +3113,21 @@ mediaWss.on('connection', (ws, req) => {
         );
         if (removed.length) voiceTrace.noteSpeakSlots({ action: 'drain', slots: removed });
       }
+      // A booking or callback confirmed after a barge-in is still owed.
+      // Speak it first, before a local fact or the model reply.
+      const owedOutcome = takeToolOutcome(brainState);
+      if (owedOutcome) {
+        callBrainStates.set(callKey, brainState);
+        console.log(`[ws/media][${callKey}] speaking queued tool outcome`);
+        callTranscript.pushAgent(owedOutcome);
+        const owedSpoken = await speakText(owedOutcome);
+        if (owedSpoken?.ok) {
+          messages.push({ role: 'assistant', content: owedOutcome, local: true });
+        } else {
+          queueToolOutcome(brainState, owedOutcome);
+          callBrainStates.set(callKey, brainState);
+        }
+      }
       const slotsBeforeReply = slotRows(brainState);
       const localReply = resolveLocalReply({
         text: clean,
@@ -3401,12 +3439,13 @@ mediaWss.on('connection', (ws, req) => {
       // VOICE_FILLER=auto (default): adaptive ack on this turn if first audio is slow.
       // Later turns may ack again. Do not latch the ack for the whole call.
       // ack → always schedule a tiny backchannel; off → silence; custom → fixed phrase.
-      // Skip when we already spoke an action-progress line for this turn.
+      // Tool turns (ESCALATE / CREATE_REQUEST) get the same adaptive ack. The
+      // action-progress line above is withheld, so skipping the ack left 1.5-1.7 s
+      // of dead air until Gemini returned the tool block (HD_ee813bcf6248 t6-t12).
       const fillerMode = (process.env.VOICE_FILLER || 'auto').toLowerCase();
       const useFiller =
         Boolean(tts) &&
         fillerMode !== 'off' &&
-        !needsImmediateProgress &&
         !bareCloser && shouldSpeakThinkingAck(clean);
       const fillerDelayMs = resolveVoiceProfile().fillerDelayMs;
       const fillerText =
@@ -3422,6 +3461,9 @@ mediaWss.on('connection', (ws, req) => {
           // Adaptive: skip if LLM→TTS already started (stream chunk or full reply).
           if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk) {
             fillerStarted = true;
+            thinkingAckTurn = turnTiming;
+            thinkingAckAtMs = Date.now();
+            ackPlayedTurn = turnTiming;
             turnTiming.markFiller();
             console.log(
               `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
@@ -3774,6 +3816,7 @@ mediaWss.on('connection', (ws, req) => {
             }
             console.log(`[ws/media][${sidLabel()}] discarding streamed reply after barge-in`);
             discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
+            queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation || result?.bargedActionConfirmation);
             bargeInActive = false;
             speakSession = null;
             if (activePlaybackGeneration === streamPlaybackGen) {
@@ -3794,6 +3837,7 @@ mediaWss.on('connection', (ws, req) => {
             }
             console.log(`[ws/media][${sidLabel()}] discarding streamed reply after barge-in`);
             discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
+            queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation || result?.bargedActionConfirmation);
             bargeInActive = false;
             speakSession = null;
             if (activePlaybackGeneration === streamPlaybackGen) {
@@ -3909,6 +3953,7 @@ mediaWss.on('connection', (ws, req) => {
           }
         } else {
           discardUnspokenAssistant(result?.spokenText || '');
+          queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation || result?.bargedActionConfirmation);
           bargeInActive = false;
           logTurnTiming(turnTiming, { outcome: 'barge_in' });
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;
@@ -3952,6 +3997,7 @@ mediaWss.on('connection', (ws, req) => {
         if (bargeInActive) {
           console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
           discardUnspokenAssistant(reply);
+          queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation || result?.bargedActionConfirmation);
           bargeInActive = false;
           logTurnTiming(turnTiming, { outcome: 'barge_in' });
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;
@@ -3988,10 +4034,34 @@ mediaWss.on('connection', (ws, req) => {
           /take a message|nitachukua ujumbe/i.test(confirmation);
         if (!(spokeLookupSentence && confirmation === lookupSpoken) && !alreadySaid) {
           await actionProgressSpeak;
-          callTranscript.pushAgent(result.actionConfirmation);
-          await speakText(result.actionConfirmation);
+          // "Alright." already played: say "They'll call you back.", not
+          // "Okay. They'll call you back." (HD_4d6ac592aeb3 t4).
+          const outcomeLine = trimAckLead(result.actionConfirmation, {
+            acked: ackPlayedTurn === turnTiming,
+          });
+          callTranscript.pushAgent(outcomeLine);
+          await speakText(outcomeLine);
           spokeThisTurn = true;
         }
+      }
+
+      // A coverage answer from Gemini that ends on a bare list gets the next
+      // step, like the local coverage line (HD_ee813bcf6248 t6/t8).
+      if (spokeThisTurn && !bargeInActive && !suppressModelSpeech && !result?.actionConfirmation) {
+        const coverageNext = coverageNextStepFor(
+          spokenChunks.join(' ').trim() || String(result?.spokenText || ''),
+          { profile: brainProfile, language: callLanguage, state: brainState }
+        );
+        if (coverageNext) {
+          console.log(`[ws/media][${sidLabel()}] coverage next step lang=${callLanguage}: ${coverageNext}`);
+          callTranscript.pushAgent(coverageNext);
+          const askSpoken = await speakText(coverageNext);
+          if (askSpoken?.ok) messages.push({ role: 'assistant', content: coverageNext, local: true });
+        }
+      }
+
+      if (!result?.actionConfirmation && result?.bargedActionConfirmation) {
+        queueToolOutcome(callBrainStates.get(callKey), result.bargedActionConfirmation);
       }
 
       // Empty Gemini success asks them to repeat once. A 503 or a broken
@@ -4103,7 +4173,7 @@ mediaWss.on('connection', (ws, req) => {
       return;
     }
     if (!utteranceParts.length) return;
-    const rawText = utteranceParts.join('').replace(/\s+/g, ' ').trim();
+    const rawText = joinUtteranceParts(utteranceParts);
     const tokenLanguages = utteranceLanguages.slice();
     utteranceParts = [];
     utteranceLanguages = [];
@@ -4152,7 +4222,7 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   function pendingUtteranceText() {
-    return utteranceParts.join('').replace(/\s+/g, ' ').trim();
+    return joinUtteranceParts(utteranceParts);
   }
 
   function noteUtteranceClock() {
@@ -4326,7 +4396,7 @@ mediaWss.on('connection', (ws, req) => {
           reason: decision.reason || '',
         });
         if (decision.queue) {
-          utteranceParts.push(text);
+          appendFinalPart(utteranceParts, evt.text);
           if (!(speaking && !bargeInActive)) scheduleUtteranceFlush();
         }
         return;
@@ -4358,7 +4428,7 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
       overlapHold.consumeInterimIfMatches(text);
-      utteranceParts.push(text);
+      appendFinalPart(utteranceParts, evt.text);
       scheduleUtteranceFlush();
       return;
     }
@@ -6117,6 +6187,9 @@ async function runGeminiTurnStreaming(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
+  // A barge cancelled the hold. The outcome is not spoken on this turn, but
+  // the caller is still owed it on the next one (toolOutcomeQueue).
+  const bargedActionConfirmation = heldTools.toolHoldCancelled ? actionConfirmation : '';
   if (heldTools.toolHoldCancelled) actionConfirmation = '';
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
@@ -6147,6 +6220,7 @@ async function runGeminiTurnStreaming(
     spokenEmitted: buffer.getSpokenEmitted().length,
     model,
     actionConfirmation,
+    bargedActionConfirmation,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
     streamed: !streamFailed,
@@ -6229,6 +6303,9 @@ async function runGeminiTurn(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
+  // A barge cancelled the hold. The outcome is not spoken on this turn, but
+  // the caller is still owed it on the next one (toolOutcomeQueue).
+  const bargedActionConfirmation = heldTools.toolHoldCancelled ? actionConfirmation : '';
   if (heldTools.toolHoldCancelled) actionConfirmation = '';
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
@@ -6260,6 +6337,7 @@ async function runGeminiTurn(
     spokenEmitted: String(outputText || '').length,
     model,
     actionConfirmation,
+    bargedActionConfirmation,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
   };
