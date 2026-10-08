@@ -726,10 +726,14 @@ export function TenantForm({
       );
       return;
     }
+    let nextCount = 0;
     setServices((prev) => {
       const existing = prev.filter((s) => s.name.trim());
-      return [...existing, ...parsed].slice(0, 40);
+      const next = [...existing, ...parsed].slice(0, 40);
+      nextCount = next.length;
+      return next;
     });
+    setServicePage(Math.max(0, Math.ceil(nextCount / SERVICE_PAGE_SIZE) - 1));
     setBulkServicesText("");
     setBulkServicesError(null);
   }
@@ -1203,7 +1207,12 @@ export function TenantForm({
         >
         <div className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <p className={settingsBlockTitleClass}>Services</p>
+            <p className={settingsBlockTitleClass}>
+              Services
+              <span className="ml-2 font-normal tabular-nums text-ink-2">
+                ({services.filter((s) => s.name.trim()).length})
+              </span>
+            </p>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
