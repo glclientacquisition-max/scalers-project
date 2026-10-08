@@ -705,6 +705,7 @@ module.exports = {
   groundFilePriceLine,
   dropSpeechSlop,
   sentenceIsSpeechSlop,
+  sentenceIsMidCallFarewell,
   knownNumbers,
   numbersIn,
   splitSentences,

@@ -502,6 +502,26 @@ describe('voice score', () => {
     assert.equal(merged.checks.prematureTurn, 1);
   });
 
+  it('does not call a dropped mid-call farewell an incomplete reply', () => {
+    const card = scoreTurns([
+      {
+        turnIndex: 11,
+        caller: { text: 'Nadhani', language: 'sw', soniox: 'sw' },
+        stages: [
+          {
+            stage: 'model',
+            phase: 'output',
+            outputText: 'Sawa Alvin. Kama hauna swali lingine kwa sasa, uwe na siku njema!',
+          },
+          { stage: 'tts', text: 'Sawa Alvin', before: 'Sawa Alvin.', language: 'sw' },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(card.checks.incomplete, 0);
+    assert.equal(card.checks.deletedAnswer, 0);
+  });
+
   it('replays a fixture into a scorecard shape', async () => {
     const replay = await replayCall({
       callId: 'HD_shape',

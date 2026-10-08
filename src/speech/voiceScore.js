@@ -8,6 +8,7 @@ const {
   ENGLISH_JOB_LOANWORDS,
 } = require('../conversation/language');
 const { utteranceLooksIncomplete } = require('./turnTaking');
+const { sentenceIsMidCallFarewell } = require('../conversation/speechGuard');
 
 const LATENCY_BUDGET_MS = 1200;
 
@@ -234,6 +235,16 @@ function looksLikeKeptAnswer(text) {
   return SERVICE_NOUN.test(raw) || NAME_ANSWER.test(raw);
 }
 
+// A mid-call goodbye is dropped on purpose. It is not missing speech.
+function answerableProse(text) {
+  return String(text || '')
+    .split(/(?<=[.!?？])\s+/)
+    .map((part) => part.trim())
+    .filter((part) => part && !sentenceIsMidCallFarewell(part))
+    .join(' ')
+    .trim();
+}
+
 function appendSpeakNotes(turn, notes) {
   for (const row of turn?.stages || []) {
     if (row.stage === 'speak_packet') {
@@ -286,7 +297,7 @@ function scoreTurn(turn) {
     notes.push(`language ${callerLang} caller, ${spokenLang} reply`);
   }
 
-  const modelChars = modelText.trim().length;
+  const modelChars = answerableProse(modelText).length;
   const spokenChars = spoken.trim().length;
   if (!held && modelChars >= 40 && spokenChars / modelChars < 0.5) {
     checks.incomplete = 1;
