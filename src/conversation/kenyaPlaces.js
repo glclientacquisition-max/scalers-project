@@ -154,6 +154,31 @@ const SPOKEN_EVERYDAY = new Set([
   'zetu',
 ]);
 
+// Kiswahili numbers and clock words. A tiny locality can share the spelling
+// ("Mbili" is in Kisii) or sit one edit away ("usiku" -> Usigu, "mwaka" ->
+// Mwala), and a reply that reads the hours ("saa mbili asubuhi hadi saa kumi
+// na mbili jioni") is then dropped as a made-up place (HD_ee813bcf6248 t16/t17).
+// These words are never a place on their own, exact or fuzzy. A multi-word
+// place that happens to contain one still binds through the spaced lookup.
+const KISWAHILI_NUMBER_TIME_WORDS = new Set([
+  // numbers
+  'moja', 'mbili', 'tatu', 'nne', 'tano', 'sita', 'saba', 'nane', 'tisa', 'kumi',
+  'ishirini', 'thelathini', 'arobaini', 'hamsini', 'sitini', 'sabini', 'themanini',
+  'tisini', 'mia', 'elfu', 'laki', 'milioni', 'nusu', 'robo', 'kasoro', 'kamili',
+  // clock and day parts
+  'saa', 'masaa', 'dakika', 'sekunde', 'asubuhi', 'mchana', 'alasiri', 'jioni',
+  'usiku', 'manane', 'alfajiri', 'mapema', 'baadaye', 'ngapi', 'zamu',
+  // days and spans
+  'leo', 'kesho', 'kutwa', 'jana', 'juzi', 'siku', 'wiki', 'wikendi', 'mwezi',
+  'mwaka', 'kila', 'kuanzia', 'hadi', 'mpaka', 'mbele', 'jumatatu', 'jumanne',
+  'jumatano', 'alhamisi', 'ijumaa', 'jumamosi', 'jumapili',
+]);
+
+/** True when the token is a Kiswahili number or time word, never a place alone. */
+function isKiswahiliNumberTimeWord(token) {
+  return KISWAHILI_NUMBER_TIME_WORDS.has(normalizePlaceKey(token));
+}
+
 /**
  * One-edit place, or nothing.
  * Common Kiswahili and other short everyday words are never a fuzzy place.
@@ -161,7 +186,7 @@ const SPOKEN_EVERYDAY = new Set([
  * @returns {string}
  */
 function oneEditPlaceName(key) {
-  if (SPOKEN_EVERYDAY.has(key)) return '';
+  if (SPOKEN_EVERYDAY.has(key) || KISWAHILI_NUMBER_TIME_WORDS.has(key)) return '';
   const names = oneEditNames(key);
   if (names.length === 1) return names[0];
   const prefixed = names.filter((name) => name.startsWith(key) && name.length === key.length + 1);
@@ -177,6 +202,7 @@ function oneEditPlaceName(key) {
 function canonicalPlaceName(token) {
   const key = normalizePlaceKey(token);
   if (!key || key.includes(' ') || key.length < 5) return '';
+  if (KISWAHILI_NUMBER_TIME_WORDS.has(key)) return '';
   if (INDEX.places[key]) return key;
   return oneEditPlaceName(key);
 }
@@ -233,6 +259,7 @@ function nearestAllowedPlace(token, allowedNames) {
   const key = normalizePlaceKey(token);
   if (!key || key.includes(' ') || key.length < 5) return '';
   if (SPOKEN_EVERYDAY.has(key) && !INDEX.places[key]) return '';
+  if (KISWAHILI_NUMBER_TIME_WORDS.has(key)) return '';
   const allowed = allowedNames instanceof Set ? allowedNames : new Set(allowedNames || []);
   const edits = oneEditNames(key);
   if (edits.length > 1) {
@@ -314,6 +341,10 @@ function bindSpokenPlace(text, opts = {}) {
         break;
       }
     }
+    if (!hit && KISWAHILI_NUMBER_TIME_WORDS.has(words[i])) {
+      i += 1;
+      continue;
+    }
     if (!hit) {
       const exact = exactSpokenPlace(words[i]);
       if (exact) {
@@ -362,6 +393,8 @@ function countiesForPlace(text) {
 }
 
 module.exports = {
+  KISWAHILI_NUMBER_TIME_WORDS,
+  isKiswahiliNumberTimeWord,
   normalizePlaceKey,
   canonicalPlaceName,
   bindSpokenPlace,

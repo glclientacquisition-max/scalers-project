@@ -63,10 +63,24 @@ function joinSpoken(names, language = 'en') {
   return `${names.slice(0, -1).join(', ')}, ${conj} ${names[names.length - 1]}`;
 }
 
+// "You guys operate until what time?" (HD_ee813bcf6248 t16/t17) and its
+// variants. Each form names the business's own open/close/work verb, so a
+// visit-time question ("can you come until what time") stays out.
+const HOURS_ASK_VARIANTS = [
+  /\byou(?:\s+guys|\s+people|\s+all)?\s+(?:operate|operating|open|work|working|close|closing)\s+(?:until|till|til|up\s+to|to)\s+what\s+time\b/i,
+  /\b(?:until|till|up\s+to)\s+what\s+time\s+(?:do|are)\s+you(?:\s+guys|\s+people)?\s+(?:operate|operating|open|work|working)\b/i,
+  /\bwhat\s+time\s+(?:do|are)\s+you(?:\s+guys|\s+people)?\s+(?:open|opening|close|closing|operate|operating|start|finish)\b/i,
+  /\b(?:operating|working|business|opening|closing)\s+(?:hours|times?)\b/i,
+  /\bhow\s+late\s+(?:are|do)\s+you\b/i,
+  /\bwhen\s+(?:are|do)\s+you(?:\s+guys|\s+people)?\s+(?:open|close|operate)\b/i,
+  /\bmna(?:fanya\s+kazi|fungua|funga)\s+(?:mpaka|hadi)\s+saa\s+ngapi\b/i,
+  /\b(?:mpaka|hadi)\s+saa\s+ngapi\s+mna(?:fanya\s+kazi|fungua|funga)\b/i,
+];
+
 function looksLikeHoursAsk(text) {
   const raw = String(text || '').trim();
   if (!raw || looksLikeNewWork(raw)) return false;
-  return HOURS_ASK_RE.test(raw);
+  return HOURS_ASK_RE.test(raw) || HOURS_ASK_VARIANTS.some((re) => re.test(raw));
 }
 
 function dayKeyFromText(text, now) {
