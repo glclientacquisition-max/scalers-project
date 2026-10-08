@@ -4,6 +4,7 @@
 
 const { normalizeServices } = require('../conversation/liveKnowledge');
 const { normalizeLocations } = require('../conversation/businessLocations');
+const { coverageAreaNames } = require('../conversation/coverageAreas');
 
 /** Soft cap — Soniox context biasing degrades with huge unrelated term lists. */
 const MAX_STT_TERMS = Number(process.env.SONIOX_STT_CONTEXT_MAX_TERMS || 40);
@@ -83,8 +84,18 @@ function callerHearingNames(tenant = {}) {
   return names;
 }
 
+/** Coverage towns always get a hearing slot, at most this many. */
+const MAX_COVERAGE_TERMS = 12;
+
 function collectTenantTerms(tenant = {}) {
   const terms = [];
+  // Coverage towns are what callers name most ("do you cover Kitengela?").
+  // curateTerms keeps the longest terms first, so a long catalogue would push
+  // short town names out; they get reserved slots instead.
+  const towns = curateTerms(
+    coverageAreaNames(tenant.businessPolicies || tenant.business_policies),
+    Math.min(MAX_COVERAGE_TERMS, MAX_STT_TERMS)
+  );
 
   const businessName = cleanTerm(tenant.businessName || tenant.business_name);
   const agentName = cleanTerm(tenant.agentName || tenant.agent_name);
@@ -128,7 +139,12 @@ function collectTenantTerms(tenant = {}) {
   // Hearing bias only. These terms do not decide that a span is the caller name.
   for (const name of callerHearingNames(tenant)) terms.push(name);
 
-  return curateTerms(terms);
+  const townKeys = new Set(towns.map((t) => t.toLowerCase()));
+  const rest = curateTerms(
+    terms.filter((t) => !townKeys.has(cleanTerm(t).toLowerCase())),
+    MAX_STT_TERMS - towns.length
+  );
+  return [...rest, ...towns];
 }
 
 /**

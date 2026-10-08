@@ -7,6 +7,11 @@
 //   node scripts/soniox-tts-listen-harness.js --mode production
 //   node scripts/soniox-tts-listen-harness.js --id 05-phone-spaced-local
 //   node scripts/soniox-tts-listen-harness.js --fixture tests/fixtures/kenya-phonetic-listen.json --mode production
+//   node scripts/soniox-tts-listen-harness.js --fixture tests/fixtures/hd015b-tts-wire-listen.json --output output/hd015b-wire
+//
+// A case with a `pieces` array is one streamed reply. raw sends the pieces the
+// way the old wire did (joined with no gap, as Soniox concatenates them);
+// production streams them through pushText, which adds the word gap.
 //
 // Requires SONIOX_API_KEY + SONIOX_VOICE for WAV output. Without them, still writes
 // the scoring sheet and production-text manifest (no audio).
@@ -109,6 +114,32 @@ async function synthesizeToPcm(text, speakOpts) {
   try {
     const result = await session.speak(text, speakOpts);
     if (result?.empty) return Buffer.alloc(0);
+    return Buffer.concat(chunks);
+  } finally {
+    session.close();
+  }
+}
+
+async function synthesizeStreamToPcm(pieces, speakOpts) {
+  const chunks = [];
+  const session = createSonioxTtsSession({
+    callSid: 'tts-wire-harness',
+    onAudio: (pcm) => {
+      if (pcm?.length) chunks.push(pcm);
+    },
+  });
+  await session.ready;
+  try {
+    const stream = await session.beginSpeak(speakOpts);
+    let pushed = 0;
+    for (const piece of pieces) {
+      if (stream.pushText(piece).pushed) pushed += 1;
+    }
+    if (!pushed) {
+      stream.cancel();
+      return Buffer.alloc(0);
+    }
+    await stream.end();
     return Buffer.concat(chunks);
   } finally {
     session.close();
@@ -234,11 +265,17 @@ async function main() {
       }
 
       process.stdout.write(`[synth] ${c.id} ${mode}… `);
-      const pcm = await synthesizeToPcm(spoken, {
+      const speakOpts = {
         alreadyPrepared: true,
         language: prepared.language,
         callLanguage: c.callLanguage || 'en',
-      });
+      };
+      const pieces = Array.isArray(c.pieces) ? c.pieces.map(String) : null;
+      const pcm = !pieces
+        ? await synthesizeToPcm(spoken, speakOpts)
+        : mode === 'raw'
+          ? await synthesizeToPcm(pieces.join(''), speakOpts)
+          : await synthesizeStreamToPcm(pieces, speakOpts);
       if (!pcm.length) {
         console.log('empty');
         continue;

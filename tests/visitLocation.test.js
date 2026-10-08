@@ -307,3 +307,29 @@ describe('visit location ladder', () => {
     assert.doesNotMatch(home, /LOCATIONS landmark\/directions/);
   });
 });
+
+describe('a covered-town answer ends on a next step (HD_72ab69cbab2b T5)', () => {
+  const { coverageAskSpeech: speech, coverageNextStepQuestion } = require('../src/conversation/visitLocation');
+  const profile = {
+    vertical: 'home_services',
+    businessPolicies: { delivery: 'Nairobi and Kitengela' },
+  };
+
+  it('asks which service when none is on the call yet', () => {
+    const line = speech('What about Kitengela?', profile, 'en', { entities: {} });
+    assert.equal(line, 'Yes, we cover Kitengela. Which service would you like?');
+    assert.match(speech('Mnafika Kitengela?', profile, 'sw', null), /^Ndiyo, tunafika Kitengela\. Ungependa huduma gani\?$/);
+  });
+
+  it('asks for the open visit slot once the service is known', () => {
+    const state = { entities: { service: { value: 'Carpet Cleaning' } }, goal: { missingSlots: ['when_text'] } };
+    assert.equal(speech('What about Kitengela?', profile, 'en', state), 'Yes, we cover Kitengela. When would you like us to come?');
+    const where = { entities: { service: { value: 'Carpet Cleaning' } }, goal: { missingSlots: ['location'] } };
+    assert.equal(coverageNextStepQuestion('en', where), 'Where should we come?');
+    assert.equal(coverageNextStepQuestion('sw', where), 'Tuje wapi?');
+  });
+
+  it('an uncovered town still ends on the note offer', () => {
+    assert.match(speech('What about Ruaka?', profile, 'en', null), /\?$/);
+  });
+});

@@ -561,7 +561,36 @@ function isNoisePlace(place) {
  * Home-services "do you cover X" / "what about X".
  * Settings text only. No model, no map.
  */
-function coverageAskSpeech(text, profile = {}, language = 'en') {
+function serviceOnFile(state) {
+  const raw = state?.entities?.service;
+  const value = raw && typeof raw === 'object' ? raw.value : raw;
+  return String(value || '').trim() !== '';
+}
+
+/**
+ * The next step after a coverage answer, in the caller's language (ported
+ * from #609 3d495b58). No service yet: which service. Else the open visit
+ * slot: where, or when we should come.
+ * @param {string} [language]
+ * @param {object} [state]
+ */
+function coverageNextStepQuestion(language = 'en', state = null) {
+  const lang = String(language || 'en').toLowerCase();
+  const sw = lang === 'sw' || lang.startsWith('swahili') || lang === 'sheng';
+  if (!serviceOnFile(state)) return sw ? 'Ungependa huduma gani?' : 'Which service would you like?';
+  const missing = Array.isArray(state?.goal?.missingSlots) ? state.goal.missingSlots : [];
+  const needsWhen = missing.some((slot) => /^(?:when|when_text|time)$/.test(slot));
+  const needsPlace = missing.some((slot) => /^(?:location|landmark|area)$/.test(slot));
+  if (needsPlace && !needsWhen) return sw ? 'Tuje wapi?' : 'Where should we come?';
+  return sw ? 'Ungependa tuje lini?' : 'When would you like us to come?';
+}
+
+/**
+ * A coverage ask answered from the file. A covered town ends on a next step
+ * (HD_72ab69cbab2b T5: "Yes, we cover Kitengela." then five seconds of
+ * silence); an uncovered town ends on the note offer.
+ */
+function coverageAskSpeech(text, profile = {}, language = 'en', state = null) {
   if (String(profile?.vertical || '').toLowerCase() !== 'home_services') return '';
   const rawPlace = coverageAskPlace(text);
   if (!rawPlace) return '';
@@ -571,9 +600,10 @@ function coverageAskSpeech(text, profile = {}, language = 'en') {
   const sw = lang === 'sw' || lang.startsWith('swahili');
   const sheng = lang === 'sheng';
   if (coverage === 'inside') {
-    if (sw) return `Ndiyo, tunafika ${place}.`;
-    if (sheng) return `Ndio, tunafika ${place}.`;
-    return `Yes, we cover ${place}.`;
+    const next = coverageNextStepQuestion(language, state);
+    if (sw) return `Ndiyo, tunafika ${place}. ${next}`;
+    if (sheng) return `Ndio, tunafika ${place}. ${next}`;
+    return `Yes, we cover ${place}. ${next}`;
   }
   if (coverage === 'outside') return outsideCoverageSpeech(language);
   if (hasCoverageText(profile)) return unsureCoverageSpeech(language);
@@ -654,6 +684,7 @@ module.exports = {
   unsureCoverageSpeech,
   coverageAskPlace,
   coverageAskSpeech,
+  coverageNextStepQuestion,
   isNoisePlace,
   appendVisitNotes,
 };

@@ -5,6 +5,7 @@ const WebSocket = require('ws');
 const { randomUUID } = require('crypto');
 
 const { prepareForTts } = require('./ttsNormalize');
+const { wireTextForPiece } = require('./ttsBoundary');
 const { resolveSonioxVoice, resolveSonioxTtsModel } = require('./sonioxVoice');
 const { classifySonioxError } = require('./sonioxErrors');
 const {
@@ -258,6 +259,8 @@ function createSonioxTtsSession({
     let speed = speedHint;
     let configured = false;
     let ended = false;
+    // Pieces already sent on this stream. Every later piece opens with a space.
+    let piecesSent = 0;
 
     const waiter = {
       cancelled: false,
@@ -312,14 +315,18 @@ function createSonioxTtsSession({
             language: opts.language || language || undefined,
             extraLexicon: opts.extraLexicon,
           });
-      const clean = prepared.text;
-      if (!clean) return { pushed: false, language: prepared.language };
+      // No letterless piece, and a word gap between pieces of one stream
+      // (src/speech/ttsBoundary.js).
+      const wire = wireTextForPiece(prepared.text, { first: piecesSent === 0 });
+      if (!wire) return { pushed: false, language: prepared.language };
+      const clean = wire.trim();
 
       ensureConfigured(prepared.language);
-      sendJson({ text: clean, text_end: false, stream_id: streamId });
+      sendJson({ text: wire, text_end: false, stream_id: streamId });
+      piecesSent += 1;
       console.log(
-        `[soniox-tts][${callSid}] chunk stream=${streamId} chars=${clean.length}` +
-          ` original=${JSON.stringify(prepared.original)} spoken=${JSON.stringify(clean)}`
+        `[soniox-tts][${callSid}] chunk stream=${streamId} piece=${piecesSent} chars=${clean.length}` +
+          ` original=${JSON.stringify(prepared.original)} spoken=${JSON.stringify(wire)}`
       );
       return { pushed: true, language: prepared.language, text: clean };
     }

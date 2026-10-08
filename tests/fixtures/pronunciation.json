@@ -13,7 +13,8 @@
       "text": "We cover Ruiru and Thika near the CBD.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectIncludes": ["Roo-ee-roo", "Thee-kah", "C B D"]
+      "expectIncludes": ["We cover Ruiru and Thika", "C B D"],
+      "expectExcludes": ["Roo-ee-roo", "Thee-kah"]
     },
     {
       "id": "money-kes-en",
@@ -98,7 +99,8 @@
       "text": "We are on Muindi Mbingu Street opposite City Market.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectIncludes": ["Moo-in-dee Mbeen-goo"]
+      "expectIncludes": ["Muindi Mbingu Street"],
+      "expectExcludes": ["Moo-in-dee"]
     },
     {
       "id": "retail-manga",

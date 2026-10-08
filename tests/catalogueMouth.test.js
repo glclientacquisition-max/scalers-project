@@ -195,8 +195,8 @@ describe('VOICE_GEMINI_CATALOGUE', () => {
     const prepared = prepareForTts(mouth.line, { callLanguage: 'sw' });
     assert.doesNotMatch(prepared.text, /\bna and\b/i);
     assert.doesNotMatch(prepared.text, /\bperiod\b/i);
-    assert.match(prepared.text, /na General cleaning na zingine/);
-    assert.doesNotMatch(prepared.text, /[.?]/);
+    assert.match(prepared.text, /na General cleaning, na zingine\./);
+    assert.match(prepared.text, /Unahitaji gani\?$/);
   });
 
   it('does not steal an hours line', () => {
@@ -266,7 +266,7 @@ describe('catalogue TTS is one breath', () => {
     assert.doesNotMatch(prepared.text, /\bperiod\b/i);
     assert.match(
       prepared.text,
-      /Couch cleaning and Mattress cleaning and Carpet cleaning/
+      /Couch cleaning, Mattress cleaning, and Carpet cleaning/
     );
   });
 });

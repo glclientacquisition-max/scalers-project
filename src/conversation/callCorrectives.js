@@ -353,7 +353,9 @@ function spaceSpokenWords(text) {
     if (REAL_GLUE_WORDS.has(`${head}${rest}`.toLowerCase())) return full;
     return `${head} ${rest}`;
   });
-  t = t.replace(/,(\S)/g, ', $1');
+  // A digit on both sides is a thousands separator (KSh 6,000), not a pause.
+  // HD_015bae4a4af2 spaced it to "6, 000" and the price was dropped as unsaid.
+  t = t.replace(/,(?=\S)(?!(?<=\d,)\d)/g, ', ');
   return t.replace(/\s+/g, ' ').trim();
 }
 
