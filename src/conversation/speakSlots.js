@@ -113,6 +113,26 @@ function takePendingSpeakSlot(state) {
  * Voice calls this with the lines it actually spoke (the fact, then the
  * name ask). A spoken fact leaves the queue. An unspoken fact stays.
  */
+/**
+ * A tool outcome that landed after barge-in. The barged turn does not speak
+ * it. The next turn that is allowed to reply does.
+ */
+function queueToolOutcome(state, line) {
+  const text = slotLine(line);
+  if (!state || !text) return '';
+  if (!state.conversation || typeof state.conversation !== 'object') {
+    state.conversation = {};
+  }
+  state.conversation.pendingToolOutcome = text;
+  return text;
+}
+
+function takeToolOutcome(state) {
+  const text = slotLine(state?.conversation?.pendingToolOutcome);
+  if (state?.conversation) state.conversation.pendingToolOutcome = '';
+  return text;
+}
+
 function drainSpokenSpeakSlots(state, spokenLines) {
   const slots = ensureSlots(state);
   if (!slots) return;
@@ -131,4 +151,6 @@ module.exports = {
   pendingSpeakSlot,
   takePendingSpeakSlot,
   drainSpokenSpeakSlots,
+  queueToolOutcome,
+  takeToolOutcome,
 };

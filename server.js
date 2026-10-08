@@ -307,6 +307,8 @@ const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/t
 const {
   drainSpokenSpeakSlots,
   isSpeakSlotOutcome,
+  queueToolOutcome,
+  takeToolOutcome,
 } = require('./src/conversation/speakSlots');
 const { narratesInternalAction, groundFilePriceLine } = require('./src/conversation/speechGuard');
 const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
@@ -3064,6 +3066,19 @@ mediaWss.on('connection', (ws, req) => {
         );
         return;
       }
+      const owedOutcome = takeToolOutcome(brainState);
+      if (owedOutcome) {
+        callBrainStates.set(callKey, brainState);
+        console.log(`[ws/media][${callKey}] speaking queued tool outcome`);
+        callTranscript.pushAgent(owedOutcome);
+        const owedSpoken = await speakText(owedOutcome);
+        if (owedSpoken?.ok) {
+          messages.push({ role: 'assistant', content: owedOutcome, local: true });
+        } else {
+          queueToolOutcome(brainState, owedOutcome);
+          callBrainStates.set(callKey, brainState);
+        }
+      }
       const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
       const nameJustConfirmed = brainState?.caller?.nameJustConfirmed === true;
       const askingName = !nameGate.runModel && Boolean(fileNameAsk) && !nameJustConfirmed;
@@ -3669,6 +3684,7 @@ mediaWss.on('connection', (ws, req) => {
             }
             console.log(`[ws/media][${sidLabel()}] discarding streamed reply after barge-in`);
             discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
+            queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation);
             bargeInActive = false;
             speakSession = null;
             if (activePlaybackGeneration === streamPlaybackGen) {
@@ -3689,6 +3705,7 @@ mediaWss.on('connection', (ws, req) => {
             }
             console.log(`[ws/media][${sidLabel()}] discarding streamed reply after barge-in`);
             discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
+            queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation);
             bargeInActive = false;
             speakSession = null;
             if (activePlaybackGeneration === streamPlaybackGen) {
@@ -3813,6 +3830,7 @@ mediaWss.on('connection', (ws, req) => {
           }
         } else {
           discardUnspokenAssistant(result?.spokenText || '');
+          queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation);
           bargeInActive = false;
           logTurnTiming(turnTiming, { outcome: 'barge_in' });
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;
@@ -3856,6 +3874,7 @@ mediaWss.on('connection', (ws, req) => {
         if (bargeInActive) {
           console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
           discardUnspokenAssistant(reply);
+          queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation);
           bargeInActive = false;
           logTurnTiming(turnTiming, { outcome: 'barge_in' });
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;

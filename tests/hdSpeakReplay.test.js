@@ -56,7 +56,7 @@ const { joinCallerFragments } = require('../src/speech/lateFinal');
 const { looksLikeEcho, utteranceLooksIncomplete, decideTurnEnd } = require('../src/speech/turnTaking');
 const { farewellLine, planBrainEndClose } = require('../src/speech/callClose');
 const { canonicalPlaceName } = require('../src/conversation/kenyaPlaces');
-const { drainSpokenSpeakSlots } = require('../src/conversation/speakSlots');
+const { drainSpokenSpeakSlots, queueToolOutcome, takeToolOutcome } = require('../src/conversation/speakSlots');
 const { fileServicePriceLine } = require('../src/conversation/catalogueMouth');
 const {
   authorizeSpeak,
@@ -1421,5 +1421,22 @@ describe('HD_e369cba6565d free caller', () => {
       assert.match(line, /2500/);
       assert.doesNotMatch(line, /Carpet/, ask);
     }
+  });
+
+  it('keeps a barged save confirmation for the next reply', () => {
+    const state = createBrainState(DUSTED);
+    state.caller.name = 'Alvin';
+    state.caller.nameConfirmed = true;
+    const saved = 'Sawa, nimehifadhi ombi lako.';
+    assert.equal(queueToolOutcome(state, saved), saved);
+    state.conversation.answersReceived = ["And, uh, let's say"];
+    const held = planCallerModelTurn(state, { fileNameAskCommitted: true });
+    assert.equal(held.hold, 'unfinished');
+    assert.equal(state.conversation.pendingToolOutcome, saved);
+    state.conversation.answersReceived.push('At what time do you close?');
+    const next = planCallerModelTurn(state, { fileNameAskCommitted: true });
+    assert.equal(next.hold, undefined);
+    assert.equal(takeToolOutcome(state), saved);
+    assert.equal(takeToolOutcome(state), '');
   });
 });

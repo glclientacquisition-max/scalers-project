@@ -115,6 +115,19 @@ assert.match(
 
 assert.match(
   source,
+  /queueToolOutcome\(callBrainStates\.get\(callKey\), result\?\.actionConfirmation\)/,
+  'a tool outcome that lands after barge-in stays queued'
+);
+
+const unfinishedAt = source.indexOf('unfinished turn, reply waits');
+const takeOutcomeAt = source.indexOf('takeToolOutcome(brainState)');
+assert.ok(
+  unfinishedAt > 0 && takeOutcomeAt > unfinishedAt,
+  'the queued tool outcome is spoken on the next reply, after an unfinished hold'
+);
+
+assert.match(
+  source,
   /guardToolPlan\(\s*ensureRequiredEscalate\(\s*ensureRequiredCreateRequest\(/,
   'Gemini tool markers must pass the tool guard after required-tool injection'
 );
