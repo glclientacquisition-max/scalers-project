@@ -4,10 +4,6 @@
  * A pull request into another feature branch is included. Closing one runs
  * this again, so that change leaves staging.
  *
- * Label skip-staging on an open pull request excludes it from the rebuild.
- * Use that to keep a curated staging tip without closing the PR. hold-staging
- * still freezes the rebuild entirely (see stage-pull-request-hold.js).
- *
  * The workflow checks out main and runs this file. It fetches pull request
  * refs and merges those refs. It does not execute files from the pull requests.
  */
@@ -48,25 +44,13 @@ function runGit(cwd, args, { allowFail = false } = {}) {
   }
 }
 
-const SKIP_STAGING_LABEL = "skip-staging";
-
-function rowHasLabel(row, name) {
-  const labels = row && row.labels;
-  if (!Array.isArray(labels)) return false;
-  return labels.some((label) => {
-    if (typeof label === "string") return label === name;
-    return Boolean(label && label.name === name);
-  });
-}
-
 function selectStagingPulls(rows, { stagingBranch = STAGING_BRANCH } = {}) {
   return (Array.isArray(rows) ? rows : [])
     .filter(
       (row) =>
         row &&
         row.headRefName !== stagingBranch &&
-        row.baseRefName !== stagingBranch &&
-        !rowHasLabel(row, SKIP_STAGING_LABEL)
+        row.baseRefName !== stagingBranch
     )
     .map((row) => Number(row.number))
     .filter((number) => Number.isInteger(number) && number > 0)
@@ -87,7 +71,7 @@ function listOpenPullNumbers({ repo, stagingBranch = STAGING_BRANCH } = {}) {
       "--limit",
       "200",
       "--json",
-      "number,headRefName,baseRefName,labels",
+      "number,headRefName,baseRefName",
     ],
     { encoding: "utf8" }
   );
@@ -259,7 +243,6 @@ if (require.main === module) main();
 
 module.exports = {
   STAGING_BRANCH,
-  SKIP_STAGING_LABEL,
   STAGING_DESK_URL,
   NOTE_MARKER,
   decideStage,
