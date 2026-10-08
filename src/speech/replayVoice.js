@@ -2,6 +2,8 @@
 // polishSpokenReply, empty-turn repair, cutNoAiSlop, prepareForTts.
 // Recorded mode speaks the fixture's model text. Live mode asks Gemini,
 // then the same mouth. A later phase swaps `respond` without a new harness.
+// mouth: 'structured' replays the Phase 2 mouth (VOICE_STRUCTURED_OUTPUT=on):
+// src/speech/structured/replay.js, one tts row per wire piece.
 
 const { polishSpokenDetail, planEmptyGeminiSpeech } = require('../conversation/dynamicSpeech');
 const { parseGeminiResponse } = require('../conversation/toolMarkers');
@@ -137,7 +139,7 @@ function lostFinalStages(turn) {
   ];
 }
 
-function replayTurn(turn, ctx) {
+function replayTurn(turn, ctx, override = null) {
   const caller = String(turn.caller || '');
   const missingModel = turn.model?.outputText == null || turn.model.outputText === '';
   if (turn.unlogged && missingModel && !turn.canned?.text) {
@@ -182,7 +184,9 @@ function replayTurn(turn, ctx) {
   }
   if (modelText == null) modelText = '';
 
-  const mouth = modelText
+  const mouth = override
+    ? override
+    : modelText
     ? speakModelText(modelText, speech, caller)
     : {
         spoken: canned?.text || '',
@@ -191,7 +195,7 @@ function replayTurn(turn, ctx) {
         stages: [],
         canned,
       };
-  if (!modelText && canned) {
+  if (!modelText && canned && !override) {
     const prepared = prepareForTts(canned.text, { callLanguage: speech.language });
     mouth.before = canned.text;
     mouth.spoken = prepared.text || canned.text;
@@ -229,10 +233,12 @@ function replayTurn(turn, ctx) {
       promptId,
       promptVersion,
       language: speech.language,
-      outputText: modelText,
+      outputText: override?.structured ? override.modelProse : modelText,
       chars: turn.model?.chars ?? modelText.length,
       spokenEmitted: turn.model?.spokenEmitted ?? null,
+      ...(override?.structured ? { raw: override.raw, legacyText: modelText } : {}),
     },
+    ...(override?.structured ? [override.structured] : []),
     ...mouth.stages,
   ];
   if (canned && !mouth.stages.some((row) => row.stage === 'canned')) {
@@ -292,7 +298,21 @@ function replayTurn(turn, ctx) {
       durationMs: turn.observed?.playedMs ?? null,
     });
   }
-  if (!barged) {
+  if (!barged && Array.isArray(mouth.pieces)) {
+    // Structured mouth: what each Soniox text message carried, one stream per turn.
+    for (const piece of mouth.pieces) {
+      stages.push({
+        stage: 'tts',
+        text: piece.text,
+        before: piece.before,
+        wire: piece.wire,
+        stream: `turn-${ctx.turnIndex}`,
+        structured: true,
+        language: piece.language,
+        voiceId: ctx.voiceId || null,
+      });
+    }
+  } else if (!barged) {
     stages.push({
       stage: 'tts',
       text: mouth.spoken,
@@ -303,7 +323,9 @@ function replayTurn(turn, ctx) {
   }
   stages.push({
     stage: 'outcome',
-    value: turn.outcome || (mouth.spoken && !barged ? 'replay' : 'silence'),
+    value: mouth.structured?.needsRecording
+      ? 'needs_recording'
+      : turn.outcome || (mouth.spoken && !barged ? 'replay' : 'silence'),
   });
   stages.push({
     stage: 'latency',
@@ -376,8 +398,19 @@ async function liveGeminiText({ caller, history, language, fixture }) {
   };
 }
 
+function structuredSpeechInputs(turn, ctx) {
+  const caller = String(turn.caller || '');
+  const evidence = analyzeCallerLanguage(caller);
+  const sticky = evidence.language === 'unknown' ? ctx.language || 'unknown' : evidence.language;
+  const speech = speechContext(ctx.state, ctx.callerTurns.concat(caller), sticky, ctx.fixture);
+  const modelText = turn.model && turn.model.outputText != null ? String(turn.model.outputText) : '';
+  const canned = !modelText && turn.canned?.text ? { path: turn.canned.path || 'canned', text: String(turn.canned.text) } : null;
+  return { speech, modelText, canned };
+}
+
 async function replayCall(fixture, opts = {}) {
   const mode = opts.mode === 'live' ? 'live' : 'recorded';
+  const structuredMouth = opts.mouth === 'structured';
   const state = initialState(fixture);
   const ctx = {
     fixture,
@@ -387,6 +420,7 @@ async function replayCall(fixture, opts = {}) {
     language: 'unknown',
     turnIndex: 0,
     voiceId: fixture.voiceId || null,
+    structuredLive: opts.structuredLive || null,
   };
   const turns = [];
   for (const turn of fixture.turns || []) {
@@ -412,6 +446,21 @@ async function replayCall(fixture, opts = {}) {
         canned: null,
       };
     }
+    if (structuredMouth && !(next.unlogged && !next.model?.outputText && !next.canned?.text)) {
+      const { speakStructured } = require('./structured/replay');
+      const inputs = structuredSpeechInputs(next, ctx);
+      const override = await speakStructured({
+        turn: next,
+        turnIndex: ctx.turnIndex,
+        ctx,
+        speech: inputs.speech,
+        modelText: inputs.modelText,
+        canned: inputs.canned,
+        sidecar: opts.structuredRecording || null,
+      });
+      turns.push(replayTurn(next, ctx, override));
+      continue;
+    }
     turns.push(replayTurn(next, ctx));
   }
   return {
@@ -421,6 +470,7 @@ async function replayCall(fixture, opts = {}) {
     callId: fixture.callId,
     tenantId: fixture.tenantId || null,
     mode,
+    ...(structuredMouth ? { mouth: 'structured' } : {}),
     turns,
   };
 }

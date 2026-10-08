@@ -476,7 +476,20 @@ function scoreTurn(turn) {
     notes.push(`language ${callerLang} caller, ${spokenLang} reply`);
   }
 
-  const modelChars = modelText.trim().length;
+  // Structured mouth: a dropped second question is intentional, and a
+  // sentence answered from data counts at the length of the data line.
+  const modelChars = Math.max(
+    0,
+    (turn.stages || [])
+      .filter((row) => row.stage === 'transform')
+      .reduce((chars, row) => {
+        if (row.reason === 'stacked_question') return chars - String(row.before || '').trim().length - 1;
+        if (row.name === 'structured_verify' && String(row.after || '').trim()) {
+          return chars - String(row.before || '').trim().length + String(row.after).trim().length;
+        }
+        return chars;
+      }, modelText.trim().length)
+  );
   const spokenChars = spoken.trim().length;
   if (!held && modelChars >= 40 && spokenChars / modelChars < 0.5) {
     checks.incomplete = 1;
@@ -506,12 +519,26 @@ function scoreTurn(turn) {
   const droppedAnswer = (turn.stages || []).some(
     (row) => row.stage === 'transform' && row.dropped && looksLikeKeptAnswer(row.before)
   );
+  // The structured mouth keeps one question per reply. A second question it
+  // dropped on purpose (reason stacked_question) is not a deleted answer.
+  const stackedDrops = (turn.stages || [])
+    .filter((row) => row.stage === 'transform' && row.reason === 'stacked_question')
+    .map((row) => normalizeSpeech(row.before));
   const droppedQuestion = (turn.stages || []).some(
-    (row) => row.stage === 'transform' && row.dropped && questionMissing(row.before, spoken)
+    (row) =>
+      row.stage === 'transform' &&
+      row.dropped &&
+      row.reason !== 'stacked_question' &&
+      questionMissing(row.before, spoken)
   );
   const modelAnswerMissing =
     looksLikeKeptAnswer(modelText) && !looksLikeKeptAnswer(spoken) && modelText.trim() !== spoken.trim();
-  const modelQuestionMissing = questionMissing(model?.outputText || '', spoken);
+  const modelQuestionMissing = stackedDrops.length
+    ? questionsOf(modelProse(model?.outputText || '')).some((question) => {
+        const body = normalizeSpeech(question);
+        return body.length > 0 && !stackedDrops.includes(body) && !normalizeSpeech(spoken).includes(body);
+      })
+    : questionMissing(model?.outputText || '', spoken);
   const droppedFact = factSentenceDropped(turn);
   if (!held && (droppedAnswer || droppedQuestion || modelAnswerMissing || modelQuestionMissing || droppedFact)) {
     checks.deletedAnswer = 1;
@@ -553,6 +580,21 @@ function scoreTurn(turn) {
       checks: emptyChecks(),
       mouth: mouth.checks,
       notes: ['raw model text was not logged', ...mouth.notes],
+    };
+  }
+  // Structured replay of a MOCK whose recorded legacy text is in another
+  // language than the lock: only a live structured recording can say what
+  // the model would write, so the turn is not scored either way.
+  if (stage(turn, 'outcome')?.value === 'needs_recording') {
+    return {
+      turnIndex: turn.turnIndex,
+      caller,
+      spoken,
+      score: null,
+      omit: true,
+      checks: emptyChecks(),
+      mouth: mouth.checks,
+      notes: ['needs a live structured recording (mock language differs from the lock)', ...mouth.notes],
     };
   }
 
