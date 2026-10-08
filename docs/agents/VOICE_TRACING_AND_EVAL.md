@@ -150,5 +150,6 @@ The fixtures are built from Railway logs and the transcript rows on 2026-10-06. 
 | `HD_21b92f25640b` | Production, 2026-10-05 19:12Z. Esga Stationery. |
 | `HD_0789461c5319` | Staging, 2026-10-07 20:49Z (23:49 EAT). Done and Dusted. First call with `voice_turn_traces`. |
 | `HD_e369cba6565d` | Staging, 2026-10-08 07:05Z (10:05 EAT). Done and Dusted, release `efb691b8`. A barged reply keeps its recorded text (`liveOutcome: barge_in`) so the mouth is gated on it. |
+| `HD_48e5ce069c12` | Staging, 2026-10-08 09:12Z (12:12 EAT). Done and Dusted with the real 16-service file, release `77a63f9e`. Kitengela called outside (coverage was missing from the prompt), then a corrected line with no next step and 7.2 s of silence. The live tenant snapshot is `tests/fixtures/tenants/done-and-dusted-staging.json`. |
 
 Today's code is expected to score badly. That is the baseline.

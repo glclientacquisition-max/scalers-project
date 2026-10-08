@@ -204,3 +204,25 @@ describe('HD_48e5 T1/T2 catalogue line from the real 16-row file', () => {
     assert.equal(closingQuestionToSpeak('Okay.', 'Okay.'), '');
   });
 });
+
+describe('HD_48e5 replay fixture', () => {
+  const { replayCall } = require('../src/speech/replayVoice');
+  const FIXTURE = require('./fixtures/voice-calls/HD_48e5ce069c12.json');
+
+  it('replays t5 as one coverage sentence that ends on the next step', async () => {
+    const call = await replayCall(FIXTURE);
+    const turns = (call.turns || []).filter((r) => r.recordKind === 'turn');
+    const t5 = turns.find((r) => r.turnIndex === 5);
+    const tts = (t5.stages || []).filter((s) => s.stage === 'tts').pop();
+    assert.equal(
+      tts.before,
+      'We cover Nairobi and its close surroundings, and Kitengela too. When would you like us to come?'
+    );
+    assert.doesNotMatch(tts.before, /Yes, we cover|outside/);
+  });
+
+  it('carries the real 16-row file and the picked coverage list', () => {
+    assert.equal(FIXTURE.servicesCatalog.length, 16);
+    assert.ok(FIXTURE.businessPolicies.coverage_areas.includes('place:kitengela'));
+  });
+});
