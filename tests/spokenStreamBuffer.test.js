@@ -32,6 +32,19 @@ test('inserts a space when Gemini drops it between words', () => {
   assert.strictEqual(joinSpokenPieces('Carpet cle', 'aning ranges'), 'Carpet cleaning ranges');
 });
 
+test('HD_48e5ce069c12 repairs a dropped space before a function word only', () => {
+  assert.strictEqual(joinSpokenPieces('I apologize', 'for the inconvenience'), 'I apologize for the inconvenience');
+  assert.strictEqual(joinSpokenPieces('We clean', 'the whole house'), 'We clean the whole house');
+  assert.strictEqual(joinSpokenPieces('Thanks for calling', 'your visit'), 'Thanks for calling your visit');
+  // Not a word start, or too short a left side to know: stay glued.
+  assert.strictEqual(joinSpokenPieces('Carpet cle', 'aning ranges'), 'Carpet cleaning ranges');
+  assert.strictEqual(joinSpokenPieces('Is th', 'is okay'), 'Is this okay');
+  assert.strictEqual(joinSpokenPieces('Kiten', 'gela'), 'Kitengela');
+  assert.strictEqual(joinSpokenPieces('There', 'fore'), 'Therefore');
+  assert.strictEqual(joinSpokenPieces('the brea', 'the'), 'the breathe');
+  assert.strictEqual(joinSpokenPieces('apolog', 'ize for'), 'apologize for');
+});
+
 test('HD_0ef68f8e7930 stream deltas speak with spaces', () => {
   const buf = createSpokenStreamBuffer();
   const emitted = [

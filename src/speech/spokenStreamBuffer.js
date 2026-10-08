@@ -24,8 +24,15 @@ function joinSpokenPieces(left, right) {
   ) {
     return `${a} ${b}`;
   }
+  // HD_48e5ce069c12 "apologizefor". A lowercase word of five or more letters,
+  // then a piece that opens with a whole function word. No dictionary: these
+  // words almost never end a longer word, and a short left side ("th" + "is")
+  // is never split.
+  if (/[a-z]{5,}$/.test(a) && BOUNDARY_WORD.test(b)) return `${a} ${b}`;
   return a + b;
 }
+
+const BOUNDARY_WORD = /^(?:for|the|your|with|from)(?=[\s,.!?;:]|$)/;
 
 /**
  * Strip complete tool blocks and end-call markers for speech.
