@@ -34,6 +34,7 @@ const {
 const { catalogueAskInPlay } = require('./fileRead');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
 const { fillSpeakSlot, takePendingSpeakSlot } = require('./speakSlots');
+const { unfinishedTurnHold } = require('./unfinishedTurn');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
@@ -108,6 +109,26 @@ function planCallerModelTurn(state, opts = {}) {
   }
   const line = fileNameAskLine(state);
   const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
+  // An unfinished turn ("Nilikuwa nauliza,") does not start a reply, and the
+  // name ask is a reply. Voice holds it on a timer and passes holdTimedOut
+  // when the caller stayed quiet, so it is not held twice.
+  // unfinishedDecided: Voice already ran this gate before Brain committed.
+  if (
+    opts.unfinishedDecided !== true &&
+    unfinishedTurnHold(state, {
+      text: latest,
+      profile: opts.profile,
+      agentAwaitingReply: opts.agentAwaitingReply,
+      holdTimedOut: opts.holdTimedOut,
+    })
+  ) {
+    return { runModel: false, line: '', hold: 'unfinished' };
+  }
+  // A held fragment the caller left hanging is answered by the model, never
+  // by an early-return line (HD_72ab69cbab2b T1). The name ask stays due.
+  if (line && opts.holdTimedOut === true) {
+    return { runModel: true, line: '', nameAskDeferred: true };
+  }
   // Staging listen: Gemini speaks the catalogue even when a file name is pending.
   // The name ask stays for the next turn. Flag off keeps the name-ask early return.
   if (line && geminiCatalogueEnabled() && freshCatalogueAsk(latest)) {
