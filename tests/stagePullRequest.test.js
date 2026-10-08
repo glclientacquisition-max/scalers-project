@@ -104,6 +104,36 @@ describe("selectStagingPulls", () => {
     ]);
     assert.deepEqual(numbers, [12, 10]);
   });
+
+  it("excludes a pull request labeled skip-staging and keeps one without the label", () => {
+    const numbers = selectStagingPulls([
+      {
+        number: 14,
+        headRefName: "cursor/phase2",
+        baseRefName: "main",
+        labels: [{ name: "skip-staging" }],
+      },
+      {
+        number: 12,
+        headRefName: "cursor/m0-coverage",
+        baseRefName: "main",
+        labels: [{ name: "voice" }],
+      },
+      {
+        number: 11,
+        headRefName: STAGING_BRANCH,
+        baseRefName: "main",
+        labels: [],
+      },
+      {
+        number: 10,
+        headRefName: "cursor/into-staging",
+        baseRefName: STAGING_BRANCH,
+        labels: [{ name: "skip-staging" }],
+      },
+    ]);
+    assert.deepEqual(numbers, [12]);
+  });
 });
 
 describe("rebuildStaging", () => {
