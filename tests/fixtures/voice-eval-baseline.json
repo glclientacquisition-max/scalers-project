@@ -1,7 +1,7 @@
 {
   "schema": "scalers.voice.eval-baseline",
   "schemaVersion": 1,
-  "recordedAt": "2026-10-08T01:37:54.830Z",
+  "recordedAt": "2026-10-08T08:04:20.561Z",
   "calls": {
     "HD_053dd373ee84": {
       "score": 82.5,
@@ -46,14 +46,14 @@
       "nameAsks": 4
     },
     "HD_48631816b68c": {
-      "score": 68.6,
+      "score": 70.7,
       "checks": {
         "languageMismatch": 5,
         "incomplete": 4,
         "repeatedQuestion": 1,
         "silence": 0,
         "deletedAnswer": 5,
-        "respelling": 4,
+        "respelling": 0,
         "prematureTurn": 1,
         "slow": 9
       },
@@ -73,15 +73,29 @@
       },
       "nameAsks": 1
     },
+    "HD_e369cba6565d": {
+      "score": 81.1,
+      "checks": {
+        "languageMismatch": 1,
+        "incomplete": 1,
+        "repeatedQuestion": 1,
+        "silence": 0,
+        "deletedAnswer": 0,
+        "respelling": 1,
+        "prematureTurn": 5,
+        "slow": 14
+      },
+      "nameAsks": 1
+    },
     "HD_e3fb94e1bd0d": {
-      "score": 94.5,
+      "score": 95.5,
       "checks": {
         "languageMismatch": 0,
         "incomplete": 0,
         "repeatedQuestion": 0,
         "silence": 0,
         "deletedAnswer": 0,
-        "respelling": 1,
+        "respelling": 0,
         "prematureTurn": 1,
         "slow": 4
       },
