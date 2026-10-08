@@ -3057,10 +3057,10 @@ mediaWss.on('connection', (ws, req) => {
         greetingBarged: greetingInterrupted && !greetingSettled,
         fileNameAskCommitted: fileNameAsksCommitted > 0,
       });
-      // "Nilikuwa nataka kujua," has not named the ask. Wait. Do not ask the name.
+      // An unfinished caller turn does not start a reply. The turn-end cap already waited.
       if (nameGate.hold === 'unfinished') {
         console.log(
-          `[ws/media][${callKey}] unfinished opening, name ask waits lang=${callLanguage}`
+          `[ws/media][${callKey}] unfinished turn, reply waits lang=${callLanguage}`
         );
         return;
       }

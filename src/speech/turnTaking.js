@@ -209,6 +209,7 @@ function utteranceLooksIncomplete(text) {
   if (/\b(let me think|i('m| am) thinking)\s*$/i.test(core)) return true;
   if (/^(actually|i said)$/i.test(norm)) return true;
   if (/\b(actually|i said)\s*$/i.test(core)) return true;
+  if (/\b(?:let'?s|let us)\s+say\s*$/i.test(core)) return true;
   return false;
 }
 

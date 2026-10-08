@@ -109,8 +109,8 @@ function planCallerModelTurn(state, opts = {}) {
   }
   const line = fileNameAskLine(state);
   const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
-  // "Nilikuwa nataka kujua," has not finished. Wait for the ask or a continuation.
-  if (line && callerTurnStillOpen(latest)) {
+  // An unfinished turn waits out the turn-end cap, then still does not start a reply.
+  if (callerTurnStillOpen(latest)) {
     return { runModel: false, line: '', hold: 'unfinished' };
   }
   // Staging listen: Gemini speaks the catalogue even when a file name is pending.

@@ -53,7 +53,8 @@ const { lockFileNameAsk, gateCallerFileSpeech } = require('../src/speech/callerF
 const { offerActOf } = require('../src/speech/offerAct');
 const { prepareForTts } = require('../src/speech/ttsNormalize');
 const { joinCallerFragments } = require('../src/speech/lateFinal');
-const { looksLikeEcho } = require('../src/speech/turnTaking');
+const { looksLikeEcho, utteranceLooksIncomplete, decideTurnEnd } = require('../src/speech/turnTaking');
+const { farewellLine, planBrainEndClose } = require('../src/speech/callClose');
 const { canonicalPlaceName } = require('../src/conversation/kenyaPlaces');
 const { drainSpokenSpeakSlots } = require('../src/conversation/speakSlots');
 const {
@@ -1342,5 +1343,60 @@ describe('HD_e369cba6565d free caller', () => {
     });
     assert.match(kisumu, /Hatufiki Kisumu/);
     assert.match(kisumu, /kukuachia ujumbe/);
+  });
+
+  it('holds an unfinished turn and does not say goodbye mid-call', () => {
+    const profile = {
+      ...DUSTED,
+      callerMemory: { name: 'Alvin', fileOwnerName: 'Alvin' },
+    };
+    const open = [
+      'A-ah,',
+      "Let's say",
+      'Nilikuwa nataka',
+      'so',
+      'na',
+      "And, uh, let's say",
+    ];
+    for (const text of open) {
+      assert.equal(utteranceLooksIncomplete(text), true, text);
+      assert.equal(callerTurnStillOpen(text), true, text);
+      const state = hear(createBrainState(profile), text, profile, 'sw');
+      state.caller.nameConfirmed = true;
+      const gate = planCallerModelTurn(state, { fileNameAskCommitted: true });
+      assert.equal(gate.hold, 'unfinished', text);
+      assert.equal(gate.runModel, false, text);
+      assert.equal(gate.line, '', text);
+    }
+    const waiting = decideTurnEnd({ text: 'A-ah,', waitedMs: 0 });
+    assert.equal(waiting.action, 'wait');
+    assert.equal(waiting.unfinished, true);
+    assert.ok(waiting.waitMs >= 700 && waiting.waitMs <= 900);
+    const capped = decideTurnEnd({ text: 'A-ah,', waitedMs: 900 });
+    assert.equal(capped.action, 'flush');
+    assert.equal(capped.reason, 'unfinished_cap');
+    const finished = hear(
+      createBrainState(profile),
+      'Nilikuwa nataka kujua kama mnafika Kisumu',
+      profile,
+      'sw'
+    );
+    finished.caller.nameConfirmed = true;
+    const go = planCallerModelTurn(finished, { fileNameAskCommitted: true });
+    assert.equal(go.hold, undefined);
+    assert.equal(go.runModel, true);
+    const state = createBrainState(DUSTED);
+    state.caller.name = 'Alvin';
+    state.caller.nameConfirmed = true;
+    const mid = polishSpokenReply('Sawa. Siku njema!', {
+      profile: DUSTED,
+      language: 'sw',
+      state,
+      callerTurns: ['A-ah,'],
+    });
+    assert.doesNotMatch(mid, /Siku njema|Kwaheri|Goodbye/i);
+    assert.equal(planBrainEndClose({ action: 'CONTINUE', language: 'sw' }).close, false);
+    assert.equal(planBrainEndClose({ action: 'END', language: 'sw' }).line, farewellLine('sw'));
+    assert.equal(farewellLine('sw'), 'Asante. Kwaheri.');
   });
 });

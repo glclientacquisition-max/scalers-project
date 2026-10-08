@@ -861,11 +861,13 @@ function callerGoalText(text, opts = {}) {
   return usableGoalRemainder(text);
 }
 
-/** An opening that has not named the ask yet. The name question waits. */
+/** The caller has not finished the thought. Any reply, including the name ask, waits. */
 function callerTurnStillOpen(text) {
+  const { utteranceLooksIncomplete } = require('../speech/turnTaking');
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!raw || usableGoalRemainder(raw)) return false;
-  if (/[,—–-]\s*$/.test(raw)) return true;
+  if (!raw) return false;
+  if (utteranceLooksIncomplete(raw)) return true;
+  if (usableGoalRemainder(raw)) return false;
   const core = raw.replace(/[.!?,;:…—–-]+$/g, '').trim();
   return UNFINISHED_STEM.test(core);
 }

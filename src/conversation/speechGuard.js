@@ -39,6 +39,15 @@ const JOB_CLOSE =
 const BARE_CLOSER =
   /^(?:how else can i help(?: you)?(?: today)?|anything else(?: i can (?:help|do)(?: for you)?)?|have a (?:great|good) day|thank you for calling\b.*|goodbye)[.!?]?$/i;
 
+// A goodbye belongs to Brain END. The canned farewell is spoken there.
+// Gemini must not close the call in the middle of it.
+const MID_CALL_FAREWELL =
+  /\b(?:siku njema|kuwa na siku|kwaheri|kwa heri|goodbye|good-?bye|bye(?:\s+bye)?|have a (?:good|great|nice) day)\b/i;
+
+function sentenceIsMidCallFarewell(sentence) {
+  return MID_CALL_FAREWELL.test(String(sentence || ''));
+}
+
 const TRANSFER_CLAIM =
   /\b(stay on the line|hold the line|(?:i(?:'m| am|'ll| will) )?(?:transferring|connecting|putting) you (?:now|through|to)|i(?:'ve| have) transferred you|let me (?:transfer|connect) you|escalat(?:e|ing|ed)|nakuunganisha|nakuhamisha)\b/i;
 
@@ -558,6 +567,10 @@ function guardSpokenReply(text, ctx = {}) {
     if (heldName && sentenceAsksForCallerName(sentence)) {
       droppedNameAsk = true;
       noteDrop(ctx, 'name_ask', sentence);
+      continue;
+    }
+    if (sentenceIsMidCallFarewell(sentence)) {
+      noteDrop(ctx, 'farewell', sentence);
       continue;
     }
     if (sentenceLeaksUnboundFile(sentence, ctx.state)) {
