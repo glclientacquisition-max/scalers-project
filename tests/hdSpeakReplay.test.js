@@ -60,6 +60,7 @@ const { canonicalPlaceName } = require('../src/conversation/kenyaPlaces');
 const { drainSpokenSpeakSlots, queueToolOutcome, takeToolOutcome } = require('../src/conversation/speakSlots');
 const { fileServicePriceLine } = require('../src/conversation/catalogueMouth');
 const { createSpokenStreamBuffer } = require('../src/speech/spokenStreamBuffer');
+const { createUnfinishedHold, unfinishedHoldMs } = require('../src/speech/unfinishedHold');
 const { unfinishedTurnHold } = require('../src/conversation/unfinishedTurn');
 const {
   authorizeSpeak,
@@ -1515,6 +1516,29 @@ describe('HD_e369cba6565d free caller', () => {
     assert.equal(beside.checks.deletedAnswer, 1);
   });
 
+  function fakeTimers() {
+    const live = new Map();
+    let next = 1;
+    return {
+      setTimeout(fn, ms) {
+        const id = next++;
+        live.set(id, { fn, ms });
+        return id;
+      },
+      clearTimeout(id) {
+        live.delete(id);
+      },
+      delays() {
+        return [...live.values()].map((row) => row.ms);
+      },
+      run() {
+        const rows = [...live.entries()];
+        live.clear();
+        for (const [, row] of rows) row.fn();
+      },
+    };
+  }
+
   function heldTurn(text, { offer = false } = {}) {
     let state = createBrainState(DUSTED);
     state.language = { current: 'sw' };
@@ -1523,6 +1547,68 @@ describe('HD_e369cba6565d free caller', () => {
     if (offer) state = noteSpokenPendingAsk(state, 'Naweza kukuachia ujumbe kwa timu yetu?');
     return hear(state, text, DUSTED, 'sw');
   }
+
+  it('answers a held turn after the hold window, and new speech cancels it', () => {
+    assert.equal(unfinishedHoldMs({}), 1600);
+    assert.equal(unfinishedHoldMs({ VOICE_UNFINISHED_HOLD_MS: '2000' }), 2000);
+    assert.equal(unfinishedHoldMs({ VOICE_UNFINISHED_HOLD_MS: '400' }), 1200);
+    assert.equal(unfinishedHoldMs({ VOICE_UNFINISHED_HOLD_MS: '9000' }), 2500);
+    assert.equal(unfinishedHoldMs({ VOICE_UNFINISHED_HOLD_MS: 'soon' }), 1600);
+
+    const timers = fakeTimers();
+    const fired = [];
+    let canFire = true;
+    const hold = createUnfinishedHold({
+      delayMs: unfinishedHoldMs({}),
+      canFire: () => canFire,
+      onTimeout: (text, signals) => fired.push({ text, signals }),
+      setTimeout: timers.setTimeout,
+      clearTimeout: timers.clearTimeout,
+    });
+
+    // "Let's say", then silence: held once, then answered with holdTimedOut.
+    const quiet = heldTurn("Let's say");
+    const gate = planCallerModelTurn(quiet, { fileNameAskCommitted: true, profile: DUSTED });
+    assert.equal(gate.hold, 'unfinished');
+    hold.hold("Let's say", { unfinished: true });
+    assert.deepEqual(timers.delays(), [1600]);
+    canFire = false;
+    timers.run();
+    assert.equal(fired.length, 0, 'waits while the agent is speaking or a turn runs');
+    assert.deepEqual(timers.delays(), [1600]);
+    canFire = true;
+    timers.run();
+    assert.deepEqual(fired.map((row) => row.text), ["Let's say"]);
+    assert.equal(fired[0].signals.unfinished, true);
+    const reply = planCallerModelTurn(quiet, {
+      fileNameAskCommitted: true,
+      profile: DUSTED,
+      holdTimedOut: true,
+    });
+    assert.equal(reply.hold, undefined);
+    assert.equal(reply.runModel, true);
+
+    // New caller words merge with the held words. The timer never fires.
+    hold.hold('Nilikuwa nataka', { unfinished: true });
+    hold.postpone();
+    assert.deepEqual(timers.delays(), [1600]);
+    const merged = hold.take('kujua kama mnafika Kitengela');
+    assert.equal(merged, 'Nilikuwa nataka kujua kama mnafika Kitengela');
+    assert.deepEqual(timers.delays(), []);
+    assert.equal(hold.pending(), false);
+    timers.run();
+    assert.equal(fired.length, 1);
+    const whole = heldTurn(merged);
+    assert.equal(unfinishedTurnHold(whole, { profile: DUSTED }), null);
+    assert.equal(planCallerModelTurn(whole, { fileNameAskCommitted: true, profile: DUSTED }).hold, undefined);
+
+    // Hangup or socket close clears a pending hold.
+    hold.hold('A-ah,', {});
+    hold.close();
+    assert.deepEqual(timers.delays(), []);
+    hold.hold('A-ah,', {});
+    assert.equal(hold.pending(), false);
+  });
 
   it('does not hold a consent word or a whole ask for its trailing comma', () => {
     for (const word of ['Sawa,', 'Ndio,', 'Ndiyo,', 'Yes,', 'Okay,', 'Ok,', 'Hapana,', 'No,']) {

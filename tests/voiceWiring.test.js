@@ -126,6 +126,42 @@ assert.ok(
   'the queued tool outcome is spoken on the next reply, after an unfinished hold'
 );
 
+const holdGateAt = source.indexOf('const unfinishedGate = unfinishedTurnHold(brainState');
+const holdCommitAt = source.indexOf('callBrainStates.set(callKey, brainState);', holdGateAt);
+assert.ok(
+  holdGateAt > 0 && holdCommitAt > holdGateAt,
+  'an unfinished turn is held before Brain commits it, so merged words are observed once'
+);
+assert.match(
+  source,
+  /unfinishedHold\.hold\(clean,[\s\S]{0,240}?idleNudge\.arm\(/,
+  'a held turn starts the hold timer and re-arms the idle nudge'
+);
+assert.match(
+  source,
+  /runCallerTurn\(text, \{ \.\.\.signals, holdTimedOut: true \}\)/,
+  'the hold timer answers the held words with holdTimedOut'
+);
+assert.match(
+  source,
+  /holdTimedOut: opts\.holdTimedOut === true/,
+  'runCallerTurn passes holdTimedOut to the hold decision'
+);
+assert.match(
+  source,
+  /if \(unfinishedHold\.pending\(\)\) \{\s*clean = unfinishedHold\.take\(clean\);/,
+  'new caller words merge with a held turn and stop its timer'
+);
+assert.ok(
+  (source.match(/unfinishedHold\.close\(\);/g) || []).length >= 3,
+  'the hold timer is cleared on hangup, outage, and socket close'
+);
+assert.match(
+  source,
+  /idleNudge\.clear\(\);\s*\/\/ The caller is still talking[^\n]*\n\s*unfinishedHold\.postpone\(\);/,
+  'interim caller speech postpones the hold timer'
+);
+
 assert.match(
   source,
   /guardToolPlan\(\s*ensureRequiredEscalate\(\s*ensureRequiredCreateRequest\(/,
