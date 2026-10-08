@@ -11,7 +11,8 @@ const { looksLikeOfferAsk } = require('./fileRead');
 const { fileServicePriceLine } = require('./catalogueMouth');
 const { numbersIn } = require('./numberWords');
 const { assessCoverage } = require('./visitLocation');
-const { canonicalPlaceName } = require('./kenyaPlaces');
+const { bindSpokenPlace } = require('./kenyaPlaces');
+const { offerActOf } = require('../speech/offerAct');
 const { openSlotLine } = require('./callCorrectives');
 const {
   callerTurnKinds,
@@ -182,6 +183,7 @@ function sentenceIsKeptOffer(sentence) {
   const raw = String(sentence || '').trim();
   if (!raw || sentenceIsIdentityAsk(raw)) return false;
   if (HELP_FILLER.test(raw) || ALREADY_ANSWERED_FILLER.test(raw)) return false;
+  if (offerActOf(raw)) return true;
   if (raw.includes('?')) return true;
   return /\b(?:would you like|shall i|should i|do you want|want me to|log a callback|ungependa|nikuhifadhi|niandike|nipigie|nikupigie)\b/i.test(
     raw
@@ -198,10 +200,11 @@ function sentenceIsSpeechSlop(sentence, callerText) {
 }
 
 /** Drop slop sentences. Keep every other sentence in the turn. */
-function dropSpeechSlop(text, callerText) {
+function dropSpeechSlop(text, callerText, dropReasons) {
   const kept = [];
   for (const sentence of splitSentences(text)) {
     if (sentenceIsSpeechSlop(sentence, callerText)) {
+      if (Array.isArray(dropReasons) && !dropReasons.includes('slop')) dropReasons.push('slop');
       logSpokenFilterDrop('slop', sentence);
       continue;
     }
@@ -453,12 +456,14 @@ function logSpokenFilterDrop(reason, dropped) {
 }
 
 function placeNamesIn(text) {
-  const found = new Set();
-  for (const word of String(text || '').toLowerCase().split(/[^a-z]+/)) {
-    const name = canonicalPlaceName(word);
-    if (name) found.add(name);
+  return new Set(bindSpokenPlace(text, { fuzzy: true }));
+}
+
+function noteDrop(ctx, reason, sentence) {
+  if (Array.isArray(ctx?.dropReasons) && !ctx.dropReasons.includes(reason)) {
+    ctx.dropReasons.push(reason);
   }
-  return found;
+  logSpokenFilterDrop(reason, sentence);
 }
 
 /** A locality the slot, the caller, and the file do not hold. */
@@ -542,12 +547,12 @@ function guardSpokenReply(text, ctx = {}) {
   for (const sentence of splitSentences(raw)) {
     if (heldName && sentenceAsksForCallerName(sentence)) {
       droppedNameAsk = true;
-      logSpokenFilterDrop('name_ask', sentence);
+      noteDrop(ctx, 'name_ask', sentence);
       continue;
     }
     if (sentenceLeaksUnboundFile(sentence, ctx.state)) {
       droppedUnboundFile = true;
-      logSpokenFilterDrop('unbound_file', sentence);
+      noteDrop(ctx, 'unbound_file', sentence);
       continue;
     }
     if (sentenceIsKeptOffer(sentence)) {
@@ -555,45 +560,45 @@ function guardSpokenReply(text, ctx = {}) {
       continue;
     }
     if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) {
-      logSpokenFilterDrop('slop', sentence);
+      noteDrop(ctx, 'slop', sentence);
       continue;
     }
     if (ACTION_NARRATION.test(sentence)) {
-      logSpokenFilterDrop('action_narration', sentence);
+      noteDrop(ctx, 'action_narration', sentence);
       continue;
     }
     if (!holdOk && HOLD_PROMISE.test(sentence)) {
       droppedJob = true;
-      logSpokenFilterDrop('hold_promise', sentence);
+      noteDrop(ctx, 'hold_promise', sentence);
       continue;
     }
     if (holdOk && HOLD_PAYMENT_LEAK.test(sentence)) {
       droppedHoldPayment = true;
-      logSpokenFilterDrop('hold_payment', sentence);
+      noteDrop(ctx, 'hold_payment', sentence);
       continue;
     }
     if (!saved && (SAVED_CLAIM.test(sentence) || JOB_CLOSE.test(sentence))) {
       droppedJob = true;
-      logSpokenFilterDrop('saved_claim', sentence);
+      noteDrop(ctx, 'saved_claim', sentence);
       continue;
     }
     if (!transferOk && TRANSFER_CLAIM.test(sentence)) {
-      logSpokenFilterDrop('transfer_claim', sentence);
+      noteDrop(ctx, 'transfer_claim', sentence);
       continue;
     }
     const coverage = COVERAGE_CLAIM.exec(sentence);
     if (coverage && assessCoverage(coverage[1], ctx.profile || {}) !== 'inside') {
-      logSpokenFilterDrop('coverage', sentence);
+      noteDrop(ctx, 'coverage', sentence);
       continue;
     }
     if (sentenceNamesUnboundPlace(sentence, allowedPlaces)) {
       droppedJob = true;
-      logSpokenFilterDrop('unbound_place', sentence);
+      noteDrop(ctx, 'unbound_place', sentence);
       continue;
     }
     if (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known)) {
       droppedNumber = true;
-      logSpokenFilterDrop('unsaid_number', sentence);
+      noteDrop(ctx, 'unsaid_number', sentence);
       continue;
     }
     kept.push(sentence);

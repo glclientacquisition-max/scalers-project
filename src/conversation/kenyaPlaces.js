@@ -80,6 +80,7 @@ const SPOKEN_EVERYDAY = new Set([
   'house',
   'huduma',
   'kesho',
+  'kwani',
   'kusafisha',
   'kwaheri',
   'leo',
@@ -245,15 +246,69 @@ function countiesMentioned(text) {
 }
 
 /**
+ * Place names in speech, including a Kiswahili split ("na kuru" is Nakuru)
+ * and a joined form. Everyday words stay out. This does not fuzzy-match them.
+ * @param {string} text
+ * @param {{ fuzzy?: boolean }} [opts] fuzzy is the speech-guard word pass.
+ * Coverage uses the exact join only, so "stage" does not become State.
+ * @returns {string[]}
+ */
+function bindSpokenPlace(text, opts = {}) {
+  const fuzzy = Boolean(opts.fuzzy);
+  const words = normalizePlaceKey(text).split(' ').filter(Boolean);
+  const found = [];
+  let i = 0;
+  while (i < words.length) {
+    let hit = '';
+    let span = 1;
+    const max = Math.min(3, words.length - i);
+    for (let len = max; len >= 2; len -= 1) {
+      const slice = words.slice(i, i + len);
+      const spaced = slice.join(' ');
+      const joined = slice.join('');
+      if (INDEX.places[spaced]) {
+        hit = spaced;
+        span = len;
+        break;
+      }
+      if (INDEX.places[joined]) {
+        hit = joined;
+        span = len;
+        break;
+      }
+    }
+    if (!hit) {
+      if (INDEX.places[words[i]]) {
+        hit = words[i];
+        span = 1;
+      } else if (fuzzy) {
+        const one = canonicalPlaceName(words[i]);
+        if (one) {
+          hit = one;
+          span = 1;
+        }
+      }
+    }
+    if (hit) found.push(hit);
+    i += span;
+  }
+  return found;
+}
+
+/**
  * Counties for a caller place. Exact names always. A one-letter miss only when
  * the whole place is a single word and that word is not already in the list.
- * Two names within one edit means no guess.
+ * Two names within one edit means no guess. A split name ("na kuru") binds
+ * to the joined Kenya place before the county check.
  * @returns {string[]}
  */
 function countiesForPlace(text) {
   const phrase = normalizePlaceKey(text);
   if (!phrase) return [];
   const found = new Set(INDEX.places[phrase] || []);
+  for (const name of bindSpokenPlace(phrase)) {
+    for (const county of INDEX.places[name] || []) found.add(county);
+  }
   const tokens = phrase.split(' ').filter((word) => word.length >= 4);
   for (let i = 0; i < tokens.length; i += 1) {
     for (const county of countiesForToken(tokens[i])) found.add(county);
@@ -271,6 +326,7 @@ function countiesForPlace(text) {
 module.exports = {
   normalizePlaceKey,
   canonicalPlaceName,
+  bindSpokenPlace,
   placesInCounties,
   nearestAllowedPlace,
   countiesMentioned,

@@ -31,6 +31,9 @@ describe('voice trace redact', () => {
     assert.match(text, /\[email\]/);
     assert.match(text, /elfu tano/);
     assert.match(text, /5000/);
+    const range = redactText('Carpet cleaning is Ksh 1500-2000.');
+    assert.match(range, /1500-2000/);
+    assert.doesNotMatch(range, /\[phone:2000\]/);
   });
 });
 

@@ -3,7 +3,7 @@
 // Recorded mode speaks the fixture's model text. Live mode asks Gemini,
 // then the same mouth. A later phase swaps `respond` without a new harness.
 
-const { polishSpokenReply, planEmptyGeminiSpeech } = require('../conversation/dynamicSpeech');
+const { polishSpokenDetail, planEmptyGeminiSpeech } = require('../conversation/dynamicSpeech');
 const { cutNoAiSlop } = require('./noAiSlop');
 const { prepareForTts } = require('./ttsNormalize');
 const { analyzeCallerLanguage, languageDirective } = require('../conversation/language');
@@ -38,6 +38,14 @@ function speechContext(state, callerTurns, language, fixture) {
     profile: {
       businessName: fixture.businessName || 'the business',
       servicesCatalog: fixture.servicesCatalog || [],
+      ...(fixture.vertical ? { vertical: fixture.vertical } : {}),
+      ...(fixture.businessPolicies ? { businessPolicies: fixture.businessPolicies } : {}),
+      ...(fixture.socialHandles || fixture.social_handles
+        ? {
+            socialHandles: fixture.socialHandles || fixture.social_handles,
+            social_handles: fixture.social_handles || fixture.socialHandles,
+          }
+        : {}),
     },
     language: language === 'unknown' ? 'en' : language,
     toolResults: [],
@@ -47,12 +55,13 @@ function speechContext(state, callerTurns, language, fixture) {
 
 function speakModelText(modelText, ctx, caller) {
   const stages = [];
-  const polished = polishSpokenReply(modelText, ctx);
+  const detail = polishSpokenDetail(modelText, ctx);
+  const polished = detail.text;
   if (polished.trim() !== String(modelText || '').trim()) {
     stages.push({
       stage: 'transform',
       name: 'polish',
-      reason: polished.trim() ? 'rewritten' : 'dropped',
+      reason: detail.reason || (polished.trim() ? 'rewritten' : 'dropped'),
       before: String(modelText || ''),
       after: polished,
       dropped: !polished.trim(),

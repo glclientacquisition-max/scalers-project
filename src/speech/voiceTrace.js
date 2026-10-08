@@ -71,6 +71,7 @@ function redactText(value) {
     .replace(PHONE_RE, (hit) => {
       const digits = hit.replace(/\D/g, '');
       if (digits.length < 8) return hit;
+      if (/^\d{3,4}\s*[-–—]\s*\d{3,4}$/.test(hit.trim())) return hit;
       return `[phone:${digits.slice(-4)}]`;
     });
 }

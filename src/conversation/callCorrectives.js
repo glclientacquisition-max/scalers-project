@@ -3,6 +3,7 @@
 
 const { confirmationLanguage } = require('./language');
 const { visitBlockSpeech } = require('./visitLocation');
+const { offerActOf } = require('../speech/offerAct');
 
 const FILLER_WORDS = new Set([
   'uh',
@@ -112,9 +113,6 @@ function looksLikeShortAffirmation(text) {
   return Boolean(core) && SHORT_AFFIRMATION.test(core);
 }
 
-const SPOKEN_OFFER =
-  /\b(?:would you like|shall i|should i|do you want|want me to|log a callback|note that|take a message|ungependa|nikuhifadhi|niandike|nipigie|nikupigie|callback)\b/i;
-
 function lineIsIdentityAsk(line) {
   return /\bam i speaking with\b|\b(?:je,?\s*)?(?:naongea na|unaongea na)\b/i.test(
     String(line || '')
@@ -122,21 +120,31 @@ function lineIsIdentityAsk(line) {
 }
 
 /**
- * A spoken offer becomes the pending ask. The next short yes resolves it.
- * A name ask is not an offer, so "Yes" after "Am I speaking with Alvin?" stays a name confirm.
+ * A spoken offer becomes the pending ask. The act is the SpeakPacket offer,
+ * in any supported language. A later slot question replaces it. A name ask
+ * is not an offer, so "Yes" after "Am I speaking with Alvin?" stays a name confirm.
  */
 function noteSpokenPendingAsk(state, line) {
   const raw = String(line || '').trim();
-  if (!state || !raw || lineIsIdentityAsk(raw) || !SPOKEN_OFFER.test(raw)) return state;
+  if (!state || !raw || lineIsIdentityAsk(raw)) return state;
   if (!state.conversation || typeof state.conversation !== 'object') {
     state.conversation = {};
   }
+  const act = offerActOf(raw);
   const asked = Array.isArray(state.conversation.questionsAsked)
     ? state.conversation.questionsAsked
     : [];
+  if (!act) {
+    if (raw.includes('?') && state.conversation.pendingAsk?.kind === 'offer') {
+      state.conversation.pendingAsk = null;
+      if (asked[asked.length - 1] === 'offer') asked.pop();
+      state.conversation.questionsAsked = asked.slice(-8);
+    }
+    return state;
+  }
   if (asked[asked.length - 1] !== 'offer') asked.push('offer');
   state.conversation.questionsAsked = asked.slice(-8);
-  state.conversation.pendingAsk = { kind: 'offer', line: raw };
+  state.conversation.pendingAsk = { kind: 'offer', act: act.act, line: raw };
   return state;
 }
 

@@ -238,6 +238,7 @@ const {
   shouldSpeakThinkingAck,
   looksLikeBareCloser,
   polishSpokenReply,
+  polishSpokenDetail,
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
@@ -298,6 +299,7 @@ const {
   createOverlapHold,
   createAgentReplayMemory,
 } = require('./src/speech/overlapHold');
+const { createLateFinalHold } = require('./src/speech/lateFinal');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
 const {
@@ -1793,6 +1795,7 @@ mediaWss.on('connection', (ws, req) => {
   /** Brain END is in flight. No idle nudge and no next caller turn. */
   let callEnding = false;
   const overlapHold = createOverlapHold();
+  const lateFinals = createLateFinalHold();
   const agentReplay = createAgentReplayMemory();
   const speakCommit = createSpeakCommit();
   const idleNudge = createIdleNudgeController({
@@ -1816,15 +1819,15 @@ mediaWss.on('connection', (ws, req) => {
     },
   });
   function commitAgentQuestionIfNeeded(opts = {}) {
-    const pendingQuestion = Boolean(agentReplay.snapshot().pendingIsQuestion);
+    const snap = agentReplay.snapshot();
     const committed = agentReplay.commitPlayback();
-    if (pendingQuestion) {
-      const spokenAsk = committed.lastAgentQuestion || lastAgentText;
-      const brain = callBrainStates.get(sidLabel());
-      if (brain && spokenAsk) {
-        noteSpokenPendingAsk(brain, spokenAsk);
-        callBrainStates.set(sidLabel(), brain);
-      }
+    const spokenAsk = snap.pendingSpeech;
+    const brain = callBrainStates.get(sidLabel());
+    if (brain && spokenAsk) {
+      noteSpokenPendingAsk(brain, spokenAsk);
+      callBrainStates.set(sidLabel(), brain);
+    }
+    if (snap.pendingIsQuestion) {
       console.log(`[ws/media][${sidLabel()}] agent_question_committed`);
       // Do not poke "still there?" after the greeting. Wait until the caller has spoken.
       idleNudge.arm({
@@ -2713,7 +2716,14 @@ mediaWss.on('connection', (ws, req) => {
       );
     }
     // Skip pure noise, but keep yes/no and short names when the agent just asked.
-    if (shouldSkipCallerTurn(clean, { lastAgentText })) {
+    const skipBrain = callBrainStates.get(sidLabel());
+    if (
+      shouldSkipCallerTurn(clean, {
+        lastAgentText,
+        pendingAsk: skipBrain?.conversation?.pendingAsk,
+        questionsAsked: skipBrain?.conversation?.questionsAsked,
+      })
+    ) {
       console.log(`[ws/media][${sidLabel()}] skip non-substantive turn: ${clean}`);
       voiceTrace.beginTurn({ callerText: clean });
       voiceTrace.noteTurnEnd({ decision: 'skip', reason: 'non_substantive' });
@@ -3311,7 +3321,7 @@ mediaWss.on('connection', (ws, req) => {
         // A sentence that narrates the send ("I've sent that to the team",
         // "I sent your name") is dropped. It must not become a repeat-ask.
         const rawChunk = String(chunk || '');
-        const polished = polishSpokenReply(String(chunk || ''), {
+        const polishedDetail = polishSpokenDetail(String(chunk || ''), {
           callerTurns: brainState.conversation?.answersReceived || [],
           profile: brainProfile,
           toolResults: [],
@@ -3319,12 +3329,13 @@ mediaWss.on('connection', (ws, req) => {
           state: brainState,
           language: callLanguage,
         });
+        const polished = polishedDetail.text;
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
           voiceTrace.noteTransform({
             stage: 'polish',
             before: rawChunk,
             after: polished,
-            reason: polished.trim() ? 'rewritten' : 'dropped',
+            reason: polishedDetail.reason || (polished.trim() ? 'rewritten' : 'dropped'),
           });
         }
         if (!polished) {
@@ -3898,19 +3909,21 @@ mediaWss.on('connection', (ws, req) => {
       return;
     }
     if (!utteranceParts.length) return;
-    const text = utteranceParts.join('').replace(/\s+/g, ' ').trim();
+    const rawText = utteranceParts.join('').replace(/\s+/g, ' ').trim();
     const tokenLanguages = utteranceLanguages.slice();
     utteranceParts = [];
     utteranceLanguages = [];
-    if (!text) return;
+    if (!rawText) return;
     // #584 decideTurnEnd passes { unfinished: true } into this flush.
     // Do not drop that flag on the way to Brain observe.
-    const label = labelFlushedCallerTurn({ text, turnEnd });
-    if (overlapHold.alreadyReleased(text)) {
+    const label = labelFlushedCallerTurn({ text: rawText, turnEnd });
+    if (overlapHold.alreadyReleased(rawText)) {
       voiceTrace.noteTurnEnd({ decision: 'drop', reason: 'duplicate' });
       console.log(`[ws/media][${sidLabel()}] caller_turn_duplicate_suppressed`);
       return;
     }
+    const text = lateFinals.merge(rawText);
+    lateFinals.noteClosed(Date.now());
     overlapHold.markReleased(text);
     if (turnBusy) {
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${text}` : text;
@@ -4102,6 +4115,13 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       if (decision.action === 'ignore' || decision.action === 'skip') {
+        if (!decision.queue && lateFinals.hold(text, { reason: decision.reason || '' })) {
+          voiceTrace.noteTurnEnd({ decision: 'hold', reason: 'late_final' });
+          console.log(
+            `[ws/media][${sidLabel()}] late_final held reason=${decision.reason || ''} ${text.slice(0, 80)}`
+          );
+          return;
+        }
         voiceTrace.noteTurnEnd({
           decision: decision.action,
           reason: decision.reason || '',

@@ -3,6 +3,7 @@
 // HD_993: "which service is you offer" must speak the Phase-0 list, not a label.
 // HD_c705 / HD_708: name Yes after a public answer continues. It does not END
 // and it does not re-list.
+// HD_e3fb94e1bd0d: price ranges, the Kiswahili offer, and Nakuru stay.
 // Deterministic. No model judge.
 // Run: node --test tests/hdSpeakReplay.test.js
 
@@ -19,9 +20,22 @@ const {
 const { determineNextBestAction } = require('../src/conversation/nextBestAction');
 const { extractConversationEntities } = require('../src/conversation/entityExtraction');
 const { planCatalogueMouth } = require('../src/speech/catalogueMouth');
-const { polishSpokenReply, planEmptyGeminiSpeech } = require('../src/conversation/dynamicSpeech');
+const {
+  polishSpokenReply,
+  polishSpokenDetail,
+  planEmptyGeminiSpeech,
+  shouldSkipCallerTurn,
+} = require('../src/conversation/dynamicSpeech');
 const { guardSpokenReply } = require('../src/conversation/speechGuard');
 const { noteSpokenPendingAsk } = require('../src/conversation/callCorrectives');
+const { numbersIn } = require('../src/conversation/numberWords');
+const {
+  coverageAskSpeech,
+  foldCanonicalPlace,
+  visitBlockSpeech,
+  unsureCoverageSpeech,
+} = require('../src/conversation/visitLocation');
+const { ensureRequiredCreateRequest } = require('../src/conversation/requiredCreateRequest');
 const { analyzeCallerLanguage, resolveLanguageState, createLanguageState } = require('../src/conversation/language');
 const { lockFileNameAsk } = require('../src/speech/callerFileSpeech');
 const { drainSpokenSpeakSlots } = require('../src/conversation/speakSlots');
@@ -644,5 +658,209 @@ describe('HD_0789461c5319 catalogue, callback, and Kiswahili', () => {
     assert.equal(bare.language, 'sw');
     const tagged = analyzeCallerLanguage('offer please', { tokenLanguages: ['sw', 'sw', 'sw'] });
     assert.equal(tagged.language, 'sw');
+  });
+});
+
+describe('HD_e3fb94e1bd0d prices, offer consent, and Nakuru', () => {
+  const DUSTED = {
+    vertical: 'home_services',
+    businessName: 'Done and Dusted',
+    servicesCatalog: [
+      { name: 'Couch cleaning', price_range: 'Ksh 800-1200' },
+      { name: 'Mattress cleaning', price_range: 'Ksh 800-1200' },
+      { name: 'Carpet cleaning', price_range: 'Ksh 1500-2000' },
+      { name: 'General cleaning' },
+    ],
+    businessPolicies: {
+      coverage_areas: [
+        'county:nairobi',
+        'county:kiambu',
+        'place:kitengela',
+        'place:juja',
+        'place:ongata rongai',
+        'place:syokimau',
+      ],
+    },
+    socialHandles: '0790381872',
+  };
+
+  it('reads a hyphen, dash, or to/hadi/mpaka span as the file numbers', () => {
+    for (const text of [
+      'Ksh 1500-2000',
+      'Ksh 1500–2000',
+      '1500 to 2000',
+      '1500 hadi 2000',
+      '1500 mpaka 2000',
+      'Ksh 800-1200',
+    ]) {
+      const found = numbersIn(text);
+      assert.ok(found.has(text.includes('800') ? '800' : '1500'), text);
+      assert.ok(found.has(text.includes('1200') ? '1200' : '2000'), text);
+    }
+    const phone = numbersIn('0712-345678');
+    assert.equal(phone.has('712'), false);
+    assert.equal(phone.has('345678'), false);
+  });
+
+  it('keeps an English and a Kiswahili price that the file wrote with a hyphen', () => {
+    const en = guardSpokenReply(
+      'For carpet cleaning, it is Ksh 1500 to 2000 depending on the size.',
+      {
+        callerTurns: ['For carpet cleaning?'],
+        profile: DUSTED,
+        language: 'en',
+        allowEmpty: true,
+        state: { conversation: { answersReceived: ['For carpet cleaning?'] } },
+      }
+    );
+    assert.match(en, /1500/);
+    assert.match(en, /2000/);
+    const sw = guardSpokenReply('Mattress cleaning ni 800 hadi 1200.', {
+      callerTurns: ['Mattress?' ],
+      profile: DUSTED,
+      language: 'sw',
+      allowEmpty: true,
+      state: { conversation: { answersReceived: ['Mattress?'] } },
+    });
+    assert.match(sw, /800/);
+    assert.match(sw, /1200/);
+    const dropped = polishSpokenDetail('It is Ksh 1500 to 2000.', {
+      callerTurns: ['how much'],
+      profile: { businessName: 'Done and Dusted', servicesCatalog: [] },
+      language: 'en',
+      state: { conversation: { answersReceived: ['how much'] } },
+    });
+    assert.doesNotMatch(dropped.text, /1500|2000/);
+    assert.equal(dropped.reason, 'unsaid_number');
+  });
+
+  it('binds na kuru to Nakuru and does not say the coverage list is missing', () => {
+    assert.match(foldCanonicalPlace('na kuru', DUSTED), /Nakuru/);
+    const sw = coverageAskSpeech('Like, mnafika na kuru?', DUSTED, 'sw');
+    assert.match(sw, /nje/);
+    assert.match(sw, /Naweza kukuachia ujumbe kwa timu yetu\?/);
+    assert.doesNotMatch(sw, /orodha|don't have our coverage list/i);
+    const en = coverageAskSpeech('Like, do you cover na kuru?', DUSTED, 'en');
+    assert.match(en, /outside our coverage/);
+    assert.match(en, /Should I note it for the team\?/);
+    assert.doesNotMatch(en, /don't have our coverage list/i);
+    assert.equal(visitBlockSpeech('outside', 'en'), 'That area is outside our coverage.');
+    const unsure = unsureCoverageSpeech('en');
+    assert.match(unsure, /not sure we cover that area/);
+    assert.match(unsure, /Should I note it for the team\?/);
+    assert.doesNotMatch(unsure, /don't have our coverage list/i);
+    const shops = coverageAskSpeech('Do you cover the shops?', DUSTED, 'en');
+    assert.match(shops, /not sure we cover that area/);
+    assert.doesNotMatch(shops, /don't have our coverage list/i);
+    const spoken = guardSpokenReply(
+      'Nakuru iko nje ya area yetu ya huduma kwani tunafanya Nairobi na maeneo ya karibu pekee.',
+      {
+        callerTurns: ['Like, mnafika na kuru?'],
+        profile: DUSTED,
+        language: 'sw',
+        allowEmpty: true,
+        state: { conversation: { answersReceived: ['Like, mnafika na kuru?'] } },
+      }
+    );
+    assert.match(spoken, /Nakuru/);
+    assert.match(spoken, /Nairobi/);
+  });
+
+  it('arms a spoken offer in Kiswahili or as an English statement, then saves on yes', () => {
+    for (const line of [
+      'Naweza kukuachia ujumbe kwa timu yetu?',
+      'I can note this for the team.',
+      'Would you like me to log a callback?',
+      'Should I note it for the team?',
+      'Naweza andika hii kwa team?',
+    ]) {
+      const state = { conversation: { questionsAsked: [] } };
+      noteSpokenPendingAsk(state, line);
+      assert.equal(state.conversation.questionsAsked.at(-1), 'offer', line);
+      assert.equal(state.conversation.pendingAsk.kind, 'offer', line);
+      assert.equal(state.conversation.pendingAsk.act, 'note_team', line);
+    }
+    for (const line of [
+      'When would you like us to come?',
+      'Would you like to book a visit?',
+      'Which service do you need?',
+      'Tuje lini kukufanyia cleaning?',
+      'Am I speaking with Alvin?',
+    ]) {
+      const state = { conversation: { questionsAsked: [] } };
+      noteSpokenPendingAsk(state, line);
+      assert.notEqual(state.conversation.questionsAsked.at(-1), 'offer', line);
+      assert.equal(state.conversation.pendingAsk || null, null, line);
+    }
+    const pending = {
+      kind: 'offer',
+      act: 'note_team',
+      line: 'Naweza kukuachia ujumbe kwa timu yetu?',
+    };
+    for (const text of ['sawa', 'ok', 'okay', 'yes', 'ndio', 'sure']) {
+      assert.equal(
+        shouldSkipCallerTurn(text, {
+          lastAgentText: 'Carpet cleaning is Ksh 1500 to 2000.',
+          pendingAsk: pending,
+          questionsAsked: ['offer'],
+        }),
+        false,
+        text
+      );
+    }
+    assert.equal(
+      shouldSkipCallerTurn('sawa', { lastAgentText: 'Carpet cleaning is Ksh 1500 to 2000.' }),
+      true
+    );
+    let state = createBrainState(DUSTED);
+    noteSpokenPendingAsk(state, 'I can note this for the team.');
+    for (const text of ['Sawa.', 'Okay.', 'yes', 'ndio', 'sure']) {
+      const next = observeCallerTurn(state, {
+        text,
+        detectedLanguage: 'en',
+        resolvedLanguage: 'en',
+        profile: DUSTED,
+      });
+      assert.equal(next.conversation.consentAck, true, text);
+    }
+    const saved = ensureRequiredCreateRequest(
+      {},
+      {
+        caller: { name: 'Alvin', phone: '+254790381872' },
+        conversation: {
+          consentAck: true,
+          pendingAsk: pending,
+          questionsAsked: ['offer'],
+        },
+      },
+      {}
+    );
+    assert.equal(saved.serviceRequest.type, 'callback');
+    assert.equal(saved.serviceRequest.item, 'message');
+    assert.equal(saved.serviceRequest.name, 'Alvin');
+    assert.match(saved.serviceRequest.notes, /kukuachia ujumbe/);
+    const named = ensureRequiredCreateRequest(
+      {},
+      {
+        caller: { name: 'Alvin' },
+        conversation: { consentAck: false, questionsAsked: ['name'] },
+      },
+      {}
+    );
+    assert.equal(named.serviceRequest, undefined);
+    const planned = planEmptyGeminiSpeech({
+      language: 'sw',
+      userText: 'Sawa.',
+      toolResults: [{ action: 'create_service_request', status: 'succeeded' }],
+    });
+    assert.match(planned.line, /nimehifadhi|saved/i);
+    assert.match(planned.line, /Asante\. Kwaheri\./);
+    const kept = guardSpokenReply('I can note this for the team.', {
+      callerTurns: ['Like, do you cover na kuru?'],
+      profile: DUSTED,
+      language: 'en',
+      allowEmpty: true,
+    });
+    assert.match(kept, /note this for the team/i);
   });
 });

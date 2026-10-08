@@ -6,6 +6,7 @@
 const { normalizePolicies } = require('./businessPolicies');
 const { normalizeLocations } = require('./businessLocations');
 const {
+  bindSpokenPlace,
   canonicalPlaceName,
   countiesMentioned,
   countiesForPlace,
@@ -449,6 +450,20 @@ function foldCanonicalPlace(place, profile) {
     .map((part) => part.trim())
     .filter((part) => part && !dropPlaceClause(part))
     .map((token) => {
+      const names = bindSpokenPlace(token);
+      const words = token
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean);
+      const joined = words.join('');
+      const spaced = words.join(' ');
+      if (
+        names.length === 1 &&
+        (names[0] === joined || names[0] === spaced)
+      ) {
+        return { text: displayPlaceName(names[0]), bound: true };
+      }
       if (/\s/.test(token)) return { text: token, bound: false };
       const name =
         allowed && allowed.size
@@ -505,6 +520,7 @@ function coverageAskPlace(text) {
     .replace(/[—–-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+  value = value.replace(/^(?:(?:like|eh|eeh|oh|ah|uh|um)\s*,?\s*)+/i, '');
   value = value.replace(/^(?:(?:do you(?: guys)?|can you)\s+)+/i, 'do you ');
   const matched =
     /\bdo you\s+(?:do|cover|service|serve|come to|go to)\s+(.+)$/i.exec(value) ||
@@ -554,8 +570,35 @@ function coverageAskSpeech(text, profile = {}, language = 'en') {
     if (sheng) return `Ndio, tunafika ${place}.`;
     return `Yes, we cover ${place}.`;
   }
-  if (coverage === 'outside') return visitBlockSpeech('outside', language);
+  if (coverage === 'outside') return outsideCoverageSpeech(language);
+  if (hasCoverageText(profile)) return unsureCoverageSpeech(language);
   return visitBlockSpeech('unknown_coverage', language);
+}
+
+function coverageNoteQuestion(language = 'en') {
+  const lang = String(language || 'en').toLowerCase();
+  if (lang === 'sheng') return 'Naweza andika hii kwa team?';
+  if (lang === 'sw' || lang.startsWith('swahili')) {
+    return 'Naweza kukuachia ujumbe kwa timu yetu?';
+  }
+  return 'Should I note it for the team?';
+}
+
+/** Out of area, then the note question in the caller's language. */
+function outsideCoverageSpeech(language = 'en') {
+  const fact = visitBlockSpeech('outside', language).replace(/[.?!]\s*$/, '');
+  return `${fact}. ${coverageNoteQuestion(language)}`;
+}
+
+/** The list is on file. The place is not on it, and we do not say the list is missing. */
+function unsureCoverageSpeech(language = 'en') {
+  const lang = String(language || 'en').toLowerCase();
+  const ask = coverageNoteQuestion(language);
+  if (lang === 'sheng') return `Sina uhakika kama tunafika hiyo area. ${ask}`;
+  if (lang === 'sw' || lang.startsWith('swahili')) {
+    return `Sina uhakika kama tunafika hapo. ${ask}`;
+  }
+  return `I'm not sure we cover that area. ${ask}`;
 }
 
 function visitBlockSpeech(blocked, language = 'en') {
@@ -602,6 +645,8 @@ module.exports = {
   preferVisitPlace,
   foldCanonicalPlace,
   visitBlockSpeech,
+  outsideCoverageSpeech,
+  unsureCoverageSpeech,
   coverageAskPlace,
   coverageAskSpeech,
   isNoisePlace,

@@ -331,6 +331,26 @@ function updateReady(payload) {
 }
 
 /**
+ * Yes to a pending note-for-the-team offer is a callback request.
+ * A visit ladder that is already complete keeps its own payload.
+ * A name confirm is not this offer.
+ */
+function offerConsentRequest(state = {}, capabilities = {}) {
+  if (capabilities.createServiceRequest === false) return null;
+  if (state.conversation?.leaveIt) return null;
+  if (!state.conversation?.consentAck) return null;
+  const ask = state.conversation?.pendingAsk;
+  if (!ask || ask.kind !== 'offer') return null;
+  return {
+    type: 'callback',
+    name: callerName(state),
+    phone: callerPhone(state),
+    item: 'message',
+    notes: clean(ask.line, 400),
+  };
+}
+
+/**
  * When next-best-action is CREATE_REQUEST and slots are complete, inject the
  * visit or hold payload if the model spoke without a tool marker.
  * Invalid payloads still go through toolExecution validators (no fake rows).
@@ -360,7 +380,14 @@ function ensureRequiredCreateRequest(parsed, state = {}, capabilities = {}) {
     }
     return next;
   }
+  const offered = offerConsentRequest(state, capabilities);
   const action = String(state.resolution?.nextBestAction || '');
+  const visitLadder =
+    action === 'CREATE_REQUEST' && slotsComplete(state) && REQUEST_INTENTS.has(intentId(state));
+  if (offered && !next.serviceRequest && !visitLadder) {
+    next.serviceRequest = offered;
+    return next;
+  }
   if (action !== 'CREATE_REQUEST') return next;
   if (!slotsComplete(state)) return next;
   if (ackWithoutConsent(state)) return next;
