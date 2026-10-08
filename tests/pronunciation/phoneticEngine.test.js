@@ -19,7 +19,12 @@ const GENERATED_JSON = path.join(
   '../../src/speech/generatedKenyaLexicon.json'
 );
 
-/** Hand-tuned KENYA_LEXICON say-forms extracted from pronunciationLexicon.js. */
+/**
+ * Benchmark for the build-time phonetic engine: the hand-tuned say-forms as
+ * they stood before 2026-10-08. Most place forms here are no longer in the
+ * production lexicon (the town A/B on #612 heard them worse than the plain
+ * names); they stay only as the engine's scoring target.
+ */
 const GOLDEN_SET = [
   { word: 'ruiru', expectedSay: 'Roo-ee-roo' },
   { word: 'thika', expectedSay: 'Thee-kah' },
@@ -219,7 +224,7 @@ describe('accuracy gates', () => {
 });
 
 describe('hand-tuned KENYA_LEXICON', () => {
-  it('contains the original 65 entries and no generated block', () => {
+  it('has no generated block and only evidence-gated place respellings', () => {
     const source = fs.readFileSync(
       path.join(__dirname, '../../src/speech/pronunciationLexicon.js'),
       'utf8'
@@ -229,8 +234,11 @@ describe('hand-tuned KENYA_LEXICON', () => {
       source.indexOf('const KENYA_LEXICON = ['),
       source.indexOf('\n];', source.indexOf('const KENYA_LEXICON = ['))
     );
-    const n = (array.match(/\{ match:/g) || []).length;
-    assert.equal(n, 65);
+    assert.match(array, /\.\.\.PLACE_LEXICON/);
+    const { KENYA_LEXICON, PLACE_LEXICON } = require('../../src/speech/pronunciationLexicon');
+    // 65 hand-tuned entries less the 25 place entries removed after the town A/B.
+    assert.equal(KENYA_LEXICON.length, 40);
+    assert.deepEqual(PLACE_LEXICON.map((e) => e.match), ['westlands']);
   });
 });
 

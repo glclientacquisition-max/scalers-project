@@ -933,18 +933,20 @@ describe('HD_0789 and HD_486 coverage lines stay in the replay', () => {
     const turn5 = ttsText(replay.turns[4]);
     const turn7 = ttsText(replay.turns[6]);
     assert.match(turn4, /Nairobi/);
-    assert.match(turn4, /Kee-ten-geh-la/);
-    assert.match(turn4, /Kee-ahm-boo/);
-    assert.match(turn4, /Joo-jah/);
+    // Place names reach Soniox as written (2026-10-08 town A/B on #612).
+    assert.match(turn4, /Kitengela/);
+    assert.match(turn4, /Kiambu/);
+    assert.match(turn4, /Juja/);
     assert.match(turn4, /Ongata Rongai/);
-    assert.match(turn4, /Shyo-kee-mau/);
+    assert.match(turn4, /Syokimau/);
+    assert.doesNotMatch(turn4, /Kee-ten-geh-la|Kee-ahm-boo|Joo-jah|Shyo-kee-mau/);
     assert.match(turn4, /tukutembelee wapi/);
     assert.match(turn5, /ndani ya Nairobi/);
     assert.match(turn5, /OngataRongai/);
     assert.match(turn5, /kwako/);
     assert.match(turn5, /Upo eneo gani/);
     assert.doesNotMatch(`${turn4} ${turn5}`, /Ndanai|\bKako\b/);
-    assert.match(turn7, /Nah-koo-roo|Nakuru/);
+    assert.match(turn7, /Nakuru/);
     assert.match(turn7, /note kwa timu/);
     for (const index of [3, 4]) {
       assert.equal(

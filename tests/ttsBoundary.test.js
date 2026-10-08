@@ -90,7 +90,7 @@ async function main() {
   const heard = sent.map((m) => m.text).join('');
   assert.equal(
     heard,
-    'Yes we cover Kee-ten-geh-la Interior window cleaning is two hundred shillings per window What day and time would work for you'
+    'Yes we cover Kitengela Interior window cleaning is two hundred shillings per window What day and time would work for you'
   );
   assert.doesNotMatch(heard, /[a-z][A-Z]/, 'no glued words across pieces');
   t2.cancel();

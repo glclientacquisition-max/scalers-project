@@ -1,15 +1,15 @@
 {
   "name": "HD_015bae4a4af2 TTS wire (turns 2 and 9)",
-  "note": "pieces are the exact prepared pieces sent live on staging 2026-10-08 12:52 EAT. raw = old glued wire, production = M0 word gap.",
+  "note": "pieces are the prepared pieces sent live on staging 2026-10-08 12:52 EAT, with the place name now spoken as written (live sent \"Kee-ten-geh-la\"; place respellings were removed after the town A/B). raw = old glued wire, production = M0 word gap.",
   "cases": [
     {
       "id": "hd015b-t2",
       "group": "hd015b-wire",
       "category": "piece-gap",
       "callLanguage": "en",
-      "text": "Yes we cover Kee-ten-geh-la Interior window cleaning is two hundred shillings per window What day and time would work for you",
+      "text": "Yes we cover Kitengela Interior window cleaning is two hundred shillings per window What day and time would work for you",
       "pieces": [
-        "Yes we cover Kee-ten-geh-la",
+        "Yes we cover Kitengela",
         "Interior window cleaning is two hundred shillings per window",
         "What day and time would work for you"
       ]

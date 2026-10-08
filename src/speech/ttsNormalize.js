@@ -114,7 +114,7 @@ function polishPunctuation(text, language) {
   // Em/en dash is a Gemini leak. Soniox may speak "dash" or restart the clause.
   t = t.replace(/\s*[\u2014\u2013]\s*/g, ', ');
   // Spaced ASCII hyphen is a list/range marker the expanders did not claim.
-  // Intra-word hyphens (M-Pesa, Roo-ee-roo) carry no spaces and must survive.
+  // Intra-word hyphens (M-Pesa, West-lands) carry no spaces and must survive.
   t = t.replace(/\s+-\s*|\s*-\s+/g, ', ');
   // Parenthetical asides read as an aside, not "open parenthesis".
   t = t.replace(/\s*\(([^()]*)\)\s*/g, ', $1, ');

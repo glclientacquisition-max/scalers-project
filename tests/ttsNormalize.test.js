@@ -48,16 +48,18 @@ test('seeds Kenya brands/places/services', () => {
   assert.ok(entries.length >= 30, `expected >=30 entries, got ${entries.length}`);
   const matches = entries.map((e) => e.match).join(' ');
   assert.ok(matches.includes('m-?pesa'));
-  assert.ok(matches.includes('ruiru'));
+  assert.ok(matches.includes('westlands'));
+  assert.ok(!matches.includes('ruiru'), 'place respellings need verified evidence');
   assert.ok(matches.includes('whatsapp'));
   assert.ok(matches.includes('geyser'));
 });
 
-test('applies brand + place rewrites', () => {
-  const out = applyLexicon('Pay via mpesa near Ruiru CBD', 'en');
+test('applies brand rewrites; places stay as written unless verified', () => {
+  const out = applyLexicon('Pay via mpesa near Ruiru CBD in Westlands', 'en');
   assert.match(out, /M-Pesa/);
-  assert.match(out, /Roo-ee-roo/);
+  assert.match(out, /near Ruiru /);
   assert.match(out, /C B D/);
+  assert.match(out, /West-lands/);
 });
 
 test('tenant overrides win over defaults', () => {
@@ -65,7 +67,7 @@ test('tenant overrides win over defaults', () => {
     { match: 'wanjiku', say: 'Wan-jee-koo', priority: 200 },
   ]);
   assert.match(out, /Wan-jee-koo/);
-  assert.match(out, /Roo-ee-roo/);
+  assert.match(out, /in Ruiru$/);
 });
 
 test('parseLexiconOverrides validates JSON', () => {
@@ -318,7 +320,7 @@ test('prepareForTts full pipeline', () => {
   });
   assert.strictEqual(prepared.language, 'en');
   assert.match(prepared.text, /M-Pesa/);
-  assert.match(prepared.text, /Thee-kah/);
+  assert.match(prepared.text, /in Thika/);
   assert.match(prepared.text, /2 5 4 7 1 2 3 4 5 6 7 8/);
   assert.ok(!prepared.text.includes('…'));
 });
@@ -444,9 +446,9 @@ test('bullet leaks flatten to a spoken list', () => {
 });
 
 test('intra-word hyphens survive (lexicon say-forms need them)', () => {
-  const prepared = prepareForTts('We clean check-in units near Ruiru.', { callLanguage: 'en' });
+  const prepared = prepareForTts('We clean check-in units near Westlands.', { callLanguage: 'en' });
   assert.match(prepared.text, /check-in/);
-  assert.match(prepared.text, /Roo-ee-roo/);
+  assert.match(prepared.text, /West-lands/);
 });
 
 test('spaced dot chains collapse so TTS does not say full stop', () => {
@@ -759,6 +761,12 @@ for (const c of golden.cases) {
       assert.ok(
         prepared.text.toLowerCase().includes(String(needle).toLowerCase()),
         `${c.id} missing "${needle}" in "${prepared.text}"`
+      );
+    }
+    for (const needle of c.expectExcludes || []) {
+      assert.ok(
+        !prepared.text.toLowerCase().includes(String(needle).toLowerCase()),
+        `${c.id} still has "${needle}" in "${prepared.text}"`
       );
     }
   });

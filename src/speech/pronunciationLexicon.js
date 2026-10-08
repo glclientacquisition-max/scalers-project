@@ -6,6 +6,41 @@
  * `match` is a case-insensitive regex source matched at word boundaries.
  */
 
+/**
+ * @typedef {{ date: string, voiceId: string, tts: string, stt: string, source: string }} PlaceEvidence
+ */
+
+/**
+ * Place respellings. A place name is spoken as written unless a respelling has
+ * listening evidence from the real Soniox voice. Hyphenated syllable splits
+ * (Kee-ten-geh-la, Joo-jah, Kah-sah-rah-nee) made names choppy and were often
+ * misheard: on 2026-10-08 (#612, voice 7b197f3c) Kiambu came back as
+ * "Kigambo", Juja as "Georgia", Ruiru as "Rui Rou", Kasarani as "Kasa Rani",
+ * while the plain names were heard correctly. Only Westlands did better
+ * respelled (plain was heard as "wastelands").
+ *
+ * Rule (tests/pronunciationLexiconEvidence.test.js): every entry here whose
+ * say differs from the place name must carry `verified` (date, voice id, TTS
+ * settings, STT result, source). Add a respelling only after a plain vs
+ * respelled render through scripts/soniox-tts-listen-harness.js plus STT.
+ * Identity entries were removed: they only changed letter case.
+ * @type {Array<LexiconEntry & { verified?: PlaceEvidence }>}
+ */
+const PLACE_LEXICON = [
+  {
+    match: 'westlands',
+    say: 'West-lands',
+    priority: 85,
+    verified: {
+      date: '2026-10-08',
+      voiceId: '7b197f3c-84b4-4404-986f-114e4dac1432',
+      tts: 'tts-rt-v2, profile balanced, speed 1, gain 1.38',
+      stt: 'Soniox stt-async-v5 (en+sw): respelled heard "Westlands", no RMS gap; plain heard "wastelands"',
+      source: 'town A/B render on #612 dc555a65 (town-ab/results.json)',
+    },
+  },
+];
+
 /** @type {LexiconEntry[]} */
 const KENYA_LEXICON = [
   // --- Brands / platforms (priority high) ---
@@ -23,33 +58,8 @@ const KENYA_LEXICON = [
   { match: 'paybill', say: 'pay bill', priority: 90 },
   { match: 'till\\s+number', say: 'till number', priority: 90 },
 
-  // --- Places / areas ---
-  { match: 'ongata\\s+rongai', say: 'Ongata Rongai', priority: 95 },
-  { match: 'athi\\s+river', say: 'Athi River', priority: 95 },
-  { match: 'industrial\\s+area', say: 'Industrial Area', priority: 90 },
-  { match: 'ruiru', say: 'Roo-ee-roo', priority: 90 },
-  { match: 'thika', say: 'Thee-kah', priority: 90 },
-  { match: 'kiambu', say: 'Kee-ahm-boo', priority: 90 },
-  { match: 'westlands', say: 'West-lands', priority: 85 },
-  { match: 'kilimani', say: 'Kee-lee-mah-nee', priority: 90 },
-  { match: 'lavington', say: 'Lavington', priority: 85 },
-  { match: 'parklands', say: 'Park-lands', priority: 85 },
-  { match: 'eastleigh', say: 'East-lee', priority: 90 },
-  { match: 'syokimau', say: 'Shyo-kee-mau', priority: 95 },
-  { match: 'kitengela', say: 'Kee-ten-geh-la', priority: 95 },
-  { match: 'limuru', say: 'Lee-moo-roo', priority: 90 },
-  { match: 'juja', say: 'Joo-jah', priority: 90 },
-  { match: 'ngong', say: 'Ngong', priority: 85 },
-  { match: 'muindi\\s+mbingu|miundi\\s+mbingu', say: 'Moo-in-dee Mbeen-goo', priority: 95 },
-  { match: 'kabete', say: 'Kah-beh-teh', priority: 90 },
-  { match: 'kasarani', say: 'Kah-sah-rah-nee', priority: 90 },
-  { match: 'embakasi', say: 'Em-bah-kah-see', priority: 90 },
-  { match: 'langata|lang\'ata', say: 'Lang-ah-ta', priority: 90 },
-  { match: 'nairobi', say: 'Nairobi', priority: 80 },
-  { match: 'mombasa', say: 'Mom-bah-sa', priority: 90 },
-  { match: 'kisumu', say: 'Kee-soo-moo', priority: 90 },
-  { match: 'nakuru', say: 'Nah-koo-roo', priority: 90 },
-  { match: 'eldoret', say: 'El-do-ret', priority: 90 },
+  // --- Places / areas: PLACE_LEXICON below (evidence-gated) ---
+  ...PLACE_LEXICON,
   { match: 'cbd', say: 'C B D', priority: 85 },
 
   // --- Service / trade terms ---
@@ -445,6 +455,7 @@ function mergeIdentityLexicon(extra, identity = {}) {
 
 module.exports = {
   KENYA_LEXICON,
+  PLACE_LEXICON,
   applyLexicon,
   listLexiconEntries,
   parseLexiconOverrides,
