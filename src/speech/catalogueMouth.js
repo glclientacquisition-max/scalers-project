@@ -130,7 +130,8 @@ function softenCataloguePunctuation(text) {
     .replace(/\?(?=\s|$)/g, ',')
     .replace(/,\s*,+/g, ', ')
     .replace(/\s+,/g, ',')
-    .replace(/,(\S)/g, ', $1')
+    // Keep a thousands separator (KSh 6,000) whole.
+    .replace(/,(?=\S)(?!(?<=\d,)\d)/g, ', ')
     .replace(/\s+/g, ' ')
     .trim();
 }
