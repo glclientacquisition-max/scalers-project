@@ -908,14 +908,18 @@ function callerGoalText(text, opts = {}) {
 }
 
 /** The caller has not finished the thought. Any reply, including the name ask, waits. */
-function callerTurnStillOpen(text) {
+function callerTurnStillOpen(text, ctx = null) {
   const { utteranceLooksIncomplete } = require('../speech/turnTaking');
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return false;
-  if (utteranceLooksIncomplete(raw)) return true;
-  if (usableGoalRemainder(raw)) return false;
-  const core = raw.replace(/[.!?,;:…—–-]+$/g, '').trim();
-  return UNFINISHED_STEM.test(core);
+  let open = utteranceLooksIncomplete(raw);
+  if (!open && !usableGoalRemainder(raw)) {
+    open = UNFINISHED_STEM.test(raw.replace(/[.!?,;:…—–-]+$/g, '').trim());
+  }
+  if (!open || !ctx) return open;
+  // With call context, a whole answer or a whole ask is not held for its comma.
+  const { completeTurnReason } = require('./unfinishedTurn');
+  return !completeTurnReason(raw, ctx);
 }
 
 function isPlausibleCallerName(value) {

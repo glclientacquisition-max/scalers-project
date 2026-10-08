@@ -34,7 +34,7 @@ const {
 const { catalogueAskInPlay } = require('./fileRead');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
 const { fillSpeakSlot, takePendingSpeakSlot } = require('./speakSlots');
-const { callerTurnStillOpen } = require('./entityExtraction');
+const { unfinishedTurnHold } = require('./unfinishedTurn');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
@@ -109,8 +109,16 @@ function planCallerModelTurn(state, opts = {}) {
   }
   const line = fileNameAskLine(state);
   const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
-  // An unfinished turn waits out the turn-end cap, then still does not start a reply.
-  if (callerTurnStillOpen(latest)) {
+  // An unfinished turn does not start a reply. Voice holds it on a timer and
+  // passes holdTimedOut when the caller stayed quiet, so it is not held twice.
+  if (
+    unfinishedTurnHold(state, {
+      text: latest,
+      profile: opts.profile,
+      agentAwaitingReply: opts.agentAwaitingReply,
+      holdTimedOut: opts.holdTimedOut,
+    })
+  ) {
     return { runModel: false, line: '', hold: 'unfinished' };
   }
   // Staging listen: Gemini speaks the catalogue even when a file name is pending.

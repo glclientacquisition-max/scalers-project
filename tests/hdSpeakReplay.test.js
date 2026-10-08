@@ -60,6 +60,7 @@ const { canonicalPlaceName } = require('../src/conversation/kenyaPlaces');
 const { drainSpokenSpeakSlots, queueToolOutcome, takeToolOutcome } = require('../src/conversation/speakSlots');
 const { fileServicePriceLine } = require('../src/conversation/catalogueMouth');
 const { createSpokenStreamBuffer } = require('../src/speech/spokenStreamBuffer');
+const { unfinishedTurnHold } = require('../src/conversation/unfinishedTurn');
 const {
   authorizeSpeak,
   createSpeakCommit,
@@ -1512,6 +1513,83 @@ describe('HD_e369cba6565d free caller', () => {
       ],
     });
     assert.equal(beside.checks.deletedAnswer, 1);
+  });
+
+  function heldTurn(text, { offer = false } = {}) {
+    let state = createBrainState(DUSTED);
+    state.language = { current: 'sw' };
+    state.caller.name = 'Alvin';
+    state.caller.nameConfirmed = true;
+    if (offer) state = noteSpokenPendingAsk(state, 'Naweza kukuachia ujumbe kwa timu yetu?');
+    return hear(state, text, DUSTED, 'sw');
+  }
+
+  it('does not hold a consent word or a whole ask for its trailing comma', () => {
+    for (const word of ['Sawa,', 'Ndio,', 'Ndiyo,', 'Yes,', 'Okay,', 'Ok,', 'Hapana,', 'No,']) {
+      assert.equal(callerTurnStillOpen(word), true, word);
+      const offered = heldTurn(word, { offer: true });
+      const gate = planCallerModelTurn(offered, { fileNameAskCommitted: true, profile: DUSTED });
+      assert.equal(gate.hold, undefined, word);
+      assert.equal(gate.runModel, true, word);
+      // With nothing pending, a bare "Sawa," is still a fragment.
+      const bare = heldTurn(word);
+      assert.equal(
+        planCallerModelTurn(bare, { fileNameAskCommitted: true, profile: DUSTED }).hold,
+        'unfinished',
+        word
+      );
+      // The agent's own question counts as pending too.
+      assert.equal(
+        unfinishedTurnHold(bare, { profile: DUSTED, agentAwaitingReply: true }),
+        null,
+        word
+      );
+    }
+
+    const whatDo = heldTurn('Mnafanya nini,');
+    assert.equal(
+      planCallerModelTurn(whatDo, { fileNameAskCommitted: true, profile: DUSTED }).hold,
+      undefined
+    );
+    const { localReply, planned } = playTurn({
+      commit: createSpeakCommit(),
+      text: 'Mnafanya nini,',
+      state: whatDo,
+      profile: DUSTED,
+      language: 'sw',
+    });
+    assert.equal(localReply.outcome, 'catalogue');
+    assert.match(planned.lines.join(' '), /Tuna Couch cleaning/);
+
+    for (const ask of [
+      'Mnafika Kitengela,',
+      'Mnafika kitengele,',
+      'Do you cover Kisumu,',
+      'Carpet cleaning ni bei gani,',
+      'How much is mattress cleaning,',
+    ]) {
+      assert.equal(unfinishedTurnHold(heldTurn(ask), { profile: DUSTED }), null, ask);
+    }
+
+    for (const fragment of [
+      'A-ah,',
+      "Let's say",
+      'Nilikuwa nataka',
+      "And, uh, let's say",
+      'Nataka carpet na',
+      'I need cleaning and',
+      'I wanted to ask so',
+      'Nataka kusafisha lakini',
+      'Mnafika,',
+      'How much,',
+    ]) {
+      const offered = heldTurn(fragment, { offer: true });
+      assert.equal(
+        planCallerModelTurn(offered, { fileNameAskCommitted: true, profile: DUSTED }).hold,
+        'unfinished',
+        fragment
+      );
+    }
   });
 
   it('queues a save without a farewell and says goodbye once on close', () => {
