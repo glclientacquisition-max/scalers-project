@@ -350,6 +350,8 @@ const {
 const {
   createToolHoldSession,
   fileReadFollowUp,
+  holdSpeaksAfterAck,
+  trimAckLead,
   turnRequestsTool,
 } = require('./src/speech/toolHold');
 const { appendFinalPart, joinUtteranceParts } = require('./src/speech/utteranceJoin');
@@ -2016,6 +2018,12 @@ mediaWss.on('connection', (ws, req) => {
   });
   /** @type {ReturnType<typeof createVoiceTurnTiming>|null} */
   let activeTurnTiming = null;
+  // The turn whose thinking-ack started last, and when. A tool hold on that
+  // same turn is skipped while the ack is recent (HD_c98820e579e1 t10).
+  let thinkingAckTurn = null;
+  let thinkingAckAtMs = 0;
+  // An ack or a hold played on this turn: a tool outcome drops its "Okay." lead.
+  let ackPlayedTurn = null;
   /** Rolling interim hypothesis while agent is busy (for barge-in). */
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
@@ -2413,6 +2421,18 @@ mediaWss.on('connection', (ws, req) => {
 
   async function speakToolHold(spoken) {
     if (!spoken?.speak || bargeInActive) return;
+    if (
+      spoken.kind === 'hold' &&
+      thinkingAckTurn &&
+      thinkingAckTurn === activeTurnTiming &&
+      !holdSpeaksAfterAck({ kind: spoken.kind, ackAtMs: thinkingAckAtMs })
+    ) {
+      console.log(
+        `[ws/media][${sidLabel()}] tool hold skipped after thinking-ack ${Date.now() - thinkingAckAtMs}ms: ${spoken.line}`
+      );
+      return;
+    }
+    if (spoken.kind === 'hold') ackPlayedTurn = activeTurnTiming;
     await speakText(spoken.line, {
       isFiller: spoken.kind === 'hold',
       skipFileGate: spoken.kind === 'hold',
@@ -3338,6 +3358,9 @@ mediaWss.on('connection', (ws, req) => {
           // Adaptive: skip if LLM→TTS already started (stream chunk or full reply).
           if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk) {
             fillerStarted = true;
+            thinkingAckTurn = turnTiming;
+            thinkingAckAtMs = Date.now();
+            ackPlayedTurn = turnTiming;
             turnTiming.markFiller();
             console.log(
               `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
@@ -3908,8 +3931,13 @@ mediaWss.on('connection', (ws, req) => {
           /take a message|nitachukua ujumbe/i.test(confirmation);
         if (!(spokeLookupSentence && confirmation === lookupSpoken) && !alreadySaid) {
           await actionProgressSpeak;
-          callTranscript.pushAgent(result.actionConfirmation);
-          await speakText(result.actionConfirmation);
+          // "Alright." already played: say "They'll call you back.", not
+          // "Okay. They'll call you back." (HD_4d6ac592aeb3 t4).
+          const outcomeLine = trimAckLead(result.actionConfirmation, {
+            acked: ackPlayedTurn === turnTiming,
+          });
+          callTranscript.pushAgent(outcomeLine);
+          await speakText(outcomeLine);
           spokeThisTurn = true;
         }
       }
