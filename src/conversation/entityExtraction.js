@@ -57,6 +57,48 @@ function distinctiveServiceTokens(name, services) {
   });
 }
 
+const ALIAS_STOP = new Set(['and', 'the', 'for', 'with', 'from', 'your', 'our']);
+
+function singularAlias(word) {
+  if (word.endsWith('ies') && word.length > 4) return `${word.slice(0, -3)}y`;
+  if (word.endsWith('s') && !word.endsWith('ss') && word.length > 3) return word.slice(0, -1);
+  return word;
+}
+
+/** Tokens and compounds inside one parenthetical. "air bnbs" yields bnb and airbnb. */
+function parentheticalAliases(name) {
+  const aliases = [];
+  const parens = [...String(name || '').matchAll(/\(([^)]+)\)/g)].map((match) => match[1]);
+  for (const paren of parens) {
+    const words = normalizeText(paren)
+      .split(' ')
+      .filter((word) => word && !ALIAS_STOP.has(word) && !GENERIC_SERVICE_WORDS.has(word));
+    for (const word of words) {
+      if (word.length >= 4) aliases.push(word);
+      const one = singularAlias(word);
+      if (one !== word && one.length >= 3) aliases.push(one);
+    }
+    for (let i = 0; i < words.length - 1; i += 1) {
+      if (words[i].length > 4) continue;
+      const joined = `${words[i]}${singularAlias(words[i + 1])}`;
+      if (joined.length >= 4) aliases.push(joined);
+    }
+  }
+  return aliases;
+}
+
+/**
+ * Aliases from a service name's parentheticals. A word that fits more than
+ * one service is left out, so a price ask does not fall through to another row.
+ */
+function serviceNameAliases(name, services) {
+  const list = services || [];
+  return [...new Set(parentheticalAliases(name))].filter((alias) => {
+    const owners = list.filter((service) => parentheticalAliases(service.name).includes(alias));
+    return owners.length === 1;
+  });
+}
+
 function findCatalogMatch(text, profile = {}) {
   const products = normalizeProducts(profile.productCatalog);
   const candidates = [];
@@ -74,7 +116,11 @@ function findCatalogMatch(text, profile = {}) {
       canonical: service.name,
       // "usafi wa carpet" or "the sofa" names the job by its object. A token
       // that appears in exactly one service name is enough to pick that service.
-      terms: [service.name, ...distinctiveServiceTokens(service.name, services)].filter(Boolean),
+      terms: [
+        service.name,
+        ...distinctiveServiceTokens(service.name, services),
+        ...serviceNameAliases(service.name, services),
+      ].filter(Boolean),
     });
   }
 

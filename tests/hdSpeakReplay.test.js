@@ -57,6 +57,7 @@ const { looksLikeEcho, utteranceLooksIncomplete, decideTurnEnd } = require('../s
 const { farewellLine, planBrainEndClose } = require('../src/speech/callClose');
 const { canonicalPlaceName } = require('../src/conversation/kenyaPlaces');
 const { drainSpokenSpeakSlots } = require('../src/conversation/speakSlots');
+const { fileServicePriceLine } = require('../src/conversation/catalogueMouth');
 const {
   authorizeSpeak,
   createSpeakCommit,
@@ -1398,5 +1399,27 @@ describe('HD_e369cba6565d free caller', () => {
     assert.equal(planBrainEndClose({ action: 'CONTINUE', language: 'sw' }).close, false);
     assert.equal(planBrainEndClose({ action: 'END', language: 'sw' }).line, farewellLine('sw'));
     assert.equal(farewellLine('sw'), 'Asante. Kwaheri.');
+  });
+
+  it('prices bnb, airbnb, and house as general cleaning', () => {
+    const profile = {
+      ...DUSTED,
+      servicesCatalog: [
+        { name: 'Carpet cleaning', price_range: 'Ksh 1500-2000' },
+        { name: 'General cleaning (houses & air bnbs)', price_range: 'Ksh 2500-4000' },
+      ],
+    };
+    const state = createBrainState(profile);
+    state.entities.service = { value: 'Carpet cleaning', confirmed: true, source: 'caller' };
+    for (const ask of [
+      'Na kuwasha bnb mna-charge how much?',
+      'How much is airbnb?',
+      'How much for the house?',
+    ]) {
+      const line = fileServicePriceLine(ask, profile, 'sw', state);
+      assert.match(line, /General cleaning/, ask);
+      assert.match(line, /2500/);
+      assert.doesNotMatch(line, /Carpet/, ask);
+    }
   });
 });
