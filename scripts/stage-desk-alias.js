@@ -18,13 +18,15 @@ const PRODUCTION_DESK_HOSTS = new Set([
   "scalers-project.vercel.app",
 ]);
 
-const IGNORE_MAIN =
-  'if [ "$VERCEL_GIT_COMMIT_REF" = "main" ]; then exit 0; else exit 1; fi';
+// Project-level fallback for commits that predate dashboard/vercel.json
+// "ignoreCommand" (that file wins when present). Build only the staging
+// branch; skip main and every other branch, as dashboard/scripts/vercel-ignore-build.sh does.
+const IGNORE_ALL_BUT_STAGING_BRANCH = `if [ "$VERCEL_GIT_COMMIT_REF" = "${STAGING_BRANCH}" ]; then exit 1; else exit 0; fi`;
 
 function stagingProjectPinBody() {
   return {
     autoAssignCustomDomains: false,
-    commandForIgnoringBuildStep: IGNORE_MAIN,
+    commandForIgnoringBuildStep: IGNORE_ALL_BUT_STAGING_BRANCH,
   };
 }
 
