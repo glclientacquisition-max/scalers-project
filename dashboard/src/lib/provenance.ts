@@ -316,15 +316,84 @@ export function policyMeta(policies: any, key: any) {
   return {};
 }
 
+// Keys in business_policies that are metadata or are read by a gate of their
+// own (holds -> request tools, booking_mode -> confirmed slots). They are not
+// spoken policy text. Lockstep with src/conversation/provenance.js.
+const POLICY_META_KEYS = new Set([
+  'provenance',
+  'field_meta',
+  'source',
+  'holds',
+  'holds_allowed',
+  'booking',
+  'booking_meta',
+  'booking_mode',
+  'bookingMode',
+  'coverage_areas',
+]);
+
+export function isPolicyMetaKey(key: any) {
+  if (POLICY_META_KEYS.has(key)) return true;
+  return /(_source|Source|_meta|_confirmed|_at)$/.test(key);
+}
+
+export function policyKeyLabel(key: any) {
+  const words = String(key || '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_\-]+/g, ' ')
+    .trim()
+    .toLowerCase();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : '';
+}
+
+// coverage_areas ids ("county:nairobi", "place:kitengela"). The server checks
+// each id against the place index (src/conversation/coverageAreas.js); this
+// file stays import-free, so it keeps the same shape without the index.
+function coverageAreaIds(obj: any): string[] | null {
+  if (!Object.prototype.hasOwnProperty.call(obj, 'coverage_areas')) return null;
+  if (!Array.isArray(obj.coverage_areas)) return null;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of obj.coverage_areas) {
+    const id = String(item || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const split = id.indexOf(':');
+    if (split < 1) continue;
+    const kind = id.slice(0, split);
+    if (kind !== 'county' && kind !== 'place') continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+
+/**
+ * Split business_policies into what the prompt may state and what it must
+ * call unknown. Every configured key lands on one side; none is dropped.
+ * coverage_areas is the settings picker list; the prompt carries the same list
+ * the voice path answers coverage from.
+ */
 export function factPolicyMap(policies: any, fieldMeta: any = null) {
   const obj = asObject(policies);
-  const out: Record<string, string> = {};
+  const out: Record<string, unknown> = {};
   const unknown: string[] = [];
   for (const [key, label] of Object.entries(POLICY_TOPICS)) {
     const text = String(obj[key] || '').trim();
     const row = classifyPolicyValue(text, policyMeta(obj, key), fieldMeta, `policies.${key}`);
     if (row.fact) out[key] = text;
     else unknown.push(label);
+  }
+  const coverage = coverageAreaIds(obj);
+  if (coverage) out.coverage_areas = coverage;
+  for (const [key, raw] of Object.entries(obj)) {
+    if (Object.prototype.hasOwnProperty.call(POLICY_TOPICS, key) || isPolicyMetaKey(key)) continue;
+    if (typeof raw !== 'string' && typeof raw !== 'number') continue;
+    const text = String(raw).trim();
+    if (!text) continue;
+    const row = classifyPolicyValue(text, policyMeta(obj, key), fieldMeta, `policies.${key}`);
+    if (row.fact) out[key] = text;
+    else unknown.push(policyKeyLabel(key));
   }
   return { policies: out, unknown };
 }
@@ -428,7 +497,8 @@ export function formatUnknownSection(topics: any) {
   }
   for (const topic of list) lines.push(`- ${topic}`);
   lines.push(
-    'For an UNKNOWN topic: admit you do not have it. Say: "Let me confirm with the owner." Do not guess, and do not use a pack seed as the answer.'
+    'For an UNKNOWN topic: admit you do not have it. Say: "Let me confirm with the owner." Do not guess, and do not use a pack seed as the answer.',
+    'A fact stated elsewhere in this brief (hours, coverage, services, prices, payment) wins over an UNKNOWN line on the same topic.'
   );
   return lines.join('\n');
 }
