@@ -9,12 +9,16 @@ const FAREWELL = {
   sheng: 'Asante. Kwaheri.',
 };
 
+function farewellLine(language) {
+  const lang = confirmationLanguage(language);
+  return FAREWELL[lang] || FAREWELL.en;
+}
+
 function planBrainEndClose({ action, language } = {}) {
   if (String(action || '').toUpperCase() !== 'END') {
     return { close: false, line: '' };
   }
-  const lang = confirmationLanguage(language);
-  return { close: true, line: FAREWELL[lang] || FAREWELL.en };
+  return { close: true, line: farewellLine(language) };
 }
 
 /**
@@ -54,6 +58,7 @@ async function runBrainEndClose(opts = {}) {
 }
 
 module.exports = {
+  farewellLine,
   planBrainEndClose,
   runBrainEndClose,
   farewellHangupDelayMs,

@@ -18,19 +18,26 @@ const {
   setNextBestAction,
 } = require('../src/conversation/brainState');
 const { determineNextBestAction } = require('../src/conversation/nextBestAction');
-const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+const {
+  extractConversationEntities,
+  extractName,
+  applyCallerNameConfirmation,
+  callerTurnStillOpen,
+} = require('../src/conversation/entityExtraction');
 const { planCatalogueMouth } = require('../src/speech/catalogueMouth');
 const {
   polishSpokenReply,
   polishSpokenDetail,
   planEmptyGeminiSpeech,
   shouldSkipCallerTurn,
+  withCallbackFarewell,
 } = require('../src/conversation/dynamicSpeech');
 const { guardSpokenReply } = require('../src/conversation/speechGuard');
-const { noteSpokenPendingAsk } = require('../src/conversation/callCorrectives');
+const { noteSpokenPendingAsk, ackIsConsent } = require('../src/conversation/callCorrectives');
 const { numbersIn } = require('../src/conversation/numberWords');
 const {
   coverageAskSpeech,
+  coverageAskPlaces,
   foldCanonicalPlace,
   visitBlockSpeech,
   unsureCoverageSpeech,
@@ -38,7 +45,12 @@ const {
 const { ensureRequiredCreateRequest } = require('../src/conversation/requiredCreateRequest');
 const { replayCall } = require('../src/speech/replayVoice');
 const { analyzeCallerLanguage, resolveLanguageState, createLanguageState } = require('../src/conversation/language');
-const { lockFileNameAsk } = require('../src/speech/callerFileSpeech');
+const { lockFileNameAsk, gateCallerFileSpeech } = require('../src/speech/callerFileSpeech');
+const { offerActOf } = require('../src/speech/offerAct');
+const { prepareForTts } = require('../src/speech/ttsNormalize');
+const { joinCallerFragments } = require('../src/speech/lateFinal');
+const { looksLikeEcho } = require('../src/speech/turnTaking');
+const { canonicalPlaceName } = require('../src/conversation/kenyaPlaces');
 const { drainSpokenSpeakSlots } = require('../src/conversation/speakSlots');
 const {
   authorizeSpeak,
@@ -933,18 +945,20 @@ describe('HD_0789 and HD_486 coverage lines stay in the replay', () => {
     const turn5 = ttsText(replay.turns[4]);
     const turn7 = ttsText(replay.turns[6]);
     assert.match(turn4, /Nairobi/);
-    assert.match(turn4, /Kee-ten-geh-la/);
-    assert.match(turn4, /Kee-ahm-boo/);
-    assert.match(turn4, /Joo-jah/);
+    assert.match(turn4, /Kitengela/);
+    assert.match(turn4, /Kiambu/);
+    assert.match(turn4, /Juja/);
     assert.match(turn4, /Ongata Rongai/);
-    assert.match(turn4, /Shyo-kee-mau/);
+    assert.match(turn4, /Syokimau/);
+    assert.doesNotMatch(turn4, /Kee-ten-geh-la|Kee-ahm-boo|Joo-jah|Shyo-kee-mau/);
     assert.match(turn4, /tukutembelee wapi/);
     assert.match(turn5, /ndani ya Nairobi/);
     assert.match(turn5, /OngataRongai/);
     assert.match(turn5, /kwako/);
     assert.match(turn5, /Upo eneo gani/);
     assert.doesNotMatch(`${turn4} ${turn5}`, /Ndanai|\bKako\b/);
-    assert.match(turn7, /Nah-koo-roo|Nakuru/);
+    assert.match(turn7, /Nakuru/);
+    assert.doesNotMatch(turn7, /Nah-koo-roo/);
     assert.match(turn7, /note kwa timu/);
     for (const index of [3, 4]) {
       assert.equal(
@@ -964,5 +978,145 @@ describe('HD_0789 and HD_486 coverage lines stay in the replay', () => {
     );
     assert.match(outside, /note kwa timu/);
     assert.doesNotMatch(outside, /Nakuru/);
+  });
+});
+
+describe('HD_6a759704f507 coverage, name, and the save farewell', () => {
+  const DUSTED = {
+    vertical: 'home_services',
+    businessName: 'Done and Dusted',
+    servicesCatalog: [
+      { name: 'Couch cleaning', price_range: 'Ksh 800-1200' },
+      { name: 'Mattress cleaning', price_range: 'Ksh 800-1200' },
+      { name: 'Carpet cleaning', price_range: 'Ksh 1500-2000' },
+      { name: 'General cleaning' },
+    ],
+    businessPolicies: {
+      coverage_areas: [
+        'county:nairobi',
+        'county:kiambu',
+        'place:kitengela',
+        'place:juja',
+        'place:ongata rongai',
+        'place:syokimau',
+      ],
+    },
+    callerMemory: { name: 'Alvin', fileOwnerName: 'Alvin' },
+  };
+
+  it('answers a list of places and still offers to take a message', () => {
+    const ask = 'Oh, eh, halafu mna- mnafika hadi Kericho na Nakuru?';
+    const places = coverageAskPlaces(ask);
+    assert.deepEqual(places, ['Kericho', 'Nakuru']);
+    const line = coverageAskSpeech(ask, DUSTED, 'sw');
+    assert.match(line, /nje/);
+    assert.match(line, /kukuachia ujumbe/);
+    const gemini =
+      'Kwa sasa tunatoa huduma Nairobi na maeneo ya karibu pekee, kwa hivyo hatutaweza kufika huko.';
+    const polished = polishSpokenDetail(gemini, {
+      profile: DUSTED,
+      language: 'sw',
+      callerTurns: ['Hapana, mimi siishi Nairobi.'],
+    });
+    assert.match(polished.text, /maeneo ya karibu pekee/);
+    assert.match(polished.text, /kukuachia ujumbe/);
+    assert.equal(offerActOf('Nani anapiga simu tafadhali?'), null);
+    assert.equal(coverageAskSpeech('which services do you do over', DUSTED, 'en'), '');
+  });
+
+  it('treats Nikujulishe as the pending offer a short yes can accept', () => {
+    const offer = 'Nikujulishe tukianza kutoa huduma huko?';
+    assert.deepEqual(offerActOf(offer), { kind: 'offer', act: 'note_team' });
+    const state = noteSpokenPendingAsk(createBrainState(DUSTED), offer);
+    assert.equal(state.conversation.questionsAsked.slice(-1)[0], 'offer');
+    assert.equal(ackIsConsent(state.conversation.questionsAsked, 'Sawa, sawa, nijulishe.'), true);
+    assert.equal(ackIsConsent(state.conversation.questionsAsked, 'wacha'), false);
+  });
+
+  it('confirms a stated name so the name can stay in the sentence', () => {
+    assert.equal(extractName('Ni pesa ngapi kuosha carpet'), null);
+    assert.equal(extractName('Ni Alvin, anapiga simu.', { knownNames: ['Alvin'] }), 'Alvin');
+    const asked = unboundAlvin(hear(createBrainState(DUSTED), 'Hello', DUSTED, 'sw'));
+    assert.equal(asked.caller.nameConfirmed, false);
+    const dropped = gateCallerFileSpeech('Pole sana Alvin, hamwezi kufika.', asked);
+    assert.equal(dropped.speak, false);
+    const said = hear(asked, 'Ni Alvin, anapiga simu.', DUSTED, 'sw');
+    assert.equal(said.caller.name, 'Alvin');
+    assert.equal(said.caller.nameConfirmed, true);
+    const kept = gateCallerFileSpeech('Pole sana Alvin, hamwezi kufika.', said);
+    assert.equal(kept.speak, true);
+    assert.match(kept.line, /Alvin/);
+    const introduced = applyCallerNameConfirmation(
+      { caller: { nameConfirmed: false }, entities: {} },
+      "I'm Alvin",
+      {
+        name: { value: 'Alvin', source: 'caller_im', confidence: 0.95, confirmed: false },
+      },
+      { knownNames: [{ name: 'Alvin', source: 'memory' }], fileOwnerName: 'Alvin' }
+    );
+    assert.equal(introduced.nameConfirmed, true);
+  });
+
+  it('does not ask the name while the opening is still open', () => {
+    const profile = {
+      ...DUSTED,
+      callerMemory: { name: 'Alvin', fileOwnerName: 'Alvin' },
+    };
+    const opening = hear(createBrainState(profile), 'Nilikuwa nataka kujua,', profile, 'sw');
+    assert.equal(callerTurnStillOpen('Nilikuwa nataka kujua,'), true);
+    const gate = planCallerModelTurn(opening, { fileNameAskCommitted: false });
+    assert.equal(gate.hold, 'unfinished');
+    assert.equal(gate.runModel, false);
+    assert.equal(gate.line, '');
+    const hello = hear(createBrainState(profile), 'Hello', profile, 'en');
+    const ready = planCallerModelTurn(hello, { fileNameAskCommitted: false });
+    assert.equal(ready.hold, undefined);
+    assert.match(ready.line, /Alvin/);
+  });
+
+  it('does not read ukubwa as a place, and Kiswahili keeps the written place', () => {
+    assert.equal(canonicalPlaceName('ukubwa'), '');
+    assert.equal(canonicalPlaceName('kubwa'), 'kubwa');
+    const sw = prepareForTts('Kuhusu Kericho na Nakuru, tuko Nairobi.', { callLanguage: 'sw' });
+    assert.match(sw.text, /Nakuru/);
+    assert.doesNotMatch(sw.text, /Nah-koo-roo/);
+    const en = prepareForTts('About Nakuru, we are in Nairobi.', { callLanguage: 'en' });
+    assert.match(en.text, /Nah-koo-roo/);
+  });
+
+  it('keeps a word boundary on a late token and does not drop Al. as echo', () => {
+    assert.equal(
+      joinCallerFragments(['Ni pesa ngapi kuosha', 'carpet.']),
+      'Ni pesa ngapi kuosha carpet.'
+    );
+    assert.equal(looksLikeEcho('Al.', 'Je, naongea na Alvin?'), false);
+  });
+
+  it('speaks the farewell on the callback save and leaves a hold alone', () => {
+    const saved = withCallbackFarewell(
+      'Sawa, nimehifadhi ombi lako.',
+      [
+        {
+          action: 'create_service_request',
+          status: 'succeeded',
+          requestType: 'callback',
+        },
+      ],
+      'sw'
+    );
+    assert.match(saved, /nimehifadhi ombi lako/);
+    assert.match(saved, /Asante\. Kwaheri\./);
+    const hold = withCallbackFarewell(
+      "Okay, I've saved your request.",
+      [
+        {
+          action: 'create_service_request',
+          status: 'succeeded',
+          requestType: 'hold',
+        },
+      ],
+      'en'
+    );
+    assert.equal(hold, "Okay, I've saved your request.");
   });
 });

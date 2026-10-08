@@ -54,6 +54,10 @@ test('detects high word-overlap echo', () => {
 test('rejects unrelated caller speech', () => {
   assert.strictEqual(looksLikeEcho('I need a plumber', 'How can I help you today?'), false);
 });
+test('a short name fragment is not an echo of the name ask', () => {
+  assert.strictEqual(looksLikeEcho('Al.', 'Je, naongea na Alvin?'), false);
+  assert.strictEqual(looksLikeEcho('al', 'Am I speaking with Alvin?'), false);
+});
 
 console.log('utteranceLooksIncomplete');
 test('flags trailing conjunctions', () => {

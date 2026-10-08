@@ -13,6 +13,7 @@ const {
   nearestAllowedPlace,
   placesInCounties,
 } = require('./kenyaPlaces');
+const { offerActOf } = require('../speech/offerAct');
 const { coveredByAreas, readCoverageAreas } = require('./coverageAreas');
 
 const CONFIRM_ACCESS_NOTE = 'confirm access';
@@ -519,31 +520,69 @@ function preferVisitPlace(previous, incoming, text = '') {
   return next;
 }
 
-function coverageAskPlace(text) {
-  let value = String(text || '')
-    .replace(/[?!.]+/g, ' ')
-    .replace(/[—–-]/g, ' ')
-    .replace(/\s+/g, ' ')
+function takeCoveragePlace(places, raw) {
+  let place = String(raw || '')
+    .replace(/^(?:the|in|at|to|hadi|mpaka|until)\s+/i, '')
+    .replace(/[?.!,]+$/g, '')
     .trim();
-  value = value.replace(/^(?:(?:like|eh|eeh|oh|ah|uh|um)\s*,?\s*)+/i, '');
-  value = value.replace(/^(?:(?:do you(?: guys)?|can you)\s+)+/i, 'do you ');
-  const matched =
-    /\bdo you\s+(?:do|cover|service|serve|come to|go to)\s+(.+)$/i.exec(value) ||
-    /^(?:what|how) about\s+(.+)$/i.exec(value) ||
-    /^(?:mnafika|mnaja|mnafanyia)\s+(.+)$/i.exec(value);
-  if (!matched) return '';
-  const place = matched[1].replace(/^(?:the|in|at|to)\s+/i, '').trim();
-  if (!place || place.split(/\s+/).length > 4) return '';
+  if (!place || place.split(/\s+/).length > 4) return;
   if (
     /\b(clean|cleaning|carpet|couch|sofa|mattress|fumigation|plumb|electric|team|price|hours|name)\b/i.test(
       place
     )
   ) {
-    return '';
+    return;
   }
-  if (!placeWords(place).length) return '';
-  if (isNoisePlace(place)) return '';
-  return place;
+  if (!placeWords(place).length || isNoisePlace(place)) return;
+  places.push(place);
+}
+
+/** Kericho na Nakuru splits. "na kuru" stays one token so it can bind to Nakuru. */
+function splitPlaceList(tail) {
+  const places = [];
+  const chunks = String(tail || '')
+    .split(/\s*,\s*|\s+\b(?:and|au|or)\b\s+/i)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  for (const chunk of chunks) {
+    const bits = chunk
+      .split(/\s+\bna\b\s+/i)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const leftIsPlace = bits.length > 1 && placeWords(bits[0]).length && !isNoisePlace(bits[0]);
+    if (leftIsPlace) {
+      for (const bit of bits) takeCoveragePlace(places, bit);
+    } else {
+      takeCoveragePlace(places, chunk);
+    }
+  }
+  return places;
+}
+
+function coverageAskPlaces(text) {
+  let value = String(text || '')
+    .replace(/[?!.]+/g, ' ')
+    .replace(/[—–-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  value = value.replace(/^(?:(?:like|eh|eeh|oh|ah|uh|um|halafu)\s*,?\s*)+/i, '');
+  value = value.replace(/^(?:(?:do you(?: guys)?|can you)\s+)+/i, 'do you ');
+  const about = /^(?:what|how) about\s+(.+)$/i.exec(value);
+  if (about) return splitPlaceList(about[1]);
+  const verb =
+    /\b(?:do you\s+(?:do|cover|service|serve|come to|go to)|mnafika|mnaja|mnafanyia)\b/i.exec(
+      value
+    );
+  if (!verb) return [];
+  const tail = value
+    .slice(verb.index + verb[0].length)
+    .replace(/^(?:\s+(?:hadi|mpaka|until|to|the|in|at))+/i, '')
+    .trim();
+  return splitPlaceList(tail);
+}
+
+function coverageAskPlace(text) {
+  return coverageAskPlaces(text).join(', ');
 }
 
 /** Trailing STT such as "over" is not a visit place. */
@@ -561,23 +600,49 @@ function isNoisePlace(place) {
  * Home-services "do you cover X" / "what about X".
  * Settings text only. No model, no map.
  */
+function joinPlaceNames(places, language) {
+  const names = places.filter(Boolean);
+  if (names.length <= 1) return names[0] || '';
+  const lang = String(language || 'en').toLowerCase();
+  const conj = lang === 'en' ? 'and' : 'na';
+  if (names.length === 2) return `${names[0]} ${conj} ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')} ${conj} ${names[names.length - 1]}`;
+}
+
 function coverageAskSpeech(text, profile = {}, language = 'en') {
   if (String(profile?.vertical || '').toLowerCase() !== 'home_services') return '';
-  const rawPlace = coverageAskPlace(text);
-  if (!rawPlace) return '';
-  const place = foldCanonicalPlace(rawPlace, profile) || rawPlace;
-  const coverage = assessCoverage(place, profile);
+  const rawPlaces = coverageAskPlaces(text);
+  if (!rawPlaces.length) return '';
+  const places = rawPlaces.map((raw) => foldCanonicalPlace(raw, profile) || raw);
+  const ratings = places.map((place) => assessCoverage(place, profile));
   const lang = String(language || 'en').toLowerCase();
   const sw = lang === 'sw' || lang.startsWith('swahili');
   const sheng = lang === 'sheng';
-  if (coverage === 'inside') {
-    if (sw) return `Ndiyo, tunafika ${place}.`;
-    if (sheng) return `Ndio, tunafika ${place}.`;
-    return `Yes, we cover ${place}.`;
+  if (ratings.some((rating) => rating === 'outside')) return outsideCoverageSpeech(language);
+  if (ratings.every((rating) => rating === 'inside')) {
+    const list = joinPlaceNames(places, language);
+    if (sw) return `Ndiyo, tunafika ${list}.`;
+    if (sheng) return `Ndio, tunafika ${list}.`;
+    return `Yes, we cover ${list}.`;
   }
-  if (coverage === 'outside') return outsideCoverageSpeech(language);
   if (hasCoverageText(profile)) return unsureCoverageSpeech(language);
   return visitBlockSpeech('unknown_coverage', language);
+}
+
+function statesOutOfArea(text) {
+  return /\b(?:outside (?:our |the )?coverage|out of (?:our )?coverage|we (?:do not|don't|can't|cannot) (?:cover|reach|serve|come)|liko nje|iko nje|nje ya (?:huduma|eneo|coverage|area)|hatutaweza kufika|hatuwezi kufika|hatufiki|maeneo ya karibu pekee|only (?:serve|cover))\b/i.test(
+    String(text || '')
+  );
+}
+
+/** A coverage answer that says the area is outside still ends with the note offer. */
+function ensureCoverageOffer(text, language = 'en') {
+  const body = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!body || !statesOutOfArea(body) || offerActOf(body)) return body;
+  const ask = coverageNoteQuestion(language);
+  const bare = ask.replace(/\?/g, '').trim().toLowerCase();
+  if (body.toLowerCase().includes(bare)) return body;
+  return `${body.replace(/[.?\s]+$/, '')}. ${ask}`;
 }
 
 function coverageNoteQuestion(language = 'en') {
@@ -653,7 +718,10 @@ module.exports = {
   outsideCoverageSpeech,
   unsureCoverageSpeech,
   coverageAskPlace,
+  coverageAskPlaces,
   coverageAskSpeech,
+  ensureCoverageOffer,
+  statesOutOfArea,
   isNoisePlace,
   appendVisitNotes,
 };

@@ -95,7 +95,8 @@ function oneEditNames(key) {
 
 // Everyday words. A one-edit guess from these is not a place
 // ("huduma" is not Huruma, "nyumba" is not Ngumba, "hello" is not Hells,
-// "ndani" is not Ndanai, "kwako" is not Kako).
+// "ndani" is not Ndanai, "kwako" is not Kako, "ukubwa" is not Kubwa).
+// scripts/data/kenyanWordlists.js is personal names and places, not this list.
 // Clipped place names stay fuzzy ("Ronga" -> Rongai, "rwaka" -> Ruaka).
 const SPOKEN_EVERYDAY = new Set([
   'about',
@@ -147,6 +148,7 @@ const SPOKEN_EVERYDAY = new Set([
   'those',
   'today',
   'tuna',
+  'ukubwa',
   'usafi',
   'water',
   'which',

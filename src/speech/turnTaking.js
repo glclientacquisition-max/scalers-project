@@ -123,10 +123,25 @@ function wordSet(text) {
  * @param {string} callerText
  * @param {string} agentText
  */
+function startsAskedName(callerText, agentText) {
+  const frag = normalizeSpeech(callerText).replace(/[^a-z]/g, '');
+  if (frag.length < 2 || frag.length > 12) return false;
+  const asked =
+    /(?:speaking with|talking (?:with|to)|naongea na|unaongea na|unazungumza na)\s+([a-z][a-z'-]{1,24})/.exec(
+      normalizeSpeech(agentText)
+    );
+  if (!asked) return false;
+  const name = asked[1].replace(/[^a-z]/g, '');
+  return name.startsWith(frag) && frag.length < name.length;
+}
+
 function looksLikeEcho(callerText, agentText) {
   const a = normalizeSpeech(callerText);
   const b = normalizeSpeech(agentText);
   if (!a || !b) return false;
+  // "Al." is the start of the name just asked, not the agent line played back.
+  if (startsAskedName(callerText, agentText)) return false;
+  if (a.length < 3) return b.split(' ').includes(a);
   if (b.includes(a) || a.includes(b.slice(0, Math.min(40, b.length)))) return true;
 
   const aw = wordSet(a);

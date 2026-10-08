@@ -34,6 +34,7 @@ const {
 const { catalogueAskInPlay } = require('./fileRead');
 const { callerTurnKinds, messageOnlyCallbackLine } = require('./messageOnly');
 const { fillSpeakSlot, takePendingSpeakSlot } = require('./speakSlots');
+const { callerTurnStillOpen } = require('./entityExtraction');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
@@ -108,6 +109,10 @@ function planCallerModelTurn(state, opts = {}) {
   }
   const line = fileNameAskLine(state);
   const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
+  // "Nilikuwa nataka kujua," has not finished. Wait for the ask or a continuation.
+  if (line && callerTurnStillOpen(latest)) {
+    return { runModel: false, line: '', hold: 'unfinished' };
+  }
   // Staging listen: Gemini speaks the catalogue even when a file name is pending.
   // The name ask stays for the next turn. Flag off keeps the name-ask early return.
   if (line && geminiCatalogueEnabled() && freshCatalogueAsk(latest)) {

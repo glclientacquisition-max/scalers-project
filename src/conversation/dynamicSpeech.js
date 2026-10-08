@@ -26,6 +26,7 @@ const {
   sanitizeSpokenFileClaim,
 } = require('./fileRead');
 const { shapeCatalogueMouth } = require('./catalogueMouth');
+const { ensureCoverageOffer } = require('./visitLocation');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 const { looksLikeFileVisitTalk } = require('./visitTalk');
 const { detectSpeedRequest } = require('../speech/speedControl');
@@ -459,6 +460,7 @@ function polishSpokenDetail(text, opts = {}) {
       callerText,
     });
   }
+  out = ensureCoverageOffer(out, opts.language);
   const before = String(text || '').trim();
   const after = String(out || '').trim();
   let reason = '';
@@ -709,6 +711,28 @@ function planEmptyGeminiSpeech({
  * Tool-only Gemini turns speak the tool line. A short yes to a saved
  * callback also gets the farewell. This does not hang up the socket.
  */
+function callbackSaveFarewell(results, language) {
+  const rows = Array.isArray(results) ? results : [];
+  const saved = rows.some((row) => {
+    if (!row || row.action !== 'create_service_request') return false;
+    if (row.status !== 'succeeded' && row.status !== 'updated') return false;
+    const type = String(row.requestType || row.value?.type || '').toLowerCase();
+    return type === 'callback';
+  });
+  if (!saved) return '';
+  const { farewellLine } = require('../speech/callClose');
+  return farewellLine(language);
+}
+
+function withCallbackFarewell(line, results, language) {
+  const farewell = callbackSaveFarewell(results, language);
+  const body = String(line || '').trim();
+  if (!farewell) return body;
+  if (body.toLowerCase().includes(farewell.toLowerCase())) return body;
+  if (/\b(?:kwaheri|goodbye|siku njema)\b/i.test(body)) return body;
+  return body ? `${body} ${farewell}` : farewell;
+}
+
 function spokenToolOutcome(toolResults, language, userText) {
   const rows = Array.isArray(toolResults) ? toolResults : [];
   if (!rows.length) return '';
@@ -722,10 +746,13 @@ function spokenToolOutcome(toolResults, language, userText) {
       row.action === 'create_service_request' &&
       (row.status === 'succeeded' || row.status === 'updated')
   );
-  if (!saved || !looksLikeShortAffirmation(userText)) return line;
-  const farewell = planBrainEndClose({ action: 'END', language });
-  if (!farewell.line || line.includes(farewell.line)) return line;
-  return `${line} ${farewell.line}`;
+  const shortFarewell =
+    saved && looksLikeShortAffirmation(userText)
+      ? planBrainEndClose({ action: 'END', language }).line
+      : '';
+  const farewell = callbackSaveFarewell(rows, language) || shortFarewell;
+  if (!farewell || line.includes(farewell)) return line;
+  return `${line} ${farewell}`;
 }
 
 /**
@@ -961,4 +988,6 @@ module.exports = {
   shouldSkipCallerTurn,
   looksLikeAwaitingCallerReply,
   looksLikeNamePrompt,
+  callbackSaveFarewell,
+  withCallbackFarewell,
 };

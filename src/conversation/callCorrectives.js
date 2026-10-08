@@ -152,10 +152,20 @@ function ackIsConsent(questionsAsked, text) {
   if (looksLikeLeaveIt(text)) return false;
   const lastAsk = (Array.isArray(questionsAsked) ? questionsAsked : []).slice(-1)[0];
   if (lastAsk === 'confirm' && looksLikeNonConsentAck(text)) return true;
-  if (lastAsk === 'offer' && (looksLikeShortAffirmation(text) || looksLikeNonConsentAck(text))) {
-    return true;
-  }
+  if (lastAsk === 'offer' && affirmsSpokenOffer(text)) return true;
   return false;
+}
+
+/** A bare yes, or a short yes that repeats the notify offer. */
+function affirmsSpokenOffer(text) {
+  if (looksLikeLeaveIt(text)) return false;
+  if (looksLikeShortAffirmation(text) || looksLikeNonConsentAck(text)) return true;
+  const t = normalizeAckText(text);
+  if (!t || t.split(' ').length > 6) return false;
+  if (!/^(?:sawa|ndio|ndiyo|ok|okay|yes|yeah|yah|yea|yep|poa|eeh|ehe|sure)\b/.test(t)) {
+    return false;
+  }
+  return Boolean(offerActOf(text));
 }
 
 function looksLikeUrgentContact(text) {

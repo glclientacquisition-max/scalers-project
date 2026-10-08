@@ -300,6 +300,7 @@ const {
   polishSpokenReply,
   polishSpokenDetail,
   looksLikePaceOnlyTurn,
+  withCallbackFarewell,
 } = require('./src/conversation/dynamicSpeech');
 const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
 const {
@@ -359,7 +360,7 @@ const {
   createOverlapHold,
   createAgentReplayMemory,
 } = require('./src/speech/overlapHold');
-const { createLateFinalHold } = require('./src/speech/lateFinal');
+const { createLateFinalHold, joinCallerFragments } = require('./src/speech/lateFinal');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
 const {
@@ -3055,6 +3056,13 @@ mediaWss.on('connection', (ws, req) => {
         greetingBarged: greetingInterrupted && !greetingSettled,
         fileNameAskCommitted: fileNameAsksCommitted > 0,
       });
+      // "Nilikuwa nataka kujua," has not named the ask. Wait. Do not ask the name.
+      if (nameGate.hold === 'unfinished') {
+        console.log(
+          `[ws/media][${callKey}] unfinished opening, name ask waits lang=${callLanguage}`
+        );
+        return;
+      }
       const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
       const nameJustConfirmed = brainState?.caller?.nameJustConfirmed === true;
       const askingName = !nameGate.runModel && Boolean(fileNameAsk) && !nameJustConfirmed;
@@ -3987,7 +3995,7 @@ mediaWss.on('connection', (ws, req) => {
       return;
     }
     if (!utteranceParts.length) return;
-    const rawText = utteranceParts.join('').replace(/\s+/g, ' ').trim();
+    const rawText = joinCallerFragments(utteranceParts);
     const tokenLanguages = utteranceLanguages.slice();
     utteranceParts = [];
     utteranceLanguages = [];
@@ -4036,7 +4044,7 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   function pendingUtteranceText() {
-    return utteranceParts.join('').replace(/\s+/g, ' ').trim();
+    return joinCallerFragments(utteranceParts);
   }
 
   function noteUtteranceClock() {
@@ -5356,6 +5364,7 @@ wss.on('connection', (ws) => {
           greetingBarged: false,
           fileNameAskCommitted: brainState?.caller?.fileNameAskSpoken === true,
         });
+        if (nameGate.hold === 'unfinished') return;
         const relayNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
         if (!nameGate.runModel && relayNameAsk) {
           brainState.caller.fileNameAskSpoken = true;
@@ -5991,9 +6000,11 @@ async function runGeminiTurnStreaming(
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
   const heldTools = await applyToolsWithHold(callSid, parsed, { shouldAbort, onToolHold });
   const execution = heldTools.execution;
-  let actionConfirmation = formatToolConfirmation(
+  const confirmLanguage = callBrainStates.get(callSid)?.language?.current || 'en';
+  let actionConfirmation = withCallbackFarewell(
+    formatToolConfirmation(execution.results, confirmLanguage),
     execution.results,
-    callBrainStates.get(callSid)?.language?.current || 'en'
+    confirmLanguage
   );
   if (heldTools.toolHoldCancelled) actionConfirmation = '';
   const spokenText = polishSpokenReply(
@@ -6103,9 +6114,11 @@ async function runGeminiTurn(
   const parsed = parseGeminiResponse(outputText);
   const heldTools = await applyToolsWithHold(callSid, parsed, hooks);
   const execution = heldTools.execution;
-  let actionConfirmation = formatToolConfirmation(
+  const confirmLanguage = callBrainStates.get(callSid)?.language?.current || 'en';
+  let actionConfirmation = withCallbackFarewell(
+    formatToolConfirmation(execution.results, confirmLanguage),
     execution.results,
-    callBrainStates.get(callSid)?.language?.current || 'en'
+    confirmLanguage
   );
   if (heldTools.toolHoldCancelled) actionConfirmation = '';
   const spokenText = polishSpokenReply(

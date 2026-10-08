@@ -3,7 +3,7 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { createLateFinalHold } = require('../src/speech/lateFinal');
+const { createLateFinalHold, joinCallerFragments } = require('../src/speech/lateFinal');
 
 describe('late final hold', () => {
   it('keeps a grace final 137ms after close and merges it into the next turn', () => {
@@ -30,5 +30,14 @@ describe('late final hold', () => {
     hold.noteClosed(1000);
     hold.hold('Kuru?', { now: 1137, reason: 'grace' });
     assert.equal(hold.merge('Like, mnafika na kuru?'), 'Like, mnafika na kuru?');
+  });
+
+  it('keeps a word boundary between separate finals', () => {
+    assert.equal(
+      joinCallerFragments(['Ni pesa ngapi kuosha', 'carpet.']),
+      'Ni pesa ngapi kuosha carpet.'
+    );
+    assert.equal(joinCallerFragments(['mna-', 'fika']), 'mna-fika');
+    assert.equal(joinCallerFragments(['mnafika', 'na.']), 'mnafika na.');
   });
 });

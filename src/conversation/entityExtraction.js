@@ -177,6 +177,9 @@ function extractName(text, opts = {}) {
     if (captured) return captured;
   }
 
+  const stated = statedIntroductionName(raw, opts);
+  if (stated) return stated;
+
   const imValue = imIntroductionName(raw);
   if (imValue) {
     const wordCount = raw.trim().split(/\s+/).length;
@@ -199,6 +202,40 @@ function extractName(text, opts = {}) {
   const particle = namePlusParticle(raw);
   if (particle && opts.firstMissing === 'name') return cleanNameCapture(particle, opts);
   return null;
+}
+
+/**
+ * "Ni Alvin", "Ni Alvin, anapiga simu", "It's Alvin".
+ * "Ni pesa ngapi" is not a name. A known file name still counts inside a longer line.
+ */
+function statedIntroductionName(raw, opts = {}) {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+  const calling = /\b(?:ni|it'?s|it is)\s+([\p{L}'’-]+)\s*,?\s+anapiga\s+simu\b/iu.exec(text);
+  if (calling) {
+    const captured = cleanNameCapture(calling[1], opts);
+    if (
+      captured &&
+      isPlausibleCallerName(captured) &&
+      !/^(?:mimi|wewe|yeye|sisi|nyinyi)$/i.test(captured)
+    ) {
+      return captured;
+    }
+  }
+  const bare = /^(?:ni|it'?s|it is)\s+([\p{L}'’-]+)[.!?]?$/iu.exec(text);
+  if (bare) {
+    const captured = cleanNameCapture(bare[1], opts);
+    if (captured && isPlausibleCallerName(captured)) return captured;
+  }
+  const ni = /\b(?:ni|it'?s|it is)\s+([\p{L}'’-]+)/iu.exec(text);
+  if (!ni || !Array.isArray(opts.knownNames)) return null;
+  const captured = cleanNameCapture(ni[1], opts);
+  if (!captured) return null;
+  const known = opts.knownNames.some((row) => {
+    const name = row && typeof row === 'object' ? row.name : row;
+    return namesLikelySame(name, captured);
+  });
+  return known ? captured : null;
 }
 
 /** "Alvin, yeah?" is the name. The particle is not part of it. */
@@ -824,6 +861,15 @@ function callerGoalText(text, opts = {}) {
   return usableGoalRemainder(text);
 }
 
+/** An opening that has not named the ask yet. The name question waits. */
+function callerTurnStillOpen(text) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw || usableGoalRemainder(raw)) return false;
+  if (/[,—–-]\s*$/.test(raw)) return true;
+  const core = raw.replace(/[.!?,;:…—–-]+$/g, '').trim();
+  return UNFINISHED_STEM.test(core);
+}
+
 function isPlausibleCallerName(value) {
   const name = String(value || '').trim();
   if (!name || name.length < 2 || name.length > 40) return false;
@@ -1157,6 +1203,7 @@ module.exports = {
   isBackchannelOrFragment,
   isRejectedGoalText,
   callerGoalText,
+  callerTurnStillOpen,
   callerAskSpecificity,
   agentAskedPendingName,
   isPlausibleCallerName,
