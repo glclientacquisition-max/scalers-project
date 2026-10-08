@@ -329,6 +329,7 @@ const {
   decideTurnEnd,
   decideCallerEvent,
   bargePhaseInputs,
+  keepDroppedFinal,
   callerEventClearsIdle,
   looksLikeEcho: turnLooksLikeEcho,
   classifyFinalDuringAgentSpeech,
@@ -2701,6 +2702,7 @@ mediaWss.on('connection', (ws, req) => {
     });
     const decision = decideCallerEvent({
       text,
+      isFinal: String(source || '').startsWith('final'),
       speaking: phaseInputs.speaking,
       turnBusy: phaseInputs.turnBusy,
       speakStartedAt,
@@ -4391,15 +4393,38 @@ mediaWss.on('connection', (ws, req) => {
           );
           return;
         }
-        voiceTrace.noteTurnEnd({
-          decision: decision.action,
-          reason: decision.reason || '',
-        });
-        if (decision.queue) {
+        // A final with a question or content words is never dropped silently
+        // (HD_054e4f7ff253 t3). Keep it as the next caller turn: after this
+        // playback when the agent is speaking, else after the in-flight turn.
+        const keep = keepDroppedFinal(decision, text);
+        voiceTrace.noteTurnEnd(
+          keep
+            ? { decision: 'queue', reason: `kept_${decision.reason || decision.action}` }
+            : { decision: decision.action, reason: decision.reason || '' }
+        );
+        if (keep) {
+          console.log(
+            `[ws/media][${sidLabel()}] caller final kept (was ${decision.action}/${decision.reason || ''}): ${text.slice(0, 80)}`
+          );
+        }
+        if (keep && speaking && !bargeInActive) {
+          overlapHold.enqueue(text, activePlaybackGeneration);
+        } else if (decision.queue || keep) {
           appendFinalPart(utteranceParts, evt.text);
           if (!(speaking && !bargeInActive)) scheduleUtteranceFlush();
+        } else {
+          console.log(
+            `[ws/media][${sidLabel()}] caller final dropped reason=${decision.reason || decision.action}: ${text.slice(0, 80)}`
+          );
         }
         return;
+      }
+
+      if (decision.reason === 'thinking_queued') {
+        voiceTrace.noteTurnEnd({ decision: 'queue', reason: 'thinking_queued' });
+        console.log(
+          `[ws/media][${sidLabel()}] caller final queued while thinking: ${text.slice(0, 80)}`
+        );
       }
 
       if (speaking && !bargeInActive) {
