@@ -81,7 +81,52 @@ function appendGeminiStreamParts(acc, chunk) {
   return next;
 }
 
-function modelPartsForHistory({ geminiParts, text, thoughtSignature } = {}) {
+// Google's documented signature for a model turn Gemini did not generate
+// (a local line, or a reply the speech guard rewrote). Text parts are not
+// strictly validated; this keeps the turn well formed either way.
+const UNSIGNED_MODEL_TURN = 'skip_thought_signature_validator';
+const TOOL_BLOCK = /###TOOL###[\s\S]*?###ENDTOOL###|###ENDCALL###/gi;
+
+function lastPartSignature(parts) {
+  if (!Array.isArray(parts)) return '';
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    const sig = parts[i]?.thoughtSignature || parts[i]?.thought_signature;
+    if (sig) return String(sig);
+  }
+  return '';
+}
+
+/**
+ * History holds what the caller heard, not the raw model text. A town the
+ * guard corrected or a word it dropped must not come back as "what I said".
+ * Tool markers from the raw reply stay so the model knows what it asked for.
+ */
+function spokenModelParts(spokenText, { geminiParts, text, thoughtSignature } = {}) {
+  const raw =
+    Array.isArray(geminiParts) && geminiParts.length
+      ? geminiParts
+          .filter((part) => part && part.thought !== true && typeof part.text === 'string')
+          .map((part) => part.text)
+          .join('')
+      : String(text || '');
+  const tools = (raw.match(TOOL_BLOCK) || []).join('\n');
+  const body = [String(spokenText || '').replace(/\s+/g, ' ').trim(), tools]
+    .filter(Boolean)
+    .join('\n');
+  if (!body) return [];
+  const signature =
+    lastPartSignature(geminiParts) || String(thoughtSignature || '') || UNSIGNED_MODEL_TURN;
+  return [{ text: body, thoughtSignature: signature }];
+}
+
+/**
+ * @param {{ geminiParts?: object[], text?: string, thoughtSignature?: string, spokenText?: string }} opts
+ *   spokenText: the guarded line the caller heard. When given, it replaces the raw text.
+ */
+function modelPartsForHistory({ geminiParts, text, thoughtSignature, spokenText } = {}) {
+  if (typeof spokenText === 'string') {
+    return spokenModelParts(spokenText, { geminiParts, text, thoughtSignature });
+  }
   if (Array.isArray(geminiParts) && geminiParts.length) {
     return geminiParts.map(cloneGeminiPart).filter(Boolean);
   }
@@ -91,19 +136,63 @@ function modelPartsForHistory({ geminiParts, text, thoughtSignature } = {}) {
 }
 
 /**
+ * Before a caller turn joins history, the agent turn since the last caller
+ * turn becomes exactly what was heard: the model reply as guarded, plus any
+ * local line (catalogue, name ask, tool outcome, nudge). Lines before the
+ * first caller turn (the greeting) stay local, so contents never open with
+ * a model turn.
+ * @param {object[]} messages  mutated in place
+ * @param {string} heard  agent text spoken since the last caller turn
+ */
+function reconcileHeardHistory(messages, heard) {
+  if (!Array.isArray(messages)) return messages;
+  const spoken = String(heard || '').replace(/\s+/g, ' ').trim();
+  if (!spoken) return messages;
+  let lastUser = -1;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === 'user') {
+      lastUser = i;
+      break;
+    }
+  }
+  if (lastUser < 0) return messages;
+  const agent = messages.slice(lastUser + 1).filter((m) => m && m.role === 'assistant');
+  const modelTurn = [...agent].reverse().find((m) => !m.local);
+  const merged = {
+    role: 'assistant',
+    content: spoken,
+    geminiParts: modelPartsForHistory({
+      geminiParts: modelTurn?.geminiParts,
+      text: modelTurn?.content,
+      thoughtSignature: modelTurn?.thoughtSignature,
+      spokenText: spoken,
+    }),
+    heard: true,
+  };
+  const keep = messages.slice(lastUser + 1).filter((m) => m && m.role !== 'assistant');
+  messages.splice(lastUser + 1, messages.length - lastUser - 1, ...keep, merged);
+  return messages;
+}
+
+/**
  * Build Gemini contents from in-memory chat messages.
- * Instant/local greetings have no thought signature — sending them as model
- * turns makes Gemini 3 MINIMAL return 400 and the caller hears silence.
- * Replay model parts as received. Do not glue a signature onto merged text.
+ * A local line before the first caller turn (the instant greeting) is left
+ * out: contents must not open with a model turn. A local line after a caller
+ * turn is sent as a model turn with the unsigned marker, so the model knows
+ * what the caller already heard. Replay model parts as received.
  */
 function buildGeminiContents(messages, windowSize = CONTEXT_WINDOW) {
   const recentMessages = Array.isArray(messages) ? messages.slice(-windowSize) : [];
   const contents = [];
   for (const message of recentMessages) {
-    if (!message || message.role === 'system' || message.local) continue;
+    if (!message || message.role === 'system') continue;
     const role = message.role === 'assistant' ? 'model' : 'user';
+    if (role === 'model' && !contents.length) continue;
     let parts;
-    if (role === 'model' && Array.isArray(message.geminiParts) && message.geminiParts.length) {
+    if (role === 'model' && message.local) {
+      const text = String(message.content || '').trim();
+      parts = text ? [{ text, thoughtSignature: UNSIGNED_MODEL_TURN }] : [];
+    } else if (role === 'model' && Array.isArray(message.geminiParts) && message.geminiParts.length) {
       parts = message.geminiParts.map(cloneGeminiPart).filter(Boolean);
     } else {
       const part = { text: String(message.content || '') };
@@ -114,6 +203,10 @@ function buildGeminiContents(messages, windowSize = CONTEXT_WINDOW) {
     }
     if (!parts.length) continue;
     const prev = contents[contents.length - 1];
+    if (prev && prev.role === 'model' && role === 'model') {
+      prev.parts.push(...parts);
+      continue;
+    }
     if (
       prev &&
       prev.role === 'user' &&
@@ -296,6 +389,8 @@ module.exports = {
   extractGeminiParts,
   appendGeminiStreamParts,
   modelPartsForHistory,
+  reconcileHeardHistory,
+  UNSIGNED_MODEL_TURN,
   buildGeminiContents,
   withTimeout,
   isTimeoutError,

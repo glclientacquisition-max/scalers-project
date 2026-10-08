@@ -799,4 +799,15 @@ assert.match(
   'barge-in during a tool hold must be able to cancel the follow-up'
 );
 
+assert.match(
+  source,
+  /reconcileHeardHistory\(messages, callTranscript\.agentSinceLastCaller\(\)\);\s*callTranscript\.pushCaller\(clean\);\s*messages\.push\(\{ role: 'user', content: clean \}\)/,
+  'before a caller turn joins history, the agent turn must become what the caller heard'
+);
+assert.match(
+  source,
+  /modelPartsForHistory\(\{[\s\S]{0,200}?spokenText: heardText,/,
+  'Gemini history must store the guarded spoken text, not the raw model text'
+);
+
 console.log('Voice runtime wiring checks passed.');

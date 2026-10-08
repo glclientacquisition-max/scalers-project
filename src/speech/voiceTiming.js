@@ -173,6 +173,15 @@ function createCallTranscript() {
     },
     stampFirstAgentSince,
     stampFromSummary,
+    /** Agent lines spoken since the last caller row, joined. */
+    agentSinceLastCaller() {
+      const out = [];
+      for (let i = rows.length - 1; i >= 0; i -= 1) {
+        if (rows[i].speaker === 'caller') break;
+        if (rows[i].speaker === 'agent') out.unshift(rows[i].text);
+      }
+      return out.join(' ');
+    },
     size() {
       return rows.length;
     },

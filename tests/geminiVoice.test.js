@@ -339,3 +339,79 @@ describe('geminiTurnTimeoutMs', () => {
     else process.env.GEMINI_TURN_TIMEOUT_MS = prev;
   });
 });
+
+describe('history holds what the caller heard (HD_48e5ce069c12)', () => {
+  const {
+    modelPartsForHistory,
+    reconcileHeardHistory,
+    UNSIGNED_MODEL_TURN,
+  } = require('../src/conversation/geminiVoice');
+
+  it('stores the guarded line and keeps the signature and tool markers', () => {
+    const parts = modelPartsForHistory({
+      geminiParts: [
+        { text: 'Kitengela is outside our main coverage area.' },
+        { text: ' ###TOOL###{"save_caller_info":{"name":"Alvin"}}###ENDTOOL###' },
+        { text: '', thoughtSignature: 'sig-final' },
+      ],
+      spokenText: 'We cover Kitengela. When would you like us to come?',
+    });
+    assert.equal(parts.length, 1);
+    assert.match(parts[0].text, /^We cover Kitengela\. When would you like us to come\?/);
+    assert.match(parts[0].text, /###TOOL###\{"save_caller_info"/);
+    assert.doesNotMatch(parts[0].text, /outside/);
+    assert.equal(parts[0].thoughtSignature, 'sig-final');
+  });
+
+  it('sends a local line after a caller turn, never a leading one', () => {
+    const contents = buildGeminiContents([
+      { role: 'assistant', content: 'Done and Dusted, this is Shy.', local: true },
+      { role: 'user', content: 'What services do you offer?' },
+      { role: 'assistant', content: 'We offer home cleaning and office cleaning.', local: true },
+      { role: 'assistant', content: 'Am I speaking with Alvin?', local: true },
+      { role: 'user', content: 'Yes.' },
+    ]);
+    assert.deepEqual(
+      contents.map((c) => c.role),
+      ['user', 'model', 'user']
+    );
+    assert.equal(contents[1].parts.length, 2);
+    assert.equal(contents[1].parts[0].text, 'We offer home cleaning and office cleaning.');
+    assert.equal(contents[1].parts[0].thoughtSignature, UNSIGNED_MODEL_TURN);
+  });
+
+  it('folds the agent turn into the heard text before the next caller turn', () => {
+    const messages = [
+      { role: 'assistant', content: 'Hello.', local: true },
+      { role: 'user', content: 'Do you have Nairobi and Kitengela?' },
+      {
+        role: 'assistant',
+        content: 'We cover Nairobi and its close surroundings, and Kitengela too.',
+        geminiParts: [{ text: 'Kitengela is outside.', thoughtSignature: 'sig-1' }],
+      },
+      { role: 'assistant', content: 'When would you like us to come?', local: true },
+    ];
+    reconcileHeardHistory(
+      messages,
+      'We cover Nairobi and its close surroundings. We also cover Kitengela. When would you like us to come?'
+    );
+    assert.equal(messages.length, 3);
+    assert.equal(messages[0].local, true);
+    const turn = messages[2];
+    assert.equal(turn.local, undefined);
+    assert.equal(
+      turn.geminiParts[0].text,
+      'We cover Nairobi and its close surroundings. We also cover Kitengela. When would you like us to come?'
+    );
+    assert.equal(turn.geminiParts[0].thoughtSignature, 'sig-1');
+    const contents = buildGeminiContents([...messages, { role: 'user', content: 'Wow.' }]);
+    assert.deepEqual(contents.map((c) => c.role), ['user', 'model', 'user']);
+    assert.doesNotMatch(JSON.stringify(contents), /outside/);
+  });
+
+  it('leaves the greeting alone before the first caller turn', () => {
+    const messages = [{ role: 'assistant', content: 'Hello.', local: true }];
+    reconcileHeardHistory(messages, 'Hello.');
+    assert.deepEqual(messages, [{ role: 'assistant', content: 'Hello.', local: true }]);
+  });
+});

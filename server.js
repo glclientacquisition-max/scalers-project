@@ -188,6 +188,7 @@ const {
   extractGeminiParts,
   appendGeminiStreamParts,
   modelPartsForHistory,
+  reconcileHeardHistory,
   buildGeminiContents,
   geminiTurnTimeoutMs,
   withTimeout,
@@ -2973,6 +2974,9 @@ mediaWss.on('connection', (ws, req) => {
         ` intent=${brainState.intent} goal=${brainState.goal.primary}` +
         ` next=${nextBestAction.action}: ${clean}`
     );
+    // The agent turn in history becomes what the caller heard: the guarded
+    // reply plus local lines (catalogue, name ask, tool outcome, nudge).
+    reconcileHeardHistory(messages, callTranscript.agentSinceLastCaller());
     callTranscript.pushCaller(clean);
     messages.push({ role: 'user', content: clean });
 
@@ -6110,14 +6114,17 @@ async function runGeminiTurnStreaming(
     finalSpeechGuardOpts(callSid, execution.results)
   );
 
+  // History holds the guarded line, not the raw model text.
+  const heardText = [spokenText, actionConfirmation].filter(Boolean).join(' ');
   const geminiParts = modelPartsForHistory({
     geminiParts: modelParts,
     text: fullText || buffer.getRaw(),
     thoughtSignature,
+    spokenText: heardText,
   });
   messages.push({
     role: 'assistant',
-    content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
+    content: heardText,
     geminiParts,
     thoughtSignature: thoughtSignature || undefined,
   });
@@ -6225,13 +6232,15 @@ async function runGeminiTurn(
   );
 
   const thoughtSignature = extractThoughtSignature(response) || undefined;
+  const heardText = [spokenText, actionConfirmation].filter(Boolean).join(' ');
   messages.push({
     role: 'assistant',
-    content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
+    content: heardText,
     geminiParts: modelPartsForHistory({
       geminiParts: extractGeminiParts(response),
       text: outputText,
       thoughtSignature,
+      spokenText: heardText,
     }),
     thoughtSignature,
   });
