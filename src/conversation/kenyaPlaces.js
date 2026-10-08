@@ -278,7 +278,9 @@ function bindSpokenPlace(text, opts = {}) {
       }
     }
     if (!hit) {
-      if (INDEX.places[words[i]]) {
+      // A 4-letter county ("mara") is also ordinary Kiswahili ("mara moja").
+      // Exact one-word places follow the same 5-letter floor as the old pass.
+      if (words[i].length >= 5 && INDEX.places[words[i]]) {
         hit = words[i];
         span = 1;
       } else if (fuzzy) {
