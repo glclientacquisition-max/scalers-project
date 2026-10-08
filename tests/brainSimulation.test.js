@@ -427,7 +427,10 @@ describe('brain simulation: 06:59 call', () => {
     assert.match(sim.turns[1].agentLine, /Yes, we cover Runda/i);
     await sim.run(['Do you do Rungai?']);
     assert.match(String(sim.turns[2].state.entities.location?.value || ''), /^Rongai$/i);
-    assert.equal(sim.turns[2].agentLine, 'That area is outside our coverage.');
+    assert.equal(
+      sim.turns[2].agentLine,
+      'That area is outside our coverage. Should I note it for the team?'
+    );
     clean(sim);
   });
 

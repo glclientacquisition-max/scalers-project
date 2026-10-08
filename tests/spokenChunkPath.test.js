@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { createSpokenStreamBuffer } = require('../src/speech/spokenStreamBuffer');
-const { polishSpokenReply } = require('../src/conversation/dynamicSpeech');
+const { polishSpokenReply, polishSpokenDetail } = require('../src/conversation/dynamicSpeech');
 const { cutNoAiSlop } = require('../src/speech/noAiSlop');
 const { gateCallerFileSpeech } = require('../src/speech/callerFileSpeech');
 const { narratesInternalAction } = require('../src/conversation/speechGuard');
@@ -27,6 +27,7 @@ function loadSpokenChunkRunner() {
     `return async function runChunk(chunk, state) {
       const {
         polishSpokenReply,
+        polishSpokenDetail,
         cutNoAiSlop,
         narratesInternalAction,
         isOrphanFragment,
@@ -74,6 +75,7 @@ function loadSpokenChunkRunner() {
   );
   return factory({
     polishSpokenReply,
+    polishSpokenDetail,
     cutNoAiSlop,
     narratesInternalAction,
     isOrphanFragment,

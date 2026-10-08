@@ -736,6 +736,18 @@ test('skip-turn does not undo barge_listen or answers', () => {
   assert.strictEqual(shouldSkipCallerTurn('actually, tomorrow', { lastAgentText: AGENT_LINE }), false);
   assert.strictEqual(shouldSkipCallerTurn('sawa', { lastAgentText: AGENT_LINE }), true);
   assert.strictEqual(shouldSkipCallerTurn('sawa', { lastAgentText: BOOK_Q }), false);
+  const offer = { kind: 'offer', act: 'note_team', line: 'Naweza kukuachia ujumbe kwa timu yetu?' };
+  for (const text of ['sawa', 'ok', 'okay', 'yes', 'ndio', 'sure']) {
+    assert.strictEqual(
+      shouldSkipCallerTurn(text, {
+        lastAgentText: AGENT_LINE,
+        pendingAsk: offer,
+        questionsAsked: ['offer'],
+      }),
+      false,
+      text
+    );
+  }
 });
 
 test('false barge does not cancel a long reply; real barge clears and the next speak is a fresh sentence', () => {

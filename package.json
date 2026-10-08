@@ -9,7 +9,7 @@
     "test:phonetic": "node --test tests/pronunciation/phoneticEngine.test.js",
     "test:tts-fixture": "node tests/ttsNormalizationFixture.test.js",
     "tts:listen-harness": "node scripts/soniox-tts-listen-harness.js",
-    "test:turns": "node tests/turnTaking.test.js",
+    "test:turns": "node tests/turnTaking.test.js && node --test tests/lateFinal.test.js",
     "test:overlap": "node tests/overlapHold.test.js",
     "test:stream": "node tests/spokenStreamBuffer.test.js",
     "test:wiring": "node tests/voiceWiring.test.js",

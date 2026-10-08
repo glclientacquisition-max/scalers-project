@@ -1,0 +1,126 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "callId": "HD_0789461c5319",
+  "tenantId": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+  "businessName": "Done and Dusted",
+  "callerName": "Alvin",
+  "nameOnFile": true,
+  "source": "Staging voice_turn_traces 2026-10-07 20:49Z (23:49 EAT). First traced call. Scorer reads the whole reply, model questions, and firstReplyPcmMs. Live mouth spoke the Kilicho coverage sentence; replay still drops both Kilicho lines.",
+  "turns": [
+    {
+      "caller": "Ah, mimi nilikuwa nauliza what you guys offer",
+      "flushed": true,
+      "canned": { "path": "file_name_ask", "text": "Am I speaking with Alvin?" },
+      "model": { "provider": "canned", "model": "file_name_ask", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null },
+      "outcome": "early_return",
+      "observed": { "firstPcmMs": 310 }
+    },
+    {
+      "caller": "Yes.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "We offer couch cleaning, carpet cleaning, mattress cleaning, general cleaning for houses and Airbnbs, and pet stain removal. Which service would you like to book, Alvin?",
+        "chars": 169,
+        "spokenEmitted": 70
+      },
+      "observed": { "firstPcmMs": 452, "firstReplyPcmMs": 1355, "firstTokenMs": 1110 }
+    },
+    {
+      "caller": "Right.",
+      "flushed": true,
+      "filler": "Mm-hmm.",
+      "outcome": "barge_in",
+      "model": { "provider": "gemini", "model": "recorded", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null },
+      "observed": { "firstPcmMs": 402 }
+    },
+    {
+      "caller": "Could you tell me the sizes you offer?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "I don't have the exact details on carpet or mattress sizes, but I can note your request for the team. Would you like me to log that for you, Alvin?",
+        "chars": 147,
+        "spokenEmitted": 147
+      },
+      "observed": { "firstPcmMs": 403, "firstReplyPcmMs": 1250, "firstTokenMs": 979 }
+    },
+    {
+      "caller": "I said, like, give me the exact—",
+      "flushed": true,
+      "filler": "Mm-hmm.",
+      "outcome": "barge_in",
+      "model": { "provider": "gemini", "model": "recorded", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null },
+      "observed": { "firstPcmMs": 446 }
+    },
+    {
+      "caller": "The exact sizes you offer.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "I do not have specific carpet or mattress measurements on file, as pricing varies by size. Should I log an enquiry so the owner can confirm the exact sizes with you?",
+        "chars": 165,
+        "spokenEmitted": 165
+      },
+      "observed": { "firstPcmMs": 403, "firstReplyPcmMs": 1088, "firstTokenMs": 918 }
+    },
+    {
+      "caller": "Like, which— which service do you offer? Only service, get away with an offer.",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning, and more. Which one do you need?"
+      },
+      "model": { "provider": "canned", "model": "speak_packet", "promptId": "voice.system", "outputText": null, "chars": 0, "spokenEmitted": null },
+      "outcome": "early_return",
+      "observed": { "firstPcmMs": 450, "firstReplyPcmMs": 100 }
+    },
+    {
+      "caller": "Wewe unafanya vitu za BNB?",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Ndiyo,Alvin, tunafanya general cleaning ya nyumba na AirBnB. Ungetaka tukuwekee visit lini na sehemu gani?",
+        "chars": 106,
+        "spokenEmitted": 106
+      },
+      "observed": { "firstPcmMs": 435, "firstReplyPcmMs": 1318, "firstTokenMs": 950 }
+    },
+    {
+      "caller": "Eeh, mimi naishi Kilicho though.",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Kilicho iko outside our standard Nairobi coverage area, so we cannot book a direct visit right now. Would you like me to log a callback for the team to check if we can reach you?",
+        "chars": 178,
+        "spokenEmitted": 99
+      },
+      "observed": { "firstPcmMs": 402, "firstReplyPcmMs": 1337, "firstTokenMs": 1136 }
+    },
+    {
+      "caller": "Sawa.",
+      "flushed": true,
+      "filler": "Just a second.",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "###TOOL###\n{\"save_caller_info\":{\"name\":\"Alvin\",\"reason\":\"Service inquiry for Kilicho coverage\"}}\n###ENDTOOL###\n\n###TOOL###\n{\"create_service_request\":{\"type\":\"callback\",\"name\":\"Alvin\",\"item\":\"General cleaning in Kilicho\",\"notes\":\"Caller lives in Kilicho, requesting a callback regarding service coverage\"}}\n###ENDTOOL###",
+        "chars": 320,
+        "spokenEmitted": 0
+      },
+      "observed": { "firstPcmMs": 402, "firstReplyPcmMs": 2003, "firstTokenMs": 1163 }
+    }
+  ]
+}
