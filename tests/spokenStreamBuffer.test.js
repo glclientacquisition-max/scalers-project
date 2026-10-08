@@ -174,6 +174,20 @@ test('never duplicates already emitted speech when tokens shift format mid-strea
   assert.strictEqual(matchCount, 1, `Expected 1 occurrence of price line, got ${matchCount}`);
 });
 
+test('a tool block does not split the word it landed inside', () => {
+  const raw = [
+    '###TOOL###',
+    '{"save_caller_info":{"name":"Alvin","reason":"Mattress cleaning booking enquiry"}}',
+    '###ENDTOOL###',
+    'Sawa Alvin, tutasafisha matresi mawili. Ungetaka tuje siku gani na saa ngapi, na wapi hapa Nairobi?',
+  ].join('\n');
+  const buf = createSpokenStreamBuffer();
+  for (let i = 0; i < raw.length; i += 3) buf.push(raw.slice(i, i + 3));
+  buf.finish();
+  assert.match(buf.getSpokenEmitted(), /Ungetaka tuje siku/);
+  assert.doesNotMatch(buf.getSpokenEmitted(), /tu je/);
+});
+
 test('does not speak outcome claims or leftover prose after a tool block', () => {
   const buf = createSpokenStreamBuffer();
   const emitted = [];

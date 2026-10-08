@@ -58,6 +58,7 @@ const { farewellLine, planBrainEndClose } = require('../src/speech/callClose');
 const { canonicalPlaceName } = require('../src/conversation/kenyaPlaces');
 const { drainSpokenSpeakSlots, queueToolOutcome, takeToolOutcome } = require('../src/conversation/speakSlots');
 const { fileServicePriceLine } = require('../src/conversation/catalogueMouth');
+const { createSpokenStreamBuffer } = require('../src/speech/spokenStreamBuffer');
 const {
   authorizeSpeak,
   createSpeakCommit,
@@ -1438,5 +1439,24 @@ describe('HD_e369cba6565d free caller', () => {
     assert.equal(next.hold, undefined);
     assert.equal(takeToolOutcome(state), saved);
     assert.equal(takeToolOutcome(state), '');
+  });
+
+  it('keeps tuje whole when a tool block is stripped from the stream', () => {
+    const raw = [
+      '###TOOL###',
+      '{"save_caller_info":{"name":"Alvin","reason":"Mattress cleaning booking enquiry"}}',
+      '###ENDTOOL###',
+      'Sawa Alvin, tutasafisha matresi mawili. Ungetaka tuje siku gani na saa ngapi, na wapi hapa Nairobi?',
+    ].join('\n');
+    const buf = createSpokenStreamBuffer();
+    for (let size = 1; size <= 40; size += 1) {
+      const streamed = createSpokenStreamBuffer();
+      for (let i = 0; i < raw.length; i += size) streamed.push(raw.slice(i, i + size));
+      streamed.finish();
+      assert.match(streamed.getSpokenEmitted(), /tuje/, `slice ${size}`);
+      assert.doesNotMatch(streamed.getSpokenEmitted(), /tu je/, `slice ${size}`);
+    }
+    buf.push(raw);
+    assert.match(buf.getSpokenEmitted(), /Ungetaka tuje siku gani/);
   });
 });

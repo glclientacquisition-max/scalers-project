@@ -245,10 +245,9 @@ function createSpokenStreamBuffer(opts = {}) {
     // Backend confirmation speaks the tool outcome. Do not flush leftover
     // model prose after a complete tool block (accept-then-object on live calls).
     if (hasCompleteToolBlock(raw)) {
-      const pending = findPendingText(speakable, emittedSpoken);
-      if (pending) {
-        emittedSpoken = `${emittedSpoken} ${pending}`.replace(/\s+/g, ' ').trim();
-      }
+      // The stripped prose is exact. Joining the pending tail with a space
+      // splits a word the tool block landed inside ("tuje" → "tu je").
+      if (speakable) emittedSpoken = speakable;
       return [];
     }
 
