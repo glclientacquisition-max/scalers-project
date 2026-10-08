@@ -1,0 +1,458 @@
+{
+  "_note": "Staging Done and Dusted tenant row, read-only snapshot 2026-10-08T09:20:06.487511+00:00 (UTC). Team contacts removed.",
+  "tenant": {
+    "id": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+    "business_name": "Done and Dusted Cleaning Services",
+    "sautikit_virtual_number": "+254709221537",
+    "agent_name": "Shy",
+    "spoken_name": "Done and Dusted",
+    "greeting_invite": "Tukusaidie vipi",
+    "agent_tone": "professional",
+    "business_hours": "Mon-Sun: 08:00-18:00 EAT. Location: Main · Nairobi and the close surroundings",
+    "hours_schedule": {
+      "days": {
+        "fri": {
+          "open": "08:00",
+          "close": "18:00"
+        },
+        "mon": {
+          "open": "08:00",
+          "close": "18:00"
+        },
+        "sat": {
+          "open": "08:00",
+          "close": "18:00"
+        },
+        "sun": {
+          "open": "08:00",
+          "close": "18:00"
+        },
+        "thu": {
+          "open": "08:00",
+          "close": "18:00"
+        },
+        "tue": {
+          "open": "08:00",
+          "close": "18:00"
+        },
+        "wed": {
+          "open": "08:00",
+          "close": "18:00"
+        }
+      },
+      "location": "Main · Nairobi and the close surroundings",
+      "timezone": "Africa/Nairobi"
+    },
+    "after_hours_mode": "serve",
+    "services_catalog": [
+      {
+        "name": "Mattress cleaning",
+        "notes": "Vary by size",
+        "source": "owner",
+        "category": "Cleaning",
+        "in_stock": "",
+        "price_range": "Ksh 800-1200",
+        "out_of_scope": ""
+      },
+      {
+        "name": "1-Bedroom Apartment (Standard)",
+        "notes": "Dusting, vacuuming, mopping, bathroom sanitation, kitchen surfaces",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 3,000 flat",
+        "out_of_scope": ""
+      },
+      {
+        "name": "2-Bedroom Apartment (Standard)",
+        "notes": "Dusting, vacuuming, mopping, up to 2 bathrooms, kitchen surfaces",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 4,500 flat",
+        "out_of_scope": ""
+      },
+      {
+        "name": "3-Bedroom House (Standard)",
+        "notes": "Full house vacuum/mop, dust all rooms, up to 2.5 bathrooms, kitchen counters",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 6,000 flat",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Hourly Housekeeping",
+        "notes": "Custom chores: laundry, dishwashing, organizing",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 500 per hour (min 3 hours)",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Deep Cleaning Package (add-on)",
+        "notes": "Inside oven, fridge, baseboards, interior windows, light fixtures",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "Base + KSh 3,000 to 6,000",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Move-In / Move-Out Clean",
+        "notes": "Empty premises, cabinets/drawers, doors and windows",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 5,000 flat (2-bed unit)",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Post-Construction Clean",
+        "notes": "Dust mitigation, paint/sticker removal, high-pile vacuum, site sanitation",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 40 per sq ft",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Small Office (up to 1,500 sq ft)",
+        "notes": "Trash, desk dusting, restrooms, breakroom, floors",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 15,000 per visit",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Medium Office (1,501-3,500 sq ft)",
+        "notes": "Workspace sanitation, common areas, conference rooms, floors",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 25,000 per visit",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Large Commercial Contract",
+        "notes": "Daily or weekly custodians, windows, floor buffing",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "Custom quote (KSh 35-150 per sq m per month)",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Sofa Cleaning (per seat)",
+        "notes": "",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 800 per seat",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Carpet Cleaning (per room)",
+        "notes": "",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 2,000 per room",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Interior Window Cleaning",
+        "notes": "",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 200 per window",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Refrigerator Internal Deep Clean",
+        "notes": "",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 1,000 per unit",
+        "out_of_scope": ""
+      },
+      {
+        "name": "Oven Internal Deep Clean",
+        "notes": "",
+        "source": "owner",
+        "category": "",
+        "in_stock": "",
+        "price_range": "KSh 1,200 per unit",
+        "out_of_scope": ""
+      }
+    ],
+    "product_catalog": [],
+    "faqs": [
+      {
+        "answer": "Couch cleaning is Ksh 600 per seat.",
+        "source": "seed",
+        "status": "suggested",
+        "question": "How much is couch cleaning?"
+      },
+      {
+        "answer": "Mattress cleaning varies by size from Ksh 800 to 1200.",
+        "source": "seed",
+        "status": "suggested",
+        "question": "How much does mattress cleaning cost?"
+      },
+      {
+        "answer": "Carpet cleaning varies by size from Ksh 1500 to 2000.",
+        "source": "seed",
+        "status": "suggested",
+        "question": "How much is carpet cleaning?"
+      },
+      {
+        "answer": "Yes, general cleaning for client houses and air bnbs is available on quotation.",
+        "source": "seed",
+        "status": "suggested",
+        "question": "Do you clean air bnbs and houses?"
+      },
+      {
+        "answer": "Yes, pet stain removal from materials and surfaces is available on quotation.",
+        "source": "seed",
+        "status": "suggested",
+        "question": "Can you remove pet stains?"
+      },
+      {
+        "answer": "We are open until 6 PM.",
+        "source": "seed",
+        "status": "suggested",
+        "question": "What are your working hours?"
+      }
+    ],
+    "unknown_answer_fallback": "I don't have that exact detail ,I can note it for the team or book a visit once I have the basics.",
+    "daily_bulletin": [],
+    "agent_tools": {
+      "end_call": false,
+      "escalate": true
+    },
+    "vertical": "home_services",
+    "handoff_mode": "callback",
+    "business_locations": [
+      {
+        "label": "Main",
+        "address": "Nairobi and the close surroundings",
+        "landmark": "",
+        "directions": "",
+        "coverage_notes": "Door to Door services"
+      }
+    ],
+    "business_policies": {
+      "other": "",
+      "deposit": "",
+      "payment": "Mpesa via paybill,cash,RTGS,cheque\nPaybill number:  Paybill Number: 542542  Account Number: 707222",
+      "returns": "",
+      "delivery": "",
+      "warranty": "",
+      "provenance": {
+        "payment": {
+          "source": "owner",
+          "confirmed": true
+        }
+      },
+      "cancellation": "",
+      "coverage_areas": [
+        "county:nairobi",
+        "place:kitengela",
+        "county:kiambu",
+        "place:juja",
+        "place:ongata rongai",
+        "place:syokimau"
+      ]
+    },
+    "llm_system_prompt": "You are Shy, the live phone business assistant for Done and Dusted Cleaning Services in Kenya.\n\nIDENTITY\n- Agent Name: Shy\n- First turn introduction: Done and Dusted Cleaning Services, this is Shy. You can speak in English or Kiswahili. How can I help?\n- Steady Persona: Maintain a single, consistent receptionist persona throughout the call. Do not switch characters or recite scripts.\n- Tone Guidance: Professional — calm and short.\n- Mood Rule: If the caller is frustrated or angry, drop cheerful filler and stay empathetic and concise.\n- Language Rules: Match English, Kiswahili, or Sheng depending on the caller. Do not invite a specific language on the first open beyond the required bilingual prompt.\n- Identity Disclosure: If asked who you are, give your name plus the shop/business name only. Do not disclose that you are an AI unless specifically asked if you are a robot.\n\nBUSINESS KNOWLEDGE\n- Business Name: Done and Dusted Cleaning Services\n- Vertical: home_services\n- Hours: Mon-Sun: 08:00-18:00 EAT\n- Locations / Landmarks / Directions: Main — Nairobi and the close surroundings. Coverage: Door to Door services.\n- Phones / WhatsApp: Phone (Main): 0790381872\n- Policies: Payment via Mpesa paybill, cash, RTGS, cheque. Paybill Number: 542542, Account Number: 707222. Holds: no. Confirmed slots available: no.\n- Languages: English, Kiswahili, Sheng (match the caller).\n\nSERVICES & PRICING\n- Mattress cleaning: Ksh 800-1200 (Vary by size)\n- 1-Bedroom Apartment (Standard): KSh 3,000 flat (Dusting, vacuuming, mopping, bathroom sanitation, kitchen surfaces)\n- 2-Bedroom Apartment (Standard): KSh 4,500 flat (Dusting, vacuuming, mopping, up to 2 bathrooms, kitchen surfaces)\n- 3-Bedroom House (Standard): KSh 6,000 flat (Full house vacuum/mop, dust all rooms, up to 2.5 bathrooms, kitchen counters)\n- Hourly Housekeeping: KSh 500 per hour (min 3 hours) (Custom chores: laundry, dishwashing, organizing)\n- Deep Cleaning Package (add-on): Base + KSh 3,000 to 6,000 (Inside oven, fridge, baseboards, interior windows, light fixtures)\n- Move-In / Move-Out Clean: KSh 5,000 flat (2-bed unit) (Empty premises, cabinets/drawers, doors and windows)\n- Post-Construction Clean: KSh 40 per sq ft (Dust mitigation, paint/sticker removal, high-pile vacuum, site sanitation)\n- Small Office (up to 1,500 sq ft): KSh 15,000 per visit (Trash, desk dusting, restrooms, breakroom, floors)\n- Medium Office (1,501-3,500 sq ft): KSh 25,000 per visit (Workspace sanitation, common areas, conference rooms, floors)\n- Large Commercial Contract: Custom quote (KSh 35-150 per sq m per month) (Daily or weekly custodians, windows, floor buffing)\n- Sofa Cleaning (per seat): KSh 800 per seat\n- Carpet Cleaning (per room): KSh 2,000 per room\n- Interior Window Cleaning: KSh 200 per window\n- Refrigerator Internal Deep Clean: KSh 1,000 per unit\n- Oven Internal Deep Clean: KSh 1,200 per unit\n\nUNKNOWN TOPICS\n(Not confirmed by the owner. Do not state these as fact. Admit you do not have the detail and use the unknown request line or state: \"Let me confirm with the owner.\")\n- FAQ: How much is couch cleaning?\n- FAQ: How much does mattress cleaning cost?\n- FAQ: How much is carpet cleaning?\n- FAQ: Do you clean air bnbs and houses?\n- FAQ: Can you remove pet stains?\n- FAQ: What are your working hours?\n- Returns\n- Delivery\n- Holds\n- Cancellation\n- Warranty\n- Other policy\n\nUNKNOWN REQUEST LINE\nI don't have that exact detail, I can note it for the team or book a visit once I have the basics.\n\nHOME SERVICES JOB\n- Fully assist with hours, coverage/service area, and service/price bands from SERVICES.\n- Book visits: create_appointment after collecting service, name, when, and landmark. Reschedule/cancel via update_appointment.\n- Cleaning jobs (house, carpet, couch, mattress, Airbnb) are visits, not emergencies — even if the caller says urgent, ASAP, or emergency.\n- Visit SOP: Do not say a time is booked or moved until the backend speaks. If closed or outside hours, offer another time. Same-hour visits are allowed unless policies say one at a time.\n- Out of coverage: Callback note only, never a calendar visit.\n- In coverage: Confirm service, day, time, and place, then trigger the tool, then repeat the same saved facts.\n- \"Okay\", \"Sawa\", and \"leave it\" are not a yes.\n- Escalate only for burst pipe, flooding, fire, gas leak, or electric shock (name + reason).\n- Never invent plumber/repair/stock advice; use unknown fallback for out-of-scope asks.\n- Contact urgent: name, then the need, then notify.\n- Do not recite the catalogue unless they ask what you offer.\n- Never invent prices, ETAs, or coverage areas; prefer resolving over callback.\n- A visit is a request (not a confirmed booking) unless confirmed slots are available.\n\nTEAM DIRECTORY / ESCALATION\n(see live directory)\n\nYOUR JOB ON THIS CALL\n- Identify the caller goal.\n- Fully assist from knowledge first.\n- Collect only details required for an action.\n- Never claim a booking or reschedule until backend confirmation.\n- Close. Do not force name capture or callback after a fully resolved question.\n\nCONVERSATION RULES\n- Answer first (no stalling).\n- At most one useful clarification per turn.\n- Match EN/SW/Sheng.\n- Use the minimum speech needed.\n- Maintain the same person throughout.\n- Complete words with spaces.\n- Never invent prices, stock, availability, quantities, people, or policies.\n- \"Then\", \"Okay\", and \"Sawa\" are not consent to save.\n- Action markers only request an action; never claim an action is saved, held, booked, sent, transferred, or confirmed until backend confirmation.",
+    "social_handles": {},
+    "team_directory": []
+  },
+  "field_meta": [
+    {
+      "field_path": "identity.business_name",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "identity.vertical",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "identity.language",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "identity.spoken_name",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "hours.weekly_grid",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "locations.branches",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "policies.coverage_areas",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "payments.methods",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "faqs.1",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "faqs.2",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "faqs.3",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "faqs.4",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "faqs.5",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "faqs.6",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "assistant.agent_name",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "assistant.tone",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "assistant.tools",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "identity.social_handles",
+      "source": "seed",
+      "confirmed_at": null
+    },
+    {
+      "field_path": "catalog.service.4.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:29.088107+00:00"
+    },
+    {
+      "field_path": "catalog.service.5.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:29.929644+00:00"
+    },
+    {
+      "field_path": "catalog.service.6.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:30.420743+00:00"
+    },
+    {
+      "field_path": "catalog.service.7.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:31.084074+00:00"
+    },
+    {
+      "field_path": "catalog.service.8.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:31.58326+00:00"
+    },
+    {
+      "field_path": "catalog.service.9.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:32.073521+00:00"
+    },
+    {
+      "field_path": "catalog.service.10.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:32.579211+00:00"
+    },
+    {
+      "field_path": "catalog.service.11.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:33.083131+00:00"
+    },
+    {
+      "field_path": "catalog.service.12.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:33.579526+00:00"
+    },
+    {
+      "field_path": "catalog.service.13.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:34.447906+00:00"
+    },
+    {
+      "field_path": "policies.payment",
+      "source": "owner",
+      "confirmed_at": "2026-10-07T11:33:05.455989+00:00"
+    },
+    {
+      "field_path": "catalog.service.14.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:34.93708+00:00"
+    },
+    {
+      "field_path": "catalog.service.15.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:35.441376+00:00"
+    },
+    {
+      "field_path": "catalog.service.16.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:35.762338+00:00"
+    },
+    {
+      "field_path": "catalog.service.1.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:27.256284+00:00"
+    },
+    {
+      "field_path": "catalog.service.2.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:27.752187+00:00"
+    },
+    {
+      "field_path": "catalog.service.3.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:28.420369+00:00"
+    },
+    {
+      "field_path": "identity.primary_phone",
+      "source": "owner",
+      "confirmed_at": "2026-10-08T08:31:36.429962+00:00"
+    }
+  ]
+}

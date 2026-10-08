@@ -13,6 +13,8 @@
 // suggested and never compile or speak as GOLDEN. import and inferred are not
 // fact until confirmed. Empty policy text is unknown. Never invent a default.
 
+const { readCoverageAreas } = require('./coverageAreas');
+
 const SOURCES = new Set(['owner', 'seed', 'import', 'inferred', 'call_suggested']);
 
 function norm(value) {
@@ -307,6 +309,46 @@ function policyMeta(policies, key) {
   return {};
 }
 
+// Keys in business_policies that are metadata or are read by a gate of their
+// own (holds -> request tools, booking_mode -> confirmed slots). They are not
+// spoken policy text.
+const POLICY_META_KEYS = new Set([
+  'provenance',
+  'field_meta',
+  'source',
+  'holds',
+  'holds_allowed',
+  'booking',
+  'booking_meta',
+  'booking_mode',
+  'bookingMode',
+  'coverage_areas',
+]);
+
+function isPolicyMetaKey(key) {
+  if (POLICY_META_KEYS.has(key)) return true;
+  return /(_source|Source|_meta|_confirmed|_at)$/.test(key);
+}
+
+function policyKeyLabel(key) {
+  const words = String(key || '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_\-]+/g, ' ')
+    .trim()
+    .toLowerCase();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : '';
+}
+
+/**
+ * Split business_policies into what the prompt may state and what it must
+ * call unknown. Every configured key lands on one side; none is dropped.
+ * - The fixed topics (payment, returns, ...) and any extra text key the owner
+ *   saved are facts only when provenance confirms them.
+ * - coverage_areas is the settings picker list. The voice path answers
+ *   coverage from it directly (assessCoverage), so the prompt carries the
+ *   same list. Otherwise the model contradicts the mouth.
+ * @returns {{ policies: Record<string, unknown>, unknown: string[] }}
+ */
 function factPolicyMap(policies, fieldMeta = null) {
   const obj = asObject(policies);
   const out = {};
@@ -316,6 +358,17 @@ function factPolicyMap(policies, fieldMeta = null) {
     const row = classifyPolicyValue(text, policyMeta(obj, key), fieldMeta, `policies.${key}`);
     if (row.fact) out[key] = text;
     else unknown.push(label);
+  }
+  const coverage = readCoverageAreas(obj);
+  if (coverage) out.coverage_areas = coverage;
+  for (const [key, raw] of Object.entries(obj)) {
+    if (Object.prototype.hasOwnProperty.call(POLICY_TOPICS, key) || isPolicyMetaKey(key)) continue;
+    if (typeof raw !== 'string' && typeof raw !== 'number') continue;
+    const text = String(raw).trim();
+    if (!text) continue;
+    const row = classifyPolicyValue(text, policyMeta(obj, key), fieldMeta, `policies.${key}`);
+    if (row.fact) out[key] = text;
+    else unknown.push(policyKeyLabel(key));
   }
   return { policies: out, unknown };
 }
@@ -419,7 +472,8 @@ function formatUnknownSection(topics) {
   }
   for (const topic of list) lines.push(`- ${topic}`);
   lines.push(
-    'For an UNKNOWN topic: admit you do not have it. Say: "Let me confirm with the owner." Do not guess, and do not use a pack seed as the answer.'
+    'For an UNKNOWN topic: admit you do not have it. Say: "Let me confirm with the owner." Do not guess, and do not use a pack seed as the answer.',
+    'A fact stated elsewhere in this brief (hours, coverage, services, prices, payment) wins over an UNKNOWN line on the same topic.'
   );
   return lines.join('\n');
 }
@@ -597,6 +651,8 @@ async function loadProvenanceEnvelope(tenantId) {
 
 module.exports = {
   PACK_POLICY_TEXTS,
+  policyKeyLabel,
+  isPolicyMetaKey,
   PACK_FAQ_PAIRS,
   norm,
   indexFieldMeta,
