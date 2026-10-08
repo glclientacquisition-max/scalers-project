@@ -61,6 +61,12 @@ SautiKit is the SIP/webhook edge. When it stops, `POST /voice/incoming` never fi
 
 Do not keep a silent failed DID. Do not assign a new DID as the "fix" unless the old one is surrendered. `TELEPHONY_PROVIDER` failover is planned, not built.
 
+## Prepaid balance empty
+
+This is not "SautiKit is down". The webhook still arrives. The wallet probe (`GET /v1/wallet`, interval `VOICE_TELEPHONY_WALLET_PROBE_MS`, default 15 minutes) sets `telephony.lastError.billingExhausted` on an empty balance or HTTP 402. The next new `POST /` or `POST /voice/incoming` returns `<Reject/>` and does not open `/ws/media`. The caller hears the carrier reject, not a Scalers clip. A later healthy probe clears the flag so calls resume without a restart.
+
+Probe HTTP errors, including 403, do not set the flag. If the probe key cannot read the wallet, calls keep streaming onto the DIDs while the balance is empty. Fix the key before expecting the gate to fire. `/healthz` `telephony.lastError.message` shows `wallet probe HTTP 403` in that case and `billingExhausted: false`.
+
 ## Clip model (voice × language, not tenant × language)
 
 Key clips by curated `soniox_voice_id` and language.
@@ -99,4 +105,5 @@ Desk Super Admin Platform board reads `/healthz`. No public status page. Voice d
 - Inventing a booking or a callback when STT cannot hear
 - Retrying depleted Gemini credits on the next turn
 - Answering a telephony outage with a spoken clip (no call reaches us)
+- Opening `/ws/media` when the wallet probe says the prepaid balance is empty or returned 402
 - Handing the owner a new DID instead of restoring or forwarding the old one

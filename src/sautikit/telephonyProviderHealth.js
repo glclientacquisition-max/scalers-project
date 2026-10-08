@@ -29,6 +29,21 @@ function isTelephonyBillingExhausted() {
   return Boolean(last.billingExhausted);
 }
 
+/** Same Reject document as the package gate and an unknown DID. */
+const TELEPHONY_BILLING_REJECT_XML =
+  '<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>';
+
+/**
+ * XML to return from POST / and POST /voice/incoming when the wallet probe has
+ * marked prepaid billing exhausted (empty balance or HTTP 402). Null means the
+ * webhook may still open Stream. Probe HTTP errors such as 403, timeouts, and
+ * never-probed state do not set the flag, so this stays null (fail open).
+ */
+function telephonyBillingRejectXml() {
+  if (!isTelephonyBillingExhausted()) return null;
+  return TELEPHONY_BILLING_REJECT_XML;
+}
+
 /** Tests only. */
 function resetTelephonyProviderHealth() {
   last = {
@@ -44,5 +59,6 @@ module.exports = {
   snapshot,
   getTelephonyProviderHealth,
   isTelephonyBillingExhausted,
+  telephonyBillingRejectXml,
   resetTelephonyProviderHealth,
 };
