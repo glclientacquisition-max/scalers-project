@@ -81,7 +81,7 @@ Staging is defined. See [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md) f
 | --- | --- |
 | Supabase | `sgcdncjxauhsbunobmob` (no production data) |
 | Voice | `https://scalers-staging-staging.up.railway.app` (Railway env `staging`, branch `cursor/staging-voice-468b`) |
-| Desk | `https://scalers-staging.vercel.app` (Vercel project `scalers-staging`, same branch). Production builds from any other branch are ignored. Why the URL used to flip: [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md). |
+| Desk | `https://scalers-staging.vercel.app` (Vercel project `scalers-staging`, same branch). Builds from any other branch are ignored. See [Vercel builds](#vercel-builds-ignored-build-step). Why the URL used to flip: [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md). |
 | Git branch | **`cursor/staging-voice-468b`**. Every open pull request is merged onto this branch for testing, including one that targets another feature branch. Open the pull request into `main` so the rebuild starts immediately. A stacked pull request joins on the next rebuild. Promote by squash-merging that tested pull request into `main`. |
 | SautiKit | Test DID `+254709221536` pointing at staging voice URL |
 
@@ -110,6 +110,21 @@ Add it with `gh pr edit NUMBER --add-label hold-staging`. Remove it with `gh pr 
 The parenthetical names only the switch that fired. `cursor/staging-voice-468b` is not updated. Railway `serviceConnect` does not run. The desk alias does not run. Closing a pull request during a hold does not take it off the branch until the next run with no hold.
 
 **After the listen.** Clear the variable and remove the label. Re-run the latest Stage pull request workflow, or wait for the next pull request event against `main` or the next push to `main`. That run connects Voice to `cursor/staging-voice-468b` again with no commit SHA.
+
+### Vercel builds (Ignored Build Step)
+
+Both Vercel projects use Root Directory `dashboard/`, so both read `dashboard/vercel.json`. Its `ignoreCommand` runs `dashboard/scripts/vercel-ignore-build.sh` before every Git build. Exit 0 skips the build (the deploy shows as Canceled, "Ignored Build Step"). Exit 1 builds.
+
+| Project | Builds | Skips |
+| --- | --- | --- |
+| `scalers-staging` | `cursor/staging-voice-468b` only, every push. The Stage-PR desk alias needs a READY deploy at the exact staging SHA. | Every other branch, including `main` and pull request branches. |
+| `scalers-project` (prod Desk) | Production (`VERCEL_ENV=production`) and `main`, always. Previews whose commits touch `dashboard/` since the branch's last built SHA. | `cursor/staging-voice-468b`. Previews that change nothing under `dashboard/` (Voice, Brain, docs, CI, root tests). |
+
+The range is `VERCEL_GIT_PREVIOUS_SHA..VERCEL_GIT_COMMIT_SHA`. On a branch's first deploy there is no previous SHA, so only the tip commit (`HEAD^..HEAD`) is checked. When the previous SHA is outside the depth-10 clone, the script builds. An unknown project, a missing `VERCEL_PROJECT_ID`, or a git error also builds.
+
+Nothing under `dashboard/` imports from outside it. If the Desk starts to import a file outside `dashboard/`, add that path to `DESK_PATHS` in the script, or previews will go stale. Tests: `node --test tests/vercelIgnoreBuild.test.js` (part of `npm run test:stage-pr`).
+
+Commits that predate this file fall back to the project setting. Stage-PR sets that on `scalers-staging` only (`scripts/stage-desk-alias.js`), and it now builds only `cursor/staging-voice-468b`.
 
 Validate database changes on staging before production. Never use production credentials for staging tests.
 

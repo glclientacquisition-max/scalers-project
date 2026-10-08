@@ -18,11 +18,11 @@ Builds of `cursor/staging-voice-468b` are preview deploys while the Vercel produ
 
 The stage workflow reapplies these on each run:
 
-1. Ignored Build Step exits 0 when `VERCEL_GIT_COMMIT_REF` is `main`.
+1. Ignored Build Step builds only `cursor/staging-voice-468b` and exits 0 for every other branch, including `main`. This project setting is the fallback for commits without the repo rule below.
 2. `autoAssignCustomDomains` is off, so a production deploy does not take the hostname.
 3. The workflow assigns `scalers-staging.vercel.app` to the ready deploy of `cursor/staging-voice-468b` only.
 
-Do not put an `ignoreCommand` in `dashboard/vercel.json`. That file is shared with production `scalers-project`.
+`dashboard/vercel.json` is shared with production `scalers-project`. Its `ignoreCommand` (`dashboard/scripts/vercel-ignore-build.sh`) overrides the project setting and branches on `VERCEL_PROJECT_ID`. On `scalers-staging` it builds only `cursor/staging-voice-468b`. On `scalers-project` production and `main` always build, and previews build only when `dashboard/` changed. Keep the staging branch building on `scalers-staging`, or the alias step times out waiting for a READY deploy. Rules: [`ENVIRONMENTS.md`](./ENVIRONMENTS.md#vercel-builds-ignored-build-step).
 
 ## Agent rules
 
