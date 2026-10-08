@@ -102,7 +102,8 @@ function planCatalogueMouth(opts = {}) {
  */
 function catalogueGeminiDirective(opts = {}) {
   const fromBrain = brainCatalogueItems(opts.localReply);
-  const file = catalogueFileNames(opts.profile || {});
+  // The directive's contract is exact file names, so no family labels here.
+  const file = catalogueFileNames(opts.profile || {}, 4, 'en', { families: false });
   const names = fromBrain ? fromBrain.names : file.names;
   const more = fromBrain ? fromBrain.more : file.more;
   if (!names.length) {
