@@ -48,6 +48,7 @@ const {
 } = require('../src/conversation/visitLocation');
 const { ensureRequiredCreateRequest } = require('../src/conversation/requiredCreateRequest');
 const { replayCall } = require('../src/speech/replayVoice');
+const { scoreTurn } = require('../src/speech/voiceScore');
 const { analyzeCallerLanguage, resolveLanguageState, createLanguageState } = require('../src/conversation/language');
 const { lockFileNameAsk, gateCallerFileSpeech } = require('../src/speech/callerFileSpeech');
 const { offerActOf } = require('../src/speech/offerAct');
@@ -1458,5 +1459,58 @@ describe('HD_e369cba6565d free caller', () => {
     }
     buf.push(raw);
     assert.match(buf.getSpokenEmitted(), /Ungetaka tuje siku gani/);
+  });
+
+  it('does not count the tool payload as a deleted answer', () => {
+    const model = [
+      '###TOOL###',
+      '{"save_caller_info":{"name":"Alvin","reason":"Mattress cleaning booking enquiry"}}',
+      '###ENDTOOL###',
+      'Sawa Alvin, tutasafisha matresi mawili. Ungetaka tuje siku gani na saa ngapi, na wapi hapa Nairobi?',
+    ].join('\n');
+    const spoken =
+      'Sawa Alvin, tutasafisha matresi mawili. Ungetaka tuje siku gani na saa ngapi, na wapi hapa Nairobi?';
+    const card = scoreTurn({
+      turnIndex: 20,
+      caller: { text: 'Are two, I have to book with you.', language: 'sw', soniox: 'sw' },
+      stages: [
+        { stage: 'model', phase: 'output', outputText: model, language: 'sw' },
+        {
+          stage: 'transform',
+          name: 'strip',
+          dropped: true,
+          before:
+            '###TOOL###\n{"save_caller_info":{"name":"Alvin","reason":"Mattress cleaning booking enquiry"}}\n###ENDTOOL###',
+          after: '',
+        },
+        { stage: 'tts', text: spoken, before: spoken, language: 'sw' },
+        { stage: 'outcome', value: 'ok' },
+      ],
+    });
+    assert.equal(card.checks.deletedAnswer, 0, card.notes.join('; '));
+    const beside = scoreTurn({
+      turnIndex: 20,
+      caller: { text: 'Are two, I have to book with you.', language: 'sw', soniox: 'sw' },
+      stages: [
+        {
+          stage: 'model',
+          phase: 'output',
+          outputText:
+            '###TOOL###{"save_caller_info":{"reason":"note"}}###ENDTOOL### Mattress cleaning ni Ksh 800-1200.',
+          language: 'sw',
+        },
+        {
+          stage: 'transform',
+          name: 'polish',
+          dropped: true,
+          before:
+            '###TOOL###{"save_caller_info":{"reason":"note"}}###ENDTOOL### Mattress cleaning ni Ksh 800-1200.',
+          after: '',
+        },
+        { stage: 'tts', text: 'Sawa.', before: 'Sawa.', language: 'sw' },
+        { stage: 'outcome', value: 'ok' },
+      ],
+    });
+    assert.equal(beside.checks.deletedAnswer, 1);
   });
 });

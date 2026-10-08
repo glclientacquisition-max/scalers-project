@@ -313,15 +313,19 @@ function scoreTurn(turn) {
     notes.push('silence after caller turn');
   }
 
+  // A tool payload is not an answer. "Mattress cleaning" inside ###TOOL###
+  // must not count as speech the caller should have heard.
   const droppedAnswer = (turn.stages || []).some(
-    (row) => row.stage === 'transform' && row.dropped && looksLikeKeptAnswer(row.before)
+    (row) =>
+      row.stage === 'transform' && row.dropped && looksLikeKeptAnswer(modelProse(row.before))
   );
   const droppedQuestion = (turn.stages || []).some(
-    (row) => row.stage === 'transform' && row.dropped && questionMissing(row.before, spoken)
+    (row) =>
+      row.stage === 'transform' && row.dropped && questionMissing(modelProse(row.before), spoken)
   );
   const modelAnswerMissing =
     looksLikeKeptAnswer(modelText) && !looksLikeKeptAnswer(spoken) && modelText.trim() !== spoken.trim();
-  const modelQuestionMissing = questionMissing(model?.outputText || '', spoken);
+  const modelQuestionMissing = questionMissing(modelText, spoken);
   const droppedFact = factSentenceDropped(turn);
   if (!held && (droppedAnswer || droppedQuestion || modelAnswerMissing || modelQuestionMissing || droppedFact)) {
     checks.deletedAnswer = 1;
