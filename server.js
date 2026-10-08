@@ -302,6 +302,7 @@ const {
   looksLikePaceOnlyTurn,
   withCallbackFarewell,
 } = require('./src/conversation/dynamicSpeech');
+const { coverageOfferToSpeak } = require('./src/conversation/visitLocation');
 const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
 const {
   drainSpokenSpeakSlots,
@@ -3413,6 +3414,8 @@ mediaWss.on('connection', (ws, req) => {
           capabilities,
           state: brainState,
           language: callLanguage,
+          // The note offer is decided on the finished reply, not on each sentence.
+          replyPartial: true,
         });
         const polished = polishedDetail.text;
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
@@ -3731,6 +3734,15 @@ mediaWss.on('connection', (ws, req) => {
             }
             if (planned.reply) callTranscript.pushAgent(planned.reply);
             spokeThisTurn = true;
+            const offerTail = coverageOfferToSpeak(
+              result?.spokenText,
+              planned.reply,
+              callLanguage
+            );
+            if (offerTail && !bargeInActive) {
+              callTranscript.pushAgent(offerTail);
+              await speakText(offerTail);
+            }
           } else {
             try {
               speakSession.cancel();

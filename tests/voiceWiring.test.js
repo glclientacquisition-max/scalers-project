@@ -109,6 +109,12 @@ assert.match(
 
 assert.match(
   source,
+  /replyPartial:\s*true/,
+  'a streamed sentence must not append the note offer on its own'
+);
+
+assert.match(
+  source,
   /guardToolPlan\(\s*ensureRequiredEscalate\(\s*ensureRequiredCreateRequest\(/,
   'Gemini tool markers must pass the tool guard after required-tool injection'
 );

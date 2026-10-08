@@ -40,6 +40,7 @@ const { numbersIn } = require('../src/conversation/numberWords');
 const {
   coverageAskSpeech,
   coverageAskPlaces,
+  coverageOfferToSpeak,
   foldCanonicalPlace,
   visitBlockSpeech,
   unsureCoverageSpeech,
@@ -1199,5 +1200,102 @@ describe('HD_6a759704f507 coverage, name, and the save farewell', () => {
       'en'
     );
     assert.equal(hold, "Okay, I've saved your request.");
+  });
+});
+
+describe('HD_e369cba6565d free caller', () => {
+  const DUSTED = {
+    vertical: 'home_services',
+    businessName: 'Done and Dusted',
+    servicesCatalog: [
+      { name: 'Couch cleaning', price_range: 'Ksh 800-1200' },
+      { name: 'Mattress cleaning', price_range: 'Ksh 800-1200' },
+      { name: 'Carpet cleaning', price_range: 'Ksh 1500-2000' },
+      { name: 'General cleaning (houses & air bnbs)' },
+    ],
+    businessPolicies: {
+      coverage_areas: [
+        'county:nairobi',
+        'county:kiambu',
+        'place:kitengela',
+        'place:juja',
+        'place:ongata rongai',
+        'place:syokimau',
+      ],
+    },
+    callerMemory: { name: 'Alvin', fileOwnerName: 'Alvin' },
+  };
+
+  function pendingOffer(language = 'sw') {
+    const state = createBrainState(DUSTED);
+    state.language = { current: language };
+    state.caller.name = 'Alvin';
+    state.caller.nameConfirmed = true;
+    return noteSpokenPendingAsk(state, 'Naweza kukuachia ujumbe kwa timu yetu?');
+  }
+
+  it('decides the note offer once on the whole reply', () => {
+    const turn2 = [
+      'Alvin, huduma zetu ni za Nairobi na maeneo ya karibu pekee, kwa hivyo hatufiki Kisumu.',
+      'Unaweza kupenda nikuandikishe ujumbe kwa timu yetu?',
+    ];
+    const turn12 = [
+      'Kitengela iko nje ya eneo letu la huduma kwa sasa kwani tunahudumia Nairobi na maeneo ya karibu pekee.',
+      'Una eneo lingine Nairobi ungependa tusafishe?',
+    ];
+    const calls = [
+      { sentences: turn2, caller: 'Nilikuwa nataka kujua kama mnafika Kisumu', keep: /hatufiki Kisumu/i },
+      {
+        sentences: turn12,
+        caller: 'A-ah, ni Nairobi pekee. Na water bowl kitengele ndio ngapi.',
+        keep: /Kitengela iko nje/i,
+      },
+    ];
+    for (const { sentences, caller, keep } of calls) {
+      const partials = sentences.map(
+        (sentence) =>
+          polishSpokenDetail(sentence, {
+            profile: DUSTED,
+            language: 'sw',
+            callerTurns: [caller],
+            state: pendingOffer(),
+            replyPartial: true,
+          }).text
+      );
+      for (const line of partials) {
+        assert.doesNotMatch(line, /kukuachia ujumbe/);
+      }
+      const whole = polishSpokenReply(sentences.join(' '), {
+        profile: DUSTED,
+        language: 'sw',
+        callerTurns: [caller],
+        state: pendingOffer(),
+      });
+      assert.match(whole, keep, whole);
+      assert.equal((whole.match(/kukuachia ujumbe/g) || []).length, 0, whole);
+    }
+    const lone = polishSpokenReply('Hatufiki Kisumu.', {
+      profile: DUSTED,
+      language: 'sw',
+      callerTurns: ['Mnafika Kisumu?'],
+    });
+    assert.equal((lone.match(/Naweza kukuachia ujumbe kwa timu yetu\?/g) || []).length, 1);
+    assert.equal(
+      coverageOfferToSpeak(lone, 'Hatufiki Kisumu.', 'sw'),
+      'Naweza kukuachia ujumbe kwa timu yetu?'
+    );
+    const again = polishSpokenReply('Hatufiki Kisumu.', {
+      profile: DUSTED,
+      language: 'sw',
+      callerTurns: ['Mnafika Kisumu?'],
+      state: pendingOffer(),
+    });
+    assert.doesNotMatch(again, /kukuachia ujumbe/);
+    const asked = polishSpokenReply(
+      'Hatufiki Kisumu. Unaweza kupenda nikuandikishe ujumbe kwa timu yetu?',
+      { profile: DUSTED, language: 'sw', callerTurns: ['Mnafika Kisumu?'] }
+    );
+    assert.equal((asked.match(/kukuachia ujumbe/g) || []).length, 0);
+    assert.match(asked, /nikuandikishe/);
   });
 });

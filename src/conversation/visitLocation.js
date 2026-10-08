@@ -670,14 +670,49 @@ function statesOutOfArea(text) {
   );
 }
 
-/** A coverage answer that says the area is outside still ends with the note offer. */
-function ensureCoverageOffer(text, language = 'en') {
+/** The call already has a note offer waiting for a yes or a later question. */
+function offerStillPending(state) {
+  if (state?.conversation?.pendingAsk?.kind === 'offer') return true;
+  const asked = state?.conversation?.questionsAsked;
+  return Array.isArray(asked) && asked[asked.length - 1] === 'offer';
+}
+
+/** A question mark or a note/notify act means this reply already asks something. */
+function replyCarriesQuestionOrOffer(text) {
+  const body = String(text || '');
+  if (body.includes('?')) return true;
+  return Boolean(offerActOf(body));
+}
+
+/**
+ * A coverage answer that says the area is outside still ends with the note
+ * offer. Once per reply: a streamed sentence does not grow its own question,
+ * a reply that already asks something does not get a second one, and a call
+ * that still has this offer pending does not hear it again.
+ */
+function ensureCoverageOffer(text, language = 'en', opts = {}) {
   const body = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!body || !statesOutOfArea(body) || offerActOf(body)) return body;
+  if (!body || !statesOutOfArea(body)) return body;
+  if (opts.replyPartial) return body;
+  if (replyCarriesQuestionOrOffer(body) || offerStillPending(opts.state)) return body;
   const ask = coverageNoteQuestion(language);
   const bare = ask.replace(/\?/g, '').trim().toLowerCase();
   if (body.toLowerCase().includes(bare)) return body;
   return `${body.replace(/[.?\s]+$/, '')}. ${ask}`;
+}
+
+/**
+ * The whole reply earned the note question after the sentences were already
+ * spoken. Return that question so the next speak slot can say it once.
+ */
+function coverageOfferToSpeak(polished, heard, language = 'en') {
+  const whole = String(polished || '').replace(/\s+/g, ' ').trim();
+  const prior = String(heard || '').replace(/\s+/g, ' ').trim();
+  const ask = coverageNoteQuestion(language);
+  if (!whole.endsWith(ask)) return '';
+  const bare = ask.replace(/\?/g, '').trim().toLowerCase();
+  if (prior.toLowerCase().includes(bare)) return '';
+  return ask;
 }
 
 function coverageNoteQuestion(language = 'en') {
@@ -756,6 +791,8 @@ module.exports = {
   coverageAskPlaces,
   coverageAskSpeech,
   ensureCoverageOffer,
+  coverageOfferToSpeak,
+  offerStillPending,
   statesOutOfArea,
   isNoisePlace,
   appendVisitNotes,

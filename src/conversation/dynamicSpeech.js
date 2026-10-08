@@ -460,7 +460,10 @@ function polishSpokenDetail(text, opts = {}) {
       callerText,
     });
   }
-  out = ensureCoverageOffer(out, opts.language);
+  out = ensureCoverageOffer(out, opts.language, {
+    replyPartial: Boolean(opts.replyPartial),
+    state: opts.state,
+  });
   const before = String(text || '').trim();
   const after = String(out || '').trim();
   let reason = '';
