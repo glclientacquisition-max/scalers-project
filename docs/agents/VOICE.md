@@ -67,6 +67,7 @@ Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; pro
 12. Gemini **credits depleted / denied** is a reasoning outage, not speech. STT and TTS still work. Keep the line open, ask for a name, save it, and alert the owner once per cooldown. Surface `gemini.lastError` on `/healthz`. Do not retry depleted credits on the next turn.
 13. SautiKit / DID down is a **telephony** outage. No webhook reaches Voice. Do not try to speak. Follow the bridge playbook in [`VOICE_DOWNTIME_AT_SCALE.md`](./VOICE_DOWNTIME_AT_SCALE.md#telephony-down-bridge-playbook): notify owner once, forward or re-point the DID, verify one test call before marking it back.
 14. A presented number that matches no business is rejected with `<Reject/>`. Do not answer as another tenant. The first-active-tenant fallback runs only when the webhook carried no number. `TENANT_ID` still pins a single-tenant host.
+15. When `isTelephonyBillingExhausted()` is true, a new `POST /` or `POST /voice/incoming` returns `<Reject/>` before Stream. No `/ws/media`. The caller hears the carrier reject. The flag is set only by an empty prepaid balance or wallet HTTP 402 (`walletProbe.js`). Probe HTTP errors, including 403, timeouts, and never-probed state do not set it, so the gate stays open until `SAUTIKIT_API_KEY` can read `GET /v1/wallet`. A later healthy probe clears the flag so calls resume without a restart. `/healthz` `telephony.lastError.billingExhausted` is that flag. In-flight lifecycle webhooks still return empty `<Response/>` and do not re-Stream.
 
 ## Env knobs (Voice)
 
