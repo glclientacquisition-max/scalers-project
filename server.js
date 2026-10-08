@@ -3820,9 +3820,14 @@ mediaWss.on('connection', (ws, req) => {
               callLanguage,
               callBrainStates.get(callKey)
             );
-            if (offerTail && !bargeInActive) {
-              callTranscript.pushAgent(offerTail);
-              await speakText(offerTail);
+            // The closing question passes the same file gate as streamed text.
+            const tailGate = offerTail
+              ? gateCallerFileSpeech(offerTail, callBrainStates.get(callKey) || brainState)
+              : null;
+            const tailLine = tailGate?.speak ? cutNoAiSlop(tailGate.line) : '';
+            if (tailLine && !bargeInActive) {
+              callTranscript.pushAgent(tailLine);
+              await speakText(tailLine);
             }
           } else {
             try {

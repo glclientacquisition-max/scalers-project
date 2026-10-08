@@ -133,3 +133,74 @@ describe('HD_48e5 T5 coverage ask is answered locally', () => {
     });
   });
 });
+
+describe('HD_48e5 T1/T2 catalogue line from the real 16-row file', () => {
+  const { offerCatalogueLine } = require('../src/conversation/knownFacts');
+  const { serviceFamilies } = require('../src/conversation/serviceFamilies');
+  const { shapeCatalogueMouth } = require('../src/conversation/catalogueMouth');
+  const { closingQuestionToSpeak } = require('../src/conversation/visitLocation');
+
+  it('speaks service families, not the first four package rows', () => {
+    const en = offerCatalogueLine('I was asking, uh, which service do you guys offer, like.', DUSTED, 'en');
+    assert.equal(
+      en,
+      'We offer Apartment and House Cleaning, Deep Cleaning, Office Cleaning, and Mattress cleaning, and more. Which one do you need?'
+    );
+    assert.doesNotMatch(en, /1-Bedroom|2-Bedroom|3-Bedroom/);
+    const sw = offerCatalogueLine('Mnafanya nini?', DUSTED, 'sw');
+    assert.match(sw, /^Tuna Apartment na House Cleaning, Deep Cleaning, Office Cleaning, na Mattress cleaning, na zingine\. Unahitaji gani\?$/);
+  });
+
+  it('derives families from any file, not this tenant', () => {
+    const salon = serviceFamilies([
+      { name: 'Haircut' },
+      { name: 'Kids haircut' },
+      { name: 'Box braids' },
+      { name: 'Knotless braids' },
+      { name: 'Manicure' },
+    ]).map((f) => f.label);
+    assert.deepEqual(salon, ['Haircut', 'Braids', 'Manicure']);
+    const byCategory = serviceFamilies([
+      { name: 'Sofa', category: 'Upholstery' },
+      { name: 'Armchair', category: 'Upholstery' },
+      { name: 'Rug', category: 'Floors' },
+    ]).map((f) => f.label);
+    assert.deepEqual(byCategory, ['Upholstery', 'Rug']);
+  });
+
+  it('keeps exact names when the file is short', () => {
+    const short = {
+      ...DUSTED,
+      servicesCatalog: DUSTED.servicesCatalog.slice(11, 14),
+    };
+    assert.equal(
+      offerCatalogueLine('What services do you offer?', short, 'en'),
+      'We offer Sofa Cleaning, Carpet Cleaning, and Interior Window Cleaning. Which one do you need?'
+    );
+  });
+
+  it('does not stack "Which service do you need?" on the model question (T2)', () => {
+    const caller = "Yeah, you're speaking with Alvin.";
+    const state = {
+      caller: { name: 'Alvin', nameConfirmed: true, nameJustConfirmed: true },
+      conversation: { answersReceived: [caller], catalogueListed: true },
+      language: { current: 'en' },
+    };
+    const opts = { profile: DUSTED, state, language: 'en', callerText: caller };
+    const dump =
+      'We offer carpet, sofa, mattress, window, and house cleaning, as well as deep cleaning, move-in cleans, post-construction, and office cleaning.';
+    const ask = 'Which one do you need today, Alvin?';
+    assert.equal(shapeCatalogueMouth(dump, { ...opts, replyPartial: true }), '');
+    assert.equal(shapeCatalogueMouth(ask, { ...opts, replyPartial: true }), ask);
+    assert.equal(shapeCatalogueMouth(`${dump} ${ask}`, opts), ask);
+  });
+
+  it('speaks the finished reply question once when no streamed sentence asked', () => {
+    assert.equal(
+      closingQuestionToSpeak('Sure. Which service do you need?', 'Sure.'),
+      'Which service do you need?'
+    );
+    assert.equal(closingQuestionToSpeak('Sure. Which one?', 'Sure. Which one?'), '');
+    assert.equal(closingQuestionToSpeak('Okay.', 'Okay.'), '');
+  });
+});

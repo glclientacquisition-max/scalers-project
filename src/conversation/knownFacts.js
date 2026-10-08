@@ -2,6 +2,7 @@
 // A capacity spike must not be what answers the catalogue or the hours.
 
 const { normalizeServices } = require('./liveKnowledge');
+const { serviceFamilies } = require('./serviceFamilies');
 const {
   parseHoursSchedule,
   openClosedStatus,
@@ -122,16 +123,26 @@ function hoursAskLine(text, profile = {}, language = 'en', now = new Date()) {
 /**
  * Service names already on the file. Notes and parentheses stay off.
  * The spoken catalogue uses the first four, then "and more" / "na zingine".
- * Brain items[] (later PR) replaces this list. Do not invent names here.
+ * A longer file is spoken as service families derived from its own names
+ * and categories (serviceFamilies), so "1-Bedroom, 2-Bedroom, 3-Bedroom"
+ * is one family and the list still covers the range. Never invented.
  * @param {object} [profile]
  * @param {number} [limit]
- * @returns {{ names: string[], more: boolean }}
+ * @param {string} [language]
+ * @returns {{ names: string[], more: boolean, families: boolean }}
  */
-function catalogueFileNames(profile = {}, limit = 4) {
+function catalogueFileNames(profile = {}, limit = 4, language = 'en') {
   const rows = normalizeServices(profile.servicesCatalog);
   const names = rows.map((row) => mouthServiceName(row.name)).filter(Boolean);
   const cap = Number.isFinite(limit) && limit > 0 ? limit : names.length;
-  return { names: names.slice(0, cap), more: names.length > cap };
+  if (names.length > cap) {
+    const families = serviceFamilies(rows, { language });
+    if (families.length < names.length && families.some((f) => f.members.length > 1)) {
+      const labels = families.map((f) => f.label);
+      return { names: labels.slice(0, cap), more: labels.length > cap, families: true };
+    }
+  }
+  return { names: names.slice(0, cap), more: names.length > cap, families: false };
 }
 
 /**
@@ -141,7 +152,7 @@ function catalogueFileNames(profile = {}, limit = 4) {
 function offerCatalogueLine(text, profile = {}, language = 'en') {
   if (!looksLikeOfferAsk(text) || looksLikeNewWork(text)) return '';
   const sw = String(language || '').toLowerCase() === 'sw' || String(language || '').toLowerCase() === 'sheng';
-  const { names, more } = catalogueFileNames(profile);
+  const { names, more } = catalogueFileNames(profile, 4, language);
   if (!names.length) {
     return sw ? 'Niambie unahitaji nini.' : 'Tell me what you need done.';
   }

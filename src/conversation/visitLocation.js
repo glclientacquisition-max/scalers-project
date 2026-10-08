@@ -899,7 +899,27 @@ function coverageOfferToSpeak(polished, heard, language = 'en', state = null) {
     if (prior.includes('?')) return '';
     return ask;
   }
-  return '';
+  return closingQuestionToSpeak(whole, prior);
+}
+
+/**
+ * Streamed sentences are guarded one by one, so the question that closes the
+ * finished reply can be lost (a dropped list sentence took it, or it was
+ * added on the whole reply). When nothing streamed asked anything, the
+ * finished reply's closing question is spoken once.
+ */
+function closingQuestionToSpeak(polished, heard) {
+  const whole = String(polished || '').replace(/\s+/g, ' ').trim();
+  const prior = String(heard || '').replace(/\s+/g, ' ').trim();
+  if (!whole || !prior || prior.includes('?')) return '';
+  const parts = whole
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const last = parts[parts.length - 1] || '';
+  if (!last.endsWith('?')) return '';
+  if (prior.toLowerCase().includes(last.replace(/\?$/, '').toLowerCase())) return '';
+  return last;
 }
 
 function coverageNoteQuestion(language = 'en') {
@@ -979,6 +999,7 @@ module.exports = {
   coverageAskSpeech,
   ensureCoverageOffer,
   coverageOfferToSpeak,
+  closingQuestionToSpeak,
   coverageNextStepQuestion,
   offerStillPending,
   groundFalseOutsideClaim,

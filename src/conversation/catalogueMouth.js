@@ -73,6 +73,20 @@ function whichServiceLine(language) {
   return 'Which service do you need?';
 }
 
+function asksWhichService(text) {
+  return /\b(?:which (?:one|service)|what (?:service|do you need)|unahitaji (?:huduma )?gani|gani)\b/i.test(
+    String(text || '')
+  );
+}
+
+function whichServiceFrom(text) {
+  const parts = String(text || '')
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.find(asksWhichService) || '';
+}
+
 /**
  * Turn block for Gemini. Empty unless the staging flag is on and this turn
  * is the first catalogue ask.
@@ -378,7 +392,14 @@ function speechAfterNameYes(text, items, language, opts = {}) {
   const kept = splitSentences(text).filter((part) => !catalogueShaped(part, items) && !isRelistSentence(part, items));
   const joined = groundCatalogueSpeech(stripControlLabel(kept.join(' ')), items, { listTurn: false });
   if (!joined || countItems(joined, items) >= 3 || catalogueShaped(joined, items)) {
-    return fileLine || whichServiceLine(language);
+    if (asksWhichService(raw) || asksWhichService(joined)) {
+      return whichServiceFrom(raw) || whichServiceLine(language);
+    }
+    if (fileLine) return fileLine;
+    // A streamed sentence: a later one may ask. The finished reply decides,
+    // and its closing question is spoken if no streamed sentence asked.
+    if (opts.replyPartial) return '';
+    return whichServiceLine(language);
   }
   return joined;
 }
@@ -427,6 +448,7 @@ function shapeCatalogueMouth(text, opts = {}) {
       callerText,
       state,
       profile,
+      replyPartial: Boolean(opts.replyPartial),
     });
   }
   if (looksLikeServiceDetailAsk(callerText) || detailAboutNamedService(callerText, profile)) {
