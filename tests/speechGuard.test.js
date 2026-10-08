@@ -149,3 +149,42 @@ describe('speech slop gate', () => {
     );
   });
 });
+
+describe('a price the reply already called not on file', () => {
+  const FILE = {
+    servicesCatalog: [{ name: '1-Bedroom Apartment (Standard)', price_range: 'KSh 3,000 flat' }],
+  };
+  const ASK_EN = ['How much is Airbnb cleaning?'];
+  const ASK_SW = ['Bei ya Airbnb cleaning ni ngapi?'];
+
+  it('turns a dropped number into the note offer once, in place', () => {
+    const out = polishSpokenReply(
+      "We don't have an Airbnb cleaning price on file. A 1-Bedroom Apartment standard clean is KSh 3,000 flat. Would you like that?",
+      { profile: FILE, language: 'en', callerTurns: ASK_EN }
+    );
+    assert.equal(
+      out,
+      "We don't have an Airbnb cleaning price on file. I can note it for the team. Would you like that?"
+    );
+  });
+
+  it('does not repeat not-on-file on a streamed piece after the reply said it', () => {
+    const out = polishSpokenReply('Usafishaji wa 1-Bedroom Apartment ni KSh 3,000.', {
+      profile: FILE,
+      language: 'sw',
+      callerTurns: ASK_SW,
+      replyPartial: true,
+      priorReply: 'Sina bei ya Airbnb cleaning kwa sasa.',
+    });
+    assert.equal(out, 'Naweza kuandika kwa timu.');
+  });
+
+  it('still leads with not-on-file when nothing said it', () => {
+    const out = polishSpokenReply('A clean is KSh 9,999. Would you like that?', {
+      profile: FILE,
+      language: 'en',
+      callerTurns: ASK_EN,
+    });
+    assert.match(out, /^I don't have that on file\. I can note it for the team\./);
+  });
+});

@@ -443,6 +443,15 @@ function groundFilePriceLine(opts = {}) {
 const NOT_ON_FILE =
   /don'?t have that on file|not on file|don'?t have that detail|sina hiyo|siko na hiyo|sina maelezo/i;
 
+// The reply already told the caller this is not on file, in any wording.
+// A dropped number then needs no second not-on-file line.
+const SAID_NOT_ON_FILE =
+  /\b(?:don'?t|do not)\s+have\b[^.?!]{0,60}\b(?:on file|price|cost|detail|details|information)\b|\bnot on file\b|\bsina\s+(?:hiyo|maelezo|bei)\b|\bsiko na hiyo\b/i;
+
+function saidNotOnFile(...texts) {
+  return texts.some((text) => NOT_ON_FILE.test(String(text || '')) || SAID_NOT_ON_FILE.test(String(text || '')));
+}
+
 /** A named catalogue row with no number. Do not borrow another service's price. */
 function catalogueRowNamedWithoutPrice(text, profile) {
   const hit = findCatalogMatch(text, profile || {});
@@ -472,6 +481,16 @@ function unknownFallback(language) {
   if (lang === 'sheng') return 'Siko na hiyo kwenye file. Naweza note kwa team.';
   return "I don't have that on file. I can note it for the team.";
 }
+
+/** The offer half of unknownFallback, for a reply that already said "not on file". */
+function noteForTeamLine(language) {
+  const lang = confirmationLanguage(language);
+  if (lang === 'sw') return 'Naweza kuandika kwa timu.';
+  if (lang === 'sheng') return 'Naweza note kwa team.';
+  return 'I can note it for the team.';
+}
+
+const OFFERED_NOTE = /\bnote (?:it|that|this|your)\b|\bmessage for the team\b|\bkuandika\b|\bujumbe\b/i;
 
 function ackFallback(language) {
   return confirmationLanguage(language) === 'en' ? 'Okay.' : 'Sawa.';
@@ -649,6 +668,13 @@ function guardSpokenReply(text, ctx = {}) {
     if (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known)) {
       droppedNumber = true;
       noteDrop(ctx, 'unsaid_number', sentence);
+      // A price ask the reply already called not on file: the dropped number
+      // becomes the offer to note it, in its place, so a following
+      // "Would you like that?" still has something to point at.
+      const soFar = [ctx.priorReply, ...kept].join(' ');
+      if (NUMBER_ASK.test(lastCallerTurn) && saidNotOnFile(soFar) && !OFFERED_NOTE.test(soFar)) {
+        kept.push(noteForTeamLine(ctx.language));
+      }
       continue;
     }
     kept.push(sentence);
@@ -688,7 +714,9 @@ function guardSpokenReply(text, ctx = {}) {
   const priced = groundedPrice;
   if (out) {
     const lead =
-      !groundedPrice && askedNumber && droppedNumber ? unknownFallback(ctx.language) : '';
+      !groundedPrice && askedNumber && droppedNumber && !saidNotOnFile(out, ctx.priorReply)
+        ? unknownFallback(ctx.language)
+        : '';
     return withMessageOnlyCallback(lead ? `${lead} ${out}` : out, ctx, appendCallback);
   }
   if (priced) return withMessageOnlyCallback(priced, ctx, appendCallback);
@@ -714,6 +742,10 @@ function guardSpokenReply(text, ctx = {}) {
   if (!out && droppedHoldPayment) return 'The owner will follow up.';
   if (ctx.allowEmpty && !askedNumber) return '';
   if (askedNumber && priced) return withMessageOnlyCallback(priced, ctx, appendCallback);
+  // This reply already said it is not on file. Do not say it twice.
+  if (droppedNumber && saidNotOnFile(ctx.priorReply)) {
+    return OFFERED_NOTE.test(String(ctx.priorReply || '')) ? '' : noteForTeamLine(ctx.language);
+  }
   return droppedNumber ? unknownFallback(ctx.language) : ackFallback(ctx.language);
 }
 
