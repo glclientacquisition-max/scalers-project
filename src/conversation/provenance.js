@@ -213,6 +213,12 @@ function indexFieldMeta(rows) {
       confirmed_at: row.confirmed_at || row.confirmedAt || null,
       confirmed_by: row.confirmed_by || row.confirmedBy || null,
     };
+    // GIGO P2 freshness. Kept only when the select returned them, so the
+    // shape is unchanged for callers that load the P0 columns only.
+    const verified = row.last_verified_at || row.lastVerifiedAt;
+    if (verified) byPath[path].last_verified_at = verified;
+    const staleDays = Number(row.stale_after_days ?? row.staleAfterDays);
+    if (Number.isFinite(staleDays) && staleDays > 0) byPath[path].stale_after_days = staleDays;
   }
   return { loaded: true, byPath };
 }
@@ -656,6 +662,10 @@ module.exports = {
   PACK_FAQ_PAIRS,
   norm,
   indexFieldMeta,
+  lookupFieldMeta,
+  productFieldPath,
+  serviceFieldPath,
+  policyMeta,
   loadProvenanceEnvelope,
   classifyRecord,
   classifyFaq,
