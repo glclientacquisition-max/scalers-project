@@ -10,6 +10,7 @@ const { gateCallerFileSpeech } = require('../callerFileSpeech');
 const { statedNumbers } = require('./numbers');
 const { isOutcomeClaim } = require('../spokenStreamBuffer');
 const { teamConfirmCoverageLine } = require('./coverageSource');
+const { checkVisitTimes, visitTimeLine } = require('./spokenFactsSource');
 
 const SPOKEN_CHAR = /[\p{L}\p{N}]/u;
 const MARKUP = /###|[*_`#<>{}[\]\\|]|^\s*[-•]\s/;
@@ -133,14 +134,27 @@ function verifySay(sentence, ctx) {
   const lang = languageProblem(text, ctx.locked);
   if (lang) problems.push({ code: 'language', detail: `locked ${ctx.locked}, ${lang}` });
 
+  const allowedCaller = new Set(statedNumbers(ctx.callerText || ''));
+  // VOICE_SPOKEN_FACTS: a Kiswahili clock slip is fixed in place; a visit
+  // time that names no open visit is a time_mismatch (spokenFactsSource).
+  let fixed = null;
+  const timeCheck = checkVisitTimes(text, { table: ctx.table, locked: ctx.locked, callerNumbers: allowedCaller, env: ctx.env });
+  if (timeCheck) {
+    if (timeCheck.fixed) fixed = timeCheck.text;
+    for (const miss of timeCheck.mismatches) {
+      problems.push({ code: 'time_mismatch', detail: `${miss.said} is not an open visit time` });
+    }
+  }
+  const checkedText = fixed || text;
+
   const cited = [];
   for (const row of Array.isArray(ctx.factsUsed) ? ctx.factsUsed : []) {
     const entry = ctx.table?.byId?.get(String(row?.id || ''));
     if (entry) cited.push(entry);
   }
-  const allowed = new Set(statedNumbers(ctx.callerText || ''));
+  const allowed = new Set(allowedCaller);
   for (const entry of cited) for (const n of entry.numbers) allowed.add(n);
-  for (const n of statedNumbers(text)) {
+  for (const n of statedNumbers(checkedText)) {
     if (!allowed.has(n)) {
       problems.push({ code: 'unbacked_number', detail: `${n} is not in a cited fact or the caller's words` });
     }
@@ -204,7 +218,7 @@ function verifySay(sentence, ctx) {
   if (ctx.nameConfirmed && NAME_ASK.test(text)) {
     problems.push({ code: 'name_confirmed', detail: 'asks a name that is already confirmed' });
   }
-  return { ok: problems.length === 0, problems };
+  return fixed ? { ok: problems.length === 0, problems, fixed } : { ok: problems.length === 0, problems };
 }
 
 /** The caller named this place in their own words. */
@@ -236,6 +250,10 @@ function dataLineFor(sentence, problems, { table, pack, callerText = '' }) {
   if (coverage) {
     const place = titleName(coverage.place);
     return coverage.code === 'coverage_contradiction' ? pack.coveredLine(place) : pack.notCoveredLine(place);
+  }
+  if (codes.has('time_mismatch')) {
+    const line = visitTimeLine(sentence, table, pack?.code);
+    if (line) return line;
   }
   if (codes.has('unbacked_number') && table?.entries?.length) {
     const words = new Set(

@@ -8,6 +8,7 @@ const { coveredByAreas } = require('../../conversation/coverageAreas');
 const { formatScheduleSummary } = require('../../conversation/businessHours');
 const { speakableCoverage } = require('./coverageSource');
 const { statedNumbers } = require('./numbers');
+const { visitFact } = require('./spokenFactsSource');
 
 function slug(text) {
   return String(text || '')
@@ -124,15 +125,10 @@ function buildFactTable(profile = {}, opts = {}) {
 
   // The caller's own open visits only once the speaker is bound to the file.
   if (opts.speakerBound) {
+    // VOICE_SPOKEN_FACTS on: card-line visits and rendered phrases (spokenFactsSource).
     openVisits(opts.state).forEach((visit, index) => {
-      const label = String(visit?.service || visit?.serviceName || visit?.item || 'visit').trim();
-      const when = String(visit?.whenText || visit?.when || visit?.window || '').trim();
-      add({
-        id: `vis:${index + 1}`,
-        kind: 'visit',
-        label,
-        text: [label, when].filter(Boolean).join(', '),
-      });
+      const fact = visitFact(visit, { env: opts.env, now: opts.now });
+      add({ id: `vis:${index + 1}`, kind: 'visit', ...fact });
     });
   }
 
