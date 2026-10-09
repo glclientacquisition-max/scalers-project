@@ -3,7 +3,10 @@
 
 const { dispatchToStaff } = require('./recipients');
 const { platformOpsDegradeBody } = require('./templates');
-const { platformOpsRecipients } = require('./platformOpsRecipients');
+const {
+  platformOpsRecipients,
+  resetPlatformOpsRecipientsCache,
+} = require('./platformOpsRecipients');
 
 /** @type {Map<string, boolean>} */
 const degraded = new Map();
@@ -58,11 +61,11 @@ async function notePlatformOpsDegrade(kind, detail = {}) {
     return { ok: false, reason: 'cooldown' };
   }
 
-  const { recipients, source } = platformOpsRecipients();
+  const { recipients, source } = await platformOpsRecipients();
   if (!recipients.length) {
     alertedAt.delete(key);
     console.error(
-      `[platform-ops] ${key} degraded but no ops list (set SCALERS_OPS_ALERT_PHONES or SCALERS_OPS_ALERT_EMAILS)`
+      `[platform-ops] ${key} degraded but no ops list (add an email in Super Admin > Escalate, or set SCALERS_OPS_ALERT_EMAILS)`
     );
     return { ok: false, reason: 'no_ops_recipients', source };
   }
@@ -90,7 +93,8 @@ async function notePlatformOpsDegrade(kind, detail = {}) {
       body,
       subject,
       lead: { reason: `Platform ${key} degraded`, businessName: null },
-      channels: { sms: true, whatsapp: true, email: true },
+      // Email only for now. No SMS or WhatsApp for platform ops alerts.
+      channels: { sms: false, whatsapp: false, email: true },
       ledger: { kind: ledgerKind(key) },
     });
     const hit = sent.find((row) => row.channel);
@@ -128,6 +132,7 @@ function resetPlatformOpsAlert() {
   degraded.clear();
   alertedAt.clear();
   dispatchOverride = null;
+  resetPlatformOpsRecipientsCache();
 }
 
 /** Tests only. */
