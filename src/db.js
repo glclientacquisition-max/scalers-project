@@ -779,6 +779,7 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
   const direction = isOutboundTransfer ? 'outbound' : 'inbound';
 
   if (Object.keys(patch).length === 0) {
+    existing.terminal_transition = false;
     await settleCallUsage({
       callId: existing.id,
       outboundUnanswered:

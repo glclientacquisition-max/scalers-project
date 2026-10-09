@@ -182,6 +182,34 @@ function buildOwnerCallMessage({ call = {}, items = [], businessName, answered, 
   };
 }
 
+/** owner_notified (new) or whatsapp_sent (old rows) on the call summary. */
+function ownerNotifiedMeta(call = {}) {
+  if (call.owner_notified || call.whatsapp_sent) return true;
+  try {
+    const meta = typeof call.summary === 'string' ? JSON.parse(call.summary) : call.summary;
+    return Boolean(meta && (meta.owner_notified || meta.whatsapp_sent));
+  } catch {
+    return false;
+  }
+}
+
+/** Per-channel result: sent if any recipient got it, else failed if tried. */
+function ownerNotifyChannels(sent = [], errors = []) {
+  const channels = {};
+  for (const r of sent) {
+    for (const e of Array.isArray(r?.errors) ? r.errors : []) {
+      const m = /(?:^|:)(sms|whatsapp|email):/.exec(String(e));
+      if (m) channels[m[1]] = channels[m[1]] || 'failed';
+    }
+  }
+  for (const e of errors || []) {
+    const m = /(?:^|:)(sms|whatsapp|email):/.exec(String(e));
+    if (m) channels[m[1]] = channels[m[1]] || 'failed';
+  }
+  for (const r of sent) if (r?.channel) channels[r.channel] = 'sent';
+  return channels;
+}
+
 module.exports = {
   ANSWERED_LEAD_TITLE,
   MISSED_LEAD_TITLE,
@@ -191,6 +219,8 @@ module.exports = {
   mergeOwnerCallItems,
   noteOwnerCallItem,
   ownerMessageAtEndEnabled,
+  ownerNotifiedMeta,
+  ownerNotifyChannels,
   ownerSummaryKeyBase,
   pendingOwnerCallItems,
 };

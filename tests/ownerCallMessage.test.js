@@ -291,3 +291,37 @@ describe('server wiring', () => {
     }
   });
 });
+
+describe('one terminal close per call (prod HD_d3900cbf2b2d: webhook Completed + socket close)', () => {
+  const { ownerNotifiedMeta, ownerNotifyChannels } = require('../src/notifications/ownerCallMessage');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const dbSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'db.js'), 'utf8');
+
+  it('only the update that leaves a live status is the terminal transition', () => {
+    assert.match(dbSrc, /TERMINAL_CLAIM_FILTER = 'status\.is\.null,status\.not\.in\.\(complete,completed,failed,no_answer\)'/);
+    assert.match(dbSrc, /if \(claimsTerminal\) \{\n\s+query = query\.or\(TERMINAL_CLAIM_FILTER\);/);
+    assert.match(dbSrc, /shaped\.terminal_transition = terminalTransition;/);
+  });
+
+  it('the second close skips resolution, review, first-forward and the owner message', () => {
+    const fn = src.slice(src.indexOf('async function markCallTerminalFromWebhook'));
+    const body = fn.slice(0, fn.indexOf('\n}\n'));
+    const guard = body.indexOf("updated.terminal_transition !== true");
+    assert.ok(guard > 0);
+    assert.ok(guard < body.indexOf('persistCallResolution('));
+    assert.ok(guard < body.indexOf('persistFirstForwardAcceptance('));
+    assert.ok(guard < body.indexOf('sendOwnerCallMessage('));
+  });
+
+  it('owner_notified is the dedupe marker; whatsapp only when WhatsApp landed', () => {
+    assert.equal(ownerNotifiedMeta({ summary: '{"owner_notified":true}' }), true);
+    assert.equal(ownerNotifiedMeta({ summary: '{"whatsapp_sent":true}' }), true);
+    assert.equal(ownerNotifiedMeta({ summary: '{}' }), false);
+    // HD_d3900: SMS 402, WhatsApp 502, email accepted.
+    const ch = ownerNotifyChannels(
+      [{ channel: 'email', errors: ['sms:402 insufficient credits', 'whatsapp:502'] }],
+      []
+    );
+    assert.deepEqual(ch, { sms: 'failed', whatsapp: 'failed', email: 'sent' });
+  });
+});
