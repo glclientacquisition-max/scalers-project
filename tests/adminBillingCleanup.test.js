@@ -25,7 +25,8 @@ describe("admin billing: readable errors", () => {
   });
 
   it("keeps a deliberate raise exception message", () => {
-    assert.equal(errors.adminFacingError({ message: "package not found", code: "P0001" }, "x"), "package not found");
+    assert.equal(errors.adminFacingError({ message: "package not found", code: "P0001" }, "x"), "Package not found");
+    assert.equal(errors.adminFacingError({ message: "duplicate key value", code: "23505" }, "x"), "x");
     assert.equal(errors.adminFacingError(new Error("Pick a package."), "x"), "Pick a package.");
   });
 

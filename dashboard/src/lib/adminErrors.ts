@@ -54,15 +54,34 @@ export function logAdminError(scope: string, raw: unknown): void {
   console.error(`[admin:${scope}]`, line || raw);
 }
 
+/**
+ * Postgres/PostgREST codes that are never safe or useful to show an operator:
+ * 42xxx (syntax, ambiguous/undefined column, permission), XX (internal),
+ * 08 (connection) and PGRST (API/schema cache).
+ */
+const INTERNAL_CODE = /^(42|XX|08|PGRST)/i;
+
+/**
+ * One plain sentence for the Admin UI. Accepts an Error, a plain
+ * PostgREST/Supabase error object ({ message, code, details, hint }) or a
+ * string. Never returns "[object Object]", SQL file paths or raw SQL errors;
+ * RAISE EXCEPTION text from our RPCs (P0001, e.g. "tenant not found") is kept.
+ */
 export function adminFacingError(
   raw: unknown,
   fallback = ADMIN_SETUP_INCOMPLETE
 ): string {
-  const parts = adminErrorParts(raw);
-  const message = parts.message.trim();
-  if (!message || isFaultCode(parts.code) || INTERNAL.test(message) || hasVendorOrInfraName(message)) return fallback;
+  if (raw && typeof raw === "object" && !(raw instanceof Error)) {
+    const { message: m, code: c } = raw as { message?: unknown; code?: unknown };
+    if (typeof m !== "string" && c == null) return fallback;
+  }
+  const { message: text, code } = adminErrorParts(raw);
+  const message = text.trim();
+  if (code && (INTERNAL_CODE.test(code) || isFaultCode(code))) return fallback;
+  if (!message || INTERNAL.test(message) || /\bambiguous\b|\[object Object\]/i.test(message)) return fallback;
+  if (hasVendorOrInfraName(message)) return fallback;
   if (message.length > 180) return fallback;
-  return message;
+  return message.charAt(0).toUpperCase() + message.slice(1);
 }
 
 /**

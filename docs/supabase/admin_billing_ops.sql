@@ -1,87 +1,10 @@
--- Admin Billing ops: grant package minutes + waive on-demand overage (ledger).
+-- Admin Billing ops: waive on-demand overage (ledger). Grant: see fix_grant_package_minutes.sql.
 -- Apply after package_catalog.sql and wallet_security_beta.sql.
 -- Service role only; mirrors assign_tenant_package wallet_write bypass.
 
-create or replace function public.grant_tenant_package_minutes(
-  p_tenant_id uuid,
-  p_minutes integer,
-  p_note text,
-  p_actor text default 'ops',
-  p_idempotency_key text default null
-)
-returns table (
-  tenant_id uuid,
-  minutes_included integer,
-  minutes_granted integer
-)
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_actor text := coalesce(nullif(trim(p_actor), ''), 'ops');
-  v_note text := trim(coalesce(p_note, ''));
-  v_minutes integer := coalesce(p_minutes, 0);
-  v_key text := nullif(trim(p_idempotency_key), '');
-  v_after integer;
-begin
-  if p_tenant_id is null then
-    raise exception 'tenant required';
-  end if;
-  if v_minutes <= 0 or v_minutes > 100000 then
-    raise exception 'minutes must be between 1 and 100000';
-  end if;
-  if v_note is null or length(v_note) < 3 then
-    raise exception 'note required (min 3 chars)';
-  end if;
-
-  if v_key is not null then
-    if exists (
-      select 1
-      from public.ops_audit_log o
-      where o.tenant_id = p_tenant_id
-        and o.action = 'grant_package_minutes'
-        and o.detail->>'idempotency_key' = v_key
-    ) then
-      select t.minutes_included into v_after from public.tenants t where t.id = p_tenant_id;
-      tenant_id := p_tenant_id;
-      minutes_included := coalesce(v_after, 0);
-      minutes_granted := 0;
-      return next;
-      return;
-    end if;
-  end if;
-
-  perform set_config('scalers.wallet_write', '1', true);
-  update public.tenants
-    set minutes_included = coalesce(minutes_included, 0) + v_minutes
-  where id = p_tenant_id
-  returning tenants.minutes_included into v_after;
-
-  if not found then
-    raise exception 'tenant not found';
-  end if;
-
-  insert into public.ops_audit_log (actor, action, tenant_id, amount_kes, detail)
-  values (
-    v_actor,
-    'grant_package_minutes',
-    p_tenant_id,
-    null,
-    jsonb_build_object(
-      'note', v_note,
-      'minutes_granted', v_minutes,
-      'minutes_included_after', v_after,
-      'idempotency_key', v_key
-    )
-  );
-
-  tenant_id := p_tenant_id;
-  minutes_included := v_after;
-  minutes_granted := v_minutes;
-  return next;
-end;
-$$;
+-- grant_tenant_package_minutes lives in fix_grant_package_minutes.sql (apply it
+-- after this file). The old body here raised 42702 "minutes_included is
+-- ambiguous" on every call and must not be re-applied.
 
 create or replace function public.waive_tenant_overage(
   p_tenant_id uuid,
@@ -176,7 +99,5 @@ begin
 end;
 $$;
 
-revoke all on function public.grant_tenant_package_minutes(uuid, integer, text, text, text) from public, anon, authenticated;
 revoke all on function public.waive_tenant_overage(uuid, text, text, text) from public, anon, authenticated;
-grant execute on function public.grant_tenant_package_minutes(uuid, integer, text, text, text) to service_role;
 grant execute on function public.waive_tenant_overage(uuid, text, text, text) to service_role;
