@@ -2,6 +2,7 @@ import { QualityIndex } from "@/components/admin/QualityIndex";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { listBusinessQuality, listReleaseDeltas } from "@/lib/adminQuality";
 import { logAdminError } from "@/lib/adminErrors";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 import { parseQualityRange } from "@/lib/adminQualityModel";
 
 export const instant = false;
@@ -11,6 +12,7 @@ export default async function AdminQualityPage({
 }: {
   searchParams: Promise<{ range?: string }>;
 }) {
+  await requireSuperAdmin();
   const range = parseQualityRange((await searchParams).range);
   try {
     const [rows, releases] = await Promise.all([listBusinessQuality(range), listReleaseDeltas()]);

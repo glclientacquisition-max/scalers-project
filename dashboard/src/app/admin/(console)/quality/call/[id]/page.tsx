@@ -4,11 +4,13 @@ import { ButtonLink } from "@/components/ui/Button";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { getCallTrace } from "@/lib/adminQuality";
 import { logAdminError } from "@/lib/adminErrors";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 import { qualityBusinessHref, qualityListHref } from "@/lib/adminQualityModel";
 
 export const instant = false;
 
 export default async function AdminQualityCallPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireSuperAdmin();
   const { id } = await params;
   try {
     const trace = await getCallTrace(decodeURIComponent(id));

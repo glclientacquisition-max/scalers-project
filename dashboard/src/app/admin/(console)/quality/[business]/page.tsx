@@ -4,6 +4,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { getBusinessQuality } from "@/lib/adminQuality";
 import { logAdminError } from "@/lib/adminErrors";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 import { parseQualityRange } from "@/lib/adminQualityModel";
 
 export const instant = false;
@@ -15,6 +16,7 @@ export default async function AdminQualityBusinessPage({
   params: Promise<{ business: string }>;
   searchParams: Promise<{ range?: string }>;
 }) {
+  await requireSuperAdmin();
   const { business } = await params;
   const range = parseQualityRange((await searchParams).range);
   try {
