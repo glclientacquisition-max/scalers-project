@@ -48,14 +48,21 @@ import {
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
-import { ownerAttestFields } from "@/lib/ownerAttestFields";
+import {
+  ownerAttestFields,
+  ownerConfirmPlan,
+  readSavedFactRow,
+} from "@/lib/ownerAttestFields";
 import { fieldPathsAttestedOnSettingsSave } from "@/lib/fieldPathsFromSettingsSave";
 import { cleanFieldPaths } from "@/lib/fieldPathRegistry";
 import {
   settingsFieldFromScope,
   settingsScopeValidationError,
 } from "@/lib/settingsSaveScope";
-import { loadCompileProvenance } from "@/lib/tenantFieldProvenance";
+import { factHashModeFromEnv, loadCompileProvenance } from "@/lib/tenantFieldProvenance";
+import { overlayFieldMeta, planFactConfirm } from "@/lib/factConfirm";
+import { normalizeFactRow } from "@/lib/factRowNormalize";
+import { assignServiceIds } from "@/lib/serviceIds";
 
 export type SettingsCompileState = {
   error?: string;
@@ -95,11 +102,16 @@ export async function saveAndCompileSettings(
     String(formData.get("services_notes") || "").trim(),
     extractServicesNotes(tenant.services_offered || "")
   );
-  const servicesCatalog = pick(
+  const storedServices = normalizeServicesCatalog(tenant.services_catalog).filter((row) => row.name);
+  const pickedServices = pick(
     "servicesCatalog",
     parseServicesCatalogField(formData.get("services_catalog")),
-    normalizeServicesCatalog(tenant.services_catalog).filter((row) => row.name)
+    storedServices
   );
+  // Catalogue saves give every service a stable id; other panels keep the stored rows as-is.
+  const servicesCatalog = settingsFieldFromScope(scope, "servicesCatalog", true, false)
+    ? assignServiceIds(pickedServices, storedServices)
+    : pickedServices;
   const productCatalog = pick(
     "productCatalog",
     parseProductCatalogField(formData.get("product_catalog")),
@@ -267,33 +279,14 @@ export async function saveAndCompileSettings(
   });
   if (scopeError) return { error: scopeError };
 
-  const provenance = await loadCompileProvenance(tenant.id);
-  const { prompt, source } = await compileReceptionistPrompt({
-    businessName,
-    servicesOffered,
-    businessHours,
-    agentTone: agentTone ?? DEFAULT_AGENT_TONE,
-    agentName,
-    teamDirectory,
-    faqs,
-    unknownAnswerFallback,
-    escalateEnabled: agentTools.escalate,
-    vertical,
-    handoffMode,
-    locationsText,
-    policiesText,
-    productsText: productsBlock,
-    socialText: socialBlock,
-    productCatalog,
-    businessPolicies,
-    fieldMeta: provenance.fieldMeta,
-    holdGate: provenance.holdGate,
-  });
-
-  const workspace = await createWorkspaceDataClient();
-  if (!workspace) {
-    return { error: "Not signed in." };
-  }
+  const ownerPathsFromForm = (() => {
+    try {
+      const parsed = JSON.parse(String(formData.get("owner_field_paths") || "[]"));
+      return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
+    } catch {
+      return [];
+    }
+  })();
 
   const patch: Record<string, unknown> = {
     business_name: businessName,
@@ -319,23 +312,62 @@ export async function saveAndCompileSettings(
     business_locations: businessLocations,
     business_policies: businessPolicies,
     tts_lexicon: ttsLexicon,
-    llm_system_prompt: prompt,
   };
 
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) {
+    return { error: "Not signed in." };
+  }
+
+  // FACT_HASH_MODE: confirm only what changed (plus "Looks right" paths). Both
+  // sides go through normalizeFactRow before the diff, so a raw seed or import
+  // row never looks changed against its parsed copy. The compile below already
+  // sees that pending confirm; the write hashes the stored row as saved.
+  const hashMode = factHashModeFromEnv();
+  const explicitPaths = cleanFieldPaths(ownerPathsFromForm);
+  const storedFactRow: Record<string, unknown> =
+    (hashMode ? await readSavedFactRow(workspace.client, tenant.id) : null) ?? { ...tenant };
+  const provenance = await loadCompileProvenance(tenant.id);
+  const compileFieldMeta = hashMode
+    ? overlayFieldMeta(
+        provenance.fieldMeta,
+        planFactConfirm({
+          scope,
+          before: storedFactRow,
+          after: { ...storedFactRow, ...patch },
+          explicitPaths,
+          normalize: normalizeFactRow,
+        })
+      )
+    : provenance.fieldMeta;
+  const { prompt, source } = await compileReceptionistPrompt({
+    businessName,
+    servicesOffered,
+    businessHours,
+    agentTone: agentTone ?? DEFAULT_AGENT_TONE,
+    agentName,
+    teamDirectory,
+    faqs,
+    unknownAnswerFallback,
+    escalateEnabled: agentTools.escalate,
+    vertical,
+    handoffMode,
+    locationsText,
+    policiesText,
+    productsText: productsBlock,
+    socialText: socialBlock,
+    productCatalog,
+    businessPolicies,
+    fieldMeta: compileFieldMeta,
+    holdGate: provenance.holdGate,
+  });
+
+  patch.llm_system_prompt = prompt;
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
 
   if (error) {
     return ownerSaveFailed("settings.save", error.message);
   }
-
-  const ownerPathsFromForm = (() => {
-    try {
-      const parsed = JSON.parse(String(formData.get("owner_field_paths") || "[]"));
-      return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
-    } catch {
-      return [];
-    }
-  })();
 
   const socialChannels = socialHandles?.channels;
   const hasSocialHandles =
@@ -361,12 +393,32 @@ export async function saveAndCompileSettings(
     lineNumber: String(tenant.sautikit_virtual_number || "").trim(),
   });
 
-  const user = await getAuthUser();
-  await ownerAttestFields(
-    tenant.id,
-    cleanFieldPaths([...pathsFromSave, ...ownerPathsFromForm]),
-    user?.id ?? null
-  );
+  if (hashMode) {
+    // Hash the stored row as saved. If it cannot be read back, confirm nothing:
+    // in hash mode a missing value_hash already reads as "Check this".
+    const saved = await readSavedFactRow(workspace.client, tenant.id);
+    if (saved) {
+      await ownerConfirmPlan(
+        tenant.id,
+        planFactConfirm({
+          scope,
+          before: storedFactRow,
+          after: saved,
+          explicitPaths,
+          normalize: normalizeFactRow,
+        })
+      );
+    } else {
+      console.warn("[settings.save] saved row unreadable, owner confirm skipped");
+    }
+  } else {
+    const user = await getAuthUser();
+    await ownerAttestFields(
+      tenant.id,
+      cleanFieldPaths([...pathsFromSave, ...ownerPathsFromForm]),
+      user?.id ?? null
+    );
+  }
 
   revalidatePath("/settings");
 

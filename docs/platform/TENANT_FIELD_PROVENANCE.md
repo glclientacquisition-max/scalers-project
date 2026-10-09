@@ -19,7 +19,8 @@ On apply, the script runs **`backfill_tenant_field_meta_seed()`** once (idempote
 | Policy key | `policies.returns`, `policies.delivery`, `policies.payment`, `policies.holds.allowed` |
 | Hours (live) | `hours.weekly_grid` → `tenants.hours_schedule` |
 | Catalog product leaf | `catalog.product.<sku_or_index>.name` |
-| Catalog service leaf | `catalog.service.<index>.name` |
+| Catalog service leaf | `catalog.service.<id>.name` (stable `svc_…` id), else `catalog.service.<index>.name` |
+| Catalog price / visit (registry only; Brain reader pending) | `catalog.product.<sku>.price`, `catalog.service.<id>.price`, `catalog.service.<id>.site_visit` |
 | FAQ row | `faqs.<index>` (status/source on the FAQ object in `tenants.faqs`) |
 | Notify | `team.notify.whatsapp`, `team.notify.email`, `team.notify.channels` |
 
@@ -102,3 +103,13 @@ Expect the FAQ query to return **0** after migration.
 1. **Structured payments / holds policy** shapes are P1; gate reads best-effort on today's `business_policies` JSON.
 
 **Decided:** bulk backfill = **seed** (§10.5); import completeness = **0%** until confirm (§10.2). Hold deposit speak = Brain/product, not this PR.
+
+## Confirm v2 (value_hash, `FACT_HASH_MODE`)
+
+SQL: [`docs/supabase/tenant_field_confirm_v2.sql`](../supabase/tenant_field_confirm_v2.sql), then [`services_catalog_stable_ids.sql`](../supabase/services_catalog_stable_ids.sql), then Brain's `scripts/backfillFactHashes.js`. Staging first; prod needs Alvin's OK.
+
+- `value_hash`: 64 lowercase hex, `hashFactValue(factValueForPath(path, savedTenantsRow))` (Brain's `factHash`). Null or empty = unconfirmed.
+- `FACT_HASH_MODE`: on only when exactly `on`, server-only. Off = the P0 rules above, unchanged (Settings save still attests every filled field in the section).
+- On: Settings save confirms **only changed fields** (by hash; whitespace-only edits are not changes) plus explicit "Looks right" paths, in one `confirm_tenant_fields(tenant, paths[], hashes[])` batch (member check, max 500, all or nothing, one history row per path). A field cleared to empty calls `reopen_tenant_field` (owner steps down to seed, hash and confirm cleared). No meta row = unconfirmed.
+- Consequence: untouched seed and import fields stay "Check this", so `tenant_completeness_score` and `tenant_hold_gate` can read lower than under P0 for tenants whose facts were confirmed by whole-section saves.
+- Service ids: Desk assigns `svc_` + 16 hex on catalogue saves (`dashboard/src/lib/serviceIds.ts`), keeps them across reorders, never reuses them.
