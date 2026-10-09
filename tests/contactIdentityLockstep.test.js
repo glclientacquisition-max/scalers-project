@@ -219,7 +219,7 @@ describe('Voice and Desk contact identity lockstep', () => {
       };
     }
     const deskCap = existing.metadata.alternate_names.map((row) => row.name);
-    assert.deepEqual(voiceCap, ['G', 'F', 'E', 'D', 'C']);
+    assert.deepEqual(voiceCap, ['Grace', 'Faith', 'Esther', 'Dennis', 'Cynthia']);
     assert.deepEqual(deskCap, voiceCap);
     assert.equal(voiceCap.length, voiceIdentity.ALT_CAP);
     assert.equal(deskCap.length, deskIdentity.ALT_CAP);

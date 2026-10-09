@@ -5,6 +5,7 @@
 const { normalizeServices } = require('../conversation/liveKnowledge');
 const { normalizeLocations } = require('../conversation/businessLocations');
 const { coverageAreaNames } = require('../conversation/coverageAreas');
+const { isJunkCallerName } = require('../conversation/callerNameQuality');
 
 /** Soft cap — Soniox context biasing degrades with huge unrelated term lists. */
 const MAX_STT_TERMS = Number(process.env.SONIOX_STT_CONTEXT_MAX_TERMS || 40);
@@ -74,8 +75,10 @@ function callerHearingNames(tenant = {}) {
   const seen = new Set();
   const names = [];
   for (const value of values) {
-    const term = cleanTerm(value);
+    const term = cleanTerm(typeof value === 'string' ? value : value?.name);
     if (term.length < 2 || term.length > 80) continue;
+    // Junk like "not a" would bias the recognizer toward hearing it again.
+    if (isJunkCallerName(term)) continue;
     const key = term.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

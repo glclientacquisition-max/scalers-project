@@ -25,6 +25,7 @@ const {
   visitBlockSpeech,
 } = require('./visitLocation');
 
+const { isEmptyRequestContent } = require('./requestNoteContent');
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
 /** Names that must never be persisted as the caller (STT / model mix-ups). */
@@ -211,6 +212,16 @@ function validateServiceRequest(
   };
   if (!value.item && !value.notes) {
     return { valid: false, reason: 'A request needs an item or concise notes.' };
+  }
+  // A callback or enquiry whose note is only the agent's own question, a
+  // closer, or an ack is not a request. No row, no "saved" line.
+  if (type !== 'hold' && type !== 'order' && isEmptyRequestContent(value)) {
+    return {
+      valid: false,
+      reason: 'The note has no caller request in it.',
+      code: 'empty_note',
+      value,
+    };
   }
 
   const identity = { agentName, businessName };
@@ -1183,9 +1194,12 @@ const DAY_CUE =
  * so the turn does not fall through to "say that again".
  */
 function toolOutcomeLine(results = [], language = 'en') {
-  const confirmed = formatToolConfirmation(results, language);
+  // An empty-note request was never a request: say nothing about it.
+  const rows = (Array.isArray(results) ? results : []).filter(
+    (row) => !(row && row.code === 'empty_note')
+  );
+  const confirmed = formatToolConfirmation(rows, language);
   if (confirmed) return confirmed;
-  const rows = Array.isArray(results) ? results : [];
   if (!rows.length) return '';
   const lang = confirmationLanguage(language);
   const sw = lang === 'sw' || lang === 'sheng';
@@ -1209,6 +1223,7 @@ function formatToolConfirmation(results = [], language = 'en') {
     ].includes(result.action)
   );
   if (!meaningful) return '';
+  if (meaningful.code === 'empty_note') return '';
 
   const lang = confirmationLanguage(language);
   const sw = lang === 'sw';
