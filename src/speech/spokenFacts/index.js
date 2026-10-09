@@ -19,6 +19,7 @@
 
 const { swahiliClock, swahiliPeriod } = require('../../conversation/swahiliClock');
 const { numberToSw } = require('../spokenForms');
+const { spokenFactsEnabled } = require('./flag');
 
 const TZ_OFFSET_MS = 3 * 60 * 60 * 1000; // Africa/Nairobi, UTC+3 all year
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -262,11 +263,6 @@ function renderFactLine(line, opts = {}) {
   }
   const out = spec.render(rendered, lang, raw);
   return typeof out === 'string' && out.trim() ? out.replace(/\s+/g, ' ').trim() : null;
-}
-
-/** VOICE_SPOKEN_FACTS: on only when exactly 'on'. Off is today's behaviour. */
-function spokenFactsEnabled(env = process.env) {
-  return Boolean(env) && env.VOICE_SPOKEN_FACTS === 'on';
 }
 
 module.exports = {

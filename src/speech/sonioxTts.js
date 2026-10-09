@@ -314,7 +314,7 @@ function createSonioxTtsSession({
             callLanguage: opts.callLanguage,
             language: opts.language || language || undefined,
             extraLexicon: opts.extraLexicon,
-            storedClockMinutes: opts.storedClockMinutes,
+            spokenFacts: opts.spokenFacts,
           });
       // No letterless piece, and a word gap between pieces of one stream
       // (src/speech/ttsBoundary.js).

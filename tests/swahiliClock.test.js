@@ -2,7 +2,9 @@
 // confirmation spoke 09:00 as "saa 9 asubuhi" twice, after the caller had
 // corrected it ("Saa 3 asubuhi, si saa 9 asubuhi"). The Swahili clock is the
 // 24-hour clock minus 6: 09:00 is "saa tatu asubuhi".
-const { describe, it } = require('node:test');
+// Everything here is behind VOICE_SPOKEN_FACTS=on; flag off keeps today's
+// wording (see the "flag off" block and tests/ttsNormalize.test.js).
+const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   swahiliClock,
@@ -18,6 +20,32 @@ const storedClock = require('../src/speech/storedClock');
 const at = (h, m = 0) => h * 60 + m;
 const NOW = new Date('2026-10-09T08:43:00Z'); // Friday 11:43 EAT
 const SAT_9 = evaluateAppointmentHours({ whenText: 'Saturday 10 October 2026, 9 AM', schedule: null, now: NOW });
+
+function withFlag(value) {
+  let saved;
+  before(() => {
+    saved = process.env.VOICE_SPOKEN_FACTS;
+    if (value == null) delete process.env.VOICE_SPOKEN_FACTS;
+    else process.env.VOICE_SPOKEN_FACTS = value;
+  });
+  after(() => {
+    if (saved == null) delete process.env.VOICE_SPOKEN_FACTS;
+    else process.env.VOICE_SPOKEN_FACTS = saved;
+  });
+}
+
+describe('flag off: today\'s behaviour', () => {
+  withFlag(null);
+  it('confirmation and TTS keep the numeral form', () => {
+    assert.equal(
+      formatToolConfirmation([{ action: 'create_appointment', status: 'succeeded', hours: SAT_9 }], 'sw'),
+      'Sawa, nimehifadhi ombi la ziara Jumamosi, 9 AM.'
+    );
+    assert.match(prepareForTts('Nimehifadhi ombi la ziara Jumamosi, 9 AM.', { callLanguage: 'sw', language: 'sw' }).text, /saa 9 asubuhi/);
+    const out = prepareForTts('Ziara ni saa nne asubuhi.', { callLanguage: 'sw', language: 'sw', spokenFacts: { times: [at(9)] } });
+    assert.equal(out.factMismatches, undefined);
+  });
+});
 
 describe('swahiliClock: hour minus 6, with period and minutes', () => {
   it('hours', () => {
@@ -49,6 +77,7 @@ describe('swahiliClock: hour minus 6, with period and minutes', () => {
 });
 
 describe('every Kiswahili time line uses the clock', () => {
+  withFlag('on');
   it('visit confirmation and move line (HD_d199dbbf6b79 t12, t16)', () => {
     assert.equal(formatRequestedWhenLabel(SAT_9.resolved ? SAT_9 : null, 'sw'), 'Jumamosi, saa tatu asubuhi');
     assert.equal(
@@ -59,10 +88,17 @@ describe('every Kiswahili time line uses the clock', () => {
       formatToolConfirmation([{ action: 'update_appointment', status: 'succeeded', hours: SAT_9 }], 'sw'),
       'Sawa, nimehamisha ziara Jumamosi, saa tatu asubuhi.'
     );
-    // English is unchanged.
+    // Tool results carry the rendered phrase; the confirmation copies it.
+    const { spokenWhenFor } = require('../src/conversation/toolExecution');
+    const spoken = spokenWhenFor(SAT_9, NOW);
+    assert.deepEqual(spoken, { en: 'tomorrow, Saturday, at 9 AM', sw: 'kesho Jumamosi, saa tatu asubuhi', sheng: 'kesho Saturday, 9 AM' });
     assert.equal(
-      formatToolConfirmation([{ action: 'create_appointment', status: 'succeeded', hours: SAT_9 }], 'en'),
-      "Okay, I've saved your visit request for Saturday at 9 AM."
+      formatToolConfirmation([{ action: 'create_appointment', status: 'succeeded', hours: SAT_9, spokenWhen: spoken }], 'sw'),
+      'Sawa, nimehifadhi ombi la ziara kesho Jumamosi, saa tatu asubuhi.'
+    );
+    assert.equal(
+      formatToolConfirmation([{ action: 'update_appointment', status: 'succeeded', hours: SAT_9, spokenWhen: spoken }], 'en'),
+      "Okay, I've moved that visit to tomorrow, Saturday, at 9 AM."
     );
   });
 
@@ -85,6 +121,7 @@ describe('every Kiswahili time line uses the clock', () => {
 });
 
 describe('guard: a Kiswahili time is checked against the stored visit time', () => {
+  withFlag('on');
   it('rewrites a slip that names the stored time; flags one that names another time', () => {
     assert.equal(reconcileSwahiliTimes('Jumamosi saa 9 asubuhi.', [at(9)]).text, 'Jumamosi saa tatu asubuhi.');
     const wrong = reconcileSwahiliTimes('Jumamosi saa nne asubuhi.', [at(9)]);
@@ -95,11 +132,21 @@ describe('guard: a Kiswahili time is checked against the stored visit time', () 
   });
 
   it('prepareForTts takes the call stored times and reports a mismatch', () => {
-    const ok = prepareForTts('Nimehamisha ziara Jumamosi, saa 9 asubuhi.', { callLanguage: 'sw', language: 'sw', storedClockMinutes: () => [at(9)] });
+    const ok = prepareForTts('Nimehamisha ziara Jumamosi, saa 9 asubuhi.', { callLanguage: 'sw', language: 'sw', spokenFacts: () => ({ times: [at(9)] }) });
     assert.equal(ok.text, 'Nimehamisha ziara Jumamosi, saa tatu asubuhi.');
-    assert.equal(ok.clockMismatches, undefined);
-    const bad = prepareForTts('Ziara ni saa nne asubuhi.', { callLanguage: 'sw', language: 'sw', storedClockMinutes: [at(9)] });
-    assert.equal(bad.clockMismatches.length, 1);
+    assert.equal(ok.factMismatches, undefined);
+    // No time written on this call: a different visit time is reported, not guessed.
+    const bad = prepareForTts('Ziara ni saa nne asubuhi.', { callLanguage: 'sw', language: 'sw', spokenFacts: { times: [at(9)] } });
+    assert.equal(bad.factMismatches.length, 1);
+    // A time written on this call replaces a wrong visit time.
+    const fixed = prepareForTts('Nimehamisha ziara Jumamosi, saa nne asubuhi.', { callLanguage: 'sw', language: 'sw', spokenFacts: { times: [at(9)], latestTime: at(9) } });
+    assert.equal(fixed.text, 'Nimehamisha ziara Jumamosi, saa tatu asubuhi.');
+    const en = prepareForTts("I've saved your visit for Saturday at 10 AM.", { callLanguage: 'en', language: 'en', spokenFacts: { times: [at(9)], latestTime: at(9) } });
+    assert.match(en.text, /9 A M/);
+    // An amount that is not a stored price is reported.
+    const price = prepareForTts('Interior window cleaning is KSh 250 per window.', { callLanguage: 'en', language: 'en', spokenFacts: { times: [], amounts: [200] } });
+    assert.deepEqual(price.factMismatches.map((m) => m.kind), ['amount']);
+    assert.equal(prepareForTts('It is KSh 200 per window.', { callLanguage: 'en', language: 'en', spokenFacts: { amounts: [200] } }).factMismatches, undefined);
   });
 
   it('storedClock collects appointment writes per call', () => {

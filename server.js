@@ -178,6 +178,8 @@ const {
 const {
   noteStoredToolResults,
   storedClockMinutes: storedToolClockMinutes,
+  latestStoredClock,
+  catalogueAmounts,
   clearStoredClocks,
 } = require('./src/speech/storedClock');
 const { eatMinutes: storedEatMinutes } = require('./src/speech/storedClock');
@@ -204,6 +206,19 @@ function callStoredClockMinutes(callSid) {
     out.add(hour * 60 + Number(clock[2] || 0));
   }
   return [...out];
+}
+
+/**
+ * VOICE_SPOKEN_FACTS: this call's stored facts for the pre-TTS guard:
+ * visit times (caller file + writes), the latest written time, and the
+ * catalogue prices in shillings. Read only when the flag is on.
+ */
+function callSpokenFacts(callSid) {
+  return {
+    times: callStoredClockMinutes(callSid),
+    latestTime: latestStoredClock(callSid),
+    amounts: catalogueAmounts(callTenantProfiles.get(callSid) || {}),
+  };
 }
 const { deriveCallResolution } = require('./src/conversation/callResolution');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
@@ -2579,7 +2594,7 @@ mediaWss.on('connection', (ws, req) => {
       callLanguage,
       language: opts.language,
       extraLexicon,
-      storedClockMinutes: () => callStoredClockMinutes(sidLabel()),
+      spokenFacts: () => callSpokenFacts(sidLabel()),
     });
     if (opts.isFiller) {
       voiceTrace.noteFiller({
@@ -3524,7 +3539,7 @@ mediaWss.on('connection', (ws, req) => {
             callLanguage,
             speedScale: ttsSpeedScale,
             extraLexicon: ttsLexiconOverrides,
-            storedClockMinutes: () => callStoredClockMinutes(sidLabel()),
+            spokenFacts: () => callSpokenFacts(sidLabel()),
           })
           .then((session) => {
             speakSession = session;
@@ -3575,7 +3590,7 @@ mediaWss.on('connection', (ws, req) => {
           callLanguage,
           speedScale: ttsSpeedScale,
           extraLexicon: ttsLexiconOverrides,
-          storedClockMinutes: () => callStoredClockMinutes(sidLabel()),
+          spokenFacts: () => callSpokenFacts(sidLabel()),
         });
         console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
         return speakSession;
@@ -3685,12 +3700,13 @@ mediaWss.on('connection', (ws, req) => {
           const traced = prepareForTts(text, {
             callLanguage,
             extraLexicon: typeof ttsLexiconOverrides !== 'undefined' ? ttsLexiconOverrides : [],
-            storedClockMinutes: () => callStoredClockMinutes(sidLabel()),
+            spokenFacts: () => callSpokenFacts(sidLabel()),
           });
           voiceTrace.noteTts({
             text: traced.text,
             before: text,
             language: traced.language,
+            ...(traced.factMismatches ? { factMismatches: traced.factMismatches } : {}),
           });
         }
         session.pushText(text);

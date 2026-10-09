@@ -7,6 +7,7 @@
 const { reconcileSwahiliTimes } = require('../conversation/swahiliClock');
 
 const byCall = new Map();
+const latestByCall = new Map();
 
 function eatMinutes(value) {
   const at = value instanceof Date ? value : new Date(value);
@@ -47,6 +48,7 @@ function noteStoredToolResults(callSid, results = []) {
       const set = setFor(callSid);
       set.delete(minutes);
       set.add(minutes);
+      latestByCall.set(String(callSid), minutes);
     }
   }
 }
@@ -56,8 +58,33 @@ function storedClockMinutes(callSid) {
   return set ? [...set] : [];
 }
 
+/** The visit time written most recently on this call, or null. */
+function latestStoredClock(callSid) {
+  const value = latestByCall.get(String(callSid || ''));
+  return Number.isFinite(value) ? value : null;
+}
+
 function clearStoredClocks(callSid) {
   byCall.delete(String(callSid || ''));
+  latestByCall.delete(String(callSid || ''));
+}
+
+/** Shilling amounts in catalogue price text ("KSh 6,000 flat", "200 per window"). */
+function catalogueAmounts(profile = {}) {
+  const out = new Set();
+  const rows = [
+    ...(Array.isArray(profile?.servicesCatalog) ? profile.servicesCatalog : []),
+    ...(Array.isArray(profile?.productCatalog) ? profile.productCatalog : []),
+  ];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const text = [row.price_range, row.price, row.price_text, row.notes].filter(Boolean).join(' ');
+    for (const m of String(text).matchAll(/\d[\d,]*(?:\.\d{1,2})?/g)) {
+      const value = Number(m[0].replace(/,/g, ''));
+      if (Number.isFinite(value) && value >= 10) out.add(value);
+    }
+  }
+  return [...out];
 }
 
 /**
@@ -73,6 +100,8 @@ module.exports = {
   noteStoredAppointments,
   noteStoredToolResults,
   storedClockMinutes,
+  latestStoredClock,
+  catalogueAmounts,
   clearStoredClocks,
   reconcileStoredSwahiliTimes,
 };

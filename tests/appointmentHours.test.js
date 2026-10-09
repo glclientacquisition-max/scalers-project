@@ -272,8 +272,8 @@ describe('evaluateAppointmentHours', () => {
       now: TUE_11,
     });
     assert.equal(formatRequestedWhenLabel(out, 'en'), 'Tuesday at 10 AM');
-    assert.equal(formatRequestedWhenLabel(out, 'sw'), 'Jumanne, saa nne asubuhi');
-    assert.equal(formatRequestedWhenLabel(out, 'mixed'), 'Jumanne, saa nne asubuhi');
+    assert.equal(formatRequestedWhenLabel(out, 'sw'), 'Jumanne, 10 AM');
+    assert.equal(formatRequestedWhenLabel(out, 'mixed'), 'Jumanne, 10 AM');
   });
 });
 
