@@ -1,7 +1,7 @@
 # Prod Admin schema gap ("Setup is incomplete")
 
 **Status:** draft. Nothing has been applied. Prod SQL needs Alvin's OK.
-**Compared:** 2026-10-09 10:30 EAT. Read-only `information_schema` SELECTs on prod `ALCR` (`fjxcdccgyhnvnnlnovcl`) and staging `scalers-staging` (`sgcdncjxauhsbunobmob`). Main = prod = `87cd6f94`.
+**Compared:** 2026-10-09 10:30 EAT. Read-only `information_schema` SELECTs on prod `ALCR` (`fjxcdccgyhnvnnlnovcl`) and staging `scalers-staging` (`sgcdncjxauhsbunobmob`). Compared against main `87cd6f94`. Main moved to `db84f5ca` (#613) at 10:41 EAT.
 
 ## What prod shows
 
@@ -11,7 +11,9 @@
 | `/admin/platform` | "Setup is incomplete" |
 | `/admin/businesses`, `/billing`, `/numbers`, `/packages`, `/voices` | Load |
 
-Overview and Platform both call `evaluatePlatformOps()` (`dashboard/src/lib/platformOps.ts`). It reads `platform_ops_settings` and `platform_ops_notices`, and neither table exists on prod. Prod logs show `[admin:overview] [object Object]`. The Supabase error is a plain object, so `isMissingTable()` stringifies it to `[object Object]` and misses the "schema cache" text. The missing table rethrows and the page shows the setup error.
+**Update 10:45 EAT:** after #613 deployed to prod (`db84f5ca`), Overview and Platform no longer show the error. #613 makes the missing ops tables degrade to "not persisted". The tables below are still missing, so ops settings and notices cannot be saved on prod until steps 1 and 2 are applied.
+
+Before #613: Overview and Platform both call `evaluatePlatformOps()` (`dashboard/src/lib/platformOps.ts`). It reads `platform_ops_settings` and `platform_ops_notices`, and neither table exists on prod. Prod logs show `[admin:overview] [object Object]`. The Supabase error is a plain object, so `isMissingTable()` stringifies it to `[object Object]` and misses the "schema cache" text. The missing table rethrows and the page shows the setup error.
 
 ## Tables Admin reads (main)
 
@@ -54,12 +56,12 @@ select column_name from information_schema.columns
 where table_schema = 'public' and table_name = 'platform_ops_settings';
 ```
 
-## Code follow-up (not in this PR)
+## Code follow-up
 
-`isMissingTable()` in `lib/platformOps.ts` and `logAdminError()` in `lib/adminErrors.ts` should read `err.message` and `err.code` (`PGRST205`, `42P01`) from plain Supabase error objects as well as `Error`. With that fix, a missing ops table degrades to "not persisted" instead of breaking Overview. Logs would then show the real message instead of `[object Object]`. This overlaps with Quality brief item 2 (Overview must survive a Quality failure).
+Done in #613 (merged): `isMissingTableError()` and `adminErrorParts()` now read plain Supabase error objects.
 
 ## Decisions for Alvin
 
-1. OK to apply steps 1 and 2 on prod? This is the minimum fix for "Setup is incomplete".
+1. OK to apply steps 1 and 2 on prod? With #613 live, the page no longer breaks without them. Without them, though, prod cannot save ops-mail people or settings, and it keeps no open notices.
 2. OK to apply step 3 now, or wait until Quality (#602/#603) is approved?
 3. Should `calls.inbox_assignee_name` / `inbox_assignee_phone` on staging get a SQL file, or be dropped from staging?
