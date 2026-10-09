@@ -18,7 +18,7 @@
     "test:naturalness": "node tests/naturalnessScore.test.js",
     "test:hd015b-m0": "node --test tests/hd015bM0Replay.test.js",
     "test:phase2-acceptance": "node --test tests/phase2/",
-    "test:voice-eval": "node --test tests/voiceTrace.test.js tests/voiceScore.test.js && node scripts/replay-voice-suite.js",
+    "test:voice-eval": "node --test tests/voiceTrace.test.js tests/voiceScore.test.js tests/voiceTurnTracesPurge.test.js && node scripts/replay-voice-suite.js",
     "voice:score": "node scripts/score-voice-call.js",
     "voice:replay": "node scripts/replay-voice-suite.js",
     "score:naturalness": "node scripts/score-voice-naturalness.js",
@@ -65,6 +65,7 @@
     "tunnel:cloudflared": "bash scripts/tunnel-cloudflared.sh"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "evalite": "^0.19.0",
     "pg": "^8.13.1",
     "vitest": "^4.0.16",
