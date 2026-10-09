@@ -211,18 +211,18 @@ Do not add a second team editor. Directory stays the single source of destinatio
 
 ## 8. Billing and ops
 
-SautiKit currently charges the workspace **KES 0 / min inbound** and **KES 3 / min outbound**. Conference transfer is two legs:
+SautiKit charges the workspace **KES 0 / min** for the inbound call itself, but **audio streaming to our WebSocket costs about KES 0.50 / min**, per second, on top of the call rate. Every inbound call the assistant answers opens that stream, so inbound is **not free**: it costs about **KES 0.50 / min** while the stream is open. Outbound is **KES 3 / min** answered (KES 0.05/sec). Source: SautiKit rate card, https://sautikit.com/pricing, checked 9 Oct 2026. Conference transfer is two legs:
 
 | Leg | Who is on it | SautiKit (workspace, current) | Scalers tenant wallet |
 | --- | --- | --- | --- |
-| Inbound | Caller → business DID (AI then conference) | **KES 0 / min** | Included minutes free. On-demand past the cap is **KES 6 / min** on `billing_rate_card`. |
+| Inbound | Caller → business DID (AI then conference) | **KES 0 / min** call + **about KES 0.50 / min** stream while the AI is on the line | Included minutes free. On-demand past the cap is **KES 6 / min** on `billing_rate_card`. |
 | Outbound | Business DID → teammate mobile | **KES 3 / min** answered (`POST /v1/calls`) | **KES 9 / min** answered on a separate `calls` row. Stored. Not offered until this executor ships. |
 
 Margin on a connected transfer is KES 6 / min (9 retail minus 3 cost). If SautiKit changes either rate, update `billing_rate_card` before that ships. Env `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (default 4) is only the fallback when `consume_call_seconds` is missing.
 
 Rules:
 
-1. **SautiKit inbound is KES 0.** Included package minutes are free. On-demand inbound past the cap is KES 6 / min.
+1. **SautiKit inbound is not free.** The call leg is KES 0, but the media stream costs about KES 0.50 / min, so each answered minute costs Scalers about KES 0.50 even inside included package minutes. Included minutes are free to the tenant. On-demand inbound past the cap is KES 6 / min.
 2. **Outbound is KES 9 / answered minute** on the rate card. It is not shown to owners until live transfer ships. SautiKit costs us **KES 3 / min** on that leg. Unanswered outbound stays 0 on both sides.
 3. **Unanswered outbound is free** at SautiKit and must stay 0 minutes on our ledger (`no_answer` / `busy` / `failed` / `canceled`).
 4. **Beta (`billing_enforcement=off`)** meters inbound only and **must not** `POST /v1/calls` in production. Otherwise Scalers eats outbound PSTN. Lab exception: `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on` on staging only.

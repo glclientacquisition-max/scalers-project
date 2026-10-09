@@ -1,5 +1,7 @@
 # Scalers
 
+> **New agent? Start at [`docs/STATUS.md`](docs/STATUS.md)**: current status, environments, what's in flight, and the rules. Then read [`AGENTS.md`](AGENTS.md).
+
 Scalers ([scalers.co.ke](https://scalers.co.ke)) is a Kenya-focused multi-tenant Business Assistant.
 
 A business gets a phone number. When a call is missed, busy, or after hours, the assistant answers, takes the caller's name and reason, and notifies the owner.

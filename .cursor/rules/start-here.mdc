@@ -1,0 +1,13 @@
+---
+description: Scalers start-here pointer. Read docs/STATUS.md before starting any task.
+alwaysApply: true
+---
+
+# Start here
+
+New to this repo or this task? Read `docs/STATUS.md` first. It covers current status, environments, what is done, on staging, in flight, next, and the rules. Then read `AGENTS.md` and your lane contract in `docs/agents/`.
+
+- One task, one lane, one PR into `main`.
+- Never release or re-point the live DID +254709221536.
+- No prod writes, secret rotation, migration rewrites, or merges to `main` without Alvin's explicit yes.
+- Update `docs/STATUS.md` sections 5 to 8 when your PR changes what is live, on staging, or in flight.
