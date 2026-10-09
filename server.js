@@ -371,6 +371,11 @@ const {
 } = require('./src/speech/overlapHold');
 const { createLateFinalHold } = require('./src/speech/lateFinal');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
+const {
+  createWaitBargeReprompt,
+  pickWaitRepromptLine,
+  shouldIgnoreEarlyGreetingWait,
+} = require('./src/speech/waitBargeReprompt');
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
@@ -1920,6 +1925,41 @@ mediaWss.on('connection', (ws, req) => {
       });
     },
   });
+  // After a wait/stop barge the agent listens. If the caller stays quiet,
+  // say one short go-ahead (HD_04cf5d5cb1aa: "Wait." cut the greeting, then
+  // 14 s of dead air). Arms even before the caller's first processed turn.
+  const waitReprompt = createWaitBargeReprompt({
+    canFire: () =>
+      ws.readyState === WebSocket.OPEN &&
+      !callEnding &&
+      !speaking &&
+      !turnBusy &&
+      !speechOutageStarted &&
+      !utteranceParts.length &&
+      !pendingUtterance &&
+      !callIsOver(),
+    speak: () => {
+      if (callIsOver()) return null;
+      const line = pickWaitRepromptLine(callLanguage);
+      console.log(`[ws/media][${sidLabel()}] wait_reprompt lang=${line.language}`);
+      return speakText(line.text, { skipFileGate: true, isWaitReprompt: true }).then((spoken) => {
+        voiceTrace.noteCall({
+          stage: 'reprompt',
+          path: 'wait_barge',
+          text: line.text,
+          language: line.language,
+          ok: Boolean(spoken?.ok),
+          at: new Date().toISOString(),
+        });
+        if (spoken?.ok) {
+          callTranscript.pushAgent(line.text);
+          messages.push({ role: 'assistant', content: line.text, local: true });
+        }
+        // Once only. From here the normal idle nudge owns the silence.
+        if (!callEnding) idleNudge.arm({ skip: false });
+      });
+    },
+  });
   // An unfinished caller turn ("Nilikuwa nauliza,") is held, not answered.
   // New caller words merge with it. If the caller stays quiet for the hold
   // window, it is answered by the model (holdTimedOut), never by an
@@ -2011,6 +2051,8 @@ mediaWss.on('connection', (ws, req) => {
   // Until this process commits that line, the caller turn must say it.
   let greetingInterrupted = false;
   let greetingSettled = false;
+  /** First greeting PCM time (ms epoch), for the early-greeting wait ignore. */
+  let greetingAudioAt = null;
   let fileNameAsksCommitted = 0;
   const firstForward = {
     greetingPlayed: false,
@@ -2028,6 +2070,7 @@ mediaWss.on('connection', (ws, req) => {
     firstForward.greetingPlayed = true;
     greetingAwaitingFirstPcm = false;
     const at = Date.now();
+    greetingAudioAt = at;
     const logged = logConnectToGreetingPcm({
       callSid: sidLabel(),
       connectedAt,
@@ -2312,6 +2355,7 @@ mediaWss.on('connection', (ws, req) => {
     unfinishedHold.close();
     greetingStarted = true;
     idleNudge.close();
+    waitReprompt.close();
     const clip = loadOutageClip(callLanguage, { voiceId: tenantSonioxVoiceId });
     const line = pickSpeechOutageLine(clip?.language || callLanguage);
     console.error(
@@ -2652,8 +2696,19 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
-  function cancelSpeech(reason) {
+  function cancelSpeech(reason, info = {}) {
     voiceTrace.noteBarge({ reason: String(reason || '') });
+    // Call-level stage too: a barge before any turn opens must still show
+    // in the trace (HD_04cf5d5cb1aa had none).
+    voiceTrace.noteCall({
+      stage: 'barge',
+      path: 'call',
+      kind: /interrupt_wait/.test(String(reason || '')) ? 'wait' : 'barge',
+      reason: String(reason || ''),
+      text: String(info.text || '').trim().slice(0, 120),
+      during: greetingSettled ? 'reply' : 'greeting',
+      at: new Date().toISOString(),
+    });
     const endingGen = activePlaybackGeneration;
     clearFillerTimer();
     idleNudge.clear();
@@ -2691,6 +2746,29 @@ mediaWss.on('connection', (ws, req) => {
 
   let lastBargeSkipLogAt = 0;
   function maybeBargeIn(text, source) {
+    // A lone "Wait." in the first moments of the greeting is not a stop:
+    // keep the greeting playing.
+    if (
+      speaking &&
+      shouldIgnoreEarlyGreetingWait({
+        text,
+        greetingPlaying: !greetingSettled,
+        greetingAudioAt,
+        now: Date.now(),
+      })
+    ) {
+      return {
+        action: 'ignore',
+        reason: 'early_greeting_wait',
+        kind: 'wait_stop',
+        phase: 'speaking',
+        interrupt: false,
+        stopTts: false,
+        queue: false,
+        skip: false,
+        replay: false,
+      };
+    }
     // After a barge has cancelled the reply, the caller's final is the next
     // turn, not a continuation of the cancelled one (HD_015bae4a4af2 t6).
     const phaseInputs = bargePhaseInputs({
@@ -2739,7 +2817,8 @@ mediaWss.on('connection', (ws, req) => {
         });
       }
     }
-    cancelSpeech(`${source}/${decision.reason}`);
+    cancelSpeech(`${source}/${decision.reason}`, { text });
+    if (decision.reason === 'interrupt_wait') waitReprompt.arm();
     return decision;
   }
 
@@ -2854,6 +2933,7 @@ mediaWss.on('connection', (ws, req) => {
     let flushed = labelTurn(clean);
     if (!clean) return;
     idleNudge.clear();
+    waitReprompt.cancel();
     if (turnBusy) {
       // Merge continuation fragments into one pending utterance (don't drop context).
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${clean}` : clean;
@@ -3231,6 +3311,7 @@ mediaWss.on('connection', (ws, req) => {
       });
       if (planned.farewell) {
         callEnding = true;
+        waitReprompt.close();
         unfinishedHold.close();
         console.log(
           `[ws/media][${callKey}] brain-end farewell lang=${callLanguage}: ${endClose.line}`
@@ -4315,6 +4396,12 @@ mediaWss.on('connection', (ws, req) => {
       // "For" mid-sentence). The hold caps how long postpones can stretch it.
       if (unfinishedHold.pending() && !looksLikeEcho(text)) unfinishedHold.postpone(text);
 
+      // Caller sound after a wait barge restarts the go-ahead timer, so it
+      // never talks over someone mid-sentence.
+      if (isInterim && waitReprompt.armed() && text.length >= 3 && !looksLikeEcho(text)) {
+        waitReprompt.arm();
+      }
+
       // Instant barge-in on accumulated interim tokens while TTS/LLM is busy.
       if (isInterim) {
         if (speaking || turnBusy) {
@@ -4349,6 +4436,29 @@ mediaWss.on('connection', (ws, req) => {
       // Finals: one turn-taking decision, then act.
       interimBargeText = '';
       const decision = maybeBargeIn(text, 'final speech');
+
+      if (decision.reason === 'early_greeting_wait') {
+        voiceTrace.noteCall({
+          stage: 'barge',
+          path: 'call',
+          kind: 'wait',
+          reason: 'early_greeting_wait',
+          action: 'ignored',
+          text: text.slice(0, 120),
+          during: 'greeting',
+          at: new Date().toISOString(),
+        });
+        console.log(
+          `[ws/media][${sidLabel()}] early greeting wait ignored, greeting keeps playing: ${text.slice(0, 40)}`
+        );
+        return;
+      }
+
+      // A real caller final ends the wait: their words are the next turn.
+      // A wait word itself keeps (or, on barge, arms) the go-ahead timer.
+      if (text && decision.reason !== 'interrupt_wait' && decision.reason !== 'echo') {
+        waitReprompt.cancel();
+      }
 
       if (decision.reason === 'echo') {
         voiceTrace.noteTurnEnd({ decision: 'drop', reason: 'echo' });
@@ -4786,6 +4896,7 @@ mediaWss.on('connection', (ws, req) => {
     clearFillerTimer();
     speakCommit.clear();
     idleNudge.close();
+    waitReprompt.close();
     unfinishedHold.close();
     if (utteranceTimer) {
       clearTimeout(utteranceTimer);
