@@ -100,7 +100,11 @@ export function QualityBusiness({
             <ul className="mt-2 divide-y divide-hairline md:hidden">
               {calls.map((call) => {
                 const failed = failingChecks(call.checks);
-                const failure = failed.length > 0 ? failed.map((check) => checkLabel(check)).join(", ") : "No failures";
+                const failure = !call.checks
+                  ? "Checks not logged"
+                  : failed.length > 0
+                    ? failed.map((check) => checkLabel(check)).join(", ")
+                    : "No failures";
                 return (
                   <ListRow
                     key={call.callId}

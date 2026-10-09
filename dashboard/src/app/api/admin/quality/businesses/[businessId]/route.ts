@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
-import { parseBusinessId, parseCallLimit } from "@/lib/quality/assemble";
+import { parseBusinessId, parseCallLimit, parseWindowDays } from "@/lib/quality/assemble";
 import { getBusinessQuality } from "@/lib/quality/readQuality";
 import { isLegacyAuthenticated } from "@/lib/auth";
 
@@ -18,13 +18,18 @@ export async function GET(
     return NextResponse.json({ error: "business_id required" }, { status: 400 });
   }
 
-  const limit = parseCallLimit(new URL(request.url).searchParams.get("limit"));
+  const params = new URL(request.url).searchParams;
+  const limit = parseCallLimit(params.get("limit"));
   if (limit == null) {
     return NextResponse.json({ error: "limit must be 1 to 100" }, { status: 400 });
   }
+  const windowDays = parseWindowDays(params.get("windowDays"));
+  if (windowDays == null) {
+    return NextResponse.json({ error: "windowDays must be 1 to 30" }, { status: 400 });
+  }
 
   try {
-    const body = await getBusinessQuality({ businessId, limit });
+    const body = await getBusinessQuality({ businessId, limit, windowDays });
     if (!body) {
       return NextResponse.json({ error: "No business." }, { status: 404 });
     }

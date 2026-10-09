@@ -1,7 +1,7 @@
 import { AdminOverviewPanel } from "@/components/AdminOverviewPanel";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { getAdminOverview } from "@/lib/admin";
-import { qualityBadges } from "@/lib/adminQuality";
+import { noQualityBadges, qualityBadges } from "@/lib/adminQuality";
 import { droppingAttentionRows } from "@/lib/adminQualityModel";
 import { logAdminError } from "@/lib/adminErrors";
 import { evaluatePlatformOps } from "@/lib/platformOps";
@@ -17,7 +17,7 @@ export default async function AdminOverviewPage() {
     [overview, ops, badges] = await Promise.all([
       getAdminOverview(),
       evaluatePlatformOps(),
-      qualityBadges(),
+      qualityBadges().catch(noQualityBadges("overview:quality")),
     ]);
   } catch (err) {
     logAdminError("overview", err);
