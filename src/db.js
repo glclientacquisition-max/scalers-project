@@ -2126,6 +2126,76 @@ async function findNotifySend({ tenantId, idempotencyKey } = {}) {
   return data || null;
 }
 
+function notifyRpcMissing(error) {
+  return /reserve_notify_send|settle_notify_send|does not exist|schema cache|could not find the function/i.test(
+    error?.message || ''
+  );
+}
+
+/**
+ * Reserve one notify send: pending notify_sends row + SMS units in one RPC.
+ * docs/supabase/notify_send_reserve_settle.sql. reason 'rpc_missing' means the
+ * SQL is not applied yet; callers fall back to the legacy consume + insert path.
+ */
+async function reserveNotifySend(params = {}) {
+  const { data, error } = await supabase.rpc('reserve_notify_send', {
+    p_tenant_id: params.tenantId || null,
+    p_idempotency_key: params.idempotencyKey,
+    p_kind: params.kind,
+    p_channel: params.channel,
+    p_recipient: params.recipient || null,
+    p_body: params.body || null,
+    p_units: Number.isFinite(Number(params.units)) ? Number(params.units) : null,
+    p_call_id: params.callId || null,
+    p_call_sid: params.callSid || null,
+    p_audience: params.audience || null,
+    p_billed_to: params.billedTo || null,
+    p_strict: Boolean(params.strict),
+  });
+  if (error) {
+    if (notifyRpcMissing(error)) return { ok: false, reason: 'rpc_missing' };
+    console.warn('[db] reserveNotifySend:', error.message);
+    return { ok: false, reason: 'rpc_failed' };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { ok: false, reason: 'rpc_failed' };
+  return {
+    ok: true,
+    id: row.send_id || null,
+    allowed: row.allowed === true,
+    replayed: row.replayed === true,
+    status: row.status || null,
+    outcome: row.outcome || null,
+    reason: row.reason || null,
+    overage: Boolean(row.overage),
+    heldUnits: Number(row.held_units) || 0,
+    attempts: Number(row.attempts) || 1,
+  };
+}
+
+/** Settle a reserved send: 'sent' or 'failed' (releases held SMS units). */
+async function settleNotifySend({ id, status, providerMessageId, failureReason } = {}) {
+  if (!id) return { ok: false, reason: 'invalid' };
+  const { data, error } = await supabase.rpc('settle_notify_send', {
+    p_send_id: id,
+    p_status: status,
+    p_provider_message_id: providerMessageId || null,
+    p_failure_reason: failureReason ? String(failureReason).slice(0, 200) : null,
+  });
+  if (error) {
+    if (notifyRpcMissing(error)) return { ok: false, reason: 'rpc_missing' };
+    console.warn('[db] settleNotifySend:', error.message);
+    return { ok: false, reason: 'rpc_failed' };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    ok: true,
+    status: row?.status || status,
+    replayed: row?.replayed === true,
+    releasedUnits: Number(row?.released_units) || 0,
+  };
+}
+
 async function consumeSmsUnits({ tenantId, units } = {}) {
   if (!tenantId) return { allowed: true, reason: 'no_tenant', overage: false };
   const need = Math.max(1, Number(units) || 1);
@@ -2320,6 +2390,8 @@ module.exports = {
   persistWhatsAppStatus,
   getWhatsAppSession,
   consumeSmsUnits,
+  reserveNotifySend,
+  settleNotifySend,
   getTenantCompletenessScore,
   getTenantHoldGate,
   listTenantFieldMeta,

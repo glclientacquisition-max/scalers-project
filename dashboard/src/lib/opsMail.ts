@@ -5,6 +5,13 @@ import {
   type OpsDnsRecord,
 } from "@/lib/platformOpsModel";
 
+import { getSupabaseAdmin } from "@/lib/supabase";
+import {
+  reserveNotifySend,
+  settleNotifySend,
+  type NotifyReservation,
+} from "@/lib/sendLedger";
+
 export { OPS_RESEND_DOMAIN, normalizeResendRecords };
 export type { OpsDnsRecord };
 
@@ -133,6 +140,11 @@ export async function sendOpsMail(opts: {
   to: string[];
   subject: string;
   text: string;
+  /**
+   * Platform ledger row (tenant null, billed_to platform). key must be stable
+   * per notice, e.g. ops:desk:<kind>:<open|recovered>:<hour>.
+   */
+  ledger?: { kind: string; key: string };
 }): Promise<{ sent: number; skipped: string }> {
   const apiKey = resendKey();
   const from = opsFromAddress();
@@ -140,22 +152,69 @@ export async function sendOpsMail(opts: {
   if (!apiKey || !from) return { sent: 0, skipped: "ops_mail_unconfigured" };
   if (!to.length) return { sent: 0, skipped: "no_recipients" };
 
-  const res = await fetch("https://api.resend.com/emails", {
+  const reservation = await reserveOpsMail(opts, to);
+  if (reservation?.mode === "reserved" && reservation.replayed) {
+    return { sent: 0, skipped: "already_sent" };
+  }
+
+  let res: Response;
+  try {
+    res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      from,
-      to,
-      subject: opts.subject,
-      text: opts.text,
-    }),
-  });
-  const json = (await res.json().catch(() => ({}))) as { message?: string };
+      body: JSON.stringify({
+        from,
+        to,
+        subject: opts.subject,
+        text: opts.text,
+      }),
+    });
+  } catch (err) {
+    await settleOpsMail(reservation, { ok: false, error: err instanceof Error ? err.message : "fetch_failed" });
+    throw err;
+  }
+  const json = (await res.json().catch(() => ({}))) as { message?: string; id?: string };
   if (!res.ok) {
+    await settleOpsMail(reservation, { ok: false, error: json.message || `resend_${res.status}` });
     throw new Error(json.message || `Ops mail failed (${res.status})`);
   }
+  await settleOpsMail(reservation, { ok: true, providerMessageId: json.id || null });
   return { sent: to.length, skipped: "" };
+}
+
+async function reserveOpsMail(
+  opts: { subject: string; text: string; ledger?: { kind: string; key: string } },
+  to: string[],
+): Promise<NotifyReservation | null> {
+  if (!opts.ledger?.key) return null;
+  try {
+    return await reserveNotifySend(getSupabaseAdmin(), {
+      tenantId: null,
+      key: opts.ledger.key,
+      kind: opts.ledger.kind,
+      channel: "email",
+      to: to.join(","),
+      body: `${opts.subject}\n\n${opts.text}`,
+      audience: "platform",
+      billedTo: "platform",
+    });
+  } catch (err) {
+    console.warn("[ops mail ledger]", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+async function settleOpsMail(
+  reservation: NotifyReservation | null,
+  outcome: { ok: boolean; providerMessageId?: string | null; error?: string | null },
+): Promise<void> {
+  if (!reservation) return;
+  try {
+    await settleNotifySend(getSupabaseAdmin(), reservation, outcome);
+  } catch (err) {
+    console.warn("[ops mail ledger]", err instanceof Error ? err.message : err);
+  }
 }

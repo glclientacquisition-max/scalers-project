@@ -6,9 +6,11 @@ const { EVENTS, renderCallerText, displayOwnerCallerName } = require('./events')
 const { parseNotifyChannels } = require('./notifyChannels');
 const {
   beginInstanceSend,
+  callerKey,
   claimTenantSms,
   durableSendClaim,
   recordNotifySend,
+  sendReserved,
   releaseInstanceFlight,
 } = require('./sendLedger');
 
@@ -116,6 +118,23 @@ async function dispatchCallerSms({ to, event, channels, ledger } = {}) {
     return { channel: null, reason: gate.reason };
   }
   try {
+    // Reserve -> send -> settle: a failed TextSMS send releases its units.
+    const reserved = await sendReserved(
+      {
+        ledger: { ...ledger, kind: event.kind },
+        key: callerKey(ledger || {}, event.kind, dest),
+        kind: event.kind,
+        channel: 'sms',
+        to: dest,
+        body,
+      },
+      () => sendSms({ to: dest, body })
+    );
+    if (!reserved.legacy) {
+      if (!reserved.sent) return { channel: null, reason: reserved.reason };
+      return { channel: 'sms', to: dest, result: reserved.result, body };
+    }
+    // Legacy path until reserve_notify_send is applied.
     const claim = await claimTenantSms({ ...ledger, kind: event.kind }, body);
     if (!claim.allowed) {
       return { channel: null, reason: claim.reason || 'sms_allowance_exhausted' };
