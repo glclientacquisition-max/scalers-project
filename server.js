@@ -359,6 +359,7 @@ const {
 } = require('./src/speech/toolHold');
 const { appendFinalPart, joinUtteranceParts } = require('./src/speech/utteranceJoin');
 const { queueToolOutcome, takeToolOutcome } = require('./src/conversation/toolOutcomeQueue');
+const { lineUnavailableXml } = require('./src/sautikit/inactiveTenantGate');
 const { coverageNextStepFor } = require('./src/conversation/coverageNextStep');
 const {
   createSpokenStreamBuffer,
@@ -1369,6 +1370,19 @@ async function handleVoiceIncoming(req, res) {
     if (telephonyReject) {
       console.warn(`[${callSid}] telephony wallet exhausted — reject`);
       return res.type('text/xml').send(telephonyReject);
+    }
+
+    // An archived or suspended business never takes the call: a short line-
+    // unavailable message and hang up, before Stream and before the call row
+    // (no minutes, no model, no outage alert). Fails open on lookup errors.
+    try {
+      const line = await db.inboundTenantLine({ toNumber, fromNumber });
+      if (line && line.closed === true) {
+        console.warn(`[${callSid}] tenant line closed (${line.reason}) tenant=${line.tenantId} — line unavailable, hang up`);
+        return res.type('text/xml').send(lineUnavailableXml());
+      }
+    } catch (lineErr) {
+      console.warn('[voice/incoming] tenant line check failed (answering):', lineErr?.message || lineErr);
     }
 
     const preTerminal = detectCallTermination(req.body, callSessionState).terminal;
