@@ -2,6 +2,9 @@
 // HD_48e5ce069c12: coverage_areas was dropped, so Gemini said Kitengela was
 // outside while the mouth says it is covered.
 
+// Fixtures here use P0 owner rows (no value_hash). An ambient FACT_HASH_MODE=on
+// in the shell must not flip them; hash-mode cases set the flag per test.
+delete process.env.FACT_HASH_MODE;
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { buildSystemPrompt } = require('../src/prompts');

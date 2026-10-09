@@ -3,14 +3,16 @@
  * Keep aligned with docs/platform/TENANT_FIELD_PROVENANCE.md.
  */
 
-const FIELD_PATH_PATTERNS: RegExp[] = [
+export const FIELD_PATH_PATTERNS: readonly RegExp[] = [
   /^identity\.(business_name|vertical|primary_phone|language|spoken_name|social_handles)$/,
   /^hours\.weekly_grid$/,
   /^locations\.branches$/,
-  /^policies\.(payment|deposit|returns|delivery|cancellation|warranty|other|coverage_areas|holds\.allowed)$/,
+  /^policies\.(payment|deposit|returns|delivery|cancellation|warranty|other|coverage_areas|holds|holds\.allowed)$/,
   /^payments\.methods$/,
-  /^catalog\.product\..+\.name$/,
-  /^catalog\.service\.\d+\.name$/,
+  // Products: sku, else 1-based position. Services: stable id (svc_… or uuid),
+  // else 1-based position (Brain's readers fall back to position).
+  /^catalog\.product\..+\.(name|price)$/,
+  /^catalog\.service\.[A-Za-z0-9_-]{1,64}\.(name|price|site_visit)$/,
   /^faqs\.\d+$/,
   /^team\.notify\.(whatsapp|email|channels)$/,
   /^assistant\.(agent_name|tone|language|tools)$/,

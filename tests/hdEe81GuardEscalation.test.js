@@ -1,6 +1,9 @@
 // Regression locks for HD_ee813bcf6248 (staging kitchen-sink 2e4b3669,
 // 2026-10-08 16:45-16:48 EAT). Every caller and model line below is from that
 // call's voice_turn_traces. Run: node --test tests/hdEe81GuardEscalation.test.js
+// Fixtures here use P0 owner rows (no value_hash). An ambient FACT_HASH_MODE=on
+// in the shell must not flip them; hash-mode cases set the flag per test.
+delete process.env.FACT_HASH_MODE;
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
