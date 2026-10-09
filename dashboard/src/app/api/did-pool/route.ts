@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { adminFacingError, logAdminError } from "@/lib/adminErrors";
+import { adminActorName } from "@/lib/adminActor";
+import { releasePoolNumber } from "@/lib/adminBusinessActions";
+import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
+import { adminFacingError, logAdminError, operatorError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import {
@@ -7,7 +10,6 @@ import {
   listDidPool,
   listPendingTenants,
   normalizeE164,
-  releaseAssignedDid,
 } from "@/lib/didPool";
 
 export async function GET() {
@@ -18,8 +20,7 @@ export async function GET() {
     const [pool, pendingBusinesses] = await Promise.all([listDidPool(), listPendingTenants()]);
     return NextResponse.json({ pool, pendingBusinesses, pendingTenants: pendingBusinesses });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: operatorError("did-pool", err, "Could not load the number pool.") }, { status: 500 });
   }
 }
 
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "release") {
-      const result = await releaseAssignedDid(String(body.e164 || ""));
+      const result = await releasePoolNumber(String(body.e164 || ""), await adminActorName());
       return NextResponse.json({ ok: true, ...result });
     }
 
@@ -81,6 +82,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (err) {
+    if (isAdminActionBlocked(err)) {
+      return NextResponse.json({ error: err.message, blocked: true }, { status: 409 });
+    }
     logAdminError("did-pool", err);
     return NextResponse.json(
       { error: adminFacingError(err, "Could not update the number pool.") },

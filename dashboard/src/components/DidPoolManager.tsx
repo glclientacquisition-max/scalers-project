@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import { BuyNumberPanel } from "@/components/BuyNumberPanel";
 import { Button } from "@/components/ui/Button";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Empty } from "@/components/ui/Empty";
 import { Field, Input } from "@/components/ui/Field";
 import { ListRow } from "@/components/ui/ListRow";
 import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { Stamp, type StampTone } from "@/components/ui/Stamp";
+import { releaseBlockReason } from "@/lib/adminBusinessModel";
 import type { DidPoolRow, PendingTenant } from "@/lib/didPool";
 
 type PoolFilter = "all" | "available" | "assigned";
@@ -42,6 +44,15 @@ function businessLabel(row: DidPoolRow) {
 
 function canRelease(status: string) {
   return status === "assigned" || status === "reserved";
+}
+
+/** Same rule as the server: a number live on an active business can't be released. */
+function releaseReason(row: DidPoolRow) {
+  return releaseBlockReason({
+    linked: Boolean(row.tenant_id && row.tenants),
+    businessName: row.tenants?.business_name,
+    isActive: row.tenants?.is_active,
+  });
 }
 
 export function DidPoolManager({
@@ -215,21 +226,43 @@ export function DidPoolManager({
               <ListRow
                 key={row.id}
                 title={row.e164}
-                preview={businessLabel(row) || row.notes || undefined}
+                preview={
+                  canRelease(row.status) && releaseReason(row)
+                    ? `Live on ${businessLabel(row)} · archive to release`
+                    : businessLabel(row) || row.notes || undefined
+                }
                 stamp={<Stamp tone={statusTone(row.status)}>{statusLabel(row.status)}</Stamp>}
                 actions={
                   canRelease(row.status) ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setReleaseTarget(row);
-                        setSheet("release");
-                      }}
-                    >
-                      Release
-                    </Button>
+                    releaseReason(row) ? (
+                      <>
+                        <span id={`release-why-${row.id}`} className="sr-only">
+                          {releaseReason(row)}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled
+                          title={releaseReason(row) || undefined}
+                          aria-describedby={`release-why-${row.id}`}
+                        >
+                          Release
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setReleaseTarget(row);
+                          setSheet("release");
+                        }}
+                      >
+                        Release
+                      </Button>
+                    )
                   ) : undefined
                 }
               />
@@ -334,43 +367,32 @@ export function DidPoolManager({
         )}
       </Sheet>
 
-      <Sheet
+      <ConfirmSheet
         open={sheet === "release"}
-        onOpenChange={(open) => {
-          if (!open) {
-            setReleaseTarget(null);
-            setSheet(null);
-          }
-        }}
-        title="Release this number?"
-        description={
-          releaseTarget
-            ? releaseLinked
-              ? `${releaseTarget.e164} returns to Available. ${releaseBusiness} waits.`
-              : `${releaseTarget.e164} returns to Available.`
-            : undefined
-        }
         theme="admin"
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setReleaseTarget(null);
-                setSheet(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="button" variant="danger" pending={pending} onClick={() => void confirmRelease()}>
-              Release
-            </Button>
-          </>
-        }
+        title="Release this number?"
+        confirmLabel="Release"
+        danger
+        pending={pending}
+        onClose={() => {
+          setReleaseTarget(null);
+          setSheet(null);
+        }}
+        onConfirm={() => void confirmRelease()}
       >
-        <p className="text-body text-ink-2">The pool row becomes Available.</p>
-      </Sheet>
+        {error ? (
+          <p className="pb-3 text-attention" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <p>
+          {releaseTarget
+            ? releaseLinked
+              ? `${releaseTarget.e164} returns to Available. ${releaseBusiness} waits for a new number.`
+              : `${releaseTarget.e164} returns to Available.`
+            : ""}
+        </p>
+      </ConfirmSheet>
     </>
   );
 }

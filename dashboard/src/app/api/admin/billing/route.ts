@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { adminActorName } from "@/lib/adminActor";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import {
   grantTenantPackageMinutes,
@@ -50,7 +51,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "business_id required" }, { status: 400 });
   }
 
-  const actor = String(body.actor || "ops").trim() || "ops";
+  // The signed-in Super Admin, never a typed name or a value from the request body.
+  const actor = await adminActorName();
   const note = String(body.note || "").trim();
 
   try {

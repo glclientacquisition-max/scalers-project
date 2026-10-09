@@ -74,7 +74,7 @@ export async function POST(request: Request) {
   } catch (err) {
     logAdminError("voices", err);
     const message = err instanceof Error ? err.message : "";
-    const error = /Voice id must be a Soniox UUID/i.test(message)
+    const error = /Voice id must be a .* UUID/i.test(message)
       ? "Voice id is not valid."
       : adminFacingError(err);
     return NextResponse.json({ error }, { status: 500 });
