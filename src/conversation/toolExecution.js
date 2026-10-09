@@ -619,11 +619,12 @@ function spokenWhenFor(hours, now = new Date()) {
     return null;
   }
   const slot = { type: 'datetime', iso: instant.toISOString(), tz: 'Africa/Nairobi', precision: 'time' };
-  return {
+  const spoken = {
     en: renderFact(slot, 'en', { now }),
     sw: renderFact(slot, 'sw', { now }),
     sheng: renderFact(slot, 'sheng', { now }),
   };
+  return spoken.en && spoken.sw && spoken.sheng ? spoken : null;
 }
 
 async function executeBrainTools({

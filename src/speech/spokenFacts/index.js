@@ -5,14 +5,16 @@
 // on the English voice). Brain hands Voice a typed line; Voice owns the
 // wording.
 //
-// Contract (agreed with Brain, 2026-10-09):
-//   renderFactLine({ template, lang: 'en'|'sw'|'sheng', slots }) -> string|null
-//   renderFact(slot, lang) -> string
-// Slots: datetime { type:'datetime', iso, tz:'Africa/Nairobi', precision:'day'|'time' },
-//        money { type:'money', minor, currency:'KES', mode?:'from'|'fixed'|'range', max_minor? },
-//        count { type:'count', n, unit }, or a plain string (names, services, places).
-// An unknown template or a missing required slot returns null; Brain then
-// falls back to its own src/conversation/factLine.js.
+// Contract: docs/specs/fact-lines.md (Brain, 58f31fb3 on brain/call-fixes-d199).
+//   renderFactLine({ template, lang: 'en'|'sw'|'sheng', slots, gate? }) -> string|null
+//   renderFact(slot, lang) -> string|null
+// Slot types: datetime { iso, precision: 'time'|'day'|'relative', text? },
+//             money { minor, max_minor?, currency, mode: 'exact'|'from'|'range' },
+//             string / enum (DB text as stored), id (never spoken).
+// Templates: visit_open, request_open, requested_at, saved_item, saved_none,
+// team_will_confirm, move_ok, visit_updated. An unknown template or a missing
+// required slot returns null; Brain then uses its src/conversation/factLine.js.
+// visit_updated never says "moved".
 //
 // HD_d199dbbf6b79: 09:00 was spoken "saa 9 asubuhi"; Kiswahili is
 // "saa tatu asubuhi" (src/conversation/swahiliClock.js).
@@ -86,13 +88,31 @@ function dayPhrase(p, nowParts, lang) {
   return dateWords(p, lang);
 }
 
+const EN_WEEKDAY_RE = new RegExp(`\\b(${WEEKDAY_EN.join('|')})\\b`, 'g');
+const EN_MONTH_RE = new RegExp(`\\b(${MONTH_EN.join('|')})\\b`, 'g');
+const EN_CLOCK_RE = /\b(\d{1,2})(?::(\d{2}))?\s*([AaPp])\.?\s?[Mm]\b\.?/g;
+
+/** A stored when_text read as is; in Kiswahili its clock and names are Kiswahili. */
+function renderWhenText(text, lang) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw || lang !== 'sw') return raw;
+  return raw
+    .replace(EN_CLOCK_RE, (full, h, m, ap) => {
+      const hour = Number(h);
+      if (!(hour >= 1 && hour <= 12)) return full;
+      return swahiliClock(((hour % 12) + (/p/i.test(ap) ? 12 : 0)) * 60 + Number(m || 0));
+    })
+    .replace(EN_WEEKDAY_RE, (day) => WEEKDAY_SW[WEEKDAY_EN.indexOf(day)])
+    .replace(EN_MONTH_RE, (month) => MONTH_SW[MONTH_EN.indexOf(month)]);
+}
+
 function renderDatetime(slot, lang, opts = {}) {
   const at = parseInstant(slot.iso);
-  if (!at) return '';
+  if (!at) return renderWhenText(slot.text, lang);
   const now = parseInstant(opts.now) || new Date();
   const p = eatParts(at);
   const n = eatParts(now);
-  if (opts.role === 'requested_at') {
+  if (opts.role === 'requested_at' || slot.precision === 'relative') {
     // When the caller asked: "jana jioni" / "yesterday at 4:47 PM".
     const diff = p.dayNumber - n.dayNumber;
     const rel = relativeDay(diff, lang);
@@ -131,7 +151,7 @@ function renderMoney(slot, lang) {
   if (String(slot.currency || 'KES').toUpperCase() !== 'KES') return '';
   const low = amountWords(slot.minor, lang);
   if (!low) return '';
-  const mode = slot.mode || 'fixed';
+  const mode = slot.mode === 'fixed' ? 'exact' : slot.mode || 'exact';
   if (mode === 'range' && slot.max_minor != null) {
     const high = amountWords(slot.max_minor, lang);
     if (!high) return '';
@@ -154,92 +174,180 @@ function renderCount(slot, lang) {
   return `${n} ${plural}`;
 }
 
+function isDatetime(slot) {
+  return slot.type === 'datetime' || (slot.type == null && !('minor' in slot) && ('iso' in slot || 'text' in slot || 'precision' in slot));
+}
+function isMoney(slot) {
+  return slot.type === 'money' || (slot.type == null && 'minor' in slot);
+}
+
 /**
- * One slot as spoken words. Plain strings pass through.
+ * One slot as spoken words. Strings pass through; typed slots render from the
+ * stored value (shape per docs/specs/fact-lines.md; a legacy `type` is read too).
  * @param {string|object} slot
  * @param {'en'|'sw'|'sheng'} lang
- * @param {{ now?: Date|string, role?: string }} [opts] role 'requested_at' speaks when it was asked.
- * @returns {string} '' when the slot cannot be rendered
+ * @param {{ now?: Date|string, role?: string }} [opts]
+ * @returns {string|null} null when the slot cannot be rendered
  */
 function renderFact(slot, lang = 'en', opts = {}) {
   const l = langOf(lang);
-  if (slot == null) return '';
-  if (typeof slot === 'string' || typeof slot === 'number') return String(slot).trim();
-  if (typeof slot !== 'object') return '';
-  if (slot.type === 'datetime') return renderDatetime(slot, l, opts);
-  if (slot.type === 'money') return renderMoney(slot, l);
-  if (slot.type === 'count') return renderCount(slot, l);
-  return '';
+  if (slot == null) return null;
+  let out = '';
+  if (typeof slot === 'string' || typeof slot === 'number') out = String(slot).trim();
+  else if (typeof slot !== 'object' || Array.isArray(slot)) out = '';
+  else if (isDatetime(slot)) out = renderDatetime(slot, l, opts);
+  else if (isMoney(slot)) out = renderMoney(slot, l);
+  else if (slot.type === 'count') out = renderCount(slot, l);
+  return out ? out.replace(/\s+/g, ' ').trim() : null;
 }
 
-const KIND_SW = { visit: 'ziara', hold: 'ombi', quote: 'ombi la bei' };
-const STATUS_EN = { requested: 'requested', confirmed: 'confirmed', scheduled: 'scheduled', pending: 'pending' };
-const REASK = {
-  time: { en: 'What time works for you?', sw: 'Saa ngapi inakufaa?', sheng: 'Time gani inakufaa?' },
-  day: { en: 'Which day works for you?', sw: 'Siku gani inakufaa?', sheng: 'Day gani inakufaa?' },
-  when: { en: 'What day and time works for you?', sw: 'Siku na saa gani inakufaa?', sheng: 'Day na time gani inakufaa?' },
-  place: { en: 'Where should we come?', sw: 'Tuje wapi?', sheng: 'Tukuje wapi?' },
-  service: { en: 'Which service do you need?', sw: 'Unahitaji huduma gani?', sheng: 'Unataka service gani?' },
-  name: { en: 'May I have your name?', sw: 'Naomba jina lako?', sheng: 'Niambie jina yako?' },
+const by = (lang, rows) => rows[lang];
+const oneOf = (value, allowed) => {
+  const v = String(value || '').toLowerCase();
+  return allowed.includes(v) ? v : null;
 };
+const and = (text, pre) => (text ? `${pre}${text}` : '');
 
 /**
- * Templates. Each returns one short sentence, or null when a required slot
- * is missing. s() renders a slot; has() tells whether it rendered.
+ * Templates (docs/specs/fact-lines.md). r: rendered slots; raw: slots as sent.
+ * Each returns one short sentence, or null.
  */
 const TEMPLATES = {
-  move_ok: { required: ['service', 'from', 'to'], render: ({ service, from, to }, lang) => ({
-    en: `Done, your ${service} visit is moved from ${from} to ${to}.`,
-    sw: `Sawa, ziara ya ${service} imehamishwa kutoka ${from} hadi ${to}.`,
-    sheng: `Poa, ${service} visit imesongezwa kutoka ${from} hadi ${to}.`,
-  })[lang] },
-  move_failed: { required: ['service'], render: ({ service }, lang) => ({
-    en: `I couldn't move your ${service} visit.`,
-    sw: `Sijaweza kuhamisha ziara ya ${service}.`,
-    sheng: `Sijaweza ku-move ${service} visit.`,
-  })[lang] },
-  book_ok: { required: ['service', 'when'], render: ({ service, when, place }, lang) => ({
-    en: `I've saved your ${service} visit request for ${when}${place ? `, in ${place}` : ''}.`,
-    sw: `Nimehifadhi ombi la ziara ya ${service} ${when}${place ? `, ${place}` : ''}.`,
-    sheng: `Nime-save ${service} visit request ${when}${place ? `, ${place}` : ''}.`,
-  })[lang] },
-  cancel_ok: { required: ['service'], render: ({ service, when }, lang) => ({
-    en: `I've cancelled your ${service} visit${when ? ` for ${when}` : ''}.`,
-    sw: `Nimeghairi ziara ya ${service}${when ? ` ya ${when}` : ''}.`,
-    sheng: `Nime-cancel ${service} visit${when ? ` ya ${when}` : ''}.`,
-  })[lang] },
-  note_ok: { required: [], render: (_, lang) => ({
-    en: "I've noted that for the team.",
-    sw: 'Nimeiandikia timu.',
-    sheng: 'Nime-note hiyo kwa team.',
-  })[lang] },
-  file_item: { required: ['kind', 'service'], render: ({ kind, service, when, requested_at: asked, status }, lang, raw) => {
-    const k = String(raw.kind || '').toLowerCase();
-    if (!KIND_SW[k]) return null;
-    if (k === 'visit') {
-      const st = STATUS_EN[String(raw.status || '').toLowerCase()];
-      return {
-        en: `You have a ${service} visit${st ? ` ${st}` : ''}${when ? ` for ${when}` : ''}.`,
-        sw: `Una ziara ya ${service}${when ? ` ${when}` : ''}.`,
-        sheng: `Uko na ${service} visit${when ? ` ${when}` : ''}.`,
-      }[lang];
-    }
-    const enKind = k === 'quote' ? 'quote request' : 'request';
-    return {
-      en: `You have a ${service} ${enKind}${asked ? ` from ${asked}` : ''}.`,
-      sw: `Una ${KIND_SW[k]} ya ${service}${asked ? ` ulilotuma ${asked}` : ''}.`,
-      sheng: `Uko na ${service} ${k === 'quote' ? 'quote' : 'request'}${asked ? ` ya ${asked}` : ''}.`,
-    }[lang];
-  } },
-  requested_when: { required: ['service', 'requested_at'], render: ({ service, requested_at: asked }, lang) => ({
-    en: `You asked for the ${service} ${asked}.`,
-    sw: `Uliomba ${service} ${asked}.`,
-    sheng: `Uli-request ${service} ${asked}.`,
-  })[lang] },
-  reask_slot: { required: ['slot'], render: (_, lang, raw) => {
-    const row = REASK[String(raw.slot || '').toLowerCase()];
-    return row ? row[lang] : null;
-  } },
+  visit_open: {
+    required: ['job', 'status'],
+    render: (r, lang, raw) => {
+      const status = oneOf(raw.status, ['requested', 'confirmed']);
+      if (!status) return null;
+      if (status === 'confirmed') {
+        return by(lang, {
+          en: `You have a ${r.job} visit confirmed${and(r.when, ' for ')}${and(r.place, ', in ')}.`,
+          sw: `Una ziara ya ${r.job} iliyothibitishwa${and(r.when, ', ')}${and(r.place, ', ')}.`,
+          sheng: `Uko na ${r.job} visit imeconfirmiwa${and(r.when, ', ')}${and(r.place, ', ')}.`,
+        });
+      }
+      return by(lang, {
+        en: `You have a ${r.job} visit request${and(r.when, ' for ')}${and(r.place, ', in ')}.`,
+        sw: `Una ombi la ziara ya ${r.job}${and(r.when, ', ')}${and(r.place, ', ')}.`,
+        sheng: `Uko na ${r.job} visit request${and(r.when, ', ')}${and(r.place, ', ')}.`,
+      });
+    },
+  },
+  request_open: {
+    required: ['kind', 'item'],
+    render: (r, lang, raw) => {
+      const kind = oneOf(raw.kind, ['enquiry', 'callback', 'hold', 'order']);
+      if (!kind) return null;
+      const when = and(r.when, ', ');
+      return by(lang, {
+        en: {
+          enquiry: `You have an open enquiry for ${r.item}${when}.`,
+          callback: `You have a callback request about ${r.item}${when}.`,
+          hold: `You have a hold on ${r.item}${when}.`,
+          order: `You have an order for ${r.item}${when}.`,
+        },
+        sw: {
+          enquiry: `Una ombi la ${r.item}${when}.`,
+          callback: `Una ombi la kupigiwa simu kuhusu ${r.item}${when}.`,
+          hold: `Una ${r.item} uliyoshikiliwa${when}.`,
+          order: `Una oda ya ${r.item}${when}.`,
+        },
+        sheng: {
+          enquiry: `Uko na enquiry ya ${r.item}${when}.`,
+          callback: `Uko na callback request kuhusu ${r.item}${when}.`,
+          hold: `Uko na hold ya ${r.item}${when}.`,
+          order: `Uko na order ya ${r.item}${when}.`,
+        },
+      })[kind];
+    },
+  },
+  requested_at: {
+    required: ['kind', 'job', 'requested_at'],
+    render: (r, lang, raw) => {
+      const kind = oneOf(raw.kind, ['visit', 'request']);
+      if (!kind) return null;
+      return by(lang, {
+        en: kind === 'visit' ? `You asked for the ${r.job} visit ${r.requested_at}.` : `You sent the ${r.job} request ${r.requested_at}.`,
+        sw: kind === 'visit' ? `Uliomba ziara ya ${r.job} ${r.requested_at}.` : `Ulituma ombi la ${r.job} ${r.requested_at}.`,
+        sheng: `Uli-request ${r.job}${kind === 'visit' ? ' visit' : ''} ${r.requested_at}.`,
+      });
+    },
+  },
+  saved_item: {
+    required: ['kind', 'job'],
+    render: (r, lang, raw) => {
+      const kind = oneOf(raw.kind, ['visit', 'request']);
+      if (!kind) return null;
+      if (kind === 'request') {
+        return by(lang, {
+          en: `I've saved a request for ${r.job}.`,
+          sw: `Nimehifadhi ombi la ${r.job}.`,
+          sheng: `Nime-save request ya ${r.job}.`,
+        });
+      }
+      if (raw.moved === true && r.when) {
+        return by(lang, {
+          en: `I've moved your ${r.job} visit to ${r.when}${and(r.place, ', in ')}.`,
+          sw: `Nimehamisha ziara ya ${r.job} hadi ${r.when}${and(r.place, ', ')}.`,
+          sheng: `Nime-move ${r.job} visit hadi ${r.when}${and(r.place, ', ')}.`,
+        });
+      }
+      return by(lang, {
+        en: `I've saved a ${r.job} visit request${and(r.when, ' for ')}${and(r.place, ', in ')}.`,
+        sw: `Nimehifadhi ombi la ziara ya ${r.job}${and(r.when, ', ')}${and(r.place, ', ')}.`,
+        sheng: `Nime-save ${r.job} visit request${and(r.when, ', ')}${and(r.place, ', ')}.`,
+      });
+    },
+  },
+  saved_none: {
+    required: [],
+    render: (_, lang) => by(lang, {
+      en: "I haven't saved anything new on this call yet.",
+      sw: 'Bado sijahifadhi kitu kipya kwenye simu hii.',
+      sheng: 'Bado sija-save kitu mpya kwa hii call.',
+    }),
+  },
+  team_will_confirm: {
+    required: [],
+    render: (_, lang) => by(lang, {
+      en: 'The team will confirm the time with you.',
+      sw: 'Timu itakuthibitishia muda.',
+      sheng: 'Team itaku-confirmia time.',
+    }),
+  },
+  move_ok: {
+    required: ['to_when'],
+    render: (r, lang) => by(lang, {
+      en: `Done, I've moved ${r.job ? `your ${r.job}` : 'that'} visit${and(r.from_when, ' from ')} to ${r.to_when}${and(r.place, ', in ')}.`,
+      sw: `Sawa, nimehamisha ziara${and(r.job, ' ya ')}${and(r.from_when, ' kutoka ')} hadi ${r.to_when}${and(r.place, ', ')}.`,
+      sheng: `Poa, nime-move ${r.job ? `${r.job} ` : ''}visit${and(r.from_when, ' kutoka ')} hadi ${r.to_when}${and(r.place, ', ')}.`,
+    }),
+  },
+  // Never "moved": the time did not change (place or notes only), or Brain
+  // could not pin it to a move.
+  visit_updated: {
+    required: [],
+    render: (r, lang) => {
+      if (r.to_when) {
+        return by(lang, {
+          en: `Okay, I've updated that visit to ${r.to_when}${and(r.place, ', in ')}.`,
+          sw: `Sawa, nimesasisha ziara hiyo iwe ${r.to_when}${and(r.place, ', ')}.`,
+          sheng: `Poa, nime-update hiyo visit iwe ${r.to_when}${and(r.place, ', ')}.`,
+        });
+      }
+      if (r.place) {
+        return by(lang, {
+          en: `Okay, I've updated that visit to ${r.place}.`,
+          sw: `Sawa, nimesasisha ziara hiyo iwe ${r.place}.`,
+          sheng: `Poa, nime-update hiyo visit iwe ${r.place}.`,
+        });
+      }
+      return by(lang, {
+        en: "Okay, I've updated that visit.",
+        sw: 'Sawa, nimesasisha ziara hiyo.',
+        sheng: 'Poa, nime-update hiyo visit.',
+      });
+    },
+  },
 };
 
 /**
@@ -250,13 +358,17 @@ const TEMPLATES = {
  */
 function renderFactLine(line, opts = {}) {
   if (!line || typeof line !== 'object') return null;
-  const spec = TEMPLATES[String(line.template || '')];
+  const spec = Object.prototype.hasOwnProperty.call(TEMPLATES, String(line.template || ''))
+    ? TEMPLATES[line.template]
+    : null;
   if (!spec) return null;
   const lang = langOf(line.lang);
   const raw = line.slots && typeof line.slots === 'object' ? line.slots : {};
   const rendered = {};
   for (const [key, value] of Object.entries(raw)) {
-    rendered[key] = renderFact(value, lang, { ...opts, role: key === 'requested_at' ? 'requested_at' : undefined });
+    if (typeof value === 'boolean') continue;
+    const text = renderFact(value, lang, { ...opts, role: key === 'requested_at' ? 'requested_at' : undefined });
+    if (text) rendered[key] = text;
   }
   for (const key of spec.required) {
     if (!rendered[key]) return null;
