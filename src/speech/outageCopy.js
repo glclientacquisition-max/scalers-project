@@ -8,7 +8,7 @@
 const OUTAGE_LINE_EN =
   'Hello. This line is on a short downtime. Please call back in a few minutes.';
 const OUTAGE_LINE_SW =
-  'Habari. Simu hii ina downtime fupi. Tafadhali piga tena baada ya dakika chache.';
+  'Habari. Simu hii haipatikani kwa muda mfupi. Tafadhali piga tena baada ya dakika chache.';
 
 function pickSpeechOutageLine(language) {
   const lang = String(language || 'en').toLowerCase();

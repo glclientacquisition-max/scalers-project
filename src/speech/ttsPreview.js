@@ -9,7 +9,7 @@ const { classifySonioxError } = require('./sonioxErrors');
 /**
  * Synthesize preview audio with the Scalers cloned voice.
  * @param {{ text: string, callLanguage?: string, language?: string, lexicon?: unknown, voiceId?: string }} opts
- * @returns {Promise<{ wav: Buffer, spokenText: string, language: string }>}
+ * @returns {Promise<{ wav: Buffer, pcm: Buffer, sampleRate: number, spokenText: string, language: string }>}
  */
 async function synthesizeTtsPreview(opts) {
   const rawText = String(opts.text || '').trim();
@@ -65,6 +65,8 @@ async function synthesizeTtsPreview(opts) {
   const wav = pcmToBrowserWav(pcm, SAMPLE_RATE);
   return {
     wav,
+    pcm,
+    sampleRate: SAMPLE_RATE,
     spokenText: prepared.text,
     language: prepared.language,
   };
