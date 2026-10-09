@@ -360,6 +360,7 @@ const {
 const { appendFinalPart, joinUtteranceParts } = require('./src/speech/utteranceJoin');
 const { queueToolOutcome, takeToolOutcome } = require('./src/conversation/toolOutcomeQueue');
 const { lineUnavailableResponse } = require('./src/sautikit/inactiveTenantGate');
+const { startLineUnavailableClipRefresh } = require('./src/sautikit/lineUnavailableAudio');
 const { coverageNextStepFor } = require('./src/conversation/coverageNextStep');
 const {
   createSpokenStreamBuffer,
@@ -6447,6 +6448,11 @@ server.listen(PORT, () => {
   if (process.env.SAUTIKIT_API_KEY) {
     startTelephonyWalletProbe();
     console.log(`✓ Telephony wallet probe scheduled (VOICE_TELEPHONY_WALLET_PROBE_MS)`);
+  }
+  // Line-unavailable clips for closed lines (#639): upload to SautiKit and
+  // keep the 7-day signed URLs fresh. No key/scope or no table: one warn, <Say>.
+  if (startLineUnavailableClipRefresh()) {
+    console.log(`✓ Line-unavailable clip refresh scheduled (VOICE_LINE_UNAVAILABLE_REFRESH_MS)`);
   }
   if (String(process.env.VOICE_PLATFORM_OPS_DRY_RUN || '').toLowerCase() === 'true') {
     console.log(`ℹ Platform ops alerts in DRY_RUN (log only)`);

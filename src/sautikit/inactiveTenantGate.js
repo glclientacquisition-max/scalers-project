@@ -14,21 +14,18 @@
 // no minutes, no outage alert. Any lookup error fails open (the gate never
 // blocks a live business because the database blinked).
 //
-// The message: <Play> of the en and sw clips when allow-listed CDN URLs are
-// configured, else <Say> with the same approved copy. Generic copy: no
-// business or agent name. The clips are dashboard/public/audio/
-// line-unavailable-{en,sw}.v1.wav (#642); downtime-* there are the outage
-// clips, never used here. Clip URL per language:
-//   VOICE_LINE_UNAVAILABLE_CLIP_URL_EN / _SW (full https URL), else
-//   VOICE_LINE_UNAVAILABLE_CLIP_BASE_URL + /audio/line-unavailable-<lang>.v1.wav
-//   (e.g. https://scalers-staging.vercel.app), else none (<Say>).
+// The message: <Play> of the en and sw clips, else <Say> with the same
+// approved copy. Generic copy: no business or agent name. The clips are
+// src/speech/pcm/line-unavailable-{en,sw}.v1.wav, uploaded to SautiKit (the
+// only supported way to give it audio) by lineUnavailableAudio.js; the signed
+// storage.sautikit.com URLs and expiries are read from voice_platform_audio.
+// downtime-* are the outage clips, never used here.
 //
 // Clip fallback. SautiKit reports no Play failure to us: a <Play> URL it
-// cannot fetch (host not on the workspace CDN allow-list, expired presigned
-// link, 404) is just silence before <Hangup/>. So a clip is only used when
-//   - the var is an https URL,
-//   - its host is in VOICE_PLAY_ALLOWED_HOSTS (comma list; default
-//     storage.sautikit.com, the host SautiKit's upload API returns), and
+// cannot fetch (expired presigned link, 404) is just silence before
+// <Hangup/>. So a clip is only used when
+//   - a stored, unexpired https URL exists for that language,
+//   - its host is storage.sautikit.com, and
 //   - a ranged GET (bytes=0-0, 1.5 s timeout) answers 200/206 with an audio
 //     or octet-stream type. GET, not HEAD: a presigned GET link refuses HEAD.
 // The probe result is cached per URL (ok 10 min, failure 1 min), so most
@@ -37,10 +34,6 @@
 // Same words as the recorded clips (approved copy).
 const LINE_UNAVAILABLE_EN = 'Hello. This line is not available right now. Thank you for calling.';
 const LINE_UNAVAILABLE_SW = 'Habari. Nambari hii haipatikani kwa sasa. Asante kwa kupiga.';
-const LINE_UNAVAILABLE_CLIP_PATHS = Object.freeze({
-  en: '/audio/line-unavailable-en.v1.wav',
-  sw: '/audio/line-unavailable-sw.v1.wav',
-});
 
 function digitsOf(value) {
   return String(value || '').replace(/\D/g, '');
@@ -93,20 +86,12 @@ function clipUrl(value) {
   return /^https:\/\/[^\s<>"]+$/i.test(url) ? url : '';
 }
 
-const DEFAULT_PLAY_HOSTS = ['storage.sautikit.com'];
+const { PLAY_HOST, storedClipUrls } = require('./lineUnavailableAudio');
+
 const PROBE_TIMEOUT_MS = 1500;
 const PROBE_OK_TTL_MS = 10 * 60 * 1000;
 const PROBE_FAIL_TTL_MS = 60 * 1000;
 const probeCache = new Map();
-
-function allowedPlayHosts(env = process.env) {
-  const raw = String(env.VOICE_PLAY_ALLOWED_HOSTS || '').trim();
-  if (!raw) return DEFAULT_PLAY_HOSTS.slice();
-  return raw
-    .split(',')
-    .map((h) => h.trim().toLowerCase())
-    .filter(Boolean);
-}
 
 function hostOf(url) {
   try {
@@ -121,9 +106,8 @@ function safeHost(url) {
   return hostOf(url) || 'invalid';
 }
 
-function hostAllowed(url, env = process.env) {
-  const host = hostOf(url);
-  return Boolean(host) && allowedPlayHosts(env).includes(host);
+function hostAllowed(url) {
+  return hostOf(url) === PLAY_HOST;
 }
 
 /**
@@ -155,13 +139,13 @@ async function probeClip(url, { fetchImpl = globalThis.fetch, timeoutMs = PROBE_
 /**
  * The clip URL to <Play>, or '' to <Say>. Never throws.
  * @param {string} raw
- * @param {{ env?: object, fetchImpl?: Function, now?: () => number, timeoutMs?: number, log?: Function }} [opts]
+ * @param {{ fetchImpl?: Function, now?: () => number, timeoutMs?: number, log?: Function }} [opts]
  */
-async function usableClipUrl(raw, { env = process.env, fetchImpl, now = Date.now, timeoutMs, log = console.warn } = {}) {
+async function usableClipUrl(raw, { fetchImpl, now = Date.now, timeoutMs, log = console.warn } = {}) {
   const url = clipUrl(raw);
   if (!url) return '';
-  if (!hostAllowed(url, env)) {
-    log(`[line-unavailable] clip host ${safeHost(url)} not in VOICE_PLAY_ALLOWED_HOSTS — using <Say>`);
+  if (!hostAllowed(url)) {
+    log(`[line-unavailable] clip host ${safeHost(url)} is not ${PLAY_HOST} — using <Say>`);
     return '';
   }
   const t = now();
@@ -182,24 +166,14 @@ function resetClipProbeCache() {
   probeCache.clear();
 }
 
-/** Configured clip URL for a language ('' when none). Not yet checked. */
-function configuredClipUrl(lang, env = process.env) {
-  const key = lang === 'sw' ? 'SW' : 'EN';
-  const explicit = String(env[`VOICE_LINE_UNAVAILABLE_CLIP_URL_${key}`] || '').trim();
-  if (explicit) return explicit;
-  const base = String(env.VOICE_LINE_UNAVAILABLE_CLIP_BASE_URL || '').trim().replace(/\/+$/, '');
-  if (!base) return '';
-  return `${base}${LINE_UNAVAILABLE_CLIP_PATHS[lang === 'sw' ? 'sw' : 'en']}`;
-}
-
 /**
  * The XML for a closed line: the en then sw message, then hang up.
  * Sync and unchecked: pass already-checked clips (see lineUnavailableResponse).
- * @param {{ env?: object, clips?: { en?: string, sw?: string } }} [opts]
+ * @param {{ clips?: { en?: string, sw?: string } }} [opts]
  */
-function lineUnavailableXml({ env = process.env, clips } = {}) {
-  const en = clipUrl(clips ? clips.en : configuredClipUrl('en', env));
-  const sw = clipUrl(clips ? clips.sw : configuredClipUrl('sw', env));
+function lineUnavailableXml({ clips } = {}) {
+  const en = clipUrl(clips && clips.en);
+  const sw = clipUrl(clips && clips.sw);
   const parts = [
     en ? `<Play>${escapeXml(en)}</Play>` : `<Say language="en-US">${escapeXml(LINE_UNAVAILABLE_EN)}</Say>`,
     sw ? `<Play>${escapeXml(sw)}</Play>` : `<Say language="sw-KE">${escapeXml(LINE_UNAVAILABLE_SW)}</Say>`,
@@ -209,33 +183,30 @@ function lineUnavailableXml({ env = process.env, clips } = {}) {
 }
 
 /**
- * The closed-line XML with each clip checked (allowed host + fetchable);
- * any clip that fails falls back to <Say> in its own language. Never throws.
+ * The closed-line XML with each stored clip checked (SautiKit host, unexpired,
+ * fetchable); any clip that fails falls back to <Say> in its own language.
+ * Never throws.
+ * @param {{ loadClipUrls?: () => Promise<{ en?: string, sw?: string }>, fetchImpl?: Function, now?: () => number, timeoutMs?: number, log?: Function }} [opts]
  */
 async function lineUnavailableResponse(opts = {}) {
-  const env = opts.env || process.env;
   try {
-    const [en, sw] = await Promise.all([
-      usableClipUrl(configuredClipUrl('en', env), { ...opts, env }),
-      usableClipUrl(configuredClipUrl('sw', env), { ...opts, env }),
-    ]);
-    return lineUnavailableXml({ env, clips: { en, sw } });
+    const load = opts.loadClipUrls || (() => storedClipUrls({ now: opts.now }));
+    const stored = (await load()) || {};
+    const [en, sw] = await Promise.all([usableClipUrl(stored.en, opts), usableClipUrl(stored.sw, opts)]);
+    return lineUnavailableXml({ clips: { en, sw } });
   } catch {
-    return lineUnavailableXml({ env, clips: { en: '', sw: '' } });
+    return lineUnavailableXml();
   }
 }
 
 module.exports = {
   LINE_UNAVAILABLE_EN,
   LINE_UNAVAILABLE_SW,
-  LINE_UNAVAILABLE_CLIP_PATHS,
-  configuredClipUrl,
   sameNumber,
   tenantLineState,
   lineUnavailableXml,
   lineUnavailableResponse,
   usableClipUrl,
   probeClip,
-  allowedPlayHosts,
   resetClipProbeCache,
 };

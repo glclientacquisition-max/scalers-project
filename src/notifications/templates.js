@@ -174,7 +174,9 @@ function platformOpsDegradeBody(kind = 'speech', detail = {}) {
       ? 'Reasoning'
       : kind === 'telephony'
         ? 'Phone line'
-        : 'Speech';
+        : kind === 'audio'
+          ? 'Phone audio'
+          : 'Speech';
   const lines = [
     `Scalers platform ${lane} is degraded.`,
     'Check /admin Platform board and Voice GET /healthz.',

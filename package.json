@@ -13,7 +13,7 @@
     "test:overlap": "node tests/overlapHold.test.js",
     "test:stream": "node tests/spokenStreamBuffer.test.js",
     "test:wiring": "node tests/voiceWiring.test.js",
-    "test:inactive-tenant": "node --test tests/inactiveTenantGate.test.js",
+    "test:inactive-tenant": "node --test tests/inactiveTenantGate.test.js tests/lineUnavailableAudio.test.js",
     "test:idle-nudge": "node --test tests/idleNudge.test.js tests/unfinishedHold.test.js",
     "test:speed-control": "node tests/speedControl.test.js",
     "test:naturalness": "node tests/naturalnessScore.test.js",

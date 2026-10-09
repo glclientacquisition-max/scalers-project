@@ -14,3 +14,7 @@ Runtime load order: in-memory warm cache, then `/tmp`, then these packaged files
 Do not commit espeak or Gemini stand-ins here.
 
 Staging warmed clone-voice clips on 2026-09-03 after Soniox credits landed (EN 174764 PCM bytes, SW 215724). Those files live in the running container only until this folder is filled.
+
+## Line-unavailable clips (not outage clips)
+
+`line-unavailable-en.v1.wav` and `line-unavailable-sw.v1.wav` are played (via SautiKit `<Play>`) to callers of an archived or suspended business, before any Stream (#639). Same voice and render path as the downtime clips. Voice uploads them to SautiKit and refreshes the signed URLs; see `src/sautikit/lineUnavailableAudio.js`. A new recording gets a new name (`.v2`).
