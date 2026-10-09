@@ -9,7 +9,7 @@ export type AdminLink = {
   exact: boolean;
   /** Phone: one of the bottom tabs, or a row in the More sheet. */
   phone: "tab" | "more";
-  /** No screen yet. Rendered as a quiet row with this line, never a dead link. */
+  /** No screen yet. Rendered as a quiet row with this line, never a dead link. None today. */
   pending?: string;
 };
 
@@ -25,13 +25,7 @@ export const ADMIN_LINKS: readonly AdminLink[] = [
   { href: "/admin/billing", label: "Billing", exact: false, phone: "tab" },
   { href: "/admin/numbers", label: "Numbers", exact: false, phone: "more" },
   { href: "/admin/platform", label: "Platform", exact: false, phone: "more" },
-  {
-    href: "/admin/activity",
-    label: "Activity",
-    exact: false,
-    phone: "more",
-    pending: "Not built yet. Admin actions are recorded from now on.",
-  },
+  { href: "/admin/activity", label: "Activity", exact: false, phone: "more" },
   { href: "/admin/voices", label: "Settings", exact: false, phone: "more" },
 ];
 

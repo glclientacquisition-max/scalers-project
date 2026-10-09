@@ -131,6 +131,7 @@ describe("requireSuperAdmin (server, before any data)", () => {
     ["dashboard/src/lib/platformOps.ts", "readPlatformOps"],
     ["dashboard/src/lib/adminToday.ts", "loadTodayCallCounts"],
     ["dashboard/src/lib/adminToday.ts", "businessesWithRecentCalls"],
+    ["dashboard/src/lib/adminActivity.ts", "loadAdminActivity"],
   ]) {
     it(`${fn} guards itself before reading data`, () => {
       const src = read(rel);

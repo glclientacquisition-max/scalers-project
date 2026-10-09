@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
+import { recordAdminAction } from "@/lib/adminAudit";
 import { releasePoolNumber } from "@/lib/adminBusinessActions";
 import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
 import { adminFacingError, logAdminError, operatorError } from "@/lib/adminErrors";
@@ -38,6 +39,12 @@ export async function POST(request: Request) {
         e164: String(body.e164 || ""),
         notes: typeof body.notes === "string" ? body.notes : undefined,
       });
+      await recordAdminAction({
+        actor: await adminActorName(),
+        action: "add_number",
+        before: null,
+        after: { number: (row as { e164?: string } | null)?.e164 ?? String(body.e164 || ""), pool: "available" },
+      });
       return NextResponse.json({ ok: true, row });
     }
 
@@ -57,6 +64,13 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
+      await recordAdminAction({
+        actor: await adminActorName(),
+        action: "assign_number",
+        businessId: tenantId,
+        before: { number: null },
+        after: { number: data },
+      });
       return NextResponse.json({ ok: true, e164: data });
     }
 
@@ -77,6 +91,13 @@ export async function POST(request: Request) {
         p_e164: e164,
       });
       if (error) throw error;
+      await recordAdminAction({
+        actor: await adminActorName(),
+        action: "assign_number",
+        businessId: tenantId,
+        before: { number: null },
+        after: { number: data || e164 },
+      });
       return NextResponse.json({ ok: true, e164: data });
     }
 

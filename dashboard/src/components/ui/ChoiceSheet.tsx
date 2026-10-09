@@ -19,6 +19,7 @@ export function ChoiceSheet<T extends string>({
   placeholder = "Choose",
   label,
   rowLabel,
+  theme = "desk",
 }: {
   id?: string;
   title: string;
@@ -29,6 +30,8 @@ export function ChoiceSheet<T extends string>({
   label?: string;
   /** When set, this control is the whole settings row: name, current value, chevron. */
   rowLabel?: string;
+  /** The drawer portals to body, so Super Admin passes its theme. */
+  theme?: "desk" | "admin";
 }) {
   const [open, setOpen] = useState(false);
   const current = options.find((opt) => opt.value === value);
@@ -67,6 +70,7 @@ export function ChoiceSheet<T extends string>({
         open={open}
         title={title}
         onOpenChange={setOpen}
+        theme={theme}
       >
         <ul>
           {options.map((opt) => {

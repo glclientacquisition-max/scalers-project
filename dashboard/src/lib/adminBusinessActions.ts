@@ -66,7 +66,7 @@ export async function releaseBusinessNumber(businessId: string, actor: string): 
   });
   if (error) throw error;
   const e164 = (data as string) || null;
-  await recordAdminAction({ actor, action: "release_number", businessId, detail: { e164 } });
+  await recordAdminAction({ actor, action: "release_number", businessId, before: { number: e164 }, after: { number: null }, detail: { e164 } });
   return e164;
 }
 
@@ -105,6 +105,8 @@ export async function releasePoolNumber(
     actor,
     action: "release_number",
     businessId: business?.id || null,
+    before: { number: e164, business: business?.id || null },
+    after: { number: e164, business: null, pool: "available" },
     detail: { e164 },
   });
   return { e164, releasedBusiness: Boolean(business) };
@@ -134,7 +136,15 @@ export async function archiveBusiness(businessId: string, actor: string, reason:
     { archived_at: new Date().toISOString(), archived_by: actor },
     { is_active: false },
   );
-  await recordAdminAction({ actor, action: "archive_business", businessId, detail: { reason, dated } });
+  await recordAdminAction({
+    actor,
+    action: "archive_business",
+    businessId,
+    reason,
+    before: { active: true },
+    after: { active: false, archive_date_saved: dated },
+    detail: { dated },
+  });
   return { dated };
 }
 
@@ -143,7 +153,13 @@ export async function restoreBusiness(businessId: string, actor: string) {
   if (!business) throw new AdminActionBlocked("This business no longer exists.");
   if (business.is_active !== false) throw new AdminActionBlocked("This business is not archived.");
   await updateTenant(businessId, { archived_at: null, archived_by: null }, { is_active: true });
-  await recordAdminAction({ actor, action: "restore_business", businessId });
+  await recordAdminAction({
+    actor,
+    action: "restore_business",
+    businessId,
+    before: { active: false, archived_at: business.archived_at || null },
+    after: { active: true },
+  });
 }
 
 /**
@@ -164,6 +180,8 @@ export async function deleteArchivedBusiness(businessId: string, actor: string, 
     actor,
     action: "delete_business",
     businessId,
+    before: { business_name: name, archived_at: business.archived_at || null },
+    after: null,
     detail: { business_name: name, archived_at: business.archived_at || null },
   });
   const { data, error } = await getSupabaseAdmin().rpc("remove_business_and_release_did", {

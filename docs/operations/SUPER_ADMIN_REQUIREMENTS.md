@@ -27,16 +27,21 @@ Requirements:
 ## Information architecture
 
 ```
-/admin                 Overview: status strip, KPIs, needs-you queue
-/admin/platform        Provider cards, infrastructure signals, ops mail
-/admin/packages        Packages, on-demand rates, assign (customer billing)
-/admin/wallets         Redirects to Businesses. Plan and charges live on the shop.
-/admin/businesses      All businesses + actions
-/admin/quality         Call quality. Worst first. Empty until traces are read.
+Nav (rail, md+):  Today · Businesses · Calls · Billing · Numbers · Platform · Activity · Settings
+Nav (phone):      Today · Businesses · Calls · Billing · More (Numbers, Platform, Activity, Settings)
+
+/admin                 Today: status line, Needs you, today's calls vs the same stretch last week. Reads only.
+/admin/businesses      All businesses + actions (assign, release when not live, archive, restore, delete after 30 days)
+/admin/quality         Calls nav item for now: call quality, worst first (traced calls only)
 /admin/quality/[business]  One business: calls, repeat failures, missed questions
 /admin/quality/call/[id]   One traced call
-/admin/numbers         Number pool (add / assign / release)
-/admin/voices          Voice catalog
+/admin/billing         Billing (packages, minutes, charging). Packages and the old Ledger route sit under it.
+/admin/packages        Packages, on-demand rates, assign (reached from Billing)
+/admin/wallets         Redirects to Businesses
+/admin/numbers         Number pool (add / assign / release). Live numbers can't be released.
+/admin/platform        Health, open notices, alert people and settings. Shows notices; sends nothing on load.
+/admin/activity        Every admin write: who, what, which business, before and after, when, why
+/admin/voices          Settings nav item for now: voice catalog
 ```
 
 Nav label for ops: **Admin** (not “DID pool”). Primary billing work starts on **Packages**. There is no Ledger tab. Plan (beta or on-demand) and charges sit on the Businesses shop. `/admin/wallets` redirects there.
@@ -62,7 +67,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 
 ### 2. Businesses (`/admin/businesses`)
 - Needs you: waiting businesses. Assign is a sheet (next available or pick).
-- List: one row per shop (number, package, money, stamp). Open the row for notify, package assign, ledger, release, remove. Type REMOVE to delete.
+- List: one row per shop (number, package, money, stamp). Open the row for notify, package assign, ledger, release (not on a live number), archive, restore, and Activity. Delete permanently 30 days after archive, typing the business name.
 - Search by business name or number. Copy says **business**, not tenant.
 
 ### 3. Numbers (`/admin/numbers`)
@@ -90,9 +95,13 @@ Business-owner nav stays: Calls · Business · Sign out.
 - List: name the desk hears, Live or Off, Default stamp. Voice id stays in the sheet.
 - Add and edit open a sheet (name, voice id, Live, Default). Remove confirms. Catalog rank stays in the database.
 
-### 7. Platform teardown / demo reset (one-time ops)
-- Ability to **remove Jirani Home Services** completely and leave `+254709221536` as **Available** in the pool for the next business.
-- Documented SQL + in-UI action with typed confirmation (`REMOVE`).
+### 7. Removing a business (Archive, then delete after 30 days)
+- **Never release, reassign, or re-point `+254709221536`.** It is Aris's live line (see `docs/STATUS.md`). The Jirani teardown that asked to free it is withdrawn.
+- A business on a live number can't have its number released. The Release control is off with the reason, and the server refuses it too.
+- Remove is **Archive**: the business goes inactive with a required reason and keeps its number. Archive doesn't stop calls on its own, so release the number afterwards if the line should go quiet.
+- Restore brings an archived business back.
+- **Delete permanently** opens 30 days after the archive date and needs the business name typed in a ConfirmSheet. It removes the business with its members, calls, and transcripts, and frees its number. The Activity row is written first and keeps the business name.
+- Every step shows in Activity with the operator, the reason, and before and after.
 
 ---
 
@@ -133,6 +142,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 - [ ] Ops can open `/admin` and see accurate platform KPIs.
 - [ ] Ops can list every business and see who is waiting for a number.
 - [ ] Ops can add a DID, assign it to a waiting business, and release it back to Available.
-- [ ] Jirani can be removed; `+254709221536` shows as Available and can be assigned to a new business.
+- [ ] A business can be archived with a reason, restored, and deleted for good 30 days after archive. `+254709221536` (Aris, live) is never released.
+- [ ] Every admin write shows in Activity: who, what, which business, before and after, when.
 - [ ] Business-owner login never sees Admin nav or `/admin` data.
 - [ ] UI copy says Business, not Tenant.
