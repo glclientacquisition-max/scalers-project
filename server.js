@@ -44,6 +44,13 @@ const {
   putGreetingPcm,
 } = require('./src/speech/greetingPcmCache');
 const { mergeIdentityLexicon } = require('./src/speech/pronunciationLexicon');
+const {
+  createInitialBurstGate,
+  prerollFilter,
+  pcmBytesToMs,
+} = require('./src/speech/greetingPreroll');
+const { buildNotifyOutcome, ownerAlreadyNotified } = require('./src/notifications/notifyOutcome');
+const { createGreetingWarmer, greetingWarmEnabled } = require('./src/speech/greetingWarm');
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
 const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
 const {
@@ -334,7 +341,6 @@ async function persistFirstForwardAcceptance(callSid, durationSeconds) {
 /** SautiKit UUID call_id → Stream session SID (HD_…) for recording attach. */
 const sidByProviderCallId = new Map();
 const providerCallIdBySid = new Map();
-const recordingFetchScheduled = new Set();
 const {
   analyzeCallerLanguage,
   dominantSonioxLanguage,
@@ -407,7 +413,8 @@ const {
 const {
   createToolHoldSession,
   fileReadFollowUp,
-  holdSpeaksAfterAck,
+  planHoldTiming,
+  toolStillRunningAfter,
   trimAckLead,
   turnRequestsTool,
 } = require('./src/speech/toolHold');
@@ -501,6 +508,9 @@ const {
   isRecordingEvent,
 } = require('./src/sautikit/recordingEvents');
 const { fetchCallRecording } = require('./src/sautikit/recordingFetch');
+const { createRecordingFetchScheduler } = require('./src/sautikit/recordingSchedule');
+const { createInboundDirectory, fastInboundEnabled } = require('./src/sautikit/inboundDirectory');
+const { createInboundCalls, completedIsCallSetup } = require('./src/sautikit/inboundCalls');
 const {
   summarizeHeaders,
   summarizeBody,
@@ -792,6 +802,32 @@ app.post('/internal/platform/ops-alert', async (req, res) => {
   return res.status(200).json({ ok: Boolean(result.ok), result });
 });
 
+/**
+ * Desk: re-render a tenant's greeting PCM after Identity / greeting / voice /
+ * hours edits so the next call plays it from cache. Body: { tenantId }.
+ */
+app.post('/internal/greeting-warm', async (req, res) => {
+  if (!voicePreviewAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!isSonioxTtsConfigured() || !greetingWarmEnabled()) {
+    return res.status(200).json({ ok: false, reason: 'greeting_warm_disabled' });
+  }
+  const tenantId = String(req.body?.tenantId || '').trim();
+  if (!tenantId) return res.status(400).json({ ok: false, reason: 'tenantId required' });
+  try {
+    const result = await greetingWarmer.warmTenant(tenantId);
+    return res.status(200).json({
+      ok: Boolean(result),
+      rendered: result?.rendered || 0,
+      dropped: result?.dropped || 0,
+      lines: result?.keys?.length || 0,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, reason: err?.message || String(err) });
+  }
+});
+
 /** Owner desk re-ping. Same dispatch as live escalate. Force retries after a failed notify. */
 app.post('/internal/desk/escalate', async (req, res) => {
   if (!voicePreviewAuthorized(req)) {
@@ -992,7 +1028,7 @@ function extractInboundCallFields(body = {}) {
   };
 }
 
-function shouldSkipMediaStream(callSessionState, body = {}, callSid = '') {
+function shouldSkipMediaStream(callSessionState, body = {}, callSid = '', opts = {}) {
   if (hasPendingLiveTransfer(callSid)) return true;
 
   const state = String(callSessionState || '').toLowerCase();
@@ -1009,7 +1045,11 @@ function shouldSkipMediaStream(callSessionState, body = {}, callSid = '') {
     body.isActive !== undefined ||
     body.direction !== undefined ||
     (durationSeconds != null && durationSeconds >= 0);
-  if (state === 'completed' && hasCallSetupFields) return false;
+  // Only for a sid that never got Stream: once answered, Completed with the
+  // same fields is the hangup (prod HD_d3900cbf2b2d, src/sautikit/inboundCalls.js).
+  const streamIssued =
+    opts.streamIssued != null ? Boolean(opts.streamIssued) : inboundCalls.streamIssuedFor(callSid);
+  if (state === 'completed' && hasCallSetupFields && !streamIssued) return false;
 
   // Stream already running / finished — never re-issue <Stream/>.
   const skipTokens = [
@@ -1128,21 +1168,37 @@ async function attachProviderRecording({
   return null;
 }
 
+// Inbound webhook state: sids that got Stream, background call-row writes,
+// and the cached DID -> tenant directory (prod HD_d3900cbf2b2d).
+const inboundCalls = createInboundCalls();
+// Greeting PCM rendered before calls ring (src/speech/greetingWarm.js).
+const greetingWarmer = createGreetingWarmer({
+  listTenantIds: async () => {
+    if (process.env.TENANT_ID) return [process.env.TENANT_ID];
+    const { rows } = await db.listInboundTenantRows();
+    return rows
+      .filter((r) => r && r.id && r.is_active !== false && !r.archived_at)
+      .map((r) => r.id);
+  },
+  getProfile: (tenantId) => db.getTenantProfile({ tenantId }),
+  createSession: ({ voiceId }) => createSonioxTtsSession({ callSid: 'greeting-warm', voiceId }),
+  log: (msg) => console.log(msg),
+});
+const inboundDirectory = createInboundDirectory({
+  loadTenants: () => db.listInboundTenantRows(),
+  defaultTenantId: process.env.TENANT_ID || null,
+  envDids: [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean),
+  log: (msg) => console.log(msg),
+});
+
+const recordingFetchScheduler = createRecordingFetchScheduler({
+  attach: (ids, source) =>
+    attachProviderRecording({ callSids: ids, fetchIfMissing: true, source }),
+  log: (msg) => console.warn(msg),
+});
+
 function scheduleRecordingFetch(callSids, source) {
-  const ids = [...new Set((callSids || []).map((id) => String(id || '').trim()).filter(Boolean))];
-  if (!ids.length) return;
-  const key = ids.join('|');
-  if (recordingFetchScheduled.has(key)) return;
-  recordingFetchScheduled.add(key);
-  setTimeout(() => {
-    attachProviderRecording({
-      callSids: ids,
-      fetchIfMissing: true,
-      source: `${source}+retry`,
-    }).catch((err) => {
-      console.warn(`[${source}] delayed recording fetch failed:`, err?.message || err);
-    });
-  }, 8000);
+  return recordingFetchScheduler.schedule(callSids, source);
 }
 
 /** Pull duration (seconds) from whatever field SautiKit used. */
@@ -1435,6 +1491,7 @@ async function maybeSendMissedTextback({ callSid, call }) {
 //    configs point at the tunnel root (logs showed POST / → 404 before).
 // ---------------------------------------------------------------------------
 async function handleVoiceIncoming(req, res) {
+  const webhookStartedAt = Date.now();
   try {
     const extracted = extractInboundCallFields(req.body);
     let fromNumber = extracted.fromNumber;
@@ -1444,15 +1501,43 @@ async function handleVoiceIncoming(req, res) {
     const callSid = extracted.callSid || `sautikit_call_${Date.now()}`;
     rememberProviderCallIds(callSid, req.body);
 
+    // Fast path: tenant DIDs, the owning tenant and the package gate come
+    // from the cached inbound directory, and the call row is written after
+    // Stream XML goes out. Prod HD_d3900cbf2b2d spent 2051 ms here on six
+    // sequential Supabase reads before answering (src/sautikit/inboundDirectory.js).
+    const fast = fastInboundEnabled();
+    let directoryHit = null;
+    if (fast) {
+      try {
+        directoryHit = await inboundDirectory.lookup(
+          { fromNumber, toNumber },
+          correctCallerCalleeNumbers
+        );
+      } catch (err) {
+        console.warn('[voice/incoming] inbound directory failed (legacy path):', err?.message || err);
+        directoryHit = null;
+      }
+    }
+
     // Load tenant DIDs and undo WebRTC/header flips before persisting.
     let tenantDids = [];
-    try {
-      tenantDids = await db.listActiveTenantDids();
-    } catch (err) {
-      console.warn('[voice/incoming] listActiveTenantDids failed:', err?.message || err);
-      tenantDids = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
+    let corrected;
+    if (directoryHit) {
+      tenantDids = directoryHit.tenantDids;
+      corrected = {
+        fromNumber: directoryHit.fromNumber,
+        toNumber: directoryHit.toNumber,
+        swapped: directoryHit.swapped,
+      };
+    } else {
+      try {
+        tenantDids = await db.listActiveTenantDids();
+      } catch (err) {
+        console.warn('[voice/incoming] listActiveTenantDids failed:', err?.message || err);
+        tenantDids = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
+      }
+      corrected = correctCallerCalleeNumbers({ fromNumber, toNumber, tenantDids });
     }
-    const corrected = correctCallerCalleeNumbers({ fromNumber, toNumber, tenantDids });
     if (corrected.swapped) {
       console.warn('[voice/incoming] caller/callee looked flipped (from matched tenant DID) — swapping', {
         before: { fromNumber, toNumber },
@@ -1480,8 +1565,18 @@ async function handleVoiceIncoming(req, res) {
     // A first webhook whose callSessionState is already "Completed" is still
     // call-set-up (it carries callerNumber/destinationNumber/isActive). Open
     // the stream, persist the call, and let the later Completed event close it.
+    // A Completed for a sid that already got Stream (memory, or a call row
+    // after a restart) is the hangup.
     const sid = extracted.callSid || callSid;
-    if (shouldSkipMediaStream(callSessionState, req.body, sid)) {
+    let streamIssued = inboundCalls.streamIssuedFor(sid);
+    if (!streamIssued && extracted.callSid && /completed/i.test(callSessionState)) {
+      try {
+        streamIssued = Boolean(await db.getCall(sid));
+      } catch {
+        /* unknown: keep the set-up reading */
+      }
+    }
+    if (shouldSkipMediaStream(callSessionState, req.body, sid, { streamIssued })) {
       const transferXml = consumeLiveTransferWebhook({
         callSid: sid,
         callSessionState,
@@ -1504,6 +1599,9 @@ async function handleVoiceIncoming(req, res) {
           durationSeconds: extractEventDurationSeconds(req.body),
           source: 'voice/incoming',
         }).catch(() => {});
+        // Prod posts every lifecycle edge to this route and never to
+        // /voice/events; fetch the provider recording from here too.
+        scheduleRecordingFetch(resolveAttachCallSids(req.body, [sid]), 'voice/incoming');
       }
       console.log('[voice/incoming] lifecycle edge — empty <Response/> (no re-Stream)');
       return res
@@ -1535,50 +1633,87 @@ async function handleVoiceIncoming(req, res) {
     }
 
     const preTerminal = detectCallTermination(req.body, callSessionState).terminal;
+    const scheduleSetupTerminal = () => {
+      // The setup webhook already says Completed. Do not mark the row
+      // complete before /ws/media has a chance to write transcript/state.
+      setTimeout(() => {
+        markCallTerminalFromWebhook({
+          callSid,
+          status: 'complete',
+          durationSeconds: extractEventDurationSeconds(req.body),
+          source: 'voice/incoming-setup-terminal',
+        }).catch(() => {});
+      }, 3000);
+    };
 
-    try {
-      const gate = await db.packageInboundOpen({ toNumber, fromNumber });
-      if (gate && gate.open === false) {
+    if (directoryHit) {
+      if (directoryHit.gate && directoryHit.gate.open === false) {
         console.warn(`[${callSid}] package exhausted — reject`);
         return res
           .type('text/xml')
           .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
       }
-    } catch (gateErr) {
-      console.warn(
-        '[voice/incoming] package gate failed (answering):',
-        gateErr?.message || gateErr
-      );
-    }
-
-    try {
-      await db.upsertCall({
-        callSid,
-        fromNumber: fromNumber || 'unknown',
-        toNumber,
-        provider: 'sautikit',
-      });
-      if (preTerminal) {
-        // The setup webhook already says Completed. Do not mark the row
-        // complete before /ws/media has a chance to write transcript/state.
-        setTimeout(() => {
-          markCallTerminalFromWebhook({
-            callSid,
-            status: 'complete',
-            durationSeconds: extractEventDurationSeconds(req.body),
-            source: 'voice/incoming-setup-terminal',
-          }).catch(() => {});
-        }, 3000);
-      }
-    } catch (dbErr) {
-      if (dbErr?.code === 'unassigned_did') {
+      if (directoryHit.unassigned) {
         console.warn(`[${callSid}] unassigned number — reject`);
         return res
           .type('text/xml')
           .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
       }
-      // Do not fail the webhook / Stream setup if DB is briefly unavailable.
-      console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
+      // Off the critical path. /ws/media awaits this before it reads the row.
+      const rowPromise = db
+        .upsertCall({
+          callSid,
+          fromNumber: fromNumber || 'unknown',
+          toNumber,
+          tenantId: directoryHit.tenantId || undefined,
+          provider: 'sautikit',
+        })
+        .then((row) => {
+          if (preTerminal) scheduleSetupTerminal();
+          return row;
+        })
+        .catch((dbErr) => {
+          console.error(
+            '[voice/incoming] background DB upsert failed (Stream already answered):',
+            dbErr?.message || dbErr
+          );
+          return null;
+        });
+      inboundCalls.trackRow(callSid, rowPromise, directoryHit.tenantId);
+    } else {
+      try {
+        const gate = await db.packageInboundOpen({ toNumber, fromNumber });
+        if (gate && gate.open === false) {
+          console.warn(`[${callSid}] package exhausted — reject`);
+          return res
+            .type('text/xml')
+            .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+        }
+      } catch (gateErr) {
+        console.warn(
+          '[voice/incoming] package gate failed (answering):',
+          gateErr?.message || gateErr
+        );
+      }
+
+      try {
+        await db.upsertCall({
+          callSid,
+          fromNumber: fromNumber || 'unknown',
+          toNumber,
+          provider: 'sautikit',
+        });
+        if (preTerminal) scheduleSetupTerminal();
+      } catch (dbErr) {
+        if (dbErr?.code === 'unassigned_did') {
+          console.warn(`[${callSid}] unassigned number — reject`);
+          return res
+            .type('text/xml')
+            .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+        }
+        // Do not fail the webhook / Stream setup if DB is briefly unavailable.
+        console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
+      }
     }
 
     const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${encodeURIComponent(callSid)}`;
@@ -1591,7 +1726,15 @@ async function handleVoiceIncoming(req, res) {
       continueUrl: buildVoiceTransferContinueUrl(req, callSid),
     });
 
+    inboundCalls.markStreamIssued(callSid);
     res.type('text/xml').send(twiml);
+    console.log(
+      `[voice/incoming][${callSid}] stream answered in ${Date.now() - webhookStartedAt}ms` +
+        ` path=${directoryHit ? 'fast' : 'legacy'}` +
+        (directoryHit
+          ? ` directory_ms=${directoryHit.lookupMs} directory_age_ms=${directoryHit.ageMs}${directoryHit.refreshed ? ' refreshed' : ''}`
+          : '')
+    );
   } catch (err) {
     console.error('[voice/incoming] Webhook handling failed:', err);
     res.sendStatus(500);
@@ -2367,6 +2510,12 @@ mediaWss.on('connection', (ws, req) => {
   let greetingSettled = false;
   /** First greeting PCM time (ms epoch), for the early-greeting wait ignore. */
   let greetingAudioAt = null;
+  // STT audio clock (ms of caller PCM sent to Soniox) at the greeting's first
+  // PCM. Words that started before it cannot barge the greeting
+  // (src/speech/greetingPreroll.js, prod HD_d3900cbf2b2d).
+  let greetingPrerollMs = null;
+  let sttAudioBytes = 0;
+  const inboundBurstGate = createInitialBurstGate();
   let fileNameAsksCommitted = 0;
   const firstForward = {
     greetingPlayed: false,
@@ -2383,6 +2532,7 @@ mediaWss.on('connection', (ws, req) => {
     firstForward.greetingLogged = true;
     firstForward.greetingPlayed = true;
     greetingAwaitingFirstPcm = false;
+    greetingPrerollMs = pcmBytesToMs(sttAudioBytes);
     const at = Date.now();
     greetingAudioAt = at;
     const logged = logConnectToGreetingPcm({
@@ -2431,6 +2581,8 @@ mediaWss.on('connection', (ws, req) => {
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
   let ttsLexiconOverrides = [];
+  /** Tenant words that split glued web/email labels ("aris" + "stationaries"). */
+  let ttsAddressTerms = [];
   /** Tenant-selected Soniox voice from curated catalog. */
   let tenantSonioxVoiceId = null;
   /** Voice id the live TTS websocket was opened with. */
@@ -2520,7 +2672,14 @@ mediaWss.on('connection', (ws, req) => {
 
   async function loadTenantPrompt() {
     try {
-      const profile = await db.getTenantProfile({ callSid: sessionCallSid });
+      // The webhook writes the call row after Stream XML (fast inbound path).
+      // Use the tenant it resolved, and let the row land before later reads.
+      const inboundTenantId = inboundCalls.tenantIdFor(sessionCallSid);
+      await inboundCalls.awaitRow(sessionCallSid, 2500);
+      const profile = await db.getTenantProfile({
+        callSid: sessionCallSid,
+        tenantId: inboundTenantId || undefined,
+      });
       await hydrateCallerMemory(profile, sessionCallSid);
       brainProfile = profile;
       businessName = profile.businessName || businessName;
@@ -2535,6 +2694,9 @@ mediaWss.on('connection', (ws, req) => {
       ttsLexiconOverrides = Array.isArray(profile.ttsLexicon)
         ? profile.ttsLexicon
         : [];
+      ttsAddressTerms = [profile.businessName, profile.spokenName].filter(
+        (v) => typeof v === 'string' && v.trim()
+      );
       tenantSonioxVoiceId = profile.sonioxVoiceId || null;
       if (sessionCallSid) {
         const parsedTools = parseAgentTools(profile.agentTools);
@@ -2787,6 +2949,7 @@ mediaWss.on('connection', (ws, req) => {
       : prepareForTts(text, {
           callLanguage,
           extraLexicon,
+          addressTerms: ttsAddressTerms,
         });
     tapSim('agent_text', { path: 'greeting', text: String(text || ''), spoken: prepared.text });
     voiceTrace.noteCall({
@@ -2835,7 +2998,7 @@ mediaWss.on('connection', (ws, req) => {
         !spoken.cancelled &&
         isGreetingCacheEnabled()
       ) {
-        putGreetingPcm(opts.greetingCacheKey, spoken.pcm);
+        putGreetingPcm(opts.greetingCacheKey, spoken.pcm, { tenantId: brainProfile?.id || null });
       }
       if (!streamed.chunks.length || spoken?.empty) return { ok: false, empty: true };
       return { ok: !spoken?.cancelled, sentences: streamed.chunks.length };
@@ -2872,16 +3035,28 @@ mediaWss.on('connection', (ws, req) => {
 
   async function speakToolHold(spoken) {
     if (!spoken?.speak || bargeInActive) return;
-    if (
-      spoken.kind === 'hold' &&
-      thinkingAckTurn &&
-      thinkingAckTurn === activeTurnTiming &&
-      !holdSpeaksAfterAck({ kind: spoken.kind, ackAtMs: thinkingAckAtMs })
-    ) {
-      console.log(
-        `[ws/media][${sidLabel()}] tool hold skipped after thinking-ack ${Date.now() - thinkingAckAtMs}ms: ${spoken.line}`
-      );
-      return;
+    if (spoken.kind === 'hold' && thinkingAckTurn && thinkingAckTurn === activeTurnTiming) {
+      const timing = planHoldTiming({ kind: spoken.kind, ackAtMs: thinkingAckAtMs });
+      if (timing.mode === 'skip') {
+        console.log(
+          `[ws/media][${sidLabel()}] tool hold skipped after thinking-ack ${Date.now() - thinkingAckAtMs}ms: ${spoken.line}`
+        );
+        return;
+      }
+      if (timing.mode === 'defer') {
+        const turnAtDefer = activeTurnTiming;
+        const slow = await toolStillRunningAfter(spoken.toolSettled, timing.delayMs);
+        if (!slow) {
+          console.log(
+            `[ws/media][${sidLabel()}] tool hold skipped (tool done <${timing.delayMs}ms after thinking-ack): ${spoken.line}`
+          );
+          return;
+        }
+        if (bargeInActive || activeTurnTiming !== turnAtDefer) return;
+        console.log(
+          `[ws/media][${sidLabel()}] tool hold after thinking-ack (tool still running ${timing.delayMs}ms): ${spoken.line}`
+        );
+      }
     }
     if (spoken.kind === 'hold') ackPlayedTurn = activeTurnTiming;
     await speakText(spoken.line, {
@@ -2990,6 +3165,7 @@ mediaWss.on('connection', (ws, req) => {
           language: opts.language,
           extraLexicon,
           spokenFacts: () => callSpokenFacts(sidLabel()),
+          addressTerms: ttsAddressTerms,
         });
     tapSim('agent_text', { path: opts.tracePath || (opts.isFiller ? 'filler' : 'speak'), text: String(text || ''), spoken: prepared.text });
     let fillerNote = null;
@@ -3068,7 +3244,7 @@ mediaWss.on('connection', (ws, req) => {
         spoken?.pcm?.length &&
         !spoken.cancelled
       ) {
-        putGreetingPcm(opts.greetingCacheKey, spoken.pcm);
+        putGreetingPcm(opts.greetingCacheKey, spoken.pcm, { tenantId: brainProfile?.id || null });
       }
       return { ok: true };
     } catch (err) {
@@ -4172,6 +4348,7 @@ mediaWss.on('connection', (ws, req) => {
             extraLexicon: ttsLexiconOverrides,
             spokenFacts: () => callSpokenFacts(sidLabel()),
             ...(structuredMouth ? { structured: true, lockedLanguage: structuredLock?.lang } : {}),
+            addressTerms: ttsAddressTerms,
           })
           .then((session) => {
             speakSession = session;
@@ -4224,6 +4401,7 @@ mediaWss.on('connection', (ws, req) => {
           extraLexicon: ttsLexiconOverrides,
           spokenFacts: () => callSpokenFacts(sidLabel()),
           ...(structuredMouth ? { structured: true, lockedLanguage: structuredLock?.lang } : {}),
+          addressTerms: ttsAddressTerms,
         });
         console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
         return speakSession;
@@ -4334,6 +4512,7 @@ mediaWss.on('connection', (ws, req) => {
             callLanguage,
             extraLexicon: typeof ttsLexiconOverrides !== 'undefined' ? ttsLexiconOverrides : [],
             spokenFacts: () => callSpokenFacts(sidLabel()),
+            addressTerms: ttsAddressTerms,
           });
           voiceTrace.noteTts({
             text: traced.text,
@@ -5065,6 +5244,18 @@ mediaWss.on('connection', (ws, req) => {
     considerTurnEnd(false);
   }
 
+  let lastPrerollSkipLogAt = 0;
+  function noteGreetingPrerollSkip(preroll, source) {
+    const now = Date.now();
+    if (now - lastPrerollSkipLogAt < 900) return;
+    lastPrerollSkipLogAt = now;
+    console.log(
+      `[ws/media][${sidLabel()}] barge skipped (greeting_preroll) src=${source} preroll_ms=${
+        greetingPrerollMs == null ? 'pending' : greetingPrerollMs
+      }: ${String(preroll.droppedText || '').slice(0, 80)}`
+    );
+  }
+
   function onSttEvent(evt) {
     if (evt.type === 'error') {
       const classified = evt.classified || classifySonioxError(evt.raw);
@@ -5105,11 +5296,24 @@ mediaWss.on('connection', (ws, req) => {
       if (isInterim && waitReprompt.armed() && text.length >= 3 && !looksLikeEcho(text)) {
         waitReprompt.arm();
       }
+      // While the greeting plays, only words that started after its first
+      // PCM can barge it. Earlier speech still queues for the first turn.
+      const preroll = prerollFilter(evt.tokens, {
+        prerollMs: greetingPrerollMs != null ? greetingPrerollMs : Infinity,
+        greetingPlaying: !greetingSettled && greetingStarted,
+      });
+      if (preroll.applied && preroll.droppedText) {
+        noteGreetingPrerollSkip(preroll, isInterim ? 'interim' : 'final');
+      }
 
       // Instant barge-in on accumulated interim tokens while TTS/LLM is busy.
       if (isInterim) {
         if (speaking || turnBusy) {
-          interimBargeText = mergeInterimHypothesis(interimBargeText, text);
+          if (preroll.preroll) return;
+          interimBargeText = mergeInterimHypothesis(
+            interimBargeText,
+            preroll.applied ? preroll.text : text
+          );
           const interimDecision = maybeBargeIn(interimBargeText, 'interim speech');
           if (callerEventClearsIdle(interimDecision)) {
             noteCallerSpeechForIdle(interimBargeText);
@@ -5139,7 +5343,9 @@ mediaWss.on('connection', (ws, req) => {
 
       // Finals: one turn-taking decision, then act.
       interimBargeText = '';
-      const decision = maybeBargeIn(text, 'final speech');
+      const decision = preroll.preroll
+        ? { interrupt: false, action: 'queue', queue: false, reason: 'greeting_preroll' }
+        : maybeBargeIn(preroll.applied ? preroll.text : text, 'final speech');
 
       if (decision.reason === 'early_greeting_wait') {
         voiceTrace.noteCall({
@@ -5486,6 +5692,11 @@ mediaWss.on('connection', (ws, req) => {
         }
 
         greetingAwaitingFirstPcm = true;
+        if (brainProfile?.id && greetingWarmEnabled()) {
+          // Cache miss: render it off-call so the next caller gets cached PCM
+          // even if this greeting is cut short (cancelled renders are not kept).
+          void greetingWarmer.warmTenant(brainProfile.id);
+        }
         const spoken = await speakGreetingSentences(spokenGreeting, {
           greetingCacheKey: found.key,
           extraLexicon: found.extraLexicon,
@@ -5616,8 +5827,22 @@ mediaWss.on('connection', (ws, req) => {
           `[ws/media] binary audio frame #${binaryFrames} (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
         );
       }
+      // The leading burst (audio SautiKit queued while the leg was set up)
+      // is drained so it cannot be transcribed late and barge the greeting.
+      const admitted = inboundBurstGate.admit(buf.length, {
+        greetingStarted: firstForward.greetingLogged,
+      });
+      if (!admitted.forward) {
+        console.log(
+          `[ws/media][${sidLabel()}] initial caller audio burst drained frame=${binaryFrames} bytes=${buf.length} total_ms=${inboundBurstGate.drainedMs}`
+        );
+        return;
+      }
       // Keep feeding STT during TTS so barge-in can fire; echo is filtered in onSttEvent.
-      if (stt) stt.sendAudio(buf);
+      if (stt) {
+        sttAudioBytes += buf.length;
+        stt.sendAudio(buf);
+      }
     } catch (err) {
       console.error(
         '[ws/media] message handler error (socket kept open):',
@@ -5669,6 +5894,13 @@ mediaWss.on('connection', (ws, req) => {
     }
     // Fallback: if SautiKit never posts call.completed, still leave the row finished.
     // Do not close the desk row while a cold Dial is waiting on Redirect.
+    if (sessionCallSid) {
+      // The hangup webhook may never reach /voice/events (prod posts to /).
+      scheduleRecordingFetch(
+        [sessionCallSid, providerCallIdBySid.get(sessionCallSid)],
+        'ws/media'
+      );
+    }
     if (sessionCallSid && !hasPendingLiveTransfer(sessionCallSid)) {
       // Caller-audio span, not socket lifetime: the socket can outlive the
       // caller by ~30 s (HD_b82fbfef7649). Fallback only; the carrier's wins.
@@ -5886,7 +6118,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     }
 
     await db.markEscalationSent(callSid);
-    await db.markWhatsappSent(callSid);
+    await db.markWhatsappSent(callSid, buildNotifyOutcome(sent));
     const liveOutcome = shapeEscalationNotifyOutcome({
       ok: true,
       soft: false,
@@ -5993,7 +6225,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
   }
 
   if (ownerNotifyInProgress.has(callSid)) return;
-  if (call.whatsapp_sent) return;
+  if (ownerAlreadyNotified(call)) return;
   ownerNotifyInProgress.add(callSid);
 
   try {
@@ -6032,7 +6264,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       ownerPhone: ownerNumber,
       ownerEmail,
     });
-    const { sent } = await dispatchToStaff({
+    const { sent, errors: notifyErrors } = await dispatchToStaff({
       recipients: inbox.recipients,
       body,
       lead,
@@ -6061,7 +6293,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       return;
     }
 
-    await db.markWhatsappSent(callSid);
+    await db.markWhatsappSent(callSid, buildNotifyOutcome(sent, notifyErrors));
     await db.mergeCallSummaryMeta({
       callSid,
       patch: {
@@ -6262,7 +6494,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
       ownerPhone: ownerNumber,
       ownerEmail,
     });
-    const { sent } = await dispatchToStaff({
+    const { sent, errors: staffNotifyErrors } = await dispatchToStaff({
       recipients: inbox.recipients,
       body,
       lead,
@@ -6277,7 +6509,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
           (result.to ? ` → ${result.to}` : '')
       );
       try {
-        await db.markWhatsappSent(callSid);
+        await db.markWhatsappSent(callSid, buildNotifyOutcome(sent, staffNotifyErrors));
         await db.mergeCallSummaryMeta({
           callSid,
           patch: {
@@ -6370,7 +6602,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
       ownerPhone: ownerNumber,
       ownerEmail,
     });
-    const { sent } = await dispatchToStaff({
+    const { sent, errors: staffNotifyErrors } = await dispatchToStaff({
       recipients: inbox.recipients,
       body,
       lead,
@@ -6385,7 +6617,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
           (result.to ? ` → ${result.to}` : '')
       );
       try {
-        await db.markWhatsappSent(callSid);
+        await db.markWhatsappSent(callSid, buildNotifyOutcome(sent, staffNotifyErrors));
         await db.mergeCallSummaryMeta({
           callSid,
           patch: {
@@ -7034,7 +7266,7 @@ async function applyToolsWithHold(callSid, parsed, hooks = {}) {
   if (session && session.phase !== 'cancelled') {
     const begun = session.begin();
     if (begun.speak && typeof hooks.onToolHold === 'function') {
-      holdSpeech = Promise.resolve(hooks.onToolHold(begun));
+      holdSpeech = Promise.resolve(hooks.onToolHold({ ...begun, toolSettled: toolPromise }));
     }
   }
   const [execution] = await Promise.all([toolPromise, holdSpeech]);
@@ -7541,6 +7773,12 @@ server.listen(PORT, () => {
     console.log(`🌐 PUBLIC_BASE_URL not set — Stream URLs use request Host header`);
   }
   console.log(`✓ Supabase database initialized`);
+  if (fastInboundEnabled()) {
+    // Warm the inbound directory so the first call never pays the read.
+    inboundDirectory.refresh().catch((err) =>
+      console.warn('[inbound-directory] warm failed (first call loads it):', err?.message || err)
+    );
+  }
   if (process.env.GEMINI_API_KEY) {
     console.log(`✓ GEMINI_API_KEY present (lazy-loaded on LLM use)`);
   } else {
@@ -7548,6 +7786,9 @@ server.listen(PORT, () => {
   }
   if (isSonioxConfigured()) {
     console.log(`✓ SONIOX_API_KEY present (STT on /ws/media)`);
+    if (isSonioxTtsConfigured() && greetingWarmEnabled()) {
+      greetingWarmer.start();
+    }
     if (isSonioxTtsConfigured()) {
       console.log(
         `✓ Soniox TTS enabled default voice=${resolveSonioxVoice()}`

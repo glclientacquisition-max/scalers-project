@@ -230,7 +230,7 @@ function createSonioxTtsSession({
 
   /**
    * Open a Soniox TTS stream that accepts incremental text chunks (LLM→TTS).
-   * @param {{ language?: string, callLanguage?: string, speed?: number, speedScale?: number, alreadyPrepared?: boolean, extraLexicon?: unknown, capture?: boolean, silent?: boolean }} [opts]
+   * @param {{ language?: string, callLanguage?: string, speed?: number, speedScale?: number, alreadyPrepared?: boolean, extraLexicon?: unknown, addressTerms?: unknown, capture?: boolean, silent?: boolean }} [opts]
    */
   async function beginSpeak(opts = {}) {
     if (closed) throw new Error('TTS session closed');
@@ -323,6 +323,7 @@ function createSonioxTtsSession({
             language: opts.language || language || undefined,
             extraLexicon: opts.extraLexicon,
             spokenFacts: opts.spokenFacts,
+            addressTerms: opts.addressTerms,
           });
       // No letterless piece, and a word gap between pieces of one stream
       // (src/speech/ttsBoundary.js).

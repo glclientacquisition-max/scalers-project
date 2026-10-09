@@ -6,6 +6,7 @@ const {
   parseLexiconOverrides,
 } = require('./pronunciationLexicon');
 const { expandPhones, expandSpokenForms } = require('./spokenForms');
+const { speakAddresses } = require('./spokenAddress');
 const { shouldRewriteSheng, rewriteShengForTts } = require('./shengRewrite');
 const { stripSpokenInstructionLeaks } = require('./spokenInstructionLeak');
 const { guardSpokenFacts } = require('./spokenFacts/guard');
@@ -265,7 +266,7 @@ function mergeExtraLexicon(extra) {
  * strip markup → Sheng rewrite → lexicon → money/time/days → phones → punctuation.
  *
  * @param {string} text
- * @param {{ callLanguage?: string, language?: string, extraLexicon?: unknown }} [opts]
+ * @param {{ callLanguage?: string, language?: string, extraLexicon?: unknown, addressTerms?: unknown }} [opts]
  * @returns {{ original: string, text: string, language: 'en'|'sw' }}
  */
 function prepareForTts(text, opts = {}) {
@@ -278,6 +279,11 @@ function prepareForTts(text, opts = {}) {
   const extras = mergeExtraLexicon(opts.extraLexicon);
 
   let spoken = stripMarkup(original);
+  // Web and email addresses in the caller's spoken form, before the lexicon
+  // so tenant say-forms still apply to the split words.
+  spoken = speakAddresses(spoken, {
+    terms: Array.isArray(opts.addressTerms) ? [...opts.addressTerms, ...extras] : extras,
+  });
   if (shouldRewriteSheng(spoken, opts.callLanguage)) {
     spoken = rewriteShengForTts(spoken);
   }

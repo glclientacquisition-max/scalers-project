@@ -83,6 +83,11 @@ function shapeCall(row) {
     recording_path: meta.recording_path || null,
     status: row.status || null,
     whatsapp_sent: Boolean(meta.whatsapp_sent),
+    owner_notified: Boolean(meta.owner_notified || meta.whatsapp_sent),
+    owner_notify_channels:
+      meta.owner_notify_channels && typeof meta.owner_notify_channels === 'object'
+        ? meta.owner_notify_channels
+        : null,
     owner_notify_kind: meta.owner_notify_kind || null,
     escalation_sent: Boolean(meta.escalation_sent),
     escalated_to: meta.escalated_to || null,
@@ -202,6 +207,33 @@ async function inboundTenantLine({ toNumber, fromNumber } = {}) {
     console.warn('[db] inboundTenantLine:', err?.message || err);
     return { closed: false, reason: 'lookup_failed', tenantId: null };
   }
+}
+
+/**
+ * Every tenant row the inbound webhook needs, in one query, for the cached
+ * inbound directory (src/sautikit/inboundDirectory.js). Optional columns
+ * fall back so an older schema still answers.
+ */
+async function listInboundTenantRows() {
+  const selects = [
+    'id, sautikit_virtual_number, is_active, archived_at, minutes_included, seconds_used, on_demand_usage_enabled',
+    'id, sautikit_virtual_number, is_active, minutes_included, seconds_used, on_demand_usage_enabled',
+    'id, sautikit_virtual_number, is_active',
+  ];
+  let lastError = null;
+  for (const columns of selects) {
+    const { data, error } = await supabase.from('tenants').select(columns);
+    if (!error) {
+      return {
+        rows: data || [],
+        packageColumns: /minutes_included/.test(columns),
+      };
+    }
+    lastError = error;
+    if (!/column|schema cache|does not exist/i.test(error.message || '')) break;
+  }
+  throwIfError('listInboundTenantRows', lastError);
+  return { rows: [], packageColumns: false };
 }
 
 /**
@@ -431,13 +463,29 @@ async function listRecentCallsFromNumber({ tenantId, callerNumber, sinceIso, lim
   return data || [];
 }
 
-async function markWhatsappSent(callSid) {
+/**
+ * Mark that staff were alerted for this call. Without an outcome (legacy
+ * callers) this still sets whatsapp_sent. With one, whatsapp_sent is true only
+ * when WhatsApp delivered; owner_notified and owner_notify_channels record
+ * what actually landed (src/notifications/notifyOutcome.js).
+ * @param {string} callSid
+ * @param {{ owner_notify_channels?: Record<string,string>, whatsapp_delivered?: boolean }} [outcome]
+ */
+async function markWhatsappSent(callSid, outcome) {
   const existing = await getCall(callSid);
   if (!existing) return false;
-  if (existing.whatsapp_sent) return false;
+  if (existing.whatsapp_sent || existing.owner_notified) return false;
 
   const meta = parseSummary(existing.summary);
-  meta.whatsapp_sent = true;
+  meta.owner_notified = true;
+  if (outcome && typeof outcome === 'object') {
+    meta.whatsapp_sent = outcome.whatsapp_delivered === true;
+    if (outcome.owner_notify_channels && typeof outcome.owner_notify_channels === 'object') {
+      meta.owner_notify_channels = { ...outcome.owner_notify_channels };
+    }
+  } else {
+    meta.whatsapp_sent = true;
+  }
 
   const { data, error } = await supabase
     .from('calls')
@@ -2467,6 +2515,7 @@ module.exports = {
   durationDecision,
   settleCallDuration,
   transcriptInsertRows,
+  listInboundTenantRows,
   upsertCall,
   saveCallerInfo,
   saveEscalation,

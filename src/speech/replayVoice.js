@@ -105,7 +105,11 @@ function speakModelText(modelText, ctx, caller) {
     });
   }
   const prepared = String(cut || '').trim()
-    ? prepareForTts(cut, { callLanguage: ctx.language })
+    ? prepareForTts(cut, {
+        callLanguage: ctx.language,
+        // Live voice splits glued web labels on the tenant's own words.
+        addressTerms: [ctx.profile?.businessName].filter((v) => v && v !== 'the business'),
+      })
     : { text: '', language: ctx.language, original: '' };
   if (prepared.text && prepared.text !== String(cut || '').trim()) {
     stages.push({

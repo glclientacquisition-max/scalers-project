@@ -229,7 +229,7 @@ const INBOX_ACTION_NOTIFY_KINDS = new Set(['appointment', 'service_request']);
  * Visit / hold / order / enquiry staff SMS already went. Do not also send a lead.
  */
 function staffInboxAlreadyNotified(call = {}) {
-  if (call.whatsapp_sent) return true;
+  if (call.owner_notified || call.whatsapp_sent) return true;
   return INBOX_ACTION_NOTIFY_KINDS.has(
     String(call.owner_notify_kind || '').toLowerCase()
   );

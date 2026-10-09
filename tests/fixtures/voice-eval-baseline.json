@@ -371,6 +371,20 @@
       },
       "nameAsks": 1
     },
+    "HD_d3900cbf2b2d": {
+      "score": 93.3,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 0,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 4
+      },
+      "nameAsks": 1
+    },
     "HD_e3fb94e1bd0d": {
       "score": 95.5,
       "checks": {
