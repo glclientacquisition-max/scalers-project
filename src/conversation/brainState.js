@@ -609,11 +609,25 @@ function observeCallerTurn(state, input = {}) {
     ) {
       next.conversation.rescheduleAsked = true;
     }
+    // HD_1b3a67ea7ee9 (8): a file ask before the name confirm ("About my
+    // booking") is pending; the confirm turn reads the file first.
+    if (!next.caller.nameConfirmed && fixesD199.fileHasRows(next) && fixesD199.looksLikeFileAsk(text)) {
+      next.conversation.fileAskPending = true;
+    }
+    // (7) Code-held asked flag: a name ask any mouth already spoke counts.
+    if (
+      next.caller.nameConfirmed !== true &&
+      next.caller.fileNameAskSpoken !== true &&
+      fixesD199.agentAskedFileName(input.lastAgentText, next.caller.fileNameAsked || next.returning?.fileOwnerName)
+    ) {
+      next.caller.fileNameAskSpoken = true;
+    }
     // (e) "Tulifika wapi na ile mambo yetu ya jana?" asks for the file.
     if (!Boolean(state?.caller?.nameConfirmed) && next.caller.nameConfirmed) {
       const prior = (next.conversation.answersReceived || []).slice(0, -1);
       if (prior.some((row) => fixesD199.looksLikeFileCatchUp(row))) {
         next.conversation.speakFileRead = true;
+        if (fixesD199.fileHasRows(next)) next.conversation.fileAskPending = true;
       }
     }
   }

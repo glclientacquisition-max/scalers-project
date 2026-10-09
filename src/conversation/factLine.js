@@ -14,6 +14,8 @@ const TEMPLATES = {
   team_will_confirm: { required: [], optional: [] },
   move_ok: { required: ['to_when'], optional: ['job', 'from_when', 'place'] },
   visit_updated: { required: [], optional: ['to_when', 'place'] },
+  confirm_identity_first: { required: [], optional: ['name', 'ask'] },
+  more_open: { required: ['count'], optional: [] },
 };
 
 let voiceRenderer;
@@ -32,6 +34,7 @@ function voice() {
 
 function present(value) {
   if (value == null) return false;
+  if (typeof value === 'boolean') return true;
   if (typeof value === 'string') return value.trim().length > 0;
   return true;
 }
@@ -168,6 +171,22 @@ function fallbackLine(line, now = new Date()) {
       const when = s('to_when');
       if (sw) return when ? `Sawa, nimebadilisha ziara hiyo iwe ${when}.` : 'Sawa, nimebadilisha ziara hiyo.';
       return when ? `Okay, I've updated that visit to ${when}.` : "Okay, I've updated that visit.";
+    }
+    case 'more_open': {
+      const n = Number(slots.count);
+      if (sw) return n === 1 ? 'Kuna kitu kingine kimoja cha zamani kwenye faili.' : `Kuna vitu ${n} vingine vya zamani kwenye faili.`;
+      return n === 1 ? 'There is one older open item on file too.' : `There are ${n} older open items on file too.`;
+    }
+    case 'confirm_identity_first': {
+      const name = s('name');
+      if (sw) {
+        return slots.ask === true && name
+          ? `Ngoja kwanza nithibitishe ninaongea na nani. Je, naongea na ${name}?`
+          : 'Ngoja kwanza nithibitishe ninaongea na nani.';
+      }
+      return slots.ask === true && name
+        ? `Let me just confirm who I'm speaking with. Am I speaking with ${name}?`
+        : "Let me just confirm who I'm speaking with first.";
     }
     default:
       return '';

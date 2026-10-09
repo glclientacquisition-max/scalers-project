@@ -905,6 +905,8 @@ function formatReturningCallerForPrompt(card) {
         ? `- Use: confirm once, "Am I speaking with ${fileWho || 'the name on this number'}?" Do not greet them as that name. Do not talk about visits yet. If they say no, ask who is speaking and do not read this file. If they confirm, answer what they just said. Do not read open visits, holds, callbacks, or orders on that turn.`
         : '- Use: do not ask who is speaking unless you are about to save something. Do not attach Open, Last, or History yet. Do not greet them as the file name. Answer what they just said.'
     );
+    const masked = maskedFileNote(card);
+    if (masked) lines.push(masked);
   } else if (!usable) {
     lines.push(
       '- Use: this speaker does not own the household file. Do not attach that visit or last reason.'
@@ -930,9 +932,31 @@ function formatReturningCallerForPrompt(card) {
   return lines.join('\n');
 }
 
+/**
+ * BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 6): the file is masked, not empty.
+ * The model must never hear "no visits" while the name is unconfirmed.
+ */
+function maskedFileNote(returning) {
+  if (!require('./callFixesD199').callFixesD199Enabled()) return '';
+  const has =
+    returning?.hasOpenRows === true ||
+    ['openRows', 'openVisits', 'openRequests'].some((k) => Array.isArray(returning?.[k]) && returning[k].length);
+  if (!has) return '';
+  return '- Caller file: MASKED until the name is confirmed, not empty. Do not tell the caller the file is empty or that nothing is on record. Confirm who is speaking first.';
+}
+
 function formatReturningFileForCallState(returning, opts = {}) {
   if (!returning || typeof returning !== 'object') return '';
   if (!speakerKnownOnFile(returning)) {
+    const masked = maskedFileNote(returning);
+    if (masked) return [formatUnboundReturningFile(returning, opts), masked].filter(Boolean).join('\n');
+    return formatUnboundReturningFile(returning, opts);
+  }
+  return formatBoundReturningFile(returning, opts);
+}
+
+function formatUnboundReturningFile(returning, opts = {}) {
+  {
     const who = returning.fileOwnerName || returning.name;
     if (returning.sharedLine) {
       return '- Caller file speaker: not bound. Shared line. Do not ask who is speaking unless you are about to save something. Do not use the file name. Do not attach Open or History. Answer what they just said.';
@@ -948,6 +972,9 @@ function formatReturningFileForCallState(returning, opts = {}) {
     }
     return '- Caller file speaker: not bound. Do not attach a visit until they say who they are. Answer what they just said.';
   }
+}
+
+function formatBoundReturningFile(returning, opts = {}) {
   if (!returningFileUsable(returning)) {
     const who = returning.boundName || returning.name || 'this speaker';
     const lines = [

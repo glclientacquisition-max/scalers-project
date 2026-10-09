@@ -139,12 +139,28 @@ function planCallerModelTurn(state, opts = {}) {
   // A held fragment the caller left hanging is answered by the model, never
   // by an early-return line (HD_72ab69cbab2b T1). The name ask stays due.
   if (line && opts.holdTimedOut === true) {
+    // BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 7): a substantive turn that came
+    // through the hold timer still gets the one file-name ask.
+    const fixes = require('./callFixesD199');
+    if (fixes.callFixesD199Enabled() && fixes.substantiveCallerTurn(latest)) {
+      return { runModel: false, line };
+    }
     return { runModel: true, line: '', nameAskDeferred: true };
   }
   // Staging listen: Gemini speaks the catalogue even when a file name is pending.
   // The name ask stays for the next turn. Flag off keeps the name-ask early return.
   if (line && geminiCatalogueEnabled() && freshCatalogueAsk(latest)) {
     return { runModel: true, line: '' };
+  }
+  // BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 7): a pure greeting or small talk
+  // is answered by the model; the one file-name ask waits for the first
+  // substantive turn. The prompt keeps the model from asking it.
+  if (
+    line &&
+    require('./callFixesD199').callFixesD199Enabled() &&
+    require('./dynamicSpeech').looksLikePhaticCallerTurn(latest)
+  ) {
+    return { runModel: true, line: '', nameAskDeferred: true };
   }
   if (line) return { runModel: false, line };
   return { runModel: true, line: '' };

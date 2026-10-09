@@ -218,6 +218,21 @@ function planVisitReadTurn({
       }
     }
   }
+  if (fixesOn && fileState && !messageOnly) {
+    // HD_1b3a67ea7ee9 (8): the confirm turn answers the file ask made before it.
+    const confirmRead = fixesD199.planConfirmFileRead(fileState, { language: languageOf(language), now });
+    if (confirmRead) {
+      return { runModel: false, line: confirmRead.line, lines: confirmRead.lines, cursor: { phase: 'done', page: 0 }, kind: 'confirm_read' };
+    }
+    // (6) Unconfirmed: the read result is masked, never empty.
+    if (
+      nameConfirmed !== true &&
+      fixesD199.fileMasked(fileState) &&
+      (lookup || more || history || fixesD199.looksLikeFileAsk(callerText))
+    ) {
+      return { runModel: true, line: '', cursor: current, masked: true, fileStatus: 'masked' };
+    }
+  }
   if (!lookup && !more && !history) return { runModel: true, line: '', cursor: current };
   if (nameJustConfirmed === true || nameConfirmed !== true) {
     return { runModel: true, line: '', cursor: current };

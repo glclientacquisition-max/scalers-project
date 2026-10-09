@@ -417,13 +417,32 @@ function planFileAnswer({ text = '', state = {}, language = 'en', now = new Date
   return null;
 }
 
-/** Open-file read: every open visit (today's included), then requests and holds. */
+const OPEN_READ_REQUESTS = 4;
+
+function rowIsPast(row) {
+  return row.past === true || /^past\b/i.test(String(row.when || ''));
+}
+
+/**
+ * Open-file read: every current open visit (today's included), then the
+ * newest open requests and holds (up to OPEN_READ_REQUESTS), then more_open
+ * with the count of older open rows left out (past-dated or over the cap).
+ */
 function openFileRead(state, language = 'en', { now = new Date() } = {}) {
   const rows = Array.isArray(state?.returning?.openRows) ? state.returning.openRows : [];
   if (!rows.length) return null;
-  const visits = rows.filter((row) => row.kind === 'visit');
-  const requests = rows.filter((row) => row.kind === 'request');
-  const rendered = renderLines([...visits, ...requests].map((row) => fileRowLine(row, language)), { now });
+  const visits = rows.filter((row) => row.kind === 'visit' && !rowIsPast(row));
+  const requests = rows
+    .filter((row) => row.kind === 'request' && !rowIsPast(row))
+    .slice()
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  const spoken = [...visits, ...requests.slice(0, OPEN_READ_REQUESTS)];
+  const lines = spoken.map((row) => fileRowLine(row, language));
+  const left = rows.length - spoken.length;
+  if (left > 0) {
+    lines.push(factLine('more_open', { count: left }, { lang: language, gate: { open_rows: rows.length, spoken: spoken.length } }));
+  }
+  const rendered = renderLines(lines, { now });
   return rendered.line ? rendered : null;
 }
 
@@ -462,6 +481,108 @@ function updateResultLines(results = [], language = 'en', { newTimeLabel = null 
   return lines.filter(Boolean);
 }
 
+// ------------------------------------------- HD_1b3a67ea7ee9 (6)(7)(8): masked file
+
+/** The caller file has open visits or requests (rows loaded at call start). */
+function fileHasRows(state) {
+  const returning = state?.returning;
+  if (!returning) return false;
+  if (returning.hasOpenRows === true) return true;
+  const rows = returning.openRows;
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+/** Masked: the file has rows and the speaker is not confirmed yet. Never empty. */
+function fileMasked(state) {
+  return state?.caller?.nameConfirmed !== true && fileHasRows(state);
+}
+
+const NO_RECORD_CLAIM =
+  /\b(?:no|zero)\s+(?:open\s+|saved\s+|existing\s+|current\s+|other\s+)?(?:bookings?|records?|visits?|appointments?|reservations?|requests?)\b|\b(?:don'?t|do not|can'?t|cannot|couldn'?t|could not)\s+(?:see|find|have|locate)\s+(?:any(?:thing)?\s+)?(?:bookings?|records?|visits?|appointments?|on file|under)\b|\bnothing\s+(?:saved|booked|on file|under (?:this|your) number)\b|\b(?:isn'?t|is not|aren'?t|are not)\s+(?:a |any )?(?:bookings?|records?|visits?|appointments?)\b|\bhakuna\s+(?:booking|bookings|ziara|rekodi|miadi|oda|ombi)\b|\bsina\s+(?:rekodi|booking|ziara)\b|\bhujaweka\s+(?:booking|ziara)\b/i;
+
+/** A sentence that says there is no booking, record or visit on file. */
+function claimsNoRecord(sentence) {
+  return NO_RECORD_CLAIM.test(String(sentence || ''));
+}
+
+const FILE_ASK =
+  /\b(?:(?:about|for|on|check|with)\s+)?my\s+(?:book|booking|bookings|visit|visits|appointment|appointments|order|hold|request)\b|\b(?:booking|ziara|oda|miadi)\s+yangu\b/i;
+
+/** The caller asks about what is on their file ("About my book."). */
+function looksLikeFileAsk(text) {
+  const raw = String(text || '');
+  if (FILE_ASK.test(raw) || looksLikeFileCatchUp(raw)) return true;
+  try {
+    // eslint-disable-next-line global-require
+    return require('./openLineSpeech').looksLikeOpenVisitLookup(raw);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * First substantive turn: not a pure greeting or small talk, not a held
+ * fragment ("I was asking—"). "About my book." is substantive.
+ */
+function substantiveCallerTurn(text) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return false;
+  if (/(?:[—–-]|,|\.\.\.|…)\s*$/.test(raw)) return false;
+  // eslint-disable-next-line global-require
+  const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
+  if (looksLikePhaticCallerTurn(raw)) return false;
+  const words = raw.toLowerCase().split(/[^\p{L}\p{N}']+/u).filter(Boolean);
+  const content = words.filter((w) => !/^(?:i|i'm|was|is|am|a|the|uh|um|eh|so|and|ah|oh|ok|okay|yes|yeah|no|hi|hello|hey|habari|yako|sasa|mambo|nzuri|sawa|asking|nilikuwa|nauliza)$/.test(w));
+  return content.length >= 1 && words.length >= 2;
+}
+
+const IDENTITY_ASK_SPOKEN =
+  /\b(?:am i speaking with|is this|naongea na|ninaongea na|unaongea na|ni wewe)\s+(\p{L}[\p{L}'-]*)/iu;
+
+/** The agent line asked "Am I speaking with {pending}?" (any mouth). */
+function agentAskedFileName(agentText, pendingName) {
+  const name = String(pendingName || '').trim().toLowerCase();
+  if (!name) return false;
+  const m = IDENTITY_ASK_SPOKEN.exec(String(agentText || ''));
+  return Boolean(m && m[1].toLowerCase() === name.split(/\s+/)[0]);
+}
+
+/**
+ * confirm_identity_first (docs/specs/fact-lines.md): replaces a dropped
+ * no-record claim while the file is masked. ask: the name ask is still due
+ * (never asked on this call); it is then marked asked (code-held flag).
+ */
+function confirmIdentityFirst(state, language = 'en', { askAllowed = true } = {}) {
+  const name = String(state?.caller?.fileNameAsked || state?.returning?.fileOwnerName || '').trim();
+  const ask = askAllowed && state?.caller?.fileNameAskSpoken !== true && Boolean(name);
+  const line = factLine(
+    'confirm_identity_first',
+    { name: name || undefined, ask },
+    { lang: language, gate: { file_masked: true, open_rows: (state?.returning?.openRows || []).length } }
+  );
+  const rendered = renderLines([line]);
+  if (ask && rendered.line && state?.caller) {
+    state.caller.fileNameAskSpoken = true;
+    if (state.conversation) state.conversation.fileNameAskTurn = Number(state.conversation.turnCount || 0);
+  }
+  return rendered;
+}
+
+/**
+ * (8) On the name-confirm turn, a file ask made before the confirm ("About my
+ * booking") is answered first: visit_open lines (then requests), before any
+ * other content. Clears the pending ask.
+ */
+function planConfirmFileRead(state, { language = 'en', now = new Date() } = {}) {
+  if (!callFixesD199Enabled()) return null;
+  if (state?.caller?.nameJustConfirmed !== true) return null;
+  if (state?.conversation?.fileAskPending !== true) return null;
+  const read = openFileRead(state, language, { now });
+  if (!read) return null;
+  state.conversation.fileAskPending = false;
+  return { ...read, kind: 'confirm_read' };
+}
+
 module.exports = {
   FLAG,
   callFixesD199Enabled,
@@ -483,4 +604,12 @@ module.exports = {
   openFileRead,
   savedReadbackLine,
   updateResultLines,
+  fileHasRows,
+  fileMasked,
+  claimsNoRecord,
+  looksLikeFileAsk,
+  substantiveCallerTurn,
+  agentAskedFileName,
+  confirmIdentityFirst,
+  planConfirmFileRead,
 };

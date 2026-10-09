@@ -185,7 +185,7 @@ describe('HD_d199dbbf6b79 replay, BRAIN_CALL_FIXES_D199=on', () => {
       assert.match(all.line, /^You have a Carpet Cleaning visit request, today, 9 AM, Kitengela\./);
       assert.deepEqual(
         [...new Set(all.lines.map((l) => l.template))],
-        ['visit_open', 'request_open']
+        ['visit_open', 'request_open', 'more_open']
       );
       assert.match(all.line, /Mansion Cleaning Custom Quote/);
       // t8 "ile carpet cleaning ... ya Kitengela" reads that one visit.
