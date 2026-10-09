@@ -522,3 +522,28 @@ describe('voice score', () => {
     assert.ok(replay.turns[0].stages.some((row) => row.stage === 'tts'));
   });
 });
+
+describe('voice score honesty', () => {
+  it('returns a null score and null diagnosis for a call with 0 turns', () => {
+    const card = scoreTurns([]);
+    assert.equal(card.score, null);
+    assert.equal(diagnoseCall(card), null);
+  });
+
+  it('returns a null score and null diagnosis when every turn is unlogged', () => {
+    const card = scoreTurns([
+      { ...turn('habari', ''), turnIndex: 1, stages: [{ stage: 'outcome', value: 'unlogged' }] },
+      { ...turn('niko Kilimani', ''), turnIndex: 2, stages: [{ stage: 'outcome', value: 'unlogged' }] },
+    ]);
+    assert.equal(card.turns.length, 2);
+    assert.ok(card.turns.every((row) => row.omit));
+    assert.equal(card.score, null);
+    assert.equal(diagnoseCall(card), null);
+  });
+
+  it('still scores and diagnoses a call with one logged turn', () => {
+    const card = scoreTurns([turn('Ni huduma gani?', 'Tuna usafi wa nyumba.', { callerLang: 'sw', ttsLang: 'sw' })]);
+    assert.equal(typeof card.score, 'number');
+    assert.equal(diagnoseCall(card), 'No failed checks.');
+  });
+});

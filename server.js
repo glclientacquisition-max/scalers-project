@@ -2266,10 +2266,12 @@ mediaWss.on('connection', (ws, req) => {
     fillerStreamId = streamId;
     activeOutboundStreamId = streamId;
     if (activeTurnTiming) activeTurnTiming.markFirstPcm();
-    if (trace) {
-      voiceTrace.noteFiller({ text: String(text || ''), before: String(text || ''), language: callLanguage });
-    }
-    if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
+    const fillerNote = trace
+      ? voiceTrace.noteFiller({ text: String(text || ''), before: String(text || ''), language: callLanguage })
+      : null;
+    const sent = ws.readyState === WebSocket.OPEN;
+    if (sent) sendPcmToMedia(ws, pcm);
+    fillerNote?.settle?.(sent);
     const waitMs = pcmDurationMs(pcm, 16000);
     await sleep(waitMs);
     if (activePlaybackGeneration === gen) {
@@ -2278,7 +2280,7 @@ mediaWss.on('connection', (ws, req) => {
       if (fillerStreamId === streamId) fillerStreamId = null;
       if (!speechOutageStarted) releaseQueuedCallerSpeech(gen);
     }
-    return { ok: true, cached: true };
+    return { ok: sent, cached: true };
   }
 
   async function speakThinkingAck(fillerText) {
@@ -2549,8 +2551,10 @@ mediaWss.on('connection', (ws, req) => {
       language: opts.language,
       extraLexicon,
     });
+    let fillerNote = null;
+    let fillerPlayed = false;
     if (opts.isFiller) {
-      voiceTrace.noteFiller({
+      fillerNote = voiceTrace.noteFiller({
         text: prepared.text,
         before: String(text),
         language: prepared.language,
@@ -2604,6 +2608,7 @@ mediaWss.on('connection', (ws, req) => {
         return { ok: false, empty: true };
       }
       const spoken = await session.end();
+      fillerPlayed = !spoken?.cancelled;
       if (
         opts.isFiller &&
         opts.fillerCacheKey &&
@@ -2636,6 +2641,7 @@ mediaWss.on('connection', (ws, req) => {
       }
       return { ok: false };
     } finally {
+      if (opts.isFiller) fillerNote?.settle?.(fillerPlayed);
       if (opts.isFiller && fillerStreamId && session?.streamId === fillerStreamId) {
         fillerStreamId = null;
       }
