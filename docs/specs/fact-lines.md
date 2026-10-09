@@ -11,7 +11,9 @@ Source call: HD_d199dbbf6b79 (staging re-dial, 2026-10-09 11:41 EAT).
   Brain never emits a line whose gate has not passed.
 - **Voice** owns the spoken wording for every template in en, sw and sheng,
   in `src/speech/spokenFacts/index.js` (branch `voice/spoken-facts`).
-- Brain calls Voice's `renderFactLine(line)` and `renderFact(slot, lang)`. Both
+- Brain calls Voice's `renderFactLine(line, { now })` and
+  `renderFact(slot, lang, { now })` (`now` anchors relative days; the live call
+  passes the current time). Both
   return `null` for an unknown template or a missing required slot. On `null`,
   or while Voice's module is not on the branch, Brain falls back to its own
   wording in `src/conversation/factLine.js`. The import is guarded (optional
@@ -79,8 +81,10 @@ Source call: HD_d199dbbf6b79 (staging re-dial, 2026-10-09 11:41 EAT).
 ### `saved_item` — one thing saved on this call
 
 - Required: `kind: enum(visit|request)`, `job: string`.
-- Optional: `when: datetime` (precision `'time'`), `place: string`,
-  `moved: boolean` (true when the save was a move of a filed visit).
+- Optional: `when: datetime` (precision `'time'`), `place: string`.
+- Never says "moved". There is no `moved` slot: "moved" comes only from
+  `move_ok`, which is gated on the update write. A move saved on this call is
+  read back as a saved visit at its new time.
 - Gate: a `create_appointment`, `update_appointment` or
   `create_service_request` result with status `succeeded` on this call.
 - Fires: "what have you saved?", "umesave nini?", one line per saved row.
@@ -109,7 +113,8 @@ Source call: HD_d199dbbf6b79 (staging re-dial, 2026-10-09 11:41 EAT).
   visit, Brain pins the write to that visit: a bare update gets T's id, and a
   `create_appointment` becomes `update_appointment` on T. A reschedule never
   creates a second live visit.
-- Fires: right after that update.
+- Fires: right after that update, for every update that sets a new time
+  (no other template says "moved").
 - `gate`: `{ appointment_id: T, to_when, filed_visit }` (`filed_visit`: T was
   on the caller file before this call). Scorer: T's row has the new window and
   no other open visit was created on this call for the same service.
