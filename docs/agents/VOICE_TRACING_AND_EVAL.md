@@ -136,6 +136,25 @@ node scripts/score-voice-call.js HD_xxxxxxxx --file data/voice-traces.jsonl
 
 The Supabase path needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the environment. It reads `voice_turn_traces` for that `call_id`.
 
+**Prod calls.** Prod Voice runs with traces off (`VOICE_TRACE` auto is off on a `prod` Railway environment) and the prod database has no `voice_turn_traces` table. Score a prod call from its stored transcript:
+
+```bash
+node scripts/score-voice-call.js <calls.id or HD_sid> --transcripts      # reads calls, transcripts, appointments
+node scripts/score-voice-call.js <calls.id> --rows call.json             # same, from an exported JSON bundle
+```
+
+`--rows` takes `{ call: { id, created_at }, transcripts: [{ speaker, text_content, created_at }], openVisits: [...], agentName, businessName }`. Transcript turns carry only the spoken text, so latency, language tags, and deleted-answer checks are weaker there.
+
+### Call-level checks (`src/speech/callChecks.js`)
+
+| Check | Fails when | Weight |
+| --- | --- | --- |
+| `visitMissed` | The caller asks what visits or bookings they have and the reply reads none (no "you have ... <day/time>") and does not say nothing is open. With `openVisits` known, "nothing open" while visits are open also fails. | 20 |
+| `dateWrong` | A spoken "today/tomorrow/leo/kesho is <day>", "<weekday>, <date> <month>", or the good morning/afternoon/evening greeting disagrees with the Africa/Nairobi calendar at that turn (turn `at`, else the call time). | 20 |
+| `nameLock` | After the caller's name is locked (a yes to "Am I speaking with X?" / "Ni X ninaongea naye?", or "my name is X" / "naitwa X"), the agent asks for the name again, calls the caller another name, or saves another name in `save_caller_info`. | 15 |
+
+They add to the call penalty (capped at 45) next to the repeated-question penalty, and their notes land on the turn that failed.
+
 ## Seeded calls
 
 The fixtures are built from Railway logs and the transcript rows on 2026-10-06. Where Gemini's raw text was not logged, the fixture uses the TTS original, a `spoken_drop` preview, or marks the turn `unlogged`. The 202-character loss on `HD_48631816b68c` is a historical note (`spokenEmitted` 0). It is not a permanent gate failure, because the text is not in the logs and later phases cannot replay it until a new call stores it.
