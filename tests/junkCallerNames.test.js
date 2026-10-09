@@ -205,3 +205,59 @@ describe('saved alternates that are not names', () => {
     assert.equal(card.sharedLine, true);
   });
 });
+
+// Staging contact (2026-10-09, HD_1677e57f73f9 / HD_ceba9d9b3f37): "so
+// disappointed" and "Mteja" still passed as saved alternates, and "Chr" (a
+// cut-off of the file name Chris) made the line look shared.
+describe('saved alternates: feelings, role words and name fragments are not names', () => {
+  const { isSavedAlternateName } = require('../src/conversation/alternateNameQuality');
+
+  it('drops feeling and state phrases (en / sw / sheng)', () => {
+    for (const name of [
+      'so disappointed', 'So Disappointed', 'very happy', 'really sorry', 'disappointed', 'impressed',
+      'quite upset', 'too busy', 'nimechoka', 'Nimechoka sana', 'sijafurahi', 'amekasirika', 'tumesikitika',
+      'furaha sana', 'mbaya kabisa', 'just checking', 'niko busy',
+    ]) {
+      assert.equal(isSavedAlternateName(name), false, `drop: ${name}`);
+    }
+  });
+
+  it('drops role and address words alone (mteja, customer, client, boss, madam, sir ...)', () => {
+    for (const name of [
+      'Mteja', 'mteja', 'Customer', 'the client', 'Boss', 'boss lady', 'Madam', 'Sir', 'Ma\'am', 'my friend',
+      'Dada', 'Kaka', 'Rafiki', 'Mama', 'Mzee', 'the owner', 'Landlord', 'Fundi', 'Bwana', 'Mdosi', 'Mheshimiwa',
+    ]) {
+      assert.equal(isSavedAlternateName(name), false, `drop: ${name}`);
+    }
+  });
+
+  it('drops a cut-off fragment of the primary name ("Chr" for Chris)', () => {
+    assert.equal(isSavedAlternateName('Chr', { primary: 'Chris' }), false);
+    assert.equal(isSavedAlternateName('Chri', { primary: 'Chris Otieno' }), false);
+    assert.equal(isSavedAlternateName('Otie', { primary: 'Chris Otieno' }), false);
+    // Not a prefix: a different person, or the name itself.
+    assert.equal(isSavedAlternateName('Christopher', { primary: 'Chris' }), true);
+    assert.equal(isSavedAlternateName('Steve', { primary: 'Chris' }), true);
+    // An Array#filter index as the second argument is ignored.
+    assert.deepEqual(['Steve', 'Mteja'].filter(isSavedAlternateName), ['Steve']);
+  });
+
+  it('keeps real names, names that look like a prefix or a feeling, and name phrases', () => {
+    for (const name of [
+      'Bwana Alvin', 'Alvin speaking', 'Mama Amina', 'Brian', 'Christopher', 'Kevin Otieno', 'Brenda Chirotits',
+      'Anastasia', 'Amelia', 'Alicia', 'Nitasha', 'Imelda', 'Salama', 'Furaha', 'Happy', 'Grace', 'Joy Wanjiru',
+      'Dada Wanjiku', 'Mzee Kamau', 'Ahmed', 'Mohamed', 'Fred', 'Sana Ali',
+    ]) {
+      assert.equal(isSavedAlternateName(name), true, `keep: ${name}`);
+    }
+  });
+
+  it('card: Mteja, so disappointed and Chr do not make the line shared', () => {
+    const card = buildCallerMemoryCard({
+      contact: { ...alvinContact(['so disappointed', 'Mteja', 'Chr', 'Bwana Chris']), name: 'Chris' },
+      openAppointments: [],
+    });
+    assert.deepEqual(card.alternateNames, ['Bwana Chris']);
+    assert.equal(card.sharedLine, false);
+  });
+});

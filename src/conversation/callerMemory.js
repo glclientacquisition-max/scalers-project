@@ -138,7 +138,7 @@ function distinctOtherPerson(primary, alternate) {
   return isPlausibleCallerName(rest);
 }
 
-function alternateNames(metadata) {
+function alternateNames(metadata, primary = null) {
   const list = metadata && Array.isArray(metadata.alternate_names)
     ? metadata.alternate_names
     : [];
@@ -146,7 +146,7 @@ function alternateNames(metadata) {
   // your") never reaches the card, the shared-line check, or the STT hints.
   return list
     .map((row) => String(typeof row === 'string' ? row : row?.name || '').trim())
-    .filter((name) => name && isSavedAlternateName(name));
+    .filter((name) => name && isSavedAlternateName(name, { primary }));
 }
 
 /**
@@ -164,7 +164,7 @@ function buildCallerMemoryCard({
   if (!contact || typeof contact !== 'object') return null;
   const phone = String(contact.phone || '').trim();
   const name = String(contact.name || '').trim() || null;
-  const alternates = alternateNames(contact.metadata);
+  const alternates = alternateNames(contact.metadata, name);
   // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 5): a saved phrase ("so
   // disappointed"), a role word ("Mteja") or a cut-off of the owner's name
   // ("Chr") is not a second person; a shared line skips the file-name ask.
