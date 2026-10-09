@@ -1,0 +1,214 @@
+{
+  "source": "staging call 5bbb0871-b674-4e24-a484-a80a3504e2c3 transcripts + notify_sends + Railway deploy logs (read-only, 2026-10-09). Turn order and times from logs; stored rows were all 17:15:30Z.",
+  "callId": "5bbb0871-b674-4e24-a484-a80a3504e2c3",
+  "callSid": "HD_b82fbfef7649",
+  "tenant": "Done and Dusted (staging)",
+  "startedAt": "2026-10-09T17:12:17.700Z",
+  "durationSeconds": 193,
+  "build": "35d88569",
+  "live": {
+    "durationSeconds": 193,
+    "vendorDurationSeconds": 162,
+    "mediaFrames": 8067,
+    "lastCallerFrameAt": "2026-10-09T17:14:59.000Z",
+    "socketClosedAt": "2026-10-09T17:15:29.200Z",
+    "socketLifetimeMs": 193082,
+    "agentTools": {
+      "escalate": true,
+      "end_call": false
+    },
+    "storedGreeting": "Good evening, Done and Dusted, this is Shy. We're closed now. Tukusaidie vipi.",
+    "transcriptCreatedAt": "2026-10-09T17:15:30.722Z",
+    "notifySends": [
+      {
+        "kind": "lead",
+        "channel": "email",
+        "recipient": "inbox-1",
+        "at": "2026-10-09T17:12:44Z",
+        "title": "New missed-call lead"
+      },
+      {
+        "kind": "lead",
+        "channel": "email",
+        "recipient": "inbox-2",
+        "at": "2026-10-09T17:12:44Z",
+        "title": "New missed-call lead"
+      },
+      {
+        "kind": "appointment",
+        "channel": "email",
+        "recipient": "inbox-1",
+        "at": "2026-10-09T17:14:37Z",
+        "title": "VISIT UPDATED"
+      },
+      {
+        "kind": "appointment",
+        "channel": "email",
+        "recipient": "inbox-2",
+        "at": "2026-10-09T17:14:38Z",
+        "title": "VISIT UPDATED"
+      }
+    ],
+    "updatedVisit": {
+      "id": "visit-b82f",
+      "service_name": "Carpet Cleaning",
+      "when_text": "tomorrow, Saturday, at 1 PM",
+      "address_landmark": "line",
+      "caller_name": "like",
+      "caller_phone": "+254700000001",
+      "status": "requested"
+    }
+  },
+  "transcript": [
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:12:20.112Z",
+      "text_content": "Good evening, Done and Dusted, this is Shy. You can speak in English or Kiswahili. We're closed now. Tukusaidie vipi."
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:12:33.898Z",
+      "text_content": "Uh, Shai Abariaku Kwaje."
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:12:34.300Z",
+      "text_content": "Am I speaking with Alvin?"
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:12:40.616Z",
+      "text_content": "Eeh, unaongea na Alvin."
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:12:42.116Z",
+      "text_content": "Asante Alvin. Ungependa tusaidie na huduma gani leo?"
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:12:52.068Z",
+      "text_content": "a."
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:12:53.787Z",
+      "text_content": "Samahani, sijakusikia vizuri. Ungependa kusaidiwa na huduma gani leo?"
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:12:58.632Z",
+      "text_content": "Kwa. Uko wapi?"
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:13:00.354Z",
+      "text_content": "Ofisi yetu kuu iko Nairobi, na tunatoa huduma za kuja mpaka mlangoni kwako Nairobi na maeneo ya jirani. Ungetaka tukutembelee wapi?"
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:13:16.156Z",
+      "text_content": "Wewe unaendelea aje wewe mwenyewe?"
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:13:17.590Z",
+      "text_content": "Niko vyema kabisa, asante kwa kuuliza Alvin. Nawe unaendeleaje, na nikutafutie huduma gani leo?"
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:13:32.657Z",
+      "text_content": "Mimi nataka kujua ni pesa ngapi kuosha carpet, na."
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:13:33.000Z",
+      "text_content": "Carpet Cleaning ni KSh 2,200 per room."
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:13:41.264Z",
+      "text_content": "Oh, so it's done per room?"
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:13:42.934Z",
+      "text_content": "Yes Alvin, carpet cleaning is 2,200 shillings per room. When would you like us to come, and where should we come?"
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:13:55.993Z",
+      "text_content": "I thought I had some visits in line."
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:13:57.750Z",
+      "text_content": "You have a carpet cleaning visit requested for tomorrow, Saturday, at 9 AM in Kitengela, Grace Apartments. Is there anything you would like to change or add for this visit?"
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:14:18.255Z",
+      "text_content": "Uh, I don't think so. Maybe—maybe can you move the time? What's the time that is indicated there?"
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:14:19.485Z",
+      "text_content": "The visit is currently set for tomorrow, Saturday, at 9 AM. What new time would work best for you?"
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:14:31.276Z",
+      "text_content": "Let's do at."
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:14:32.453Z",
+      "text_content": "What specific time would you like to move the visit to?"
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:14:33.817Z",
+      "text_content": "1:00 PM."
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:14:35.008Z",
+      "text_content": "1:00 PM is fine."
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:14:36.294Z",
+      "text_content": "Okay, Sawa."
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:14:37.377Z",
+      "text_content": "I've moved that visit to tomorrow, Saturday, at 1 PM."
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:14:51.071Z",
+      "text_content": "Uh, I appreciate it then."
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:14:52.352Z",
+      "text_content": "You are welcome, Alvin. Have a great day!"
+    },
+    {
+      "speaker": "caller",
+      "at": "2026-10-09T17:14:58.041Z",
+      "text_content": "Haya."
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:14:59.454Z",
+      "text_content": "Sawa Alvin, uwe na siku njema!"
+    },
+    {
+      "speaker": "agent",
+      "at": "2026-10-09T17:15:08.847Z",
+      "text_content": "Naweza kusaidia?"
+    }
+  ]
+}

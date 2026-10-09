@@ -1320,6 +1320,11 @@ function formatToolConfirmation(results = [], language = 'en') {
   if (meaningful.code === 'message_only') {
     return messageOnlyCallbackLine(sheng ? 'sheng' : sw ? 'sw' : 'en');
   }
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 6): a save blocked on a
+  // cut-off turn speaks the ask_need line; nothing was written.
+  if (meaningful.code === 'fragment_turn' && require('./callFixesD199').callFixesD199Enabled()) {
+    return String(meaningful.askLine || '');
+  }
   if (meaningful.action === 'tool_request') {
     if (sw) return 'Sijaweza kukamilisha hatua hiyo.';
     if (sheng) return 'Sijaweza ku-complete hiyo action.';

@@ -319,7 +319,10 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     '- Cancel: update_appointment status=cancelled. Attendance confirm is not a new booking. Cancel does not need a location.',
     '- Emergency and human escalate do not wait for a location.',
     '- Never invent prices, coverage, or ETAs. Use the coverage list on file. Do not invent areas.',
-    '- Out of coverage: say that area is outside our coverage. Do not offer a callback note until a callback row is saved. Okay, Sawa, or leave it is not a booking. Do not say you will serve them tomorrow.',
+    // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 4): no "Okay, Sawa" pair for the model to copy.
+    require('../callFixesD199').ackPromptText(
+      '- Out of coverage: say that area is outside our coverage. Do not offer a callback note until a callback row is saved. Okay, Sawa, or leave it is not a booking. Do not say you will serve them tomorrow.'
+    ),
     '- In coverage: confirm service, day, time, and place, then the tool, then speak only the facts the tool saved.',
     '- Then, Okay, and Sawa are not a yes and not a time.',
     '- Cleaning, repair, install, pest, and similar jobs share this spine. Use SERVICES names; do not invent a niche that is not listed.',

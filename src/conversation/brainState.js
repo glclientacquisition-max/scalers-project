@@ -373,16 +373,34 @@ function createBrainState(profile = {}) {
 }
 
 function promoteCallerGoal(next, text, input, previousIntent) {
-  const usable = callerGoalText(text, {
+  let usable = callerGoalText(text, {
     unfinished: input?.unfinished === true,
     weak: input?.weak === true || input?.weakStt === true,
   });
   if (!usable) return;
+  const fixesD199 = require('./callFixesD199');
+  const fixesOn = fixesD199.callFixesD199Enabled();
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 8): "A mood. Diary" is the
+  // catalogue's "Mood diary a8"; otherwise the words, joined.
+  if (fixesOn) usable = fixesD199.cleanGoalText(usable, input?.profile || {});
   const current = String(next.goal?.description || '').trim();
   if (!current || isRejectedGoalText(current)) {
     next.goal.description = usable;
     return;
   }
+  // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 3): a bare slot answer ("1:00 PM
+  // is fine") answers the goal; it does not replace it.
+  if (
+    fixesOn &&
+    usable.split(/\s+/).length <= 5 &&
+    fixesD199.isWhenSlotValue(usable) &&
+    callerAskSpecificity(usable) === 0
+  ) {
+    return;
+  }
+  // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 3): a cut-off fragment ("Let's
+  // do at") never replaces a goal already held.
+  if (fixesOn && fixesD199.isFragmentTurn(text) && callerAskSpecificity(usable) === 0) return;
   // After the file name is bound, the goal is the last actionable ask.
   if (next.caller?.nameConfirmed) {
     next.goal.description = usable;
@@ -466,6 +484,13 @@ function observeCallerTurn(state, input = {}) {
   next.conversation.nonConsentAck =
     looksLikeNonConsentAck(text) && !next.conversation.consentAck;
   next.conversation.leaveIt = looksLikeLeaveIt(text);
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 6): a cut-off turn saves nothing.
+  if (require('./callFixesD199').callFixesD199Enabled()) {
+    next.conversation.fragmentTurn = require('./callFixesD199').isFragmentTurn(text, {
+      unfinished: input.unfinished === true,
+      bargeIn: input.bargeIn === true,
+    });
+  }
   if (text) next.conversation.answersReceived.push(text);
   next.conversation.answersReceived = next.conversation.answersReceived.slice(-8);
 
@@ -745,7 +770,15 @@ function observeCallerTurn(state, input = {}) {
         confirmed: false,
       };
     }
-    if (next.intent === 'booking' || keptSpecific) {
+    // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 2): moving or updating a visit on
+    // file keeps its place; the coverage gate is for a new create in a new place.
+    const moveKeepsPlace = require('./callFixesD199').skipCoverageGateForMove(next, {
+      incomingPlace: incoming && incoming !== previous ? incoming : '',
+      profile: input.profile || {},
+    });
+    if (moveKeepsPlace) {
+      next.visitPlace = null;
+    } else if (next.intent === 'booking' || keptSpecific) {
       next.visitPlace = decideVisitPlace(place, {
         profile: input.profile || {},
         detailAsked: Boolean(next.conversation.locationDetailAsked),
@@ -778,6 +811,17 @@ function observeCallerTurn(state, input = {}) {
   next.goal.missingSlots = missingGoalSlots(next, slotProfile);
   next = applySpokenClockRefusal(next, input.profile || {}, input.now || new Date());
   next.goal.missingSlots = missingGoalSlots(next, slotProfile);
+  // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 2): a move keeps the visit's place
+  // on file, so the place slots are never asked again for it.
+  const moveFixes = require('./callFixesD199');
+  if (
+    moveFixes.skipCoverageGateForMove(next, { profile: input.profile || {} }) &&
+    (next.returning?.openRows || []).some((row) => row && row.kind === 'visit')
+  ) {
+    next.goal.missingSlots = next.goal.missingSlots.filter(
+      (slot) => !['location', 'area', 'landmark'].includes(slot)
+    );
+  }
   return next;
 }
 
@@ -1016,6 +1060,14 @@ function recordActionResults(state, results = []) {
             status: result.record.status || null,
             service_name: result.record.service_name || null,
             call_id: result.record.call_id || null,
+            // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 3): the written time, for
+            // the outcome note ("Moved ... to Sat 10 Oct, 1 PM").
+            ...(require('./callFixesD199').callFixesD199Enabled()
+              ? {
+                  window_start: result.record.window_start || null,
+                  when_text: result.record.when_text || null,
+                }
+              : {}),
           },
         }
       : {}),
@@ -1271,8 +1323,12 @@ function formatBrainStateForPrompt(state) {
       }
     ),
     value.conversation?.nonConsentAck
-      ? '- Acknowledgment only (Then, Okay, Sawa, or leave it). Not a quantity, a time, or a yes. Do not invent a count. Do not say a visit or order is saved.'
+      ? require('./callFixesD199').ackPromptText(
+          '- Acknowledgment only (Then, Okay, Sawa, or leave it). Not a quantity, a time, or a yes. Do not invent a count. Do not say a visit or order is saved.'
+        )
       : '',
+    // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 4): one ack word, in the call language.
+    require('./callFixesD199').callFixesD199Enabled() ? require('./callFixesD199').ACK_LANGUAGE_LINE : '',
     value.conversation?.consentAck
       ? '- The caller answered your confirm ask with Okay. That is a yes. Proceed with the tool. Do not ask again.'
       : '',

@@ -225,7 +225,12 @@ describe('deriveCallResolution', () => {
     });
     assert.equal(later.resolution, 'resolved');
     assert.equal(later.primaryIntent, 'book_visit');
-    assert.equal(later.resolutionNote, 'Answered.');
+    // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 3): flag on, the note says what
+    // this call wrote to the other call's visit.
+    assert.equal(
+      later.resolutionNote,
+      process.env.BRAIN_CALL_FIXES_D199 === 'on' ? 'Updated Carpet cleaning visit' : 'Answered.'
+    );
     const same = deriveCallResolution({
       brainState: state,
       callId: 'call-original',

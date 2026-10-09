@@ -28,11 +28,22 @@ const STRUCTURED_ZERO = ['deletedAnswer', 'languageMismatch'];
 const STRUCTURED_MOUTH_ZERO = ['gluedPiece', 'letterlessPiece'];
 
 function loadFixtures() {
-  return fs
+  const all = fs
     .readdirSync(FIXTURE_DIR)
     .filter((name) => name.endsWith('.json'))
     .sort()
     .map((name) => JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, name), 'utf8')));
+  // One scored call per callId. Voice keeps the recorded transcript fixture
+  // and Brain keeps a turns fixture for the same call (5bbb0871 has both);
+  // the transcript one is the replay of record.
+  const byId = new Map();
+  for (const fixture of all) {
+    const prev = byId.get(fixture.callId);
+    if (!prev || (!Array.isArray(prev.transcript) && Array.isArray(fixture.transcript))) {
+      byId.set(fixture.callId, fixture);
+    }
+  }
+  return all.filter((fixture) => byId.get(fixture.callId) === fixture);
 }
 
 function loadStructuredRecording(callId) {

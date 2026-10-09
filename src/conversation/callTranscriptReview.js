@@ -267,6 +267,12 @@ function applySnapshotCard(out, flags) {
     out.done = HOLD_OPEN_NOTE;
     out.applied.card = true;
   }
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 8): an enquiry row is an
+  // enquiry, not a hold.
+  if (flags?.enquirySaved && !flags?.holdOpen && !flags?.visitRequested) {
+    out.done = `Enquiry saved${flags.enquiryItem ? `: ${flags.enquiryItem}` : ''}.`;
+    out.applied.card = true;
+  }
   let next = '';
   if (flags?.visitRequested) next = 'Confirm the visit.';
   else if (flags?.callbackSaved) next = 'Call them back.';
@@ -501,7 +507,18 @@ function toolFlagsFromBrain(brainState, callId = null) {
   ).toLowerCase();
   const holdStatus = String(hold?.requestStatus || hold?.record?.status || 'open').toLowerCase();
   const holdType = String(hold?.requestType || hold?.value?.type || '').toLowerCase();
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 8): the kind comes from the
+  // row written. Only a hold row is a hold.
+  const fixesOn = require('./callFixesD199').callFixesD199Enabled();
+  const realHold = !holdType || holdType === 'hold' || holdType === 'hold_or_pickup' || holdType === 'order';
   return {
+    ...(fixesOn
+      ? {
+          enquirySaved: Boolean(hold) && !realHold && holdType !== 'callback',
+          enquiryItem: String(hold?.value?.item || hold?.record?.item || '').trim(),
+          holdKind: hold ? holdType || 'hold' : null,
+        }
+      : {}),
     holdSaved: ok('create_service_request'),
     callbackSaved: ok('create_service_request') && holdType === 'callback',
     visitSaved: ok('create_appointment') || ok('update_appointment'),
@@ -526,7 +543,8 @@ function toolFlagsFromBrain(brainState, callId = null) {
     refusedWhen: Array.isArray(brainState?.actions?.refusedHours)
       ? brainState.actions.refusedHours.filter(Boolean)
       : [],
-    holdOpen: Boolean(hold) && (!holdStatus || holdStatus === 'open'),
+    holdOpen:
+      Boolean(hold) && (!holdStatus || holdStatus === 'open') && (!fixesOn || realHold),
     escalateSaved: ok('escalate'),
     escalateReason: String(
       escalate?.value?.reason || escalate?.record?.reason || ''
@@ -616,6 +634,22 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical, 
     next: '',
     applied: { reason: false, intent: false, resolution: false, card: false },
   };
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 8): the owner-review kind is
+  // what was written: a visit row is book_visit, a hold row hold_or_pickup,
+  // an enquiry or callback row the derived intent. No write: the model's.
+  if (require('./callFixesD199').callFixesD199Enabled() && review) {
+    let kind = review.primary_intent || null;
+    if (flags.visitSaved) kind = 'book_visit';
+    else if (flags.holdKind) {
+      const holdish = ['hold', 'hold_or_pickup', 'order'].includes(flags.holdKind);
+      kind = holdish
+        ? 'hold_or_pickup'
+        : derivedIntent && derivedIntent !== 'hold_or_pickup'
+          ? derivedIntent
+          : 'order_enquiry';
+    }
+    out.reviewKind = kind;
+  }
 
   const cleaned = review ? cleanReason(review.reason) : '';
   const cleanedWant = review
@@ -1146,7 +1180,8 @@ async function writeReviewedSummary({ callSid, merged, review, derived, summary 
       needs_owner: Boolean(review?.needs_owner),
       urgent: Boolean(review?.urgent),
       confidence: clampConfidence(review?.confidence),
-      primary_intent: review?.primary_intent || null,
+      primary_intent:
+        merged.reviewKind !== undefined ? merged.reviewKind : review?.primary_intent || null,
       applied: merged.applied,
       at: new Date().toISOString(),
     },

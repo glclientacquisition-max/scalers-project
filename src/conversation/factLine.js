@@ -20,6 +20,7 @@ const TEMPLATES = {
   past_row: { required: ['kind', 'job'], optional: ['when', 'place'] },
   reask_slot: { required: ['slot'], optional: ['day', 'pending_hour', 'ask_count'] },
   ask_area: { required: [], optional: [] },
+  ask_need: { required: [], optional: [] },
 };
 
 let voiceRenderer;
@@ -218,6 +219,9 @@ function fallbackLine(line, now = new Date()) {
     }
     case 'ask_area':
       return sw ? 'Uko eneo gani?' : 'Which area are you in?';
+    case 'ask_need':
+      if (line.lang === 'sheng') return 'Poa. Unataka kujua nini?';
+      return sw ? 'Sawa. Ungependa kujua nini?' : 'Sure. What would you like to know?';
     case 'confirm_identity_first': {
       const name = s('name');
       if (sw) {

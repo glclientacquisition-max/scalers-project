@@ -1,214 +1,644 @@
 {
-  "source": "staging call 5bbb0871-b674-4e24-a484-a80a3504e2c3 transcripts + notify_sends + Railway deploy logs (read-only, 2026-10-09). Turn order and times from logs; stored rows were all 17:15:30Z.",
+  "note": "Staging D&D call 5bbb0871-b674-4e24-a484-a80a3504e2c3 / HD_b82fbfef7649 (2026-10-09 20:12 EAT, staging voice/staging-pin-1009 @ 35d88569, structured mouth on). Read-only SELECTs on calls, transcripts, voice_turn_traces, appointments, notify_sends; brain-trace lines from the staging Railway deploy log. Caller file = the d199 fixture's rows plus visit b140110d as it stood before this call moved it (Sat 9 AM, caller_name 'like' saved by HD_d199 t11/t12). Caller phone omitted. 'turn' is Brain's turn number; 'voiceTurn' is voice_turn_traces.turn_index.",
   "callId": "5bbb0871-b674-4e24-a484-a80a3504e2c3",
   "callSid": "HD_b82fbfef7649",
-  "tenant": "Done and Dusted (staging)",
-  "startedAt": "2026-10-09T17:12:17.700Z",
-  "durationSeconds": 193,
-  "build": "35d88569",
-  "live": {
-    "durationSeconds": 193,
-    "vendorDurationSeconds": 162,
-    "mediaFrames": 8067,
-    "lastCallerFrameAt": "2026-10-09T17:14:59.000Z",
-    "socketClosedAt": "2026-10-09T17:15:29.200Z",
-    "socketLifetimeMs": 193082,
-    "agentTools": {
-      "escalate": true,
-      "end_call": false
+  "startedAt": "2026-10-09T17:12:17.364Z",
+  "tenantFixture": "done-and-dusted-staging",
+  "businessName": "Done and Dusted Cleaning Services",
+  "vertical": "home_services",
+  "callerFile": {
+    "contact": {
+      "id": "b0a335e9-219d-431c-bb66-6b884f256751",
+      "name": "Alvin",
+      "notes": null,
+      "last_reason": null,
+      "metadata": {
+        "alternate_names": [
+          {
+            "name": "Bwana Alvin",
+            "seen_at": "2026-10-04T18:55:51.114Z"
+          },
+          {
+            "name": "Alvin speaking",
+            "seen_at": "2026-10-04T12:06:16.647Z"
+          },
+          {
+            "name": "impressed by your",
+            "seen_at": "2026-10-03T15:56:09.095Z"
+          }
+        ]
+      }
     },
-    "storedGreeting": "Good evening, Done and Dusted, this is Shy. We're closed now. Tukusaidie vipi.",
-    "transcriptCreatedAt": "2026-10-09T17:15:30.722Z",
-    "notifySends": [
+    "requests": [
       {
-        "kind": "lead",
-        "channel": "email",
-        "recipient": "inbox-1",
-        "at": "2026-10-09T17:12:44Z",
-        "title": "New missed-call lead"
+        "id": "2b684460-2ae5-4ae3-8a83-787f594415e0",
+        "item": "Mansion Cleaning Custom Quote",
+        "notes": "Caller will call back in a minute regarding cleaning in Kilimani.",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-08T20:15:04.636479+00:00",
+        "request_type": "enquiry",
+        "window_start": null,
+        "window_end": null
       },
       {
-        "kind": "lead",
-        "channel": "email",
-        "recipient": "inbox-2",
-        "at": "2026-10-09T17:12:44Z",
-        "title": "New missed-call lead"
+        "id": "09518c1b-5544-48d5-9a5a-01f572782c0f",
+        "item": "Water bowl enquiry",
+        "notes": "Caller asking about water bowl service and coverage/pricing",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-08T07:08:40.819507+00:00",
+        "request_type": "enquiry",
+        "window_start": null,
+        "window_end": null
       },
       {
-        "kind": "appointment",
-        "channel": "email",
-        "recipient": "inbox-1",
-        "at": "2026-10-09T17:14:37Z",
-        "title": "VISIT UPDATED"
+        "id": "741a1d51-0d0a-4b97-b355-bca56d67ba61",
+        "item": "Carpet cleaning outside coverage",
+        "notes": "Caller in Kericho/Nakuru, notify if coverage expands",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-08T06:07:10.666765+00:00",
+        "request_type": "callback",
+        "window_start": null,
+        "window_end": null
       },
       {
-        "kind": "appointment",
-        "channel": "email",
-        "recipient": "inbox-2",
-        "at": "2026-10-09T17:14:38Z",
-        "title": "VISIT UPDATED"
+        "id": "f30286a5-c8d6-443b-9802-1ee78af420b7",
+        "item": "Dishwashing enquiry",
+        "notes": "Caller requested a callback regarding dishwashing service details",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-07T09:45:28.215426+00:00",
+        "request_type": "callback",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "3f758e81-f302-4e91-9072-fbdc2a15c438",
+        "item": "Kuosha vyombo",
+        "notes": "Inquiry about dishwashing service",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-06T20:18:53.977374+00:00",
+        "request_type": "enquiry",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "a39484c1-9de4-4275-b0a2-606046a0cecd",
+        "item": "Carpet cleaning confirmation message",
+        "notes": "Caller requested a confirmation message for today's carpet cleaning visit in Westlands to plan work",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-05T06:10:20.584985+00:00",
+        "request_type": "callback",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "b40a3a7d-d221-47b9-89c4-432815169d07",
+        "item": "Carpet cleaning",
+        "notes": "Caller requested carpet cleaning for tomorrow, needs location and time follow-up.",
+        "status": "open",
+        "quantity": null,
+        "when_text": "tomorrow",
+        "created_at": "2026-10-04T20:28:49.323+00:00",
+        "request_type": "enquiry",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "fa6520fe-000f-4f8e-8819-8e8fb038338a",
+        "item": "Gilgil service inquiry",
+        "notes": "enquiry — Gilgil service inquiry",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-04T18:55:51.287371+00:00",
+        "request_type": "enquiry",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "f83b358f-a6ae-4587-b6d6-0b517d6dab01",
+        "item": "Kiambu cleaning service request",
+        "notes": "Interested in cleaning services in Kiambu area outside Nairobi coverage",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-04T18:47:14.880814+00:00",
+        "request_type": "callback",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "0002db81-d036-4fcf-b10b-cc48c93d10df",
+        "item": "Window cleaning",
+        "notes": "Wants a quote for window cleaning",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-04T14:46:53.37449+00:00",
+        "request_type": "enquiry",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "d736e9c6-f99a-4c38-a57f-4b46f3da3ba4",
+        "item": "Window cleaning enquiry",
+        "notes": "Interested in window cleaning services",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-04T14:27:28.849256+00:00",
+        "request_type": "enquiry",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "5efb631e-453c-4e6f-ad03-6a19c8739d96",
+        "item": "General cleaning",
+        "notes": "Wants general cleaning all over",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-04T07:05:57.2915+00:00",
+        "request_type": "callback",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "e7bfb2a6-a38d-4236-8501-cfa5dd8e427f",
+        "item": "explanation of cleaning services process",
+        "notes": "Caller requested a callback to explain the detailed process for cleaning services.",
+        "status": "open",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-03T15:56:09.336349+00:00",
+        "request_type": "callback",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "967678aa-79b1-4cdd-9815-6bf1d5d5bd61",
+        "item": "SMS booking confirmation",
+        "notes": "Caller requested SMS confirmation message for tomorrow's booking",
+        "status": "open",
+        "quantity": null,
+        "when_text": "tomorrow at 10:00 AM",
+        "created_at": "2026-09-16T08:47:47.073817+00:00",
+        "request_type": "callback",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "6a6835da-c1f5-49fc-b31f-7223ced595c9",
+        "item": "Carpet cleaning and Pet stain removal",
+        "notes": "Caller wants combined confirmation sent for both jobs tomorrow at 10:00 AM",
+        "status": "open",
+        "quantity": null,
+        "when_text": "tomorrow at 10:00 AM",
+        "created_at": "2026-09-16T08:31:50.342295+00:00",
+        "request_type": "enquiry",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "c2ff9889-9654-4d22-8c90-1e71099b1985",
+        "item": "message",
+        "notes": "Should I note it for the team?",
+        "status": "cancelled",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-09T08:02:05.389453+00:00",
+        "request_type": "callback",
+        "window_start": null,
+        "window_end": null
+      },
+      {
+        "id": "3c4f9371-5323-46ac-97cf-00b58bebc03d",
+        "item": "message",
+        "notes": "I don't have that on file. I can note it for the team.",
+        "status": "cancelled",
+        "quantity": null,
+        "when_text": null,
+        "created_at": "2026-10-08T14:48:52.144503+00:00",
+        "request_type": "callback",
+        "window_start": null,
+        "window_end": null
       }
     ],
-    "updatedVisit": {
-      "id": "visit-b82f",
-      "service_name": "Carpet Cleaning",
-      "when_text": "tomorrow, Saturday, at 1 PM",
-      "address_landmark": "line",
-      "caller_name": "like",
-      "caller_phone": "+254700000001",
-      "status": "requested"
-    }
+    "openAppointments": [
+      {
+        "id": "b140110d-9d62-422e-ae78-2b85cab837c6",
+        "service_name": "Carpet Cleaning (per room)",
+        "status": "requested",
+        "when_text": "Saturday 10 October 2026, 9 AM",
+        "window_start": "2026-10-10T06:00:00+00:00",
+        "window_end": "2026-10-10T06:00:00+00:00",
+        "address_landmark": "Kitengela, Grace Apartments",
+        "notes": "Kitengela, Grace Apartments",
+        "caller_name": "like",
+        "call_id": "74704bcd-a069-4392-b92a-90fcd4834f5f",
+        "created_at": "2026-10-09T08:43:43.658441+00:00"
+      },
+      {
+        "id": "47362e7b-a0df-44c2-9e3e-6740192a94f1",
+        "service_name": "Carpet Cleaning",
+        "status": "requested",
+        "when_text": "Friday 9 October 2026, 9 AM",
+        "window_start": "2026-10-09T06:00:29.205+00:00",
+        "window_end": "2026-10-09T06:00:29.205+00:00",
+        "address_landmark": "Kitengela",
+        "notes": "Confirm access/gate upon arrival",
+        "created_at": "2026-10-08T13:47:30.22025+00:00"
+      },
+      {
+        "id": "4860a3b9-48c5-47a1-8f57-a69836ca0d5a",
+        "service_name": "Couch cleaning",
+        "status": "requested",
+        "when_text": "Monday 5 October 2026, morning",
+        "window_start": null,
+        "window_end": null,
+        "address_landmark": "Westlands, ABC",
+        "notes": "Add couch cleaning to today's visit",
+        "created_at": "2026-10-05T06:11:15.671809+00:00"
+      },
+      {
+        "id": "e3b93ac0-171a-4eee-a25c-c1ed634634a6",
+        "service_name": "Couch cleaning",
+        "status": "requested",
+        "when_text": "Monday 5 October 2026, 8 AM",
+        "window_start": "2026-10-05T05:00:04.278+00:00",
+        "window_end": "2026-10-05T05:00:04.278+00:00",
+        "address_landmark": "Westlands",
+        "notes": "confirm access",
+        "created_at": "2026-10-04T20:04:04.835574+00:00"
+      },
+      {
+        "id": "8f114c28-edc5-40a2-9c64-5860146e0463",
+        "service_name": "Carpet cleaning",
+        "status": "requested",
+        "when_text": "Tomorrow at 9 a.m.",
+        "window_start": "2026-10-05T06:00:39.115+00:00",
+        "window_end": "2026-10-05T06:00:39.115+00:00",
+        "address_landmark": "Westlands, near ABC",
+        "notes": "Carpet cleaning booking",
+        "created_at": "2026-10-04T18:46:39.569987+00:00"
+      },
+      {
+        "id": "6d991592-e9f9-43b4-b209-753ffa4d8a04",
+        "service_name": "Carpet cleaning",
+        "status": "requested",
+        "when_text": "Monday 5 October 2026, 9 AM",
+        "window_start": "2026-10-05T06:00:18.133+00:00",
+        "window_end": "2026-10-05T06:00:18.133+00:00",
+        "address_landmark": "Westlands ABC",
+        "notes": "confirm access",
+        "created_at": "2026-10-04T14:46:18.621682+00:00"
+      },
+      {
+        "id": "f70b73ea-ed7c-4334-8640-9d4601a895ad",
+        "service_name": "Carpet cleaning",
+        "status": "requested",
+        "when_text": "Monday 5 October 2026, 9 AM",
+        "window_start": "2026-10-05T06:00:00+00:00",
+        "window_end": "2026-10-05T06:00:00+00:00",
+        "address_landmark": "Westlands, near ABC",
+        "notes": "Confirm access",
+        "created_at": "2026-10-04T14:26:21.035626+00:00"
+      },
+      {
+        "id": "699f3573-38df-4baf-aea6-8fd408cd088f",
+        "service_name": "Carpet cleaning",
+        "status": "requested",
+        "when_text": "tomorrow at 9 AM",
+        "window_start": "2026-10-05T06:00:56.733+00:00",
+        "window_end": "2026-10-05T06:00:56.733+00:00",
+        "address_landmark": "Westlands, ABC",
+        "notes": "confirm access",
+        "created_at": "2026-10-04T13:58:57.072636+00:00"
+      },
+      {
+        "id": "534b53af-05e4-4ed0-b52d-9516da8d63ba",
+        "service_name": "Carpet cleaning",
+        "status": "requested",
+        "when_text": "Tomorrow morning",
+        "window_start": null,
+        "window_end": null,
+        "address_landmark": "Westlands, ABC",
+        "notes": "visit — Carpet cleaning — Tomorrow morning — Westlands, ABC",
+        "created_at": "2026-10-04T12:06:16.772933+00:00"
+      },
+      {
+        "id": "cd54de55-910d-4b98-a8ad-38857585d938",
+        "service_name": "Carpet cleaning",
+        "status": "requested",
+        "when_text": "Tomorrow morning",
+        "window_start": null,
+        "window_end": null,
+        "address_landmark": "Westlands",
+        "notes": "confirm access",
+        "created_at": "2026-10-04T11:01:07.104366+00:00"
+      },
+      {
+        "id": "be30316d-f8c6-4698-8dc1-b382c83e1c4c",
+        "service_name": "Carpet cleaning",
+        "status": "requested",
+        "when_text": "22 Sep 2026 09:00",
+        "window_start": "2026-09-22T06:00:00+00:00",
+        "window_end": "2026-09-22T06:00:00+00:00",
+        "address_landmark": "Barnabas",
+        "notes": "Carpet cleaning booking request",
+        "created_at": "2026-09-04T03:02:24.15697+00:00"
+      },
+      {
+        "id": "64075dce-084c-4355-a434-6dee71be391a",
+        "service_name": "Carpet cleaning",
+        "status": "requested",
+        "when_text": "tomorrow at 12:00 PM",
+        "window_start": null,
+        "window_end": null,
+        "address_landmark": "Westlands, Nairobi",
+        "notes": "visit — Carpet cleaning — tomorrow at 12:00 PM — Westlands, Nairobi",
+        "created_at": "2026-08-16T01:39:28.58999+00:00"
+      },
+      {
+        "id": "d7d0b2fd-29f4-465b-a00c-f37461564bec",
+        "service_name": "Carpet cleaning",
+        "status": "requested",
+        "when_text": "tomorrow at 12:00 PM",
+        "window_start": null,
+        "window_end": null,
+        "address_landmark": "Westlands",
+        "notes": "Carpet cleaning booking",
+        "created_at": "2026-08-16T01:39:18.731367+00:00"
+      },
+      {
+        "id": "751e9c2c-03ef-4ff1-9e3b-beb201041009",
+        "service_name": "Couch cleaning",
+        "status": "requested",
+        "when_text": "Tomorrow at 10:00 AM",
+        "window_start": null,
+        "window_end": null,
+        "address_landmark": "Kilimani, Nairobi",
+        "notes": "Couch cleaning booking at Kilimani tomorrow 10 AM",
+        "created_at": "2026-08-16T01:15:11.301044+00:00"
+      },
+      {
+        "id": "ee40cd35-db6a-4a85-872e-3b9c1152db90",
+        "service_name": "Carpet cleaning",
+        "status": "requested",
+        "when_text": "Monday morning",
+        "window_start": null,
+        "window_end": null,
+        "address_landmark": "Kilimani Nairobi",
+        "notes": "Caller won't be available, someone else will be on site",
+        "created_at": "2026-08-16T00:52:24.100763+00:00"
+      },
+      {
+        "id": "925cb207-36e2-4ac0-818c-2d9a64c86f18",
+        "service_name": "Couch cleaning",
+        "status": "requested",
+        "when_text": "at 7:00 PM",
+        "window_start": null,
+        "window_end": null,
+        "address_landmark": "Kilimani, Nairobi",
+        "notes": "Couch cleaning",
+        "created_at": "2026-08-16T00:29:40.282581+00:00"
+      }
+    ]
   },
-  "transcript": [
+  "turns": [
     {
-      "speaker": "agent",
-      "at": "2026-10-09T17:12:20.112Z",
-      "text_content": "Good evening, Done and Dusted, this is Shy. You can speak in English or Kiswahili. We're closed now. Tukusaidie vipi."
+      "turn": 1,
+      "voiceTurn": 1,
+      "caller": "Uh, Shai Abariaku Kwaje.",
+      "language": "sw",
+      "spoken": "Am I speaking with Alvin?",
+      "path": "file_name_ask"
     },
     {
-      "speaker": "caller",
-      "at": "2026-10-09T17:12:33.898Z",
-      "text_content": "Uh, Shai Abariaku Kwaje."
+      "turn": 2,
+      "voiceTurn": 2,
+      "caller": "Eeh, unaongea na Alvin.",
+      "language": "sw",
+      "spoken": "Asante Alvin. Ungependa tusaidie na huduma gani leo?",
+      "tools": [
+        {
+          "name": "save_caller_info",
+          "args": {
+            "name": "Alvin",
+            "reason": "general enquiry"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "model": {
+        "chars": 212,
+        "say": [
+          "Asante Alvin. Ungependa tusaidie na huduma gani leo?"
+        ]
+      }
     },
     {
-      "speaker": "agent",
-      "at": "2026-10-09T17:12:34.300Z",
-      "text_content": "Am I speaking with Alvin?"
+      "turn": 3,
+      "voiceTurn": 3,
+      "caller": "a.",
+      "language": "sw",
+      "spoken": "Samahani, sijakusikia vizuri. Ungependa kusaidiwa na huduma gani leo?",
+      "model": {
+        "chars": 146,
+        "say": [
+          "Samahani, sijakusikia vizuri. Ungependa kusaidiwa na huduma gani leo?"
+        ]
+      }
     },
     {
-      "speaker": "caller",
-      "at": "2026-10-09T17:12:40.616Z",
-      "text_content": "Eeh, unaongea na Alvin."
+      "turn": 4,
+      "voiceTurn": 5,
+      "caller": "Kwa. Uko wapi?",
+      "language": "sw",
+      "spoken": "Ofisi yetu kuu iko Nairobi, na tunatoa huduma za kuja mpaka mlangoni kwako Nairobi na maeneo ya jirani. Ungetaka tukutembelee wapi?",
+      "model": {
+        "chars": 265,
+        "say": [
+          "Ofisi yetu kuu iko Nairobi, na tunatoa huduma za kuja mpaka mlangoni kwako Nairobi na maeneo ya jirani. Ungetaka tukutembelee wapi?"
+        ]
+      }
     },
     {
-      "speaker": "agent",
-      "at": "2026-10-09T17:12:42.116Z",
-      "text_content": "Asante Alvin. Ungependa tusaidie na huduma gani leo?"
+      "turn": 5,
+      "voiceTurn": 6,
+      "caller": "Wewe unaendelea aje wewe mwenyewe?",
+      "language": "sw",
+      "spoken": "Niko vyema kabisa, asante kwa kuuliza Alvin. Nawe unaendeleaje, na nikutafutie huduma gani leo?"
     },
     {
-      "speaker": "caller",
-      "at": "2026-10-09T17:12:52.068Z",
-      "text_content": "a."
+      "turn": 6,
+      "voiceTurn": 7,
+      "caller": "Mimi nataka kujua ni pesa ngapi kuosha carpet, na.",
+      "language": "sw",
+      "spoken": "Carpet Cleaning ni KSh 2,200 per room.",
+      "path": "speak_packet price"
     },
     {
-      "speaker": "agent",
-      "at": "2026-10-09T17:12:53.787Z",
-      "text_content": "Samahani, sijakusikia vizuri. Ungependa kusaidiwa na huduma gani leo?"
+      "turn": 7,
+      "voiceTurn": 8,
+      "caller": "Oh, so it's done per room?",
+      "language": "en",
+      "spoken": "Yes Alvin, carpet cleaning is 2,200 shillings per room. When would you like us to come, and where should we come?",
+      "model": {
+        "chars": 348,
+        "say": [
+          "Yes Alvin, carpet cleaning is 2,200 shillings per room.",
+          "When would you like us to come, and where should we come?"
+        ]
+      },
+      "live": {
+        "when": "Oh, so it's done per room",
+        "whenSource": "contextual_slot_answer"
+      }
     },
     {
-      "speaker": "caller",
-      "at": "2026-10-09T17:12:58.632Z",
-      "text_content": "Kwa. Uko wapi?"
+      "turn": 8,
+      "voiceTurn": 9,
+      "caller": "I thought I had some visits in line.",
+      "language": "en",
+      "spoken": "You have a carpet cleaning visit requested for tomorrow, Saturday, at 9 AM in Kitengela, Grace Apartments. Is there anything you would like to change or add for this visit?",
+      "live": {
+        "location": "line",
+        "locationSource": "caller_explicit"
+      }
     },
     {
-      "speaker": "agent",
-      "at": "2026-10-09T17:13:00.354Z",
-      "text_content": "Ofisi yetu kuu iko Nairobi, na tunatoa huduma za kuja mpaka mlangoni kwako Nairobi na maeneo ya jirani. Ungetaka tukutembelee wapi?"
+      "turn": 9,
+      "voiceTurn": 10,
+      "caller": "Uh, I don't think so. Maybe—maybe can you move the time? What's the time that is indicated there?",
+      "language": "en",
+      "spoken": "The visit is currently set for tomorrow, Saturday, at 9 AM. What new time would work best for you?",
+      "live": {
+        "decisionReason": "Coverage is not on file and the location is only an area. Do not invent coverage. Do not create_appointment. Offer to note it for the owner. Never say landmark.",
+        "packet": "visit_block withheld"
+      }
     },
     {
-      "speaker": "caller",
-      "at": "2026-10-09T17:13:16.156Z",
-      "text_content": "Wewe unaendelea aje wewe mwenyewe?"
+      "turn": 10,
+      "voiceTurn": 11,
+      "caller": "Let's do at.",
+      "language": "en",
+      "spoken": "What specific time would you like to move the visit to?",
+      "outcome": "barge_in",
+      "model": {
+        "chars": 114,
+        "say": [
+          "What specific time would you like to move the visit to?"
+        ]
+      }
     },
     {
-      "speaker": "agent",
-      "at": "2026-10-09T17:13:17.590Z",
-      "text_content": "Niko vyema kabisa, asante kwa kuuliza Alvin. Nawe unaendeleaje, na nikutafutie huduma gani leo?"
+      "turn": 11,
+      "voiceTurn": 12,
+      "caller": "1:00 PM.",
+      "language": "en",
+      "spoken": "",
+      "outcome": "barge_in"
     },
     {
-      "speaker": "caller",
-      "at": "2026-10-09T17:13:32.657Z",
-      "text_content": "Mimi nataka kujua ni pesa ngapi kuosha carpet, na."
+      "turn": 12,
+      "voiceTurn": 13,
+      "caller": "1:00 PM is fine.",
+      "language": "en",
+      "spoken": "Okay, Sawa. I've moved that visit to tomorrow, Saturday, at 1 PM.",
+      "tools": [
+        {
+          "name": "update_appointment",
+          "args": {
+            "status": "requested",
+            "when_text": "Saturday 10 October 2026, 1:00 PM"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "model": {
+        "chars": 200,
+        "lang": "en",
+        "say": [
+          "Okay, Sawa."
+        ]
+      }
     },
     {
-      "speaker": "agent",
-      "at": "2026-10-09T17:13:33.000Z",
-      "text_content": "Carpet Cleaning ni KSh 2,200 per room."
+      "turn": 13,
+      "voiceTurn": 16,
+      "caller": "Uh, I appreciate it then.",
+      "language": "en",
+      "spoken": "You are welcome, Alvin. Have a great day!",
+      "model": {
+        "chars": 102,
+        "say": [
+          "You are welcome, Alvin. Have a great day!"
+        ]
+      }
     },
     {
-      "speaker": "caller",
-      "at": "2026-10-09T17:13:41.264Z",
-      "text_content": "Oh, so it's done per room?"
-    },
-    {
-      "speaker": "agent",
-      "at": "2026-10-09T17:13:42.934Z",
-      "text_content": "Yes Alvin, carpet cleaning is 2,200 shillings per room. When would you like us to come, and where should we come?"
-    },
-    {
-      "speaker": "caller",
-      "at": "2026-10-09T17:13:55.993Z",
-      "text_content": "I thought I had some visits in line."
-    },
-    {
-      "speaker": "agent",
-      "at": "2026-10-09T17:13:57.750Z",
-      "text_content": "You have a carpet cleaning visit requested for tomorrow, Saturday, at 9 AM in Kitengela, Grace Apartments. Is there anything you would like to change or add for this visit?"
-    },
-    {
-      "speaker": "caller",
-      "at": "2026-10-09T17:14:18.255Z",
-      "text_content": "Uh, I don't think so. Maybe—maybe can you move the time? What's the time that is indicated there?"
-    },
-    {
-      "speaker": "agent",
-      "at": "2026-10-09T17:14:19.485Z",
-      "text_content": "The visit is currently set for tomorrow, Saturday, at 9 AM. What new time would work best for you?"
-    },
-    {
-      "speaker": "caller",
-      "at": "2026-10-09T17:14:31.276Z",
-      "text_content": "Let's do at."
-    },
-    {
-      "speaker": "agent",
-      "at": "2026-10-09T17:14:32.453Z",
-      "text_content": "What specific time would you like to move the visit to?"
-    },
-    {
-      "speaker": "caller",
-      "at": "2026-10-09T17:14:33.817Z",
-      "text_content": "1:00 PM."
-    },
-    {
-      "speaker": "caller",
-      "at": "2026-10-09T17:14:35.008Z",
-      "text_content": "1:00 PM is fine."
-    },
-    {
-      "speaker": "agent",
-      "at": "2026-10-09T17:14:36.294Z",
-      "text_content": "Okay, Sawa."
-    },
-    {
-      "speaker": "agent",
-      "at": "2026-10-09T17:14:37.377Z",
-      "text_content": "I've moved that visit to tomorrow, Saturday, at 1 PM."
-    },
-    {
-      "speaker": "caller",
-      "at": "2026-10-09T17:14:51.071Z",
-      "text_content": "Uh, I appreciate it then."
-    },
-    {
-      "speaker": "agent",
-      "at": "2026-10-09T17:14:52.352Z",
-      "text_content": "You are welcome, Alvin. Have a great day!"
-    },
-    {
-      "speaker": "caller",
-      "at": "2026-10-09T17:14:58.041Z",
-      "text_content": "Haya."
-    },
-    {
-      "speaker": "agent",
-      "at": "2026-10-09T17:14:59.454Z",
-      "text_content": "Sawa Alvin, uwe na siku njema!"
-    },
-    {
-      "speaker": "agent",
-      "at": "2026-10-09T17:15:08.847Z",
-      "text_content": "Naweza kusaidia?"
+      "turn": 14,
+      "voiceTurn": 17,
+      "caller": "Haya.",
+      "language": "sw",
+      "spoken": "Sawa Alvin, uwe na siku njema!",
+      "model": {
+        "chars": 98,
+        "say": [
+          "Sawa Alvin, uwe na siku njema!"
+        ]
+      }
     }
-  ]
+  ],
+  "live": {
+    "resolution": "resolved",
+    "resolutionNote": "Answered.",
+    "primaryIntent": "book_visit",
+    "brainSummary": "Intent: book_visit. Caller: Alvin. Goal: Haya",
+    "visitUpdatedAlert": "VISIT UPDATED. Done and Dusted Cleaning Services\nService: Carpet Cleaning (per room)\nWhen: Saturday 10 October 2026, 1 PM\nWhere: Kitengela, Grace Apartments\nCaller: like\nNotes: Kitengela, Grace Apartments\nStatus: requested\nOpen Inbox Visits to confirm or cancel.",
+    "updatedRow": {
+      "id": "b140110d-9d62-422e-ae78-2b85cab837c6",
+      "call_id": "74704bcd-a069-4392-b92a-90fcd4834f5f",
+      "service_name": "Carpet Cleaning (per room)",
+      "status": "requested",
+      "when_text": "Saturday 10 October 2026, 1 PM",
+      "window_start": "2026-10-10T10:00:00+00:00",
+      "window_end": "2026-10-10T10:00:00+00:00",
+      "address_landmark": "Kitengela, Grace Apartments",
+      "caller_name": "like"
+    },
+    "traceScore": 82.9,
+    "incompleteTurns": [
+      2,
+      3,
+      5,
+      8,
+      11,
+      13,
+      16,
+      17
+    ],
+    "incompleteNotes": {
+      "2": "spoken 52 of model 212",
+      "3": "spoken 69 of model 146",
+      "5": "spoken 131 of model 265",
+      "8": "spoken 132 of model 288",
+      "11": "spoken 55 of model 114",
+      "13": "spoken 66 of model 200",
+      "16": "spoken 41 of model 102",
+      "17": "spoken 30 of model 98"
+    }
+  }
 }

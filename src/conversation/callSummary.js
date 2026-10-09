@@ -61,10 +61,14 @@ function deriveCallSummary(opts = {}) {
     primaryIntent = 'human';
   }
 
+  const fixesD199 = require('./callFixesD199');
   const products = [
     entityValue(state.entities?.product),
     entityValue(state.entities?.requestedItem),
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 8): "A mood. Diary" → "A mood Diary".
+    .map((item) => (fixesD199.callFixesD199Enabled() ? fixesD199.joinBrokenPhrase(item) : item));
 
   const actions = [];
   const instructions = [];
