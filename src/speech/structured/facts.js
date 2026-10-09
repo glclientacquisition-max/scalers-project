@@ -6,6 +6,7 @@
 const { normalizePolicies, POLICY_LABELS } = require('../../conversation/businessPolicies');
 const { coveredByAreas } = require('../../conversation/coverageAreas');
 const { formatScheduleSummary } = require('../../conversation/businessHours');
+const { speakableCoverage } = require('./coverageSource');
 const { statedNumbers } = require('./numbers');
 
 function slug(text) {
@@ -88,7 +89,10 @@ function buildFactTable(profile = {}, opts = {}) {
   }
 
   const policies = normalizePolicies(profile?.businessPolicies);
-  const areas = Array.isArray(policies.coverage_areas) ? policies.coverage_areas : [];
+  // BRAIN_CONFIRMED_COVERAGE on: only owner-confirmed areas (else none).
+  // Off: the stored list, as before.
+  const coverage = speakableCoverage(profile, { env: opts.env });
+  const areas = coverage.areas;
   for (const area of areas) {
     const name = area.slice(area.indexOf(':') + 1);
     add({
@@ -137,6 +141,7 @@ function buildFactTable(profile = {}, opts = {}) {
     entries,
     byId,
     coverageAreas: areas,
+    coverageGate: { gated: coverage.gated, confirmed: coverage.confirmed },
     isCovered(placeText) {
       return areas.length ? coveredByAreas(placeText, areas) : null;
     },
@@ -145,12 +150,20 @@ function buildFactTable(profile = {}, opts = {}) {
 
 /** Prompt block. Ids in brackets are what facts_used must cite. */
 function formatFactsBlock(table) {
+  const unconfirmed = table?.coverageGate?.gated && !table.coverageGate.confirmed;
+  const coverageRule = unconfirmed
+    ? ['COVERAGE: the owner has not confirmed any service area. Never say we cover, serve or do not cover a place, and never list areas. For a place, say the team will confirm it.']
+    : [];
   if (!table?.entries?.length) {
-    return 'GROUNDED FACTS: (none on file). State no prices, places or policies; offer to note the question for the team.';
+    return [
+      'GROUNDED FACTS: (none on file). State no prices, places or policies; offer to note the question for the team.',
+      ...coverageRule,
+    ].join('\n');
   }
   return [
     'GROUNDED FACTS (the only business facts you may state; cite each one you use by its [id] in facts_used):',
     ...table.entries.map((entry) => `[${entry.id}] ${entry.text}`),
+    ...coverageRule,
   ].join('\n');
 }
 
