@@ -11,6 +11,7 @@ const PLATFORM_KINDS = new Set([
   'platform_ops_speech',
   'platform_ops_reasoning',
   'platform_ops_telephony',
+  'platform_ops_package',
 ]);
 
 const CALLER_KINDS = new Set([

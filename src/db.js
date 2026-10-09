@@ -172,8 +172,50 @@ async function listActiveTenantDids() {
 }
 
 /**
- * New inbound calls stop when the package minute bucket is used up and
- * on-demand is off. Missing columns fail open so a webhook still answers.
+ * Package minute state for one tenant. Never throws; null when unreadable.
+ * periodStart comes from tenant_subscriptions (null without a package row).
+ */
+async function getTenantPackageUsage(tenantId) {
+  if (!tenantId) return null;
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('id, business_name, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement')
+    .eq('id', tenantId)
+    .maybeSingle();
+  if (error) {
+    if (!/minutes_included|seconds_used|on_demand_usage_enabled|billing_enforcement|column|schema cache/i.test(error.message || '')) {
+      console.warn('[db] getTenantPackageUsage:', error.message);
+    }
+    return { error: error.message || 'lookup_failed' };
+  }
+  if (!data) return null;
+  let periodStart = null;
+  try {
+    const { data: sub, error: subErr } = await supabase
+      .from('tenant_subscriptions')
+      .select('current_period_start')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (!subErr) periodStart = sub?.current_period_start || null;
+  } catch {
+    periodStart = null;
+  }
+  return {
+    tenantId: data.id,
+    businessName: data.business_name || null,
+    minutesIncluded: data.minutes_included,
+    secondsUsed: data.seconds_used,
+    onDemand: Boolean(data.on_demand_usage_enabled),
+    enforcement: data.billing_enforcement || 'off',
+    periodStart,
+  };
+}
+
+/**
+ * Package minute cap gate for a new inbound call.
+ * Rejects only when billing is enforced (soft/hard), included minutes are
+ * used, and on-demand is off. Beta (enforcement off) never rejects; it keeps
+ * metering and ops get 80% / 100% notices. Lookup failures fail open.
  */
 async function packageInboundOpen({ toNumber, fromNumber, tenantId } = {}) {
   let resolvedTenantId;
@@ -185,25 +227,73 @@ async function packageInboundOpen({ toNumber, fromNumber, tenantId } = {}) {
     return { open: true, reason: 'tenant_lookup_failed' };
   }
 
-  const { data, error } = await supabase
-    .from('tenants')
-    .select('minutes_included, seconds_used, on_demand_usage_enabled')
-    .eq('id', resolvedTenantId)
-    .maybeSingle();
-
-  if (error) {
-    if (/minutes_included|seconds_used|on_demand_usage_enabled|column|schema cache/i.test(error.message || '')) {
-      return { open: true, reason: 'columns_missing' };
-    }
-    console.warn('[db] packageInboundOpen:', error.message);
-    return { open: true, reason: 'lookup_failed' };
+  const usage = await getTenantPackageUsage(resolvedTenantId);
+  if (!usage) return { open: true, reason: 'lookup_failed' };
+  if (usage.error) {
+    return {
+      open: true,
+      reason: /column|schema cache/i.test(usage.error) ? 'columns_missing' : 'lookup_failed',
+    };
   }
 
-  return inboundOpen({
-    minutesIncluded: data?.minutes_included,
-    secondsUsed: data?.seconds_used,
-    onDemand: Boolean(data?.on_demand_usage_enabled),
+  return {
+    ...inboundOpen({
+      minutesIncluded: usage.minutesIncluded,
+      secondsUsed: usage.secondsUsed,
+      onDemand: usage.onDemand,
+      enforcement: usage.enforcement,
+    }),
+    usage,
+  };
+}
+
+/** Durable dedupe marker for one-off ops notices (status 'resolved', hidden on Desk). */
+async function hasPlatformOpsMarker(kind) {
+  const { data, error } = await supabase
+    .from('platform_ops_notices')
+    .select('id')
+    .eq('kind', kind)
+    .limit(1);
+  if (error) {
+    if (/platform_ops_notices|does not exist|schema cache|relation/i.test(error.message || '')) {
+      return false;
+    }
+    throw new Error(error.message);
+  }
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function putPlatformOpsMarker(kind, detail) {
+  const now = new Date().toISOString();
+  const { error } = await supabase.from('platform_ops_notices').insert({
+    kind,
+    status: 'resolved',
+    detail: detail ? String(detail).slice(0, 500) : null,
+    opened_at: now,
+    notified_at: now,
+    resolved_at: now,
   });
+  if (error && !/platform_ops_notices|does not exist|schema cache|relation/i.test(error.message || '')) {
+    throw new Error(error.message);
+  }
+}
+
+/** Fire-and-forget after metering: 80% / 100% ops notice for beta tenants. */
+async function checkPackageUsageAlertsForCall(callId) {
+  try {
+    const { data: callRow, error } = await supabase
+      .from('calls')
+      .select('tenant_id')
+      .eq('id', callId)
+      .maybeSingle();
+    if (error || !callRow?.tenant_id) return;
+    const usage = await getTenantPackageUsage(callRow.tenant_id);
+    if (!usage || usage.error) return;
+    const { maybeAlertPackageUsage } = require('./billing/packageUsageAlerts');
+    await maybeAlertPackageUsage(usage);
+  } catch (err) {
+    console.warn('[db] package usage alert:', err?.message || err);
+  }
 }
 
 async function upsertCall({
@@ -741,6 +831,7 @@ async function settleCallUsage({
 
   const metered = await consumeCallSeconds({ callId, seconds, direction });
   if (metered.applied) {
+    void checkPackageUsageAlertsForCall(callId);
     const amount = Number(metered.row?.amount_kes || 0);
     if (amount > 0) {
       console.log(
@@ -2293,6 +2384,9 @@ module.exports = {
   setCallResolution,
   chargeCallToWallet,
   packageInboundOpen,
+  getTenantPackageUsage,
+  hasPlatformOpsMarker,
+  putPlatformOpsMarker,
   uploadRecordingBuffer,
   getCall,
   getTenantById,

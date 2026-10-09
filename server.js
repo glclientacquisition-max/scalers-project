@@ -219,6 +219,7 @@ const {
   opsCooldownMs,
 } = require('./src/notifications/platformOpsAlert');
 const { platformOpsRecipients } = require('./src/notifications/platformOpsRecipients');
+const { maybeAlertPackageUsage } = require('./src/billing/packageUsageAlerts');
 const {
   selectProductsForTurn,
   formatTargetedProductsForPrompt,
@@ -1375,8 +1376,17 @@ async function handleVoiceIncoming(req, res) {
 
     try {
       const gate = await db.packageInboundOpen({ toNumber, fromNumber });
+      if (gate?.usage) {
+        // Beta tenants are never rejected at the cap; ops get 80% / 100% notices.
+        void maybeAlertPackageUsage(gate.usage).catch((err) => {
+          console.warn('[package-usage] alert failed:', err?.message || err);
+        });
+      }
+      if (gate?.reason === 'beta_over_cap') {
+        console.log(`[${callSid}] package minutes used, billing in beta — answering (metered, not charged)`);
+      }
       if (gate && gate.open === false) {
-        console.warn(`[${callSid}] package exhausted — reject`);
+        console.warn(`[${callSid}] package exhausted (billing ${gate.usage?.enforcement || '?'}, on-demand off) — reject`);
         return res
           .type('text/xml')
           .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
