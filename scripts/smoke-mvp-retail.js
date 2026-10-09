@@ -5,6 +5,9 @@
  * Beachhead scenarios mirror docs/product/MVP_SHIP_AND_TEST.md.
  */
 
+// Fixtures use P0 owner rows (no value_hash). An ambient FACT_HASH_MODE=on in the
+// shell must not change the scenarios or the baseline scores.
+delete process.env.FACT_HASH_MODE;
 const {
   createBrainState,
   inferIntent,
