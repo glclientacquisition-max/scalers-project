@@ -12,7 +12,8 @@
 //             money { minor, max_minor?, currency, mode: 'exact'|'from'|'range' },
 //             string / enum (DB text as stored), id (never spoken).
 // Templates: visit_open, request_open, requested_at, saved_item, saved_none,
-// team_will_confirm, move_ok, visit_updated. An unknown template or a missing
+// team_will_confirm, move_ok, visit_updated, confirm_identity_first,
+// more_open (5397e87c). An unknown template or a missing
 // required slot returns null; Brain then uses its src/conversation/factLine.js.
 // visit_updated never says "moved".
 //
@@ -342,7 +343,59 @@ const TEMPLATES = {
       });
     },
   },
+  // The caller file is masked (name not confirmed). Brain dropped a "no
+  // bookings" claim; this is said instead. ask: true carries the one
+  // file-name ask; false means it was already spoken, so no ask here.
+  confirm_identity_first: {
+    required: [],
+    render: (r, lang, raw) => {
+      const name = raw.ask === true ? r.name : '';
+      if (name) {
+        return by(lang, {
+          en: `Let me just confirm who I'm speaking with, is this ${name}?`,
+          sw: `Wacha nithibitishe kwanza, ninazungumza na ${name}?`,
+          sheng: `Wacha ni-confirm kwanza, naongea na ${name}?`,
+        });
+      }
+      return by(lang, {
+        en: "Let me just confirm who I'm speaking with first.",
+        sw: 'Wacha nithibitishe kwanza ninazungumza na nani.',
+        sheng: 'Wacha ni-confirm kwanza naongea na nani.',
+      });
+    },
+  },
+  // Last line of an open-file read: open rows left out (past-dated, or
+  // requests past the newest four).
+  more_open: {
+    required: [],
+    render: (_, lang, raw) => {
+      const n = Number(raw.count);
+      if (!Number.isInteger(n) || n < 1) return null;
+      if (n === 1) {
+        return by(lang, {
+          en: 'There is one older open item on file too.',
+          sw: 'Pia kuna ombi lingine moja la zamani lililo wazi kwenye faili.',
+          sheng: 'Pia kuna kitu ingine moja ya zamani iko open kwa file.',
+        });
+      }
+      return by(lang, {
+        en: `There are ${n} older open items on file too.`,
+        sw: `Pia kuna maombi mengine ${maCount(n)} ya zamani yaliyo wazi kwenye faili.`,
+        sheng: `Pia kuna vitu zingine ${n} za zamani ziko open kwa file.`,
+      });
+    },
+  },
 };
+
+// Kiswahili count agreeing with a ma- class noun (maombi): mawili, matatu,
+// manne, matano, manane; sita, saba, tisa, kumi and the tens do not change.
+const MA_UNITS = { mbili: 'mawili', tatu: 'matatu', nne: 'manne', tano: 'matano', nane: 'manane' };
+function maCount(n) {
+  const words = numberToSw(n).split(' ');
+  const last = words.length - 1;
+  if (MA_UNITS[words[last]]) words[last] = MA_UNITS[words[last]];
+  return words.join(' ');
+}
 
 /**
  * A Brain fact line as one spoken sentence.

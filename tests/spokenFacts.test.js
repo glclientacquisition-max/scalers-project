@@ -60,7 +60,7 @@ describe('renderFact', () => {
 
 describe('renderFactLine templates (fact-lines.md)', () => {
   it('has exactly Brain\'s 8 templates', () => {
-    assert.deepEqual([...TEMPLATES].sort(), ['move_ok', 'request_open', 'requested_at', 'saved_item', 'saved_none', 'team_will_confirm', 'visit_open', 'visit_updated']);
+    assert.deepEqual([...TEMPLATES].sort(), ['confirm_identity_first', 'more_open', 'move_ok', 'request_open', 'requested_at', 'saved_item', 'saved_none', 'team_will_confirm', 'visit_open', 'visit_updated']);
   });
   it('move_ok needs only to_when; job and from_when are optional', () => {
     assert.equal(line('move_ok', 'sw', { to_when: SAT_9 }), 'Sawa, nimehamisha ziara hadi kesho Jumamosi, saa tatu asubuhi.');
@@ -132,5 +132,42 @@ describe('renderFactLine templates (fact-lines.md)', () => {
     assert.equal(spokenFactsEnabled({ VOICE_SPOKEN_FACTS: 'on' }), true);
     assert.equal(spokenFactsEnabled({ VOICE_SPOKEN_FACTS: 'true' }), false);
     assert.equal(spokenFactsEnabled({}), false);
+  });
+});
+
+// 5397e87c: confirm_identity_first and more_open (HD_1b3a67ea7ee9).
+describe('confirm_identity_first and more_open', () => {
+  it('confirm_identity_first carries the name ask only with ask: true and a name', () => {
+    assert.equal(line('confirm_identity_first', 'en', { name: 'Wanjiku', ask: true }), "Let me just confirm who I'm speaking with, is this Wanjiku?");
+    assert.equal(line('confirm_identity_first', 'sw', { name: 'Wanjiku', ask: true }), 'Wacha nithibitishe kwanza, ninazungumza na Wanjiku?');
+    assert.equal(line('confirm_identity_first', 'sheng', { name: 'Wanjiku', ask: true }), 'Wacha ni-confirm kwanza, naongea na Wanjiku?');
+    // Ask already spoken on this call: never asked twice.
+    assert.equal(line('confirm_identity_first', 'en', { name: 'Wanjiku', ask: false }), "Let me just confirm who I'm speaking with first.");
+    assert.equal(line('confirm_identity_first', 'sw', { name: 'Wanjiku', ask: false }), 'Wacha nithibitishe kwanza ninazungumza na nani.');
+    assert.equal(line('confirm_identity_first', 'sheng', {}), 'Wacha ni-confirm kwanza naongea na nani.');
+    // ask without a name has nothing to ask.
+    assert.equal(line('confirm_identity_first', 'en', { ask: true }), "Let me just confirm who I'm speaking with first.");
+    for (const lang of ['en', 'sw', 'sheng']) {
+      const out = line('confirm_identity_first', lang, { name: 'Wanjiku', ask: true });
+      assert.doesNotMatch(out, /no (bookings?|records?|visits?)|hakuna/i);
+      assert.equal(out.split(/[.?!]\s/).length, 1, out);
+    }
+  });
+  it('more_open: count 1 is singular; Kiswahili counts agree with maombi', () => {
+    assert.equal(line('more_open', 'en', { count: 1 }), 'There is one older open item on file too.');
+    assert.equal(line('more_open', 'en', { count: 3 }), 'There are 3 older open items on file too.');
+    assert.equal(line('more_open', 'sw', { count: 1 }), 'Pia kuna ombi lingine moja la zamani lililo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 2 }), 'Pia kuna maombi mengine mawili ya zamani yaliyo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 5 }), 'Pia kuna maombi mengine matano ya zamani yaliyo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 6 }), 'Pia kuna maombi mengine sita ya zamani yaliyo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 8 }), 'Pia kuna maombi mengine manane ya zamani yaliyo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 12 }), 'Pia kuna maombi mengine kumi na mawili ya zamani yaliyo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sheng', { count: 4 }), 'Pia kuna vitu zingine 4 za zamani ziko open kwa file.');
+  });
+  it('more_open with no, zero or bad count returns null (Brain falls back)', () => {
+    assert.equal(line('more_open', 'en', {}), null);
+    assert.equal(line('more_open', 'en', { count: 0 }), null);
+    assert.equal(line('more_open', 'sw', { count: 'many' }), null);
+    assert.equal(line('more_open', 'sw', { count: 2.5 }), null);
   });
 });
