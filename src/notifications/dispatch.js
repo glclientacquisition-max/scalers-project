@@ -100,10 +100,11 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
       const recorded = await recordDispatchResult(ledger, result, text);
       const claim = durableSendClaim(recorded);
       if (!claim.ok) {
-        return { channel: null, reason: claim.reason };
+        return { channel: null, reason: claim.reason, errors: [...errors] };
       }
     }
-    return result;
+    // Channels that failed before this one landed (notifyOutcome.js).
+    return result && typeof result === 'object' ? { ...result, errors: [...errors] } : result;
   }
 
   try {
