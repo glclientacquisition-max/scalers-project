@@ -426,6 +426,17 @@ const {
   appointmentEvent,
 } = require('./src/notifications/events');
 const {
+  buildOwnerCallMessage,
+  clearOwnerCallItems,
+  mergeOwnerCallItems,
+  noteOwnerCallItem,
+  ownerMessageAtEndEnabled,
+  ownerNotifiedMeta,
+  ownerNotifyChannels,
+  ownerSummaryKeyBase,
+  pendingOwnerCallItems,
+} = require('./src/notifications/ownerCallMessage');
+const {
   dispatchCallerSms,
   appointmentCallerEvent,
   requestCallerEvent,
@@ -1213,9 +1224,19 @@ async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, s
       durationSeconds: durationSeconds ?? null,
       found: Boolean(updated),
     });
+    // Post-close work runs once, for the close that ended the call. The other
+    // path (carrier webhook vs media-socket close) only adds its duration.
+    if (updated && updated.terminal_transition !== true) {
+      console.log(`[${source}] call ${callSid} already closed; post-close work skipped`);
+      return updated;
+    }
     // Best-effort outcome while Brain state may still be in memory.
     await persistCallResolution(callSid, source, { turns, callStatus: status });
     await persistFirstForwardAcceptance(callSid, durationSeconds);
+    if (updated && ownerMessageAtEndEnabled()) {
+      // One owner message per call, after the call. Every close path lands here.
+      await sendOwnerCallMessage(callSid, { terminal: true, source });
+    }
     if (updated) {
       // Fire-and-forget: SMS latency must not hold the webhook open.
       maybeSendMissedTextback({ callSid, call: updated }).catch((err) =>
@@ -2793,7 +2814,7 @@ mediaWss.on('connection', (ws, req) => {
           name: planned.name,
           reason: 'Live line could not complete. Team to follow up.',
         });
-        maybeSendWhatsAppNotification(sidLabel());
+        maybeSendWhatsAppNotification(sidLabel(), { midCall: true });
       } catch (err) {
         console.error(
           `[ws/media][${sidLabel()}] llm recovery save failed:`,
@@ -5109,7 +5130,12 @@ async function maybeQueueLiveTransfer({
 }
 
 async function maybeSendWhatsAppNotification(callSid, opts = {}) {
-  // Lead alert: WhatsApp owner number when sender is ready; email fallback otherwise.
+  if (ownerMessageAtEndEnabled()) {
+    // Never mid-call. Late paths (recording webhooks) re-check the one message.
+    if (opts.midCall === true) return;
+    return sendOwnerCallMessage(callSid, { source: opts.source || 'late' });
+  }
+  // Legacy (VOICE_OWNER_MESSAGE_AT_END=off): lead alert as it happens.
   const call = await db.getCall(callSid);
   if (!call) return;
 
@@ -5218,9 +5244,143 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
   }
 }
 
+const OWNER_TERMINAL_STATUSES = new Set([
+  'complete',
+  'completed',
+  'failed',
+  'no_answer',
+  'busy',
+  'canceled',
+  'cancelled',
+]);
+
+/**
+ * The one owner message for a call: visits, else requests, else a lead.
+ * Runs on every close path; safe to call more than once. The ledger key
+ * handoff:<call_id>:summary:<channel>:<recipient> is unique in notify_sends.
+ */
+async function sendOwnerCallMessage(callSid, opts = {}) {
+  if (!callSid) return null;
+  if (ownerNotifyInProgress.has(callSid)) return null;
+  ownerNotifyInProgress.add(callSid);
+  try {
+    const call = await db.getCall(callSid);
+    if (!call) return null;
+    const terminal =
+      opts.terminal === true || OWNER_TERMINAL_STATUSES.has(String(call.status || '').toLowerCase());
+    if (!terminal) return null;
+    if (staffInboxAlreadyNotified(call) || ownerNotifiedMeta(call)) {
+      clearOwnerCallItems(callSid);
+      return null;
+    }
+
+    let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
+    let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
+    let businessName = process.env.BUSINESS_NAME || null;
+    let notifyChannels = null;
+    let teamDirectory = [];
+    let tenantId = call.tenant_id || null;
+    try {
+      const profile = await db.getTenantProfile({ callSid });
+      ownerNumber = profile.whatsappNumber || ownerNumber;
+      ownerEmail = profile.alertEmail || ownerEmail;
+      businessName = profile.businessName || businessName;
+      notifyChannels = profile.notifyChannels || null;
+      teamDirectory = profile.teamDirectory || [];
+      tenantId = profile.id || tenantId;
+    } catch (err) {
+      console.warn(`[${callSid}] tenant lookup for owner message failed:`, err?.message || err);
+    }
+
+    const dbItems = await db
+      .listCallOwnerItems({ callId: call.id, tenantId: call.tenant_id || tenantId })
+      .catch(() => []);
+    const items = mergeOwnerCallItems(dbItems, pendingOwnerCallItems(callSid));
+    const signals = callFirstForward.get(callSid) || {};
+    const message = buildOwnerCallMessage({
+      call,
+      items,
+      businessName,
+      answered: signals.greetingPlayed === true ? true : undefined,
+      callUrl: callDeskUrl(call.id),
+    });
+    if (!message) {
+      clearOwnerCallItems(callSid);
+      return null;
+    }
+
+    const inbox = staffRecipients('inbox', {
+      teamDirectory,
+      ownerPhone: ownerNumber,
+      ownerEmail,
+    });
+    const { sent, errors } = await dispatchToStaff({
+      recipients: inbox.recipients,
+      body: message.body,
+      lead: message.lead,
+      subject: message.subject,
+      channels: notifyChannels,
+      ledger: {
+        tenantId,
+        callId: call.id || null,
+        callSid,
+        kind: message.kind,
+        keyBase: ownerSummaryKeyBase(call.id, callSid),
+      },
+    });
+    const result =
+      sent[0] || { channel: null, reason: inbox.source === 'none' ? 'no_inbox_recipient' : 'send_failed' };
+    if (!result.channel) {
+      console.warn(
+        `[${callSid}] Owner message skipped (${result.reason || 'unknown'}) kind=${message.kind}`,
+        {
+          inbox: inbox.source,
+          smsSender: smsSenderReady(),
+          whatsappSender: whatsAppSenderReady(),
+          emailFallback: emailFallbackReady(),
+        }
+      );
+      return null;
+    }
+    clearOwnerCallItems(callSid);
+    // owner_notified is the dedupe marker; whatsapp_sent only when WhatsApp landed.
+    const channels = ownerNotifyChannels(sent, errors);
+    await db.markWhatsappSent(callSid, {
+      owner_notify_channels: channels,
+      whatsapp_delivered: channels.whatsapp === 'sent',
+    });
+    await db.mergeCallSummaryMeta({
+      callSid,
+      patch: {
+        owner_notified: true,
+        owner_notify_channels: channels,
+        whatsapp_sent: channels.whatsapp === 'sent',
+        owner_notify_body: message.body,
+        owner_notify_channel: result.channel,
+        owner_notify_kind: message.kind,
+        owner_notify_answered: message.answered,
+        owner_notify_recipients: sent.length,
+      },
+    });
+    console.log(
+      `[${callSid}] Owner message (${message.kind}${message.answered ? ', answered' : ''}) ` +
+        `via ${result.channel} to ${sent.length} recipient(s) source=${opts.source || 'n/a'}`
+    );
+    return message;
+  } catch (err) {
+    console.error(`[${callSid}] Owner message failed:`, err?.message || err);
+    return null;
+  } finally {
+    ownerNotifyInProgress.delete(callSid);
+  }
+}
+
 /** Dedicated hold/order/enquiry alert. Marks the call so hangup does not also send a lead. */
 async function maybeSendServiceRequestNotification(callSid, request) {
   if (!request) return;
+  // Owner hears once, after the call (sendOwnerCallMessage). Caller confirmation still goes now.
+  const ownerAtEnd = ownerMessageAtEndEnabled();
+  if (ownerAtEnd) noteOwnerCallItem(callSid, { type: 'request', kind: 'created', row: request });
   let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
   let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
   let businessName = process.env.BUSINESS_NAME || 'your business';
@@ -5258,45 +5418,47 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     callerNumber: request.caller_phone,
   };
 
-  const inbox = staffRecipients('inbox', {
-    teamDirectory,
-    ownerPhone: ownerNumber,
-    ownerEmail,
-  });
-  const { sent } = await dispatchToStaff({
-    recipients: inbox.recipients,
-    body,
-    lead,
-    channels: notifyChannels,
-    subject: renderEventSubject(event),
-    ledger: { ...ledger, kind: 'service_request' },
-  });
-  const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
-  if (result.channel) {
-    console.log(
-      `[${callSid}] Request notify (${event.title}) via ${result.channel}` +
-        (result.to ? ` → ${result.to}` : '')
-    );
-    try {
-      await db.markWhatsappSent(callSid);
-      await db.mergeCallSummaryMeta({
-        callSid,
-        patch: {
-          owner_notify_body: body,
-          owner_notify_channel: result.channel,
-          owner_notify_kind: 'service_request',
-        },
-      });
-    } catch (err) {
+  if (!ownerAtEnd) {
+    const inbox = staffRecipients('inbox', {
+      teamDirectory,
+      ownerPhone: ownerNumber,
+      ownerEmail,
+    });
+    const { sent } = await dispatchToStaff({
+      recipients: inbox.recipients,
+      body,
+      lead,
+      channels: notifyChannels,
+      subject: renderEventSubject(event),
+      ledger: { ...ledger, kind: 'service_request' },
+    });
+    const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
+    if (result.channel) {
+      console.log(
+        `[${callSid}] Request notify (${event.title}) via ${result.channel}` +
+          (result.to ? ` → ${result.to}` : '')
+      );
+      try {
+        await db.markWhatsappSent(callSid);
+        await db.mergeCallSummaryMeta({
+          callSid,
+          patch: {
+            owner_notify_body: body,
+            owner_notify_channel: result.channel,
+            owner_notify_kind: 'service_request',
+          },
+        });
+      } catch (err) {
+        console.warn(
+          `[${callSid}] request notify mark sent failed:`,
+          err?.message || err
+        );
+      }
+    } else {
       console.warn(
-        `[${callSid}] request notify mark sent failed:`,
-        err?.message || err
+        `[${callSid}] Request notify skipped (${result.reason || 'unknown'})`
       );
     }
-  } else {
-    console.warn(
-      `[${callSid}] Request notify skipped (${result.reason || 'unknown'})`
-    );
   }
 
   const callerEvent = requestCallerEvent({ ...request, businessName });
@@ -5322,6 +5484,9 @@ async function maybeSendServiceRequestNotification(callSid, request) {
 /** Visit booking alert for home-services appointments. */
 async function maybeSendAppointmentNotification(callSid, appointment, kind = 'created') {
   if (!appointment) return;
+  // Owner hears once, after the call (sendOwnerCallMessage). Caller confirmation still goes now.
+  const ownerAtEnd = ownerMessageAtEndEnabled();
+  if (ownerAtEnd) noteOwnerCallItem(callSid, { type: 'visit', kind, row: appointment });
   let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
   let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
   let businessName = process.env.BUSINESS_NAME || 'your business';
@@ -5361,45 +5526,47 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     callerNumber: appointment.caller_phone,
   };
 
-  const inbox = staffRecipients('inbox', {
-    teamDirectory,
-    ownerPhone: ownerNumber,
-    ownerEmail,
-  });
-  const { sent } = await dispatchToStaff({
-    recipients: inbox.recipients,
-    body,
-    lead,
-    subject: renderEventSubject(event),
-    channels: notifyChannels,
-    ledger: { ...ledger, kind: 'appointment' },
-  });
-  const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
-  if (result.channel) {
-    console.log(
-      `[${callSid}] Appointment notify (${kind}) via ${result.channel}` +
-        (result.to ? ` → ${result.to}` : '')
-    );
-    try {
-      await db.markWhatsappSent(callSid);
-      await db.mergeCallSummaryMeta({
-        callSid,
-        patch: {
-          owner_notify_body: body,
-          owner_notify_channel: result.channel,
-          owner_notify_kind: 'appointment',
-        },
-      });
-    } catch (err) {
+  if (!ownerAtEnd) {
+    const inbox = staffRecipients('inbox', {
+      teamDirectory,
+      ownerPhone: ownerNumber,
+      ownerEmail,
+    });
+    const { sent } = await dispatchToStaff({
+      recipients: inbox.recipients,
+      body,
+      lead,
+      subject: renderEventSubject(event),
+      channels: notifyChannels,
+      ledger: { ...ledger, kind: 'appointment' },
+    });
+    const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
+    if (result.channel) {
+      console.log(
+        `[${callSid}] Appointment notify (${kind}) via ${result.channel}` +
+          (result.to ? ` → ${result.to}` : '')
+      );
+      try {
+        await db.markWhatsappSent(callSid);
+        await db.mergeCallSummaryMeta({
+          callSid,
+          patch: {
+            owner_notify_body: body,
+            owner_notify_channel: result.channel,
+            owner_notify_kind: 'appointment',
+          },
+        });
+      } catch (err) {
+        console.warn(
+          `[${callSid}] appointment notify mark sent failed:`,
+          err?.message || err
+        );
+      }
+    } else {
       console.warn(
-        `[${callSid}] appointment notify mark sent failed:`,
-        err?.message || err
+        `[${callSid}] Appointment notify skipped (${result.reason || 'unknown'})`
       );
     }
-  } else {
-    console.warn(
-      `[${callSid}] Appointment notify skipped (${result.reason || 'unknown'})`
-    );
   }
 
   const callerEvent = appointmentCallerEvent(
