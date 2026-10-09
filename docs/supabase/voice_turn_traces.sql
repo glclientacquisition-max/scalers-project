@@ -53,8 +53,7 @@ grant all on public.voice_turn_traces to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Retention: keep 30 days of traces.
--- pg_cron is NOT enabled on prod (checked 2026-10-09), so this adds a purge function only.
--- Scheduling (pick one, needs Alvin's OK):
+-- Scheduled on prod by voice_turn_traces_cron.sql (pg_cron, daily 03:17 EAT). Options considered:
 --   a) enable pg_cron, then:
 --        select cron.schedule('purge_voice_turn_traces', '17 2 * * *',
 --          $$select public.purge_voice_turn_traces(30)$$);
