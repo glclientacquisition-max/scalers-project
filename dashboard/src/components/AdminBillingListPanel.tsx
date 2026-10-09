@@ -102,18 +102,17 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
         ) : (
           <ul className="divide-y divide-line/70 border-y border-line/70" aria-label="Businesses">
             {filtered.map((r) => (
-              <li key={r.id}>
-                <ListRow
-                  href={`/admin/billing/${r.id}`}
-                  title={r.business_name}
-                  when={r.statusLabel}
-                  preview={[
-                    `${r.packageName || "No package"}${r.period ? ` / ${r.period}` : ""}`,
-                    `${usedOfIncluded(r.minutesUsed, r.minutesIncluded)} min`,
-                    chargingModeLabel(r.billing_enforcement),
-                  ].join(" · ")}
-                />
-              </li>
+              <ListRow
+                key={r.id}
+                href={`/admin/billing/${r.id}`}
+                title={r.business_name}
+                when={r.statusLabel}
+                preview={[
+                  `${r.packageName || "No package"}${r.period ? ` / ${r.period}` : ""}`,
+                  `${usedOfIncluded(r.minutesUsed, r.minutesIncluded)} min`,
+                  chargingModeLabel(r.billing_enforcement),
+                ].join(" · ")}
+              />
             ))}
           </ul>
         )}
