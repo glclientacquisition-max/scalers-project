@@ -8,6 +8,8 @@ const {
 const { expandPhones, expandSpokenForms } = require('./spokenForms');
 const { shouldRewriteSheng, rewriteShengForTts } = require('./shengRewrite');
 const { stripSpokenInstructionLeaks } = require('./spokenInstructionLeak');
+const { guardSpokenFacts } = require('./spokenFacts/guard');
+const { spokenFactsEnabled } = require('./spokenFacts/flag');
 
 const SW_UTTERANCE_MARKERS =
   /\b(habari|sawa|asante|karibu|tafadhali|nina|nataka|ningependa|ndiyo|hapana|kwaheri|jina|msaada|kidogo|naweza|unaweza|ninaomba|naomba|pole|samahani|bei|huduma|nitakupigia|nakucheckia|shida|kesho|leo)\b/gi;
@@ -280,11 +282,24 @@ function prepareForTts(text, opts = {}) {
     spoken = rewriteShengForTts(spoken);
   }
   spoken = applyLexicon(spoken, language, extras);
+  let factMismatches = [];
+  if (spokenFactsEnabled()) {
+    // VOICE_SPOKEN_FACTS: spoken times and amounts are checked against the
+    // turn's stored facts first (HD_d199dbbf6b79), then expanded for TTS.
+    const facts = typeof opts.spokenFacts === 'function' ? opts.spokenFacts() : opts.spokenFacts;
+    if (facts && typeof facts === 'object') {
+      const checked = guardSpokenFacts(spoken, { ...facts, lang: language });
+      spoken = checked.text;
+      factMismatches = checked.mismatches;
+    }
+  }
   spoken = expandSpokenForms(spoken, language);
   spoken = expandPhones(spoken);
   spoken = polishPunctuation(spoken, language);
 
-  return { original, text: spoken, language };
+  return factMismatches.length
+    ? { original, text: spoken, language, factMismatches }
+    : { original, text: spoken, language };
 }
 
 /**

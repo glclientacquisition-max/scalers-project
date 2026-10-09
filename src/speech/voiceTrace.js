@@ -416,6 +416,10 @@ function createVoiceTrace(opts = {}) {
       ...(info.wire != null ? { wire: redactText(info.wire) } : {}),
       ...(info.stream != null ? { stream: String(info.stream) } : {}),
       ...(info.structured === true ? { structured: true } : {}),
+      // VOICE_SPOKEN_FACTS: a spoken time or amount that disagreed with the stored facts.
+      ...(Array.isArray(info.factMismatches) && info.factMismatches.length
+        ? { factMismatches: info.factMismatches.map((row) => ({ kind: row.kind, said: redactText(row.said || '') })) }
+        : {}),
     });
   }
 

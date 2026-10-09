@@ -10,6 +10,8 @@ const {
   parseAbsoluteWhenDate,
   weekdaySpoken,
 } = require('./appointmentHours');
+const { renderFact } = require('../speech/spokenFacts');
+const { spokenFactsEnabled } = require('../speech/spokenFacts/flag');
 const { clockPhrase, dayCue } = require('./visitTime');
 const { canonicalizeCallerName } = require('./callerNameMatch');
 const { isJunkCallerName } = require('./callerNameQuality');
@@ -648,6 +650,28 @@ function applyHeldCallerName(parsed, held) {
   return next;
 }
 
+/**
+ * VOICE_SPOKEN_FACTS: the stored visit time as spoken words per language,
+ * carried on the tool result so the confirmation (and the model's next
+ * turn, which sees it in history) copies it: sw "kesho Jumamosi, saa tatu
+ * asubuhi", en "tomorrow, Saturday, at 9 AM". Null when the flag is off.
+ */
+function spokenWhenFor(hours, now = new Date()) {
+  if (!spokenFactsEnabled()) return null;
+  const resolved = hours?.resolved;
+  const instant = resolved?.instant;
+  if (!resolved || resolved.isNow || resolved.periodLabel || !(instant instanceof Date) || Number.isNaN(instant.getTime())) {
+    return null;
+  }
+  const slot = { type: 'datetime', iso: instant.toISOString(), tz: 'Africa/Nairobi', precision: 'time' };
+  const spoken = {
+    en: renderFact(slot, 'en', { now }),
+    sw: renderFact(slot, 'sw', { now }),
+    sheng: renderFact(slot, 'sheng', { now }),
+  };
+  return spoken.en && spoken.sw && spoken.sheng ? spoken : null;
+}
+
 async function executeBrainTools({
   parsed,
   capabilities = {},
@@ -947,6 +971,7 @@ async function executeBrainTools({
                 value: validation.value,
                 hours: validation.hours || null,
                 record: created,
+                ...(spokenWhenFor(validation.hours, now) ? { spokenWhen: spokenWhenFor(validation.hours, now) } : {}),
               }
             : {
                 action: 'create_appointment',
@@ -1025,6 +1050,7 @@ async function executeBrainTools({
                 value: validation.value,
                 hours: validation.hours || null,
                 record: updated,
+                ...(spokenWhenFor(validation.hours, now) ? { spokenWhen: spokenWhenFor(validation.hours, now) } : {}),
               }
             : {
                 action: 'update_appointment',
@@ -1301,7 +1327,7 @@ function formatToolConfirmation(results = [], language = 'en') {
   }
   if (meaningful.action === 'create_appointment') {
     if (meaningful.status === 'succeeded') {
-      const whenLabel = formatRequestedWhenLabel(meaningful.hours, lang);
+      const whenLabel = meaningful.spokenWhen?.[lang] || formatRequestedWhenLabel(meaningful.hours, lang);
       if (sw) {
         return whenLabel
           ? `Sawa, nimehifadhi ombi la ziara ${whenLabel}.`
@@ -1373,7 +1399,7 @@ function formatToolConfirmation(results = [], language = 'en') {
         if (sheng) return 'Poa, nime-cancel hiyo visit.';
         return "Okay, I've cancelled that visit.";
       }
-      const whenLabel = formatRequestedWhenLabel(meaningful.hours, lang);
+      const whenLabel = meaningful.spokenWhen?.[lang] || formatRequestedWhenLabel(meaningful.hours, lang);
       if (sw) {
         return whenLabel
           ? `Sawa, nimehamisha ziara ${whenLabel}.`
@@ -1491,6 +1517,7 @@ function formatToolConfirmation(results = [], language = 'en') {
 }
 
 module.exports = {
+  spokenWhenFor,
   REQUEST_TYPES,
   RESERVED_CALLER_NAMES,
   stableFingerprint,

@@ -176,6 +176,51 @@ const {
   formatToolConfirmation,
   brainLinesForResults,
 } = require('./src/conversation/toolExecution');
+const {
+  noteStoredToolResults,
+  storedClockMinutes: storedToolClockMinutes,
+  latestStoredClock,
+  catalogueAmounts,
+  clearStoredClocks,
+} = require('./src/speech/storedClock');
+const { eatMinutes: storedEatMinutes } = require('./src/speech/storedClock');
+
+/**
+ * Stored visit times (EAT minutes) for this call: the caller file's open
+ * visits and every appointment written on the call. Kiswahili times are
+ * checked against these before TTS (HD_d199dbbf6b79).
+ */
+function callStoredClockMinutes(callSid) {
+  const out = new Set(storedToolClockMinutes(callSid));
+  const card = callTenantProfiles.get(callSid)?.callerMemory;
+  const visits = Array.isArray(card?.openVisits) ? card.openVisits : [];
+  for (const visit of visits) {
+    if (visit && typeof visit === 'object' && (visit.window_start || visit.windowStart)) {
+      const m = storedEatMinutes(visit.window_start || visit.windowStart);
+      if (m != null) out.add(m);
+      continue;
+    }
+    const text = typeof visit === 'string' ? visit : String(visit?.whenText || visit?.when_text || '');
+    const clock = /\b(\d{1,2})(?::(\d{2}))?\s*([AaPp])\.?\s?[Mm]\b/.exec(text);
+    if (!clock) continue;
+    const hour = (Number(clock[1]) % 12) + (/p/i.test(clock[3]) ? 12 : 0);
+    out.add(hour * 60 + Number(clock[2] || 0));
+  }
+  return [...out];
+}
+
+/**
+ * VOICE_SPOKEN_FACTS: this call's stored facts for the pre-TTS guard:
+ * visit times (caller file + writes), the latest written time, and the
+ * catalogue prices in shillings. Read only when the flag is on.
+ */
+function callSpokenFacts(callSid) {
+  return {
+    times: callStoredClockMinutes(callSid),
+    latestTime: latestStoredClock(callSid),
+    amounts: catalogueAmounts(callTenantProfiles.get(callSid) || {}),
+  };
+}
 const { deriveCallResolution } = require('./src/conversation/callResolution');
 const { planConfirmFileRead } = require('./src/conversation/callFixesD199');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
@@ -2632,6 +2677,7 @@ mediaWss.on('connection', (ws, req) => {
           callLanguage,
           language: opts.language,
           extraLexicon,
+          spokenFacts: () => callSpokenFacts(sidLabel()),
         });
     tapSim('agent_text', { path: opts.tracePath || (opts.isFiller ? 'filler' : 'speak'), text: String(text || ''), spoken: prepared.text });
     let fillerNote = null;
@@ -3654,6 +3700,7 @@ mediaWss.on('connection', (ws, req) => {
             callLanguage,
             speedScale: ttsSpeedScale,
             extraLexicon: ttsLexiconOverrides,
+            spokenFacts: () => callSpokenFacts(sidLabel()),
             ...(structuredMouth ? { structured: true, lockedLanguage: structuredLock?.lang } : {}),
           })
           .then((session) => {
@@ -3705,6 +3752,7 @@ mediaWss.on('connection', (ws, req) => {
           callLanguage,
           speedScale: ttsSpeedScale,
           extraLexicon: ttsLexiconOverrides,
+          spokenFacts: () => callSpokenFacts(sidLabel()),
           ...(structuredMouth ? { structured: true, lockedLanguage: structuredLock?.lang } : {}),
         });
         console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
@@ -3815,11 +3863,13 @@ mediaWss.on('connection', (ws, req) => {
           const traced = prepareForTts(text, {
             callLanguage,
             extraLexicon: typeof ttsLexiconOverrides !== 'undefined' ? ttsLexiconOverrides : [],
+            spokenFacts: () => callSpokenFacts(sidLabel()),
           });
           voiceTrace.noteTts({
             text: traced.text,
             before: text,
             language: traced.language,
+            ...(traced.factMismatches ? { factMismatches: traced.factMismatches } : {}),
           });
         }
         session.pushText(text);
@@ -5129,6 +5179,7 @@ mediaWss.on('connection', (ws, req) => {
         .finally(() => {
           callAgentTools.delete(sessionCallSid);
           callBrainStates.delete(sessionCallSid);
+          clearStoredClocks(sessionCallSid);
           callBrainCapabilities.delete(sessionCallSid);
           callTenantProfiles.delete(sessionCallSid);
         });
@@ -5942,6 +5993,7 @@ wss.on('connection', (ws) => {
         .finally(() => {
           callAgentTools.delete(callSid);
           callBrainStates.delete(callSid);
+          clearStoredClocks(callSid);
           callBrainCapabilities.delete(callSid);
           callTenantProfiles.delete(callSid);
         });
@@ -6614,6 +6666,7 @@ async function runGeminiTurnStreaming(
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
   const heldTools = await applyToolsWithHold(callSid, parsed, { shouldAbort, onToolHold });
   const execution = heldTools.execution;
+  noteStoredToolResults(callSid, execution.results);
   let actionConfirmation = formatToolConfirmation(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
@@ -6744,6 +6797,7 @@ async function runGeminiTurn(
   const parsed = parseGeminiResponse(outputText);
   const heldTools = await applyToolsWithHold(callSid, parsed, hooks);
   const execution = heldTools.execution;
+  noteStoredToolResults(callSid, execution.results);
   let actionConfirmation = formatToolConfirmation(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
