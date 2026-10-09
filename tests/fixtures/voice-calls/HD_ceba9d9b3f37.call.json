@@ -1,0 +1,75 @@
+{
+  "source": "staging calls ae6d7c03-0da3-4573-afec-bb7ca38847ec + transcripts (read-only SELECT, 2026-10-09)",
+  "callId": "ae6d7c03-0da3-4573-afec-bb7ca38847ec",
+  "callSid": "HD_ceba9d9b3f37",
+  "tenant": "Done and Dusted (staging)",
+  "startedAt": "2026-10-09T09:59:43.504Z",
+  "durationSeconds": 86,
+  "build": "ccdab29b",
+  "live": {
+    "primaryIntent": "general_enquiry",
+    "resolution": "resolved",
+    "resolutionNote": "The caller said goodbye. Close with a short farewell.",
+    "summary": {
+      "text": "Alvin asked about that's all.",
+      "brain_summary": "Intent: general_enquiry. Caller: Alvin. Goal: That's all",
+      "reason": "Alvin asked about that's all.",
+      "primary_intent": "general_enquiry",
+      "language": "en"
+    },
+    "ownerReview": {
+      "reason": "Alvin asked about that's all.",
+      "want": "Alvin asked about that's all.",
+      "done": "Hours were answered.",
+      "mood": "calm",
+      "next": "Hours were answered.",
+      "needs_human": false,
+      "needs_owner": false,
+      "urgent": false,
+      "confidence": 0.95,
+      "primary_intent": "general_enquiry"
+    }
+  },
+  "transcript": [
+    {
+      "speaker": "agent",
+      "text_content": "Done and Dusted, this is Shy. You can speak in English or Kiswahili. Tukusaidie vipi.",
+      "created_at": "2026-10-09 10:01:11.122343+00"
+    },
+    {
+      "speaker": "caller",
+      "text_content": "My booking, please.",
+      "created_at": "2026-10-09 10:01:11.122343+00"
+    },
+    {
+      "speaker": "agent",
+      "text_content": "Am I speaking with Alvin?",
+      "created_at": "2026-10-09 10:01:11.122343+00"
+    },
+    {
+      "speaker": "caller",
+      "text_content": "Yeah.",
+      "created_at": "2026-10-09 10:01:11.122343+00"
+    },
+    {
+      "speaker": "agent",
+      "text_content": "You have a Carpet Cleaning visit request for today, Friday, at 9 AM, in Kitengela. You have a Carpet Cleaning (per room) visit request for tomorrow, Saturday, at 9 AM, in Kitengela, Grace Apartments. You have an open enquiry for Mansion Cleaning Custom Quote. You have an open enquiry for Water bowl enquiry. You have a callback request about Carpet cleaning outside coverage. You have a callback request about Dishwashing enquiry. There are 25 older open items on file too.",
+      "created_at": "2026-10-09 10:01:11.122343+00"
+    },
+    {
+      "speaker": "caller",
+      "text_content": "Um, and what services do you offer?",
+      "created_at": "2026-10-09 10:01:11.122343+00"
+    },
+    {
+      "speaker": "agent",
+      "text_content": "We offer Apartment and House Cleaning, Deep Cleaning, Office Cleaning, and Mattress cleaning, and more. Which one do you need?",
+      "created_at": "2026-10-09 10:01:11.122343+00"
+    },
+    {
+      "speaker": "caller",
+      "text_content": "Okay, thank you.",
+      "created_at": "2026-10-09 10:01:11.122343+00"
+    }
+  ]
+}

@@ -843,12 +843,21 @@ function usableGoalRemainder(text) {
  */
 function isRejectedGoalText(text, opts = {}) {
   if (opts.unfinished === true || opts.weak === true) return true;
+  // BRAIN_CALL_FIXES_D199 (HD_ceba9d9b3f37 8b): "that's all", "hiyo tu",
+  // "okay thank you", "asante", "nothing else" and fillers are not goals.
+  const fixes = require('./callFixesD199');
+  if (fixes.callFixesD199Enabled() && fixes.notAGoal(text)) return true;
   return !usableGoalRemainder(text);
 }
 
 function callerGoalText(text, opts = {}) {
   if (opts.unfinished === true || opts.weak === true) return '';
-  return usableGoalRemainder(text);
+  const goal = usableGoalRemainder(text);
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 2, 4): a closing ("That's all.",
+  // "asante", "hiyo tu") or a thinking filler is never the caller's goal.
+  const fixes = require('./callFixesD199');
+  if (goal && fixes.callFixesD199Enabled() && (fixes.notAGoal(text) || fixes.notAGoal(goal))) return '';
+  return goal;
 }
 
 function isPlausibleCallerName(value) {

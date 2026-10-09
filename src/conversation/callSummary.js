@@ -29,6 +29,9 @@ function safeCallerName(state) {
 function safeGoalDescription(raw) {
   const goal = clean(callerGoalText(raw), 160);
   if (!goal) return '';
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 4): "Alvin asked about that's all."
+  const fixes = require('./callFixesD199');
+  if (fixes.callFixesD199Enabled() && fixes.notAGoal(goal)) return '';
   return goal;
 }
 
