@@ -36,6 +36,14 @@ afterEach(() => source.resetCoverageSourceForTests());
 
 describe('coverage source adapter', () => {
   it('uses the mirror while Brain confirmedCoverage.js is not on this branch', () => {
+    let brainOnBranch = true;
+    try {
+      require.resolve('../../src/conversation/confirmedCoverage');
+    } catch {
+      brainOnBranch = false;
+    }
+    assert.equal(source.coverageSourceKind(), brainOnBranch ? 'brain' : 'mirror');
+    source.resetCoverageSourceForTests(null);
     assert.equal(source.coverageSourceKind(), 'mirror');
   });
 
@@ -46,7 +54,8 @@ describe('coverage source adapter', () => {
     assert.equal(source.confirmedCoverageOn(ON), true);
   });
 
-  it('flag on: seed list or no meta is not speakable; an owner row is', () => {
+  it('flag on: seed list or no meta is not speakable; an owner row is (mirror)', () => {
+    source.resetCoverageSourceForTests(null);
     assert.deepEqual(source.speakableCoverage(DUSTED, { env: ON }), { gated: true, confirmed: false, areas: [] });
     assert.deepEqual(source.speakableCoverage({ ...DUSTED, fieldMeta: SEED_META }, { env: ON }).areas, []);
     const owned = source.speakableCoverage({ ...DUSTED, fieldMeta: OWNER_META }, { env: ON });
