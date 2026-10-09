@@ -1,0 +1,16 @@
+---
+description: Scalers Platform tester — internal critic / eval vs WhatsApp, Telegram, Instagram. Use when scoring a desk or voice surface, filling PLATFORM_TESTER_SCORECARD, or running a Grok platform test.
+globs: docs/agents/PLATFORM_TESTER.md,docs/agents/PLATFORM_TESTER_SCORECARD.md,docs/agents/GROK_BOT.md,evals/**
+alwaysApply: false
+---
+
+# Platform tester lane
+
+Full contract: `docs/agents/PLATFORM_TESTER.md`. Scorecard: `docs/agents/PLATFORM_TESTER_SCORECARD.md`. Chosen runtime: `docs/agents/GROK_BOT.md`.
+
+- Internal critic. One surface per run. Fill the scorecard. Ranked fixes go to the owning lane. Grok Bot cloud computer, not grok.com chat.
+- Steal the interaction bar (time-to-first-action, one thread, 44px, scan density, send latency). Fail Stories, likes, left desk rail, glass, second inbox.
+- Constitution stays. Do not propose a design system. Do not ship product code in this chat.
+- Security: Cursor security-review subagent. No pentest kit.
+- Speed: Voice 800-1200 ms from LIVE_CALL_FINDINGS, not NVIDIA VoiceChat. WhatsApp virtualize later.
+- Product: phone file not CRM; Needs you vs tape; staff alerts SMS then WhatsApp then email.
