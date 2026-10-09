@@ -9,6 +9,10 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+// Picker lists carry an owner row (ownerCoverage). Bare Okay/Sawa consent and
+// coverage lines with no list on file are the flag-off path (flagOff);
+// BRAIN_CONFIRMED_COVERAGE=on twins: confirmedCoverage.test.js.
+const { ownerCoverage, flagOff } = require('./helpers/ownerCoverage');
 const fs = require('fs');
 const path = require('path');
 const { resolveLocalReply, planCallerModelTurn } = require('../src/conversation/turnPolicy');
@@ -603,7 +607,7 @@ describe('HD_0789461c5319 catalogue, callback, and Kiswahili', () => {
     assert.doesNotMatch(polished, /Which service do you need\?.*Which service would you like/s);
   });
 
-  it('keeps the callback offer, and Sawa resolves it into a farewell', () => {
+  it('keeps the callback offer, and Sawa resolves it into a farewell', flagOff(() => {
     const offered = guardSpokenReply(
       'Kilicho iko outside our standard Nairobi coverage area, so we cannot book a direct visit right now. Would you like me to log a callback for the team to check if we can reach you?',
       {
@@ -643,7 +647,7 @@ describe('HD_0789461c5319 catalogue, callback, and Kiswahili', () => {
     assert.match(planned.line, /Asante\. Kwaheri\./);
     const repair = planEmptyGeminiSpeech({ language: 'en', userText: 'Sawa.' });
     assert.equal(repair.kind, 'hear_again');
-  });
+  }));
 
   it('reads Kiswahili from keywords when Soniox tags are empty, and from tags when they exist', () => {
     const bnb = analyzeCallerLanguage('Wewe unafanya vitu za BNB?');
@@ -665,7 +669,7 @@ describe('HD_0789461c5319 catalogue, callback, and Kiswahili', () => {
 });
 
 describe('HD_e3fb94e1bd0d prices, offer consent, and Nakuru', () => {
-  const DUSTED = {
+  const DUSTED = ownerCoverage({
     vertical: 'home_services',
     businessName: 'Done and Dusted',
     servicesCatalog: [
@@ -685,7 +689,7 @@ describe('HD_e3fb94e1bd0d prices, offer consent, and Nakuru', () => {
       ],
     },
     socialHandles: '0790381872',
-  };
+  });
 
   it('reads a hyphen, dash, or to/hadi/mpaka span as the file numbers', () => {
     for (const text of [
@@ -753,7 +757,9 @@ describe('HD_e3fb94e1bd0d prices, offer consent, and Nakuru', () => {
     assert.match(unsure, /Should I note it for the team\?/);
     assert.doesNotMatch(unsure, /don't have our coverage list/i);
     const shops = coverageAskSpeech('Do you cover the shops?', DUSTED, 'en');
-    assert.match(shops, /not sure we cover that area/);
+    // BRAIN_CALL_FIXES_D199 (c): not a real place, so no coverage packet at all.
+    if (process.env.BRAIN_CALL_FIXES_D199 === 'on') assert.equal(shops, '');
+    else assert.match(shops, /not sure we cover that area/);
     assert.doesNotMatch(shops, /don't have our coverage list/i);
     const spoken = guardSpokenReply(
       'Nakuru iko nje ya area yetu ya huduma kwani tunafanya Nairobi na maeneo ya karibu pekee.',
@@ -769,7 +775,7 @@ describe('HD_e3fb94e1bd0d prices, offer consent, and Nakuru', () => {
     assert.match(spoken, /Nairobi/);
   });
 
-  it('arms a spoken offer in Kiswahili or as an English statement, then saves on yes', () => {
+  it('arms a spoken offer in Kiswahili or as an English statement, then saves on yes', flagOff(() => {
     for (const line of [
       'Naweza kukuachia ujumbe kwa timu yetu?',
       'I can note this for the team.',
@@ -868,11 +874,11 @@ describe('HD_e3fb94e1bd0d prices, offer consent, and Nakuru', () => {
       allowEmpty: true,
     });
     assert.match(kept, /note this for the team/i);
-  });
+  }));
 });
 
 describe('HD_0789 and HD_486 coverage lines stay in the replay', () => {
-  const COVERAGE = {
+  const COVERAGE = ownerCoverage({
     businessName: 'Done and Dusted',
     businessPolicies: {
       coverage_areas: [
@@ -884,7 +890,7 @@ describe('HD_0789 and HD_486 coverage lines stay in the replay', () => {
         'place:syokimau',
       ],
     },
-  };
+  });
 
   function ttsText(turn) {
     const row = (turn.stages || []).find((stage) => stage.stage === 'tts');
@@ -931,6 +937,7 @@ describe('HD_0789 and HD_486 coverage lines stay in the replay', () => {
       )
     );
     fixture.businessPolicies = COVERAGE.businessPolicies;
+    fixture.fieldMeta = COVERAGE.fieldMeta;
     const replay = await replayCall(fixture);
     const turn4 = ttsText(replay.turns[3]);
     const turn5 = ttsText(replay.turns[4]);

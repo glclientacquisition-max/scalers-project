@@ -65,7 +65,10 @@ const {
   isLocationRefusal,
   isNoisePlace,
   preferVisitPlace,
+  coverageStatus,
 } = require('./visitLocation');
+const { countiesForPlace } = require('./kenyaPlaces');
+const { confirmedCoverageEnabled, recordCoverageNeed } = require('./confirmedCoverage');
 const {
   isRepairSignal,
   applyRepairObservation,
@@ -594,6 +597,40 @@ function observeCallerTurn(state, input = {}) {
     );
     if (askedRows) next.conversation.speakFileRead = true;
   }
+  const fixesD199 = require('./callFixesD199');
+  if (fixesD199.callFixesD199Enabled()) {
+    // BRAIN_CALL_FIXES_D199 (a): the caller is moving a visit already on file
+    // ("Siache tuieke ikuwe kesho"). A create in this state moves that row.
+    const fileVisits = (next.returning?.openRows || []).some((row) => row.kind === 'visit');
+    if (fixesD199.looksLikeNewJobAsk(text)) next.conversation.rescheduleAsked = false;
+    else if (
+      fileVisits &&
+      (fixesD199.looksLikeRescheduleAsk(text) || looksLikeCancelOrReschedule(text))
+    ) {
+      next.conversation.rescheduleAsked = true;
+    }
+    // HD_1b3a67ea7ee9 (8): a file ask before the name confirm ("About my
+    // booking") is pending; the confirm turn reads the file first.
+    if (!next.caller.nameConfirmed && fixesD199.fileHasRows(next) && fixesD199.looksLikeFileAsk(text)) {
+      next.conversation.fileAskPending = true;
+    }
+    // (7) Code-held asked flag: a name ask any mouth already spoke counts.
+    if (
+      next.caller.nameConfirmed !== true &&
+      next.caller.fileNameAskSpoken !== true &&
+      fixesD199.agentAskedFileName(input.lastAgentText, next.caller.fileNameAsked || next.returning?.fileOwnerName)
+    ) {
+      next.caller.fileNameAskSpoken = true;
+    }
+    // (e) "Tulifika wapi na ile mambo yetu ya jana?" asks for the file.
+    if (!Boolean(state?.caller?.nameConfirmed) && next.caller.nameConfirmed) {
+      const prior = (next.conversation.answersReceived || []).slice(0, -1);
+      if (prior.some((row) => fixesD199.looksLikeFileCatchUp(row))) {
+        next.conversation.speakFileRead = true;
+        if (fixesD199.fileHasRows(next)) next.conversation.fileAskPending = true;
+      }
+    }
+  }
   next.conversation.fileReadSentence =
     spokenFileRead({
       text,
@@ -643,6 +680,14 @@ function observeCallerTurn(state, input = {}) {
     const askedPlace = coverageAskPlace(text);
     if (askedPlace) {
       const foldedAsk = foldCanonicalPlace(askedPlace, input.profile) || askedPlace;
+      // BRAIN_CONFIRMED_COVERAGE: a place we cannot answer from the confirmed
+      // list is an open need for the owner (handoff-record needs[]).
+      if (confirmedCoverageEnabled()) {
+        const status = coverageStatus(foldedAsk, input.profile || {});
+        if (status !== 'inside' && status !== 'outside' && countiesForPlace(foldedAsk).length) {
+          recordCoverageNeed(next, foldedAsk, next.conversation.turnCount);
+        }
+      }
       next.entities.location = {
         value: foldedAsk,
         source: 'caller_explicit',
@@ -702,6 +747,9 @@ function observeCallerTurn(state, input = {}) {
       });
     } else {
       next.visitPlace = null;
+    }
+    if (next.visitPlace?.coverageUnconfirmed && confirmedCoverageEnabled()) {
+      recordCoverageNeed(next, place, next.conversation.turnCount);
     }
     if (
       next.visitPlace?.blocked === 'outside' ||
@@ -967,10 +1015,20 @@ function recordActionResults(state, results = []) {
               result.value.service_name ||
               result.value.service ||
               null,
+            // BRAIN_CALL_FIXES_D199 (e): the place, for "what have you saved?".
+            ...(require('./callFixesD199').callFixesD199Enabled()
+              ? {
+                  landmark: result.value.landmark || result.value.location || null,
+                  windowStart: result.value.windowStart || null,
+                  appointmentId: result.value.appointmentId || null,
+                }
+              : {}),
           },
         }
       : {}),
     ...(result.soft ? { soft: true } : {}),
+    ...(result.movedFiledVisit ? { movedFiledVisit: true } : {}),
+    ...(result.id && require('./callFixesD199').callFixesD199Enabled() ? { id: String(result.id) } : {}),
   }));
   if (!Array.isArray(next.actions.refusedHours)) next.actions.refusedHours = [];
   if (!Array.isArray(next.actions.refusedPlaces)) next.actions.refusedPlaces = [];

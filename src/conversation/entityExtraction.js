@@ -394,6 +394,18 @@ function applyCallerNameConfirmation(
         }
         return done(corrected, true, 'caller_correction', 0.98);
       }
+      // BRAIN_CALL_FIXES_D199 (d): "No, like, the mansion one" answers the
+      // last line, not the name. Only a no about the name unlocks it.
+      if (require('./callFixesD199').callFixesD199Enabled()) {
+        const agent = String(opts.lastAgentText || '');
+        const aboutName =
+          /\b(?:name|jina|speaking with|naongea na|unaongea na)\b/i.test(agent) ||
+          (prevName && agent.toLowerCase().includes(String(prevName).toLowerCase())) ||
+          /\b(?:wrong name|not my name|si jina|sio jina|si hiyo jina)\b/i.test(text);
+        if (!aboutName) {
+          return done(prevName, true, previous?.entities?.name?.source || 'caller_explicit', 0.95);
+        }
+      }
       return done(prevName, false, previous?.entities?.name?.source || 'caller_explicit', 0.9);
     }
     if (extracted && extracted !== prevName) {
@@ -844,6 +856,9 @@ function isPlausibleCallerName(value) {
   if (!name || name.length < 2 || name.length > 40) return false;
   if (isJunkCallerName(name)) return false;
   if (isHearAgainSignal(name) || isBackchannelOrFragment(name)) return false;
+  // BRAIN_CALL_FIXES_D199 (d): "No, like, the mansion one" is not the name Like.
+  const fixes = require('./callFixesD199');
+  if (fixes.callFixesD199Enabled() && fixes.isFillerPhrase(name)) return false;
   const lower = name.toLowerCase();
   if (
     /\b(i('d| would)? like to|i want to|i need to|i have to|discuss|talk about|speak to|tell me|can you|could you)\b/i.test(
@@ -1080,7 +1095,17 @@ function extractConversationEntities(
   if (phone) entities.phone = entity(phone, 'caller_explicit', 0.98, true);
   const when = extractWhen(text);
   if (when) entities.when = entity(when, 'caller_explicit', 0.9, false);
-  const quantity = extractQuantity(text, intent);
+  const fixesD199 = require('./callFixesD199');
+  const fixesOn = fixesD199.callFixesD199Enabled();
+  // BRAIN_CALL_FIXES_D199 (d): a count needs a countable thing, not a clock
+  // ("9 works best") or a pronoun ("the mansion one").
+  const quantity = fixesOn
+    ? ['hold', 'order', 'booking'].includes(intent) && !looksLikeNonConsentAck(text)
+      ? fixesD199.quantityWithUnit(text, {
+          quantityAsked: (state?.goal?.missingSlots || [])[0] === 'quantity',
+        })
+      : null
+    : extractQuantity(text, intent);
   if (quantity) entities.quantity = entity(quantity, 'caller_explicit', 0.9, false);
   const budget = extractBudget(text);
   if (budget) entities.budget = entity(budget, 'caller_explicit', 0.85, false);
@@ -1113,7 +1138,9 @@ function extractConversationEntities(
     !entities.product &&
     !entities.service &&
     firstMissing === 'subject' &&
-    shortAnswer
+    shortAnswer &&
+    // BRAIN_CALL_FIXES_D199 (d): filler is never the service.
+    !(fixesOn && fixesD199.isFillerPhrase(shortAnswer))
   ) {
     entities.requestedItem = entity(
       shortAnswer,
@@ -1131,7 +1158,14 @@ function extractConversationEntities(
     shortAnswer &&
     !isLocationRefusal(shortAnswer) &&
     !/\b(?:don'?t know|not sure|no idea|sijui|hakuna)\b/i.test(shortAnswer) &&
-    !extractWhen(shortAnswer)
+    !extractWhen(shortAnswer) &&
+    // BRAIN_CALL_FIXES_D199 (d): "9 works best" answers the time, not the place.
+    !(
+      fixesOn &&
+      (fixesD199.looksLikeTimeFragment(shortAnswer) ||
+        fixesD199.isFillerPhrase(shortAnswer) ||
+        fixesD199.looksLikeClauseNotPlace(text))
+    )
   ) {
     entities.location = entity(shortAnswer, 'contextual_slot_answer', 0.75, false);
   }

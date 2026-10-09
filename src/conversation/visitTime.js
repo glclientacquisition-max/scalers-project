@@ -92,6 +92,30 @@ function mergeTimeAnswer({ when = '', pendingHour = null, text = '' } = {}) {
   return { when, pendingHour, changed: false };
 }
 
+/**
+ * BRAIN_CALL_FIXES_D199: "9" is a Western hour; ask in Swahili clock time,
+ * "Saa tatu asubuhi au saa tatu usiku?", via swahiliClock (#633,
+ * src/conversation/swahiliClock.js). '' when the flag is off or the module is
+ * not on the branch yet (then the old line stays).
+ */
+function swahiliPendingHourAsk(pendingHour) {
+  if (!require('./callFixesD199').callFixesD199Enabled()) return '';
+  const n = Number(pendingHour);
+  if (!(n >= 1 && n <= 11)) return '';
+  let clock = null;
+  try {
+    // eslint-disable-next-line global-require
+    clock = require('./swahiliClock');
+  } catch (err) {
+    if (err && err.code !== 'MODULE_NOT_FOUND') throw err;
+  }
+  if (!clock || typeof clock.swahiliClock !== 'function') return '';
+  const am = clock.swahiliClock(n * 60);
+  const pm = clock.swahiliClock((n + 12) * 60);
+  if (!am || !pm) return '';
+  return `${am.charAt(0).toUpperCase()}${am.slice(1)} au ${pm}?`;
+}
+
 function timeAskLine({ when = '', pendingHour = null, language = 'en', askCount = 1 } = {}) {
   const lang = confirmationLanguage(language);
   const sw = lang === 'sw' || lang === 'sheng';
@@ -100,6 +124,8 @@ function timeAskLine({ when = '', pendingHour = null, language = 'en', askCount 
   const daySw = day === 'tomorrow' || day === 'kesho' ? 'kesho' : day === 'today' || day === 'leo' ? 'leo' : 'siku hiyo';
   if (pendingHour === 12) return sw ? 'Saa sita mchana?' : 'Twelve noon?';
   if (pendingHour != null) {
+    const swClock = sw ? swahiliPendingHourAsk(pendingHour) : '';
+    if (swClock) return swClock;
     return sw
       ? `Saa ${pendingHour} asubuhi au mchana?`
       : `${pendingHour} in the morning or in the afternoon?`;

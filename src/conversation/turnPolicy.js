@@ -38,6 +38,18 @@ const { unfinishedTurnHold } = require('./unfinishedTurn');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
+function offerYesNoLine(language) {
+  const lang = String(language || 'en').toLowerCase();
+  if (lang === 'sheng') return 'Niandike hii kwa team? Sema ndio ama hapana.';
+  if (lang === 'sw' || lang.startsWith('swahili')) return 'Niandike hii kwa timu? Tafadhali sema ndio au hapana.';
+  return 'Should I note it for the team? Please say yes or no.';
+}
+
+function slotText(raw) {
+  const value = raw && typeof raw === 'object' ? raw.value : raw;
+  return String(value || '').trim();
+}
+
 function nothingSavedLine(language) {
   const lang = String(language || 'en').toLowerCase();
   if (lang === 'sw') return 'Sawa. Sijahifadhi chochote.';
@@ -127,6 +139,12 @@ function planCallerModelTurn(state, opts = {}) {
   // A held fragment the caller left hanging is answered by the model, never
   // by an early-return line (HD_72ab69cbab2b T1). The name ask stays due.
   if (line && opts.holdTimedOut === true) {
+    // BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 7): a substantive turn that came
+    // through the hold timer still gets the one file-name ask.
+    const fixes = require('./callFixesD199');
+    if (fixes.callFixesD199Enabled() && fixes.substantiveCallerTurn(latest)) {
+      return { runModel: false, line };
+    }
     return { runModel: true, line: '', nameAskDeferred: true };
   }
   // Staging listen: Gemini speaks the catalogue even when a file name is pending.
@@ -134,8 +152,26 @@ function planCallerModelTurn(state, opts = {}) {
   if (line && geminiCatalogueEnabled() && freshCatalogueAsk(latest)) {
     return { runModel: true, line: '' };
   }
+  // BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 7): a pure greeting or small talk
+  // is answered by the model; the one file-name ask waits for the first
+  // substantive turn. The prompt keeps the model from asking it.
+  if (
+    line &&
+    require('./callFixesD199').callFixesD199Enabled() &&
+    require('./dynamicSpeech').looksLikePhaticCallerTurn(latest)
+  ) {
+    return { runModel: true, line: '', nameAskDeferred: true };
+  }
   if (line) return { runModel: false, line };
   return { runModel: true, line: '' };
+}
+
+function fileAnswerOwnsTurn(text, state) {
+  const fixes = require('./callFixesD199');
+  if (!fixes.callFixesD199Enabled()) return false;
+  if (state?.caller?.nameConfirmed !== true || state?.caller?.nameJustConfirmed === true) return false;
+  if (state?.messageOnly === true) return false;
+  return Boolean(fixes.planFileAnswer({ text, state })?.line);
 }
 
 function resolveLocalReply({
@@ -172,8 +208,25 @@ function resolveLocalReply({
     };
   }
 
+  // BRAIN_CONFIRMED_COVERAGE: a bare Okay / Sawa to the note-for-the-team
+  // offer is not a yes. Ask once for a clear yes or no; nothing is saved.
+  if (
+    state?.conversation?.pendingAsk?.kind === 'offer' &&
+    state?.conversation?.nonConsentAck === true &&
+    state?.conversation?.leaveIt !== true &&
+    require('./confirmedCoverage').confirmedCoverageEnabled()
+  ) {
+    return { outcome: 'offer_yes_no', line: offerYesNoLine(language) };
+  }
+
   // Visit, hold, and order words are on conversation.fileReadSentence for Voice.
   // Do not speak them here. A local reply would end the turn before Gemini.
+
+  // BRAIN_CALL_FIXES_D199: a turn that names a file row or asks about the file
+  // ("what about the mansion one?", "when did I request that?") is the file
+  // read's (planVisitReadTurn), ahead of any fact, coverage or place-block
+  // branch here (HD_d199dbbf6b79 t4).
+  if (fileAnswerOwnsTurn(clean, state)) return null;
 
   const detailLine = serviceFactsLine(clean, profile, language);
   if (detailLine) return publish({ outcome: 'service_facts', line: detailLine });
@@ -216,7 +269,11 @@ function resolveLocalReply({
   const coverageLine = coverageAskSpeech(clean, profile, language, state);
   if (coverageLine) return publish({ outcome: 'coverage', line: coverageLine });
 
-  const placeBlockLine = visitBlockSpeech(state?.visitPlace?.blocked, language);
+  const placeBlockLine = visitBlockSpeech(
+    state?.visitPlace?.blocked,
+    language,
+    slotText(state?.entities?.location) || slotText(state?.entities?.landmark)
+  );
   if (placeBlockLine && looksLikeLeaveIt(clean)) {
     return { outcome: 'leave_it', line: nothingSavedLine(language) };
   }

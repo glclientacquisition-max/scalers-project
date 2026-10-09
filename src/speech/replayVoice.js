@@ -45,6 +45,8 @@ function speechContext(state, callerTurns, language, fixture) {
       servicesCatalog: fixture.servicesCatalog || [],
       ...(fixture.vertical ? { vertical: fixture.vertical } : {}),
       ...(fixture.businessPolicies ? { businessPolicies: fixture.businessPolicies } : {}),
+      // Owner-confirm rows (tenant_field_meta) for BRAIN_CONFIRMED_COVERAGE replays.
+      ...(fixture.fieldMeta ? { fieldMeta: fixture.fieldMeta } : {}),
       ...(fixture.hoursSchedule ? { hoursSchedule: fixture.hoursSchedule } : {}),
       ...(fixture.socialHandles || fixture.social_handles
         ? {
