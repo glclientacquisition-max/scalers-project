@@ -52,6 +52,8 @@ async function loadTranscriptCall(callId) {
     .from('transcripts')
     .select('speaker, text_content, created_at')
     .eq('call_id', call.id)
+    // Prod writes all rows of a call with one created_at and there is no
+    // sequence column; ties come back in insert order (not guaranteed).
     .order('created_at', { ascending: true });
   if (tErr) throw new Error(tErr.message);
   let openVisits = null;

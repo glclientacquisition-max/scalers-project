@@ -143,7 +143,7 @@ node scripts/score-voice-call.js <calls.id or HD_sid> --transcripts      # reads
 node scripts/score-voice-call.js <calls.id> --rows call.json             # same, from an exported JSON bundle
 ```
 
-`--rows` takes `{ call: { id, created_at }, transcripts: [{ speaker, text_content, created_at }], openVisits: [...], agentName, businessName }`. Transcript turns carry only the spoken text, so latency, language tags, and deleted-answer checks are weaker there.
+`--rows` takes `{ call: { id, created_at }, transcripts: [{ speaker, text_content, created_at }], openVisits: [...], agentName, businessName }`. Transcript turns carry only the spoken text, so latency, language tags, and deleted-answer checks are weaker there. Prod writes every transcript row of a call with one `created_at` and `transcripts` has no sequence column, so row order is the insert (physical) order. `--transcripts` relies on that; for an export, order by `created_at, ctid`.
 
 ### Call-level checks (`src/speech/callChecks.js`)
 
