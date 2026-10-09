@@ -15,7 +15,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const FIXTURE = require('./fixtures/voice-calls/HD_b82fbfef7649.call.json');
+const FIXTURE = require('./fixtures/voice-calls/HD_b82fbfef7649.json');
 const {
   detectFarewell,
   farewellGraceMs,
