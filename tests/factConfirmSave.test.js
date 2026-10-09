@@ -215,6 +215,24 @@ before(() => {
     out.d1OnePath = 'catalog.service.' + savedOne.services_catalog[1].id + '.name';
     out.d1OneHash = hashFactValue(factValueForPath(out.d1OnePath, savedOne));
 
+    // "Looks right" on leaf catalogue paths (Brain e1a1e9ac): service price,
+    // product price, site_visit true and false. No change, explicit paths only.
+    const leafSaved = clone(savedIds);
+    const leafPaths = [
+      'catalog.service.' + leafSaved.services_catalog[0].id + '.price',
+      'catalog.product.SR-1.price',
+      'catalog.service.' + leafSaved.services_catalog[2].id + '.site_visit',
+      'catalog.service.' + leafSaved.services_catalog[1].id + '.site_visit',
+      'catalog.product.1.price',
+    ];
+    const leaf = planFactConfirm({ scope: 'catalog', before: rawIds, after: leafSaved, explicitPaths: leafPaths, normalize: normalizeFactRow });
+    out.leafPaths = leafPaths;
+    out.leafValues = leafPaths.map((p) => factValueForPath(p, leafSaved));
+    out.leafKnown = leafPaths.map((p) => isKnownFieldPath(p));
+    out.leafConfirm = leaf.confirm;
+    out.leafExpected = leafPaths.map((p) => hashFactValue(factValueForPath(p, leafSaved)));
+    out.leafReopen = leaf.reopen;
+
     // Stamped hash = hash of the saved, stored value, for changed and "Looks right" paths alike.
     const savedMany = clone(savedSame);
     savedMany.business_policies.returns = 'Exchanges within 7 days';
@@ -355,6 +373,27 @@ describe('D1: no-change save on a raw seed row (FACT_HASH_MODE on)', { skip: tsS
       'team.notify.whatsapp',
     ]);
     assert.equal(R.manyHashesMatch, true);
+  });
+});
+
+describe('"Looks right" on .price and .site_visit paths', { skip: tsSkip }, () => {
+  it('the paths are registered and resolve to a real value, never undefined', () => {
+    assert.deepEqual(R.leafKnown, [true, true, true, true, true]);
+    const [svcPrice, prodPrice, visitYes, visitNo, prodByPosition] = R.leafValues;
+    assert.deepEqual(svcPrice, { price: 'KES 2,500' });
+    assert.deepEqual(prodPrice, { price: 'KES 900' });
+    assert.equal(visitYes, true);
+    assert.equal(visitNo, false);
+    // The product has a sku, so its position path finds nothing (null, not undefined).
+    assert.equal(prodByPosition, null);
+  });
+
+  it('each stamps hashFactValue(factValueForPath(path, savedRow)); a path with no value stamps nothing', () => {
+    assert.deepEqual(
+      R.leafConfirm,
+      R.leafPaths.slice(0, 4).map((path, i) => ({ path, hash: R.leafExpected[i] }))
+    );
+    assert.deepEqual(R.leafReopen, []);
   });
 });
 

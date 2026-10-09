@@ -48,7 +48,8 @@ function asList(raw: unknown): unknown[] {
 
 /**
  * Empty means nothing to confirm: null, blank text, [], {}, a catalogue row
- * with no name, or a FAQ missing its question or answer.
+ * (.name path) with no name, or a FAQ missing its question or answer.
+ * A site_visit fact of false is a value, not empty.
  */
 export function isEmptyFactValue(value: unknown, path = ""): boolean {
   if (value === undefined || value === null) return true;
@@ -57,7 +58,8 @@ export function isEmptyFactValue(value: unknown, path = ""): boolean {
   if (typeof value === "object") {
     const obj = value as Row;
     if (!Object.keys(obj).length) return true;
-    if (path.startsWith("catalog.")) return !String(obj.name ?? "").trim();
+    // A catalogue row needs a name; a .price fact ({ price, mode }) does not.
+    if (path.startsWith("catalog.") && path.endsWith(".name")) return !String(obj.name ?? "").trim();
     if (path.startsWith("faqs.")) {
       return !String(obj.question ?? "").trim() || !String(obj.answer ?? "").trim();
     }
