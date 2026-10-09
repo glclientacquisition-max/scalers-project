@@ -1,5 +1,6 @@
 // Billing rules for live transfer.
-// SautiKit workspace cost today: inbound KES 0 / min, outbound KES 3 / min.
+// SautiKit workspace cost today: inbound call KES 0 / min plus about KES 0.50 / min
+// for the Voice media stream, outbound KES 3 / min answered.
 // Tenant card: inbound 0, outbound 4 / min (KES 1 / min margin on a connected transfer).
 
 const DEFAULT_INBOUND_RATE = 0;

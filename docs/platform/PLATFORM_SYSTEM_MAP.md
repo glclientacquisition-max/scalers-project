@@ -234,7 +234,7 @@ One prepaid **KES** wallet. AI is inside the minute rate. Dual telecom-KES + AI-
 | Item | Truth |
 | --- | --- |
 | Charge | RPC `charge_call_to_wallet`, idempotent per `call_id`. Voice calls it on completed inbound. |
-| Inbound on-demand | **KES 6 / min** (`billing_rate_card` 0.10/sec) past included minutes. SautiKit inbound is free. |
+| Inbound on-demand | **KES 6 / min** (`billing_rate_card` 0.10/sec) past included minutes. Our SautiKit cost is about KES 0.50 / min (inbound call KES 0 plus WebSocket streaming KES 0.50 / min). |
 | Outbound transfer | **KES 9 / min** stored on the rate card. Not offered and not originated until live transfer. |
 | Beta | `billing_enforcement=off` (default). Meter only. No charge. No outbound PSTN. |
 | Soft / hard | Ops graduates on Admin → Wallets. Hard inbound block **not** shipped. |
