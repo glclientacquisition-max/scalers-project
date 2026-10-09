@@ -270,6 +270,31 @@ async function saveCallerInfo({ callSid, name, reason }) {
 }
 
 /**
+ * Insert rows for transcripts. Each live turn carries the time it was heard
+ * or spoken (`at`); without it every row took the flush time
+ * (HD_b82fbfef7649: all rows 20:15:30 EAT, order scrambled). Times are kept
+ * strictly increasing so created_at ordering matches turn order.
+ */
+function transcriptInsertRows(callId, rows = []) {
+  let prev = 0;
+  return rows.map((turn) => {
+    const row = {
+      call_id: callId,
+      speaker: turn.speaker,
+      text_content: turn.text,
+      latency_ms: turn.latencyMs ?? null,
+    };
+    const at = turn.at ? Date.parse(turn.at) : NaN;
+    if (Number.isFinite(at)) {
+      const ms = at <= prev ? prev + 1 : at;
+      prev = ms;
+      row.created_at = new Date(ms).toISOString();
+    }
+    return row;
+  });
+}
+
+/**
  * Replace transcript turns for a call.
  * Accepts either the legacy full-text blob ("Caller: …\\nAgent: …") or
  * an array of { speaker, text, latencyMs }.
@@ -305,12 +330,7 @@ async function appendTranscript({ callSid, transcript, turns }) {
 
   if (rows.length === 0) return [];
 
-  const payload = rows.map((turn) => ({
-    call_id: call.id,
-    speaker: turn.speaker,
-    text_content: turn.text,
-    latency_ms: turn.latencyMs ?? null,
-  }));
+  const payload = transcriptInsertRows(call.id, rows);
 
   const { data, error } = await supabase
     .from('transcripts')
@@ -561,7 +581,37 @@ async function uploadRecordingBuffer({
  * Matches on sautikit_call_sid. Idempotent — safe to call from multiple webhooks.
  * Does not reopen a call that is already terminal unless upgrading duration.
  */
-async function updateCallStatus({ callSid, status, durationSeconds, force = false }) {
+/**
+ * Which duration wins. The carrier's figure is what the call cost and is
+ * final; the media socket's figure is a fallback only. HD_b82fbfef7649: the
+ * socket stayed open ~30 s after the caller hung up (193 s vs carrier 162 s)
+ * and "largest wins" billed 193 s, which consume_call_seconds cannot refund.
+ * @returns {{ accept: boolean, reason: string }}
+ */
+function durationDecision({ existingSeconds, existingSource, nextSeconds, nextSource } = {}) {
+  const next = Math.max(0, Math.round(Number(nextSeconds)));
+  if (!Number.isFinite(next)) return { accept: false, reason: 'invalid' };
+  const prev = existingSeconds == null ? null : Number(existingSeconds);
+  const prevSource = String(existingSource || '');
+  const source = String(nextSource || '');
+  if (source === 'vendor') {
+    if (next <= 0 && prev > 0) return { accept: false, reason: 'vendor_zero' };
+    return { accept: true, reason: 'vendor' };
+  }
+  if (prevSource === 'vendor') return { accept: false, reason: 'vendor_already' };
+  if (!prev) return { accept: true, reason: 'fill' };
+  if (next > 0 && next >= prev) return { accept: true, reason: 'larger' };
+  return { accept: false, reason: 'smaller' };
+}
+
+async function updateCallStatus({
+  callSid,
+  status,
+  durationSeconds,
+  force = false,
+  durationSource,
+  settle = true,
+}) {
   if (!callSid) {
     throw new Error('[db] updateCallStatus: callSid required');
   }
@@ -613,19 +663,38 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
     patch.status = finalStatus;
   }
 
+  const sourced = durationSource === 'vendor' || durationSource === 'media';
   if (durationSeconds != null && Number.isFinite(Number(durationSeconds))) {
     const nextDuration = Math.max(0, Math.round(Number(durationSeconds)));
-    if (existing.duration_seconds == null || existing.duration_seconds === 0 || nextDuration > 0) {
-      // Always accept a positive duration; fill zeros from later webhooks.
-      if (!existing.duration_seconds || nextDuration >= Number(existing.duration_seconds || 0)) {
-        patch.duration_seconds = nextDuration;
-        // Billable minutes ≈ talk time (0.1 min resolution). Used by one-KES wallet charge.
-        // Unanswered outbound transfer ring time is not billable (SautiKit does not charge it).
-        if (isOutboundTransfer && finalStatus !== 'complete') {
-          patch.ai_processing_minutes = 0;
-        } else {
-          patch.ai_processing_minutes = Math.round((nextDuration / 60) * 10) / 10;
-        }
+    const decision = sourced
+      ? durationDecision({
+          existingSeconds: existing.duration_seconds,
+          existingSource: existingMeta.duration_source,
+          nextSeconds: nextDuration,
+          nextSource: durationSource,
+        })
+      : null;
+    if (sourced) {
+      const metaPatch = {
+        ...existingMeta,
+        [`duration_${durationSource}_seconds`]: nextDuration,
+      };
+      if (decision.accept) metaPatch.duration_source = durationSource;
+      patch.summary = serializeSummary(metaPatch);
+    }
+    const legacyAccept =
+      !sourced &&
+      (existing.duration_seconds == null || existing.duration_seconds === 0 || nextDuration > 0) &&
+      (!existing.duration_seconds || nextDuration >= Number(existing.duration_seconds || 0));
+    // Legacy (no source): always accept a positive duration; fill zeros from later webhooks.
+    if (sourced ? decision.accept : legacyAccept) {
+      patch.duration_seconds = nextDuration;
+      // Billable minutes ≈ talk time (0.1 min resolution). Used by one-KES wallet charge.
+      // Unanswered outbound transfer ring time is not billable (SautiKit does not charge it).
+      if (isOutboundTransfer && finalStatus !== 'complete') {
+        patch.ai_processing_minutes = 0;
+      } else {
+        patch.ai_processing_minutes = Math.round((nextDuration / 60) * 10) / 10;
       }
     }
   }
@@ -633,6 +702,7 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
   const direction = isOutboundTransfer ? 'outbound' : 'inbound';
 
   if (Object.keys(patch).length === 0) {
+    if (!settle) return existing;
     await settleCallUsage({
       callId: existing.id,
       outboundUnanswered:
@@ -655,6 +725,8 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
   throwIfError('updateCallStatus', error);
   const shaped = shapeCall(data);
 
+  // A media-socket figure waits for the carrier's (settleCallDuration later).
+  if (!settle) return shaped;
   await settleCallUsage({
     callId: shaped?.id,
     outboundUnanswered: isOutboundTransfer && finalStatus !== 'complete',
@@ -723,6 +795,27 @@ async function setCallResolution({
  * Past the cap with on-demand off: meter only, no debit.
  * Falls back to charge_call_to_wallet only when consume_call_seconds is not applied yet.
  */
+/**
+ * Settle usage on whatever duration the row holds now. Used when the carrier
+ * figure never arrived after a media-socket close. consume_call_seconds only
+ * applies positive deltas, so a second settle is a no-op.
+ */
+async function settleCallDuration(callSid) {
+  const existing = await getCall(callSid);
+  if (!existing) return null;
+  const meta = parseSummary(existing.summary);
+  const isOutboundTransfer = meta.kind === 'live_transfer' && meta.direction === 'outbound';
+  return settleCallUsage({
+    callId: existing.id,
+    outboundUnanswered:
+      isOutboundTransfer && String(existing.status || '').toLowerCase() !== 'complete',
+    durationSeconds: existing.duration_seconds,
+    minutes: existing.ai_processing_minutes,
+    rateKesPerMin: isOutboundTransfer ? envTransferRateKesPerMin() : WALLET_RATE_KES_PER_MINUTE,
+    direction: isOutboundTransfer ? 'outbound' : 'inbound',
+  });
+}
+
 async function settleCallUsage({
   callId,
   outboundUnanswered,
@@ -2311,6 +2404,9 @@ async function listCallOwnerItems({ callId, tenantId } = {}) {
 
 module.exports = {
   listCallOwnerItems,
+  durationDecision,
+  settleCallDuration,
+  transcriptInsertRows,
   upsertCall,
   saveCallerInfo,
   saveEscalation,

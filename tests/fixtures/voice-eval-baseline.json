@@ -1,7 +1,7 @@
 {
   "schema": "scalers.voice.eval-baseline",
   "schemaVersion": 1,
-  "recordedAt": "2026-10-09T10:45:38.557Z",
+  "recordedAt": "2026-10-09T17:35:32.174Z",
   "calls": {
     "HD_015bae4a4af2": {
       "score": 87.9,
@@ -278,6 +278,29 @@
         "replacedAnswer": 0
       },
       "nameAsks": 1
+    },
+    "5bbb0871-b674-4e24-a484-a80a3504e2c3": {
+      "score": null,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 0,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 0,
+        "lostCallerFinal": 0
+      },
+      "mouth": {
+        "gluedPiece": 0,
+        "letterlessPiece": 0,
+        "monologue": 0,
+        "lostTurn": 0,
+        "stackedQuestion": 0,
+        "replacedAnswer": 0
+      },
+      "nameAsks": 0
     },
     "ae6d7c03-0da3-4573-afec-bb7ca38847ec": {
       "score": null,

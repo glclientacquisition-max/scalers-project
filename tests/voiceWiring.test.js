@@ -486,7 +486,7 @@ assert.match(
 // never an unsigned Gemini model turn, only a user-side note (HD_ceba9d9b3f37).
 assert.match(
   source,
-  /recordSpokenLine\(messages, greetingLine, \{ source: 'greeting' \}\)/,
+  /recordSpokenLine\(messages, spokenGreeting, \{ source: 'greeting' \}\)/,
   'instant greeting must be recorded local so it is not sent as an unsigned Gemini model turn'
 );
 assert.match(
