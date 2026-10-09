@@ -1,4 +1,3 @@
-import { connection } from "next/server";
 import { listDidPool, listPendingTenants } from "@/lib/didPool";
 import { sendOpsMail, isOpsMailConfigured } from "@/lib/opsMail";
 import {
@@ -28,6 +27,7 @@ import {
 import { fetchVoiceHealthz } from "@/lib/platformVoiceHealth";
 import { getSautikitWallet, isSautikitConfigured, listSautikitNumbers } from "@/lib/sautikit";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 
 function envEmails(): string[] {
   return parseOpsEmails(
@@ -230,7 +230,7 @@ export async function evaluatePlatformOps(): Promise<{
   infra: ReturnType<typeof infraFromEnv>;
   mailConfigured: boolean;
 }> {
-  await connection();
+  await requireSuperAdmin();
   const [{ settings, persisted }, pool, pending, expiredBeta, voice, telecom] = await Promise.all([
     loadOpsSettings(),
     listDidPool().catch(() => []),

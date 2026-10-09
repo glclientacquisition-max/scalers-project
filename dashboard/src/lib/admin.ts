@@ -1,7 +1,7 @@
-import { connection } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { listDidPool, listPendingTenants, type DidPoolRow, type PendingTenant } from "@/lib/didPool";
 import { loadBusinessPackageNames } from "@/lib/packageCatalog";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 
 export type AdminBusiness = {
   id: string;
@@ -94,7 +94,7 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
 }
 
 export async function getAdminOverview(): Promise<AdminOverview> {
-  await connection();
+  await requireSuperAdmin();
   const admin = getSupabaseAdmin();
   const since = new Date();
   since.setDate(since.getDate() - 7);
