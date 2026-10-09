@@ -117,14 +117,15 @@ async function resolveTenantId({ toNumber, fromNumber, tenantId }) {
     // Also try digit-normalized match for +254 vs 254 variants.
     const digits = String(candidate).replace(/\D/g, '');
     if (!digits) continue;
-    const { data: all, error: listError } = await supabase
-      .from('tenants')
-      .select('id, sautikit_virtual_number')
-      .eq('is_active', true);
+    // Every owner of the number, live first: an archived or suspended owner
+    // still resolves to itself (the inbound gate closes its line) instead of
+    // falling through to unassigned_did or another tenant.
+    const { data: all, error: listError } = await selectTenantLineRows();
     throwIfError('resolveTenantId(list)', listError);
-    const hit = (all || []).find(
-      (row) => String(row.sautikit_virtual_number || '').replace(/\D/g, '') === digits
-    );
+    // Same number rule as the inbound gate (+254 / 254 / 0 forms).
+    const { isTenantLineInactive, sameNumber } = require('./sautikit/inactiveTenantGate');
+    const owners = (all || []).filter((row) => sameNumber(row.sautikit_virtual_number, candidate));
+    const hit = owners.find((row) => !isTenantLineInactive(row)) || owners[0];
     if (hit?.id) return hit.id;
   }
 
@@ -220,18 +221,32 @@ async function notePlatformAudioError({ key, error: message } = {}) {
   return true;
 }
 
+// Line-state columns, newest first. Prod has line_status but not yet
+// archived_at; a missing column drops out and never closes a line.
+const TENANT_LINE_SELECTS = Object.freeze([
+  'id, sautikit_virtual_number, is_active, archived_at, line_status',
+  'id, sautikit_virtual_number, is_active, archived_at',
+  'id, sautikit_virtual_number, is_active, line_status',
+  'id, sautikit_virtual_number, is_active',
+]);
+
+async function selectTenantLineRows() {
+  let last = { data: null, error: null };
+  for (const columns of TENANT_LINE_SELECTS) {
+    last = await supabase.from('tenants').select(columns);
+    if (!last.error) return last;
+    if (!/column|schema cache|does not exist/i.test(last.error.message || '')) return last;
+  }
+  return last;
+}
+
 async function inboundTenantLine({ toNumber, fromNumber } = {}) {
   const { tenantLineState, sameNumber } = require('./sautikit/inactiveTenantGate');
   if (DEFAULT_TENANT_ID) return { closed: false, reason: 'default_tenant', tenantId: null };
   const candidates = [toNumber, fromNumber].filter(Boolean);
   if (!candidates.length) return { closed: false, reason: 'no_number', tenantId: null };
   try {
-    let { data, error } = await supabase
-      .from('tenants')
-      .select('id, sautikit_virtual_number, is_active, archived_at');
-    if (error && /archived_at|column|schema cache/i.test(error.message || '')) {
-      ({ data, error } = await supabase.from('tenants').select('id, sautikit_virtual_number, is_active'));
-    }
+    const { data, error } = await selectTenantLineRows();
     if (error) {
       console.warn('[db] inboundTenantLine:', error.message);
       return { closed: false, reason: 'lookup_failed', tenantId: null };
@@ -2359,6 +2374,7 @@ async function confirmTenantField({ tenantId, fieldPath, userId = null } = {}) {
 }
 
 module.exports = {
+  resolveTenantId,
   inboundTenantLine,
   getPlatformAudio,
   upsertPlatformAudio,

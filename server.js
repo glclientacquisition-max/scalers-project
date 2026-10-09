@@ -414,6 +414,8 @@ const {
 const { appendFinalPart, joinUtteranceParts } = require('./src/speech/utteranceJoin');
 const { queueToolOutcome, takeToolOutcome } = require('./src/conversation/toolOutcomeQueue');
 const { lineUnavailableResponse } = require('./src/sautikit/inactiveTenantGate');
+const { createClosedLineCalls } = require('./src/sautikit/closedLineCalls');
+const closedLineCalls = createClosedLineCalls();
 const { startLineUnavailableClipRefresh } = require('./src/sautikit/lineUnavailableAudio');
 const { coverageNextStepFor } = require('./src/conversation/coverageNextStep');
 const {
@@ -1401,6 +1403,14 @@ async function handleVoiceIncoming(req, res) {
     // call-set-up (it carries callerNumber/destinationNumber/isActive). Open
     // the stream, persist the call, and let the later Completed event close it.
     const sid = extracted.callSid || callSid;
+    if (closedLineCalls.has(sid, callSid)) {
+      // A closed line (#639) already got line-unavailable + Hangup. Its later
+      // lifecycle webhooks touch nothing: no call row, minutes or alerts.
+      console.log(`[voice/incoming] closed-line call ${sid} lifecycle edge — empty <Response/>`);
+      return res
+        .type('text/xml')
+        .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
     if (shouldSkipMediaStream(callSessionState, req.body, sid)) {
       const transferXml = consumeLiveTransferWebhook({
         callSid: sid,
@@ -1448,6 +1458,7 @@ async function handleVoiceIncoming(req, res) {
       const line = await db.inboundTenantLine({ toNumber, fromNumber });
       if (line && line.closed === true) {
         console.warn(`[${callSid}] tenant line closed (${line.reason}) tenant=${line.tenantId} — line unavailable, hang up`);
+        closedLineCalls.remember(sid, callSid, extracted.callSid);
         return res.type('text/xml').send(await lineUnavailableResponse());
       }
     } catch (lineErr) {
@@ -1746,6 +1757,12 @@ app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
       console.log(
         `[voice/events] StreamStopped with pending Dial callSid=${callSid} (events_url cannot return Dial; wait for /voice/transfer Redirect)`
       );
+    }
+
+    if (callSid && closedLineCalls.has(callSid, sidByProviderCallId.get(callSid))) {
+      // Closed line (#639): no call row, no recording fetch, no owner alert.
+      console.log(`[voice/events] closed-line call ${callSid} — ignored`);
+      return;
     }
 
     const termination = detectCallTermination(body, kind);
