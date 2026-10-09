@@ -15,6 +15,7 @@
 const { extractGeminiText, extractThoughtSignature } = require('../../conversation/geminiVoice');
 const { createStructuredStreamReader, parseStructured } = require('./jsonStream');
 const { verifySay, dataLineFor } = require('./verify');
+const { noteSpokenLine } = require('./fileGuard');
 const { getLanguagePack } = require('./languages');
 const { MAX_SAY, TOOL_NAMES } = require('./schema');
 
@@ -117,6 +118,8 @@ async function runStructuredTurn(opts) {
     }
     if (firstSayAt == null) firstSayAt = now();
     spoken.push({ text: line, source, index });
+    // The file-name ask is code-held: once spoken, never asked again.
+    noteSpokenLine(line, state);
     if (!holdSpeech && typeof onSay === 'function') await onSay(line, { source, index });
   }
 
@@ -161,12 +164,17 @@ async function runStructuredTurn(opts) {
       }
       const checked = verifySay(text, verifyCtx(factsUsed));
       let line = text;
+      if (checked.fixed) {
+        // VOICE_SPOKEN_FACTS: the stored visit time, in the Kiswahili clock.
+        transforms.push({ name: 'spoken_facts', reason: 'clock', before: text, after: checked.fixed, dropped: false });
+        line = checked.fixed;
+      }
       if (!checked.ok) {
         for (const p of checked.problems) problems.push({ attempt, ...p, sentence: text });
         if (spoken.length === 0 && attempt < maxAttempts) return false;
         const codes = checked.problems.map((p) => p.code);
-        const data = dataLineFor(text, checked.problems, { table, pack, callerText });
-        const factual = codes.some((c) => c === 'unbacked_number' || c.startsWith('coverage_'));
+        const data = dataLineFor(text, checked.problems, { table, pack, callerText, state });
+        const factual = codes.some((c) => c === 'unbacked_number' || c === 'time_mismatch' || c.startsWith('coverage_'));
         if (data) line = data;
         else if (factual && !unverifiedSpoken) {
           line = pack.unverified;

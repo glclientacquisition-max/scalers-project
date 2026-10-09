@@ -9,6 +9,9 @@ const { bindSpokenPlace, canonicalPlaceName } = require('../../conversation/keny
 const { gateCallerFileSpeech } = require('../callerFileSpeech');
 const { statedNumbers } = require('./numbers');
 const { isOutcomeClaim } = require('../spokenStreamBuffer');
+const { teamConfirmCoverageLine } = require('./coverageSource');
+const { checkVisitTimes, visitTimeLine } = require('./spokenFactsSource');
+const { fileGuardProblems, noRecordReplacement } = require('./fileGuard');
 
 const SPOKEN_CHAR = /[\p{L}\p{N}]/u;
 const MARKUP = /###|[*_`#<>{}[\]\\|]|^\s*[-•]\s/;
@@ -16,6 +19,11 @@ const NEGATES_COVERAGE =
   /\b(outside|beyond|don'?t (?:cover|reach|serve|go)|do not (?:cover|reach|serve|go)|not (?:cover|reach|serve)|can'?t (?:reach|come)|cannot (?:reach|come)|no coverage|hatufiki|hatufanyi kazi|haturuki|nje ya)\b/i;
 const ASSERTS_COVERAGE =
   /\b(we (?:do )?(?:cover|reach|serve|come to|go to|work in)|yes,? we cover|tunafika|tunafanya kazi|tunahudumia|tuko)\b/i;
+// A coverage claim with no place: "we serve the surrounding areas".
+const AREA_TALK = /\b(?:areas?|coverage|maeneo|eneo)\b/i;
+// Looser claim words, used only when no owner-confirmed list exists:
+// "we only serve", "we also reach".
+const LOOSE_CLAIM = /\bwe\s+(?:\w+\s+){0,2}?(?:cover|serve|reach)\b|\btunahudumia\b|\btunafika\b/i;
 const NAME_ASK =
   /\b(may i have your name|what(?:'s| is) your name|am i speaking with|naongea na|ninaongea na|jina lako ni nani|niambie jina)\b/i;
 const LOANWORDS = new Set(ENGLISH_JOB_LOANWORDS.map((word) => String(word).toLowerCase()));
@@ -127,14 +135,27 @@ function verifySay(sentence, ctx) {
   const lang = languageProblem(text, ctx.locked);
   if (lang) problems.push({ code: 'language', detail: `locked ${ctx.locked}, ${lang}` });
 
+  const allowedCaller = new Set(statedNumbers(ctx.callerText || ''));
+  // VOICE_SPOKEN_FACTS: a Kiswahili clock slip is fixed in place; a visit
+  // time that names no open visit is a time_mismatch (spokenFactsSource).
+  let fixed = null;
+  const timeCheck = checkVisitTimes(text, { table: ctx.table, locked: ctx.locked, callerNumbers: allowedCaller, env: ctx.env });
+  if (timeCheck) {
+    if (timeCheck.fixed) fixed = timeCheck.text;
+    for (const miss of timeCheck.mismatches) {
+      problems.push({ code: 'time_mismatch', detail: `${miss.said} is not an open visit time` });
+    }
+  }
+  const checkedText = fixed || text;
+
   const cited = [];
   for (const row of Array.isArray(ctx.factsUsed) ? ctx.factsUsed : []) {
     const entry = ctx.table?.byId?.get(String(row?.id || ''));
     if (entry) cited.push(entry);
   }
-  const allowed = new Set(statedNumbers(ctx.callerText || ''));
+  const allowed = new Set(allowedCaller);
   for (const entry of cited) for (const n of entry.numbers) allowed.add(n);
-  for (const n of statedNumbers(text)) {
+  for (const n of statedNumbers(checkedText)) {
     if (!allowed.has(n)) {
       problems.push({ code: 'unbacked_number', detail: `${n} is not in a cited fact or the caller's words` });
     }
@@ -161,6 +182,27 @@ function verifySay(sentence, ctx) {
         }
       }
     }
+  } else if (ctx.table?.coverageGate?.gated && !ctx.table.coverageGate.confirmed) {
+    // BRAIN_CONFIRMED_COVERAGE on, no owner-confirmed list: no coverage claim
+    // either way, and no area list (HD_23445a4f780c t8, t9, t11).
+    const seen = new Set();
+    for (const raw of coverageClauses(text)) {
+      const callerLocation = CALLER_LOCATION_LEAD.test(raw);
+      const { text: clause } = withoutPlaceReferences(raw);
+      const negates = !callerLocation && NEGATES_COVERAGE.test(clause);
+      const asserts = ASSERTS_COVERAGE.test(clause) || LOOSE_CLAIM.test(clause);
+      if (!negates && !asserts) continue;
+      const places = placesIn(clause);
+      if (!places.length && AREA_TALK.test(clause) && !seen.has('')) {
+        seen.add('');
+        problems.push({ code: 'coverage_unconfirmed', detail: 'states the service area without an owner-confirmed list', place: '' });
+      }
+      for (const place of places) {
+        if (seen.has(place)) continue;
+        seen.add(place);
+        problems.push({ code: 'coverage_unconfirmed', detail: `${titleName(place)} coverage is not owner-confirmed`, place });
+      }
+    }
   }
 
   if (ctx.state) {
@@ -168,6 +210,9 @@ function verifySay(sentence, ctx) {
     if (!gated.speak || gated.reason === 'trimmed') {
       problems.push({ code: 'privacy_unbound', detail: 'names the caller file before the speaker is confirmed' });
     }
+    // Brain's speech guard (BRAIN_CALL_FIXES_D199): no empty-file claim while
+    // the file is masked or has rows; the file-name ask once (HD_1b3a67ea7ee9).
+    for (const p of fileGuardProblems(text, ctx.state)) problems.push(p);
   }
   // Sentences are spoken before tools run. A saved or booked outcome is
   // confirmed from the tool result (formatToolConfirmation), never claimed.
@@ -177,7 +222,7 @@ function verifySay(sentence, ctx) {
   if (ctx.nameConfirmed && NAME_ASK.test(text)) {
     problems.push({ code: 'name_confirmed', detail: 'asks a name that is already confirmed' });
   }
-  return { ok: problems.length === 0, problems };
+  return fixed ? { ok: problems.length === 0, problems, fixed } : { ok: problems.length === 0, problems };
 }
 
 /** The caller named this place in their own words. */
@@ -192,8 +237,19 @@ function callerNamedPlace(callerText, place) {
  * A coverage line ("Ndiyo, tunafika X.") replaces the reply only for a place
  * the caller named; otherwise it answers a question nobody asked.
  */
-function dataLineFor(sentence, problems, { table, pack, callerText = '' }) {
+function dataLineFor(sentence, problems, { table, pack, callerText = '', state = null }) {
   const codes = new Set(problems.map((p) => p.code));
+  if (codes.has('no_record_claim')) {
+    // Masked: "Let me just confirm who I'm speaking with" (+ the ask when due).
+    // Bound with rows: the open-file read. Never the empty-file claim.
+    return noRecordReplacement(state, pack?.code || 'en');
+  }
+  if (codes.has('coverage_unconfirmed')) {
+    // "I'll have the team confirm {place}" for the place the caller named.
+    const named = problems.find((p) => p.code === 'coverage_unconfirmed' && p.place && callerNamedPlace(callerText, p.place));
+    const asked = named ? named.place : placesIn(String(callerText || '')).slice(-1)[0];
+    if (asked) return teamConfirmCoverageLine(titleName(asked), pack?.code);
+  }
   const coverage = problems.find(
     (p) =>
       (p.code === 'coverage_contradiction' || p.code === 'coverage_unbacked') &&
@@ -203,6 +259,10 @@ function dataLineFor(sentence, problems, { table, pack, callerText = '' }) {
   if (coverage) {
     const place = titleName(coverage.place);
     return coverage.code === 'coverage_contradiction' ? pack.coveredLine(place) : pack.notCoveredLine(place);
+  }
+  if (codes.has('time_mismatch')) {
+    const line = visitTimeLine(sentence, table, pack?.code);
+    if (line) return line;
   }
   if (codes.has('unbacked_number') && table?.entries?.length) {
     const words = new Set(
