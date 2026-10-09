@@ -152,8 +152,11 @@ node scripts/score-voice-call.js <calls.id> --rows call.json             # same,
 | `visitMissed` | The caller asks what visits or bookings they have and the reply reads none (no "you have ... <day/time>") and does not say nothing is open. With `openVisits` known, "nothing open" while visits are open also fails. | 20 |
 | `dateWrong` | A spoken "today/tomorrow/leo/kesho is <day>", "<weekday>, <date> <month>", or the good morning/afternoon/evening greeting disagrees with the Africa/Nairobi calendar at that turn (turn `at`, else the call time). | 20 |
 | `nameLock` | After the caller's name is locked (a yes to "Am I speaking with X?" / "Ni X ninaongea naye?", or "my name is X" / "naitwa X"), the agent asks for the name again, calls the caller another name, or saves another name in `save_caller_info`. | 15 |
+| `ignoredFile` | The caller has a file (`callerFile`: contact name, open visits, open holds) and the agent says it has no record ("I don't have any record", "sina kumbukumbu"), or never confirms the name on file and never mentions the file (a catalogue list naming the same job does not count; the job must come with its time, or the hold item with hold talk). One finding each. HD_23445a4f780c. | 25 |
 
-They add to the call penalty (capped at 45) next to the repeated-question penalty, and their notes land on the turn that failed.
+`--transcripts` loads `callerFile` read-only (contact name, open `service_requests`, open visits before the call). Trace runs carry no caller file; pass `--ctx facts.json` with `{ callAt, callerFile: { name, openVisits, openRequests } }`.
+
+They add to the call penalty (capped at 60) next to the repeated-question penalty, and their notes land on the turn that failed.
 
 ## Seeded calls
 

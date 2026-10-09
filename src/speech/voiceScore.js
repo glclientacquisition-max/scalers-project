@@ -442,6 +442,7 @@ const CHECK_WEIGHT = {
   visitMissed: 20,
   dateWrong: 20,
   nameLock: 15,
+  ignoredFile: 25,
 };
 
 const CHECK_LINE = {
@@ -456,6 +457,7 @@ const CHECK_LINE = {
   visitMissed: 'Open visits were not read out',
   dateWrong: 'A spoken day or date was wrong for Nairobi',
   nameLock: 'The caller name did not stay locked',
+  ignoredFile: 'The caller file was ignored',
 };
 
 function turnsForCheck(scored, key) {

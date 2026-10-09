@@ -13,7 +13,9 @@
 //
 // CALL_ID is calls.id (uuid) or the SautiKit sid (HD_...). --rows takes
 // { call: { id, created_at, tenant_id, ... }, transcripts: [{ speaker, text_content, created_at }],
-//   openVisits: [{ service_name, when_text, window_start, status }], agentName, businessName }.
+//   openVisits: [{ service_name, when_text, window_start, status }], agentName, businessName,
+//   callerFile: { name, openVisits, openRequests } }.
+//   --ctx facts.json adds the same call facts to a trace run (traces carry no caller file).
 // Transcript scoring has no latency, language tags, or model output, so slow,
 // language and deleted-answer checks are weaker there; visit read, Nairobi date
 // and name lock work on the spoken text.
@@ -68,11 +70,34 @@ async function loadTranscriptCall(callId) {
       .in('status', OPEN_VISIT_STATUS);
     if (!vErr) openVisits = visits || [];
   }
-  return { call, transcripts: transcripts || [], openVisits };
+  // The caller file as it stood when the call started: contact name and
+  // open holds. Read-only. Used by the ignored-caller-file check.
+  let callerFile = null;
+  if (call.caller_number) {
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('name')
+      .eq('tenant_id', call.tenant_id)
+      .eq('phone', call.caller_number)
+      .maybeSingle();
+    const { data: requests, error: rErr } = await supabase
+      .from('service_requests')
+      .select('request_type, item, notes, status, created_at')
+      .eq('tenant_id', call.tenant_id)
+      .eq('caller_phone', call.caller_number)
+      .eq('status', 'open')
+      .lt('created_at', call.created_at);
+    callerFile = {
+      name: contact?.name || null,
+      openVisits: openVisits || [],
+      openRequests: rErr ? [] : requests || [],
+    };
+  }
+  return { call, transcripts: transcripts || [], openVisits, callerFile };
 }
 
 async function main() {
-  const callId = process.argv.slice(2).find((item, i, all) => item && !item.startsWith('--') && !['--file', '--rows'].includes(all[i - 1]));
+  const callId = process.argv.slice(2).find((item, i, all) => item && !item.startsWith('--') && !['--file', '--rows', '--ctx'].includes(all[i - 1]));
   if (!callId) {
     console.error('Usage: node scripts/score-voice-call.js CALL_ID [--file trace.jsonl | --transcripts | --rows call.json]');
     process.exit(1);
@@ -89,10 +114,14 @@ async function main() {
       openVisits: Array.isArray(bundle.openVisits) ? bundle.openVisits : null,
       agentName: bundle.agentName || null,
       businessName: bundle.businessName || null,
+      callerFile: bundle.callerFile || null,
     };
   } else {
     const file = arg('--file');
     turns = await readStoredTurns(callId, file ? { file } : {});
+    // Traces carry no caller file: --ctx facts.json passes { callAt, callerFile, ... }.
+    const ctxFile = arg('--ctx');
+    if (ctxFile) ctx = JSON.parse(fs.readFileSync(ctxFile, 'utf8'));
   }
   if (!turns.length) {
     console.error(`No turns for ${callId}`);

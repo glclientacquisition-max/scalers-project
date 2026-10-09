@@ -1,0 +1,294 @@
+{
+ "_note": "HD_23445a4f780c (staging, 9 Oct 2026 10:59 EAT). Turns rebuilt from the staging deploy log window 07:59:37Z-08:02:18Z (caller finals + spoken TTS chunks, fillers dropped). The opening turns before the log window are not included.",
+ "callerFile": {
+  "name": "Alvin",
+  "openVisits": [
+   {
+    "service_name": "carpet cleaning",
+    "when_text": "today 9 AM",
+    "status": "requested"
+   }
+  ],
+  "openRequests": [
+   {
+    "request_type": "enquiry",
+    "item": "cleaning quote",
+    "notes": "quote from 8 Oct"
+   }
+  ]
+ },
+ "turns": [
+  {
+   "recordKind": "turn",
+   "callId": "HD_23445a4f780c",
+   "turnIndex": 1,
+   "at": "2026-10-09T07:59:39.758658294Z",
+   "caller": {
+    "text": "tulikuwa tumeongea na wewe jana kuhusu usafi fulani.",
+    "language": "sw"
+   },
+   "stages": [
+    {
+     "stage": "tts",
+     "text": "Aha, samahani, sina kumbukumbu ya mazungumzo yetu ya jana kwenye mfumo wangu. Ungetaka tufanye usafi gani leo?",
+     "before": "Aha, samahani, sina kumbukumbu ya mazungumzo yetu ya jana kwenye mfumo wangu. Ungetaka tufanye usafi gani leo?",
+     "language": null
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_23445a4f780c",
+   "turnIndex": 2,
+   "at": "2026-10-09T07:59:55.079792100Z",
+   "caller": {
+    "text": "Eeh, mnawashangaa nini? Si tu be specific.",
+    "language": "sw"
+   },
+   "stages": [
+    {
+     "stage": "tts",
+     "text": "Tunafanya usafi wa nyumba, carpet, sofa, mattress na hata deep cleaning. Ungependa tukusaidie na gani kati ya hizo?",
+     "before": "Tunafanya usafi wa nyumba, carpet, sofa, mattress na hata deep cleaning. Ungependa tukusaidie na gani kati ya hizo?",
+     "language": null
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_23445a4f780c",
+   "turnIndex": 3,
+   "at": "2026-10-09T08:00:10.091888631Z",
+   "caller": {
+    "text": "How much do you charge for deep cleaning?",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "tts",
+     "text": "Our Deep Cleaning Package is an add-on that costs between 3,000 to 6,000 shillings, depending on the job. Which specific house or office standard package would you like to add it to?",
+     "before": "Our Deep Cleaning Package is an add-on that costs between 3,000 to 6,000 shillings, depending on the job. Which specific house or office standard package would you like to add it to?",
+     "language": null
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_23445a4f780c",
+   "turnIndex": 4,
+   "at": "2026-10-09T08:00:31.858974641Z",
+   "caller": {
+    "text": "You do. Also, even wash offices?",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "tts",
+     "text": "Yes, we clean offices too.",
+     "before": "Yes, we clean offices too.",
+     "language": null
+    },
+    {
+     "stage": "tts",
+     "text": "Small offices up to 1,500 square feet cost 15,000 shillings, medium offices cost 25,000 shillings, and large commercial spaces get custom quotes.",
+     "before": "Small offices up to 1,500 square feet cost 15,000 shillings, medium offices cost 25,000 shillings, and large commercial spaces get custom quotes.",
+     "language": null
+    },
+    {
+     "stage": "tts",
+     "text": "Would you like to book a visit for an office or a home clean?",
+     "before": "Would you like to book a visit for an office or a home clean?",
+     "language": null
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_23445a4f780c",
+   "turnIndex": 5,
+   "at": "2026-10-09T08:00:58.706057014Z",
+   "caller": {
+    "text": "What? Where are you located?",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "tts",
+     "text": "We are located in Nairobi and offer door-to-door cleaning services across Nairobi and surrounding areas like Kiambu, Kitengela, Juja, Rongai, and Syokimau. Where are you located so we can plan a visit?",
+     "before": "We are located in Nairobi and offer door-to-door cleaning services across Nairobi and surrounding areas like Kiambu, Kitengela, Juja, Rongai, and Syokimau. Where are you located so we can plan a visit?",
+     "language": null
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_23445a4f780c",
+   "turnIndex": 6,
+   "at": "2026-10-09T08:01:24.292713086Z",
+   "caller": {
+    "text": "Mmh, na kama niko outside Nairobi, how is it done?",
+    "language": "sw"
+   },
+   "stages": [
+    {
+     "stage": "tts",
+     "text": "Ndiyo, tunafika Syokimau.",
+     "before": "Ndiyo, tunafika Syokimau.",
+     "language": null
+    },
+    {
+     "stage": "tts",
+     "text": "Ungependa huduma gani?",
+     "before": "Ungependa huduma gani?",
+     "language": null
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_23445a4f780c",
+   "turnIndex": 7,
+   "at": "2026-10-09T08:01:39.769519452Z",
+   "caller": {
+    "text": "Like, if I'm outside the county of Nairobi, say.",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "outcome",
+     "value": "barge_in"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_23445a4f780c",
+   "turnIndex": 8,
+   "at": "2026-10-09T08:01:42.086427974Z",
+   "caller": {
+    "text": "Maybe Nakuru, Kisumu, how is it done?",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "tts",
+     "text": "Places like Nakuru and Kisumu are outside our coverage area, as we only serve Nairobi, Kiambu, Kitengela, Juja, Ongata Rongai, and Syokimau.",
+     "before": "Places like Nakuru and Kisumu are outside our coverage area, as we only serve Nairobi, Kiambu, Kitengela, Juja, Ongata Rongai, and Syokimau.",
+     "language": null
+    },
+    {
+     "stage": "tts",
+     "text": "Should I note it for the team?",
+     "before": "Should I note it for the team?",
+     "language": null
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_23445a4f780c",
+   "turnIndex": 9,
+   "at": "2026-10-09T08:02:02.708438882Z",
+   "caller": {
+    "text": "Okay.",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "tts",
+     "text": "Is there anything else I can help you with today?",
+     "before": "Is there anything else I can help you with today?",
+     "language": null
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_23445a4f780c",
+   "turnIndex": 10,
+   "at": "2026-10-09T08:02:05.507375923Z",
+   "caller": {
+    "text": "So with you, I can make a booking, right?",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "tts",
+     "text": "Okay, I've saved your request.",
+     "before": "Okay, I've saved your request.",
+     "language": null
+    },
+    {
+     "stage": "tts",
+     "text": "Yes, you can make a booking request with me.",
+     "before": "Yes, you can make a booking request with me.",
+     "language": null
+    },
+    {
+     "stage": "tts",
+     "text": "May I have your name to get started?",
+     "before": "May I have your name to get started?",
+     "language": null
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_23445a4f780c",
+   "turnIndex": 11,
+   "at": "2026-10-09T08:02:17.301026830Z",
+   "caller": {
+    "text": "Okay.",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "tts",
+     "text": "Thank you. Goodbye.",
+     "before": "Thank you. Goodbye.",
+     "language": null
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  }
+ ]
+}

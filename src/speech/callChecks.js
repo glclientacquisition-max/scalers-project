@@ -6,10 +6,14 @@
 //   nameLock     after the caller's name is locked (confirmed or given), the
 //                agent asks for it again, calls the caller something else, or
 //                saves a different name.
+//   ignoredFile  the caller has a file (name, open visits or holds) and the
+//                agent says it has no record, or never confirms the name and
+//                never mentions the file (HD_23445a4f780c).
 // Inputs are trace turns (src/speech/voiceTrace.js) or turns built from stored
 // transcripts (turnsFromTranscriptRows). ctx is optional:
 //   { callAt, openVisits: [{ service_name, when_text, window_start }], agentName,
-//     businessName, extraNonNames: [] }
+//     businessName, extraNonNames: [],
+//     callerFile: { name, openVisits: [...], openRequests: [{ item, request_type, notes }] } }
 
 const {
   looksLikeOpenVisitLookup,
@@ -358,16 +362,112 @@ function nameLockChecks(turns = [], ctx = {}) {
   return out;
 }
 
+// ---------- ignored caller file ----------
+
+const NO_RECORD =
+  /\b(?:(?:i |we )?(?:don't|do not) have (?:any |a )?(?:record|records|history|file|details|notes)|no (?:record|records|history|file) of|(?:i |we )?(?:can't|cannot) (?:find|see) (?:any |a )?(?:record|records|history|file|booking)|(?:you(?:'re| are) )?(?:a )?new (?:caller|customer) here|first time (?:calling|you call)|sina (?:kumbukumbu|rekodi|historia|record)|hatuna (?:kumbukumbu|rekodi|historia|record)|haina (?:kumbukumbu|rekodi)|sioni (?:rekodi|kumbukumbu|record))\b/i;
+const FILE_TALK =
+  /\b(?:your (?:visit|booking|appointment|hold|order|file|quote)|last time|yesterday(?:'s)? (?:call|quote|request)|we spoke|on file|ziara yako|booking yako|hold yako|oda yako|jana tuli(?:ongea|zungumza)|mara ya mwisho)\b/i;
+
+const FILE_STOP = new Set(['visit', 'request', 'hold', 'callback', 'message', 'open', 'requested', 'confirmed', 'cleaning', 'service', 'the', 'and', 'for', 'at']);
+
+function tokensOf(raw) {
+  return String(raw || '')
+    .toLowerCase()
+    .split(/[^\p{L}0-9]+/u)
+    .filter((w) => w && (w.length >= 3 || /\d/.test(w)) && !FILE_STOP.has(w));
+}
+
+// A catalogue list naming "carpet" is not the file. A file mention pairs the
+// job with its time ("carpet ... 9 AM today"), or the hold item with hold talk.
+function fileMatchers(file) {
+  const rows = [];
+  for (const v of file.openVisits || []) {
+    const job = typeof v === 'string' ? v.split('|')[0] : v?.service_name || v?.serviceName;
+    const when = typeof v === 'string' ? v.split('|').slice(1).join(' ') : v?.when_text || v?.whenText;
+    const jobT = tokensOf(job);
+    const whenT = tokensOf(when);
+    if (jobT.length && whenT.length) rows.push((t) => jobT.some((w) => t.has(w)) && whenT.some((w) => t.has(w)));
+  }
+  for (const r of file.openRequests || []) {
+    const itemT = tokensOf(typeof r === 'string' ? r : r?.item);
+    if (itemT.length) {
+      rows.push((t, raw) => itemT.some((w) => t.has(w)) && /\b(?:hold|request|quote|order|callback|ombi|oda)\b/i.test(raw));
+    }
+  }
+  return rows;
+}
+
+// "I've saved your visit request" is this call's new write, not the file.
+const SAVE_LINE = /\b(?:i've|i have|we've|we have) (?:saved|updated|moved|cancelled|noted)\b|\bnime(?:hifadhi|-save|sasisha|hamisha|ghairi)\b/i;
+
+function mentionsFile(spoken, matchers) {
+  return String(spoken)
+    .split(/(?<=[.?!])\s+/)
+    .filter((sentence) => !SAVE_LINE.test(sentence))
+    .some((sentence) => {
+      if (FILE_TALK.test(sentence)) return true;
+      const t = new Set(tokensOf(sentence));
+      return matchers.some((fn) => fn(t, sentence));
+    });
+}
+
+function callerFileOf(ctx = {}) {
+  const file = ctx.callerFile && typeof ctx.callerFile === 'object' ? ctx.callerFile : {};
+  const name = String(file.name || '').trim() || null;
+  const openVisits = Array.isArray(file.openVisits) ? file.openVisits : Array.isArray(ctx.openVisits) ? ctx.openVisits : [];
+  const openRequests = Array.isArray(file.openRequests) ? file.openRequests : [];
+  if (!name && !openVisits.length && !openRequests.length) return null;
+  return { name, openVisits, openRequests };
+}
+
+function ignoredFileChecks(turns = [], ctx = {}) {
+  const file = callerFileOf(ctx);
+  if (!file) return [];
+  const out = [];
+  const nameKeys = nameTokens(file.name).filter((t) => t.length >= 3);
+  const matchers = fileMatchers(file);
+  let confirmedName = false;
+  let mentionedFile = false;
+  let firstAgentTurn = null;
+  let noRecordAt = null;
+  for (const turn of turns) {
+    const spoken = spokenOf(turn);
+    if (!spoken) continue;
+    if (firstAgentTurn == null) firstAgentTurn = turn.turnIndex ?? null;
+    const lower = spoken.toLowerCase();
+    const ask = fileNameAsk(spoken);
+    if (nameKeys.length && ((ask && sameName(ask, file.name)) || nameKeys.some((k) => new RegExp(`\\b${k}\\b`, 'i').test(lower)))) {
+      confirmedName = true;
+    }
+    if (mentionsFile(spoken, matchers)) mentionedFile = true;
+    if (noRecordAt == null && NO_RECORD.test(spoken)) noRecordAt = turn.turnIndex ?? null;
+  }
+  const facts = [
+    file.name ? `name ${file.name}` : null,
+    file.openVisits.length ? `${file.openVisits.length} open visit(s)` : null,
+    file.openRequests.length ? `${file.openRequests.length} open hold(s)` : null,
+  ].filter(Boolean).join(', ');
+  if (noRecordAt != null) {
+    out.push({ turnIndex: noRecordAt, note: `ignored caller file: said there is no record, file has ${facts}` });
+  }
+  if (!confirmedName && !mentionedFile) {
+    out.push({ turnIndex: firstAgentTurn, note: `ignored caller file: never confirmed the name or mentioned the file (${facts})` });
+  }
+  return out;
+}
+
 // ---------- combined ----------
 
-const CALL_CHECK_WEIGHT = { visitMissed: 20, dateWrong: 20, nameLock: 15 };
-const CALL_CHECK_CAP = 45;
+const CALL_CHECK_WEIGHT = { visitMissed: 20, dateWrong: 20, nameLock: 15, ignoredFile: 25 };
+const CALL_CHECK_CAP = 60;
 
 function callChecks(turns = [], ctx = {}) {
   const found = {
     visitMissed: visitReadChecks(turns, ctx),
     dateWrong: nairobiDateChecks(turns, ctx),
     nameLock: nameLockChecks(turns, ctx),
+    ignoredFile: ignoredFileChecks(turns, ctx),
   };
   const counts = {};
   let penalty = 0;
@@ -431,6 +531,7 @@ module.exports = {
   visitReadChecks,
   nairobiDateChecks,
   nameLockChecks,
+  ignoredFileChecks,
   nairobiParts,
   dateClaims,
   asksForVisits,

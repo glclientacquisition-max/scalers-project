@@ -187,7 +187,7 @@ describe('scorer wiring', () => {
   it('a clean call keeps zero call-level checks', () => {
     const card = scoreTurns([turn(1, 'Hello', 'Hello, how can I help?', { at: FRIDAY_MORNING })]);
     assert.deepEqual([card.checks.visitMissed, card.checks.dateWrong, card.checks.nameLock], [0, 0, 0]);
-    assert.deepEqual(callChecks([]).counts, { visitMissed: 0, dateWrong: 0, nameLock: 0 });
+    assert.deepEqual(callChecks([]).counts, { visitMissed: 0, dateWrong: 0, nameLock: 0, ignoredFile: 0 });
   });
 });
 
@@ -211,5 +211,55 @@ describe('transcript rows (prod has no traces)', () => {
     assert.equal(turns[2].at, AFTER_MIDNIGHT_EAT);
     const card = scoreTurns(turns, { callAt: AFTER_MIDNIGHT_EAT, agentName: 'Lynn', businessName: 'Aris' });
     assert.deepEqual([card.checks.dateWrong, card.checks.nameLock], [0, 0]);
+  });
+});
+
+describe('ignored caller file (HD_23445a4f780c)', () => {
+  const { ignoredFileChecks } = require('../src/speech/callChecks');
+  const hd = require('./fixtures/hd23445TurnsPartial.json');
+  const file = hd.callerFile;
+
+  it('HD_23445a4f780c scores clearly lower once the caller file is known', () => {
+    const blind = scoreTurns(hd.turns, { callAt: '2026-10-09T07:59:00Z' });
+    const known = scoreTurns(hd.turns, { callAt: '2026-10-09T07:59:00Z', callerFile: file });
+    assert.equal(known.checks.ignoredFile, 2);
+    assert.ok(known.score <= 60, `score ${known.score}`);
+    assert.ok(known.score < 96.7 - 30, `score ${known.score}`);
+    assert.ok(blind.score - known.score >= 40, `${blind.score} -> ${known.score}`);
+    assert.ok(known.callFindings.ignoredFile.some((row) => /no record/.test(row.note)));
+    assert.match(diagnoseCall(known), /caller file/i);
+  });
+
+  it('confirming the name on file is not ignoring it', () => {
+    const turns = [
+      turn(1, 'Hello', 'Am I speaking with Alvin?'),
+      turn(2, 'Yes', 'Welcome back. How can I help?'),
+    ];
+    assert.deepEqual(ignoredFileChecks(turns, { callerFile: file }), []);
+  });
+
+  it('reading the open visit counts as using the file', () => {
+    const turns = [turn(1, 'Hello', 'Hello. The carpet cleaning is set for today at 9 AM. Anything else?')];
+    assert.deepEqual(ignoredFileChecks(turns, { callerFile: { openVisits: file.openVisits } }), []);
+  });
+
+  it('a catalogue list naming the same job is not a file mention', () => {
+    const turns = [turn(1, 'What do you do?', 'We do house, carpet, sofa and mattress cleaning.')];
+    const rows = ignoredFileChecks(turns, { callerFile: { openVisits: file.openVisits } });
+    assert.equal(rows.length, 1);
+    assert.match(rows[0].note, /never confirmed/);
+  });
+
+  it('"no record" is penalised even after the name was used', () => {
+    const turns = [turn(1, 'Hi', "Hi Alvin. Sorry, I don't have any record of that.")];
+    const rows = ignoredFileChecks(turns, { callerFile: file });
+    assert.equal(rows.length, 1);
+    assert.match(rows[0].note, /no record/);
+  });
+
+  it('a new caller with no file is never flagged', () => {
+    const turns = [turn(1, 'Hi', 'Sina kumbukumbu ya hilo. Ungependa huduma gani?')];
+    assert.deepEqual(ignoredFileChecks(turns, {}), []);
+    assert.deepEqual(ignoredFileChecks(turns, { callerFile: { name: null, openVisits: [], openRequests: [] } }), []);
   });
 });
