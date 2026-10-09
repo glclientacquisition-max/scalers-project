@@ -6,6 +6,9 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import { inferPriceMode } from "@/lib/outcomeGates";
 import { recompileAfterCatalogImport, upsertTenantFieldMeta } from "@/lib/deskProvenance";
+import { factHashModeFromEnv } from "@/lib/tenantFieldProvenance";
+import { ownerConfirmPlan, readSavedFactRow } from "@/lib/ownerAttestFields";
+import { planFactConfirm } from "@/lib/factConfirm";
 import { fetchPublicUrlSafe } from "@/lib/ingest/ssrfFetch";
 import {
   htmlToPlainText,
@@ -244,6 +247,26 @@ export async function applyCatalogImportAction(
     return ownerSaveFailed("catalog", error.message);
   }
 
+  const hashMode = factHashModeFromEnv();
+  if (confirm && hashMode) {
+    // Hash mode: the owner confirmed this import, so confirm the imported rows
+    // (only those) with the hash of the saved row in one batch.
+    const imported = new Set(
+      stamped.map((p) => (p.sku.trim() || p.name.trim()).toLowerCase())
+    );
+    const explicitPaths = merged.flatMap((product, index) =>
+      imported.has((product.sku.trim() || product.name.trim()).toLowerCase())
+        ? [`catalog.product.${product.sku.trim() || String(index + 1)}.name`]
+        : []
+    );
+    const saved =
+      (await readSavedFactRow(workspace.client, tenant.id)) ?? { ...tenant, ...patch };
+    await ownerConfirmPlan(
+      tenant.id,
+      planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths })
+    );
+  }
+
   let message = "Catalogue saved for the next call.";
   if (confirm) {
     try {
@@ -259,7 +282,8 @@ export async function applyCatalogImportAction(
       message = "Live catalog updated. Assistant refresh pending.";
     }
     const first = merged[0];
-    if (first?.name) {
+    // Hash mode confirmed the imported rows above, before the recompile.
+    if (!hashMode && first?.name) {
       const sku = first.sku.trim() || "1";
       const meta = await upsertTenantFieldMeta({
         tenantId: tenant.id,

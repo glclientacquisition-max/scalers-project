@@ -1,5 +1,6 @@
 import { jsonFieldSource } from "./catalogSeeds";
 import { type FieldSource } from "./fieldSource";
+import { stableRowId } from "./factHash";
 
 export type ProvenanceMeta = Record<string, FieldSource>;
 
@@ -162,7 +163,7 @@ function serviceScore(
     ok += 1;
     scored += fieldScore(
       true,
-      `catalog.service.${index + 1}.name`,
+      `catalog.service.${stableRowId(item) || String(index + 1)}.name`,
       meta,
       jsonFieldSource(item)
     );
