@@ -52,11 +52,6 @@ function distinctOtherPerson(primary, alternate) {
     return !NAME_CRUMB.test(lower) && !owner.has(lower);
   });
   if (!leftover.length) return false;
-  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 5): a saved phrase ("so
-  // disappointed") or a role word ("Mteja", customer) is not a second person
-  // on the line. A shared line skips the code-held file-name ask.
-  const fixes = require('./callFixesD199');
-  if (fixes.callFixesD199Enabled() && !fixes.alternateNamesAPerson(leftover, primary)) return false;
   return isPlausibleCallerName(leftover.join(' '));
 }
 
@@ -85,7 +80,12 @@ function buildCallerMemoryCard({
   const phone = String(contact.phone || '').trim();
   const name = String(contact.name || '').trim() || null;
   const alternates = alternateNames(contact.metadata);
-  const sharedLine = alternates.some((alt) => distinctOtherPerson(name, alt));
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 5): a saved phrase ("so
+  // disappointed"), a role word ("Mteja") or a cut-off of the owner's name
+  // ("Chr") is not a second person; a shared line skips the file-name ask.
+  const sharedLine = alternates.some(
+    (alt) => distinctOtherPerson(name, alt) && require('./callFixesD199').alternateIsAPerson(name, alt)
+  );
   const lived = collectLivedAppointments(
     nextAppointment,
     recentAppointments,

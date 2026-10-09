@@ -895,6 +895,24 @@ function alternateNamesAPerson(words = [], owner = '') {
   return list.every((w) => /^\p{Lu}/u.test(w));
 }
 
+const ALT_CRUMB =
+  /^(?:speaking|speak|speaks|bwana|mr|mrs|ms|miss|the|a|an|my|your|by|of|to|for|and|with|from|aje|nauliza|jina|name|uh|um|yes|yeah|this|is|am|i|im|it's|its|here|ni|mimi|naitwa)$/i;
+
+/**
+ * A saved alternate name is another person on the line. Flag off: always
+ * true (the caller's existing check decides). On: crumbs and the owner's own
+ * words are removed, then alternateNamesAPerson decides.
+ */
+function alternateIsAPerson(primary, alternate) {
+  if (!callFixesD199Enabled()) return true;
+  const owner = new Set(String(primary || '').toLowerCase().split(/\s+/).filter(Boolean));
+  const leftover = String(alternate || '')
+    .replace(/[.,!?]+/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w && !ALT_CRUMB.test(w) && !owner.has(w.toLowerCase()));
+  return alternateNamesAPerson(leftover, primary);
+}
+
 // ------------------------------------------- HD_1677e57f73f9 (6) ask_area
 
 const COVER_VERB =
@@ -937,6 +955,7 @@ module.exports = {
   coverageAskWithoutPlace,
   askAreaLine,
   alternateNamesAPerson,
+  alternateIsAPerson,
   keepRaisedTopics,
   callFixesD199Enabled,
   isFillerPhrase,
