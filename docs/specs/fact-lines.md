@@ -212,6 +212,20 @@ Source call: HD_d199dbbf6b79 (staging re-dial, 2026-10-09 11:41 EAT).
 - While masked, the model is told the file is MASKED, not empty, and the read
   result says `masked`, never empty.
 
+### `ask_need` — the caller was cut off before saying what they need
+
+- Slots: none.
+- Gate: the caller turn is a fragment: it ends on a dash or ellipsis, it was
+  cut off or barged in on, it ends on a dangling word ("for a", "kuhusu"), or
+  it names a need verb with no object ("I was inquiring", "Nilikuwa
+  nauliza"). Brain drops any create on that turn and writes nothing (Aris
+  HD_d3900cbf2b2d).
+- Fires: in place of a save confirmation ("I've saved your request") when the
+  save was blocked on a fragment.
+- Wording (Brain fallback; Voice owns the wording): "Sure. What would you like
+  to know?" / "Sawa. Ungependa kujua nini?" / Sheng "Poa. Unataka kujua nini?"
+- `gate`: `{ fragment: true, write: 'none' }`.
+
 ## Fallback
 
 `src/conversation/factLine.js` holds Brain's fallback wording for every
