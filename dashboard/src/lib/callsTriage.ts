@@ -46,7 +46,7 @@ export function toLead(call: CallRow, facts?: OwnerFacts | null): Lead {
     call,
     name: typeof meta.name === "string" ? meta.name : null,
     reason: pickCallOwnerReason(meta),
-    notified: Boolean(meta.whatsapp_sent),
+    notified: Boolean(meta.owner_notified || meta.whatsapp_sent),
     urgent: String(call.sentiment || "").toLowerCase() === "urgent",
     leadStatus: parseLeadStatus(call.lead_status),
     resolution: owned.resolution as CallResolution,

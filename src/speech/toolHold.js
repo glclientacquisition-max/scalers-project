@@ -87,6 +87,77 @@ function holdSpeaksAfterAck({
   return Number(nowMs) - at >= windowMs;
 }
 
+// A slow tool write must never leave the caller in silence. Prod
+// HD_d3900cbf2b2d t5 (2026-10-09 20:19 EAT): "Mm-hmm" at +0, tool started
+// +1.76 s, the 4 s ack rule skipped "Just a second.", the write landed +2.47 s
+// and the reply +2.60 s, about 2.1 s of dead air. With a recent ack the hold
+// now waits TOOL_HOLD_SLOW_MS for the tool; a fast tool still gets no hold
+// (the HD_c98820 stacking case), a slow one gets it.
+const TOOL_HOLD_SLOW_MS = 700;
+
+function deferredToolHoldEnabled(env = process.env) {
+  const raw = String(env.VOICE_TOOL_HOLD_DEFERRED ?? '').trim().toLowerCase();
+  return !['0', 'false', 'off', 'no'].includes(raw);
+}
+
+function toolHoldSlowMs(env = process.env) {
+  const n = Number(env.VOICE_TOOL_HOLD_SLOW_MS);
+  return Number.isFinite(n) && n >= 0 ? n : TOOL_HOLD_SLOW_MS;
+}
+
+/**
+ * How to play a hold line for a tool call.
+ * @param {{ kind?: string, ackAtMs?: number, nowMs?: number, windowMs?: number, deferred?: boolean, slowMs?: number }} opts
+ * @returns {{ mode: 'now'|'defer'|'skip', delayMs: number }}
+ */
+function planHoldTiming({
+  kind = 'hold',
+  ackAtMs = 0,
+  nowMs = Date.now(),
+  windowMs = HOLD_AFTER_ACK_MS,
+  deferred = deferredToolHoldEnabled(),
+  slowMs = toolHoldSlowMs(),
+} = {}) {
+  if (holdSpeaksAfterAck({ kind, ackAtMs, nowMs, windowMs })) {
+    return { mode: 'now', delayMs: 0 };
+  }
+  if (!deferred) return { mode: 'skip', delayMs: 0 };
+  return { mode: 'defer', delayMs: Math.max(0, Number(slowMs) || 0) };
+}
+
+/**
+ * Resolve true when `settled` is still pending after `delayMs`.
+ * @param {Promise<unknown>|undefined} settled
+ * @param {number} delayMs
+ */
+function toolStillRunningAfter(settled, delayMs) {
+  if (!settled || typeof settled.then !== 'function') {
+    return new Promise((resolve) => setTimeout(() => resolve(true), delayMs));
+  }
+  return new Promise((resolve) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      resolve(true);
+    }, delayMs);
+    Promise.resolve(settled).then(
+      () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(false);
+      },
+      () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(false);
+      }
+    );
+  });
+}
+
 const ACK_LEAD = /^\s*(?:okay|ok|alright|sawa)\s*[.,!]\s*(?=\S)/i;
 
 /**
@@ -171,7 +242,11 @@ function createToolHoldSession({ language = 'en', seed = '' } = {}) {
 
 module.exports = {
   HOLD_AFTER_ACK_MS,
+  TOOL_HOLD_SLOW_MS,
   holdSpeaksAfterAck,
+  planHoldTiming,
+  toolStillRunningAfter,
+  deferredToolHoldEnabled,
   trimAckLead,
   TOOL_HOLD_PACKS,
   pickToolHoldLine,
