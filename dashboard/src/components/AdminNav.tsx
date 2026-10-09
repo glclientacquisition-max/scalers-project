@@ -130,11 +130,28 @@ function AdminIcon({ name }: { name: string }) {
       </svg>
     );
   }
+  if (name === "Quality") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <path d="M3.5 13.5 7.5 9l2.5 2.5L16.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M12.5 5H16.5V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
   if (name === "Numbers") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
         <rect x="6" y="2.5" width="8" height="15" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
         <path d="M9 15h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === "More") {
+    return (
+      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className={cls}>
+        <circle cx="4.5" cy="10" r="1.25" />
+        <circle cx="10" cy="10" r="1.25" />
+        <circle cx="15.5" cy="10" r="1.25" />
       </svg>
     );
   }
