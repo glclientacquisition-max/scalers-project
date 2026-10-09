@@ -6,7 +6,8 @@
 //
 // Dry run by default. --apply writes. Never overwrites an existing value_hash
 // (that would silently re-confirm an edited value), never confirms an empty
-// value, and reports rows whose path cannot be resolved.
+// value, never confirms a .price / .site_visit leaf on a nameless row
+// (skipped_nameless), and reports rows whose path cannot be resolved.
 //
 // Usage:
 //   node scripts/backfillFactHashes.js --tenant <uuid> [--tenant <uuid> ...] [--apply]
@@ -249,11 +250,11 @@ async function runBackfill({ client, supabaseUrl, args, log = console.log }) {
     }
   }
 
-  const summary = { missingIds, tenants: [], totals: { owner_rows: 0, to_write: 0, written: 0, unchanged: 0, kept_existing: 0, skipped_empty: 0, unresolved: 0, write_errors: 0 } };
+  const summary = { missingIds, tenants: [], totals: { owner_rows: 0, to_write: 0, written: 0, unchanged: 0, kept_existing: 0, skipped_empty: 0, skipped_nameless: 0, unresolved: 0, write_errors: 0 } };
   const samples = [];
   const unresolved = [];
   for (const tenantId of tenantIds) {
-    const counts = { tenant_id: tenantId, owner_rows: 0, to_write: 0, written: 0, unchanged: 0, kept_existing: 0, skipped_empty: 0, unresolved: 0, write_errors: 0 };
+    const counts = { tenant_id: tenantId, owner_rows: 0, to_write: 0, written: 0, unchanged: 0, kept_existing: 0, skipped_empty: 0, skipped_nameless: 0, unresolved: 0, write_errors: 0 };
     const tenant = tenants.get(tenantId);
     for (const row of byTenant.get(tenantId)) {
       counts.owner_rows += 1;
@@ -273,6 +274,12 @@ async function runBackfill({ client, supabaseUrl, args, log = console.log }) {
       if (value === null && (namesARow(path) || (rowPath && factValueForPath(rowPath, tenant) === null))) {
         counts.unresolved += 1;
         unresolved.push({ tenant_id: tenantId, field_path: path, reason: 'row_not_found' });
+        continue;
+      }
+      // A leaf (.price / .site_visit) on a row with no name is not a fact: the
+      // readers never surface a nameless row, so never confirm its leaves.
+      if (rowPath && isEmptyFactValue(rowPath, factValueForPath(rowPath, tenant))) {
+        counts.skipped_nameless += 1;
         continue;
       }
       if (isEmptyFactValue(path, value)) {
@@ -307,7 +314,7 @@ async function runBackfill({ client, supabaseUrl, args, log = console.log }) {
     log(
       `${tenantId}: owner_rows=${counts.owner_rows} to_write=${counts.to_write}` +
         (args.apply ? ` written=${counts.written} write_errors=${counts.write_errors}` : '') +
-        ` unchanged=${counts.unchanged} kept_existing=${counts.kept_existing} skipped_empty=${counts.skipped_empty} unresolved=${counts.unresolved}`
+        ` unchanged=${counts.unchanged} kept_existing=${counts.kept_existing} skipped_empty=${counts.skipped_empty} skipped_nameless=${counts.skipped_nameless} unresolved=${counts.unresolved}`
     );
   }
   // Sample prints paths and hashes only, never the values (they include owner phones).

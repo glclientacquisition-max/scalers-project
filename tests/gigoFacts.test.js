@@ -423,6 +423,42 @@ describe('gigo catalogue leaf paths (.price / .site_visit)', () => {
     assert.equal(item.reconfirm, true);
   });
 
+  it('a nameless row is never surfaced, even with owner-confirmed leaf hashes', () => {
+    for (const hashMode of [true, false]) {
+      const p = profile({
+        servicesCatalog: [
+          { id: 'svc_named', name: 'Carpet cleaning', price_range: 'KES 1,500' },
+          { id: 'svc_nameless', name: '', price_range: 'KES 777', site_visit_required: true },
+          { id: 'svc_blank', name: '   ', price_range: 'KES 888' },
+        ],
+        productCatalog: [{ sku: 'P9', price: '999', in_stock: 'yes' }],
+      });
+      const row = tenantRowFromProfile(p);
+      const rows = [
+        'catalog.service.svc_named.name',
+        'catalog.service.svc_nameless.name',
+        'catalog.service.svc_nameless.price',
+        'catalog.service.svc_nameless.site_visit',
+        'catalog.service.svc_blank.price',
+        'catalog.product.P9.name',
+        'catalog.product.P9.price',
+      ].map((field_path) => ({
+        field_path,
+        source: 'owner',
+        confirmed_at: NOW.toISOString(),
+        value_hash: hashFactValue(factValueForPath(field_path, row)),
+      }));
+      const hp = { ...p, fieldMeta: indexFieldMeta(rows, { hashMode }) };
+      const cat = readCatalog(hp, { now: NOW, hashMode });
+      assert.deepEqual(cat.services.map((i) => i.name), ['Carpet cleaning'], `hashMode ${hashMode}`);
+      assert.deepEqual(cat.products, [], `hashMode ${hashMode}`);
+      for (const q of ['KES 777', '777', 'P9', '999']) {
+        assert.notEqual(lookupCatalogItem(hp, q, { now: NOW, hashMode }).status, 'found', q);
+      }
+      assert.doesNotMatch(formatGigoFactsForPrompt(hp, { now: NOW, hashMode }), /777|888|999/);
+    }
+  });
+
   it('flag off: leaf rows are ignored', () => {
     const item = carpet(setup([['catalog.service.svc_carpet.price', { value_hash: null, source: 'seed' }]], false));
     assert.equal(item.price.status, 'known');

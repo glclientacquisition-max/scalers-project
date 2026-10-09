@@ -174,8 +174,8 @@ describe('backfillFactHashes run', () => {
     assert.ok(meta.every((m) => m.value_hash === null));
     const t1 = r.summary.tenants.find((t) => t.tenant_id === T1);
     assert.deepEqual(
-      { owner: t1.owner_rows, write: t1.to_write, empty: t1.skipped_empty, unresolved: t1.unresolved, written: t1.written },
-      { owner: 16, write: 7, empty: 5, unresolved: 4, written: 0 }
+      { owner: t1.owner_rows, write: t1.to_write, empty: t1.skipped_empty, nameless: t1.skipped_nameless, unresolved: t1.unresolved, written: t1.written },
+      { owner: 16, write: 7, empty: 4, nameless: 1, unresolved: 4, written: 0 }
     );
     const t3 = r.summary.tenants.find((t) => t.tenant_id === T3);
     assert.equal(t3.unresolved, 1);
@@ -188,6 +188,7 @@ describe('backfillFactHashes run', () => {
     assert.equal(reasons[`${T3}:identity.business_name`], 'tenant_not_found');
     const out = lines.join('\n');
     assert.match(out, /dry run/);
+    assert.match(out, /skipped_nameless=1/);
     assert.match(out, /sample \(5\)/);
     assert.doesNotMatch(out, /Mama|M-Pesa|Haircut/, 'sample prints hashes, never values');
   });
@@ -277,6 +278,49 @@ describe('backfillFactHashes run', () => {
     const allowed = await runBackfill({ client, supabaseUrl: STAGING, args: parseArgs(['--tenant', T2, '--apply', '--allow-missing-ids']), log: quiet });
     assert.equal(allowed.code, 0);
     assert.equal(rows[0].value_hash, hashFactValue('Fundi Co'));
+  });
+
+  it('never confirms a .price / .site_visit leaf on a nameless row (skipped_nameless)', async () => {
+    const tenant = {
+      id: T2,
+      services_catalog: [
+        { id: 'svc_named', name: 'Carpet', price_range: 'KES 5', site_visit_required: true },
+        { id: 'svc_nameless', name: '', price_range: 'KES 5', site_visit_required: true },
+        { id: 'svc_blank', name: '   ', pricing_mode: 'quote', site_visit_required: false },
+      ],
+      product_catalog: [{ name: ' ', price: '9' }, { sku: 'P2', price: '10' }],
+    };
+    const leafPaths = [
+      'catalog.service.svc_nameless.price',
+      'catalog.service.svc_nameless.site_visit',
+      'catalog.service.svc_blank.price',
+      'catalog.service.svc_blank.site_visit',
+      'catalog.product.1.price',
+      'catalog.product.P2.price',
+    ];
+    const meta = [
+      ...leafPaths,
+      'catalog.service.svc_named.price',
+      'catalog.service.svc_named.site_visit',
+      'catalog.service.svc_nameless.name',
+    ].map((field_path) => ({ tenant_id: T2, field_path, source: 'owner', value_hash: null }));
+    const lines = [];
+    const dry = await runBackfill({ client: fakeClient({ meta, tenants: [tenant] }), supabaseUrl: STAGING, args: parseArgs(['--tenant', T2]), log: (l) => lines.push(l) });
+    assert.equal(dry.code, 0);
+    const t = dry.summary.tenants[0];
+    assert.deepEqual(
+      { nameless: t.skipped_nameless, empty: t.skipped_empty, write: t.to_write },
+      { nameless: 6, empty: 1, write: 2 },
+      'six nameless leaves skipped; the nameless .name row is empty; only the named row leaves are planned'
+    );
+    assert.match(lines.join('\n'), /skipped_nameless=6/);
+    assert.equal(dry.summary.totals.skipped_nameless, 6);
+
+    const applied = await runBackfill({ client: fakeClient({ meta, tenants: [tenant] }), supabaseUrl: STAGING, args: parseArgs(['--tenant', T2, '--apply']), log: quiet });
+    assert.equal(applied.summary.totals.written, 2);
+    for (const p of leafPaths) assert.equal(meta.find((m) => m.field_path === p).value_hash, null, p);
+    assert.equal(meta.find((m) => m.field_path === 'catalog.service.svc_named.price').value_hash, hashFactValue({ price: 'KES 5' }));
+    assert.equal(meta.find((m) => m.field_path === 'catalog.service.svc_named.site_visit').value_hash, hashFactValue(true));
   });
 
   it('isEmptyFactValue', () => {
