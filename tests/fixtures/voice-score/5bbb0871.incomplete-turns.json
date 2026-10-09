@@ -1,0 +1,356 @@
+{
+  "note": "Staging call 5bbb0871-b674-4e24-a484-a80a3504e2c3 (HD_b82fbfef7649, 2026-10-09 20:12 EAT, build 35d88569): the 8 turns voice_turn_traces flagged incomplete. Structured mouth: model outputText is the JSON envelope; spoken text is say[]. Trimmed to turn_end, model, tts and outcome rows.",
+  "callId": "5bbb0871-b674-4e24-a484-a80a3504e2c3",
+  "liveIncomplete": 8,
+  "turns": [
+    {
+      "turnIndex": 2,
+      "caller": {
+        "text": "Eeh, unaongea na Alvin.",
+        "language": "sw",
+        "soniox": "sw",
+        "detected": "sw"
+      },
+      "stages": [
+        {
+          "stage": "turn_end",
+          "decision": "flush",
+          "reason": "caller_turn_processed"
+        },
+        {
+          "stage": "model",
+          "phase": "request",
+          "language": "sw",
+          "provider": "gemini",
+          "promptId": "voice.system"
+        },
+        {
+          "stage": "tts",
+          "text": "Asante Alvin. Ungependa tusaidie na huduma gani leo?",
+          "before": "Asante Alvin. Ungependa tusaidie na huduma gani leo?",
+          "language": "sw",
+          "structured": true
+        },
+        {
+          "stage": "model",
+          "phase": "output",
+          "language": "sw",
+          "provider": "gemini",
+          "promptId": "voice.system",
+          "outputText": "{\"lang\":\"sw\",\"intent\":\"booking\",\"facts_used\":[],\"say\":[\"Asante Alvin. Ungependa tusaidie na huduma gani leo?\"],\"tool\":{\"name\":\"save_caller_info\",\"args_json\":\"{\\\"name\\\":\\\"Alvin\\\",\\\"reason\\\":\\\"general enquiry\\\"}\"}}"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "turnIndex": 3,
+      "caller": {
+        "text": "a.",
+        "language": "sw",
+        "soniox": "sw",
+        "detected": "sw"
+      },
+      "stages": [
+        {
+          "stage": "turn_end",
+          "decision": "flush",
+          "reason": "caller_turn_processed"
+        },
+        {
+          "stage": "model",
+          "phase": "request",
+          "language": "sw",
+          "provider": "gemini",
+          "promptId": "voice.system"
+        },
+        {
+          "stage": "tts",
+          "text": "Samahani, sijakusikia vizuri. Ungependa kusaidiwa na huduma gani leo?",
+          "before": "Samahani, sijakusikia vizuri. Ungependa kusaidiwa na huduma gani leo?",
+          "language": "sw",
+          "structured": true
+        },
+        {
+          "stage": "model",
+          "phase": "output",
+          "language": "sw",
+          "provider": "gemini",
+          "promptId": "voice.system",
+          "outputText": "{\"lang\":\"sw\",\"intent\":\"services\",\"facts_used\":[],\"say\":[\"Samahani, sijakusikia vizuri. Ungependa kusaidiwa na huduma gani leo?\"],\"end_call\":false}"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "turnIndex": 5,
+      "caller": {
+        "text": "Kwa. Uko wapi?",
+        "language": "sw",
+        "soniox": "sw",
+        "detected": "sw"
+      },
+      "stages": [
+        {
+          "stage": "turn_end",
+          "decision": "flush",
+          "reason": "caller_turn_processed"
+        },
+        {
+          "stage": "model",
+          "phase": "request",
+          "language": "sw",
+          "provider": "gemini",
+          "promptId": "voice.system"
+        },
+        {
+          "stage": "tts",
+          "text": "Ofisi yetu kuu iko Nairobi, na tunatoa huduma za kuja mpaka mlangoni kwako Nairobi na maeneo ya jirani. Ungetaka tukutembelee wapi?",
+          "before": "Ofisi yetu kuu iko Nairobi, na tunatoa huduma za kuja mpaka mlangoni kwako Nairobi na maeneo ya jirani. Ungetaka tukutembelee wapi?",
+          "language": "sw",
+          "structured": true
+        },
+        {
+          "stage": "model",
+          "phase": "output",
+          "language": "sw",
+          "provider": "gemini",
+          "promptId": "voice.system",
+          "outputText": "{\"lang\":\"sw\",\"intent\":\"coverage\",\"facts_used\":[{\"kind\":\"location\",\"id\":\"loc:main\"},{\"kind\":\"coverage\",\"id\":\"cov:nairobi\"}],\"say\":[\"Ofisi yetu kuu iko Nairobi, na tunatoa huduma za kuja mpaka mlangoni kwako Nairobi na maeneo ya jirani. Ungetaka tukutembelee wapi?\"]}"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "turnIndex": 8,
+      "caller": {
+        "text": "Oh, so it's done per room?",
+        "language": "en",
+        "soniox": "en",
+        "detected": "en"
+      },
+      "stages": [
+        {
+          "stage": "turn_end",
+          "decision": "flush",
+          "reason": "caller_turn_processed"
+        },
+        {
+          "stage": "model",
+          "phase": "request",
+          "language": "en",
+          "provider": "gemini",
+          "promptId": "voice.system"
+        },
+        {
+          "stage": "tts",
+          "text": "Yes Alvin, carpet cleaning is two thousand two hundred shillings per room.",
+          "before": "Yes Alvin, carpet cleaning is 2,200 shillings per room.",
+          "language": "en",
+          "structured": true
+        },
+        {
+          "stage": "tts",
+          "text": "When would you like us to come, and where should we come?",
+          "before": "When would you like us to come, and where should we come?",
+          "language": "en",
+          "structured": true
+        },
+        {
+          "stage": "model",
+          "phase": "output",
+          "language": "en",
+          "provider": "gemini",
+          "promptId": "voice.system",
+          "outputText": "{\n  \"lang\": \"en\",\n  \"intent\": \"booking\",\n  \"facts_used\": [\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:carpet-cleaning\"\n    },\n    {\n      \"kind\": \"price\",\n      \"id\": \"svc:carpet-cleaning\"\n    }\n  ],\n  \"say\": [\n    \"Yes Alvin, carpet cleaning is 2,200 shillings per room.\",\n    \"When would you like us to come, and where should we come?\"\n  ]\n}"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "turnIndex": 11,
+      "caller": {
+        "text": "Let's do at.",
+        "language": "en",
+        "soniox": "en",
+        "detected": "en"
+      },
+      "stages": [
+        {
+          "stage": "turn_end",
+          "decision": "flush",
+          "reason": "caller_turn_processed"
+        },
+        {
+          "stage": "model",
+          "phase": "request",
+          "language": "en",
+          "provider": "gemini",
+          "promptId": "voice.system"
+        },
+        {
+          "stage": "tts",
+          "text": "What specific time would you like to move the visit to?",
+          "before": "What specific time would you like to move the visit to?",
+          "language": "en",
+          "structured": true
+        },
+        {
+          "stage": "model",
+          "phase": "output",
+          "language": "en",
+          "provider": "gemini",
+          "promptId": "voice.system",
+          "outputText": "{\"lang\":\"en\",\"intent\":\"booking\",\"facts_used\":[],\"say\":[\"What specific time would you like to move the visit to?\"]}"
+        },
+        {
+          "stage": "outcome",
+          "value": "barge_in"
+        }
+      ]
+    },
+    {
+      "turnIndex": 13,
+      "caller": {
+        "text": "1:00 PM is fine.",
+        "language": "en",
+        "soniox": "en",
+        "detected": "en"
+      },
+      "stages": [
+        {
+          "stage": "turn_end",
+          "decision": "flush",
+          "reason": "caller_turn_processed"
+        },
+        {
+          "stage": "model",
+          "phase": "request",
+          "language": "en",
+          "provider": "gemini",
+          "promptId": "voice.system"
+        },
+        {
+          "stage": "tts",
+          "text": "Okay, Sawa.",
+          "before": "Okay, Sawa.",
+          "language": "en",
+          "structured": true
+        },
+        {
+          "stage": "tts",
+          "text": "I've moved that visit to tomorrow, Saturday, at 1 P M.",
+          "before": "I've moved that visit to tomorrow, Saturday, at 1 PM.",
+          "language": "en"
+        },
+        {
+          "stage": "model",
+          "phase": "output",
+          "language": "en",
+          "provider": "gemini",
+          "promptId": "voice.system",
+          "outputText": "{\"lang\":\"en\",\"intent\":\"booking\",\"facts_used\":[],\"say\":[\"Okay, Sawa.\"],\"tool\":{\"name\":\"update_appointment\",\"args_json\":\"{\\\"status\\\":\\\"requested\\\",\\\"when_text\\\":\\\"Saturday 10 October 2026, 1:00 PM\\\"}\"}}"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "turnIndex": 16,
+      "caller": {
+        "text": "Uh, I appreciate it then.",
+        "language": "en",
+        "soniox": "en",
+        "detected": "en"
+      },
+      "stages": [
+        {
+          "stage": "turn_end",
+          "decision": "flush",
+          "reason": "caller_turn_processed"
+        },
+        {
+          "stage": "model",
+          "phase": "request",
+          "language": "en",
+          "provider": "gemini",
+          "promptId": "voice.system"
+        },
+        {
+          "stage": "tts",
+          "text": "You are welcome, Alvin. Have a great day.",
+          "before": "You are welcome, Alvin. Have a great day!",
+          "language": "en",
+          "structured": true
+        },
+        {
+          "stage": "model",
+          "phase": "output",
+          "language": "en",
+          "provider": "gemini",
+          "promptId": "voice.system",
+          "outputText": "{\"lang\":\"en\",\"intent\":\"smalltalk\",\"facts_used\":[],\"say\":[\"You are welcome, Alvin. Have a great day!\"]}"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "turnIndex": 17,
+      "caller": {
+        "text": "Haya.",
+        "language": "sw",
+        "soniox": "sw",
+        "detected": "sw"
+      },
+      "stages": [
+        {
+          "stage": "turn_end",
+          "decision": "flush",
+          "reason": "caller_turn_processed"
+        },
+        {
+          "stage": "model",
+          "phase": "request",
+          "language": "sw",
+          "provider": "gemini",
+          "promptId": "voice.system"
+        },
+        {
+          "stage": "tts",
+          "text": "Sawa Alvin, uwe na siku njema.",
+          "before": "Sawa Alvin, uwe na siku njema!",
+          "language": "sw",
+          "structured": true
+        },
+        {
+          "stage": "model",
+          "phase": "output",
+          "language": "sw",
+          "provider": "gemini",
+          "promptId": "voice.system",
+          "outputText": "{\"lang\": \"sw\", \"intent\": \"smalltalk\", \"facts_used\": [], \"say\": [\"Sawa Alvin, uwe na siku njema!\"]}"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    }
+  ]
+}

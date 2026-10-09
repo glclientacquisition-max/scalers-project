@@ -35,8 +35,43 @@ function stage(turn, name, phase) {
   return rows[rows.length - 1] || null;
 }
 
+// The structured mouth's model output is a JSON envelope
+// ({ lang, intent, facts_used, say: [...], tool?, end_call? }); only say[] is
+// meant to be spoken. Scoring the raw envelope made every short reply look
+// "incomplete" (staging 5bbb0871: all 8 flags were the JSON wrapper).
+function structuredSay(raw) {
+  const text = String(raw || '').trim();
+  if (!text.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.say)) {
+      return parsed.say.filter((piece) => typeof piece === 'string').join(' ');
+    }
+    if (parsed && typeof parsed === 'object' && typeof parsed.say === 'string') return parsed.say;
+    return null;
+  } catch {
+    // A cut-off stream: take the complete say[] strings that arrived.
+    const at = text.search(/"say"\s*:\s*\[/);
+    if (at < 0) return null;
+    const tail = text.slice(at).replace(/^"say"\s*:\s*\[/, '');
+    const pieces = [];
+    const re = /\s*"((?:[^"\\]|\\.)*)"\s*(,|\])/gy;
+    let m;
+    while ((m = re.exec(tail))) {
+      try {
+        pieces.push(JSON.parse(`"${m[1]}"`));
+      } catch {
+        break;
+      }
+      if (m[2] === ']') break;
+    }
+    return pieces.join(' ');
+  }
+}
+
 function modelProse(text) {
-  return String(text || '')
+  const say = structuredSay(text);
+  return String(say != null ? say : text || '')
     .replace(/###TOOL###[\s\S]*?###ENDTOOL###/gi, ' ')
     .replace(/###ENDCALL###/gi, ' ')
     .replace(/\s+/g, ' ')
@@ -622,6 +657,7 @@ function formatSummary(scorecard) {
 }
 
 module.exports = {
+  modelProse,
   LATENCY_BUDGET_MS,
   scoreTurn,
   scoreTurns,

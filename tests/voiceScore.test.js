@@ -522,3 +522,52 @@ describe('voice score', () => {
     assert.ok(replay.turns[0].stages.some((row) => row.stage === 'tts'));
   });
 });
+
+describe('structured mouth: model prose is say[] (staging 5bbb0871)', () => {
+  const { modelProse } = require('../src/speech/voiceScore');
+  const FIXTURE = require('./fixtures/voice-score/5bbb0871.incomplete-turns.json');
+
+  it('unwraps the JSON envelope to say[], tool and flags dropped', () => {
+    assert.equal(
+      modelProse('{"lang":"en","intent":"booking","facts_used":[],"say":["Okay.","When should we come?"],"tool":{"name":"x","args_json":"{}"}}'),
+      'Okay. When should we come?'
+    );
+    assert.equal(modelProse('{\n  "lang": "sw",\n  "say": [\n    "Sawa."\n  ]\n}'), 'Sawa.');
+    assert.equal(modelProse('{"lang":"en","say":[]}'), '');
+  });
+
+  it('a cut-off envelope keeps the say[] strings that arrived', () => {
+    assert.equal(modelProse('{"lang":"en","say":["Sure, I can help.","When would'), 'Sure, I can help.');
+    assert.equal(modelProse('{"lang":"en","say":["Say \\"hi\\" now."],"tool":{'), 'Say "hi" now.');
+  });
+
+  it('legacy prose and ###TOOL### blocks are unchanged', () => {
+    assert.equal(modelProse('Sawa. ###TOOL###{"name":"x"}###ENDTOOL### Tuje lini?'), 'Sawa. Tuje lini?');
+    assert.equal(modelProse('Goodbye. ###ENDCALL###'), 'Goodbye.');
+    assert.equal(modelProse('{not json at all'), '{not json at all');
+  });
+
+  it('all 8 live "incomplete" flags on 5bbb0871 were false positives', () => {
+    assert.equal(FIXTURE.turns.length, FIXTURE.liveIncomplete);
+    const card = scoreTurns(FIXTURE.turns);
+    const flagged = card.turns.filter((t) => t.checks.incomplete).map((t) => t.notes);
+    assert.deepEqual(flagged, []);
+    assert.equal(card.checks.incomplete, 0);
+  });
+
+  it('a structured turn that really dropped most of say[] is still incomplete', () => {
+    const say = ['Carpet cleaning is 2,200 shillings per room, and sofa cleaning is 1,500 per seat.', 'When should we come?'];
+    const card = scoreTurns([
+      {
+        caller: { text: 'How much?', language: 'en' },
+        stages: [
+          { stage: 'turn_end', decision: 'flush', reason: 'caller_turn_processed' },
+          { stage: 'tts', text: 'Carpet cleaning', before: 'Carpet cleaning', language: 'en', structured: true },
+          { stage: 'model', phase: 'output', language: 'en', outputText: JSON.stringify({ lang: 'en', say }) },
+          { stage: 'outcome', value: 'ok' },
+        ],
+      },
+    ]);
+    assert.equal(card.checks.incomplete, 1);
+  });
+});
