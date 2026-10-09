@@ -20,7 +20,8 @@ describe('emergencyTts', () => {
     assert.equal(pickSpeechOutageLine('sw'), OUTAGE_LINE_SW);
     assert.equal(pickSpeechOutageLine('sheng'), OUTAGE_LINE_SW);
     assert.match(OUTAGE_LINE_EN, /downtime/i);
-    assert.match(OUTAGE_LINE_SW, /downtime/i);
+    assert.match(OUTAGE_LINE_SW, /haipatikani kwa muda mfupi/i);
+    assert.doesNotMatch(OUTAGE_LINE_SW, /downtime/i);
     assert.doesNotMatch(OUTAGE_LINE_EN, /[—–]/);
     assert.doesNotMatch(OUTAGE_LINE_SW, /[—–]/);
   });
