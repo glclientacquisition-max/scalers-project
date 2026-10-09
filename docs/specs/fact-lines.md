@@ -54,8 +54,14 @@ Source call: HD_d199dbbf6b79 (staging re-dial, 2026-10-09 11:41 EAT).
 - Gate: an `appointments` row for this caller with status `requested` or
   `confirmed`, read at call start. A visit earlier today (Nairobi day) is
   today's visit, not a past one.
-- Fires: the open-file read ("what do I have"), and a named-row ask that
-  matches a visit ("ile carpet cleaning ya Kitengela").
+- Fires: the open-file read ("what do I have"), a named-row ask that
+  matches a visit ("ile carpet cleaning ya Kitengela"), and the name-confirm
+  turn when the caller asked about their file before confirming ("About my
+  booking" → "Yeah"): then `visit_open` lines come first on that turn, before
+  any other content (no price line in front of them).
+- The open-file read says every current open visit (today's included), then
+  the newest four open requests (`request_open`), then `more_open` for the
+  rest.
 - `gate`: `{ appointment_id }`.
 
 ### `request_open` — an open request or hold on the caller file
@@ -126,6 +132,30 @@ Source call: HD_d199dbbf6b79 (staging re-dial, 2026-10-09 11:41 EAT).
   notes only). Brain does not say "moved" for it.
 - Fires: right after that update.
 - `gate`: `{ appointment_id: T }`.
+
+### `more_open` — older open rows left out of the read
+
+- Required: `count: integer` (open rows not read: past-dated, or requests
+  over the four newest).
+- Gate: the open-file read left out `count` open rows of the caller file.
+- Fires: last line of an open-file read when `count > 0`.
+- `gate`: `{ open_rows, spoken }`.
+
+### `confirm_identity_first` — the file is masked, confirm the speaker
+
+- Optional: `name: string` (the file name being confirmed), `ask: boolean`
+  (true: this line also carries the one file-name ask, "Am I speaking with
+  {name}?"; false: the ask was already spoken on this call, so no ask).
+- Gate: the caller file is masked (name not confirmed) and has open rows, and
+  a reply line claimed there are no bookings, records or visits. Brain drops
+  that claim (hard rule, speech guard) and speaks this instead. With `ask`,
+  the file-name ask is marked spoken (code-held; never asked twice).
+- Fires: in place of a dropped no-record claim before the name confirm. After
+  the confirm, a no-record claim on a non-empty file is replaced by the
+  open-file read instead.
+- `gate`: `{ file_masked: true, open_rows }`.
+- While masked, the model is told the file is MASKED, not empty, and the read
+  result says `masked`, never empty.
 
 ## Fallback
 
