@@ -4,9 +4,10 @@
 -- current_period_start / current_period_end forward by the subscription's
 -- period (month or year) and zero the tenant's usage counters:
 --   tenants.seconds_used, sms_used_units, email_used_units, whatsapp_used_units
--- Included units (minutes_included, sms_included_units, ...) are NOT touched.
+-- and rebuild included units from the package (+ grants that count in the new
+-- period). Pending downgrades / period changes / unassigns apply here.
 --
--- Run after: package_catalog.sql (tenant_subscriptions, counters,
+-- Run after: package_state_rules.sql, package_catalog.sql (tenant_subscriptions, counters,
 --            tenants_protect_wallet_columns), wallet_security_beta.sql
 --            (ops_audit_log). Requires the pg_cron extension.
 -- ASCII-only (safe for Supabase SQL Editor).
@@ -47,7 +48,19 @@
 
 -- ---------------------------------------------------------------------------
 -- 1. Function
+--    Usage periods are always one calendar month (EAT); annual tenants roll
+--    monthly and their billing term (term_start/term_end) moves only at its end.
+--    Rolls active AND no-package (cancelled) rows: a no-package tenant still
+--    needs its usage clock for on-demand billing. At the boundary it applies a
+--    pending change (downgrade / period_change / unassign, see
+--    package_state_rules.sql), zeroes usage, and rebuilds
+--      minutes_included = package minutes (0 with no package)
+--                       + billing_grant_minutes_for_period(new period)
+--    so upgrade proration and expired grants drop off. Grant rows are never
+--    deleted. Requires package_state_rules.sql.
 -- ---------------------------------------------------------------------------
+drop function if exists public.roll_package_periods(boolean);
+
 create or replace function public.roll_package_periods(p_dry_run boolean default false)
 returns table (
   tenant_id uuid,
@@ -59,7 +72,11 @@ returns table (
   seconds_used_before integer,
   sms_used_before integer,
   email_used_before integer,
-  whatsapp_used_before integer
+  whatsapp_used_before integer,
+  applied_change text,
+  package_id_after uuid,
+  minutes_included_after integer,
+  term_end_after timestamptz
 )
 language plpgsql
 security definer
@@ -68,30 +85,75 @@ as $$
 #variable_conflict use_column
 declare
   r record;
-  v_step interval;
   v_start timestamptz;
   v_end timestamptz;
+  v_period text;
+  v_package uuid;
+  v_status text;
+  v_change text;
+  v_minutes integer;
+  v_grants integer;
+  v_term_start timestamptz;
+  v_term_end timestamptz;
 begin
   for r in
-    select s.tenant_id, s.period, s.current_period_start, s.current_period_end,
+    select s.tenant_id, s.period, s.status, s.package_id,
+           s.current_period_start, s.current_period_end, s.term_start, s.term_end,
+           s.pending_change, s.pending_package_id, s.pending_period, s.pending_effective_at,
            t.seconds_used, t.sms_used_units, t.email_used_units, t.whatsapp_used_units
     from public.tenant_subscriptions s
     join public.tenants t on t.id = s.tenant_id
-    where s.status = 'active'
+    where s.status in ('active', 'cancelled')
       and s.current_period_end is not null
       and s.current_period_end <= now()
     for update of s skip locked
   loop
-    v_step := case when r.period = 'year' then interval '12 months' else interval '1 month' end;
+    v_period := r.period;
+    v_package := r.package_id;
+    v_status := r.status;
+    v_change := null;
+
+    if r.pending_change is not null and r.pending_effective_at <= r.current_period_end then
+      v_change := r.pending_change;
+      if r.pending_change = 'unassign' then
+        v_status := 'cancelled';
+      else
+        v_package := r.pending_package_id;
+        v_period := r.pending_period;
+      end if;
+    end if;
+
+    -- Usage always rolls one calendar month (EAT), for monthly and annual terms.
     v_start := r.current_period_end;
-    v_end := r.current_period_end + v_step;
+    v_end := public.billing_add_months(v_start, 1);
     while v_end <= now() loop
       v_start := v_end;
-      v_end := v_end + v_step;
+      v_end := public.billing_add_months(v_start, 1);
     end loop;
 
+    -- Billing term: a term switch starts a new term with the new usage month;
+    -- otherwise the term moves only once it has ended.
+    if v_change = 'period_change' or r.term_end is null then
+      v_term_start := v_start;
+      v_term_end := public.billing_add_months(v_start, case when v_period = 'year' then 12 else 1 end);
+    else
+      v_term_start := r.term_start;
+      v_term_end := r.term_end;
+      while v_term_end <= v_start loop
+        v_term_start := v_term_end;
+        v_term_end := public.billing_add_months(v_term_start, case when v_period = 'year' then 12 else 1 end);
+      end loop;
+    end if;
+
+    v_grants := public.billing_grant_minutes_for_period(r.tenant_id, v_start, v_end);
+    if v_status = 'active' then
+      select p.minutes + v_grants into v_minutes from public.billing_packages p where p.id = v_package;
+    else
+      v_minutes := v_grants;
+    end if;
+
     tenant_id := r.tenant_id;
-    period := r.period;
+    period := v_period;
     old_period_start := r.current_period_start;
     old_period_end := r.current_period_end;
     new_period_start := v_start;
@@ -100,11 +162,27 @@ begin
     sms_used_before := r.sms_used_units;
     email_used_before := r.email_used_units;
     whatsapp_used_before := r.whatsapp_used_units;
+    applied_change := v_change;
+    package_id_after := case when v_status = 'active' then v_package end;
+    minutes_included_after := v_minutes;
+    term_end_after := v_term_end;
 
     if not p_dry_run then
       update public.tenant_subscriptions s
         set current_period_start = v_start,
             current_period_end = v_end,
+            period = v_period,
+            term_start = v_term_start,
+            term_end = v_term_end,
+            package_id = v_package,
+            status = v_status,
+            ended_at = case when v_change = 'unassign' then r.current_period_end else s.ended_at end,
+            pending_package_id = case when v_change is not null then null else s.pending_package_id end,
+            pending_period = case when v_change is not null then null else s.pending_period end,
+            pending_change = case when v_change is not null then null else s.pending_change end,
+            pending_effective_at = case when v_change is not null then null else s.pending_effective_at end,
+            pending_set_at = case when v_change is not null then null else s.pending_set_at end,
+            pending_actor = case when v_change is not null then null else s.pending_actor end,
             updated_at = now()
         where s.tenant_id = r.tenant_id
           and s.current_period_end = r.current_period_end;  -- guard against a concurrent roll
@@ -119,6 +197,11 @@ begin
               whatsapp_used_units = 0
           where t.id = r.tenant_id;
 
+        perform public._tenant_set_allowances(
+          r.tenant_id,
+          case when v_status = 'active' then v_package end,
+          v_minutes);
+
         insert into public.ops_audit_log (actor, action, tenant_id, amount_kes, detail)
         values (
           'cron',
@@ -126,11 +209,17 @@ begin
           r.tenant_id,
           null,
           jsonb_build_object(
-            'period', r.period,
+            'period', v_period,
             'old_start', r.current_period_start,
             'old_end', r.current_period_end,
             'new_start', v_start,
             'new_end', v_end,
+            'term_start', v_term_start,
+            'term_end', v_term_end,
+            'applied_change', v_change,
+            'package_id', case when v_status = 'active' then v_package end,
+            'minutes_included_after', v_minutes,
+            'grant_minutes', v_grants,
             'seconds_used', r.seconds_used,
             'sms_used_units', r.sms_used_units,
             'email_used_units', r.email_used_units,
@@ -146,7 +235,7 @@ end;
 $$;
 
 comment on function public.roll_package_periods(boolean) is
-  'Roll ended tenant_subscriptions periods forward and zero *_used counters. p_dry_run=true reports only.';
+  'Roll ended tenant_subscriptions periods forward, apply pending changes, zero *_used counters, rebuild minutes_included (package + grants for the new period). p_dry_run=true reports only.';
 
 revoke all on function public.roll_package_periods(boolean) from public, anon, authenticated;
 grant execute on function public.roll_package_periods(boolean) to service_role;

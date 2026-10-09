@@ -6,7 +6,7 @@ import {
   loadBillingHistory,
 } from "@/lib/adminBilling";
 import { isLegacyAuthenticated } from "@/lib/auth";
-import { assignBusinessPackage } from "@/lib/packageCatalog";
+import { assignBusinessPackage, unassignBusinessPackage } from "@/lib/packageCatalog";
 import {
   setTenantBillingMode,
   type BillingMode,
@@ -81,8 +81,26 @@ export async function POST(request: Request) {
       if (period !== "month" && period !== "year") {
         return NextResponse.json({ error: "Period must be month or year" }, { status: 400 });
       }
-      await assignBusinessPackage({ tenantId: businessId, packageId, period });
-      return NextResponse.json({ ok: true });
+      const change = await assignBusinessPackage({
+        tenantId: businessId,
+        packageId,
+        period,
+        actor,
+        note: note || undefined,
+      });
+      return NextResponse.json({ ok: true, ...change });
+    }
+
+    if (action === "unassign_package") {
+      const when = String(body.when || "");
+      if (when !== "now" && when !== "period_end") {
+        return NextResponse.json({ error: "Choose now or end of period" }, { status: 400 });
+      }
+      if (note.length < 3) {
+        return NextResponse.json({ error: "Reason required (min 3 chars)" }, { status: 400 });
+      }
+      const result = await unassignBusinessPackage({ tenantId: businessId, when, note, actor });
+      return NextResponse.json({ ok: true, ...result });
     }
 
     if (action === "set_billing_mode") {
