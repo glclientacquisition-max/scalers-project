@@ -60,6 +60,7 @@ function baselineShape(calls) {
  * cannot judge is needs_recording and scored by neither):
  * - the structured mean is at least the legacy mean;
  * - turns the structured engine spoke have deletedAnswer 0 and languageMismatch 0
+ *   (a barged turn is held to legacy for deletedAnswer: the cut reply has no tts row)
  *   (canned / early-return turns are Phase 3 and only held to "not worse");
  * - no turn sends a glued or letterless TTS piece.
  */
@@ -86,8 +87,14 @@ function compareStructured(pairs) {
     structured.turns.forEach((turn, i) => {
       const spokeStructured = (replay.turns[i]?.stages || []).some((row) => row.stage === 'structured');
       if (spokeStructured && turn.score != null) {
+        // A barge-in cut the playback: the reply never reached a tts row, so the
+        // scorer reads it as deleted on both mouths. Hold that turn to "not worse
+        // than legacy" for deletedAnswer instead of zero (HD_72ab69cbab2b t2).
+        const barged = (replay.turns[i]?.stages || []).some((row) => row.stage === 'outcome' && row.value === 'barge_in');
         for (const key of STRUCTURED_ZERO) {
-          if (Number(turn.checks?.[key] || 0) > 0) failures.push(`${id} #${i + 1} ${key}=${turn.checks[key]}`);
+          const value = Number(turn.checks?.[key] || 0);
+          if (barged && key === 'deletedAnswer' && value <= Number(legacy.turns[i]?.checks?.[key] || 0)) continue;
+          if (value > 0) failures.push(`${id} #${i + 1} ${key}=${turn.checks[key]}`);
         }
       }
       for (const key of STRUCTURED_MOUTH_ZERO) {
