@@ -75,7 +75,7 @@ function callerHearingNames(tenant = {}) {
     ...[
       ...(Array.isArray(card.alternateNames) ? card.alternateNames : []),
       ...(Array.isArray(tenant.alternateNames) ? tenant.alternateNames : []),
-    ].filter(isSavedAlternateName),
+    ].filter((alt) => isSavedAlternateName(alt, { primary: [card.fileOwnerName, card.name, tenant.callerName, tenant.caller_name] })),
   ];
   const seen = new Set();
   const names = [];
