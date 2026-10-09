@@ -10,7 +10,7 @@
 const CACHE_MS_DEFAULT = 3 * 60 * 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** @type {{ at: number, emails: string[], source: string } | null} */
+/** @type {{ at: number, emails: string[], source: string, kinds?: object } | null} */
 let cache = null;
 /** @type {null | (() => Promise<{ data: any, error: any }>)} */
 let loaderOverride = null;
@@ -45,6 +45,27 @@ function emailsFromSettingsRow(row) {
   return normalizeEmails(Array.isArray(row.emails) ? row.emails : []);
 }
 
+/** Admin type toggles (platform_ops_settings.kinds). Missing means on. */
+function kindsFromSettingsRow(row) {
+  const kinds = row && typeof row === 'object' ? row.kinds : null;
+  if (!kinds || typeof kinds !== 'object' || Array.isArray(kinds)) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(kinds)) {
+    if (typeof v === 'boolean') out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * Whether an Admin notice type is on (Super Admin > Platform toggles).
+ * Unknown, unreadable, or missing settings count as on.
+ * @param {string} kind e.g. 'sautikit_low'
+ */
+async function platformOpsKindEnabled(kind, opts = {}) {
+  const { kinds } = await platformOpsRecipients(opts);
+  return !kinds || kinds[kind] !== false;
+}
+
 function envEmails(env = process.env) {
   return normalizeEmails(
     splitEnvList(env.SCALERS_OPS_ALERT_EMAILS || env.SCALERS_OPS_ALERT_EMAIL || '')
@@ -65,7 +86,7 @@ async function defaultLoader() {
   const { supabase } = require('../lib/supabaseClient');
   return supabase
     .from('platform_ops_settings')
-    .select('emails, people')
+    .select('emails, people, kinds')
     .eq('id', 1)
     .maybeSingle();
 }
@@ -92,15 +113,22 @@ async function platformOpsRecipients(opts = {}) {
   const env = opts.env || process.env;
   const now = opts.now ?? Date.now();
   if (!opts.force && cache && now - cache.at < cacheMs(env)) {
-    return { recipients: toRecipients(cache.emails), emails: cache.emails, source: cache.source };
+    return {
+      recipients: toRecipients(cache.emails),
+      emails: cache.emails,
+      source: cache.source,
+      kinds: cache.kinds || {},
+    };
   }
 
   let adminEmails = [];
+  let kinds = {};
   let adminError;
   try {
     const { data, error } = await (loaderOverride || defaultLoader)();
     if (error) throw error;
     adminEmails = emailsFromSettingsRow(data);
+    kinds = kindsFromSettingsRow(data);
   } catch (err) {
     adminError = String(err?.message || err).slice(0, 200);
     console.warn(
@@ -120,8 +148,8 @@ async function platformOpsRecipients(opts = {}) {
     );
   }
 
-  cache = { at: now, emails, source };
-  const out = { recipients: toRecipients(emails), emails, source };
+  cache = { at: now, emails, source, kinds };
+  const out = { recipients: toRecipients(emails), emails, source, kinds };
   if (adminError) out.adminError = adminError;
   return out;
 }
@@ -138,6 +166,8 @@ function resetPlatformOpsRecipientsCache() {
 }
 
 module.exports = {
+  platformOpsKindEnabled,
+  kindsFromSettingsRow,
   platformOpsRecipients,
   emailsFromSettingsRow,
   envEmails,

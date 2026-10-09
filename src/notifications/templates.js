@@ -175,10 +175,10 @@ function platformOpsDegradeBody(kind = 'speech', detail = {}) {
       : kind === 'telephony'
         ? 'Phone line'
         : 'Speech';
-  const lines = [
-    `Scalers platform ${lane} is degraded.`,
-    'Check /admin Platform board and Voice GET /healthz.',
-  ];
+  const lines = [`Scalers platform ${lane} is degraded.`];
+  const cause = String(detail.cause || '').trim();
+  if (cause) lines.push(`Cause: ${cause.slice(0, 160)}.`.replace(/\.\.$/, '.'));
+  lines.push('Check /admin Platform board and Voice GET /healthz.');
   const channel = String(detail.channel || '').trim();
   if (channel) lines.push(`Channel: ${channel}`);
   const message = String(detail.message || '').trim();
@@ -187,6 +187,27 @@ function platformOpsDegradeBody(kind = 'speech', detail = {}) {
     const major = Number(detail.balanceMinor) / 100;
     lines.push(`Wallet: ${detail.currency} ${major}`);
   }
+  return lines.join('\n');
+}
+
+function formatMinor(minor) {
+  const n = Number(minor);
+  if (!Number.isFinite(n)) return '?';
+  return (n / 100).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Staff-only phone wallet low notice. No vendor names. */
+function platformOpsWalletLowBody(detail = {}) {
+  const currency = String(detail.currency || 'KES').trim() || 'KES';
+  const lines = ['Scalers platform phone wallet is low.'];
+  if (detail.balanceMinor != null) {
+    const under =
+      detail.thresholdMinor != null ? ` (under ${currency} ${formatMinor(detail.thresholdMinor)})` : '';
+    lines.push(`Balance: ${currency} ${formatMinor(detail.balanceMinor)}${under}`);
+  }
+  lines.push('Top up the phone wallet before calls stop. Check /admin Platform board.');
+  const source = String(detail.source || '').trim();
+  if (source) lines.push(`Seen by: ${source}`);
   return lines.join('\n');
 }
 
@@ -253,6 +274,7 @@ module.exports = {
   escalationBody,
   missedTextbackBody,
   platformOpsDegradeBody,
+  platformOpsWalletLowBody,
   outageBody,
   renderCallerText,
   renderStaffSubject,

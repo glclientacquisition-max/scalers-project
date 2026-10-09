@@ -215,6 +215,10 @@ const {
   probeSautikitWallet,
 } = require('./src/sautikit/walletProbe');
 const {
+  handleWalletWebhookEvent,
+  isWalletEventKind,
+} = require('./src/sautikit/walletLowBalance');
+const {
   notePlatformOpsDegrade,
   opsCooldownMs,
 } = require('./src/notifications/platformOpsAlert');
@@ -1633,6 +1637,20 @@ app.post('/voice/recording-status', sautikitWebhookGuard, async (req, res) => {
 app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
   if (isWhatsAppEventKind(req)) {
     return handleWhatsAppWebhook(req, res);
+  }
+  // wallet.low_balance (and other wallet.* events): staff ops only, never call
+  // handling. Signature already checked by sautikitWebhookGuard above.
+  const walletKind = extractEventKind(req.headers, req.body || {});
+  if (isWalletEventKind(walletKind)) {
+    res.sendStatus(200);
+    void handleWalletWebhookEvent({
+      headers: req.headers,
+      body: req.body || {},
+      kind: walletKind,
+    }).catch((err) => {
+      console.warn('[voice/events] wallet event failed:', err?.message || err);
+    });
+    return;
   }
   // Always ACK immediately so SautiKit does not retry (DB work is best-effort).
   res.sendStatus(200);
