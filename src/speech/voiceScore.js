@@ -35,8 +35,43 @@ function stage(turn, name, phase) {
   return rows[rows.length - 1] || null;
 }
 
+// The structured mouth's model output is a JSON envelope
+// ({ lang, intent, facts_used, say: [...], tool?, end_call? }); only say[] is
+// meant to be spoken. Scoring the raw envelope made every short reply look
+// "incomplete" (staging 5bbb0871: all 8 flags were the JSON wrapper).
+function structuredSay(raw) {
+  const text = String(raw || '').trim();
+  if (!text.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.say)) {
+      return parsed.say.filter((piece) => typeof piece === 'string').join(' ');
+    }
+    if (parsed && typeof parsed === 'object' && typeof parsed.say === 'string') return parsed.say;
+    return null;
+  } catch {
+    // A cut-off stream: take the complete say[] strings that arrived.
+    const at = text.search(/"say"\s*:\s*\[/);
+    if (at < 0) return null;
+    const tail = text.slice(at).replace(/^"say"\s*:\s*\[/, '');
+    const pieces = [];
+    const re = /\s*"((?:[^"\\]|\\.)*)"\s*(,|\])/gy;
+    let m;
+    while ((m = re.exec(tail))) {
+      try {
+        pieces.push(JSON.parse(`"${m[1]}"`));
+      } catch {
+        break;
+      }
+      if (m[2] === ']') break;
+    }
+    return pieces.join(' ');
+  }
+}
+
 function modelProse(text) {
-  return String(text || '')
+  const say = structuredSay(text);
+  return String(say != null ? say : text || '')
     .replace(/###TOOL###[\s\S]*?###ENDTOOL###/gi, ' ')
     .replace(/###ENDCALL###/gi, ' ')
     .replace(/\s+/g, ' ')
@@ -250,6 +285,23 @@ function appendSpeakNotes(turn, notes) {
   }
 }
 
+// A caller closing ("that's all", "asante", "hiyo tu", "bye").
+const CALLER_CLOSING =
+  /^(?:(?:okay|ok|alright|sawa|so|um|uh|yeah|yes|no|basi)[,.\s]+)*(?:that'?s (?:all|it)|that is (?:all|it)|bye(?: bye)?|goodbye|good bye|kwaheri|tutaonana|see you|thank you(?: so much| very much)?|thanks(?: a lot)?|asante(?: sana)?|hiyo tu|ni hiyo tu|ni hayo tu|hayo tu|baadaye basi|nothing else|hakuna kingine|i'?m done)(?:[,.!\s]+(?:that'?s all|bye|goodbye|kwaheri|thank you|thanks|asante(?: sana)?|baadaye basi|hiyo tu|ni hayo tu))*[.!\s]*$/i;
+
+/**
+ * The call ended with this turn because the caller left: Voice traced the
+ * call as over (stage call_over / turn_end reason call_over), or the caller
+ * closed and nothing after it was spoken.
+ */
+function callerLeftAfter(turn) {
+  const rows = turn?.stages || [];
+  if (rows.some((row) => row.stage === 'call_over' || (row.stage === 'turn_end' && row.reason === 'call_over'))) {
+    return true;
+  }
+  return CALLER_CLOSING.test(String(turn?.caller?.text || '').trim());
+}
+
 function emptyChecks() {
   return {
     languageMismatch: 0,
@@ -263,7 +315,12 @@ function emptyChecks() {
   };
 }
 
-function scoreTurn(turn) {
+/**
+ * @param {object} turn
+ * @param {{ callerLeft?: boolean }} [opts] callerLeft: the last turn of a call
+ *   the caller ended (callerLeftAfter); its missing reply is not silence.
+ */
+function scoreTurn(turn, opts = {}) {
   const checks = emptyChecks();
   const notes = [];
   const caller = String(turn?.caller?.text || '');
@@ -310,8 +367,12 @@ function scoreTurn(turn) {
     caller.trim().length >= 2 &&
     !spoken.trim()
   ) {
-    checks.silence = 1;
-    notes.push('silence after caller turn');
+    if (opts.callerLeft) {
+      notes.push('caller hung up; no reply owed');
+    } else {
+      checks.silence = 1;
+      notes.push('silence after caller turn');
+    }
   }
 
   const droppedAnswer = (turn.stages || []).some(
@@ -389,7 +450,12 @@ function scoreTurn(turn) {
  *   optional call facts for the call-level checks (src/speech/callChecks.js).
  */
 function scoreTurns(turns = [], ctx = {}) {
-  const scored = turns.map((turn) => scoreTurn(turn));
+  // The caller's last words before hanging up get no reply: that is not
+  // silence (HD_ceba9d9b3f37 t6 "That's all." after the hangup).
+  const last = turns.length - 1;
+  const scored = turns.map((turn, i) =>
+    scoreTurn(turn, { callerLeft: i === last && callerLeftAfter(turn) })
+  );
   const checks = emptyChecks();
   const asked = [];
   const nameAskTurns = [];
@@ -442,6 +508,10 @@ const CHECK_WEIGHT = {
   visitMissed: 20,
   dateWrong: 20,
   nameLock: 15,
+  ignoredFile: 25,
+  holdMissed: 15,
+  falseMove: 20,
+  swTimeWrong: 15,
 };
 
 const CHECK_LINE = {
@@ -456,6 +526,10 @@ const CHECK_LINE = {
   visitMissed: 'Open visits were not read out',
   dateWrong: 'A spoken day or date was wrong for Nairobi',
   nameLock: 'The caller name did not stay locked',
+  ignoredFile: 'The caller file was ignored',
+  holdMissed: 'An open hold the caller asked about was not read',
+  falseMove: 'Claimed a move, but a new visit was made and the old one is still open',
+  swTimeWrong: 'A Kiswahili time disagreed with the stored time',
 };
 
 function turnsForCheck(scored, key) {
@@ -583,9 +657,11 @@ function formatSummary(scorecard) {
 }
 
 module.exports = {
+  modelProse,
   LATENCY_BUDGET_MS,
   scoreTurn,
   scoreTurns,
+  callerLeftAfter,
   diagnoseCall,
   scoreFixtureReplay,
   compareToBaseline,
