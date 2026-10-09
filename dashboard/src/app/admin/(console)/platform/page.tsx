@@ -2,16 +2,17 @@ import { AdminOpsNotices, AdminPlatformOpsForm } from "@/components/AdminPlatfor
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { PlatformRunBoard } from "@/components/PlatformRunBoard";
 import { logAdminError } from "@/lib/adminErrors";
-import { evaluatePlatformOps } from "@/lib/platformOps";
+import { readPlatformOps } from "@/lib/platformOps";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 
 export const instant = false;
 
+/** Shows notices and health. Sends nothing: the scheduled check (api/cron/ops-alerts) opens and mails. */
 export default async function AdminPlatformPage() {
   await requireSuperAdmin();
   let snapshot;
   try {
-    snapshot = await evaluatePlatformOps();
+    snapshot = await readPlatformOps();
   } catch (err) {
     logAdminError("platform", err);
     return <AdminSetupError />;
