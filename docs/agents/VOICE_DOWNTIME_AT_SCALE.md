@@ -107,3 +107,11 @@ Desk Super Admin Platform board reads `/healthz`. No public status page. Voice d
 - Answering a telephony outage with a spoken clip (no call reaches us)
 - Opening `/ws/media` when the wallet probe says the prepaid balance is empty or returned 402
 - Handing the owner a new DID instead of restoring or forwarding the old one
+
+## Archived or suspended business (not an outage)
+
+A call to a DID whose tenant rows are all archived or `is_active = false` never takes the call (`src/sautikit/inactiveTenantGate.js`, #639): `/voice/incoming` returns the line-unavailable message and `<Hangup/>` before Stream and the call row. No minutes, no model, no owner or ops outage alert. Lookup errors fail open.
+
+- Clips (#642): `dashboard/public/audio/line-unavailable-en.v1.wav` ("Hello. This line is not available right now. Thank you for calling.") and `line-unavailable-sw.v1.wav` ("Habari. Nambari hii haipatikani kwa sasa. Asante kwa kupiga."), platform clone voice, 16 kHz mono, MP3 copies alongside. The `downtime-*` files there are the outage clips; never point the closed-line vars at them.
+- URLs: `VOICE_LINE_UNAVAILABLE_CLIP_URL_EN` / `_SW`, or `VOICE_LINE_UNAVAILABLE_CLIP_BASE_URL` (e.g. `https://scalers-staging.vercel.app`, prod `https://www.scalers.co.ke`) which fills `/audio/line-unavailable-<lang>.v1.wav`.
+- SautiKit reports no `<Play>` failure, so each clip is checked first: host in `VOICE_PLAY_ALLOWED_HOSTS` (default `storage.sautikit.com`; the host must also be on the SautiKit workspace CDN allow-list) and a ranged GET (1.5 s, cached 10 min ok / 1 min failed) returns audio. Otherwise that language uses `<Say>` with the same words.
