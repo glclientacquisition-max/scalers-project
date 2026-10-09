@@ -431,6 +431,8 @@ const {
   mergeOwnerCallItems,
   noteOwnerCallItem,
   ownerMessageAtEndEnabled,
+  ownerNotifiedMeta,
+  ownerNotifyChannels,
   ownerSummaryKeyBase,
   pendingOwnerCallItems,
 } = require('./src/notifications/ownerCallMessage');
@@ -1222,6 +1224,12 @@ async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, s
       durationSeconds: durationSeconds ?? null,
       found: Boolean(updated),
     });
+    // Post-close work runs once, for the close that ended the call. The other
+    // path (carrier webhook vs media-socket close) only adds its duration.
+    if (updated && updated.terminal_transition !== true) {
+      console.log(`[${source}] call ${callSid} already closed; post-close work skipped`);
+      return updated;
+    }
     // Best-effort outcome while Brain state may still be in memory.
     await persistCallResolution(callSid, source, { turns, callStatus: status });
     await persistFirstForwardAcceptance(callSid, durationSeconds);
@@ -5261,7 +5269,7 @@ async function sendOwnerCallMessage(callSid, opts = {}) {
     const terminal =
       opts.terminal === true || OWNER_TERMINAL_STATUSES.has(String(call.status || '').toLowerCase());
     if (!terminal) return null;
-    if (staffInboxAlreadyNotified(call)) {
+    if (staffInboxAlreadyNotified(call) || ownerNotifiedMeta(call)) {
       clearOwnerCallItems(callSid);
       return null;
     }
@@ -5306,7 +5314,7 @@ async function sendOwnerCallMessage(callSid, opts = {}) {
       ownerPhone: ownerNumber,
       ownerEmail,
     });
-    const { sent } = await dispatchToStaff({
+    const { sent, errors } = await dispatchToStaff({
       recipients: inbox.recipients,
       body: message.body,
       lead: message.lead,
@@ -5335,10 +5343,18 @@ async function sendOwnerCallMessage(callSid, opts = {}) {
       return null;
     }
     clearOwnerCallItems(callSid);
-    await db.markWhatsappSent(callSid);
+    // owner_notified is the dedupe marker; whatsapp_sent only when WhatsApp landed.
+    const channels = ownerNotifyChannels(sent, errors);
+    await db.markWhatsappSent(callSid, {
+      owner_notify_channels: channels,
+      whatsapp_delivered: channels.whatsapp === 'sent',
+    });
     await db.mergeCallSummaryMeta({
       callSid,
       patch: {
+        owner_notified: true,
+        owner_notify_channels: channels,
+        whatsapp_sent: channels.whatsapp === 'sent',
         owner_notify_body: message.body,
         owner_notify_channel: result.channel,
         owner_notify_kind: message.kind,

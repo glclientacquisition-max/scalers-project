@@ -561,6 +561,8 @@ async function uploadRecordingBuffer({
  * Matches on sautikit_call_sid. Idempotent — safe to call from multiple webhooks.
  * Does not reopen a call that is already terminal unless upgrading duration.
  */
+const TERMINAL_CLAIM_FILTER = 'status.is.null,status.not.in.(complete,completed,failed,no_answer)';
+
 async function updateCallStatus({ callSid, status, durationSeconds, force = false }) {
   if (!callSid) {
     throw new Error('[db] updateCallStatus: callSid required');
@@ -633,6 +635,7 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
   const direction = isOutboundTransfer ? 'outbound' : 'inbound';
 
   if (Object.keys(patch).length === 0) {
+    existing.terminal_transition = false;
     await settleCallUsage({
       callId: existing.id,
       outboundUnanswered:
@@ -645,15 +648,38 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
     return existing;
   }
 
-  const { data, error } = await supabase
-    .from('calls')
-    .update(patch)
-    .eq('sautikit_call_sid', callSid)
-    .select('*')
-    .maybeSingle();
-
+  // One terminal transition per call, guarded in the DB. A hangup reaches
+  // us as the carrier webhook AND as the media-socket close (prod
+  // HD_d3900cbf2b2d); both used to run resolution, review, first-forward and
+  // owner alerts. Only the update that moves the row out of a live status
+  // reports terminal_transition: true.
+  const claimsTerminal = Boolean(patch.status) && !alreadyTerminal;
+  let query = supabase.from('calls').update(patch).eq('sautikit_call_sid', callSid);
+  if (claimsTerminal) {
+    query = query.or(TERMINAL_CLAIM_FILTER);
+  }
+  let { data, error } = await query.select('*').maybeSingle();
   throwIfError('updateCallStatus', error);
+  let terminalTransition = claimsTerminal && Boolean(data);
+  if (claimsTerminal && !data) {
+    // Another close won. Keep its status; still apply a duration.
+    const rest = { ...patch };
+    delete rest.status;
+    if (Object.keys(rest).length) {
+      ({ data, error } = await supabase
+        .from('calls')
+        .update(rest)
+        .eq('sautikit_call_sid', callSid)
+        .select('*')
+        .maybeSingle());
+      throwIfError('updateCallStatus(after race)', error);
+    } else {
+      data = existing._raw;
+    }
+    terminalTransition = false;
+  }
   const shaped = shapeCall(data);
+  if (shaped) shaped.terminal_transition = terminalTransition;
 
   await settleCallUsage({
     callId: shaped?.id,
