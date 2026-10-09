@@ -48,6 +48,14 @@ function productRows(profile) {
   return rows.filter((row) => row && String(row.name || row.title || '').trim());
 }
 
+/** The caller file has open visits or requests (loaded at call start). */
+function fileHasRows(state) {
+  const returning = state?.returning;
+  if (!returning || typeof returning !== 'object') return false;
+  if (returning.hasOpenRows === true) return true;
+  return ['openRows', 'openVisits', 'openRequests'].some((key) => Array.isArray(returning[key]) && returning[key].length > 0);
+}
+
 function openVisits(state) {
   const rows = state?.returning?.openVisits;
   return Array.isArray(rows) ? rows : [];
@@ -132,8 +140,14 @@ function buildFactTable(profile = {}, opts = {}) {
     });
   }
 
+  // HD_1b3a67ea7ee9: before the name confirm the file is masked, not empty.
+  // Its visits stay out of the table, so say so; an empty table read as
+  // "no bookings saved under this number".
+  const callerFile = opts.speakerBound ? 'bound' : fileHasRows(opts.state) ? 'masked' : 'none';
+
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
   return {
+    callerFile,
     entries,
     byId,
     coverageAreas: areas,
@@ -144,23 +158,29 @@ function buildFactTable(profile = {}, opts = {}) {
   };
 }
 
+const MASKED_FILE_RULE =
+  'CALLER FILE: MASKED, not empty. This number has open visits or requests on file, hidden until the speaker confirms their name. Never say there are no bookings, visits or records for this number. Confirm who is speaking first, then the file can be read.';
+
 /** Prompt block. Ids in brackets are what facts_used must cite. */
 function formatFactsBlock(table) {
   const unconfirmed = table?.coverageGate?.gated && !table.coverageGate.confirmed;
   const coverageRule = unconfirmed
     ? ['COVERAGE: the owner has not confirmed any service area. Never say we cover, serve or do not cover a place, and never list areas. For a place, say the team will confirm it.']
     : [];
+  const fileRule = table?.callerFile === 'masked' ? [MASKED_FILE_RULE] : [];
   if (!table?.entries?.length) {
     return [
       'GROUNDED FACTS: (none on file). State no prices, places or policies; offer to note the question for the team.',
       ...coverageRule,
+      ...fileRule,
     ].join('\n');
   }
   return [
     'GROUNDED FACTS (the only business facts you may state; cite each one you use by its [id] in facts_used):',
     ...table.entries.map((entry) => `[${entry.id}] ${entry.text}`),
     ...coverageRule,
+    ...fileRule,
   ].join('\n');
 }
 
-module.exports = { buildFactTable, formatFactsBlock, slug };
+module.exports = { buildFactTable, formatFactsBlock, slug, fileHasRows, MASKED_FILE_RULE };

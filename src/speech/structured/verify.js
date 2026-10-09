@@ -11,6 +11,7 @@ const { statedNumbers } = require('./numbers');
 const { isOutcomeClaim } = require('../spokenStreamBuffer');
 const { teamConfirmCoverageLine } = require('./coverageSource');
 const { checkVisitTimes, visitTimeLine } = require('./spokenFactsSource');
+const { fileGuardProblems, noRecordReplacement } = require('./fileGuard');
 
 const SPOKEN_CHAR = /[\p{L}\p{N}]/u;
 const MARKUP = /###|[*_`#<>{}[\]\\|]|^\s*[-•]\s/;
@@ -209,6 +210,9 @@ function verifySay(sentence, ctx) {
     if (!gated.speak || gated.reason === 'trimmed') {
       problems.push({ code: 'privacy_unbound', detail: 'names the caller file before the speaker is confirmed' });
     }
+    // Brain's speech guard (BRAIN_CALL_FIXES_D199): no empty-file claim while
+    // the file is masked or has rows; the file-name ask once (HD_1b3a67ea7ee9).
+    for (const p of fileGuardProblems(text, ctx.state)) problems.push(p);
   }
   // Sentences are spoken before tools run. A saved or booked outcome is
   // confirmed from the tool result (formatToolConfirmation), never claimed.
@@ -233,8 +237,13 @@ function callerNamedPlace(callerText, place) {
  * A coverage line ("Ndiyo, tunafika X.") replaces the reply only for a place
  * the caller named; otherwise it answers a question nobody asked.
  */
-function dataLineFor(sentence, problems, { table, pack, callerText = '' }) {
+function dataLineFor(sentence, problems, { table, pack, callerText = '', state = null }) {
   const codes = new Set(problems.map((p) => p.code));
+  if (codes.has('no_record_claim')) {
+    // Masked: "Let me just confirm who I'm speaking with" (+ the ask when due).
+    // Bound with rows: the open-file read. Never the empty-file claim.
+    return noRecordReplacement(state, pack?.code || 'en');
+  }
   if (codes.has('coverage_unconfirmed')) {
     // "I'll have the team confirm {place}" for the place the caller named.
     const named = problems.find((p) => p.code === 'coverage_unconfirmed' && p.place && callerNamedPlace(callerText, p.place));
