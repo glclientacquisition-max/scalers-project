@@ -166,6 +166,58 @@ describe('factValueForPath', () => {
   });
 });
 
+describe('shared path vectors (factValueForPath)', () => {
+  const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/factHashVectors.json'), 'utf8'));
+  const PATH_VECTORS = FIXTURE.pathVectors;
+
+  it(`JS matches all ${PATH_VECTORS.length} path vectors, including .price and .site_visit`, () => {
+    assert.ok(PATH_VECTORS.some((v) => /\.price$/.test(v.path)));
+    assert.ok(PATH_VECTORS.some((v) => /\.site_visit$/.test(v.path)));
+    for (const v of PATH_VECTORS) {
+      const value = factValueForPath(v.path, FIXTURE.pathTenant);
+      if (v.unknownPath) {
+        assert.equal(value, undefined, v.name);
+        continue;
+      }
+      assert.deepEqual(value, v.value, v.name);
+      assert.equal(hashFactValue(value), v.sha256, v.name);
+    }
+  });
+
+  it('a price or site visit edit changes the leaf hash; whitespace does not', () => {
+    const t = FIXTURE.pathTenant;
+    const leaf = (p, tenant) => hashFactValue(factValueForPath(p, tenant));
+    const edited = JSON.parse(JSON.stringify(t));
+    edited.services_catalog[1].priceRange = 'KES 900';
+    assert.equal(leaf('catalog.service.2.price', edited), leaf('catalog.service.2.price', t));
+    edited.services_catalog[1].priceRange = 'KES 950';
+    assert.notEqual(leaf('catalog.service.2.price', edited), leaf('catalog.service.2.price', t));
+    edited.services_catalog[0].site_visit_required = 'yes';
+    assert.notEqual(leaf('catalog.service.svc_carpet.site_visit', edited), leaf('catalog.service.svc_carpet.site_visit', t));
+    // the leaf follows the id, not the position
+    const moved = JSON.parse(JSON.stringify(t));
+    moved.services_catalog.reverse();
+    assert.equal(leaf('catalog.service.svc_carpet.price', moved), leaf('catalog.service.svc_carpet.price', t));
+  });
+
+  it('TS twin matches all path vectors', { skip: tsSkip }, () => {
+    const out = runTs(`
+      import { readFileSync } from 'node:fs';
+      import { factValueForPath, hashFactValue } from './dashboard/src/lib/factHash.ts';
+      const f = JSON.parse(readFileSync('./tests/fixtures/factHashVectors.json', 'utf8'));
+      process.stdout.write(JSON.stringify(f.pathVectors.map((v) => {
+        const value = factValueForPath(v.path, f.pathTenant);
+        return value === undefined ? { unknown: true } : { value, sha256: hashFactValue(value) };
+      })));
+    `);
+    PATH_VECTORS.forEach((v, i) => {
+      if (v.unknownPath) return assert.deepEqual(out[i], { unknown: true }, v.name);
+      assert.deepEqual(out[i].value, v.value, v.name);
+      assert.equal(out[i].sha256, v.sha256, v.name);
+    });
+  });
+});
+
 describe('stable service ids', () => {
   it('uses a non-numeric id, else the position', () => {
     assert.equal(serviceFieldPath(0, { id: 'svc_carpet' }), 'catalog.service.svc_carpet.name');

@@ -63,7 +63,7 @@ const tenant1 = {
   vertical: 'retail',
   alert_email: '',
   business_policies: { payment: ['M-Pesa', 'cash'], holds: { allowed: true }, delivery: null },
-  services_catalog: [{ id: 'svc-cut', name: 'Haircut', price: 500 }, { name: '' }],
+  services_catalog: [{ id: 'svc-cut', name: 'Haircut', price: 500, site_visit_required: false }, { id: 'svc_empty', name: '' }],
   product_catalog: [],
   faqs: [{ question: 'Open Sunday?', answer: 'No' }, { question: 'Parking?', answer: '' }],
 };
@@ -76,14 +76,18 @@ function metaRows() {
     { tenant_id: T1, field_path: 'policies.holds', source: 'owner', value_hash: null },
     { tenant_id: T1, field_path: 'catalog.service.svc-cut.name', source: 'owner', value_hash: null },
     { tenant_id: T1, field_path: 'faqs.1', source: 'owner', value_hash: null },
+    { tenant_id: T1, field_path: 'catalog.service.svc-cut.price', source: 'owner', value_hash: null },
+    { tenant_id: T1, field_path: 'catalog.service.svc-cut.site_visit', source: 'owner', value_hash: null },
     // empty values: never confirm
     { tenant_id: T1, field_path: 'team.notify.email', source: 'owner', value_hash: null },
     { tenant_id: T1, field_path: 'policies.delivery', source: 'owner', value_hash: null },
-    { tenant_id: T1, field_path: 'catalog.service.2.name', source: 'owner', value_hash: null },
+    { tenant_id: T1, field_path: 'catalog.service.svc_empty.name', source: 'owner', value_hash: null },
     { tenant_id: T1, field_path: 'faqs.2', source: 'owner', value_hash: null },
+    { tenant_id: T1, field_path: 'catalog.service.svc_empty.price', source: 'owner', value_hash: null },
     // unresolved
     { tenant_id: T1, field_path: 'catalog.service.svc-gone.name', source: 'owner', value_hash: null },
     { tenant_id: T1, field_path: 'faqs.9', source: 'owner', value_hash: null },
+    { tenant_id: T1, field_path: 'catalog.service.svc-gone.price', source: 'owner', value_hash: null },
     { tenant_id: T1, field_path: 'mystery.path', source: 'owner', value_hash: null },
     // not owner: untouched
     { tenant_id: T1, field_path: 'identity.vertical', source: 'seed', value_hash: null },
@@ -148,7 +152,7 @@ describe('backfillFactHashes target guard', () => {
     assert.ok(meta.every((m) => m.value_hash === null));
     const applied = await runBackfill({ client, supabaseUrl: prodUrl, args: parseArgs(['--tenant', T1, '--apply', '--i-have-alvin-ok']), log: quiet });
     assert.equal(applied.code, 0);
-    assert.equal(applied.summary.totals.written, 5);
+    assert.equal(applied.summary.totals.written, 7);
   });
 
   it('bad args exit 2 without touching the client', async () => {
@@ -171,7 +175,7 @@ describe('backfillFactHashes run', () => {
     const t1 = r.summary.tenants.find((t) => t.tenant_id === T1);
     assert.deepEqual(
       { owner: t1.owner_rows, write: t1.to_write, empty: t1.skipped_empty, unresolved: t1.unresolved, written: t1.written },
-      { owner: 12, write: 5, empty: 4, unresolved: 3, written: 0 }
+      { owner: 16, write: 7, empty: 5, unresolved: 4, written: 0 }
     );
     const t3 = r.summary.tenants.find((t) => t.tenant_id === T3);
     assert.equal(t3.unresolved, 1);
@@ -180,6 +184,7 @@ describe('backfillFactHashes run', () => {
     assert.equal(reasons[`${T1}:catalog.service.svc-gone.name`], 'row_not_found');
     assert.equal(reasons[`${T1}:faqs.9`], 'row_not_found');
     assert.equal(reasons[`${T1}:mystery.path`], 'unknown_path');
+    assert.equal(reasons[`${T1}:catalog.service.svc-gone.price`], 'row_not_found');
     assert.equal(reasons[`${T3}:identity.business_name`], 'tenant_not_found');
     const out = lines.join('\n');
     assert.match(out, /dry run/);
@@ -199,13 +204,16 @@ describe('backfillFactHashes run', () => {
     assert.equal(get(T1, 'policies.holds'), hashFactValue(true));
     assert.equal(get(T1, 'catalog.service.svc-cut.name'), hashFactValue(catalogRowFactValue(tenant1.services_catalog[0])));
     assert.equal(get(T1, 'faqs.1'), hashFactValue(faqFactValue(tenant1.faqs[0])));
+    assert.equal(get(T1, 'catalog.service.svc-cut.price'), hashFactValue({ price: 500 }));
+    assert.equal(get(T1, 'catalog.service.svc-cut.site_visit'), hashFactValue(false));
+    assert.equal(get(T1, 'catalog.service.svc_empty.price'), null, 'empty leaf never confirmed');
     assert.equal(get(T2, 'identity.business_name'), hashFactValue('Fundi Co'));
     for (const m of meta) if (m.value_hash) assert.match(m.value_hash, /^[0-9a-f]{64}$/);
-    for (const p of ['team.notify.email', 'policies.delivery', 'catalog.service.2.name', 'faqs.2', 'mystery.path', 'identity.vertical']) {
+    for (const p of ['team.notify.email', 'policies.delivery', 'catalog.service.svc_empty.name', 'faqs.2', 'mystery.path', 'identity.vertical']) {
       assert.equal(get(T1, p), null, p);
     }
     assert.equal(get(T3, 'identity.business_name'), null, 'excluded tenant untouched');
-    assert.equal(r.summary.totals.written, 6);
+    assert.equal(r.summary.totals.written, 8);
   });
 
   it('never overwrites an existing value_hash and is idempotent', async () => {
@@ -243,7 +251,32 @@ describe('backfillFactHashes run', () => {
     const client = fakeClient({ meta: metaRows(), tenants: [tenant1], updateError: { message: 'denied' } });
     const r = await runBackfill({ client, supabaseUrl: STAGING, args: parseArgs(['--tenant', T1, '--apply']), log: quiet });
     assert.equal(r.code, 1);
-    assert.equal(r.summary.totals.write_errors, 5);
+    assert.equal(r.summary.totals.write_errors, 7);
+  });
+
+  it('services rows without ids: dry run warns, --apply refuses with exit 2 unless --allow-missing-ids', async () => {
+    const legacy = { id: T2, business_name: 'Fundi Co', services_catalog: [{ name: 'Plumbing' }, { id: '7', name: 'Numeric id' }, { id: 'svc_ok', name: 'Ok' }] };
+    const meta = () => [{ tenant_id: T2, field_path: 'identity.business_name', source: 'owner', value_hash: null }];
+
+    let rows = meta();
+    let lines = [];
+    const dry = await runBackfill({ client: fakeClient({ meta: rows, tenants: [legacy] }), supabaseUrl: STAGING, args: parseArgs(['--tenant', T2]), log: (l) => lines.push(l) });
+    assert.equal(dry.code, 0);
+    assert.match(lines.join('\n'), new RegExp(`${T2}: 2 row\\(s\\)`));
+    assert.deepEqual(dry.summary.missingIds, [{ tenant_id: T2, rows: 2 }]);
+
+    rows = meta();
+    lines = [];
+    const client = fakeClient({ meta: rows, tenants: [legacy] });
+    const refused = await runBackfill({ client, supabaseUrl: STAGING, args: parseArgs(['--tenant', T2, '--apply']), log: (l) => lines.push(l) });
+    assert.equal(refused.code, 2);
+    assert.match(lines.join('\n'), /--allow-missing-ids/);
+    assert.ok(client.calls.every((c) => c.op === 'select'), 'nothing written');
+    assert.equal(rows[0].value_hash, null);
+
+    const allowed = await runBackfill({ client, supabaseUrl: STAGING, args: parseArgs(['--tenant', T2, '--apply', '--allow-missing-ids']), log: quiet });
+    assert.equal(allowed.code, 0);
+    assert.equal(rows[0].value_hash, hashFactValue('Fundi Co'));
   });
 
   it('isEmptyFactValue', () => {
@@ -252,6 +285,8 @@ describe('backfillFactHashes run', () => {
     assert.equal(isEmptyFactValue('policies.returns', {}), true);
     assert.equal(isEmptyFactValue('policies.holds', false), false);
     assert.equal(isEmptyFactValue('catalog.service.x.name', { price: 5 }), true);
+    assert.equal(isEmptyFactValue('catalog.service.x.price', { price: 5 }), false);
+    assert.equal(isEmptyFactValue('catalog.service.x.site_visit', false), false);
     assert.equal(isEmptyFactValue('faqs.1', { question: 'q', answer: ' ' }), true);
   });
 });

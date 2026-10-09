@@ -26,7 +26,7 @@ const {
   resolveHashMode,
   faqFieldPath,
 } = require('../provenance');
-const { factValueForPath, tenantRowFromProfile, catalogRowFactValue } = require('../factHash');
+const { factValueForPath, tenantRowFromProfile, catalogRowFactValue, siteVisitFactValue } = require('../factHash');
 const { isMessageOnlyMode } = require('../messageOnly');
 const { formatScheduleSummary } = require('../businessHours');
 const { coveredByAreas, formatCoverageList } = require('../coverageAreas');
@@ -178,11 +178,18 @@ function asArray(raw) {
   return [];
 }
 
-function leafReading(name, checked, rowStale) {
+function leafReading(name, checked, rowStale, gateOk = true) {
   const leaf = CATALOG_LEAVES[name];
   if (!checked.ok) return { status: 'unknown', value: null, reason: checked.reason, topic: leaf.topic };
+  if (!gateOk) return { status: 'unknown', value: null, reason: 'unconfirmed', topic: leaf.topic };
   if (rowStale && leaf.volatile) return { status: 'unknown', value: null, reason: 'stale', topic: leaf.topic };
   return { status: 'known', value: checked.value, reason: null, topic: leaf.topic };
+}
+
+/** Service site visit: true / false as stored (same rule as factHash), else missing. */
+function validateSiteVisit(row) {
+  const value = siteVisitFactValue(row);
+  return value === null ? { ok: false, reason: 'missing' } : { ok: true, value };
 }
 
 function catalogRows(profile, kind, now) {
@@ -215,7 +222,24 @@ function catalogRows(profile, kind, now) {
     // still covers every leaf; otherwise each leaf uses its own default.
     const rowMeta = lookupFieldMeta(fieldMeta, fieldPath);
     const rowFresh = freshness(rowMeta, now);
-    const leafStale = (leaf) => (hashOn ? freshnessFor(profile, fieldPath, leaf, now).stale : rowFresh.stale);
+    // Hash mode only: an owner leaf row (catalog.<kind>.<key>.price /
+    // .site_visit) is an extra gate on that leaf, and its own freshness
+    // replaces the row's for that leaf. No leaf row: the leaf follows the row.
+    const leafGate = (leaf) => {
+      if (!hashOn) return { ok: true, meta: null };
+      const leafPath = fieldPath.replace(/\.name$/, `.${leaf}`);
+      const meta = lookupFieldMeta(fieldMeta, leafPath);
+      if (!meta) return { ok: true, meta: null };
+      const stored = kind === 'product' ? { product_catalog: raw } : { services_catalog: raw };
+      const value = factValueForPath(leafPath, stored);
+      return { ok: classifyRecord({}, { fieldMeta, fieldPath: leafPath, value, hashMode: true }).fact, meta };
+    };
+    const gates = { price: leafGate('price'), site_visit: kind === 'service' ? leafGate('site_visit') : null };
+    const leafStale = (leaf) => {
+      if (!hashOn) return rowFresh.stale;
+      if (gates[leaf]?.meta) return freshness(gates[leaf].meta, now, { defaultDays: defaultStaleAfterDays(leaf) }).stale;
+      return freshnessFor(profile, fieldPath, leaf, now).stale;
+    };
     const staleBy = { price: leafStale('price'), in_stock: leafStale('in_stock'), lead_time: leafStale('lead_time') };
     const stale = hashOn ? Object.values(staleBy).some(Boolean) : rowFresh.stale;
     const priceRaw = kind === 'product' ? row.price ?? row.price_range : row.price_range ?? row.priceRange ?? row.price;
@@ -232,10 +256,13 @@ function catalogRows(profile, kind, now) {
       fieldPath,
       source: prov.source,
       stale,
-      price: leafReading('price', validatePrice(priceRaw, modeRaw), staleBy.price),
+      price: leafReading('price', validatePrice(priceRaw, modeRaw), staleBy.price, gates.price.ok),
       in_stock: leafReading('in_stock', validateStock(row.in_stock ?? row.inStock), staleBy.in_stock),
       lead_time: leafReading('lead_time', validateEta(row.lead_time ?? row.leadTime ?? row.eta), staleBy.lead_time),
       out_of_scope: outOfScope.ok ? outOfScope.value : null,
+      ...(kind === 'service'
+        ? { site_visit: leafReading('site_visit', validateSiteVisit(row), false, gates.site_visit.ok) }
+        : {}),
       ...(hashOn ? { reconfirm: stale } : {}),
     });
   });

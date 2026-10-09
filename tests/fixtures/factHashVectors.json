@@ -258,5 +258,189 @@
       "canonical": "\"Karibu sana \ud83d\udc4b mteja\"",
       "sha256": "2f22e9326b55c2622e6ab5919c519a52607fb63e2d5718611e689f506675ec32"
     }
+  ],
+  "pathNote": "factValueForPath(path, pathTenant): value (undefined = unknown path) and hashFactValue(value). Both twins must match.",
+  "pathTenant": {
+    "business_name": "Done and Dusted",
+    "business_policies": {
+      "payment": "M-Pesa till 123456"
+    },
+    "services_catalog": [
+      {
+        "id": "svc_carpet",
+        "name": "Carpet cleaning",
+        "price_range": "KES 1,500 - 2,000",
+        "pricing_mode": "range",
+        "site_visit_required": false
+      },
+      {
+        "name": "Sofa cleaning",
+        "priceRange": "  KES   900 ",
+        "site_visit_required": "yes"
+      },
+      {
+        "id": "svc_quote",
+        "name": "Deep clean",
+        "price_range": "",
+        "pricing_mode": "quote",
+        "siteVisitRequired": true
+      },
+      {
+        "id": "svc_bare",
+        "name": "Window clean",
+        "price_range": null,
+        "site_visit_required": "maybe"
+      },
+      {
+        "id": "42",
+        "name": "Numeric id is positional",
+        "price": 600
+      }
+    ],
+    "product_catalog": [
+      {
+        "name": "Ream",
+        "sku": "P1",
+        "price": 650,
+        "price_range": "600-700"
+      },
+      {
+        "name": "Stapler",
+        "price_range": "450.00"
+      },
+      {
+        "name": "Pens",
+        "sku": "P3",
+        "price": ""
+      }
+    ]
+  },
+  "pathVectors": [
+    {
+      "name": "service price, id path",
+      "path": "catalog.service.svc_carpet.price",
+      "value": {
+        "price": "KES 1,500 - 2,000",
+        "mode": "range"
+      },
+      "sha256": "f37550ddd8b3d005d2605eb076cfc4f3c1031850af4befac5c3b5d9e5dc3a3c2"
+    },
+    {
+      "name": "service price, position path and priceRange alias",
+      "path": "catalog.service.2.price",
+      "value": {
+        "price": "  KES   900 "
+      },
+      "sha256": "f72430da6bc444a227ac499508d5c8ad47cc75bac4a6bac500da62ca82466830"
+    },
+    {
+      "name": "service price, mode only",
+      "path": "catalog.service.svc_quote.price",
+      "value": {
+        "mode": "quote"
+      },
+      "sha256": "81921f6561c771777f05bd09d62bc755a1218ae6aeebb01899326fd00e087d60"
+    },
+    {
+      "name": "service price, empty",
+      "path": "catalog.service.svc_bare.price",
+      "value": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "service price, numeric id stays positional",
+      "path": "catalog.service.5.price",
+      "value": {
+        "price": 600
+      },
+      "sha256": "caf1757ce7330ac14eb604537c253502151ad738996d03525a5bd55bcc282e5f"
+    },
+    {
+      "name": "numeric id is not a key",
+      "path": "catalog.service.42.price",
+      "value": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "service site_visit false",
+      "path": "catalog.service.svc_carpet.site_visit",
+      "value": false,
+      "sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "name": "service site_visit \"yes\" text",
+      "path": "catalog.service.2.site_visit",
+      "value": true,
+      "sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "name": "service site_visit camelCase",
+      "path": "catalog.service.svc_quote.site_visit",
+      "value": true,
+      "sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "name": "service site_visit unknown text",
+      "path": "catalog.service.svc_bare.site_visit",
+      "value": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "service row missing",
+      "path": "catalog.service.svc_gone.price",
+      "value": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "product price wins over price_range",
+      "path": "catalog.product.P1.price",
+      "value": {
+        "price": 650
+      },
+      "sha256": "af3be3b4fc7684938b5a9219dcbc71fa9e5f31236b6a2a8b3fe337c38d4c0304"
+    },
+    {
+      "name": "product price_range fallback, decimal text",
+      "path": "catalog.product.2.price",
+      "value": {
+        "price": "450.00"
+      },
+      "sha256": "faf7e49c8dd6e00fdf84557f61762a2708300a94ecca3184f655e92b2efa7180"
+    },
+    {
+      "name": "product price empty",
+      "path": "catalog.product.P3.price",
+      "value": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "product has no site_visit path",
+      "path": "catalog.product.P1.site_visit",
+      "unknownPath": true
+    },
+    {
+      "name": "service row name path includes id",
+      "path": "catalog.service.svc_carpet.name",
+      "value": {
+        "id": "svc_carpet",
+        "name": "Carpet cleaning",
+        "price_range": "KES 1,500 - 2,000",
+        "pricing_mode": "range",
+        "site_visit_required": false
+      },
+      "sha256": "59f0ac660d9597d4144130ec184e8870e6930ef27d28c0679061557d35819378"
+    },
+    {
+      "name": "scalar",
+      "path": "identity.business_name",
+      "value": "Done and Dusted",
+      "sha256": "e926d15fde266321017e18dc63cf138d601ee3e2171aeddbb7e7ff0ab3c35ca8"
+    },
+    {
+      "name": "policy",
+      "path": "policies.payment",
+      "value": "M-Pesa till 123456",
+      "sha256": "52b0c0c1fc335d7fc448a19a880e034139f8dd0838ff0bf3d75da13182ee083b"
+    }
   ]
 }
