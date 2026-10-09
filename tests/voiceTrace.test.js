@@ -230,3 +230,41 @@ describe('voice trace session', () => {
     assert.equal(trace.commitTurn({ outcome: 'ok' }), null);
   });
 });
+
+describe('voice trace filler played', () => {
+  function fillerTrace(sink) {
+    return createVoiceTrace({ enabled: true, sink, callId: () => 'HD_filler', tenantId: () => null });
+  }
+
+  it('records played false when filler playback fails', async () => {
+    const sink = createMemorySink();
+    const trace = fillerTrace(sink);
+    trace.beginTurn({ callerText: 'bei ni ngapi' });
+    const note = trace.noteFiller({ text: 'Sawa.', language: 'sw' });
+    const turn = trace.commitTurn({ outcome: 'ok' });
+    const row = turn.stages.find((stage) => stage.stage === 'filler');
+    assert.equal(row.played, null);
+    note.settle(false);
+    assert.equal(row.played, false);
+    await trace.finishCall();
+    const stored = sink.records.find((rec) => rec.recordKind === 'turn');
+    assert.equal(stored.stages.find((stage) => stage.stage === 'filler').played, false);
+  });
+
+  it('records played true only from a real playback result', () => {
+    const trace = fillerTrace(createMemorySink());
+    trace.beginTurn({ callerText: 'habari' });
+    trace.noteFiller({ text: 'Sawa.' }).settle(true);
+    const loose = trace.noteFiller({ text: 'Okay.' });
+    loose.settle({ ok: true });
+    const turn = trace.commitTurn({ outcome: 'ok' });
+    const rows = turn.stages.filter((stage) => stage.stage === 'filler');
+    assert.deepEqual(rows.map((row) => row.played), [true, false]);
+  });
+
+  it('server.js settles filler played from both playback paths', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    assert.match(src, /fillerNote\?\.settle\?\.\(sent\)/);
+    assert.match(src, /fillerNote\?\.settle\?\.\(fillerPlayed\)/);
+  });
+});
