@@ -472,14 +472,18 @@ describe('4) closing cues go to the close path', () => {
     assert.equal(planClosingCue({ text: 'Okay, thank you.', lastAgentText: 'Shall I book it for Saturday?' }).action, 'none');
   });
 
-  it('HD_1677 t32 "Sawa, ni hayo tu. Baadaye basi.": Brain missed it, Voice closes', () => {
+  it('HD_1677 t32 "Sawa, ni hayo tu. Baadaye basi.": the call closes even when Brain misses it', () => {
     const t32 = HD1677.turns.find((t) => t.turn === 32);
     assert.equal(t32.caller, 'Sawa, ni hayo tu. Baadaye basi.');
     const state = createBrainState(callProfile());
     state.conversation.answersReceived = [t32.caller];
+    // Flag off, Brain misses it (live); with BRAIN_CALL_FIXES_D199 on, Brain's
+    // own END may catch it. Either way the call closes.
     const brain = determineNextBestAction({ state, capabilities: {} });
-    assert.notEqual(brain.action, 'END');
-    assert.deepEqual(planClosingCue({ text: t32.caller, brainAction: brain.action, language: 'sw' }), { action: 'end', cue: 'end', reason: 'closing_cue' });
+    if (brain.action !== 'END') {
+      assert.deepEqual(planClosingCue({ text: t32.caller, brainAction: brain.action, language: 'sw' }), { action: 'end', cue: 'end', reason: 'closing_cue' });
+    }
+    assert.deepEqual(planClosingCue({ text: t32.caller, brainAction: 'ANSWER', language: 'sw' }), { action: 'end', cue: 'end', reason: 'closing_cue' });
     // No other HD_1677 caller turn is a close.
     for (const t of HD1677.turns.filter((x) => x.caller && x.turn < 32)) {
       assert.notEqual(planClosingCue({ text: t.caller, brainAction: 'ANSWER' }).action, 'end', t.caller);

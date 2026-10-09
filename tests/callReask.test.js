@@ -158,7 +158,7 @@ describe('E) HD_1677e57f73f9: a barged re-ask stays pending', () => {
   it('server wiring: snapshot before observe, keep after; owed split; re-ask speak result noted', () => {
     assert.match(SERVER, /const reaskBefore = reaskSnapshot\(previousBrainState\);\s*let brainState = observeCallerTurn\(/);
     assert.match(SERVER, /if \(keepUnheardReask\(reaskBefore, brainState\)\)/);
-    assert.match(SERVER, /const owedSplit = splitOwedOutcome\(takeToolOutcome\(brainState\), brainState\);/);
+    assert.match(SERVER, /const owedOutcome = takeToolOutcome\(brainState\);\s*const owedSplit = splitOwedOutcome\(owedOutcome, brainState\);/);
     assert.match(SERVER, /const reaskSpoken = noteSpokenLine\(rescue\.line, 'reask_slot', await speakText\(rescue\.line\)\);\s*\/\/[^\n]*\n\s*noteReaskResult\(brainState, rescue\.line, reaskSpoken\);/);
   });
 });
