@@ -36,32 +36,116 @@ function looksLikeTranscript(text) {
 const NAME_CRUMB =
   /^(?:speaking|speak|speaks|bwana|mr|mrs|ms|miss|sir|madam|the|a|an|my|your|by|of|to|for|and|with|from|aje|nauliza|jina|name|uh|um|yes|yeah|this|is|am|i|im)$/i;
 
-/** Another person on this phone. Same-person speech and junk are not a shared line. */
+// Common English nicknames. Either side may be the nickname.
+const NICKNAMES = {
+  chris: ['christopher', 'christine', 'christian', 'christina'],
+  mike: ['michael'],
+  steve: ['stephen', 'steven'],
+  joe: ['joseph'],
+  jim: ['james'],
+  kate: ['catherine', 'katherine'],
+  liz: ['elizabeth'],
+  beth: ['elizabeth'],
+  dan: ['daniel'],
+  dave: ['david'],
+  sam: ['samuel', 'samantha'],
+  ben: ['benjamin'],
+  tony: ['anthony'],
+  nick: ['nicholas'],
+  bob: ['robert'],
+  rob: ['robert'],
+  bill: ['william'],
+  will: ['william'],
+  pat: ['patrick', 'patricia'],
+  vicky: ['victoria'],
+  fred: ['frederick'],
+  ken: ['kenneth'],
+  peris: ['perpetua'],
+};
+
+function nameWords(raw) {
+  return String(raw || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\s'-]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function editDistance(a, b) {
+  if (a === b) return 0;
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i += 1) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const keep = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = keep;
+    }
+  }
+  return prev[b.length];
+}
+
+function nicknameOf(a, b) {
+  return (NICKNAMES[a] || []).includes(b) || (NICKNAMES[b] || []).includes(a);
+}
+
+/** One word that is the same person spelled or shortened another way. */
+function wordVariant(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (nicknameOf(a, b)) return true;
+  const short = a.length <= b.length ? a : b;
+  const long = a.length <= b.length ? b : a;
+  // Chris / Christopher. Three letters or more, so "Al" never matches.
+  if (short.length >= 3 && long.startsWith(short)) return true;
+  // Cherotich / Chirotits: STT spelling drift on a longer word.
+  const budget = short.length >= 7 ? 3 : short.length >= 5 ? 2 : short.length >= 4 ? 1 : 0;
+  return budget > 0 && editDistance(a, b) <= budget;
+}
+
+/**
+ * Same person said or spelled another way: shares the first name, contains the
+ * primary name, or a word is a near-spelling, prefix, or nickname of it.
+ */
+function samePersonVariant(primary, alternate) {
+  const owner = nameWords(primary).filter((w) => !NAME_CRUMB.test(w));
+  const alt = nameWords(alternate).filter((w) => !NAME_CRUMB.test(w));
+  if (!owner.length || !alt.length) return false;
+  if (owner[0] === alt[0]) return true;
+  return alt.some((a) => owner.some((o) => wordVariant(a, o)));
+}
+
+/**
+ * Another person on this phone. Shared line needs a clearly different person:
+ * not junk, not a fuzzy or nickname match, not a phrase holding the primary
+ * name ("Bwana Alvin", "Alvin speaking").
+ */
 function distinctOtherPerson(primary, alternate) {
   const alt = String(alternate || '').trim();
   if (!alt || isJunkCallerName(alt)) return false;
   if (primary && namesMatch(alt, primary)) return false;
-  const owner = new Set(
-    String(primary || '')
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(Boolean)
-  );
+  if (primary && samePersonVariant(primary, alt)) return false;
+  const owner = new Set(nameWords(primary));
   const leftover = alt.split(/\s+/).filter((word) => {
     const lower = word.toLowerCase();
     return !NAME_CRUMB.test(lower) && !owner.has(lower);
   });
   if (!leftover.length) return false;
-  return isPlausibleCallerName(leftover.join(' '));
+  const rest = leftover.join(' ');
+  if (isJunkCallerName(rest)) return false;
+  return isPlausibleCallerName(rest);
 }
 
 function alternateNames(metadata) {
   const list = metadata && Array.isArray(metadata.alternate_names)
     ? metadata.alternate_names
     : [];
+  // Read-time guard: junk already in the database ("not a") never reaches the
+  // card, the shared-line check, or the STT hint list.
   return list
-    .map((row) => String(row?.name || '').trim())
-    .filter(Boolean);
+    .map((row) => String(typeof row === 'string' ? row : row?.name || '').trim())
+    .filter((name) => name && !isJunkCallerName(name));
 }
 
 /**
@@ -988,6 +1072,8 @@ async function attachCallerMemory(profile, deps = {}) {
 
 module.exports = {
   CLIP,
+  distinctOtherPerson,
+  samePersonVariant,
   applyLiveCallerFile,
   attachCallerMemory,
   bindCallerMemoryCard,

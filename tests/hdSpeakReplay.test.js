@@ -834,6 +834,7 @@ describe('HD_e3fb94e1bd0d prices, offer consent, and Nakuru', () => {
           consentAck: true,
           pendingAsk: pending,
           questionsAsked: ['offer'],
+          answersReceived: ['Mnafika Nakuru?', 'Sawa.'],
         },
       },
       {}
@@ -841,7 +842,9 @@ describe('HD_e3fb94e1bd0d prices, offer consent, and Nakuru', () => {
     assert.equal(saved.serviceRequest.type, 'callback');
     assert.equal(saved.serviceRequest.item, 'message');
     assert.equal(saved.serviceRequest.name, 'Alvin');
-    assert.match(saved.serviceRequest.notes, /kukuachia ujumbe/);
+    // The note is the caller's ask, never the agent's offer line (HD_23445a4f780c).
+    assert.match(saved.serviceRequest.notes, /Nakuru/);
+    assert.doesNotMatch(saved.serviceRequest.notes, /kukuachia ujumbe/);
     const named = ensureRequiredCreateRequest(
       {},
       {

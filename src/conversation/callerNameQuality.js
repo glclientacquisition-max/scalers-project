@@ -29,6 +29,41 @@ const JUNK_CALLER_NAMES = new Set([
   'at around',
 ]);
 
+// Words that are never a name on their own. A "name" made only of these is
+// speech-to-text debris, e.g. "not a" from HD_c98820e579e1, which then made
+// Alvin's own phone look like a shared line on HD_23445a4f780c.
+// English, Kiswahili and Sheng function words, fillers, acks and honorifics.
+const NAME_FUNCTION_WORDS = new Set([
+  // English function words
+  'a', 'an', 'the', 'not', 'no', 'nor', 'or', 'and', 'but', 'so', 'if', 'then',
+  'of', 'to', 'for', 'in', 'on', 'at', 'by', 'with', 'from', 'as', 'into', 'about',
+  'is', 'am', 'are', 'was', 'were', 'be', 'been', 'it', 'its', "it's", 'this', 'that',
+  'these', 'those', 'there', 'here', 'i', "i'm", 'im', 'me', 'my', 'mine', 'you',
+  'your', 'we', 'our', 'he', 'she', 'his', 'her', 'they', 'them', 'their', 'do',
+  'does', 'did', "don't", 'dont', 'can', 'just', 'also', 'too', 'very',
+  'what', 'where', 'when', 'who', 'how', 'why', 'which', 'name', 'called', 'speaking',
+  'speak', 'call', 'wait', 'now', 'again', 'still', 'only', 'some', 'any', 'all',
+  // Fillers and acks
+  'yes', 'yeah', 'yep', 'yup', 'ok', 'okay', 'okey', 'alright', 'right', 'sure',
+  'fine', 'good', 'great', 'cool', 'nice', 'hello', 'hallo', 'hi', 'hey', 'please',
+  'thanks', 'thank', 'sorry', 'pardon', 'uh', 'um', 'umm', 'uhm', 'er', 'erm', 'ah',
+  'eh', 'oh', 'mm', 'mmm', 'hmm', 'hm', 'huh', 'uhhuh', 'nope', 'nah',
+  // Honorifics on their own
+  'sir', 'madam', 'mr', 'mrs', 'ms', 'miss', 'bwana', 'mzee',
+  // Kiswahili
+  'ndiyo', 'ndio', 'sawa', 'hapana', 'si', 'ni', 'na', 'ya', 'wa', 'la', 'za', 'kwa',
+  'katika', 'hii', 'huyu', 'hiyo', 'yule', 'mimi', 'wewe', 'yeye', 'sisi', 'nini',
+  'nani', 'wapi', 'lini', 'jina', 'langu', 'lako', 'naitwa', 'nauliza', 'asante',
+  'karibu', 'habari', 'jambo', 'samahani', 'tafadhali', 'ngoja', 'subiri',
+  'basi', 'sasa', 'bado', 'tu', 'pia', 'eeh', 'ee', 'eh',
+  // Sheng
+  'aje', 'poa', 'sasa', 'niaje', 'mambo', 'fiti', 'sema', 'ati', 'kwani', 'manze',
+  'buda', 'msee', 'bro', 'boss',
+  // Hear-again and stray words seen as prod alternates ("Rudia tena", "bad",
+  // "Draft tech"). Never a person.
+  'rudia', 'tena', 'repeat', 'bad', 'draft', 'tech',
+]);
+
 function cleanCallerName(raw) {
   return String(raw || '')
     .replace(/[.,;:]+$/g, '')
@@ -44,6 +79,11 @@ function isJunkCallerName(raw) {
   if (JUNK_CALLER_NAMES.has(lower) || JUNK_CALLER_NAMES.has(compact)) return true;
   if (/^(where|what|when|who|how|why)(\s+are you)?$/i.test(lower)) return true;
   if (compact === 'ataround' || compact === 'atround') return true;
+  // One or two letters is never a name we can greet or store.
+  if (compact.replace(/[^\p{L}]/gu, '').length <= 2) return true;
+  const words = lower.split(/\s+/).map((w) => w.replace(/^[^\p{L}']+|[^\p{L}']+$/gu, '')).filter(Boolean);
+  if (!words.length) return true;
+  if (words.every((w) => NAME_FUNCTION_WORDS.has(w))) return true;
   return false;
 }
 
@@ -55,6 +95,7 @@ function sanitizeStoredCallerName(raw) {
 
 module.exports = {
   JUNK_CALLER_NAMES,
+  NAME_FUNCTION_WORDS,
   cleanCallerName,
   isJunkCallerName,
   sanitizeStoredCallerName,
