@@ -172,12 +172,6 @@ async function listActiveTenantDids() {
   return [...new Set([...fromDb, ...fromEnv.filter(isAssignableDid)])];
 }
 
-/**
- * The tenant rows that own the dialled number, active or not, and whether the
- * line is closed (every owner inactive or archived). Fails open: any error, a
- * DEFAULT_TENANT_ID deploy, or no number gives { closed: false }.
- * src/sautikit/inactiveTenantGate.js
- */
 // Platform audio hosted by SautiKit (line-unavailable clips, #639). Service
 // role only. The url is a presigned link: never log it.
 const PLATFORM_AUDIO_COLUMNS = 'key, url, expires_at, uploaded_at, file_sha256, size_bytes, mime_type, last_error, last_error_at';
@@ -221,8 +215,9 @@ async function notePlatformAudioError({ key, error: message } = {}) {
   return true;
 }
 
-// Line-state columns, newest first. Prod has line_status but not yet
-// archived_at; a missing column drops out and never closes a line.
+// Line-state columns, newest first. archived_at comes from
+// admin_business_archive.sql (#636), line_status from line_rental_grace.sql.
+// A missing column drops out and never closes a line.
 const TENANT_LINE_SELECTS = Object.freeze([
   'id, sautikit_virtual_number, is_active, archived_at, line_status',
   'id, sautikit_virtual_number, is_active, archived_at',
@@ -240,6 +235,12 @@ async function selectTenantLineRows() {
   return last;
 }
 
+/**
+ * The tenant rows that own the dialled number, active or not, and whether the
+ * line is closed (every owner inactive or archived). Fails open: any error, a
+ * DEFAULT_TENANT_ID deploy, or no number gives { closed: false }.
+ * src/sautikit/inactiveTenantGate.js
+ */
 async function inboundTenantLine({ toNumber, fromNumber } = {}) {
   const { tenantLineState, sameNumber } = require('./sautikit/inactiveTenantGate');
   if (DEFAULT_TENANT_ID) return { closed: false, reason: 'default_tenant', tenantId: null };

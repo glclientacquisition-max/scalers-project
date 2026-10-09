@@ -266,7 +266,10 @@ describe('ops alert kind audio respects VOICE_PLATFORM_OPS_DRY_RUN', () => {
   it('dry run logs, sends nothing', async () => {
     const saved = { ...process.env };
     process.env.VOICE_PLATFORM_OPS_DRY_RUN = 'true';
-    process.env.SCALERS_OPS_ALERT_PHONES = '+254700000099';
+    process.env.SCALERS_OPS_ALERT_EMAILS = 'ops@example.test';
+    const opsRecipients = require('../src/notifications/platformOpsRecipients');
+    opsRecipients.setPlatformOpsRecipientsLoader(async () => ({ data: null, error: null }));
+    opsRecipients.resetPlatformOpsRecipientsCache();
     ops.resetPlatformOpsAlert();
     let sent = 0;
     ops.setPlatformOpsDispatch(async () => {
@@ -284,6 +287,8 @@ describe('ops alert kind audio respects VOICE_PLATFORM_OPS_DRY_RUN', () => {
     } finally {
       console.warn = warn;
       ops.resetPlatformOpsAlert();
+      opsRecipients.setPlatformOpsRecipientsLoader(null);
+      opsRecipients.resetPlatformOpsRecipientsCache();
       for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
       Object.assign(process.env, saved);
     }

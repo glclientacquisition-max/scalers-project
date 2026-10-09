@@ -367,6 +367,48 @@ describe('db.resolveTenantId: an archived owner resolves to itself, never unassi
   });
 });
 
+describe('prod replay: the three prod tenants (snapshot 2026-10-09 EAT) answer exactly as before', () => {
+  // Read-only snapshot of prod tenants (fjxcdccgyhnvnnlnovcl): every column the
+  // gate reads, after admin_business_archive.sql. Ids shortened.
+  const PROD = [
+    { id: '24ca3d5e', business_name: 'Aris Kenya', sautikit_virtual_number: '+254709221536', is_active: true, line_status: 'active', archived_at: null },
+    { id: 'c81b3480', business_name: 'Esga Stationery', sautikit_virtual_number: '+254709221542', is_active: true, line_status: 'active', archived_at: null },
+    { id: 'f75588d4', business_name: 'Scalers Business Solutions', sautikit_virtual_number: 'pending:f75588d4-a98f-4d25-9e17-6c9fb536ec9d', is_active: true, line_status: 'active', archived_at: null },
+  ];
+  const schemas = [
+    ['full (archived_at + line_status)', false, false],
+    ['before admin_business_archive.sql (no archived_at)', true, false],
+    ['oldest (is_active only)', true, true],
+  ];
+  for (const [label, noArchived, noLineStatus] of schemas) {
+    it(`Aris +254709221536 and Esga stay live, resolve to themselves: ${label}`, async () => {
+      failWith = null;
+      archivedColumnMissing = noArchived;
+      lineStatusColumnMissing = noLineStatus;
+      tenantRows = PROD.map((r) => ({ ...r }));
+      try {
+        for (const to of ['+254709221536', '254709221536', '0709221536']) {
+          assert.deepEqual(await db.inboundTenantLine({ toNumber: to, fromNumber: '+254722000000' }), { closed: false, reason: 'live', tenantId: '24ca3d5e' }, to);
+          assert.equal(await db.resolveTenantId({ toNumber: to, fromNumber: '+254722000000' }), '24ca3d5e', to);
+        }
+        assert.deepEqual(await db.inboundTenantLine({ toNumber: '+254709221542' }), { closed: false, reason: 'live', tenantId: 'c81b3480' });
+        assert.equal(await db.resolveTenantId({ toNumber: '+254709221542' }), 'c81b3480');
+        // The staging DID is not a prod tenant: unchanged (no tenant, not closed).
+        assert.deepEqual(await db.inboundTenantLine({ toNumber: STAGING_DID }), { closed: false, reason: 'no_tenant', tenantId: null });
+      } finally {
+        archivedColumnMissing = false;
+        lineStatusColumnMissing = false;
+      }
+    });
+  }
+
+  it('Admin Archive on prod (#636: is_active=false + archived_at) closes only that business', async () => {
+    tenantRows = PROD.map((r) => (r.id === 'c81b3480' ? { ...r, is_active: false, archived_at: '2026-10-09T19:00:00Z' } : { ...r }));
+    assert.deepEqual(await db.inboundTenantLine({ toNumber: '+254709221542' }), { closed: true, reason: 'archived', tenantId: 'c81b3480' });
+    assert.deepEqual(await db.inboundTenantLine({ toNumber: '+254709221536' }), { closed: false, reason: 'live', tenantId: '24ca3d5e' });
+  });
+});
+
 describe('closed-line calls: later webhooks touch nothing', () => {
   const { createClosedLineCalls } = require('../src/sautikit/closedLineCalls');
   it('remembers gated sids for a TTL, bounded', () => {
