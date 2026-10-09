@@ -350,7 +350,9 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     return {
       action: ACTIONS.ANSWER,
       reason: ackOnly
-        ? 'Out of coverage. Callback note only. Okay, Sawa, or leave it is not a booking. Do not create_appointment. Do not say you will serve them tomorrow.'
+        ? require('./callFixesD199').ackPromptText(
+            'Out of coverage. Callback note only. Okay, Sawa, or leave it is not a booking. Do not create_appointment. Do not say you will serve them tomorrow.'
+          )
         : 'The area is outside POLICIES/LOCATIONS. Do not create_appointment. Say the area is outside our coverage. Do not offer a callback. Never say landmark.',
     };
   }
@@ -406,7 +408,9 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
         action: ACTIONS.ASK_CLARIFICATION,
         slot: 'confirm',
         reason:
-          'Okay, Sawa, or leave it is not a yes. Confirm the facts. Do not lock the visit or order. Do not say it is saved.',
+          require('./callFixesD199').ackPromptText(
+            'Okay, Sawa, or leave it is not a yes. Confirm the facts. Do not lock the visit or order. Do not say it is saved.'
+          ),
       };
     }
   }
@@ -517,8 +521,14 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     const request = authorizeAction(ACTIONS.CREATE_REQUEST, capabilities);
     const homeVisit =
       String(state?.vertical || '').toLowerCase() === 'home_services';
+    // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 2): a move of a visit on file
+    // is an update, never a new create.
+    const movingVisitOnFile =
+      require('./callFixesD199').callFixesD199Enabled() &&
+      state?.conversation?.rescheduleAsked === true &&
+      (state?.returning?.openRows || []).some((row) => row && row.kind === 'visit');
     const visitReason =
-      intent === 'cancellation'
+      intent === 'cancellation' || movingVisitOnFile
         ? 'Slots are complete. Append update_appointment and speak nothing. Do not tell the caller it is moved or cancelled; the backend speaks the outcome.'
         : 'Slots are complete. Append create_appointment and speak nothing. Do not tell the caller it is booked; the backend speaks the outcome.';
     return request.allowed

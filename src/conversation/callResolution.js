@@ -334,6 +334,16 @@ function deriveCallResolution(opts = {}) {
     if (appointmentOk && foreignVisitUpdate(results, opts.callId)) {
       note = 'Answered.';
     }
+    // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 3): a visit from another call
+    // that this call changed says what was written ("Moved Carpet Cleaning
+    // (per room) visit to Sat 10 Oct, 1 PM"), not "Answered.". The status
+    // notes ("Visit confirmed", "Visit request saved — confirm on desk.")
+    // for this call's own rows stay as they are.
+    const fixesD199 = require('./callFixesD199');
+    if (fixesD199.callFixesD199Enabled() && note === 'Answered.') {
+      const written = fixesD199.outcomeNote(results, { now: opts.now || new Date() });
+      if (written) note = written;
+    }
   } else if (updateAttemptFailed(results)) {
     resolution = 'needs_human';
     note = '';
@@ -349,6 +359,12 @@ function deriveCallResolution(opts = {}) {
         (intent ? `Answered ${intent}` : 'Caller question answered'),
       200
     );
+    // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 3): nothing written: name the
+    // topic that was answered, not a prompt reason.
+    const fixesD199 = require('./callFixesD199');
+    if (fixesD199.callFixesD199Enabled()) {
+      note = fixesD199.answeredTopicNote(state) || note;
+    }
   } else if (turnCount <= 1) {
     resolution = 'abandoned';
     note = 'Very short call — little conversation';

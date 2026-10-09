@@ -140,7 +140,7 @@ function coverageRealPlace(place, profile = {}) {
 // ------------------------------------------------------------- (a) reschedule
 
 const RESCHEDULE_ASK =
-  /\b(?:reschedule|move (?:it|that|the visit|my visit)|push it|make it|change it to|shift it|instead of|tuieke|tuiweke|iweke|ikuwe|iwe (?:kesho|leo)|tuisogeze|isogeze|sogeza|hamisha|tuihamishe|ibadilishe|badilisha)\b/i;
+  /\b(?:reschedule|move (?:it|that|the visit|my visit)|(?:move|change|shift) (?:the |my )?(?:time|date|day)|push it|make it|change it to|shift it|instead of|tuieke|tuiweke|iweke|ikuwe|iwe (?:kesho|leo)|tuisogeze|isogeze|sogeza|hamisha|tuihamishe|ibadilishe|badilisha)\b/i;
 
 function looksLikeRescheduleAsk(text) {
   return RESCHEDULE_ASK.test(String(text || ''));
@@ -606,7 +606,7 @@ function planConfirmFileRead(state, { language = 'en', now = new Date() } = {}) 
 // ------------------------------------------- HD_1677e57f73f9 (2, 4) closings
 
 const CLOSING_PART =
-  /^(?:(?:ok(?:ay)?|alright|sawa|yeah|yes|no|um+|uh+) )?(?:ok(?:ay)?|alright|all right|sawa(?: sawa)?|poa|fine|great|yes|yeah|no|hapana|eeh|ehe|ndio|basi|thank you(?: so much| very much)?|thanks(?: a lot)?|asante(?: sana)?|nashukuru|that'?s all|that is all|that'?s it|that is it|that'?s everything|nothing else|no(?:,)? thanks?|no thank you|hiyo tu|ni hiyo tu|ni hayo tu|hayo tu|hakuna kingine|bas(?:i)? hivyo|baadaye(?: basi)?|tutaonana|kwaheri|bye(?: bye)?|goodbye|good bye|see you|have a (?:good|nice|great) day|siku njema)$/i;
+  /^(?:(?:ok(?:ay)?|alright|sawa|haya|yeah|yes|no|um+|uh+) )?(?:ok(?:ay)?(?: then)?|alright(?: then)?|all right|sawa(?: sawa| basi)?|haya(?: basi| sawa)?|sure|cool|noted|got it|mhm+|aha|i appreciate it(?: then)?|appreciate it|much appreciated|shukran(?:i)?|poa|fine|great|yes|yeah|no|hapana|eeh|ehe|ndio|basi|thank you(?: so much| very much)?|thanks(?: a lot)?|asante(?: sana)?|nashukuru|that'?s all|that is all|that'?s it|that is it|that'?s everything|nothing else|no(?:,)? thanks?|no thank you|hiyo tu|ni hiyo tu|ni hayo tu|hayo tu|hakuna kingine|bas(?:i)? hivyo|baadaye(?: basi)?|tutaonana|kwaheri|bye(?: bye)?|goodbye|good bye|see you|have a (?:good|nice|great) day|siku njema)$/i;
 
 /**
  * "Okay, thank you", "asante", "that's all", "hiyo tu", "Sawa, ni hayo tu.
@@ -628,7 +628,7 @@ function isClosingCue(text) {
   if (!parts.length) return false;
   if (!parts.every((part) => CLOSING_PART.test(part))) return false;
   // At least one real closing word: not only "okay" / "sawa" / "yes".
-  return parts.some((part) => !/^(?:ok(?:ay)?|alright|all right|sawa(?: sawa)?|poa|fine|great|yes|yeah|no|hapana|eeh|ehe|ndio|basi)$/.test(part));
+  return parts.some((part) => !/^(?:ok(?:ay)?(?: then)?|alright(?: then)?|all right|sawa(?: sawa| basi)?|haya(?: basi| sawa)?|sure|cool|noted|got it|mhm+|aha|poa|fine|great|yes|yeah|no|hapana|eeh|ehe|ndio|basi)$/.test(part));
 }
 
 const THINKING_FILLER =
@@ -639,7 +639,18 @@ function notAGoal(text) {
   const raw = String(text || '').trim().replace(/[.!,]+$/g, '').trim();
   if (!raw) return true;
   if (isClosingCue(raw)) return true;
-  return THINKING_FILLER.test(raw);
+  if (THINKING_FILLER.test(raw)) return true;
+  // HD_b82fbfef7649 (3): "Haya.", "Sawa.", "Okay then", "Uh, I appreciate it
+  // then": every clause an ack, a thanks, or a filler. Never a goal.
+  if (/\?/.test(raw)) return false;
+  const parts = raw
+    .toLowerCase()
+    .replace(/[’]/g, "'")
+    .replace(/[—–]/g, ',')
+    .split(/[,.!;]+/)
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  return parts.length > 0 && parts.every((part) => CLOSING_PART.test(part) || THINKING_FILLER.test(part));
 }
 
 // ------------------------------------- HD_ceba9d9b3f37 (8) review topics
@@ -980,8 +991,277 @@ function askAreaLine(language = 'en', { asked = '' } = {}) {
   return renderLines([factLine('ask_area', {}, { lang: language, gate: { coverage_target: asked, real_place: false } })]);
 }
 
+// ------------------------------------------------ HD_b82fbfef7649 round 4 (1)
+// Slot values. A sentence is never a time; a non-place word is never a place.
+
+const DAY_OR_PART =
+  /\b(?:today|tomorrow|tonight|weekend|week|month|morning|afternoon|evening|night|noon|midday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|leo|kesho|keshokutwa|juzi|jana|wiki|asubuhi|mchana|jioni|usiku|jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili|saa|now|asap|sasa hivi)\b/i;
+
+/**
+ * A when slot parses to a day or a time, or stays empty: "Oh, so it's done
+ * per room" is a question about the price, not the visit time.
+ */
+function isWhenSlotValue(value, { now = new Date() } = {}) {
+  const raw = String(value || '').trim();
+  if (!raw) return false;
+  // A clock or date number, not a size token ("a8", "A4").
+  if (/(?:^|[^\p{L}\d])\d/u.test(raw)) return true;
+  if (DAY_OR_PART.test(raw)) return true;
+  // eslint-disable-next-line global-require
+  const { resolveAppointmentWhen } = require('./appointmentHours');
+  try {
+    return resolveAppointmentWhen(raw, now)?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+const LANDMARK_NOUN =
+  /\b(?:apartments?|apts?|estate|court|road|rd|street|st|avenue|ave|drive|lane|close|crescent|way|plaza|mall|centre|center|tower|towers|flats?|gardens?|heights|park|villas?|residence|residency|block|phase|stage|junction|roundabout|hospital|school|church|mosque|market|hotel|house\s+no|plot|gate|building|bldg|near|opposite|behind|next to|karibu|nyuma ya|mbele ya|mtaa)\b/i;
+
+const COMMON_LOWER = new Set([
+  'line', 'queue', 'there', 'here', 'home', 'town', 'place', 'it', 'that', 'this', 'mind',
+  'time', 'touch', 'person', 'general', 'fact', 'case', 'total', 'advance', 'person',
+  'time', 'detail', 'details', 'stock', 'charge', 'question', 'order', 'person', 'room',
+  'rooms', 'progress', 'process', 'future', 'line', 'bed', 'office', 'house',
+]);
+
+/**
+ * A location slot is a place: the Phase 0 real-place test (countiesForPlace),
+ * a landmark noun ("Grace Apartments", "near Naivas"), a tenant area, or a
+ * proper name the caller said. "line" in "visits in line" is none of these.
+ */
+function isPlaceSlotValue(value, { profile = {} } = {}) {
+  const raw = String(value || '').trim();
+  if (!raw) return false;
+  if (isFillerPhrase(raw) || looksLikeTimeFragment(raw) || notAGoal(raw) || isFragmentTurn(raw)) return false;
+  // eslint-disable-next-line global-require
+  const { countiesForPlace } = require('./kenyaPlaces');
+  if (countiesForPlace(raw).length > 0) return true;
+  if (LANDMARK_NOUN.test(raw)) return true;
+  const lower = raw.toLowerCase();
+  const areas = [];
+  for (const row of Array.isArray(profile?.businessLocations) ? profile.businessLocations : []) {
+    areas.push(row?.name, row?.area, row?.town);
+  }
+  if (areas.filter(Boolean).some((a) => String(a).toLowerCase() === lower)) return true;
+  const words = raw.split(/[\s,]+/).filter(Boolean);
+  if (words.length === 1 && COMMON_LOWER.has(lower)) return false;
+  // A proper name as said ("Ketengela", "Two Rivers"); a lower-case common word is not.
+  return words.some((w) => /^\p{Lu}[\p{L}'’-]{2,}$/u.test(w) && !COMMON_LOWER.has(w.toLowerCase()));
+}
+
+/** Drop a junk when/location from one turn's entities (flag on only). */
+function dropJunkSlots(entities, { profile = {}, now = new Date() } = {}) {
+  if (!callFixesD199Enabled() || !entities) return entities;
+  const val = (e) => (e && typeof e === 'object' ? String(e.value || '') : String(e || ''));
+  if (entities.when && !isWhenSlotValue(val(entities.when), { now })) delete entities.when;
+  if (entities.location && !isPlaceSlotValue(val(entities.location), { profile })) delete entities.location;
+  return entities;
+}
+
+/**
+ * The name an owner alert or notify payload carries: the code-held confirmed
+ * name, never a saved row's name or an older alternate. Unconfirmed: a row
+ * name only when it passes the name checks, else none.
+ */
+function alertCallerName({ state = null, rowName = '' } = {}) {
+  const held = String(state?.caller?.name || '').trim();
+  // eslint-disable-next-line global-require
+  const { isPlausibleCallerName } = require('./entityExtraction');
+  if (held && state?.caller?.nameConfirmed === true && isPlausibleCallerName(held)) return held;
+  const row = String(rowName || '').trim();
+  if (row && isPlausibleCallerName(row) && !isFillerPhrase(row)) return held && held === row ? held : row;
+  return '';
+}
+
+// ------------------------------------------------ HD_b82fbfef7649 round 4 (2)
+
+/**
+ * The coverage gate is for a new create in a new place. A move or update of a
+ * visit on file keeps that visit's place unless the caller names a new real
+ * place, so it never meets the gate.
+ */
+function skipCoverageGateForMove(state, { incomingPlace = '', profile = {} } = {}) {
+  if (!callFixesD199Enabled()) return false;
+  if (state?.conversation?.rescheduleAsked !== true) return false;
+  if (looksLikeNewJobAsk((state?.conversation?.answersReceived || []).slice(-1)[0] || '')) return false;
+  const fresh = String(incomingPlace || '').trim();
+  if (!fresh) return true;
+  const lower = fresh.toLowerCase();
+  const visits = (state?.returning?.openRows || []).filter((row) => row && row.kind === 'visit');
+  if (visits.some((row) => String(row.place || '').toLowerCase().includes(lower))) return true;
+  return !isPlaceSlotValue(fresh, { profile });
+}
+
+// ------------------------------------------------ HD_b82fbfef7649 round 4 (3)
+
+/**
+ * The resolution note from what was written this call: "Moved Carpet
+ * Cleaning visit to Sat 10 Oct, 1 PM". Null when nothing was written.
+ */
+function outcomeNote(results = [], { now = new Date() } = {}) {
+  const rows = (Array.isArray(results) ? results : []).filter(
+    (r) => r && (r.status === 'succeeded' || r.status === 'updated')
+  );
+  const last = (action) => [...rows].reverse().find((r) => r.action === action) || null;
+  const update = last('update_appointment');
+  if (update) {
+    const job = String(update.record?.service_name || update.value?.serviceName || '').trim() || 'the';
+    const status = String(update.value?.status || update.record?.status || '').toLowerCase();
+    if (status === 'cancelled') return `Cancelled ${job} visit`.replace(/\s+/g, ' ');
+    const when = shortWhen(update.record?.window_start, update.value?.whenText || update.record?.when_text, now);
+    if (when) return `Moved ${job} visit to ${when}`.replace(/\s+/g, ' ');
+    return `Updated ${job} visit`.replace(/\s+/g, ' ');
+  }
+  const create = last('create_appointment');
+  if (create) {
+    const job = String(create.record?.service_name || create.value?.serviceName || 'visit').trim();
+    const when = shortWhen(create.record?.window_start, create.value?.whenText || create.record?.when_text, now);
+    return `Visit requested: ${job}${when ? `, ${when}` : ''}`;
+  }
+  const request = last('create_service_request');
+  if (request) {
+    const type = String(request.requestType || request.value?.type || request.record?.request_type || 'request').toLowerCase();
+    const item = String(request.value?.item || request.record?.item || '').trim();
+    const label = type === 'hold' || type === 'hold_or_pickup' ? 'Hold' : type.charAt(0).toUpperCase() + type.slice(1);
+    return `${label} saved${item ? `: ${item}` : ''}`;
+  }
+  return null;
+}
+
+function shortWhen(windowStart, whenText, now = new Date()) {
+  const iso = windowStart ? new Date(windowStart) : null;
+  if (iso && !Number.isNaN(iso.getTime())) {
+    const day = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' }).format(iso);
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true }).formatToParts(iso);
+    const hour = parts.find((p) => p.type === 'hour')?.value;
+    const minute = parts.find((p) => p.type === 'minute')?.value;
+    const period = String(parts.find((p) => p.type === 'dayPeriod')?.value || '').toUpperCase();
+    return `${day.replace(',', '')}, ${hour}${minute && minute !== '00' ? `:${minute}` : ''} ${period}`.trim();
+  }
+  return String(whenText || '').trim();
+}
+
+/** "Answered: price." when nothing was written and a question was answered. */
+function answeredTopicNote(state) {
+  const intent = String(state?.intent || '').toLowerCase();
+  const topics = {
+    location: 'location', directions: 'directions', hours: 'hours', hours_open: 'hours',
+    price: 'price', pricing: 'price', product_inquiry: 'product', order_enquiry: 'product',
+    services: 'services', coverage: 'coverage', visit_lookup: 'visit on file',
+  };
+  const goal = String(state?.goal?.description || '').trim();
+  if (topics[intent]) return `Answered: ${topics[intent]}${goal && !notAGoal(goal) ? ` (${goal.slice(0, 80)})` : ''}.`;
+  if (goal && !notAGoal(goal)) return `Answered: ${goal.slice(0, 120)}.`;
+  return null;
+}
+
+// ------------------------------------------------ HD_b82fbfef7649 round 4 (4)
+
+/**
+ * Brain's prompt lines never put Okay and Sawa side by side: the model read
+ * "Okay, Sawa, or leave it" and said "Okay, Sawa." on an English turn.
+ */
+function ackPromptText(text) {
+  if (!callFixesD199Enabled()) return text;
+  return String(text || '')
+    .replace(/\(Then, Okay, Sawa, or leave it\)/g, '(a bare acknowledgment, or leave it)')
+    .replace(/Okay, Sawa, or leave it/g, 'A bare acknowledgment or leave it');
+}
+
+const ACK_LANGUAGE_LINE =
+  '- Acknowledge in the call language only: English Okay, Kiswahili Sawa. Never both in one reply.';
+
+// ------------------------------------------------ Aris HD_d3900cbf2b2d (6)
+
+const DANGLING_END =
+  /\b(?:for|a|an|the|about|of|to|with|on|at|in|and|or|but|my|your|some|any|like|kuhusu|ya|wa|la|za|cha|kwa|na)\s*[.,]*$/i;
+const NEED_VERB_NO_OBJECT =
+  /^(?:(?:uh+|um+|er+|so|yes|yeah|okay|ok|hi|hello|well|sawa|eeh|ah+)[\s,]+)*(?:i\s+(?:was|am|'m)\s+(?:inquiring|enquiring|asking|wondering|calling|looking|trying)|i\s+(?:wanted|want|would like|need|wish)(?:\s+to\s+(?:ask|know|inquire|enquire|find out|check|get|order|buy|book))?|i(?:'m| am| was) calling(?:\s+(?:about|to|for|regarding))?|i\s+have\s+a\s+question|nilikuwa\s+(?:nauliza|nataka|naulizia|napiga)|nataka\s+(?:kuuliza|kujua)|nilitaka(?:\s+kuuliza|\s+kujua)?|ninauliza|naulizia|nilikuwa)\s*[.,!]*$/i;
+
+/**
+ * A cut-off turn: trailing dash or ellipsis, a dangling word ("how much for
+ * a"), an ask verb with no object ("I was inquiring"), or Voice marked it
+ * unfinished / barged. Nothing is saved on it.
+ */
+function isFragmentTurn(text, { unfinished = false, bargeIn = false } = {}) {
+  if (unfinished === true || bargeIn === true) return true;
+  const raw = String(text || '').trim();
+  if (!raw) return true;
+  if (/(?:[—–-]|\.{3}|…)\s*$/.test(raw)) return true;
+  const body = raw.replace(/[?!.]+$/g, '').trim();
+  if (!body) return true;
+  // "What do you guys deal with?" is a whole question that ends on a preposition.
+  const wholeQuestion =
+    /\?\s*$/.test(raw) && /\b(?:what|who|which|where|how|nini|gani|wapi)\b/i.test(body) && body.split(/\s+/).length >= 4;
+  if (!wholeQuestion && DANGLING_END.test(body)) return true;
+  return NEED_VERB_NO_OBJECT.test(body);
+}
+
+/** The ask_need line (Voice owns wording; Brain's fallback in factLine.js). */
+function askNeedLine(language = 'en') {
+  return renderLines([factLine('ask_need', {}, { lang: language, gate: { fragment: true, write: 'none' } })]);
+}
+
+// ------------------------------------------------ Aris HD_d3900cbf2b2d (7, 8)
+
+const SIZE_TOKEN = /^(?:a[0-9]|b[0-9]|[0-9]+x[0-9]+|[0-9]+(?:pg|pgs|pages|ml|l|g|kg|cm|mm)|[0-9]+)$/i;
+
+/**
+ * A product named without its size token ("mood diary" for "Mood diary
+ * a8"). The base name must belong to exactly one product.
+ */
+function sizelessProductTerms(products = []) {
+  // eslint-disable-next-line global-require
+  const { normalizeText } = require('./entityExtraction');
+  const bases = new Map();
+  for (const product of products) {
+    const name = normalizeText(product?.name || '');
+    const words = name.split(' ').filter(Boolean);
+    const kept = words.filter((w) => !SIZE_TOKEN.test(w));
+    if (kept.length < 2 || kept.length === words.length) continue;
+    const base = kept.join(' ');
+    bases.set(base, bases.has(base) ? null : product.name);
+  }
+  return [...bases.entries()].filter(([, name]) => name).map(([term, canonical]) => ({ term, canonical }));
+}
+
+/** "A mood. Diary" → "a mood diary": STT stops inside a product name. */
+function joinBrokenPhrase(text) {
+  return String(text || '').replace(/\s*\.\s+(?=\p{Ll}|\p{Lu}\p{Ll})/gu, ' ').trim();
+}
+
+/**
+ * The goal text: the canonical product name when the caller named a
+ * catalogue product, else the cleaned words.
+ */
+function cleanGoalText(goal, profile = {}) {
+  if (!callFixesD199Enabled()) return goal;
+  const joined = joinBrokenPhrase(goal).replace(/[?]+$/, '').trim();
+  // eslint-disable-next-line global-require
+  const { findCatalogMatch } = require('./entityExtraction');
+  const match = profile && (profile.productCatalog || profile.servicesCatalog) ? findCatalogMatch(joined, profile) : null;
+  if (match?.kind === 'product' && match.canonical) return match.canonical;
+  return goal;
+}
+
 module.exports = {
   FLAG,
+  isWhenSlotValue,
+  isPlaceSlotValue,
+  dropJunkSlots,
+  alertCallerName,
+  skipCoverageGateForMove,
+  outcomeNote,
+  answeredTopicNote,
+  ackPromptText,
+  ACK_LANGUAGE_LINE,
+  isFragmentTurn,
+  askNeedLine,
+  sizelessProductTerms,
+  joinBrokenPhrase,
+  cleanGoalText,
   isClosingCue,
   notAGoal,
   noteRejectedCreate,

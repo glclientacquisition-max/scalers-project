@@ -1795,6 +1795,8 @@ async function updateAppointment({
   serviceName,
   windowStart,
   windowEnd,
+  callerName,
+  replaceCallerName,
 } = {}) {
   let resolvedTenantId = tenantId || null;
   let callRow = null;
@@ -1830,6 +1832,10 @@ async function updateAppointment({
     const endIso = new Date(windowEnd).toISOString();
     if (!Number.isNaN(Date.parse(endIso))) patch.window_end = endIso;
   }
+  // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 1): only the code-held confirmed
+  // name is passed here; it replaces a junk name an older call saved, never
+  // a real one (replaceCallerName decides).
+  const heldName = String(callerName || '').trim();
 
   if (Object.keys(patch).length <= 1) {
     return null;
@@ -1884,6 +1890,26 @@ async function updateAppointment({
     return null;
   }
   throwIfError('updateAppointment', error);
+  if (
+    data &&
+    heldName &&
+    data.caller_name !== heldName &&
+    typeof replaceCallerName === 'function' &&
+    replaceCallerName(data.caller_name)
+  ) {
+    const { data: named, error: nameErr } = await supabase
+      .from('appointments')
+      .update({ caller_name: heldName.slice(0, 120) })
+      .eq('id', data.id)
+      .eq('tenant_id', resolvedTenantId)
+      .select('*')
+      .maybeSingle();
+    if (nameErr) {
+      console.warn('[db] updateAppointment caller_name skipped:', nameErr.message);
+      return data;
+    }
+    return named || data;
+  }
   return data || null;
 }
 

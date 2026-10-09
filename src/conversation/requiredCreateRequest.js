@@ -265,6 +265,23 @@ function guardToolPlan(parsed, state = {}, capabilities = {}) {
   // rejected create (callback or retry) is not a model save on an ack turn.
   const brainRescue = next.brainRescue === true && fixesD199.callFixesD199Enabled();
   delete next.brainRescue;
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 6): nothing is saved on a
+  // cut-off turn ("Uh, I was inquiring—"). Ask what they need; no write.
+  if (
+    !brainRescue &&
+    fixesD199.callFixesD199Enabled() &&
+    (next.serviceRequest || next.appointment) &&
+    (state.conversation?.fragmentTurn === true || fixesD199.isFragmentTurn(latestCallerTurn(state)))
+  ) {
+    delete next.serviceRequest;
+    delete next.appointment;
+    // The name on file is already confirmed: a fragment adds no caller info.
+    if (state.caller?.nameConfirmed === true) {
+      delete next.name;
+      delete next.reason;
+    }
+    next.fragmentBlocked = true;
+  }
   if (!brainRescue && ackWithoutConsent(state)) {
     delete next.serviceRequest;
     delete next.appointment;

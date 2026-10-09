@@ -1,0 +1,102 @@
+{
+  "note": "PROD Aris Kenya call 32fb7b9d-1bdc-4deb-bd92-7db1a9bfd202 (HD_d3900cbf2b2d), 2026-10-09 20:18 EAT, tenant 24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0, release main @ 96ac39eb (non-structured path). Pulled strictly read-only (SELECT only); nothing written to prod. Caller phone omitted.",
+  "callId": "32fb7b9d-1bdc-4deb-bd92-7db1a9bfd202",
+  "callSid": "HD_d3900cbf2b2d",
+  "tenantId": "24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0",
+  "tenantFixture": "aris-prod",
+  "businessName": "Aris Kenya",
+  "vertical": "retail",
+  "callerFile": {
+    "contact": {
+      "name": "Alvin Yegon"
+    },
+    "requests": [],
+    "openAppointments": []
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "caller": "I'm not going to scam y",
+      "language": "en",
+      "spoken": "Am I speaking with Alvin Yegon?"
+    },
+    {
+      "turn": 2,
+      "caller": "Yeah, you're speaking with Alvin Yegon.",
+      "language": "en",
+      "spoken": "Thank you for confirming, Alvin. How can I assist you with Aris Kenya today?"
+    },
+    {
+      "turn": 4,
+      "caller": "Uh, what do you guys deal with?",
+      "language": "en",
+      "spoken": "(stationery list plus website)"
+    },
+    {
+      "turn": 5,
+      "caller": "Uh, I was inquiring—",
+      "sttFinals": [
+        "Uh, I was inquiring",
+        "—"
+      ],
+      "language": "en",
+      "bargeInAfter": true,
+      "tools": [
+        {
+          "name": "save_caller_info",
+          "args": {
+            "name": "Alvin Yegon",
+            "reason": "Inquiring about products and services"
+          },
+          "status": "succeeded"
+        },
+        {
+          "name": "create_service_request",
+          "args": {
+            "item": "General product enquiry",
+            "notes": "Caller asked about offerings and products",
+            "type": "enquiry"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "modelOutput": "tool markers only",
+      "spoken": "I've saved your request."
+    },
+    {
+      "turn": 6,
+      "caller": "Uh, how much for a.",
+      "language": "en",
+      "bargeIn": true,
+      "spoken": ""
+    },
+    {
+      "turn": 7,
+      "caller": "A mood. Diary?",
+      "language": "en",
+      "spoken": "I don't have the exact price for the Mood Diary A8 right now, Alvin. I can log an enquiry so our team gets back to you with the price."
+    }
+  ],
+  "live": {
+    "resolutionNote": "Request saved (enquiry)",
+    "primaryIntent": "order_enquiry",
+    "brainSummary": "Intent: order_enquiry. Caller: Alvin Yegon. Goal: A mood. Diary. Products: A mood. Diary. Actions: enquiry. General product enquiry. Instructions: Caller asked about offerings and products",
+    "ownerReview": {
+      "done": "Hold saved; awaiting owner Done.",
+      "primary_intent": "hold_or_pickup",
+      "needs_human": true
+    },
+    "serviceRequest": {
+      "id": "f4375622-c626-4e86-8348-56ab7ce49559",
+      "type": "enquiry",
+      "status": "open",
+      "item": "General product enquiry",
+      "created_at": "2026-10-09T17:19:12Z"
+    },
+    "catalogRow": {
+      "name": "Mood diary a8",
+      "price": "",
+      "source": "owner"
+    }
+  }
+}

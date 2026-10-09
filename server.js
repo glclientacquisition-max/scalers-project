@@ -121,8 +121,12 @@ function noteTracedGeminiTools(callSid, before, after, results) {
       args: summarizeToolArgs(argsSource),
     });
   }
-  if (after?.consentBlocked || after?.needsVisitTime) {
-    const status = after.consentBlocked ? 'consent_blocked' : 'needs_visit_time';
+  if (after?.consentBlocked || after?.needsVisitTime || after?.fragmentBlocked) {
+    const status = after.consentBlocked
+      ? 'consent_blocked'
+      : after.fragmentBlocked
+        ? 'fragment_turn'
+        : 'needs_visit_time';
     for (const [field, name] of TRACE_TOOL_FIELDS) {
       if (!before?.[field] || seen.has(name)) continue;
       trace.noteTool({
@@ -5834,9 +5838,9 @@ async function applyGeminiTools(callSid, parsed) {
     state,
     capabilities
   );
-  if (enforcedParsed.consentBlocked || enforcedParsed.needsVisitTime) {
+  if (enforcedParsed.consentBlocked || enforcedParsed.needsVisitTime || enforcedParsed.fragmentBlocked) {
     console.log(
-      `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : 'needs_visit_time'}`
+      `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : enforcedParsed.fragmentBlocked ? 'fragment_turn' : 'needs_visit_time'}`
     );
   }
   const execution = await executeBrainTools({
@@ -5878,7 +5882,15 @@ async function applyGeminiTools(callSid, parsed) {
           console.log(
             `[${callSid}] service_request created id=${created.id} type=${created.request_type}`
           );
-          maybeSendServiceRequestNotification(callSid, created).catch((err) => {
+          const fixesD199 = require('./src/conversation/callFixesD199');
+          const alertRow = fixesD199.callFixesD199Enabled()
+            ? {
+                ...created,
+                caller_name:
+                  fixesD199.alertCallerName({ state, rowName: created.caller_name }) || null,
+              }
+            : created;
+          maybeSendServiceRequestNotification(callSid, alertRow).catch((err) => {
             console.error(`[${callSid}] service request notify error:`, err?.message || err);
           });
         }
@@ -5918,15 +5930,38 @@ async function applyGeminiTools(callSid, parsed) {
           console.log(
             `[${callSid}] appointment created id=${created.id} service=${created.service_name}`
           );
-          maybeSendAppointmentNotification(callSid, created, 'created').catch((err) => {
+          const fixesD199 = require('./src/conversation/callFixesD199');
+          const alertRow = fixesD199.callFixesD199Enabled()
+            ? {
+                ...created,
+                caller_name:
+                  fixesD199.alertCallerName({ state, rowName: created.caller_name }) || null,
+              }
+            : created;
+          maybeSendAppointmentNotification(callSid, alertRow, 'created').catch((err) => {
             console.error(`[${callSid}] appointment notify error:`, err?.message || err);
           });
         }
         return created;
       },
       updateAppointment: async (appointment) => {
+        // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 1): the row and the VISIT
+        // UPDATED alert carry the code-held confirmed name, never the junk
+        // name an older call saved on the row ("Caller: like").
+        const fixesD199 = require('./src/conversation/callFixesD199');
+        const heldName = fixesD199.callFixesD199Enabled()
+          ? fixesD199.alertCallerName({ state })
+          : '';
         const updated = await db.updateAppointment({
           callSid,
+          ...(heldName
+            ? {
+                callerName: heldName,
+                // Only a junk row name ("like") is replaced, never a real one.
+                replaceCallerName: (rowName) =>
+                  !fixesD199.alertCallerName({ state: { caller: {} }, rowName }),
+              }
+            : {}),
           appointmentId: appointment.appointmentId,
           phone: appointment.phone,
           status: appointment.status,
@@ -5941,7 +5976,14 @@ async function applyGeminiTools(callSid, parsed) {
           console.log(
             `[${callSid}] appointment updated id=${updated.id} status=${updated.status}`
           );
-          maybeSendAppointmentNotification(callSid, updated, 'updated').catch((err) => {
+          const alertRow = fixesD199.callFixesD199Enabled()
+            ? {
+                ...updated,
+                caller_name:
+                  fixesD199.alertCallerName({ state, rowName: updated.caller_name }) || null,
+              }
+            : updated;
+          maybeSendAppointmentNotification(callSid, alertRow, 'updated').catch((err) => {
             console.error(`[${callSid}] appointment update notify error:`, err?.message || err);
           });
         }
@@ -5969,6 +6011,21 @@ async function applyGeminiTools(callSid, parsed) {
     });
   }
 
+  if (enforcedParsed.fragmentBlocked) {
+    // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 6): no write on a cut-off
+    // turn; the ask_need line asks what they need.
+    const ask = require('./src/conversation/callFixesD199').askNeedLine(
+      state.language?.current || 'en'
+    );
+    execution.results.unshift({
+      action: 'create_service_request',
+      status: 'blocked',
+      code: 'fragment_turn',
+      reason: 'The caller had not said what they need.',
+      askLine: ask.line,
+      askLines: ask.lines,
+    });
+  }
   let updatedState = recordActionResults(state, execution.results);
   // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): hold a rejected create until it
   // is re-asked and saved, or saved as a callback. The invalid result carries

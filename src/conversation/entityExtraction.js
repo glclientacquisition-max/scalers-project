@@ -78,6 +78,16 @@ function findCatalogMatch(text, profile = {}) {
     });
   }
 
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 7): "mood diary" names
+  // "Mood diary a8" when that base name belongs to one product only.
+  const fixes = require('./callFixesD199');
+  if (fixes.callFixesD199Enabled()) {
+    for (const { term, canonical } of fixes.sizelessProductTerms(products)) {
+      candidates.push({ kind: 'product', canonical, terms: [term] });
+    }
+    text = fixes.joinBrokenPhrase(text);
+  }
+
   let best = null;
   for (const candidate of candidates) {
     for (const term of candidate.terms) {
@@ -1178,6 +1188,11 @@ function extractConversationEntities(
   ) {
     entities.location = entity(shortAnswer, 'contextual_slot_answer', 0.75, false);
   }
+
+  // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 1): a sentence is never the time
+  // ("Oh, so it's done per room") and a non-place word never the location
+  // ("visits in line"). Junk stays empty.
+  if (fixesOn) fixesD199.dropJunkSlots(entities, { profile });
 
   return entities;
 }
