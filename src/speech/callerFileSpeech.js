@@ -39,6 +39,80 @@ function fileNames(state) {
   return names;
 }
 
+// A question that only confirms who is speaking, in en / sw / sheng. The rule
+// is structural, not a phrase list of whole sentences: strip one confirm
+// phrase (front or back) and a tag word, and what is left must be exactly the
+// primary on-file name (full, or its first name). Anything else in the
+// sentence (a row, a place, a second name) keeps the gate closed.
+// HD_1677e57f73f9: "Je, ninaongea na Chris?" was dropped as privacy_unbound.
+const CONFIRM_LEAD = new RegExp(
+  '^(?:' +
+    [
+      'am i (?:speaking|talking) (?:with|to)',
+      'is this',
+      'is that',
+      'are you',
+      'is it',
+      'speaking (?:with|to)',
+      '(?:ni)?naongea na',
+      '(?:ni)?nazungumza na',
+      'unaongea na',
+      'niongee na',
+      'unaitwa',
+      'wewe ni',
+      'ni wewe',
+      'huyu ni',
+      'niko na',
+      'ni',
+    ].join('|') +
+    ')\\s+',
+  'i'
+);
+const CONFIRM_TAIL = /[\s,]+(?:is that you|is this you|ni wewe|ndiye wewe|ndio wewe|right|sindio|si ndio|ama)$/i;
+const CONFIRM_OPENER = /^(?:je|sorry|hi|hello|habari|samahani|so|and|na|ok(?:ay)?|sawa|just to confirm|kuthibitisha)[,\s]+/i;
+
+// The primary on-file name: the file owner, and the name Brain asks about
+// (fileNameAsked, usually the owner's first name). Never an alternate.
+function primaryFileNames(state) {
+  return [state?.caller?.fileNameAsked, state?.returning?.fileOwnerName]
+    .map((v) => String(v || '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+}
+
+const normName = (value) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}' -]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/**
+ * The sentence is a question that asks only to confirm the primary on-file
+ * name ("Je, ninaongea na Chris?", "Am I speaking with Chris Otieno?",
+ * "Chris, ni wewe?"). It says nothing from the file beyond the name.
+ * @param {string} sentence
+ * @param {object} state
+ */
+function isPrimaryNameConfirm(sentence, state) {
+  const primaries = primaryFileNames(state).map(normName).filter(Boolean);
+  if (!primaries.length) return false;
+  let text = String(sentence || '').replace(/\s+/g, ' ').trim();
+  if (!/\?$/.test(text) || OPEN_ROW_RE.test(text)) return false;
+  text = text.replace(/[?!.]+$/, '').trim();
+  for (let i = 0; i < 2; i += 1) text = text.replace(CONFIRM_OPENER, '').trim();
+  const lead = CONFIRM_LEAD.test(text);
+  if (lead) text = text.replace(CONFIRM_LEAD, '').trim();
+  const tail = CONFIRM_TAIL.test(text);
+  if (tail) text = text.replace(CONFIRM_TAIL, '').trim();
+  if (!lead && !tail) return false;
+  const who = normName(text.replace(/[,]+$/, ''));
+  if (!who) return false;
+  return primaries.some((primary) => {
+    const first = primary.split(' ')[0];
+    return who === primary || (first.length >= 2 && who === first);
+  });
+}
+
 function sentenceUsesFileName(sentence, names) {
   for (const name of names) {
     const re = new RegExp(`\\b${escapeName(name)}\\b`, 'i');
@@ -71,7 +145,7 @@ function gateCallerFileSpeech(line, state) {
   const kept = [];
   let blocked = false;
   for (const sentence of splitSentences(text)) {
-    if (IDENTITY_ASK_RE.test(sentence)) {
+    if (IDENTITY_ASK_RE.test(sentence) || isPrimaryNameConfirm(sentence, state)) {
       kept.push(sentence);
       continue;
     }
@@ -182,6 +256,7 @@ function lockFileNameAsk(line, language) {
 module.exports = {
   speakerBound,
   gateCallerFileSpeech,
+  isPrimaryNameConfirm,
   lineIsOpenFileRow,
   answerBeforeNameAsk,
   linesBeforeNameAsk,
