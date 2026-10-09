@@ -81,6 +81,8 @@ function appendGeminiStreamParts(acc, chunk) {
   return next;
 }
 
+const { isSpokenLine, spokenLineNote } = require('../speech/spokenHistory');
+
 function modelPartsForHistory({ geminiParts, text, thoughtSignature } = {}) {
   if (Array.isArray(geminiParts) && geminiParts.length) {
     return geminiParts.map(cloneGeminiPart).filter(Boolean);
@@ -100,10 +102,18 @@ function buildGeminiContents(messages, windowSize = CONTEXT_WINDOW) {
   const recentMessages = Array.isArray(messages) ? messages.slice(-windowSize) : [];
   const contents = [];
   for (const message of recentMessages) {
-    if (!message || message.role === 'system' || message.local) continue;
-    const role = message.role === 'assistant' ? 'model' : 'user';
+    if (!message || message.role === 'system') continue;
+    // A line the code spoke (visit read, name ask, service list, nudge) has
+    // no thought signature. It reaches the model as a user-side note, in
+    // order, so the model knows it was said (HD_ceba9d9b3f37). Other local
+    // rows (the instant greeting) stay out.
+    const spokenNote = isSpokenLine(message) ? spokenLineNote(message.content) : '';
+    if (message.local && !spokenNote) continue;
+    const role = spokenNote ? 'user' : message.role === 'assistant' ? 'model' : 'user';
     let parts;
-    if (role === 'model' && Array.isArray(message.geminiParts) && message.geminiParts.length) {
+    if (spokenNote) {
+      parts = [{ text: spokenNote }];
+    } else if (role === 'model' && Array.isArray(message.geminiParts) && message.geminiParts.length) {
       parts = message.geminiParts.map(cloneGeminiPart).filter(Boolean);
     } else {
       const part = { text: String(message.content || '') };
