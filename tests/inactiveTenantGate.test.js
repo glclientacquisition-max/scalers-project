@@ -16,10 +16,7 @@ const {
   lineUnavailableXml,
   lineUnavailableResponse,
   usableClipUrl,
-  allowedPlayHosts,
   resetClipProbeCache,
-  LINE_UNAVAILABLE_CLIP_PATHS,
-  configuredClipUrl,
 } = require('../src/sautikit/inactiveTenantGate');
 
 const SERVER = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
@@ -88,7 +85,7 @@ describe('tenantLineState', () => {
 
 describe('lineUnavailableXml', () => {
   it('says the short en and sw line, then hangs up; never Stream', () => {
-    const xml = lineUnavailableXml({ env: {} });
+    const xml = lineUnavailableXml();
     assert.equal(
       xml,
       '<?xml version="1.0" encoding="UTF-8"?><Response>' +
@@ -98,55 +95,25 @@ describe('lineUnavailableXml', () => {
     assert.doesNotMatch(LINE_UNAVAILABLE_EN + LINE_UNAVAILABLE_SW, /downtime|outage|call back/i, 'not an outage message');
   });
 
-  it('plays allow-listed clips when configured; ignores non-https values', () => {
-    const xml = lineUnavailableXml({
-      env: { VOICE_LINE_UNAVAILABLE_CLIP_URL_EN: 'https://cdn.example.com/a/en.wav', VOICE_LINE_UNAVAILABLE_CLIP_URL_SW: 'javascript:alert(1)' },
-    });
-    assert.match(xml, /<Play>https:\/\/cdn\.example\.com\/a\/en\.wav<\/Play><Say language="sw-KE">/);
+  it('approved copy, same words as the recorded clips', () => {
+    assert.equal(LINE_UNAVAILABLE_EN, 'Hello. This line is not available right now. Thank you for calling.');
+    assert.equal(LINE_UNAVAILABLE_SW, 'Habari. Nambari hii haipatikani kwa sasa. Asante kwa kupiga.');
+  });
+
+  it('plays checked clips; ignores non-https values', () => {
+    const xml = lineUnavailableXml({ clips: { en: 'https://storage.sautikit.com/a/en.wav', sw: 'javascript:alert(1)' } });
+    assert.match(xml, /<Play>https:\/\/storage\.sautikit\.com\/a\/en\.wav<\/Play><Say language="sw-KE">/);
     assert.match(xml, /<Hangup\/><\/Response>$/);
   });
 });
 
-describe('clip defaults: line-unavailable-* names, never the downtime clips', () => {
-  it('approved copy, same words as the recorded clips', () => {
-    assert.equal(LINE_UNAVAILABLE_EN, 'Hello. This line is not available right now. Thank you for calling.');
-    assert.equal(LINE_UNAVAILABLE_SW, 'Habari. Nambari hii haipatikani kwa sasa. Asante kwa kupiga.');
-    assert.deepEqual(LINE_UNAVAILABLE_CLIP_PATHS, { en: '/audio/line-unavailable-en.v1.wav', sw: '/audio/line-unavailable-sw.v1.wav' });
-  });
-
-  it('base URL fills the line-unavailable paths; explicit URLs win; nothing set is no clip', () => {
-    const base = { VOICE_LINE_UNAVAILABLE_CLIP_BASE_URL: 'https://scalers-staging.vercel.app/' };
-    assert.equal(configuredClipUrl('en', base), 'https://scalers-staging.vercel.app/audio/line-unavailable-en.v1.wav');
-    assert.equal(configuredClipUrl('sw', base), 'https://scalers-staging.vercel.app/audio/line-unavailable-sw.v1.wav');
-    const both = { ...base, VOICE_LINE_UNAVAILABLE_CLIP_URL_SW: 'https://storage.sautikit.com/x/sw.wav' };
-    assert.equal(configuredClipUrl('sw', both), 'https://storage.sautikit.com/x/sw.wav');
-    assert.equal(configuredClipUrl('en', {}), '');
-    assert.doesNotMatch(configuredClipUrl('en', base) + configuredClipUrl('sw', base), /downtime/);
-  });
-
-  it('base URL on an allowed, fetchable host plays both clips', async () => {
-    resetClipProbeCache();
-    const env = { VOICE_LINE_UNAVAILABLE_CLIP_BASE_URL: 'https://www.scalers.co.ke', VOICE_PLAY_ALLOWED_HOSTS: 'www.scalers.co.ke' };
-    const seen = [];
-    const fetchImpl = async (url) => {
-      seen.push(url);
-      return { status: 206, headers: { get: () => 'audio/wave' }, body: null };
-    };
-    const xml = await lineUnavailableResponse({ env, fetchImpl, log: () => {} });
-    assert.ok(xml.includes('<Play>https://www.scalers.co.ke/audio/line-unavailable-en.v1.wav</Play><Play>https://www.scalers.co.ke/audio/line-unavailable-sw.v1.wav</Play><Hangup/>'));
-    assert.deepEqual(seen.sort(), [
-      'https://www.scalers.co.ke/audio/line-unavailable-en.v1.wav',
-      'https://www.scalers.co.ke/audio/line-unavailable-sw.v1.wav',
-    ]);
-  });
-});
-
-describe('clip fallback: <Say> unless the clip is allowed and fetchable', () => {
+describe('clip fallback: <Say> unless the stored clip is on SautiKit storage and fetchable', () => {
   const EN = 'https://storage.sautikit.com/ws/line-en.wav?X-Amz-Signature=secret';
   const SW = 'https://storage.sautikit.com/ws/line-sw.wav?X-Amz-Signature=secret';
   const SAY_EN = `<Say language="en-US">${LINE_UNAVAILABLE_EN}</Say>`;
   const SAY_SW = `<Say language="sw-KE">${LINE_UNAVAILABLE_SW}</Say>`;
   const audio = (status = 206, type = 'audio/wav') => ({ status, headers: { get: () => type }, body: null });
+  const stored = (urls) => async () => urls;
   function fakeFetch(handler) {
     const calls = [];
     const fn = async (url, init) => {
@@ -158,19 +125,23 @@ describe('clip fallback: <Say> unless the clip is allowed and fetchable', () => 
   }
   const quiet = () => {};
 
-  it('unset vars: <Say> both, no network', async () => {
+  it('nothing stored: <Say> both, no network', async () => {
     resetClipProbeCache();
     const f = fakeFetch(() => audio());
-    const xml = await lineUnavailableResponse({ env: {}, fetchImpl: f, log: quiet });
+    const xml = await lineUnavailableResponse({ loadClipUrls: stored({ en: '', sw: '' }), fetchImpl: f, log: quiet });
     assert.ok(xml.includes(SAY_EN + SAY_SW + '<Hangup/>'));
     assert.equal(f.calls.length, 0);
   });
 
-  it('fetchable clips on an allowed host: <Play> both; probe is a ranged GET with a timeout signal', async () => {
+  it('store lookup throws: <Say> both, never throws', async () => {
+    const xml = await lineUnavailableResponse({ loadClipUrls: async () => { throw new Error('db down'); }, log: quiet });
+    assert.ok(xml.includes(SAY_EN + SAY_SW + '<Hangup/>'));
+  });
+
+  it('fetchable stored clips: <Play> both; probe is a ranged GET with a timeout signal', async () => {
     resetClipProbeCache();
     const f = fakeFetch(() => audio());
-    const env = { VOICE_LINE_UNAVAILABLE_CLIP_URL_EN: EN, VOICE_LINE_UNAVAILABLE_CLIP_URL_SW: SW };
-    const xml = await lineUnavailableResponse({ env, fetchImpl: f, log: quiet });
+    const xml = await lineUnavailableResponse({ loadClipUrls: stored({ en: EN, sw: SW }), fetchImpl: f, log: quiet });
     assert.match(xml, /<Response><Play>https:\/\/storage\.sautikit\.com\/ws\/line-en\.wav\?X-Amz-Signature=secret<\/Play><Play>https:\/\/storage\.sautikit\.com\/ws\/line-sw\.wav/);
     assert.match(xml, /<Hangup\/><\/Response>$/);
     assert.equal(f.calls.length, 2);
@@ -179,17 +150,13 @@ describe('clip fallback: <Say> unless the clip is allowed and fetchable', () => 
     assert.ok(f.calls[0].init.signal);
   });
 
-  it('host not allowed: <Say> without probing; VOICE_PLAY_ALLOWED_HOSTS opts a host in', async () => {
+  it('a host other than storage.sautikit.com: <Say> without probing', async () => {
     resetClipProbeCache();
     const f = fakeFetch(() => audio(200, 'audio/mpeg'));
-    const url = 'https://www.scalers.co.ke/audio/downtime-en.v1.wav';
     const logs = [];
-    assert.equal(await usableClipUrl(url, { env: {}, fetchImpl: f, log: (m) => logs.push(m) }), '');
+    assert.equal(await usableClipUrl('https://www.scalers.co.ke/audio/x.wav', { fetchImpl: f, log: (m) => logs.push(m) }), '');
     assert.equal(f.calls.length, 0);
-    assert.match(logs[0], /www\.scalers\.co\.ke not in VOICE_PLAY_ALLOWED_HOSTS/);
-    assert.deepEqual(allowedPlayHosts({}), ['storage.sautikit.com']);
-    const env = { VOICE_PLAY_ALLOWED_HOSTS: 'storage.sautikit.com, WWW.Scalers.co.ke' };
-    assert.equal(await usableClipUrl(url, { env, fetchImpl: f, log: quiet }), url);
+    assert.match(logs[0], /www\.scalers\.co\.ke is not storage\.sautikit\.com/);
   });
 
   it('404, expired link (403), HTML page, network error or timeout: that language falls back to <Say>', async () => {
@@ -203,9 +170,8 @@ describe('clip fallback: <Say> unless the clip is allowed and fetchable', () => 
     for (const [handler, why] of cases) {
       resetClipProbeCache();
       const logs = [];
-      const env = { VOICE_LINE_UNAVAILABLE_CLIP_URL_EN: EN, VOICE_LINE_UNAVAILABLE_CLIP_URL_SW: SW };
       const f = fakeFetch((u, init) => (u === EN ? handler(u, init) : audio()));
-      const xml = await lineUnavailableResponse({ env, fetchImpl: f, timeoutMs: 20, log: (m) => logs.push(m) });
+      const xml = await lineUnavailableResponse({ loadClipUrls: stored({ en: EN, sw: SW }), fetchImpl: f, timeoutMs: 20, log: (m) => logs.push(m) });
       assert.ok(xml.includes(SAY_EN + '<Play>'), why);
       assert.match(xml, /line-sw\.wav[^<]*<\/Play><Hangup\/>/, why);
       assert.ok(logs.some((m) => m.includes(`(${why})`)), `${why}: ${logs}`);
@@ -219,7 +185,7 @@ describe('clip fallback: <Say> unless the clip is allowed and fetchable', () => 
     const now = () => t;
     let healthy = false;
     const f = fakeFetch(() => (healthy ? audio() : audio(503, 'text/plain')));
-    const opts = { env: {}, fetchImpl: f, now, log: quiet };
+    const opts = { fetchImpl: f, now, log: quiet };
     assert.equal(await usableClipUrl(EN, opts), '');
     healthy = true;
     t += 30_000;
@@ -238,9 +204,13 @@ describe('clip fallback: <Say> unless the clip is allowed and fetchable', () => 
 
   it('no fetch available: <Say>, never throws', async () => {
     resetClipProbeCache();
-    const env = { VOICE_LINE_UNAVAILABLE_CLIP_URL_EN: EN };
-    const xml = await lineUnavailableResponse({ env, fetchImpl: 'nope', log: quiet });
+    const xml = await lineUnavailableResponse({ loadClipUrls: stored({ en: EN }), fetchImpl: 'nope', log: quiet });
     assert.ok(xml.includes(SAY_EN + SAY_SW));
+  });
+
+  it('no clip URL env vars or host allow-list var remain', () => {
+    const gate = fs.readFileSync(path.join(__dirname, '..', 'src', 'sautikit', 'inactiveTenantGate.js'), 'utf8');
+    assert.doesNotMatch(gate, /VOICE_LINE_UNAVAILABLE_CLIP_URL|VOICE_PLAY_ALLOWED_HOSTS|CLIP_BASE_URL|process\.env/);
   });
 });
 

@@ -177,6 +177,49 @@ async function listActiveTenantDids() {
  * DEFAULT_TENANT_ID deploy, or no number gives { closed: false }.
  * src/sautikit/inactiveTenantGate.js
  */
+// Platform audio hosted by SautiKit (line-unavailable clips, #639). Service
+// role only. The url is a presigned link: never log it.
+const PLATFORM_AUDIO_COLUMNS = 'key, url, expires_at, uploaded_at, file_sha256, size_bytes, mime_type, last_error, last_error_at';
+
+async function getPlatformAudio(keys = []) {
+  const list = (Array.isArray(keys) ? keys : []).filter(Boolean);
+  if (!list.length) return [];
+  const { data, error } = await supabase.from('voice_platform_audio').select(PLATFORM_AUDIO_COLUMNS).in('key', list);
+  throwIfError('getPlatformAudio', error);
+  return data || [];
+}
+
+async function upsertPlatformAudio({ key, url, expiresAt, fileSha256, sizeBytes, mimeType } = {}) {
+  if (!key || !url || !expiresAt) throw new Error('[db] upsertPlatformAudio: key, url and expiresAt are required');
+  const { error } = await supabase.from('voice_platform_audio').upsert(
+    {
+      key,
+      url,
+      expires_at: expiresAt,
+      uploaded_at: new Date().toISOString(),
+      file_sha256: fileSha256 || null,
+      size_bytes: sizeBytes == null ? null : Number(sizeBytes),
+      mime_type: mimeType || null,
+      last_error: null,
+      last_error_at: null,
+    },
+    { onConflict: 'key' }
+  );
+  throwIfError('upsertPlatformAudio', error);
+  return true;
+}
+
+/** Keeps the current url; only records the failure. */
+async function notePlatformAudioError({ key, error: message } = {}) {
+  if (!key) return false;
+  const { error } = await supabase
+    .from('voice_platform_audio')
+    .update({ last_error: String(message || 'error').slice(0, 200), last_error_at: new Date().toISOString() })
+    .eq('key', key);
+  throwIfError('notePlatformAudioError', error);
+  return true;
+}
+
 async function inboundTenantLine({ toNumber, fromNumber } = {}) {
   const { tenantLineState, sameNumber } = require('./sautikit/inactiveTenantGate');
   if (DEFAULT_TENANT_ID) return { closed: false, reason: 'default_tenant', tenantId: null };
@@ -2317,6 +2360,9 @@ async function confirmTenantField({ tenantId, fieldPath, userId = null } = {}) {
 
 module.exports = {
   inboundTenantLine,
+  getPlatformAudio,
+  upsertPlatformAudio,
+  notePlatformAudioError,
   upsertCall,
   saveCallerInfo,
   saveEscalation,
