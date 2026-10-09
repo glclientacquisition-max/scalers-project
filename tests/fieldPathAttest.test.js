@@ -50,7 +50,8 @@ describe("GIGO owner attest wiring", () => {
   it("settings save builder attests catalogue name paths", () => {
     const builder = read("dashboard/src/lib/fieldPathsFromSettingsSave.ts");
     assert.match(builder, /catalog\.product\.\$\{sku\}\.name/);
-    assert.match(builder, /catalog\.service\.\$\{index \+ 1\}\.name/);
+    // Services key by stable svc_ id, else 1-based position (fact-confirm PR 1).
+    assert.match(builder, /catalog\.service\.\$\{stableRowId\(row\) \|\| String\(index \+ 1\)\}\.name/);
     assert.match(builder, /includes\("servicesCatalog"\)/);
     assert.match(builder, /includes\("productCatalog"\)/);
   });

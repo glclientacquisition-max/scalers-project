@@ -12,6 +12,9 @@
 // GEMINI_API_KEY; never run in CI) asks Gemini under responseSchema and writes
 // those sidecars with the raw chunk texts.
 
+// Fixtures use P0 owner rows (no value_hash). An ambient FACT_HASH_MODE=on in the
+// shell must not change the scenarios or the baseline scores.
+delete process.env.FACT_HASH_MODE;
 const fs = require('fs');
 const path = require('path');
 const { replayCall } = require('../src/speech/replayVoice');

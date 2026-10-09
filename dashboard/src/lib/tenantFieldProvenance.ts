@@ -174,3 +174,29 @@ export async function confirmTenantField(input: {
     p_user_id: input.userId ?? null,
   });
 }
+
+/**
+ * Confirm v2 batch: owner-confirm paths with the saved value's hash, all or
+ * nothing (docs/supabase/tenant_field_confirm_v2.sql). Hash mode only.
+ */
+export async function confirmTenantFieldsBatch(input: {
+  tenantId: string;
+  paths: string[];
+  hashes: string[];
+}) {
+  const supabase = await createSupabaseServerClient();
+  return supabase.rpc("confirm_tenant_fields", {
+    p_tenant_id: input.tenantId,
+    p_paths: input.paths,
+    p_hashes: input.hashes,
+  });
+}
+
+/** Confirm v2: clear the confirm on one path so it reads "Check this" again. */
+export async function reopenTenantField(input: { tenantId: string; fieldPath: string }) {
+  const supabase = await createSupabaseServerClient();
+  return supabase.rpc("reopen_tenant_field", {
+    p_tenant_id: input.tenantId,
+    p_field_path: input.fieldPath,
+  });
+}
