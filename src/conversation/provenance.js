@@ -12,8 +12,28 @@
 // Only owner, or an explicit confirm, is fact. seed and call_suggested cap at
 // suggested and never compile or speak as GOLDEN. import and inferred are not
 // fact until confirmed. Empty policy text is unknown. Never invent a default.
+//
+// Confirm v2 (value_hash), behind FACT_HASH_MODE (on only when exactly 'on').
+// Hash mode off: the P0 rules above, exactly. Hash mode on: a path is fact only
+// when its tenant_field_meta row exists with source = 'owner' AND value_hash ===
+// hashFactValue(current value). No meta row, a missing value_hash (or column),
+// or any in-data source/confirmed hint is not confirmed.
+// JS resolves hash mode from an explicit { hashMode } option, then a hashMode
+// set on the indexed fieldMeta, then process.env.FACT_HASH_MODE.
 
 const { readCoverageAreas } = require('./coverageAreas');
+const {
+  confirmedCoverageEnabled,
+  confirmedCoverageReading,
+  coverageOwnerRowConfirms,
+} = require('./confirmedCoverage');
+const {
+  hashFactValue,
+  catalogRowFactValue,
+  faqFactValue,
+  holdsFactValue,
+  stableRowId,
+} = require('./factHash');
 
 const SOURCES = new Set(['owner', 'seed', 'import', 'inferred', 'call_suggested']);
 
@@ -173,7 +193,25 @@ function readSource(row) {
   return SOURCES.has(raw) ? raw : '';
 }
 
-function isConfirmed(row) {
+
+/** Hash mode for one call: explicit option, then fieldMeta.hashMode, then env. */
+function resolveHashMode(explicit, fieldMeta) {
+  if (typeof explicit === 'boolean') return explicit;
+  if (typeof explicit === 'string') return explicit === 'on';
+  if (fieldMeta && typeof fieldMeta.hashMode === 'boolean') return fieldMeta.hashMode;
+  return process.env.FACT_HASH_MODE === 'on';
+}
+
+/** Pin hash mode on a fieldMeta index (null stays null when off). */
+function withHashMode(fieldMeta, hashMode) {
+  if (typeof hashMode !== 'boolean') return fieldMeta;
+  if (!fieldMeta) return hashMode ? { loaded: false, hashMode: true, byPath: {} } : null;
+  return { ...fieldMeta, hashMode };
+}
+
+/** In-data envelope confirm (P0). In hash mode in-data hints never confirm. */
+function isConfirmed(row, { hashMode } = {}) {
+  if (resolveHashMode(hashMode)) return false;
   const env = envelopeOf(row);
   if (env.confirmed === true) return true;
   if (env.confirmed_by) return true;
@@ -201,8 +239,12 @@ function isPackService(row) {
  * this tenant has no rows, so each missing path still uses the heuristic.
  * @param {Array<{ field_path?: string, source?: string }>|null|undefined} rows
  */
-function indexFieldMeta(rows) {
-  if (!Array.isArray(rows)) return null;
+function indexFieldMeta(rows, { hashMode } = {}) {
+  if (!Array.isArray(rows)) {
+    // Hash mode with no table loaded: every path is unconfirmed, so carry the
+    // mode on an empty index instead of returning null (null = P0 heuristic).
+    return hashMode === true ? { loaded: false, hashMode: true, byPath: {} } : null;
+  }
   const byPath = {};
   for (const row of rows) {
     const path = String(row?.field_path || row?.fieldPath || '').trim();
@@ -213,8 +255,19 @@ function indexFieldMeta(rows) {
       confirmed_at: row.confirmed_at || row.confirmedAt || null,
       confirmed_by: row.confirmed_by || row.confirmedBy || null,
     };
+    // GIGO P2 freshness. Kept only when the select returned them, so the
+    // shape is unchanged for callers that load the P0 columns only.
+    const verified = row.last_verified_at || row.lastVerifiedAt;
+    if (verified) byPath[path].last_verified_at = verified;
+    const staleDays = Number(row.stale_after_days ?? row.staleAfterDays);
+    if (Number.isFinite(staleDays) && staleDays > 0) byPath[path].stale_after_days = staleDays;
+    // Confirm v2. Read only in hash mode; a row without it is unconfirmed there.
+    const hash = String(row.value_hash || row.valueHash || '').trim().toLowerCase();
+    if (hash) byPath[path].value_hash = hash;
   }
-  return { loaded: true, byPath };
+  const out = { loaded: true, byPath };
+  if (typeof hashMode === 'boolean') out.hashMode = hashMode;
+  return out;
 }
 
 function lookupFieldMeta(fieldMeta, fieldPath) {
@@ -231,8 +284,10 @@ function productFieldPath(row, index) {
   return `catalog.product.${sku || String(index + 1)}.name`;
 }
 
-function serviceFieldPath(index) {
-  return `catalog.service.${index + 1}.name`;
+/** Stable id (non-numeric) when the row has one, else the 1-based position. */
+function serviceFieldPath(index, row = null) {
+  const id = stableRowId(row);
+  return `catalog.service.${id || String(index + 1)}.name`;
 }
 
 function faqFieldPath(index) {
@@ -244,8 +299,21 @@ function faqFieldPath(index) {
  * fact is only owner or an explicit confirm. seed and call_suggested are never fact.
  * A tenant_field_meta row for fieldPath replaces the pack-text guess.
  */
-function classifyRecord(row, { packSeed = false, fieldMeta = null, fieldPath = '' } = {}) {
+function classifyRecord(row, { packSeed = false, fieldMeta = null, fieldPath = '', value, hashMode } = {}) {
   const meta = lookupFieldMeta(fieldMeta, fieldPath);
+  if (resolveHashMode(hashMode, fieldMeta)) {
+    if (!meta) return { source: '', confirmed: false, fact: false, status: 'suggested', hashCheck: 'no_row' };
+    const hash = meta.value_hash || null;
+    const matches =
+      meta.source === 'owner' && Boolean(hash) && value !== undefined && hash === hashFactValue(value);
+    const hashCheck = !hash ? 'missing' : matches ? 'match' : 'mismatch';
+    let status = 'suggested';
+    if (matches) {
+      const raw = String(envelopeOf(row).status || '').trim().toLowerCase();
+      status = raw === 'golden' ? 'golden' : 'confirmed';
+    }
+    return { source: meta.source, confirmed: matches, fact: matches, status, hashCheck };
+  }
   let working = row;
   let seed = packSeed;
   if (meta) {
@@ -259,7 +327,7 @@ function classifyRecord(row, { packSeed = false, fieldMeta = null, fieldPath = '
     };
     seed = false;
   }
-  const confirmed = isConfirmed(working);
+  const confirmed = isConfirmed(working, { hashMode: false });
   let source = readSource(working);
   if (!source && seed) source = 'seed';
   if (!source && confirmed) source = 'owner';
@@ -281,7 +349,7 @@ function classifyFaq(faq, fieldMeta = null, fieldPath = '') {
   const question = String(faq?.question || '').trim();
   const answer = String(faq?.answer || '').trim();
   const packSeed = isPackFaq(question, answer);
-  const row = classifyRecord(faq, { packSeed, fieldMeta, fieldPath });
+  const row = classifyRecord(faq, { packSeed, fieldMeta, fieldPath, value: faqFactValue(faq) });
   return { ...row, question, answer };
 }
 
@@ -293,7 +361,7 @@ function classifyPolicyValue(text, meta, fieldMeta = null, fieldPath = '') {
     ? meta
     : { source: packSeed ? 'seed' : '' };
   return {
-    ...classifyRecord(base, { packSeed, fieldMeta, fieldPath }),
+    ...classifyRecord(base, { packSeed, fieldMeta, fieldPath, value: text }),
     empty: false,
     text: value,
   };
@@ -360,7 +428,15 @@ function factPolicyMap(policies, fieldMeta = null) {
     else unknown.push(label);
   }
   const coverage = readCoverageAreas(obj);
-  if (coverage) out.coverage_areas = coverage;
+  if (coverage && confirmedCoverageEnabled()) {
+    // BRAIN_CONFIRMED_COVERAGE: only an owner-confirmed list reaches the prompt.
+    const scoped = { businessPolicies: obj, fieldMeta };
+    const confirmed = coverage.length
+      ? confirmedCoverageReading(scoped).confirmed
+      : coverageOwnerRowConfirms(scoped); // owner confirmed "no areas listed"
+    if (confirmed) out.coverage_areas = coverage;
+    else unknown.push('Areas we serve');
+  } else if (coverage) out.coverage_areas = coverage;
   for (const [key, raw] of Object.entries(obj)) {
     if (Object.prototype.hasOwnProperty.call(POLICY_TOPICS, key) || isPolicyMetaKey(key)) continue;
     if (typeof raw !== 'string' && typeof raw !== 'number') continue;
@@ -385,6 +461,7 @@ function holdRulesAllow(policies, fieldMeta = null) {
       packSeed: false,
       fieldMeta,
       fieldPath: 'policies.holds',
+      value: holdsFactValue(obj),
     });
     if (allowed === 'no' || allowed === 'false') return false;
     if ((allowed === 'yes' || allowed === 'true') && row.fact) return true;
@@ -404,6 +481,7 @@ function factProducts(raw, fieldMeta = null) {
       packSeed: false,
       fieldMeta,
       fieldPath: productFieldPath(row, index),
+      value: catalogRowFactValue(row),
     }).fact;
   });
 }
@@ -415,7 +493,8 @@ function factServices(raw, fieldMeta = null) {
     return classifyRecord(row, {
       packSeed: isPackService(row),
       fieldMeta,
-      fieldPath: serviceFieldPath(index),
+      fieldPath: serviceFieldPath(index, row),
+      value: catalogRowFactValue(row),
     }).fact;
   });
 }
@@ -491,7 +570,9 @@ function buildCompileSections({
   businessPolicies = null,
   fieldMeta = null,
   holdGate = null,
+  hashMode = undefined,
 } = {}) {
+  fieldMeta = withHashMode(fieldMeta, hashMode);
   const faqRows = asArray(faqs)
     .map((faq, index) => classifyFaq(faq, fieldMeta, faqFieldPath(index)))
     .filter((row) => row.question && row.answer);
@@ -649,13 +730,27 @@ async function loadProvenanceEnvelope(tenantId) {
   return { fieldMeta, holdGate };
 }
 
+const factHash = require('./factHash');
+
 module.exports = {
+  resolveHashMode,
+  withHashMode,
+  isConfirmed,
+  hashFactValue: factHash.hashFactValue,
+  canonicalFactJson: factHash.canonicalFactJson,
+  factValueForPath: factHash.factValueForPath,
+  tenantRowFromProfile: factHash.tenantRowFromProfile,
+  faqFieldPath,
   PACK_POLICY_TEXTS,
   policyKeyLabel,
   isPolicyMetaKey,
   PACK_FAQ_PAIRS,
   norm,
   indexFieldMeta,
+  lookupFieldMeta,
+  productFieldPath,
+  serviceFieldPath,
+  policyMeta,
   loadProvenanceEnvelope,
   classifyRecord,
   classifyFaq,

@@ -1,6 +1,7 @@
 // Normalize tenant business_policies for live ground truth.
 
 const { formatCoverageList, parseCoverageAreas } = require('./coverageAreas');
+const { confirmedCoverageEnabled, confirmedCoveragePromptRule } = require('./confirmedCoverage');
 
 const POLICY_LABELS = {
   payment: 'Payment',
@@ -93,6 +94,7 @@ function formatPoliciesBlock(policies) {
     anyContent = true;
     lines.push(`- ${label}: ${text}`);
   }
+  const gate = confirmedCoverageEnabled();
   if (Array.isArray(p.coverage_areas)) {
     lines.push(
       `- Coverage: ${formatCoverageList(p.coverage_areas) || '(none listed)'}`
@@ -100,10 +102,16 @@ function formatPoliciesBlock(policies) {
     lines.push(
       'COVERAGE RULE: The Coverage line is the only service area. A county on it covers every town in that county. Delivery text is timing and other instructions.'
     );
+    if (gate) lines.push(confirmedCoveragePromptRule(true));
+  } else if (gate) {
+    // BRAIN_CONFIRMED_COVERAGE: factPolicyMap left an unconfirmed list out.
+    lines.push('- Coverage: (not confirmed by the owner)');
+    lines.push(confirmedCoveragePromptRule(false));
   }
   if (!anyContent && !Array.isArray(p.coverage_areas)) {
     return [
       '(no policy text on file)',
+      ...(gate ? ['- Coverage: (not confirmed by the owner)', confirmedCoveragePromptRule(false)] : []),
       'POLICY RULE: For any policy ask (returns, refunds, payment, etc.), say you do not have that detail. Offer to save a note ONLY if the caller asks. Never invent policy wording. Never force name/reason capture.',
     ].join('\n');
   }
