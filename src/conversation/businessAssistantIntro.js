@@ -11,6 +11,9 @@
  * 7. Never speak a default shop name ("the business").
  */
 
+// Retired 2026-10-09 (Alvin): no business speaks a language invite on first
+// audio. Language is matched after the caller speaks. Kept only so guards and
+// tests can assert it is never spoken; FORBIDDEN_FIRST_OPEN rejects it.
 const LANGUAGE_INVITE = 'You can speak in English or Kiswahili.';
 
 const FORBIDDEN_FIRST_OPEN =
@@ -236,16 +239,6 @@ function composeOpenerIdentity(opts = {}) {
  * }} opts
  * @returns {string}
  */
-function wantsLanguageInvite(opts = {}) {
-  if (opts.requireLanguageInvite === true) return true;
-  const vertical = String(opts.vertical || '').trim().toLowerCase();
-  return vertical === 'home_services' || vertical === 'homeservices' || vertical === 'home_service';
-}
-
-function languageInviteClause(opts = {}) {
-  return wantsLanguageInvite(opts) ? `${LANGUAGE_INVITE} ` : '';
-}
-
 function composeBusinessAssistantIntro(opts = {}) {
   const afterHoursMode =
     String(opts.afterHoursMode || 'serve').trim().toLowerCase() === 'message'
@@ -254,7 +247,6 @@ function composeBusinessAssistantIntro(opts = {}) {
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
   const identity = composeOpenerIdentity(opts);
-  const invite = languageInviteClause(opts);
   const help = greetingHelpLine(opts);
   const fileName = String(opts.callerFileName || opts.fileOwnerName || '').trim();
   const nameAsk =
@@ -264,22 +256,22 @@ function composeBusinessAssistantIntro(opts = {}) {
 
   if (closureNotice) {
     const follow = afterHoursMode === 'message' ? nameAsk : help;
-    return `${identity} ${invite}${closureNotice} ${follow}`;
+    return `${identity} ${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === 'message') {
-    return `${identity} ${invite}We're closed now. ${nameAsk}`;
+    return `${identity} We're closed now. ${nameAsk}`;
   }
 
   if (closed) {
-    return `${identity} ${invite}We're closed now. ${help}`;
+    return `${identity} We're closed now. ${help}`;
   }
 
   if (afterHoursMode === 'message') {
-    return `${identity} ${invite}I can take a message. ${nameAsk}`;
+    return `${identity} I can take a message. ${nameAsk}`;
   }
 
-  return `${identity} ${invite}${help}`;
+  return `${identity} ${help}`;
 }
 
 /**
@@ -299,12 +291,7 @@ function introLooksValid(line, businessName, agentName, opts = {}) {
     .replace(/\s+/g, ' ')
     .trim();
   if (!text || text.length > 220) return false;
-  const requireInvite = wantsLanguageInvite(opts);
-  if (requireInvite) {
-    if (!/\byou can speak in english or kiswahili\b/i.test(text)) return false;
-  } else if (FORBIDDEN_FIRST_OPEN.test(text)) {
-    return false;
-  }
+  if (FORBIDDEN_FIRST_OPEN.test(text)) return false;
   const spoken = spokenShopLabel(opts);
   const name = spoken || String(businessName || '').trim();
   if (name && !/^the business$/i.test(name)) {
@@ -354,7 +341,6 @@ module.exports = {
   eatTimeOfDay,
   LANGUAGE_INVITE,
   FORBIDDEN_FIRST_OPEN,
-  wantsLanguageInvite,
   summarizeOfferingForIntro,
   composeOpenerIdentity,
   composeBusinessAssistantIntro,
