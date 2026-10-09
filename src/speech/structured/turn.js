@@ -15,6 +15,7 @@
 const { extractGeminiText, extractThoughtSignature } = require('../../conversation/geminiVoice');
 const { createStructuredStreamReader, parseStructured } = require('./jsonStream');
 const { verifySay, dataLineFor } = require('./verify');
+const { rewriteCrossLanguageFillers } = require('./crossLanguageFiller');
 const { noteSpokenLine } = require('./fileGuard');
 const { getLanguagePack } = require('./languages');
 const { MAX_SAY, TOOL_NAMES } = require('./schema');
@@ -161,6 +162,21 @@ async function runStructuredTurn(opts) {
         problems.push({ attempt, code: 'over_max_say', detail: `say item ${index + 1}`, sentence: text });
         transforms.push({ name: 'structured_verify', reason: 'over_max_say', before: text, after: '', dropped: true });
         return true;
+      }
+      // A cross-language filler ("Okay, Sawa." under an English lock) is
+      // rewritten or dropped in place; the turn is not regenerated.
+      const filler = rewriteCrossLanguageFillers(text, locked);
+      if (filler.changed) {
+        transforms.push({
+          name: 'structured_lock',
+          reason: 'cross_language_filler',
+          before: text,
+          after: filler.text,
+          dropped: !filler.text,
+          words: filler.words,
+        });
+        if (!filler.text) return true;
+        text = filler.text;
       }
       const checked = verifySay(text, verifyCtx(factsUsed));
       let line = text;

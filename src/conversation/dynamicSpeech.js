@@ -8,7 +8,6 @@ const {
   greetingHelpLine,
   spokenShopLabel,
   introLooksValid,
-  LANGUAGE_INVITE,
 } = require('./businessAssistantIntro');
 const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
@@ -44,7 +43,6 @@ function fallbackGreeting(businessName, opts = {}) {
     greetingInvite: opts.greetingInvite,
     agentName: opts.agentName,
     vertical: opts.vertical,
-    requireLanguageInvite: opts.requireLanguageInvite,
     offeringLine: opts.offeringLine,
     servicesCatalog: opts.servicesCatalog,
     servicesOffered: opts.servicesOffered || opts.servicesNotes,
@@ -156,11 +154,7 @@ You MUST include your name ${agentName}.
 Do not add a joke. Do not pretend to be the owner.
 Do not use IVR lines like "you've reached" or "thank you for calling".
 Do not list services or prices in the greeting. Grounded offerings wait until they ask.
-${
-    vertical === 'home_services'
-      ? `You MUST include this exact sentence before the closing question: "${LANGUAGE_INVITE}"`
-      : 'Do not say they can speak in English or Kiswahili. Language match happens after they speak.'
-  }
+Do not say they can speak in English or Kiswahili. Language match happens after they speak.
 It is ${tod} in Nairobi. ${openLine}
 Use clear English for this first greeting (the caller has not spoken yet. Do not open with Habari).
 No quotes, no markdown, never say "the business" as a placeholder.
