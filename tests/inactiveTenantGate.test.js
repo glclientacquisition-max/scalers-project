@@ -14,6 +14,10 @@ const {
   sameNumber,
   tenantLineState,
   lineUnavailableXml,
+  lineUnavailableResponse,
+  usableClipUrl,
+  allowedPlayHosts,
+  resetClipProbeCache,
 } = require('../src/sautikit/inactiveTenantGate');
 
 const SERVER = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
@@ -101,6 +105,109 @@ describe('lineUnavailableXml', () => {
   });
 });
 
+describe('clip fallback: <Say> unless the clip is allowed and fetchable', () => {
+  const EN = 'https://storage.sautikit.com/ws/line-en.wav?X-Amz-Signature=secret';
+  const SW = 'https://storage.sautikit.com/ws/line-sw.wav?X-Amz-Signature=secret';
+  const SAY_EN = `<Say language="en-US">${LINE_UNAVAILABLE_EN}</Say>`;
+  const SAY_SW = `<Say language="sw-KE">${LINE_UNAVAILABLE_SW}</Say>`;
+  const audio = (status = 206, type = 'audio/wav') => ({ status, headers: { get: () => type }, body: null });
+  function fakeFetch(handler) {
+    const calls = [];
+    const fn = async (url, init) => {
+      calls.push({ url, init });
+      return handler(url, init);
+    };
+    fn.calls = calls;
+    return fn;
+  }
+  const quiet = () => {};
+
+  it('unset vars: <Say> both, no network', async () => {
+    resetClipProbeCache();
+    const f = fakeFetch(() => audio());
+    const xml = await lineUnavailableResponse({ env: {}, fetchImpl: f, log: quiet });
+    assert.ok(xml.includes(SAY_EN + SAY_SW + '<Hangup/>'));
+    assert.equal(f.calls.length, 0);
+  });
+
+  it('fetchable clips on an allowed host: <Play> both; probe is a ranged GET with a timeout signal', async () => {
+    resetClipProbeCache();
+    const f = fakeFetch(() => audio());
+    const env = { VOICE_LINE_UNAVAILABLE_CLIP_URL_EN: EN, VOICE_LINE_UNAVAILABLE_CLIP_URL_SW: SW };
+    const xml = await lineUnavailableResponse({ env, fetchImpl: f, log: quiet });
+    assert.match(xml, /<Response><Play>https:\/\/storage\.sautikit\.com\/ws\/line-en\.wav\?X-Amz-Signature=secret<\/Play><Play>https:\/\/storage\.sautikit\.com\/ws\/line-sw\.wav/);
+    assert.match(xml, /<Hangup\/><\/Response>$/);
+    assert.equal(f.calls.length, 2);
+    assert.equal(f.calls[0].init.method, 'GET');
+    assert.equal(f.calls[0].init.headers.Range, 'bytes=0-0');
+    assert.ok(f.calls[0].init.signal);
+  });
+
+  it('host not allowed: <Say> without probing; VOICE_PLAY_ALLOWED_HOSTS opts a host in', async () => {
+    resetClipProbeCache();
+    const f = fakeFetch(() => audio(200, 'audio/mpeg'));
+    const url = 'https://www.scalers.co.ke/audio/downtime-en.v1.wav';
+    const logs = [];
+    assert.equal(await usableClipUrl(url, { env: {}, fetchImpl: f, log: (m) => logs.push(m) }), '');
+    assert.equal(f.calls.length, 0);
+    assert.match(logs[0], /www\.scalers\.co\.ke not in VOICE_PLAY_ALLOWED_HOSTS/);
+    assert.deepEqual(allowedPlayHosts({}), ['storage.sautikit.com']);
+    const env = { VOICE_PLAY_ALLOWED_HOSTS: 'storage.sautikit.com, WWW.Scalers.co.ke' };
+    assert.equal(await usableClipUrl(url, { env, fetchImpl: f, log: quiet }), url);
+  });
+
+  it('404, expired link (403), HTML page, network error or timeout: that language falls back to <Say>', async () => {
+    const cases = [
+      [() => audio(404, 'text/plain'), 'status_404'],
+      [() => audio(403, 'application/xml'), 'status_403'],
+      [() => audio(200, 'text/html; charset=utf-8'), 'not_audio'],
+      [() => { throw new Error('ECONNRESET'); }, 'fetch_error'],
+      [(u, init) => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted')))), 'timeout'],
+    ];
+    for (const [handler, why] of cases) {
+      resetClipProbeCache();
+      const logs = [];
+      const env = { VOICE_LINE_UNAVAILABLE_CLIP_URL_EN: EN, VOICE_LINE_UNAVAILABLE_CLIP_URL_SW: SW };
+      const f = fakeFetch((u, init) => (u === EN ? handler(u, init) : audio()));
+      const xml = await lineUnavailableResponse({ env, fetchImpl: f, timeoutMs: 20, log: (m) => logs.push(m) });
+      assert.ok(xml.includes(SAY_EN + '<Play>'), why);
+      assert.match(xml, /line-sw\.wav[^<]*<\/Play><Hangup\/>/, why);
+      assert.ok(logs.some((m) => m.includes(`(${why})`)), `${why}: ${logs}`);
+      assert.ok(logs.every((m) => !m.includes('Signature') && !m.includes('/ws/')), 'logs show the host only');
+    }
+  });
+
+  it('caches the probe per URL: ok for 10 min, failure for 1 min', async () => {
+    resetClipProbeCache();
+    let t = 1_000_000;
+    const now = () => t;
+    let healthy = false;
+    const f = fakeFetch(() => (healthy ? audio() : audio(503, 'text/plain')));
+    const opts = { env: {}, fetchImpl: f, now, log: quiet };
+    assert.equal(await usableClipUrl(EN, opts), '');
+    healthy = true;
+    t += 30_000;
+    assert.equal(await usableClipUrl(EN, opts), '', 'failure still cached');
+    assert.equal(f.calls.length, 1);
+    t += 31_000;
+    assert.equal(await usableClipUrl(EN, opts), EN, 'retried after a minute');
+    healthy = false;
+    t += 9 * 60_000;
+    assert.equal(await usableClipUrl(EN, opts), EN, 'ok cached for ten minutes');
+    assert.equal(f.calls.length, 2);
+    t += 61_000;
+    assert.equal(await usableClipUrl(EN, opts), '');
+    assert.equal(f.calls.length, 3);
+  });
+
+  it('no fetch available: <Say>, never throws', async () => {
+    resetClipProbeCache();
+    const env = { VOICE_LINE_UNAVAILABLE_CLIP_URL_EN: EN };
+    const xml = await lineUnavailableResponse({ env, fetchImpl: 'nope', log: quiet });
+    assert.ok(xml.includes(SAY_EN + SAY_SW));
+  });
+});
+
 describe('db.inboundTenantLine', () => {
   it('closed for an archived or suspended owner of the dialled number', async () => {
     failWith = null;
@@ -148,7 +255,7 @@ describe('server wiring: the gate runs before Stream, the call row and minutes',
     assert.ok(reject < line && line < pkg && pkg < row && row < stream);
   });
   it('a closed line returns the line-unavailable XML and nothing else runs', () => {
-    assert.match(body, /if \(line && line\.closed === true\) \{[\s\S]{0,200}return res\.type\('text\/xml'\)\.send\(lineUnavailableXml\(\)\);/);
+    assert.match(body, /if \(line && line\.closed === true\) \{[\s\S]{0,200}return res\.type\('text\/xml'\)\.send\(await lineUnavailableResponse\(\)\);/);
     // A failed check answers (fail open), it does not throw out of the handler.
     assert.match(body, /catch \(lineErr\) \{\s*console\.warn\('\[voice\/incoming\] tenant line check failed \(answering\):/);
   });
