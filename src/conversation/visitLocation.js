@@ -597,6 +597,10 @@ function coverageAskPlace(text) {
   }
   if (!placeWords(place).length) return '';
   if (isNoisePlace(place)) return '';
+  // BRAIN_CALL_FIXES_D199 (c): only a real place name runs the coverage check.
+  // "What about the mansion one?" is a file row, not a place (HD_d199 t4).
+  const fixes = require('./callFixesD199');
+  if (fixes.callFixesD199Enabled() && !fixes.coverageRealPlace(place)) return '';
   return place;
 }
 

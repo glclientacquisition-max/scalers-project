@@ -597,6 +597,26 @@ function observeCallerTurn(state, input = {}) {
     );
     if (askedRows) next.conversation.speakFileRead = true;
   }
+  const fixesD199 = require('./callFixesD199');
+  if (fixesD199.callFixesD199Enabled()) {
+    // BRAIN_CALL_FIXES_D199 (a): the caller is moving a visit already on file
+    // ("Siache tuieke ikuwe kesho"). A create in this state moves that row.
+    const fileVisits = (next.returning?.openRows || []).some((row) => row.kind === 'visit');
+    if (fixesD199.looksLikeNewJobAsk(text)) next.conversation.rescheduleAsked = false;
+    else if (
+      fileVisits &&
+      (fixesD199.looksLikeRescheduleAsk(text) || looksLikeCancelOrReschedule(text))
+    ) {
+      next.conversation.rescheduleAsked = true;
+    }
+    // (e) "Tulifika wapi na ile mambo yetu ya jana?" asks for the file.
+    if (!Boolean(state?.caller?.nameConfirmed) && next.caller.nameConfirmed) {
+      const prior = (next.conversation.answersReceived || []).slice(0, -1);
+      if (prior.some((row) => fixesD199.looksLikeFileCatchUp(row))) {
+        next.conversation.speakFileRead = true;
+      }
+    }
+  }
   next.conversation.fileReadSentence =
     spokenFileRead({
       text,
@@ -981,10 +1001,20 @@ function recordActionResults(state, results = []) {
               result.value.service_name ||
               result.value.service ||
               null,
+            // BRAIN_CALL_FIXES_D199 (e): the place, for "what have you saved?".
+            ...(require('./callFixesD199').callFixesD199Enabled()
+              ? {
+                  landmark: result.value.landmark || result.value.location || null,
+                  windowStart: result.value.windowStart || null,
+                  appointmentId: result.value.appointmentId || null,
+                }
+              : {}),
           },
         }
       : {}),
     ...(result.soft ? { soft: true } : {}),
+    ...(result.movedFiledVisit ? { movedFiledVisit: true } : {}),
+    ...(result.id && require('./callFixesD199').callFixesD199Enabled() ? { id: String(result.id) } : {}),
   }));
   if (!Array.isArray(next.actions.refusedHours)) next.actions.refusedHours = [];
   if (!Array.isArray(next.actions.refusedPlaces)) next.actions.refusedPlaces = [];

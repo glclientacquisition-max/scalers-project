@@ -163,7 +163,52 @@ function buildCallerMemoryCard({
     standing: standing || null,
     language: language || null,
     personProfiles,
+    ...(require('./callFixesD199').callFixesD199Enabled()
+      ? { openRows: structuredOpenRows(lived.open, requestSplit.open) }
+      : {}),
   };
+}
+
+/**
+ * BRAIN_CALL_FIXES_D199: open visits and open requests/holds with ids and
+ * created_at, so code can answer "when did I request that?", read requests
+ * with visits, and move the visit a reschedule names.
+ */
+function structuredOpenRows(openVisits = [], openRequests = []) {
+  const rows = [];
+  for (const item of openVisits) {
+    const row = item?.row || {};
+    const job = clip(row.service_name || row.serviceName, 48);
+    if (!job) continue;
+    rows.push({
+      id: row.id || null,
+      kind: 'visit',
+      type: 'visit',
+      job,
+      when: fullWhen(row.when_text || row.whenText) || '',
+      place: clip(row.address_landmark || row.addressLandmark || row.landmark, 48) || '',
+      windowStart: row.window_start || row.windowStart || null,
+      status: clip(row.status, 16) || '',
+      createdAt: row.created_at || row.createdAt || null,
+      past: Boolean(item?.lived?.past),
+    });
+  }
+  for (const row of openRequests) {
+    const job = clip(row?.item, 48);
+    if (!job) continue;
+    rows.push({
+      id: row.id || null,
+      kind: 'request',
+      type: clip(row.request_type || row.type, 16) || 'enquiry',
+      job,
+      when: clip(row.when_text || row.whenText, 32) || '',
+      place: '',
+      status: 'open',
+      createdAt: row.created_at || row.createdAt || null,
+      past: false,
+    });
+  }
+  return rows;
 }
 
 function clipLang(raw) {
@@ -767,6 +812,7 @@ function returningFileFromCard(card) {
     nextVisitStatus: usable ? card.nextVisitStatus || null : null,
     nextVisitLandmark: usable ? card.nextVisitLandmark || null : null,
     openRequests: usable && Array.isArray(card.openRequests) ? card.openRequests : [],
+    ...(Array.isArray(card.openRows) ? { openRows: usable ? card.openRows : [] } : {}),
     recentBookings: usable && Array.isArray(card.recentBookings) ? card.recentBookings : [],
     place: identityBound ? card.place || null : null,
     usualJob: identityBound ? card.usualJob || null : null,

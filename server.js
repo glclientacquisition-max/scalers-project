@@ -174,6 +174,7 @@ const { logBrainTrace } = require('./src/conversation/brainObservability');
 const {
   executeBrainTools,
   formatToolConfirmation,
+  brainLinesForResults,
 } = require('./src/conversation/toolExecution');
 const { deriveCallResolution } = require('./src/conversation/callResolution');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
@@ -3378,6 +3379,9 @@ mediaWss.on('connection', (ws, req) => {
         openVisits: brainState?.returning?.openVisits,
         appointments: visitAppointments,
         cursor: brainState?.conversation?.visitReview || null,
+        // BRAIN_CALL_FIXES_D199: requests with visits; code file answers.
+        openRequests: brainState?.returning?.openRequests,
+        fileState: brainState,
       });
       if (visitRead.runModel === false && visitRead.line) {
         if (!brainState.conversation || typeof brainState.conversation !== 'object') {
@@ -3386,6 +3390,7 @@ mediaWss.on('connection', (ws, req) => {
         brainState.conversation.visitReview = visitRead.cursor;
         callBrainStates.set(callKey, brainState);
         console.log(`[ws/media][${callKey}] visit read before model: ${visitRead.line}`);
+        if (Array.isArray(visitRead.lines)) voiceTrace.noteBrainLines(visitRead.lines);
         bargeInActive = false;
         suppressReplyRemainder = false;
         callTranscript.pushAgent(visitRead.line);
@@ -4027,6 +4032,10 @@ mediaWss.on('connection', (ws, req) => {
 
       if (result?.actionConfirmation && !bargeInActive) {
         const confirmation = String(result.actionConfirmation).trim();
+        // BRAIN_CALL_FIXES_D199: the fact lines behind this confirmation.
+        if (Array.isArray(result?.brainLines) && result.brainLines.length) {
+          voiceTrace.noteBrainLines(result.brainLines);
+        }
         const lookupSpoken = spokenChunks.join(' ').trim();
         // The lookup sentence is already on the stream. Do not speakText it.
         const alreadySaid =
@@ -5581,6 +5590,9 @@ wss.on('connection', (ws) => {
           openVisits: brainState?.returning?.openVisits,
           appointments: promptAppointments,
           cursor: brainState?.conversation?.visitReview || null,
+          // BRAIN_CALL_FIXES_D199: requests with visits; code file answers.
+          openRequests: brainState?.returning?.openRequests,
+          fileState: brainState,
         });
         if (promptVisitRead.runModel === false && promptVisitRead.line) {
           if (!brainState.conversation || typeof brainState.conversation !== 'object') {
@@ -6191,6 +6203,11 @@ async function runGeminiTurnStreaming(
   // the caller is still owed it on the next one (toolOutcomeQueue).
   const bargedActionConfirmation = heldTools.toolHoldCancelled ? actionConfirmation : '';
   if (heldTools.toolHoldCancelled) actionConfirmation = '';
+  // BRAIN_CALL_FIXES_D199: fact lines behind the confirmation (trace brain.lines[]).
+  const brainLines = brainLinesForResults(
+    execution.results,
+    callBrainStates.get(callSid)?.language?.current || 'en'
+  ).lines;
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({
@@ -6221,6 +6238,7 @@ async function runGeminiTurnStreaming(
     model,
     actionConfirmation,
     bargedActionConfirmation,
+    brainLines,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
     streamed: !streamFailed,
@@ -6307,6 +6325,11 @@ async function runGeminiTurn(
   // the caller is still owed it on the next one (toolOutcomeQueue).
   const bargedActionConfirmation = heldTools.toolHoldCancelled ? actionConfirmation : '';
   if (heldTools.toolHoldCancelled) actionConfirmation = '';
+  // BRAIN_CALL_FIXES_D199: fact lines behind the confirmation (trace brain.lines[]).
+  const brainLines = brainLinesForResults(
+    execution.results,
+    callBrainStates.get(callSid)?.language?.current || 'en'
+  ).lines;
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({
@@ -6338,6 +6361,7 @@ async function runGeminiTurn(
     model,
     actionConfirmation,
     bargedActionConfirmation,
+    brainLines,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
   };

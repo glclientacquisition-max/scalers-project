@@ -977,6 +977,13 @@ async function executeBrainTools({
                 status: 'succeeded',
                 fingerprint,
                 id: updated.id || null,
+                // BRAIN_CALL_FIXES_D199: move_ok only for the filed visit the
+                // reschedule named (docs/specs/fact-lines.md).
+                ...(parsed.rescheduledFrom &&
+                validation.value.appointmentId === parsed.rescheduledFrom &&
+                require('./callFixesD199').callFixesD199Enabled()
+                  ? { movedFiledVisit: true }
+                  : {}),
                 appointmentStatus: updated.status || validation.value.status,
                 value: validation.value,
                 hours: validation.hours || null,
@@ -1207,6 +1214,17 @@ function toolOutcomeLine(results = [], language = 'en') {
   return sw ? 'Sawa.' : 'Okay.';
 }
 
+/**
+ * BRAIN_CALL_FIXES_D199: fact lines for tool results (move_ok / visit_updated),
+ * rendered. { line, lines } — lines go on the trace as brain.lines[].
+ */
+function brainLinesForResults(results = [], language = 'en') {
+  const fixes = require('./callFixesD199');
+  if (!fixes.callFixesD199Enabled()) return { line: '', lines: [] };
+  const { renderLines } = require('./factLine');
+  return renderLines(fixes.updateResultLines(results, confirmationLanguage(language)));
+}
+
 function formatToolConfirmation(results = [], language = 'en') {
   const meaningful = results.find((result) =>
     [
@@ -1299,6 +1317,10 @@ function formatToolConfirmation(results = [], language = 'en') {
   if (meaningful.action === 'update_appointment') {
     if (meaningful.status === 'succeeded') {
       const st = String(meaningful.appointmentStatus || '').toLowerCase();
+      if (st !== 'cancelled' && require('./callFixesD199').callFixesD199Enabled()) {
+        const spoken = brainLinesForResults([meaningful], language).line;
+        if (spoken) return spoken;
+      }
       if (st === 'cancelled') {
         if (sw) return 'Sawa, nimeghairi ziara hiyo.';
         if (sheng) return 'Poa, nime-cancel hiyo visit.';
@@ -1437,6 +1459,7 @@ module.exports = {
   validateUpdateAppointment,
   executeBrainTools,
   formatToolConfirmation,
+  brainLinesForResults,
   toolOutcomeLine,
   formatVisitTimeProblem,
 };

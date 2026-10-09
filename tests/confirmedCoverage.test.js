@@ -246,7 +246,12 @@ describe('flag on, owner-confirmed list', () => {
     assert.match(coverageAskSpeech('Do you cover Nakuru?', CONFIRMED, 'en'), /outside our coverage/);
     // Text that is not a place gets the no-claim unsure line, not "confirm shops".
     const shops = coverageAskSpeech('Do you cover the shops?', CONFIRMED, 'en');
-    assert.match(shops, /not sure we cover that area/);
+    if (process.env.BRAIN_CALL_FIXES_D199 === 'on') {
+      // BRAIN_CALL_FIXES_D199 (c): not a real place, so no coverage packet at all.
+      assert.equal(shops, '');
+    } else {
+      assert.match(shops, /not sure we cover that area/);
+    }
     assert.doesNotMatch(shops, /confirm shops|we cover the shops/i);
     assert.match(buildLiveGroundTruth(CONFIRMED), /- Coverage: Nairobi, Kitengela, Kiambu, Juja, Ongata Rongai, Syokimau/);
     assert.equal(guard('Yes, we cover Syokimau.', 'Do you cover Syokimau?', 'en', CONFIRMED), 'Yes, we cover Syokimau.');

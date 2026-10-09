@@ -757,7 +757,9 @@ describe('HD_e3fb94e1bd0d prices, offer consent, and Nakuru', () => {
     assert.match(unsure, /Should I note it for the team\?/);
     assert.doesNotMatch(unsure, /don't have our coverage list/i);
     const shops = coverageAskSpeech('Do you cover the shops?', DUSTED, 'en');
-    assert.match(shops, /not sure we cover that area/);
+    // BRAIN_CALL_FIXES_D199 (c): not a real place, so no coverage packet at all.
+    if (process.env.BRAIN_CALL_FIXES_D199 === 'on') assert.equal(shops, '');
+    else assert.match(shops, /not sure we cover that area/);
     assert.doesNotMatch(shops, /don't have our coverage list/i);
     const spoken = guardSpokenReply(
       'Nakuru iko nje ya area yetu ya huduma kwani tunafanya Nairobi na maeneo ya karibu pekee.',

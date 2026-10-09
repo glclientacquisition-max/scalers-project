@@ -239,7 +239,11 @@ function shouldBlockHomeVisitClassEscalate(state = {}, escalatePayload) {
 }
 
 function guardToolPlan(parsed, state = {}, capabilities = {}) {
-  const next = parsed && typeof parsed === 'object' ? { ...parsed } : {};
+  let next = parsed && typeof parsed === 'object' ? { ...parsed } : {};
+  // BRAIN_CALL_FIXES_D199 (a): a reschedule moves the open visit on file.
+  // Never a second live visit from one reschedule (HD_d199 b140110d + 47362e7b).
+  const fixesD199 = require('./callFixesD199');
+  if (fixesD199.callFixesD199Enabled()) next = fixesD199.rescheduleCreateAsUpdate(next, state);
   if (next.escalate && shouldBlockHomeVisitClassEscalate(state, next.escalate)) {
     delete next.escalate;
     next.visitClassEscalateBlocked = true;
