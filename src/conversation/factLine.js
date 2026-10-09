@@ -9,7 +9,7 @@ const TEMPLATES = {
   visit_open: { required: ['job', 'status'], optional: ['when', 'place'] },
   request_open: { required: ['kind', 'item'], optional: ['when'] },
   requested_at: { required: ['kind', 'job', 'requested_at'], optional: [] },
-  saved_item: { required: ['kind', 'job'], optional: ['when', 'place', 'moved'] },
+  saved_item: { required: ['kind', 'job'], optional: ['when', 'place'] },
   saved_none: { required: [], optional: ['next_visit'] },
   team_will_confirm: { required: [], optional: [] },
   move_ok: { required: ['to_when'], optional: ['job', 'from_when', 'place'] },
@@ -112,7 +112,7 @@ function renderDatetime(slot, lang = 'en', now = new Date()) {
 function renderSlot(key, value, lang, now) {
   if (value && typeof value === 'object' && ('iso' in value || 'text' in value)) {
     const v = voice();
-    const voiced = v && typeof v.renderFact === 'function' ? v.renderFact(value, lang) : null;
+    const voiced = v && typeof v.renderFact === 'function' ? v.renderFact(value, lang, { now }) : null;
     return voiced || renderDatetime(value, lang, now);
   }
   return String(value == null ? '' : value);
@@ -178,7 +178,7 @@ function fallbackLine(line, now = new Date()) {
 function renderLine(line, { now = new Date() } = {}) {
   if (!line) return '';
   const v = voice();
-  const voiced = v && typeof v.renderFactLine === 'function' ? v.renderFactLine(line) : null;
+  const voiced = v && typeof v.renderFactLine === 'function' ? v.renderFactLine(line, { now }) : null;
   return String(voiced || fallbackLine(line, now) || '').trim();
 }
 

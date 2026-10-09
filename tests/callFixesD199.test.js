@@ -2,7 +2,7 @@
 // replayed from the call's traces and the caller file rows at call start.
 // BRAIN_CALL_FIXES_D199=on fixes them; off keeps the old behaviour (pinned here).
 
-const { describe, it } = require('node:test');
+const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 
 const FIXTURE = require('./fixtures/voice-calls/HD_d199dbbf6b79.call.json');
@@ -17,6 +17,14 @@ const { planVisitReadTurn } = require('../src/conversation/openLineSpeech');
 const { guardToolPlan } = require('../src/conversation/requiredCreateRequest');
 const { executeBrainTools, formatToolConfirmation } = require('../src/conversation/toolExecution');
 const { nairobiDateTime, quantityWithUnit } = require('../src/conversation/callFixesD199');
+
+const { setVoiceRendererForTest } = require('../src/conversation/factLine');
+
+// These tests pin Brain's fallback wording (factLine.js). Voice's renderer
+// (src/speech/spokenFacts, #633) wins when it is present, so it is switched
+// off here; the line objects are asserted as well.
+before(() => setVoiceRendererForTest(null));
+after(() => setVoiceRendererForTest(undefined));
 
 const NOW = new Date(FIXTURE.startedAt);
 const TODAY_VISIT = '47362e7b-a0df-44c2-9e3e-6740192a94f1';
@@ -146,10 +154,16 @@ describe('HD_d199dbbf6b79 replay, BRAIN_CALL_FIXES_D199=on', () => {
     withFlag('on', () => {
       assert.equal(coverageAskPlace(turnText(4)), '');
       const { state, profile } = replay(4);
-      assert.notEqual(
-        resolveLocalReply({ text: turnText(4), state, profile, language: 'en' })?.outcome,
-        'coverage'
-      );
+      // The file and hold lookup owns this turn: no local reply (coverage,
+      // place block, fact) runs ahead of it, and the file read answers.
+      assert.equal(resolveLocalReply({ text: turnText(4), state, profile, language: 'en' }), null);
+      assert.equal(fileRead(state, 4).line, 'You have an enquiry for Mansion Cleaning Custom Quote.');
+      // A file row named by a real place is still the file's, not coverage.
+      const kit = 'What about ile ya Kitengela?';
+      assert.equal(coverageAskPlace(kit), 'ile ya Kitengela');
+      assert.match(coverageAskSpeech(kit, profile, 'en'), /\S/);
+      assert.equal(resolveLocalReply({ text: kit, state, profile, language: 'en' }), null);
+      assert.match(fileRead(state, kit).line, /Carpet Cleaning visit request, today, 9 AM, Kitengela/);
       assert.equal(coverageAskSpeech(turnText(4), profile, 'en'), '');
       assert.equal(state.entities.location, undefined);
       // A real place still gets the check.
@@ -245,6 +259,53 @@ describe('HD_d199dbbf6b79 replay, BRAIN_CALL_FIXES_D199=on', () => {
       assert.deepEqual(read.lines.map((l) => l.template), ['saved_item', 'team_will_confirm']);
     }));
 
+  it('(3) t9 save_caller_info "like" does not save the name; Alvin stays', async () =>
+    withFlagAsync('on', async () => {
+      const { state, profile } = replay(9);
+      assert.equal(state.caller.name, 'Alvin');
+      const t9 = FIXTURE.turns.find((t) => t.turn === 9).tools[0];
+      assert.equal(t9.args.name, 'like');
+      const saves = [];
+      const exec = await executeBrainTools({
+        parsed: { name: t9.args.name, reason: t9.args.reason },
+        capabilities: {},
+        heldCallerName: state.caller.name,
+        nameConfirmed: true,
+        now: NOW,
+        handlers: { saveCallerInfo: async (row) => (saves.push(row), { ...row }) },
+      });
+      assert.equal(saves.length, 1);
+      assert.notEqual(saves[0].name, 'like');
+      assert.equal(saves[0].reason, 'Carpet cleaning booking for mansion');
+      const after = recordActionResults(state, exec.results || exec);
+      assert.equal(after.caller.name, 'Alvin');
+      assert.equal(after.entities.name.value, 'Alvin');
+      void profile;
+    }));
+
+  it('(4) a bare hour is asked back in Swahili clock time', () =>
+    withFlag('on', () => {
+      const { timeAskLine } = require('../src/conversation/visitTime');
+      let clock = null;
+      try {
+        clock = require('../src/conversation/swahiliClock');
+      } catch {
+        clock = null;
+      }
+      const line = timeAskLine({ when: 'kesho', pendingHour: 9, language: 'sw' });
+      if (clock) {
+        assert.equal(line, 'Saa tatu asubuhi au saa tatu usiku?');
+        assert.equal(timeAskLine({ when: 'kesho', pendingHour: 2, language: 'sw' }), 'Saa nane usiku au saa nane mchana?');
+      } else {
+        // swahiliClock.js (#633) not on this branch yet: the old line stays.
+        assert.equal(line, 'Saa 9 asubuhi au mchana?');
+      }
+      assert.equal(timeAskLine({ when: 'tomorrow', pendingHour: 9, language: 'en' }), '9 in the morning or in the afternoon?');
+      withFlag(null, () =>
+        assert.equal(timeAskLine({ when: 'kesho', pendingHour: 9, language: 'sw' }), 'Saa 9 asubuhi au mchana?')
+      );
+    }));
+
   it('a new job is never turned into a move', () =>
     withFlag('on', () => {
       const { state } = replay(12);
@@ -268,6 +329,8 @@ describe('HD_d199dbbf6b79 replay, flag off keeps the live behaviour', () => {
       assert.match(card.openVisits[0], /^Carpet Cleaning \| past 9 Oct/);
       assert.equal(card.openRows, undefined);
       assert.equal(coverageAskPlace(turnText(4)), 'mansion one');
+      const off4 = replay(4);
+      assert.equal(resolveLocalReply({ text: turnText(4), state: off4.state, profile: off4.profile, language: 'en' })?.outcome, 'coverage');
       const { state } = replay(12);
       assert.equal(state.caller.name, 'like');
       assert.equal(fileRead(state, 3).runModel, true);
@@ -284,7 +347,7 @@ describe('HD_d199dbbf6b79 replay, flag off keeps the live behaviour', () => {
 });
 
 describe('fact lines (docs/specs/fact-lines.md)', () => {
-  const { factLine, renderLine, setVoiceRendererForTest } = require('../src/conversation/factLine');
+  const { factLine, renderLine } = require('../src/conversation/factLine');
   const { createVoiceTrace } = require('../src/speech/voiceTrace');
 
   it('drops an unknown template or a missing required slot', () => {
@@ -302,7 +365,7 @@ describe('fact lines (docs/specs/fact-lines.md)', () => {
       setVoiceRendererForTest(null);
       assert.equal(renderLine(line), 'I have not saved anything new on this call yet.');
     } finally {
-      setVoiceRendererForTest(undefined);
+      setVoiceRendererForTest(null);
     }
   });
 
@@ -325,5 +388,37 @@ describe('fact lines (docs/specs/fact-lines.md)', () => {
     trace.commitTurn({});
     assert.equal(written[0].brain.lines[0].template, 'requested_at');
     assert.equal(written[0].brain.lines[0].gate.appointment_id, TODAY_VISIT);
+  });
+});
+
+describe("fact lines with Voice's renderer (#633), when it is on the branch", () => {
+  let voice = null;
+  try {
+    voice = require('../src/speech/spokenFacts');
+  } catch {
+    voice = null;
+  }
+  it('every Brain line from the replay renders, and saved_item never says moved', { skip: !voice && 'src/speech/spokenFacts not on this branch' }, async () => {
+    const prevVoice = process.env.VOICE_SPOKEN_FACTS;
+    process.env.VOICE_SPOKEN_FACTS = 'on';
+    setVoiceRendererForTest(undefined);
+    try {
+      await withFlagAsync('on', async () => {
+        const { factLine, renderLine } = require('../src/conversation/factLine');
+        const saved = factLine('saved_item', { kind: 'visit', job: 'Carpet Cleaning', when: { iso: '2026-10-10T06:00:00Z', precision: 'time' }, place: 'Kitengela' }, { lang: 'en' });
+        assert.equal(saved.slots.moved, undefined);
+        assert.doesNotMatch(renderLine(saved, { now: NOW }), /moved|hamisha/i);
+        const move = factLine('move_ok', { job: 'Carpet Cleaning', to_when: { iso: '2026-10-10T06:00:00Z', precision: 'time' } }, { lang: 'sw' });
+        assert.match(renderLine(move, { now: NOW }), /hamisha/);
+        const { state } = replay(3);
+        const read = fileRead(state, 3);
+        assert.equal(read.lines[0].template, 'requested_at');
+        assert.ok(read.line.length > 0);
+      });
+    } finally {
+      if (prevVoice == null) delete process.env.VOICE_SPOKEN_FACTS;
+      else process.env.VOICE_SPOKEN_FACTS = prevVoice;
+      setVoiceRendererForTest(null);
+    }
   });
 });

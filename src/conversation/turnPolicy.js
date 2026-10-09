@@ -150,6 +150,14 @@ function planCallerModelTurn(state, opts = {}) {
   return { runModel: true, line: '' };
 }
 
+function fileAnswerOwnsTurn(text, state) {
+  const fixes = require('./callFixesD199');
+  if (!fixes.callFixesD199Enabled()) return false;
+  if (state?.caller?.nameConfirmed !== true || state?.caller?.nameJustConfirmed === true) return false;
+  if (state?.messageOnly === true) return false;
+  return Boolean(fixes.planFileAnswer({ text, state })?.line);
+}
+
 function resolveLocalReply({
   text,
   state,
@@ -197,6 +205,12 @@ function resolveLocalReply({
 
   // Visit, hold, and order words are on conversation.fileReadSentence for Voice.
   // Do not speak them here. A local reply would end the turn before Gemini.
+
+  // BRAIN_CALL_FIXES_D199: a turn that names a file row or asks about the file
+  // ("what about the mansion one?", "when did I request that?") is the file
+  // read's (planVisitReadTurn), ahead of any fact, coverage or place-block
+  // branch here (HD_d199dbbf6b79 t4).
+  if (fileAnswerOwnsTurn(clean, state)) return null;
 
   const detailLine = serviceFactsLine(clean, profile, language);
   if (detailLine) return publish({ outcome: 'service_facts', line: detailLine });

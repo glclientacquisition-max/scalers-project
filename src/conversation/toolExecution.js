@@ -316,6 +316,27 @@ function validateServiceRequest(
   return { valid: true, value };
 }
 
+/**
+ * A name save_caller_info may store: #628's checks, not a copy of them.
+ * isSavedAlternateName (src/conversation/alternateNameQuality.js, #628) when it
+ * is on the branch; until then the same two checks it is built from:
+ * isJunkCallerName and isPlausibleCallerName.
+ */
+function savableCallerName(name) {
+  let alternate = null;
+  try {
+    // eslint-disable-next-line global-require
+    alternate = require('./alternateNameQuality');
+  } catch (err) {
+    if (err && err.code !== 'MODULE_NOT_FOUND') throw err;
+  }
+  if (alternate && typeof alternate.isSavedAlternateName === 'function') {
+    return alternate.isSavedAlternateName(name);
+  }
+  if (isJunkCallerName(name)) return false;
+  return require('./entityExtraction').isPlausibleCallerName(name);
+}
+
 function validateCallerInfo(parsed, { agentName = '', businessName = '', knownNames = [] } = {}) {
   const value = {
     name: canonicalCallerName(parsed?.name, knownNames),
@@ -323,6 +344,11 @@ function validateCallerInfo(parsed, { agentName = '', businessName = '', knownNa
   };
   if (value.name && isReservedCallerName(value.name, { agentName, businessName })) {
     // Keep reason-only capture; drop the bad name so we don't poison the lead.
+    value.name = '';
+  }
+  // BRAIN_CALL_FIXES_D199: #628's junk-name check gates the saved name too
+  // (HD_d199dbbf6b79 t9 saved "like"). The name stays code-held.
+  if (value.name && require('./callFixesD199').callFixesD199Enabled() && !savableCallerName(value.name)) {
     value.name = '';
   }
   return {

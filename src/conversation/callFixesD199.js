@@ -343,7 +343,6 @@ function savedResultRows(state) {
         when: whenSlot(val.windowStart, val.whenText),
         place: val.landmark || '',
         status: rec.status || r.appointmentStatus || 'requested',
-        moved: r.action === 'update_appointment',
       });
     } else if (r.action === 'create_service_request') {
       rows.push({
@@ -366,7 +365,7 @@ function savedReadbackLines(state, lang = 'en') {
     const lines = saved.map((row) =>
       factLine(
         'saved_item',
-        { kind: row.kind, job: row.job, when: row.when, place: row.place, moved: row.moved },
+        { kind: row.kind, job: row.job, when: row.when, place: row.place },
         { lang, gate: { action: row.action, id: row.id } }
       )
     );
