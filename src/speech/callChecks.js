@@ -228,6 +228,31 @@ function asksForVisits(text) {
   return VISIT_ASK_EXTRA.test(raw);
 }
 
+const CONFIRM_YES = /^(?:yes|yeah|yep|yup|sure|correct|right|that's (?:me|right|correct)|it's me|this is (?:he|she|me)|speaking|ndio|ndiyo|ni mimi|eeh|eh|ehe|sawa)\b/i;
+
+/** The turn read the open file: a visit_read canned line, or visit_open fact lines. */
+function turnReadsFile(turn) {
+  if (stagesOf(turn, 'canned').some((row) => row.path === 'visit_read')) return true;
+  if (brainLinesOf(turn).some((line) => line.template === 'visit_open')) return true;
+  const spoken = spokenOf(turn);
+  return VISIT_READ.test(spoken) && VISIT_WHEN.test(spoken) && !VISIT_NONE.test(spoken);
+}
+
+/**
+ * A visit ask on an unconfirmed caller gets the file-name ask first; the
+ * read comes on the confirm turn (HD_ceba9d9b3f37 t1 "My booking, please."
+ * -> "Am I speaking with Alvin?", t2 "Yeah." -> the read-out). That is the
+ * read, not a miss.
+ */
+function readOnConfirmTurn(turns, i) {
+  const asked = fileNameAsk(spokenOf(turns[i])) ||
+    stagesOf(turns[i], 'canned').some((row) => row.path === 'file_name_ask');
+  if (!asked) return false;
+  const next = turns[i + 1];
+  if (!next || !CONFIRM_YES.test(callerOf(next))) return false;
+  return turnReadsFile(next);
+}
+
 function visitReadChecks(turns = [], ctx = {}) {
   const open = Array.isArray(ctx.openVisits) ? ctx.openVisits : null;
   const out = [];
@@ -238,7 +263,8 @@ function visitReadChecks(turns = [], ctx = {}) {
     let reply = spokenOf(turn);
     if (!reply.trim() && turns[i + 1] && !callerOf(turns[i + 1])) reply = spokenOf(turns[i + 1]);
     const saidNone = VISIT_NONE.test(reply);
-    const read = !saidNone && VISIT_READ.test(reply) && VISIT_WHEN.test(reply);
+    const read =
+      (!saidNone && VISIT_READ.test(reply) && VISIT_WHEN.test(reply)) || readOnConfirmTurn(turns, i);
     if (saidNone && open && open.length) {
       out.push({ turnIndex: turn.turnIndex ?? null, note: `visit ask answered "none" but ${open.length} open visit(s) on file` });
       continue;
@@ -823,6 +849,7 @@ module.exports = {
   CALL_CHECK_WEIGHT,
   callChecks,
   visitReadChecks,
+  turnReadsFile,
   nairobiDateChecks,
   nameLockChecks,
   ignoredFileChecks,

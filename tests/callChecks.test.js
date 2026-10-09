@@ -390,3 +390,44 @@ describe('brain.lines[] on the trace (docs/specs/fact-lines.md)', () => {
     assert.equal(out.counts.falseMove, 1);
   });
 });
+
+// HD_ceba9d9b3f37 (staging 2026-10-09 12:59 EAT): "My booking, please." got
+// the file-name ask; the read-out came on the confirm turn ("Yeah."). The
+// caller's last "That's all." ran after the hangup and got no reply.
+describe('HD_ceba9d9b3f37: read on the confirm turn; no silence after the hangup', () => {
+  const READ =
+    'You have a Carpet Cleaning visit request for today, Friday, at 9 AM, in Kitengela. You have a Carpet Cleaning (per room) visit request for tomorrow, Saturday, at 9 AM, in Kitengela, Grace Apartments.';
+  const canned = (path, text) => ({ stage: 'canned', path, text });
+
+  it('the read on the confirm turn counts for the visit ask', () => {
+    const turns = [
+      { ...turn(1, 'My booking, please.', 'Am I speaking with Alvin?'), stages: [canned('file_name_ask', 'Am I speaking with Alvin?'), { stage: 'tts', text: 'Am I speaking with Alvin?' }] },
+      { ...turn(2, 'Yeah.', READ), stages: [canned('visit_read', READ), { stage: 'tts', text: READ }] },
+    ];
+    assert.deepEqual(visitReadChecks(turns, {}), []);
+    // Brain fact lines alone (no canned row) also count.
+    const viaLines = [turns[0], { ...turn(2, 'Yes.', 'Sawa.'), brain: { lines: [{ template: 'visit_open', slots: {} }] } }];
+    assert.deepEqual(visitReadChecks(viaLines, {}), []);
+  });
+
+  it('still a miss when the confirm turn reads nothing, or the caller says no', () => {
+    const ask = turn(1, 'My booking, please.', 'Am I speaking with Alvin?');
+    assert.equal(visitReadChecks([ask, turn(2, 'Yeah.', 'How can I help you today?')], {}).length, 1);
+    assert.equal(visitReadChecks([ask, turn(2, 'No, this is Grace.', READ)], {}).length, 1);
+    assert.equal(visitReadChecks([turn(1, 'My booking, please.', 'Sure, one moment.'), turn(2, 'Yeah.', READ)], {}).length, 1);
+  });
+
+  it('the last "That\'s all." after the hangup is not silence; a mid-call one still is', () => {
+    const last = turn(6, "That's all.", '', { stages: [{ stage: 'turn_end', decision: 'flush' }, { stage: 'outcome', value: 'early_return' }] });
+    const before = turn(5, 'Okay, thank you.', 'Is there anything else I can help you with?');
+    const scored = scoreTurns([before, last], {});
+    assert.equal(scored.checks.silence, 0);
+    assert.ok(scored.turns.find((t) => t.turnIndex === 6).notes.includes('caller hung up; no reply owed'));
+    // Voice now traces the call end: any last words then are not silence.
+    const traced = turn(6, 'Hello?', '', { stages: [{ stage: 'turn_end', decision: 'skip', reason: 'call_over' }] });
+    assert.equal(scoreTurns([before, traced], {}).checks.silence, 0);
+    // Not the last turn, or not a close: still silence.
+    assert.equal(scoreTurns([last, before], {}).checks.silence, 1);
+    assert.equal(scoreTurns([before, turn(6, 'What about Saturday?', '')], {}).checks.silence, 1);
+  });
+});
