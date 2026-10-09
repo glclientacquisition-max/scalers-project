@@ -202,7 +202,8 @@ describe('server wiring', () => {
   });
 
   it('ws/media reads the tenant the webhook resolved and waits for the row', () => {
-    const at = src.indexOf('async function ensureTenantPrompt()');
+    // ensureTenantPrompt memoizes; the load itself lives in loadTenantPrompt.
+    const at = src.indexOf('async function loadTenantPrompt()');
     const body = src.slice(at, at + 1200);
     assert.match(body, /inboundCalls\.tenantIdFor\(sessionCallSid\)/);
     assert.match(body, /await inboundCalls\.awaitRow\(sessionCallSid, 2500\)/);

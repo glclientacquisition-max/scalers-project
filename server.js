@@ -535,7 +535,6 @@ const {
   noteOwnerCallItem,
   ownerMessageAtEndEnabled,
   ownerNotifiedMeta,
-  ownerNotifyChannels,
   ownerSummaryKeyBase,
   pendingOwnerCallItems,
 } = require('./src/notifications/ownerCallMessage');
@@ -6414,11 +6413,8 @@ async function sendOwnerCallMessage(callSid, opts = {}) {
     }
     clearOwnerCallItems(callSid);
     // owner_notified is the dedupe marker; whatsapp_sent only when WhatsApp landed.
-    const channels = ownerNotifyChannels(sent, errors);
-    await db.markWhatsappSent(callSid, {
-      owner_notify_channels: channels,
-      whatsapp_delivered: channels.whatsapp === 'sent',
-    });
+    await db.markWhatsappSent(callSid, buildNotifyOutcome(sent, errors));
+    const channels = buildNotifyOutcome(sent, errors).owner_notify_channels;
     await db.mergeCallSummaryMeta({
       callSid,
       patch: {
