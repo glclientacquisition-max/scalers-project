@@ -218,6 +218,7 @@ const {
   notePlatformOpsDegrade,
   opsCooldownMs,
 } = require('./src/notifications/platformOpsAlert');
+const { platformOpsRecipients } = require('./src/notifications/platformOpsRecipients');
 const {
   selectProductsForTurn,
   formatTargetedProductsForPrompt,
@@ -6436,13 +6437,15 @@ server.listen(PORT, () => {
   if (String(process.env.VOICE_PLATFORM_OPS_DRY_RUN || '').toLowerCase() === 'true') {
     console.log(`ℹ Platform ops alerts in DRY_RUN (log only)`);
   }
-  if (String(process.env.SCALERS_OPS_ALERT_PHONES || process.env.SCALERS_OPS_ALERT_EMAILS || '')) {
-    console.log(`✓ Platform ops alert list configured`);
-  } else {
-    console.log(
-      `ℹ Platform ops alert list not set (SCALERS_OPS_ALERT_PHONES / SCALERS_OPS_ALERT_EMAILS)`
-    );
-  }
+  void platformOpsRecipients({ force: true })
+    .then(({ emails, source }) => {
+      if (emails.length) {
+        console.log(
+          `✓ Platform ops alert list: ${emails.length} email(s) from ${source === 'admin' ? 'Super Admin' : 'SCALERS_OPS_ALERT_EMAILS'} (email only)`
+        );
+      }
+    })
+    .catch(() => {});
   if (String(process.env.SAUTIKIT_VALIDATE_WEBHOOKS || '').toLowerCase() === 'true') {
     console.log(`✓ SautiKit webhook signature validation ON`);
   }
