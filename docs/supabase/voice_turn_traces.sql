@@ -50,3 +50,34 @@ revoke all on public.voice_turn_traces from anon;
 revoke all on public.voice_turn_traces from authenticated;
 
 grant all on public.voice_turn_traces to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Retention: keep 30 days of traces.
+-- pg_cron is NOT enabled on prod (checked 2026-10-09), so this adds a purge function only.
+-- Scheduling (pick one, needs Alvin's OK):
+--   a) enable pg_cron, then:
+--        select cron.schedule('purge_voice_turn_traces', '17 2 * * *',
+--          $$select public.purge_voice_turn_traces(30)$$);
+--   b) a daily service-role caller (voice server or a Vercel cron) runs
+--        rpc('purge_voice_turn_traces', { p_days: 30 }).
+-- Until one is scheduled, run it by hand: select public.purge_voice_turn_traces(30);
+-- Security invoker: only service_role can execute it, and only service_role can delete rows.
+-- ---------------------------------------------------------------------------
+create or replace function public.purge_voice_turn_traces(p_days integer default 30)
+returns integer
+language sql
+set search_path = public
+as $$
+  with gone as (
+    delete from public.voice_turn_traces
+    where created_at < now() - make_interval(days => greatest(coalesce(p_days, 30), 1))
+    returning 1
+  )
+  select count(*)::integer from gone;
+$$;
+
+comment on function public.purge_voice_turn_traces(integer) is
+  'Deletes voice_turn_traces older than p_days (default 30, minimum 1). Returns rows deleted.';
+
+revoke all on function public.purge_voice_turn_traces(integer) from public, anon, authenticated;
+grant execute on function public.purge_voice_turn_traces(integer) to service_role;
