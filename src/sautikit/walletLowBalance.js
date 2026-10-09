@@ -16,6 +16,15 @@
 //
 // A balance-unknown reading (probe error, 402, timeout, missing field) never
 // alerts and never re-arms.
+//
+// Zero or below: the wallet is empty and the existing "phone line down" alert
+// (walletProbe, with the cause named) is the ONE alert for that reading. Here
+// we still claim every threshold silently, so a drop from above 500 straight to
+// 0 never fires "wallet low" later on the same drop.
+//
+// The webhook input is inert unless VOICE_WALLET_WEBHOOK=on: the route still
+// answers 200 and ignores the body. It waits on confirming how the vendor signs
+// workspace webhooks (see docs/ops/wallet-low-balance-alert.md).
 
 const {
   sendPlatformOpsNotice,
@@ -62,6 +71,10 @@ function thresholdsMinor(env = process.env) {
 
 function alertsOff(env = process.env) {
   return String(env.VOICE_WALLET_LOW_ALERT || 'on').toLowerCase() === 'off';
+}
+
+function webhookOn(env = process.env) {
+  return String(env.VOICE_WALLET_WEBHOOK || 'off').toLowerCase() === 'on';
 }
 
 function toMs(value) {
@@ -262,6 +275,13 @@ async function observeWalletBalance(reading = {}) {
     console.log(`[wallet-low] re-armed thresholds=${rearmed.join(',')} source=${source}`);
   }
   if (!crossed.length) return { ok: true, alerted: false, crossed, rearmed };
+  if (balance <= 0) {
+    // Empty wallet: the phone-line-down alert names the cause. One mail only.
+    console.warn(
+      `[wallet-low] wallet empty; thresholds=${crossed.join(',')} marked crossed, line-down alert carries the cause source=${source}`
+    );
+    return { ok: true, alerted: false, suppressed: 'empty_wallet', crossed, rearmed };
+  }
 
   const lowest = Math.min(...crossed);
   const currency = String(reading.currency || 'KES').trim() || 'KES';
@@ -293,18 +313,24 @@ function headerValue(headers, name) {
 
 /**
  * Handle a wallet.* webhook (signature already checked by sautikitWebhookGuard).
- * Dedupe on event_id, then feed data.balance_minor into the shared evaluator.
+ * Inert unless VOICE_WALLET_WEBHOOK=on.
+ * Dedupe on event_id (body, then X-Sautikit-Event-Id, then
+ * X-Sautikit-Idempotency-Key), then feed data.balance_minor into the shared evaluator.
  *
  * @param {{ headers?: object, body?: object, kind?: string, now?: number }} input
  */
-async function handleWalletWebhookEvent({ headers = {}, body = {}, kind, now } = {}) {
+async function handleWalletWebhookEvent({ headers = {}, body = {}, kind, now, env } = {}) {
+  if (!webhookOn(env || process.env)) {
+    console.log('[wallet-low] wallet webhook ignored (VOICE_WALLET_WEBHOOK is off; poll only)');
+    return { ok: false, reason: 'webhook_off' };
+  }
   const eventKind = String(kind || body.kind || headerValue(headers, 'x-sautikit-event') || '')
     .trim()
     .toLowerCase();
   const eventId =
     String(body.event_id || body.id || '').trim() ||
-    headerValue(headers, 'x-sautikit-idempotency-key') ||
-    headerValue(headers, 'x-sautikit-event-id');
+    headerValue(headers, 'x-sautikit-event-id') ||
+    headerValue(headers, 'x-sautikit-idempotency-key');
 
   if (eventId) {
     const claimed = await withStore((store) => store.claimEvent(eventId, eventKind));
@@ -371,6 +397,7 @@ module.exports = {
   observeWalletBalance,
   handleWalletWebhookEvent,
   isWalletEventKind,
+  webhookOn,
   createMemoryStore,
   createSupabaseStore,
   isMissingObject,
