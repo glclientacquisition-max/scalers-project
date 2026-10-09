@@ -31,7 +31,9 @@ describe('walletProbe', () => {
   it('probes wallet and alerts ops on first empty balance', async () => {
     let alerted = 0;
     let walletLow = 0;
-    setPlatformOpsDispatch(async ({ ledger }) => {
+    let lastBody = '';
+    setPlatformOpsDispatch(async ({ ledger, body }) => {
+      lastBody = body;
       if (ledger.kind === 'platform_ops_wallet') walletLow += 1;
       else alerted += 1;
       return { sent: [{ channel: 'email' }], errors: [] };
@@ -48,8 +50,9 @@ describe('walletProbe', () => {
     assert.equal(result.billingExhausted, true);
     await new Promise((r) => setTimeout(r, 20));
     assert.equal(alerted, 1);
-    // Empty is also under the lowest low-balance threshold: one wallet notice.
-    assert.equal(walletLow, 1);
-    assert.equal(result.lowBalance.alerted, true);
+    // Empty wallet sends exactly one alert: line down, with the cause named.
+    assert.equal(walletLow, 0);
+    assert.equal(result.lowBalance.suppressed, 'empty_wallet');
+    assert.match(lastBody, /Cause: Phone wallet is empty, top up to restore calls\./);
   });
 });

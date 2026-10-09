@@ -175,10 +175,10 @@ function platformOpsDegradeBody(kind = 'speech', detail = {}) {
       : kind === 'telephony'
         ? 'Phone line'
         : 'Speech';
-  const lines = [
-    `Scalers platform ${lane} is degraded.`,
-    'Check /admin Platform board and Voice GET /healthz.',
-  ];
+  const lines = [`Scalers platform ${lane} is degraded.`];
+  const cause = String(detail.cause || '').trim();
+  if (cause) lines.push(`Cause: ${cause.slice(0, 160)}.`.replace(/\.\.$/, '.'));
+  lines.push('Check /admin Platform board and Voice GET /healthz.');
   const channel = String(detail.channel || '').trim();
   if (channel) lines.push(`Channel: ${channel}`);
   const message = String(detail.message || '').trim();

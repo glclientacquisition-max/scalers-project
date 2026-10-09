@@ -10,6 +10,8 @@
 // (errors, 402, timeouts) never alerts or re-arms them.
 
 const DEFAULT_API_BASE = 'https://api.sautikit.com';
+// Staff ops mail only. Plain words, no vendor name.
+const EMPTY_WALLET_CAUSE = 'Phone wallet is empty, top up to restore calls';
 const {
   snapshot,
   getTelephonyProviderHealth,
@@ -120,6 +122,7 @@ async function probeSautikitWallet(opts = {}) {
 
   if (next.billingExhausted && !wasExhausted) {
     void notePlatformOpsDegrade('telephony', {
+      cause: EMPTY_WALLET_CAUSE,
       message: next.message,
       balanceMinor: next.balanceMinor,
       currency: next.currency,
@@ -176,4 +179,5 @@ module.exports = {
   classifyWalletResponse,
   startTelephonyWalletProbe,
   telephonyProbeIntervalMs,
+  EMPTY_WALLET_CAUSE,
 };

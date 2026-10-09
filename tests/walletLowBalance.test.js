@@ -32,6 +32,7 @@ const ENV_KEYS = [
   'SAUTIKIT_VALIDATE_WEBHOOKS',
   'SAUTIKIT_WEBHOOK_SECRET',
   'SCALERS_OPS_ALERT_EMAILS',
+  'VOICE_WALLET_WEBHOOK',
 ];
 
 function adminSettings(kinds = {}) {
@@ -73,6 +74,7 @@ describe('walletLowBalance', () => {
     resetPlatformOpsAlert();
     resetTelephonyProviderHealth();
     resetWalletLowBalance();
+    process.env.VOICE_WALLET_WEBHOOK = 'on'; // webhook tests; default-off has its own test
     store = createMemoryStore(); // stands in for the DB table: survives "restarts"
     setWalletLowBalanceStore(store);
     adminSettings();
@@ -146,6 +148,48 @@ describe('walletLowBalance', () => {
     assert.equal(sent.length, 1);
   });
 
+  it('empty wallet: one line-down alert naming the cause, no wallet-low, thresholds marked crossed', async () => {
+    const balances = [80000, 0];
+    let i = 0;
+    const fetchImpl = async () => ({
+      status: 200,
+      text: async () => JSON.stringify({ data: { currency: 'KES', balance_minor: balances[i++] } }),
+    });
+    await probeSautikitWallet({ apiKey: 'test-key', fetchImpl });
+    assert.equal(sent.length, 0);
+    const empty = await probeSautikitWallet({ apiKey: 'test-key', fetchImpl });
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(empty.billingExhausted, true);
+    assert.equal(empty.lowBalance.suppressed, 'empty_wallet');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].ledger.kind, 'platform_ops_telephony');
+    assert.equal(sent[0].subject, 'Scalers platform phone line down');
+    assert.match(sent[0].body, /Cause: Phone wallet is empty, top up to restore calls\./);
+    assert.doesNotMatch(sent[0].body, /sautikit/i);
+    assert.equal(store._rows.get(50000).crossed, true);
+    assert.equal(store._rows.get(10000).crossed, true);
+
+    // Still empty: nothing more.
+    assert.equal((await observeWalletBalance({ balanceMinor: 0, source: 'poll' })).alerted, false);
+    // Partial top-up to KES 300: re-arms 100 only; still under 500 on the same drop, no alert.
+    const partial = await observeWalletBalance({ balanceMinor: 30000, source: 'poll' });
+    assert.deepEqual(partial.rearmed, [10000]);
+    assert.equal(partial.alerted, false);
+    // Falls under 100 again (above zero): thresholds fire normally.
+    const low = await observeWalletBalance({ balanceMinor: 5000, source: 'poll' });
+    assert.equal(low.alerted, true);
+    assert.deepEqual(low.crossed, [10000]);
+    assert.equal(sent.filter((m) => m.ledger.kind === 'platform_ops_wallet').length, 1);
+  });
+
+  it('empty wallet after the 500 alert: only the line-down alert, 100 marked crossed', async () => {
+    await observeWalletBalance({ balanceMinor: 45000, source: 'poll' });
+    const zero = await observeWalletBalance({ balanceMinor: -50, source: 'poll' });
+    assert.equal(zero.suppressed, 'empty_wallet');
+    assert.deepEqual(zero.crossed, [10000]);
+    assert.equal(sent.length, 1); // the earlier 500 alert only
+  });
+
   it('a restart does not re-alert the same crossing (state persisted)', async () => {
     await observeWalletBalance({ balanceMinor: 45000, source: 'poll' });
     assert.equal(sent.length, 1);
@@ -167,6 +211,25 @@ describe('walletLowBalance', () => {
     const first = await handleWalletWebhookEvent({ headers: {}, body });
     assert.equal(first.alerted, true);
     const dup = await handleWalletWebhookEvent({ headers: {}, body });
+    assert.equal(dup.reason, 'duplicate');
+    assert.equal(sent.length, 1);
+  });
+
+  it('webhook is inert by default (VOICE_WALLET_WEBHOOK unset or off)', async () => {
+    delete process.env.VOICE_WALLET_WEBHOOK;
+    const r = await handleWalletWebhookEvent({ headers: {}, body: walletEvent('evt_off', 100) });
+    assert.equal(r.reason, 'webhook_off');
+    process.env.VOICE_WALLET_WEBHOOK = 'off';
+    assert.equal((await handleWalletWebhookEvent({ headers: {}, body: walletEvent('evt_off2', 100) })).reason, 'webhook_off');
+    assert.equal(sent.length, 0);
+    assert.equal(store._rows.size, 0); // no state touched
+  });
+
+  it('webhook dedupes on X-Sautikit-Event-Id when the body has no event_id', async () => {
+    const body = walletEvent(undefined, 45000);
+    delete body.event_id;
+    await handleWalletWebhookEvent({ headers: { 'x-sautikit-event-id': 'uuid-1', 'x-sautikit-idempotency-key': 'd1' }, body });
+    const dup = await handleWalletWebhookEvent({ headers: { 'x-sautikit-event-id': 'uuid-1', 'x-sautikit-idempotency-key': 'd2' }, body });
     assert.equal(dup.reason, 'duplicate');
     assert.equal(sent.length, 1);
   });
