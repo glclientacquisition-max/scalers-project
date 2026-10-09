@@ -8,6 +8,7 @@ const {
   ENGLISH_JOB_LOANWORDS,
 } = require('../conversation/language');
 const { utteranceLooksIncomplete } = require('./turnTaking');
+const { callChecks } = require('./callChecks');
 
 const LATENCY_BUDGET_MS = 1200;
 
@@ -382,8 +383,13 @@ function scoreTurn(turn) {
   };
 }
 
-function scoreTurns(turns = []) {
-  const scored = turns.map(scoreTurn);
+/**
+ * @param {object[]} turns
+ * @param {{ callAt?: string, openVisits?: object[], agentName?: string, businessName?: string }} [ctx]
+ *   optional call facts for the call-level checks (src/speech/callChecks.js).
+ */
+function scoreTurns(turns = [], ctx = {}) {
+  const scored = turns.map((turn) => scoreTurn(turn));
   const checks = emptyChecks();
   const asked = [];
   const nameAskTurns = [];
@@ -412,9 +418,18 @@ function scoreTurns(turns = []) {
   const avg = counted.length
     ? counted.reduce((sum, turn) => sum + turn.score, 0) / counted.length
     : 100;
-  const callPenalty = Math.min(30, checks.repeatedQuestion * 8);
+  // Visit read, Nairobi date, and name lock are call-level (callChecks.js).
+  const call = callChecks(turns, ctx || {});
+  for (const [key, count] of Object.entries(call.counts)) checks[key] = count;
+  for (const rows of Object.values(call.findings)) {
+    for (const row of rows) {
+      const hit = scored.find((turn) => turn.turnIndex != null && turn.turnIndex === row.turnIndex);
+      if (hit) hit.notes = [...(hit.notes || []), row.note];
+    }
+  }
+  const callPenalty = Math.min(30, checks.repeatedQuestion * 8) + call.penalty;
   const score = Math.round((Math.max(0, avg - callPenalty) + Number.EPSILON) * 10) / 10;
-  return { score, checks, turns: scored, nameAsks, nameAskTurns };
+  return { score, checks, turns: scored, nameAsks, nameAskTurns, callFindings: call.findings };
 }
 
 const CHECK_WEIGHT = {
@@ -424,6 +439,9 @@ const CHECK_WEIGHT = {
   incomplete: 20,
   prematureTurn: 10,
   slow: 10,
+  visitMissed: 20,
+  dateWrong: 20,
+  nameLock: 15,
 };
 
 const CHECK_LINE = {
@@ -435,6 +453,9 @@ const CHECK_LINE = {
   slow: 'First audio was late',
   respelling: 'An English-style respelling was spoken',
   repeatedQuestion: 'A question was repeated',
+  visitMissed: 'Open visits were not read out',
+  dateWrong: 'A spoken day or date was wrong for Nairobi',
+  nameLock: 'The caller name did not stay locked',
 };
 
 function turnsForCheck(scored, key) {
@@ -449,7 +470,11 @@ function diagnoseCall(card = {}) {
   for (const [key, weight] of Object.entries(CHECK_WEIGHT)) {
     const count = checks[key] || 0;
     if (count > 0) {
-      ranked.push({ key, points: count * weight, turns: turnsForCheck(card.turns, key) });
+      const callRows = card.callFindings?.[key];
+      const turns = callRows
+        ? [...new Set(callRows.map((row) => row.turnIndex).filter((index) => index != null))]
+        : turnsForCheck(card.turns, key);
+      ranked.push({ key, points: count * weight, turns });
     }
   }
   const respell = checks.respelling || 0;
