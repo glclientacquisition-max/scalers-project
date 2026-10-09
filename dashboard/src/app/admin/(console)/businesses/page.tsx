@@ -2,10 +2,12 @@ import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminBusinessesPanel } from "@/components/AdminBusinessesPanel";
 import { getAdminOverview } from "@/lib/admin";
 import { logAdminError } from "@/lib/adminErrors";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 
 export const instant = false;
 
 export default async function AdminBusinessesPage() {
+  await requireSuperAdmin();
   let overview;
   try {
     overview = await getAdminOverview();

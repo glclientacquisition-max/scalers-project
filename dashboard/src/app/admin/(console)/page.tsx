@@ -4,10 +4,12 @@ import { getAdminOverview } from "@/lib/admin";
 import { logAdminError } from "@/lib/adminErrors";
 import { evaluatePlatformOps } from "@/lib/platformOps";
 import { mergeQueueRows } from "@/lib/platformOpsModel";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 
 export const instant = false;
 
 export default async function AdminOverviewPage() {
+  await requireSuperAdmin();
   let overview;
   let ops;
   try {
