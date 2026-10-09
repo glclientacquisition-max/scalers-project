@@ -10,6 +10,7 @@ import {
 } from "@/lib/tenantFieldProvenance";
 import { validConfirmBatch, type FactConfirmPlan } from "@/lib/factConfirm";
 import { createWorkspaceDataClient } from "@/lib/tenant";
+import { FACT_ROW_COLUMNS, FACT_ROW_CORE_COLUMNS } from "@/lib/factRowColumns";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 async function attestOne(
@@ -106,22 +107,25 @@ export async function ownerConfirmPlan(tenantId: string, plan: FactConfirmPlan):
   }
 }
 
-const FACT_ROW_COLUMNS =
-  "business_name, vertical, spoken_name, social_handles, hours_schedule, business_locations, business_policies, agent_name, agent_tone, agent_tools, faqs, services_catalog, product_catalog";
-
-/** The stored row after a save, so confirm hashes what was written. Null on a read error. */
+/**
+ * The stored fact columns (FACT_ROW_COLUMNS), read before a save for the diff
+ * and after it so confirm hashes what was written. Null on a read error.
+ */
 export async function readSavedFactRow(
   client: SupabaseClient,
   tenantId: string
 ): Promise<Record<string, unknown> | null> {
-  const { data, error } = await client
-    .from("tenants")
-    .select(FACT_ROW_COLUMNS)
-    .eq("id", tenantId)
-    .maybeSingle();
+  const read = (columns: string) =>
+    client.from("tenants").select(columns).eq("id", tenantId).maybeSingle();
+  let { data, error } = await read(FACT_ROW_COLUMNS);
+  if (error?.code === "42703") {
+    // An older database without an optional column: the core facts still confirm.
+    console.warn("[readSavedFactRow] optional column missing, core columns only");
+    ({ data, error } = await read(FACT_ROW_CORE_COLUMNS));
+  }
   if (error || !data) {
     if (error) console.warn("[readSavedFactRow]", error.message);
     return null;
   }
-  return data as Record<string, unknown>;
+  return data as unknown as Record<string, unknown>;
 }

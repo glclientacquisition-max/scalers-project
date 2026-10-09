@@ -139,6 +139,10 @@ function contentHash(value: unknown, path: string): string | null {
 /**
  * Which paths to confirm (with the saved value's hash) and which to reopen.
  * `before` is the stored row ahead of the save, `after` the saved row.
+ * `normalize` puts both rows in one normal form before the diff (Settings
+ * passes normalizeFactRow), so a raw seed row never looks changed against its
+ * parsed copy. The stamped hash is always taken from `after` as saved:
+ * hashFactValue(factValueForPath(path, after)).
  * A list row that only moved (its value already existed in the same list
  * before the save) is not a change, so a delete never confirms its neighbours
  * and a service that only gained its stable id is not confirmed either.
@@ -148,9 +152,13 @@ export function planFactConfirm(input: {
   before: Row;
   after: Row;
   explicitPaths?: string[];
+  normalize?: (row: Row) => Row;
 }): FactConfirmPlan {
-  const before = input.before || {};
-  const after = input.after || {};
+  const normalize = input.normalize || ((row: Row) => row);
+  const saved = input.after || {};
+  const before = normalize(input.before || {});
+  const after = normalize(saved);
+  const savedHash = (path: string) => hashOrNull(factValueForPath(path, saved), path);
   const paths = new Set<string>([
     ...scopeFactPaths(input.scope, before),
     ...scopeFactPaths(input.scope, after),
@@ -166,6 +174,21 @@ export function planFactConfirm(input: {
     beforeListHashes.get(kind)!.add(h);
   }
 
+  // List rows that now sit under a stable key they did not have before (a
+  // service that just got its svc_ id). Their old positional path empties, but
+  // the fact did not go anywhere, so it is not reopened.
+  const beforePaths = new Set(scopeFactPaths(input.scope, before));
+  const rekeyedHashes = new Map<string, Set<string>>();
+  for (const path of scopeFactPaths(input.scope, after)) {
+    const kind = listKind(path);
+    if (!kind || kind === "faq" || beforePaths.has(path)) continue;
+    if (/^\d+$/.test(path.split(".")[2] || "")) continue;
+    const h = contentHash(factValueForPath(path, after), path);
+    if (!h) continue;
+    if (!rekeyedHashes.has(kind)) rekeyedHashes.set(kind, new Set());
+    rekeyedHashes.get(kind)!.add(h);
+  }
+
   const confirm = new Map<string, string>();
   const reopen = new Set<string>();
 
@@ -175,20 +198,24 @@ export function planFactConfirm(input: {
     const prevHash = hashOrNull(factValueForPath(path, before), path);
     const nowHash = hashOrNull(now, path);
     if (!nowHash) {
-      if (prevHash) reopen.add(path);
+      const kind = listKind(path);
+      const prevContent = contentHash(factValueForPath(path, before), path) || "";
+      const rekeyed = kind ? rekeyedHashes.get(kind)?.has(prevContent) : false;
+      if (prevHash && !rekeyed) reopen.add(path);
       continue;
     }
     if (nowHash === prevHash) continue;
     const kind = listKind(path);
     if (kind && beforeListHashes.get(kind)?.has(contentHash(now, path) || "")) continue;
-    confirm.set(path, nowHash);
+    const stamp = savedHash(path);
+    if (stamp) confirm.set(path, stamp);
   }
 
   for (const raw of input.explicitPaths || []) {
     const path = String(raw || "").trim();
     if (!path || confirm.has(path)) continue;
-    const nowHash = hashOrNull(factValueForPath(path, after), path);
-    if (nowHash) confirm.set(path, nowHash);
+    const stamp = savedHash(path);
+    if (stamp) confirm.set(path, stamp);
   }
 
   return {

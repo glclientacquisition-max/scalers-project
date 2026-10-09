@@ -44,11 +44,38 @@ const SEED_ROW = {
   faqs: [{ question: 'Do you work Sundays?', answer: 'No' }],
 };
 
+// A seed/import row as stored: camelCase keys, string flags, a nameless row, no
+// stable ids, and a null assistant name. Nothing an owner confirmed.
+const RAW_SEED = {
+  business_name: 'Done and Dusted ',
+  vertical: 'Home_Services',
+  agent_name: null,
+  agent_tone: 'Warm',
+  whatsapp_notification_number: '+254700000000',
+  alert_email: 'ops@example.co.ke',
+  sautikit_virtual_number: '+254711000000',
+  hours_schedule: { mon: { open: '08:00', close: '17:00' } },
+  business_locations: [{ name: 'Kilimani' }],
+  business_policies: { payment: 'M-Pesa till 123456', returns: 'No returns', coverage_areas: ['county:nairobi'] },
+  social_handles: {},
+  services_catalog: [
+    { name: 'Sofa clean', priceRange: 'KES 2,500', source: 'seed', status: 'suggested' },
+    { name: ' Carpet clean', priceRange: 'KES 1,500', siteVisitRequired: 'no', source: 'import' },
+    { name: 'Deep clean', siteVisitRequired: 'yes', inStock: '', source: 'seed' },
+    { priceRange: 'KES 100' },
+  ],
+  product_catalog: [
+    { name: 'Stain remover', priceRange: 'KES 900', SKU: 'SR-1', source: 'import' },
+  ],
+  faqs: [{ question: 'Do you work Sundays?', answer: 'No' }],
+};
+
 let R = null;
 
 before(() => {
   if (tsSkip) return;
   const seed = JSON.stringify(SEED_ROW);
+  const rawSeed = JSON.stringify(RAW_SEED);
   const vectors = JSON.stringify(VECTORS.map((v) => ({ input: v.input, sha256: v.sha256, name: v.name })));
   R = runTs(`
     import { planFactConfirm, overlayFieldMeta, validConfirmBatch, isEmptyFactValue, scopeFactPaths } from './dashboard/src/lib/factConfirm.ts';
@@ -57,8 +84,12 @@ before(() => {
     import { hashFactValue, factValueForPath } from './dashboard/src/lib/factHash.ts';
     import { indexFieldMeta, classifyRecord, factServices } from './dashboard/src/lib/provenance.ts';
     import { catalogRowFactValue } from './dashboard/src/lib/factHash.ts';
+    import { normalizeFactRow } from './dashboard/src/lib/factRowNormalize.ts';
+    import { FACT_ROW_COLUMN_LIST, FACT_ROW_CORE_COLUMNS } from './dashboard/src/lib/factRowColumns.ts';
+    import { FIELD_PATH_PATTERNS } from './dashboard/src/lib/fieldPathRegistry.ts';
 
     const seed = ${seed};
+    const RAW_SEED = ${rawSeed};
     const clone = (x) => JSON.parse(JSON.stringify(x));
     const out = {};
 
@@ -105,6 +136,9 @@ before(() => {
     const noIds = clone(seed); noIds.services_catalog = noIds.services_catalog.map(({ id, ...rest }) => rest);
     const withIds = clone(noIds); withIds.services_catalog = assignServiceIds(withIds.services_catalog, noIds.services_catalog);
     out.gainedId = planFactConfirm({ scope: 'catalog', before: noIds, after: withIds });
+    // A deleted service with no id still reopens when the rest gain ids.
+    const gainedMinusOne = clone(withIds); gainedMinusOne.services_catalog.splice(0, 1);
+    out.gainedIdDelete = planFactConfirm({ scope: 'catalog', before: noIds, after: gainedMinusOne });
 
     // Service ids survive reordering and edits; new rows and forged ids get fresh ones.
     const stored = seed.services_catalog;
@@ -159,6 +193,58 @@ before(() => {
     out.empty = [isEmptyFactValue('  '), isEmptyFactValue([]), isEmptyFactValue({}), isEmptyFactValue({ price: '1' }, 'catalog.product.1.name'), isEmptyFactValue({ question: 'q', answer: '' }, 'faqs.1'), isEmptyFactValue('x')];
     out.allScope = scopeFactPaths('', seed).length > scopeFactPaths('policies', seed).length;
 
+    // D1: a raw seed/import row (camelCase keys, string flags, nameless rows, no
+    // ids) against the row a catalogue save writes (parsed, ids assigned).
+    const raw = clone(RAW_SEED);
+    const savedSame = normalizeFactRow(raw);
+    savedSame.services_catalog = assignServiceIds(savedSame.services_catalog, normalizeFactRow(raw).services_catalog);
+    const planRaw = (scope, after, extra = {}) => planFactConfirm({ scope, before: raw, after, normalize: normalizeFactRow, ...extra });
+    out.d1NoChange = planRaw('catalog', savedSame);
+    out.d1NoChangeAll = planRaw('', savedSame);
+    out.d1Unnormalized = planFactConfirm({ scope: 'catalog', before: raw, after: savedSame }).confirm.length;
+    out.d1Idempotent = hashFactValue(normalizeFactRow(savedSame)) === hashFactValue(savedSame);
+
+    // Live rows carry svc_ ids (services_catalog_stable_ids.sql) but stay raw otherwise.
+    const rawIds = clone(RAW_SEED);
+    rawIds.services_catalog.forEach((row, i) => { row.id = 'svc_' + String(i + 1).repeat(16); });
+    const savedIds = normalizeFactRow(rawIds);
+    out.d1NoChangeIds = planFactConfirm({ scope: 'catalog', before: rawIds, after: savedIds, normalize: normalizeFactRow });
+    const savedOne = clone(savedIds);
+    savedOne.services_catalog[1].price_range = 'KES 1,800';
+    out.d1One = planFactConfirm({ scope: 'catalog', before: rawIds, after: savedOne, normalize: normalizeFactRow });
+    out.d1OnePath = 'catalog.service.' + savedOne.services_catalog[1].id + '.name';
+    out.d1OneHash = hashFactValue(factValueForPath(out.d1OnePath, savedOne));
+
+    // Stamped hash = hash of the saved, stored value, for changed and "Looks right" paths alike.
+    const savedMany = clone(savedSame);
+    savedMany.business_policies.returns = 'Exchanges within 7 days';
+    savedMany.product_catalog[0].price = 'KES 950';
+    savedMany.whatsapp_notification_number = '+254700000001';
+    savedMany.alert_email = 'owner@example.co.ke';
+    const many = planRaw('', savedMany, { explicitPaths: ['team.notify.whatsapp', 'team.notify.email', 'identity.primary_phone', 'policies.payment'] });
+    out.manyPaths = many.confirm.map((r) => r.path).sort();
+    out.manyHashesMatch = many.confirm.every((r) => r.hash === hashFactValue(factValueForPath(r.path, savedMany)));
+
+    // D2: every column a registered path reads is selected by readSavedFactRow.
+    const SAMPLE_PATHS = [
+      'identity.business_name', 'identity.vertical', 'identity.primary_phone', 'identity.language',
+      'identity.spoken_name', 'identity.social_handles', 'hours.weekly_grid', 'locations.branches',
+      'policies.payment', 'policies.deposit', 'policies.returns', 'policies.delivery', 'policies.cancellation',
+      'policies.warranty', 'policies.other', 'policies.coverage_areas', 'policies.holds', 'policies.holds.allowed',
+      'payments.methods', 'catalog.product.SKU-1.name', 'catalog.product.2.price',
+      'catalog.service.svc_aaaaaaaaaaaaaaaa.name', 'catalog.service.1.price', 'catalog.service.svc_x.site_visit',
+      'faqs.1', 'team.notify.whatsapp', 'team.notify.email', 'team.notify.channels',
+      'assistant.agent_name', 'assistant.tone', 'assistant.language', 'assistant.tools', 'bulletin.items',
+    ];
+    out.samplesKnown = SAMPLE_PATHS.every((p) => isKnownFieldPath(p));
+    out.patternsCovered = FIELD_PATH_PATTERNS.map((re) => SAMPLE_PATHS.some((p) => re.test(p)));
+    const touched = new Set();
+    const spy = new Proxy({}, { get(_, key) { if (typeof key === 'string') touched.add(key); return undefined; }, has() { return true; } });
+    for (const p of SAMPLE_PATHS) factValueForPath(p, spy);
+    out.registryColumns = [...touched].sort();
+    out.factRowColumns = [...FACT_ROW_COLUMN_LIST];
+    out.coreColumns = FACT_ROW_CORE_COLUMNS.split(', ');
+
     console.log(JSON.stringify(out));
   `);
 });
@@ -207,8 +293,13 @@ describe('changed-only confirm (FACT_HASH_MODE on)', { skip: tsSkip }, () => {
     assert.deepEqual(R.deleteMove.reopen, ['catalog.product.3.name']);
   });
 
-  it('a service that only gained its stable id is not confirmed', () => {
-    assert.deepEqual(R.gainedId.confirm, []);
+  it('a service that only gained its stable id is not confirmed, and its old position is not reopened', () => {
+    assert.deepEqual(R.gainedId, { confirm: [], reopen: [] });
+  });
+
+  it('a service deleted while the rest gain ids still reopens', () => {
+    assert.deepEqual(R.gainedIdDelete.confirm, []);
+    assert.deepEqual(R.gainedIdDelete.reopen, ['catalog.service.1.name']);
   });
 
   it('an import reopens a confirmed fact', () => {
@@ -229,6 +320,60 @@ describe('changed-only confirm (FACT_HASH_MODE on)', { skip: tsSkip }, () => {
   it('empty detection', () => {
     assert.deepEqual(R.empty, [true, true, true, true, true, false]);
     assert.equal(R.allScope, true);
+  });
+});
+
+describe('D1: no-change save on a raw seed row (FACT_HASH_MODE on)', { skip: tsSkip }, () => {
+  it('a catalogue save with no changes stamps nothing: seed and import rows stay seed', () => {
+    assert.deepEqual(R.d1NoChange, { confirm: [], reopen: [] });
+  });
+
+  it('the same holds for rows that already carry svc_ ids', () => {
+    assert.deepEqual(R.d1NoChangeIds, { confirm: [], reopen: [] });
+  });
+
+  it('a whole-form save with no changes stamps nothing either', () => {
+    assert.deepEqual(R.d1NoChangeAll, { confirm: [], reopen: [] });
+  });
+
+  it('without the shared normal form the same save would confirm rows (the bug)', () => {
+    assert.ok(R.d1Unnormalized > 0);
+    assert.equal(R.d1Idempotent, true);
+  });
+
+  it('changing one field stamps only that path, with the saved value hash', () => {
+    assert.deepEqual(R.d1One, { confirm: [{ path: R.d1OnePath, hash: R.d1OneHash }], reopen: [] });
+  });
+
+  it('every stamped hash equals hashFactValue(factValueForPath(path, savedRow))', () => {
+    assert.deepEqual(R.manyPaths, [
+      'catalog.product.SR-1.name',
+      'identity.primary_phone',
+      'policies.payment',
+      'policies.returns',
+      'team.notify.email',
+      'team.notify.whatsapp',
+    ]);
+    assert.equal(R.manyHashesMatch, true);
+  });
+});
+
+describe('D2: readSavedFactRow columns', { skip: tsSkip }, () => {
+  it('the sample paths cover every registry pattern', () => {
+    assert.equal(R.samplesKnown, true);
+    R.patternsCovered.forEach((ok, i) => assert.ok(ok, `pattern ${i} has no sample path`));
+  });
+
+  it('every column behind a registered path is in FACT_ROW_COLUMNS', () => {
+    const missing = R.registryColumns.filter((c) => !R.factRowColumns.includes(c));
+    assert.deepEqual(missing, []);
+    for (const c of ['sautikit_virtual_number', 'alert_email', 'whatsapp_notification_number']) {
+      assert.ok(R.factRowColumns.includes(c), c);
+    }
+  });
+
+  it('the core fallback is a subset of the full list', () => {
+    for (const c of R.coreColumns) assert.ok(R.factRowColumns.includes(c), c);
   });
 });
 
@@ -280,6 +425,10 @@ describe('wiring (static)', () => {
   it('settings save: hash mode uses the changed-only batch on the saved row; flag off keeps P0 attest', () => {
     assert.match(actions, /const hashMode = factHashModeFromEnv\(\)/);
     assert.match(actions, /if \(hashMode\) \{[\s\S]*readSavedFactRow[\s\S]*ownerConfirmPlan[\s\S]*\} else \{[\s\S]*ownerAttestFields\(/);
+    // D1: both sides normalised before the diff. D3: no fallback to form state.
+    assert.equal((actions.match(/normalize: normalizeFactRow/g) || []).length, 2);
+    assert.doesNotMatch(actions, /readSavedFactRow\([^)]*\)\)\s*\?\?\s*\{\s*\.\.\.tenant,\s*\.\.\.patch/);
+    assert.doesNotMatch(actions, /before: tenant/);
     assert.match(actions, /fieldMeta: compileFieldMeta/);
     assert.match(actions, /assignServiceIds\(pickedServices, storedServices\)/);
   });

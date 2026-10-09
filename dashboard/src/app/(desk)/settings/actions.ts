@@ -61,6 +61,7 @@ import {
 } from "@/lib/settingsSaveScope";
 import { factHashModeFromEnv, loadCompileProvenance } from "@/lib/tenantFieldProvenance";
 import { overlayFieldMeta, planFactConfirm } from "@/lib/factConfirm";
+import { normalizeFactRow } from "@/lib/factRowNormalize";
 import { assignServiceIds } from "@/lib/serviceIds";
 
 export type SettingsCompileState = {
@@ -313,15 +314,30 @@ export async function saveAndCompileSettings(
     tts_lexicon: ttsLexicon,
   };
 
-  // FACT_HASH_MODE: confirm only what changed (plus "Looks right" paths). The
-  // compile below already sees that pending confirm; the write hashes the saved row.
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) {
+    return { error: "Not signed in." };
+  }
+
+  // FACT_HASH_MODE: confirm only what changed (plus "Looks right" paths). Both
+  // sides go through normalizeFactRow before the diff, so a raw seed or import
+  // row never looks changed against its parsed copy. The compile below already
+  // sees that pending confirm; the write hashes the stored row as saved.
   const hashMode = factHashModeFromEnv();
   const explicitPaths = cleanFieldPaths(ownerPathsFromForm);
+  const storedFactRow: Record<string, unknown> =
+    (hashMode ? await readSavedFactRow(workspace.client, tenant.id) : null) ?? { ...tenant };
   const provenance = await loadCompileProvenance(tenant.id);
   const compileFieldMeta = hashMode
     ? overlayFieldMeta(
         provenance.fieldMeta,
-        planFactConfirm({ scope, before: tenant, after: { ...tenant, ...patch }, explicitPaths })
+        planFactConfirm({
+          scope,
+          before: storedFactRow,
+          after: { ...storedFactRow, ...patch },
+          explicitPaths,
+          normalize: normalizeFactRow,
+        })
       )
     : provenance.fieldMeta;
   const { prompt, source } = await compileReceptionistPrompt({
@@ -345,11 +361,6 @@ export async function saveAndCompileSettings(
     fieldMeta: compileFieldMeta,
     holdGate: provenance.holdGate,
   });
-
-  const workspace = await createWorkspaceDataClient();
-  if (!workspace) {
-    return { error: "Not signed in." };
-  }
 
   patch.llm_system_prompt = prompt;
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
@@ -383,12 +394,23 @@ export async function saveAndCompileSettings(
   });
 
   if (hashMode) {
-    const saved =
-      (await readSavedFactRow(workspace.client, tenant.id)) ?? { ...tenant, ...patch };
-    await ownerConfirmPlan(
-      tenant.id,
-      planFactConfirm({ scope, before: tenant, after: saved, explicitPaths })
-    );
+    // Hash the stored row as saved. If it cannot be read back, confirm nothing:
+    // in hash mode a missing value_hash already reads as "Check this".
+    const saved = await readSavedFactRow(workspace.client, tenant.id);
+    if (saved) {
+      await ownerConfirmPlan(
+        tenant.id,
+        planFactConfirm({
+          scope,
+          before: storedFactRow,
+          after: saved,
+          explicitPaths,
+          normalize: normalizeFactRow,
+        })
+      );
+    } else {
+      console.warn("[settings.save] saved row unreadable, owner confirm skipped");
+    }
   } else {
     const user = await getAuthUser();
     await ownerAttestFields(

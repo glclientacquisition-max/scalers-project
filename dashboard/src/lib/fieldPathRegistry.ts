@@ -3,7 +3,7 @@
  * Keep aligned with docs/platform/TENANT_FIELD_PROVENANCE.md.
  */
 
-const FIELD_PATH_PATTERNS: RegExp[] = [
+export const FIELD_PATH_PATTERNS: readonly RegExp[] = [
   /^identity\.(business_name|vertical|primary_phone|language|spoken_name|social_handles)$/,
   /^hours\.weekly_grid$/,
   /^locations\.branches$/,
