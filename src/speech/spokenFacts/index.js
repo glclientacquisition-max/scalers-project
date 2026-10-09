@@ -203,6 +203,35 @@ function renderFact(slot, lang = 'en', opts = {}) {
 }
 
 const by = (lang, rows) => rows[lang];
+
+// Kind nouns a stored request title can carry. Stripped from the item so the
+// template's own kind word is the only one spoken.
+const REQUEST_KIND_TAIL =
+  /(?:\s*[-:,(]\s*|\s+)(?:enquiry|enquiries|inquiry|inquiries|request|requests|callback(?:\s+request)?|call\s*back(?:\s+request)?|ombi|maombi|order)\)?\s*$/i;
+const REQUEST_KIND_HEAD =
+  /^\s*(?:(?:an?\s+)?(?:open\s+)?(?:enquiry|inquiry|request|callback(?:\s+request)?|ombi|order)\s+(?:about|for|on|of|la|kuhusu|ya)\s+)/i;
+
+/**
+ * A request title as the object of "an open enquiry about ...".
+ * "Water bowl enquiry" -> "water bowl"; "Enquiry about dog food" -> "dog food".
+ * A title that is only a kind noun ("Enquiry") gives '' (the line is not read).
+ * @param {string} item
+ * @returns {string}
+ */
+function requestItemPhrase(item) {
+  let out = String(item || '').replace(/\s+/g, ' ').trim().replace(/[.?!]+$/, '');
+  for (let i = 0; i < 2; i += 1) {
+    const next = out.replace(REQUEST_KIND_HEAD, '').replace(REQUEST_KIND_TAIL, '').trim();
+    if (next === out) break;
+    out = next;
+  }
+  if (!out || /^(?:enquiry|inquiry|request|callback|ombi|order)$/i.test(out)) return '';
+  // "Water bowl" reads as a noun mid-sentence; a Title Case Name or an
+  // acronym stays as stored.
+  const words = out.split(' ');
+  const sentenceCase = /^[A-Z][a-z]/.test(words[0]) && words.slice(1).every((w) => !/[A-Z]/.test(w));
+  return sentenceCase ? out.charAt(0).toLowerCase() + out.slice(1) : out;
+}
 const oneOf = (value, allowed) => {
   const v = String(value || '').toLowerCase();
   return allowed.includes(v) ? v : null;
@@ -233,30 +262,37 @@ const TEMPLATES = {
       });
     },
   },
+  // The item is the request title as stored, which often carries the kind
+  // already ("Water bowl enquiry"). Said once: "an open enquiry about
+  // water bowl", never "open enquiry for Water bowl enquiry" (HD_ceba9d9b3f37).
   request_open: {
     required: ['kind', 'item'],
     render: (r, lang, raw) => {
       const kind = oneOf(raw.kind, ['enquiry', 'callback', 'hold', 'order']);
       if (!kind) return null;
+      // A title that is only a kind noun ("Callback request") is said once
+      // with no item: "You have a callback request."
+      const item = requestItemPhrase(r.item);
+      const pre = (word) => (item ? ` ${word} ${item}` : '');
       const when = and(r.when, ', ');
       return by(lang, {
         en: {
-          enquiry: `You have an open enquiry for ${r.item}${when}.`,
-          callback: `You have a callback request about ${r.item}${when}.`,
-          hold: `You have a hold on ${r.item}${when}.`,
-          order: `You have an order for ${r.item}${when}.`,
+          enquiry: `You have an open enquiry${pre('about')}${when}.`,
+          callback: `You have a callback request${pre('about')}${when}.`,
+          hold: `You have a hold${pre('on')}${when}.`,
+          order: `You have an order${pre('for')}${when}.`,
         },
         sw: {
-          enquiry: `Una ombi la ${r.item}${when}.`,
-          callback: `Una ombi la kupigiwa simu kuhusu ${r.item}${when}.`,
-          hold: `Una ${r.item} uliyoshikiliwa${when}.`,
-          order: `Una oda ya ${r.item}${when}.`,
+          enquiry: `Una ombi${pre('kuhusu')}${when}.`,
+          callback: `Una ombi la kupigiwa simu${pre('kuhusu')}${when}.`,
+          hold: item ? `Una ${item} uliyoshikiliwa${when}.` : `Una kitu ulichoshikiliwa${when}.`,
+          order: `Una oda${pre('ya')}${when}.`,
         },
         sheng: {
-          enquiry: `Uko na enquiry ya ${r.item}${when}.`,
-          callback: `Uko na callback request kuhusu ${r.item}${when}.`,
-          hold: `Uko na hold ya ${r.item}${when}.`,
-          order: `Uko na order ya ${r.item}${when}.`,
+          enquiry: `Uko na enquiry${pre('kuhusu')}${when}.`,
+          callback: `Uko na callback request${pre('kuhusu')}${when}.`,
+          hold: `Uko na hold${pre('ya')}${when}.`,
+          order: `Uko na order${pre('ya')}${when}.`,
         },
       })[kind];
     },
@@ -364,8 +400,9 @@ const TEMPLATES = {
       });
     },
   },
-  // Last line of an open-file read: open rows left out (past-dated, or
-  // requests past the newest four).
+  // Last line of an open-file read: open rows not read out (past-dated, or
+  // past the read-out cap, src/speech/fileReadOut.js). Not "older": the
+  // cap leaves out newer rows too.
   more_open: {
     required: [],
     render: (_, lang, raw) => {
@@ -373,15 +410,15 @@ const TEMPLATES = {
       if (!Number.isInteger(n) || n < 1) return null;
       if (n === 1) {
         return by(lang, {
-          en: 'There is one older open item on file too.',
-          sw: 'Pia kuna ombi lingine moja la zamani lililo wazi kwenye faili.',
-          sheng: 'Pia kuna kitu ingine moja ya zamani iko open kwa file.',
+          en: 'There is one more open item on file.',
+          sw: 'Kuna ombi lingine moja lililo wazi kwenye faili.',
+          sheng: 'Kuna kitu ingine moja iko open kwa file.',
         });
       }
       return by(lang, {
-        en: `There are ${n} older open items on file too.`,
-        sw: `Pia kuna maombi mengine ${maCount(n)} ya zamani yaliyo wazi kwenye faili.`,
-        sheng: `Pia kuna vitu zingine ${n} za zamani ziko open kwa file.`,
+        en: `There are ${n} more open items on file.`,
+        sw: `Kuna maombi mengine ${maCount(n)} yaliyo wazi kwenye faili.`,
+        sheng: `Kuna vitu zingine ${n} ziko open kwa file.`,
       });
     },
   },
@@ -429,6 +466,7 @@ module.exports = {
   renderFact,
   spokenFactsEnabled,
   TEMPLATES: Object.keys(TEMPLATES),
+  requestItemPhrase,
   clockEn,
   eatParts,
 };

@@ -482,8 +482,15 @@ assert.match(
   'live Soniox PCM must warm that catalog voice downtime clip'
 );
 
+// The greeting goes through recordSpokenLine (local: true, spoken: true):
+// never an unsigned Gemini model turn, only a user-side note (HD_ceba9d9b3f37).
 assert.match(
   source,
+  /recordSpokenLine\(messages, greetingLine, \{ source: 'greeting' \}\)/,
+  'instant greeting must be recorded local so it is not sent as an unsigned Gemini model turn'
+);
+assert.match(
+  fs.readFileSync(path.join(__dirname, '..', 'src', 'speech', 'spokenHistory.js'), 'utf8'),
   /local:\s*true/,
   'instant greeting must be marked local so it is not sent as an unsigned Gemini model turn'
 );

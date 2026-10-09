@@ -434,7 +434,12 @@ const {
   createAgentReplayMemory,
 } = require('./src/speech/overlapHold');
 const { createLateFinalHold } = require('./src/speech/lateFinal');
-const { createIdleNudgeController } = require('./src/speech/idleNudge');
+const {
+  createIdleNudgeController,
+  idleNudgeArmPlan,
+  idleNudgeDelayMs,
+  idleStatementDelayMs,
+} = require('./src/speech/idleNudge');
 const {
   createWaitBargeReprompt,
   pickWaitRepromptLine,
@@ -443,6 +448,11 @@ const {
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
+const { speechVerdict, outageHandlingAllowed } = require('./src/speech/callOver');
+const { recordSpokenLine, spokenLineReachedCaller } = require('./src/speech/spokenHistory');
+const { shapeFileReadOut } = require('./src/speech/fileReadOut');
+const { supersedeDecision } = require('./src/speech/staleReply');
+const { planClosingCue } = require('./src/speech/closingCue');
 const {
   createVoiceTurnTiming,
   createCallTranscript,
@@ -1966,7 +1976,10 @@ mediaWss.on('connection', (ws, req) => {
     }
     return false;
   }
+  const idleQuestionDelayMs = idleNudgeDelayMs();
+  const idleStatementDelay = idleStatementDelayMs();
   const idleNudge = createIdleNudgeController({
+    delayMs: idleQuestionDelayMs,
     canFire: () =>
       ws.readyState === WebSocket.OPEN &&
       !callEnding &&
@@ -1984,7 +1997,7 @@ mediaWss.on('connection', (ws, req) => {
       return speakText(line, { isIdleNudge: true }).then((spoken) => {
         if (spoken?.ok) {
           callTranscript.pushAgent(line);
-          messages.push({ role: 'assistant', content: line, local: true });
+          recordSpokenLine(messages, line, { source: 'idle_nudge' });
         }
       });
     },
@@ -2017,7 +2030,7 @@ mediaWss.on('connection', (ws, req) => {
         });
         if (spoken?.ok) {
           callTranscript.pushAgent(line.text);
-          messages.push({ role: 'assistant', content: line.text, local: true });
+          recordSpokenLine(messages, line.text, { source: 'wait_reprompt' });
         }
         // Once only. From here the normal idle nudge owns the silence.
         if (!callEnding) idleNudge.arm({ skip: false });
@@ -2057,12 +2070,37 @@ mediaWss.on('connection', (ws, req) => {
     }
     if (snap.pendingIsQuestion) {
       console.log(`[ws/media][${sidLabel()}] agent_question_committed`);
-      // Do not poke "still there?" after the greeting. Wait until the caller has spoken.
-      idleNudge.arm({
-        skip: Boolean(opts.isIdleNudge) || !heardCallerUtterance,
+    }
+    // Any committed line arms "still there?": a question on the long delay,
+    // a statement on the short one (HD_ceba9d9b3f37). Not after the greeting.
+    if (snap.pendingSpeech || snap.pendingIsQuestion) {
+      applyIdleArmPlan({
+        event: 'line_committed',
+        pendingIsQuestion: Boolean(snap.pendingIsQuestion),
+        isIdleNudge: Boolean(opts.isIdleNudge),
       });
     }
     return committed;
+  }
+  function applyIdleArmPlan(input) {
+    const plan = idleNudgeArmPlan({
+      ...input,
+      heardCaller: heardCallerUtterance,
+      callEnding: callEnding || callIsOver(),
+      callerPending: input.event === 'turn_end' && (Boolean(pendingUtterance) || utteranceParts.length > 0),
+      armed: idleNudge.armed(),
+      questionDelayMs: idleQuestionDelayMs,
+      statementDelayMs: idleStatementDelay,
+    });
+    if (plan.arm) {
+      idleNudge.arm({ delayMs: plan.delayMs });
+      if (input.event === 'turn_end') {
+        console.log(`[ws/media][${sidLabel()}] idle_nudge armed reason=${plan.reason} in ${plan.delayMs}ms`);
+      }
+    } else if (plan.skip) {
+      idleNudge.arm({ skip: true });
+    }
+    return plan;
   }
   function noteCallerSpeechForIdle(text) {
     const sample = String(text || '').trim();
@@ -2080,6 +2118,41 @@ mediaWss.on('connection', (ws, req) => {
   let playbackGeneration = 0;
   let activePlaybackGeneration = 0;
   let pendingUtterance = null;
+  // The model call of the current caller turn, while it is in flight. A
+  // caller final that lands before any of its reply went to TTS supersedes
+  // it (src/speech/staleReply.js, HD_ceba9d9b3f37).
+  let inflightModelTurn = null;
+  let supersededTurnTiming = null;
+  // "Anything else?" was the last thing said for a caller thanks.
+  let closingCheckAsked = false;
+  function supersedeStaleReply(text, source) {
+    const flight = inflightModelTurn;
+    const decision = supersedeDecision({
+      modelPending: Boolean(flight),
+      replyStarted: Boolean(flight && flight.replyStarted()),
+      superseded: Boolean(flight && flight.superseded),
+      text,
+      echo: looksLikeEcho(text),
+    });
+    if (!decision.supersede) return false;
+    flight.superseded = true;
+    supersededTurnTiming = flight.timing;
+    // Same discard as a barge: the model call aborts, nothing of it plays,
+    // tool outcomes stay owed, and the queued words run next.
+    bargeInActive = true;
+    suppressReplyRemainder = true;
+    console.log(
+      `[ws/media][${sidLabel()}] stale reply superseded reason=${decision.reason} via=${source}: ${String(text || '').slice(0, 80)}`
+    );
+    voiceTrace.noteCall({
+      stage: 'stale_reply',
+      reason: decision.reason,
+      cue: decision.cue || '',
+      text: String(text || '').trim().slice(0, 120),
+      at: new Date().toISOString(),
+    });
+    return true;
+  }
   let pendingTurnSignals = {
     unfinished: false,
     weak: false,
@@ -2430,6 +2503,16 @@ mediaWss.on('connection', (ws, req) => {
    * downtime recording (same voice as the greeting) and hang up.
    */
   async function handleSpeechProviderOutage(reason) {
+    // HD_ceba9d9b3f37: a goodbye spoken after the caller hung up found no TTS
+    // session. That is a closed call, not a provider outage: no downtime clip,
+    // no owner alert, no hangup timer.
+    if (!outageHandlingAllowed({ callOver: callIsOver() })) {
+      console.log(
+        `[ws/media][${sidLabel()}] speech skipped after call end (${reason}): not an outage, no alert`
+      );
+      voiceTrace.noteCall({ stage: 'call_over', reason: String(reason || ''), at: new Date().toISOString() });
+      return { ok: false, callOver: true };
+    }
     if (speechOutageStarted) return { ok: false, outage: true };
     speechOutageStarted = true;
     unfinishedHold.close();
@@ -2455,7 +2538,7 @@ mediaWss.on('connection', (ws, req) => {
       if (pcm?.length) {
         const waitMs = await playLocalPcm(pcm);
         callTranscript.pushAgent(line);
-        messages.push({ role: 'assistant', content: line, local: true });
+        recordSpokenLine(messages, line, { source: 'outage_line' });
         hangupAfterSpeechOutage(waitMs);
         return { ok: true, outage: true, emergency: true };
       }
@@ -2619,6 +2702,21 @@ mediaWss.on('connection', (ws, req) => {
     });
   }
 
+  // A turn whose reply was dropped for a newer caller final (not a barge).
+  function bargeOutcome(timing) {
+    return supersededTurnTiming && supersededTurnTiming === timing ? 'superseded' : 'barge_in';
+  }
+
+  // Every line the code speaks (not the model) goes into the model history
+  // through this one helper, once the caller heard it (HD_ceba9d9b3f37: the
+  // model re-read the visits and the service list it never saw).
+  // Model replies and their tool confirmations are already in the history
+  // from the model turn; fillers, tool holds and replays are not recorded.
+  function noteSpokenLine(line, source, spoken) {
+    if (spokenLineReachedCaller(spoken)) recordSpokenLine(messages, line, { source });
+    return spoken;
+  }
+
   async function speakText(text, opts = {}) {
     if (!opts.skipFileGate && !opts.isFiller && !opts.isReplay && !opts.isIdleNudge) {
       const gated = gateCallerFileSpeech(text, callBrainStates.get(sidLabel()));
@@ -2631,6 +2729,13 @@ mediaWss.on('connection', (ws, req) => {
       text = gated.line;
     }
     if (!text) return { ok: false };
+    // Nothing is spoken once the caller has hung up (HD_ceba9d9b3f37).
+    if (speechVerdict({ callOver: callIsOver() }) === 'call_over') {
+      console.log(
+        `[ws/media][${sidLabel()}] speakText skipped — call over: ${String(text).slice(0, 80)}`
+      );
+      return { ok: false, callOver: true };
+    }
     if (speechOutageStarted) return { ok: false, outage: true };
     // Greeting / early turns can race tenantWarm → TTS session create.
     if (!tts && ttsReadyPromise) {
@@ -2643,7 +2748,19 @@ mediaWss.on('connection', (ws, req) => {
         /* ignore */
       }
     }
-    if (!tts) {
+    const verdict = speechVerdict({
+      callOver: callIsOver(),
+      outageStarted: speechOutageStarted,
+      ttsReady: Boolean(tts),
+    });
+    if (verdict === 'call_over') {
+      console.log(
+        `[ws/media][${sidLabel()}] speakText skipped — call over: ${String(text).slice(0, 80)}`
+      );
+      return { ok: false, callOver: true };
+    }
+    if (verdict === 'outage_started') return { ok: false, outage: true };
+    if (verdict === 'outage') {
       console.warn(
         `[ws/media][${sidLabel()}] speakText skipped — TTS unavailable: ${String(text).slice(0, 80)}`
       );
@@ -3038,6 +3155,7 @@ mediaWss.on('connection', (ws, req) => {
     idleNudge.clear();
     waitReprompt.cancel();
     if (turnBusy) {
+      supersedeStaleReply(clean, 'turn_while_busy');
       // Merge continuation fragments into one pending utterance (don't drop context).
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${clean}` : clean;
       if (flushed.unfinished) pendingTurnSignals.unfinished = true;
@@ -3089,6 +3207,9 @@ mediaWss.on('connection', (ws, req) => {
       voiceTrace.beginTurn({ callerText: clean });
       voiceTrace.noteTurnEnd({ decision: 'skip', reason: 'non_substantive' });
       voiceTrace.commitTurn({ outcome: 'skip' });
+      // The caller's "Okay." cleared the nudge. Nothing is said back, so
+      // the silence after it still gets a check-in (HD_ceba9d9b3f37 t3).
+      applyIdleArmPlan({ event: 'turn_end' });
       return;
     }
 
@@ -3201,8 +3322,27 @@ mediaWss.on('connection', (ws, req) => {
     if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
       systemPrompt = buildSystemPrompt(brainProfile);
     }
-    const nextBestAction = determineNextBestAction({ state: brainState, capabilities });
+    let nextBestAction = determineNextBestAction({ state: brainState, capabilities });
     brainState = setNextBestAction(brainState, nextBestAction);
+    // Closing cues Brain's sign-off check does not see ("Okay, thank you.",
+    // "asante", "Sawa, ni hayo tu. Baadaye basi.") go to the close path
+    // (src/speech/closingCue.js, HD_ceba9d9b3f37 / HD_1677e57f73f9).
+    const closingCue = planClosingCue({
+      text: clean,
+      brainAction: nextBestAction.action,
+      lastAgentText,
+      closingCheckAsked,
+      language: callLanguage,
+    });
+    closingCheckAsked = false;
+    if (closingCue.action === 'end') {
+      nextBestAction = {
+        action: 'END',
+        reason: `The caller is wrapping up (${closingCue.reason}). Close with a short farewell.`,
+      };
+      brainState = setNextBestAction(brainState, nextBestAction);
+      console.log(`[ws/media][${callKey}] closing cue end reason=${closingCue.reason}: ${clean}`);
+    }
     if (
       previousBrainState?.caller?.nameConfirmed !== true &&
       brainState?.caller?.nameConfirmed === true
@@ -3234,6 +3374,18 @@ mediaWss.on('connection', (ws, req) => {
     callTranscript.pushCaller(clean);
     tapSim('caller_turn', { text: clean, lock: structuredLock?.lang || null });
     messages.push({ role: 'user', content: clean });
+    // A turn queued behind a reply can run after the caller hung up
+    // (HD_ceba9d9b3f37 "That's all."). Brain has observed it for the summary;
+    // nothing is spoken and the model is not asked.
+    if (callIsOver()) {
+      console.log(`[ws/media][${callKey}] caller turn after call end: observed, nothing spoken`);
+      voiceTrace.noteTurnEnd({ decision: 'skip', reason: 'call_over' });
+      callEnding = true;
+      logTurnTiming(turnTiming, { outcome: 'call_over' });
+      if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+      turnBusy = false;
+      return;
+    }
 
     const turnMatches = selectProductsForTurn({
       catalog: brainProfile.productCatalog,
@@ -3314,8 +3466,8 @@ mediaWss.on('connection', (ws, req) => {
         console.log(`[ws/media][${callKey}] speaking queued tool outcome`);
         callTranscript.pushAgent(owedOutcome);
         const owedSpoken = await speakText(owedOutcome);
-        if (owedSpoken?.ok) {
-          messages.push({ role: 'assistant', content: owedOutcome, local: true });
+        if (spokenLineReachedCaller(owedSpoken)) {
+          recordSpokenLine(messages, owedOutcome, { source: 'tool_outcome' });
         } else {
           queueToolOutcome(brainState, owedOutcome);
           callBrainStates.set(callKey, brainState);
@@ -3405,8 +3557,13 @@ mediaWss.on('connection', (ws, req) => {
       const nameJustConfirmed = brainState?.caller?.nameJustConfirmed === true;
       // BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 8): "Yeah" to the name ask
       // after "About my booking": visit_open first, before any other content.
+      // Voice caps what is said (2 rows + a count) and ends on a question
+      // (HD_ceba9d9b3f37). Brain still picks the rows and their order.
       const confirmRead = nameJustConfirmed
-        ? planConfirmFileRead(brainState, { language: callLanguage, now: new Date() })
+        ? shapeFileReadOut(planConfirmFileRead(brainState, { language: callLanguage, now: new Date() }), {
+            language: callLanguage,
+            now: new Date(),
+          })
         : null;
       if (confirmRead?.line) {
         callBrainStates.set(callKey, brainState);
@@ -3416,7 +3573,25 @@ mediaWss.on('connection', (ws, req) => {
         suppressReplyRemainder = false;
         callTranscript.pushAgent(confirmRead.line);
         turnTiming.markFirstSpokenChunk();
-        await speakText(confirmRead.line, { tracePath: 'visit_read' });
+        noteSpokenLine(
+          confirmRead.line,
+          'confirm_read',
+          await speakText(confirmRead.line, { tracePath: 'visit_read' })
+        );
+        spokeThisTurn = true;
+        return;
+      }
+      // A thanks that is not an answer: one short "anything else?" instead of
+      // a model turn. The next thanks or a bare no closes the call.
+      if (closingCue.action === 'check' && closingCue.line && !nameJustConfirmed) {
+        closingCheckAsked = true;
+        callBrainStates.set(callKey, brainState);
+        console.log(`[ws/media][${callKey}] closing check lang=${callLanguage}: ${closingCue.line}`);
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(closingCue.line);
+        turnTiming.markFirstSpokenChunk();
+        noteSpokenLine(closingCue.line, 'closing_check', await speakText(closingCue.line, { tracePath: 'closing_check' }));
         spokeThisTurn = true;
         return;
       }
@@ -3484,6 +3659,8 @@ mediaWss.on('connection', (ws, req) => {
           action: nextBestAction.action,
           language: callLanguage,
           idle: idleNudge,
+          // The caller already hung up: no goodbye into a closed socket, no hangup.
+          isOver: callIsOver,
           speak: async (line) => {
             bargeInActive = false;
             suppressReplyRemainder = false;
@@ -3491,7 +3668,8 @@ mediaWss.on('connection', (ws, req) => {
             turnTiming.markFirstSpokenChunk();
             playbackBytes = 0;
             playbackStartedAt = 0;
-            await speakText(line);
+            const farewellSpoken = await speakText(line);
+            noteSpokenLine(line, 'farewell', farewellSpoken);
             spokeThisTurn = true;
           },
           hangup: () => {
@@ -3550,13 +3728,22 @@ mediaWss.on('connection', (ws, req) => {
           callTranscript.pushAgent(line);
           turnTiming.markFirstSpokenChunk();
           const nameAsk = askingName && line === fileNameAsk;
-          await speakText(
+          const plannedSpoken = await speakText(
             line,
             speakCommit.wasSpoken(line)
               ? { skipFileGate: true, ...(nameAsk ? { tracePath: 'file_name_ask' } : {}) }
               : nameAsk
                 ? { tracePath: 'file_name_ask' }
                 : {}
+          );
+          noteSpokenLine(
+            line,
+            nameAsk
+              ? 'file_name_ask'
+              : spokeCatalogue && line === catalogueMouth.line
+                ? 'catalogue'
+                : 'speak_slot',
+            plannedSpoken
           );
           spokeThisTurn = true;
         }
@@ -3591,7 +3778,7 @@ mediaWss.on('connection', (ws, req) => {
           turnTiming.markFirstSpokenChunk();
           playbackBytes = 0;
           playbackStartedAt = 0;
-          await speakText(heldFact, { skipFileGate: true });
+          noteSpokenLine(heldFact, 'speak_slot', await speakText(heldFact, { skipFileGate: true }));
           spokeThisTurn = true;
           return;
         }
@@ -3627,6 +3814,20 @@ mediaWss.on('connection', (ws, req) => {
         openRequests: brainState?.returning?.openRequests,
         fileState: brainState,
       });
+      if (
+        visitRead.runModel === false &&
+        visitRead.line &&
+        (visitRead.kind === 'open_read' || visitRead.kind === 'confirm_read')
+      ) {
+        const shaped = shapeFileReadOut(
+          { line: visitRead.line, lines: visitRead.lines, kind: visitRead.kind },
+          { language: callLanguage, now: new Date() }
+        );
+        if (shaped?.line) {
+          visitRead.line = shaped.line;
+          visitRead.lines = shaped.lines;
+        }
+      }
       if (visitRead.runModel === false && visitRead.line) {
         if (!brainState.conversation || typeof brainState.conversation !== 'object') {
           brainState.conversation = {};
@@ -3639,7 +3840,11 @@ mediaWss.on('connection', (ws, req) => {
         suppressReplyRemainder = false;
         callTranscript.pushAgent(visitRead.line);
         turnTiming.markFirstSpokenChunk();
-        await speakText(visitRead.line, { tracePath: 'visit_read' });
+        noteSpokenLine(
+          visitRead.line,
+          'visit_read',
+          await speakText(visitRead.line, { tracePath: 'visit_read' })
+        );
         spokeThisTurn = true;
         return;
       }
@@ -4029,6 +4234,7 @@ mediaWss.on('connection', (ws, req) => {
           speakSession = null;
         }
         callTranscript.pushAgent(sentence);
+        recordSpokenLine(messages, sentence, { source: 'lookup_sentence' });
         spokeLookupSentence = true;
         console.log(`[ws/media][${sidLabel()}] lookup sentence on stream: ${sentence}`);
         return true;
@@ -4067,6 +4273,7 @@ mediaWss.on('connection', (ws, req) => {
         };
         voiceTrace.noteCanned({ path: 'llm_unavailable', text: result.spokenText });
         traceModelResult(result);
+        if (inflightModelTurn?.timing === turnTiming) inflightModelTurn = null;
         stopFillerForReply();
         if (speakSession) {
           try {
@@ -4083,17 +4290,22 @@ mediaWss.on('connection', (ws, req) => {
             await actionProgressSpeak;
             callTranscript.pushAgent(result.spokenText);
             turnTiming.markFirstSpokenChunk();
-            await speakText(
-              catalogueMouth.letGemini && !structuredMouth
-                ? softenCataloguePunctuation(result.spokenText)
-                : result.spokenText,
-              { tracePath: 'llm_unavailable' }
+            noteSpokenLine(
+              result.spokenText,
+              'llm_unavailable',
+              await speakText(
+                catalogueMouth.letGemini && !structuredMouth
+                  ? softenCataloguePunctuation(result.spokenText)
+                  : result.spokenText,
+                { tracePath: 'llm_unavailable' }
+              )
             );
             spokeThisTurn = true;
           }
         }
       } else if (streamOn) {
         turnTiming.markLlmStart();
+        inflightModelTurn = { timing: turnTiming, superseded: false, replyStarted: () => firstSpokenChunk };
         voiceTrace.noteModelRequest({
           provider: 'gemini',
           model: geminiPrimaryModel(),
@@ -4116,6 +4328,7 @@ mediaWss.on('connection', (ws, req) => {
               catalogueBreath: catalogueMouth.letGemini,
             });
         traceModelResult(result);
+        if (inflightModelTurn?.timing === turnTiming) inflightModelTurn = null;
         stopFillerForReply();
 
         if (suppressModelSpeech) {
@@ -4134,7 +4347,7 @@ mediaWss.on('connection', (ws, req) => {
               speaking = false;
               releaseQueuedCallerSpeech(streamPlaybackGen);
             }
-            logTurnTiming(turnTiming, { outcome: 'barge_in' });
+            logTurnTiming(turnTiming, { outcome: bargeOutcome(turnTiming) });
             if (activeTurnTiming === turnTiming) activeTurnTiming = null;
             return;
           }
@@ -4155,7 +4368,7 @@ mediaWss.on('connection', (ws, req) => {
               speaking = false;
               releaseQueuedCallerSpeech(streamPlaybackGen);
             }
-            logTurnTiming(turnTiming, { outcome: 'barge_in' });
+            logTurnTiming(turnTiming, { outcome: bargeOutcome(turnTiming) });
             if (activeTurnTiming === turnTiming) activeTurnTiming = null;
             return;
           }
@@ -4213,7 +4426,9 @@ mediaWss.on('connection', (ws, req) => {
               if (reply) {
                 callTranscript.pushAgent(reply);
                 turnTiming.markFirstSpokenChunk();
-                await speakText(reply, missed ? { tracePath: 'speech_repair' } : undefined);
+                const replySpoken = await speakText(reply, missed ? { tracePath: 'speech_repair' } : undefined);
+                // A model reply is already in the history; a repair line is not.
+                if (missed) noteSpokenLine(reply, 'speech_repair', replySpoken);
                 spokeThisTurn = true;
                 turnOutcome = result?.llmHardDown
                   ? 'speech_guarantee'
@@ -4255,7 +4470,9 @@ mediaWss.on('connection', (ws, req) => {
             if (reply) {
               callTranscript.pushAgent(reply);
               turnTiming.markFirstSpokenChunk();
-              await speakText(reply, missed ? { tracePath: 'speech_repair' } : undefined);
+              const replySpoken = await speakText(reply, missed ? { tracePath: 'speech_repair' } : undefined);
+              // A model reply is already in the history; a repair line is not.
+              if (missed) noteSpokenLine(reply, 'speech_repair', replySpoken);
               spokeThisTurn = true;
               turnOutcome = result?.llmHardDown
                 ? 'speech_guarantee'
@@ -4270,12 +4487,13 @@ mediaWss.on('connection', (ws, req) => {
           discardUnspokenAssistant(result?.spokenText || '');
           queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation || result?.bargedActionConfirmation);
           bargeInActive = false;
-          logTurnTiming(turnTiming, { outcome: 'barge_in' });
+          logTurnTiming(turnTiming, { outcome: bargeOutcome(turnTiming) });
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
         }
       } else {
         turnTiming.markLlmStart();
+        inflightModelTurn = { timing: turnTiming, superseded: false, replyStarted: () => firstSpokenChunk };
         voiceTrace.noteModelRequest({
           provider: 'gemini',
           model: geminiPrimaryModel(),
@@ -4298,6 +4516,7 @@ mediaWss.on('connection', (ws, req) => {
               onToolHold: speakToolHold,
             });
         traceModelResult(result);
+        if (inflightModelTurn?.timing === turnTiming) inflightModelTurn = null;
         stopFillerForReply();
         if (speakSession) {
           try {
@@ -4326,7 +4545,7 @@ mediaWss.on('connection', (ws, req) => {
           discardUnspokenAssistant(reply);
           queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation || result?.bargedActionConfirmation);
           bargeInActive = false;
-          logTurnTiming(turnTiming, { outcome: 'barge_in' });
+          logTurnTiming(turnTiming, { outcome: bargeOutcome(turnTiming) });
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
         }
@@ -4342,12 +4561,13 @@ mediaWss.on('connection', (ws, req) => {
         } else if (reply && !skipDuplicateAsk) {
           callTranscript.pushAgent(reply);
           turnTiming.markFirstSpokenChunk();
-          await speakText(
+          const repairLine = !result?.spokenText && (result?.timedOut || result?.llmFailed);
+          const replySpoken = await speakText(
             reply,
-            !result?.spokenText && (result?.timedOut || result?.llmFailed)
-              ? { tracePath: 'speech_repair' }
-              : undefined
+            repairLine ? { tracePath: 'speech_repair' } : undefined
           );
+          // A model reply is already in the history; a repair line is not.
+          if (repairLine) noteSpokenLine(reply, 'speech_repair', replySpoken);
           spokeThisTurn = true;
         }
       }
@@ -4386,8 +4606,7 @@ mediaWss.on('connection', (ws, req) => {
         if (coverageNext) {
           console.log(`[ws/media][${sidLabel()}] coverage next step lang=${callLanguage}: ${coverageNext}`);
           callTranscript.pushAgent(coverageNext);
-          const askSpoken = await speakText(coverageNext);
-          if (askSpoken?.ok) messages.push({ role: 'assistant', content: coverageNext, local: true });
+          noteSpokenLine(coverageNext, 'coverage_next', await speakText(coverageNext));
         }
       }
 
@@ -4408,9 +4627,13 @@ mediaWss.on('connection', (ws, req) => {
             );
             callTranscript.pushAgent(guarantee);
             turnTiming.markFirstSpokenChunk();
-            await speakText(guarantee, {
-              tracePath: result?.llmHardDown ? 'speech_guarantee' : 'speech_repair',
-            });
+            noteSpokenLine(
+              guarantee,
+              result?.llmHardDown ? 'speech_guarantee' : 'speech_repair',
+              await speakText(guarantee, {
+                tracePath: result?.llmHardDown ? 'speech_guarantee' : 'speech_repair',
+              })
+            );
             spokeThisTurn = true;
             turnOutcome = result?.llmHardDown ? 'speech_guarantee' : 'speech_repair';
           } else {
@@ -4434,7 +4657,11 @@ mediaWss.on('connection', (ws, req) => {
             );
             callTranscript.pushAgent(planned.line);
             turnTiming.markFirstSpokenChunk();
-            await speakText(planned.line, { tracePath: planned.kind || 'speech_repair' });
+            noteSpokenLine(
+              planned.line,
+              planned.kind || 'speech_repair',
+              await speakText(planned.line, { tracePath: planned.kind || 'speech_repair' })
+            );
             spokeThisTurn = true;
             turnOutcome = 'speech_repair';
           } else {
@@ -4476,7 +4703,7 @@ mediaWss.on('connection', (ws, req) => {
       } else if (!bargeInActive && !progressAlreadySpoken && !spokeThisTurn) {
         const recovery = await resolveLlmRecoverySpeech(clean);
         callTranscript.pushAgent(recovery);
-        await speakText(recovery, { tracePath: 'llm_recovery' });
+        noteSpokenLine(recovery, 'llm_recovery', await speakText(recovery, { tracePath: 'llm_recovery' }));
       }
       logTurnTiming(turnTiming, { outcome: 'error' });
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
@@ -4487,7 +4714,10 @@ mediaWss.on('connection', (ws, req) => {
         logTurnTiming(turnTiming, { outcome: 'early_return' });
         activeTurnTiming = null;
       }
+      if (inflightModelTurn?.timing === turnTiming) inflightModelTurn = null;
       turnBusy = false;
+      // Any turn that ends without the caller speaking gets the check-in.
+      applyIdleArmPlan({ event: 'turn_end' });
       kickPendingTurn();
     }
   }
@@ -4521,6 +4751,7 @@ mediaWss.on('connection', (ws, req) => {
     lateFinals.noteClosed(Date.now());
     overlapHold.markReleased(text);
     if (turnBusy) {
+      supersedeStaleReply(text, 'flush_while_busy');
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${text}` : text;
       if (label.unfinished) pendingTurnSignals.unfinished = true;
       if (label.weak) pendingTurnSignals.weak = true;
@@ -4785,6 +5016,7 @@ mediaWss.on('connection', (ws, req) => {
         console.log(
           `[ws/media][${sidLabel()}] caller final queued while thinking: ${text.slice(0, 80)}`
         );
+        supersedeStaleReply(text, 'thinking_queued');
       }
 
       if (speaking && !bargeInActive) {
@@ -4993,7 +5225,7 @@ mediaWss.on('connection', (ws, req) => {
         });
         await playCachedFillerPcm(found.pcm, { text: greetingLine, trace: false });
         callTranscript.pushAgent(greetingLine);
-        messages.push({ role: 'assistant', content: greetingLine, local: true });
+        recordSpokenLine(messages, greetingLine, { source: 'greeting' });
         if (!greetingInterrupted) markGreetingFileNameAsk(greetingLine);
       } else {
         let readyTts = await ttsReadyPromise;
@@ -5036,7 +5268,7 @@ mediaWss.on('connection', (ws, req) => {
         if (spoken?.outage || speechOutageStarted) return;
         if (spoken?.ok) {
           callTranscript.pushAgent(greetingLine);
-          messages.push({ role: 'assistant', content: greetingLine, local: true });
+          recordSpokenLine(messages, greetingLine, { source: 'greeting' });
           if (!greetingInterrupted && !spoken.cancelled) markGreetingFileNameAsk(greetingLine);
         }
       }
@@ -5078,7 +5310,7 @@ mediaWss.on('connection', (ws, req) => {
         });
         greetingAwaitingFirstPcm = true;
         await speakGreetingSentences(fallback);
-        messages.push({ role: 'assistant', content: fallback, local: true });
+        recordSpokenLine(messages, fallback, { source: 'greeting_fallback' });
       } catch {
         /* ignore */
       }

@@ -102,8 +102,8 @@ describe('renderFactLine templates (fact-lines.md)', () => {
       line('visit_open', 'en', { job: 'Carpet Cleaning', status: 'confirmed', when: SAT_9 }),
       'You have a Carpet Cleaning visit confirmed for tomorrow, Saturday, at 9 AM.'
     );
-    assert.equal(line('request_open', 'en', { kind: 'enquiry', item: 'Mansion Cleaning Custom Quote' }), 'You have an open enquiry for Mansion Cleaning Custom Quote.');
-    assert.equal(line('request_open', 'sw', { kind: 'enquiry', item: 'Mansion Cleaning Custom Quote' }), 'Una ombi la Mansion Cleaning Custom Quote.');
+    assert.equal(line('request_open', 'en', { kind: 'enquiry', item: 'Mansion Cleaning Custom Quote' }), 'You have an open enquiry about Mansion Cleaning Custom Quote.');
+    assert.equal(line('request_open', 'sw', { kind: 'enquiry', item: 'Mansion Cleaning Custom Quote' }), 'Una ombi kuhusu Mansion Cleaning Custom Quote.');
     assert.equal(line('visit_open', 'en', { job: 'x', status: 'cancelled' }), null);
     assert.equal(line('request_open', 'en', { kind: 'quote', item: 'x' }), null);
   });
@@ -154,15 +154,31 @@ describe('confirm_identity_first and more_open', () => {
     }
   });
   it('more_open: count 1 is singular; Kiswahili counts agree with maombi', () => {
-    assert.equal(line('more_open', 'en', { count: 1 }), 'There is one older open item on file too.');
-    assert.equal(line('more_open', 'en', { count: 3 }), 'There are 3 older open items on file too.');
-    assert.equal(line('more_open', 'sw', { count: 1 }), 'Pia kuna ombi lingine moja la zamani lililo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sw', { count: 2 }), 'Pia kuna maombi mengine mawili ya zamani yaliyo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sw', { count: 5 }), 'Pia kuna maombi mengine matano ya zamani yaliyo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sw', { count: 6 }), 'Pia kuna maombi mengine sita ya zamani yaliyo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sw', { count: 8 }), 'Pia kuna maombi mengine manane ya zamani yaliyo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sw', { count: 12 }), 'Pia kuna maombi mengine kumi na mawili ya zamani yaliyo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sheng', { count: 4 }), 'Pia kuna vitu zingine 4 za zamani ziko open kwa file.');
+    // Not "older": the read-out cap (src/speech/fileReadOut.js) leaves out newer rows too.
+    assert.equal(line('more_open', 'en', { count: 1 }), 'There is one more open item on file.');
+    assert.equal(line('more_open', 'en', { count: 3 }), 'There are 3 more open items on file.');
+    assert.equal(line('more_open', 'sw', { count: 1 }), 'Kuna ombi lingine moja lililo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 2 }), 'Kuna maombi mengine mawili yaliyo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 5 }), 'Kuna maombi mengine matano yaliyo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 6 }), 'Kuna maombi mengine sita yaliyo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 8 }), 'Kuna maombi mengine manane yaliyo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 12 }), 'Kuna maombi mengine kumi na mawili yaliyo wazi kwenye faili.');
+    assert.equal(line('more_open', 'sheng', { count: 4 }), 'Kuna vitu zingine 4 ziko open kwa file.');
+  });
+  it('request_open says the kind once (HD_ceba9d9b3f37: "open enquiry for Water bowl enquiry")', () => {
+    assert.equal(line('request_open', 'en', { kind: 'enquiry', item: 'Water bowl enquiry' }), 'You have an open enquiry about water bowl.');
+    assert.equal(line('request_open', 'en', { kind: 'callback', item: 'Dishwashing enquiry' }), 'You have a callback request about dishwashing.');
+    assert.equal(line('request_open', 'en', { kind: 'callback', item: 'Carpet cleaning outside coverage' }), 'You have a callback request about carpet cleaning outside coverage.');
+    assert.equal(line('request_open', 'en', { kind: 'enquiry', item: 'Enquiry about dog food' }), 'You have an open enquiry about dog food.');
+    assert.equal(line('request_open', 'en', { kind: 'callback', item: 'Callback request' }), 'You have a callback request.');
+    assert.equal(line('request_open', 'sw', { kind: 'enquiry', item: 'Water bowl enquiry' }), 'Una ombi kuhusu water bowl.');
+    assert.equal(line('request_open', 'sheng', { kind: 'enquiry', item: 'Water bowl enquiry' }), 'Uko na enquiry kuhusu water bowl.');
+    for (const lang of ['en', 'sw', 'sheng']) {
+      for (const kind of ['enquiry', 'callback', 'hold', 'order']) {
+        const said = line('request_open', lang, { kind, item: 'Water bowl enquiry' });
+        assert.doesNotMatch(said, /enquiry.*enquiry|bowl enquiry/i, `${lang}/${kind}: ${said}`);
+      }
+    }
   });
   it('more_open with no, zero or bad count returns null (Brain falls back)', () => {
     assert.equal(line('more_open', 'en', {}), null);
