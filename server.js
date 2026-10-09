@@ -138,6 +138,11 @@ const { bulletinClosureNotice } = require('./src/conversation/dailyBulletin');
 const { parseAgentTools } = require('./src/conversation/agentTools');
 const { parseGeminiResponse } = require('./src/conversation/toolMarkers');
 const {
+  mergeNativeFunctionCalls,
+  nativeFunctionToolsConfig,
+  withNativeFunctionsPrompt,
+} = require('./src/conversation/geminiFunctions');
+const {
   createBrainState,
   inferIntent,
   observeCallerTurn,
@@ -5730,7 +5735,9 @@ async function generateGeminiText({
 
 function geminiVoiceConfig(systemPrompt) {
   return {
-    systemInstruction: { parts: [{ text: systemPrompt }] },
+    // BRAIN_NATIVE_FUNCTIONS=on adds the day-one function note and
+    // declarations. Off (default) leaves this config as it was.
+    systemInstruction: { parts: [{ text: withNativeFunctionsPrompt(systemPrompt) }] },
     // Slightly lower temp + shorter cap → faster, more consistent phone lines.
     temperature: Number(process.env.GEMINI_VOICE_TEMPERATURE || 0.35),
     maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 256),
@@ -5738,6 +5745,7 @@ function geminiVoiceConfig(systemPrompt) {
     thinkingConfig: {
       thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'MINIMAL',
     },
+    ...nativeFunctionToolsConfig(),
   };
 }
 
@@ -6181,6 +6189,7 @@ async function runGeminiTurnStreaming(
   }
 
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
+  Object.assign(parsed, mergeNativeFunctionCalls(parsed, modelParts, { callSid }));
   const heldTools = await applyToolsWithHold(callSid, parsed, { shouldAbort, onToolHold });
   const execution = heldTools.execution;
   let actionConfirmation = formatToolConfirmation(
@@ -6297,6 +6306,7 @@ async function runGeminiTurn(
 
   const outputText = extractGeminiText(response);
   const parsed = parseGeminiResponse(outputText);
+  Object.assign(parsed, mergeNativeFunctionCalls(parsed, response, { callSid }));
   const heldTools = await applyToolsWithHold(callSid, parsed, hooks);
   const execution = heldTools.execution;
   let actionConfirmation = formatToolConfirmation(

@@ -596,7 +596,9 @@ function applyHeldCallerName(parsed, held) {
   const stamp = (row) => (row && typeof row === 'object' ? { ...row, name: held } : row);
   const next = { ...parsed };
   // Replace a name the model sent. Do not invent a save the model did not send.
-  if (next.name) next.name = held;
+  // A native save_caller_info carries no name (callerInfoRequested): the code
+  // attaches the name it already holds.
+  if (next.name || next.callerInfoRequested) next.name = held;
   if (next.escalate) next.escalate = stamp(next.escalate);
   if (next.appointment) next.appointment = stamp(next.appointment);
   if (next.serviceRequest) next.serviceRequest = stamp(next.serviceRequest);

@@ -47,9 +47,23 @@ function cloneGeminiPart(part) {
   if (part.thought === true) cloned.thought = true;
   const signature = part.thoughtSignature || part.thought_signature;
   if (signature) cloned.thoughtSignature = String(signature);
-  if (!cloned.text && !cloned.thoughtSignature && !cloned.thought) return null;
+  // Native function calls (BRAIN_NATIVE_FUNCTIONS) are kept so the turn can
+  // parse them. buildGeminiContents drops them again before replay.
+  const call = part.functionCall || part.function_call;
+  if (call && typeof call === 'object' && String(call.name || '').trim()) {
+    const args = call.args ?? call.arguments;
+    cloned.functionCall = {
+      name: String(call.name).trim(),
+      args: args && typeof args === 'object' && !Array.isArray(args) ? { ...args } : {},
+    };
+  }
+  if (!cloned.text && !cloned.thoughtSignature && !cloned.thought && !cloned.functionCall) {
+    return null;
+  }
   const cleaned = sanitizePartText(cloned);
-  if (!cleaned.text && !cleaned.thoughtSignature && !cleaned.thought) return null;
+  if (!cleaned.text && !cleaned.thoughtSignature && !cleaned.thought && !cleaned.functionCall) {
+    return null;
+  }
   return cleaned;
 }
 
@@ -104,7 +118,13 @@ function buildGeminiContents(messages, windowSize = CONTEXT_WINDOW) {
     const role = message.role === 'assistant' ? 'model' : 'user';
     let parts;
     if (role === 'model' && Array.isArray(message.geminiParts) && message.geminiParts.length) {
-      parts = message.geminiParts.map(cloneGeminiPart).filter(Boolean);
+      // We run tools ourselves and never send a functionResponse. A replayed
+      // functionCall part would be an unanswered call, so drop it (and its
+      // signature). A function-only turn is skipped like a local line; CALL
+      // STATE already carries what was saved. Do not glue a signature onto text.
+      parts = message.geminiParts
+        .map(cloneGeminiPart)
+        .filter((part) => part && !part.functionCall);
     } else {
       const part = { text: String(message.content || '') };
       if (role === 'model' && message.thoughtSignature) {
