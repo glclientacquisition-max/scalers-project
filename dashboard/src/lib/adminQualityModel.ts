@@ -32,13 +32,13 @@ export type QualityRange = "7d" | "30d";
 export const LATENCY_BUDGET_MS = 1200;
 
 /**
- * Caller outcomes that count as Couldn't answer.
- * Match is case-insensitive. Brain confirms these literals.
+ * Turn outcomes that count as Couldn't answer. Literals from Brain.
+ * Compared lowercase. `speech_repair` is a retry, not a miss, so it stays out.
  */
-export const COULDNT_ANSWER_OUTCOMES = ["unknown", "escalation"] as const;
+export const COULDNT_ANSWER_OUTCOMES = ["error", "stream_timeout", "speech_guarantee", "speech_quiet"] as const;
 
-/** Canned paths that count as Couldn't answer. Brain confirms this literal. */
-export const COULDNT_ANSWER_CANNED = ["llm_recovery"] as const;
+/** Canned paths that count as Couldn't answer. Literals from Brain. Compared lowercase. */
+export const COULDNT_ANSWER_CANNED = ["llm_recovery", "llm_unavailable", "speech_guarantee"] as const;
 
 /** Higher impact first. Ties in `topCheck` break toward this order. */
 const CHECK_SEVERITY: readonly VoiceCheckName[] = [
@@ -399,16 +399,18 @@ function isCouldntAnswerOutcome(value: string): boolean {
 
 function turnMissed(turn: VoiceTurnTrace): boolean {
   for (const stage of turn.stages) {
-    if (stage.stage === "canned" && (COULDNT_ANSWER_CANNED as readonly string[]).includes(stage.path)) return true;
+    if (stage.stage === "canned" && (COULDNT_ANSWER_CANNED as readonly string[]).includes(stage.path.trim().toLowerCase())) {
+      return true;
+    }
     if (stage.stage === "outcome" && isCouldntAnswerOutcome(stage.value)) return true;
   }
   return false;
 }
 
 /**
- * Caller questions from turns that closed UNKNOWN or escalation, or used the
- * recovery line. Silence and deleted answer are delivery faults, not missing
- * knowledge, so they do not count. Deduped by the caller question.
+ * Caller questions from turns whose outcome is in COULDNT_ANSWER_OUTCOMES, or
+ * that played a COULDNT_ANSWER_CANNED line. Silence and deleted answer checks
+ * do not count. Deduped by the caller question.
  */
 export function couldntAnswerQuestions(turns: readonly VoiceTurnTrace[]): string[] {
   const seen = new Set<string>();

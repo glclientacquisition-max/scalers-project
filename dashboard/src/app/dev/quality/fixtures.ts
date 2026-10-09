@@ -126,10 +126,10 @@ const lowUnknown: VoiceTurnTrace["stages"] = [
   },
   { stage: "tts", text: "Kesho tuna nafasi asubuhi.", before: "Kesho tuna nafasi asubuhi.", language: "sw", voiceId: null },
   { stage: "latency", callerStopToModelFirstTokenMs: 420, callerStopToFirstTtsPcmMs: 880 },
-  { stage: "outcome", value: "UNKNOWN" },
+  { stage: "outcome", value: "STREAM_TIMEOUT" },
 ];
 
-const lowEscalation: VoiceTurnTrace["stages"] = [
+const lowQuiet: VoiceTurnTrace["stages"] = [
   {
     stage: "stt",
     kind: "final",
@@ -138,7 +138,7 @@ const lowEscalation: VoiceTurnTrace["stages"] = [
   },
   { stage: "language", detected: "sw", sticky: "sw", confidence: 0.8 },
   { stage: "barge_in", reason: "caller" },
-  { stage: "outcome", value: "escalation" },
+  { stage: "outcome", value: "speech_quiet" },
 ];
 
 const lowClear: VoiceTurnTrace["stages"] = [
@@ -183,7 +183,7 @@ export const LOW_CALL: VoiceCallTrace = {
     turn("HD_dev_low", 0, "Unafanya huduma gani?", { incomplete: 1, deletedAnswer: 1, slow: 1 }, lowStagesAsk),
     turn("HD_dev_low", 1, "Unafanya huduma gani?", { silence: 1 }, lowSilence),
     turn("HD_dev_low", 2, "Naweza kuja kesho?", { incomplete: 1 }, lowUnknown),
-    turn("HD_dev_low", 3, "Ni Alvin.", {}, lowEscalation),
+    turn("HD_dev_low", 3, "Ni Alvin.", {}, lowQuiet),
     turn("HD_dev_low", 4, "Asante, hiyo inatosha.", {}, lowClear),
   ],
 };

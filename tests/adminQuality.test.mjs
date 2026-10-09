@@ -221,11 +221,13 @@ describe("Quality view model", () => {
   });
 
   it("keeps Couldn't answer literals behind constants", () => {
-    assert.deepEqual(model.COULDNT_ANSWER_OUTCOMES, ["unknown", "escalation"]);
-    assert.deepEqual(model.COULDNT_ANSWER_CANNED, ["llm_recovery"]);
+    assert.deepEqual(model.COULDNT_ANSWER_OUTCOMES, ["error", "stream_timeout", "speech_guarantee", "speech_quiet"]);
+    assert.deepEqual(model.COULDNT_ANSWER_CANNED, ["llm_recovery", "llm_unavailable", "speech_guarantee"]);
+    assert.equal(model.COULDNT_ANSWER_OUTCOMES.includes("speech_repair"), false);
+    assert.equal(model.COULDNT_ANSWER_CANNED.includes("speech_repair"), false);
   });
 
-  it("counts only unknown, escalation, and the recovery line as Couldn't answer", () => {
+  it("counts Brain's outcomes and canned lines as Couldn't answer, and nothing else", () => {
     const questions = model.couldntAnswerQuestions([
       turn({ text: "Unafanya huduma gani?", hit: { incomplete: 1, deletedAnswer: 1 }, turnIndex: 0 }),
       turn({ text: "Mko wapi?", hit: { silence: 1 }, turnIndex: 1 }),
@@ -234,14 +236,36 @@ describe("Quality view model", () => {
         stages: [{ stage: "canned", path: "llm_recovery", text: "Sema tena." }],
         turnIndex: 2,
       }),
-      turn({ text: "Naweza kuja kesho?", stages: [{ stage: "outcome", value: "UNKNOWN" }], turnIndex: 3 }),
-      turn({ text: "Ni Alvin.", stages: [{ stage: "outcome", value: "Escalation" }], turnIndex: 4 }),
-      turn({ text: "Asante, hiyo inatosha.", stages: [{ stage: "outcome", value: "ok" }], turnIndex: 5 }),
-      turn({ text: "   ", stages: [{ stage: "outcome", value: "unknown" }], turnIndex: 6 }),
-      turn({ text: "Habari", stages: [{ stage: "canned", path: "greeting", text: "Habari." }], turnIndex: 7 }),
-      turn({ text: "Bei gani?", stages: [{ stage: "outcome", value: "unknown" }], turnIndex: 8 }),
+      turn({ text: "Naweza kuja kesho?", stages: [{ stage: "outcome", value: "ERROR" }], turnIndex: 3 }),
+      turn({ text: "Mnafika Kitengela?", stages: [{ stage: "outcome", value: "stream_timeout" }], turnIndex: 4 }),
+      turn({ text: "Bei ya sofa?", stages: [{ stage: "outcome", value: "Speech_Guarantee" }], turnIndex: 5 }),
+      turn({ text: "Hello?", stages: [{ stage: "outcome", value: "speech_quiet" }], turnIndex: 6 }),
+      turn({ text: "Mnafanya Jumapili?", stages: [{ stage: "canned", path: "LLM_UNAVAILABLE", text: "" }], turnIndex: 7 }),
+      turn({ text: "Mnaosha carpet?", stages: [{ stage: "canned", path: "speech_guarantee", text: "" }], turnIndex: 8 }),
+      turn({ text: "Rudia tafadhali", stages: [{ stage: "canned", path: "speech_repair", text: "" }], turnIndex: 9 }),
+      turn({ text: "Sema tena", stages: [{ stage: "outcome", value: "speech_repair" }], turnIndex: 10 }),
+      turn({ text: "Ni Alvin.", stages: [{ stage: "outcome", value: "escalation" }], turnIndex: 11 }),
+      turn({ text: "Sijui", stages: [{ stage: "outcome", value: "unknown" }], turnIndex: 12 }),
+      turn({ text: "Asante.", stages: [{ stage: "outcome", value: "ok" }], turnIndex: 13 }),
+      turn({ text: "   ", stages: [{ stage: "outcome", value: "error" }], turnIndex: 14 }),
+      turn({ text: "Habari", stages: [{ stage: "canned", path: "greeting", text: "Habari." }], turnIndex: 15 }),
     ]);
-    assert.deepEqual(questions, ["unafanya   huduma gani?", "Naweza kuja kesho?", "Ni Alvin.", "Bei gani?"]);
+    assert.deepEqual(questions, [
+      "unafanya   huduma gani?",
+      "Naweza kuja kesho?",
+      "Mnafika Kitengela?",
+      "Bei ya sofa?",
+      "Hello?",
+      "Mnafanya Jumapili?",
+      "Mnaosha carpet?",
+    ]);
+  });
+
+  it("gives a non-zero Couldn't answer count on a fixture with those outcomes", () => {
+    const turns = ["error", "stream_timeout", "speech_guarantee", "speech_quiet"].map((value, index) =>
+      turn({ text: `Swali ${index + 1}?`, stages: [{ stage: "outcome", value }], turnIndex: index }),
+    );
+    assert.equal(model.couldntAnswerQuestions(turns).length, 4);
   });
 
   it("shows the stored diagnosis, and Not scored when Voice stored none", () => {

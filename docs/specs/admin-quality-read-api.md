@@ -200,7 +200,7 @@ Same names as the voice scorecard: `languageMismatch`, `incomplete`, `repeatedQu
 - The diagnosis line is the stored `diagnosis`. Null means Voice could not score the call (#621) and reads "Not scored".
 - Missing checks read "Not logged". "No failures" means checks were stored and none failed.
 - A filler reads "Played" only when its stage stored `played: true`, "Not played" for `false`, and "Not logged" otherwise. Voice does not write `played` yet, so today every filler reads "Not logged".
-- Couldn't answer lists caller questions from turns whose outcome is `unknown` or `escalation`, or that used the `llm_recovery` canned line. Silence and deleted answer do not count. Brain confirms these literals (`COULDNT_ANSWER_OUTCOMES`, `COULDNT_ANSWER_CANNED` in `adminQualityModel.ts`).
+- Couldn't answer lists caller questions from turns whose outcome stage is `error`, `stream_timeout`, `speech_guarantee`, or `speech_quiet`, or that played the canned line `llm_recovery`, `llm_unavailable`, or `speech_guarantee`. Both compare lowercase. `speech_repair` does not count, and neither do silence or deleted-answer checks. The call-level `calls.resolution` is not used. Literals are from Brain (`COULDNT_ANSWER_OUTCOMES`, `COULDNT_ANSWER_CANNED` in `adminQualityModel.ts`).
 - Save as test writes `null` for provider, model, and prompt id when the trace did not store them.
 - The call screen says "Heard" and "Model output", and the Raw view drops provider, model, and voice ids. Releases show the label or the first-call date, not the git SHA.
 - Overview and Businesses wrap the Quality read in `.catch(noQualityBadges(...))`, so a Quality failure logs and leaves the badges empty.
