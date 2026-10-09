@@ -161,3 +161,24 @@ describe('guard: a Kiswahili time is checked against the stored visit time', () 
     assert.deepEqual(storedClock.storedClockMinutes('HD_test'), []);
   });
 });
+
+describe('prompt time example (src/prompts.js)', () => {
+  const { buildSystemPrompt, CONVERSATION_RULES, conversationRules } = require('../src/prompts');
+  it('flag off: unchanged', () => {
+    assert.equal(conversationRules({}), CONVERSATION_RULES);
+    assert.match(CONVERSATION_RULES, /"saa 3 jioni"/);
+  });
+  it('flag on: 3 PM is "saa tisa mchana", from swahiliClock', () => {
+    const on = conversationRules({ VOICE_SPOKEN_FACTS: 'on' });
+    assert.match(on, /\("3 P M" \/ "saa tisa mchana"\)/);
+    assert.doesNotMatch(on, /saa 3 jioni/);
+  });
+  describe('buildSystemPrompt follows the flag', () => {
+    withFlag('on');
+    it('uses the Kiswahili clock example', () => {
+      const prompt = buildSystemPrompt({ businessName: 'Test' });
+      assert.match(prompt, /saa tisa mchana/);
+      assert.doesNotMatch(prompt, /saa 3 jioni/);
+    });
+  });
+});

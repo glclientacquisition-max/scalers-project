@@ -284,13 +284,7 @@ const TEMPLATES = {
           sheng: `Nime-save request ya ${r.job}.`,
         });
       }
-      if (raw.moved === true && r.when) {
-        return by(lang, {
-          en: `I've moved your ${r.job} visit to ${r.when}${and(r.place, ', in ')}.`,
-          sw: `Nimehamisha ziara ya ${r.job} hadi ${r.when}${and(r.place, ', ')}.`,
-          sheng: `Nime-move ${r.job} visit hadi ${r.when}${and(r.place, ', ')}.`,
-        });
-      }
+      // Never "moved", even with moved: true; only move_ok says moved.
       return by(lang, {
         en: `I've saved a ${r.job} visit request${and(r.when, ' for ')}${and(r.place, ', in ')}.`,
         sw: `Nimehifadhi ombi la ziara ya ${r.job}${and(r.when, ', ')}${and(r.place, ', ')}.`,

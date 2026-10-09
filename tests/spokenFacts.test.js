@@ -81,6 +81,18 @@ describe('renderFactLine templates (fact-lines.md)', () => {
     }
     assert.equal(line('visit_updated', 'en', { place: 'Kitengela' }), "Okay, I've updated that visit to Kitengela.");
   });
+  it('saved_item never says moved, even with moved: true (only move_ok does)', () => {
+    for (const lang of ['en', 'sw', 'sheng']) {
+      for (const moved of [true, false, undefined]) {
+        const text = line('saved_item', lang, { kind: 'visit', job: 'Carpet Cleaning', when: SAT_9, place: 'Kitengela', moved });
+        assert.ok(text, `${lang} ${moved}`);
+        assert.doesNotMatch(text, /\bmov|hamish|songez/i, text);
+        assert.match(text, /saved|hifadhi|save/i, text);
+      }
+    }
+    assert.equal(line('saved_item', 'sw', { kind: 'visit', job: 'Carpet Cleaning', when: SAT_9, moved: true }), 'Nimehifadhi ombi la ziara ya Carpet Cleaning, kesho Jumamosi, saa tatu asubuhi.');
+    assert.equal(line('saved_item', 'sheng', { kind: 'visit', job: 'Carpet Cleaning', when: SAT_9, moved: true }), 'Nime-save Carpet Cleaning visit request, kesho Saturday, 9 AM.');
+  });
   it('visit_open and request_open (HD_d199: the mansion quote)', () => {
     assert.equal(
       line('visit_open', 'sw', { job: 'Carpet Cleaning', status: 'requested', when: FRI_9, place: 'Kitengela' }),
@@ -102,7 +114,7 @@ describe('renderFactLine templates (fact-lines.md)', () => {
       'You sent the Mansion Cleaning Custom Quote request yesterday at 11:15 PM.'
     );
     assert.equal(line('saved_item', 'sw', { kind: 'visit', job: 'Carpet Cleaning', when: SAT_9 }), 'Nimehifadhi ombi la ziara ya Carpet Cleaning, kesho Jumamosi, saa tatu asubuhi.');
-    assert.equal(line('saved_item', 'en', { kind: 'visit', job: 'Carpet Cleaning', when: SAT_9, moved: true }), "I've moved your Carpet Cleaning visit to tomorrow, Saturday, at 9 AM.");
+    assert.equal(line('saved_item', 'en', { kind: 'visit', job: 'Carpet Cleaning', when: SAT_9, moved: true }), "I've saved a Carpet Cleaning visit request for tomorrow, Saturday, at 9 AM.");
     assert.equal(line('saved_item', 'en', { kind: 'request', job: 'Mansion Cleaning Custom Quote' }), "I've saved a request for Mansion Cleaning Custom Quote.");
     assert.equal(line('saved_none', 'sw', {}), 'Bado sijahifadhi kitu kipya kwenye simu hii.');
     assert.equal(line('team_will_confirm', 'en', {}), 'The team will confirm the time with you.');
