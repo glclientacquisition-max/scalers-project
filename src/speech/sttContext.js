@@ -6,6 +6,7 @@ const { normalizeServices } = require('../conversation/liveKnowledge');
 const { normalizeLocations } = require('../conversation/businessLocations');
 const { coverageAreaNames } = require('../conversation/coverageAreas');
 const { isJunkCallerName } = require('../conversation/callerNameQuality');
+const { isSavedAlternateName } = require('../conversation/alternateNameQuality');
 
 /** Soft cap — Soniox context biasing degrades with huge unrelated term lists. */
 const MAX_STT_TERMS = Number(process.env.SONIOX_STT_CONTEXT_MAX_TERMS || 40);
@@ -69,8 +70,12 @@ function callerHearingNames(tenant = {}) {
     tenant.caller_name,
     card.fileOwnerName,
     card.name,
-    ...(Array.isArray(card.alternateNames) ? card.alternateNames : []),
-    ...(Array.isArray(tenant.alternateNames) ? tenant.alternateNames : []),
+    // Saved alternates are checked again here: a card built elsewhere may
+    // still carry phrases like "impressed by your".
+    ...[
+      ...(Array.isArray(card.alternateNames) ? card.alternateNames : []),
+      ...(Array.isArray(tenant.alternateNames) ? tenant.alternateNames : []),
+    ].filter(isSavedAlternateName),
   ];
   const seen = new Set();
   const names = [];

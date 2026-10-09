@@ -144,3 +144,52 @@ describe('shared line needs a clearly different person', () => {
     assert.equal(card('Chris', ['Steve']).sharedLine, true);
   });
 });
+
+// Alvin's staging contact (2026-10-09) carries "impressed by your" and
+// "Nauliza aje" as saved alternates. They are phrases, not names.
+describe('saved alternates that are not names', () => {
+  const { isSavedAlternateName } = require('../src/conversation/alternateNameQuality');
+  const STAGING = ['Bwana Alvin', 'Alvin speaking', 'impressed by your', 'Nauliza aje'];
+
+  it('drops phrases and keeps names and name phrases', () => {
+    for (const name of ['impressed by your', 'Impressed by your work', 'Nauliza aje', 'I want to', 'calling about', 'not a', '']) {
+      assert.equal(isSavedAlternateName(name), false, `drop: ${name}`);
+    }
+    for (const name of ['Bwana Alvin', 'Alvin speaking', 'Brian', 'Mama Amina', 'Brenda Chirotits', 'Kevin Otieno', 'Christopher']) {
+      assert.equal(isSavedAlternateName(name), true, `keep: ${name}`);
+    }
+    assert.equal(isSavedAlternateName({ name: 'Brian' }), true);
+    assert.equal(isSavedAlternateName({ name: 'impressed by your' }), false);
+  });
+
+  it('card keeps only Bwana Alvin and Alvin speaking, line not shared', () => {
+    const card = buildCallerMemoryCard({ contact: alvinContact(STAGING), openAppointments: [] });
+    assert.deepEqual(card.alternateNames, ['Bwana Alvin', 'Alvin speaking']);
+    assert.equal(card.sharedLine, false);
+    assert.equal(card.greetByName, true);
+  });
+
+  it('string-shaped rows are filtered the same way', () => {
+    const contact = { ...alvinContact([]), metadata: { alternate_names: STAGING } };
+    const card = buildCallerMemoryCard({ contact });
+    assert.deepEqual(card.alternateNames, ['Bwana Alvin', 'Alvin speaking']);
+  });
+
+  it('phrases never reach the STT hints, even from a raw card', () => {
+    const names = callerHearingNames({
+      callerMemory: { name: 'Alvin', alternateNames: STAGING },
+      alternateNames: ['impressed by your', 'Brian'],
+    });
+    assert.ok(names.includes('Alvin'));
+    assert.ok(names.includes('Bwana Alvin'));
+    assert.ok(names.includes('Alvin speaking'));
+    assert.ok(names.includes('Brian'));
+    assert.ok(!names.some((n) => /impressed|nauliza/i.test(n)), names.join(','));
+  });
+
+  it('a real second person beside the phrases is still a shared line', () => {
+    const card = buildCallerMemoryCard({ contact: alvinContact([...STAGING, 'Brian']) });
+    assert.deepEqual(card.alternateNames, ['Bwana Alvin', 'Alvin speaking', 'Brian']);
+    assert.equal(card.sharedLine, true);
+  });
+});

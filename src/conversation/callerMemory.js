@@ -10,6 +10,7 @@ const { namesMatch } = require('./contactIdentity');
 const { isJunkCallerName } = require('./callerNameQuality');
 const { isPlausibleCallerName } = require('./entityExtraction');
 const { compactNameKey } = require('./callerNameMatch');
+const { isSavedAlternateName } = require('./alternateNameQuality');
 const { classifyLivedVisit } = require('./visitCalendar');
 const { parseAbsoluteWhenDate } = require('./appointmentHours');
 
@@ -141,11 +142,11 @@ function alternateNames(metadata) {
   const list = metadata && Array.isArray(metadata.alternate_names)
     ? metadata.alternate_names
     : [];
-  // Read-time guard: junk already in the database ("not a") never reaches the
-  // card, the shared-line check, or the STT hint list.
+  // Read-time guard: junk already in the database ("not a", "impressed by
+  // your") never reaches the card, the shared-line check, or the STT hints.
   return list
     .map((row) => String(typeof row === 'string' ? row : row?.name || '').trim())
-    .filter((name) => name && !isJunkCallerName(name));
+    .filter((name) => name && isSavedAlternateName(name));
 }
 
 /**
