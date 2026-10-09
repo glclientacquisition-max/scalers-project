@@ -13,7 +13,8 @@
 //             string / enum (DB text as stored), id (never spoken).
 // Templates: visit_open, request_open, requested_at, saved_item, saved_none,
 // team_will_confirm, move_ok, visit_updated, confirm_identity_first,
-// more_open (5397e87c). An unknown template or a missing
+// more_open (5397e87c); past_open, past_row, reask_slot, ask_area and the
+// narrowed more_open (current requests only) from 3808c04e. An unknown template or a missing
 // required slot returns null; Brain then uses its src/conversation/factLine.js.
 // visit_updated never says "moved".
 //
@@ -23,6 +24,7 @@
 const { swahiliClock, swahiliPeriod } = require('../../conversation/swahiliClock');
 const { numberToSw } = require('../spokenForms');
 const { spokenFactsEnabled } = require('./flag');
+const { dayCue, timeAskLine } = require('../../conversation/visitTime');
 
 const TZ_OFFSET_MS = 3 * 60 * 60 * 1000; // Africa/Nairobi, UTC+3 all year
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -400,9 +402,9 @@ const TEMPLATES = {
       });
     },
   },
-  // Last line of an open-file read: open rows not read out (past-dated, or
-  // past the read-out cap, src/speech/fileReadOut.js). Not "older": the
-  // cap leaves out newer rows too.
+  // An open-file read's count of current open rows not read out (Brain's
+  // four-request cap, or Voice's read-out cap, src/speech/fileReadOut.js).
+  // Past-dated rows are never in it: they are past_open (3808c04e).
   more_open: {
     required: [],
     render: (_, lang, raw) => {
@@ -410,17 +412,89 @@ const TEMPLATES = {
       if (!Number.isInteger(n) || n < 1) return null;
       if (n === 1) {
         return by(lang, {
-          en: 'There is one more open item on file.',
-          sw: 'Kuna ombi lingine moja lililo wazi kwenye faili.',
-          sheng: 'Kuna kitu ingine moja iko open kwa file.',
+          en: 'There is one more open request on file.',
+          sw: 'Kuna ombi lingine moja kwenye faili.',
+          sheng: 'Kuna request ingine moja kwa file.',
         });
       }
       return by(lang, {
-        en: `There are ${n} more open items on file.`,
-        sw: `Kuna maombi mengine ${maCount(n)} yaliyo wazi kwenye faili.`,
-        sheng: `Kuna vitu zingine ${n} ziko open kwa file.`,
+        en: `There are ${n} more open requests on file.`,
+        sw: `Kuna maombi mengine ${maCount(n)} kwenye faili.`,
+        sheng: `Kuna requests zingine ${n} kwa file.`,
       });
     },
+  },
+  // Past-dated rows still unconfirmed: a count only, never "open" or
+  // "upcoming" (HD_1677e57f73f9 (3)).
+  past_open: {
+    required: [],
+    render: (_, lang, raw) => {
+      const n = Number(raw.count);
+      if (!Number.isInteger(n) || n < 1) return null;
+      if (n === 1) {
+        return by(lang, {
+          en: 'There is one past-dated request the team still has to confirm.',
+          sw: 'Kuna ombi moja la tarehe iliyopita ambalo timu bado haijathibitisha.',
+          sheng: 'Kuna request moja ya date imepita ambayo team bado haija-confirm.',
+        });
+      }
+      return by(lang, {
+        en: `There are ${n} past-dated requests the team still has to confirm.`,
+        sw: `Kuna maombi ${maCount(n)} ya tarehe zilizopita ambayo timu bado haijathibitisha.`,
+        sheng: `Kuna requests ${n} za date zimepita ambazo team bado haija-confirm.`,
+      });
+    },
+  },
+  // The caller named one past-dated row: it has passed, never "open".
+  past_row: {
+    required: ['job'],
+    render: (r, lang, raw) => {
+      if (String(raw.kind || '').toLowerCase() === 'visit') {
+        return by(lang, {
+          en: `The ${r.job} visit request${and(r.when, ' for ')}${and(r.place, ', ')}${r.place ? ',' : ''} has passed and was not confirmed.`,
+          sw: `Ombi la ziara ya ${r.job}${and(r.when, ', ')}${and(r.place, ', ')} limepita na halikuthibitishwa.`,
+          sheng: `${r.job} visit request${and(r.when, ', ')}${and(r.place, ', ')} imepita na haikuconfirmiwa.`,
+        });
+      }
+      const item = requestItemPhrase(r.job) || r.job;
+      return by(lang, {
+        en: `The request about ${item}${r.when ? `, ${r.when},` : ''} has passed and was not confirmed.`,
+        sw: `Ombi kuhusu ${item}${and(r.when, ', ')} limepita na halikuthibitishwa.`,
+        sheng: `Request ya ${item}${and(r.when, ', ')} imepita na haikuconfirmiwa.`,
+      });
+    },
+  },
+  // A rejected create asks for its missing slot, again after a barge-in.
+  // slot when: the visit time ask (Brain's timeAskLine, Swahili clock for
+  // an ambiguous "saa nane"); slot location: where to come.
+  reask_slot: {
+    required: [],
+    render: (_, lang, raw) => {
+      const slot = oneOf(raw.slot, ['when', 'location']);
+      if (!slot) return null;
+      if (slot === 'location') {
+        return by(lang, { en: 'Where should we come?', sw: 'Tuje wapi?', sheng: 'Tukuje wapi?' });
+      }
+      const hour = Number(raw.pending_hour);
+      const pendingHour = Number.isInteger(hour) && hour >= 1 && hour <= 12 ? hour : null;
+      const askCount = Number(raw.ask_count) || 1;
+      if (lang === 'sheng' && pendingHour == null) {
+        const day = dayCue(String(raw.day || ''));
+        const daySw = day === 'tomorrow' || day === 'kesho' ? 'kesho' : day === 'today' || day === 'leo' ? 'leo' : 'siku hiyo';
+        return askCount >= 2 ? 'Asubuhi ama mchana?' : `Ni time gani ${daySw}?`;
+      }
+      return timeAskLine({
+        when: String(raw.day || ''),
+        pendingHour,
+        language: lang === 'en' ? 'en' : 'sw',
+        askCount,
+      });
+    },
+  },
+  // A coverage question with no real place: ask the area, claim nothing.
+  ask_area: {
+    required: [],
+    render: (_, lang) => by(lang, { en: 'Which area are you in?', sw: 'Uko eneo gani?', sheng: 'Uko area gani?' }),
   },
 };
 

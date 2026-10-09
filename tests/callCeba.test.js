@@ -327,17 +327,26 @@ describe('5) HD_ceba t2 read-out: 2 rows, a count, a question, the kind said onc
         assert.equal(state.caller.nameJustConfirmed, true);
         const raw = planConfirmFileRead(state, { language: lang, now: NOW });
         assert.ok(raw, 'Brain plans the confirm read');
-        const rows = raw.lines.filter((l) => l.template !== 'more_open').length;
-        const total = raw.lines.find((l) => l.template === 'more_open')?.gate?.open_rows;
+        const rows = raw.lines.filter((l) => !['more_open', 'past_open'].includes(l.template)).length;
+        const past = raw.lines.find((l) => l.template === 'past_open')?.slots?.count;
         const read = shapeFileReadOut(raw, { language: lang, now: NOW });
-        assert.deepEqual(read.lines.map((l) => l.template), ['visit_open', 'visit_open', 'more_open']);
+        // Brain (3808c04e): today's 9 AM visit had passed at call time, so it
+        // is in the past bucket; more_open counts current requests only.
+        assert.deepEqual(raw.lines.map((l) => l.template).slice(-2), ['more_open', 'past_open']);
+        assert.deepEqual(read.lines.map((l) => l.template), ['visit_open', 'request_open', 'more_open', 'past_open']);
         assert.equal(read.kept, 2);
-        assert.equal(read.more, total - 2);
+        assert.equal(read.more, rows - 2 + raw.lines.find((l) => l.template === 'more_open').slots.count);
+        assert.equal(read.lines.at(-1).slots.count, past);
         assert.ok(rows > 2);
         assert.ok(read.line.endsWith(readOutQuestion(lang)), read.line);
         assert.doesNotMatch(read.line, /enquiry.*enquiry|older/i);
         if (lang === 'en') {
-          assert.match(read.line, /^You have a Carpet Cleaning visit request for today, Friday, at 9 AM, in Kitengela\. You have a Carpet Cleaning \(per room\) visit request for tomorrow, Saturday, at 9 AM, in Kitengela, Grace Apartments\. There are \d+ more open items on file\. Would you like/);
+          assert.equal(
+            read.line,
+            'You have a Carpet Cleaning (per room) visit request for tomorrow, Saturday, at 9 AM, in Kitengela, Grace Apartments. ' +
+              'You have an open enquiry about Mansion Cleaning Custom Quote. There are 10 more open requests on file. ' +
+              `There are 19 past-dated requests the team still has to confirm. ${readOutQuestion('en')}`
+          );
         }
       }));
   }
@@ -356,6 +365,30 @@ describe('5) HD_ceba t2 read-out: 2 rows, a count, a question, the kind said onc
     );
     assert.equal(read.line, `You have a Carpet Cleaning visit request. You have an open enquiry about water bowl. ${readOutQuestion('en')}`);
     assert.equal(read.more, 0);
+  });
+
+  it('past-dated rows stay Brain\'s past_open count, never folded into more_open', () => {
+    const v = (job) => ({ template: 'visit_open', lang: 'en', slots: { job, status: 'requested' }, gate: {} });
+    const read = shapeFileReadOut(
+      {
+        line: 'x',
+        kind: 'open_read',
+        lines: [
+          v('A'), v('B'), v('C'),
+          { template: 'more_open', lang: 'en', slots: { count: 2 }, gate: { open_rows: 30, spoken: 3 } },
+          { template: 'past_open', lang: 'en', slots: { count: 25 }, gate: { past_rows: 25 } },
+        ],
+      },
+      { language: 'en', now: NOW }
+    );
+    assert.deepEqual(read.lines.map((l) => [l.template, l.slots.count]), [['visit_open', undefined], ['visit_open', undefined], ['more_open', 3], ['past_open', 25]]);
+    assert.equal(read.more, 3);
+    // A named past row alone is read as passed, with the question.
+    const named = shapeFileReadOut(
+      { line: 'x', kind: 'open_read', lines: [{ template: 'past_row', lang: 'en', slots: { kind: 'visit', job: 'Carpet Cleaning' }, gate: { past: true } }] },
+      { language: 'en', now: NOW }
+    );
+    assert.equal(named.line, `The Carpet Cleaning visit request has passed and was not confirmed. ${readOutQuestion('en')}`);
   });
 
   it('server wiring: confirm and open reads go through shapeFileReadOut', () => {

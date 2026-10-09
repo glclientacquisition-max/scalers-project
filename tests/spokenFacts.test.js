@@ -59,8 +59,11 @@ describe('renderFact', () => {
 });
 
 describe('renderFactLine templates (fact-lines.md)', () => {
-  it('has exactly Brain\'s 8 templates', () => {
-    assert.deepEqual([...TEMPLATES].sort(), ['confirm_identity_first', 'more_open', 'move_ok', 'request_open', 'requested_at', 'saved_item', 'saved_none', 'team_will_confirm', 'visit_open', 'visit_updated']);
+  it('has exactly Brain\'s templates (fact-lines 3808c04e)', () => {
+    assert.deepEqual([...TEMPLATES].sort(), ['ask_area', 'confirm_identity_first', 'more_open', 'move_ok', 'past_open', 'past_row', 'reask_slot', 'request_open', 'requested_at', 'saved_item', 'saved_none', 'team_will_confirm', 'visit_open', 'visit_updated']);
+    // Every Brain template has Voice wording (no silent fallback).
+    const brain = Object.keys(require('../src/conversation/factLine').TEMPLATES).sort();
+    assert.deepEqual(brain, [...TEMPLATES].sort());
   });
   it('move_ok needs only to_when; job and from_when are optional', () => {
     assert.equal(line('move_ok', 'sw', { to_when: SAT_9 }), 'Sawa, nimehamisha ziara hadi kesho Jumamosi, saa tatu asubuhi.');
@@ -153,17 +156,17 @@ describe('confirm_identity_first and more_open', () => {
       assert.equal(out.split(/[.?!]\s/).length, 1, out);
     }
   });
-  it('more_open: count 1 is singular; Kiswahili counts agree with maombi', () => {
-    // Not "older": the read-out cap (src/speech/fileReadOut.js) leaves out newer rows too.
-    assert.equal(line('more_open', 'en', { count: 1 }), 'There is one more open item on file.');
-    assert.equal(line('more_open', 'en', { count: 3 }), 'There are 3 more open items on file.');
-    assert.equal(line('more_open', 'sw', { count: 1 }), 'Kuna ombi lingine moja lililo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sw', { count: 2 }), 'Kuna maombi mengine mawili yaliyo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sw', { count: 5 }), 'Kuna maombi mengine matano yaliyo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sw', { count: 6 }), 'Kuna maombi mengine sita yaliyo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sw', { count: 8 }), 'Kuna maombi mengine manane yaliyo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sw', { count: 12 }), 'Kuna maombi mengine kumi na mawili yaliyo wazi kwenye faili.');
-    assert.equal(line('more_open', 'sheng', { count: 4 }), 'Kuna vitu zingine 4 ziko open kwa file.');
+  it('more_open: current open requests only; count 1 is singular; Kiswahili counts agree with maombi', () => {
+    assert.equal(line('more_open', 'en', { count: 1 }), 'There is one more open request on file.');
+    assert.equal(line('more_open', 'en', { count: 3 }), 'There are 3 more open requests on file.');
+    assert.equal(line('more_open', 'sw', { count: 1 }), 'Kuna ombi lingine moja kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 2 }), 'Kuna maombi mengine mawili kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 5 }), 'Kuna maombi mengine matano kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 6 }), 'Kuna maombi mengine sita kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 8 }), 'Kuna maombi mengine manane kwenye faili.');
+    assert.equal(line('more_open', 'sw', { count: 12 }), 'Kuna maombi mengine kumi na mawili kwenye faili.');
+    assert.equal(line('more_open', 'sheng', { count: 4 }), 'Kuna requests zingine 4 kwa file.');
+    assert.equal(line('more_open', 'sheng', { count: 1 }), 'Kuna request ingine moja kwa file.');
   });
   it('request_open says the kind once (HD_ceba9d9b3f37: "open enquiry for Water bowl enquiry")', () => {
     assert.equal(line('request_open', 'en', { kind: 'enquiry', item: 'Water bowl enquiry' }), 'You have an open enquiry about water bowl.');
@@ -185,5 +188,71 @@ describe('confirm_identity_first and more_open', () => {
     assert.equal(line('more_open', 'en', { count: 0 }), null);
     assert.equal(line('more_open', 'sw', { count: 'many' }), null);
     assert.equal(line('more_open', 'sw', { count: 2.5 }), null);
+  });
+});
+
+describe('fact-lines 3808c04e: past_open, past_row, reask_slot, ask_area (HD_1677e57f73f9)', () => {
+  const withD199 = (fn) => {
+    const prev = process.env.BRAIN_CALL_FIXES_D199;
+    process.env.BRAIN_CALL_FIXES_D199 = 'on';
+    try {
+      return fn();
+    } finally {
+      if (prev == null) delete process.env.BRAIN_CALL_FIXES_D199;
+      else process.env.BRAIN_CALL_FIXES_D199 = prev;
+    }
+  };
+  it('past_open is a count only, never "open" or "upcoming"', () => {
+    assert.equal(line('past_open', 'en', { count: 1 }), 'There is one past-dated request the team still has to confirm.');
+    assert.equal(line('past_open', 'en', { count: 19 }), 'There are 19 past-dated requests the team still has to confirm.');
+    assert.equal(line('past_open', 'sw', { count: 1 }), 'Kuna ombi moja la tarehe iliyopita ambalo timu bado haijathibitisha.');
+    assert.equal(line('past_open', 'sw', { count: 3 }), 'Kuna maombi matatu ya tarehe zilizopita ambayo timu bado haijathibitisha.');
+    assert.equal(line('past_open', 'sheng', { count: 3 }), 'Kuna requests 3 za date zimepita ambazo team bado haija-confirm.');
+    for (const bad of [{}, { count: 0 }, { count: 'x' }]) assert.equal(line('past_open', 'en', bad), null);
+  });
+  it('past_row says the row has passed and was not confirmed', () => {
+    const FRI_9_TEXT = at('2026-10-09T06:00:00Z');
+    assert.equal(
+      line('past_row', 'en', { kind: 'visit', job: 'Carpet Cleaning', when: FRI_9_TEXT, place: 'Kitengela' }),
+      'The Carpet Cleaning visit request for today, Friday, at 9 AM, Kitengela, has passed and was not confirmed.'
+    );
+    assert.equal(
+      line('past_row', 'sw', { kind: 'visit', job: 'Carpet Cleaning', when: FRI_9_TEXT, place: 'Kitengela' }),
+      'Ombi la ziara ya Carpet Cleaning, leo Ijumaa, saa tatu asubuhi, Kitengela limepita na halikuthibitishwa.'
+    );
+    assert.equal(line('past_row', 'en', { kind: 'visit', job: 'Carpet Cleaning' }), 'The Carpet Cleaning visit request has passed and was not confirmed.');
+    // Brain sends a request row's type as kind; the item is said once.
+    assert.equal(line('past_row', 'en', { kind: 'enquiry', job: 'Water bowl enquiry' }), 'The request about water bowl has passed and was not confirmed.');
+    assert.equal(line('past_row', 'sw', { kind: 'callback', job: 'Water bowl enquiry' }), 'Ombi kuhusu water bowl limepita na halikuthibitishwa.');
+    assert.equal(line('past_row', 'sheng', { kind: 'visit', job: 'Carpet Cleaning' }), 'Carpet Cleaning visit request imepita na haikuconfirmiwa.');
+    for (const lang of ['en', 'sw', 'sheng']) {
+      const said = line('past_row', lang, { kind: 'visit', job: 'Carpet Cleaning', when: FRI_9_TEXT });
+      assert.doesNotMatch(said, /\b(open|upcoming|booked|iko open)\b/i, said);
+    }
+    assert.equal(line('past_row', 'en', { kind: 'visit' }), null);
+  });
+  it('reask_slot when: the visit time ask; AM/PM in Swahili clock words for a pending hour', () =>
+    withD199(() => {
+      assert.equal(line('reask_slot', 'en', { slot: 'when', day: 'today' }), 'What time today?');
+      assert.equal(line('reask_slot', 'sw', { slot: 'when', day: 'leo' }), 'Saa ngapi leo?');
+      assert.equal(line('reask_slot', 'sheng', { slot: 'when', day: 'leo' }), 'Ni time gani leo?');
+      assert.equal(line('reask_slot', 'en', { slot: 'when', day: 'today', ask_count: 2 }), 'Morning or afternoon?');
+      assert.equal(line('reask_slot', 'sw', { slot: 'when', ask_count: 2 }), 'Asubuhi au mchana?');
+      assert.equal(line('reask_slot', 'sheng', { slot: 'when', ask_count: 2 }), 'Asubuhi ama mchana?');
+      assert.equal(line('reask_slot', 'en', { slot: 'when', pending_hour: 8 }), '8 in the morning or in the afternoon?');
+      const sw8 = line('reask_slot', 'sw', { slot: 'when', day: 'leo', pending_hour: 8 });
+      assert.match(sw8, /^Saa \p{L}+/u);
+      assert.doesNotMatch(sw8, /\d/, 'Swahili clock in words');
+      assert.equal(line('reask_slot', 'sheng', { slot: 'when', pending_hour: 8 }), sw8);
+      assert.equal(line('reask_slot', 'en', { slot: 'location' }), 'Where should we come?');
+      assert.equal(line('reask_slot', 'sw', { slot: 'location' }), 'Tuje wapi?');
+      assert.equal(line('reask_slot', 'sheng', { slot: 'location' }), 'Tukuje wapi?');
+      assert.equal(line('reask_slot', 'en', { slot: 'price' }), null);
+      assert.equal(line('reask_slot', 'en', {}), null);
+    }));
+  it('ask_area makes no coverage claim', () => {
+    assert.equal(line('ask_area', 'en', {}), 'Which area are you in?');
+    assert.equal(line('ask_area', 'sw', {}), 'Uko eneo gani?');
+    assert.equal(line('ask_area', 'sheng', {}), 'Uko area gani?');
   });
 });

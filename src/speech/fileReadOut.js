@@ -5,8 +5,9 @@
 // HD_ceba9d9b3f37 (staging 2026-10-09): "Yes, it's me." got two visits and
 // three requests in one breath, then nothing. The caller said "Okay." and
 // waited in silence. A read-out is short and hands the turn back:
-//   - at most READ_OUT_MAX_ITEMS rows are read (visits first, as Brain
-//     ordered them), the rest are one more_open count;
+//   - at most READ_OUT_MAX_ITEMS current rows are read (visits first, as
+//     Brain ordered them), the rest are one more_open count; past-dated
+//     rows stay Brain's separate past_open count;
 //   - it ends on a short question (en / sw / sheng), unless it already does.
 // Brain (planConfirmFileRead / openFileRead) still decides what is open and
 // in what order; Voice decides how much of it is said.
@@ -63,21 +64,34 @@ function shapeFileReadOut(read, opts = {}) {
   if (!read || !Array.isArray(read.lines) || !read.lines.length) return read || null;
   const language = langOf(opts.language);
   const max = Number.isInteger(opts.maxItems) && opts.maxItems > 0 ? opts.maxItems : READ_OUT_MAX_ITEMS;
-  const items = read.lines.filter((l) => l && l.template !== 'more_open');
+  // Brain (3808c04e): more_open counts only current open requests left out
+  // of its read; past-dated rows are their own past_open count (or a
+  // past_row when named). Both counts survive the cap; past rows are never
+  // folded into "more open".
+  const COUNTS = new Set(['more_open', 'past_open']);
+  const items = read.lines.filter((l) => l && !COUNTS.has(l.template) && l.template !== 'past_row');
+  const pastRows = read.lines.filter((l) => l && l.template === 'past_row');
   const moreLine = read.lines.find((l) => l && l.template === 'more_open');
+  const pastLine = read.lines.find((l) => l && l.template === 'past_open');
   const moreBefore = Number(moreLine?.slots?.count) || 0;
-  const openRows = Number(moreLine?.gate?.open_rows);
-  const total = Number.isInteger(openRows) && openRows > 0 ? openRows : items.length + moreBefore;
+  const total = items.length + moreBefore;
   const kept = items.slice(0, max).map(cleanRequestLine);
   const more = Math.max(0, total - kept.length);
-  const lines = kept.map((l) => {
+  const strip = (l) => {
     const { text, ...rest } = l;
     return rest;
-  });
+  };
+  const lines = kept.map(strip);
   if (more > 0) {
     lines.push(
       factLine('more_open', { count: more }, { lang: language, gate: { open_rows: total, spoken: kept.length } })
     );
+  }
+  // A named past row (no current rows) is read as is; otherwise one count.
+  if (!kept.length && pastRows.length) lines.push(...pastRows.slice(0, max).map(strip));
+  if (pastLine) lines.push(strip(pastLine));
+  else if (kept.length && pastRows.length) {
+    lines.push(factLine('past_open', { count: pastRows.length }, { lang: language, gate: { past_rows: pastRows.length } }));
   }
   const rendered = renderLines(lines, { now: opts.now || new Date() });
   if (!rendered.line) return read;
