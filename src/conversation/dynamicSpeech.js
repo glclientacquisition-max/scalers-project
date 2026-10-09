@@ -108,6 +108,8 @@ async function generateDynamicGreeting(opts) {
     afterHoursMode,
     closureNotice,
     callerFileName: opts.callerFileName || opts.fileOwnerName,
+    // Greeting warm renders the next daypart ahead of time (greetingWarm.js).
+    now: opts.now,
     ...offeringOpts,
   };
   const instant = fallbackGreeting(businessName, introOpts);

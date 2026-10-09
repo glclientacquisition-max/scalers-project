@@ -1,6 +1,8 @@
 // Turn-taking helpers: adaptive end-of-utterance flush + barge-in decisions.
 // Caller-event policy lives in decideCallerEvent — one table, one outcome.
 
+const COMPLETE_QUESTION_FLUSH_MS = 360;
+
 const INCOMPLETE_TAIL =
   /\b(and|but|so|because|or|then|also|with|for|to|na|lakini|kwa|sababu|ama|halafu|then)\s*$/i;
 
@@ -152,9 +154,64 @@ function looksLikeEcho(callerText, agentText) {
  * before deciding the thought is complete.
  * @param {string} text
  */
+// A wh-question that strands its preposition is whole: "What do you guys deal
+// with?", "Who am I speaking to?", "Where are you from?". Prod HD_d3900cbf2b2d
+// t3 (2026-10-09 20:18 EAT) read the trailing "with" as a fragment and held a
+// complete question 800 + 1600 ms. Only with the recognizer's "?" and a wh +
+// auxiliary frame; "How much for", "Can I pay with", and an unpunctuated
+// "what do you deal with" still wait.
+const STRANDED_PREP = String.raw`(?:with|for|to|from|about|in|on|at|of|into|by)`;
+const LEAD_FILLER = String.raw`(?:(?:uh+|um+|so|okay|ok|and|well|yes|yeah|hi|hello|sorry|eeh|ehh)[,.\s]+)*`;
+const WH_AUX_STRANDED = new RegExp(
+  String.raw`^${LEAD_FILLER}(?:what|who|whom|which|where)\b(?:\s+[\p{L}'’-]+){0,4}?\s+(?:do|does|did|are|is|am|was|were|can|could|will|would|should|have|has)\b(?:\s+[\p{L}'’-]+){1,6}?\s+${STRANDED_PREP}\s*\?\s*$`,
+  'iu'
+);
+const WH_CONTRACTED_STRANDED = new RegExp(
+  String.raw`^${LEAD_FILLER}(?:what|who|where|which)['’]s\b(?:\s+[\p{L}'’-]+){0,6}?\s+${STRANDED_PREP}\s*\?\s*$`,
+  'iu'
+);
+
+/**
+ * A wh-question whose last word is a stranded preposition, marked "?" by STT.
+ * @param {string} text
+ */
+function isStrandedPrepositionQuestion(text) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw || !/\?\s*$/.test(raw)) return false;
+  return WH_AUX_STRANDED.test(raw) || WH_CONTRACTED_STRANDED.test(raw);
+}
+
+const EN_QUESTION_LEAD = new RegExp(
+  String.raw`^${LEAD_FILLER}(?:what|who|whom|which|where|when|why|how|do|does|did|are|is|am|can|could|will|would|should|have|has)\b`,
+  'iu'
+);
+const SW_QUESTION_WORD =
+  /\b(?:gani|nini|ngapi|wapi|lini|nani|vipi|je|kweli|ama\s+la|au\s+sivyo)\s*\??\s*$/iu;
+const SW_QUESTION_LEAD = /^(?:je|ni\s+bei\s+gani|bei\s+gani|mnauza|mnafanya|mko|uko|una|mna|naweza|tunaweza|mnaweza|unaweza)\b/iu;
+
+/**
+ * A syntactically whole question or request (en/sw): recognizer "?", a
+ * question frame, and no open tail. Voice uses this to shorten the
+ * end-of-turn wait; an open tail ("…and", "my name is") is never whole.
+ * @param {string} text
+ */
+function looksLikeCompleteQuestion(text) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return false;
+  if (utteranceLooksIncomplete(raw)) return false;
+  const words = normalizeSpeech(raw).replace(/\?/g, ' ').split(' ').filter(Boolean);
+  if (words.length < 2) return false;
+  if (/\?\s*$/.test(raw)) {
+    return EN_QUESTION_LEAD.test(raw) || SW_QUESTION_LEAD.test(raw) || SW_QUESTION_WORD.test(raw);
+  }
+  // Kiswahili questions often arrive without "?": "Mnauza vitabu gani".
+  return words.length >= 3 && SW_QUESTION_WORD.test(raw);
+}
+
 function utteranceLooksIncomplete(text) {
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return false;
+  if (isStrandedPrepositionQuestion(raw)) return false;
 
   // Live call HD_0cdf315f02e9: "executive room,and." was flushed mid-thought.
   // Trailing comma or dash means the caller has not finished the phrase.
@@ -778,6 +835,12 @@ function adaptiveFlushMs(opts = {}) {
     return clamp(Math.max(base + 450, min + 200), min, max);
   }
 
+  // A whole question already handed the turn back. Soniox's endpoint still
+  // flushes at once; this only caps the wait when the final lands first.
+  if (looksLikeCompleteQuestion(text)) {
+    return clamp(Math.min(base, COMPLETE_QUESTION_FLUSH_MS), min, max);
+  }
+
   if (/[.!?]$/.test(text) && !utteranceLooksIncomplete(text)) {
     return clamp(Math.min(base, 480), min, max);
   }
@@ -794,6 +857,7 @@ function adaptiveFlushMs(opts = {}) {
 }
 
 const TURN_END_CAP_MS = 800;
+
 
 function turnEndCapMs(opts = {}) {
   const raw =
@@ -908,6 +972,9 @@ module.exports = {
   normalizeSpeech,
   looksLikeEcho,
   utteranceLooksIncomplete,
+  isStrandedPrepositionQuestion,
+  looksLikeCompleteQuestion,
+  COMPLETE_QUESTION_FLUSH_MS,
   isInterruptOnlyUtterance,
   agentAwaitingReply,
   hasBargeContent,

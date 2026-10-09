@@ -1,0 +1,123 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "callId": "HD_d3900cbf2b2d",
+  "tenantId": "24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0",
+  "businessName": "Aris Kenya",
+  "callerName": "Alvin Yegon",
+  "nameOnFile": true,
+  "source": "Prod voice_turn_traces 2026-10-09 17:18Z (20:18 EAT), main 96ac39eb. Greeting cut by pre-greeting caller audio (t1), complete question held 2.4 s on a stranded 'with' (t3/t4), domain read as 'arisstationaries. co. ke.' (t4), tool hold skipped after the ack (t5). Replay checks the mouth; timing fixes are pinned in tests/prodDeadAirReplay.test.js.",
+  "turns": [
+    {
+      "caller": "I'm not going to scam you.",
+      "flushed": true,
+      "canned": {
+        "path": "file_name_ask",
+        "text": "Am I speaking with Alvin Yegon?"
+      },
+      "model": {
+        "provider": "canned",
+        "model": "file_name_ask",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "outcome": "early_return",
+      "observed": {
+        "firstPcmMs": 360,
+        "firstReplyPcmMs": 360
+      }
+    },
+    {
+      "caller": "Yeah, you're speaking with Alvin Yegon.",
+      "flushed": true,
+      "filler": "Mm-hmm.",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Thank you for confirming, Alvin. How can I assist you with Aris Kenya today?",
+        "chars": 76,
+        "spokenEmitted": 76
+      },
+      "observed": {
+        "firstPcmMs": 442,
+        "firstReplyPcmMs": 1921,
+        "firstTokenMs": 1162
+      }
+    },
+    {
+      "caller": "Uh, what do you guys deal with?",
+      "flushed": true,
+      "filler": "Alright.",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "We sell stationery and art supplies like notebooks, pens, drawing books, T-squares, calculators, rulers, and sticky notes. You can also shop online on our website at arisstationaries.co.ke.",
+        "chars": 189,
+        "spokenEmitted": 189
+      },
+      "observed": {
+        "firstPcmMs": 404,
+        "firstReplyPcmMs": 2490,
+        "firstTokenMs": 1161
+      }
+    },
+    {
+      "caller": "Uh, I was inquiring",
+      "flushed": true,
+      "filler": "Mm-hmm.",
+      "outcome": "barge_in",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "###TOOL###\n{\"save_caller_info\":{\"name\":\"Alvin Yegon\",\"reason\":\"Inquiring about products and services\"}}\n###ENDTOOL###\n###TOOL###\n{\"create_service_request\":{\"item\":\"General product enquiry\",\"name\":\"Alvin Yegon\",\"notes\":\"Caller asked about offerings and products\",\"type\":\"enquiry\"}}\n###ENDTOOL###",
+        "chars": 294,
+        "spokenEmitted": 0
+      },
+      "observed": {
+        "firstPcmMs": 404,
+        "firstReplyPcmMs": 3371,
+        "firstTokenMs": 1746
+      }
+    },
+    {
+      "caller": "Uh, how much for a.",
+      "flushed": true,
+      "filler": "Alright.",
+      "outcome": "barge_in",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "observed": {
+        "firstPcmMs": 404
+      }
+    },
+    {
+      "caller": "A mood. Diary?",
+      "flushed": true,
+      "filler": "Alright.",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "I don't have the exact price for the Mood Diary A8 right now, Alvin. I can log an enquiry so our team gets back to you with the price.",
+        "chars": 134,
+        "spokenEmitted": 134
+      },
+      "observed": {
+        "firstPcmMs": 404,
+        "firstReplyPcmMs": 2306,
+        "firstTokenMs": 1085
+      }
+    }
+  ]
+}
