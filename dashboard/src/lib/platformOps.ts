@@ -1,4 +1,4 @@
-import { connection } from "next/server";
+import { adminErrorParts, isMissingTableError } from "@/lib/adminErrors";
 import { listDidPool, listPendingTenants } from "@/lib/didPool";
 import { sendOpsMail, isOpsMailConfigured } from "@/lib/opsMail";
 import {
@@ -28,6 +28,7 @@ import {
 import { fetchVoiceHealthz } from "@/lib/platformVoiceHealth";
 import { getSautikitWallet, isSautikitConfigured, listSautikitNumbers } from "@/lib/sautikit";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 
 function envEmails(): string[] {
   return parseOpsEmails(
@@ -35,9 +36,18 @@ function envEmails(): string[] {
   );
 }
 
+/**
+ * Supabase returns plain { message, code } objects (not Error instances), so read
+ * the fields instead of `instanceof Error` — otherwise PGRST205 / 42P01 rethrow.
+ */
 function isMissingTable(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err || "");
-  return /platform_ops_|relation .* does not exist|schema cache/i.test(message);
+  if (isMissingTableError(err)) return true;
+  return /platform_ops_|schema cache/i.test(adminErrorParts(err).message);
+}
+
+function warnMissingOpsTable(table: string, err: unknown): void {
+  const { message, code } = adminErrorParts(err);
+  console.warn(`[admin:platform-ops] ${table} unavailable, using fallback: ${message}${code ? ` [${code}]` : ""}`);
 }
 
 export async function countExpiredBeta(): Promise<number> {
@@ -98,6 +108,7 @@ export async function loadOpsSettings(): Promise<{ settings: OpsSettings; persis
     };
   } catch (err) {
     if (isMissingTable(err)) {
+      warnMissingOpsTable("platform_ops_settings", err);
       const people = parsePeople([], envEmails());
       return {
         settings: { ...defaultOpsSettings(), emails: emailsFromPeople(people).length ? emailsFromPeople(people) : envEmails(), people },
@@ -141,7 +152,8 @@ export async function saveOpsSettings(input: {
   return settings;
 }
 
-export async function listOpenOpsNotices(): Promise<OpsNotice[]> {
+/** Open notices, or null when the notices table is missing. */
+async function readOpenOpsNotices(): Promise<OpsNotice[] | null> {
   try {
     const admin = getSupabaseAdmin();
     const { data, error } = await admin
@@ -152,9 +164,16 @@ export async function listOpenOpsNotices(): Promise<OpsNotice[]> {
     if (error) throw error;
     return (data || []) as OpsNotice[];
   } catch (err) {
-    if (isMissingTable(err)) return [];
+    if (isMissingTable(err)) {
+      warnMissingOpsTable("platform_ops_notices", err);
+      return null;
+    }
     throw err;
   }
+}
+
+export async function listOpenOpsNotices(): Promise<OpsNotice[]> {
+  return (await readOpenOpsNotices()) ?? [];
 }
 
 async function persistOpen(kind: OpsNoticeKind, detail: string): Promise<void> {
@@ -230,7 +249,7 @@ export async function evaluatePlatformOps(): Promise<{
   infra: ReturnType<typeof infraFromEnv>;
   mailConfigured: boolean;
 }> {
-  await connection();
+  await requireSuperAdmin();
   const [{ settings, persisted }, pool, pending, expiredBeta, voice, telecom] = await Promise.all([
     loadOpsSettings(),
     listDidPool().catch(() => []),
@@ -254,10 +273,12 @@ export async function evaluatePlatformOps(): Promise<{
     expiredBetaCount: expiredBeta,
   });
   const strip = deriveStatusStrip(signals);
-  const existing = persisted ? await listOpenOpsNotices() : [];
-  const plan = reconcileNotices(existing, signals, settings.kinds);
+  const existing = persisted ? await readOpenOpsNotices() : null;
+  // Without the notices table there is nothing to open, dedupe, or mail against.
+  const noticesReady = existing !== null;
+  const plan = reconcileNotices(existing ?? [], signals, settings.kinds);
 
-  if (persisted) {
+  if (noticesReady) {
     const byKind = new Map(signals.map((signal) => [signal.kind, signal]));
     for (const kind of plan.open) {
       await persistOpen(kind, byKind.get(kind)?.detail || kindLabel(kind));
@@ -281,7 +302,7 @@ export async function evaluatePlatformOps(): Promise<{
     persisted,
     signals,
     strip,
-    notices: persisted ? await listOpenOpsNotices() : [],
+    notices: noticesReady ? await listOpenOpsNotices() : [],
     infra: infraFromEnv({
       voiceReachable: voice.status === "ok" ? true : voice.status === "unreachable" ? false : null,
       supabaseUrl: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
