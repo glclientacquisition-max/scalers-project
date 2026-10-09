@@ -653,9 +653,15 @@ function coverageAskSpeech(text, profile = {}, language = 'en', state = null) {
   const lang = String(language || 'en').toLowerCase();
   const sw = lang === 'sw' || lang.startsWith('swahili');
   const sheng = lang === 'sheng';
-  if (confirmedCoverageEnabled() && coverage !== 'inside' && coverage !== 'outside') {
-    // Unconfirmed list, no list, or a place the confirmed list cannot place:
-    // no claim either way. The need is recorded on brain state (brainState.js).
+  if (
+    confirmedCoverageEnabled() &&
+    coverage !== 'inside' &&
+    coverage !== 'outside' &&
+    countiesForPlace(place).length
+  ) {
+    // A real place with no confirmed answer: no claim either way. The need is
+    // recorded on brain state (brainState.js). Text that is not a place
+    // ("the shops") falls through to the no-claim unsure line.
     return `${teamConfirmCoverageLine(place, language)} ${coverageNextStepQuestion(language, state)}`;
   }
   if (coverage === 'inside') {

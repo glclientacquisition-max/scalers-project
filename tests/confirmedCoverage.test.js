@@ -244,10 +244,19 @@ describe('flag on, owner-confirmed list', () => {
     assert.equal(coverageStatus('Nakuru', CONFIRMED), 'outside');
     assert.match(coverageAskSpeech('Do you cover Syokimau?', CONFIRMED, 'en'), /^Yes, we cover Syokimau\./);
     assert.match(coverageAskSpeech('Do you cover Nakuru?', CONFIRMED, 'en'), /outside our coverage/);
+    // Text that is not a place gets the no-claim unsure line, not "confirm shops".
+    const shops = coverageAskSpeech('Do you cover the shops?', CONFIRMED, 'en');
+    assert.match(shops, /not sure we cover that area/);
+    assert.doesNotMatch(shops, /confirm shops|we cover the shops/i);
     assert.match(buildLiveGroundTruth(CONFIRMED), /- Coverage: Nairobi, Kitengela, Kiambu, Juja, Ongata Rongai, Syokimau/);
     assert.equal(guard('Yes, we cover Syokimau.', 'Do you cover Syokimau?', 'en', CONFIRMED), 'Yes, we cover Syokimau.');
     assert.doesNotMatch(guard('We do not cover Syokimau.', 'Do you cover Syokimau?', 'en', CONFIRMED), /do not cover/);
     assert.doesNotMatch(guard('We do not cover Syokimau.', 'Do you cover Syokimau?', 'en', CONFIRMED), /team confirm/);
+    // Naming the list in a denial of an outside place is not a contradiction.
+    assert.match(
+      guard('Nakuru is outside our Nairobi coverage area.', 'Do you cover Nakuru?', 'en', CONFIRMED),
+      /outside our Nairobi coverage area/
+    );
   });
 
   it('FACT_HASH_MODE on: an owner row without a matching value_hash is unconfirmed', () => {

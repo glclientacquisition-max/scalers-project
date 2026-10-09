@@ -1,10 +1,67 @@
 # Handoff record (one per call)
 
-Status: DRAFT for Voice + Desk review. Nothing here is built except Phase 0
+Status: DRAFT; decisions locked 2026-10-09 (Chief under Alvin's delegation,
+Voice and Desk replies, Alvin on SMS). See "Locked decisions". Nothing here is built except Phase 0
 (BRAIN_CONFIRMED_COVERAGE, `src/conversation/confirmedCoverage.js`), whose
 `state.needs[]` entries already use the `needs[]` shape below.
 Owner: Brain (contract + brain side). Voice writes delivery; Desk reads and
 resolves. Design source: Voice's escalation design, approved by Alvin.
+
+## Locked decisions (2026-10-09)
+
+1. **Strict coverage rule.** With BRAIN_CONFIRMED_COVERAGE on, coverage is
+   claimed only from an explicit owner row on `policies.coverage_areas` (plus
+   a matching `value_hash` under FACT_HASH_MODE). No owner row = unconfirmed.
+   The flag stays **off in prod** until Aris has owner-confirmed coverage, and
+   **off everywhere** until Desk ships the coverage confirm action (Desk PR 3,
+   the drawer); the field moves into Locations in Desk PR 5.
+2. **"Three failed repairs"** = the assistant's own conversation repair
+   counter (`state.repair.failureCount`), three failed in a row. Not a caller
+   reporting the same fault fixed three times.
+3. **Frustration** is off by default; the owner can switch it on per playbook.
+4. **Urgent alert channel.** Email first while SMS is off. SMS (locked by
+   Alvin): once the tenant's SMS allowance is used up, an urgent SMS goes out
+   only if the tenant has on-demand on, billed as on-demand. Otherwise the
+   alert goes by email, `delivery.sms = { state: 'skipped', reason:
+   'allowance_exhausted' }`, and no SMS is sent. The check is Ops-Billing's
+   `claim_sms_units(p_tenant_id, p_units, p_idempotency_key, p_strict)`
+   (draft `2026-10-09_claim_sms_units.sql`, not applied; prod SQL needs
+   Alvin's GO). Brain does not own it. The urgent SMS path calls it with
+   `p_strict = true` and the urgent key below:
+   - outcome `included` or `on_demand`: send the SMS.
+   - outcome `refused`: no SMS, `delivery.sms` skipped `allowance_exhausted`, send email.
+   - database error: fail closed for this path: no SMS, email only.
+   - The old `consume_sms_units` is not used for handoff alerts.
+11. **Idempotency keys (locked).** A claim is remembered per key and the
+    record `version` bumps on every write, so no send key includes the
+    version (a later write would resend and rebill).
+    - Urgent alert, SMS claim and `notify_sends` row:
+      `handoff:<call_id>:urgent:<rule_id>:<channel>`, e.g.
+      `handoff:<call_id>:urgent:safety:sms`. Matches "at most one alert per
+      rule per call".
+    - End-of-call summary: `handoff:<call_id>:summary:<channel>`. Sent once per
+      channel per call. A later change (name captured, need resolved) updates
+      the record and the Desk card; it is not re-sent.
+5. **Timing.** Voice fires the alert as soon as the rule matches and does not
+   block speech. The agent never says the team was alerted until the send
+   confirms (`delivery.<channel>.state = 'sent'`). Before that the only line
+   is "I'm getting this to the team now" (sw: "Ninaifikisha kwa timu sasa hivi").
+6. **Name on urgent alerts.** `validateEscalation` drops the name requirement
+   for urgent alerts only: the caller ID phone is enough, `caller_name_source
+   = 'none'`, and the same record is updated (`version+1`) once the name is
+   captured. Non-urgent escalation keeps the name requirement.
+7. **End-of-call writer** (Voice-owned hook, today `writeHangupSummary`) must
+   run on every close path: hangup, socket drop, farewell, outage clip.
+8. **Voice structured path.** Voice wires #614's `src/speech/structured/facts.js:91`
+   and verify's covered / not-covered lines to `speakableCoverageAreas(profile)`
+   (`src/conversation/confirmedCoverage.js`) when the flag is on.
+9. **Desk Needs-you.** One card per handoff record (per call), `needs[]` shown
+   as a checklist (open / resolved / handed off). Cards sort by urgency, then
+   callback window. A card stays open while any need is open.
+10. **Urgent-rules UI.** A per-playbook toggle list in Settings. Choosing a
+    playbook seeds the defaults; the owner switches each rule on or off.
+    Stored in `tenants.urgent_rules` keyed by stable rule id (below), never
+    by label text.
 
 ## Why
 
@@ -24,11 +81,11 @@ not copy them.
 | `version` | int | +1 on every write. Writers send `expected_version` (optimistic lock). |
 | `needs` | jsonb[] | see below. |
 | `urgency` | `none`/`soon`/`now` | `now` = alert immediately (1c). |
-| `urgency_reason` | text | rule id + short reason, e.g. `safety: "water everywhere"`. |
+| `urgency_reason` | text | stable rule id + short reason, e.g. `safety: "water everywhere"`. |
 | `callback_window` | jsonb | `{ text, start, end }` Nairobi time, only as the caller said it. Never invented. Null when not said. |
 | `language` | `en`/`sw`/`sheng` | from `state.language.current`. |
 | `caller_name` | text | code-held only. |
-| `caller_name_source` | `file_confirmed`/`asked_saved`/`none` | `file_confirmed` = phone file + caller said yes; `asked_saved` = asked on this call and saved; `none` = no name (an alert still goes). |
+| `caller_name_source` | `file_confirmed`/`asked_saved`/`none` | `file_confirmed` = phone file + caller said yes; `asked_saved` = asked on this call and saved; `none` = no name (an urgent alert still goes on caller ID; the record is updated when the name is captured). |
 | `caller_name_confidence` | numeric 0..1 | 1.0 file_confirmed, from STT/quality for asked_saved, 0 none. |
 | `returning_caller` | bool | `state.returning` has a file. |
 | `hold_ids` | uuid[] | `service_requests` with `request_type='hold'` from this call. |
@@ -51,7 +108,7 @@ not copy them.
   "outcome": "visit_saved | answered_from_file | request_saved | ... (when resolved)",
   "open_reason": "coverage_unconfirmed | fact_unknown | caller_declined | tool_failed | name_missing | ... (when open)",
   "link": { "table": "appointments", "id": "..." },
-  "urgent_rule": "safety | payment_dispute | insists_on_person | repair_loop | frustration | null",
+  "urgent_rule": "safety | payment_dispute | insists_person | repair_fail_3 | frustration | null",
   "created_turn": 7,
   "updated_turn": 9
 }
@@ -61,10 +118,10 @@ not copy them.
 
 ```json
 {
-  "sms":      { "state": "queued | sent | failed | skipped", "at": "...", "reason": null, "notify_send_id": "..." },
+  "sms":      { "state": "queued | sent | failed | skipped", "at": "...", "reason": "allowance_exhausted | not_enabled | null", "notify_send_id": "..." },
   "whatsapp": { "state": "...", "at": "...", "reason": "not_configured" },
   "email":    { "state": "...", "at": "...", "reason": null },
-  "last_alert_version": 3
+  "urgent_sent": ["safety"]
 }
 ```
 
@@ -82,24 +139,27 @@ Urgency only goes up during a call: `none` -> `soon` -> `now`.
 
 An immediate alert is the same record: Brain upserts with `urgency='now'`,
 Voice sends the alert and writes `delivery` + `status='alerted'`; at hangup
-Brain upserts the final needs/summary with `version+1`. Voice re-sends only
-if the hangup version adds a new `now` need or changes the callback window
-(`delivery.last_alert_version` < version and a send-worthy diff).
+Brain upserts the final needs/summary with `version+1`. Voice sends an urgent
+alert only for a rule id not yet in `delivery.urgent_sent` (key
+`handoff:<call_id>:urgent:<rule_id>:<channel>`), and the end-of-call summary
+once per channel (`handoff:<call_id>:summary:<channel>`). A version bump alone
+never sends.
 
 ## Who writes what
 
 | writer | writes | when |
 |---|---|---|
 | Brain | `needs`, `urgency`, `urgency_reason`, `callback_window`, `language`, caller name fields, `returning_caller`, link ids, `summary` | each turn (in memory), upsert on urgent-now and at hangup (`writeHangupSummary`) |
-| Voice | `delivery`, `status` open->alerted | after `dispatchAlert` / `dispatchEscalationAlert`; reads `notify_sends` rows by idempotency key |
+| Voice | `delivery`, `status` open->alerted; end-of-call upsert trigger | alert fires as soon as Brain marks a rule (no speech block); end-of-call hook runs on hangup, socket drop, farewell, outage clip |
 | Desk | `status` -> closed, need `resolved`/reopen, owner note | owner action, via RPC |
 
 All writes go through `public.upsert_call_handoff(p_call_id, p_expected_version, p_patch jsonb)` (service_role) or the Desk RPCs. No direct table UPDATE from the client.
 
 ## Reuse, not duplicate
 
-- **Notify:** keep `src/notifications/dispatch.js` (SMS -> WhatsApp -> email) and the `notify_sends` ledger. Idempotency key `handoff:<call_id>:v<version>:<channel>`. `delivery` is a projection of those rows.
-- **Escalate tool:** stays the way a caller-requested human handoff is sent. Its result sets the `human` need to `handed_off`. Change needed: `validateEscalation` refuses with no caller name (`missingSlots: ['name']`); an urgent-now alert must go with `caller_name_source='none'` and the phone number.
+- **Notify:** keep `src/notifications/dispatch.js` (SMS -> WhatsApp -> email) and the `notify_sends` ledger. Idempotency keys per decision 11 (`handoff:<call_id>:urgent:<rule_id>:<channel>`, `handoff:<call_id>:summary:<channel>`; never the version). `delivery` is a projection of those rows.
+- **Escalate tool:** stays the way a caller-requested human handoff is sent. Its result sets the `human` need to `handed_off`. Change (locked): `validateEscalation` skips the name requirement for urgent alerts only (caller ID phone, `caller_name_source='none'`); non-urgent keeps `missingSlots: ['name']`.
+- **SMS allowance:** urgent SMS goes through Ops-Billing's `claim_sms_units(..., p_strict => true)` with the urgent key (decision 4). Brain only reads the outcome.
 - **Rows:** `service_requests`, `appointments` stay the system of record; the record links them. `calls.resolution` / `resolution_note` / summary meta stay as they are and are derived alongside (`callResolution.js`, `callSummary.js`).
 - **Owner targets:** `team_notify` facts / `alert_email` / `notify_channels` decide recipients; nothing new.
 
@@ -218,23 +278,29 @@ grant execute on function public.upsert_call_handoff(uuid, integer, jsonb) to se
 ## Phase 1(c): urgent-now rules (design)
 
 An urgent-now rule sets `urgency='now'`, adds `urgent_rule` on the need, and
-triggers one immediate alert (record upsert + Voice send). The call continues;
-the agent says only what is true ("I've flagged this for the team now" only
-after the send succeeded, per the speech guard's saved-claim rule).
+triggers one immediate alert (record upsert + Voice send, not blocking
+speech). The call continues. Until a channel confirms `sent`, the agent may
+say only "I'm getting this to the team now"; "the team has been alerted" is
+allowed only after the send confirms (speech guard saved-claim rule).
+
+Stable rule ids (stored keys; never change them, labels may change):
 
 | rule id | detects (code, not the model) | default on for playbook |
 |---|---|---|
 | `safety` | `looksLikeTrueHomeEmergency` (burst, flood, gas, shock, fire, "hatari") + damage words | home_services: on; retail: on |
 | `payment_dispute` | double charge, refund demand, "nimekatwa pesa", M-Pesa reversal | all: on |
-| `insists_on_person` | `intent==='human'` asked twice, or one explicit "I want to talk to a person / nataka kuongea na mtu" after a decline | all: on |
-| `repair_loop` | `state.repair.failureCount >= 3` (three failed repairs) | all: on |
-| `frustration` | `state.emotion.state` frustrated/angry with intensity high, or two complaint markers | all: off by default (noisy) |
+| `insists_person` | `intent==='human'` asked twice, or one explicit "I want to talk to a person / nataka kuongea na mtu" after a decline | all: on |
+| `repair_fail_3` | the assistant's conversation repair counter `state.repair.failureCount` reaches 3 failed in a row | all: on |
+| `frustration` | `state.emotion.state` frustrated/angry with intensity high, or two complaint markers | all: **off** (owner can switch on per playbook) |
 
-- Defaults live per playbook (`playbooks/*.js` export `URGENT_DEFAULTS`).
-- Owner-editable: Desk setting `tenants.urgent_rules jsonb` (`{rule_id: bool}`),
-  a confirmed fact like any other (GIGO: owner row required). Missing = playbook
-  default.
+- Defaults live per playbook (`playbooks/*.js` export `URGENT_DEFAULTS`,
+  keyed by rule id). Choosing a playbook in Settings seeds them.
+- Owner-editable in Settings as a per-playbook toggle list, stored in
+  `tenants.urgent_rules jsonb` as `{ "<rule_id>": true|false }`. A missing
+  key = playbook default. Unknown keys are ignored.
 - Off-hours do not suppress `safety`. Message-only mode still alerts.
+- Channel: email while SMS is off; SMS past the allowance only with on-demand
+  on (decision 4).
 - At most one immediate alert per rule per call; later turns update the record.
 
 ## Flags and rollout
@@ -246,9 +312,16 @@ price, coverage, stock, or ETA; a missing fact is a need, not an answer.
 
 ## Open questions
 
-1. Voice: do you send the urgent-now alert from the brain turn (before TTS) or after the line is spoken? Spec assumes before, call continues.
-2. Voice: OK to drop the name requirement in `validateEscalation` for urgent-now alerts (`caller_name_source='none'`)?
-3. Desk: one "Needs you" row per record, or one per open need?
-4. Desk: urgent rules as a settings toggle list, or inside the playbook pick?
-5. Alvin: is `frustration` default off right? Is "three failed repairs" the conversation repair counter (assumed) or a caller reporting the same fault fixed three times?
-6. Alvin: should an urgent-now alert use SMS even when the tenant's SMS allowance is spent (billed to tenant on-demand)?
+For Alvin:
+
+- Beta tenants with on-demand on: get the urgent SMS unbilled (billed 0,
+  `would_bill` recorded), unless Alvin wants beta billed. Open; the
+  Ops-Billing draft currently records beta on-demand as billed 0.
+
+Implementation follow-ups:
+
+- Ops-Billing: `claim_sms_units` applied to staging, then prod after Alvin's GO.
+
+- Desk: RPC names for close / resolve need / reopen (Desk PR).
+- Brain + Voice: link arrays (`hold_ids`, `visit_ids`, `request_ids`) appended by a sibling function, or sent whole in `p_patch`.
+- Brain: enforce "urgency only goes up" inside `upsert_call_handoff` before ship.

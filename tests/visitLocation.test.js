@@ -1,5 +1,8 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+// Picker lists carry an owner row (ownerCoverage). Delivery / location-note coverage
+// is the flag-off path (flagOff); BRAIN_CONFIRMED_COVERAGE=on twins: confirmedCoverage.test.js.
+const { ownerCoverage, flagOff } = require('./helpers/ownerCoverage');
 const { parseGeminiResponse } = require('../src/conversation/toolMarkers');
 const {
   executeBrainTools,
@@ -34,7 +37,7 @@ describe('visit location ladder', () => {
     assert.equal(classifyVisitLocation('Westlands, I will share a pin'), 'pin_promised');
   });
 
-  it('matches coverage from policies and location coverage notes, not shop landmarks', () => {
+  it('matches coverage from policies and location coverage notes, not shop landmarks', flagOff(() => {
     const profile = {
       businessPolicies: { delivery: 'Westlands and Kilimani' },
       businessLocations: [
@@ -49,9 +52,9 @@ describe('visit location ladder', () => {
       'outside'
     );
     assert.equal(assessCoverage('Runda', { businessPolicies: {} }), 'unknown');
-  });
+  }));
 
-  it('treats a county in Delivery as its localities, not the office address', () => {
+  it('treats a county in Delivery as its localities, not the office address', flagOff(() => {
     const nairobi = { businessPolicies: { delivery: 'Nairobi' } };
     assert.equal(assessCoverage('Runda Green Park gate 4', nairobi), 'inside');
     assert.equal(assessCoverage('Westlands', nairobi), 'inside');
@@ -92,31 +95,31 @@ describe('visit location ladder', () => {
     const booked = decideVisitPlace('Runda', { profile: nairobi, detailAsked: true });
     assert.equal(booked.bookable, true);
     assert.equal(booked.coverage, 'inside');
-  });
+  }));
 
   it('uses a saved coverage directory instead of Delivery text', () => {
-    const nairobi = {
+    const nairobi = ownerCoverage({
       businessPolicies: {
         delivery: 'Same day before 2pm',
         coverage_areas: ['county:nairobi'],
       },
-    };
+    });
     assert.equal(assessCoverage('Runda Green Park gate 4', nairobi), 'inside');
     assert.equal(assessCoverage('Westlands', nairobi), 'inside');
     assert.equal(assessCoverage('Ruaka', nairobi), 'outside');
     assert.equal(assessCoverage('Rongai', nairobi), 'outside');
     assert.equal(assessCoverage('Mombasa', nairobi), 'outside');
     assert.equal(assessCoverage('Mombasa Road', nairobi), 'inside');
-    const narrow = {
+    const narrow = ownerCoverage({
       businessPolicies: {
         delivery: 'Nairobi',
         coverage_areas: ['place:westlands', 'place:kilimani'],
       },
-    };
+    });
     assert.equal(assessCoverage('Westlands', narrow), 'inside');
     assert.equal(assessCoverage('Runda', narrow), 'outside');
     assert.equal(assessCoverage('Ruaka', narrow), 'outside');
-    const kajiado = { businessPolicies: { coverage_areas: ['county:kajiado'] } };
+    const kajiado = ownerCoverage({ businessPolicies: { coverage_areas: ['county:kajiado'] } });
     assert.equal(assessCoverage('Rongai', kajiado), 'inside');
     assert.equal(assessCoverage('Kitengela', kajiado), 'inside');
     assert.equal(assessCoverage('Runda', kajiado), 'outside');
@@ -124,9 +127,9 @@ describe('visit location ladder', () => {
       businessPolicies: { delivery: 'Nairobi', coverage_areas: [] },
     };
     assert.equal(assessCoverage('Runda', cleared), 'unknown');
-    const dusted = {
+    const dusted = ownerCoverage({
       businessPolicies: { coverage_areas: ['county:nairobi', 'place:kitengela'] },
-    };
+    });
     assert.equal(foldCanonicalPlace('Rwangai', dusted), 'Rongai');
     assert.equal(foldCanonicalPlace('Rwangai'), 'Rwangai');
     assert.equal(assessCoverage(foldCanonicalPlace('Rwangai', dusted), dusted), 'outside');
@@ -164,7 +167,7 @@ describe('visit location ladder', () => {
     );
   });
 
-  it('answers a coverage question from settings text', () => {
+  it('answers a coverage question from settings text', flagOff(() => {
     const profile = {
       vertical: 'home_services',
       businessPolicies: { delivery: 'Nairobi and Westlands' },
@@ -199,7 +202,7 @@ describe('visit location ladder', () => {
       coverageAskSpeech('What about Rongai?', { vertical: 'retail', businessPolicies: { delivery: 'Nairobi' } }, 'en'),
       ''
     );
-  });
+  }));
 
   it('speaks the fixed outside line', () => {
     assert.equal(visitBlockSpeech('outside', 'en'), 'That area is outside our coverage.');
@@ -209,7 +212,7 @@ describe('visit location ladder', () => {
     assert.equal(visitBlockSpeech('refused', 'en'), '');
   });
 
-  it('soft-saves area-only only after one follow-up when coverage matches', () => {
+  it('soft-saves area-only only after one follow-up when coverage matches', flagOff(() => {
     const profile = { businessPolicies: { delivery: 'Runda, Karen' } };
     const first = decideVisitPlace('Runda', { profile, detailAsked: false });
     assert.equal(first.ask, true);
@@ -223,7 +226,7 @@ describe('visit location ladder', () => {
     const unknown = decideVisitPlace('Runda', { profile: {}, detailAsked: true });
     assert.equal(unknown.blocked, 'unknown_coverage');
     assert.equal(unknown.bookable, false);
-  });
+  }));
 
   it('stores a location alias on the existing landmark field', async () => {
     let saved = null;
@@ -246,7 +249,7 @@ describe('visit location ladder', () => {
     assert.doesNotMatch(formatToolConfirmation(execution.results, 'en'), /landmark/i);
   });
 
-  it('rejects an outside area and does not insert a visit', async () => {
+  it('rejects an outside area and does not insert a visit', flagOff(async () => {
     let calls = 0;
     const execution = await executeBrainTools({
       parsed: parseGeminiResponse(
@@ -274,9 +277,9 @@ describe('visit location ladder', () => {
     assert.match(formatToolConfirmation(execution.results, 'sw'), /nje/i);
     assert.match(formatToolConfirmation(execution.results, 'sheng'), /nje/i);
     assert.doesNotMatch(formatToolConfirmation(execution.results, 'en'), /landmark/i);
-  });
+  }));
 
-  it('flags confirm access when an in-coverage area is saved', async () => {
+  it('flags confirm access when an in-coverage area is saved', flagOff(async () => {
     let saved = null;
     const execution = await executeBrainTools({
       parsed: parseGeminiResponse(
@@ -296,7 +299,7 @@ describe('visit location ladder', () => {
     assert.equal(execution.results[0].status, 'succeeded');
     assert.equal(saved.landmark, 'Runda');
     assert.match(saved.notes, /confirm access/i);
-  });
+  }));
 
   it('keeps retail directions on shop landmarks', () => {
     const retail = formatPlaybookForPrompt({ vertical: 'retail' });
@@ -315,19 +318,19 @@ describe('a covered-town answer ends on a next step (HD_72ab69cbab2b T5)', () =>
     businessPolicies: { delivery: 'Nairobi and Kitengela' },
   };
 
-  it('asks which service when none is on the call yet', () => {
+  it('asks which service when none is on the call yet', flagOff(() => {
     const line = speech('What about Kitengela?', profile, 'en', { entities: {} });
     assert.equal(line, 'Yes, we cover Kitengela. Which service would you like?');
     assert.match(speech('Mnafika Kitengela?', profile, 'sw', null), /^Ndiyo, tunafika Kitengela\. Ungependa huduma gani\?$/);
-  });
+  }));
 
-  it('asks for the open visit slot once the service is known', () => {
+  it('asks for the open visit slot once the service is known', flagOff(() => {
     const state = { entities: { service: { value: 'Carpet Cleaning' } }, goal: { missingSlots: ['when_text'] } };
     assert.equal(speech('What about Kitengela?', profile, 'en', state), 'Yes, we cover Kitengela. When would you like us to come?');
     const where = { entities: { service: { value: 'Carpet Cleaning' } }, goal: { missingSlots: ['location'] } };
     assert.equal(coverageNextStepQuestion('en', where), 'Where should we come?');
     assert.equal(coverageNextStepQuestion('sw', where), 'Tuje wapi?');
-  });
+  }));
 
   it('an uncovered town still ends on the note offer', () => {
     assert.match(speech('What about Ruaka?', profile, 'en', null), /\?$/);

@@ -79,16 +79,16 @@ function coverageAskedPlace(lastCallerTurn, profile = {}) {
 
 /**
  * Flag on: why this coverage sentence may not be spoken, or ''.
- * No confirmed list: every coverage sentence. Confirmed list: a denial that
- * names a place the confirmed list covers.
+ * No confirmed list: every coverage sentence. Confirmed list: a denial while
+ * the place the caller asked about is inside the confirmed list. ("outside
+ * our Nairobi coverage" names the list, not the caller's place.)
  */
-function unconfirmedCoverageDrop(sentence, ctx, confirmed) {
+function unconfirmedCoverageDrop(sentence, ctx, confirmed, lastCallerTurn = '') {
   if (!COVERAGE_TALK.test(sentence)) return '';
   if (!confirmed) return 'coverage_unconfirmed';
   if (COVERAGE_DENIAL.test(sentence)) {
-    for (const name of bindSpokenPlace(sentence)) {
-      if (coverageStatus(name, ctx.profile || {}) === 'inside') return 'coverage_contradiction';
-    }
+    const asked = coverageAskedPlace(lastCallerTurn, ctx.profile || {});
+    if (asked && coverageStatus(asked, ctx.profile || {}) === 'inside') return 'coverage_contradiction';
   }
   return '';
 }
@@ -685,7 +685,7 @@ function guardSpokenReply(text, ctx = {}) {
       noteDrop(ctx, 'coverage', sentence);
       continue;
     }
-    const coverageDrop = coverageGate ? unconfirmedCoverageDrop(sentence, ctx, coverageConfirmed) : '';
+    const coverageDrop = coverageGate ? unconfirmedCoverageDrop(sentence, ctx, coverageConfirmed, lastCallerTurn) : '';
     if (coverageDrop) {
       if (!coverageConfirmed) droppedCoverage = true;
       noteDrop(ctx, coverageDrop, sentence);

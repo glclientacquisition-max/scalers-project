@@ -42,6 +42,21 @@ function confirmedCoverageReading(profile = {}, opts = {}) {
 }
 
 /**
+ * True when the owner row on policies.coverage_areas confirms the stored list
+ * as it is, including an empty list (validateCoverage reads [] as missing, so
+ * readFact cannot). Hash mode also needs the matching value_hash.
+ */
+function coverageOwnerRowConfirms(profile = {}) {
+  const { lookupFieldMeta, classifyRecord } = require('./provenance');
+  const { factValueForPath, tenantRowFromProfile } = require('./factHash');
+  const fieldMeta = profile?.fieldMeta || null;
+  const meta = lookupFieldMeta(fieldMeta, 'policies.coverage_areas');
+  if (!meta || !(meta.source === 'owner' || meta.confirmed_at || meta.confirmed_by)) return false;
+  const value = factValueForPath('policies.coverage_areas', tenantRowFromProfile(profile || {}));
+  return classifyRecord({}, { fieldMeta, fieldPath: 'policies.coverage_areas', value }).fact === true;
+}
+
+/**
  * Coverage areas a speech or prompt layer may state as fact.
  * Flag off: the stored picker list (today's behaviour). Flag on: the
  * confirmed list only, else null.
@@ -137,6 +152,7 @@ function confirmedCoveragePromptRule(confirmed) {
 
 module.exports = {
   FLAG,
+  coverageOwnerRowConfirms,
   confirmedCoveragePromptRule,
   confirmedCoverageEnabled,
   confirmedCoverageReading,

@@ -12,9 +12,11 @@ const {
   checkPromptFacts,
 } = require('../src/conversation/promptFacts');
 const SNAPSHOT = require('./fixtures/tenants/done-and-dusted-staging.json');
+const { ownerCoverage } = require('./helpers/ownerCoverage');
 
 describe('tenant prompt facts', () => {
-  const profile = profileFromSnapshot(SNAPSHOT);
+  // Owner row on coverage so BRAIN_CONFIRMED_COVERAGE=on reads the list as fact.
+  const profile = ownerCoverage(profileFromSnapshot(SNAPSHOT));
   const prompt = buildSystemPrompt(profile);
 
   it('puts coverage towns, hours, and all 16 services in the live prompt', () => {
@@ -36,7 +38,7 @@ describe('tenant prompt facts', () => {
   });
 
   it('keeps every configured policy key on one side: fact or unknown', () => {
-    const split = factPolicyMap({
+    const policies = {
       payment: 'M-Pesa',
       min_notice: 'Book one day ahead',
       pet_policy: 'Pets stay in another room',
@@ -48,13 +50,14 @@ describe('tenant prompt facts', () => {
       coverage_areas: ['county:nairobi', 'place:kitengela'],
       booking_mode: 'request',
       holds: { allowed: 'no' },
-    });
+    };
+    const split = factPolicyMap(policies, ownerCoverage({ businessPolicies: policies }).fieldMeta);
     assert.equal(split.policies.min_notice, 'Book one day ahead');
     assert.deepEqual(split.policies.coverage_areas, ['county:nairobi', 'place:kitengela']);
     assert.ok(split.unknown.includes('Pet policy'));
     assert.equal(split.policies.booking_mode, undefined);
     assert.equal(split.policies.holds, undefined);
-    const truth = buildLiveGroundTruth({
+    const truth = buildLiveGroundTruth(ownerCoverage({
       businessName: 'Test',
       businessPolicies: {
         payment: 'M-Pesa',
@@ -62,16 +65,16 @@ describe('tenant prompt facts', () => {
         provenance: { payment: { source: 'owner', confirmed: true } },
         coverage_areas: ['county:nairobi', 'place:kitengela'],
       },
-    });
+    }));
     assert.match(truth, /- Min notice: Book one day ahead/);
     assert.match(truth, /- Coverage: Nairobi, Kitengela/);
   });
 
   it('keeps an empty picked list as an empty service area', () => {
-    const truth = buildLiveGroundTruth({
+    const truth = buildLiveGroundTruth(ownerCoverage({
       businessName: 'Test',
       businessPolicies: { payment: 'Cash', coverage_areas: [] },
-    });
+    }));
     assert.match(truth, /- Coverage: \(none listed\)/);
   });
 });
