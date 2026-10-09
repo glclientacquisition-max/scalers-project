@@ -472,6 +472,7 @@ const {
   mergeOwnerCallItems,
   noteOwnerCallItem,
   ownerMessageAtEndEnabled,
+  ownerNotifiedMeta,
   ownerSummaryKeyBase,
   pendingOwnerCallItems,
 } = require('./src/notifications/ownerCallMessage');
@@ -5808,7 +5809,7 @@ async function sendOwnerCallMessage(callSid, opts = {}) {
     const terminal =
       opts.terminal === true || OWNER_TERMINAL_STATUSES.has(String(call.status || '').toLowerCase());
     if (!terminal) return null;
-    if (staffInboxAlreadyNotified(call)) {
+    if (staffInboxAlreadyNotified(call) || ownerNotifiedMeta(call)) {
       clearOwnerCallItems(callSid);
       return null;
     }
