@@ -431,7 +431,7 @@ function openFileRead(state, language = 'en', { now = new Date() } = {}) {
  * move_ok / visit_updated for a succeeded update_appointment (fact-lines.md).
  * move_ok only when the row moved is the filed visit the reschedule named.
  */
-function updateResultLines(results = [], language = 'en') {
+function updateResultLines(results = [], language = 'en', { newTimeLabel = null } = {}) {
   const lines = [];
   for (const r of Array.isArray(results) ? results : []) {
     if (r?.action !== 'update_appointment' || r.status !== 'succeeded') continue;
@@ -439,9 +439,13 @@ function updateResultLines(results = [], language = 'en') {
     if (st === 'cancelled') continue;
     const val = r.value || {};
     const rec = r.record || {};
-    const toWhen = whenSlot(val.windowStart || rec.window_start, val.whenText || rec.when_text);
+    const instant = r.hours?.resolved?.instant;
+    const iso = instant instanceof Date && !Number.isNaN(instant.getTime()) ? instant.toISOString() : null;
+    const label = typeof newTimeLabel === 'function' ? newTimeLabel(r) : '';
+    const toWhen = whenSlot(iso || val.windowStart || rec.window_start, label || val.whenText || rec.when_text);
     const id = r.id || val.appointmentId || null;
-    if (toWhen) {
+    const moved = typeof newTimeLabel === 'function' ? Boolean(label) : Boolean(toWhen);
+    if (moved && toWhen) {
       // The same row got a new time: that is a move. A reschedule of a filed
       // visit is pinned to that row (rescheduleCreateAsUpdate), never a create.
       lines.push(

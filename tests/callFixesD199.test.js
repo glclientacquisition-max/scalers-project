@@ -246,7 +246,7 @@ describe('HD_d199dbbf6b79 replay, BRAIN_CALL_FIXES_D199=on', () => {
       assert.equal(calls[0][1].appointmentId, TODAY_VISIT);
       const results = exec.results || exec;
       const line = formatToolConfirmation(results, 'sw');
-      assert.match(line, /^Sawa, nimehamisha ziara ya Carpet Cleaning hadi /);
+      assert.match(line, /^Sawa, nimehamisha ziara /);
       const { brainLinesForResults } = require('../src/conversation/toolExecution');
       const moved = brainLinesForResults(results, 'en').lines;
       assert.equal(moved[0].template, 'move_ok');

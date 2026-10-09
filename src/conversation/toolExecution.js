@@ -1247,8 +1247,18 @@ function toolOutcomeLine(results = [], language = 'en') {
 function brainLinesForResults(results = [], language = 'en') {
   const fixes = require('./callFixesD199');
   if (!fixes.callFixesD199Enabled()) return { line: '', lines: [] };
-  const { renderLines } = require('./factLine');
-  return renderLines(fixes.updateResultLines(results, confirmationLanguage(language)));
+  const lang = confirmationLanguage(language);
+  // The spoken confirmation stays formatToolConfirmation (Voice's spokenWhen).
+  // It says "moved" exactly when the update has a new time label, which is
+  // the move_ok gate; the trace line carries that spoken text.
+  const lines = fixes.updateResultLines(results, lang, {
+    newTimeLabel: (r) => formatRequestedWhenLabel(r.hours, lang),
+  });
+  const out = lines.map((line, i) => {
+    const r = (results || []).filter((x) => x?.action === 'update_appointment' && x.status === 'succeeded' && String(x.appointmentStatus || '').toLowerCase() !== 'cancelled')[i];
+    return { ...line, text: r ? formatToolConfirmation([r], language) : '' };
+  });
+  return { line: out.map((l) => l.text).filter(Boolean).join(' '), lines: out };
 }
 
 function formatToolConfirmation(results = [], language = 'en') {
@@ -1343,10 +1353,6 @@ function formatToolConfirmation(results = [], language = 'en') {
   if (meaningful.action === 'update_appointment') {
     if (meaningful.status === 'succeeded') {
       const st = String(meaningful.appointmentStatus || '').toLowerCase();
-      if (st !== 'cancelled' && require('./callFixesD199').callFixesD199Enabled()) {
-        const spoken = brainLinesForResults([meaningful], language).line;
-        if (spoken) return spoken;
-      }
       if (st === 'cancelled') {
         if (sw) return 'Sawa, nimeghairi ziara hiyo.';
         if (sheng) return 'Poa, nime-cancel hiyo visit.';
