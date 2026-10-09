@@ -2,8 +2,9 @@ import type { BusinessPolicies } from "@/lib/businessPolicies";
 import { POLICY_FIELDS } from "@/lib/businessPolicies";
 import type { ProductItem } from "@/lib/productCatalog";
 import { settingsScopeIncludes } from "@/lib/settingsSaveScope";
+import { stableRowId } from "@/lib/factHash";
 
-type ServiceRow = { name?: string };
+type ServiceRow = { name?: string; id?: string };
 type FaqRow = { question?: string; answer?: string };
 
 export type SettingsSaveAttestInput = {
@@ -44,7 +45,7 @@ function catalogPaths(
   });
   services.forEach((row, index) => {
     if (!String(row.name || "").trim()) return;
-    pushUnique(out, seen, `catalog.service.${index + 1}.name`);
+    pushUnique(out, seen, `catalog.service.${stableRowId(row) || String(index + 1)}.name`);
   });
 }
 

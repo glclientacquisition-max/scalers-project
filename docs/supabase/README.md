@@ -114,6 +114,8 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 21c | [`service_request_windows.sql`](./service_request_windows.sql) | `contacts_and_requests.sql` | Hold `window_start` / `window_end` + owner UPDATE grant for `when_text` and windows |
 | 22 | [`product_catalog_and_social.sql`](./product_catalog_and_social.sql) | `business_operating_model.sql` | `product_catalog` + `social_handles` (products separate from services) |
 | 22b | [`tenant_field_provenance.sql`](./tenant_field_provenance.sql) | `product_catalog_and_social.sql` | GIGO P0: `tenant_field_meta`, audit history, completeness + hold gate RPCs, FAQ status/source demotion. See [`docs/platform/TENANT_FIELD_PROVENANCE.md`](../platform/TENANT_FIELD_PROVENANCE.md). |
+| 22c | [`tenant_field_confirm_v2.sql`](./tenant_field_confirm_v2.sql) | `tenant_field_provenance.sql` | GIGO confirm v2: `tenant_field_meta.value_hash`, `confirm_tenant_fields` (batch, max 500, all or nothing), `reopen_tenant_field`. Read only when `FACT_HASH_MODE=on`. Staging first; prod needs Alvin's OK. |
+| 22d | [`services_catalog_stable_ids.sql`](./services_catalog_stable_ids.sql) | `tenant_field_confirm_v2.sql` | One-time: stable `svc_` ids on `services_catalog` rows and provenance moved from `catalog.service.<n>` to `catalog.service.<id>`. Run before Brain's `scripts/backfillFactHashes.js`. |
 | 23 | [`appointments.sql`](./appointments.sql) | `contacts_and_requests.sql` | Home-services visit bookings (`requested\|confirmed\|cancelled\|done`) + RLS |
 
 ### 10. Realtime
@@ -134,7 +136,8 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 24m | [`platform_ops_people.sql`](./platform_ops_people.sql) | `platform_ops_notices.sql` | Escalate people jsonb (name, phone, email). Applied on scalers-staging with the Platform rebuild. |
 | 24n | [`voice_turn_traces.sql`](./voice_turn_traces.sql) | `platform_ops_people.sql` | Per-turn voice traces (`voice_turn_traces`) plus call `score`, `checks`, `diagnosis`, and `release`. Service role only. Not applied by deploy. Apply the whole file on staging before `VOICE_TRACE` can persist. Re-running it adds the score columns if an earlier draft of the table is already there. |
 | 24o | [`calls_inbox_assignee.sql`](./calls_inbox_assignee.sql) | `inbox_triage.sql` | Optional. `calls.inbox_assignee_name` / `inbox_assignee_phone` (text, nullable). Already on scalers-staging (manual, 2026-10); file written to match. Not on prod. |
-| 24p | [`voice_turn_traces_cron.sql`](./voice_turn_traces_cron.sql) | `voice_turn_traces.sql` | Enables pg_cron and schedules `purge_voice_turn_traces(30)` daily at 00:17 UTC (03:17 EAT). Applied on prod 2026-10-09. Not on staging. |
+| 24p | [`voice_turn_traces_cron.sql`](./voice_turn_traces_cron.sql) | `voice_turn_traces.sql`, `voice_turn_traces_created_at_idx.sql` | Enables pg_cron and schedules `call purge_voice_turn_traces_batched(30)` daily at 00:17 UTC (03:17 EAT). Applied on prod 2026-10-09 13:38 EAT with Alvin's GO (job id 1 now runs the CALL). Not on staging (no pg_cron). |
+| 24q | [`voice_turn_traces_created_at_idx.sql`](./voice_turn_traces_created_at_idx.sql) | `voice_turn_traces.sql` | Index on `voice_turn_traces(created_at)` for the purge. Plain CREATE INDEX (table is tiny); file explains when to use CONCURRENTLY. Applied on scalers-staging and prod 2026-10-09. Partitioning plan: [`docs/ops/voice-turn-traces-partitioning.md`](../ops/voice-turn-traces-partitioning.md). |
 | 24f | [`whatsapp_threads.sql`](./whatsapp_threads.sql) | `notify_send_ledger.sql` | Platform two-way WhatsApp persist (`whatsapp_threads` / `whatsapp_messages`). Service role only. Not voice DID routing. |
 
 ---

@@ -4,6 +4,9 @@
 // every turn. The gates must strip all of it for every playbook. Any invariant
 // violation fails the build.
 
+// Fixtures here use P0 owner rows (no value_hash). An ambient FACT_HASH_MODE=on
+// in the shell must not flip them; hash-mode cases set the flag per test.
+delete process.env.FACT_HASH_MODE;
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
