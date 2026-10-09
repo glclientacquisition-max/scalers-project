@@ -1,0 +1,215 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "callId": "HD_48e5ce069c12",
+  "tenantId": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+  "businessName": "Done and Dusted",
+  "callerName": "Alvin",
+  "nameOnFile": true,
+  "vertical": "home_services",
+  "servicesCatalog": [
+    {
+      "name": "Mattress cleaning",
+      "notes": "Vary by size",
+      "category": "Cleaning",
+      "price_range": "Ksh 800-1200"
+    },
+    {
+      "name": "1-Bedroom Apartment (Standard)",
+      "notes": "Dusting, vacuuming, mopping, bathroom sanitation, kitchen surfaces",
+      "price_range": "KSh 3,000 flat"
+    },
+    {
+      "name": "2-Bedroom Apartment (Standard)",
+      "notes": "Dusting, vacuuming, mopping, up to 2 bathrooms, kitchen surfaces",
+      "price_range": "KSh 4,500 flat"
+    },
+    {
+      "name": "3-Bedroom House (Standard)",
+      "notes": "Full house vacuum/mop, dust all rooms, up to 2.5 bathrooms, kitchen counters",
+      "price_range": "KSh 6,000 flat"
+    },
+    {
+      "name": "Hourly Housekeeping",
+      "notes": "Custom chores: laundry, dishwashing, organizing",
+      "price_range": "KSh 500 per hour (min 3 hours)"
+    },
+    {
+      "name": "Deep Cleaning Package (add-on)",
+      "notes": "Inside oven, fridge, baseboards, interior windows, light fixtures",
+      "price_range": "Base + KSh 3,000 to 6,000"
+    },
+    {
+      "name": "Move-In / Move-Out Clean",
+      "notes": "Empty premises, cabinets/drawers, doors and windows",
+      "price_range": "KSh 5,000 flat (2-bed unit)"
+    },
+    {
+      "name": "Post-Construction Clean",
+      "notes": "Dust mitigation, paint/sticker removal, high-pile vacuum, site sanitation",
+      "price_range": "KSh 40 per sq ft"
+    },
+    {
+      "name": "Small Office (up to 1,500 sq ft)",
+      "notes": "Trash, desk dusting, restrooms, breakroom, floors",
+      "price_range": "KSh 15,000 per visit"
+    },
+    {
+      "name": "Medium Office (1,501-3,500 sq ft)",
+      "notes": "Workspace sanitation, common areas, conference rooms, floors",
+      "price_range": "KSh 25,000 per visit"
+    },
+    {
+      "name": "Large Commercial Contract",
+      "notes": "Daily or weekly custodians, windows, floor buffing",
+      "price_range": "Custom quote (KSh 35-150 per sq m per month)"
+    },
+    {
+      "name": "Sofa Cleaning (per seat)",
+      "price_range": "KSh 800 per seat"
+    },
+    {
+      "name": "Carpet Cleaning (per room)",
+      "price_range": "KSh 2,000 per room"
+    },
+    {
+      "name": "Interior Window Cleaning",
+      "price_range": "KSh 200 per window"
+    },
+    {
+      "name": "Refrigerator Internal Deep Clean",
+      "price_range": "KSh 1,000 per unit"
+    },
+    {
+      "name": "Oven Internal Deep Clean",
+      "price_range": "KSh 1,200 per unit"
+    }
+  ],
+  "businessPolicies": {
+    "coverage_areas": [
+      "county:nairobi",
+      "place:kitengela",
+      "county:kiambu",
+      "place:juja",
+      "place:ongata rongai",
+      "place:syokimau"
+    ]
+  },
+  "socialHandles": {
+    "main": "0790381872"
+  },
+  "source": "Staging voice_turn_traces 2026-10-08 09:12Z (12:12 EAT), release 77a63f9e, the real 16-service Done and Dusted file. Free caller (Alvin), \"really poor\". Live defects: the catalogue spoke the first four package rows (t1), which-service stacked on the model question (t2), Kitengela called outside because coverage_areas never reached the prompt, then the correction \"Yes, we cover Kitengela.\" with no next step and 7.2 s of silence (t5), a raw-history contradiction and \"apologizefor\" (t6). Recorded model text replays through the current mouth. The barged t2 reply keeps its recorded text (liveOutcome barge_in).",
+  "turns": [
+    {
+      "caller": "I was asking, uh, which service do you guys offer, like.",
+      "soniox": "en",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "We offer Mattress cleaning, 1-Bedroom Apartment, 2-Bedroom Apartment, and 3-Bedroom House, and more. Which one do you need? Am I speaking with Alvin?"
+      },
+      "model": {
+        "provider": "canned",
+        "model": "speak_packet",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "outcome": "early_return",
+      "observed": {
+        "firstPcmMs": 322,
+        "firstReplyPcmMs": 322
+      }
+    },
+    {
+      "caller": "Yeah, you're speaking with Alvin.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "We offer carpet, sofa, mattress, window, and house cleaning, as well as deep cleaning, move-in cleans, post-construction, and office cleaning. Which one do you need today, Alvin?",
+        "chars": 178,
+        "spokenEmitted": 178
+      },
+      "filler": "Mm-hmm.",
+      "observed": {
+        "firstPcmMs": 464,
+        "firstReplyPcmMs": 1961,
+        "firstTokenMs": 1154
+      },
+      "liveOutcome": "barge_in"
+    },
+    {
+      "caller": "Uh, we—",
+      "soniox": null,
+      "flushed": false,
+      "holdReason": "unfinished",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "outcome": "hold"
+    },
+    {
+      "caller": "Uh, we— We do window cleaning is good.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Yes, we offer interior window cleaning at KSh 200 per window. Would you like to book a visit for that, Alvin?",
+        "chars": 109,
+        "spokenEmitted": 109
+      },
+      "filler": "Mm-hmm.",
+      "observed": {
+        "firstPcmMs": 409,
+        "firstReplyPcmMs": 1695,
+        "firstTokenMs": 1303
+      }
+    },
+    {
+      "caller": "Uh, do you have, like, Nairobi and Kitengela or something?",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "We cover Nairobi and its close surroundings. Kitengela is outside our main coverage area, but I can note your request for the team.",
+        "chars": 131,
+        "spokenEmitted": 131
+      },
+      "filler": "Alright.",
+      "observed": {
+        "firstPcmMs": 466,
+        "firstReplyPcmMs": 1778,
+        "firstTokenMs": 1214
+      }
+    },
+    {
+      "caller": "Wow, this is poor, man.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "I apologizefor the inconvenience, Alvin. I can take down your message and ask the management to see if a special trip to Kitengela is possible for you?",
+        "chars": 151,
+        "spokenEmitted": 151
+      },
+      "filler": "Mm-hmm.",
+      "observed": {},
+      "outcome": "call_end"
+    }
+  ]
+}

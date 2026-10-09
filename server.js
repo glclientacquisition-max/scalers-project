@@ -366,6 +366,15 @@ const {
   speakPreparedSentences,
 } = require('./src/speech/spokenStreamBuffer');
 const { cutNoAiSlop } = require('./src/speech/noAiSlop');
+// Phase 2 structured mouth (VOICE_STRUCTURED_OUTPUT, default off).
+const { structuredOutputEnabled } = require('./src/speech/structured/flag');
+const { prepareStructuredPiece } = require('./src/speech/structured/speechBoundary');
+const { lockReplyLanguage } = require('./src/speech/structured/languageLock');
+const { buildFactTable, formatFactsBlock } = require('./src/speech/structured/facts');
+const { runStructuredGeminiTurn } = require('./src/speech/structured/geminiTurn');
+const { historyPartsFor } = require('./src/speech/structured/turn');
+const { splitSentences: splitStructuredSentences } = require('./src/speech/structured/mockLabel');
+const { simTapAllowed, simTapFrame } = require('./src/speech/structured/simTap');
 const {
   createOverlapHold,
   createAgentReplayMemory,
@@ -2081,6 +2090,20 @@ mediaWss.on('connection', (ws, req) => {
   let ttsSessionVoiceId = null;
   /** Latest tenant fields used to build Soniox STT context (hearing path). */
   let sttTenantSnapshot = null;
+  /** VOICE_STRUCTURED_OUTPUT, read once per call so a call never mixes mouths. */
+  const structuredMouth = structuredOutputEnabled();
+  /** Reply language locked for the current structured turn (en | sw | sheng). */
+  let structuredLock = null;
+  /** Simulator tap: VOICE_SIM_TAP=on and the stream metadata says simulator:true. */
+  let simTap = false;
+  function tapSim(event, fields = {}) {
+    if (!simTap) return;
+    try {
+      ws.send(JSON.stringify(simTapFrame(event, fields)));
+    } catch {
+      /* tap only */
+    }
+  }
 
   const sidLabel = () => sessionCallSid || `media_${connectedAt}`;
   const voiceTrace = createVoiceTrace({
@@ -2388,10 +2411,13 @@ mediaWss.on('connection', (ws, req) => {
     const extraLexicon = Array.isArray(opts.extraLexicon)
       ? opts.extraLexicon
       : mergeIdentityLexicon(ttsLexiconOverrides, { businessName, agentName });
-    const prepared = prepareForTts(text, {
-      callLanguage,
-      extraLexicon,
-    });
+    const prepared = structuredMouth
+      ? prepareStructuredPiece(text, { callLanguage, extraLexicon })
+      : prepareForTts(text, {
+          callLanguage,
+          extraLexicon,
+        });
+    tapSim('agent_text', { path: 'greeting', text: String(text || ''), spoken: prepared.text });
     voiceTrace.noteCall({
       stage: 'tts',
       path: 'greeting',
@@ -2409,7 +2435,8 @@ mediaWss.on('connection', (ws, req) => {
       session = await tts.beginSpeak({
         callLanguage,
         language: prepared.language,
-        alreadyPrepared: true,
+        // Structured mouth: the session's one boundary prepares each sentence.
+        ...(structuredMouth ? { structured: true } : { alreadyPrepared: true }),
         speedScale: 1,
         extraLexicon,
         capture: Boolean(opts.greetingCacheKey && isGreetingCacheEnabled() && ttsSpeedScale === 1),
@@ -2427,7 +2454,9 @@ mediaWss.on('connection', (ws, req) => {
         return { ok: false, cancelled: true };
       }
       activeOutboundStreamId = session.streamId;
-      const streamed = await speakPreparedSentences(session, prepared.text);
+      const streamed = structuredMouth
+        ? await speakStructuredSentences(session, text)
+        : await speakPreparedSentences(session, prepared.text);
       const spoken = streamed.spoken;
       if (
         opts.greetingCacheKey &&
@@ -2545,11 +2574,18 @@ mediaWss.on('connection', (ws, req) => {
     const extraLexicon = Array.isArray(opts.extraLexicon)
       ? opts.extraLexicon
       : mergeIdentityLexicon(ttsLexiconOverrides, { businessName, agentName });
-    const prepared = prepareForTts(text, {
-      callLanguage,
-      language: opts.language,
-      extraLexicon,
-    });
+    const prepared = structuredMouth
+      ? prepareStructuredPiece(text, {
+          callLanguage,
+          language: opts.language || structuredLock?.lang,
+          extraLexicon,
+        })
+      : prepareForTts(text, {
+          callLanguage,
+          language: opts.language,
+          extraLexicon,
+        });
+    tapSim('agent_text', { path: opts.tracePath || (opts.isFiller ? 'filler' : 'speak'), text: String(text || ''), spoken: prepared.text });
     if (opts.isFiller) {
       voiceTrace.noteFiller({
         text: prepared.text,
@@ -2575,7 +2611,9 @@ mediaWss.on('connection', (ws, req) => {
       session = await tts.beginSpeak({
         language: prepared.language,
         callLanguage,
-        alreadyPrepared: true,
+        ...(structuredMouth
+          ? { structured: true, lockedLanguage: opts.language || structuredLock?.lang, extraLexicon }
+          : { alreadyPrepared: true }),
         speed: speedForLanguage(prepared.language),
         speedScale: ttsSpeedScale,
         capture: Boolean(
@@ -2599,7 +2637,9 @@ mediaWss.on('connection', (ws, req) => {
       }
       activeOutboundStreamId = session.streamId;
       if (opts.isFiller) fillerStreamId = session.streamId;
-      const pushed = session.pushText(prepared.text);
+      const pushed = structuredMouth
+        ? session.pushText(text, { language: opts.language || structuredLock?.lang })
+        : session.pushText(prepared.text);
       if (!pushed.pushed) {
         session.cancel();
         return { ok: false, empty: true };
@@ -2949,6 +2989,15 @@ mediaWss.on('connection', (ws, req) => {
     const languageEvidence = analyzeCallerLanguage(clean, {
       tokenLanguages: opts.tokenLanguages,
     });
+    if (structuredMouth) {
+      // Lock the reply language from this turn's Soniox tags before the
+      // sticky state moves; the lock becomes the schema's lang enum.
+      structuredLock = lockReplyLanguage({
+        text: clean,
+        tokenLanguages: opts.tokenLanguages,
+        state: callLanguageState,
+      });
+    }
     callLanguageState = resolveLanguageState(callLanguageState, languageEvidence);
     callLanguage = callLanguageState.current;
 
@@ -3041,6 +3090,7 @@ mediaWss.on('connection', (ws, req) => {
         ` next=${nextBestAction.action}: ${clean}`
     );
     callTranscript.pushCaller(clean);
+    tapSim('caller_turn', { text: clean, lock: structuredLock?.lang || null });
     messages.push({ role: 'user', content: clean });
 
     const turnMatches = selectProductsForTurn({
@@ -3478,7 +3528,7 @@ mediaWss.on('connection', (ws, req) => {
         Boolean(process.env.GEMINI_API_KEY) &&
         Boolean(tts) &&
         (!needsImmediateProgress || suppressModelSpeech) &&
-        (process.env.VOICE_LLM_STREAM || 'on').toLowerCase() !== 'off';
+        (structuredMouth || (process.env.VOICE_LLM_STREAM || 'on').toLowerCase() !== 'off');
 
       let speakSession = null;
       /** @type {Promise<any>|null} */
@@ -3493,6 +3543,7 @@ mediaWss.on('connection', (ws, req) => {
             callLanguage,
             speedScale: ttsSpeedScale,
             extraLexicon: ttsLexiconOverrides,
+            ...(structuredMouth ? { structured: true, lockedLanguage: structuredLock?.lang } : {}),
           })
           .then((session) => {
             speakSession = session;
@@ -3543,6 +3594,7 @@ mediaWss.on('connection', (ws, req) => {
           callLanguage,
           speedScale: ttsSpeedScale,
           extraLexicon: ttsLexiconOverrides,
+          ...(structuredMouth ? { structured: true, lockedLanguage: structuredLock?.lang } : {}),
         });
         console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
         return speakSession;
@@ -3660,6 +3712,54 @@ mediaWss.on('connection', (ws, req) => {
           });
         }
         session.pushText(text);
+        spokenChunks.push(text);
+        lastAgentText = spokenChunks.join(' ');
+      }
+
+      // Structured mouth: one checked say[] sentence (src/speech/structured/turn.js).
+      // No polish, slop or stream-join filters; the session boundary prepares it.
+      async function onStructuredSay(line, meta = {}) {
+        if (suppressModelSpeech) return;
+        const text = String(line || '').trim();
+        if (!text || !tts) return;
+        if (suppressReplyRemainder || bargeInActive) return;
+        firstSpokenChunk = true;
+        spokeThisTurn = true;
+        turnTiming.markFirstSpokenChunk();
+        stopFillerForReply();
+        if (bargeInActive || suppressReplyRemainder) return;
+        const session = await ensureReplySpeakSession();
+        if (!session || bargeInActive || suppressReplyRemainder) {
+          try {
+            session?.cancel();
+          } catch {
+            /* ignore */
+          }
+          speakSession = null;
+          return;
+        }
+        const startingPlayback = !speaking || activePlaybackGeneration !== playbackGeneration;
+        if (startingPlayback) {
+          const prev = activePlaybackGeneration;
+          activePlaybackGeneration = ++playbackGeneration;
+          streamPlaybackGen = activePlaybackGeneration;
+          speakStartedAt = Date.now();
+          if (prev > 0) overlapHold.reassignPending(prev, activePlaybackGeneration);
+        }
+        activeOutboundStreamId = session.streamId;
+        speaking = true;
+        bargeCancelledText = '';
+        const pushed = session.pushText(text, { language: structuredLock?.lang });
+        voiceTrace.noteTts({
+          text: pushed?.text || '',
+          before: text,
+          language: pushed?.language || null,
+          wire: pushed?.wire ?? '',
+          stream: session.streamId,
+          structured: true,
+        });
+        tapSim('agent_text', { path: `structured_${meta.source || 'model'}`, text, spoken: pushed?.text || '', wire: pushed?.wire || '' });
+        if (!pushed?.pushed) return;
         spokenChunks.push(text);
         lastAgentText = spokenChunks.join(' ');
       }
@@ -3782,7 +3882,7 @@ mediaWss.on('connection', (ws, req) => {
             callTranscript.pushAgent(result.spokenText);
             turnTiming.markFirstSpokenChunk();
             await speakText(
-              catalogueMouth.letGemini
+              catalogueMouth.letGemini && !structuredMouth
                 ? softenCataloguePunctuation(result.spokenText)
                 : result.spokenText,
               { tracePath: 'llm_unavailable' }
@@ -3799,12 +3899,20 @@ mediaWss.on('connection', (ws, req) => {
           promptVersion: VOICE_SYSTEM_PROMPT_VERSION,
           language: callLanguage,
         });
-        result = await runGeminiTurnStreaming(messages, sidLabel(), catalogueSystemPrompt, {
-          onSpokenChunk,
-          shouldAbort: () => bargeInActive,
-          onToolHold: speakToolHold,
-          catalogueBreath: catalogueMouth.letGemini,
-        });
+        result = structuredMouth
+          ? await runStructuredGeminiTurnStreaming(messages, sidLabel(), catalogueSystemPrompt, {
+              onSay: onStructuredSay,
+              shouldAbort: () => bargeInActive,
+              onToolHold: speakToolHold,
+              lock: structuredLock,
+              trace: voiceTrace,
+            })
+          : await runGeminiTurnStreaming(messages, sidLabel(), catalogueSystemPrompt, {
+              onSpokenChunk,
+              shouldAbort: () => bargeInActive,
+              onToolHold: speakToolHold,
+              catalogueBreath: catalogueMouth.letGemini,
+            });
         traceModelResult(result);
         stopFillerForReply();
 
@@ -3895,9 +4003,11 @@ mediaWss.on('connection', (ws, req) => {
               const missed = Boolean(result?.timedOut || result?.llmFailed);
               const reply = missed
                 ? await speechWhenModelMissed(result, clean, localReply)
-                : catalogueMouth.letGemini
-                  ? softenCataloguePunctuation(cutNoAiSlop(planned.reply))
-                  : cutNoAiSlop(planned.reply);
+                : structuredMouth
+                  ? planned.reply
+                  : catalogueMouth.letGemini
+                    ? softenCataloguePunctuation(cutNoAiSlop(planned.reply))
+                    : cutNoAiSlop(planned.reply);
               if (reply) {
                 callTranscript.pushAgent(reply);
                 turnTiming.markFirstSpokenChunk();
@@ -3935,9 +4045,11 @@ mediaWss.on('connection', (ws, req) => {
             const missed = Boolean(result?.timedOut || result?.llmFailed);
             const reply = missed
               ? await speechWhenModelMissed(result, clean, localReply)
-              : catalogueMouth.letGemini
-                ? softenCataloguePunctuation(cutNoAiSlop(planned.reply))
-                : cutNoAiSlop(planned.reply);
+              : structuredMouth
+                ? planned.reply
+                : catalogueMouth.letGemini
+                  ? softenCataloguePunctuation(cutNoAiSlop(planned.reply))
+                  : cutNoAiSlop(planned.reply);
             if (reply) {
               callTranscript.pushAgent(reply);
               turnTiming.markFirstSpokenChunk();
@@ -3969,10 +4081,20 @@ mediaWss.on('connection', (ws, req) => {
           promptVersion: VOICE_SYSTEM_PROMPT_VERSION,
           language: callLanguage,
         });
-        result = await runGeminiTurn(messages, sidLabel(), catalogueSystemPrompt, {
-          shouldAbort: () => bargeInActive,
-          onToolHold: speakToolHold,
-        });
+        // Structured mouth on an action turn: the progress line plays first, so
+        // the checked sentences are held and spoken after it by speakText.
+        result = structuredMouth
+          ? await runStructuredGeminiTurnStreaming(messages, sidLabel(), catalogueSystemPrompt, {
+              holdSpeech: true,
+              shouldAbort: () => bargeInActive,
+              onToolHold: speakToolHold,
+              lock: structuredLock,
+              trace: voiceTrace,
+            })
+          : await runGeminiTurn(messages, sidLabel(), catalogueSystemPrompt, {
+              shouldAbort: () => bargeInActive,
+              onToolHold: speakToolHold,
+            });
         traceModelResult(result);
         stopFillerForReply();
         if (speakSession) {
@@ -3984,9 +4106,11 @@ mediaWss.on('connection', (ws, req) => {
           speakSession = null;
         }
         const modelLine = result?.spokenText
-          ? catalogueMouth.letGemini
-            ? softenCataloguePunctuation(cutNoAiSlop(result.spokenText))
-            : cutNoAiSlop(result.spokenText)
+          ? structuredMouth
+            ? result.spokenText
+            : catalogueMouth.letGemini
+              ? softenCataloguePunctuation(cutNoAiSlop(result.spokenText))
+              : cutNoAiSlop(result.spokenText)
           : '';
         const reply =
           (result?.spokenText ? modelLine : '') ||
@@ -4395,6 +4519,8 @@ mediaWss.on('connection', (ws, req) => {
         voiceTrace.noteTurnEnd({
           decision: decision.action,
           reason: decision.reason || '',
+          text,
+          queued: Boolean(decision.queue),
         });
         if (decision.queue) {
           appendFinalPart(utteranceParts, evt.text);
@@ -4718,6 +4844,10 @@ mediaWss.on('connection', (ws, req) => {
             }
 
             const meta = parsed.metadata || parsed;
+            if (!simTap && meta && meta.simulator === true && simTapAllowed()) {
+              simTap = true;
+              console.log('[ws/media] simulator tap on (VOICE_SIM_TAP)');
+            }
             const incomingCallSid =
               meta.callSid ||
               meta.call_sid ||
@@ -6031,6 +6161,135 @@ async function applyToolsWithHold(callSid, parsed, hooks = {}) {
     }
   }
   return { execution, toolHoldCancelled };
+}
+
+/**
+ * Greeting and other canned multi-sentence lines on the structured mouth:
+ * one push per sentence, so the session boundary gives each a word gap.
+ */
+async function speakStructuredSentences(session, text) {
+  const chunks = [];
+  for (const sentence of splitStructuredSentences(text)) {
+    const pushed = session.pushText(sentence);
+    if (pushed?.pushed) chunks.push(pushed.text);
+  }
+  const spoken = await session.end();
+  return { chunks, spoken };
+}
+
+/**
+ * VOICE_STRUCTURED_OUTPUT=on. Gemini answers one JSON object under a
+ * responseSchema whose lang enum is the locked reply language. Each say[]
+ * sentence is checked against the facts it cites and spoken (or held) as it
+ * closes. Tools run from the tool field through the same markers parser.
+ * History stores what was actually spoken. The legacy polish / slop / stream
+ * join chain is not called.
+ */
+async function runStructuredGeminiTurnStreaming(
+  messages,
+  callSid,
+  systemPrompt = buildSystemPrompt(),
+  { onSay, holdSpeech = false, shouldAbort, onToolHold, lock, trace } = {}
+) {
+  const state = callBrainStates.get(callSid) || null;
+  const profile = callTenantProfiles.get(callSid) || {};
+  const locked = lock?.lang ? lock : { lang: 'en', source: 'default' };
+  const table = buildFactTable(profile, { state, speakerBound: speakerBound(state) });
+  const callerTurns = state?.conversation?.answersReceived || [];
+  const result = await runStructuredGeminiTurn({
+    generateContentStream: (request) => getGeminiClient().models.generateContentStream(request),
+    contents: buildGeminiContents(messages),
+    systemPrompt,
+    factsBlock: formatFactsBlock(table),
+    lock: locked,
+    table,
+    callerText: [...callerTurns, latestCallerUtterance(messages)].join(' '),
+    state,
+    nameConfirmed: state?.caller?.nameConfirmed === true,
+    onSay: holdSpeech ? null : onSay,
+    holdSpeech,
+    shouldAbort,
+    primary: geminiPrimaryModel(),
+    backup: geminiBackupModel(),
+    timeoutMs: geminiTurnTimeoutMs(),
+    log: (line) => console.log(`[${callSid}] ${line}`),
+    sleep,
+  });
+  if (trace) {
+    trace.noteStructured({
+      lang: locked.lang,
+      locked: locked.source,
+      intent: result.intent,
+      say: result.spoken.map((row) => row.text),
+      factsUsed: result.factsUsed,
+      problems: result.problems.map((p) => ({ attempt: p.attempt, code: p.code, detail: p.detail || null })),
+      attempts: result.attempts,
+      repaired: result.repaired,
+    });
+    for (const t of result.transforms) {
+      trace.noteTransform({ stage: t.name, before: t.before, after: t.after, reason: t.reason });
+    }
+  }
+  console.log(
+    `[${callSid}] structured turn lang=${locked.lang}(${locked.source}) intent=${result.intent || ''}` +
+      ` say=${result.spoken.length} attempts=${result.attempts} repaired=${result.repaired ? 1 : 0}` +
+      ` problems=${result.problems.map((p) => p.code).join(',') || 'none'}`
+  );
+  if (result.llmFailed) {
+    if (result.providerError && !result.timedOut) {
+      noteGeminiProviderError(classifyGeminiError(result.providerError), result.providerError);
+    }
+    return {
+      spokenText: '',
+      rawText: result.raw || '',
+      firstTokenAt: result.firstTokenAt,
+      spokenEmitted: 0,
+      model: result.model,
+      actionConfirmation: '',
+      toolResults: [],
+      shouldEndCall: false,
+      streamed: false,
+      llmFailed: true,
+      llmHardDown: result.llmHardDown,
+      timedOut: result.timedOut,
+    };
+  }
+  const lines = result.spoken.map((row) => row.text);
+  const parsed = parseGeminiResponse([result.spokenText, result.toolText].filter(Boolean).join(' '));
+  const heldTools = await applyToolsWithHold(callSid, parsed, { shouldAbort, onToolHold });
+  const execution = heldTools.execution;
+  let actionConfirmation = formatToolConfirmation(
+    execution.results,
+    callBrainStates.get(callSid)?.language?.current || 'en'
+  );
+  if (heldTools.toolHoldCancelled) actionConfirmation = '';
+  const spokenText = spokenTextForToolTurn({
+    spoken: spokenTextWithoutToolFallback({ spoken: lines.join(' '), actionConfirmation }),
+    toolResults: execution.results,
+  });
+  // Streamed lines were spoken as they closed. Held lines are spoken only if
+  // spokenText keeps them. History records exactly that.
+  const historyLines = holdSpeech ? (spokenText ? lines : []) : lines;
+  const history = historyPartsFor(result, { spokenLines: historyLines });
+  messages.push({
+    role: 'assistant',
+    content: [historyLines.join(' '), actionConfirmation].filter(Boolean).join(' '),
+    geminiParts: history.parts,
+    thoughtSignature: result.thoughtSignature || undefined,
+  });
+  return {
+    spokenText,
+    rawText: result.raw || '',
+    rawChars: String(result.raw || '').length,
+    firstTokenAt: result.firstTokenAt,
+    spokenEmitted: holdSpeech ? 0 : lines.length,
+    model: result.model,
+    actionConfirmation,
+    toolResults: execution.results,
+    shouldEndCall: execution.shouldEndCall,
+    streamed: !holdSpeech,
+    structured: true,
+  };
 }
 
 async function runGeminiTurnStreaming(

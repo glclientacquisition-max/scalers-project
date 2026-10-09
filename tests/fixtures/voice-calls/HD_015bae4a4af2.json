@@ -285,7 +285,8 @@
       },
       "liveTts": [],
       "unlogged": true,
-      "outcome": "barge_in"
+      "outcome": "barge_in",
+      "lostFinal": "How much is it?"
     },
     {
       "caller": "How much is it?",
@@ -330,7 +331,8 @@
       },
       "observed": {
         "firstPcmMs": 606,
-        "firstReplyPcmMs": 606
+        "firstReplyPcmMs": 606,
+        "playedMs": 29500
       },
       "liveTts": [
         "You have Couch cleaning Monday 5 October 2026 morning West-lands ABC You have Couch cleaning Monday 5 October 2026 8 A M West-lands You have Carpet cleaning Tomorrow at 9 A M West-lands near ABC You have Carpet cleaning Monday 5 October 2026 9 A M West-lands ABC You have Carpet cleaning Monday 5 October 2026 9 A M West-lands near ABC You have Carpet cleaning tomorrow at 9 A M West-lands ABC You have Carpet cleaning Tomorrow morning West-lands ABC You have Carpet cleaning Tomorrow morning West-lands What would you like to do"

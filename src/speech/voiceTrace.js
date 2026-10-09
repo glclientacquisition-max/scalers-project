@@ -218,6 +218,7 @@ function noopTrace() {
     noteTransform: noop,
     noteCanned: noop,
     noteTts: noop,
+    noteStructured: noop,
     noteFiller: noop,
     noteTool: noop,
     noteBarge: noop,
@@ -325,6 +326,10 @@ function createVoiceTrace(opts = {}) {
       stage: 'turn_end',
       decision: String(info.decision || 'flush'),
       reason: String(info.reason || ''),
+      // Optional: the ignored final and whether it was queued into the next
+      // turn. The scorer's lostTurn check reads them.
+      ...(info.text != null ? { text: redactText(info.text) } : {}),
+      ...(info.queued != null ? { queued: Boolean(info.queued) } : {}),
       at: new Date().toISOString(),
     });
   }
@@ -405,6 +410,25 @@ function createVoiceTrace(opts = {}) {
       before: info.before != null ? redactText(info.before) : null,
       language: info.language || null,
       voiceId: info.voiceId || voiceOf() || null,
+      // Optional (structured path): the exact Soniox wire text and stream id,
+      // so the scorer can see a missing word gap between pieces.
+      ...(info.wire != null ? { wire: redactText(info.wire) } : {}),
+      ...(info.stream != null ? { stream: String(info.stream) } : {}),
+      ...(info.structured === true ? { structured: true } : {}),
+    });
+  }
+
+  function noteStructured(info = {}) {
+    pushStage({
+      stage: 'structured',
+      lang: info.lang || null,
+      locked: info.locked || null,
+      intent: info.intent || null,
+      say: (Array.isArray(info.say) ? info.say : []).map((line) => redactText(line)),
+      factsUsed: Array.isArray(info.factsUsed) ? info.factsUsed.slice(0, 12) : [],
+      problems: Array.isArray(info.problems) ? info.problems.slice(0, 12) : [],
+      attempts: Number(info.attempts || 1),
+      repaired: Boolean(info.repaired),
     });
   }
 
@@ -575,6 +599,7 @@ function createVoiceTrace(opts = {}) {
     noteTransform: guard(noteTransform),
     noteCanned: guard(noteCanned),
     noteTts: guard(noteTts),
+    noteStructured: guard(noteStructured),
     noteFiller: guard(noteFiller),
     noteTool: guard(noteTool),
     noteBarge: guard(noteBarge),

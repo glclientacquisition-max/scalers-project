@@ -1,0 +1,12 @@
+{
+  "about": "HD_015b shape: services, price, coverage, a barge-in, and a Swahili turn. Set \"to\" to a local test tenant DID.",
+  "to": "",
+  "turns": [
+    { "say": "Hi, what services do you offer?" },
+    { "say": "How much is sofa cleaning for a five seater?" },
+    { "say": "Do you come to Kitengela?" },
+    { "say": "Wait, what else can you do?", "bargeInAfterMs": 900 },
+    { "say": "Sawa, nataka kubook kesho asubuhi.", "lang": "sw" },
+    { "say": "Thank you, bye." }
+  ]
+}

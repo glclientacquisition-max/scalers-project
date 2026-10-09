@@ -305,4 +305,5 @@ module.exports = {
   splitSpeakableChunks,
   speakPreparedSentences,
   createSpokenStreamBuffer,
+  isOutcomeClaim,
 };
