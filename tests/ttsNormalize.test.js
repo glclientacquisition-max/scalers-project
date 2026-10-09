@@ -207,7 +207,7 @@ test('expandBarePriceInContext only after Price:', () => {
 test('expandTimes + day ranges', () => {
   assert.match(expandTimes('Open 8am close 6:30pm', 'en'), /8 A M/);
   assert.match(expandTimes('Open 8am close 6:30pm', 'en'), /6 30 P M/);
-  assert.match(expandTimes('Fungua 8am', 'sw'), /saa 8 asubuhi/);
+  assert.match(expandTimes('Fungua 8am', 'sw'), /saa mbili asubuhi/);
   assert.match(expandDayRanges('Mon-Sat', 'en'), /Monday to Saturday/);
   assert.match(expandDayRanges('Mon-Sat', 'sw'), /Jumatatu hadi Jumamosi/);
 });
@@ -231,11 +231,11 @@ test('expand24HourTime is a safety net and skips AM/PM forms', () => {
   assert.strictEqual(expand24HourTime('08:00–18:00', 'en'), '8 AM to 6 PM');
   assert.strictEqual(
     expand24HourTime('08:00-18:00', 'sw'),
-    'saa 8 asubuhi hadi saa 6 jioni'
+    'saa mbili asubuhi hadi saa kumi na mbili jioni'
   );
   assert.strictEqual(
     expand24HourTime('14:30', 'sw'),
-    'saa 2 na dakika 30 jioni'
+    'saa nane na nusu mchana'
   );
   assert.strictEqual(expand24HourTime('8 A M', 'en'), '8 A M');
   assert.strictEqual(expand24HourTime('9:00 AM', 'en'), '9:00 AM');
@@ -477,7 +477,7 @@ test('12h time ranges expand both sides and drop the dash', () => {
 
 test('SW 12h range keeps a single saa head', () => {
   const prepared = prepareForTts('Tunafungua saa 8am - 4pm. Sawa.', { callLanguage: 'sw' });
-  assert.match(prepared.text, /saa 8 asubuhi hadi saa 4 jioni/);
+  assert.match(prepared.text, /saa mbili asubuhi hadi saa kumi jioni/);
   assert.ok(!/saa saa/.test(prepared.text));
 });
 
@@ -659,15 +659,15 @@ test('millions speak in words', () => {
 test('swahili numeric clock keeps its stated period, no doubled saa', () => {
   assert.strictEqual(
     prepareForTts('Anwani na muda ni kesho saa 3:00 usiku hapo Panda.', { callLanguage: 'sw' }).text,
-    'Anwani na muda ni kesho saa 3 usiku hapo Panda.'
+    'Anwani na muda ni kesho saa tatu usiku hapo Panda.'
   );
   assert.strictEqual(
     prepareForTts('Tufike saa 3:30 usiku.', { callLanguage: 'sw' }).text,
-    'Tufike saa 3 na dakika 30 usiku.'
+    'Tufike saa tatu na nusu usiku.'
   );
   assert.strictEqual(
     prepareForTts('Kuanzia 6:00 asubuhi.', { callLanguage: 'sw' }).text,
-    'Kuanzia saa 6 asubuhi.'
+    'Kuanzia saa kumi na mbili asubuhi.'
   );
 });
 

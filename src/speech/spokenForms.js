@@ -1,6 +1,7 @@
 // Language-aware spoken forms for money, times, day ranges, and phones.
 
 const { minutesToHour12 } = require('../conversation/appointmentHours');
+const { swahiliClock, normalizeSwahiliClockText } = require('../conversation/swahiliClock');
 
 const EN_ONES = [
   'zero',
@@ -395,12 +396,9 @@ function expandSwahiliBarePrices(text, lang = 'en') {
 
 function speak12hTime(hour, mins, isPm, lang) {
   if (lang === 'sw') {
-    // Keep hour numeral + clear period; full Swahili clock mapping is easy to get wrong.
-    const period = isPm ? 'jioni' : 'asubuhi';
-    if (mins && mins !== 0) {
-      return `saa ${hour} na dakika ${mins} ${period}`;
-    }
-    return `saa ${hour} ${period}`;
+    // Kiswahili clock: 9 AM is "saa tatu asubuhi" (HD_d199dbbf6b79).
+    const hour24 = (Number(hour) % 12) + (isPm ? 12 : 0);
+    return swahiliClock(hour24 * 60 + (Number(mins) || 0));
   }
   const period = isPm ? 'P M' : 'A M';
   if (mins != null && mins !== 0) {
@@ -458,7 +456,8 @@ function expandTimeRanges12h(text, lang = 'en') {
         /^p/i.test(mer2),
         ttsLang
       );
-      const left = ttsLang === 'sw' ? `saa ${Number(h1)}` : String(Number(h1));
+      const left =
+        ttsLang === 'sw' ? speak12hTime(Number(h1), null, /^p/i.test(mer2), ttsLang) : String(Number(h1));
       if (saaPrefix) return `${saaPrefix}${left.replace(/^saa\s+/, '')} ${joiner} ${right}`;
       return `${left} ${joiner} ${right}`;
     }
@@ -478,21 +477,13 @@ const SW_PERIOD = '(asubuhi|mchana|jioni|usiku|alfajiri)';
  * Numeric clock with a Swahili period word: "saa 3:00 usiku" / "3:30 usiku".
  * Claims these before expand24HourTime, which would otherwise read 3:00 as a
  * 24h clock and emit a doubled, contradictory "saa saa 3 asubuhi usiku".
- * Keeps the hour numeral (house style) and the stated period.
+ * Speaks the Kiswahili clock (hour minus 6), see conversation/swahiliClock.
  * @param {string} text
  */
 function expandSwahiliClockTimes(text) {
-  return String(text || '').replace(
-    new RegExp(`\\b(?:saa\\s+)?(\\d{1,2})(?::(\\d{2}))?\\s*${SW_PERIOD}\\b`, 'gi'),
-    (full, h, m, period) => {
-      const hour = Number(h);
-      if (hour < 1 || hour > 12) return full;
-      const mins = m != null ? Number(m) : 0;
-      const p = period.toLowerCase();
-      if (mins) return `saa ${hour} na dakika ${mins} ${p}`;
-      return `saa ${hour} ${p}`;
-    }
-  );
+  // "saa 9 asubuhi" (a Western numeral) and "saa 3:00 usiku" both become
+  // the spoken Kiswahili clock: "saa tatu asubuhi", "saa tatu usiku".
+  return normalizeSwahiliClockText(text);
 }
 
 function expandTimes(text, lang = 'en') {
@@ -512,15 +503,8 @@ const TIME_24 = '([01]?\\d|2[0-3]):([0-5]\\d)';
 const NOT_MERIDIEM = '(?!\\s*(?:a\\.?m\\.?|p\\.?m\\.?))';
 
 function speak24hClock(hour24, minute, lang) {
-  const label = minutesToHour12(hour24 * 60 + minute);
-  if (lang !== 'sw') return label;
-  const parsed = /^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/.exec(label);
-  if (!parsed) return label;
-  const hour12 = Number(parsed[1]);
-  const mins = parsed[2] ? Number(parsed[2]) : 0;
-  const period = parsed[3] === 'PM' ? 'jioni' : 'asubuhi';
-  if (mins) return `saa ${hour12} na dakika ${mins} ${period}`;
-  return `saa ${hour12} ${period}`;
+  if (lang === 'sw') return swahiliClock(hour24 * 60 + minute);
+  return minutesToHour12(hour24 * 60 + minute);
 }
 
 /**
@@ -661,6 +645,8 @@ function expandSpokenForms(text, lang = 'en') {
   out = expandTimes(out, lang);
   out = expand24HourTime(out, lang);
   out = expandDayRanges(out, lang);
+  // "saa 14:30" → "saa saa nane na nusu": the clock already says saa.
+  if (lang === 'sw') out = out.replace(/\b(saa)\s+saa\b/gi, '$1');
   return out;
 }
 

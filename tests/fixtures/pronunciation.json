@@ -42,7 +42,7 @@
       "text": "Tunafungua saa 8am. Sawa asante.",
       "callLanguage": "sw",
       "expectLanguage": "sw",
-      "expectIncludes": ["saa 8 asubuhi"]
+      "expectIncludes": ["saa mbili asubuhi"]
     },
     {
       "id": "days-en",

@@ -175,6 +175,36 @@ const {
   executeBrainTools,
   formatToolConfirmation,
 } = require('./src/conversation/toolExecution');
+const {
+  noteStoredToolResults,
+  storedClockMinutes: storedToolClockMinutes,
+  clearStoredClocks,
+} = require('./src/speech/storedClock');
+const { eatMinutes: storedEatMinutes } = require('./src/speech/storedClock');
+
+/**
+ * Stored visit times (EAT minutes) for this call: the caller file's open
+ * visits and every appointment written on the call. Kiswahili times are
+ * checked against these before TTS (HD_d199dbbf6b79).
+ */
+function callStoredClockMinutes(callSid) {
+  const out = new Set(storedToolClockMinutes(callSid));
+  const card = callTenantProfiles.get(callSid)?.callerMemory;
+  const visits = Array.isArray(card?.openVisits) ? card.openVisits : [];
+  for (const visit of visits) {
+    if (visit && typeof visit === 'object' && (visit.window_start || visit.windowStart)) {
+      const m = storedEatMinutes(visit.window_start || visit.windowStart);
+      if (m != null) out.add(m);
+      continue;
+    }
+    const text = typeof visit === 'string' ? visit : String(visit?.whenText || visit?.when_text || '');
+    const clock = /\b(\d{1,2})(?::(\d{2}))?\s*([AaPp])\.?\s?[Mm]\b/.exec(text);
+    if (!clock) continue;
+    const hour = (Number(clock[1]) % 12) + (/p/i.test(clock[3]) ? 12 : 0);
+    out.add(hour * 60 + Number(clock[2] || 0));
+  }
+  return [...out];
+}
 const { deriveCallResolution } = require('./src/conversation/callResolution');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
 const {
@@ -2549,6 +2579,7 @@ mediaWss.on('connection', (ws, req) => {
       callLanguage,
       language: opts.language,
       extraLexicon,
+      storedClockMinutes: () => callStoredClockMinutes(sidLabel()),
     });
     if (opts.isFiller) {
       voiceTrace.noteFiller({
@@ -3493,6 +3524,7 @@ mediaWss.on('connection', (ws, req) => {
             callLanguage,
             speedScale: ttsSpeedScale,
             extraLexicon: ttsLexiconOverrides,
+            storedClockMinutes: () => callStoredClockMinutes(sidLabel()),
           })
           .then((session) => {
             speakSession = session;
@@ -3543,6 +3575,7 @@ mediaWss.on('connection', (ws, req) => {
           callLanguage,
           speedScale: ttsSpeedScale,
           extraLexicon: ttsLexiconOverrides,
+          storedClockMinutes: () => callStoredClockMinutes(sidLabel()),
         });
         console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
         return speakSession;
@@ -3652,6 +3685,7 @@ mediaWss.on('connection', (ws, req) => {
           const traced = prepareForTts(text, {
             callLanguage,
             extraLexicon: typeof ttsLexiconOverrides !== 'undefined' ? ttsLexiconOverrides : [],
+            storedClockMinutes: () => callStoredClockMinutes(sidLabel()),
           });
           voiceTrace.noteTts({
             text: traced.text,
@@ -4831,6 +4865,7 @@ mediaWss.on('connection', (ws, req) => {
         .finally(() => {
           callAgentTools.delete(sessionCallSid);
           callBrainStates.delete(sessionCallSid);
+          clearStoredClocks(sessionCallSid);
           callBrainCapabilities.delete(sessionCallSid);
           callTenantProfiles.delete(sessionCallSid);
         });
@@ -5641,6 +5676,7 @@ wss.on('connection', (ws) => {
         .finally(() => {
           callAgentTools.delete(callSid);
           callBrainStates.delete(callSid);
+          clearStoredClocks(callSid);
           callBrainCapabilities.delete(callSid);
           callTenantProfiles.delete(callSid);
         });
@@ -6184,6 +6220,7 @@ async function runGeminiTurnStreaming(
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
   const heldTools = await applyToolsWithHold(callSid, parsed, { shouldAbort, onToolHold });
   const execution = heldTools.execution;
+  noteStoredToolResults(callSid, execution.results);
   let actionConfirmation = formatToolConfirmation(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
@@ -6300,6 +6337,7 @@ async function runGeminiTurn(
   const parsed = parseGeminiResponse(outputText);
   const heldTools = await applyToolsWithHold(callSid, parsed, hooks);
   const execution = heldTools.execution;
+  noteStoredToolResults(callSid, execution.results);
   let actionConfirmation = formatToolConfirmation(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'

@@ -9,6 +9,7 @@ const {
   timeToMinutes,
 } = require('./businessHours');
 const { confirmationLanguage } = require('./language');
+const { swahiliClock } = require('./swahiliClock');
 
 const CODES = Object.freeze({
   valid: 'valid',
@@ -457,6 +458,11 @@ function formatRequestedWhenLabel(hours, language = 'en') {
   // A period is the caller's word. Morning is not 10:00.
   if (resolved.periodLabel) {
     return lang === 'en' ? `${day} ${resolved.periodLabel}` : `${day}, ${resolved.periodLabel}`;
+  }
+  if (lang === 'sw') {
+    // Kiswahili clock: 09:00 is "saa tatu asubuhi", never "saa 9 asubuhi".
+    const clock = swahiliClock(resolved.minutesSinceMidnight);
+    return clock ? `${day}, ${clock}` : '';
   }
   const time = minutesToHour12(resolved.minutesSinceMidnight);
   if (!time) return '';
