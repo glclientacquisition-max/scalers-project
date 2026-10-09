@@ -64,7 +64,7 @@
       "text": "Bei ni 1500/=. Asante sana.",
       "callLanguage": "sw",
       "expectLanguage": "sw",
-      "expectProductionText": "Bei ni shilingi elfu moja na mia tano Asante sana"
+      "expectProductionText": "Bei ni shilingi elfu moja na mia tano. Asante sana."
     },
     {
       "id": "24-price-slash-hyphen-sw",
@@ -73,7 +73,7 @@
       "text": "Bei ni 500/-. Asante sana.",
       "callLanguage": "sw",
       "expectLanguage": "sw",
-      "expectProductionText": "Bei ni shilingi mia tano Asante sana"
+      "expectProductionText": "Bei ni shilingi mia tano. Asante sana."
     },
     {
       "id": "25-price-label-thousands",
@@ -82,7 +82,7 @@
       "text": "Price: 15,000",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Price fifteen thousand"
+      "expectProductionText": "Price, fifteen thousand"
     },
     {
       "id": "26-price-label-hundreds",
@@ -91,7 +91,7 @@
       "text": "Price: 900",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Price nine hundred"
+      "expectProductionText": "Price, nine hundred"
     },
     {
       "id": "27-price-label-range",
@@ -100,7 +100,7 @@
       "text": "Price: 1,500-2,000",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Price one thousand five hundred to two thousand"
+      "expectProductionText": "Price, one thousand five hundred to two thousand"
     },
     {
       "id": "28-price-label-with-quantity",
@@ -109,7 +109,7 @@
       "text": "Price: 15,000 for 3 books",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Price fifteen thousand for 3 books"
+      "expectProductionText": "Price, fifteen thousand for 3 books"
     },
     {
       "id": "05-phone-spaced-local",
@@ -183,7 +183,7 @@
       "text": "14:30",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "2 30 PM"
+      "expectProductionText": "2:30 PM"
     },
     {
       "id": "10-hours-line",
@@ -192,7 +192,7 @@
       "text": "Mon-Sat: 09:00-19:00 EAT",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Monday to Saturday 9 AM to 7 PM EAT"
+      "expectProductionText": "Monday to Saturday, 9 AM to 7 PM EAT"
     },
     {
       "id": "11-date-ordinal",
@@ -211,7 +211,7 @@
       "text": "August 12th, 2026",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "August 12th 2026",
+      "expectProductionText": "August 12th, 2026",
       "deprioritized": true
     },
     {
@@ -258,7 +258,7 @@
       "text": "Shop No. M4 on the 3rd floor",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Shop No M4 on the 3rd floor",
+      "expectProductionText": "Shop No. M4 on the 3rd floor",
       "source": "shop/ordinal pattern — genericized"
     },
     {
@@ -277,7 +277,7 @@
       "text": "Sofa cleaning - carpet cleaning - mattress cleaning.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Sofa cleaning and carpet cleaning and mattress cleaning",
+      "expectProductionText": "Sofa cleaning, carpet cleaning, and mattress cleaning.",
       "source": "spaced hyphen list markers become and so TTS never says hyphen and the names stay separate"
     },
     {
@@ -287,7 +287,7 @@
       "text": "Services: - Sofa - Carpets.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Services Sofa Carpets",
+      "expectProductionText": "Services, Sofa, Carpets.",
       "source": "markdown bullet leak flattens to a spoken list"
     },
     {
@@ -297,7 +297,7 @@
       "text": "Wait . . . let me check.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Wait let me check",
+      "expectProductionText": "Wait. let me check.",
       "source": "spaced dot chain is one pause, not three full stops"
     },
     {
@@ -307,7 +307,7 @@
       "text": "Open 3:00pm-4:00pm.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Open 3 P M to 4 P M",
+      "expectProductionText": "Open 3 P M to 4 P M.",
       "source": "12h range expands both sides so the dash never reaches TTS"
     },
     {
@@ -317,7 +317,7 @@
       "text": "e.g. sofas and rugs.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "for example sofas and rugs",
+      "expectProductionText": "for example sofas and rugs.",
       "source": "abbreviations speak as words, not spelled-out dots"
     },
     {
@@ -327,7 +327,7 @@
       "text": "1. Book 2. Confirm.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "1 Book 2 Confirm",
+      "expectProductionText": "1, Book 2, Confirm.",
       "source": "numbered-list markers become commas, not full stops"
     },
     {
@@ -337,7 +337,7 @@
       "text": "Pay to till number 5194830.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Pay to till number 5 1 9 4 8 3 0",
+      "expectProductionText": "Pay to till number 5 1 9 4 8 3 0.",
       "source": "till numbers read digit by digit, never as one giant number"
     },
     {
@@ -347,7 +347,7 @@
       "text": "Paybill 247247, account 10203040.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "pay bill 2 4 7 2 4 7 account 1 0 2 0 3 0 4 0",
+      "expectProductionText": "pay bill 2 4 7 2 4 7, account 1 0 2 0 3 0 4 0.",
       "source": "paybill and account numbers read digit by digit"
     },
     {
@@ -357,7 +357,7 @@
       "text": "It takes 30-40 minutes.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "It takes 30 to 40 minutes",
+      "expectProductionText": "It takes 30 to 40 minutes.",
       "source": "compact duration ranges speak with to"
     },
     {
@@ -367,7 +367,7 @@
       "text": "Delivery in 1-2 days.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Delivery in 1 to 2 days"
+      "expectProductionText": "Delivery in 1 to 2 days."
     },
     {
       "id": "42-always-open",
@@ -376,7 +376,7 @@
       "text": "We are open 24/7.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "We are open 24 7",
+      "expectProductionText": "We are open 24 7.",
       "source": "24/7 never says slash"
     },
     {
@@ -386,7 +386,7 @@
       "text": "Order number 45678.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Order number 4 5 6 7 8"
+      "expectProductionText": "Order number 4 5 6 7 8."
     },
     {
       "id": "44-currency-receipt-prefix",
@@ -413,7 +413,7 @@
       "text": "Shillings 5,000 only.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "five thousand shillings only"
+      "expectProductionText": "five thousand shillings only."
     },
     {
       "id": "47-currency-usd-prefix",
@@ -422,7 +422,7 @@
       "text": "USD 100 per night.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "one hundred dollars per night"
+      "expectProductionText": "one hundred dollars per night."
     },
     {
       "id": "48-currency-usd-cents",
@@ -431,7 +431,7 @@
       "text": "USD 99.99.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "ninety nine dollars and ninety nine cents"
+      "expectProductionText": "ninety nine dollars and ninety nine cents."
     },
     {
       "id": "49-currency-to-range",
@@ -440,7 +440,7 @@
       "text": "KSh 500 to 800.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "five hundred shillings to eight hundred shillings"
+      "expectProductionText": "five hundred shillings to eight hundred shillings."
     },
     {
       "id": "50-currency-millions",
@@ -449,7 +449,7 @@
       "text": "KSh 1,000,000.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "one million shillings"
+      "expectProductionText": "one million shillings."
     },
     {
       "id": "51-currency-sw-receipt-prefix",
@@ -458,7 +458,7 @@
       "text": "Bei ni Ksh 2,500/=.",
       "callLanguage": "sw",
       "expectLanguage": "sw",
-      "expectProductionText": "Bei ni shilingi elfu mbili na mia tano"
+      "expectProductionText": "Bei ni shilingi elfu mbili na mia tano."
     },
     {
       "id": "52-sw-numeric-clock-period",
@@ -467,7 +467,7 @@
       "text": "Anwani na muda ni kesho saa 3:00 usiku hapo Panda.",
       "callLanguage": "sw",
       "expectLanguage": "sw",
-      "expectProductionText": "Anwani na muda ni kesho saa 3 usiku hapo Panda"
+      "expectProductionText": "Anwani na muda ni kesho saa 3 usiku hapo Panda."
     },
     {
       "id": "53-parenthetical-aside",
@@ -476,7 +476,7 @@
       "text": "Ilikuwa ni usafishaji wa godoro (mattress cleaning) kesho saa nane mchana.",
       "callLanguage": "sw",
       "expectLanguage": "sw",
-      "expectProductionText": "Ilikuwa ni usafishaji wa godoro mattress cleaning kesho saa nane mchana"
+      "expectProductionText": "Ilikuwa ni usafishaji wa godoro, mattress cleaning, kesho saa nane mchana."
     },
     {
       "id": "19-lexicon-brand",
@@ -485,7 +485,7 @@
       "text": "Manga books are available today.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Man-gah books are available today",
+      "expectProductionText": "Man-gah books are available today.",
       "source": "ChapterOne bulletin pattern — tenant lexicon example; swap brand for other tenants"
     },
     {
@@ -495,7 +495,7 @@
       "text": "Hello, you've reached ChapterOne Bookstore, this is Aisha speaking.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Hello you've reached Chapter One Bookstore this is Eye-sha speaking",
+      "expectProductionText": "Hello, you've reached Chapter One Bookstore, this is Eye-sha speaking.",
       "source": "ChapterOne greeting — tenant lexicon example; swap business/agent for other tenants"
     }
   ]

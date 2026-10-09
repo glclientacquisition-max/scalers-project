@@ -3,11 +3,13 @@
 // Recorded mode speaks the fixture's model text. Live mode asks Gemini,
 // then the same mouth. A later phase swaps `respond` without a new harness.
 
-const { polishSpokenReply, planEmptyGeminiSpeech } = require('../conversation/dynamicSpeech');
+const { polishSpokenDetail, planEmptyGeminiSpeech } = require('../conversation/dynamicSpeech');
+const { parseGeminiResponse } = require('../conversation/toolMarkers');
 const { cutNoAiSlop } = require('./noAiSlop');
 const { prepareForTts } = require('./ttsNormalize');
 const { analyzeCallerLanguage, languageDirective } = require('../conversation/language');
 const { SCHEMA, SCHEMA_VERSION } = require('./voiceTrace');
+const { coverageNextStepFor } = require('../conversation/coverageNextStep');
 
 function initialState(fixture = {}) {
   const name = String(fixture.callerName || '').trim();
@@ -38,6 +40,15 @@ function speechContext(state, callerTurns, language, fixture) {
     profile: {
       businessName: fixture.businessName || 'the business',
       servicesCatalog: fixture.servicesCatalog || [],
+      ...(fixture.vertical ? { vertical: fixture.vertical } : {}),
+      ...(fixture.businessPolicies ? { businessPolicies: fixture.businessPolicies } : {}),
+      ...(fixture.hoursSchedule ? { hoursSchedule: fixture.hoursSchedule } : {}),
+      ...(fixture.socialHandles || fixture.social_handles
+        ? {
+            socialHandles: fixture.socialHandles || fixture.social_handles,
+            social_handles: fixture.social_handles || fixture.socialHandles,
+          }
+        : {}),
     },
     language: language === 'unknown' ? 'en' : language,
     toolResults: [],
@@ -47,20 +58,23 @@ function speechContext(state, callerTurns, language, fixture) {
 
 function speakModelText(modelText, ctx, caller) {
   const stages = [];
-  const polished = polishSpokenReply(modelText, ctx);
-  if (polished.trim() !== String(modelText || '').trim()) {
+  const prose = String(parseGeminiResponse(modelText).spokenText || '').trim();
+  const detail = polishSpokenDetail(prose, ctx);
+  const polished = detail.text;
+  if (polished.trim() !== prose) {
     stages.push({
       stage: 'transform',
       name: 'polish',
-      reason: polished.trim() ? 'rewritten' : 'dropped',
-      before: String(modelText || ''),
+      reason: detail.reason || (polished.trim() ? 'rewritten' : 'dropped'),
+      before: prose,
       after: polished,
       dropped: !polished.trim(),
+      dropReasons: Array.isArray(detail.dropReasons) ? detail.dropReasons.slice() : [],
     });
   }
   let spoken = polished;
   let canned = null;
-  if (!spoken.trim() && String(modelText || '').trim()) {
+  if (!spoken.trim() && (prose || String(modelText || '').trim())) {
     const planned = planEmptyGeminiSpeech({
       brainState: ctx.state,
       language: ctx.language,
@@ -98,7 +112,13 @@ function speakModelText(modelText, ctx, caller) {
       dropped: false,
     });
   }
-  return { spoken: prepared.text || '', ttsLanguage: prepared.language || ctx.language, stages, canned };
+  return {
+    spoken: prepared.text || '',
+    before: String(cut || '').trim(),
+    ttsLanguage: prepared.language || ctx.language,
+    stages,
+    canned,
+  };
 }
 
 function replayTurn(turn, ctx) {
@@ -149,12 +169,14 @@ function replayTurn(turn, ctx) {
     ? speakModelText(modelText, speech, caller)
     : {
         spoken: canned?.text || '',
+        before: canned?.text || '',
         ttsLanguage: speech.language,
         stages: [],
         canned,
       };
   if (!modelText && canned) {
     const prepared = prepareForTts(canned.text, { callLanguage: speech.language });
+    mouth.before = canned.text;
     mouth.spoken = prepared.text || canned.text;
     mouth.ttsLanguage = prepared.language || speech.language;
     if (prepared.text && prepared.text !== canned.text) {
@@ -179,6 +201,7 @@ function replayTurn(turn, ctx) {
       stage: 'language',
       detected: evidence.language,
       sticky: speech.language,
+      soniox: turn.soniox || null,
       confidence: evidence.confidence,
     },
     {
@@ -198,17 +221,67 @@ function replayTurn(turn, ctx) {
   if (canned && !mouth.stages.some((row) => row.stage === 'canned')) {
     stages.push({ stage: 'canned', path: canned.path, text: canned.text });
   }
+  if (turn.lateFinal) {
+    stages.push({
+      stage: 'stt',
+      kind: 'final',
+      text: String(turn.lateFinal),
+      tokens: [],
+    });
+    stages.push({
+      stage: 'turn_end',
+      decision: turn.lateFinalMerged ? 'hold' : 'ignore',
+      reason: turn.lateFinalMerged ? 'late_final' : 'grace',
+    });
+  }
+  if (turn.filler) {
+    stages.push({
+      stage: 'filler',
+      text: String(turn.filler),
+      before: String(turn.filler),
+      language: speech.language,
+    });
+  }
+  const barged = turn.outcome === 'barge_in';
+  // Voice speaks the coverage next step after a model coverage answer (server.js).
+  if (modelText && !barged && mouth.spoken) {
+    const next = coverageNextStepFor(mouth.spoken, {
+      profile: speech.profile,
+      language: speech.language,
+      state: ctx.state,
+    });
+    if (next) {
+      const before = mouth.spoken;
+      const ask = prepareForTts(next, { callLanguage: speech.language }).text || next;
+      mouth.spoken = `${mouth.spoken} ${ask}`;
+      stages.push({
+        stage: 'transform',
+        name: 'coverage_next_step',
+        reason: 'appended',
+        before,
+        after: mouth.spoken,
+        dropped: false,
+      });
+    }
+  }
+  if (!barged) {
+    stages.push({
+      stage: 'tts',
+      text: mouth.spoken,
+      before: mouth.before || mouth.spoken,
+      language: mouth.ttsLanguage,
+      voiceId: ctx.voiceId || null,
+    });
+  }
   stages.push({
-    stage: 'tts',
-    text: mouth.spoken,
-    language: mouth.ttsLanguage,
-    voiceId: ctx.voiceId || null,
+    stage: 'outcome',
+    value: turn.outcome || (mouth.spoken && !barged ? 'replay' : 'silence'),
   });
-  stages.push({ stage: 'outcome', value: mouth.spoken ? 'replay' : 'silence' });
   stages.push({
     stage: 'latency',
     callerStopToModelFirstTokenMs: turn.observed?.firstTokenMs ?? null,
     callerStopToFirstTtsPcmMs: turn.observed?.firstPcmMs ?? null,
+    firstReplyPcmMs: turn.observed?.firstReplyPcmMs ?? null,
   });
 
   ctx.callerTurns.push(caller);
@@ -229,6 +302,9 @@ function replayTurn(turn, ctx) {
     caller: {
       text: caller,
       language: evidence.language,
+      sticky,
+      detected: evidence.language,
+      soniox: turn.soniox || null,
       confidence: evidence.confidence,
     },
     stages,

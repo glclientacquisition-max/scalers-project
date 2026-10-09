@@ -43,6 +43,64 @@ async function resolveSessionContext(opts = {}) {
   }
 }
 
+/** sw / swh, en, sheng. Other tags stay null so the keyword fallback can run. */
+function sonioxLanguageCode(tag) {
+  const raw = String(tag || '')
+    .toLowerCase()
+    .trim();
+  if (!raw) return null;
+  if (raw === 'sw' || raw === 'swh' || raw.startsWith('sw-') || raw.startsWith('sw_')) return 'sw';
+  if (raw === 'en' || raw.startsWith('en-') || raw.startsWith('en_')) return 'en';
+  if (raw.includes('sheng')) return 'sheng';
+  return null;
+}
+
+/**
+ * Finals, interims, and per-token language tags from one Soniox message.
+ * @param {object} [msg]
+ */
+function tokensFromSonioxMessage(msg) {
+  let interim = '';
+  let finals = '';
+  let sawEndpoint = false;
+  const tokens = [];
+  const tokenLanguages = [];
+  const rows = Array.isArray(msg?.tokens) ? msg.tokens : [];
+  for (const token of rows) {
+    if (!token || typeof token.text !== 'string') continue;
+    const language = sonioxLanguageCode(token.language || token.language_code);
+    const startMs = token.start_ms ?? token.startMs ?? null;
+    const endMs = token.end_ms ?? token.endMs ?? null;
+    if (language) tokenLanguages.push(language);
+    if (token.text.includes('<end>')) {
+      sawEndpoint = true;
+      const cleaned = token.text.replace(/<\/?end>/g, '').replace(/\?/g, '').trim();
+      if (cleaned) {
+        tokens.push({
+          text: cleaned,
+          final: Boolean(token.is_final),
+          language,
+          startMs,
+          endMs,
+        });
+        if (token.is_final) finals += cleaned;
+        else interim += cleaned;
+      }
+      continue;
+    }
+    tokens.push({
+      text: token.text,
+      final: Boolean(token.is_final),
+      language,
+      startMs,
+      endMs,
+    });
+    if (token.is_final) finals += token.text;
+    else interim += token.text;
+  }
+  return { interim, finals, sawEndpoint, tokens, tokenLanguages };
+}
+
 /**
  * Open a Soniox realtime transcription session.
  * @param {object} opts
@@ -81,6 +139,7 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
           sample_rate: SAMPLE_RATE,
           num_channels: 1,
           language_hints: hints,
+          enable_language_identification: true,
           // Endpoint tuning: snappier defaults; incomplete thoughts rely on adaptive local flush.
           enable_endpoint_detection: true,
           endpoint_latency_adjustment_level: ENDPOINT_LATENCY_ADJ,
@@ -106,7 +165,7 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
         const termList = contextUsed ? config.context.terms : [];
         console.log(
           `[soniox-stt][${callSid}] session open model=${SONIOX_MODEL} rate=${SAMPLE_RATE}` +
-            ` hints=${hints.join('+')}` +
+            ` hints=${hints.join('+')} langId=on` +
             ` context_used=${contextUsed}` +
             ` terms=${termList.length}` +
             (termList.length ? ` term_list=${JSON.stringify(termList)}` : '') +
@@ -151,65 +210,32 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
       }
 
       if (Array.isArray(msg.tokens) && msg.tokens.length) {
-        let interim = '';
-        let finals = '';
-        let sawEndpoint = false;
-        const tokens = [];
-        for (const token of msg.tokens) {
-          if (!token || typeof token.text !== 'string') continue;
-          const language = token.language || token.language_code || null;
-          const startMs = token.start_ms ?? token.startMs ?? null;
-          const endMs = token.end_ms ?? token.endMs ?? null;
-          // Soniox endpoint marker when enable_endpoint_detection is on.
-          if (token.text.includes('<end>')) {
-            sawEndpoint = true;
-            const cleaned = token.text.replace(/<\/?end>/g, '').replace(/\?/g, '').trim();
-            if (cleaned) {
-              tokens.push({
-                text: cleaned,
-                final: Boolean(token.is_final),
-                language,
-                startMs,
-                endMs,
-              });
-              if (token.is_final) finals += cleaned;
-              else interim += cleaned;
-            }
-            continue;
-          }
-          tokens.push({
-            text: token.text,
-            final: Boolean(token.is_final),
-            language,
-            startMs,
-            endMs,
-          });
-          if (token.is_final) finals += token.text;
-          else interim += token.text;
-        }
-        if (finals) {
-          console.log(`[soniox-stt][${callSid}] FINAL: ${finals}`);
+        const parsed = tokensFromSonioxMessage(msg);
+        if (parsed.finals) {
+          console.log(`[soniox-stt][${callSid}] FINAL: ${parsed.finals}`);
           noteSonioxProviderOk('stt');
           onEvent({
             type: 'transcript',
-            text: finals,
+            text: parsed.finals,
             isFinal: true,
             raw: msg,
-            tokens: tokens.filter((token) => token.final),
+            tokens: parsed.tokens.filter((token) => token.final),
+            tokenLanguages: parsed.tokenLanguages,
           });
-        } else if (interim) {
-          console.log(`[soniox-stt][${callSid}] interim: ${interim}`);
+        } else if (parsed.interim) {
+          console.log(`[soniox-stt][${callSid}] interim: ${parsed.interim}`);
           onEvent({
             type: 'transcript',
-            text: interim,
+            text: parsed.interim,
             isFinal: false,
             raw: msg,
-            tokens: tokens.filter((token) => !token.final),
+            tokens: parsed.tokens.filter((token) => !token.final),
+            tokenLanguages: parsed.tokenLanguages,
           });
         }
-        if (sawEndpoint) {
+        if (parsed.sawEndpoint) {
           console.log(`[soniox-stt][${callSid}] endpoint`);
-          onEvent({ type: 'endpoint', raw: msg, tokens });
+          onEvent({ type: 'endpoint', raw: msg, tokens: parsed.tokens });
         }
       }
 
@@ -274,5 +300,7 @@ module.exports = {
   isSonioxConfigured,
   buildSttContext,
   isSttContextEnabled,
+  sonioxLanguageCode,
+  tokensFromSonioxMessage,
   SAMPLE_RATE,
 };

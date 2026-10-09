@@ -18,13 +18,34 @@ const QUANTITY_WORDS = { ...NUMBER_WORDS, one: 1, moja: 1 };
 const STANDALONE_DIGITS = /(?<![\w-])\d[\d,]*(?:\.\d+)?(?![\w-])/g;
 const NUMBER_WORD_RE = new RegExp(`\\b(${Object.keys(NUMBER_WORDS).join('|')})\\b`, 'gi');
 const QUANTITY_WORD_RE = new RegExp(`\\b(${Object.keys(QUANTITY_WORDS).join('|')})\\b`, 'i');
+const RANGE_RE = /(\d[\d,]*)(?:\s*[-–—]\s*|\s+(?:to|hadi|mpaka)\s+)(\d[\d,]*)/gi;
+
+function digitBody(raw) {
+  return String(raw || '').replace(/[^\d.]/g, '').replace(/^0+(?=\d)/, '');
+}
+
+/** A catalogue price span. A hyphenated phone (0712-345678) is not a price. */
+function rangeIsPrice(left, right) {
+  const a = String(left || '').replace(/\D/g, '');
+  const b = String(right || '').replace(/\D/g, '');
+  if (!a || !b || a.length > 6 || b.length > 6) return false;
+  if (a.length + b.length >= 8 && /^0/.test(a)) return false;
+  return true;
+}
 
 /** Every number a text states, as canonical digit strings. */
 function numbersIn(text) {
   const out = new Set();
   const raw = String(text || '');
+  for (const hit of raw.matchAll(RANGE_RE)) {
+    if (!rangeIsPrice(hit[1], hit[2])) continue;
+    const left = digitBody(hit[1]);
+    const right = digitBody(hit[2]);
+    if (left) out.add(left);
+    if (right) out.add(right);
+  }
   for (const hit of raw.match(STANDALONE_DIGITS) || []) {
-    out.add(hit.replace(/,/g, '').replace(/^0+(?=\d)/, ''));
+    out.add(digitBody(hit));
   }
   // HH:MM contributes its hour. It does not authorize the other 12-hour form.
   for (const hit of raw.matchAll(/\b(\d{1,2}):(\d{2})\b/g)) {

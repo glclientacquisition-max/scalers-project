@@ -31,10 +31,19 @@ function defaultScoreCall(turns) {
     score: card.score,
     checks: card.checks,
     diagnosis: diagnoseCall(card),
+    turns: card.turns,
   };
 }
 
 function callTraceColumns(record) {
+  if (record?.recordKind === 'turn') {
+    return {
+      score: record.score ?? null,
+      checks: record.checks ?? null,
+      diagnosis: null,
+      release: null,
+    };
+  }
   if (record?.recordKind !== 'call') {
     return { score: null, checks: null, diagnosis: null, release: null };
   }
@@ -71,6 +80,7 @@ function redactText(value) {
     .replace(PHONE_RE, (hit) => {
       const digits = hit.replace(/\D/g, '');
       if (digits.length < 8) return hit;
+      if (/^\d{3,4}\s*[-–—]\s*\d{3,4}$/.test(hit.trim())) return hit;
       return `[phone:${digits.slice(-4)}]`;
     });
 }
@@ -83,17 +93,35 @@ function createMemorySink() {
     async write(record) {
       records.push(record);
     },
+    async update() {},
   };
 }
 
 function createJsonlSink(filePath) {
   const target = path.resolve(filePath);
+  const records = [];
+  async function flush() {
+    await fs.promises.mkdir(path.dirname(target), { recursive: true });
+    const body = records.map((row) => JSON.stringify(row)).join('\n');
+    await fs.promises.writeFile(target, body ? `${body}\n` : '', 'utf8');
+  }
   return {
     kind: 'jsonl',
     filePath: target,
     async write(record) {
-      await fs.promises.mkdir(path.dirname(target), { recursive: true });
-      await fs.promises.appendFile(target, `${JSON.stringify(record)}\n`, 'utf8');
+      records.push(record);
+      await flush();
+    },
+    async update(record) {
+      const idx = records.findIndex(
+        (row) =>
+          row === record ||
+          (row.callId === record.callId &&
+            row.recordKind === record.recordKind &&
+            row.turnIndex === record.turnIndex)
+      );
+      if (idx >= 0) records[idx] = record;
+      await flush();
     },
   };
 }
@@ -135,6 +163,33 @@ function createSupabaseSink() {
         console.warn('[voice-trace] insert failed:', error.message);
       }
     },
+    async update(record) {
+      let supabase;
+      try {
+        ({ supabase } = require('../lib/supabaseClient'));
+      } catch (err) {
+        if (!warned) {
+          warned = true;
+          console.warn('[voice-trace] supabase client unavailable:', err?.message || err);
+        }
+        return;
+      }
+      const scored = callTraceColumns(record);
+      const { error } = await supabase
+        .from('voice_turn_traces')
+        .update({
+          score: scored.score,
+          checks: scored.checks,
+          payload: record,
+        })
+        .eq('call_id', String(record.callId || 'unknown'))
+        .eq('record_kind', 'turn')
+        .eq('turn_index', Number(record.turnIndex));
+      if (error && !warned) {
+        warned = true;
+        console.warn('[voice-trace] update failed:', error.message);
+      }
+    },
   };
 }
 
@@ -163,6 +218,8 @@ function noopTrace() {
     noteTransform: noop,
     noteCanned: noop,
     noteTts: noop,
+    noteFiller: noop,
+    noteTool: noop,
     noteBarge: noop,
     noteSpeakPacket: noop,
     noteSpeakSlots: noop,
@@ -236,6 +293,9 @@ function createVoiceTrace(opts = {}) {
       caller: {
         text: redactText(callerText),
         language: lang?.current || lang?.language || null,
+        sticky: lang?.current || lang?.language || null,
+        detected: lang?.detected || null,
+        soniox: lang?.soniox || null,
         confidence: lang?.confidence ?? null,
       },
       stages: sttBuffer.splice(0, sttBuffer.length),
@@ -270,10 +330,17 @@ function createVoiceTrace(opts = {}) {
   }
 
   function noteLanguage(info = {}) {
+    if (open?.caller) {
+      if (info.detected != null) open.caller.detected = info.detected || null;
+      if (info.sticky != null) open.caller.sticky = info.sticky || null;
+      if (info.soniox != null) open.caller.soniox = info.soniox || null;
+      if (info.confidence != null) open.caller.confidence = info.confidence;
+    }
     pushStage({
       stage: 'language',
       detected: info.detected || null,
       sticky: info.sticky || null,
+      soniox: info.soniox || null,
       confidence: info.confidence ?? null,
     });
   }
@@ -314,6 +381,9 @@ function createVoiceTrace(opts = {}) {
       stage: 'transform',
       name: String(info.stage || info.name || 'speech'),
       reason: String(info.reason || (after.trim() ? 'rewritten' : 'dropped')),
+      dropReasons: (Array.isArray(info.dropReasons) ? info.dropReasons : [])
+        .map((reason) => String(reason || ''))
+        .filter(Boolean),
       before: redactText(before),
       after: redactText(after),
       dropped: !after.trim(),
@@ -335,6 +405,24 @@ function createVoiceTrace(opts = {}) {
       before: info.before != null ? redactText(info.before) : null,
       language: info.language || null,
       voiceId: info.voiceId || voiceOf() || null,
+    });
+  }
+
+  function noteFiller(info = {}) {
+    pushStage({
+      stage: 'filler',
+      text: redactText(info.text || ''),
+      before: info.before != null ? redactText(info.before) : null,
+      language: info.language || null,
+    });
+  }
+
+  function noteTool(info = {}) {
+    pushStage({
+      stage: 'tool',
+      name: String(info.name || ''),
+      status: info.status || null,
+      args: redactText(info.args || ''),
     });
   }
 
@@ -384,10 +472,12 @@ function createVoiceTrace(opts = {}) {
         ? Math.max(0, pendingFirstTokenAt - turnStartedAt)
         : extra.callerStopToModelFirstTokenMs ?? null;
     const pcm = extra.latency?.first_pcm_ms ?? extra.callerStopToFirstTtsPcmMs ?? null;
+    const replyPcm = extra.latency?.first_reply_pcm_ms ?? extra.latency?.firstReplyPcmMs ?? null;
     open.stages.push({
       stage: 'latency',
       callerStopToModelFirstTokenMs: firstTokenMs,
       callerStopToFirstTtsPcmMs: pcm == null || pcm < 0 ? null : pcm,
+      firstReplyPcmMs: replyPcm == null || replyPcm < 0 ? null : replyPcm,
     });
     open.stages.push({ stage: 'outcome', value: String(extra.outcome || 'ok') });
     open.voiceId = voiceOf() || null;
@@ -415,12 +505,29 @@ function createVoiceTrace(opts = {}) {
       score = card?.score ?? null;
       checks = card?.checks ?? null;
       diagnosis = card?.diagnosis ?? null;
+      const perTurn = Array.isArray(card?.turns) ? card.turns : [];
+      for (const turn of committedTurns) {
+        const row = perTurn.find((item) => item.turnIndex === turn.turnIndex);
+        if (!row) continue;
+        turn.score = row.omit ? null : row.score ?? null;
+        turn.checks = row.checks ?? null;
+        turn.notes = Array.isArray(row.notes) ? row.notes.slice() : [];
+        if (typeof sink.update === 'function') {
+          const update = Promise.resolve(sink.update(turn)).catch((err) => {
+            console.warn('[voice-trace] turn score update failed:', err?.message || err);
+          });
+          pendingWrites.add(update);
+          update.finally(() => pendingWrites.delete(update));
+          await update;
+        }
+      }
     } catch (err) {
       if (!scoreWarned) {
         scoreWarned = true;
         console.warn('[voice-trace] score failed:', err?.message || err);
       }
     }
+    if (pendingWrites.size) await Promise.all([...pendingWrites]);
     const record = {
       schema: CALL_SCHEMA,
       schemaVersion: SCHEMA_VERSION,
@@ -468,6 +575,8 @@ function createVoiceTrace(opts = {}) {
     noteTransform: guard(noteTransform),
     noteCanned: guard(noteCanned),
     noteTts: guard(noteTts),
+    noteFiller: guard(noteFiller),
+    noteTool: guard(noteTool),
     noteBarge: guard(noteBarge),
     noteSpeakPacket: guard(noteSpeakPacket),
     noteSpeakSlots: guard(noteSpeakSlots),

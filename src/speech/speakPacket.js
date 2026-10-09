@@ -7,6 +7,8 @@
 // private: a booking ladder, an open file row, an empty detail fallback.
 // Private text is not committed.
 
+const { offerActOf } = require('./offerAct');
+
 const PUBLIC_OUTCOMES = new Set([
   'catalogue',
   'price',
@@ -47,15 +49,16 @@ function authorizeSpeak(reply) {
   const text = cleanLine(reply.line);
   if (!outcome || !text) return null;
   if (openFileRow(text)) return null;
+  const offer = Boolean(offerActOf(text));
   if (outcome === 'service_facts') {
     if (EMPTY_DETAIL_RE.test(text)) return null;
-    return { tier: 'public', text, outcome, committed: true };
+    return { tier: 'public', text, outcome, committed: true, offer };
   }
   if (PUBLIC_OUTCOMES.has(outcome)) {
-    return { tier: 'public', text, outcome, committed: true };
+    return { tier: 'public', text, outcome, committed: true, offer };
   }
   if (STEP_UP_OUTCOMES.has(outcome)) {
-    return { tier: 'step_up', text, outcome, committed: true };
+    return { tier: 'step_up', text, outcome, committed: true, offer };
   }
   return null;
 }
@@ -80,6 +83,7 @@ function createSpeakCommit() {
       tier,
       text,
       outcome: String(packet.outcome || ''),
+      offer: packet.offer === true,
       committed: true,
       spoken: false,
       spokenText: '',

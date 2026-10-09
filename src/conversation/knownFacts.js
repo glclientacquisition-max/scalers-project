@@ -2,6 +2,7 @@
 // A capacity spike must not be what answers the catalogue or the hours.
 
 const { normalizeServices } = require('./liveKnowledge');
+const { serviceFamilies } = require('./serviceFamilies');
 const {
   parseHoursSchedule,
   openClosedStatus,
@@ -63,10 +64,24 @@ function joinSpoken(names, language = 'en') {
   return `${names.slice(0, -1).join(', ')}, ${conj} ${names[names.length - 1]}`;
 }
 
+// "You guys operate until what time?" (HD_ee813bcf6248 t16/t17) and its
+// variants. Each form names the business's own open/close/work verb, so a
+// visit-time question ("can you come until what time") stays out.
+const HOURS_ASK_VARIANTS = [
+  /\byou(?:\s+guys|\s+people|\s+all)?\s+(?:operate|operating|open|work|working|close|closing)\s+(?:until|till|til|up\s+to|to)\s+what\s+time\b/i,
+  /\b(?:until|till|up\s+to)\s+what\s+time\s+(?:do|are)\s+you(?:\s+guys|\s+people)?\s+(?:operate|operating|open|work|working)\b/i,
+  /\bwhat\s+time\s+(?:do|are)\s+you(?:\s+guys|\s+people)?\s+(?:open|opening|close|closing|operate|operating|start|finish)\b/i,
+  /\b(?:operating|working|business|opening|closing)\s+(?:hours|times?)\b/i,
+  /\bhow\s+late\s+(?:are|do)\s+you\b/i,
+  /\bwhen\s+(?:are|do)\s+you(?:\s+guys|\s+people)?\s+(?:open|close|operate)\b/i,
+  /\bmna(?:fanya\s+kazi|fungua|funga)\s+(?:mpaka|hadi)\s+saa\s+ngapi\b/i,
+  /\b(?:mpaka|hadi)\s+saa\s+ngapi\s+mna(?:fanya\s+kazi|fungua|funga)\b/i,
+];
+
 function looksLikeHoursAsk(text) {
   const raw = String(text || '').trim();
   if (!raw || looksLikeNewWork(raw)) return false;
-  return HOURS_ASK_RE.test(raw);
+  return HOURS_ASK_RE.test(raw) || HOURS_ASK_VARIANTS.some((re) => re.test(raw));
 }
 
 function dayKeyFromText(text, now) {
@@ -122,16 +137,29 @@ function hoursAskLine(text, profile = {}, language = 'en', now = new Date()) {
 /**
  * Service names already on the file. Notes and parentheses stay off.
  * The spoken catalogue uses the first four, then "and more" / "na zingine".
- * Brain items[] (later PR) replaces this list. Do not invent names here.
+ * A longer file is spoken as service families derived from its own names
+ * and categories (serviceFamilies), so "1-Bedroom, 2-Bedroom, 3-Bedroom"
+ * is one family and the list still covers the range. Never invented.
+ * opts.families false keeps exact file names (the Gemini catalogue
+ * directive, whose contract is "do not rename").
  * @param {object} [profile]
  * @param {number} [limit]
- * @returns {{ names: string[], more: boolean }}
+ * @param {string} [language]
+ * @param {{ families?: boolean }} [opts]
+ * @returns {{ names: string[], more: boolean, families: boolean }}
  */
-function catalogueFileNames(profile = {}, limit = 4) {
+function catalogueFileNames(profile = {}, limit = 4, language = 'en', opts = {}) {
   const rows = normalizeServices(profile.servicesCatalog);
   const names = rows.map((row) => mouthServiceName(row.name)).filter(Boolean);
   const cap = Number.isFinite(limit) && limit > 0 ? limit : names.length;
-  return { names: names.slice(0, cap), more: names.length > cap };
+  if (opts.families !== false && names.length > cap) {
+    const families = serviceFamilies(rows, { language });
+    if (families.length < names.length && families.some((f) => f.members.length > 1)) {
+      const labels = families.map((f) => f.label);
+      return { names: labels.slice(0, cap), more: labels.length > cap, families: true };
+    }
+  }
+  return { names: names.slice(0, cap), more: names.length > cap, families: false };
 }
 
 /**
@@ -141,7 +169,7 @@ function catalogueFileNames(profile = {}, limit = 4) {
 function offerCatalogueLine(text, profile = {}, language = 'en') {
   if (!looksLikeOfferAsk(text) || looksLikeNewWork(text)) return '';
   const sw = String(language || '').toLowerCase() === 'sw' || String(language || '').toLowerCase() === 'sheng';
-  const { names, more } = catalogueFileNames(profile);
+  const { names, more } = catalogueFileNames(profile, 4, language);
   if (!names.length) {
     return sw ? 'Niambie unahitaji nini.' : 'Tell me what you need done.';
   }

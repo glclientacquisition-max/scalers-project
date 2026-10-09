@@ -72,6 +72,36 @@ test('skips regex-y lexicon matches', () => {
   assert.ok(!ctx.terms.some((t) => t.includes('?')));
 });
 
+test('coverage towns are hearing terms', () => {
+  const ctx = buildSttContext({
+    businessName: 'Done and Dusted',
+    agentName: 'Shy',
+    servicesCatalog: [{ name: 'Interior Window Cleaning' }],
+    businessPolicies: {
+      coverage_areas: ['place:kitengela', 'county:nairobi', 'place:ongata rongai', 'place:juja'],
+    },
+  });
+  for (const town of ['Kitengela', 'Nairobi', 'Ongata Rongai', 'Juja']) {
+    assert.ok(ctx.terms.includes(town), `missing ${town}`);
+  }
+  assert.ok(ctx.terms.includes('Interior Window Cleaning'));
+});
+
+test('a long catalogue does not push the coverage towns out', () => {
+  const servicesCatalog = Array.from({ length: 60 }, (_, i) => ({
+    name: `Premium deep cleaning package number ${i + 1}`,
+  }));
+  const ctx = buildSttContext({
+    businessName: 'Done and Dusted',
+    agentName: 'Shy',
+    servicesCatalog,
+    business_policies: JSON.stringify({ coverage_areas: ['place:kitengela', 'place:syokimau'] }),
+  });
+  assert.ok(ctx.terms.length <= 40);
+  assert.ok(ctx.terms.includes('Kitengela'));
+  assert.ok(ctx.terms.includes('Syokimau'));
+});
+
 test('null tenant → null context', () => {
   assert.strictEqual(buildSttContext(null), null);
   assert.strictEqual(buildSttContext({}), null);

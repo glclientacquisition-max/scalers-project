@@ -79,7 +79,8 @@ Apply `docs/supabase/pronunciation_gemini_scan.sql` for the queue / dismissal / 
 
 ## Do / don’t for `say` forms
 
-- Do: light respellings (`Eye-sha`, `Moo-in-dee Mbeen-goo`, `Chapter One`).
+- Do: light respellings (`Eye-sha`, `Chapter One`).
+- Places: speak the name as written. A built-in place respelling lives in `PLACE_LEXICON` (`src/speech/pronunciationLexicon.js`) only with a `verified` note (date, voice id, TTS settings, STT result, source); `tests/pronunciationLexiconEvidence.test.js` fails without one. On 2026-10-08 (#612) a plain vs respelled render through the real voice heard `Kee-ahm-boo` as "Kigambo", `Joo-jah` as "Georgia" and `Roo-ee-roo` as "Rui Rou", while the plain names came back right. Only `West-lands` (plain heard as "wastelands") is kept.
 - Don’t: hyphenate every English syllable (`Si-ti`, `Op-po-sit`, `loh-kay-tid`).
 - Don’t: single common words as `match`.
 - Don’t: ALLCAPS stress in `say` (`KIP-rop`). Soniox may spell the letters. Keep stress in `stressSyllable` metadata on generated candidates only.

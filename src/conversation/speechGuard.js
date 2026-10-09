@@ -9,9 +9,12 @@ const { factServices, factProducts, speechFactText } = require('./provenance');
 const { entityValue, findCatalogMatch } = require('./entityExtraction');
 const { looksLikeOfferAsk } = require('./fileRead');
 const { fileServicePriceLine } = require('./catalogueMouth');
+const { hoursAskLine, looksLikeHoursAsk } = require('./knownFacts');
+const { parseHoursSchedule } = require('./businessHours');
 const { numbersIn } = require('./numberWords');
 const { assessCoverage } = require('./visitLocation');
-const { canonicalPlaceName } = require('./kenyaPlaces');
+const { bindSpokenPlace } = require('./kenyaPlaces');
+const { offerActOf } = require('../speech/offerAct');
 const { openSlotLine } = require('./callCorrectives');
 const {
   callerTurnKinds,
@@ -166,9 +169,32 @@ function unboundFileFallback(language) {
  * "What do you need done" and an unasked callback pitch drop only when they
  * do not answer what the caller just said.
  */
+function sentenceIsIdentityAsk(sentence) {
+  const raw = String(sentence || '').trim();
+  if (!raw) return false;
+  if (/\bam i speaking with\b/i.test(raw)) return true;
+  if (/\b(?:je,?\s*)?(?:naongea na|unaongea na|niongee na|ni wewe)\b/i.test(raw)) return true;
+  return sentenceAsksForCallerName(raw);
+}
+
+/**
+ * A spoken offer or a real question stays. Filler closers and the name ask do not.
+ * The place filter must not delete "Would you like me to log a callback?".
+ */
+function sentenceIsKeptOffer(sentence) {
+  const raw = String(sentence || '').trim();
+  if (!raw || sentenceIsIdentityAsk(raw)) return false;
+  if (HELP_FILLER.test(raw) || ALREADY_ANSWERED_FILLER.test(raw)) return false;
+  if (offerActOf(raw)) return true;
+  if (raw.includes('?')) return true;
+  return /\b(?:would you like|shall i|should i|do you want|want me to|log a callback|ungependa|nikuhifadhi|niandike|nipigie|nikupigie)\b/i.test(
+    raw
+  );
+}
+
 function sentenceIsSpeechSlop(sentence, callerText) {
   const raw = String(sentence || '').trim();
-  if (!raw || isProtectedSpeech(raw)) return false;
+  if (!raw || isProtectedSpeech(raw) || sentenceIsKeptOffer(raw)) return false;
   if (HELP_FILLER.test(raw)) return true;
   if (callerAskedSpecificQuestion(callerText) && ALREADY_ANSWERED_FILLER.test(raw)) return true;
   if (!callerAskedForCallback(callerText) && CALLBACK_PITCH.test(raw)) return true;
@@ -176,10 +202,11 @@ function sentenceIsSpeechSlop(sentence, callerText) {
 }
 
 /** Drop slop sentences. Keep every other sentence in the turn. */
-function dropSpeechSlop(text, callerText) {
+function dropSpeechSlop(text, callerText, dropReasons) {
   const kept = [];
   for (const sentence of splitSentences(text)) {
     if (sentenceIsSpeechSlop(sentence, callerText)) {
+      if (Array.isArray(dropReasons) && !dropReasons.includes('slop')) dropReasons.push('slop');
       logSpokenFilterDrop('slop', sentence);
       continue;
     }
@@ -254,6 +281,52 @@ function sentenceHasUnsaidClock(sentence, allowed) {
     if (!allowed.has(key)) return true;
   }
   return false;
+}
+
+/**
+ * Clocks and numbers that state the business's own hours on file: the 12-hour
+ * clock ("8am", "6pm"), the 24-hour hour, and the Kiswahili hour ("saa mbili"
+ * is 8 AM, "saa kumi na mbili" is 6 PM). Only used when the caller asked the
+ * hours, so a visit clock is still never authorized by the hours (#489).
+ */
+function fileHoursFacts(profile = {}) {
+  const parsed = parseHoursSchedule(profile?.hoursSchedule);
+  const clocks = new Set();
+  const numbers = new Set(['0']);
+  if (!parsed) return null;
+  for (const day of Object.values(parsed.days || {})) {
+    if (!day) continue;
+    for (const hhmm of [day.open, day.close]) {
+      const [hRaw, mRaw] = String(hhmm || '').split(':');
+      const h24 = Number(hRaw);
+      const minute = Number(mRaw || 0);
+      if (!Number.isFinite(h24)) continue;
+      const h12 = h24 % 12 || 12;
+      const ap = h24 < 12 ? 'am' : 'pm';
+      clocks.add(clockKey(h12, minute ? String(minute) : '', ap));
+      numbers.add(String(h24));
+      numbers.add(String(h12));
+      if (minute) numbers.add(String(minute));
+      const swHour = (h12 + 6) % 12 || 12;
+      numbers.add(String(swHour));
+      if (swHour > 10) {
+        numbers.add('10');
+        numbers.add(String(swHour - 10));
+      }
+    }
+  }
+  return clocks.size ? { clocks, numbers } : null;
+}
+
+/** An answer to an hours ask whose clocks and numbers are all the hours on file. */
+function sentenceStatesFileHours(sentence, hoursFacts) {
+  if (!hoursFacts) return false;
+  const clocks = clockKeys(sentence);
+  const numbers = numbersIn(sentence);
+  if (!clocks.size && !numbers.size) return false;
+  for (const key of clocks) if (!hoursFacts.clocks.has(key)) return false;
+  for (const number of numbers) if (!hoursFacts.numbers.has(number)) return false;
+  return true;
 }
 
 function sentenceHasNewNumber(sentence, known) {
@@ -431,12 +504,14 @@ function logSpokenFilterDrop(reason, dropped) {
 }
 
 function placeNamesIn(text) {
-  const found = new Set();
-  for (const word of String(text || '').toLowerCase().split(/[^a-z]+/)) {
-    const name = canonicalPlaceName(word);
-    if (name) found.add(name);
+  return new Set(bindSpokenPlace(text, { fuzzy: true }));
+}
+
+function noteDrop(ctx, reason, sentence) {
+  if (Array.isArray(ctx?.dropReasons) && !ctx.dropReasons.includes(reason)) {
+    ctx.dropReasons.push(reason);
   }
-  return found;
+  logSpokenFilterDrop(reason, sentence);
 }
 
 /** A locality the slot, the caller, and the file do not hold. */
@@ -515,59 +590,67 @@ function guardSpokenReply(text, ctx = {}) {
   let droppedJob = false;
   let droppedUnboundFile = false;
   const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
+  const hoursFacts = looksLikeHoursAsk(lastCallerTurn) ? fileHoursFacts(ctx.profile || {}) : null;
   const heldName = heldCallerName(ctx.state);
   let droppedNameAsk = false;
   for (const sentence of splitSentences(raw)) {
     if (heldName && sentenceAsksForCallerName(sentence)) {
       droppedNameAsk = true;
-      logSpokenFilterDrop('name_ask', sentence);
+      noteDrop(ctx, 'name_ask', sentence);
       continue;
     }
     if (sentenceLeaksUnboundFile(sentence, ctx.state)) {
       droppedUnboundFile = true;
-      logSpokenFilterDrop('unbound_file', sentence);
+      noteDrop(ctx, 'unbound_file', sentence);
+      continue;
+    }
+    if (sentenceIsKeptOffer(sentence)) {
+      kept.push(sentence);
       continue;
     }
     if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) {
-      logSpokenFilterDrop('slop', sentence);
+      noteDrop(ctx, 'slop', sentence);
       continue;
     }
     if (ACTION_NARRATION.test(sentence)) {
-      logSpokenFilterDrop('action_narration', sentence);
+      noteDrop(ctx, 'action_narration', sentence);
       continue;
     }
     if (!holdOk && HOLD_PROMISE.test(sentence)) {
       droppedJob = true;
-      logSpokenFilterDrop('hold_promise', sentence);
+      noteDrop(ctx, 'hold_promise', sentence);
       continue;
     }
     if (holdOk && HOLD_PAYMENT_LEAK.test(sentence)) {
       droppedHoldPayment = true;
-      logSpokenFilterDrop('hold_payment', sentence);
+      noteDrop(ctx, 'hold_payment', sentence);
       continue;
     }
     if (!saved && (SAVED_CLAIM.test(sentence) || JOB_CLOSE.test(sentence))) {
       droppedJob = true;
-      logSpokenFilterDrop('saved_claim', sentence);
+      noteDrop(ctx, 'saved_claim', sentence);
       continue;
     }
     if (!transferOk && TRANSFER_CLAIM.test(sentence)) {
-      logSpokenFilterDrop('transfer_claim', sentence);
+      noteDrop(ctx, 'transfer_claim', sentence);
       continue;
     }
     const coverage = COVERAGE_CLAIM.exec(sentence);
     if (coverage && assessCoverage(coverage[1], ctx.profile || {}) !== 'inside') {
-      logSpokenFilterDrop('coverage', sentence);
+      noteDrop(ctx, 'coverage', sentence);
       continue;
     }
     if (sentenceNamesUnboundPlace(sentence, allowedPlaces)) {
       droppedJob = true;
-      logSpokenFilterDrop('unbound_place', sentence);
+      noteDrop(ctx, 'unbound_place', sentence);
       continue;
     }
-    if (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known)) {
+    if (
+      !sentenceStatesFileHours(sentence, hoursFacts) &&
+      (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known))
+    ) {
       droppedNumber = true;
-      logSpokenFilterDrop('unsaid_number', sentence);
+      noteDrop(ctx, 'unsaid_number', sentence);
       continue;
     }
     kept.push(sentence);
@@ -598,11 +681,21 @@ function guardSpokenReply(text, ctx = {}) {
       out = !out || NOT_ON_FILE.test(out) ? groundedPrice : `${groundedPrice} ${out}`;
     }
   }
+  // The caller asked the hours and the model's clock sentence was dropped
+  // (hours on file do not authorize a model clock, #489). Speak the file's
+  // hours line instead of "not on file" or a bare "Okay." (HD_ee813bcf6248).
+  const groundedHours =
+    !groundedPrice && droppedNumber ? hoursAskLine(lastCallerTurn, ctx.profile || {}, ctx.language) : '';
+  if (groundedHours) {
+    out = !out || NOT_ON_FILE.test(out) ? groundedHours : `${groundedHours} ${out}`;
+  }
   const askedNumber = NUMBER_ASK.test(lastCallerTurn);
   const priced = groundedPrice;
   if (out) {
     const lead =
-      !groundedPrice && askedNumber && droppedNumber ? unknownFallback(ctx.language) : '';
+      !groundedPrice && !groundedHours && askedNumber && droppedNumber
+        ? unknownFallback(ctx.language)
+        : '';
     return withMessageOnlyCallback(lead ? `${lead} ${out}` : out, ctx, appendCallback);
   }
   if (priced) return withMessageOnlyCallback(priced, ctx, appendCallback);

@@ -32,14 +32,14 @@ create index if not exists voice_turn_traces_tenant_idx
   on public.voice_turn_traces (tenant_id, created_at desc);
 
 comment on table public.voice_turn_traces is
-  'Voice turn traces. payload is scalers.voice.turn or scalers.voice.call. pii=transcript. Phones and emails are redacted in the writer. Names stay for scoring. Call rows also store score, checks, diagnosis, and release. Turn rows leave those columns null.';
+  'Voice turn traces. payload is scalers.voice.turn or scalers.voice.call. pii=transcript. Phones and emails are redacted in the writer. Names stay for scoring. Call rows store score, checks, diagnosis, and release. Turn rows store that turn score and checks. Diagnosis and release stay null on turn rows.';
 
 comment on column public.voice_turn_traces.score is
-  'Call score 0-100, written once at hangup. Null on turn rows and when scoring threw.';
+  '0-100. Call row is the call score. Turn row is that turn score. Written at hangup. Null when scoring threw.';
 comment on column public.voice_turn_traces.checks is
-  'Per-check counts for the call. Null on turn rows.';
+  'Per-check counts. Call row is the call total. Turn row is that turn. Written at hangup.';
 comment on column public.voice_turn_traces.diagnosis is
-  'One plain-English line naming the worst check. Null on turn rows and when scoring threw.';
+  'One plain-English line naming the worst check. Call rows only. Null on turn rows and when scoring threw.';
 comment on column public.voice_turn_traces.release is
   'gitSha, branch, and optional label for the process that finished the call.';
 

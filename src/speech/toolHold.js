@@ -62,6 +62,46 @@ function fileReadFollowUp(results) {
   };
 }
 
+// A thinking-ack ("Alright.", "Sawa.") that started this turn already told the
+// caller we heard them. A hold line on top of it, then an outcome that opens
+// with "Okay.", stacks three acknowledgements before any content:
+// "Alright." "Let me check." "Okay, I've saved your request." (HD_c98820e579e1
+// t10) and "Alright." "Just a second." "Okay. They'll call you back."
+// (HD_4d6ac592aeb3 t4). Skip the hold while the ack is recent. A long wait
+// still gets one, so the caller is not left in silence.
+const HOLD_AFTER_ACK_MS = 4000;
+
+/**
+ * @param {{ kind?: string, ackAtMs?: number, nowMs?: number, windowMs?: number }} opts
+ * @returns {boolean} true when the hold line should still be spoken
+ */
+function holdSpeaksAfterAck({
+  kind = 'hold',
+  ackAtMs = 0,
+  nowMs = Date.now(),
+  windowMs = HOLD_AFTER_ACK_MS,
+} = {}) {
+  if (kind !== 'hold') return true;
+  const at = Number(ackAtMs) || 0;
+  if (!at) return true;
+  return Number(nowMs) - at >= windowMs;
+}
+
+const ACK_LEAD = /^\s*(?:okay|ok|alright|sawa)\s*[.,!]\s*(?=\S)/i;
+
+/**
+ * Drop a leading "Okay." / "Sawa," from a tool outcome when an ack or hold
+ * already played this turn. The content of the line is unchanged.
+ * @param {string} line
+ * @param {{ acked?: boolean }} opts
+ */
+function trimAckLead(line, { acked = false } = {}) {
+  const text = String(line || '');
+  if (!acked || !ACK_LEAD.test(text)) return text;
+  const rest = text.replace(ACK_LEAD, '');
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
 function turnRequestsTool(parsed) {
   if (!parsed || typeof parsed !== 'object') return false;
   if (parsed.appointment) return true;
@@ -130,6 +170,9 @@ function createToolHoldSession({ language = 'en', seed = '' } = {}) {
 }
 
 module.exports = {
+  HOLD_AFTER_ACK_MS,
+  holdSpeaksAfterAck,
+  trimAckLead,
   TOOL_HOLD_PACKS,
   pickToolHoldLine,
   planToolHold,

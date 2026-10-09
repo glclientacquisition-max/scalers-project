@@ -44,6 +44,27 @@ const SWAHILI_MARKERS = [
   'kuja',
   'ako',
   'siku',
+  'mimi',
+  'wewe',
+  'yeye',
+  'sisi',
+  'ninyi',
+  'nyinyi',
+  'nilikuwa',
+  'nauliza',
+  'ninauliza',
+  'unafanya',
+  'mnafanya',
+  'naishi',
+  'ninaishi',
+  'vitu',
+  'niko',
+  'uko',
+  'iko',
+  'hapa',
+  'huko',
+  'mnatoa',
+  'tunatoa',
 ];
 
 const SHENG_MARKERS = [
@@ -182,10 +203,44 @@ function countMarkers(raw, markers) {
 }
 
 /**
- * Evidence-bearing detection for stateful language policy.
- * @param {string} text
+ * One Soniox language for a turn. Empty tags return null so the keyword
+ * fallback can run. A tie is mixed. Keywords are not added here.
+ * @param {string[]} [tags]
+ * @returns {'en'|'sw'|'sheng'|'mixed'|null}
  */
-function analyzeCallerLanguage(text) {
+function dominantSonioxLanguage(tags) {
+  const counts = { en: 0, sw: 0, sheng: 0 };
+  for (const tag of Array.isArray(tags) ? tags : []) {
+    const bucket = languageTagBucket(tag);
+    if (bucket && Object.prototype.hasOwnProperty.call(counts, bucket)) counts[bucket] += 1;
+  }
+  const ranked = Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1]);
+  if (!ranked.length) return null;
+  if (ranked.length > 1 && ranked[1][1] === ranked[0][1]) return 'mixed';
+  return ranked[0][0];
+}
+
+/** Soniox language tag, or empty. sw / swh, en, sheng. */
+function languageTagBucket(tag) {
+  const raw = String(tag || '')
+    .toLowerCase()
+    .trim();
+  if (!raw) return '';
+  if (raw === 'sw' || raw === 'swh' || raw.startsWith('sw-') || raw.startsWith('sw_')) return 'sw';
+  if (raw === 'en' || raw.startsWith('en-') || raw.startsWith('en_')) return 'en';
+  if (raw.includes('sheng')) return 'sheng';
+  return '';
+}
+
+/**
+ * Evidence-bearing detection for stateful language policy.
+ * Soniox per-token tags outweigh keywords. Empty tags use the keyword list.
+ * @param {string} text
+ * @param {{ tokenLanguages?: string[] }} [opts]
+ */
+function analyzeCallerLanguage(text, opts = {}) {
   const raw = String(text || '')
     .toLowerCase()
     .replace(/\s+/g, ' ')
@@ -201,7 +256,14 @@ function analyzeCallerLanguage(text) {
   let swHits = countMarkers(raw, SWAHILI_MARKERS);
   let enHits = countMarkers(raw, ENGLISH_CORE_MARKERS);
   const loanHits = countMarkers(raw, ENGLISH_JOB_LOANWORDS);
-  const shengHits = countMarkers(raw, SHENG_MARKERS);
+  let shengHits = countMarkers(raw, SHENG_MARKERS);
+  const tags = Array.isArray(opts.tokenLanguages) ? opts.tokenLanguages : [];
+  for (const tag of tags) {
+    const bucket = languageTagBucket(tag);
+    if (bucket === 'sw') swHits += 3;
+    else if (bucket === 'en') enHits += 3;
+    else if (bucket === 'sheng') shengHits += 3;
+  }
   if (swHits === 0) enHits += loanHits;
 
   if (
@@ -421,6 +483,8 @@ function languageDirective(lang) {
 
 module.exports = {
   analyzeCallerLanguage,
+  dominantSonioxLanguage,
+  ENGLISH_JOB_LOANWORDS,
   detectCallerLanguage,
   createLanguageState,
   resolveLanguageState,

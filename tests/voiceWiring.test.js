@@ -103,8 +103,8 @@ assert.match(
 
 assert.match(
   source,
-  /polishSpokenReply\(String\(chunk \|\| ''\)/,
-  'streamed chunks must pass polish (speech guard, menu strip) before TTS'
+  /polishSpokenDetail\(String\(chunk \|\| ''\)/,
+  'streamed chunks must pass polish (speech guard, menu strip) before TTS and keep the drop reason'
 );
 
 assert.match(
@@ -690,6 +690,18 @@ assert.match(
   source,
   /package exhausted — reject/,
   'a used-up package with on-demand off must not open the media stream'
+);
+
+const telephonyRejectAt = source.indexOf('telephonyBillingRejectXml()');
+const answerStreamAt = source.indexOf('const twiml = buildAnswerStreamXml(');
+assert.ok(
+  telephonyRejectAt > 0 && telephonyRejectAt < answerStreamAt,
+  'exhausted SautiKit prepaid balance must Reject before Stream XML'
+);
+assert.match(
+  source,
+  /telephony wallet exhausted — reject/,
+  'exhausted prepaid balance must log the reject reason'
 );
 
 assert.match(

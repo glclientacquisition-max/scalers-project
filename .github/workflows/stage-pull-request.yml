@@ -6,9 +6,14 @@
 # This workflow runs from main (pull_request_target) and only git-merges pull
 # request refs. It does not install or run code from those pull requests.
 #
-# Railway scalers staging must follow this branch with no commit SHA. A pin
-# ignores later pushes. After the git rebuild, this workflow connects the
-# staging Voice service to the branch again so a pin cannot stick.
+# Railway scalers staging follows this branch with no commit SHA, unless a
+# Stage-PR hold is on. A pin ignores later pushes. After the git rebuild, this
+# workflow connects the staging Voice service to the branch again so a pin
+# cannot stick. That connect is a Railway serviceConnect with the branch and
+# no commit SHA. Railway also autodeploys a push to the connected branch, so
+# a hold skips the push and the connect. The next run with no hold does both.
+# Hold is on when repository variable STAGE_PR_HOLD is 1, true, or on, or any
+# open pull request has the label hold-staging.
 # Preview deploys do not take scalers-staging.vercel.app. This workflow assigns
 # that hostname to the READY deploy of this branch. It does not touch
 # scalers-project or scalers.co.ke.
@@ -49,8 +54,17 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Check Stage-PR hold
+        id: hold
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          STAGE_PR_HOLD: ${{ vars.STAGE_PR_HOLD }}
+        run: node scripts/stage-pull-request-hold.js
+
       - name: Rebuild staging from main and open pull requests
         id: stage
+        if: steps.hold.outcome == 'success' && steps.hold.outputs.hold != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -65,7 +79,11 @@ jobs:
         continue-on-error: true
 
       - name: Connect Railway staging Voice to the staging branch
-        if: always() && steps.stage.outcome != 'skipped'
+        if: >-
+          always() &&
+          steps.hold.outcome == 'success' &&
+          steps.hold.outputs.hold != 'true' &&
+          steps.stage.outcome != 'skipped'
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           PROJECT_ID: ${{ secrets.RAILWAY_STAGING_PROJECT_ID != '' && secrets.RAILWAY_STAGING_PROJECT_ID || '7d397b45-3d3d-4939-bd2b-a0e1e71d9dd7' }}
@@ -125,7 +143,11 @@ jobs:
           echo "Railway staging Voice follows cursor/staging-voice-468b with no commit pin."
 
       - name: Point staging desk at the staging branch
-        if: always() && steps.stage.outcome != 'skipped'
+        if: >-
+          always() &&
+          steps.hold.outcome == 'success' &&
+          steps.hold.outputs.hold != 'true' &&
+          steps.stage.outcome != 'skipped'
         timeout-minutes: 20
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -133,7 +155,7 @@ jobs:
         run: node scripts/stage-desk-alias.js
 
       - name: Record the result on the pull request
-        if: always()
+        if: always() && steps.hold.outcome == 'success' && steps.hold.outputs.hold != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}

@@ -40,20 +40,22 @@ Writes are fire-and-forget. A trace error never throws into the call. `finishCal
 Turn record (`schema: scalers.voice.turn`):
 
 - `callId`, `tenantId`, `turnIndex`, `pii`, `at`, `voiceId`
-- `caller.text`, `caller.language`, `caller.confidence`
+- `caller.text`, `caller.language` (sticky), `caller.sticky`, `caller.detected`, `caller.soniox`, `caller.confidence`
 - `stages[]`, in order. Each stage has `stage`:
 
 | stage | Fields |
 | --- | --- |
 | `stt` | `kind` interim or final, `text`, `tokens[]` with `text`, `final`, `language`, `startMs`, `endMs` |
 | `turn_end` | `decision` flush, hold, skip, drop, queue, replay. `reason` |
-| `language` | `detected`, `sticky`, `confidence` |
+| `language` | `detected`, `sticky`, `soniox`, `confidence` |
 | `model` | `phase` request or output. Request stores `provider`, `model`, `promptId`, `promptVersion`, `language`. It does not store the prompt body. Output stores `outputText`, `chars`, `spokenEmitted`. |
 | `transform` | `name`, `reason`, `before`, `after`, `dropped` |
 | `canned` | `path`, `text`. Paths include `greeting`, `file_name_ask`, `visit_read`, `hear_again`, `speech_repair`, `llm_recovery`. |
-| `tts` | `text` sent toward TTS, `before`, `language`, `voiceId` |
+| `tts` | `text` sent toward TTS, `before` (punctuation still on), `language`, `voiceId`. One stage per spoken sentence. Fillers are not `tts`. |
+| `filler` | Thinking-ack or tool-hold audio. `text`, `before`, `language`. Not part of the scored reply. |
+| `tool` | `name`, `status`, `args`. Args are a short summary (name, reason, item, when). Phones stay redacted. A consent block is `status: consent_blocked`. |
 | `barge_in` | `reason` |
-| `latency` | `callerStopToModelFirstTokenMs`, `callerStopToFirstTtsPcmMs` |
+| `latency` | `callerStopToModelFirstTokenMs`, `callerStopToFirstTtsPcmMs` (first audio, including a filler), `firstReplyPcmMs` (first audio that is not a filler). |
 | `outcome` | `value` such as `ok`, `barge_in`, `speech_repair`, `early_return`, `unlogged` |
 | `speak_packet` | `tier` (`public`, `step_up`, or `private`), `outcome`, `text`, `committed`. Written when SpeakPacket commits a fact, and when a local line stays private. |
 | `speak_slots` | `action` `enqueue` or `drain`, and `slots[]` with `outcome`, `line`, `language`. Enqueue is a slot Brain filled on this turn. Drain is a slot Voice removed because that line was spoken. |
@@ -69,13 +71,15 @@ Call record (`schema: scalers.voice.call`): `startedAt`, `endedAt`, `turnCount`,
 
 The worst check is the one that costs the most points on this call (silence 30, a deleted answer 25, language or completeness 20, a repeated question up to 30, respelling capped at 3, a cut-off or a slow first audio 10). A scoring error logs `[voice-trace] score failed` once per process and leaves the three fields null. The call row is still written.
 
-The call row copies `score`, `checks`, `diagnosis`, and `release` onto columns of the same names. Turn rows leave those columns null. The Admin Quality tab reads the columns. The payload has the same fields.
+`finishCall` writes the call score onto the call row, then writes each turn's own `score`, `checks`, and `notes` onto that turn row. `score` and `checks` are columns and payload. `notes` are the reason strings for that turn, on the payload. Diagnosis and release stay on the call row. Turn rows leave `diagnosis` and `release` null. The Admin Quality tab reads the columns. The payload has the same score and checks.
+
+Soniox realtime sessions send `enable_language_identification: true`. Per-token tags are `sw`, `en`, or `sheng`. Language hints alone do not fill `token.language`. HD_0789461c5319 had `language: null` on every token because that flag was off. The trace stores the Soniox language on `caller.soniox` and the language stage, next to the keyword `detected` value and the sticky language. The scorer uses the Soniox language when any tag is present. It uses the keyword fallback only when every tag is empty. It does not count both.
 
 Prompt identity lives in `src/prompts.js` as `VOICE_SYSTEM_PROMPT_ID` (`voice.system`) and `VOICE_SYSTEM_PROMPT_VERSION`. Bump the version when the prompt text changes. Do not put the prompt in the trace.
 
 ## Replay
 
-`src/speech/replayVoice.js` does not load `server.js`. It runs the same mouth the call uses: `polishSpokenReply`, empty-turn repair, `cutNoAiSlop`, `prepareForTts`.
+`src/speech/replayVoice.js` does not load `server.js`. It runs the same mouth the call uses: `polishSpokenReply`, empty-turn repair, `cutNoAiSlop`, `prepareForTts`. Tool marker blocks are removed before that mouth, the same way a live turn speaks `spokenText` and not the tool JSON. The model stage still stores the raw text.
 
 ```bash
 npm run voice:replay
@@ -92,14 +96,14 @@ A later brain passes `respond` to `replayCall(fixture, { mode: 'live', respond }
 
 | Check | When it counts |
 | --- | --- |
-| `languageMismatch` | Reply language is not the caller language. `mixed` matches either side. Sheng matches Kiswahili. A bare sawa or okay is neutral. |
-| `incomplete` | Spoken characters are under half the model text (model at least 40 characters), or the caller asked for services and the spoken line has no service noun. |
-| `repeatedQuestion` | Name or identity asked more than once, or the same question spoken again. Call-level. |
-| `silence` | Caller text and no spoken line, and the turn was not held. |
-| `deletedAnswer` | A transform dropped a line that named a service or stated the caller's name, or the model had that and the spoken line does not. |
+| `languageMismatch` | The whole spoken reply is not the caller's language. When Soniox tagged the turn (`caller.soniox`, the language stage, or STT token languages), that language is the caller language and the keyword fallback is not also checked. When every tag is empty, the caller language is `caller.detected` or the language stage, then the caller text. It does not use the sticky language. A reply is not English just because it contains one job loanword such as cleaning. `mixed` matches either side. Sheng matches Kiswahili. A bare sawa or okay is neutral. One mismatch per turn. |
+| `incomplete` | Spoken characters are under half the model prose (model at least 40 characters), or the caller asked for services and the spoken reply has no service noun. Tool marker blocks are not prose. |
+| `repeatedQuestion` | Name or identity asked more than once, or the same question appears again. Questions are read from the model prose or from `tts.before`, where the question mark is still present. A name ask is not also counted as a question. Call-level. |
+| `silence` | Caller text and no spoken reply, and the turn was not held, skipped, or a backchannel such as Okay, and did not end in `barge_in`. A filler is not a reply. |
+| `deletedAnswer` | A transform dropped a service or name line, or the model prose named one and the spoken reply does not, or a question in the model prose (or a dropped transform) is missing from the whole spoken reply, or a sentence was dropped with reason `unbound_place` or `unsaid_number`. |
 | `respelling` | Hyphenated English-style spellings on a Kiswahili mouth (`Kee-ten-geh-la`). |
-| `prematureTurn` | Caller text ended on a dash or comma, or was cut mid-phrase, and the turn flushed. |
-| `slow` | First TTS PCM later than 1200 ms. Missing latency is skipped. |
+| `prematureTurn` | Caller text ended on a dash or comma, or was cut mid-phrase, and the turn flushed. A late token dropped (`turn_end` grace/ignore) or merged after the turn closed (`late_final`) counts as a cut. |
+| `slow` | `firstReplyPcmMs` later than 1200 ms. When that field is absent, the scorer uses `callerStopToFirstTtsPcmMs`, which is the reply on older fixtures. A filler with no reply is not slow. Missing latency is skipped. |
 
 Call score is the average turn score, minus up to 30 for repeated questions. A turn marked `unlogged` is left out of the average.
 
@@ -144,5 +148,6 @@ The fixtures are built from Railway logs and the transcript rows on 2026-10-06. 
 | `HD_b47644d19072` | Staging, 08:36Z. |
 | `HD_fe0d1e8fbd6e` | Staging, 08:04Z. |
 | `HD_21b92f25640b` | Production, 2026-10-05 19:12Z. Esga Stationery. |
+| `HD_0789461c5319` | Staging, 2026-10-07 20:49Z (23:49 EAT). Done and Dusted. First call with `voice_turn_traces`. |
 
 Today's code is expected to score badly. That is the baseline.

@@ -795,6 +795,21 @@ function peelGoalClause(clause) {
  * Actionable remainder of a caller turn. Unfinished stems, greetings, and
  * identity echoes drop out. Empty means this turn is not a goal.
  */
+/**
+ * The caller has not finished the thought ("Nilikuwa nauliza,", "Let's say",
+ * a trailing "na" or "and"). Any reply, including the name ask, waits.
+ * Ported from #609 (edfe8447, fe571063, 4e6abe8f).
+ * @param {string} text
+ */
+function callerTurnStillOpen(text) {
+  const { utteranceLooksIncomplete } = require('../speech/turnTaking');
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return false;
+  if (utteranceLooksIncomplete(raw)) return true;
+  if (usableGoalRemainder(raw)) return false;
+  return UNFINISHED_STEM.test(raw.replace(/[.!?,;:…—–-]+$/g, '').trim());
+}
+
 function usableGoalRemainder(text) {
   const raw = String(text || '').trim();
   if (!raw) return '';
@@ -1157,6 +1172,7 @@ module.exports = {
   isBackchannelOrFragment,
   isRejectedGoalText,
   callerGoalText,
+  callerTurnStillOpen,
   callerAskSpecificity,
   agentAskedPendingName,
   isPlausibleCallerName,
