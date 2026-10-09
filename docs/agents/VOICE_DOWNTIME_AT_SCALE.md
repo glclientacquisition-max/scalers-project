@@ -29,7 +29,7 @@ Shared catalog voices serve many tenants. Agent names differ. Pre-rendered audio
 Keep one voice-generic sentence:
 
 - EN: `Hello. This line is on a short downtime. Please call back in a few minutes.`
-- SW: `Habari. Simu hii ina downtime fupi. Tafadhali piga tena baada ya dakika chache.`
+- SW: `Habari. Simu hii haipatikani kwa muda mfupi. Tafadhali piga tena baada ya dakika chache.`
 
 The caller already dialed that DID. Voice continuity is the identity. A wrong name is worse than no name.
 
