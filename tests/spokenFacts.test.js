@@ -139,11 +139,11 @@ describe('renderFactLine templates (fact-lines.md)', () => {
 describe('confirm_identity_first and more_open', () => {
   it('confirm_identity_first carries the name ask only with ask: true and a name', () => {
     assert.equal(line('confirm_identity_first', 'en', { name: 'Wanjiku', ask: true }), "Let me just confirm who I'm speaking with, is this Wanjiku?");
-    assert.equal(line('confirm_identity_first', 'sw', { name: 'Wanjiku', ask: true }), 'Wacha nithibitishe kwanza, ninazungumza na Wanjiku?');
+    assert.equal(line('confirm_identity_first', 'sw', { name: 'Wanjiku', ask: true }), 'Wacha nithibitishe kwanza, naongea na Wanjiku?');
     assert.equal(line('confirm_identity_first', 'sheng', { name: 'Wanjiku', ask: true }), 'Wacha ni-confirm kwanza, naongea na Wanjiku?');
     // Ask already spoken on this call: never asked twice.
     assert.equal(line('confirm_identity_first', 'en', { name: 'Wanjiku', ask: false }), "Let me just confirm who I'm speaking with first.");
-    assert.equal(line('confirm_identity_first', 'sw', { name: 'Wanjiku', ask: false }), 'Wacha nithibitishe kwanza ninazungumza na nani.');
+    assert.equal(line('confirm_identity_first', 'sw', { name: 'Wanjiku', ask: false }), 'Wacha nithibitishe kwanza naongea na nani.');
     assert.equal(line('confirm_identity_first', 'sheng', {}), 'Wacha ni-confirm kwanza naongea na nani.');
     // ask without a name has nothing to ask.
     assert.equal(line('confirm_identity_first', 'en', { ask: true }), "Let me just confirm who I'm speaking with first.");

@@ -353,13 +353,13 @@ const TEMPLATES = {
       if (name) {
         return by(lang, {
           en: `Let me just confirm who I'm speaking with, is this ${name}?`,
-          sw: `Wacha nithibitishe kwanza, ninazungumza na ${name}?`,
+          sw: `Wacha nithibitishe kwanza, naongea na ${name}?`,
           sheng: `Wacha ni-confirm kwanza, naongea na ${name}?`,
         });
       }
       return by(lang, {
         en: "Let me just confirm who I'm speaking with first.",
-        sw: 'Wacha nithibitishe kwanza ninazungumza na nani.',
+        sw: 'Wacha nithibitishe kwanza naongea na nani.',
         sheng: 'Wacha ni-confirm kwanza naongea na nani.',
       });
     },
