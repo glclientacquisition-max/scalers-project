@@ -23,6 +23,7 @@ const {
   unknownFaqTopics,
   formatUnknownSection,
 } = require('../provenance');
+const { factValueForPath, tenantRowFromProfile, catalogRowFactValue } = require('../factHash');
 const { isMessageOnlyMode } = require('../messageOnly');
 const { formatScheduleSummary } = require('../businessHours');
 const { coveredByAreas, formatCoverageList } = require('../coverageAreas');
@@ -64,14 +65,16 @@ function unknownReading(base, reason, source = '') {
 
 function provenanceFor(def, raw, profile) {
   const fieldMeta = profile.fieldMeta || null;
+  // Confirm v2: the value the owner's value_hash must match.
+  const value = factValueForPath(def.fieldPath, tenantRowFromProfile(profile));
   if (def.policyKey) {
     const text = asText(raw);
     const packSeed = isPackPolicyText(text);
     const meta = policyMeta(policiesOf(profile), def.policyKey);
     const base = meta && Object.keys(meta).length ? meta : { source: packSeed ? 'seed' : '' };
-    return classifyRecord(base, { packSeed, fieldMeta, fieldPath: def.fieldPath });
+    return classifyRecord(base, { packSeed, fieldMeta, fieldPath: def.fieldPath, value });
   }
-  return classifyRecord({}, { packSeed: false, fieldMeta, fieldPath: def.fieldPath });
+  return classifyRecord({}, { packSeed: false, fieldMeta, fieldPath: def.fieldPath, value });
 }
 
 /**
@@ -165,11 +168,12 @@ function catalogRows(profile, kind, now) {
       if (name.reason === 'garbage') garbage += 1;
       return;
     }
-    const fieldPath = kind === 'product' ? productFieldPath(row, index) : serviceFieldPath(index);
+    const fieldPath = kind === 'product' ? productFieldPath(row, index) : serviceFieldPath(index, row);
     const prov = classifyRecord(row, {
       packSeed: kind === 'service' ? isPackService(row) : false,
       fieldMeta,
       fieldPath,
+      value: catalogRowFactValue(row),
     });
     if (!prov.fact) {
       unconfirmed += 1;

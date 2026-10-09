@@ -20,7 +20,26 @@ export type TenantFieldMetaRow = {
   source: string;
   confirmed_by?: string | null;
   confirmed_at?: string | null;
+  last_verified_at?: string | null;
+  stale_after_days?: number | null;
+  /** Present only once tenant_field_confirm_v2.sql is applied. */
+  value_hash?: string | null;
 };
+
+// Same step-down as src/lib/tenantFieldMetaSelect.js: a DB without value_hash
+// (or the freshness columns) still loads provenance under the P0 rules.
+const FIELD_META_COLUMN_SETS = [
+  "field_path, source, confirmed_by, confirmed_at, last_verified_at, stale_after_days, value_hash",
+  "field_path, source, confirmed_by, confirmed_at, last_verified_at, stale_after_days",
+  "field_path, source, confirmed_by, confirmed_at",
+];
+
+function isMissingFieldMetaColumn(error: { code?: string; message?: string; details?: string; hint?: string } | null) {
+  if (!error) return false;
+  const text = `${error.code || ""} ${error.message || ""} ${error.details || ""} ${error.hint || ""}`;
+  if (!/value_hash|last_verified_at|stale_after_days/i.test(text)) return false;
+  return /42703|PGRST204|does not exist|could not find|schema cache/i.test(text);
+}
 
 function parseHoldGate(raw: unknown): TenantHoldGate {
   const row = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
@@ -80,10 +99,14 @@ export async function getTenantHoldGate(tenantId: string): Promise<TenantHoldGat
 export async function listTenantFieldMeta(tenantId: string): Promise<TenantFieldMetaRow[] | null> {
   if (!tenantId) return null;
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("tenant_field_meta")
-    .select("field_path, source, confirmed_by, confirmed_at")
-    .eq("tenant_id", tenantId);
+  let data: unknown = null;
+  let error: { code?: string; message?: string; details?: string; hint?: string } | null = null;
+  for (const columns of FIELD_META_COLUMN_SETS) {
+    const res = await supabase.from("tenant_field_meta").select(columns).eq("tenant_id", tenantId);
+    data = res.data;
+    error = res.error;
+    if (!error || !isMissingFieldMetaColumn(error)) break;
+  }
   if (error) {
     if (/tenant_field_meta|does not exist|schema cache/i.test(error.message || "")) return null;
     console.warn("[tenantFieldProvenance] tenant_field_meta", error.message);

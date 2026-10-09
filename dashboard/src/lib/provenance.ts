@@ -21,6 +21,21 @@
 // Only owner, or an explicit confirm, is fact. seed and call_suggested cap at
 // suggested and never compile or speak as GOLDEN. import and inferred are not
 // fact until confirmed. Empty policy text is unknown. Never invent a default.
+//
+// Confirm v2 (value_hash): when the loaded meta rows carry value_hash (the
+// column exists), a path with a meta row is fact only when source = 'owner'
+// AND value_hash === hashFactValue(current value). A missing hash is not
+// confirmed. The table row beats in-data source/confirmed hints. When the
+// column is absent (DB before tenant_field_confirm_v2.sql) the P0 rules above
+// still apply, so a deploy ahead of the SQL changes nothing.
+
+import {
+  hashFactValue,
+  catalogRowFactValue,
+  faqFactValue,
+  holdsFactValue,
+  stableRowId,
+} from './factHash';
 
 export const SOURCES = new Set(['owner', 'seed', 'import', 'inferred', 'call_suggested']);
 
@@ -208,8 +223,12 @@ export function isPackService(row: any) {
  * this tenant has no rows, so each missing path still uses the heuristic.
  * @param {Array<{ field_path?: string, source?: string }>|null|undefined} rows
  */
-export function indexFieldMeta(rows: any) {
+export function indexFieldMeta(rows: any, { hashEnforced }: { hashEnforced?: boolean } = {}) {
   if (!Array.isArray(rows)) return null;
+  const enforced =
+    typeof hashEnforced === 'boolean'
+      ? hashEnforced
+      : rows.some((row: any) => row && typeof row === 'object' && Object.prototype.hasOwnProperty.call(row, 'value_hash'));
   const byPath: Record<string, any> = {};
   for (const row of rows) {
     const path = String(row?.field_path || row?.fieldPath || '').trim();
@@ -220,8 +239,14 @@ export function indexFieldMeta(rows: any) {
       confirmed_at: row.confirmed_at || row.confirmedAt || null,
       confirmed_by: row.confirmed_by || row.confirmedBy || null,
     };
+    // GIGO P2 freshness. Kept only when the select returned them.
+    const verified = row.last_verified_at || row.lastVerifiedAt;
+    if (verified) byPath[path].last_verified_at = verified;
+    const staleDays = Number(row.stale_after_days ?? row.staleAfterDays);
+    if (Number.isFinite(staleDays) && staleDays > 0) byPath[path].stale_after_days = staleDays;
+    if (enforced) byPath[path].value_hash = String(row.value_hash || row.valueHash || '').trim().toLowerCase() || null;
   }
-  return { loaded: true, byPath };
+  return { loaded: true, hashEnforced: enforced, byPath };
 }
 
 export function lookupFieldMeta(fieldMeta: any, fieldPath: any) {
@@ -238,8 +263,10 @@ export function productFieldPath(row: any, index: any) {
   return `catalog.product.${sku || String(index + 1)}.name`;
 }
 
-export function serviceFieldPath(index: any) {
-  return `catalog.service.${index + 1}.name`;
+/** Stable id (non-numeric) when the row has one, else the 1-based position. */
+export function serviceFieldPath(index: any, row: any = null) {
+  const id = stableRowId(row);
+  return `catalog.service.${id || String(index + 1)}.name`;
 }
 
 export function faqFieldPath(index: any) {
@@ -251,8 +278,20 @@ export function faqFieldPath(index: any) {
  * fact is only owner or an explicit confirm. seed and call_suggested are never fact.
  * A tenant_field_meta row for fieldPath replaces the pack-text guess.
  */
-export function classifyRecord(row: any, { packSeed = false, fieldMeta = null, fieldPath = '' }: any = {}) {
+export function classifyRecord(row: any, { packSeed = false, fieldMeta = null, fieldPath = '', value }: any = {}) {
   const meta = lookupFieldMeta(fieldMeta, fieldPath);
+  if (meta && fieldMeta && (fieldMeta as any).hashEnforced) {
+    const hash = meta.value_hash || null;
+    const matches =
+      meta.source === 'owner' && Boolean(hash) && value !== undefined && hash === hashFactValue(value);
+    const hashCheck = !hash ? 'missing' : matches ? 'match' : 'mismatch';
+    let status = 'suggested';
+    if (matches) {
+      const raw = String(envelopeOf(row).status || '').trim().toLowerCase();
+      status = raw === 'golden' ? 'golden' : 'confirmed';
+    }
+    return { source: meta.source, confirmed: matches, fact: matches, status, hashCheck };
+  }
   let working = row;
   let seed = packSeed;
   if (meta) {
@@ -288,7 +327,7 @@ export function classifyFaq(faq: any, fieldMeta: any = null, fieldPath: any = ''
   const question = String(faq?.question || '').trim();
   const answer = String(faq?.answer || '').trim();
   const packSeed = isPackFaq(question, answer);
-  const row = classifyRecord(faq, { packSeed, fieldMeta, fieldPath });
+  const row = classifyRecord(faq, { packSeed, fieldMeta, fieldPath, value: faqFactValue(faq) });
   return { ...row, question, answer };
 }
 
@@ -300,7 +339,7 @@ export function classifyPolicyValue(text: any, meta: any, fieldMeta: any = null,
     ? meta
     : { source: packSeed ? 'seed' : '' };
   return {
-    ...classifyRecord(base, { packSeed, fieldMeta, fieldPath }),
+    ...classifyRecord(base, { packSeed, fieldMeta, fieldPath, value: text }),
     empty: false,
     text: value,
   };
@@ -410,6 +449,7 @@ export function holdRulesAllow(policies: any, fieldMeta: any = null) {
       packSeed: false,
       fieldMeta,
       fieldPath: 'policies.holds',
+      value: holdsFactValue(obj),
     });
     if (allowed === 'no' || allowed === 'false') return false;
     if ((allowed === 'yes' || allowed === 'true') && row.fact) return true;
@@ -429,6 +469,7 @@ export function factProducts(raw: any, fieldMeta: any = null) {
       packSeed: false,
       fieldMeta,
       fieldPath: productFieldPath(row, index),
+      value: catalogRowFactValue(row),
     }).fact;
   });
 }
@@ -440,7 +481,8 @@ export function factServices(raw: any, fieldMeta: any = null) {
     return classifyRecord(row, {
       packSeed: isPackService(row),
       fieldMeta,
-      fieldPath: serviceFieldPath(index),
+      fieldPath: serviceFieldPath(index, row),
+      value: catalogRowFactValue(row),
     }).fact;
   });
 }

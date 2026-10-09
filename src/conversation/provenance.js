@@ -12,8 +12,22 @@
 // Only owner, or an explicit confirm, is fact. seed and call_suggested cap at
 // suggested and never compile or speak as GOLDEN. import and inferred are not
 // fact until confirmed. Empty policy text is unknown. Never invent a default.
+//
+// Confirm v2 (value_hash): when the loaded meta rows carry value_hash (the
+// column exists), a path with a meta row is fact only when source = 'owner'
+// AND value_hash === hashFactValue(current value). A missing hash is not
+// confirmed. The table row beats in-data source/confirmed hints. When the
+// column is absent (DB before tenant_field_confirm_v2.sql) the P0 rules above
+// still apply, so a deploy ahead of the SQL changes nothing.
 
 const { readCoverageAreas } = require('./coverageAreas');
+const {
+  hashFactValue,
+  catalogRowFactValue,
+  faqFactValue,
+  holdsFactValue,
+  stableRowId,
+} = require('./factHash');
 
 const SOURCES = new Set(['owner', 'seed', 'import', 'inferred', 'call_suggested']);
 
@@ -201,8 +215,12 @@ function isPackService(row) {
  * this tenant has no rows, so each missing path still uses the heuristic.
  * @param {Array<{ field_path?: string, source?: string }>|null|undefined} rows
  */
-function indexFieldMeta(rows) {
+function indexFieldMeta(rows, { hashEnforced } = {}) {
   if (!Array.isArray(rows)) return null;
+  const enforced =
+    typeof hashEnforced === 'boolean'
+      ? hashEnforced
+      : rows.some((row) => row && typeof row === 'object' && Object.prototype.hasOwnProperty.call(row, 'value_hash'));
   const byPath = {};
   for (const row of rows) {
     const path = String(row?.field_path || row?.fieldPath || '').trim();
@@ -219,8 +237,9 @@ function indexFieldMeta(rows) {
     if (verified) byPath[path].last_verified_at = verified;
     const staleDays = Number(row.stale_after_days ?? row.staleAfterDays);
     if (Number.isFinite(staleDays) && staleDays > 0) byPath[path].stale_after_days = staleDays;
+    if (enforced) byPath[path].value_hash = String(row.value_hash || row.valueHash || '').trim().toLowerCase() || null;
   }
-  return { loaded: true, byPath };
+  return { loaded: true, hashEnforced: enforced, byPath };
 }
 
 function lookupFieldMeta(fieldMeta, fieldPath) {
@@ -237,8 +256,10 @@ function productFieldPath(row, index) {
   return `catalog.product.${sku || String(index + 1)}.name`;
 }
 
-function serviceFieldPath(index) {
-  return `catalog.service.${index + 1}.name`;
+/** Stable id (non-numeric) when the row has one, else the 1-based position. */
+function serviceFieldPath(index, row = null) {
+  const id = stableRowId(row);
+  return `catalog.service.${id || String(index + 1)}.name`;
 }
 
 function faqFieldPath(index) {
@@ -250,8 +271,20 @@ function faqFieldPath(index) {
  * fact is only owner or an explicit confirm. seed and call_suggested are never fact.
  * A tenant_field_meta row for fieldPath replaces the pack-text guess.
  */
-function classifyRecord(row, { packSeed = false, fieldMeta = null, fieldPath = '' } = {}) {
+function classifyRecord(row, { packSeed = false, fieldMeta = null, fieldPath = '', value } = {}) {
   const meta = lookupFieldMeta(fieldMeta, fieldPath);
+  if (meta && fieldMeta && fieldMeta.hashEnforced) {
+    const hash = meta.value_hash || null;
+    const matches =
+      meta.source === 'owner' && Boolean(hash) && value !== undefined && hash === hashFactValue(value);
+    const hashCheck = !hash ? 'missing' : matches ? 'match' : 'mismatch';
+    let status = 'suggested';
+    if (matches) {
+      const raw = String(envelopeOf(row).status || '').trim().toLowerCase();
+      status = raw === 'golden' ? 'golden' : 'confirmed';
+    }
+    return { source: meta.source, confirmed: matches, fact: matches, status, hashCheck };
+  }
   let working = row;
   let seed = packSeed;
   if (meta) {
@@ -287,7 +320,7 @@ function classifyFaq(faq, fieldMeta = null, fieldPath = '') {
   const question = String(faq?.question || '').trim();
   const answer = String(faq?.answer || '').trim();
   const packSeed = isPackFaq(question, answer);
-  const row = classifyRecord(faq, { packSeed, fieldMeta, fieldPath });
+  const row = classifyRecord(faq, { packSeed, fieldMeta, fieldPath, value: faqFactValue(faq) });
   return { ...row, question, answer };
 }
 
@@ -299,7 +332,7 @@ function classifyPolicyValue(text, meta, fieldMeta = null, fieldPath = '') {
     ? meta
     : { source: packSeed ? 'seed' : '' };
   return {
-    ...classifyRecord(base, { packSeed, fieldMeta, fieldPath }),
+    ...classifyRecord(base, { packSeed, fieldMeta, fieldPath, value: text }),
     empty: false,
     text: value,
   };
@@ -391,6 +424,7 @@ function holdRulesAllow(policies, fieldMeta = null) {
       packSeed: false,
       fieldMeta,
       fieldPath: 'policies.holds',
+      value: holdsFactValue(obj),
     });
     if (allowed === 'no' || allowed === 'false') return false;
     if ((allowed === 'yes' || allowed === 'true') && row.fact) return true;
@@ -410,6 +444,7 @@ function factProducts(raw, fieldMeta = null) {
       packSeed: false,
       fieldMeta,
       fieldPath: productFieldPath(row, index),
+      value: catalogRowFactValue(row),
     }).fact;
   });
 }
@@ -421,7 +456,8 @@ function factServices(raw, fieldMeta = null) {
     return classifyRecord(row, {
       packSeed: isPackService(row),
       fieldMeta,
-      fieldPath: serviceFieldPath(index),
+      fieldPath: serviceFieldPath(index, row),
+      value: catalogRowFactValue(row),
     }).fact;
   });
 }
@@ -655,7 +691,14 @@ async function loadProvenanceEnvelope(tenantId) {
   return { fieldMeta, holdGate };
 }
 
+const factHash = require('./factHash');
+
 module.exports = {
+  hashFactValue: factHash.hashFactValue,
+  canonicalFactJson: factHash.canonicalFactJson,
+  factValueForPath: factHash.factValueForPath,
+  tenantRowFromProfile: factHash.tenantRowFromProfile,
+  faqFieldPath,
   PACK_POLICY_TEXTS,
   policyKeyLabel,
   isPolicyMetaKey,
