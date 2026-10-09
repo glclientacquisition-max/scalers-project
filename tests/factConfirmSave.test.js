@@ -233,6 +233,29 @@ before(() => {
     out.leafExpected = leafPaths.map((p) => hashFactValue(factValueForPath(p, leafSaved)));
     out.leafReopen = leaf.reopen;
 
+    // Brain's repro: nameless rows (empty or whitespace name) stamp no leaves;
+    // a named sibling in the same save still does.
+    const nameless = clone(savedIds);
+    nameless.services_catalog.push({ id: 'svc_nameless0000000', name: '', price_range: 'KES 5', site_visit_required: true });
+    nameless.services_catalog.push({ id: 'svc_blankname000000', name: '   ', price_range: 'KES 6', site_visit_required: false });
+    nameless.product_catalog = [{ name: ' ', price: '9' }, { name: 'Brush', price: '150' }];
+    const namelessPaths = [
+      'catalog.service.svc_nameless0000000.price',
+      'catalog.service.svc_nameless0000000.site_visit',
+      'catalog.service.svc_blankname000000.price',
+      'catalog.service.svc_blankname000000.site_visit',
+      'catalog.product.1.price',
+    ];
+    const namedPaths = [
+      'catalog.service.' + nameless.services_catalog[0].id + '.price',
+      'catalog.service.' + nameless.services_catalog[2].id + '.site_visit',
+      'catalog.product.2.price',
+    ];
+    const namelessPlan = planFactConfirm({ scope: 'pronunciation', before: nameless, after: nameless, explicitPaths: [...namelessPaths, ...namedPaths], normalize: normalizeFactRow });
+    out.namelessValues = namelessPaths.map((p) => factValueForPath(p, nameless));
+    out.namelessConfirm = namelessPlan.confirm;
+    out.namedExpected = namedPaths.map((path) => ({ path, hash: hashFactValue(factValueForPath(path, nameless)) }));
+
     // Stamped hash = hash of the saved, stored value, for changed and "Looks right" paths alike.
     const savedMany = clone(savedSame);
     savedMany.business_policies.returns = 'Exchanges within 7 days';
@@ -394,6 +417,16 @@ describe('"Looks right" on .price and .site_visit paths', { skip: tsSkip }, () =
       R.leafPaths.slice(0, 4).map((path, i) => ({ path, hash: R.leafExpected[i] }))
     );
     assert.deepEqual(R.leafReopen, []);
+  });
+});
+
+describe('nameless catalogue rows stamp no .price / .site_visit', { skip: tsSkip }, () => {
+  it('the leaves have values, so only the name rule keeps them out', () => {
+    assert.deepEqual(R.namelessValues, [{ price: 'KES 5' }, true, { price: 'KES 6' }, false, { price: '9' }]);
+  });
+
+  it('empty and whitespace-only names stamp nothing; named siblings still stamp the saved-row hash', () => {
+    assert.deepEqual(R.namelessConfirm, R.namedExpected);
   });
 });
 

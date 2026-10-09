@@ -14,6 +14,8 @@ import { factValueForPath, hashFactValue, stableRowId } from "./factHash";
 
 export const FACT_HASH_RE = /^[0-9a-f]{64}$/;
 export const CONFIRM_BATCH_MAX = 500;
+/** catalog.service.<id|n>.price / .site_visit, catalog.product.<sku|n>.price; group 1 is the row path. */
+const CATALOG_LEAF_RE = /^(catalog\.(?:service|product)\..+)\.(?:price|site_visit)$/;
 
 /** Policy text keys a Policies save owns (POLICY_FIELDS ids in businessPolicies). */
 export const POLICY_TEXT_KEYS = [
@@ -160,7 +162,16 @@ export function planFactConfirm(input: {
   const saved = input.after || {};
   const before = normalize(input.before || {});
   const after = normalize(saved);
-  const savedHash = (path: string) => hashOrNull(factValueForPath(path, saved), path);
+  const savedHash = (path: string) => {
+    // A .price / .site_visit fact belongs to a catalogue row; a nameless row
+    // (blank or whitespace name) is not a fact yet, so its leaves stamp nothing.
+    const leaf = path.match(CATALOG_LEAF_RE);
+    if (leaf) {
+      const namePath = `${leaf[1]}.name`;
+      if (isEmptyFactValue(factValueForPath(namePath, saved), namePath)) return null;
+    }
+    return hashOrNull(factValueForPath(path, saved), path);
+  };
   const paths = new Set<string>([
     ...scopeFactPaths(input.scope, before),
     ...scopeFactPaths(input.scope, after),
