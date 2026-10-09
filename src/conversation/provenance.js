@@ -13,12 +13,13 @@
 // suggested and never compile or speak as GOLDEN. import and inferred are not
 // fact until confirmed. Empty policy text is unknown. Never invent a default.
 //
-// Confirm v2 (value_hash): when the loaded meta rows carry value_hash (the
-// column exists), a path with a meta row is fact only when source = 'owner'
-// AND value_hash === hashFactValue(current value). A missing hash is not
-// confirmed. The table row beats in-data source/confirmed hints. When the
-// column is absent (DB before tenant_field_confirm_v2.sql) the P0 rules above
-// still apply, so a deploy ahead of the SQL changes nothing.
+// Confirm v2 (value_hash), behind FACT_HASH_MODE (on only when exactly 'on').
+// Hash mode off: the P0 rules above, exactly. Hash mode on: a path is fact only
+// when its tenant_field_meta row exists with source = 'owner' AND value_hash ===
+// hashFactValue(current value). No meta row, a missing value_hash (or column),
+// or any in-data source/confirmed hint is not confirmed.
+// JS resolves hash mode from an explicit { hashMode } option, then a hashMode
+// set on the indexed fieldMeta, then process.env.FACT_HASH_MODE.
 
 const { readCoverageAreas } = require('./coverageAreas');
 const {
@@ -187,7 +188,25 @@ function readSource(row) {
   return SOURCES.has(raw) ? raw : '';
 }
 
-function isConfirmed(row) {
+
+/** Hash mode for one call: explicit option, then fieldMeta.hashMode, then env. */
+function resolveHashMode(explicit, fieldMeta) {
+  if (typeof explicit === 'boolean') return explicit;
+  if (typeof explicit === 'string') return explicit === 'on';
+  if (fieldMeta && typeof fieldMeta.hashMode === 'boolean') return fieldMeta.hashMode;
+  return process.env.FACT_HASH_MODE === 'on';
+}
+
+/** Pin hash mode on a fieldMeta index (null stays null when off). */
+function withHashMode(fieldMeta, hashMode) {
+  if (typeof hashMode !== 'boolean') return fieldMeta;
+  if (!fieldMeta) return hashMode ? { loaded: false, hashMode: true, byPath: {} } : null;
+  return { ...fieldMeta, hashMode };
+}
+
+/** In-data envelope confirm (P0). In hash mode in-data hints never confirm. */
+function isConfirmed(row, { hashMode } = {}) {
+  if (resolveHashMode(hashMode)) return false;
   const env = envelopeOf(row);
   if (env.confirmed === true) return true;
   if (env.confirmed_by) return true;
@@ -215,12 +234,12 @@ function isPackService(row) {
  * this tenant has no rows, so each missing path still uses the heuristic.
  * @param {Array<{ field_path?: string, source?: string }>|null|undefined} rows
  */
-function indexFieldMeta(rows, { hashEnforced } = {}) {
-  if (!Array.isArray(rows)) return null;
-  const enforced =
-    typeof hashEnforced === 'boolean'
-      ? hashEnforced
-      : rows.some((row) => row && typeof row === 'object' && Object.prototype.hasOwnProperty.call(row, 'value_hash'));
+function indexFieldMeta(rows, { hashMode } = {}) {
+  if (!Array.isArray(rows)) {
+    // Hash mode with no table loaded: every path is unconfirmed, so carry the
+    // mode on an empty index instead of returning null (null = P0 heuristic).
+    return hashMode === true ? { loaded: false, hashMode: true, byPath: {} } : null;
+  }
   const byPath = {};
   for (const row of rows) {
     const path = String(row?.field_path || row?.fieldPath || '').trim();
@@ -237,9 +256,13 @@ function indexFieldMeta(rows, { hashEnforced } = {}) {
     if (verified) byPath[path].last_verified_at = verified;
     const staleDays = Number(row.stale_after_days ?? row.staleAfterDays);
     if (Number.isFinite(staleDays) && staleDays > 0) byPath[path].stale_after_days = staleDays;
-    if (enforced) byPath[path].value_hash = String(row.value_hash || row.valueHash || '').trim().toLowerCase() || null;
+    // Confirm v2. Read only in hash mode; a row without it is unconfirmed there.
+    const hash = String(row.value_hash || row.valueHash || '').trim().toLowerCase();
+    if (hash) byPath[path].value_hash = hash;
   }
-  return { loaded: true, hashEnforced: enforced, byPath };
+  const out = { loaded: true, byPath };
+  if (typeof hashMode === 'boolean') out.hashMode = hashMode;
+  return out;
 }
 
 function lookupFieldMeta(fieldMeta, fieldPath) {
@@ -271,9 +294,10 @@ function faqFieldPath(index) {
  * fact is only owner or an explicit confirm. seed and call_suggested are never fact.
  * A tenant_field_meta row for fieldPath replaces the pack-text guess.
  */
-function classifyRecord(row, { packSeed = false, fieldMeta = null, fieldPath = '', value } = {}) {
+function classifyRecord(row, { packSeed = false, fieldMeta = null, fieldPath = '', value, hashMode } = {}) {
   const meta = lookupFieldMeta(fieldMeta, fieldPath);
-  if (meta && fieldMeta && fieldMeta.hashEnforced) {
+  if (resolveHashMode(hashMode, fieldMeta)) {
+    if (!meta) return { source: '', confirmed: false, fact: false, status: 'suggested', hashCheck: 'no_row' };
     const hash = meta.value_hash || null;
     const matches =
       meta.source === 'owner' && Boolean(hash) && value !== undefined && hash === hashFactValue(value);
@@ -298,7 +322,7 @@ function classifyRecord(row, { packSeed = false, fieldMeta = null, fieldPath = '
     };
     seed = false;
   }
-  const confirmed = isConfirmed(working);
+  const confirmed = isConfirmed(working, { hashMode: false });
   let source = readSource(working);
   if (!source && seed) source = 'seed';
   if (!source && confirmed) source = 'owner';
@@ -533,7 +557,9 @@ function buildCompileSections({
   businessPolicies = null,
   fieldMeta = null,
   holdGate = null,
+  hashMode = undefined,
 } = {}) {
+  fieldMeta = withHashMode(fieldMeta, hashMode);
   const faqRows = asArray(faqs)
     .map((faq, index) => classifyFaq(faq, fieldMeta, faqFieldPath(index)))
     .filter((row) => row.question && row.answer);
@@ -694,6 +720,9 @@ async function loadProvenanceEnvelope(tenantId) {
 const factHash = require('./factHash');
 
 module.exports = {
+  resolveHashMode,
+  withHashMode,
+  isConfirmed,
   hashFactValue: factHash.hashFactValue,
   canonicalFactJson: factHash.canonicalFactJson,
   factValueForPath: factHash.factValueForPath,

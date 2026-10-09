@@ -22,6 +22,9 @@ const {
   factFaqs,
   unknownFaqTopics,
   formatUnknownSection,
+  withHashMode,
+  resolveHashMode,
+  faqFieldPath,
 } = require('../provenance');
 const { factValueForPath, tenantRowFromProfile, catalogRowFactValue } = require('../factHash');
 const { isMessageOnlyMode } = require('../messageOnly');
@@ -39,6 +42,7 @@ const {
   FACTS,
   CATALOG_LEAVES,
   GIGO_DOMAINS,
+  defaultStaleAfterDays,
   factDefinition,
   policiesOf,
 } = require('./factSchema');
@@ -46,17 +50,41 @@ const {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * P2 freshness. Only an explicit stale_after_days on the meta row makes a
- * fact stale; Brain does not invent a shelf life.
+ * Profile with an explicit confirm-v2 hash mode pinned on its fieldMeta.
+ * Without an explicit { hashMode }, provenance.js reads FACT_HASH_MODE.
  */
-function freshness(meta, now = new Date()) {
+function scoped(profileIn, hashMode) {
+  const profile = profileIn && typeof profileIn === 'object' ? profileIn : {};
+  if (typeof hashMode !== 'boolean') return profile;
+  return { ...profile, fieldMeta: withHashMode(profile.fieldMeta || null, hashMode) };
+}
+
+/**
+ * P2 freshness. The meta row's stale_after_days wins. defaultDays (the
+ * approved DEFAULT_STALE_AFTER_DAYS) is passed only in FACT_HASH_MODE, so with
+ * the flag off only an explicit stale_after_days makes a fact stale.
+ */
+function freshness(meta, now = new Date(), { defaultDays = null } = {}) {
   if (!meta) return { stale: false, verifiedAt: null };
   const verifiedAt = meta.last_verified_at || meta.confirmed_at || null;
-  const days = Number(meta.stale_after_days);
+  const own = Number(meta.stale_after_days);
+  const days = Number.isFinite(own) && own > 0 ? own : Number(defaultDays);
   if (!verifiedAt || !Number.isFinite(days) || days <= 0) return { stale: false, verifiedAt };
   const at = new Date(verifiedAt);
   if (Number.isNaN(at.getTime())) return { stale: false, verifiedAt };
   return { stale: now.getTime() - at.getTime() > days * DAY_MS, verifiedAt };
+}
+
+/** Hash mode for a scoped profile: pinned fieldMeta.hashMode, else FACT_HASH_MODE. */
+function hashModeOf(profile) {
+  return resolveHashMode(undefined, profile.fieldMeta || null);
+}
+
+/** Freshness with the approved default shelf life, applied only in hash mode. */
+function freshnessFor(profile, fieldPath, shelfLife, now) {
+  const meta = lookupFieldMeta(profile.fieldMeta || null, fieldPath);
+  if (!hashModeOf(profile)) return freshness(meta, now);
+  return freshness(meta, now, { defaultDays: defaultStaleAfterDays(shelfLife) });
 }
 
 function unknownReading(base, reason, source = '') {
@@ -83,8 +111,8 @@ function provenanceFor(def, raw, profile) {
  * @param {string} key      e.g. 'hours.weekly', 'payments.methods'
  * @param {{ now?: Date }} [opts]
  */
-function readFact(profileIn = {}, key, { now = new Date() } = {}) {
-  const profile = profileIn && typeof profileIn === 'object' ? profileIn : {};
+function readFact(profileIn = {}, key, { now = new Date(), hashMode } = {}) {
+  const profile = scoped(profileIn, hashMode);
   const def = factDefinition(key);
   if (!def) {
     return {
@@ -113,12 +141,13 @@ function readFact(profileIn = {}, key, { now = new Date() } = {}) {
   const checked = def.validate(raw, { now, profile });
   if (!checked.ok) return unknownReading(base, checked.reason);
 
-  const fieldMeta = profile.fieldMeta || null;
   const prov = provenanceFor(def, raw, profile);
   if (!prov.fact) return unknownReading(base, 'unconfirmed', prov.source);
 
-  const { stale, verifiedAt } = freshness(lookupFieldMeta(fieldMeta, def.fieldPath), now);
-  if (stale && def.volatile) return unknownReading(base, 'stale', prov.source);
+  const { stale, verifiedAt } = freshnessFor(profile, def.fieldPath, def.shelfLife, now);
+  // Hash mode only: a stale fact is flagged for the owner to re-confirm.
+  const flag = hashModeOf(profile) ? { reconfirm: stale } : {};
+  if (stale && def.volatile) return { ...unknownReading(base, 'stale', prov.source), ...flag };
   return {
     ...base,
     status: 'known',
@@ -127,6 +156,7 @@ function readFact(profileIn = {}, key, { now = new Date() } = {}) {
     source: prov.source,
     stale,
     verifiedAt,
+    ...flag,
   };
 }
 
@@ -157,6 +187,7 @@ function leafReading(name, checked, rowStale) {
 
 function catalogRows(profile, kind, now) {
   const fieldMeta = profile.fieldMeta || null;
+  const hashOn = hashModeOf(profile);
   const raw = asArray(kind === 'product' ? profile.productCatalog : profile.servicesCatalog);
   const items = [];
   let unconfirmed = 0;
@@ -179,7 +210,14 @@ function catalogRows(profile, kind, now) {
       unconfirmed += 1;
       return;
     }
-    const { stale } = freshness(lookupFieldMeta(fieldMeta, fieldPath), now);
+    // Row meta rides on the name path. Flag off: one row-level stale for every
+    // leaf (explicit stale_after_days only). Hash mode: an explicit row value
+    // still covers every leaf; otherwise each leaf uses its own default.
+    const rowMeta = lookupFieldMeta(fieldMeta, fieldPath);
+    const rowFresh = freshness(rowMeta, now);
+    const leafStale = (leaf) => (hashOn ? freshnessFor(profile, fieldPath, leaf, now).stale : rowFresh.stale);
+    const staleBy = { price: leafStale('price'), in_stock: leafStale('in_stock'), lead_time: leafStale('lead_time') };
+    const stale = hashOn ? Object.values(staleBy).some(Boolean) : rowFresh.stale;
     const priceRaw = kind === 'product' ? row.price ?? row.price_range : row.price_range ?? row.priceRange ?? row.price;
     const modeRaw = row.price_mode ?? row.pricing_mode ?? row.priceMode ?? row.pricingMode;
     const aliases = (Array.isArray(row.aliases) ? row.aliases : [])
@@ -194,10 +232,11 @@ function catalogRows(profile, kind, now) {
       fieldPath,
       source: prov.source,
       stale,
-      price: leafReading('price', validatePrice(priceRaw, modeRaw), stale),
-      in_stock: leafReading('in_stock', validateStock(row.in_stock ?? row.inStock), stale),
-      lead_time: leafReading('lead_time', validateEta(row.lead_time ?? row.leadTime ?? row.eta), stale),
+      price: leafReading('price', validatePrice(priceRaw, modeRaw), staleBy.price),
+      in_stock: leafReading('in_stock', validateStock(row.in_stock ?? row.inStock), staleBy.in_stock),
+      lead_time: leafReading('lead_time', validateEta(row.lead_time ?? row.leadTime ?? row.eta), staleBy.lead_time),
       out_of_scope: outOfScope.ok ? outOfScope.value : null,
+      ...(hashOn ? { reconfirm: stale } : {}),
     });
   });
   return { items, unconfirmed, garbage };
@@ -207,8 +246,8 @@ function catalogRows(profile, kind, now) {
  * Owner-confirmed catalogue. Unconfirmed and garbage rows are counted, never
  * returned as items.
  */
-function readCatalog(profileIn = {}, { now = new Date() } = {}) {
-  const profile = profileIn && typeof profileIn === 'object' ? profileIn : {};
+function readCatalog(profileIn = {}, { now = new Date(), hashMode } = {}) {
+  const profile = scoped(profileIn, hashMode);
   const services = catalogRows(profile, 'service', now);
   const products = catalogRows(profile, 'product', now);
   const items = [...services.items, ...products.items];
@@ -274,19 +313,28 @@ function lookupCatalogItem(profile = {}, query, opts = {}) {
 }
 
 /** Owner-confirmed FAQs and the unconfirmed FAQ topics. */
-function readFaqs(profileIn = {}) {
-  const profile = profileIn && typeof profileIn === 'object' ? profileIn : {};
+function readFaqs(profileIn = {}, { hashMode, now = new Date() } = {}) {
+  const profile = scoped(profileIn, hashMode);
   const fieldMeta = profile.fieldMeta || null;
   const known = factFaqs(profile.faqs, fieldMeta)
     .filter((row) => validateText(row.question).ok && validateText(row.answer).ok)
     .map((row) => ({ question: row.question, answer: row.answer }));
-  return {
+  const out = {
     domain: 'faqs',
     status: known.length ? 'known' : 'unknown',
     reason: known.length ? null : 'missing',
     faqs: known,
     unknownTopics: unknownFaqTopics(profile.faqs, fieldMeta),
   };
+  if (!hashModeOf(profile)) return out;
+  // Hash mode: FAQs are not volatile, so a stale one is still spoken and its
+  // { question, fieldPath } is listed for the owner to re-confirm.
+  const knownQs = new Set(known.map((f) => f.question));
+  out.reconfirm = asArray(profile.faqs)
+    .map((faq, index) => ({ faq, path: faqFieldPath(index) }))
+    .filter(({ faq, path }) => knownQs.has(faq?.question) && freshnessFor(profile, path, 'faqs', now).stale)
+    .map(({ faq, path }) => ({ question: faq.question, fieldPath: path }));
+  return out;
 }
 
 /**
@@ -309,9 +357,31 @@ function readAllFacts(profile = {}, opts = {}) {
   const out = {};
   for (const domain of GIGO_DOMAINS) {
     if (domain === 'catalog') out.catalog = readCatalog(profile, opts);
-    else if (domain === 'faqs') out.faqs = readFaqs(profile);
+    else if (domain === 'faqs') out.faqs = readFaqs(profile, opts);
     else out[domain] = readDomain(profile, domain, opts);
   }
+  return out;
+}
+
+/**
+ * Hash mode only: the stale facts the owner should re-confirm (P2 re-verify
+ * queue), as { fieldPath, topic, volatile }. [] when the flag is off.
+ */
+function factsToReconfirm(profileIn = {}, opts = {}) {
+  const profile = scoped(profileIn, opts.hashMode);
+  if (!hashModeOf(profile)) return [];
+  const all = readAllFacts(profile, { ...opts, hashMode: undefined });
+  const out = [];
+  for (const domain of GIGO_DOMAINS) {
+    if (domain === 'catalog' || domain === 'faqs') continue;
+    for (const r of all[domain]) {
+      if (r.reconfirm) out.push({ fieldPath: r.fieldPath, topic: r.topic, volatile: Boolean(factDefinition(r.key)?.volatile) });
+    }
+  }
+  for (const item of [...all.catalog.services, ...all.catalog.products]) {
+    if (item.reconfirm) out.push({ fieldPath: item.fieldPath, topic: item.name, volatile: true });
+  }
+  for (const f of all.faqs.reconfirm || []) out.push({ fieldPath: f.fieldPath, topic: `FAQ: ${f.question}`, volatile: false });
   return out;
 }
 
@@ -399,6 +469,7 @@ module.exports = {
   lookupCatalogItem,
   checkCoverage,
   readAllFacts,
+  factsToReconfirm,
   unknownFactLine,
   formatGigoFactsForPrompt,
 };

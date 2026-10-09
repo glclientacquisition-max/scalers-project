@@ -65,6 +65,7 @@ function speakOpts(profile, opts = {}) {
 function runFactTool(name, args = {}, profileIn = {}, opts = {}) {
   const profile = profileIn && typeof profileIn === 'object' ? profileIn : {};
   const now = opts.now || new Date();
+  const hashMode = opts.hashMode;
   try {
     if (name === 'read_business_fact') {
       const key = String(args?.key || '');
@@ -77,7 +78,7 @@ function runFactTool(name, args = {}, profileIn = {}, opts = {}) {
           say: unknownFactLine(speakOpts(profile, opts)),
         };
       }
-      const r = readFact(profile, key, { now });
+      const r = readFact(profile, key, { now, hashMode });
       if (r.status === 'known') return { ok: true, tool: name, status: 'known', value: r.value, reason: null };
       return {
         ok: true,
@@ -88,7 +89,7 @@ function runFactTool(name, args = {}, profileIn = {}, opts = {}) {
       };
     }
     if (name === 'lookup_catalog_item') {
-      const hit = lookupCatalogItem(profile, String(args?.query || ''), { now });
+      const hit = lookupCatalogItem(profile, String(args?.query || ''), { now, hashMode });
       if (hit.status !== 'found') {
         return {
           ok: true,
@@ -128,7 +129,7 @@ function runFactTool(name, args = {}, profileIn = {}, opts = {}) {
       };
     }
     if (name === 'check_coverage') {
-      const res = checkCoverage(profile, String(args?.place || ''), { now });
+      const res = checkCoverage(profile, String(args?.place || ''), { now, hashMode });
       return {
         ok: true,
         tool: name,

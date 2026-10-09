@@ -24,7 +24,10 @@ const {
   formatGigoFactsForPrompt,
   runFactTool,
   GIGO_FACT_TOOLS,
+  DEFAULT_STALE_AFTER_DAYS,
+  factsToReconfirm,
 } = require('../src/conversation/gigo');
+const { hashFactValue, factValueForPath, tenantRowFromProfile } = require('../src/conversation/factHash');
 const { indexFieldMeta } = require('../src/conversation/provenance');
 
 const NOW = new Date('2026-10-09T07:00:00Z');
@@ -265,6 +268,104 @@ describe('gigo P2 freshness', () => {
     const pay = readFact(p, 'payments.methods', { now: NOW });
     assert.equal(pay.status, 'known');
     assert.equal(pay.stale, true);
+  });
+});
+
+describe('gigo P2 default shelf life (FACT_HASH_MODE)', () => {
+  const daysAgo = (n) => new Date(NOW.getTime() - n * 86400000).toISOString();
+  function hashedProfile(metaSpec, extra = {}) {
+    const p = profile({ faqs: [{ question: 'Do you work Sundays?', answer: 'No, Monday to Saturday.' }], ...extra });
+    const row = tenantRowFromProfile(p);
+    const rows = metaSpec.map(([path, at, more = {}]) => ({
+      field_path: path,
+      source: 'owner',
+      confirmed_at: at,
+      value_hash: hashFactValue(factValueForPath(path, row)),
+      ...more,
+    }));
+    return { p, rows };
+  }
+  const spec = [
+    ['catalog.product.P1.name', daysAgo(10)],
+    ['policies.payment', daysAgo(200)],
+    ['hours.weekly_grid', daysAgo(100)],
+    ['locations.branches', daysAgo(100)],
+    ['identity.business_name', daysAgo(2000)],
+    ['faqs.1', daysAgo(181)],
+  ];
+
+  it('locks the approved table', () => {
+    assert.deepEqual({ ...DEFAULT_STALE_AFTER_DAYS }, {
+      in_stock: 3, price: 30, lead_time: 14, bulletin: null, hours: 90, coverage_areas: 180,
+      payments: 180, deposits: 90, policies: 180, faqs: 180, locations: 365,
+      identity: null, assistant: null, team_notify: null,
+    });
+    assert.ok(Object.isFrozen(DEFAULT_STALE_AFTER_DAYS));
+    for (const def of FACTS) assert.ok(def.shelfLife in DEFAULT_STALE_AFTER_DAYS, def.key);
+  });
+
+  it('flag on: defaults apply when the row has no stale_after_days', () => {
+    const { p, rows } = hashedProfile(spec);
+    const hp = { ...p, fieldMeta: indexFieldMeta(rows, { hashMode: true }) };
+    const ream = readCatalog(hp, { now: NOW }).products.find((r) => r.name === 'Ream of paper');
+    assert.equal(ream.price.status, 'known', 'price 30d: 10 days old is fresh');
+    assert.equal(ream.in_stock.reason, 'stale', 'stock 3d: 10 days old is unknown');
+    assert.equal(ream.reconfirm, true);
+    const pay = readFact(hp, 'payments.methods', { now: NOW });
+    assert.deepEqual([pay.status, pay.stale, pay.reconfirm], ['known', true, true], 'non-volatile stays spoken');
+    const hours = readFact(hp, 'hours.weekly', { now: NOW });
+    assert.deepEqual([hours.status, hours.stale, hours.reconfirm], ['known', true, true]);
+    const loc = readFact(hp, 'locations.branches', { now: NOW });
+    assert.deepEqual([loc.status, loc.stale, loc.reconfirm], ['known', false, false], '365d');
+    const name = readFact(hp, 'identity.business_name', { now: NOW });
+    assert.deepEqual([name.status, name.stale], ['known', false], 'identity never stale by age');
+    const faqs = readFaqs(hp, { now: NOW });
+    assert.equal(faqs.faqs.length, 1, 'stale FAQ still spoken');
+    assert.deepEqual(faqs.reconfirm, [{ question: 'Do you work Sundays?', fieldPath: 'faqs.1' }]);
+    assert.deepEqual(
+      factsToReconfirm(hp, { now: NOW }).map((r) => r.fieldPath).sort(),
+      ['catalog.product.P1.name', 'faqs.1', 'hours.weekly_grid', 'policies.payment']
+    );
+    // explicit hashMode on an unpinned index gives the same answer
+    const viaOpt = readFact({ ...p, fieldMeta: indexFieldMeta(rows) }, 'payments.methods', { now: NOW, hashMode: true });
+    assert.equal(viaOpt.reconfirm, true);
+  });
+
+  it('flag on: an explicit stale_after_days on the row beats the default', () => {
+    const { p, rows } = hashedProfile([
+      ['catalog.product.P1.name', daysAgo(10), { stale_after_days: 60 }],
+      ['policies.payment', daysAgo(200), { stale_after_days: 365 }],
+      ['hours.weekly_grid', daysAgo(5), { stale_after_days: 1 }],
+    ]);
+    const hp = { ...p, fieldMeta: indexFieldMeta(rows, { hashMode: true }) };
+    const ream = readCatalog(hp, { now: NOW }).products.find((r) => r.name === 'Ream of paper');
+    assert.equal(ream.in_stock.status, 'known');
+    assert.equal(ream.reconfirm, false);
+    assert.equal(readFact(hp, 'payments.methods', { now: NOW }).stale, false);
+    assert.equal(readFact(hp, 'hours.weekly', { now: NOW }).reconfirm, true);
+  });
+
+  it('flag off: no defaults, no reconfirm keys, nothing queued', () => {
+    const { p, rows } = hashedProfile(spec);
+    const off = { ...p, fieldMeta: indexFieldMeta(rows, { hashMode: false }) };
+    const ream = readCatalog(off, { now: NOW }).products.find((r) => r.name === 'Ream of paper');
+    assert.equal(ream.in_stock.status, 'known');
+    assert.equal('reconfirm' in ream, false);
+    const pay = readFact(off, 'payments.methods', { now: NOW });
+    assert.equal(pay.stale, false);
+    assert.equal('reconfirm' in pay, false);
+    assert.equal('reconfirm' in readFaqs(off, { now: NOW }), false);
+    assert.deepEqual(factsToReconfirm(off, { now: NOW }), []);
+    // same output as a P0 index with no flag pinned and FACT_HASH_MODE unset
+    const prev = process.env.FACT_HASH_MODE;
+    delete process.env.FACT_HASH_MODE;
+    try {
+      const p0 = { ...p, fieldMeta: indexFieldMeta(rows) };
+      assert.deepEqual(readAllFacts(p0, { now: NOW }), readAllFacts(off, { now: NOW }));
+    } finally {
+      if (prev === undefined) delete process.env.FACT_HASH_MODE;
+      else process.env.FACT_HASH_MODE = prev;
+    }
   });
 });
 

@@ -28,7 +28,7 @@ Field paths follow `docs/platform/TENANT_FIELD_PROVENANCE.md` and `dashboard/src
 | `src/conversation/gigo/factTools.js` | Read-only tool declarations and runner |
 | `src/conversation/gigo/index.js` | Barrel |
 | `tests/gigoFacts.test.js` | Unit tests (in `npm run test:brain`) |
-| `src/conversation/provenance.js` | `indexFieldMeta` keeps `last_verified_at` / `stale_after_days` / `value_hash`; value_hash-gated `classifyRecord`; exports `lookupFieldMeta`, `productFieldPath`, `serviceFieldPath`, `faqFieldPath`, `policyMeta`, and the hash helpers |
+| `src/conversation/provenance.js` | `indexFieldMeta` keeps `last_verified_at` / `stale_after_days` / `value_hash`; `FACT_HASH_MODE`-gated `classifyRecord`; exports `lookupFieldMeta`, `productFieldPath`, `serviceFieldPath`, `faqFieldPath`, `policyMeta`, and the hash helpers |
 | `src/conversation/factHash.js`, `dashboard/src/lib/factHash.ts` | Confirm v2 normalise-and-hash helper (JS + pure-sync TS twin) and `factValueForPath` |
 | `tests/fixtures/factHashVectors.json`, `tests/factHash.test.js` | Shared vectors both twins must pass |
 | `src/lib/tenantFieldMetaSelect.js` | Column-tolerant `tenant_field_meta` select used by `src/db.js` |
@@ -109,7 +109,7 @@ There's no callback promise (a callback is spoken only after a callback row is s
 | Part | What | Depends on |
 | --- | --- | --- |
 | Unmet demand | When a reader returns `unknown` or `lookupCatalogItem` returns `not_listed` / `unknown` on a call, log `{ tenant_id, call_id, fact_key or query, reason }` (PII-free). It feeds the gap queue. | `readFact`, `lookupCatalogItem`, `checkCoverage` results; a Platform table (proposal) |
-| Staleness re-verify | `freshness()` marks a fact stale when `last_verified_at` (or `confirmed_at`) is older than the row's `stale_after_days`. A stale **volatile** leaf (price, stock, lead time) is spoken as unknown. A stale policy stays known and is queued for the owner to re-confirm. Brain sets no shelf life. Only the meta row does. | `freshness`, Platform select change (1) |
+| Staleness re-verify | `freshness()` marks a fact stale when `last_verified_at` (or `confirmed_at`) is older than the row's `stale_after_days`. A stale **volatile** leaf (price, stock, lead time) is spoken as unknown. A stale policy stays known and is flagged for re-confirm (`factsToReconfirm`). Flag off: only the meta row's `stale_after_days` counts. `FACT_HASH_MODE=on`: the locked `DEFAULT_STALE_AFTER_DAYS` fill in when the row has none (see Default shelf life). | `freshness`, `factsToReconfirm`, Platform select change (1) |
 | Digest | A weekly owner list: top unmet asks, stale facts, unconfirmed imports, in plain nouns ("3 callers asked for a price on Sofa cleaning"). | `readAllFacts` + unmet-demand log |
 
 ## Confirm v2: value_hash (Brain side)
@@ -136,17 +136,44 @@ JS: `src/conversation/factHash.js` (node crypto). TS: `dashboard/src/lib/factHas
 | `faqs.<n>` | `{ question, answer }` only |
 | `catalog.service.<id\|n>.name`, `catalog.product.<sku\|n>.name` | the whole row minus envelope keys (`source, status, confirmed*, envelope, field_meta, meta, provenance, value_hash`) and minus empty leaves (`""`, `null`, `[]`). A price, stock, or lead-time edit reopens the row. |
 
-**Readers.** When the loaded meta rows carry a `value_hash` key (the column exists), a path that has a meta row is fact only when `source = 'owner'` and `value_hash === hashFactValue(current value)`. A null or empty hash is not confirmed. An import with `confirmed_at` but no owner source is not confirmed. The table row beats in-data `source: 'owner'` / `confirmed` hints. The result carries `hashCheck: 'match' | 'mismatch' | 'missing'`. When the column is absent, the P0 rules apply unchanged, so this can ship before the SQL. A path with **no** meta row still uses the P0 fallback (see open question).
+**Readers: `FACT_HASH_MODE` flag.** Hash mode is on only when `FACT_HASH_MODE` is exactly `on` (default off; `true`, `ON`, `1` are off).
+
+- JS (`provenance.js`, `gigo/factReaders.js`, `gigo/factTools.js`): an explicit `{ hashMode }` option wins, then `fieldMeta.hashMode` (set by `indexFieldMeta(rows, { hashMode })` / `withHashMode`), then `process.env.FACT_HASH_MODE === 'on'`.
+- TS (`dashboard/src/lib/provenance.ts`): `isConfirmed(row, { hashMode })`, `classifyRecord(..., hashMode)`, `buildCompileSections({ hashMode })`, `indexFieldMeta(rows, { hashMode })`. It never reads env, so client code must pass it (no `NEXT_PUBLIC`). The server helper `loadCompileProvenance` in `tenantFieldProvenance.ts` defaults it from `factHashModeFromEnv()`.
+- **Flag off:** the P0 rules exactly, even when rows carry `value_hash` (the old auto-detect on the column is removed).
+- **Flag on:** a path is fact only when a meta row exists with `source = 'owner'` **and** `value_hash === hashFactValue(current value)`. **No meta row means unconfirmed** (this replaces the P0 fallback where unmarked text counts as owner). A missing column, or no table, behaves as no hash, so the path is unconfirmed. A null or empty hash is not confirmed. An import with `confirmed_at` but no owner source is not confirmed. The table row beats in-data `source: 'owner'` / `confirmed` hints. The result carries `hashCheck: 'match' | 'mismatch' | 'missing' | 'no_row'`.
+- Do not turn the flag on until the backfill below has run for that environment, or every owner fact reads as unconfirmed. The `tenant_hold_gate` RPC still checks owner meta, not hashes.
+
+**Backfill (`scripts/backfillFactHashes.js`, one-time, not run by this branch).** For each `tenant_field_meta` row with `source = 'owner'` and no `value_hash`, it writes `hashFactValue(factValueForPath(field_path, tenantsRow))` as lowercase hex, using the stored tenants row.
+
+```
+node scripts/backfillFactHashes.js --tenant <uuid> [--tenant <uuid> ...]      # dry run
+node scripts/backfillFactHashes.js --all-except <uuid,uuid> --apply           # write
+  --sample N            rows to print in the sample (default 5; paths + hashes only, never values)
+  --i-have-alvin-ok     required for any target that is not staging or local
+```
+
+- A scope is required: `--tenant` (repeatable) or `--all-except`.
+- Guard: host `sgcdncjxauhsbunobmob.supabase.co` (staging) and local hosts (`localhost`, `127.0.0.1`, `::1`, `*.localhost`, `host.docker.internal`) run. Anything else, including prod ALCR `fjxcdccgyhnvnnlnovcl` (`docs/operations/ENVIRONMENTS.md`), is refused (dry run too) unless `--i-have-alvin-ok` is passed. The guard runs before a client is created.
+- It skips empty values (null, blank text, `[]`, `{}`, a catalogue row with no name, a FAQ missing a question or answer), so it never confirms an empty value. It reports unresolved rows (`unknown_path`, `row_not_found`, `tenant_not_found`). It never overwrites an existing `value_hash` (counted as `kept_existing`), so it is idempotent and won't re-confirm an edited value. Updates are guarded with `.is('value_hash', null)`.
+- Exit codes: 0 ok, 1 write errors, 2 bad args or guard refusal, 3 `value_hash` column missing, 4 read error.
 
 **Service ids.** `catalog.service.<id>.name` when the row has a non-numeric id matching `[A-Za-z0-9_-]{1,64}` (uuid or `svc_…`). Otherwise the 1-based position. Pure-digit ids fall back to the position so they can't collide with index paths. Products keep `sku`, then position.
 
 **listTenantFieldMeta.** `src/db.js` (and the Desk server twin in `tenantFieldProvenance.ts`) select `field_path, source, confirmed_by, confirmed_at, last_verified_at, stale_after_days, value_hash`. On a missing-column error (42703 / PGRST204 / "does not exist" / "schema cache" naming one of those columns) they step down to the same list without `value_hash`, then to the P0 four. A missing table still returns null as before.
 
-## Default shelf-life proposal (Alvin decides; not in code)
+## Default shelf life (LOCKED: approved by Alvin 2026-10-09)
 
-A confirmed fact turns stale `stale_after_days` after `last_verified_at` (or `confirmed_at`). A stale **volatile** fact is spoken as unknown. A stale non-volatile fact is still spoken and is queued for the owner to re-confirm. Nothing below is applied until Alvin picks the numbers and Desk/Platform writes them into `stale_after_days`.
+A confirmed fact turns stale `stale_after_days` after `last_verified_at` (or `confirmed_at`). A stale **volatile** fact (stock, price, lead time) reads as unknown. A stale non-volatile fact is still spoken and is flagged for the owner to re-confirm (`reconfirm: true` on the reading, `readFaqs().reconfirm`, and `factsToReconfirm(profile)` for the queue).
 
-| Field | Proposed days | Volatile | Reason |
+In code: `DEFAULT_STALE_AFTER_DAYS` in `src/conversation/gigo/factSchema.js`; each scalar fact carries a `shelfLife` key into it. Rules:
+
+- Gated by `FACT_HASH_MODE`. With the flag off nothing changes: only an explicit `stale_after_days` on the meta row makes a fact stale, and readings carry no `reconfirm` key.
+- With the flag on, the meta row's own `stale_after_days` wins. The default is used only when the row has none.
+- Catalogue rows: the meta row lives on the name path. An explicit row `stale_after_days` covers every leaf. Otherwise each leaf uses its own default (price 30, stock 3, lead time 14), and the row is flagged when any leaf is stale.
+- No `last_verified_at` / `confirmed_at` means not stale (the hash check still decides whether it is a fact).
+
+| Field | Days | Volatile | Reason |
 | --- | --- | --- | --- |
 | Stock (`in_stock`) | 3 | yes | Shelves change daily. A week-old "yes" is how a caller makes a wasted trip. |
 | Price (catalogue price / range) | 30 | yes | Kenyan SME prices move with input costs and fuel. Monthly is the most an owner will tolerate re-confirming. |

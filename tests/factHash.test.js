@@ -17,6 +17,8 @@ const {
 } = require('../src/conversation/factHash');
 const {
   indexFieldMeta,
+  isConfirmed,
+  buildCompileSections,
   classifyRecord,
   factServices,
   factProducts,
@@ -38,11 +40,11 @@ const [major, minor] = process.versions.node.split('.').map(Number);
 const CAN_STRIP_TYPES = major > 22 || (major === 22 && minor >= 6);
 
 /** Run an ESM script that imports dashboard TS. Returns parsed stdout JSON. */
-function runTs(script) {
+function runTs(script, env = {}) {
   const child = spawnSync(
     process.execPath,
     ['--experimental-strip-types', '--no-warnings', '--import', './tests/registerTs.mjs', '--input-type=module', '-e', script],
-    { cwd: ROOT, encoding: 'utf8' }
+    { cwd: ROOT, encoding: 'utf8', env: { ...process.env, FACT_HASH_MODE: '', ...env } }
   );
   assert.equal(child.status, 0, child.stderr);
   return JSON.parse(child.stdout);
@@ -180,14 +182,15 @@ describe('stable service ids', () => {
       source: 'owner',
       value_hash: hashFactValue(catalogRowFactValue(carpet)),
     };
-    const meta = indexFieldMeta([carpetMeta]);
     const reordered = [{ name: 'New row', price_range: '100' }, carpet];
-    const withSeed = indexFieldMeta([carpetMeta, { field_path: 'catalog.service.1.name', source: 'seed', value_hash: null }]);
-    assert.deepEqual(factServices(reordered, withSeed).map((r) => r.name), ['Carpet cleaning']);
-    // Without a meta row at all, a path keeps the P0 fallback (open question for Alvin).
-    assert.deepEqual(factServices(reordered, meta).map((r) => r.name), ['New row', 'Carpet cleaning']);
+    // Hash mode: the new row has no meta row, so it is not confirmed.
+    assert.deepEqual(factServices(reordered, hashIdx([carpetMeta])).map((r) => r.name), ['Carpet cleaning']);
+    // Flag off: P0 fallback, unmarked rows stay owner.
+    assert.deepEqual(factServices(reordered, indexFieldMeta([carpetMeta])).map((r) => r.name), ['New row', 'Carpet cleaning']);
   });
 });
+
+const hashIdx = (rows) => indexFieldMeta(rows, { hashMode: true });
 
 function owner(fieldPath, value, extra = {}) {
   return { field_path: fieldPath, source: 'owner', value_hash: hashFactValue(value), ...extra };
@@ -196,8 +199,8 @@ function owner(fieldPath, value, extra = {}) {
 describe('value_hash confirmation (JS)', () => {
   it('owner + matching hash is fact; edit, missing hash, or non-owner is not', () => {
     const v = 'M-Pesa till 123456';
-    const ok = indexFieldMeta([owner('policies.payment', v)]);
-    assert.equal(ok.hashEnforced, true);
+    const ok = hashIdx([owner('policies.payment', v)]);
+    assert.equal(ok.hashMode, true);
     assert.equal(classifyRecord({}, { fieldMeta: ok, fieldPath: 'policies.payment', value: v }).fact, true);
     assert.equal(
       classifyRecord({}, { fieldMeta: ok, fieldPath: 'policies.payment', value: '  M-Pesa   till 123456 ' }).fact,
@@ -207,11 +210,11 @@ describe('value_hash confirmation (JS)', () => {
     const edited = classifyRecord({}, { fieldMeta: ok, fieldPath: 'policies.payment', value: 'M-Pesa till 999999' });
     assert.equal(edited.fact, false);
     assert.equal(edited.hashCheck, 'mismatch');
-    const noHash = indexFieldMeta([{ field_path: 'policies.payment', source: 'owner', value_hash: null }]);
+    const noHash = hashIdx([{ field_path: 'policies.payment', source: 'owner', value_hash: null }]);
     const r = classifyRecord({}, { fieldMeta: noHash, fieldPath: 'policies.payment', value: v });
     assert.equal(r.fact, false);
     assert.equal(r.hashCheck, 'missing');
-    const imported = indexFieldMeta([
+    const imported = hashIdx([
       { ...owner('policies.payment', v), source: 'import', confirmed_at: '2026-10-01T00:00:00Z' },
     ]);
     assert.equal(classifyRecord({}, { fieldMeta: imported, fieldPath: 'policies.payment', value: v }).fact, false);
@@ -220,35 +223,41 @@ describe('value_hash confirmation (JS)', () => {
 
   it('the table row beats in-data owner hints', () => {
     const faq = { question: 'Parking?', answer: 'Behind the shop.', source: 'owner', confirmed: true, status: 'golden' };
-    const seeded = indexFieldMeta([{ field_path: 'faqs.1', source: 'seed', value_hash: null }]);
+    const seeded = hashIdx([{ field_path: 'faqs.1', source: 'seed', value_hash: null }]);
     assert.equal(factFaqs([faq], seeded).length, 0);
-    const confirmed = indexFieldMeta([owner('faqs.1', { question: faq.question, answer: faq.answer })]);
+    const confirmed = hashIdx([owner('faqs.1', { question: faq.question, answer: faq.answer })]);
     const rows = factFaqs([faq], confirmed);
     assert.equal(rows.length, 1);
     assert.equal(rows[0].status, 'golden');
-    const unhashedOwner = indexFieldMeta([{ field_path: 'faqs.1', source: 'owner', value_hash: '' }]);
+    const unhashedOwner = hashIdx([{ field_path: 'faqs.1', source: 'owner', value_hash: '' }]);
     assert.equal(factFaqs([faq], unhashedOwner).length, 0);
   });
 
   it('policies, products, and services follow the hash', () => {
     const policies = { payment: 'M-Pesa till 123456', returns: 'Seven days with receipt.' };
-    const meta = indexFieldMeta([owner('policies.payment', policies.payment), owner('policies.returns', 'Fourteen days.')]);
+    const meta = hashIdx([owner('policies.payment', policies.payment), owner('policies.returns', 'Fourteen days.')]);
     const split = factPolicyMap(policies, meta);
     assert.equal(split.policies.payment, 'M-Pesa till 123456');
     assert.equal(split.policies.returns, undefined);
     assert.ok(split.unknown.includes('Returns'));
     const ream = { name: 'Ream', sku: 'P1', price: 650 };
-    const pmeta = indexFieldMeta([owner('catalog.product.P1.name', catalogRowFactValue({ ...ream, price: '650.00' }))]);
+    const pmeta = hashIdx([owner('catalog.product.P1.name', catalogRowFactValue({ ...ream, price: '650.00' }))]);
     assert.equal(factProducts([ream], pmeta).length, 1, '650 and "650.00" hash the same');
     assert.equal(factProducts([{ ...ream, price: 700 }], pmeta).length, 0, 'a price edit reopens the row');
   });
 
-  it('P0 rules stay when the rows carry no value_hash key (column absent)', () => {
-    const p0 = indexFieldMeta([{ field_path: 'policies.payment', source: 'owner' }]);
-    assert.equal(p0.hashEnforced, false);
-    assert.equal(classifyRecord({}, { fieldMeta: p0, fieldPath: 'policies.payment', value: 'x y' }).fact, true);
-    const forced = indexFieldMeta([{ field_path: 'policies.payment', source: 'owner' }], { hashEnforced: true });
-    assert.equal(classifyRecord({}, { fieldMeta: forced, fieldPath: 'policies.payment', value: 'x y' }).fact, false);
+  it('no meta row, or a row without value_hash (column absent), is unconfirmed in hash mode', () => {
+    const noCol = hashIdx([{ field_path: 'policies.payment', source: 'owner' }]);
+    const r = classifyRecord({}, { fieldMeta: noCol, fieldPath: 'policies.payment', value: 'x y' });
+    assert.equal(r.fact, false);
+    assert.equal(r.hashCheck, 'missing');
+    const none = classifyRecord({ source: 'owner', confirmed: true }, { fieldMeta: hashIdx([]), fieldPath: 'policies.payment', value: 'x y' });
+    assert.equal(none.fact, false);
+    assert.equal(none.hashCheck, 'no_row');
+    const noTable = classifyRecord({}, { fieldMeta: null, fieldPath: 'policies.payment', value: 'x y', hashMode: true });
+    assert.equal(noTable.fact, false);
+    assert.equal(indexFieldMeta(null, { hashMode: true }).hashMode, true);
+    assert.equal(indexFieldMeta(null), null);
   });
 
   it('gigo readers use the hash', () => {
@@ -256,7 +265,7 @@ describe('value_hash confirmation (JS)', () => {
       businessPolicies: { payment: 'M-Pesa till 123456' },
       hoursSchedule: { days: { mon: { open: '08:00', close: '17:00' } } },
       servicesCatalog: [{ id: 'svc_carpet', name: 'Carpet cleaning', price_range: 'KES 1,500' }],
-      fieldMeta: indexFieldMeta([
+      fieldMeta: hashIdx([
         owner('policies.payment', 'M-Pesa till 123456'),
         owner('hours.weekly_grid', { days: { mon: { open: '08:00', close: '18:00' } } }),
         owner('catalog.service.svc_carpet.name', { id: 'svc_carpet', name: 'Carpet cleaning', price_range: 'KES 1,500' }),
@@ -269,6 +278,74 @@ describe('value_hash confirmation (JS)', () => {
     const cat = readCatalog(profile);
     assert.equal(cat.services[0].fieldPath, 'catalog.service.svc_carpet.name');
     assert.equal(cat.services[0].price.value.text, 'KES 1,500');
+  });
+});
+
+describe('FACT_HASH_MODE flag (JS)', () => {
+  function withEnv(value, fn) {
+    const prev = process.env.FACT_HASH_MODE;
+    if (value === undefined) delete process.env.FACT_HASH_MODE;
+    else process.env.FACT_HASH_MODE = value;
+    try {
+      return fn();
+    } finally {
+      if (prev === undefined) delete process.env.FACT_HASH_MODE;
+      else process.env.FACT_HASH_MODE = prev;
+    }
+  }
+  const meta = () => indexFieldMeta([{ field_path: 'policies.payment', source: 'owner', value_hash: 'f'.repeat(64) }]);
+  const classify = (opts = {}) =>
+    classifyRecord({}, { fieldMeta: meta(), fieldPath: 'policies.payment', value: 'M-Pesa', ...opts });
+
+  it('is on only when exactly "on"', () => {
+    assert.equal(withEnv('on', () => classify()).fact, false, 'on: hash mismatch');
+    for (const v of [undefined, '', 'ON', 'On', ' on', '1', 'true', 'yes', 'off']) {
+      assert.equal(withEnv(v, () => classify()).fact, true, `env ${JSON.stringify(v)} is off`);
+      assert.equal(withEnv(v, () => classify()).hashCheck, undefined);
+    }
+  });
+
+  it('an explicit { hashMode } beats env, both ways', () => {
+    assert.equal(withEnv('on', () => classify({ hashMode: false })).fact, true);
+    assert.equal(withEnv(undefined, () => classify({ hashMode: true })).fact, false);
+    assert.equal(withEnv('on', () => isConfirmed({ confirmed: true }, { hashMode: false })), true);
+    assert.equal(withEnv('on', () => isConfirmed({ confirmed: true })), false);
+    assert.equal(withEnv(undefined, () => isConfirmed({ confirmed: true })), true);
+  });
+
+  it('flag off: rows with value_hash give exactly the P0 compile output', () => {
+    const fixture = {
+      faqs: [{ question: 'Parking?', answer: 'Behind the shop.' }, { question: 'Wifi?', answer: 'Yes.' }],
+      businessPolicies: { payment: 'M-Pesa till 1', returns: 'Seven days.' },
+      productCatalog: [{ name: 'Ream', sku: 'P1', price: '650' }],
+      servicesCatalog: [{ id: 'svc_a', name: 'Carpet', price_range: '1500' }],
+    };
+    const p0Rows = [
+      { field_path: 'faqs.2', source: 'seed' },
+      { field_path: 'policies.returns', source: 'import' },
+      { field_path: 'policies.payment', source: 'owner' },
+    ];
+    const hashedRows = p0Rows.map((r) => ({ ...r, value_hash: 'a'.repeat(64), last_verified_at: null, stale_after_days: null }));
+    withEnv(undefined, () => {
+      const a = buildCompileSections({ ...fixture, fieldMeta: indexFieldMeta(p0Rows) });
+      const b = buildCompileSections({ ...fixture, fieldMeta: indexFieldMeta(hashedRows) });
+      assert.deepEqual(b, a);
+      assert.deepEqual(factServices(fixture.servicesCatalog, indexFieldMeta(hashedRows)).length, 1);
+    });
+  });
+
+  it('buildCompileSections and gigo readers take { hashMode }', () => {
+    const rows = [owner('policies.payment', 'M-Pesa till 1')];
+    withEnv(undefined, () => {
+      const on = buildCompileSections({ businessPolicies: { payment: 'M-Pesa till 1', returns: 'Seven days.' }, fieldMeta: indexFieldMeta(rows), hashMode: true });
+      assert.match(on.policiesText, /M-Pesa till 1/);
+      assert.doesNotMatch(on.policiesText, /Seven days/, 'returns has no meta row');
+      const profile = { businessPolicies: { payment: 'M-Pesa till 1', returns: 'Seven days.' }, fieldMeta: indexFieldMeta(rows) };
+      assert.equal(readFact(profile, 'policies.returns').status, 'known', 'flag off: P0');
+      assert.equal(readFact(profile, 'policies.returns', { hashMode: true }).reason, 'unconfirmed');
+      assert.equal(readFact(profile, 'payments.methods', { hashMode: true }).status, 'known');
+      assert.equal(readFact({ businessPolicies: { payment: 'x y z' } }, 'payments.methods', { hashMode: true }).reason, 'unconfirmed');
+    });
   });
 });
 
@@ -290,14 +367,20 @@ describe('value_hash confirmation (TS twin)', () => {
     const out = runTs(`
       import { indexFieldMeta, classifyRecord, factServices } from './dashboard/src/lib/provenance.ts';
       const cases = ${JSON.stringify(cases)};
-      const res = cases.map((c) => classifyRecord({}, { fieldMeta: indexFieldMeta(c.rows), fieldPath: c.path, value: c.value }));
-      const svc = factServices(${JSON.stringify(services)}, indexFieldMeta(${JSON.stringify(svcRows)})).map((r) => r.name);
-      process.stdout.write(JSON.stringify({ res, svc }));
-    `);
-    const js = cases.map((c) => classifyRecord({}, { fieldMeta: indexFieldMeta(c.rows), fieldPath: c.path, value: c.value }));
-    assert.deepEqual(out.res, js);
-    assert.deepEqual(out.svc, factServices(services, indexFieldMeta(svcRows)).map((r) => r.name));
+      const run = (hashMode) => cases.map((c) => classifyRecord({}, { fieldMeta: indexFieldMeta(c.rows), fieldPath: c.path, value: c.value, hashMode }));
+      const svc = factServices(${JSON.stringify(services)}, indexFieldMeta(${JSON.stringify(svcRows)}, { hashMode: true })).map((r) => r.name);
+      // FACT_HASH_MODE=on is set on this child: the TS twin must ignore env.
+      const envIgnored = classifyRecord({}, { fieldMeta: indexFieldMeta(cases[3].rows), fieldPath: 'policies.payment', value: 'x' });
+      process.stdout.write(JSON.stringify({ on: run(true), off: run(false), svc, envIgnored }));
+    `, { FACT_HASH_MODE: 'on' });
+    for (const hashMode of [true, false]) {
+      const js = cases.map((c) => classifyRecord({}, { fieldMeta: indexFieldMeta(c.rows), fieldPath: c.path, value: c.value, hashMode }));
+      assert.deepEqual(out[hashMode ? 'on' : 'off'], js, `hashMode ${hashMode}`);
+    }
+    assert.deepEqual(out.svc, factServices(services, hashIdx(svcRows)).map((r) => r.name));
     assert.deepEqual(out.svc, ['Carpet cleaning']);
+    assert.equal(out.envIgnored.fact, true);
+    assert.equal(out.envIgnored.hashCheck, undefined);
   });
 });
 
@@ -325,7 +408,9 @@ describe('listTenantFieldMeta column step-down', () => {
     });
     assert.equal(seen.length, 2);
     assert.equal(res.columns, TENANT_FIELD_META_COLUMN_SETS[1]);
-    assert.equal(indexFieldMeta(res.rows).hashEnforced, false);
+    const row = { fieldPath: 'policies.payment', value: 'x' };
+    assert.equal(classifyRecord({}, { ...row, fieldMeta: hashIdx(res.rows) }).hashCheck, 'missing');
+    assert.equal(classifyRecord({}, { ...row, fieldMeta: indexFieldMeta(res.rows), hashMode: false }).fact, true);
   });
 
   it('falls back to the P0 columns, and passes other errors through', async () => {

@@ -116,12 +116,14 @@ function validateBulletin(raw, now) {
  * - topic:      caller-safe topic label for the UNKNOWN list
  * - speakable:  false for facts the caller must never hear (notify targets)
  * - volatile:   true when a stale value must be treated as unknown (P2)
+ * - shelfLife:  DEFAULT_STALE_AFTER_DAYS key used when the meta row has no stale_after_days
  * - read:       profile -> raw stored value
  * - validate:   raw -> { ok, value } | { ok: false, reason }
  */
 const FACTS = [
   {
     key: 'identity.business_name',
+    shelfLife: 'identity',
     domain: 'identity',
     fieldPath: 'identity.business_name',
     topic: 'Business name',
@@ -130,6 +132,7 @@ const FACTS = [
   },
   {
     key: 'identity.vertical',
+    shelfLife: 'identity',
     domain: 'identity',
     fieldPath: 'identity.vertical',
     topic: 'Business type',
@@ -143,6 +146,7 @@ const FACTS = [
   },
   {
     key: 'identity.primary_phone',
+    shelfLife: 'identity',
     domain: 'identity',
     fieldPath: 'identity.primary_phone',
     topic: 'Business line',
@@ -152,6 +156,7 @@ const FACTS = [
   },
   {
     key: 'hours.weekly',
+    shelfLife: 'hours',
     domain: 'hours',
     fieldPath: 'hours.weekly_grid',
     topic: 'Opening hours',
@@ -161,6 +166,7 @@ const FACTS = [
   },
   {
     key: 'locations.branches',
+    shelfLife: 'locations',
     domain: 'locations',
     fieldPath: 'locations.branches',
     topic: 'Location and directions',
@@ -169,6 +175,7 @@ const FACTS = [
   },
   {
     key: 'locations.coverage_areas',
+    shelfLife: 'coverage_areas',
     domain: 'locations',
     fieldPath: 'policies.coverage_areas',
     topic: 'Areas we serve',
@@ -178,6 +185,7 @@ const FACTS = [
   },
   {
     key: 'payments.methods',
+    shelfLife: 'payments',
     domain: 'payments',
     fieldPath: 'policies.payment',
     topic: 'Payment',
@@ -187,6 +195,7 @@ const FACTS = [
   },
   {
     key: 'payments.deposit',
+    shelfLife: 'deposits',
     domain: 'payments',
     fieldPath: 'policies.deposit',
     topic: 'Deposits',
@@ -196,6 +205,7 @@ const FACTS = [
   },
   ...['returns', 'delivery', 'cancellation', 'warranty', 'other'].map((name) => ({
     key: `policies.${name}`,
+    shelfLife: 'policies',
     domain: 'policies',
     fieldPath: `policies.${name}`,
     topic: name === 'other' ? 'Other policy' : name.charAt(0).toUpperCase() + name.slice(1),
@@ -205,6 +215,7 @@ const FACTS = [
   })),
   {
     key: 'team_notify.whatsapp',
+    shelfLife: 'team_notify',
     domain: 'team_notify',
     fieldPath: 'team.notify.whatsapp',
     topic: 'Owner alerts',
@@ -214,6 +225,7 @@ const FACTS = [
   },
   {
     key: 'team_notify.email',
+    shelfLife: 'team_notify',
     domain: 'team_notify',
     fieldPath: 'team.notify.email',
     topic: 'Owner alerts',
@@ -223,6 +235,7 @@ const FACTS = [
   },
   {
     key: 'assistant.agent_name',
+    shelfLife: 'assistant',
     domain: 'assistant',
     fieldPath: 'assistant.agent_name',
     topic: 'Assistant name',
@@ -231,6 +244,7 @@ const FACTS = [
   },
   {
     key: 'assistant.tone',
+    shelfLife: 'assistant',
     domain: 'assistant',
     fieldPath: 'assistant.tone',
     topic: 'Tone',
@@ -240,6 +254,7 @@ const FACTS = [
   },
   {
     key: 'bulletin.active',
+    shelfLife: 'bulletin',
     domain: 'bulletin',
     fieldPath: 'bulletin.items',
     topic: "Today's notice",
@@ -247,6 +262,38 @@ const FACTS = [
     validate: (raw, ctx) => validateBulletin(raw, ctx?.now || new Date()),
   },
 ].map((def) => Object.freeze({ phase: 'P1', speakable: true, volatile: false, ...def }));
+
+/**
+ * GIGO P2 default shelf life in days, approved by Alvin 2026-10-09
+ * (docs/specs/gigo-p1-p2-facts.md). Used only in FACT_HASH_MODE and only when
+ * the tenant_field_meta row has no stale_after_days of its own. null = never
+ * stale by age (bulletin items carry ends_at; identity, assistant and notify
+ * targets reopen through the value hash on edit). Volatile entries (stock,
+ * price, lead time) read as unknown once stale; the rest are still spoken and
+ * flagged for re-confirm.
+ */
+const DEFAULT_STALE_AFTER_DAYS = Object.freeze({
+  in_stock: 3,
+  price: 30,
+  lead_time: 14,
+  bulletin: null,
+  hours: 90,
+  coverage_areas: 180,
+  payments: 180,
+  deposits: 90,
+  policies: 180,
+  faqs: 180,
+  locations: 365,
+  identity: null,
+  assistant: null,
+  team_notify: null,
+});
+
+/** Default shelf life for a shelfLife key, or null (never stale by age). */
+function defaultStaleAfterDays(shelfLife) {
+  const days = DEFAULT_STALE_AFTER_DAYS[shelfLife];
+  return Number.isFinite(days) && days > 0 ? days : null;
+}
 
 /**
  * Per-row catalogue leaves. Row provenance rides on the row's name path
@@ -273,6 +320,8 @@ function factsForDomain(domain) {
 }
 
 module.exports = {
+  DEFAULT_STALE_AFTER_DAYS,
+  defaultStaleAfterDays,
   GIGO_DOMAINS,
   FACTS,
   CATALOG_LEAVES,

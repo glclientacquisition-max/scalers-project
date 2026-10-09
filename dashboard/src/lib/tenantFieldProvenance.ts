@@ -140,14 +140,20 @@ export async function upsertTenantFieldMeta(input: {
   });
 }
 
+/** FACT_HASH_MODE, on only when exactly 'on'. Server only (no NEXT_PUBLIC). */
+export function factHashModeFromEnv(): boolean {
+  return process.env.FACT_HASH_MODE === "on";
+}
+
 /** Index meta rows and the hold gate for compile. Null fields keep the pack heuristic. */
 export async function loadCompileProvenance(tenantId: string) {
-  if (!tenantId) return { fieldMeta: null, holdGate: null };
+  if (!tenantId) return { fieldMeta: indexFieldMeta(null, { hashMode: factHashModeFromEnv() }), holdGate: null };
   const [rows, gate] = await Promise.all([
     listTenantFieldMeta(tenantId),
     getTenantHoldGate(tenantId),
   ]);
-  const fieldMeta = indexFieldMeta(rows);
+  // Server-side default for confirm v2 hash mode. Client code passes hashMode in.
+  const fieldMeta = indexFieldMeta(rows, { hashMode: factHashModeFromEnv() });
   const reasons = Array.isArray(gate?.reasons) ? gate.reasons.map((reason) => String(reason)) : [];
   const holdGate =
     gate && typeof gate.allowed === "boolean" && !reasons.includes("provenance_rpc_missing")
