@@ -15,13 +15,13 @@ export type AdminLink = {
 
 /**
  * Desktop rail: all eight, in this order. Phone: the four `tab` items plus More.
- * Calls points at the calls section on Today until the Calls screen exists.
+ * Calls opens the call quality screens (#603) until the Calls list (A6) absorbs them.
  * Settings opens Voices, the one settings screen today.
  */
 export const ADMIN_LINKS: readonly AdminLink[] = [
   { href: "/admin", label: "Today", exact: true, phone: "tab" },
   { href: "/admin/businesses", label: "Businesses", exact: false, phone: "tab" },
-  { href: "/admin#calls", label: "Calls", exact: true, phone: "tab" },
+  { href: "/admin/quality", label: "Calls", exact: false, phone: "tab" },
   { href: "/admin/billing", label: "Billing", exact: false, phone: "tab" },
   { href: "/admin/numbers", label: "Numbers", exact: false, phone: "more" },
   { href: "/admin/platform", label: "Platform", exact: false, phone: "more" },
@@ -44,6 +44,16 @@ export const ADMIN_SECTIONS: readonly { href: string; label: string; parent: str
 export const ADMIN_PHONE_TABS = ADMIN_LINKS.filter((item) => item.phone === "tab");
 export const ADMIN_MORE_LINKS = ADMIN_LINKS.filter((item) => item.phone === "more");
 
+/** Phone bar: four destinations, then More. */
+export function adminPhoneTabs(): AdminLink[] {
+  return [...ADMIN_PHONE_TABS];
+}
+
+/** The More sheet rows. */
+export function adminPhoneMore(): AdminLink[] {
+  return [...ADMIN_MORE_LINKS];
+}
+
 export const adminShellClass =
   "admin-theme fixed inset-0 flex min-w-0 overflow-hidden bg-canvas text-ink pt-[env(safe-area-inset-top,0px)]";
 
@@ -57,6 +67,11 @@ function pathOnly(pathname: string) {
 
 function linkFor(href: string): AdminLink | undefined {
   return ADMIN_LINKS.find((item) => item.href === href);
+}
+
+/** Quality nested screens carry a breadcrumb, so the shell chevron stays off. Phone tabs still hide. */
+export function adminHidesShellBack(pathname: string): boolean {
+  return pathOnly(pathname).startsWith("/admin/quality/");
 }
 
 /** List root for a nested admin path. Null on a destination itself. Label is the parent list, never a generic back word. */

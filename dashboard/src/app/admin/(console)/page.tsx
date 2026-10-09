@@ -1,6 +1,8 @@
 import { AdminTodayPanel } from "@/components/AdminTodayPanel";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { getAdminOverview } from "@/lib/admin";
+import { noQualityBadges, qualityBadges } from "@/lib/adminQuality";
+import { droppingAttentionRows } from "@/lib/adminQualityModel";
 import { logAdminError } from "@/lib/adminErrors";
 import { businessesWithRecentCalls, loadTodayCallCounts } from "@/lib/adminToday";
 import {
@@ -26,8 +28,14 @@ export default async function AdminTodayPage() {
   let overview;
   let ops;
   let counts;
+  let badges;
   try {
-    [overview, ops, counts] = await Promise.all([getAdminOverview(), readPlatformOps(), loadTodayCallCounts(now)]);
+    [overview, ops, counts, badges] = await Promise.all([
+      getAdminOverview(),
+      readPlatformOps(),
+      loadTodayCallCounts(now),
+      qualityBadges().catch(noQualityBadges("today:quality")),
+    ]);
   } catch (err) {
     logAdminError("today", err);
     return <AdminSetupError />;
@@ -51,7 +59,13 @@ export default async function AdminTodayPage() {
     <AdminTodayPanel
       dayLabel={eatDayLabel(now)}
       status={statusSentence(ops.signals)}
-      queue={todayQueue({ noticeRows, businesses, callingBusinessIds: calling, now })}
+      queue={[
+        ...todayQueue({ noticeRows, businesses, callingBusinessIds: calling, now }),
+        ...droppingAttentionRows(
+          badges,
+          overview.businesses.map((b) => ({ id: b.id, name: b.business_name })),
+        ),
+      ]}
       needsNumber={overview.waitingForNumber > 0 || overview.availableDids === 0}
       numbers={todayNumberRows(counts, now)}
     />

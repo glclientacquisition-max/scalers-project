@@ -81,10 +81,11 @@ export function AdminTodayPanel({
           {numbers.map((row) => (
             <ListRow
               key={row.key}
+              href={row.href}
               title={row.title}
               preview={row.detail}
               when={row.available ? <span className="text-body text-ink">{row.value}</span> : undefined}
-              stamp={row.available ? undefined : <Stamp tone="neutral">Not yet</Stamp>}
+              stamp={row.available ? undefined : <Stamp tone="neutral">{row.href ? "Open" : "Not yet"}</Stamp>}
             />
           ))}
         </ul>

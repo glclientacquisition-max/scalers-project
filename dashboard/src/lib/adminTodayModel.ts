@@ -55,6 +55,7 @@ export type TodayNumberRow = {
   detail: string;
   /** False when the data does not exist yet. The row says why instead of showing a number. */
   available: boolean;
+  href?: string;
 };
 
 function compareLine(count: { today: number; lastWeek: number }, weekday: string): string {
@@ -62,7 +63,7 @@ function compareLine(count: { today: number; lastWeek: number }, weekday: string
 }
 
 /**
- * Today in numbers. `couldntAnswer` stays a gap until the call-quality reader is on main.
+ * Today in numbers. Couldn't answer has no platform-wide count yet; the row opens Calls, where each business lists its own.
  */
 export function todayNumberRows(counts: CallCounts, now: Date): TodayNumberRow[] {
   const weekday = WEEKDAYS[new Date(now.getTime() + EAT_OFFSET_MS).getUTCDay()];
@@ -78,8 +79,9 @@ export function todayNumberRows(counts: CallCounts, now: Date): TodayNumberRow[]
       key: "couldnt-answer",
       title: "Couldn't answer",
       value: "",
-      detail: "Arrives with call quality.",
+      detail: "Per business on Calls. Traced calls only.",
       available: false,
+      href: "/admin/quality",
     },
   ];
 }

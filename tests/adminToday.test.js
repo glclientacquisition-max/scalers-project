@@ -73,7 +73,8 @@ describe("Super Admin Today: numbers from calls only", () => {
     assert.equal(rows[1].value, "");
     assert.equal(rows[2].value, "2");
     assert.equal(rows[3].available, false);
-    assert.equal(rows[3].detail, "Arrives with call quality.");
+    assert.equal(rows[3].detail, "Per business on Calls. Traced calls only.");
+    assert.equal(rows[3].href, "/admin/quality");
   });
 
   it("reads resolution counts from calls and treats a missing column as a gap", () => {
@@ -156,6 +157,7 @@ describe("Super Admin nav: eight destinations, phone 4 + More", () => {
         assert.equal(fs.existsSync(path.join(consoleDir, item.href.replace("/admin/", ""), "page.tsx")), false, item.label);
         continue;
       }
+      // Calls → /admin/quality ships in #603; this branch carries it (merge #603 first).
       const [route, hash] = item.href.split("#");
       const rel = route === "/admin" ? "page.tsx" : path.join(route.replace("/admin/", ""), "page.tsx");
       assert.ok(fs.existsSync(path.join(consoleDir, rel)), `${item.label} → ${item.href}`);
@@ -165,7 +167,7 @@ describe("Super Admin nav: eight destinations, phone 4 + More", () => {
   });
 
   it("opens More as a bottom Sheet, not a centred dialog", () => {
-    assert.match(nav, /<Sheet open=\{moreOpen\}/);
+    assert.match(nav, /<Sheet open=\{open\} onOpenChange=\{setOpen\} title="More"/);
     assert.match(nav, /title="More"/);
     assert.match(nav, /theme="admin"/);
     assert.match(nav, /aria-haspopup="dialog"/);

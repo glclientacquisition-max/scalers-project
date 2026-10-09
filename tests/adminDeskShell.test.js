@@ -15,7 +15,7 @@ function read(rel) {
 
 function loadParents() {
   const script = `
-    import { adminParentTarget, ADMIN_LINKS } from ${JSON.stringify(linksPath)};
+    import { adminParentTarget, adminPhoneMore, adminPhoneTabs, ADMIN_LINKS } from ${JSON.stringify(linksPath)};
     const cases = {
       overview: adminParentTarget("/admin"),
       billingClient: adminParentTarget("/admin/billing/abc"),
@@ -28,6 +28,8 @@ function loadParents() {
       packages: adminParentTarget("/admin/packages"),
       billing: adminParentTarget("/admin/billing"),
       labels: ADMIN_LINKS.map((item) => item.label),
+      phoneTabs: adminPhoneTabs().map((item) => item.label),
+      phoneMore: adminPhoneMore().map((item) => item.label),
     };
     console.log(JSON.stringify(cases));
   `;
@@ -68,6 +70,12 @@ describe("admin desk standard shell", () => {
     assert.match(adminNav, /md:flex/);
     assert.match(adminNav, /md:hidden/);
     assert.match(adminNav, /min-h-12/);
+    assert.match(adminNav, /adminPhoneTabs\(\)/);
+    assert.match(adminNav, />More</);
+    assert.doesNotMatch(adminNav, /overflow-x-auto/);
+    assert.doesNotMatch(adminNav, /w-\[4\.5rem\]/);
+    assert.deepEqual(loadParents().phoneTabs, ["Today", "Businesses", "Calls", "Billing"]);
+    assert.deepEqual(loadParents().phoneMore, ["Numbers", "Platform", "Activity", "Settings"]);
     assert.match(links, /safe-area-inset-top/);
     assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/(desk)/loading.tsx")), false);
     assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/admin/loading.tsx")), false);
@@ -103,7 +111,7 @@ describe("admin desk standard shell", () => {
     assert.equal(got.nested.label === "Back", false);
     assert.doesNotMatch(adminNav, />Back</);
     assert.match(adminNav, /adminParentTarget/);
-    assert.match(adminNav, /<DeskBack href=\{parent\.href\}>\{parent\.label\}<\/DeskBack>/);
+    assert.match(adminNav, /<DeskBack href=\{href\(parent\.href\)\}>\{parent\.label\}<\/DeskBack>/);
     assert.doesNotMatch(adminNav, /BackChevron/);
   });
 
