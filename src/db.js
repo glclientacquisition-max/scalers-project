@@ -117,14 +117,15 @@ async function resolveTenantId({ toNumber, fromNumber, tenantId }) {
     // Also try digit-normalized match for +254 vs 254 variants.
     const digits = String(candidate).replace(/\D/g, '');
     if (!digits) continue;
-    const { data: all, error: listError } = await supabase
-      .from('tenants')
-      .select('id, sautikit_virtual_number')
-      .eq('is_active', true);
+    // Every owner of the number, live first: an archived or suspended owner
+    // still resolves to itself (the inbound gate closes its line) instead of
+    // falling through to unassigned_did or another tenant.
+    const { data: all, error: listError } = await selectTenantLineRows();
     throwIfError('resolveTenantId(list)', listError);
-    const hit = (all || []).find(
-      (row) => String(row.sautikit_virtual_number || '').replace(/\D/g, '') === digits
-    );
+    // Same number rule as the inbound gate (+254 / 254 / 0 forms).
+    const { isTenantLineInactive, sameNumber } = require('./sautikit/inactiveTenantGate');
+    const owners = (all || []).filter((row) => sameNumber(row.sautikit_virtual_number, candidate));
+    const hit = owners.find((row) => !isTenantLineInactive(row)) || owners[0];
     if (hit?.id) return hit.id;
   }
 
@@ -169,6 +170,96 @@ async function listActiveTenantDids() {
   const fromEnv = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
   const fromDb = (data || []).map((r) => r.sautikit_virtual_number).filter(isAssignableDid);
   return [...new Set([...fromDb, ...fromEnv.filter(isAssignableDid)])];
+}
+
+/**
+ * The tenant rows that own the dialled number, active or not, and whether the
+ * line is closed (every owner inactive or archived). Fails open: any error, a
+ * DEFAULT_TENANT_ID deploy, or no number gives { closed: false }.
+ * src/sautikit/inactiveTenantGate.js
+ */
+// Platform audio hosted by SautiKit (line-unavailable clips, #639). Service
+// role only. The url is a presigned link: never log it.
+const PLATFORM_AUDIO_COLUMNS = 'key, url, expires_at, uploaded_at, file_sha256, size_bytes, mime_type, last_error, last_error_at';
+
+async function getPlatformAudio(keys = []) {
+  const list = (Array.isArray(keys) ? keys : []).filter(Boolean);
+  if (!list.length) return [];
+  const { data, error } = await supabase.from('voice_platform_audio').select(PLATFORM_AUDIO_COLUMNS).in('key', list);
+  throwIfError('getPlatformAudio', error);
+  return data || [];
+}
+
+async function upsertPlatformAudio({ key, url, expiresAt, fileSha256, sizeBytes, mimeType } = {}) {
+  if (!key || !url || !expiresAt) throw new Error('[db] upsertPlatformAudio: key, url and expiresAt are required');
+  const { error } = await supabase.from('voice_platform_audio').upsert(
+    {
+      key,
+      url,
+      expires_at: expiresAt,
+      uploaded_at: new Date().toISOString(),
+      file_sha256: fileSha256 || null,
+      size_bytes: sizeBytes == null ? null : Number(sizeBytes),
+      mime_type: mimeType || null,
+      last_error: null,
+      last_error_at: null,
+    },
+    { onConflict: 'key' }
+  );
+  throwIfError('upsertPlatformAudio', error);
+  return true;
+}
+
+/** Keeps the current url; only records the failure. */
+async function notePlatformAudioError({ key, error: message } = {}) {
+  if (!key) return false;
+  const { error } = await supabase
+    .from('voice_platform_audio')
+    .update({ last_error: String(message || 'error').slice(0, 200), last_error_at: new Date().toISOString() })
+    .eq('key', key);
+  throwIfError('notePlatformAudioError', error);
+  return true;
+}
+
+// Line-state columns, newest first. Prod has line_status but not yet
+// archived_at; a missing column drops out and never closes a line.
+const TENANT_LINE_SELECTS = Object.freeze([
+  'id, sautikit_virtual_number, is_active, archived_at, line_status',
+  'id, sautikit_virtual_number, is_active, archived_at',
+  'id, sautikit_virtual_number, is_active, line_status',
+  'id, sautikit_virtual_number, is_active',
+]);
+
+async function selectTenantLineRows() {
+  let last = { data: null, error: null };
+  for (const columns of TENANT_LINE_SELECTS) {
+    last = await supabase.from('tenants').select(columns);
+    if (!last.error) return last;
+    if (!/column|schema cache|does not exist/i.test(last.error.message || '')) return last;
+  }
+  return last;
+}
+
+async function inboundTenantLine({ toNumber, fromNumber } = {}) {
+  const { tenantLineState, sameNumber } = require('./sautikit/inactiveTenantGate');
+  if (DEFAULT_TENANT_ID) return { closed: false, reason: 'default_tenant', tenantId: null };
+  const candidates = [toNumber, fromNumber].filter(Boolean);
+  if (!candidates.length) return { closed: false, reason: 'no_number', tenantId: null };
+  try {
+    const { data, error } = await selectTenantLineRows();
+    if (error) {
+      console.warn('[db] inboundTenantLine:', error.message);
+      return { closed: false, reason: 'lookup_failed', tenantId: null };
+    }
+    for (const candidate of candidates) {
+      const owners = (data || []).filter((row) => sameNumber(row.sautikit_virtual_number, candidate));
+      if (owners.length) return tenantLineState(owners);
+    }
+    return { closed: false, reason: 'no_tenant', tenantId: null };
+  } catch (err) {
+    console.warn('[db] inboundTenantLine:', err?.message || err);
+    return { closed: false, reason: 'lookup_failed', tenantId: null };
+  }
 }
 
 /**
@@ -2283,6 +2374,11 @@ async function confirmTenantField({ tenantId, fieldPath, userId = null } = {}) {
 }
 
 module.exports = {
+  resolveTenantId,
+  inboundTenantLine,
+  getPlatformAudio,
+  upsertPlatformAudio,
+  notePlatformAudioError,
   upsertCall,
   saveCallerInfo,
   saveEscalation,
