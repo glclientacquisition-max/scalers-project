@@ -24,8 +24,10 @@ const {
   beginInstanceSend,
   claimTenantSms,
   durableSendClaim,
+  personKey,
   recordDispatchResult,
   releaseInstanceFlight,
+  sendReserved,
 } = require('./sendLedger');
 
 function whatsAppSenderReady() {
@@ -95,6 +97,25 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
     return { channel: null, reason: gate.reason };
   }
 
+  // Reserve -> send -> settle under ONE per-person key. A failed or refused
+  // SMS is released and the same row is re-armed for WhatsApp/email.
+  const ledgerKind = kind || (ledger && ledger.kind);
+  const key =
+    ledger && typeof ledger === 'object'
+      ? personKey({ ...ledger, kind: ledgerKind }, { to, email })
+      : null;
+  let legacy = !key;
+
+  async function viaReserve(channel, dest, send) {
+    const out = await sendReserved(
+      { ledger, key, kind: ledgerKind, channel, to: dest, body: text, strict: ledger?.strict },
+      send
+    );
+    if (out.legacy) legacy = true;
+    return out;
+  }
+
+  // Legacy path (reserve_notify_send not applied yet): record after the send.
   async function accept(result) {
     if (result?.channel) {
       const recorded = await recordDispatchResult(ledger, result, text);
@@ -110,20 +131,50 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
     if (prefs.sms) {
       const smsTo = normalizeSmsTo(to);
       if (smsSenderReady() && smsTo) {
-        const claim = await claimTenantSms(ledger, text);
-        if (!claim.allowed) {
-          errors.push(`sms:${claim.reason || 'sms_allowance_exhausted'}`);
-          console.warn(
-            `[notify] tenant SMS skipped (${claim.reason || 'sms_allowance_exhausted'})`
-          );
-        } else {
-          if (ledger && typeof ledger === 'object') ledger.overage = Boolean(claim.overage);
+        let handled = false;
+        if (!legacy) {
           try {
-            const sms = await trySendSms({ to, body: text });
-            if (sms) return accept(sms);
+            const out = await viaReserve('sms', smsTo, async () => {
+              const sms = await trySendSms({ to, body: text });
+              if (!sms) throw new Error('sms_unavailable');
+              return sms;
+            });
+            if (!out.legacy) {
+              handled = true;
+              if (out.sent) {
+                if (ledger && typeof ledger === 'object') ledger.overage = out.overage;
+                return out.result;
+              }
+              if (out.reason === 'instance_already_sent' || out.reason === 'instance_in_flight') {
+                return { channel: null, reason: out.reason };
+              }
+              errors.push(`sms:${out.reason || 'sms_allowance_exhausted'}`);
+              console.warn(`[notify] tenant SMS skipped (${out.reason})`);
+            }
           } catch (err) {
+            handled = true;
             errors.push(`sms:${err?.message || err}`);
-            console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
+            console.warn(
+              `[notify] SMS send failed (${err?.message || err}); units released, trying next channel`
+            );
+          }
+        }
+        if (!handled) {
+          const claim = await claimTenantSms(ledger, text);
+          if (!claim.allowed) {
+            errors.push(`sms:${claim.reason || 'sms_allowance_exhausted'}`);
+            console.warn(
+              `[notify] tenant SMS skipped (${claim.reason || 'sms_allowance_exhausted'})`
+            );
+          } else {
+            if (ledger && typeof ledger === 'object') ledger.overage = Boolean(claim.overage);
+            try {
+              const sms = await trySendSms({ to, body: text });
+              if (sms) return accept(sms);
+            } catch (err) {
+              errors.push(`sms:${err?.message || err}`);
+              console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
+            }
           }
         }
       }
@@ -131,13 +182,23 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
 
     if (prefs.whatsapp) {
       try {
-        const wa = await trySendWhatsApp({
-          to,
-          body: text,
-          lead,
-          kind: kind || (ledger && ledger.kind),
-        });
-        if (wa) return accept(wa);
+        const waTo = normalizeWhatsAppTo(to);
+        if (!legacy && whatsAppSenderReady() && waTo) {
+          const out = await viaReserve('whatsapp', waTo, () =>
+            trySendWhatsApp({ to, body: text, lead, kind: ledgerKind })
+          );
+          if (!out.legacy) {
+            if (out.sent) return out.result;
+            if (out.reason === 'instance_already_sent' || out.reason === 'instance_in_flight') {
+              return { channel: null, reason: out.reason };
+            }
+            errors.push(`whatsapp:${out.reason}`);
+          }
+        }
+        if (legacy) {
+          const wa = await trySendWhatsApp({ to, body: text, lead, kind: ledgerKind });
+          if (wa) return accept(wa);
+        }
       } catch (err) {
         errors.push(`whatsapp:${err?.message || err}`);
         if (!prefs.email || !emailFallbackReady()) {
@@ -150,6 +211,21 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
     }
 
     if (prefs.email) {
+      const mailTo = normalizeEmail(email);
+      if (!legacy && emailFallbackReady() && mailTo) {
+        const out = await viaReserve('email', mailTo, async () => {
+          const mail = await sendEmailFallback({ to: email, body: text, lead, subject });
+          if (!mail.channel) throw new Error(mail.reason || 'email_failed');
+          return mail;
+        });
+        if (!out.legacy) {
+          if (out.sent) return out.result;
+          if (out.reason === 'instance_already_sent' || out.reason === 'instance_in_flight') {
+            return { channel: null, reason: out.reason };
+          }
+          return { channel: null, reason: out.reason || 'send_failed', errors };
+        }
+      }
       const mail = await sendEmailFallback({
         to: email,
         body: text,

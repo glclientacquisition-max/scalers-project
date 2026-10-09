@@ -10,10 +10,12 @@ const { parseNotifyChannels } = require('./notifyChannels');
 const { missedTextbackBody } = require('./templates');
 const {
   beginInstanceSend,
+  callerKey,
   claimTenantSms,
   durableSendClaim,
   recordNotifySend,
   releaseInstanceFlight,
+  sendReserved,
 } = require('./sendLedger');
 
 const TEXTBACK_META_KEY = 'missed_textback_at';
@@ -80,6 +82,23 @@ async function sendMissedTextback({ to, businessName, ledger } = {}) {
     return { channel: null, reason: gate.reason };
   }
   try {
+    // Reserve -> send -> settle: a failed TextSMS send releases its units.
+    const reserved = await sendReserved(
+      {
+        ledger: { ...ledger, kind: 'missed_textback' },
+        key: callerKey(ledger || {}, 'missed_textback', dest),
+        kind: 'missed_textback',
+        channel: 'sms',
+        to: dest,
+        body,
+      },
+      () => sendSms({ to: dest, body })
+    );
+    if (!reserved.legacy) {
+      if (!reserved.sent) return { channel: null, reason: reserved.reason };
+      return { channel: 'sms', to: dest, result: reserved.result, body };
+    }
+    // Legacy path until reserve_notify_send is applied.
     const claim = await claimTenantSms({ ...ledger, kind: 'missed_textback' }, body);
     if (!claim.allowed) {
       return { channel: null, reason: claim.reason || 'sms_allowance_exhausted' };

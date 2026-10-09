@@ -414,6 +414,7 @@ const {
   createWsPayloadSampler,
 } = require('./src/sautikit/safeLog');
 const { isWhatsAppConfigured, sendOwnerWhatsApp, markWhatsAppRead, normalizeWhatsAppTo } = require('./src/notifications/whatsapp');
+const { sendReserved } = require('./src/notifications/sendLedger');
 const {
   ownerLeadEvent,
   renderEventText,
@@ -703,6 +704,7 @@ app.post('/internal/desk/escalate', async (req, res) => {
       name: String(req.body?.callerName || '').trim() || undefined,
       reason: String(req.body?.reason || '').trim() || 'Desk ping',
       force: req.body?.force !== false,
+      pingId: String(req.body?.pingId || '').trim().slice(0, 80) || undefined,
     });
     return res.status(200).json(result);
   } catch (err) {
@@ -1499,8 +1501,28 @@ async function handleWhatsAppWebhook(req, res) {
         await noteWhatsAppDeliveryFailed(row);
       },
       markRead: (wamid) => markWhatsAppRead(wamid),
-      sendText: async ({ to, body }) => {
-        const json = await sendOwnerWhatsApp({ to, body, windowOpen: true });
+      sendText: async ({ to, body, replyTo }) => {
+        // Platform-billed reply: notify_sends row (tenant null) keyed by the
+        // inbound wamid, so a webhook redelivery cannot send or count twice.
+        const waTo = normalizeWhatsAppTo(to);
+        const reserved = await sendReserved(
+          {
+            ledger: { tenantId: null, kind: 'platform_wa_reply' },
+            key: replyTo ? `wa:${replyTo}` : `wa:${waTo}:${new Date().toISOString().slice(0, 16)}`,
+            kind: 'platform_wa_reply',
+            channel: 'whatsapp',
+            to: waTo,
+            body,
+          },
+          () => sendOwnerWhatsApp({ to, body, windowOpen: true })
+        );
+        if (!reserved.legacy && !reserved.sent) {
+          console.warn(`[whatsapp/events] reply skipped (${reserved.reason})`);
+          return null;
+        }
+        const json = reserved.legacy
+          ? await sendOwnerWhatsApp({ to, body, windowOpen: true })
+          : reserved.result;
         await db.persistPlatformWhatsAppOutbound({
           identity: 'platform',
           phoneNumberId: platformPhoneNumberId(),
@@ -4971,6 +4993,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         callSid,
         kind: 'escalation',
         force,
+        pingId: escalate.pingId || null,
       },
     });
 

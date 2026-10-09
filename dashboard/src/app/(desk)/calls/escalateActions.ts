@@ -104,6 +104,7 @@ export async function pingTeammateAction(opts: {
         callerName,
         reason,
         force: true,
+        pingId: crypto.randomUUID(),
         language: "en",
       }),
       cache: "no-store",

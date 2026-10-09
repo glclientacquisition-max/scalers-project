@@ -59,6 +59,10 @@ export async function POST(request: Request) {
         to: emails,
         subject: "Scalers ops: test",
         text: "Test from Platform.",
+        ledger: {
+          kind: "platform_ops_test",
+          key: `ops:desk:test:${new Date().toISOString().slice(0, 16)}`,
+        },
       });
       if (result.skipped === "ops_mail_unconfigured") {
         return NextResponse.json({ error: "Mail is off." }, { status: 400 });

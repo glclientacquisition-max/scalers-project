@@ -95,7 +95,9 @@ async function notePlatformOpsDegrade(kind, detail = {}) {
       lead: { reason: `Platform ${key} degraded`, businessName: null },
       // Email only for now. No SMS or WhatsApp for platform ops alerts.
       channels: { sms: false, whatsapp: false, email: true },
-      ledger: { kind: ledgerKind(key) },
+      // Recorded as a platform row (tenant null) under one key per incident:
+      // ops:<kind>:<incident start ms>:<person>. Was dropped as invalid before.
+      ledger: { kind: ledgerKind(key), keyBase: `ops:${ledgerKind(key)}:${now}` },
     });
     const hit = sent.find((row) => row.channel);
     if (!hit) {
