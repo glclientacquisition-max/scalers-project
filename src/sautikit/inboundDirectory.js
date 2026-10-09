@@ -129,6 +129,11 @@ function createInboundDirectory(opts = {}) {
         secondsUsed: tenant.seconds_used,
         onDemand: Boolean(tenant.on_demand_usage_enabled),
         enforcement,
+        // tenant_subscriptions.status via db.listInboundTenantRows; unknown
+        // (read failed) stays null so 0 minutes fails open.
+        hasPackage: tenant.package_status === undefined || tenant.package_status === null
+          ? null
+          : tenant.package_status === 'active',
       }),
       enforcement,
     };
@@ -167,6 +172,7 @@ function createInboundDirectory(opts = {}) {
       toNumber: r.fixed.toNumber,
       swapped: Boolean(r.fixed.swapped),
       tenantId: tenant?.id || null,
+      businessName: tenant?.business_name || null,
       unassigned: !tenant && hasNumber && !defaultTenantId,
       // No number at all: legacy falls back to the first active tenant inside
       // upsertCall; leave tenantId null and let it.

@@ -316,7 +316,8 @@ export async function loadPackageCatalog(): Promise<PackageCatalog> {
   const [ratesRes, packsRes, subsRes, tenantsRes, membersRes] = await Promise.all([
     admin.from("billing_rate_card").select("*").eq("id", 1).maybeSingle(),
     admin.from("billing_packages").select("*").order("sort_order", { ascending: true }),
-    admin.from("tenant_subscriptions").select("tenant_id, package_id, period"),
+    // status 'cancelled' = explicit no package (package_state_rules.sql).
+    admin.from("tenant_subscriptions").select("tenant_id, package_id, period").eq("status", "active"),
     admin.from("tenants").select(TENANT_USAGE_SELECT).order("business_name", { ascending: true }),
     admin.from("tenant_members").select("tenant_id"),
   ]);
@@ -449,7 +450,8 @@ export async function loadBusinessPackageNames(): Promise<
 > {
   const admin = getSupabaseAdmin();
   const [subsRes, packsRes] = await Promise.all([
-    admin.from("tenant_subscriptions").select("tenant_id, package_id, period"),
+    // status 'cancelled' = explicit no package (package_state_rules.sql).
+    admin.from("tenant_subscriptions").select("tenant_id, package_id, period").eq("status", "active"),
     admin.from("billing_packages").select("id, name"),
   ]);
   if (subsRes.error && isMissingCatalog(subsRes.error.message)) return new Map();
@@ -480,7 +482,12 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
         )
         .eq("id", tenantId)
         .maybeSingle(),
-      admin.from("tenant_subscriptions").select("package_id, period").eq("tenant_id", tenantId).maybeSingle(),
+      admin
+        .from("tenant_subscriptions")
+        .select("package_id, period")
+        .eq("tenant_id", tenantId)
+        .eq("status", "active")
+        .maybeSingle(),
       admin.from("billing_rate_card").select("*").eq("id", 1).maybeSingle(),
       admin.from("tenant_members").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
     ]);
@@ -530,16 +537,67 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
   }
 }
 
+export type PackageChangeKind =
+  | "new"
+  | "same"
+  | "pending_cancelled"
+  | "upgrade"
+  | "downgrade_scheduled"
+  | "period_change_scheduled";
+
+export type PackageChangeResult = {
+  changeKind: PackageChangeKind | null;
+  effectiveAt: string | null;
+  minutesIncluded: number | null;
+};
+
+/**
+ * Upgrade applies now (prorated minutes, grants kept). Downgrade and period
+ * change are scheduled for the next period. See package_state_rules.sql.
+ */
 export async function assignBusinessPackage(opts: {
   tenantId: string;
   packageId: string;
   period: "month" | "year";
-}): Promise<void> {
+  actor?: string;
+  note?: string;
+}): Promise<PackageChangeResult> {
   const admin = getSupabaseAdmin();
-  const { error } = await admin.rpc("assign_tenant_package", {
+  const { data, error } = await admin.rpc("assign_tenant_package", {
     p_tenant_id: opts.tenantId,
     p_package_id: opts.packageId,
     p_period: opts.period,
+    p_actor: opts.actor || "ops",
+    p_note: opts.note || null,
   });
   if (error) throw error;
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
+  return {
+    changeKind: (row?.change_kind as PackageChangeKind) ?? null,
+    effectiveAt: row?.effective_at ? String(row.effective_at) : null,
+    minutesIncluded: row?.minutes_included == null ? null : Number(row.minutes_included),
+  };
+}
+
+/** Explicit "no package". when = now | period_end. Never unlimited. */
+export async function unassignBusinessPackage(opts: {
+  tenantId: string;
+  when: "now" | "period_end";
+  note: string;
+  actor?: string;
+}): Promise<{ packageState: "active" | "none"; effectiveAt: string | null; minutesIncluded: number }> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.rpc("unassign_tenant_package", {
+    p_tenant_id: opts.tenantId,
+    p_when: opts.when,
+    p_note: opts.note,
+    p_actor: opts.actor || "ops",
+  });
+  if (error) throw error;
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
+  return {
+    packageState: row?.package_state === "active" ? "active" : "none",
+    effectiveAt: row?.effective_at ? String(row.effective_at) : null,
+    minutesIncluded: Number(row?.minutes_included ?? 0),
+  };
 }
