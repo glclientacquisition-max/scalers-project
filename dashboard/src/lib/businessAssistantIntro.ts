@@ -1,9 +1,10 @@
 /**
  * Desk mirror of src/conversation/businessAssistantIntro.js
  * Keep rules in sync: shop first, named person, one help question.
- * Open and closed: no services list. Home services: English/Kiswahili invite on first open. Do not open with Habari.
+ * Open and closed: no services list. No language invite on first open (any vertical). Do not open with Habari.
  */
 
+// Retired 2026-10-09: never spoken on first open. Kept for guards/tests.
 export const LANGUAGE_INVITE = "You can speak in English or Kiswahili.";
 
 export type BusinessAssistantIntroOpts = {
@@ -12,7 +13,6 @@ export type BusinessAssistantIntroOpts = {
   greetingInvite?: string | null;
   agentName?: string | null;
   vertical?: string | null;
-  requireLanguageInvite?: boolean;
   offeringLine?: string | null;
   servicesCatalog?: Array<{ name?: string | null }> | null;
   servicesOffered?: string | null;
@@ -196,20 +196,6 @@ export function previewBusinessAssistantIntro(
   });
 }
 
-function wantsLanguageInvite(opts: BusinessAssistantIntroOpts = {}): boolean {
-  if (opts.requireLanguageInvite === true) return true;
-  const vertical = String(opts.vertical || "").trim().toLowerCase();
-  return (
-    vertical === "home_services" ||
-    vertical === "homeservices" ||
-    vertical === "home_service"
-  );
-}
-
-function languageInviteClause(opts: BusinessAssistantIntroOpts = {}): string {
-  return wantsLanguageInvite(opts) ? `${LANGUAGE_INVITE} ` : "";
-}
-
 export function composeBusinessAssistantIntro(
   opts: BusinessAssistantIntroOpts = {}
 ): string {
@@ -220,7 +206,6 @@ export function composeBusinessAssistantIntro(
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
   const identity = composeOpenerIdentity(opts);
-  const invite = languageInviteClause(opts);
   const help = greetingHelpLine(opts);
   const fileName = String(opts.callerFileName || "").trim();
   const nameAsk =
@@ -230,20 +215,20 @@ export function composeBusinessAssistantIntro(
 
   if (closureNotice) {
     const follow = afterHoursMode === "message" ? nameAsk : help;
-    return `${identity} ${invite}${closureNotice} ${follow}`;
+    return `${identity} ${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === "message") {
-    return `${identity} ${invite}We're closed now. ${nameAsk}`;
+    return `${identity} We're closed now. ${nameAsk}`;
   }
 
   if (closed) {
-    return `${identity} ${invite}We're closed now. ${help}`;
+    return `${identity} We're closed now. ${help}`;
   }
 
   if (afterHoursMode === "message") {
-    return `${identity} ${invite}I can take a message. ${nameAsk}`;
+    return `${identity} I can take a message. ${nameAsk}`;
   }
 
-  return `${identity} ${invite}${help}`;
+  return `${identity} ${help}`;
 }
