@@ -223,6 +223,7 @@ function noopTrace() {
     noteBarge: noop,
     noteSpeakPacket: noop,
     noteSpeakSlots: noop,
+    noteBrainLines: noop,
     noteCall: noop,
     commitTurn: noop,
     finishCall: async () => null,
@@ -459,6 +460,22 @@ function createVoiceTrace(opts = {}) {
     });
   }
 
+  // Brain fact lines (docs/specs/fact-lines.md) on this turn: brain.lines[].
+  // Voice's scorer checks them against the DB.
+  function noteBrainLines(lines = []) {
+    if (!open) return;
+    const rows = (Array.isArray(lines) ? lines : []).slice(0, 24).map((line) => ({
+      template: String(line?.template || ''),
+      lang: line?.lang || null,
+      slots: line?.slots && typeof line.slots === 'object' ? line.slots : {},
+      gate: line?.gate && typeof line.gate === 'object' ? line.gate : {},
+      text: redactText(line?.text || ''),
+    }));
+    if (!rows.length) return;
+    if (!open.brain || typeof open.brain !== 'object') open.brain = { lines: [] };
+    open.brain.lines.push(...rows);
+  }
+
   function noteCall(stage = {}) {
     if (!stage || typeof stage !== 'object') return;
     callStages.push(stage);
@@ -580,6 +597,7 @@ function createVoiceTrace(opts = {}) {
     noteBarge: guard(noteBarge),
     noteSpeakPacket: guard(noteSpeakPacket),
     noteSpeakSlots: guard(noteSpeakSlots),
+    noteBrainLines: guard(noteBrainLines),
     noteCall: guard(noteCall),
     commitTurn: guard(commitTurn),
     finishCall: async () => {

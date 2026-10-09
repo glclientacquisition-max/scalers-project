@@ -29,6 +29,9 @@ function safeCallerName(state) {
 function safeGoalDescription(raw) {
   const goal = clean(callerGoalText(raw), 160);
   if (!goal) return '';
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 4): "Alvin asked about that's all."
+  const fixes = require('./callFixesD199');
+  if (fixes.callFixesD199Enabled() && fixes.notAGoal(goal)) return '';
   return goal;
 }
 
@@ -86,6 +89,12 @@ function deriveCallSummary(opts = {}) {
     ) {
       actions.push('Needs human. Notify failed.');
     }
+  }
+
+  // BRAIN_CONFIRMED_COVERAGE: places the owner still has to confirm.
+  // state.needs exists only when the flag is on.
+  for (const line of require('./confirmedCoverage').openCoverageNeedLines(state)) {
+    if (!instructions.includes(line)) instructions.push(line);
   }
 
   const name = safeCallerName(state);

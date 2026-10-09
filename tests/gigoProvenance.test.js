@@ -80,6 +80,10 @@ describe('gigo provenance', () => {
       process.execPath,
       [
         '--experimental-strip-types',
+        // provenance.ts imports './factHash' (extensionless, as Next resolves it).
+        '--import',
+        './tests/registerTs.mjs',
+        '--input-type=module',
         '-e',
         `import { buildCompileSections } from './dashboard/src/lib/provenance.ts';
 const fixture = ${JSON.stringify(fixture)};

@@ -80,14 +80,24 @@ function buildCallerMemoryCard({
   const phone = String(contact.phone || '').trim();
   const name = String(contact.name || '').trim() || null;
   const alternates = alternateNames(contact.metadata);
-  const sharedLine = alternates.some((alt) => distinctOtherPerson(name, alt));
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 5): a saved phrase ("so
+  // disappointed"), a role word ("Mteja") or a cut-off of the owner's name
+  // ("Chr") is not a second person; a shared line skips the file-name ask.
+  const sharedLine = alternates.some(
+    (alt) => distinctOtherPerson(name, alt) && require('./callFixesD199').alternateIsAPerson(name, alt)
+  );
   const lived = collectLivedAppointments(
     nextAppointment,
     recentAppointments,
     now,
     openAppointments
   );
-  const nextItem = lived.open[0] || null;
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 3): a visit or request whose time
+  // is past (Nairobi) and still requested is its own bucket, never open or
+  // upcoming; the card carries only its count.
+  const pastBucket = require('./callFixesD199').callFixesD199Enabled();
+  const liveOpen = pastBucket ? lived.open.filter((item) => !livedItemPast(item)) : lived.open;
+  const nextItem = liveOpen[0] || null;
   const nextRow = nextItem ? nextItem.row : null;
   const lastReason = clip(scrubLivedReason(contact.last_reason, lived));
   const notes = clip(contact.notes, 60);
@@ -95,10 +105,16 @@ function buildCallerMemoryCard({
   // Cap is wide enough that a past-due open hold is not dropped just because
   // two newer open rows exist. Date-past is not a reason to drop status open.
   // Every still-open request. A past-due open hold is not dropped for a newer pair.
-  const requests = requestSplit.open
+  const liveRequests = pastBucket
+    ? requestSplit.openItems.filter((item) => !livedItemPast(item)).map((item) => item.row)
+    : requestSplit.open;
+  const requests = liveRequests
     .map(clipRequestLine)
     .filter(Boolean);
-  const openVisitLines = lived.open
+  const pastOpenCount = pastBucket
+    ? lived.open.length - liveOpen.length + (requestSplit.open.length - liveRequests.length)
+    : 0;
+  const openVisitLines = liveOpen
     .map((item) => clipVisitLine(item.row, { whenMax: null }))
     .filter(Boolean);
   const appointment = openVisitLines[0] || null;
@@ -138,6 +154,7 @@ function buildCallerMemoryCard({
     Boolean(place) ||
     Boolean(usualJob) ||
     Boolean(standing) ||
+    pastOpenCount > 0 ||
     Boolean(phone);
   if (!hasFile) return null;
 
@@ -163,7 +180,65 @@ function buildCallerMemoryCard({
     standing: standing || null,
     language: language || null,
     personProfiles,
+    ...(require('./callFixesD199').callFixesD199Enabled()
+      ? { openRows: structuredOpenRows(lived.open, requestSplit.openItems), pastOpenCount }
+      : {}),
   };
+}
+
+/**
+ * BRAIN_CALL_FIXES_D199: open visits and open requests/holds with ids and
+ * created_at, so code can answer "when did I request that?", read requests
+ * with visits, and move the visit a reschedule names.
+ */
+/** Past-dated: the lived time has passed, or the refreshed when reads "past ...". */
+function livedItemPast(item) {
+  if (!item || typeof item !== 'object') return false;
+  // A hold or order waits for pickup; a past date does not close it.
+  const type = String(item.row?.request_type || item.row?.type || '').toLowerCase();
+  if (type === 'hold' || type === 'order') return false;
+  if (item.lived?.past) return true;
+  const when = String(item.row?.when_text || item.row?.whenText || '');
+  return /^past\b/i.test(when.trim());
+}
+
+function structuredOpenRows(openVisits = [], openRequests = []) {
+  // openRequests: { row, lived } items (or bare rows).
+  const rows = [];
+  for (const item of openVisits) {
+    const row = item?.row || {};
+    const job = clip(row.service_name || row.serviceName, 48);
+    if (!job) continue;
+    rows.push({
+      id: row.id || null,
+      kind: 'visit',
+      type: 'visit',
+      job,
+      when: fullWhen(row.when_text || row.whenText) || '',
+      place: clip(row.address_landmark || row.addressLandmark || row.landmark, 48) || '',
+      windowStart: row.window_start || row.windowStart || null,
+      status: clip(row.status, 16) || '',
+      createdAt: row.created_at || row.createdAt || null,
+      past: livedItemPast(item),
+    });
+  }
+  for (const entry of openRequests) {
+    const row = entry && entry.row ? entry.row : entry;
+    const job = clip(row?.item, 48);
+    if (!job) continue;
+    rows.push({
+      id: row.id || null,
+      kind: 'request',
+      type: clip(row.request_type || row.type, 16) || 'enquiry',
+      job,
+      when: clip(row.when_text || row.whenText, 32) || '',
+      place: '',
+      status: 'open',
+      createdAt: row.created_at || row.createdAt || null,
+      past: livedItemPast(entry),
+    });
+  }
+  return rows;
 }
 
 function clipLang(raw) {
@@ -391,7 +466,7 @@ function splitRequestRows(rows, now) {
     const tb = b.lived.instant ? b.lived.instant.getTime() : Number.POSITIVE_INFINITY;
     return a.lived.past ? tb - ta : ta - tb;
   });
-  return { open: open.map((item) => item.row), finished };
+  return { open: open.map((item) => item.row), openItems: open, finished };
 }
 
 function reviewStamp(row, index) {
@@ -744,7 +819,9 @@ function returningFileFromCard(card) {
   const fileOwnerName = fileOwnerNameOf(card);
   const hasOpenRows = Boolean(
     (Array.isArray(card.openVisits) && card.openVisits.length) ||
-      (Array.isArray(card.openRequests) && card.openRequests.length)
+      (Array.isArray(card.openRequests) && card.openRequests.length) ||
+      // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 3): only set with the flag on.
+      card.pastOpenCount > 0
   );
   const filePending =
     !identityBound &&
@@ -767,6 +844,8 @@ function returningFileFromCard(card) {
     nextVisitStatus: usable ? card.nextVisitStatus || null : null,
     nextVisitLandmark: usable ? card.nextVisitLandmark || null : null,
     openRequests: usable && Array.isArray(card.openRequests) ? card.openRequests : [],
+    ...(Array.isArray(card.openRows) ? { openRows: usable ? card.openRows : [] } : {}),
+    ...(card.pastOpenCount > 0 ? { pastOpenCount: usable ? card.pastOpenCount : 0 } : {}),
     recentBookings: usable && Array.isArray(card.recentBookings) ? card.recentBookings : [],
     place: identityBound ? card.place || null : null,
     usualJob: identityBound ? card.usualJob || null : null,
@@ -829,6 +908,11 @@ function formatReturningCallerForPrompt(card) {
     for (const row of openRequests) {
       lines.push(`- Open: ${row}`);
     }
+    if (card.pastOpenCount) {
+      lines.push(
+        `- Past-dated, not confirmed: ${card.pastOpenCount} row${card.pastOpenCount === 1 ? '' : 's'} whose time has passed. Never read them as open or upcoming.`
+      );
+    }
     if (card.lastReason) lines.push(`- Last: ${card.lastReason}`);
     const recentBookings = Array.isArray(card.recentBookings) ? card.recentBookings : [];
     for (const row of recentBookings) {
@@ -859,6 +943,8 @@ function formatReturningCallerForPrompt(card) {
         ? `- Use: confirm once, "Am I speaking with ${fileWho || 'the name on this number'}?" Do not greet them as that name. Do not talk about visits yet. If they say no, ask who is speaking and do not read this file. If they confirm, answer what they just said. Do not read open visits, holds, callbacks, or orders on that turn.`
         : '- Use: do not ask who is speaking unless you are about to save something. Do not attach Open, Last, or History yet. Do not greet them as the file name. Answer what they just said.'
     );
+    const masked = maskedFileNote(card);
+    if (masked) lines.push(masked);
   } else if (!usable) {
     lines.push(
       '- Use: this speaker does not own the household file. Do not attach that visit or last reason.'
@@ -884,9 +970,31 @@ function formatReturningCallerForPrompt(card) {
   return lines.join('\n');
 }
 
+/**
+ * BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 6): the file is masked, not empty.
+ * The model must never hear "no visits" while the name is unconfirmed.
+ */
+function maskedFileNote(returning) {
+  if (!require('./callFixesD199').callFixesD199Enabled()) return '';
+  const has =
+    returning?.hasOpenRows === true ||
+    ['openRows', 'openVisits', 'openRequests'].some((k) => Array.isArray(returning?.[k]) && returning[k].length);
+  if (!has) return '';
+  return '- Caller file: MASKED until the name is confirmed, not empty. Do not tell the caller the file is empty or that nothing is on record. Confirm who is speaking first.';
+}
+
 function formatReturningFileForCallState(returning, opts = {}) {
   if (!returning || typeof returning !== 'object') return '';
   if (!speakerKnownOnFile(returning)) {
+    const masked = maskedFileNote(returning);
+    if (masked) return [formatUnboundReturningFile(returning, opts), masked].filter(Boolean).join('\n');
+    return formatUnboundReturningFile(returning, opts);
+  }
+  return formatBoundReturningFile(returning, opts);
+}
+
+function formatUnboundReturningFile(returning, opts = {}) {
+  {
     const who = returning.fileOwnerName || returning.name;
     if (returning.sharedLine) {
       return '- Caller file speaker: not bound. Shared line. Do not ask who is speaking unless you are about to save something. Do not use the file name. Do not attach Open or History. Answer what they just said.';
@@ -902,6 +1010,9 @@ function formatReturningFileForCallState(returning, opts = {}) {
     }
     return '- Caller file speaker: not bound. Do not attach a visit until they say who they are. Answer what they just said.';
   }
+}
+
+function formatBoundReturningFile(returning, opts = {}) {
   if (!returningFileUsable(returning)) {
     const who = returning.boundName || returning.name || 'this speaker';
     const lines = [

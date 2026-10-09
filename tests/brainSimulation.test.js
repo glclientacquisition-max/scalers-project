@@ -6,6 +6,8 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+// Delivery-text coverage is the flag-off path; BRAIN_CONFIRMED_COVERAGE=on twins: confirmedCoverage.test.js.
+const { flagOff } = require('./helpers/ownerCoverage');
 
 const { createSimulator } = require('./helpers/brainSimulator');
 const {
@@ -96,7 +98,7 @@ describe('brain simulation: home visit', () => {
     clean(sim);
   });
 
-  it('out of coverage then "leave it" saves nothing and does not repeat the block', async () => {
+  it('out of coverage then "leave it" saves nothing and does not repeat the block', flagOff(async () => {
     const sim = createSimulator({ profile: home });
     await sim.run(['Can you come to Rongai tomorrow for sofa cleaning?', 'Just leave it.']);
     const spoken = lines(sim);
@@ -106,7 +108,7 @@ describe('brain simulation: home visit', () => {
     assert.equal(sim.saved.appointments.length, 0);
     assert.equal(sim.saved.serviceRequests.length, 0);
     clean(sim);
-  });
+  }));
 
   it('a landmark nobody can place gets one area question, never a refusal', async () => {
     const sim = createSimulator({ profile: narrow });
@@ -299,7 +301,7 @@ describe('consent gate', () => {
 });
 
 describe('brain simulation: 06:59 call', () => {
-  it('binds Ronga to Rongai, stores Alvin, and does not save the visit', async () => {
+  it('binds Ronga to Rongai, stores Alvin, and does not save the visit', flagOff(async () => {
     const sim = createSimulator({ profile: home, leak: 'none' });
     await sim.run([
       'Tomorrow, Carpet cleaning in Ronga.',
@@ -313,7 +315,7 @@ describe('brain simulation: 06:59 call', () => {
     assert.equal(sim.saved.serviceRequests.length, 0);
     assert.doesNotMatch(lines(sim).join('\n'), /all set/i);
     clean(sim);
-  });
+  }));
 
   it('keeps the day on 7:00 AM, drops a false close, and refuses the hour', async () => {
     const sim = createSimulator({
@@ -415,7 +417,7 @@ describe('brain simulation: 06:59 call', () => {
     clean(sim);
   });
 
-  it('keeps Rongai from Lurungai, Rungai and does not offer a callback', async () => {
+  it('keeps Rongai from Lurungai, Rungai and does not offer a callback', flagOff(async () => {
     const sim = createSimulator({ profile: home, leak: 'none' });
     await sim.run(['Carpet cleaning tomorrow in Lurungai, Rungai.']);
     const place = String(sim.turns[0].state.entities.location?.value || '');
@@ -432,7 +434,7 @@ describe('brain simulation: 06:59 call', () => {
       'That area is outside our coverage. Should I note it for the team?'
     );
     clean(sim);
-  });
+  }));
 
   it('speaks a period as a period and does not invent 10 AM', async () => {
     const sim = createSimulator({ profile: home, leak: 'none' });
@@ -506,7 +508,7 @@ describe('speech gate', () => {
     );
   });
 
-  it('drops a coverage flip for a place outside the file', () => {
+  it('drops a coverage flip for a place outside the file', flagOff(() => {
     const out = guardSpokenReply('We can definitely come to Runda. Where should we come?', {
       ...ctx,
       profile: narrow,
@@ -514,7 +516,7 @@ describe('speech gate', () => {
     assert.equal(out, 'Where should we come?');
     const inside = guardSpokenReply('We can come to Westlands. What time?', { ...ctx, profile: narrow });
     assert.equal(inside, 'We can come to Westlands. What time?');
-  });
+  }));
 
   it('answers a price question honestly when the number had to be dropped', () => {
     const out = guardSpokenReply('It costs 500 shillings.', {

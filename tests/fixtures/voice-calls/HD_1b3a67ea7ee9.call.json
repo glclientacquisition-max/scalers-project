@@ -1,0 +1,475 @@
+{
+ "note": "Staging D&D call HD_1b3a67ea7ee9 (2026-10-09 12:02 EAT, staging c8fb514f). Caller text, spoken lines and tool calls from voice_turn_traces (turn_index 1-11); caller file rows (contact, open service_requests, requested/confirmed appointments) as loaded at call start (created before 09:02:32Z), read-only. Caller phone omitted. heldTimedOut marks a held fragment the model answered after the hold timer. t7 model line before structured_verify: You have a carpet cleaning visit requested for Saturday 10 October 2026 at 9 AM in Kitengela, Grace Apartments.",
+ "callId": "HD_1b3a67ea7ee9",
+ "startedAt": "2026-10-09T09:02:32.035Z",
+ "tenantFixture": "done-and-dusted-staging.json",
+ "businessName": "Done and Dusted",
+ "vertical": "home_services",
+ "callerFile": {
+  "contact": {
+   "id": "b0a335e9-219d-431c-bb66-6b884f256751",
+   "name": "Alvin",
+   "notes": null,
+   "last_reason": null,
+   "metadata": {
+    "alternate_names": [
+     {
+      "name": "Bwana Alvin",
+      "seen_at": "2026-10-04T18:55:51.114Z"
+     },
+     {
+      "name": "Alvin speaking",
+      "seen_at": "2026-10-04T12:06:16.647Z"
+     },
+     {
+      "name": "impressed by your",
+      "seen_at": "2026-10-03T15:56:09.095Z"
+     }
+    ]
+   }
+  },
+  "requests": [
+   {
+    "id": "2b684460-2ae5-4ae3-8a83-787f594415e0",
+    "item": "Mansion Cleaning Custom Quote",
+    "notes": "Caller will call back in a minute regarding cleaning in Kilimani.",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-08T20:15:04.636479+00:00",
+    "request_type": "enquiry",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "09518c1b-5544-48d5-9a5a-01f572782c0f",
+    "item": "Water bowl enquiry",
+    "notes": "Caller asking about water bowl service and coverage/pricing",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-08T07:08:40.819507+00:00",
+    "request_type": "enquiry",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "741a1d51-0d0a-4b97-b355-bca56d67ba61",
+    "item": "Carpet cleaning outside coverage",
+    "notes": "Caller in Kericho/Nakuru, notify if coverage expands",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-08T06:07:10.666765+00:00",
+    "request_type": "callback",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "f30286a5-c8d6-443b-9802-1ee78af420b7",
+    "item": "Dishwashing enquiry",
+    "notes": "Caller requested a callback regarding dishwashing service details",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-07T09:45:28.215426+00:00",
+    "request_type": "callback",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "3f758e81-f302-4e91-9072-fbdc2a15c438",
+    "item": "Kuosha vyombo",
+    "notes": "Inquiry about dishwashing service",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-06T20:18:53.977374+00:00",
+    "request_type": "enquiry",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "a39484c1-9de4-4275-b0a2-606046a0cecd",
+    "item": "Carpet cleaning confirmation message",
+    "notes": "Caller requested a confirmation message for today's carpet cleaning visit in Westlands to plan work",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-05T06:10:20.584985+00:00",
+    "request_type": "callback",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "b40a3a7d-d221-47b9-89c4-432815169d07",
+    "item": "Carpet cleaning",
+    "notes": "Caller requested carpet cleaning for tomorrow, needs location and time follow-up.",
+    "status": "open",
+    "quantity": null,
+    "when_text": "tomorrow",
+    "created_at": "2026-10-04T20:28:49.323+00:00",
+    "request_type": "enquiry",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "fa6520fe-000f-4f8e-8819-8e8fb038338a",
+    "item": "Gilgil service inquiry",
+    "notes": "enquiry — Gilgil service inquiry",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-04T18:55:51.287371+00:00",
+    "request_type": "enquiry",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "f83b358f-a6ae-4587-b6d6-0b517d6dab01",
+    "item": "Kiambu cleaning service request",
+    "notes": "Interested in cleaning services in Kiambu area outside Nairobi coverage",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-04T18:47:14.880814+00:00",
+    "request_type": "callback",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "0002db81-d036-4fcf-b10b-cc48c93d10df",
+    "item": "Window cleaning",
+    "notes": "Wants a quote for window cleaning",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-04T14:46:53.37449+00:00",
+    "request_type": "enquiry",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "d736e9c6-f99a-4c38-a57f-4b46f3da3ba4",
+    "item": "Window cleaning enquiry",
+    "notes": "Interested in window cleaning services",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-04T14:27:28.849256+00:00",
+    "request_type": "enquiry",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "5efb631e-453c-4e6f-ad03-6a19c8739d96",
+    "item": "General cleaning",
+    "notes": "Wants general cleaning all over",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-04T07:05:57.2915+00:00",
+    "request_type": "callback",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "e7bfb2a6-a38d-4236-8501-cfa5dd8e427f",
+    "item": "explanation of cleaning services process",
+    "notes": "Caller requested a callback to explain the detailed process for cleaning services.",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-03T15:56:09.336349+00:00",
+    "request_type": "callback",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "967678aa-79b1-4cdd-9815-6bf1d5d5bd61",
+    "item": "SMS booking confirmation",
+    "notes": "Caller requested SMS confirmation message for tomorrow's booking",
+    "status": "open",
+    "quantity": null,
+    "when_text": "tomorrow at 10:00 AM",
+    "created_at": "2026-09-16T08:47:47.073817+00:00",
+    "request_type": "callback",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "6a6835da-c1f5-49fc-b31f-7223ced595c9",
+    "item": "Carpet cleaning and Pet stain removal",
+    "notes": "Caller wants combined confirmation sent for both jobs tomorrow at 10:00 AM",
+    "status": "open",
+    "quantity": null,
+    "when_text": "tomorrow at 10:00 AM",
+    "created_at": "2026-09-16T08:31:50.342295+00:00",
+    "request_type": "enquiry",
+    "window_start": null,
+    "window_end": null
+   }
+  ],
+  "openAppointments": [
+   {
+    "id": "b140110d-9d62-422e-ae78-2b85cab837c6",
+    "service_name": "Carpet Cleaning (per room)",
+    "status": "requested",
+    "when_text": "Saturday 10 October 2026, 9 AM",
+    "window_start": "2026-10-10T06:00:05.611+00:00",
+    "window_end": "2026-10-10T06:00:05.611+00:00",
+    "address_landmark": "Kitengela, Grace Apartments",
+    "notes": "Kitengela, Grace Apartments",
+    "created_at": "2026-10-09T08:43:43.658441+00:00"
+   },
+   {
+    "id": "47362e7b-a0df-44c2-9e3e-6740192a94f1",
+    "service_name": "Carpet Cleaning",
+    "status": "requested",
+    "when_text": "Friday 9 October 2026, 9 AM",
+    "window_start": "2026-10-09T06:00:29.205+00:00",
+    "window_end": "2026-10-09T06:00:29.205+00:00",
+    "address_landmark": "Kitengela",
+    "notes": "Confirm access/gate upon arrival",
+    "created_at": "2026-10-08T13:47:30.22025+00:00"
+   },
+   {
+    "id": "4860a3b9-48c5-47a1-8f57-a69836ca0d5a",
+    "service_name": "Couch cleaning",
+    "status": "requested",
+    "when_text": "Monday 5 October 2026, morning",
+    "window_start": null,
+    "window_end": null,
+    "address_landmark": "Westlands, ABC",
+    "notes": "Add couch cleaning to today's visit",
+    "created_at": "2026-10-05T06:11:15.671809+00:00"
+   },
+   {
+    "id": "e3b93ac0-171a-4eee-a25c-c1ed634634a6",
+    "service_name": "Couch cleaning",
+    "status": "requested",
+    "when_text": "Monday 5 October 2026, 8 AM",
+    "window_start": "2026-10-05T05:00:04.278+00:00",
+    "window_end": "2026-10-05T05:00:04.278+00:00",
+    "address_landmark": "Westlands",
+    "notes": "confirm access",
+    "created_at": "2026-10-04T20:04:04.835574+00:00"
+   },
+   {
+    "id": "8f114c28-edc5-40a2-9c64-5860146e0463",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "Tomorrow at 9 a.m.",
+    "window_start": "2026-10-05T06:00:39.115+00:00",
+    "window_end": "2026-10-05T06:00:39.115+00:00",
+    "address_landmark": "Westlands, near ABC",
+    "notes": "Carpet cleaning booking",
+    "created_at": "2026-10-04T18:46:39.569987+00:00"
+   },
+   {
+    "id": "6d991592-e9f9-43b4-b209-753ffa4d8a04",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "Monday 5 October 2026, 9 AM",
+    "window_start": "2026-10-05T06:00:18.133+00:00",
+    "window_end": "2026-10-05T06:00:18.133+00:00",
+    "address_landmark": "Westlands ABC",
+    "notes": "confirm access",
+    "created_at": "2026-10-04T14:46:18.621682+00:00"
+   },
+   {
+    "id": "f70b73ea-ed7c-4334-8640-9d4601a895ad",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "Monday 5 October 2026, 9 AM",
+    "window_start": "2026-10-05T06:00:00+00:00",
+    "window_end": "2026-10-05T06:00:00+00:00",
+    "address_landmark": "Westlands, near ABC",
+    "notes": "Confirm access",
+    "created_at": "2026-10-04T14:26:21.035626+00:00"
+   },
+   {
+    "id": "699f3573-38df-4baf-aea6-8fd408cd088f",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "tomorrow at 9 AM",
+    "window_start": "2026-10-05T06:00:56.733+00:00",
+    "window_end": "2026-10-05T06:00:56.733+00:00",
+    "address_landmark": "Westlands, ABC",
+    "notes": "confirm access",
+    "created_at": "2026-10-04T13:58:57.072636+00:00"
+   },
+   {
+    "id": "534b53af-05e4-4ed0-b52d-9516da8d63ba",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "Tomorrow morning",
+    "window_start": null,
+    "window_end": null,
+    "address_landmark": "Westlands, ABC",
+    "notes": "visit — Carpet cleaning — Tomorrow morning — Westlands, ABC",
+    "created_at": "2026-10-04T12:06:16.772933+00:00"
+   },
+   {
+    "id": "cd54de55-910d-4b98-a8ad-38857585d938",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "Tomorrow morning",
+    "window_start": null,
+    "window_end": null,
+    "address_landmark": "Westlands",
+    "notes": "confirm access",
+    "created_at": "2026-10-04T11:01:07.104366+00:00"
+   },
+   {
+    "id": "be30316d-f8c6-4698-8dc1-b382c83e1c4c",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "22 Sep 2026 09:00",
+    "window_start": "2026-09-22T06:00:00+00:00",
+    "window_end": "2026-09-22T06:00:00+00:00",
+    "address_landmark": "Barnabas",
+    "notes": "Carpet cleaning booking request",
+    "created_at": "2026-09-04T03:02:24.15697+00:00"
+   },
+   {
+    "id": "64075dce-084c-4355-a434-6dee71be391a",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "tomorrow at 12:00 PM",
+    "window_start": null,
+    "window_end": null,
+    "address_landmark": "Westlands, Nairobi",
+    "notes": "visit — Carpet cleaning — tomorrow at 12:00 PM — Westlands, Nairobi",
+    "created_at": "2026-08-16T01:39:28.58999+00:00"
+   },
+   {
+    "id": "d7d0b2fd-29f4-465b-a00c-f37461564bec",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "tomorrow at 12:00 PM",
+    "window_start": null,
+    "window_end": null,
+    "address_landmark": "Westlands",
+    "notes": "Carpet cleaning booking",
+    "created_at": "2026-08-16T01:39:18.731367+00:00"
+   },
+   {
+    "id": "751e9c2c-03ef-4ff1-9e3b-beb201041009",
+    "service_name": "Couch cleaning",
+    "status": "requested",
+    "when_text": "Tomorrow at 10:00 AM",
+    "window_start": null,
+    "window_end": null,
+    "address_landmark": "Kilimani, Nairobi",
+    "notes": "Couch cleaning booking at Kilimani tomorrow 10 AM",
+    "created_at": "2026-08-16T01:15:11.301044+00:00"
+   },
+   {
+    "id": "ee40cd35-db6a-4a85-872e-3b9c1152db90",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "Monday morning",
+    "window_start": null,
+    "window_end": null,
+    "address_landmark": "Kilimani Nairobi",
+    "notes": "Caller won't be available, someone else will be on site",
+    "created_at": "2026-08-16T00:52:24.100763+00:00"
+   },
+   {
+    "id": "925cb207-36e2-4ac0-818c-2d9a64c86f18",
+    "service_name": "Couch cleaning",
+    "status": "requested",
+    "when_text": "at 7:00 PM",
+    "window_start": null,
+    "window_end": null,
+    "address_landmark": "Kilimani, Nairobi",
+    "notes": "Couch cleaning",
+    "created_at": "2026-08-16T00:29:40.282581+00:00"
+   }
+  ]
+ },
+ "turns": [
+  {
+   "turn": 1,
+   "caller": "Habari yako,",
+   "language": "sw",
+   "held": "unfinished"
+  },
+  {
+   "turn": 2,
+   "caller": "Habari yako,",
+   "language": "sw",
+   "holdTimedOut": true,
+   "spoken": "Nzuri sana. Nikusaidie vipi leo?"
+  },
+  {
+   "turn": 3,
+   "caller": "I was asking—",
+   "language": "en",
+   "held": "unfinished"
+  },
+  {
+   "turn": 4,
+   "caller": "I was asking—",
+   "language": "en",
+   "holdTimedOut": true,
+   "spoken": "Yes, I am listening. How can I help you today?"
+  },
+  {
+   "turn": 5,
+   "caller": "About my book.",
+   "language": "en",
+   "spoken": "There are no bookings saved under this number right now. Am I speaking with Alvin?",
+   "modelSay": [
+    "Am I speaking with Alvin?",
+    "There are no bookings saved under this number right now."
+   ]
+  },
+  {
+   "turn": 6,
+   "caller": "About my booking.",
+   "language": "en",
+   "spoken": "Am I speaking with Alvin?"
+  },
+  {
+   "turn": 7,
+   "caller": "Yeah.",
+   "language": "en",
+   "spoken": "Carpet Cleaning is two thousand shillings per room. Would you like to make any changes to it?",
+   "modelSay": [
+    "You have a carpet cleaning visit requested for Saturday 10 October 2026 at 9 AM in Kitengela, Grace Apartments.",
+    "Would you like to make any changes to it?"
+   ]
+  },
+  {
+   "turn": 8,
+   "caller": "ate how much.",
+   "language": "en",
+   "spoken": "Carpet cleaning is shilingi elfu mbili per room. Which service would you like to know the price for?"
+  },
+  {
+   "turn": 9,
+   "caller": "Is it?",
+   "language": "en",
+   "spoken": "Yes, carpet cleaning is two thousand shillings per room. Would you like to book this service today?"
+  },
+  {
+   "turn": 10,
+   "caller": "Shh, already—",
+   "language": "en",
+   "held": "unfinished"
+  },
+  {
+   "turn": 11,
+   "caller": "Shh, already— I've booked it.",
+   "language": "en",
+   "spoken": "Understood, Alvin. Is there anything else I can assist you with regarding your booking?"
+  }
+ ],
+ "after": {
+  "fileNameAsks": 2,
+  "noRecordClaimTurn": 5,
+  "visitFactsDroppedTurn": 7
+ }
+}

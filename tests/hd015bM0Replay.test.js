@@ -22,7 +22,9 @@ const { looksLikeOfferAsk } = require('../src/conversation/fileRead');
 const { looksLikeVisitReviewMore } = require('../src/conversation/openLineSpeech');
 const { bargePhaseInputs, decideCallerEvent } = require('../src/speech/turnTaking');
 
-const DUSTED = profileFromSnapshot(TENANT);
+const { ownerCoverage } = require('./helpers/ownerCoverage');
+// Owner row on coverage so BRAIN_CONFIRMED_COVERAGE=on reads the list as fact.
+const DUSTED = ownerCoverage(profileFromSnapshot(TENANT));
 const turn = (n) => FIXTURE.turns[n - 1];
 
 class FakeWebSocket extends EventEmitter {
