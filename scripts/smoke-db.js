@@ -11,39 +11,23 @@ try {
 const SMOKE_DID = '+254200000001';
 
 /**
- * Pick a tenant without maybeSingle() on a non-unique filter.
- * Staging often has several is_active rows; maybeSingle then errors, the
- * script ignores it, and insert collides on tenants_sautikit_virtual_number_key.
+ * Staging smoke writes go to ONE dedicated tenant only: Test Archive Co.
+ * Never fall back to "the first active tenant" (that was Done and Dusted on
+ * staging, so every push to main wrote a SMOKE_ call into a real-looking
+ * tenant, once mid-call). Never insert a tenant. Override with SMOKE_TENANT_ID.
  */
-async function ensureTenant(supabase) {
-  const { data: byDid, error: byDidError } = await supabase
-    .from('tenants')
-    .select('id')
-    .eq('sautikit_virtual_number', SMOKE_DID)
-    .maybeSingle();
-  if (byDidError) throw byDidError;
-  if (byDid?.id) return byDid.id;
+const SMOKE_TENANT_ID = '51a6c7c6-72f9-43f7-b6c2-942960029cca';
 
-  const { data: active, error: activeError } = await supabase
-    .from('tenants')
-    .select('id')
-    .eq('is_active', true)
-    .order('created_at', { ascending: true })
-    .limit(1);
-  if (activeError) throw activeError;
-  if (active?.[0]?.id) return active[0].id;
-
+async function ensureTenant(supabase, tenantId = process.env.SMOKE_TENANT_ID || SMOKE_TENANT_ID) {
   const { data, error } = await supabase
     .from('tenants')
-    .insert({
-      business_name: 'Phase1 Smoke Tenant',
-      sautikit_virtual_number: SMOKE_DID,
-      whatsapp_notification_number: '+254700000000',
-      is_active: true,
-    })
     .select('id')
-    .single();
+    .eq('id', tenantId)
+    .maybeSingle();
   if (error) throw error;
+  if (!data?.id) {
+    throw new Error(`smoke tenant ${tenantId} not found; refusing to write into any other tenant`);
+  }
   return data.id;
 }
 
@@ -113,7 +97,7 @@ async function main() {
   console.log('✓ smoke-db passed');
 }
 
-module.exports = { ensureTenant, SMOKE_DID };
+module.exports = { ensureTenant, SMOKE_DID, SMOKE_TENANT_ID };
 
 if (require.main === module) {
   main().catch((err) => {
