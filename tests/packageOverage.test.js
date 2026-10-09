@@ -2,7 +2,12 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
-const { billableTalkSeconds, quoteCallOverage, inboundOpen } = require("../src/billing/packageOverage");
+const {
+  billableTalkSeconds,
+  quoteCallOverage,
+  inboundOpen,
+  packageUsageThreshold,
+} = require("../src/billing/packageOverage");
 
 function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
@@ -79,23 +84,46 @@ describe("package overage", () => {
     assert.equal(quote.reason, "beta");
   });
 
-  it("rejects the next call when the package is used up and on-demand is off", () => {
+  it("rejects at the cap only when billing is enforced and on-demand is off", () => {
+    for (const enforcement of ["soft", "hard"]) {
+      assert.deepEqual(
+        inboundOpen({ minutesIncluded: 300, secondsUsed: 300 * 60, onDemand: false, enforcement }),
+        { open: false, reason: "package_exhausted" }
+      );
+      assert.deepEqual(
+        inboundOpen({ minutesIncluded: 300, secondsUsed: 300 * 60 - 1, onDemand: false, enforcement }),
+        { open: true, reason: "included" }
+      );
+      assert.deepEqual(
+        inboundOpen({ minutesIncluded: 300, secondsUsed: 300 * 60, onDemand: true, enforcement }),
+        { open: true, reason: "on_demand" }
+      );
+    }
     assert.deepEqual(
-      inboundOpen({ minutesIncluded: 300, secondsUsed: 300 * 60, onDemand: false }),
-      { open: false, reason: "package_exhausted" }
-    );
-    assert.deepEqual(
-      inboundOpen({ minutesIncluded: 300, secondsUsed: 300 * 60 - 1, onDemand: false }),
-      { open: true, reason: "included" }
-    );
-    assert.deepEqual(
-      inboundOpen({ minutesIncluded: 300, secondsUsed: 300 * 60, onDemand: true }),
-      { open: true, reason: "on_demand" }
-    );
-    assert.deepEqual(
-      inboundOpen({ minutesIncluded: 0, secondsUsed: 100, onDemand: false }),
+      inboundOpen({ minutesIncluded: 0, secondsUsed: 100, onDemand: false, enforcement: "soft" }),
       { open: true, reason: "no_package_minutes" }
     );
+  });
+
+  it("never rejects at the cap while billing is off (beta)", () => {
+    for (const enforcement of ["off", "OFF", null, undefined, ""]) {
+      assert.deepEqual(
+        inboundOpen({ minutesIncluded: 300, secondsUsed: 900 * 60, onDemand: false, enforcement }),
+        { open: true, reason: "beta_over_cap" }
+      );
+    }
+    assert.deepEqual(
+      inboundOpen({ minutesIncluded: 300, secondsUsed: 300 * 60, onDemand: false }),
+      { open: true, reason: "beta_over_cap" }
+    );
+  });
+
+  it("usage thresholds are 80% and 100% of included minutes", () => {
+    assert.equal(packageUsageThreshold({ minutesIncluded: 300, secondsUsed: 240 * 60 - 1 }), 0);
+    assert.equal(packageUsageThreshold({ minutesIncluded: 300, secondsUsed: 240 * 60 }), 80);
+    assert.equal(packageUsageThreshold({ minutesIncluded: 300, secondsUsed: 300 * 60 - 1 }), 80);
+    assert.equal(packageUsageThreshold({ minutesIncluded: 300, secondsUsed: 300 * 60 }), 100);
+    assert.equal(packageUsageThreshold({ minutesIncluded: 0, secondsUsed: 999 }), 0);
   });
 
   it("does not bill unanswered outbound ring time", () => {

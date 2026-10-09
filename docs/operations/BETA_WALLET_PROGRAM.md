@@ -6,9 +6,9 @@ Billing modes are **product controls** for metering and on-demand debits. They a
 
 | Mode (`billing_enforcement`) | Charges? | Blocks calls? | Use for |
 |---|---|---|---|
-| `off` | No (meter only) | No, until package minutes are used up **and** on-demand is off | **Beta whitelist** |
-| `soft` | Yes (on-demand past included when opted in) | No | **On-demand soft** — debit scaffolding; ledger debits; do not block at zero |
-| `hard` | Yes | Later (inbound gate not shipped) | **On-demand hard** — charge; future inbound block when product-approved |
+| `off` | No (meter only) | **Never.** Past included minutes, calls are still answered and metered. Ops get one email at 80% and one at 100% per tenant per period | **Beta whitelist** |
+| `soft` | Yes (on-demand past included when opted in) | Yes, at the package minute cap when on-demand is off | **On-demand soft** — debit scaffolding; ledger debits; do not block at zero |
+| `hard` | Yes | Yes, at the package minute cap when on-demand is off. Money-based inbound block not shipped | **On-demand hard** — charge; future inbound block when product-approved |
 
 New workspaces default to **`off`** (beta).
 

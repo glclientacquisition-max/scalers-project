@@ -46,17 +46,46 @@ function quoteCallOverage({
   return { meterSeconds, overageSeconds, debitKes, reason };
 }
 
-function inboundOpen({ minutesIncluded = 0, secondsUsed = 0, onDemand = false } = {}) {
+function isEnforced(enforcement) {
+  const mode = String(enforcement || "off").trim().toLowerCase();
+  return mode === "soft" || mode === "hard";
+}
+
+/**
+ * Inbound gate at the package minute cap.
+ * Beta (`billing_enforcement` off or unknown) never rejects: usage keeps
+ * metering and ops get the 80% / 100% notices instead. Only soft / hard with
+ * on-demand off stop a new call once included minutes are used.
+ */
+function inboundOpen({
+  minutesIncluded = 0,
+  secondsUsed = 0,
+  onDemand = false,
+  enforcement = "off",
+} = {}) {
   const includedMinutes = Math.max(0, Math.round(Number(minutesIncluded) || 0));
   if (includedMinutes <= 0) return { open: true, reason: "no_package_minutes" };
   const used = Math.max(0, Math.round(Number(secondsUsed) || 0));
   if (used < includedMinutes * 60) return { open: true, reason: "included" };
   if (onDemand) return { open: true, reason: "on_demand" };
+  if (!isEnforced(enforcement)) return { open: true, reason: "beta_over_cap" };
   return { open: false, reason: "package_exhausted" };
+}
+
+/** Highest usage notice crossed: 0, 80, or 100 (percent of included minutes). */
+function packageUsageThreshold({ minutesIncluded = 0, secondsUsed = 0 } = {}) {
+  const includedSeconds = Math.max(0, Math.round(Number(minutesIncluded) || 0)) * 60;
+  if (includedSeconds <= 0) return 0;
+  const used = Math.max(0, Math.round(Number(secondsUsed) || 0));
+  if (used >= includedSeconds) return 100;
+  if (used * 100 >= includedSeconds * 80) return 80;
+  return 0;
 }
 
 module.exports = {
   billableTalkSeconds,
   quoteCallOverage,
   inboundOpen,
+  isEnforced,
+  packageUsageThreshold,
 };

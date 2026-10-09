@@ -3,11 +3,13 @@ const assert = require('assert');
 const {
   notePlatformOpsDegrade,
   notePlatformOpsRecovered,
+  notePlatformOpsEvent,
   buildPlatformOpsBody,
   resetPlatformOpsAlert,
   setPlatformOpsDispatch,
   ledgerKind,
 } = require('../src/notifications/platformOpsAlert');
+const { resetPlatformOpsRecipientsCache } = require('../src/notifications/platformOpsRecipients');
 const { resetSonioxProviderHealth, noteSonioxProviderError } = require('../src/speech/sonioxProviderHealth');
 const { classifySonioxError } = require('../src/speech/sonioxErrors');
 
@@ -86,6 +88,39 @@ describe('platformOpsAlert', () => {
     process.env.SCALERS_OPS_ALERT_PHONES = '+254700000099';
     const result = await notePlatformOpsDegrade('speech');
     assert.equal(result.reason, 'no_ops_recipients');
+    assert.equal(called, false);
+  });
+
+  it('one-off ops events go email only to the ops list', async () => {
+    const sent = [];
+    setPlatformOpsDispatch(async (opts) => {
+      sent.push(opts);
+      return { sent: [{ channel: 'email', to: 'ops@scalers.co.ke' }], errors: [] };
+    });
+    process.env.SCALERS_OPS_ALERT_EMAILS = 'ops@scalers.co.ke';
+    const res = await notePlatformOpsEvent({
+      kind: 'platform_ops_package',
+      subject: 'Scalers ops: X at 80% of package minutes',
+      body: 'b',
+    });
+    assert.equal(res.ok, true);
+    assert.deepEqual(sent[0].channels, { sms: false, whatsapp: false, email: true });
+    assert.equal(sent[0].ledger.kind, 'platform_ops_package');
+  });
+
+  it('one-off ops events respect DRY_RUN and empty lists', async () => {
+    let called = false;
+    setPlatformOpsDispatch(async () => {
+      called = true;
+      return { sent: [], errors: [] };
+    });
+    const empty = await notePlatformOpsEvent({ kind: 'platform_ops_package', subject: 's', body: 'b' });
+    assert.equal(empty.reason, 'no_ops_recipients');
+    resetPlatformOpsRecipientsCache();
+    process.env.SCALERS_OPS_ALERT_EMAILS = 'ops@scalers.co.ke';
+    process.env.VOICE_PLATFORM_OPS_DRY_RUN = 'true';
+    const dry = await notePlatformOpsEvent({ kind: 'platform_ops_package', subject: 's', body: 'b' });
+    assert.equal(dry.channel, 'dry_run');
     assert.equal(called, false);
   });
 

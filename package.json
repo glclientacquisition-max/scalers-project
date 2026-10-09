@@ -25,7 +25,7 @@
     "test:action-progress": "node tests/actionProgress.test.js",
     "test:spoken-filter": "node --test tests/spokenFilterDrop.test.js tests/hdEe81GuardEscalation.test.js tests/hdC988ToolTurnStack.test.js",
     "test:tts-cancel": "node tests/sonioxTtsCancel.test.js",
-    "test:soniox-errors": "node --test tests/sonioxErrors.test.js tests/sonioxLanguage.test.js tests/sonioxTtsBilling.test.js tests/sonioxTtsStaleStream.test.js tests/sonioxTtsSilentStream.test.js tests/pcmUtil.test.js tests/voiceProfile.test.js tests/emergencyTts.test.js tests/outageClips.test.js tests/speechOutageNotify.test.js tests/platformOpsAlert.test.js tests/platformOpsRecipients.test.js tests/walletProbe.test.js tests/inboundBillingGate.test.js",
+    "test:soniox-errors": "node --test tests/sonioxErrors.test.js tests/sonioxLanguage.test.js tests/sonioxTtsBilling.test.js tests/sonioxTtsStaleStream.test.js tests/sonioxTtsSilentStream.test.js tests/pcmUtil.test.js tests/voiceProfile.test.js tests/emergencyTts.test.js tests/outageClips.test.js tests/speechOutageNotify.test.js tests/platformOpsAlert.test.js tests/platformOpsRecipients.test.js tests/packageOverage.test.js tests/packageUsageAlerts.test.js tests/walletProbe.test.js tests/inboundBillingGate.test.js",
     "test:soniox-voice": "node --test tests/sonioxVoice.test.js tests/wavPack.test.js",
     "test:timing": "node tests/voiceTiming.test.js",
     "test:filler-pcm": "node tests/fillerPcmCache.test.js",
