@@ -13,7 +13,8 @@
 //             string / enum (DB text as stored), id (never spoken).
 // Templates: visit_open, request_open, requested_at, saved_item, saved_none,
 // team_will_confirm, move_ok, visit_updated, confirm_identity_first,
-// more_open (5397e87c). An unknown template or a missing
+// more_open (5397e87c); past_open, past_row, reask_slot, ask_area and the
+// narrowed more_open (current requests only) from 3808c04e. An unknown template or a missing
 // required slot returns null; Brain then uses its src/conversation/factLine.js.
 // visit_updated never says "moved".
 //
@@ -23,6 +24,7 @@
 const { swahiliClock, swahiliPeriod } = require('../../conversation/swahiliClock');
 const { numberToSw } = require('../spokenForms');
 const { spokenFactsEnabled } = require('./flag');
+const { dayCue, timeAskLine } = require('../../conversation/visitTime');
 
 const TZ_OFFSET_MS = 3 * 60 * 60 * 1000; // Africa/Nairobi, UTC+3 all year
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -203,6 +205,35 @@ function renderFact(slot, lang = 'en', opts = {}) {
 }
 
 const by = (lang, rows) => rows[lang];
+
+// Kind nouns a stored request title can carry. Stripped from the item so the
+// template's own kind word is the only one spoken.
+const REQUEST_KIND_TAIL =
+  /(?:\s*[-:,(]\s*|\s+)(?:enquiry|enquiries|inquiry|inquiries|request|requests|callback(?:\s+request)?|call\s*back(?:\s+request)?|ombi|maombi|order)\)?\s*$/i;
+const REQUEST_KIND_HEAD =
+  /^\s*(?:(?:an?\s+)?(?:open\s+)?(?:enquiry|inquiry|request|callback(?:\s+request)?|ombi|order)\s+(?:about|for|on|of|la|kuhusu|ya)\s+)/i;
+
+/**
+ * A request title as the object of "an open enquiry about ...".
+ * "Water bowl enquiry" -> "water bowl"; "Enquiry about dog food" -> "dog food".
+ * A title that is only a kind noun ("Enquiry") gives '' (the line is not read).
+ * @param {string} item
+ * @returns {string}
+ */
+function requestItemPhrase(item) {
+  let out = String(item || '').replace(/\s+/g, ' ').trim().replace(/[.?!]+$/, '');
+  for (let i = 0; i < 2; i += 1) {
+    const next = out.replace(REQUEST_KIND_HEAD, '').replace(REQUEST_KIND_TAIL, '').trim();
+    if (next === out) break;
+    out = next;
+  }
+  if (!out || /^(?:enquiry|inquiry|request|callback|ombi|order)$/i.test(out)) return '';
+  // "Water bowl" reads as a noun mid-sentence; a Title Case Name or an
+  // acronym stays as stored.
+  const words = out.split(' ');
+  const sentenceCase = /^[A-Z][a-z]/.test(words[0]) && words.slice(1).every((w) => !/[A-Z]/.test(w));
+  return sentenceCase ? out.charAt(0).toLowerCase() + out.slice(1) : out;
+}
 const oneOf = (value, allowed) => {
   const v = String(value || '').toLowerCase();
   return allowed.includes(v) ? v : null;
@@ -233,30 +264,37 @@ const TEMPLATES = {
       });
     },
   },
+  // The item is the request title as stored, which often carries the kind
+  // already ("Water bowl enquiry"). Said once: "an open enquiry about
+  // water bowl", never "open enquiry for Water bowl enquiry" (HD_ceba9d9b3f37).
   request_open: {
     required: ['kind', 'item'],
     render: (r, lang, raw) => {
       const kind = oneOf(raw.kind, ['enquiry', 'callback', 'hold', 'order']);
       if (!kind) return null;
+      // A title that is only a kind noun ("Callback request") is said once
+      // with no item: "You have a callback request."
+      const item = requestItemPhrase(r.item);
+      const pre = (word) => (item ? ` ${word} ${item}` : '');
       const when = and(r.when, ', ');
       return by(lang, {
         en: {
-          enquiry: `You have an open enquiry for ${r.item}${when}.`,
-          callback: `You have a callback request about ${r.item}${when}.`,
-          hold: `You have a hold on ${r.item}${when}.`,
-          order: `You have an order for ${r.item}${when}.`,
+          enquiry: `You have an open enquiry${pre('about')}${when}.`,
+          callback: `You have a callback request${pre('about')}${when}.`,
+          hold: `You have a hold${pre('on')}${when}.`,
+          order: `You have an order${pre('for')}${when}.`,
         },
         sw: {
-          enquiry: `Una ombi la ${r.item}${when}.`,
-          callback: `Una ombi la kupigiwa simu kuhusu ${r.item}${when}.`,
-          hold: `Una ${r.item} uliyoshikiliwa${when}.`,
-          order: `Una oda ya ${r.item}${when}.`,
+          enquiry: `Una ombi${pre('kuhusu')}${when}.`,
+          callback: `Una ombi la kupigiwa simu${pre('kuhusu')}${when}.`,
+          hold: item ? `Una ${item} uliyoshikiliwa${when}.` : `Una kitu ulichoshikiliwa${when}.`,
+          order: `Una oda${pre('ya')}${when}.`,
         },
         sheng: {
-          enquiry: `Uko na enquiry ya ${r.item}${when}.`,
-          callback: `Uko na callback request kuhusu ${r.item}${when}.`,
-          hold: `Uko na hold ya ${r.item}${when}.`,
-          order: `Uko na order ya ${r.item}${when}.`,
+          enquiry: `Uko na enquiry${pre('kuhusu')}${when}.`,
+          callback: `Uko na callback request${pre('kuhusu')}${when}.`,
+          hold: `Uko na hold${pre('ya')}${when}.`,
+          order: `Uko na order${pre('ya')}${when}.`,
         },
       })[kind];
     },
@@ -364,8 +402,9 @@ const TEMPLATES = {
       });
     },
   },
-  // Last line of an open-file read: open rows left out (past-dated, or
-  // requests past the newest four).
+  // An open-file read's count of current open rows not read out (Brain's
+  // four-request cap, or Voice's read-out cap, src/speech/fileReadOut.js).
+  // Past-dated rows are never in it: they are past_open (3808c04e).
   more_open: {
     required: [],
     render: (_, lang, raw) => {
@@ -373,17 +412,89 @@ const TEMPLATES = {
       if (!Number.isInteger(n) || n < 1) return null;
       if (n === 1) {
         return by(lang, {
-          en: 'There is one older open item on file too.',
-          sw: 'Pia kuna ombi lingine moja la zamani lililo wazi kwenye faili.',
-          sheng: 'Pia kuna kitu ingine moja ya zamani iko open kwa file.',
+          en: 'There is one more open request on file.',
+          sw: 'Kuna ombi lingine moja kwenye faili.',
+          sheng: 'Kuna request ingine moja kwa file.',
         });
       }
       return by(lang, {
-        en: `There are ${n} older open items on file too.`,
-        sw: `Pia kuna maombi mengine ${maCount(n)} ya zamani yaliyo wazi kwenye faili.`,
-        sheng: `Pia kuna vitu zingine ${n} za zamani ziko open kwa file.`,
+        en: `There are ${n} more open requests on file.`,
+        sw: `Kuna maombi mengine ${maCount(n)} kwenye faili.`,
+        sheng: `Kuna requests zingine ${n} kwa file.`,
       });
     },
+  },
+  // Past-dated rows still unconfirmed: a count only, never "open" or
+  // "upcoming" (HD_1677e57f73f9 (3)).
+  past_open: {
+    required: [],
+    render: (_, lang, raw) => {
+      const n = Number(raw.count);
+      if (!Number.isInteger(n) || n < 1) return null;
+      if (n === 1) {
+        return by(lang, {
+          en: 'There is one past-dated request the team still has to confirm.',
+          sw: 'Kuna ombi moja la tarehe iliyopita ambalo timu bado haijathibitisha.',
+          sheng: 'Kuna request moja ya date imepita ambayo team bado haija-confirm.',
+        });
+      }
+      return by(lang, {
+        en: `There are ${n} past-dated requests the team still has to confirm.`,
+        sw: `Kuna maombi ${maCount(n)} ya tarehe zilizopita ambayo timu bado haijathibitisha.`,
+        sheng: `Kuna requests ${n} za date zimepita ambazo team bado haija-confirm.`,
+      });
+    },
+  },
+  // The caller named one past-dated row: it has passed, never "open".
+  past_row: {
+    required: ['job'],
+    render: (r, lang, raw) => {
+      if (String(raw.kind || '').toLowerCase() === 'visit') {
+        return by(lang, {
+          en: `The ${r.job} visit request${and(r.when, ' for ')}${and(r.place, ', ')}${r.place ? ',' : ''} has passed and was not confirmed.`,
+          sw: `Ombi la ziara ya ${r.job}${and(r.when, ', ')}${and(r.place, ', ')} limepita na halikuthibitishwa.`,
+          sheng: `${r.job} visit request${and(r.when, ', ')}${and(r.place, ', ')} imepita na haikuconfirmiwa.`,
+        });
+      }
+      const item = requestItemPhrase(r.job) || r.job;
+      return by(lang, {
+        en: `The request about ${item}${r.when ? `, ${r.when},` : ''} has passed and was not confirmed.`,
+        sw: `Ombi kuhusu ${item}${and(r.when, ', ')} limepita na halikuthibitishwa.`,
+        sheng: `Request ya ${item}${and(r.when, ', ')} imepita na haikuconfirmiwa.`,
+      });
+    },
+  },
+  // A rejected create asks for its missing slot, again after a barge-in.
+  // slot when: the visit time ask (Brain's timeAskLine, Swahili clock for
+  // an ambiguous "saa nane"); slot location: where to come.
+  reask_slot: {
+    required: [],
+    render: (_, lang, raw) => {
+      const slot = oneOf(raw.slot, ['when', 'location']);
+      if (!slot) return null;
+      if (slot === 'location') {
+        return by(lang, { en: 'Where should we come?', sw: 'Tuje wapi?', sheng: 'Tukuje wapi?' });
+      }
+      const hour = Number(raw.pending_hour);
+      const pendingHour = Number.isInteger(hour) && hour >= 1 && hour <= 12 ? hour : null;
+      const askCount = Number(raw.ask_count) || 1;
+      if (lang === 'sheng' && pendingHour == null) {
+        const day = dayCue(String(raw.day || ''));
+        const daySw = day === 'tomorrow' || day === 'kesho' ? 'kesho' : day === 'today' || day === 'leo' ? 'leo' : 'siku hiyo';
+        return askCount >= 2 ? 'Asubuhi ama mchana?' : `Ni time gani ${daySw}?`;
+      }
+      return timeAskLine({
+        when: String(raw.day || ''),
+        pendingHour,
+        language: lang === 'en' ? 'en' : 'sw',
+        askCount,
+      });
+    },
+  },
+  // A coverage question with no real place: ask the area, claim nothing.
+  ask_area: {
+    required: [],
+    render: (_, lang) => by(lang, { en: 'Which area are you in?', sw: 'Uko eneo gani?', sheng: 'Uko area gani?' }),
   },
 };
 
@@ -429,6 +540,7 @@ module.exports = {
   renderFact,
   spokenFactsEnabled,
   TEMPLATES: Object.keys(TEMPLATES),
+  requestItemPhrase,
   clockEn,
   eatParts,
 };
