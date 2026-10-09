@@ -25,6 +25,8 @@ function loadParents() {
       nested: adminParentTarget("/admin/businesses/abc"),
       unknown: adminParentTarget("/admin/ops/extra"),
       query: adminParentTarget("/admin/voices/1?x=1"),
+      packages: adminParentTarget("/admin/packages"),
+      billing: adminParentTarget("/admin/billing"),
       labels: ADMIN_LINKS.map((item) => item.label),
     };
     console.log(JSON.stringify(cases));
@@ -75,17 +77,26 @@ describe("admin desk standard shell", () => {
   it("names a nested screen for the parent admin list", () => {
     const got = loadParents();
     assert.equal(got.overview, null);
-    assert.deepEqual(got.billingClient, { href: "/admin", label: "Overview" });
-    assert.deepEqual(got.wallets, { href: "/admin", label: "Overview" });
-    assert.deepEqual(got.ledgerNested, { href: "/admin", label: "Overview" });
+    assert.deepEqual(got.billingClient, { href: "/admin/billing", label: "Billing" });
+    assert.deepEqual(got.wallets, { href: "/admin/billing", label: "Billing" });
+    assert.deepEqual(got.ledgerNested, { href: "/admin/billing", label: "Billing" });
+    assert.deepEqual(got.packages, { href: "/admin/billing", label: "Billing" });
+    assert.equal(got.billing, null);
     assert.equal(got.businesses, null);
     assert.deepEqual(got.nested, { href: "/admin/businesses", label: "Businesses" });
-    assert.deepEqual(got.unknown, { href: "/admin", label: "Overview" });
-    assert.deepEqual(got.query, { href: "/admin/voices", label: "Voices" });
-    assert.ok(got.labels.includes("Packages"));
-    assert.ok(got.labels.includes("Platform"));
+    assert.deepEqual(got.unknown, { href: "/admin", label: "Today" });
+    assert.deepEqual(got.query, { href: "/admin/voices", label: "Settings" });
+    assert.deepEqual(got.labels, [
+      "Today",
+      "Businesses",
+      "Calls",
+      "Billing",
+      "Numbers",
+      "Platform",
+      "Activity",
+      "Settings",
+    ]);
     assert.ok(!got.labels.includes("Ledger"));
-    assert.ok(!got.labels.includes("Billing"));
     for (const label of got.labels) {
       assert.notEqual(label, "Back");
     }
