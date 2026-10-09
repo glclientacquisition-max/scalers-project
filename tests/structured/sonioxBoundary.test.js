@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const Module = require('module');
 const EventEmitter = require('events');
 const { prepareForTts } = require('../../src/speech/ttsNormalize');
+const { wireTextForPiece } = require('../../src/speech/ttsBoundary');
 
 class FakeWebSocket extends EventEmitter {
   constructor() {
@@ -67,7 +68,9 @@ describe('Soniox TTS boundary under VOICE_STRUCTURED_OUTPUT', () => {
       const { wire, taps } = await wireFor(PIECES, { flag });
       assert.deepEqual(
         wire,
-        PIECES.map((p) => prepareForTts(p, { callLanguage: 'en' }).text),
+        // Main's legacy wire since #612: prepareForTts, then a word gap on every
+        // later piece (src/speech/ttsBoundary.js wireTextForPiece).
+        PIECES.map((p, i) => wireTextForPiece(prepareForTts(p, { callLanguage: 'en' }).text, { first: i === 0 })),
         `flag=${flag}`
       );
       assert.equal(taps.length, 0);

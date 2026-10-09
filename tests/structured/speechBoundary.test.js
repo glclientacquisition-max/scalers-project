@@ -27,8 +27,10 @@ describe('structured TTS boundary (the one sanitiser)', () => {
   });
   it('plain place names by default; legacy respellings only with VOICE_STRUCTURED_RESPELL=on', () => {
     assert.match(prepareStructuredPiece('We cover Kitengela and Ruiru.', { env }).text, /Kitengela and Ruiru/);
+    // Main (#612) dropped the built-in Kitengela respelling for lack of listening
+    // evidence, so RESPELL=on has nothing to add for it; the name stays plain.
     const on = prepareStructuredPiece('We cover Kitengela.', { env: { ...env, VOICE_STRUCTURED_RESPELL: 'on' } });
-    assert.match(on.text, /Kee-ten-geh-la/);
+    assert.match(on.text, /Kitengela/);
     assert.match(prepareStructuredPiece('Pay with mpesa.', { env }).text, /M-Pesa/);
   });
   it('tenant lexicon entries still apply', () => {
@@ -47,7 +49,8 @@ describe('structured TTS boundary (the one sanitiser)', () => {
 
 describe('applyLexicon opts (flag-off callers pass three args)', () => {
   it('three-arg calls are unchanged', () => {
-    assert.equal(applyLexicon('Kitengela', 'en', []), 'Kee-ten-geh-la');
+    // Same output as main's three-arg applyLexicon (no built-in place respelling since #612).
+    assert.equal(applyLexicon('Kitengela via mpesa', 'en', []), 'Kitengela via M-Pesa');
   });
   it('builtinRespell false skips syllable respellings only', () => {
     assert.equal(applyLexicon('Kitengela via mpesa', 'en', [], { builtinRespell: false }), 'Kitengela via M-Pesa');
