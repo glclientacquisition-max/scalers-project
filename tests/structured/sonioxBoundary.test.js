@@ -80,9 +80,9 @@ describe('Soniox TTS boundary under VOICE_STRUCTURED_OUTPUT', () => {
   it('flag on: structured boundary, word gap from the second piece, tap sees each piece', async () => {
     const { wire, results, taps } = await wireFor(PIECES, { flag: 'on' });
     assert.deepEqual(wire, [
-      'Yes we cover Kitengela',
-      ' Interior window cleaning is two hundred shillings per window',
-      ' What day and time would work for you',
+      'Yes, we cover Kitengela.',
+      ' Interior window cleaning is two hundred shillings per window.',
+      ' What day and time would work for you?',
     ]);
     assert.doesNotMatch(wire.join(''), /[a-z][A-Z]/);
     assert.equal(results[1].wire, wire[1]);
@@ -91,7 +91,7 @@ describe('Soniox TTS boundary under VOICE_STRUCTURED_OUTPUT', () => {
 
   it('flag on: letterless pieces are refused and do not consume the first slot', async () => {
     const { wire } = await wireFor([',', 'Sure.', ' - ', 'What day works?'], { flag: 'on' });
-    assert.deepEqual(wire, ['Sure', ' What day works']);
+    assert.deepEqual(wire, ['Sure.', ' What day works?']);
   });
 
   it('alreadyPrepared streams (fillers, cached greetings) never use the structured boundary', async () => {
@@ -102,6 +102,6 @@ describe('Soniox TTS boundary under VOICE_STRUCTURED_OUTPUT', () => {
   it('a per-piece locked language reaches the boundary', async () => {
     const { results } = await wireFor(['Bei ni shilingi 6,000.'], { flag: 'on', beginOpts: { lockedLanguage: 'sw' } });
     assert.equal(results[0].language, 'sw');
-    assert.equal(results[0].text, 'Bei ni shilingi elfu sita');
+    assert.equal(results[0].text, 'Bei ni shilingi elfu sita.');
   });
 });

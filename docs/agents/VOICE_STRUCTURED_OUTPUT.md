@@ -57,7 +57,7 @@ English caller. Phase 2 changes the contract instead of adding filters.
 7. **One sanitiser at the TTS boundary** (`structured/speechBoundary.js`):
    strip markup → force the locked pack's TTS language → Sheng rewrite →
    lexicon → spoken forms (numbers, phones, money) → marks. Commas and full stops
-   are removed unless `VOICE_TTS_PROSODY_MARKS=on`; short lists get "and"/"na".
+   are kept for prosody (only `. , ?`) unless `VOICE_TTS_PROSODY_MARKS=off`; short lists get "and"/"na".
    Every piece after the first starts with a space (no glued words) and a piece
    with no letter or digit is refused. `sonioxTts.pushText` routes here when the
    session was opened structured.
@@ -84,7 +84,7 @@ code; they pass through the same boundary but are not regenerated (Phase 3).
 | --- | --- | --- |
 | `VOICE_STRUCTURED_OUTPUT` | off | Phase 2 mouth. Forces streaming on. |
 | `GEMINI_STRUCTURED_MAX_OUTPUT_TOKENS` | 512 | JSON needs more room than prose. |
-| `VOICE_TTS_PROSODY_MARKS` | off | Keep punctuation for Soniox prosody. |
+| `VOICE_TTS_PROSODY_MARKS` | on | Keep `. , ?` for Soniox prosody (matches main's legacy wire since #612). `off` strips them. |
 | `VOICE_STRUCTURED_RESPELL` | off | Built-in syllable respellings in the boundary. |
 | `VOICE_SIM_TAP` | off | Text tap for the simulator (needs `simulator:true` metadata). |
 

@@ -6,18 +6,21 @@
 // Per-tenant enablement (VOICE_STRUCTURED_TENANTS) is Phase 6, not here.
 
 const ON = new Set(['on', '1', 'true', 'yes']);
+const OFF = new Set(['off', '0', 'false', 'no']);
 
 function structuredOutputEnabled(env = process.env) {
   return ON.has(String(env.VOICE_STRUCTURED_OUTPUT || 'off').trim().toLowerCase());
 }
 
 /**
- * Sentence marks at the TTS boundary. off (default) strips them as the
- * legacy path does since #585. on keeps . , ? once a Soniox TTS -> STT
- * round trip shows marks are not voiced when pieces carry a word gap.
+ * Sentence marks at the TTS boundary. on (default, matching main since #612 /
+ * HD_72ab69cbab2b and the staging punctuation A/B) keeps . , ? on the wire:
+ * Soniox voices none of them and they give the comma/stop pauses and the
+ * question rise. off strips them (the original Phase 2 default).
  */
 function prosodyMarksEnabled(env = process.env) {
-  return ON.has(String(env.VOICE_TTS_PROSODY_MARKS || 'off').trim().toLowerCase());
+  const raw = String(env.VOICE_TTS_PROSODY_MARKS || 'on').trim().toLowerCase();
+  return !OFF.has(raw);
 }
 
 /**
