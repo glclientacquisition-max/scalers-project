@@ -8,6 +8,23 @@ import {
   isAdminHostName,
   isLoopbackHost,
 } from "@/lib/adminHost";
+import { ADMIN_CACHE_CONTROL, adminGateRedirect, isNoStoreAdminPath } from "@/lib/adminGate";
+
+/**
+ * Super Admin gate. Runs before any page code: no admin cookie means a redirect with no body.
+ * Every admin response is marked no-store so no shared cache keeps a copy.
+ */
+function adminGate(request: NextRequest, path: string): NextResponse | null {
+  if (!isNoStoreAdminPath(path)) return null;
+  const to = adminGateRedirect(
+    path,
+    request.cookies.getAll().map((c) => c.name),
+    process.env.DASHBOARD_OPEN === "true"
+  );
+  const res = to ? NextResponse.redirect(new URL(to, request.url), 307) : NextResponse.next();
+  res.headers.set("Cache-Control", ADMIN_CACHE_CONTROL);
+  return res;
+}
 
 export function proxy(request: NextRequest) {
   const hostname = hostnameOf(request.headers.get("host"));
@@ -25,7 +42,7 @@ export function proxy(request: NextRequest) {
       dest.port = "";
       return NextResponse.redirect(dest);
     }
-    return NextResponse.next();
+    return adminGate(request, path) || NextResponse.next();
   }
 
   if (adminHost && !isLoopbackHost(hostname) && path.startsWith("/admin")) {
@@ -46,7 +63,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(dest, 308);
   }
 
-  return NextResponse.next();
+  return adminGate(request, path) || NextResponse.next();
 }
 
 export const config = {

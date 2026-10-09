@@ -3,10 +3,12 @@ import { AdminBusinessesPanel } from "@/components/AdminBusinessesPanel";
 import { getAdminOverview } from "@/lib/admin";
 import { noQualityBadges, qualityBadges } from "@/lib/adminQuality";
 import { logAdminError } from "@/lib/adminErrors";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 
 export const instant = false;
 
 export default async function AdminBusinessesPage() {
+  await requireSuperAdmin();
   let overview;
   let badges;
   try {

@@ -2,10 +2,12 @@ import { AdminSetupError } from "@/components/AdminSetupError";
 import { DidPoolManager } from "@/components/DidPoolManager";
 import { logAdminError } from "@/lib/adminErrors";
 import { listDidPool, listPendingTenants } from "@/lib/didPool";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 
 export const instant = false;
 
 export default async function AdminNumbersPage() {
+  await requireSuperAdmin();
   let pool;
   let pendingBusinesses;
   try {

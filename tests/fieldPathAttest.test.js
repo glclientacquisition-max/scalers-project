@@ -46,4 +46,12 @@ describe("GIGO owner attest wiring", () => {
     assert.doesNotMatch(alerts, /CaptureConfirmList/);
     assert.match(form, /owner_field_paths/);
   });
+
+  it("settings save builder attests catalogue name paths", () => {
+    const builder = read("dashboard/src/lib/fieldPathsFromSettingsSave.ts");
+    assert.match(builder, /catalog\.product\.\$\{sku\}\.name/);
+    assert.match(builder, /catalog\.service\.\$\{index \+ 1\}\.name/);
+    assert.match(builder, /includes\("servicesCatalog"\)/);
+    assert.match(builder, /includes\("productCatalog"\)/);
+  });
 });

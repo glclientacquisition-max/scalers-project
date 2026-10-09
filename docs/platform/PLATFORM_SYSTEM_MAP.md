@@ -46,7 +46,7 @@ Status: **live** = production path in code and used. **partial** = code exists, 
 | Caller SMS | Opt-in confirmations | `src/notifications/callerSms.js`; `notify_channels.caller_sms` | **partial** | Default **off**. Templates exist. Do not imply every caller is texted. |
 | Missed text-back | Separate opt-in on failed/no-answer | `src/notifications/missedTextback.js` | **live** (toggle off by default) | Promises callback only. No inbound SMS route. |
 | Desk wa.me | Owner’s personal WhatsApp to the caller | `dashboard/src/components/WhatsAppLink.tsx`; `logWhatsAppFollowUp` | **live** | Click = opened / followed up. **Not** Meta delivery. Writes `lead_status=resolved` + note. |
-| Platform WhatsApp Cloud | Scalers WABA via SautiKit | `src/notifications/whatsapp.js`; `src/sautikit/whatsappInbound.js`; `docs/supabase/whatsapp_threads.sql` | **partial** | Staff templates + inbound ack only. Same E.164 as Done and Dusted **voice**. No shop inbox. |
+| Platform WhatsApp Cloud | Scalers WABA via SautiKit | `src/notifications/whatsapp.js`; `src/sautikit/whatsappInbound.js`; `docs/supabase/whatsapp_threads.sql` | **partial** | Staff templates + inbound ack only. Sender `+254709221536`. Staging voice is `+254709221537` (Done and Dusted). Prod voice on `+254709221536` is Aris Kenya. No shop inbox. |
 | Instagram / other social | Handles on the tenant profile | `tenants.social_handles`; `src/conversation/socialHandles.js` | **docs-only** as a channel | Brain may *read* a handle. There is no IG inbox, Graph, or send. |
 | Wallet / ledger | One prepaid KES wallet | `docs/supabase/one_wallet_billing.sql`; `src/db.js` `chargeCallToWallet`; desk `/wallet` | **live** (beta meters, does not charge) | Do not show dual USD/KES as the product. M-Pesa top-up is a stub. |
 | SMS allowance | Included segments, same on-demand toggle | `docs/supabase/sms_allowance.sql`; `consumeSmsUnits` | **live** if SQL applied; skip tenant SMS if RPC missing | Skip tenant SMS at cap (paid) or `rpc_missing`. Never debit KES for SMS. Never claim sent without a ledger row. |
@@ -209,7 +209,7 @@ Intelligence-before-automation is product law. Platform does not stand up a camp
 
 There is **no** shop Embedded Signup, no per-tenant WABA, no caller WhatsApp templates, no desk composer, no Chatwoot.
 
-Phase 0 dual-use (live until a second DID): voice on `+254709221536` is **Done and Dusted**; Cloud identity on the same E.164 is **Scalers**. Inbound must route on `phone_number_id` `1237105982825100`, never `resolveTenantId(DID)`. Phase 2 (new Kenya DID, then point Scalers tenant at 0709) is Ops + Platform. Do not DELETE the SautiKit number. Do not enable Calling.
+Staging voice is `+254709221537` (**Done and Dusted**, agent Shy). Prod voice is `+254709221536` (**Aris Kenya**, agent Lynn). Cloud identity on `+254709221536` is **Scalers**. Inbound must route on `phone_number_id` `1237105982825100`, never `resolveTenantId(DID)`. Do not DELETE the SautiKit number. Do not enable Calling.
 
 Delivery statuses already parse and persist (`persistWhatsAppStatus`). Desk does not show Meta ticks. Product + Critic lock words **before** Platform surfaces them. Until then, vocab-only.
 
@@ -234,7 +234,7 @@ One prepaid **KES** wallet. AI is inside the minute rate. Dual telecom-KES + AI-
 | Item | Truth |
 | --- | --- |
 | Charge | RPC `charge_call_to_wallet`, idempotent per `call_id`. Voice calls it on completed inbound. |
-| Inbound on-demand | **KES 6 / min** (`billing_rate_card` 0.10/sec) past included minutes. SautiKit inbound is free. |
+| Inbound on-demand | **KES 6 / min** (`billing_rate_card` 0.10/sec) past included minutes. Our SautiKit cost is about KES 0.50 / min (inbound call KES 0 plus WebSocket streaming KES 0.50 / min). |
 | Outbound transfer | **KES 9 / min** stored on the rate card. Not offered and not originated until live transfer. |
 | Beta | `billing_enforcement=off` (default). Meter only. No charge. No outbound PSTN. |
 | Soft / hard | Ops graduates on Admin → Wallets. Hard inbound block **not** shipped. |

@@ -58,8 +58,8 @@ describe("admin desk standard shell", () => {
     assert.doesNotMatch(deskLayout, /ADMIN_LINKS/);
     assert.doesNotMatch(deskLayout, /AdminNav/);
     assert.doesNotMatch(deskLayout, /AdminRail/);
-    assert.match(adminLayout, /isLegacyAuthenticated/);
-    assert.match(adminLayout, /redirect\(\(await getAuthUser\(\)\) \? "\/home" : "\/admin\/login"\)/);
+    assert.match(adminLayout, /await requireSuperAdmin\(\)/);
+    assert.doesNotMatch(adminLayout, /"\/home"/);
     assert.match(deskLayout, /redirect\("\/admin"\)/);
     assert.match(deskLayout, /redirect\("\/login"\)/);
     assert.doesNotMatch(adminLayout, /bg-brand-900/);

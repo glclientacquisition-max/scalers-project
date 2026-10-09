@@ -1,9 +1,8 @@
 // src/sautikit/whatsappInbound.js
-// Phase 0 dual-use (until a second DID exists):
-//   Voice DID +254709221536 still resolves to Done and Dusted via resolveTenantId.
-//   WhatsApp Cloud API on the same E.164 is Scalers (platform).
+// Staging voice is +254709221537 (Done and Dusted, agent Shy).
+// Prod voice is +254709221536 (Aris Kenya, agent Lynn).
+// WhatsApp Cloud API on +254709221536 is Scalers (platform).
 // Inbound chat MUST route on Meta phone_number_id, never resolveTenantId(DID).
-// Phase 2: move Done and Dusted voice to a new DID, then point Scalers tenant at 0709221536.
 // Do not enable WhatsApp Calling. Do not DELETE the SautiKit number.
 
 const PLATFORM_WHATSAPP_PHONE_NUMBER_ID = '1237105982825100';
