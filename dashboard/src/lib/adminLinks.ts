@@ -14,9 +14,27 @@ export const ADMIN_LINKS: readonly AdminLink[] = [
   { href: "/admin/platform", label: "Platform", exact: false },
   { href: "/admin/packages", label: "Packages", exact: false },
   { href: "/admin/businesses", label: "Businesses", exact: false },
+  { href: "/admin/quality", label: "Quality", exact: false },
   { href: "/admin/numbers", label: "Numbers", exact: false },
   { href: "/admin/voices", label: "Voices", exact: false },
 ];
+
+/** Phone bar. Seven labels do not fit at 360 without clipping, so the rest live under More. */
+const PHONE_TAB_HREFS = ["/admin", "/admin/businesses", "/admin/quality", "/admin/numbers"] as const;
+
+export function adminPhoneTabs(): AdminLink[] {
+  const byHref = new Map(ADMIN_LINKS.map((item) => [item.href, item]));
+  return PHONE_TAB_HREFS.map((href) => {
+    const item = byHref.get(href);
+    if (!item) throw new Error(`Missing admin phone tab ${href}`);
+    return item;
+  });
+}
+
+export function adminPhoneMore(): AdminLink[] {
+  const shown = new Set<string>(PHONE_TAB_HREFS);
+  return ADMIN_LINKS.filter((item) => !shown.has(item.href));
+}
 
 export const adminShellClass =
   "admin-theme fixed inset-0 flex min-w-0 overflow-hidden bg-canvas text-ink pt-[env(safe-area-inset-top,0px)]";
@@ -27,6 +45,11 @@ export const adminMainClass =
 function pathOnly(pathname: string) {
   const bare = (pathname.split("?")[0] || "/").replace(/\/+$/, "") || "/";
   return bare;
+}
+
+/** Quality nested screens carry a breadcrumb, so the shell chevron stays off. Phone tabs still hide. */
+export function adminHidesShellBack(pathname: string): boolean {
+  return pathOnly(pathname).startsWith("/admin/quality/");
 }
 
 /** List root for a nested admin path. Null on a destination itself. Label is the parent list, never a generic back word. */

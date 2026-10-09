@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminBusiness } from "@/lib/admin";
+import type { QualityBadge } from "@/lib/adminQualityModel";
+import { formatScore } from "@/lib/adminQualityModel";
 import type { PendingTenant } from "@/lib/didPool";
 import type { WalletLedgerRow } from "@/lib/wallet";
 import { archiveState, releaseBlockReason } from "@/lib/adminBusinessModel";
@@ -127,10 +129,12 @@ export function AdminBusinessesPanel({
   businesses,
   pendingBusinesses,
   availableDids,
+  badges = {},
 }: {
   businesses: AdminBusiness[];
   pendingBusinesses: PendingTenant[];
   availableDids: { e164: string }[];
+  badges?: Record<string, QualityBadge>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -347,16 +351,25 @@ export function AdminBusinessesPanel({
           <Empty title={emptyTitle} line={emptyLine} />
         ) : (
           <ul className="divide-y divide-hairline">
-            {pageRows.map((b) => (
-              <ListRow
-                key={b.id}
-                id={`biz-${b.id}`}
-                title={b.business_name}
-                preview={previewLine(b)}
-                stamp={<Stamp tone={statusTone(b.status)}>{statusLabel(b.status)}</Stamp>}
-                onOpen={() => openShop(b.id)}
-              />
-            ))}
+            {pageRows.map((b) => {
+              const badge = badges[b.id];
+              return (
+                <ListRow
+                  key={b.id}
+                  id={`biz-${b.id}`}
+                  title={b.business_name}
+                  preview={badge?.dropping ? `${previewLine(b)} · ${badge.droppingReason}` : previewLine(b)}
+                  when={badge && badge.score != null ? formatScore(badge.score) : undefined}
+                  stamp={
+                    <span className="inline-flex items-center gap-2">
+                      {badge?.dropping ? <Stamp tone="attention">Dropping</Stamp> : null}
+                      <Stamp tone={statusTone(b.status)}>{statusLabel(b.status)}</Stamp>
+                    </span>
+                  }
+                  onOpen={() => openShop(b.id)}
+                />
+              );
+            })}
           </ul>
         )}
         {filtered.length > PAGE_SIZE ? (
@@ -398,6 +411,24 @@ export function AdminBusinessesPanel({
         {open ? (
           <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
             <ListRow title="Number" preview={phoneLine(open)} />
+            {badges[open.id] ? (
+              <ListRow
+                title="Quality"
+                href={`/admin/quality/${open.id}`}
+                preview={
+                  badges[open.id]?.dropping
+                    ? badges[open.id]?.droppingReason
+                    : formatScore(badges[open.id]?.score ?? null)
+                }
+                stamp={
+                  badges[open.id]?.dropping ? (
+                    <Stamp tone="attention">Dropping</Stamp>
+                  ) : (
+                    <Stamp tone="neutral">{formatScore(badges[open.id]?.score ?? null)}</Stamp>
+                  )
+                }
+              />
+            ) : null}
             <ListRow title="Notify" preview={notifyLabel(open.whatsapp_notification_number)} />
             <ListRow title="Created" preview={formatCreated(open.created_at)} />
             <ListRow
