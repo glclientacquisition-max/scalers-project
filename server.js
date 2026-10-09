@@ -3470,21 +3470,22 @@ mediaWss.on('connection', (ws, req) => {
       // Speak it first, before a local fact or the model reply.
       // While a rejected create is held, its re-ask is not replayed from the
       // queue; Brain's re-ask path below decides (re-ask, retry, callback).
-      const owedSplit = splitOwedOutcome(takeToolOutcome(brainState), brainState);
+      const owedOutcome = takeToolOutcome(brainState);
+      const owedSplit = splitOwedOutcome(owedOutcome, brainState);
       if (owedSplit.reask) {
         console.log(`[ws/media][${callKey}] owed re-ask left to the held create: ${owedSplit.reask}`);
         brainState.conversation.rejectedCreate.reaskUnheard = true;
       }
-      const owedOutcome = owedSplit.outcome;
-      if (owedOutcome) {
+      const owedLine = owedSplit.outcome;
+      if (owedLine) {
         callBrainStates.set(callKey, brainState);
         console.log(`[ws/media][${callKey}] speaking queued tool outcome`);
-        callTranscript.pushAgent(owedOutcome);
-        const owedSpoken = await speakText(owedOutcome);
+        callTranscript.pushAgent(owedLine);
+        const owedSpoken = await speakText(owedLine);
         if (spokenLineReachedCaller(owedSpoken)) {
-          recordSpokenLine(messages, owedOutcome, { source: 'tool_outcome' });
+          recordSpokenLine(messages, owedLine, { source: 'tool_outcome' });
         } else {
-          queueToolOutcome(brainState, owedOutcome);
+          queueToolOutcome(brainState, owedLine);
           callBrainStates.set(callKey, brainState);
         }
       }
