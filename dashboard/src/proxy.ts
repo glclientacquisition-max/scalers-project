@@ -67,5 +67,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image).*)"],
+  // /audio/* (public phone-system clips) never runs the proxy: no admin-host
+  // redirect, no auth gate, no no-store header.
+  matcher: ["/((?!_next/static|_next/image|audio/).*)"],
 };
