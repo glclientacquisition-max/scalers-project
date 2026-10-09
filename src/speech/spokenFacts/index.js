@@ -14,7 +14,8 @@
 // Templates: visit_open, request_open, requested_at, saved_item, saved_none,
 // team_will_confirm, move_ok, visit_updated, confirm_identity_first,
 // more_open (5397e87c); past_open, past_row, reask_slot, ask_area and the
-// narrowed more_open (current requests only) from 3808c04e. An unknown template or a missing
+// narrowed more_open (current requests only) from 3808c04e; ask_need from
+// daebc5d9. An unknown template or a missing
 // required slot returns null; Brain then uses its src/conversation/factLine.js.
 // visit_updated never says "moved".
 //
@@ -495,6 +496,17 @@ const TEMPLATES = {
   ask_area: {
     required: [],
     render: (_, lang) => by(lang, { en: 'Which area are you in?', sw: 'Uko eneo gani?', sheng: 'Uko area gani?' }),
+  },
+  // The caller was cut off before saying what they need (fact-lines
+  // daebc5d9, Aris HD_d3900cbf2b2d): ask for it, confirm nothing, save nothing.
+  ask_need: {
+    required: [],
+    render: (_, lang) =>
+      by(lang, {
+        en: 'Sure, what would you like to know?',
+        sw: 'Sawa, ungependa kujua nini?',
+        sheng: 'Poa, unataka kujua nini?',
+      }),
   },
 };
 

@@ -59,8 +59,8 @@ describe('renderFact', () => {
 });
 
 describe('renderFactLine templates (fact-lines.md)', () => {
-  it('has exactly Brain\'s templates (fact-lines 3808c04e)', () => {
-    assert.deepEqual([...TEMPLATES].sort(), ['ask_area', 'confirm_identity_first', 'more_open', 'move_ok', 'past_open', 'past_row', 'reask_slot', 'request_open', 'requested_at', 'saved_item', 'saved_none', 'team_will_confirm', 'visit_open', 'visit_updated']);
+  it('has exactly Brain\'s templates (fact-lines daebc5d9)', () => {
+    assert.deepEqual([...TEMPLATES].sort(), ['ask_area', 'ask_need', 'confirm_identity_first', 'more_open', 'move_ok', 'past_open', 'past_row', 'reask_slot', 'request_open', 'requested_at', 'saved_item', 'saved_none', 'team_will_confirm', 'visit_open', 'visit_updated']);
     // Every Brain template has Voice wording (no silent fallback).
     const brain = Object.keys(require('../src/conversation/factLine').TEMPLATES).sort();
     assert.deepEqual(brain, [...TEMPLATES].sort());
@@ -254,5 +254,25 @@ describe('fact-lines 3808c04e: past_open, past_row, reask_slot, ask_area (HD_167
     assert.equal(line('ask_area', 'en', {}), 'Which area are you in?');
     assert.equal(line('ask_area', 'sw', {}), 'Uko eneo gani?');
     assert.equal(line('ask_area', 'sheng', {}), 'Uko area gani?');
+  });
+});
+
+describe('fact-lines daebc5d9: ask_need (Aris HD_d3900cbf2b2d)', () => {
+  it('asks what the caller needs, en/sw/sheng, one question, nothing saved or promised', () => {
+    assert.equal(line('ask_need', 'en', {}), 'Sure, what would you like to know?');
+    assert.equal(line('ask_need', 'sw', {}), 'Sawa, ungependa kujua nini?');
+    assert.equal(line('ask_need', 'sheng', {}), 'Poa, unataka kujua nini?');
+    for (const lang of ['en', 'sw', 'sheng']) {
+      const text = line('ask_need', lang, {});
+      assert.equal((text.match(/\?/g) || []).length, 1, text);
+      assert.doesNotMatch(text, /saved|hifadhi|save|request|ombi/i, text);
+    }
+  });
+  it('Voice wording wins over Brain\'s fallback (no silent fallback)', () => {
+    const { fallbackLine } = require('../src/conversation/factLine');
+    if (typeof fallbackLine === 'function') {
+      assert.ok(fallbackLine({ template: 'ask_need', lang: 'en', slots: {} }));
+    }
+    assert.ok(renderFactLine({ template: 'ask_need', lang: 'sw', slots: {} }));
   });
 });
