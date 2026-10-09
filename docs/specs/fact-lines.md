@@ -52,16 +52,19 @@ Source call: HD_d199dbbf6b79 (staging re-dial, 2026-10-09 11:41 EAT).
 - Optional: `when: datetime` (precision `'time'` when the row has a window,
   else `{ text }`), `place: string`.
 - Gate: an `appointments` row for this caller with status `requested` or
-  `confirmed`, read at call start. A visit earlier today (Nairobi day) is
-  today's visit, not a past one.
+  `confirmed`, read at call start, whose time has not passed (Nairobi time).
+  A `confirmed` visit earlier today is still today's visit. A `requested`
+  row whose time has passed is never open or upcoming: it goes to the past
+  bucket (`past_open`, `past_row`).
 - Fires: the open-file read ("what do I have"), a named-row ask that
   matches a visit ("ile carpet cleaning ya Kitengela"), and the name-confirm
   turn when the caller asked about their file before confirming ("About my
   booking" → "Yeah"): then `visit_open` lines come first on that turn, before
   any other content (no price line in front of them).
-- The open-file read says every current open visit (today's included), then
-  the newest four open requests (`request_open`), then `more_open` for the
-  rest.
+- The open-file read, in order: every current open visit (`visit_open`),
+  the newest four current open requests (`request_open`), `more_open` for the
+  current requests over four, then `past_open` for the past-dated rows (a
+  count only, never read row by row).
 - `gate`: `{ appointment_id }`.
 
 ### `request_open` — an open request or hold on the caller file
@@ -135,11 +138,63 @@ Source call: HD_d199dbbf6b79 (staging re-dial, 2026-10-09 11:41 EAT).
 
 ### `more_open` — older open rows left out of the read
 
-- Required: `count: integer` (open rows not read: past-dated, or requests
-  over the four newest).
-- Gate: the open-file read left out `count` open rows of the caller file.
-- Fires: last line of an open-file read when `count > 0`.
+- Required: `count: integer` (current open requests over the four newest).
+  Past-dated rows are not counted here; they are `past_open`.
+- Gate: the open-file read left out `count` current open requests.
+- Fires: after the `request_open` lines when `count > 0`.
+- Wording: "There are N more open requests on file." / "Kuna maombi mengine N
+  kwenye faili."
 - `gate`: `{ open_rows, spoken }`.
+
+### `past_open` — past-dated rows still unconfirmed
+
+- Required: `count: integer`.
+- Gate: `count` caller-file rows still `requested` (visits) or `open`
+  (requests) whose time is before now (Nairobi time). They are never read as
+  open or upcoming.
+- Fires: last line of the open-file read when `count > 0`. A count line only.
+- Wording: "There are N past-dated requests the team still has to confirm." /
+  "Kuna maombi N ya tarehe zilizopita ambayo timu bado haijathibitisha."
+- `gate`: `{ past_rows }`.
+
+### `past_row` — the caller named one past-dated row
+
+- Required: `kind: enum(visit|request)`, `job: string`.
+- Optional: `when: datetime` (`{ text }`), `place: string`.
+- Gate: a named-row ask ("ile ya Kitengela") matches a row in the past bucket.
+- Fires: in place of `visit_open` / `request_open` for that row. Never says
+  the row is open, booked or upcoming.
+- Wording: "The {job} visit request for {when}, {place}, has passed and was
+  not confirmed." / "Ombi la ziara ya {job}, {when}, {place} limepita na
+  halikuthibitishwa."
+- `gate`: `{ appointment_id | request_id, past: true }`.
+
+### `reask_slot` — a rejected create asks for its missing slot
+
+- Required: `slot: enum(when|location)`.
+- Optional: `day: string`, `pending_hour: integer` (Western hour 1-12 of an
+  ambiguous clock), `ask_count: integer`.
+- Gate: `create_appointment` returned `invalid` on this call for a missing or
+  ambiguous slot (e.g. "Visit has a day but no time."). Brain holds the
+  rejected create.
+- Fires: as the confirmation of the rejected turn; again before the model on
+  the next caller turn if the re-ask never reached the caller (barge-in).
+  `slot: when` uses the visit time ask; with `pending_hour` it is the AM/PM
+  ask in Swahili clock wording ("Saa nane usiku au saa nane mchana?").
+- After one re-ask with the slot still missing, or a closing, Brain saves a
+  `create_service_request` of type `callback` instead ("Visit time to
+  confirm."), confirmed by `saved_item`. Hard check: no turn ends with a
+  rejected create and neither a re-ask nor a callback.
+- `gate`: `{ action: 'create_appointment', status: 'invalid', slot }`.
+
+### `ask_area` — a coverage question with no real place
+
+- Slots: none.
+- Gate: the caller asked about coverage ("Do you cover the shops?",
+  "Mnafika maduka?") and the target is not a known place and not a service.
+- Fires: in place of a coverage answer. Makes no coverage claim either way.
+- Wording: "Which area are you in?" / "Uko eneo gani?"
+- `gate`: `{ coverage_target }`.
 
 ### `confirm_identity_first` — the file is masked, confirm the speaker
 
