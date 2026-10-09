@@ -172,6 +172,39 @@ async function listActiveTenantDids() {
 }
 
 /**
+ * The tenant rows that own the dialled number, active or not, and whether the
+ * line is closed (every owner inactive or archived). Fails open: any error, a
+ * DEFAULT_TENANT_ID deploy, or no number gives { closed: false }.
+ * src/sautikit/inactiveTenantGate.js
+ */
+async function inboundTenantLine({ toNumber, fromNumber } = {}) {
+  const { tenantLineState, sameNumber } = require('./sautikit/inactiveTenantGate');
+  if (DEFAULT_TENANT_ID) return { closed: false, reason: 'default_tenant', tenantId: null };
+  const candidates = [toNumber, fromNumber].filter(Boolean);
+  if (!candidates.length) return { closed: false, reason: 'no_number', tenantId: null };
+  try {
+    let { data, error } = await supabase
+      .from('tenants')
+      .select('id, sautikit_virtual_number, is_active, archived_at');
+    if (error && /archived_at|column|schema cache/i.test(error.message || '')) {
+      ({ data, error } = await supabase.from('tenants').select('id, sautikit_virtual_number, is_active'));
+    }
+    if (error) {
+      console.warn('[db] inboundTenantLine:', error.message);
+      return { closed: false, reason: 'lookup_failed', tenantId: null };
+    }
+    for (const candidate of candidates) {
+      const owners = (data || []).filter((row) => sameNumber(row.sautikit_virtual_number, candidate));
+      if (owners.length) return tenantLineState(owners);
+    }
+    return { closed: false, reason: 'no_tenant', tenantId: null };
+  } catch (err) {
+    console.warn('[db] inboundTenantLine:', err?.message || err);
+    return { closed: false, reason: 'lookup_failed', tenantId: null };
+  }
+}
+
+/**
  * New inbound calls stop when the package minute bucket is used up and
  * on-demand is off. Missing columns fail open so a webhook still answers.
  */
@@ -2283,6 +2316,7 @@ async function confirmTenantField({ tenantId, fieldPath, userId = null } = {}) {
 }
 
 module.exports = {
+  inboundTenantLine,
   upsertCall,
   saveCallerInfo,
   saveEscalation,
