@@ -307,8 +307,22 @@ function whenSlot(iso, text, precision = 'time') {
   return null;
 }
 
-/** visit_open / request_open for a file row. */
+/** visit_open / request_open for a file row; past_row for a past-dated one. */
 function fileRowLine(row, lang = 'en') {
+  // HD_1677e57f73f9 (3): a named row whose time has passed is never read as
+  // open or upcoming.
+  if (rowIsPast(row)) {
+    return factLine(
+      'past_row',
+      {
+        kind: row.kind === 'visit' ? 'visit' : String(row.type || 'enquiry').toLowerCase(),
+        job: row.job,
+        when: row.kind === 'visit' ? whenSlot(row.windowStart, row.when) : whenSlot(null, row.when),
+        place: row.place,
+      },
+      { lang, gate: { [row.kind === 'visit' ? 'appointment_id' : 'request_id']: row.id || null, past: true } }
+    );
+  }
   if (row.kind === 'visit') {
     return factLine(
       'visit_open',
@@ -438,12 +452,18 @@ function openFileRead(state, language = 'en', { now = new Date() } = {}) {
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   const spoken = [...visits, ...requests.slice(0, OPEN_READ_REQUESTS)];
   const lines = spoken.map((row) => fileRowLine(row, language));
-  const left = rows.length - spoken.length;
-  if (left > 0) {
-    lines.push(factLine('more_open', { count: left }, { lang: language, gate: { open_rows: rows.length, spoken: spoken.length } }));
+  // HD_1677e57f73f9 (3): past-dated rows still 'requested' are their own
+  // bucket, never read as open or upcoming; only a count.
+  const past = rows.filter(rowIsPast).length;
+  const more = requests.length - Math.min(requests.length, OPEN_READ_REQUESTS);
+  if (more > 0) {
+    lines.push(factLine('more_open', { count: more }, { lang: language, gate: { open_rows: rows.length, spoken: spoken.length } }));
+  }
+  if (past > 0) {
+    lines.push(factLine('past_open', { count: past }, { lang: language, gate: { past_rows: past, now: now.toISOString() } }));
   }
   const rendered = renderLines(lines, { now });
-  return rendered.line ? rendered : null;
+  return rendered.line && spoken.length ? rendered : rendered.line && past ? rendered : null;
 }
 
 /**
@@ -583,8 +603,400 @@ function planConfirmFileRead(state, { language = 'en', now = new Date() } = {}) 
   return { ...read, kind: 'confirm_read' };
 }
 
+// ------------------------------------------- HD_1677e57f73f9 (2, 4) closings
+
+const CLOSING_PART =
+  /^(?:(?:ok(?:ay)?|alright|sawa|yeah|yes|no|um+|uh+) )?(?:ok(?:ay)?|alright|all right|sawa(?: sawa)?|poa|fine|great|yes|yeah|no|hapana|eeh|ehe|ndio|basi|thank you(?: so much| very much)?|thanks(?: a lot)?|asante(?: sana)?|nashukuru|that'?s all|that is all|that'?s it|that is it|that'?s everything|nothing else|no(?:,)? thanks?|no thank you|hiyo tu|ni hiyo tu|ni hayo tu|hayo tu|hakuna kingine|bas(?:i)? hivyo|baadaye(?: basi)?|tutaonana|kwaheri|bye(?: bye)?|goodbye|good bye|see you|have a (?:good|nice|great) day|siku njema)$/i;
+
+/**
+ * "Okay, thank you", "asante", "that's all", "hiyo tu", "Sawa, ni hayo tu.
+ * Baadaye basi." are closings, not questions, and never a goal. Every
+ * clause must be a closing word; a bare "okay" or "sawa" alone is an ack,
+ * not a closing.
+ */
+function isClosingCue(text) {
+  const raw = String(text || '')
+    .toLowerCase()
+    .replace(/[’]/g, "'")
+    .replace(/[—–]/g, ',')
+    .trim();
+  if (!raw || /\?/.test(raw)) return false;
+  const parts = raw
+    .split(/[,.!;]+/)
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  if (!parts.length) return false;
+  if (!parts.every((part) => CLOSING_PART.test(part))) return false;
+  // At least one real closing word: not only "okay" / "sawa" / "yes".
+  return parts.some((part) => !/^(?:ok(?:ay)?|alright|all right|sawa(?: sawa)?|poa|fine|great|yes|yeah|no|hapana|eeh|ehe|ndio|basi)$/.test(part));
+}
+
+const THINKING_FILLER =
+  /^(?:natafakari|nafikiria|ngoja(?: kidogo)?|subiri(?: kidogo)?|let me think|hold on|one (?:sec|second|moment)|wait|um+|uh+|hmm+|mm+|m-m|a-a|eh+|ah+)$/i;
+
+/** A closing or a thinking filler ("Natafakari.") is never a goal. */
+function notAGoal(text) {
+  const raw = String(text || '').trim().replace(/[.!,]+$/g, '').trim();
+  if (!raw) return true;
+  if (isClosingCue(raw)) return true;
+  return THINKING_FILLER.test(raw);
+}
+
+// ------------------------------------- HD_ceba9d9b3f37 (8) review topics
+
+// A done/next line naming one of these topics stays only when the intent or
+// the caller's own words raised it ("Hours were answered." on a booking call
+// that never mentioned hours is dropped).
+const REVIEW_TOPICS = [
+  {
+    topic: 'hours',
+    line: /\b(?:hours?|opening times?|open(?:ing)? (?:days|time)|saa za kazi)\b/i,
+    caller: /\b(?:hours?|open|opening|close|closing|closed|what time do you|saa za kazi|mnafungua|mnafunga|mko wazi|wazi saa)\b/i,
+    intents: ['hours', 'hours_open', 'opening_hours'],
+  },
+  {
+    topic: 'price',
+    line: /\b(?:price[sd]?|pricing|cost|quote|rates?|bei|gharama)\b/i,
+    caller: /\b(?:price|prices|pricing|cost|costs|how much|charge|quote|rates?|bei|gharama|ni ngapi|pesa ngapi|shillings?|ksh|bob)\b/i,
+    intents: ['price', 'pricing', 'quote', 'price_enquiry'],
+  },
+  {
+    topic: 'directions',
+    line: /\b(?:directions?|how to get|route|maelekezo)\b/i,
+    caller: /\b(?:directions?|where are you|located|location|find you|get there|mko wapi|wapi|maelekezo|map)\b/i,
+    intents: ['directions', 'location'],
+  },
+  {
+    topic: 'coverage',
+    line: /\b(?:coverage|covers?|covered|service areas?|areas? (?:we|you) serve)\b/i,
+    caller: /\b(?:cover|covers|coverage|come to|reach|serve|area|mnafika|mnafikia|mnakuja|mnapatikana|mnafanya kazi)\b/i,
+    intents: ['coverage', 'service_area'],
+  },
+  {
+    topic: 'payments',
+    line: /\b(?:payments?|paid|m-?pesa|paybill|till number|deposit|malipo)\b/i,
+    caller: /\b(?:pay|paying|payment|paid|m-?pesa|paybill|till|deposit|cash|card|lipa|kulipa|malipo)\b/i,
+    intents: ['payment', 'payments'],
+  },
+];
+
+/**
+ * Keep only the sentences of an owner-review done/next line whose topic came
+ * up. Returns { text, dropped: [topic...] }.
+ */
+function keepRaisedTopics(text, { intent = '', callerTurns = [] } = {}) {
+  const raw = String(text || '').trim();
+  if (!raw) return { text: '', dropped: [] };
+  const said = (Array.isArray(callerTurns) ? callerTurns : [callerTurns]).join(' ');
+  const intentKeys = (Array.isArray(intent) ? intent : [intent]).map((i) => String(i || '').toLowerCase());
+  const dropped = [];
+  const sentences = raw.match(/[^.!?]+[.!?]*/g) || [raw];
+  const kept = sentences.filter((sentence) => {
+    for (const row of REVIEW_TOPICS) {
+      if (!row.line.test(sentence)) continue;
+      if (row.intents.some((i) => intentKeys.includes(i)) || row.caller.test(said)) continue;
+      dropped.push(row.topic);
+      return false;
+    }
+    return true;
+  });
+  return { text: kept.join(' ').replace(/\s+/g, ' ').trim(), dropped };
+}
+
+// ------------------------------------- HD_1677e57f73f9 (1b) rejected create
+
+/**
+ * A create the guard rejected ("Visit has a day but no time.") is held on
+ * state.conversation.rejectedCreate until it is saved, re-asked once and
+ * answered, or saved as a callback. A turn never ends with it silent.
+ */
+// HD_1677e57f73f9 (follow-up 2): intent stayed general_enquiry for a whole
+// booking call. Only these soft intents are moved to booking.
+const SOFT_INTENTS = new Set(['unknown', 'general_enquiry', 'location', 'availability', 'price', 'product_inquiry', '']);
+
+function slotValue(entity) {
+  if (!entity) return '';
+  if (typeof entity === 'string') return entity.trim();
+  return String(entity.value || '').trim();
+}
+
+/**
+ * Move a soft intent to booking once a visit is being collected (a day or
+ * time plus a service or place on a home-services call) or a create was
+ * attempted. Returns true when it moved.
+ */
+function promoteBookingIntent(state, { profile = {}, createAttempted = false } = {}) {
+  if (!callFixesD199Enabled() || !state) return false;
+  const intent = String(state.intent || '');
+  if (intent === 'booking' || !SOFT_INTENTS.has(intent)) return false;
+  const vertical = String(profile?.vertical || state.vertical || '').toLowerCase();
+  const attempted = createAttempted || Boolean(state.conversation?.rejectedCreate);
+  let collecting = false;
+  if (vertical === 'home_services') {
+    const e = state.entities || {};
+    const when = slotValue(e.when);
+    const job = slotValue(e.service) || slotValue(e.requestedItem);
+    const place = slotValue(e.location) || slotValue(e.landmark);
+    collecting = Boolean(when && (job || place));
+  }
+  if (!attempted && !collecting) return false;
+  state.intent = 'booking';
+  if (state.goal && typeof state.goal === 'object') {
+    state.goal.primary = 'make_booking_request';
+    if (state.goal.status !== 'completed') state.goal.status = 'active';
+  }
+  return true;
+}
+
+function noteRejectedCreate(state, { slot = 'when', whenText = '', appointment = null, now = new Date() } = {}) {
+  if (!callFixesD199Enabled() || !state) return null;
+  if (!state.conversation) state.conversation = {};
+  promoteBookingIntent(state, { createAttempted: true });
+  const prev = state.conversation.rejectedCreate;
+  state.conversation.rejectedCreate = {
+    slot,
+    whenText: String(whenText || ''),
+    appointment: appointment && typeof appointment === 'object' ? { ...appointment } : prev?.appointment || null,
+    reasks: prev?.reasks || 0,
+    at: now.toISOString(),
+    turn: Number(state.conversation.turnCount || 0),
+  };
+  return state.conversation.rejectedCreate;
+}
+
+function callerPendingHour(state) {
+  const { swahiliPendingHourOf } = require('./visitTime');
+  const answers = state?.conversation?.answersReceived || [];
+  for (let i = answers.length - 1; i >= 0; i -= 1) {
+    const hour = swahiliPendingHourOf(answers[i]);
+    if (hour) return hour;
+  }
+  return state?.conversation?.pendingHour ?? null;
+}
+
+/** reask_slot for the held rejected create (the AM/PM ask when "saa 8" was said). */
+function reaskSlotLine(state, language = 'en') {
+  const pending = state?.conversation?.rejectedCreate;
+  if (!pending) return null;
+  const { dayCue, whenValue } = require('./visitTime');
+  const day = dayCue(pending.whenText) || dayCue(whenValue(state)) || '';
+  const hour = pending.slot === 'when' ? callerPendingHour(state) : null;
+  return renderLines([
+    factLine(
+      'reask_slot',
+      { slot: pending.slot, day: day || undefined, pending_hour: hour ?? undefined, ask_count: (pending.reasks || 0) + 1 },
+      { lang: language, gate: { rejected: 'create_appointment', reason: 'Visit has a day but no time.' } }
+    ),
+  ]);
+}
+
+const TIME_ASK_SPOKEN =
+  /\b(?:saa ngapi|what time|which time|morning or|asubuhi au|mchana au|usiku au|jioni au|in the morning or|am or pm)\b|\bsaa \p{L}+(?: na \p{L}+)? (?:asubuhi|mchana|jioni|usiku) au\b/iu;
+
+/** Caller turn bookkeeping: count a spoken re-ask; note a time that came in. */
+function observeRejectedCreate(state, { lastAgentText = '' } = {}) {
+  const pending = state?.conversation?.rejectedCreate;
+  if (!callFixesD199Enabled() || !pending) return;
+  if (pending.slot === 'when' && TIME_ASK_SPOKEN.test(String(lastAgentText || ''))) {
+    pending.reasks = (pending.reasks || 0) + 1;
+    if (!(state.conversation.questionsAsked || []).slice(-1).includes('time')) {
+      state.conversation.questionsAsked = [...(state.conversation.questionsAsked || []), 'time'];
+    }
+  }
+}
+
+function rejectedSlotFilled(state) {
+  const pending = state?.conversation?.rejectedCreate;
+  if (!pending) return false;
+  if (pending.slot !== 'when') return false;
+  const { whenValue, whenHasClockTime } = require('./visitTime');
+  const when = whenValue(state);
+  return Boolean(when) && whenHasClockTime(when);
+}
+
+function rejectedCallback(state) {
+  const pending = state?.conversation?.rejectedCreate || {};
+  const appt = pending.appointment || {};
+  const { whenValue, dayCue } = require('./visitTime');
+  const service = String(appt.serviceName || appt.service_name || entityText(state?.entities?.service) || 'visit');
+  const place = String(appt.landmark || appt.location || entityText(state?.entities?.location) || '');
+  const said = (state?.conversation?.answersReceived || []).slice(-4).join(' ');
+  const day = dayCue(pending.whenText) || dayCue(whenValue(state)) || '';
+  return {
+    type: 'callback',
+    name: String(state?.caller?.name || appt.name || ''),
+    item: service,
+    whenText: day,
+    notes: [
+      'Visit time to confirm.',
+      place ? `Place: ${place}.` : '',
+      said ? `Caller said: ${said}`.slice(0, 240) : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+  };
+}
+
+function entityText(value) {
+  if (value && typeof value === 'object') return String(value.value || '');
+  return String(value || '');
+}
+
+/**
+ * Before the model, while a rejected create is held:
+ *  - the slot came in: retry the create with it (kind 'retry');
+ *  - the re-ask was spoken once and not answered, or the caller is closing:
+ *    save a callback request so the call is never lost (kind 'callback');
+ *  - the re-ask never reached the caller (barge-in, model spoke over it):
+ *    speak reask_slot now (kind 'reask').
+ */
+function planRejectedCreate(state, { language = 'en', text = '' } = {}) {
+  if (!callFixesD199Enabled()) return null;
+  const pending = state?.conversation?.rejectedCreate;
+  if (!pending) return null;
+  const latest = String(text || (state?.conversation?.answersReceived || []).slice(-1)[0] || '');
+  if (rejectedSlotFilled(state) && pending.appointment) {
+    const { whenValue, dayCue } = require('./visitTime');
+    const said = whenValue(state);
+    const day = dayCue(said) ? '' : dayCue(pending.whenText);
+    const when = `${day} ${said}`.trim();
+    return {
+      kind: 'retry',
+      parsed: { appointment: { ...pending.appointment, whenText: when, when_text: when }, brainRescue: true },
+    };
+  }
+  if ((pending.reasks || 0) >= 1 || isClosingCue(latest)) {
+    return { kind: 'callback', parsed: { serviceRequest: rejectedCallback(state), brainRescue: true } };
+  }
+  const reask = reaskSlotLine(state, language);
+  if (!reask?.line) return { kind: 'callback', parsed: { serviceRequest: rejectedCallback(state), brainRescue: true } };
+  return { kind: 'reask', line: reask.line, lines: reask.lines };
+}
+
+/** The code re-ask was spoken: count it and hold the hour for the AM/PM answer. */
+function markReaskSpoken(state) {
+  const pending = state?.conversation?.rejectedCreate;
+  if (!pending) return;
+  pending.reaskSpokenTurn = Number(state.conversation.turnCount || 0);
+  const hour = callerPendingHour(state);
+  if (hour != null && state.conversation.pendingHour == null) state.conversation.pendingHour = hour;
+}
+
+/** Results of a tool turn settle the held create (saved, callback, or still rejected). */
+function settleRejectedCreate(state, results = []) {
+  if (!callFixesD199Enabled() || !state?.conversation?.rejectedCreate) return;
+  const saved = (results || []).some(
+    (r) =>
+      ['create_appointment', 'create_service_request', 'update_appointment'].includes(r?.action) &&
+      ['succeeded', 'updated', 'duplicate'].includes(r?.status)
+  );
+  if (saved) state.conversation.rejectedCreate = null;
+}
+
+/**
+ * Hard check (HD_1677e57f73f9 1b): a turn with a rejected create must speak
+ * the re-ask or save a callback. True when this turn broke that.
+ */
+function rejectedCreateUnhandled(state, { spoken = '', results = [] } = {}) {
+  if (!callFixesD199Enabled()) return false;
+  const rejected = (results || []).some((r) => r?.action === 'create_appointment' && r?.status === 'invalid');
+  const pending = state?.conversation?.rejectedCreate;
+  if (!rejected && !pending) return false;
+  const callback = (results || []).some(
+    (r) => r?.action === 'create_service_request' && ['succeeded', 'duplicate'].includes(r?.status)
+  );
+  if (callback || (!pending && !rejected)) return false;
+  return !TIME_ASK_SPOKEN.test(String(spoken || '')) && !/\b(?:tuje wapi|where should we come)\b/i.test(String(spoken || ''));
+}
+
+// ------------------------------------------- HD_1677e57f73f9 (5) shared line
+
+const ROLE_WORDS = new Set([
+  'mteja', 'wateja', 'customer', 'client', 'caller', 'mpigaji', 'mgeni', 'guest',
+  'boss', 'madam', 'madame', 'sir', 'mama', 'baba', 'mzee', 'dada', 'kaka', 'rafiki',
+  'friend', 'owner', 'tenant', 'landlord', 'manager', 'someone', 'somebody', 'mtu',
+]);
+
+/**
+ * Leftover words of a saved alternate name (after crumbs and the owner's own
+ * words) name another person: each word is capitalised as the name extractor
+ * saves names, none is a role word, and it is not a cut-off of the owner's
+ * name. "so disappointed", "impressed by your", "Mteja" and "Chr" (for
+ * Chris) are not people.
+ */
+function alternateNamesAPerson(words = [], owner = '') {
+  const list = (Array.isArray(words) ? words : String(words || '').split(/\s+/)).filter(Boolean);
+  if (!list.length) return false;
+  if (list.some((w) => ROLE_WORDS.has(w.toLowerCase()))) return false;
+  // A cut-off of the owner's own name ("Chr" for Chris) is the owner.
+  const ownerWords = String(owner || '').toLowerCase().split(/\s+/).filter(Boolean);
+  if (list.every((w) => ownerWords.some((o) => o.startsWith(w.toLowerCase()) && w.length < o.length))) return false;
+  return list.every((w) => /^\p{Lu}/u.test(w));
+}
+
+const ALT_CRUMB =
+  /^(?:speaking|speak|speaks|bwana|mr|mrs|ms|miss|the|a|an|my|your|by|of|to|for|and|with|from|aje|nauliza|jina|name|uh|um|yes|yeah|this|is|am|i|im|it's|its|here|ni|mimi|naitwa)$/i;
+
+/**
+ * A saved alternate name is another person on the line. Flag off: always
+ * true (the caller's existing check decides). On: crumbs and the owner's own
+ * words are removed, then alternateNamesAPerson decides.
+ */
+function alternateIsAPerson(primary, alternate) {
+  if (!callFixesD199Enabled()) return true;
+  const owner = new Set(String(primary || '').toLowerCase().split(/\s+/).filter(Boolean));
+  const leftover = String(alternate || '')
+    .replace(/[.,!?]+/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w && !ALT_CRUMB.test(w) && !owner.has(w.toLowerCase()));
+  return alternateNamesAPerson(leftover, primary);
+}
+
+// ------------------------------------------- HD_1677e57f73f9 (6) ask_area
+
+const COVER_VERB =
+  /\b(?:do you|can you|d'you|you guys)\s+(?:cover|serve|service|come to|go to|reach|work in)\s+(.+)$|^(?:mnafika|mnaja|mnafanya kazi)\s+(.+)$/i;
+
+/**
+ * "Do you cover the shops?": a coverage question with no real place in it.
+ * Ask which area (ask_area); no coverage claim either way. A service word
+ * ("do you cover carpets") or a file row is not this.
+ */
+function coverageAskWithoutPlace(text, profile = {}) {
+  if (!callFixesD199Enabled()) return null;
+  const value = String(text || '').replace(/[?!.]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const m = COVER_VERB.exec(value);
+  if (!m) return null;
+  const target = String(m[1] || m[2] || '').replace(/^(?:the|in|at|to)\s+/i, '').trim();
+  if (!target) return null;
+  if (/\b(clean|cleaning|carpet|couch|sofa|mattress|fumigation|plumb|electric|price|hours|window|kitchen)\w*/i.test(target)) return null;
+  const service = serviceWordsOf(profile);
+  if (target.toLowerCase().split(/[^\p{L}]+/u).some((w) => service.has(w))) return null;
+  if (coverageRealPlace(target, profile)) return null;
+  return target;
+}
+
+function askAreaLine(language = 'en', { asked = '' } = {}) {
+  return renderLines([factLine('ask_area', {}, { lang: language, gate: { coverage_target: asked, real_place: false } })]);
+}
+
 module.exports = {
   FLAG,
+  isClosingCue,
+  notAGoal,
+  noteRejectedCreate,
+  observeRejectedCreate,
+  planRejectedCreate,
+  markReaskSpoken,
+  settleRejectedCreate,
+  rejectedCreateUnhandled,
+  reaskSlotLine,
+  coverageAskWithoutPlace,
+  askAreaLine,
+  alternateNamesAPerson,
+  promoteBookingIntent,
+  alternateIsAPerson,
+  keepRaisedTopics,
   callFixesD199Enabled,
   isFillerPhrase,
   looksLikeTimeFragment,

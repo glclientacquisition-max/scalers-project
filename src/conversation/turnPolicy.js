@@ -268,6 +268,16 @@ function resolveLocalReply({
 
   const coverageLine = coverageAskSpeech(clean, profile, language, state);
   if (coverageLine) return publish({ outcome: 'coverage', line: coverageLine });
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 6): "Do you cover the shops?" names
+  // no real place. Ask which area (ask_area); no coverage claim either way.
+  {
+    const fixes = require('./callFixesD199');
+    const asked = fixes.coverageAskWithoutPlace(clean, profile);
+    if (asked) {
+      const area = fixes.askAreaLine(language, { asked });
+      if (area.line) return publish({ outcome: 'ask_area', line: area.line, lines: area.lines });
+    }
+  }
 
   const placeBlockLine = visitBlockSpeech(
     state?.visitPlace?.blocked,

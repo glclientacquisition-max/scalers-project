@@ -16,6 +16,10 @@ const TEMPLATES = {
   visit_updated: { required: [], optional: ['to_when', 'place'] },
   confirm_identity_first: { required: [], optional: ['name', 'ask'] },
   more_open: { required: ['count'], optional: [] },
+  past_open: { required: ['count'], optional: [] },
+  past_row: { required: ['kind', 'job'], optional: ['when', 'place'] },
+  reask_slot: { required: ['slot'], optional: ['day', 'pending_hour', 'ask_count'] },
+  ask_area: { required: [], optional: [] },
 };
 
 let voiceRenderer;
@@ -174,9 +178,46 @@ function fallbackLine(line, now = new Date()) {
     }
     case 'more_open': {
       const n = Number(slots.count);
-      if (sw) return n === 1 ? 'Kuna kitu kingine kimoja cha zamani kwenye faili.' : `Kuna vitu ${n} vingine vya zamani kwenye faili.`;
-      return n === 1 ? 'There is one older open item on file too.' : `There are ${n} older open items on file too.`;
+      if (sw) return n === 1 ? 'Kuna ombi lingine moja kwenye faili.' : `Kuna maombi mengine ${n} kwenye faili.`;
+      return n === 1 ? 'There is one more open request on file.' : `There are ${n} more open requests on file.`;
     }
+    case 'past_open': {
+      const n = Number(slots.count);
+      if (sw) {
+        return n === 1
+          ? 'Kuna ombi moja la tarehe iliyopita ambalo timu bado haijathibitisha.'
+          : `Kuna maombi ${n} ya tarehe zilizopita ambayo timu bado haijathibitisha.`;
+      }
+      return n === 1
+        ? 'There is one past-dated request the team still has to confirm.'
+        : `There are ${n} past-dated requests the team still has to confirm.`;
+    }
+    case 'past_row': {
+      const when = s('when');
+      const where = s('place');
+      if (slots.kind === 'visit') {
+        if (sw) return `Ombi la ziara ya ${s('job')}${tail(when, where)} limepita na halikuthibitishwa.`;
+        return `The ${s('job')} visit request${when ? ` for ${when}` : ''}${where ? `, ${where},` : ''} has passed and was not confirmed.`;
+      }
+      if (sw) return `Ombi la ${s('job')}${tail(when)} limepita na halikuthibitishwa.`;
+      return `The request for ${s('job')}${when ? `, ${when},` : ''} has passed and was not confirmed.`;
+    }
+    case 'reask_slot': {
+      if (slots.slot === 'when') {
+        // eslint-disable-next-line global-require
+        const { timeAskLine } = require('./visitTime');
+        return timeAskLine({
+          when: String(slots.day || ''),
+          pendingHour: present(slots.pending_hour) ? Number(slots.pending_hour) : null,
+          language: line.lang,
+          askCount: Number(slots.ask_count) || 1,
+        });
+      }
+      if (slots.slot === 'location') return sw ? 'Tuje wapi?' : 'Where should we come?';
+      return '';
+    }
+    case 'ask_area':
+      return sw ? 'Uko eneo gani?' : 'Which area are you in?';
     case 'confirm_identity_first': {
       const name = s('name');
       if (sw) {

@@ -241,10 +241,15 @@ function classifyLivedVisit(row, now = new Date()) {
   } else if (pastMode === 'date' && dayKey) {
     past = dayKey < eatYmd(now);
   }
-  // BRAIN_CALL_FIXES_D199 (e): a visit earlier today (EAT) is still today's
-  // visit. HD_d199dbbf6b79 read Friday 9 AM at 11:41 as "past" and dropped it.
+  // BRAIN_CALL_FIXES_D199 (e): a confirmed visit earlier today (EAT) is still
+  // today's visit. HD_1677e57f73f9 (3): one still 'requested' whose time has
+  // passed is past (today's 9 AM at 1 PM), never open or upcoming.
   const todayStill =
-    past && dayKey && dayKey === eatYmd(now) && require('./callFixesD199').callFixesD199Enabled();
+    past &&
+    dayKey &&
+    dayKey === eatYmd(now) &&
+    String(row?.status || '').toLowerCase() === 'confirmed' &&
+    require('./callFixesD199').callFixesD199Enabled();
   if (todayStill) past = false;
 
   const spokenDay = past ? 'past' : spokenDayWord(dayKey, now) || null;

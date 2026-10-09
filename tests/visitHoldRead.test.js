@@ -18,6 +18,11 @@ const BOOKING_DENIAL = "I don't have a booking for you.";
 const HOLD_DENIAL = "I don't have an order or a hold for you.";
 const NOTHING_OPEN = 'Nothing is still open.';
 
+// BRAIN_CALL_FIXES_D199=on (HD_1677e57f73f9 item 3): a past-dated requested
+// visit is only in the past_open count line, never read as open.
+const PAST_RULE = () => require('../src/conversation/callFixesD199').callFixesD199Enabled();
+const PAST_ONE = 'There is one past-dated request the team still has to confirm.';
+
 function played(turn) {
   assert.equal(turn.local, null);
   return turn.state.conversation.fileReadSentence;
@@ -67,14 +72,27 @@ describe('visit and hold read before the empty-file line', () => {
         },
       ],
     });
-    assert.match(card.openVisits.join(' '), /carpet cleaning/i);
+    if (PAST_RULE()) {
+      assert.doesNotMatch(card.openVisits.join(' '), /carpet cleaning/i);
+      assert.equal(card.pastOpenCount, 1);
+    } else {
+      assert.match(card.openVisits.join(' '), /carpet cleaning/i);
+      assert.match(card.openVisits.join(' '), /past/i);
+    }
     assert.match(card.openVisits.join(' '), /pet stain/i);
     assert.match(card.nextAppointment, /pet stain/i);
-    assert.match(card.openVisits.join(' '), /past/i);
     const state = boundState(card, 'home_services');
     assert.equal(hasReadableFile(state), true);
     const line = heard(card, "I'm inquiring about my bookings");
     assert.match(line, /You have pet stain, tomorrow 10:00 AM/);
+    if (PAST_RULE()) {
+      assert.equal(line, `You have pet stain, tomorrow 10:00 AM. ${PAST_ONE}`);
+      const pastBlock = formatReturningCallerForPrompt(bindCallerMemoryCard(card, 'Alvin'));
+      assert.doesNotMatch(pastBlock, /Open: visit \| carpet cleaning/i);
+      assert.match(pastBlock, /Open: visit \| pet stain/i);
+      assert.match(pastBlock, /Past-dated, not confirmed: 1 row/);
+      return;
+    }
     assert.match(line, /You have carpet cleaning, past/);
     assert.doesNotMatch(line, /these visits/i);
     assert.notEqual(line, BOOKING_DENIAL);
@@ -336,8 +354,13 @@ describe('backend read plays instead of an unnamed-visit question', () => {
     const yes = say('Yes', 'Am I speaking with Alvin?');
     assert.equal(yes.state.caller.nameConfirmed, true);
     const line = played(yes);
-    assert.match(line, /You have carpet cleaning, past/i);
-    assert.match(line, /Rongai/);
+    if (PAST_RULE()) {
+      assert.doesNotMatch(line, /carpet cleaning|Rongai/i);
+      assert.match(line, new RegExp(PAST_ONE));
+    } else {
+      assert.match(line, /You have carpet cleaning, past/i);
+      assert.match(line, /Rongai/);
+    }
     assert.match(line, /You have pet stain, tomorrow 10:00 AM/i);
     assert.match(line, /You have a Atomic Habits request/i);
     assert.match(line, /sofa cleaning/i);
@@ -356,13 +379,23 @@ describe('backend read plays instead of an unnamed-visit question', () => {
     say('Yes', 'Am I speaking with Alvin?');
     const upcoming = say('which ones are upcoming?');
     assert.match(played(upcoming), /pet stain, tomorrow 10:00 AM/i);
-    assert.match(played(upcoming), /carpet cleaning/i);
+    if (PAST_RULE()) {
+      assert.doesNotMatch(played(upcoming), /carpet cleaning/i);
+      assert.match(played(upcoming), new RegExp(PAST_ONE));
+    } else {
+      assert.match(played(upcoming), /carpet cleaning/i);
+    }
     assert.match(played(upcoming), /Atomic Habits/i);
     assert.doesNotMatch(played(upcoming), /specific detail/i);
     assert.doesNotMatch(played(upcoming), /these visits/i);
     const read = say('can you read them to me?');
     assert.match(played(read), /pet stain/i);
-    assert.match(played(read), /carpet cleaning/i);
+    if (PAST_RULE()) {
+      assert.doesNotMatch(played(read), /carpet cleaning/i);
+      assert.match(played(read), new RegExp(PAST_ONE));
+    } else {
+      assert.match(played(read), /carpet cleaning/i);
+    }
     assert.doesNotMatch(played(read), /anything else you'd like to do/i);
     assert.doesNotMatch(played(read), /either of them/i);
   });
@@ -375,7 +408,12 @@ describe('backend read plays instead of an unnamed-visit question', () => {
     const later = say('What are my bookings?');
     assert.equal(later.state.caller.nameConfirmed, true);
     assert.match(played(later), /You have pet stain, tomorrow 10:00 AM/);
-    assert.match(played(later), /You have carpet cleaning/);
+    if (PAST_RULE()) {
+      assert.doesNotMatch(played(later), /carpet cleaning/i);
+      assert.match(played(later), new RegExp(PAST_ONE));
+    } else {
+      assert.match(played(later), /You have carpet cleaning/);
+    }
     assert.match(played(later), /Atomic Habits/);
     assert.doesNotMatch(played(later), /something specific|these visits|either of them|anything else/i);
     const hold = say('What do I have on hold?');
@@ -469,12 +507,20 @@ describe('windowless requested visits and compliments', () => {
 
   it('reads every windowless requested visit, not only the dated visit and two requests', () => {
     const card = dialCard();
-    assert.equal(card.openVisits.length, 7);
     const line = heard(card, 'What are my bookings?');
     assert.notEqual(line, NOTHING_OPEN);
-    assert.match(line, /Pet stain removal/);
-    assert.match(line, /carpet and pet stain/);
-    assert.match(line, /callback SMS confirmation/);
+    if (PAST_RULE()) {
+      // Pet stain removal and both requests are dated 17 Sep: past.
+      assert.equal(card.openVisits.length, 6);
+      assert.equal(card.pastOpenCount, 3);
+      assert.doesNotMatch(line, /Pet stain removal|carpet and pet stain|callback SMS confirmation/);
+      assert.match(line, /There are 3 past-dated requests the team still has to confirm\.$/);
+    } else {
+      assert.equal(card.openVisits.length, 7);
+      assert.match(line, /Pet stain removal/);
+      assert.match(line, /carpet and pet stain/);
+      assert.match(line, /callback SMS confirmation/);
+    }
     assert.equal((line.match(/You have Couch cleaning, Kilimani/g) || []).length, 2);
     assert.match(line, /You have Carpet cleaning, Kilimani/);
     assert.equal((line.match(/You have Carpet cleaning, Westlands/g) || []).length, 2);
@@ -598,6 +644,19 @@ describe('a when stays on the row that has it', () => {
 
   it('does not give a windowless row a sibling when, and says the Barnabas date once', () => {
     const card = dialCard();
+    if (PAST_RULE()) {
+      // Every dated row (Aug 16 "at 7:00 PM", "Monday morning", "tomorrow at
+      // 12:00 PM", 22 Sep 09:00) has passed; only the undated Runda row is open.
+      assert.deepEqual(card.openVisits, ['Mattress cleaning | requested | Runda']);
+      assert.equal(card.pastOpenCount, 5);
+      const pastSentence = heard(card, 'What are my bookings?');
+      assert.equal(
+        pastSentence,
+        'You have Mattress cleaning, Runda. There are 5 past-dated requests the team still has to confirm.'
+      );
+      assert.doesNotMatch(pastSentence, /Couch|Kilimani|Westlands|Barnabas|22 Sep|12:00/);
+      return;
+    }
     const lines = card.openVisits.join(' || ');
     assert.match(lines, /Couch cleaning \| requested \| Kilimani/);
     assert.doesNotMatch(lines, /7:00/);

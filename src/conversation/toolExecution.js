@@ -1350,6 +1350,10 @@ function formatToolConfirmation(results = [], language = 'en') {
     if (meaningful.status === 'invalid') {
       const code = String(meaningful.code || '');
       const hours = meaningful.hours || {};
+      // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): the held create's reask_slot.
+      if (meaningful.reaskLine && require('./callFixesD199').callFixesD199Enabled()) {
+        return String(meaningful.reaskLine);
+      }
       if (code === 'outside_coverage') {
         return visitBlockSpeech('outside', lang);
       }

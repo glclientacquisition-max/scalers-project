@@ -222,7 +222,14 @@ function callSpokenFacts(callSid) {
   };
 }
 const { deriveCallResolution } = require('./src/conversation/callResolution');
-const { planConfirmFileRead } = require('./src/conversation/callFixesD199');
+const {
+  planConfirmFileRead,
+  planRejectedCreate,
+  markReaskSpoken,
+  noteRejectedCreate,
+  settleRejectedCreate,
+  reaskSlotLine,
+} = require('./src/conversation/callFixesD199');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
 const {
   schedulePostCallTranscriptReview,
@@ -3413,6 +3420,40 @@ mediaWss.on('connection', (ws, req) => {
         spokeThisTurn = true;
         return;
       }
+      // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): a create the guard
+      // rejected is never left silent. Re-ask the slot once (reask_slot); the
+      // slot came in: save it; re-ask unanswered or a closing: save a callback.
+      const rescue = planRejectedCreate(brainState, { language: callLanguage, text: clean });
+      if (rescue && !(rescue.kind === 'reask' && !nameGate.runModel && fileNameAsk && !nameJustConfirmed)) {
+        if (rescue.kind === 'reask') {
+          markReaskSpoken(brainState);
+          callBrainStates.set(callKey, brainState);
+          console.log(`[ws/media][${callKey}] rejected create re-ask before model: ${rescue.line}`);
+          voiceTrace.noteBrainLines(rescue.lines);
+          bargeInActive = false;
+          suppressReplyRemainder = false;
+          callTranscript.pushAgent(rescue.line);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(rescue.line);
+          spokeThisTurn = true;
+          return;
+        }
+        callBrainStates.set(callKey, brainState);
+        const rescued = await applyGeminiTools(callKey, rescue.parsed);
+        const rescueLine = formatToolConfirmation(rescued?.results || [], callLanguage);
+        console.log(`[ws/media][${callKey}] rejected create ${rescue.kind}: ${rescueLine}`);
+        voiceTrace.noteBrainLines(brainLinesForResults(rescued?.results || [], callLanguage).lines);
+        if (rescueLine) {
+          bargeInActive = false;
+          suppressReplyRemainder = false;
+          callTranscript.pushAgent(rescueLine);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(rescueLine);
+          spokeThisTurn = true;
+          return;
+        }
+        brainState = callBrainStates.get(callKey) || brainState;
+      }
       const askingName = !nameGate.runModel && Boolean(fileNameAsk) && !nameJustConfirmed;
       const endClose = planBrainEndClose({
         action: nextBestAction.action,
@@ -6253,6 +6294,25 @@ async function applyGeminiTools(callSid, parsed) {
   }
 
   let updatedState = recordActionResults(state, execution.results);
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): hold a rejected create until it
+  // is re-asked and saved, or saved as a callback. The invalid result carries
+  // the reask_slot line ("Saa nane usiku au saa nane mchana?").
+  settleRejectedCreate(updatedState, execution.results);
+  if (enforcedParsed.needsVisitTime) {
+    const held = noteRejectedCreate(updatedState, {
+      slot: 'when',
+      whenText: String(enforcedParsed.needsVisitTime),
+      appointment: enforcedParsed.rejectedAppointment || null,
+    });
+    if (held) {
+      const reask = reaskSlotLine(updatedState, updatedState.language?.current || 'en');
+      const invalid = execution.results.find((r) => r.code === 'unparsed_when' && r.status === 'invalid');
+      if (invalid && reask?.line) {
+        invalid.reaskLine = reask.line;
+        invalid.reaskLines = reask.lines;
+      }
+    }
+  }
   if (execution.shouldEndCall) {
     updatedState = setNextBestAction(updatedState, {
       action: 'END',

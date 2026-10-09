@@ -29,6 +29,7 @@ const { defaultHoursSchedule } = require('./businessHours');
 const {
   isHomeVisitState,
   mergeTimeAnswer,
+  swahiliPendingHourOf,
   timeAskCount,
   clockPhrase,
   dayCue,
@@ -622,6 +623,12 @@ function observeCallerTurn(state, input = {}) {
     ) {
       next.caller.fileNameAskSpoken = true;
     }
+    // HD_1677e57f73f9 (1b): a re-ask of a rejected create that reached the
+    // caller counts; one unanswered re-ask then saves a callback.
+    fixesD199.observeRejectedCreate(next, { lastAgentText: input.lastAgentText });
+    // A visit being collected (day/time + service or place) or a create
+    // attempt is a booking, not a general enquiry.
+    fixesD199.promoteBookingIntent(next, { profile: input.profile || {} });
     // (e) "Tulifika wapi na ile mambo yetu ya jana?" asks for the file.
     if (!Boolean(state?.caller?.nameConfirmed) && next.caller.nameConfirmed) {
       const prior = (next.conversation.answersReceived || []).slice(0, -1);
@@ -787,7 +794,11 @@ function applyVisitTimeAnswer(state, text, profile = {}) {
   const asked = timeAskCount(next);
   const lastAsk = (next.conversation.questionsAsked || []).slice(-1)[0];
   const answeringTime = lastAsk === 'time' || next.conversation.pendingHour != null;
-  const homeVisit = isHomeVisitState(next, profile);
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): a held rejected create takes
+  // its time answer even when the intent never read as a booking.
+  const homeVisit =
+    isHomeVisitState(next, profile) ||
+    Boolean(next.conversation?.rejectedCreate && require('./callFixesD199').callFixesD199Enabled());
   if (text && /\b(any ?time|anytime|whenever|wakati wowote|saa yoyote)\b/i.test(text) && !clockPhrase(text)) {
     const waivedWhen = whenValue(next);
     if (waivedWhen && dayCue(waivedWhen)) {
@@ -796,6 +807,12 @@ function applyVisitTimeAnswer(state, text, profile = {}) {
     }
   }
   if (!homeVisit || !text) return next;
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1a): "leo saa 8:00" with no period
+  // is saa nane, 2 AM or 2 PM. Hold the hour; the time ask is the AM/PM ask.
+  if (next.conversation.pendingHour == null) {
+    const swHour = swahiliPendingHourOf(text);
+    if (swHour) next.conversation.pendingHour = swHour;
+  }
   const when = whenValue(next);
   if (when && clockPhrase(when) && BARE_NO.test(text)) {
     const clock = clockPhrase(when);

@@ -218,8 +218,17 @@ function parseAbsoluteWhenDate(raw) {
  * @returns {{ ok: true, instant: Date, isNow: boolean, weekday: string, minutesSinceMidnight: number, weekdayLong: string } | { ok: false }}
  */
 function resolveAppointmentWhen(whenText, now = new Date()) {
-  const raw = String(whenText || '').replace(/\s+/g, ' ').trim();
+  let raw = String(whenText || '').replace(/\s+/g, ' ').trim();
   if (!raw) return { ok: false };
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1a): "saa nane mchana" is 14:00;
+  // "leo saa 8:00" with no period is ambiguous, never 08:00.
+  if (require('./callFixesD199').callFixesD199Enabled()) {
+    const sw = require('./swahiliClockParse').normalizeSwahiliClock(raw);
+    if (sw.changed) {
+      if (sw.resolved == null) return { ok: false, swahiliAmbiguous: sw.ambiguous };
+      raw = sw.text;
+    }
+  }
   if (AMBIGUOUS_RE.test(raw)) return { ok: false };
   if (/\bnext\s+week\b/i.test(raw) && !parseWeekdayKey(raw)) return { ok: false };
 

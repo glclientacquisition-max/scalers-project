@@ -184,11 +184,13 @@ describe('HD_1b3a67ea7ee9 replay, BRAIN_CALL_FIXES_D199=on', () => {
       assert.equal(read.runModel, false);
       assert.equal(read.kind, 'confirm_read');
       assert.equal(read.lines[0].template, 'visit_open');
-      // The two current Carpet visits, then the newest four open requests.
-      assert.deepEqual(read.lines.map((l) => l.template), ['visit_open', 'visit_open', 'request_open', 'request_open', 'request_open', 'request_open', 'more_open']);
-      assert.match(read.line, /^You have a Carpet Cleaning visit request, today, 9 AM, Kitengela\. You have a Carpet Cleaning \(per room\) visit request, tomorrow, 9 AM, Kitengela, Grace Apartments\./);
+      // The current visit, the newest four open requests, then counts. Today's
+      // 9 AM at 12:02 is past and still requested (HD_1677e57f73f9 3): a count.
+      assert.deepEqual(read.lines.map((l) => l.template), ['visit_open', 'request_open', 'request_open', 'request_open', 'request_open', 'more_open', 'past_open']);
+      assert.match(read.line, /^You have a Carpet Cleaning \(per room\) visit request, tomorrow, 9 AM, Kitengela, Grace Apartments\./);
       assert.match(read.line, /Mansion Cleaning Custom Quote/);
-      assert.match(read.line, /There are 25 older open items on file too\.$/);
+      assert.doesNotMatch(read.line, /today, 9 AM/);
+      assert.match(read.line, /There are 19 past-dated requests the team still has to confirm\.$/);
       assert.ok(read.lines.some((l) => l.template === 'request_open'));
       assert.doesNotMatch(read.line, /shillings|KSh/);
       assert.equal(t7.state.conversation.fileAskPending, false);

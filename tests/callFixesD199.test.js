@@ -126,14 +126,19 @@ const T12_PLAN = {
 };
 
 describe('HD_d199dbbf6b79 replay, BRAIN_CALL_FIXES_D199=on', () => {
-  it('(e) the opening read carries today 9 AM Kitengela, first', () =>
+  it('(e)/(HD_1677 3) today 9 AM still requested at 11:41 is past: never open or upcoming', () =>
     withFlag('on', () => {
       const card = callProfile().callerMemory;
-      assert.equal(card.openVisits[0], 'Carpet Cleaning | today, 9 AM | requested | Kitengela');
-      assert.equal(card.nextVisitWhen, 'today, 9 AM');
+      // HD_1677e57f73f9 (3) replaces the earlier "today's 9 AM is today's
+      // visit": its time has passed and it is still 'requested'.
+      assert.deepEqual(card.openVisits, []);
+      assert.equal(card.nextVisitWhen, null);
+      assert.equal(card.pastOpenCount, 19);
       const { state } = replay(2);
       assert.equal(state.caller.nameConfirmed, true);
-      assert.match(state.returning.openVisits[0], /today, 9 AM/);
+      assert.deepEqual(state.returning.openVisits || [], []);
+      const today = state.returning.openRows.find((r) => r.id === TODAY_VISIT);
+      assert.equal(today.past, true);
     }));
 
   it('(e) t3 "when did I request that?" is answered from created_at in Nairobi time', () =>
@@ -163,7 +168,10 @@ describe('HD_d199dbbf6b79 replay, BRAIN_CALL_FIXES_D199=on', () => {
       assert.equal(coverageAskPlace(kit), 'ile ya Kitengela');
       assert.match(coverageAskSpeech(kit, profile, 'en'), /\S/);
       assert.equal(resolveLocalReply({ text: kit, state, profile, language: 'en' }), null);
-      assert.match(fileRead(state, kit).line, /Carpet Cleaning visit request, today, 9 AM, Kitengela/);
+      assert.equal(
+        fileRead(state, kit).line,
+        'The Carpet Cleaning visit request for today, 9 AM, Kitengela, has passed and was not confirmed.'
+      );
       assert.equal(coverageAskSpeech(turnText(4), profile, 'en'), '');
       assert.equal(state.entities.location, undefined);
       // A real place still gets the check.
@@ -182,14 +190,19 @@ describe('HD_d199dbbf6b79 replay, BRAIN_CALL_FIXES_D199=on', () => {
       const { state } = replay(3);
       const all = fileRead(state, 'What do I have on file?');
       assert.equal(all.runModel, false);
-      assert.match(all.line, /^You have a Carpet Cleaning visit request, today, 9 AM, Kitengela\./);
+      // HD_1677e57f73f9 (3): past-dated rows are a count, never read as open.
+      assert.match(all.line, /^You have an enquiry for Mansion Cleaning Custom Quote\./);
       assert.deepEqual(
         [...new Set(all.lines.map((l) => l.template))],
-        ['visit_open', 'request_open', 'more_open']
+        ['request_open', 'more_open', 'past_open']
       );
-      assert.match(all.line, /Mansion Cleaning Custom Quote/);
-      // t8 "ile carpet cleaning ... ya Kitengela" reads that one visit.
-      assert.equal(fileRead(replay(8).state, 8).line, 'Una ziara ya Carpet Cleaning, leo, 9 AM, Kitengela.');
+      assert.match(all.line, /There are 19 past-dated requests the team still has to confirm\.$/);
+      assert.doesNotMatch(all.line, /today, 9 AM/);
+      // t8 "ile carpet cleaning ... ya Kitengela" names that one visit: past.
+      assert.equal(
+        fileRead(replay(8).state, 8).line,
+        'Ombi la ziara ya Carpet Cleaning, leo, 9 AM, Kitengela limepita na halikuthibitishwa.'
+      );
     }));
 
   it('(d) slots: no time as location, no clock or pronoun as quantity, no filler as name', () =>
@@ -293,13 +306,10 @@ describe('HD_d199dbbf6b79 replay, BRAIN_CALL_FIXES_D199=on', () => {
         clock = null;
       }
       const line = timeAskLine({ when: 'kesho', pendingHour: 9, language: 'sw' });
-      if (clock) {
-        assert.equal(line, 'Saa tatu asubuhi au saa tatu usiku?');
-        assert.equal(timeAskLine({ when: 'kesho', pendingHour: 2, language: 'sw' }), 'Saa nane usiku au saa nane mchana?');
-      } else {
-        // swahiliClock.js (#633) not on this branch yet: the old line stays.
-        assert.equal(line, 'Saa 9 asubuhi au mchana?');
-      }
+      // Same wording with swahiliClock.js (#633) and with Brain's fallback.
+      void clock;
+      assert.equal(line, 'Saa tatu asubuhi au saa tatu usiku?');
+      assert.equal(timeAskLine({ when: 'kesho', pendingHour: 2, language: 'sw' }), 'Saa nane usiku au saa nane mchana?');
       assert.equal(timeAskLine({ when: 'tomorrow', pendingHour: 9, language: 'en' }), '9 in the morning or in the afternoon?');
       withFlag(null, () =>
         assert.equal(timeAskLine({ when: 'kesho', pendingHour: 9, language: 'sw' }), 'Saa 9 asubuhi au mchana?')

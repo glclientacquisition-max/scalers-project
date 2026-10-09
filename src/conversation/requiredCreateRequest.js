@@ -128,7 +128,20 @@ function clockKey(text) {
 function callerSaidClock(state, whenText) {
   const wanted = clockKey(whenText);
   if (!wanted) return false;
-  const turns = (state?.conversation?.answersReceived || []).join(' ');
+  let turns = (state?.conversation?.answersReceived || []).join(' ');
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1a): read each turn's Kiswahili
+  // clock first. "saa nane mchana" said 2pm; "saa 8:00" alone said neither
+  // 8 nor 2 (ambiguous, cut out), so the model's "2:00 PM" is a guess.
+  if (require('./callFixesD199').callFixesD199Enabled()) {
+    const { normalizeSwahiliClock } = require('./swahiliClockParse');
+    const answers = state?.conversation?.answersReceived || [];
+    turns = answers.map((turn) => normalizeSwahiliClock(turn).text).join(' ');
+    if (answers.some((turn) => clockKey(normalizeSwahiliClock(turn).text) === wanted)) return true;
+    // A clock Brain merged from the caller's own answers (time ask, AM/PM ask).
+    const when = state?.entities?.when;
+    const merged = when && typeof when === 'object' && when.source === 'caller_explicit' ? when.value : '';
+    if (merged && clockKey(normalizeSwahiliClock(String(merged)).text) === wanted) return true;
+  }
   if (clockKey(turns) === wanted) return true;
   const hour = Number(String(wanted).match(/^(\d{1,2})/)?.[1]);
   if (!hour) return false;
@@ -249,7 +262,11 @@ function guardToolPlan(parsed, state = {}, capabilities = {}) {
     delete next.escalate;
     next.visitClassEscalateBlocked = true;
   }
-  if (ackWithoutConsent(state)) {
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): Brain's own rescue of a
+  // rejected create (callback or retry) is not a model save on an ack turn.
+  const brainRescue = next.brainRescue === true && fixesD199.callFixesD199Enabled();
+  delete next.brainRescue;
+  if (!brainRescue && ackWithoutConsent(state)) {
     delete next.serviceRequest;
     delete next.appointment;
     delete next.appointmentUpdate;
@@ -309,6 +326,14 @@ function guardToolPlan(parsed, state = {}, capabilities = {}) {
       };
     } else if (bareDay) {
       next.needsVisitTime = whenText;
+      // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): keep the rejected create
+      // so Brain can re-ask and retry it, or save it as a callback.
+      if (require('./callFixesD199').callFixesD199Enabled()) {
+        Object.defineProperty(next, 'rejectedAppointment', {
+          value: next.appointment,
+          enumerable: false,
+        });
+      }
       delete next.appointment;
     }
   }

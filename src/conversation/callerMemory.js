@@ -165,14 +165,24 @@ function buildCallerMemoryCard({
   const phone = String(contact.phone || '').trim();
   const name = String(contact.name || '').trim() || null;
   const alternates = alternateNames(contact.metadata);
-  const sharedLine = alternates.some((alt) => distinctOtherPerson(name, alt));
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 5): a saved phrase ("so
+  // disappointed"), a role word ("Mteja") or a cut-off of the owner's name
+  // ("Chr") is not a second person; a shared line skips the file-name ask.
+  const sharedLine = alternates.some(
+    (alt) => distinctOtherPerson(name, alt) && require('./callFixesD199').alternateIsAPerson(name, alt)
+  );
   const lived = collectLivedAppointments(
     nextAppointment,
     recentAppointments,
     now,
     openAppointments
   );
-  const nextItem = lived.open[0] || null;
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 3): a visit or request whose time
+  // is past (Nairobi) and still requested is its own bucket, never open or
+  // upcoming; the card carries only its count.
+  const pastBucket = require('./callFixesD199').callFixesD199Enabled();
+  const liveOpen = pastBucket ? lived.open.filter((item) => !livedItemPast(item)) : lived.open;
+  const nextItem = liveOpen[0] || null;
   const nextRow = nextItem ? nextItem.row : null;
   const lastReason = clip(scrubLivedReason(contact.last_reason, lived));
   const notes = clip(contact.notes, 60);
@@ -180,10 +190,16 @@ function buildCallerMemoryCard({
   // Cap is wide enough that a past-due open hold is not dropped just because
   // two newer open rows exist. Date-past is not a reason to drop status open.
   // Every still-open request. A past-due open hold is not dropped for a newer pair.
-  const requests = requestSplit.open
+  const liveRequests = pastBucket
+    ? requestSplit.openItems.filter((item) => !livedItemPast(item)).map((item) => item.row)
+    : requestSplit.open;
+  const requests = liveRequests
     .map(clipRequestLine)
     .filter(Boolean);
-  const openVisitLines = lived.open
+  const pastOpenCount = pastBucket
+    ? lived.open.length - liveOpen.length + (requestSplit.open.length - liveRequests.length)
+    : 0;
+  const openVisitLines = liveOpen
     .map((item) => clipVisitLine(item.row, { whenMax: null }))
     .filter(Boolean);
   const appointment = openVisitLines[0] || null;
@@ -223,6 +239,7 @@ function buildCallerMemoryCard({
     Boolean(place) ||
     Boolean(usualJob) ||
     Boolean(standing) ||
+    pastOpenCount > 0 ||
     Boolean(phone);
   if (!hasFile) return null;
 
@@ -249,7 +266,7 @@ function buildCallerMemoryCard({
     language: language || null,
     personProfiles,
     ...(require('./callFixesD199').callFixesD199Enabled()
-      ? { openRows: structuredOpenRows(lived.open, requestSplit.open) }
+      ? { openRows: structuredOpenRows(lived.open, requestSplit.openItems), pastOpenCount }
       : {}),
   };
 }
@@ -259,7 +276,19 @@ function buildCallerMemoryCard({
  * created_at, so code can answer "when did I request that?", read requests
  * with visits, and move the visit a reschedule names.
  */
+/** Past-dated: the lived time has passed, or the refreshed when reads "past ...". */
+function livedItemPast(item) {
+  if (!item || typeof item !== 'object') return false;
+  // A hold or order waits for pickup; a past date does not close it.
+  const type = String(item.row?.request_type || item.row?.type || '').toLowerCase();
+  if (type === 'hold' || type === 'order') return false;
+  if (item.lived?.past) return true;
+  const when = String(item.row?.when_text || item.row?.whenText || '');
+  return /^past\b/i.test(when.trim());
+}
+
 function structuredOpenRows(openVisits = [], openRequests = []) {
+  // openRequests: { row, lived } items (or bare rows).
   const rows = [];
   for (const item of openVisits) {
     const row = item?.row || {};
@@ -275,10 +304,11 @@ function structuredOpenRows(openVisits = [], openRequests = []) {
       windowStart: row.window_start || row.windowStart || null,
       status: clip(row.status, 16) || '',
       createdAt: row.created_at || row.createdAt || null,
-      past: Boolean(item?.lived?.past),
+      past: livedItemPast(item),
     });
   }
-  for (const row of openRequests) {
+  for (const entry of openRequests) {
+    const row = entry && entry.row ? entry.row : entry;
     const job = clip(row?.item, 48);
     if (!job) continue;
     rows.push({
@@ -290,7 +320,7 @@ function structuredOpenRows(openVisits = [], openRequests = []) {
       place: '',
       status: 'open',
       createdAt: row.created_at || row.createdAt || null,
-      past: false,
+      past: livedItemPast(entry),
     });
   }
   return rows;
@@ -521,7 +551,7 @@ function splitRequestRows(rows, now) {
     const tb = b.lived.instant ? b.lived.instant.getTime() : Number.POSITIVE_INFINITY;
     return a.lived.past ? tb - ta : ta - tb;
   });
-  return { open: open.map((item) => item.row), finished };
+  return { open: open.map((item) => item.row), openItems: open, finished };
 }
 
 function reviewStamp(row, index) {
@@ -874,7 +904,9 @@ function returningFileFromCard(card) {
   const fileOwnerName = fileOwnerNameOf(card);
   const hasOpenRows = Boolean(
     (Array.isArray(card.openVisits) && card.openVisits.length) ||
-      (Array.isArray(card.openRequests) && card.openRequests.length)
+      (Array.isArray(card.openRequests) && card.openRequests.length) ||
+      // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 3): only set with the flag on.
+      card.pastOpenCount > 0
   );
   const filePending =
     !identityBound &&
@@ -898,6 +930,7 @@ function returningFileFromCard(card) {
     nextVisitLandmark: usable ? card.nextVisitLandmark || null : null,
     openRequests: usable && Array.isArray(card.openRequests) ? card.openRequests : [],
     ...(Array.isArray(card.openRows) ? { openRows: usable ? card.openRows : [] } : {}),
+    ...(card.pastOpenCount > 0 ? { pastOpenCount: usable ? card.pastOpenCount : 0 } : {}),
     recentBookings: usable && Array.isArray(card.recentBookings) ? card.recentBookings : [],
     place: identityBound ? card.place || null : null,
     usualJob: identityBound ? card.usualJob || null : null,
@@ -959,6 +992,11 @@ function formatReturningCallerForPrompt(card) {
     const openRequests = Array.isArray(card.openRequests) ? card.openRequests : [];
     for (const row of openRequests) {
       lines.push(`- Open: ${row}`);
+    }
+    if (card.pastOpenCount) {
+      lines.push(
+        `- Past-dated, not confirmed: ${card.pastOpenCount} row${card.pastOpenCount === 1 ? '' : 's'} whose time has passed. Never read them as open or upcoming.`
+      );
     }
     if (card.lastReason) lines.push(`- Last: ${card.lastReason}`);
     const recentBookings = Array.isArray(card.recentBookings) ? card.recentBookings : [];

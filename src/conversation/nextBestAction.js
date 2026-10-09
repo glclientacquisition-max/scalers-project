@@ -50,6 +50,10 @@ function callerSignedOff(text) {
     .trim();
   if (!raw) return false;
   if (SIGN_OFF.test(raw)) return true;
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 2): "Okay, thank you", "asante",
+  // "hiyo tu" are closings, not questions.
+  const fixes = require('./callFixesD199');
+  if (fixes.callFixesD199Enabled() && fixes.isClosingCue(text)) return true;
   return /\bkwaheri\b/.test(raw) && raw.split(/\s+/).length <= 6;
 }
 
