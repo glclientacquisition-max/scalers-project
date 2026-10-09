@@ -124,6 +124,8 @@ function hasReadableFile(state) {
   if (Array.isArray(file.openVisits) && file.openVisits.length > 0) return true;
   if (Array.isArray(file.openRequests) && file.openRequests.length > 0) return true;
   if (Array.isArray(file.recentBookings) && file.recentBookings.length > 0) return true;
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 3): past-dated rows are on file.
+  if (file.pastOpenCount > 0) return true;
   return false;
 }
 
@@ -323,6 +325,14 @@ function spokenFileRead({ text = '', state = {}, language } = {}) {
     const requests = Array.isArray(file.openRequests) ? file.openRequests : [];
     for (const row of requests) {
       const said = speakSavedLine(row, language, 'request');
+      if (said) lines.push(said);
+    }
+    // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 3): past-dated requested rows
+    // are a count line only (past_open), never read as open.
+    if (file.pastOpenCount > 0) {
+      const { factLine, renderLine } = require('./factLine');
+      const lang = String(language || 'en').toLowerCase() === 'en' ? 'en' : 'sw';
+      const said = renderLine(factLine('past_open', { count: file.pastOpenCount }, { lang }));
       if (said) lines.push(said);
     }
   }

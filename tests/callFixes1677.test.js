@@ -147,6 +147,23 @@ describe('HD_1677e57f73f9 replay, BRAIN_CALL_FIXES_D199=on', () => {
       assert.equal(timeAskLine({ when: 'leo', pendingHour: 2, language: 'sw' }), 'Saa nane usiku au saa nane mchana?');
     }));
 
+  it('(follow-up 2) intent moves to booking once the visit is being collected', () =>
+    withFlag('on', () => {
+      const seen = {};
+      replay(33, { onTurn: (t, { state }) => { seen[t.turn] = state.intent; } });
+      // Live: general_enquiry for all 33 turns.
+      assert.equal(seen[25], 'general_enquiry');
+      // t27 "utume hao watu leo saa 8:00 wakuje" (day/time + service on file).
+      assert.equal(seen[27], 'booking');
+      for (const n of [28, 29, 30, 31, 32, 33]) assert.equal(seen[n], 'booking', `t${n}`);
+      assert.equal(replay(33).state.goal.primary, 'make_booking_request');
+      // A rejected create alone is a booking attempt.
+      const early = replay(3).state;
+      assert.equal(early.intent, 'general_enquiry');
+      fixes.noteRejectedCreate(early, { slot: 'when', whenText: 'today', appointment: T30_PLAN.appointment, now: NOW });
+      assert.equal(early.intent, 'booking');
+    }));
+
   it('(1a) t30: "leo saa 8:00" never becomes the model\'s 2:00 PM; a period said is kept', () =>
     withFlag('on', () => {
       const { state } = replay(29);
@@ -304,6 +321,7 @@ describe('HD_1677e57f73f9 replay, flag off keeps the live behaviour', () => {
       assert.equal(card.sharedLine, true);
       const { asks, state } = replay(29);
       assert.deepEqual(asks, []);
+      assert.equal(state.intent, 'general_enquiry');
       const plan = guardToolPlan(JSON.parse(JSON.stringify(T30_PLAN)), state, {});
       assert.equal(plan.needsVisitTime, 'today');
       assert.equal(fixes.planRejectedCreate(state, { language: 'sw' }), null);

@@ -819,7 +819,9 @@ function returningFileFromCard(card) {
   const fileOwnerName = fileOwnerNameOf(card);
   const hasOpenRows = Boolean(
     (Array.isArray(card.openVisits) && card.openVisits.length) ||
-      (Array.isArray(card.openRequests) && card.openRequests.length)
+      (Array.isArray(card.openRequests) && card.openRequests.length) ||
+      // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 3): only set with the flag on.
+      card.pastOpenCount > 0
   );
   const filePending =
     !identityBound &&
@@ -843,6 +845,7 @@ function returningFileFromCard(card) {
     nextVisitLandmark: usable ? card.nextVisitLandmark || null : null,
     openRequests: usable && Array.isArray(card.openRequests) ? card.openRequests : [],
     ...(Array.isArray(card.openRows) ? { openRows: usable ? card.openRows : [] } : {}),
+    ...(card.pastOpenCount > 0 ? { pastOpenCount: usable ? card.pastOpenCount : 0 } : {}),
     recentBookings: usable && Array.isArray(card.recentBookings) ? card.recentBookings : [],
     place: identityBound ? card.place || null : null,
     usualJob: identityBound ? card.usualJob || null : null,

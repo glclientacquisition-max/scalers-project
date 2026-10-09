@@ -626,6 +626,9 @@ function observeCallerTurn(state, input = {}) {
     // HD_1677e57f73f9 (1b): a re-ask of a rejected create that reached the
     // caller counts; one unanswered re-ask then saves a callback.
     fixesD199.observeRejectedCreate(next, { lastAgentText: input.lastAgentText });
+    // A visit being collected (day/time + service or place) or a create
+    // attempt is a booking, not a general enquiry.
+    fixesD199.promoteBookingIntent(next, { profile: input.profile || {} });
     // (e) "Tulifika wapi na ile mambo yetu ya jana?" asks for the file.
     if (!Boolean(state?.caller?.nameConfirmed) && next.caller.nameConfirmed) {
       const prior = (next.conversation.answersReceived || []).slice(0, -1);

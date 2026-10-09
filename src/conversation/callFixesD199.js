@@ -710,9 +710,48 @@ function keepRaisedTopics(text, { intent = '', callerTurns = [] } = {}) {
  * state.conversation.rejectedCreate until it is saved, re-asked once and
  * answered, or saved as a callback. A turn never ends with it silent.
  */
+// HD_1677e57f73f9 (follow-up 2): intent stayed general_enquiry for a whole
+// booking call. Only these soft intents are moved to booking.
+const SOFT_INTENTS = new Set(['unknown', 'general_enquiry', 'location', 'availability', 'price', 'product_inquiry', '']);
+
+function slotValue(entity) {
+  if (!entity) return '';
+  if (typeof entity === 'string') return entity.trim();
+  return String(entity.value || '').trim();
+}
+
+/**
+ * Move a soft intent to booking once a visit is being collected (a day or
+ * time plus a service or place on a home-services call) or a create was
+ * attempted. Returns true when it moved.
+ */
+function promoteBookingIntent(state, { profile = {}, createAttempted = false } = {}) {
+  if (!callFixesD199Enabled() || !state) return false;
+  const intent = String(state.intent || '');
+  if (intent === 'booking' || !SOFT_INTENTS.has(intent)) return false;
+  const vertical = String(profile?.vertical || state.vertical || '').toLowerCase();
+  const attempted = createAttempted || Boolean(state.conversation?.rejectedCreate);
+  let collecting = false;
+  if (vertical === 'home_services') {
+    const e = state.entities || {};
+    const when = slotValue(e.when);
+    const job = slotValue(e.service) || slotValue(e.requestedItem);
+    const place = slotValue(e.location) || slotValue(e.landmark);
+    collecting = Boolean(when && (job || place));
+  }
+  if (!attempted && !collecting) return false;
+  state.intent = 'booking';
+  if (state.goal && typeof state.goal === 'object') {
+    state.goal.primary = 'make_booking_request';
+    if (state.goal.status !== 'completed') state.goal.status = 'active';
+  }
+  return true;
+}
+
 function noteRejectedCreate(state, { slot = 'when', whenText = '', appointment = null, now = new Date() } = {}) {
   if (!callFixesD199Enabled() || !state) return null;
   if (!state.conversation) state.conversation = {};
+  promoteBookingIntent(state, { createAttempted: true });
   const prev = state.conversation.rejectedCreate;
   state.conversation.rejectedCreate = {
     slot,
@@ -955,6 +994,7 @@ module.exports = {
   coverageAskWithoutPlace,
   askAreaLine,
   alternateNamesAPerson,
+  promoteBookingIntent,
   alternateIsAPerson,
   keepRaisedTopics,
   callFixesD199Enabled,
