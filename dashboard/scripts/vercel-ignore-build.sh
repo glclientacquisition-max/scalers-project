@@ -24,6 +24,10 @@
 # from outside it (checked 2026-10-08; next.config pins outputFileTracingRoot
 # and turbopack.root to dashboard/). Add a path to DESK_PATHS if that changes.
 #
+# Env-only changes (e.g. a new Preview var) do not trigger a preview build:
+# this script skips when nothing under dashboard/ changed since the last built
+# SHA, and Vercel redeploys run it too. Push a commit touching dashboard/.
+#
 # Local dry run: VERCEL_PROJECT_ID=... VERCEL_ENV=preview \
 #   VERCEL_GIT_COMMIT_REF=my-branch VERCEL_GIT_COMMIT_SHA=<sha> \
 #   VERCEL_GIT_PREVIOUS_SHA=<sha> bash dashboard/scripts/vercel-ignore-build.sh
