@@ -116,8 +116,11 @@ describe("platform ops missing-table fallback wiring", () => {
   });
 
   it("skips notice writes and mail when the notices table is missing", () => {
-    assert.match(src, /const noticesReady = existing !== null;/);
-    assert.match(src, /if \(noticesReady\) \{/);
+    // Page loads never write notices; the scheduled check skips the run when the table is missing.
+    assert.doesNotMatch(src, /\.insert\(|sendOpsMail/);
+    const cron = fs.readFileSync(path.join(ROOT, "dashboard/src/lib/opsAlerts.ts"), "utf8");
+    assert.match(cron, /if \(!isMissingTableError\(probe\.error\)\) throw probe\.error;/);
+    assert.match(cron, /platform_ops_notices missing; skipping/);
   });
 });
 

@@ -29,7 +29,7 @@ describe("Super Admin Today: reads only", () => {
 
   it("loads through read-only helpers, never the notice check", () => {
     assert.match(page, /readPlatformOps\(\)/);
-    assert.doesNotMatch(page, /evaluatePlatformOps/);
+    assert.doesNotMatch(page, /evaluatePlatformOps|runScheduledOpsAlerts/);
     assert.doesNotMatch(page, WRITES);
     assert.doesNotMatch(page, /"use client"/);
   });
@@ -41,10 +41,9 @@ describe("Super Admin Today: reads only", () => {
     assert.doesNotMatch(fnBody(ops, "loadOpsSettings"), WRITES);
     assert.doesNotMatch(fnBody(admin, "getAdminOverview"), WRITES);
     assert.doesNotMatch(fnBody(admin, "listBusinesses"), WRITES);
-    // Platform still runs the check, so alerts keep firing from there.
-    assert.match(fnBody(ops, "evaluatePlatformOps"), /persistOpen/);
-    assert.match(fnBody(ops, "evaluatePlatformOps"), /mailKinds/);
-    assert.match(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /evaluatePlatformOps/);
+    // The check moved to the cron route; no Admin page runs it.
+    assert.doesNotMatch(ops, /evaluatePlatformOps/);
+    assert.match(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /readPlatformOps\(\)/);
   });
 });
 
