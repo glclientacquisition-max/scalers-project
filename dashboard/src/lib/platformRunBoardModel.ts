@@ -1,6 +1,7 @@
 import type { SonioxHealthSnapshot, VoiceHealthFetch, VoiceHealthzPayload } from "@/lib/platformVoiceHealth";
 import type { SautikitNumber, SautikitWallet } from "@/lib/sautikit";
 import { formatMinor } from "@/lib/sautikit";
+import { plainServiceDetail } from "@/lib/adminErrors";
 
 export type PlatformHealthTone = "ok" | "attention" | "neutral";
 
@@ -43,7 +44,8 @@ function pickSonioxErrorDetail(snapshot: SonioxHealthSnapshot | undefined): stri
   const recent = channels.find((c) => c.message && c.message !== "ok");
   const hit = billing || fatal || recent;
   if (!hit?.message || hit.message === "ok") return null;
-  return hit.message;
+  // Upstream text names suppliers and keys. Show the plain problem; Voice logs the raw line.
+  return plainServiceDetail(hit.message);
 }
 
 export function deriveSpeechHealth(
@@ -52,7 +54,7 @@ export function deriveSpeechHealth(
   if (!voice || voice.status !== "ok") {
     const detail =
       voice?.status === "unreachable" || voice?.status === "invalid"
-        ? voice.message
+        ? "Not reachable"
         : "Not connected";
     return { tone: "neutral", label: "Unknown", detail };
   }
@@ -63,7 +65,7 @@ export function deriveSpeechHealth(
     return {
       tone: "attention",
       label: "Degraded",
-      detail: pickSonioxErrorDetail(last) || "Speech billing exhausted",
+      detail: pickSonioxErrorDetail(last) || "Out of credit",
     };
   }
 
@@ -90,7 +92,7 @@ export function deriveReasoningHealth(
   if (!voice || voice.status !== "ok") {
     const detail =
       voice?.status === "unreachable" || voice?.status === "invalid"
-        ? voice.message
+        ? "Not reachable"
         : "Not connected";
     return { tone: "neutral", label: "Unknown", detail };
   }
@@ -101,21 +103,21 @@ export function deriveReasoningHealth(
     return {
       tone: "attention",
       label: "Degraded",
-      detail: snap?.lastError?.message || "Reasoning credits exhausted or denied",
+      detail: snap?.denied ? "Access refused" : "Out of credit",
     };
   }
   if (snap?.lastError?.kind === "denied") {
     return {
       tone: "attention",
       label: "Degraded",
-      detail: snap.lastError.message || "Reasoning denied",
+      detail: "Access refused",
     };
   }
   if (snap?.lastError?.message) {
     return {
       tone: "attention",
       label: "Degraded",
-      detail: snap.lastError.message,
+      detail: plainServiceDetail(snap.lastError.message),
     };
   }
 
@@ -135,7 +137,7 @@ export function derivePhoneLineHealth(telecom: PhoneLineTelecomInput): PlatformR
     };
   }
   if (telecom.status === "error") {
-    return { tone: "attention", label: "Degraded", detail: telecom.message };
+    return { tone: "attention", label: "Degraded", detail: plainServiceDetail(telecom.message) };
   }
 
   const { numbers } = telecom;

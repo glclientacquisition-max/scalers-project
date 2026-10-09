@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { removeBusinessAndReleaseDid, releaseDidFromBusiness } from "@/lib/admin";
+import { adminActorName } from "@/lib/adminActor";
+import {
+  archiveBusiness,
+  deleteArchivedBusiness,
+  releaseBusinessNumber,
+  restoreBusiness,
+} from "@/lib/adminBusinessActions";
+import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -14,8 +21,11 @@ export async function POST(request: Request) {
   const businessId = String(body.business_id || "");
 
   if (!businessId) {
-    return NextResponse.json({ error: "business_id required" }, { status: 400 });
+    return NextResponse.json({ error: "Pick a business first." }, { status: 400 });
   }
+
+  // The signed-in Super Admin, never a name from the request body.
+  const actor = await adminActorName();
 
   try {
     if (action === "assign_next") {
@@ -31,17 +41,32 @@ export async function POST(request: Request) {
     }
 
     if (action === "release_did") {
-      const e164 = await releaseDidFromBusiness(businessId);
+      const e164 = await releaseBusinessNumber(businessId, actor);
       return NextResponse.json({ ok: true, e164 });
     }
 
-    if (action === "remove") {
-      const e164 = await removeBusinessAndReleaseDid(businessId);
+    if (action === "archive") {
+      const reason = String(body.reason || "").trim();
+      const result = await archiveBusiness(businessId, actor, reason);
+      return NextResponse.json({ ok: true, ...result });
+    }
+
+    if (action === "restore") {
+      await restoreBusiness(businessId, actor);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "delete_permanently") {
+      const e164 = await deleteArchivedBusiness(businessId, actor, String(body.confirm_name || ""));
       return NextResponse.json({ ok: true, e164 });
     }
 
+    // "remove" (hard delete in one step) is gone: Archive, then permanent delete after the grace period.
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (err) {
+    if (isAdminActionBlocked(err)) {
+      return NextResponse.json({ error: err.message, blocked: true }, { status: 409 });
+    }
     logAdminError("businesses", err);
     return NextResponse.json({ error: adminFacingError(err) }, { status: 500 });
   }

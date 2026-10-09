@@ -33,7 +33,7 @@ async function resendJson(
   init: { method?: string; body?: unknown } = {},
 ): Promise<{ ok: boolean; status: number; json: Record<string, unknown> }> {
   const apiKey = resendKey();
-  if (!apiKey) return { ok: false, status: 0, json: { message: "RESEND_API_KEY is not set." } };
+  if (!apiKey) return { ok: false, status: 0, json: { message: "Email sending is off on this server." } };
   const res = await fetch(`https://api.resend.com${path}`, {
     method: init.method || "GET",
     headers: {
@@ -54,8 +54,8 @@ function domainFromRow(row: Record<string, unknown> | null): OpsResendDomain {
       status: resendKey() ? "missing" : "no_key",
       records: [],
       message: resendKey()
-        ? "Create the Resend domain, then add the DNS records on scalers.co.ke."
-        : "Set RESEND_API_KEY on the desk to create ops.scalers.co.ke.",
+        ? "Create the sending domain, then add its DNS records on scalers.co.ke."
+        : "Email sending is off on this server.",
     };
   }
   const status = String(row.status || "pending");
@@ -80,7 +80,7 @@ export async function getOpsResendDomain(): Promise<OpsResendDomain> {
       domain: OPS_RESEND_DOMAIN,
       status: "error",
       records: [],
-      message: String(listed.json.message || `Resend list failed (${listed.status})`),
+      message: `Could not list sending domains (${listed.status}).`,
     };
   }
   const rows = Array.isArray(listed.json.data) ? listed.json.data : [];
@@ -108,7 +108,7 @@ export async function ensureOpsResendDomain(): Promise<OpsResendDomain> {
     return {
       ...current,
       status: "error",
-      message: String(created.json.message || `Resend create failed (${created.status})`),
+      message: `Could not create the sending domain (${created.status}).`,
     };
   }
   return domainFromRow(created.json);

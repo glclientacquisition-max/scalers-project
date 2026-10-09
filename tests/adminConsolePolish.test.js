@@ -156,7 +156,9 @@ describe("admin console polish", () => {
     assert.doesNotMatch(panel, /title="Ledger"/);
     assert.match(panel, /b\.package_name/);
     assert.doesNotMatch(panel, /wallet_balance_kes/);
-    assert.match(panel, /REMOVE/);
+    // Remove became Archive (A0). Permanent delete only after the grace period, typed name.
+    assert.doesNotMatch(panel, /REMOVE/);
+    assert.match(panel, /Archive this business\?/);
     assert.doesNotMatch(panel, /disabled=\{pending \|\| availableDidCount === 0\}/);
   });
 
@@ -261,8 +263,8 @@ describe("admin console polish", () => {
     assert.doesNotMatch(overview, /href="\/admin\/billing"/);
     const poolApi = read("dashboard/src/app/api/did-pool/route.ts");
     assert.match(poolApi, /action === "release"/);
-    assert.match(poolApi, /releaseAssignedDid/);
-    assert.match(read("dashboard/src/lib/didPool.ts"), /export async function releaseAssignedDid/);
+    assert.match(poolApi, /releasePoolNumber/);
+    assert.doesNotMatch(read("dashboard/src/lib/didPool.ts"), /export async function releaseAssignedDid/);
     const opsApi = read("dashboard/src/app/api/admin/platform-ops/route.ts");
     assert.match(opsApi, /prepare_resend/);
     assert.match(opsApi, /verify_resend/);

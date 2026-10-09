@@ -25,7 +25,7 @@ export async function GET() {
     return NextResponse.json({ ok: true, domain: await getOpsResendDomain() });
   } catch (err) {
     logAdminError("platform-ops", err);
-    return NextResponse.json({ error: adminFacingError(err, "Could not read Resend.") }, { status: 500 });
+    return NextResponse.json({ error: adminFacingError(err, "Could not check email sending.") }, { status: 500 });
   }
 }
 
