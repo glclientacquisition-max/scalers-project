@@ -2205,10 +2205,13 @@ async function getTenantHoldGate(tenantId) {
 
 async function listTenantFieldMeta(tenantId) {
   if (!tenantId) return null;
-  const { data, error } = await supabase
-    .from('tenant_field_meta')
-    .select('field_path, source, confirmed_by, confirmed_at')
-    .eq('tenant_id', tenantId);
+  // Confirm v2 columns (value_hash) and P2 freshness, stepping down when a
+  // column is not on this database yet. Rows without a value_hash key keep
+  // the P0 provenance rules (src/conversation/provenance.js indexFieldMeta).
+  const { selectTenantFieldMeta } = require('./lib/tenantFieldMetaSelect');
+  const { rows, error } = await selectTenantFieldMeta((columns) =>
+    supabase.from('tenant_field_meta').select(columns).eq('tenant_id', tenantId)
+  );
   if (error) {
     if (provenanceRpcMissing(error.message)) {
       console.warn(
@@ -2218,7 +2221,7 @@ async function listTenantFieldMeta(tenantId) {
     }
     throwIfError('listTenantFieldMeta', error);
   }
-  return Array.isArray(data) ? data : [];
+  return Array.isArray(rows) ? rows : [];
 }
 
 async function upsertTenantFieldMeta({

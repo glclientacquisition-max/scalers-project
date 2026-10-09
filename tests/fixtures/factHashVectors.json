@@ -1,0 +1,446 @@
+{
+  "version": 1,
+  "note": "Shared by src/conversation/factHash.js and dashboard/src/lib/factHash.ts. Regenerate only with a deliberate canonical-form change; Desk must match.",
+  "vectors": [
+    {
+      "name": "plain text",
+      "input": "M-Pesa till 123456",
+      "canonical": "\"M-Pesa till 123456\"",
+      "sha256": "52b0c0c1fc335d7fc448a19a880e034139f8dd0838ff0bf3d75da13182ee083b"
+    },
+    {
+      "name": "trim and collapse whitespace",
+      "input": "  M-Pesa \t till\n\n123456  ",
+      "canonical": "\"M-Pesa till 123456\"",
+      "sha256": "52b0c0c1fc335d7fc448a19a880e034139f8dd0838ff0bf3d75da13182ee083b"
+    },
+    {
+      "name": "case kept",
+      "input": "m-pesa TILL 123456",
+      "canonical": "\"m-pesa TILL 123456\"",
+      "sha256": "a05609019f6627774b7a2f18a487f3f706cd8813c3768e31cb4f23237c0dd8be"
+    },
+    {
+      "name": "NFC: decomposed e-acute equals composed",
+      "input": "Cafe\u0301 Nyama",
+      "canonical": "\"Caf\u00e9 Nyama\"",
+      "sha256": "f0cea308909ac2047e2fe0375fd528d4b2dfee92e1c088ec62226a8e68de4753"
+    },
+    {
+      "name": "NFC: composed e-acute",
+      "input": "Caf\u00e9 Nyama",
+      "canonical": "\"Caf\u00e9 Nyama\"",
+      "sha256": "f0cea308909ac2047e2fe0375fd528d4b2dfee92e1c088ec62226a8e68de4753"
+    },
+    {
+      "name": "non-breaking space collapses",
+      "input": "Prestige\u00a0\u00a0Plaza",
+      "canonical": "\"Prestige Plaza\"",
+      "sha256": "182e120fc30e38f92ceea6b56bf109dde04ed7e91d3751c405075ba1ced21739"
+    },
+    {
+      "name": "integer number",
+      "input": 600,
+      "canonical": "\"600\"",
+      "sha256": "b08eab77f8e1fded9209737f000550f19ae422a6b83a26fdfcc517d57e4ba117"
+    },
+    {
+      "name": "float number with zero fraction",
+      "input": 600,
+      "canonical": "\"600\"",
+      "sha256": "b08eab77f8e1fded9209737f000550f19ae422a6b83a26fdfcc517d57e4ba117"
+    },
+    {
+      "name": "decimal string trailing zeros",
+      "input": "600.00",
+      "canonical": "\"600\"",
+      "sha256": "b08eab77f8e1fded9209737f000550f19ae422a6b83a26fdfcc517d57e4ba117"
+    },
+    {
+      "name": "decimal string one zero",
+      "input": "600.0",
+      "canonical": "\"600\"",
+      "sha256": "b08eab77f8e1fded9209737f000550f19ae422a6b83a26fdfcc517d57e4ba117"
+    },
+    {
+      "name": "plain integer string",
+      "input": "600",
+      "canonical": "\"600\"",
+      "sha256": "b08eab77f8e1fded9209737f000550f19ae422a6b83a26fdfcc517d57e4ba117"
+    },
+    {
+      "name": "padded integer string",
+      "input": " 600 ",
+      "canonical": "\"600\"",
+      "sha256": "b08eab77f8e1fded9209737f000550f19ae422a6b83a26fdfcc517d57e4ba117"
+    },
+    {
+      "name": "decimal string",
+      "input": "1.50",
+      "canonical": "\"1.5\"",
+      "sha256": "24c74279834561bd8e2846f7eebd4a3cd158413fcf88c604c081cd040d871614"
+    },
+    {
+      "name": "negative decimal string",
+      "input": "-0.50",
+      "canonical": "\"-0.5\"",
+      "sha256": "bbe425924adccb7546b46ab25bd23bd903b50578d576cf365e1c21b1c10d4916"
+    },
+    {
+      "name": "negative zero string",
+      "input": "-0",
+      "canonical": "\"0\"",
+      "sha256": "98089e6d36f78e9766c9ea34d5acb3611f3a92cd81c5eb102095d924ffc7d08b"
+    },
+    {
+      "name": "negative zero number",
+      "input": 0,
+      "canonical": "\"0\"",
+      "sha256": "98089e6d36f78e9766c9ea34d5acb3611f3a92cd81c5eb102095d924ffc7d08b"
+    },
+    {
+      "name": "leading-zero phone stays text",
+      "input": "0712345678",
+      "canonical": "\"0712345678\"",
+      "sha256": "810b0ffa19b539d3732cf3bb1aea13bc9486127c397d26a52a4c21aaf74e6a99"
+    },
+    {
+      "name": "international phone stays text",
+      "input": "+254709221537",
+      "canonical": "\"+254709221537\"",
+      "sha256": "6355b52ace6cbbfa76bf542df67298d32f0024e6dd3fea51957dc387b3ca0145"
+    },
+    {
+      "name": "grouped digits stay text",
+      "input": "1,500",
+      "canonical": "\"1,500\"",
+      "sha256": "09330122012cfd574f7a8274a76267130885092e57d2170012b4183839bd1eb7"
+    },
+    {
+      "name": "currency text stays text",
+      "input": "KES 1,500 - 3,000",
+      "canonical": "\"KES 1,500 - 3,000\"",
+      "sha256": "721fa9bc7840f10628097f83bd18737a4fe06ffa56a2829ba82c73aa6f96e944"
+    },
+    {
+      "name": "large number no exponent",
+      "input": 1e+21,
+      "canonical": "\"1000000000000000000000\"",
+      "sha256": "f6cbf2bc458ed45fbd2c538d23f50215a619930df0c249d29516b43a99e73754"
+    },
+    {
+      "name": "small number no exponent",
+      "input": 1.5e-7,
+      "canonical": "\"0.00000015\"",
+      "sha256": "debb1e83a3527304f9011e157e7c6821496baa347310ba4475d5c23cf1569fe1"
+    },
+    {
+      "name": "boolean true",
+      "input": true,
+      "canonical": "true",
+      "sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "name": "boolean false",
+      "input": false,
+      "canonical": "false",
+      "sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "name": "null",
+      "input": null,
+      "canonical": "null",
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "empty string",
+      "input": "",
+      "canonical": "\"\"",
+      "sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126"
+    },
+    {
+      "name": "array keeps order",
+      "input": [
+        "county:nairobi",
+        "place:kitengela"
+      ],
+      "canonical": "[\"county:nairobi\",\"place:kitengela\"]",
+      "sha256": "2673b6bb5197775a2febbbd60fcdc20de40ef1d39aec43bc8918332b6baf2406"
+    },
+    {
+      "name": "array reversed differs",
+      "input": [
+        "place:kitengela",
+        "county:nairobi"
+      ],
+      "canonical": "[\"place:kitengela\",\"county:nairobi\"]",
+      "sha256": "190728e606b97fee0dbe8b43bd814a2ebc11344b84495508a1a660d8cdc8ca71"
+    },
+    {
+      "name": "array with numbers",
+      "input": [
+        1,
+        "2.0",
+        3.25
+      ],
+      "canonical": "[\"1\",\"2\",\"3.25\"]",
+      "sha256": "fb3958d546595891925fe69d3dc35cc33a57721c131a966e648bd95baa456c60"
+    },
+    {
+      "name": "object keys sorted",
+      "input": {
+        "b": 1,
+        "a": "x"
+      },
+      "canonical": "{\"a\":\"x\",\"b\":\"1\"}",
+      "sha256": "7334a2cc4a6d35131be94eb77b871c4fb17f78e7c44198f028ba702d98e0ba71"
+    },
+    {
+      "name": "object same keys other order",
+      "input": {
+        "a": "x",
+        "b": 1
+      },
+      "canonical": "{\"a\":\"x\",\"b\":\"1\"}",
+      "sha256": "7334a2cc4a6d35131be94eb77b871c4fb17f78e7c44198f028ba702d98e0ba71"
+    },
+    {
+      "name": "nested hours grid",
+      "input": {
+        "timezone": "Africa/Nairobi",
+        "days": {
+          "mon": {
+            "open": "08:00",
+            "close": "17:00"
+          },
+          "sun": null
+        }
+      },
+      "canonical": "{\"days\":{\"mon\":{\"close\":\"17:00\",\"open\":\"08:00\"},\"sun\":null},\"timezone\":\"Africa/Nairobi\"}",
+      "sha256": "2ecf8693234321bf1b5e5afcb1646f716b22ced1f635bfda9eb80465ba5eb6f4"
+    },
+    {
+      "name": "faq projection",
+      "input": {
+        "question": "Do you have parking?",
+        "answer": "Yes,  behind the shop."
+      },
+      "canonical": "{\"answer\":\"Yes, behind the shop.\",\"question\":\"Do you have parking?\"}",
+      "sha256": "f7be603b4c027a5bca7c7db6d4ee4d3356d9999ecf6a03abaeb201514a541f88"
+    },
+    {
+      "name": "catalog row projection",
+      "input": {
+        "name": "Carpet cleaning",
+        "price_range": "KES 1,500 - 3,000",
+        "site_visit_required": true,
+        "aliases": [
+          "carpet",
+          "rug"
+        ]
+      },
+      "canonical": "{\"aliases\":[\"carpet\",\"rug\"],\"name\":\"Carpet cleaning\",\"price_range\":\"KES 1,500 - 3,000\",\"site_visit_required\":true}",
+      "sha256": "93dbc927aeb9178df2f0c5c055b7f83409b1ba17378a26c109ff0b584e732650"
+    },
+    {
+      "name": "uppercase keys sort before lowercase",
+      "input": {
+        "a": 1,
+        "B": 2,
+        "_c": 3
+      },
+      "canonical": "{\"B\":\"2\",\"_c\":\"3\",\"a\":\"1\"}",
+      "sha256": "d5e9a6555c8ccea0cd075ae137d36076846b18158e11659c3f7b4715a90298ee"
+    },
+    {
+      "name": "emoji and swahili",
+      "input": "Karibu sana \ud83d\udc4b mteja",
+      "canonical": "\"Karibu sana \ud83d\udc4b mteja\"",
+      "sha256": "2f22e9326b55c2622e6ab5919c519a52607fb63e2d5718611e689f506675ec32"
+    }
+  ],
+  "pathNote": "factValueForPath(path, pathTenant): value (undefined = unknown path) and hashFactValue(value). Both twins must match.",
+  "pathTenant": {
+    "business_name": "Done and Dusted",
+    "business_policies": {
+      "payment": "M-Pesa till 123456"
+    },
+    "services_catalog": [
+      {
+        "id": "svc_carpet",
+        "name": "Carpet cleaning",
+        "price_range": "KES 1,500 - 2,000",
+        "pricing_mode": "range",
+        "site_visit_required": false
+      },
+      {
+        "name": "Sofa cleaning",
+        "priceRange": "  KES   900 ",
+        "site_visit_required": "yes"
+      },
+      {
+        "id": "svc_quote",
+        "name": "Deep clean",
+        "price_range": "",
+        "pricing_mode": "quote",
+        "siteVisitRequired": true
+      },
+      {
+        "id": "svc_bare",
+        "name": "Window clean",
+        "price_range": null,
+        "site_visit_required": "maybe"
+      },
+      {
+        "id": "42",
+        "name": "Numeric id is positional",
+        "price": 600
+      }
+    ],
+    "product_catalog": [
+      {
+        "name": "Ream",
+        "sku": "P1",
+        "price": 650,
+        "price_range": "600-700"
+      },
+      {
+        "name": "Stapler",
+        "price_range": "450.00"
+      },
+      {
+        "name": "Pens",
+        "sku": "P3",
+        "price": ""
+      }
+    ]
+  },
+  "pathVectors": [
+    {
+      "name": "service price, id path",
+      "path": "catalog.service.svc_carpet.price",
+      "value": {
+        "price": "KES 1,500 - 2,000",
+        "mode": "range"
+      },
+      "sha256": "f37550ddd8b3d005d2605eb076cfc4f3c1031850af4befac5c3b5d9e5dc3a3c2"
+    },
+    {
+      "name": "service price, position path and priceRange alias",
+      "path": "catalog.service.2.price",
+      "value": {
+        "price": "  KES   900 "
+      },
+      "sha256": "f72430da6bc444a227ac499508d5c8ad47cc75bac4a6bac500da62ca82466830"
+    },
+    {
+      "name": "service price, mode only",
+      "path": "catalog.service.svc_quote.price",
+      "value": {
+        "mode": "quote"
+      },
+      "sha256": "81921f6561c771777f05bd09d62bc755a1218ae6aeebb01899326fd00e087d60"
+    },
+    {
+      "name": "service price, empty",
+      "path": "catalog.service.svc_bare.price",
+      "value": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "service price, numeric id stays positional",
+      "path": "catalog.service.5.price",
+      "value": {
+        "price": 600
+      },
+      "sha256": "caf1757ce7330ac14eb604537c253502151ad738996d03525a5bd55bcc282e5f"
+    },
+    {
+      "name": "numeric id is not a key",
+      "path": "catalog.service.42.price",
+      "value": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "service site_visit false",
+      "path": "catalog.service.svc_carpet.site_visit",
+      "value": false,
+      "sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "name": "service site_visit \"yes\" text",
+      "path": "catalog.service.2.site_visit",
+      "value": true,
+      "sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "name": "service site_visit camelCase",
+      "path": "catalog.service.svc_quote.site_visit",
+      "value": true,
+      "sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "name": "service site_visit unknown text",
+      "path": "catalog.service.svc_bare.site_visit",
+      "value": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "service row missing",
+      "path": "catalog.service.svc_gone.price",
+      "value": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "product price wins over price_range",
+      "path": "catalog.product.P1.price",
+      "value": {
+        "price": 650
+      },
+      "sha256": "af3be3b4fc7684938b5a9219dcbc71fa9e5f31236b6a2a8b3fe337c38d4c0304"
+    },
+    {
+      "name": "product price_range fallback, decimal text",
+      "path": "catalog.product.2.price",
+      "value": {
+        "price": "450.00"
+      },
+      "sha256": "faf7e49c8dd6e00fdf84557f61762a2708300a94ecca3184f655e92b2efa7180"
+    },
+    {
+      "name": "product price empty",
+      "path": "catalog.product.P3.price",
+      "value": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "product has no site_visit path",
+      "path": "catalog.product.P1.site_visit",
+      "unknownPath": true
+    },
+    {
+      "name": "service row name path includes id",
+      "path": "catalog.service.svc_carpet.name",
+      "value": {
+        "id": "svc_carpet",
+        "name": "Carpet cleaning",
+        "price_range": "KES 1,500 - 2,000",
+        "pricing_mode": "range",
+        "site_visit_required": false
+      },
+      "sha256": "59f0ac660d9597d4144130ec184e8870e6930ef27d28c0679061557d35819378"
+    },
+    {
+      "name": "scalar",
+      "path": "identity.business_name",
+      "value": "Done and Dusted",
+      "sha256": "e926d15fde266321017e18dc63cf138d601ee3e2171aeddbb7e7ff0ab3c35ca8"
+    },
+    {
+      "name": "policy",
+      "path": "policies.payment",
+      "value": "M-Pesa till 123456",
+      "sha256": "52b0c0c1fc335d7fc448a19a880e034139f8dd0838ff0bf3d75da13182ee083b"
+    }
+  ]
+}

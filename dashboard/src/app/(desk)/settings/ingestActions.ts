@@ -35,6 +35,7 @@ import {
 import type { FaqEntry, TeamDirectoryEntry } from "@/lib/supabase";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
 import { parseAgentTools } from "@/lib/agentTools";
+import { assignServiceIds } from "@/lib/serviceIds";
 import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
 import {
@@ -399,7 +400,10 @@ export async function applyIngestAction(
     llm_system_prompt: prompt,
   };
   if (merged.touched.services) {
-    patch.services_catalog = merged.services;
+    patch.services_catalog = assignServiceIds(
+      merged.services,
+      normalizeServicesCatalog(tenant.services_catalog)
+    );
     patch.services_offered = servicesOffered;
   }
   if (merged.touched.faqs) {
