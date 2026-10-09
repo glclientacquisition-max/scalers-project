@@ -20,11 +20,17 @@ import {
   type BillingRateCard,
   type TenantSubscriptionRow,
 } from "@/lib/packageCatalog";
-import { assignmentFromBusiness, packagePriceLabel } from "@/lib/packagePriceLabel";
+import { packagePriceLabel } from "@/lib/packagePriceLabel";
 import { usedOfIncluded } from "@/lib/packageUsageAlign";
+import { requestErrorText } from "@/lib/adminBillingCopy";
 
 type Tab = "packages" | "shops";
-type SheetKind = "rates" | "sku" | "assign";
+type SheetKind = "rates" | "sku";
+
+/** Packages are assigned on the business's Billing page, behind one confirm. */
+function billingHref(tenantId: string) {
+  return `/admin/billing/${tenantId}`;
+}
 
 function SheetNote({ error }: { error: string | null }) {
   if (!error) return null;
@@ -65,10 +71,6 @@ export function AdminPackagesPanel({
   const [pending, startTransition] = useTransition();
   const [rates, setRates] = useState(initialRates);
   const [packs, setPacks] = useState(initialPackages);
-  const opening = assignmentFromBusiness(businesses[0]);
-  const [businessId, setBusinessId] = useState(businesses[0]?.tenantId || "");
-  const [packageId, setPackageId] = useState(opening.packageId || initialPackages[0]?.id || "");
-  const [period, setPeriod] = useState<"month" | "year">(opening.period || "month");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("packages");
@@ -78,11 +80,6 @@ export function AdminPackagesPanel({
 
   const inboundMin = inboundKesPerMinute(rates.inboundKesPerSecond);
   const outboundMin = outboundKesPerMinute(rates.outboundKesPerSecond);
-
-  const selected = useMemo(
-    () => businesses.find((row) => row.tenantId === businessId) || null,
-    [businesses, businessId],
-  );
 
   const sku = packs.find((pack) => pack.id === skuId) || null;
   const skuIndex = packs.findIndex((pack) => pack.id === skuId);
@@ -98,15 +95,6 @@ export function AdminPackagesPanel({
     );
   }, [businesses, query]);
 
-  const assignPacks = packs.filter((pack) => pack.isActive || pack.id === packageId);
-
-  function selectBusiness(id: string) {
-    setBusinessId(id);
-    const next = assignmentFromBusiness(businesses.find((row) => row.tenantId === id));
-    if (next.packageId) setPackageId(next.packageId);
-    if (next.period) setPeriod(next.period);
-  }
-
   function patchPack(index: number, patch: Partial<BillingPackage>) {
     setPacks((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
@@ -119,18 +107,7 @@ export function AdminPackagesPanel({
   function openSku(id: string) {
     setError(null);
     setSkuId(id);
-    setPackageId(id);
     setSheet("sku");
-  }
-
-  function openAssign(opts: { businessId?: string; packageId?: string }) {
-    setError(null);
-    if (opts.businessId) {
-      selectBusiness(opts.businessId);
-      if (!opts.packageId) setSkuId(null);
-    }
-    if (opts.packageId) setPackageId(opts.packageId);
-    setSheet("assign");
   }
 
   async function post(body: Record<string, unknown>, okText: string) {
@@ -141,9 +118,9 @@ export function AdminPackagesPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const json = (await res.json().catch(() => ({}))) as { error?: string };
+    const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setError(json.error || "Could not save.");
+      setError(requestErrorText(json, "Could not save. Nothing changed."));
       return false;
     }
     setStatus(okText);
@@ -161,19 +138,9 @@ export function AdminPackagesPanel({
               <ListRow
                 key={row.tenantId}
                 title={row.businessName}
-                preview={row.gap || "No package"}
+                preview={row.gap || "No package. Open to assign one."}
                 unread
-                onOpen={() => openAssign({ businessId: row.tenantId })}
-                actions={
-                  <Button
-                    type="button"
-                    variant="tonal"
-                    size="sm"
-                    onClick={() => openAssign({ businessId: row.tenantId })}
-                  >
-                    Assign
-                  </Button>
-                }
+                href={billingHref(row.tenantId)}
               />
             ))}
           </ul>
@@ -227,18 +194,6 @@ export function AdminPackagesPanel({
                   when={`${pack.minutes.toLocaleString("en-KE")} min`}
                   stamp={<Stamp tone={pack.isActive ? "live" : "neutral"}>{pack.isActive ? "Live" : "Hidden"}</Stamp>}
                   onOpen={() => openSku(pack.id)}
-                  actions={
-                    catalogOnly ? undefined : (
-                      <Button
-                        type="button"
-                        variant="tonal"
-                        size="sm"
-                        onClick={() => openAssign({ packageId: pack.id })}
-                      >
-                        Assign
-                      </Button>
-                    )
-                  }
                 />
               ))}
             </ul>
@@ -275,7 +230,7 @@ export function AdminPackagesPanel({
                         {usedOfIncluded(minutesUsedFromSeconds(row.usage.secondsUsed), row.usage.minutesIncluded)}
                       </Stamp>
                     }
-                    onOpen={() => openAssign({ businessId: row.tenantId })}
+                    href={billingHref(row.tenantId)}
                   />
                 ))}
               </ul>
@@ -418,42 +373,35 @@ export function AdminPackagesPanel({
         theme="admin"
         footer={
           sku ? (
-            <>
-              {catalogOnly ? null : (
-                <Button type="button" variant="tonal" block onClick={() => openAssign({ packageId: sku.id })}>
-                  Assign
-                </Button>
-              )}
-              <Button
-                type="button"
-                block
-                pending={pending}
-                onClick={() =>
-                  void post(
-                    {
-                      action: "save_package",
-                      id: sku.id,
-                      sku: sku.sku,
-                      name: sku.name,
-                      monthly_price_kes: sku.monthlyPriceKes,
-                      seats: sku.seats,
-                      minutes: sku.minutes,
-                      sms: sku.sms,
-                      email: sku.email,
-                      staff_wa: sku.staffWa,
-                      dids: sku.dids,
-                      sort_order: sku.sortOrder,
-                      is_active: sku.isActive,
-                    },
-                    `${sku.name} saved.`,
-                  ).then((ok) => {
-                    if (ok) setSheet(null);
-                  })
-                }
-              >
-                Save
-              </Button>
-            </>
+            <Button
+              type="button"
+              block
+              pending={pending}
+              onClick={() =>
+                void post(
+                  {
+                    action: "save_package",
+                    id: sku.id,
+                    sku: sku.sku,
+                    name: sku.name,
+                    monthly_price_kes: sku.monthlyPriceKes,
+                    seats: sku.seats,
+                    minutes: sku.minutes,
+                    sms: sku.sms,
+                    email: sku.email,
+                    staff_wa: sku.staffWa,
+                    dids: sku.dids,
+                    sort_order: sku.sortOrder,
+                    is_active: sku.isActive,
+                  },
+                  `${sku.name} saved.`,
+                ).then((ok) => {
+                  if (ok) setSheet(null);
+                })
+              }
+            >
+              Save
+            </Button>
           ) : null
         }
       >
@@ -518,85 +466,6 @@ export function AdminPackagesPanel({
         ) : null}
       </Sheet>
 
-      <Sheet
-        open={sheet === "assign"}
-        onOpenChange={(next) => {
-          if (!next) setSheet(skuId ? "sku" : null);
-        }}
-        title="Assign"
-        theme="admin"
-        footer={
-          catalogOnly ? null : (
-            <Button
-              type="button"
-              block
-              pending={pending}
-              disabled={!businessId || !packageId}
-              onClick={() =>
-                void post(
-                  {
-                    action: "assign",
-                    business_id: businessId,
-                    package_id: packageId,
-                    period,
-                  },
-                  "Package assigned.",
-                ).then((ok) => {
-                  if (ok) setSheet(null);
-                })
-              }
-            >
-              Assign
-            </Button>
-          )
-        }
-      >
-        <SheetNote error={error} />
-        <p className="pb-3 text-body text-ink">
-          {selected?.packageName
-            ? `Now ${selected.packageName}${selected.period ? ` / ${selected.period}` : ""}`
-            : "Now none"}
-        </p>
-        <Segmented
-          className="-mx-5 px-5 sm:-mx-6 sm:px-6"
-          label="Period"
-          items={[
-            { key: "month", label: "Month", active: period === "month" },
-            { key: "year", label: "Year", active: period === "year" },
-          ]}
-          onSelect={(key) => setPeriod(key as "month" | "year")}
-        />
-        {businesses.length === 0 ? (
-          <Empty className="px-0 py-8" title="No businesses." />
-        ) : (
-          <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
-            {businesses.map((row) => (
-              <ListRow
-                key={row.tenantId}
-                title={row.businessName}
-                preview={shopWhen(row)}
-                unread={row.tenantId === businessId}
-                onOpen={() => selectBusiness(row.tenantId)}
-              />
-            ))}
-          </ul>
-        )}
-        {assignPacks.length === 0 ? (
-          <Empty className="px-0 py-8" title="None live." />
-        ) : (
-          <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
-            {assignPacks.map((pack) => (
-              <ListRow
-                key={pack.id}
-                title={pack.name}
-                preview={packagePriceLabel(pack.monthlyPriceKes)}
-                unread={pack.id === packageId}
-                onOpen={() => setPackageId(pack.id)}
-              />
-            ))}
-          </ul>
-        )}
-      </Sheet>
     </>
   );
 }
