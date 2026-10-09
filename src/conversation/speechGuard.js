@@ -12,7 +12,12 @@ const { fileServicePriceLine } = require('./catalogueMouth');
 const { hoursAskLine, looksLikeHoursAsk } = require('./knownFacts');
 const { parseHoursSchedule } = require('./businessHours');
 const { numbersIn } = require('./numberWords');
-const { assessCoverage } = require('./visitLocation');
+const { assessCoverage, coverageStatus, coverageAskPlace, foldCanonicalPlace } = require('./visitLocation');
+const {
+  confirmedCoverageEnabled,
+  confirmedCoverageReading,
+  teamConfirmCoverageLine,
+} = require('./confirmedCoverage');
 const { bindSpokenPlace } = require('./kenyaPlaces');
 const { offerActOf } = require('../speech/offerAct');
 const { openSlotLine } = require('./callCorrectives');
@@ -51,6 +56,42 @@ const ACTION_NARRATION =
 
 const COVERAGE_CLAIM =
   /\b(?:[Ww]e|[Tt]una|[Tt]unaweza|[Tt]uta)(?:\s+\w+){0,2}?\s+(?:cover|serve|reach|come(?:\s+out)?\s+to|kuja|kufika)\s+(?:to\s+)?([A-Z][\w'’]*(?:\s+[A-Z][\w'’]*){0,2})/;
+
+// BRAIN_CONFIRMED_COVERAGE: any sentence that states the service area, a
+// list of areas, or a denial. Without an owner-confirmed list none of these
+// may be spoken (HD_23445a4f780c t8, t9, t11).
+const COVERAGE_TALK =
+  /\b(?:we\s+(?:\w+\s+){0,2}?(?:cover|serve|reach)\b|(?:our|the)\s+(?:coverage|service\s+areas?)\b|coverage\s+areas?\b|outside\s+(?:of\s+)?(?:our|the)\s+(?:coverage|service\s+area|area)|(?:do\s+not|don'?t)\s+(?:cover|serve|reach|go\s+to|come\s+to)\b|surrounding\s+areas\b|tunafanya\s+(?:\w+\s+)?(?:kote|katika|huko)\b|maeneo\s+ya\s+karibu|maeneo\s+tunayo\w*|tunafika|tunahudumia|hatufiki|hatuhudumii|nje\s+ya\s+(?:huduma|maeneo|eneo))/i;
+const COVERAGE_DENIAL =
+  /\b(?:outside\s+(?:of\s+)?(?:our|the)\s+(?:coverage|service\s+area|area)|(?:do\s+not|don'?t)\s+(?:cover|serve|reach|go\s+to|come\s+to)\b|hatufiki|hatuhudumii|nje\s+ya\s+(?:huduma|maeneo|eneo))/i;
+
+function titlePlace(name) {
+  return String(name || '').replace(/(^|[\s-])[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+/** The place the caller is asking about, for "I'll have the team confirm {place}". */
+function coverageAskedPlace(lastCallerTurn, profile = {}) {
+  const asked = coverageAskPlace(lastCallerTurn);
+  if (asked) return foldCanonicalPlace(asked, profile) || asked;
+  const bound = bindSpokenPlace(lastCallerTurn);
+  return bound.length ? titlePlace(bound[bound.length - 1]) : '';
+}
+
+/**
+ * Flag on: why this coverage sentence may not be spoken, or ''.
+ * No confirmed list: every coverage sentence. Confirmed list: a denial that
+ * names a place the confirmed list covers.
+ */
+function unconfirmedCoverageDrop(sentence, ctx, confirmed) {
+  if (!COVERAGE_TALK.test(sentence)) return '';
+  if (!confirmed) return 'coverage_unconfirmed';
+  if (COVERAGE_DENIAL.test(sentence)) {
+    for (const name of bindSpokenPlace(sentence)) {
+      if (coverageStatus(name, ctx.profile || {}) === 'inside') return 'coverage_contradiction';
+    }
+  }
+  return '';
+}
 
 // Filler that does not answer the caller. Dropped in the mouth, not by a
 // prompt line, so a later prompt cannot speak it. A real answer in the same
@@ -593,6 +634,9 @@ function guardSpokenReply(text, ctx = {}) {
   const hoursFacts = looksLikeHoursAsk(lastCallerTurn) ? fileHoursFacts(ctx.profile || {}) : null;
   const heldName = heldCallerName(ctx.state);
   let droppedNameAsk = false;
+  const coverageGate = confirmedCoverageEnabled();
+  const coverageConfirmed = coverageGate && confirmedCoverageReading(ctx.profile || {}).confirmed;
+  let droppedCoverage = false;
   for (const sentence of splitSentences(raw)) {
     if (heldName && sentenceAsksForCallerName(sentence)) {
       droppedNameAsk = true;
@@ -637,7 +681,14 @@ function guardSpokenReply(text, ctx = {}) {
     }
     const coverage = COVERAGE_CLAIM.exec(sentence);
     if (coverage && assessCoverage(coverage[1], ctx.profile || {}) !== 'inside') {
+      if (coverageGate && !coverageConfirmed) droppedCoverage = true;
       noteDrop(ctx, 'coverage', sentence);
+      continue;
+    }
+    const coverageDrop = coverageGate ? unconfirmedCoverageDrop(sentence, ctx, coverageConfirmed) : '';
+    if (coverageDrop) {
+      if (!coverageConfirmed) droppedCoverage = true;
+      noteDrop(ctx, coverageDrop, sentence);
       continue;
     }
     if (sentenceNamesUnboundPlace(sentence, allowedPlaces)) {
@@ -657,6 +708,18 @@ function guardSpokenReply(text, ctx = {}) {
   }
   let out = kept.join(' ').trim();
   if (holdOpenSlot && droppedJob && BARE_CLOSER.test(out)) out = '';
+  if (droppedCoverage) {
+    // Flag on: the dropped coverage claim becomes "I'll have the team confirm
+    // {place}". No claim either way, no callback time.
+    // Once per caller turn: streamed sentences each pass through here.
+    const conv = ctx.state && typeof ctx.state === 'object' ? (ctx.state.conversation ||= {}) : null;
+    const turn = Number(conv?.turnCount || 0);
+    const line = teamConfirmCoverageLine(coverageAskedPlace(lastCallerTurn, ctx.profile || {}), ctx.language);
+    if (!out.includes(line) && !(conv && conv.coverageConfirmLineTurn === turn && turn > 0)) {
+      out = out ? `${line} ${out}` : line;
+      if (conv) conv.coverageConfirmLineTurn = turn;
+    }
+  }
   const cataloguePrice = fileServicePriceLine(
     lastCallerTurn,
     ctx.profile,

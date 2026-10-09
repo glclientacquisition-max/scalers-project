@@ -22,6 +22,7 @@
 // set on the indexed fieldMeta, then process.env.FACT_HASH_MODE.
 
 const { readCoverageAreas } = require('./coverageAreas');
+const { confirmedCoverageEnabled, confirmedCoverageReading } = require('./confirmedCoverage');
 const {
   hashFactValue,
   catalogRowFactValue,
@@ -423,7 +424,11 @@ function factPolicyMap(policies, fieldMeta = null) {
     else unknown.push(label);
   }
   const coverage = readCoverageAreas(obj);
-  if (coverage) out.coverage_areas = coverage;
+  if (coverage && confirmedCoverageEnabled()) {
+    // BRAIN_CONFIRMED_COVERAGE: only an owner-confirmed list reaches the prompt.
+    if (confirmedCoverageReading({ businessPolicies: obj, fieldMeta }).confirmed) out.coverage_areas = coverage;
+    else unknown.push('Areas we serve');
+  } else if (coverage) out.coverage_areas = coverage;
   for (const [key, raw] of Object.entries(obj)) {
     if (Object.prototype.hasOwnProperty.call(POLICY_TOPICS, key) || isPolicyMetaKey(key)) continue;
     if (typeof raw !== 'string' && typeof raw !== 'number') continue;

@@ -65,7 +65,10 @@ const {
   isLocationRefusal,
   isNoisePlace,
   preferVisitPlace,
+  coverageStatus,
 } = require('./visitLocation');
+const { countiesForPlace } = require('./kenyaPlaces');
+const { confirmedCoverageEnabled, recordCoverageNeed } = require('./confirmedCoverage');
 const {
   isRepairSignal,
   applyRepairObservation,
@@ -643,6 +646,14 @@ function observeCallerTurn(state, input = {}) {
     const askedPlace = coverageAskPlace(text);
     if (askedPlace) {
       const foldedAsk = foldCanonicalPlace(askedPlace, input.profile) || askedPlace;
+      // BRAIN_CONFIRMED_COVERAGE: a place we cannot answer from the confirmed
+      // list is an open need for the owner (handoff-record needs[]).
+      if (confirmedCoverageEnabled()) {
+        const status = coverageStatus(foldedAsk, input.profile || {});
+        if (status !== 'inside' && status !== 'outside' && countiesForPlace(foldedAsk).length) {
+          recordCoverageNeed(next, foldedAsk, next.conversation.turnCount);
+        }
+      }
       next.entities.location = {
         value: foldedAsk,
         source: 'caller_explicit',
@@ -702,6 +713,9 @@ function observeCallerTurn(state, input = {}) {
       });
     } else {
       next.visitPlace = null;
+    }
+    if (next.visitPlace?.coverageUnconfirmed && confirmedCoverageEnabled()) {
+      recordCoverageNeed(next, place, next.conversation.turnCount);
     }
     if (
       next.visitPlace?.blocked === 'outside' ||
