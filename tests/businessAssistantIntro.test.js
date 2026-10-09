@@ -48,6 +48,15 @@ describe('business assistant introduction', () => {
   });
 
   it('drops the English or Kiswahili invite from first audio', () => {
+    // Every vertical, including home_services, and a Gemini line that adds it is rejected.
+    for (const vertical of ['retail', 'home_services', 'homeservices', '']) {
+      const v = composeBusinessAssistantIntro({ businessName: 'Done and Dusted', agentName: 'Shy', vertical, isOpen: true, variant: 0 });
+      assert.doesNotMatch(v, /English or Kiswahili/i, vertical);
+    }
+    assert.equal(
+      introLooksValid('Done and Dusted, this is Shy. You can speak in English or Kiswahili. How can I help?', 'Done and Dusted', 'Shy', { vertical: 'home_services' }),
+      false
+    );
     const line = composeBusinessAssistantIntro({
       businessName: 'ChapterOne Bookstore',
       agentName: 'Aisha',
@@ -134,7 +143,7 @@ describe('business assistant introduction', () => {
     assertForbiddenOpen(line);
   });
 
-  it('pack #0: home_services intro includes English/Kiswahili invite', () => {
+  it('pack #0: home_services intro has no language invite (retired 2026-10-09)', () => {
     const line = composeBusinessAssistantIntro({
       businessName: 'Done and Dusted Cleaning Services',
       agentName: 'Shy',
@@ -144,7 +153,7 @@ describe('business assistant introduction', () => {
       variant: 0,
     });
     assert.match(line, /Done and Dusted Cleaning Services, this is Shy\./);
-    assert.match(line, /You can speak in English or Kiswahili\./);
+    assert.doesNotMatch(line, /English or Kiswahili/i);
     assert.match(line, /How can I help/);
     assert.ok(
       introLooksValid(line, 'Done and Dusted Cleaning Services', 'Shy', {
@@ -375,7 +384,7 @@ describe('business assistant introduction', () => {
     });
     assert.equal(
       line,
-      "Good evening, Done and Dusted, this is Shy. You can speak in English or Kiswahili. We're closed now. Where are we cleaning?"
+      "Good evening, Done and Dusted, this is Shy. We're closed now. Where are we cleaning?"
     );
     assert.match(line, /Done and Dusted, this is Shy\./);
     assert.doesNotMatch(line, /Shy here\./);
