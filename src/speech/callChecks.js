@@ -9,11 +9,26 @@
 //   ignoredFile  the caller has a file (name, open visits or holds) and the
 //                agent says it has no record, or never confirms the name and
 //                never mentions the file (HD_23445a4f780c).
+//   holdMissed   the caller asks about an open hold or quote on file ("the
+//                mansion one") and the reply does not read it, or denies it
+//                (HD_d199dbbf6b79).
+//   falseMove    the agent says it moved or rescheduled a visit, but the
+//                database shows a new visit made on this call while the earlier
+//                one is still open (HD_d199dbbf6b79). Brain fact lines on the
+//                trace (turn.brain.lines[], docs/specs/fact-lines.md) are
+//                checked too: move_ok while a second live visit exists for the
+//                same job, or the moved row not holding the new time, or
+//                visit_updated saying "moved", is the same fail.
+//   swTimeWrong  a spoken Kiswahili clock time disagrees with the stored visit
+//                time (Swahili clock = 24h minus 6; 09:00 is "saa tatu
+//                asubuhi", not "saa 9 asubuhi") (HD_d199dbbf6b79).
 // Inputs are trace turns (src/speech/voiceTrace.js) or turns built from stored
 // transcripts (turnsFromTranscriptRows). ctx is optional:
 //   { callAt, openVisits: [{ service_name, when_text, window_start }], agentName,
 //     businessName, extraNonNames: [],
-//     callerFile: { name, openVisits: [...], openRequests: [{ item, request_type, notes }] } }
+//     callerFile: { name, openVisits: [...], openRequests: [{ item, request_type, notes }] },
+//     callVisits: [{ id, service_name, when_text, window_start, status }] (visits created on this call),
+//     gateVisits: [{ id, service_name, window_start, status }] (rows named by brain.lines[].gate, read after the call) }
 
 const {
   looksLikeOpenVisitLookup,
@@ -457,9 +472,285 @@ function ignoredFileChecks(turns = [], ctx = {}) {
   return out;
 }
 
+// ---------- open hold asked about, not read ----------
+
+// Generic words on a hold item that do not identify it.
+const HOLD_STOP = new Set(['custom', 'quote', 'quotation', 'enquiry', 'inquiry', 'general', 'booking', 'one', 'item']);
+const HOLD_DENIAL =
+  /\b(?:not sure|do not have|don't have|no (?:record|hold|quote|visit)|nothing (?:saved|on file|open)|can(?:no|')t find|sina|hakuna|sijapata)\b/i;
+
+function holdKeys(row) {
+  const item = typeof row === 'string' ? row : row?.item;
+  return tokensOf(item).filter((w) => !HOLD_STOP.has(w) && !/^\d+$/.test(w));
+}
+
+function holdMissedChecks(turns = [], ctx = {}) {
+  const file = callerFileOf(ctx);
+  if (!file || !file.openRequests.length) return [];
+  const holds = file.openRequests
+    .map((row) => ({ row, keys: holdKeys(row) }))
+    .filter((h) => h.keys.length);
+  if (!holds.length) return [];
+  const out = [];
+  for (const turn of turns) {
+    const caller = new Set(tokensOf(callerOf(turn)));
+    const spoken = spokenOf(turn);
+    if (!spoken) continue;
+    for (const hold of holds) {
+      const key = hold.keys.find((w) => caller.has(w));
+      if (!key) continue;
+      const read = new RegExp(`\\b${key}\\b`, 'i').test(spoken) && !HOLD_DENIAL.test(spoken);
+      if (!read) {
+        const item = typeof hold.row === 'string' ? hold.row : hold.row.item;
+        out.push({ turnIndex: turn.turnIndex ?? null, note: `open hold not read: caller asked about "${key}", file has "${item}"` });
+      }
+    }
+  }
+  return out;
+}
+
+// ---------- moved claim, but a new visit was made ----------
+
+const MOVE_CLAIM =
+  /\b(?:i've|i have|we've|we have)\s+(?:moved|rescheduled)\b|\b(?:moved|rescheduled) (?:it|that|the|your) (?:visit|booking|appointment)?|\bnimehamisha\b|\bnime-?move\b|\bimehamishwa\b|\btumehamisha\b/i;
+
+function serviceKeys(row) {
+  return tokensOf(typeof row === 'string' ? row.split('|')[0] : row?.service_name || row?.serviceName).filter(
+    (w) => !['per', 'room'].includes(w)
+  );
+}
+
+function falseMoveChecks(turns = [], ctx = {}) {
+  const created = Array.isArray(ctx.callVisits) ? ctx.callVisits : [];
+  const file = callerFileOf(ctx);
+  const before = file ? file.openVisits : [];
+  if (!created.length || !before.length) return [];
+  // An earlier visit for the same job is still open after the call.
+  const stillOpen = before.filter((old) => {
+    const oldKeys = serviceKeys(old);
+    return created.some((made) => serviceKeys(made).some((w) => oldKeys.includes(w)));
+  });
+  if (!stillOpen.length) return [];
+  const out = [];
+  for (const turn of turns) {
+    const spoken = spokenOf(turn);
+    if (!spoken || !MOVE_CLAIM.test(spoken)) continue;
+    const old = stillOpen[0];
+    const oldWhen = typeof old === 'string' ? old : old.when_text || old.whenText || '';
+    out.push({
+      turnIndex: turn.turnIndex ?? null,
+      note: `claimed a move, but a new visit was made on this call and the earlier one (${oldWhen}) is still open`,
+    });
+  }
+  return out;
+}
+
+// ---------- Brain fact lines (turn.brain.lines[]) ----------
+
+const OPEN_STATUS = new Set(['requested', 'confirmed']);
+
+/** brain.lines[] on a trace turn (noteBrainLines), or a 'brain' stage with lines. */
+function brainLinesOf(turn) {
+  const direct = Array.isArray(turn?.brain?.lines) ? turn.brain.lines : [];
+  const staged = stagesOf(turn, 'brain').flatMap((row) => (Array.isArray(row.lines) ? row.lines : []));
+  return [...direct, ...staged].filter((line) => line && typeof line === 'object');
+}
+
+function slotIso(slot) {
+  return slot && typeof slot === 'object' && slot.iso ? Date.parse(slot.iso) : NaN;
+}
+
+function brainMoveChecks(turns = [], ctx = {}) {
+  const created = Array.isArray(ctx.callVisits) ? ctx.callVisits : [];
+  const gateRows = Array.isArray(ctx.gateVisits) ? ctx.gateVisits : [];
+  const byId = new Map();
+  for (const row of [...created, ...gateRows]) if (row?.id) byId.set(String(row.id), row);
+  const file = callerFileOf(ctx);
+  const filed = file ? file.openVisits : [];
+  const out = [];
+  for (const turn of turns) {
+    for (const line of brainLinesOf(turn)) {
+      const at = turn.turnIndex ?? null;
+      if (line.template === 'visit_updated') {
+        if (MOVE_CLAIM.test(String(line.text || ''))) {
+          out.push({ turnIndex: at, note: 'visit_updated line says "moved"; the time did not change' });
+        }
+        continue;
+      }
+      if (line.template !== 'move_ok') continue;
+      const gate = line.gate || {};
+      const slots = line.slots || {};
+      const target = gate.appointment_id ? String(gate.appointment_id) : '';
+      if (!target) {
+        out.push({ turnIndex: at, note: 'move_ok spoken with no moved visit id in its gate' });
+        continue;
+      }
+      const row = byId.get(target);
+      const toMs = slotIso(gate.to_when) || slotIso(slots.to_when);
+      if (row && row.window_start && Number.isFinite(toMs) && Date.parse(row.window_start) !== toMs) {
+        out.push({ turnIndex: at, note: `move_ok, but visit ${target.slice(0, 8)} does not hold the new time` });
+        continue;
+      }
+      const jobKeys = serviceKeys({ service_name: slots.job || row?.service_name || '' });
+      const sameJob = (other) => !jobKeys.length || serviceKeys(other).some((w) => jobKeys.includes(w));
+      // A second live visit made on this call for the same job.
+      const duplicate = created.find(
+        (other) => other?.id && String(other.id) !== target && OPEN_STATUS.has(String(other.status || '').toLowerCase()) && sameJob(other)
+      );
+      if (duplicate) {
+        out.push({
+          turnIndex: at,
+          note: `move_ok, but a second live visit (${String(duplicate.id).slice(0, 8)}, ${duplicate.when_text || ''}) was created on this call`,
+        });
+        continue;
+      }
+      // The moved row was made on this call while the filed visit for the job is still open.
+      const madeHere = created.some((other) => String(other?.id || '') === target);
+      const oldOpen = madeHere
+        ? filed.find((old) => {
+            if (typeof old !== 'string' && old?.id && String(old.id) === target) return false;
+            const after = typeof old !== 'string' && old?.id ? byId.get(String(old.id)) : null;
+            if (after && !OPEN_STATUS.has(String(after.status || '').toLowerCase())) return false;
+            return sameJob(old);
+          })
+        : null;
+      if (oldOpen) {
+        const oldWhen = typeof oldOpen === 'string' ? oldOpen : oldOpen.when_text || oldOpen.whenText || '';
+        out.push({ turnIndex: at, note: `move_ok, but the earlier visit (${oldWhen}) is still open` });
+      }
+    }
+  }
+  return out;
+}
+
+/** One finding per turn: the trace line and the spoken claim are the same fail. */
+function oncePerTurn(...lists) {
+  const seen = new Set();
+  const out = [];
+  for (const row of lists.flat()) {
+    const key = row.turnIndex == null ? `x${out.length}` : String(row.turnIndex);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
+}
+
+// ---------- Kiswahili clock vs stored time ----------
+
+const SW_HOURS = ['', 'moja', 'mbili', 'tatu', 'nne', 'tano', 'sita', 'saba', 'nane', 'tisa', 'kumi', 'kumi na moja', 'kumi na mbili'];
+const SW_HOUR_RE = '(\\d{1,2}|kumi na moja|kumi na mbili|moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi)';
+const SW_CLOCK = new RegExp(
+  `\\bsaa\\s+${SW_HOUR_RE}(?::(\\d{2})|\\s+na\\s+(nusu|robo)|\\s+kasoro\\s+(robo))?\\s+(asubuhi|mchana|alasiri|jioni|usiku|alfajiri)\\b`,
+  'gi'
+);
+const SW_PERIOD_HOURS = {
+  alfajiri: [[3, 7]],
+  asubuhi: [[6, 12]],
+  mchana: [[12, 17]],
+  alasiri: [[13, 18]],
+  jioni: [[15, 20]],
+  usiku: [[18, 24], [0, 6]],
+};
+const VISIT_WORDS = /\b(?:ziara|visit|appointment|booking|miadi|nimehifadhi|nimehamisha|tufike|tutafika)\b/i;
+
+function swHourNumber(token) {
+  const raw = String(token || '').toLowerCase();
+  if (/^\d+$/.test(raw)) return Number(raw);
+  const i = SW_HOURS.indexOf(raw);
+  return i > 0 ? i : null;
+}
+
+/** Minutes since midnight a Swahili clock phrase can mean (Swahili reading only). */
+function swClockReadings(hourToken, extra, period) {
+  const n = swHourNumber(hourToken);
+  if (!(n >= 1 && n <= 12)) return [];
+  let mins = 0;
+  let hourShift = 0;
+  if (extra.colon != null) mins = Number(extra.colon);
+  else if (extra.frac === 'nusu') mins = 30;
+  else if (extra.frac === 'robo') mins = 15;
+  else if (extra.less === 'robo') {
+    mins = 45;
+    hourShift = -1;
+  }
+  const ranges = SW_PERIOD_HOURS[period] || [[0, 24]];
+  return [n + 6, n + 18]
+    .map((h) => ((((h + hourShift) % 24) + 24) % 24) * 60 + mins)
+    .filter((v) => ranges.some(([a, b]) => Math.floor(v / 60) >= a && Math.floor(v / 60) < b));
+}
+
+function eatMinutesOf(value) {
+  const at = new Date(value);
+  if (Number.isNaN(at.getTime())) return null;
+  // Africa/Nairobi is UTC+3 all year.
+  const eat = new Date(at.getTime() + 3 * 60 * 60 * 1000);
+  return eat.getUTCHours() * 60 + eat.getUTCMinutes();
+}
+
+function clockFromText(text) {
+  const m = /\b(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s?m\b/i.exec(String(text || ''));
+  if (!m) return null;
+  return ((Number(m[1]) % 12) + (/p/i.test(m[3]) ? 12 : 0)) * 60 + Number(m[2] || 0);
+}
+
+function storedVisitMinutes(turns, ctx) {
+  const out = new Set();
+  const file = callerFileOf(ctx);
+  const rows = [...(Array.isArray(ctx.callVisits) ? ctx.callVisits : []), ...(file ? file.openVisits : [])];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const fromStart = row.window_start ? eatMinutesOf(row.window_start) : null;
+    const value = fromStart != null ? fromStart : clockFromText(row.when_text || row.whenText);
+    if (value != null) out.add(value);
+  }
+  for (const turn of turns) {
+    for (const tool of stagesOf(turn, 'tool')) {
+      if (tool.status !== 'succeeded' || !/appointment/.test(String(tool.name || ''))) continue;
+      const when = /whenText=([^=]*?)(?:\s+\w+=|$)/.exec(String(tool.args || ''));
+      const value = when ? clockFromText(when[1]) : null;
+      if (value != null) out.add(value);
+    }
+  }
+  return out;
+}
+
+function swTimeChecks(turns = [], ctx = {}) {
+  const stored = storedVisitMinutes(turns, ctx);
+  const out = [];
+  for (const turn of turns) {
+    const spoken = spokenOf(turn);
+    if (!spoken) continue;
+    for (const sentence of spoken.split(/(?<=[.?!])\s+/)) {
+      if (!VISIT_WORDS.test(sentence)) continue;
+      SW_CLOCK.lastIndex = 0;
+      let match;
+      while ((match = SW_CLOCK.exec(sentence))) {
+        const [phrase, hour, colon, frac, less, period] = match;
+        const readings = swClockReadings(hour, { colon, frac: frac && frac.toLowerCase(), less: less && less.toLowerCase() }, period.toLowerCase());
+        // "saa 9 asubuhi" has no Swahili reading at all: a Western numeral.
+        const wrong = !readings.length || (stored.size > 0 && !readings.some((v) => stored.has(v)));
+        if (wrong) {
+          const want = [...stored].map((v) => `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`).join(', ');
+          out.push({ turnIndex: turn.turnIndex ?? null, note: `Kiswahili time "${phrase}" disagrees with the stored time${want ? ` (${want} EAT)` : ''}` });
+        }
+      }
+    }
+  }
+  return out;
+}
+
 // ---------- combined ----------
 
-const CALL_CHECK_WEIGHT = { visitMissed: 20, dateWrong: 20, nameLock: 15, ignoredFile: 25 };
+const CALL_CHECK_WEIGHT = {
+  visitMissed: 20,
+  dateWrong: 20,
+  nameLock: 15,
+  ignoredFile: 25,
+  holdMissed: 15,
+  falseMove: 20,
+  swTimeWrong: 15,
+};
 const CALL_CHECK_CAP = 60;
 
 function callChecks(turns = [], ctx = {}) {
@@ -468,6 +759,9 @@ function callChecks(turns = [], ctx = {}) {
     dateWrong: nairobiDateChecks(turns, ctx),
     nameLock: nameLockChecks(turns, ctx),
     ignoredFile: ignoredFileChecks(turns, ctx),
+    holdMissed: holdMissedChecks(turns, ctx),
+    falseMove: oncePerTurn(brainMoveChecks(turns, ctx), falseMoveChecks(turns, ctx)),
+    swTimeWrong: swTimeChecks(turns, ctx),
   };
   const counts = {};
   let penalty = 0;
@@ -532,6 +826,12 @@ module.exports = {
   nairobiDateChecks,
   nameLockChecks,
   ignoredFileChecks,
+  holdMissedChecks,
+  falseMoveChecks,
+  brainMoveChecks,
+  brainLinesOf,
+  swTimeChecks,
+  swClockReadings,
   nairobiParts,
   dateClaims,
   asksForVisits,

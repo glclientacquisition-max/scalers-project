@@ -1,0 +1,751 @@
+{
+ "_note": "HD_d199dbbf6b79 (staging, 9 Oct 2026 11:41 EAT). Trace turns from staging voice_turn_traces, reduced to caller final, spoken TTS (fillers dropped), tool and structured stages, latency and outcome. callerFile and callVisits are staging rows read at 11:45 EAT.",
+ "callAt": "2026-10-09T08:41:30.613Z",
+ "callerFile": {
+  "name": "Alvin",
+  "openVisits": [
+   {
+    "service_name": "Carpet Cleaning",
+    "when_text": "Friday 9 October 2026, 9 AM",
+    "window_start": "2026-10-09T06:00:29.205Z",
+    "address_landmark": "Kitengela",
+    "status": "requested"
+   }
+  ],
+  "openRequests": [
+   {
+    "request_type": "enquiry",
+    "item": "Mansion Cleaning Custom Quote",
+    "notes": "Caller will call back in a minute regarding cleaning in Kilimani.",
+    "status": "open"
+   }
+  ]
+ },
+ "callVisits": [
+  {
+   "service_name": "Carpet Cleaning (per room)",
+   "when_text": "Saturday 10 October 2026, 9 AM",
+   "window_start": "2026-10-10T06:00:05.611Z",
+   "address_landmark": "Kitengela, Grace Apartments",
+   "status": "requested",
+   "created_at": "2026-10-09T08:43:43.658Z"
+  }
+ ],
+ "turns": [
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 1,
+   "at": "2026-10-09T08:41:46.202Z",
+   "caller": {
+    "text": "Ah, tulifika wapi na ile mambo yetu ya jana?",
+    "language": "sw"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:41:46.202Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "tts",
+     "text": "Je, naongea na Alvin?",
+     "before": "Je, naongea na Alvin?",
+     "language": "sw"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": 297,
+     "callerStopToFirstTtsPcmMs": 297,
+     "callerStopToModelFirstTokenMs": null
+    },
+    {
+     "stage": "outcome",
+     "value": "early_return"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 2,
+   "at": "2026-10-09T08:41:50.010Z",
+   "caller": {
+    "text": "Yeah.",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:41:50.010Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "structured",
+     "lang": "en",
+     "attempts": 2,
+     "problems": [
+      {
+       "code": "unbacked_number",
+       "detail": "9 is not in a cited fact or the caller's words",
+       "attempt": 1
+      }
+     ],
+     "intent": "visit_lookup",
+     "factsUsed": [
+      {
+       "id": "vis:1",
+       "kind": "visit"
+      }
+     ]
+    },
+    {
+     "stage": "tts",
+     "text": "You have an open visit request for carpet cleaning in Kitengela.",
+     "before": "You have an open visit request for carpet cleaning in Kitengela.",
+     "language": "en",
+     "structured": true
+    },
+    {
+     "stage": "tts",
+     "text": "How would you like to proceed with it?",
+     "before": "How would you like to proceed with it?",
+     "language": "en",
+     "structured": true
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": 3192,
+     "callerStopToFirstTtsPcmMs": 468,
+     "callerStopToModelFirstTokenMs": 1316
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 3,
+   "at": "2026-10-09T08:42:04.899Z",
+   "caller": {
+    "text": "Uh, like, it was yesterday—when did I request that?",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:42:04.899Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "structured",
+     "lang": "en",
+     "attempts": 2,
+     "problems": [
+      {
+       "code": "unbacked_number",
+       "detail": "9 is not in a cited fact or the caller's words",
+       "attempt": 1
+      }
+     ],
+     "intent": "visit_lookup",
+     "factsUsed": [
+      {
+       "id": "vis:1",
+       "kind": "visit"
+      }
+     ]
+    },
+    {
+     "stage": "tts",
+     "text": "You have a carpet cleaning visit request for Kitengela on file.",
+     "before": "You have a carpet cleaning visit request for Kitengela on file.",
+     "language": "en",
+     "structured": true
+    },
+    {
+     "stage": "tts",
+     "text": "Would you like to reschedule or update it?",
+     "before": "Would you like to reschedule or update it?",
+     "language": "en",
+     "structured": true
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": 2935,
+     "callerStopToFirstTtsPcmMs": 468,
+     "callerStopToModelFirstTokenMs": 1218
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 4,
+   "at": "2026-10-09T08:42:17.847Z",
+   "caller": {
+    "text": "What about the mansion one?",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:42:17.847Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "tts",
+     "text": "I'm not sure we cover that area. Should I note it for the team?",
+     "before": "I'm not sure we cover that area. Should I note it for the team?",
+     "language": "en"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": 381,
+     "callerStopToFirstTtsPcmMs": 381,
+     "callerStopToModelFirstTokenMs": null
+    },
+    {
+     "stage": "outcome",
+     "value": "early_return"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 5,
+   "at": "2026-10-09T08:42:26.370Z",
+   "caller": {
+    "text": "No, like, the mansion—the mansion one, I gave you.",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:42:26.370Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "structured",
+     "lang": "en",
+     "attempts": 1,
+     "problems": [],
+     "intent": "visit_lookup",
+     "factsUsed": []
+    },
+    {
+     "stage": "tts",
+     "text": "I do not have a visit saved for a mansion on your file.",
+     "before": "I do not have a visit saved for a mansion on your file.",
+     "language": "en",
+     "structured": true
+    },
+    {
+     "stage": "tts",
+     "text": "Would you like me to book a house cleaning visit for you now?",
+     "before": "Would you like me to book a house cleaning visit for you now?",
+     "language": "en",
+     "structured": true
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": 1936,
+     "callerStopToFirstTtsPcmMs": 464,
+     "callerStopToModelFirstTokenMs": 1281
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 6,
+   "at": "2026-10-09T08:42:43.369Z",
+   "caller": {
+    "text": "Maybe you tell me how much you charge for window cleaning or something?",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:42:43.369Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "tts",
+     "text": "Interior Window Cleaning is two hundred shillings per window.",
+     "before": "Interior Window Cleaning is two hundred shillings per window.",
+     "language": "en"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": 233,
+     "callerStopToFirstTtsPcmMs": 233,
+     "callerStopToModelFirstTokenMs": null
+    },
+    {
+     "stage": "outcome",
+     "value": "early_return"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 7,
+   "at": "2026-10-09T08:42:53.331Z",
+   "caller": {
+    "text": "Wallahi, ni 200 shillings peke yake?",
+    "language": "sw"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:42:53.331Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "structured",
+     "lang": "sw",
+     "attempts": 1,
+     "problems": [],
+     "intent": "price",
+     "factsUsed": [
+      {
+       "id": "svc:interior-window-cleaning",
+       "kind": "price"
+      }
+     ]
+    },
+    {
+     "stage": "tts",
+     "text": "Ndio, cleaning ya window ya ndani ni shilingi mia mbili kwa kila dirisha. Ungetaka tukuwekee appointment ya kusafisha madirisha?",
+     "before": "Ndio, cleaning ya window ya ndani ni shilingi mia mbili kwa kila dirisha. Ungetaka tukuwekee appointment ya kusafisha madirisha?",
+     "language": "sw",
+     "structured": true
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": 1878,
+     "callerStopToFirstTtsPcmMs": 405,
+     "callerStopToModelFirstTokenMs": 1200
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 8,
+   "at": "2026-10-09T08:43:13.590Z",
+   "caller": {
+    "text": "Eeh, na ile carpet cleaning, ulikuwa unaniambia saa hii ya Kitengela?",
+    "language": "sw"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:43:13.590Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": null,
+     "callerStopToFirstTtsPcmMs": 408,
+     "callerStopToModelFirstTokenMs": null
+    },
+    {
+     "stage": "outcome",
+     "value": "barge_in"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 9,
+   "at": "2026-10-09T08:43:15.514Z",
+   "caller": {
+    "text": "Siache tuieke ikuwe kesho.",
+    "language": "sw"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:43:15.514Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "structured",
+     "lang": "sw",
+     "attempts": 1,
+     "problems": [],
+     "intent": "booking",
+     "factsUsed": [
+      {
+       "id": "svc:carpet-cleaning",
+       "kind": "service"
+      }
+     ]
+    },
+    {
+     "stage": "tts",
+     "text": "Tuko na carpet cleaning ya kesho kwa mansion. Iko eneo gani au estate gani?",
+     "before": "Tuko na carpet cleaning ya kesho kwa mansion. Iko eneo gani au estate gani?",
+     "language": "sw",
+     "structured": true
+    },
+    {
+     "stage": "tool",
+     "name": "save_caller_info",
+     "args": "name=like reason=Carpet cleaning booking for mansion",
+     "status": "succeeded"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": 1591,
+     "callerStopToFirstTtsPcmMs": 719,
+     "callerStopToModelFirstTokenMs": 1062
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 10,
+   "at": "2026-10-09T08:43:27.518Z",
+   "caller": {
+    "text": "Ah, si tomorrow in Kitengela.",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:43:27.518Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": null,
+     "callerStopToFirstTtsPcmMs": 407,
+     "callerStopToModelFirstTokenMs": null
+    },
+    {
+     "stage": "outcome",
+     "value": "barge_in"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 11,
+   "at": "2026-10-09T08:43:30.634Z",
+   "caller": {
+    "text": "I told you tomorrow in Ketengela at the grace apartments.",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:43:30.634Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "structured",
+     "lang": "en",
+     "attempts": 1,
+     "problems": [],
+     "intent": "booking",
+     "factsUsed": [
+      {
+       "id": "svc:carpet-cleaning",
+       "kind": "service"
+      },
+      {
+       "id": "cov:kitengela",
+       "kind": "coverage"
+      }
+     ]
+    },
+    {
+     "stage": "tts",
+     "text": "I have Carpet Cleaning for like in Kitengela at Grace Apartments tomorrow.",
+     "before": "I have Carpet Cleaning for like in Kitengela at Grace Apartments tomorrow.",
+     "language": "en",
+     "structured": true
+    },
+    {
+     "stage": "tts",
+     "text": "What time tomorrow?",
+     "before": "What time tomorrow?",
+     "language": "en",
+     "structured": true
+    },
+    {
+     "stage": "tool",
+     "name": "save_caller_info",
+     "args": "name=like reason=visit — Carpet Cleaning (per room) — tomorrow — Kitengela, Grace Apartments",
+     "status": "succeeded"
+    },
+    {
+     "stage": "tool",
+     "name": "create_appointment",
+     "args": "reason=Visit has a day but no time.",
+     "status": "invalid"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": 1654,
+     "callerStopToFirstTtsPcmMs": 407,
+     "callerStopToModelFirstTokenMs": 1089
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 12,
+   "at": "2026-10-09T08:43:41.793Z",
+   "caller": {
+    "text": "Ah, 9 works best.",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:43:41.793Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "structured",
+     "lang": "en",
+     "attempts": 1,
+     "problems": [],
+     "intent": "booking",
+     "factsUsed": [
+      {
+       "id": "svc:carpet-cleaning",
+       "kind": "service"
+      }
+     ]
+    },
+    {
+     "stage": "tts",
+     "text": "Iko sawa.",
+     "before": "Iko sawa.",
+     "language": "sw",
+     "structured": true
+    },
+    {
+     "stage": "tts",
+     "text": "Nimehifadhi ombi la ziara Jumamosi, saa 9 asubuhi.",
+     "before": "Nimehifadhi ombi la ziara Jumamosi, 9 AM.",
+     "language": "sw",
+     "structured": true
+    },
+    {
+     "stage": "tool",
+     "name": "create_appointment",
+     "args": "name=like serviceName=Carpet Cleaning (per room) whenText=Saturday 10 October 2026, 9 AM",
+     "status": "succeeded"
+    },
+    {
+     "stage": "tool",
+     "name": "save_caller_info",
+     "args": "name=like reason=visit — Carpet Cleaning (per room) — tomorrow 9 AM — Kitengela, Grace Apartments",
+     "status": "succeeded"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": 2400,
+     "callerStopToFirstTtsPcmMs": 404,
+     "callerStopToModelFirstTokenMs": 1192
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 13,
+   "at": "2026-10-09T08:43:55.364Z",
+   "caller": {
+    "text": "Saa 3 asubuhi, si saa 9 asubuhi.",
+    "language": "sw"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:43:55.364Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": null,
+     "callerStopToFirstTtsPcmMs": 406,
+     "callerStopToModelFirstTokenMs": null
+    },
+    {
+     "stage": "outcome",
+     "value": "barge_in"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 14,
+   "at": "2026-10-09T08:43:59.623Z",
+   "caller": {
+    "text": "So, like, can you tell me, like,",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:43:59.623Z",
+     "reason": "unfinished",
+     "decision": "hold"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": null,
+     "callerStopToFirstTtsPcmMs": null,
+     "callerStopToModelFirstTokenMs": null
+    },
+    {
+     "stage": "outcome",
+     "value": "hold"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 15,
+   "at": "2026-10-09T08:44:02.681Z",
+   "caller": {
+    "text": "So, like, can you tell me, like, Can you tell me, like, what you—what exactly you've saved?",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:44:02.681Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": null,
+     "callerStopToFirstTtsPcmMs": 405,
+     "callerStopToModelFirstTokenMs": null
+    },
+    {
+     "stage": "outcome",
+     "value": "barge_in"
+    }
+   ]
+  },
+  {
+   "recordKind": "turn",
+   "callId": "HD_d199dbbf6b79",
+   "turnIndex": 16,
+   "at": "2026-10-09T08:44:03.988Z",
+   "caller": {
+    "text": "So that I can confirm?",
+    "language": "en"
+   },
+   "stages": [
+    {
+     "stage": "turn_end",
+     "at": "2026-10-09T08:44:03.988Z",
+     "reason": "caller_turn_processed",
+     "decision": "flush"
+    },
+    {
+     "stage": "structured",
+     "lang": "en",
+     "attempts": 1,
+     "problems": [],
+     "intent": "booking",
+     "factsUsed": [
+      {
+       "id": "svc:carpet-cleaning",
+       "kind": "service"
+      }
+     ]
+    },
+    {
+     "stage": "tts",
+     "text": "Iko sawa.",
+     "before": "Iko sawa.",
+     "language": "sw",
+     "structured": true
+    },
+    {
+     "stage": "tts",
+     "text": "Nimehamisha ziara Jumamosi, saa 9 asubuhi.",
+     "before": "Nimehamisha ziara Jumamosi, 9 AM.",
+     "language": "sw",
+     "structured": true
+    },
+    {
+     "stage": "tool",
+     "name": "update_appointment",
+     "args": "whenText=Saturday 10 October 2026, 9 AM",
+     "status": "succeeded"
+    },
+    {
+     "stage": "latency",
+     "firstReplyPcmMs": 2001,
+     "callerStopToFirstTtsPcmMs": 403,
+     "callerStopToModelFirstTokenMs": 1322
+    },
+    {
+     "stage": "outcome",
+     "value": "ok"
+    }
+   ]
+  }
+ ]
+}

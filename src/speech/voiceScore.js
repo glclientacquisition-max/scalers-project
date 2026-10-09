@@ -443,6 +443,9 @@ const CHECK_WEIGHT = {
   dateWrong: 20,
   nameLock: 15,
   ignoredFile: 25,
+  holdMissed: 15,
+  falseMove: 20,
+  swTimeWrong: 15,
 };
 
 const CHECK_LINE = {
@@ -458,6 +461,9 @@ const CHECK_LINE = {
   dateWrong: 'A spoken day or date was wrong for Nairobi',
   nameLock: 'The caller name did not stay locked',
   ignoredFile: 'The caller file was ignored',
+  holdMissed: 'An open hold the caller asked about was not read',
+  falseMove: 'Claimed a move, but a new visit was made and the old one is still open',
+  swTimeWrong: 'A Kiswahili time disagreed with the stored time',
 };
 
 function turnsForCheck(scored, key) {

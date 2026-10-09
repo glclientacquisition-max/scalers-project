@@ -14,7 +14,7 @@
 // CALL_ID is calls.id (uuid) or the SautiKit sid (HD_...). --rows takes
 // { call: { id, created_at, tenant_id, ... }, transcripts: [{ speaker, text_content, created_at }],
 //   openVisits: [{ service_name, when_text, window_start, status }], agentName, businessName,
-//   callerFile: { name, openVisits, openRequests } }.
+//   callerFile: { name, openVisits, openRequests }, callVisits: [visits created on the call] }.
 //   --ctx facts.json adds the same call facts to a trace run (traces carry no caller file).
 // Transcript scoring has no latency, language tags, or model output, so slow,
 // language and deleted-answer checks are weaker there; visit read, Nairobi date
@@ -23,7 +23,7 @@
 const fs = require('fs');
 const { readStoredTurns } = require('../src/speech/voiceTrace');
 const { scoreTurns, diagnoseCall, formatSummary } = require('../src/speech/voiceScore');
-const { turnsFromTranscriptRows } = require('../src/speech/callChecks');
+const { turnsFromTranscriptRows, brainLinesOf } = require('../src/speech/callChecks');
 
 const OPEN_VISIT_STATUS = ['requested', 'confirmed', 'open', 'pending', 'scheduled'];
 
@@ -93,7 +93,29 @@ async function loadTranscriptCall(callId) {
       openRequests: rErr ? [] : requests || [],
     };
   }
-  return { call, transcripts: transcripts || [], openVisits, callerFile };
+  // Visits written on this call (for the moved-but-duplicated check).
+  const { data: callVisits } = await supabase
+    .from('appointments')
+    .select('id, service_name, when_text, window_start, status, created_at')
+    .eq('call_id', call.id);
+  return { call, transcripts: transcripts || [], openVisits, callerFile, callVisits: callVisits || [] };
+}
+
+// Rows named by Brain fact-line gates (turn.brain.lines[].gate.appointment_id),
+// read now, so move_ok is checked against the DB after the call.
+async function loadGateVisits(turns) {
+  const ids = [...new Set(turns.flatMap((turn) => brainLinesOf(turn).map((line) => line?.gate?.appointment_id).filter(Boolean)))];
+  if (!ids.length || flag('--no-db')) return [];
+  try {
+    const { supabase } = require('../src/lib/supabaseClient');
+    const { data } = await supabase
+      .from('appointments')
+      .select('id, service_name, when_text, window_start, status, call_id')
+      .in('id', ids);
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 async function main() {
@@ -115,6 +137,7 @@ async function main() {
       agentName: bundle.agentName || null,
       businessName: bundle.businessName || null,
       callerFile: bundle.callerFile || null,
+      callVisits: Array.isArray(bundle.callVisits) ? bundle.callVisits : null,
     };
   } else {
     const file = arg('--file');
@@ -122,6 +145,7 @@ async function main() {
     // Traces carry no caller file: --ctx facts.json passes { callAt, callerFile, ... }.
     const ctxFile = arg('--ctx');
     if (ctxFile) ctx = JSON.parse(fs.readFileSync(ctxFile, 'utf8'));
+    if (!ctx.gateVisits) ctx.gateVisits = await loadGateVisits(turns);
   }
   if (!turns.length) {
     console.error(`No turns for ${callId}`);

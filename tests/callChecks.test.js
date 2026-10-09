@@ -187,7 +187,7 @@ describe('scorer wiring', () => {
   it('a clean call keeps zero call-level checks', () => {
     const card = scoreTurns([turn(1, 'Hello', 'Hello, how can I help?', { at: FRIDAY_MORNING })]);
     assert.deepEqual([card.checks.visitMissed, card.checks.dateWrong, card.checks.nameLock], [0, 0, 0]);
-    assert.deepEqual(callChecks([]).counts, { visitMissed: 0, dateWrong: 0, nameLock: 0, ignoredFile: 0 });
+    assert.deepEqual(callChecks([]).counts, { visitMissed: 0, dateWrong: 0, nameLock: 0, ignoredFile: 0, holdMissed: 0, falseMove: 0, swTimeWrong: 0 });
   });
 });
 
@@ -261,5 +261,132 @@ describe('ignored caller file (HD_23445a4f780c)', () => {
     const turns = [turn(1, 'Hi', 'Sina kumbukumbu ya hilo. Ungependa huduma gani?')];
     assert.deepEqual(ignoredFileChecks(turns, {}), []);
     assert.deepEqual(ignoredFileChecks(turns, { callerFile: { name: null, openVisits: [], openRequests: [] } }), []);
+  });
+});
+
+describe('HD_d199dbbf6b79: hold not read, false move, wrong Kiswahili time', () => {
+  const { holdMissedChecks, falseMoveChecks, swTimeChecks, swClockReadings } = require('../src/speech/callChecks');
+  const hd = require('./fixtures/hdD199Turns.json');
+  const ctx = { callAt: hd.callAt, callerFile: hd.callerFile, callVisits: hd.callVisits };
+
+  it('drops well below 100 once the file and call visits are known', () => {
+    // Without the file the scorer still hears "saa 9 asubuhi" (no Swahili reading).
+    const blind = scoreTurns(hd.turns, { callAt: hd.callAt });
+    const known = scoreTurns(hd.turns, ctx);
+    assert.equal(blind.checks.swTimeWrong, 2);
+    assert.equal(known.checks.holdMissed, 2);
+    assert.equal(known.checks.falseMove, 1);
+    assert.equal(known.checks.swTimeWrong, 2);
+    assert.ok(known.score <= 40, `score ${known.score}`);
+    assert.ok(blind.score - known.score >= 25, `${blind.score} -> ${known.score}`);
+    // Before these checks the call scored 92.5 (only slow first audio).
+    assert.ok(92.5 - known.score >= 50, `${known.score}`);
+    assert.deepEqual(known.callFindings.holdMissed.map((r) => r.turnIndex), [4, 5]);
+    assert.deepEqual(known.callFindings.falseMove.map((r) => r.turnIndex), [16]);
+    assert.deepEqual(known.callFindings.swTimeWrong.map((r) => r.turnIndex), [12, 16]);
+  });
+
+  it('holdMissed: reading the hold passes; a denial or a coverage line does not', () => {
+    const file = hd.callerFile;
+    assert.deepEqual(
+      holdMissedChecks([turn(1, 'What about the mansion one?', 'Your mansion cleaning quote from last night is still open. Want me to book it?')], { callerFile: file }),
+      []
+    );
+    assert.equal(holdMissedChecks([turn(1, 'What about the mansion one?', "I'm not sure we cover that area.")], { callerFile: file }).length, 1);
+    assert.equal(holdMissedChecks([turn(1, 'the mansion one', 'I do not have a visit saved for a mansion on your file.')], { callerFile: file }).length, 1);
+    // The caller never asked about it: nothing to miss.
+    assert.deepEqual(holdMissedChecks([turn(1, 'How much is window cleaning?', 'KSh 200 per window.')], { callerFile: file }), []);
+    // Generic words ("quote") do not count as asking about this hold.
+    assert.deepEqual(holdMissedChecks([turn(1, 'Can I get a quote?', 'Sure, for which service?')], { callerFile: file }), []);
+  });
+
+  it('falseMove: only when a new visit was made and the old one is still open', () => {
+    const line = [turn(1, 'Confirm?', 'Nimehamisha ziara Jumamosi, saa tatu asubuhi.')];
+    assert.equal(falseMoveChecks(line, ctx).length, 1);
+    assert.equal(falseMoveChecks([turn(1, 'x', "Okay, I've moved that visit to Saturday at 9 AM.")], ctx).length, 1);
+    // A real update (no new visit on the call) is fine.
+    assert.deepEqual(falseMoveChecks(line, { callerFile: hd.callerFile, callVisits: [] }), []);
+    // A new visit with no earlier open one is fine.
+    assert.deepEqual(falseMoveChecks(line, { callerFile: { name: 'Alvin', openVisits: [], openRequests: [] }, callVisits: hd.callVisits }), []);
+    // No move claim, no finding.
+    assert.deepEqual(falseMoveChecks([turn(1, 'x', 'Nimehifadhi ombi la ziara Jumamosi, saa tatu asubuhi.')], ctx), []);
+  });
+
+  it('swTimeWrong: Swahili clock is 24h minus 6', () => {
+    assert.deepEqual(swClockReadings('tatu', {}, 'asubuhi'), [9 * 60]);
+    assert.deepEqual(swClockReadings('9', {}, 'asubuhi'), []);
+    assert.deepEqual(swClockReadings('tisa', {}, 'mchana'), [15 * 60]);
+    assert.deepEqual(swClockReadings('nne', { less: 'robo' }, 'asubuhi'), [9 * 60 + 45]);
+    const good = [turn(1, 'x', 'Nimehifadhi ombi la ziara Jumamosi, saa tatu asubuhi.')];
+    assert.deepEqual(swTimeChecks(good, ctx), []);
+    assert.equal(swTimeChecks([turn(1, 'x', 'Nimehifadhi ombi la ziara Jumamosi, saa 9 asubuhi.')], ctx).length, 1);
+    assert.equal(swTimeChecks([turn(1, 'x', 'Ziara yako ni Jumamosi saa nne asubuhi.')], ctx).length, 1);
+    // Business hours are not a visit time.
+    assert.deepEqual(swTimeChecks([turn(1, 'x', 'Tunafungua saa mbili asubuhi hadi saa kumi na mbili jioni.')], ctx), []);
+  });
+});
+
+describe('brain.lines[] on the trace (docs/specs/fact-lines.md)', () => {
+  const { brainMoveChecks, brainLinesOf, callChecks } = require('../src/speech/callChecks');
+  const hd = require('./fixtures/hdD199Turns.json');
+  const OLD = '47362e7b-0000-4000-8000-000000000001'; // filed: Friday 9 AM, still requested
+  const NEW = 'b140110d-0000-4000-8000-000000000002'; // created on HD_d199: Saturday 9 AM
+  const SAT_9 = { iso: '2026-10-10T06:00:05.611Z', precision: 'time' };
+  const callerFile = { ...hd.callerFile, openVisits: hd.callerFile.openVisits.map((v) => ({ ...v, id: OLD })) };
+  const callVisits = hd.callVisits.map((v) => ({ ...v, id: NEW }));
+  const withLines = (lines) => ({ turnIndex: 16, caller: { text: 'Ihamishe' }, stages: [], brain: { lines } });
+  const moveOk = (id, extra = {}) => ({
+    template: 'move_ok',
+    lang: 'sw',
+    slots: { to_when: SAT_9, job: 'Carpet Cleaning' },
+    gate: { appointment_id: id, to_when: SAT_9, filed_visit: id === OLD },
+    text: 'Sawa, nimehamisha ziara ya Carpet Cleaning hadi kesho Jumamosi, saa tatu asubuhi.',
+    ...extra,
+  });
+
+  it('reads turn.brain.lines and a brain stage', () => {
+    assert.equal(brainLinesOf(withLines([moveOk(NEW)])).length, 1);
+    assert.equal(brainLinesOf({ stages: [{ stage: 'brain', lines: [moveOk(NEW)] }] }).length, 1);
+    assert.deepEqual(brainLinesOf({ stages: [] }), []);
+  });
+
+  it('HD_d199 shape: move_ok on the new row while the filed visit is still open is a fail', () => {
+    const found = brainMoveChecks([withLines([moveOk(NEW)])], { callerFile, callVisits });
+    assert.equal(found.length, 1);
+    assert.match(found[0].note, /earlier visit .* still open/);
+  });
+
+  it('move_ok on the filed row with a second live visit made on the call is a fail', () => {
+    const gateVisits = [{ id: OLD, service_name: 'Carpet Cleaning', window_start: SAT_9.iso, status: 'requested' }];
+    const found = brainMoveChecks([withLines([moveOk(OLD)])], { callerFile, callVisits, gateVisits });
+    assert.equal(found.length, 1);
+    assert.match(found[0].note, /second live visit/);
+  });
+
+  it('the moved row not holding the new time is a fail', () => {
+    const gateVisits = [{ id: OLD, service_name: 'Carpet Cleaning', window_start: '2026-10-09T06:00:29.205Z', status: 'requested' }];
+    const found = brainMoveChecks([withLines([moveOk(OLD)])], { callerFile, callVisits: [], gateVisits });
+    assert.match(found[0].note, /does not hold the new time/);
+  });
+
+  it('a clean move passes: filed row holds the new time, no second visit', () => {
+    const gateVisits = [{ id: OLD, service_name: 'Carpet Cleaning', window_start: SAT_9.iso, status: 'requested' }];
+    assert.deepEqual(brainMoveChecks([withLines([moveOk(OLD)])], { callerFile, callVisits: [], gateVisits }), []);
+    // A different job created on the same call is not a duplicate.
+    const other = [{ id: NEW, service_name: 'Sofa Cleaning', status: 'requested' }];
+    assert.deepEqual(brainMoveChecks([withLines([moveOk(OLD)])], { callerFile, callVisits: other, gateVisits }), []);
+  });
+
+  it('move_ok without a gate id, and visit_updated that says moved, are fails', () => {
+    assert.match(brainMoveChecks([withLines([moveOk(null)])], {})[0].note, /no moved visit id/);
+    const updated = { template: 'visit_updated', lang: 'en', slots: {}, gate: { appointment_id: OLD }, text: "Okay, I've moved that visit." };
+    assert.equal(brainMoveChecks([withLines([updated])], {}).length, 1);
+    assert.deepEqual(brainMoveChecks([withLines([{ ...updated, text: "Okay, I've updated that visit." }])], {}), []);
+  });
+
+  it('the spoken claim and the trace line on one turn count once in falseMove', () => {
+    const t = { ...withLines([moveOk(NEW)]), stages: [{ stage: 'tts', text: 'Nimehamisha ziara Jumamosi, saa tatu asubuhi.' }] };
+    const out = callChecks([t], { callerFile, callVisits });
+    assert.equal(out.counts.falseMove, 1);
   });
 });
