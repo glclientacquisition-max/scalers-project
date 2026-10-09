@@ -563,13 +563,21 @@ export async function assignBusinessPackage(opts: {
   note?: string;
 }): Promise<PackageChangeResult> {
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin.rpc("assign_tenant_package", {
+  let { data, error } = await admin.rpc("assign_tenant_package", {
     p_tenant_id: opts.tenantId,
     p_package_id: opts.packageId,
     p_period: opts.period,
     p_actor: opts.actor || "ops",
     p_note: opts.note || null,
   });
+  if (error && (error as { code?: string }).code === "PGRST202") {
+    // Deploy window: package_state_rules.sql not applied yet (3-arg RPC only).
+    ({ data, error } = await admin.rpc("assign_tenant_package", {
+      p_tenant_id: opts.tenantId,
+      p_package_id: opts.packageId,
+      p_period: opts.period,
+    }));
+  }
   if (error) throw error;
   const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
   return {

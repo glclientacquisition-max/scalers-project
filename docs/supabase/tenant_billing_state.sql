@@ -12,6 +12,8 @@
 --
 -- Columns
 --   package_state      active | none (explicit no package; never unlimited)
+--   billing_term       month | year; term_start / term_end = invoicing term
+--   period_start/_end  USAGE month (always one calendar month, EAT)
 --   mode_label         beta (enforcement off) | metered (enforced, on-demand on)
 --                      | capped (enforced, on-demand off)
 --   included_minutes   tenants.minutes_included (package part + granted)
@@ -85,8 +87,9 @@ begin
         coalesce(s.current_period_start,
           date_trunc('month', now() at time zone 'Africa/Nairobi') at time zone 'Africa/Nairobi') as period_start,
         case when s.tenant_id is null
-          then (date_trunc('month', now() at time zone 'Africa/Nairobi') + interval '1 month') at time zone 'Africa/Nairobi'
+          then public.billing_add_months(date_trunc('month', now() at time zone 'Africa/Nairobi') at time zone 'Africa/Nairobi', 1)
           else s.current_period_end end as period_end,
+        s.term_start, s.term_end,
         s.pending_change, s.pending_package_id, s.pending_period, s.pending_effective_at
       from public.tenants t
       left join public.tenant_subscriptions s on s.tenant_id = t.id
@@ -99,7 +102,9 @@ begin
         case when ps.sub_status = 'active' then ps.package_id end as package_id,
         case when ps.sub_status = 'active' then p.sku end as package_sku,
         case when ps.sub_status = 'active' then p.name end as package_name,
-        ps.period as billing_period,
+        ps.period as billing_term,
+        ps.term_start,
+        ps.term_end,
         ps.period_start,
         ps.period_end,
         ps.pending_change,
@@ -132,7 +137,9 @@ begin
       b.package_id,
       b.package_sku,
       b.package_name,
-      b.billing_period,
+      b.billing_term,
+      b.term_start,
+      b.term_end,
       b.period_start,
       b.period_end,
       b.pending_change,
