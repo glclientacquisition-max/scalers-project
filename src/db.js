@@ -2282,7 +2282,35 @@ async function confirmTenantField({ tenantId, fieldPath, userId = null } = {}) {
   return data || null;
 }
 
+/**
+ * Visits and requests created on this call. End-of-call owner message reads
+ * these so a restart mid-call does not drop them. Updates to rows from an
+ * earlier call are tracked in memory by the voice server.
+ */
+async function listCallOwnerItems({ callId, tenantId } = {}) {
+  if (!callId) return [];
+  const out = [];
+  for (const [table, type] of [
+    ['appointments', 'visit'],
+    ['service_requests', 'request'],
+  ]) {
+    try {
+      let q = supabase.from(table).select('*').eq('call_id', callId);
+      if (tenantId) q = q.eq('tenant_id', tenantId);
+      const { data, error } = await q.order('created_at', { ascending: true }).limit(10);
+      if (error) throw error;
+      for (const row of data || []) {
+        out.push({ type, kind: 'created', row, at: Date.parse(row.created_at) || 0 });
+      }
+    } catch (err) {
+      console.warn(`[db] listCallOwnerItems ${table} failed:`, err?.message || err);
+    }
+  }
+  return out;
+}
+
 module.exports = {
+  listCallOwnerItems,
   upsertCall,
   saveCallerInfo,
   saveEscalation,

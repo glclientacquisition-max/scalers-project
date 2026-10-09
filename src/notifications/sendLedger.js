@@ -60,9 +60,13 @@ function normalizeDest(value) {
     .replace(/[^\d@._a-z-]/g, '');
 }
 
-function idempotencyKey({ tenantId, callSid, callId, kind, channel, to, at } = {}) {
+function idempotencyKey({ tenantId, callSid, callId, kind, channel, to, at, keyBase } = {}) {
   const dest = normalizeDest(to) || 'none';
   const ch = String(channel || 'sms');
+  // Handoff-style keys (#632): one per call, not per kind.
+  // <keyBase>:<channel>:<recipient>, e.g. handoff:<call_id>:summary:email:a@b.c
+  const base = String(keyBase || '').trim();
+  if (base) return `${base}:${ch}:${dest}`;
   const k = String(kind || 'unknown');
   const tenant = String(tenantId || 'none');
   const sid = String(callSid || '').trim();
@@ -94,6 +98,7 @@ function buildLedgerRow({
   providerMessageId,
   at,
   overage,
+  keyBase,
 } = {}) {
   const cls = classify(kind);
   const ch = String(channel || '').trim();
@@ -118,6 +123,7 @@ function buildLedgerRow({
       channel: ch,
       to,
       at,
+      keyBase,
     }),
   };
 }
@@ -191,7 +197,8 @@ function instanceFlightKey(ledger, to) {
   const dests = destKeys(to);
   if (!ledger?.tenantId || !dests.length) return null;
   const call = String(ledger.callSid || ledger.callId || '').trim() || 'ops';
-  return `${ledger.tenantId}:${call}:${String(ledger.kind || 'unknown')}:${dests
+  const scope = String(ledger.keyBase || '').trim() || String(ledger.kind || 'unknown');
+  return `${ledger.tenantId}:${call}:${scope}:${dests
     .slice()
     .sort()
     .join(',')}`;
@@ -245,6 +252,7 @@ async function instanceAlreadyDelivered(ledger, to) {
           kind: ledger.kind,
           channel,
           to: dest,
+          keyBase: ledger.keyBase,
         });
         const found = await db.findNotifySend({
           tenantId: ledger.tenantId,
