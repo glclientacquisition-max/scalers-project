@@ -432,13 +432,22 @@ function createVoiceTrace(opts = {}) {
     });
   }
 
+  // played starts null (unknown) and is settled from the real playback result.
+  // Returns settle(played) so the call site records true or false, never assumes.
   function noteFiller(info = {}) {
-    pushStage({
+    const row = {
       stage: 'filler',
       text: redactText(info.text || ''),
       before: info.before != null ? redactText(info.before) : null,
       language: info.language || null,
-    });
+      played: typeof info.played === 'boolean' ? info.played : null,
+    };
+    pushStage(row);
+    return {
+      settle(played) {
+        row.played = played === true;
+      },
+    };
   }
 
   function noteTool(info = {}) {

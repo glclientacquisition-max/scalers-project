@@ -699,9 +699,12 @@ function scoreTurns(turns = []) {
     }
   }
   const counted = scored.filter((turn) => !turn.omit);
-  const avg = counted.length
-    ? counted.reduce((sum, turn) => sum + turn.score, 0) / counted.length
-    : 100;
+  // No scorable turn (0 turns, or every turn unlogged) means no score. A stored
+  // 100 here would inflate Admin Quality averages.
+  if (!counted.length) {
+    return { score: null, checks, mouth, turns: scored, nameAsks, nameAskTurns };
+  }
+  const avg = counted.reduce((sum, turn) => sum + turn.score, 0) / counted.length;
   const callPenalty = Math.min(30, checks.repeatedQuestion * 8);
   const score = Math.round((Math.max(0, avg - callPenalty) + Number.EPSILON) * 10) / 10;
   return { score, checks, mouth, turns: scored, nameAsks, nameAskTurns };
@@ -736,6 +739,9 @@ function turnsForCheck(scored, key) {
 }
 
 function diagnoseCall(card = {}) {
+  // Nothing was scored, so there is nothing to diagnose. Not "No failed checks."
+  if (card.score === null) return null;
+  if (Array.isArray(card.turns) && !card.turns.some((turn) => !turn.omit)) return null;
   const checks = card.checks || {};
   const ranked = [];
   for (const [key, weight] of Object.entries(CHECK_WEIGHT)) {
