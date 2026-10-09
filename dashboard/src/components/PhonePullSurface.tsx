@@ -166,7 +166,8 @@ function PhonePullSurface({
           <DeskError>{error}</DeskError>
         </div>
       ) : null}
-      {slot instanceof HTMLElement ? createPortal(mark, slot) : mark}
+      {/* Narrow by value, not DOM class: this renders during SSR, where HTMLElement is undefined. */}
+      {slot !== null && slot !== "inline" ? createPortal(mark, slot) : mark}
     </div>
   );
 }
