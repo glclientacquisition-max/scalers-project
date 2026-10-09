@@ -1,4 +1,4 @@
-// Platform-wide ops alerts (speech | reasoning | telephony). Not per-tenant owner SMS.
+// Platform-wide ops alerts (speech | reasoning | telephony | audio). Not per-tenant owner SMS.
 // Separate cooldown and recipient list from speechOutageNotify.js.
 
 const { dispatchToStaff } = require('./recipients');
@@ -14,7 +14,8 @@ const degraded = new Map();
 const alertedAt = new Map();
 let dispatchOverride = null;
 
-const KINDS = new Set(['speech', 'reasoning', 'telephony']);
+// audio: SautiKit-hosted line-unavailable clips failed to refresh (calls use <Say>).
+const KINDS = new Set(['speech', 'reasoning', 'telephony', 'audio']);
 
 function normalizeKind(kind) {
   const k = String(kind || '').trim().toLowerCase();
@@ -47,7 +48,7 @@ function buildPlatformOpsBody(kind, detail = {}) {
 /**
  * Fire when a platform lane newly degrades. One ping per kind until recovery.
  *
- * @param {'speech'|'reasoning'|'telephony'|'llm'} kind
+ * @param {'speech'|'reasoning'|'telephony'|'audio'|'llm'} kind
  * @param {{ channel?: string, message?: string, balanceMinor?: number, currency?: string }} [detail]
  */
 async function notePlatformOpsDegrade(kind, detail = {}) {
@@ -76,7 +77,9 @@ async function notePlatformOpsDegrade(kind, detail = {}) {
       ? 'Scalers platform speech down'
       : key === 'reasoning'
         ? 'Scalers platform reasoning down'
-        : 'Scalers platform phone line down';
+        : key === 'audio'
+          ? 'Scalers platform phone audio refresh failed'
+          : 'Scalers platform phone line down';
 
   if (String(process.env.VOICE_PLATFORM_OPS_DRY_RUN || '').toLowerCase() === 'true') {
     degraded.set(key, true);
