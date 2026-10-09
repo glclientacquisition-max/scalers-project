@@ -4,6 +4,10 @@
 // do not. The probe key must be able to read GET /v1/wallet or that gate
 // never fires. A later healthy probe clears the flag so calls resume without
 // a restart.
+//
+// Each reading with a known balance also feeds the low-balance thresholds
+// (walletLowBalance.js, VOICE_WALLET_ALERT_THRESHOLDS_KES). Unknown balance
+// (errors, 402, timeouts) never alerts or re-arms them.
 
 const DEFAULT_API_BASE = 'https://api.sautikit.com';
 const {
@@ -15,6 +19,7 @@ const {
   notePlatformOpsDegrade,
   notePlatformOpsRecovered,
 } = require('../notifications/platformOpsAlert');
+const { observeWalletBalance } = require('./walletLowBalance');
 
 function apiBase(value) {
   return String(value || process.env.SAUTIKIT_API_BASE || DEFAULT_API_BASE).replace(
@@ -125,10 +130,25 @@ async function probeSautikitWallet(opts = {}) {
     notePlatformOpsRecovered('telephony');
   }
 
+  let lowBalance = { ok: false, reason: 'balance_unknown' };
+  if (next.balanceMinor != null) {
+    try {
+      lowBalance = await observeWalletBalance({
+        balanceMinor: next.balanceMinor,
+        currency: next.currency,
+        source: 'poll',
+      });
+    } catch (err) {
+      console.warn('[telephony] low-balance check failed:', err?.message || err);
+      lowBalance = { ok: false, reason: 'error' };
+    }
+  }
+
   return {
     ok: true,
     status,
     billingExhausted: next.billingExhausted,
+    lowBalance,
     health: getTelephonyProviderHealth(),
   };
 }

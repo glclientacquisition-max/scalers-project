@@ -190,6 +190,27 @@ function platformOpsDegradeBody(kind = 'speech', detail = {}) {
   return lines.join('\n');
 }
 
+function formatMinor(minor) {
+  const n = Number(minor);
+  if (!Number.isFinite(n)) return '?';
+  return (n / 100).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Staff-only phone wallet low notice. No vendor names. */
+function platformOpsWalletLowBody(detail = {}) {
+  const currency = String(detail.currency || 'KES').trim() || 'KES';
+  const lines = ['Scalers platform phone wallet is low.'];
+  if (detail.balanceMinor != null) {
+    const under =
+      detail.thresholdMinor != null ? ` (under ${currency} ${formatMinor(detail.thresholdMinor)})` : '';
+    lines.push(`Balance: ${currency} ${formatMinor(detail.balanceMinor)}${under}`);
+  }
+  lines.push('Top up the phone wallet before calls stop. Check /admin Platform board.');
+  const source = String(detail.source || '').trim();
+  if (source) lines.push(`Seen by: ${source}`);
+  return lines.join('\n');
+}
+
 function outageBody(businessName, kind = 'speech') {
   const who = String(businessName || '').trim();
   if (kind === 'llm') {
@@ -253,6 +274,7 @@ module.exports = {
   escalationBody,
   missedTextbackBody,
   platformOpsDegradeBody,
+  platformOpsWalletLowBody,
   outageBody,
   renderCallerText,
   renderStaffSubject,
