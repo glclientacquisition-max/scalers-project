@@ -165,7 +165,7 @@ async function runStructuredTurn(opts) {
         for (const p of checked.problems) problems.push({ attempt, ...p, sentence: text });
         if (spoken.length === 0 && attempt < maxAttempts) return false;
         const codes = checked.problems.map((p) => p.code);
-        const data = dataLineFor(text, checked.problems, { table, pack });
+        const data = dataLineFor(text, checked.problems, { table, pack, callerText });
         const factual = codes.some((c) => c === 'unbacked_number' || c.startsWith('coverage_'));
         if (data) line = data;
         else if (factual && !unverifiedSpoken) {

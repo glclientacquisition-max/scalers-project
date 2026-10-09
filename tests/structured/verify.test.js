@@ -48,7 +48,10 @@ describe('verifySay: facts are checked against facts_used, not filtered by regex
   it('coverage is read from the coverage list (HD_015b "Kitengele")', () => {
     const r = verifySay('Sorry, Kitengela is outside our area.', { locked: 'en', table, factsUsed: [] });
     assert.deepEqual(codes(r), ['coverage_contradiction']);
-    assert.equal(dataLineFor('x', r.problems, { table, pack: getLanguagePack('sw') }), 'Ndiyo, tunafika Kitengela.');
+    assert.equal(
+      dataLineFor('x', r.problems, { table, pack: getLanguagePack('sw'), callerText: 'Mnafika Kitengela?' }),
+      'Ndiyo, tunafika Kitengela.'
+    );
     const nakuru = verifySay('Yes, we cover Nakuru.', { locked: 'en', table, factsUsed: [] });
     assert.deepEqual(codes(nakuru), ['coverage_unbacked']);
   });
@@ -85,3 +88,36 @@ describe('language lock', () => {
     assert.equal(lockReplyLanguage({ text: 'mm' }).lang, 'en');
   });
 });
+
+describe('HD_23445a4f780c: "outside Nairobi" is the caller, not a coverage denial', () => {
+  const caller = 'Mmh, na kama niko outside Nairobi, how is it done?';
+  const cov = (r) => r.problems.filter((p) => p.code.startsWith('coverage_'));
+  it('a reply listing the areas we reach outside Nairobi passes', () => {
+    for (const [locked, sentence] of [
+      ['sw', 'Kama uko nje ya Nairobi, tunafika Kiambu, Kitengela, Juja, Ongata Rongai na Syokimau.'],
+      ['sw', 'Tunafika maeneo ya nje ya Nairobi kama Syokimau na Kitengela.'],
+      ['sw', 'Nje ya Nairobi tunafika Syokimau, Kitengela na Juja.'],
+      ['sw', 'Hatufiki nje ya Nairobi isipokuwa Syokimau.'],
+      ['en', 'Outside Nairobi county we also reach Syokimau and Kitengela.'],
+      ['en', 'If you are outside Nairobi, we reach Kiambu, Juja and Syokimau.'],
+    ]) {
+      assert.deepEqual(cov(verifySay(sentence, { locked, table, factsUsed: [], callerText: caller })), [], sentence);
+    }
+  });
+  it('a real denial of a covered place still fails', () => {
+    assert.deepEqual(codes(verifySay('Kitengela iko nje ya maeneo yetu.', { locked: 'sw', table, factsUsed: [] })), ['coverage_contradiction']);
+    assert.deepEqual(codes(verifySay('Hatufiki Kitengela.', { locked: 'sw', table, factsUsed: [] })), ['coverage_contradiction']);
+  });
+  it('the canned "Ndiyo, tunafika X." never replaces a reply about a place the caller did not name', () => {
+    const r = verifySay('Hatufiki Syokimau.', { locked: 'sw', table, factsUsed: [], callerText: caller });
+    assert.deepEqual(codes(r), ['coverage_contradiction']);
+    assert.equal(dataLineFor('Hatufiki Syokimau.', r.problems, { table, pack: getLanguagePack('sw'), callerText: caller }), '');
+    assert.equal(
+      dataLineFor('Hatufiki Syokimau.', r.problems, { table, pack: getLanguagePack('sw'), callerText: 'Mnafika Syokimau?' }),
+      'Ndiyo, tunafika Syokimau.'
+    );
+    const nakuru = verifySay('Yes, we cover Nakuru.', { locked: 'en', table, factsUsed: [] });
+    assert.equal(dataLineFor('x', nakuru.problems, { table, pack: getLanguagePack('en'), callerText: caller }), '');
+  });
+});
+
