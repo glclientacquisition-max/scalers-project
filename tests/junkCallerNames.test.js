@@ -35,6 +35,18 @@ describe('junk caller names', () => {
     for (const name of JUNK) assert.equal(isJunkCallerName(name), true, `junk: ${name}`);
   });
 
+  it('discourse fillers heard as a name are junk ("like", HD_1b3a67ea7ee9)', () => {
+    for (const name of ['like', 'Like', 'like.', 'Like,', 'um', 'uh', 'so', 'okay', 'yes', 'no', 'sure', 'hmm', 'hmmm', 'sawa', 'ndio', 'eeh', 'well', 'actually', 'basically', 'anyway', 'maybe', 'mhm', 'yaani', 'ehe', 'like um', 'so like']) {
+      assert.equal(isJunkCallerName(name), true, `junk: ${name}`);
+    }
+  });
+
+  it('fillers never block a real name', () => {
+    for (const name of ['Sue', 'Noah', 'Joy', 'Faith', 'Grace', 'Mercy', 'Hope', 'Wanjiku', 'Alvin', 'Liam', 'Lilian', 'Wellington', 'Maya', 'Sawe', 'Ndiomu', 'Likimani']) {
+      assert.equal(isJunkCallerName(name), false, `real: ${name}`);
+    }
+  });
+
   it('keeps real names', () => {
     for (const name of REAL) assert.equal(isJunkCallerName(name), false, `real: ${name}`);
   });

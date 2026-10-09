@@ -48,6 +48,9 @@ const NAME_FUNCTION_WORDS = new Set([
   'fine', 'good', 'great', 'cool', 'nice', 'hello', 'hallo', 'hi', 'hey', 'please',
   'thanks', 'thank', 'sorry', 'pardon', 'uh', 'um', 'umm', 'uhm', 'er', 'erm', 'ah',
   'eh', 'oh', 'mm', 'mmm', 'hmm', 'hm', 'huh', 'uhhuh', 'nope', 'nah',
+  // Discourse fillers heard as a name ("like" on HD_1b3a67ea7ee9)
+  'like', 'well', 'actually', 'basically', 'anyway', 'anyways', 'maybe',
+  'hmmm', 'mhm', 'mmhm', 'uhuh', 'aah', 'ahh', 'ehh', 'ehe', 'yaani',
   // Honorifics on their own
   'sir', 'madam', 'mr', 'mrs', 'ms', 'miss', 'bwana', 'mzee',
   // Kiswahili
