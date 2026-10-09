@@ -101,6 +101,7 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { CoverageAreaField } from "@/components/CoverageAreaField";
+import { stableRowId } from "@/lib/factHash";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
 import { deskShiftClass } from "@/components/ui/deskChrome";
@@ -611,7 +612,7 @@ export function TenantForm({
   function updateService(index: number, key: keyof ServiceItem, value: string) {
     const current = services[index];
     if (current && String(current[key] ?? "") !== value && current.name.trim()) {
-      queueOwnerPath(`catalog.service.${index + 1}.name`);
+      queueOwnerPath(`catalog.service.${stableRowId(current) || String(index + 1)}.name`);
     }
     setServices((prev) =>
       prev.map((row, i) =>
