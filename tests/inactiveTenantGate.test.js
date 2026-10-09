@@ -12,6 +12,8 @@ const {
   LINE_UNAVAILABLE_EN,
   LINE_UNAVAILABLE_SW,
   sameNumber,
+  isTenantLineInactive,
+  tenantLineInactiveReason,
   tenantLineState,
   lineUnavailableXml,
   lineUnavailableResponse,
@@ -26,19 +28,36 @@ const STAGING_DID = '+254709221537';
 let tenantRows = [];
 let failWith = null;
 let archivedColumnMissing = false;
+let lineStatusColumnMissing = false;
+const selects = [];
 function fakeSupabase() {
   return {
     from(table) {
       assert.equal(table, 'tenants');
       return {
         select(cols) {
-          if (failWith) return Promise.resolve({ data: null, error: { message: failWith } });
-          if (archivedColumnMissing && /archived_at/.test(cols)) {
-            return Promise.resolve({ data: null, error: { message: 'column tenants.archived_at does not exist' } });
+          selects.push(cols);
+          let result;
+          if (failWith) result = { data: null, error: { message: failWith } };
+          else if (archivedColumnMissing && /archived_at/.test(cols)) {
+            result = { data: null, error: { message: 'column tenants.archived_at does not exist' } };
+          } else if (lineStatusColumnMissing && /line_status/.test(cols)) {
+            result = { data: null, error: { message: 'column tenants.line_status does not exist' } };
+          } else {
+            const keep = cols.split(',').map((c) => c.trim());
+            const data = tenantRows.map((row) => Object.fromEntries(keep.filter((k) => k in row).map((k) => [k, row[k]])));
+            result = { data, error: null };
           }
-          const keep = cols.split(',').map((c) => c.trim());
-          const data = tenantRows.map((row) => Object.fromEntries(keep.filter((k) => k in row).map((k) => [k, row[k]])));
-          return Promise.resolve({ data, error: null });
+          const query = Promise.resolve(result);
+          // resolveTenantId: .eq('sautikit_virtual_number', n).maybeSingle()
+          query.eq = (col, value) => ({
+            maybeSingle: async () => {
+              if (result.error) return result;
+              const hit = result.data.find((row) => row[col] === value);
+              return { data: hit || null, error: null };
+            },
+          });
+          return query;
         },
       };
     },
@@ -53,7 +72,36 @@ before(() => {
   db = require('../src/db');
 });
 
+describe('isTenantLineInactive: one predicate for a closed line', () => {
+  it('archived_at set, line_status suspended, or is_active false close the line', () => {
+    assert.equal(isTenantLineInactive({ id: 'a', is_active: true, archived_at: '2026-10-09T18:00:00Z' }), true);
+    assert.equal(isTenantLineInactive({ id: 'a', is_active: true, line_status: 'suspended' }), true);
+    assert.equal(isTenantLineInactive({ id: 'a', is_active: true, line_status: ' Suspended ' }), true);
+    assert.equal(isTenantLineInactive({ id: 'a', is_active: false }), true);
+    assert.equal(tenantLineInactiveReason({ is_active: false, line_status: 'suspended', archived_at: 'x' }), 'archived');
+    assert.equal(tenantLineInactiveReason({ is_active: false, line_status: 'suspended' }), 'suspended');
+    assert.equal(tenantLineInactiveReason({ is_active: false, line_status: 'active' }), 'inactive');
+  });
+
+  it('active, grace, missing columns and null rows stay live', () => {
+    assert.equal(isTenantLineInactive({ id: 'a', is_active: true, archived_at: null, line_status: 'active' }), false);
+    assert.equal(isTenantLineInactive({ id: 'a', is_active: true, line_status: 'grace' }), false, 'grace still answers');
+    assert.equal(isTenantLineInactive({ id: 'a' }), false);
+    assert.equal(isTenantLineInactive(null), false);
+    assert.equal(tenantLineInactiveReason(undefined), null);
+  });
+});
+
 describe('tenantLineState', () => {
+  it('a suspended owner closes the line; archived wins the reason over suspended / inactive', () => {
+    assert.deepEqual(tenantLineState([{ id: 's', is_active: true, line_status: 'suspended' }]), { closed: true, reason: 'suspended', tenantId: 's' });
+    assert.deepEqual(
+      tenantLineState([{ id: 'p', is_active: false }, { id: 's', line_status: 'suspended' }, { id: 'g', archived_at: 'x' }]),
+      { closed: true, reason: 'archived', tenantId: 'g' }
+    );
+    assert.deepEqual(tenantLineState([{ id: 'g', line_status: 'grace', is_active: true }]), { closed: false, reason: 'live', tenantId: 'g' });
+  });
+
   it('a live owner keeps the line open; archived or inactive owners close it', () => {
     assert.deepEqual(tenantLineState([{ id: 'a', is_active: true }]), { closed: false, reason: 'live', tenantId: 'a' });
     assert.deepEqual(tenantLineState([{ id: 'a', is_active: false }]), { closed: true, reason: 'inactive', tenantId: 'a' });
@@ -236,6 +284,38 @@ describe('db.inboundTenantLine', () => {
     archivedColumnMissing = false;
   });
 
+  it('archived but still is_active = true (Admin Archive keeps the flag): closed, returns the archived tenant itself', async () => {
+    tenantRows = [
+      { id: 'other', sautikit_virtual_number: '+254700000009', is_active: true, archived_at: null, line_status: 'active' },
+      { id: 'archived', sautikit_virtual_number: STAGING_DID, is_active: true, archived_at: '2026-10-09T18:00:00Z', line_status: 'active' },
+    ];
+    assert.deepEqual(await db.inboundTenantLine({ toNumber: STAGING_DID }), { closed: true, reason: 'archived', tenantId: 'archived' });
+    // 254… / 0… forms of the same number find the same archived tenant, never 'other'.
+    assert.deepEqual(await db.inboundTenantLine({ toNumber: '254709221537' }), { closed: true, reason: 'archived', tenantId: 'archived' });
+    assert.deepEqual(await db.inboundTenantLine({ toNumber: '0709221537' }), { closed: true, reason: 'archived', tenantId: 'archived' });
+  });
+
+  it('suspended (line_status) closes; grace and active answer unchanged', async () => {
+    tenantRows = [
+      { id: 'susp', sautikit_virtual_number: '+254700000004', is_active: true, archived_at: null, line_status: 'suspended' },
+      { id: 'grace', sautikit_virtual_number: '+254700000005', is_active: true, archived_at: null, line_status: 'grace' },
+      { id: 'live', sautikit_virtual_number: '+254700000006', is_active: true, archived_at: null, line_status: 'active' },
+    ];
+    assert.deepEqual(await db.inboundTenantLine({ toNumber: '+254700000004' }), { closed: true, reason: 'suspended', tenantId: 'susp' });
+    assert.deepEqual(await db.inboundTenantLine({ toNumber: '+254700000005' }), { closed: false, reason: 'live', tenantId: 'grace' });
+    assert.deepEqual(await db.inboundTenantLine({ toNumber: '+254700000006' }), { closed: false, reason: 'live', tenantId: 'live' });
+  });
+
+  it('prod schema today (line_status, no archived_at) and the oldest schema (is_active only) both work', async () => {
+    tenantRows = [{ id: 'susp', sautikit_virtual_number: STAGING_DID, is_active: true, archived_at: 'not-on-prod', line_status: 'suspended' }];
+    archivedColumnMissing = true;
+    assert.deepEqual(await db.inboundTenantLine({ toNumber: STAGING_DID }), { closed: true, reason: 'suspended', tenantId: 'susp' });
+    lineStatusColumnMissing = true;
+    assert.deepEqual(await db.inboundTenantLine({ toNumber: STAGING_DID }), { closed: false, reason: 'live', tenantId: 'susp' }, 'unknown state never closes');
+    archivedColumnMissing = false;
+    lineStatusColumnMissing = false;
+  });
+
   it('fails open on a lookup error or no number', async () => {
     failWith = 'connection reset';
     assert.equal((await db.inboundTenantLine({ toNumber: STAGING_DID })).closed, false);
@@ -261,8 +341,99 @@ describe('server wiring: the gate runs before Stream, the call row and minutes',
     assert.ok(reject < line && line < pkg && pkg < row && row < stream);
   });
   it('a closed line returns the line-unavailable XML and nothing else runs', () => {
-    assert.match(body, /if \(line && line\.closed === true\) \{[\s\S]{0,200}return res\.type\('text\/xml'\)\.send\(await lineUnavailableResponse\(\)\);/);
+    assert.match(body, /if \(line && line\.closed === true\) \{[\s\S]{0,300}return res\.type\('text\/xml'\)\.send\(await lineUnavailableResponse\(\)\);/);
     // A failed check answers (fail open), it does not throw out of the handler.
     assert.match(body, /catch \(lineErr\) \{\s*console\.warn\('\[voice\/incoming\] tenant line check failed \(answering\):/);
   });
+});
+
+describe('db.resolveTenantId: an archived owner resolves to itself, never unassigned or another tenant', () => {
+  it('digit-form match finds an archived / inactive owner; a live owner of the same digits wins', async () => {
+    failWith = null;
+    tenantRows = [
+      { id: 'other', sautikit_virtual_number: '+254700000009', is_active: true, archived_at: null, line_status: 'active' },
+      { id: 'archived', sautikit_virtual_number: '254709221537', is_active: false, archived_at: '2026-10-09T18:00:00Z', line_status: 'active' },
+    ];
+    assert.equal(await db.resolveTenantId({ toNumber: STAGING_DID }), 'archived');
+    tenantRows.push({ id: 'newOwner', sautikit_virtual_number: '0709221537', is_active: true, archived_at: null, line_status: 'active' });
+    assert.equal(await db.resolveTenantId({ toNumber: STAGING_DID }), 'newOwner');
+  });
+
+  it('active tenants resolve exactly as before; an unknown number is still unassigned_did', async () => {
+    tenantRows = [{ id: 'live', sautikit_virtual_number: '+254700000001', is_active: true, archived_at: null, line_status: 'active' }];
+    assert.equal(await db.resolveTenantId({ toNumber: '+254700000001' }), 'live');
+    assert.equal(await db.resolveTenantId({ toNumber: '254700000001' }), 'live');
+    await assert.rejects(db.resolveTenantId({ toNumber: '+254711111111' }), (err) => err.code === 'unassigned_did');
+  });
+});
+
+describe('closed-line calls: later webhooks touch nothing', () => {
+  const { createClosedLineCalls } = require('../src/sautikit/closedLineCalls');
+  it('remembers gated sids for a TTL, bounded', () => {
+    let t = 0;
+    const memo = createClosedLineCalls({ ttlMs: 1000, now: () => t, max: 3 });
+    memo.remember('a', '', null, 'b');
+    assert.equal(memo.has('a'), true);
+    assert.equal(memo.has(undefined, 'b'), true);
+    assert.equal(memo.has('c'), false);
+    t = 1001;
+    assert.equal(memo.has('a'), false, 'expired');
+    memo.remember('1', '2', '3', '4');
+    assert.ok(memo.size <= 3);
+    assert.equal(memo.has('4'), true);
+  });
+
+  it('server: gate remembers the call; incoming lifecycle and /voice/events short-circuit before any call-row, recording or alert work', () => {
+    const start = SERVER.indexOf('async function handleVoiceIncoming(');
+    const incoming = SERVER.slice(start, SERVER.indexOf('\n}\n', start));
+    assert.match(incoming, /line\.closed === true\) \{[\s\S]{0,300}closedLineCalls\.remember\(sid, callSid, extracted\.callSid\);[\s\S]{0,80}lineUnavailableResponse\(\)/);
+    const memo = incoming.indexOf('closedLineCalls.has(sid, callSid)');
+    assert.ok(memo > 0 && memo < incoming.indexOf('shouldSkipMediaStream('), 'checked before lifecycle handling');
+    assert.ok(memo < incoming.indexOf('markCallTerminalFromWebhook('));
+    const ev = SERVER.indexOf("app.post('/voice/events'");
+    const events = SERVER.slice(ev, SERVER.indexOf('\n});\n', ev));
+    const skip = events.indexOf('closedLineCalls.has(callSid');
+    assert.ok(skip > 0);
+    for (const later of ['attachProviderRecording(', 'markCallTerminalFromWebhook(', 'maybeSendWhatsAppNotification(', 'scheduleRecordingFetch(']) {
+      assert.ok(skip < events.indexOf(later), later);
+    }
+  });
+
+  it('archived call: the gate answers with clip + Hangup and no Stream / session / call row; active call: unchanged path', () => {
+    const start = SERVER.indexOf('async function handleVoiceIncoming(');
+    const incoming = SERVER.slice(start, SERVER.indexOf('\n}\n', start));
+    const gate = incoming.indexOf('await db.inboundTenantLine(');
+    const closedReturn = incoming.indexOf('return res.type(\'text/xml\').send(await lineUnavailableResponse());');
+    // Everything that starts a session, writes a lead/call row, charges minutes or alerts comes after the closed return.
+    for (const later of ['db.packageInboundOpen(', 'await db.upsertCall(', 'buildAnswerStreamXml(']) {
+      const i = incoming.indexOf(later);
+      assert.ok(i > closedReturn && closedReturn > gate, later);
+    }
+  });
+});
+
+// #645 (VOICE_FAST_INBOUND) adds an in-memory DID -> tenant directory. The
+// closed-line decision above does NOT depend on it: handleVoiceIncoming asks
+// db.inboundTenantLine (a direct read) before Stream on every call. These run
+// only when the directory is in the build (combined staging), and pin the
+// contract #645 must keep so it never routes an archived line as live.
+describe('#645 inbound directory contract (runs when src/sautikit/inboundDirectory.js is present)', () => {
+  const dirPath = path.join(__dirname, '..', 'src', 'sautikit', 'inboundDirectory.js');
+  const present = fs.existsSync(dirPath);
+  it('an archived owner is reported closed (line.archived), never swapped for another tenant', { skip: !present && 'no #645 directory in this build' }, async () => {
+    const { createInboundDirectory } = require(dirPath);
+    const dir = createInboundDirectory({
+      loadTenants: async () => ({
+        rows: [
+          { id: 'other', sautikit_virtual_number: '+254700000009', is_active: true, archived_at: null },
+          { id: 'archived', sautikit_virtual_number: STAGING_DID, is_active: true, archived_at: '2026-10-09T18:00:00Z' },
+        ],
+        packageColumns: false,
+      }),
+    });
+    const hit = await dir.lookup({ toNumber: STAGING_DID, fromNumber: '+254711000000' });
+    assert.equal(hit.tenantId, 'archived');
+    assert.ok(hit.line && (hit.line.archived === true || hit.line.closed === true));
+  });
+  it('TODO #645: directory uses isTenantLineInactive (line_status suspended) so the gate can skip its DB read', { todo: true }, () => {});
 });
