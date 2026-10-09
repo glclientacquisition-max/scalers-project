@@ -7,7 +7,7 @@ import { AdminAccountMenu } from "@/components/AdminAccountMenu";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
-import { Menu, MenuLinkItem } from "@/components/ui/Menu";
+import { Sheet } from "@/components/ui/Sheet";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   ADMIN_LINKS,
@@ -259,47 +259,61 @@ const phoneTabClass =
   "flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 pt-1.5";
 const phoneLabelClass = "max-w-full truncate text-center text-caption leading-none";
 
-/** Platform, Packages, and Voices. The bar itself stays five items wide. */
+/**
+ * Platform, Packages, and Voices. The bar itself stays five items wide.
+ * The chooser is the same bottom drawer as every other overlay.
+ */
 function AdminPhoneMore() {
   const { path, href: mapHref } = useAdminChrome();
+  const [open, setOpen] = useState(false);
   const more = adminPhoneMore();
   const active = more.some((item) => adminRouteActive(path, item.href, item.exact));
 
   return (
-    <Menu
-      side="top"
-      align="end"
-      trigger={
-        <button
-          type="button"
-          aria-label="More"
-          className={[
-            phoneTabClass,
-            deskShiftClass,
-            focusRingVisible,
-            active ? "font-semibold text-accent-deep" : "font-medium text-ink-soft",
-          ].join(" ")}
-        >
-          <AdminIcon name="More" />
-          <span className={phoneLabelClass}>More</span>
-        </button>
-      }
-    >
-      {more.map((item) => {
-        const current = adminRouteActive(path, item.href, item.exact);
-        return (
-          <MenuLinkItem
-            key={item.href}
-            href={mapHref(item.href)}
-            aria-current={current ? "page" : undefined}
-            className={current ? "font-semibold text-accent-deep" : undefined}
-          >
-            <AdminIcon name={item.label} />
-            {item.label}
-          </MenuLinkItem>
-        );
-      })}
-    </Menu>
+    <>
+      <button
+        type="button"
+        aria-label="More"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+        className={[
+          phoneTabClass,
+          deskShiftClass,
+          focusRingVisible,
+          active ? "font-semibold text-accent-deep" : "font-medium text-ink-soft",
+        ].join(" ")}
+      >
+        <AdminIcon name="More" />
+        <span className={phoneLabelClass}>More</span>
+      </button>
+      <Sheet open={open} onOpenChange={setOpen} title="More" theme="admin">
+        <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
+          {more.map((item) => {
+            const current = adminRouteActive(path, item.href, item.exact);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={mapHref(item.href)}
+                  scroll={false}
+                  aria-current={current ? "page" : undefined}
+                  onClick={() => setOpen(false)}
+                  className={[
+                    "flex min-h-12 items-center gap-3 px-5 text-body outline-none sm:px-6",
+                    deskShiftClass,
+                    "hover:bg-surface-2 active:bg-surface-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
+                    current ? "font-semibold text-accent-deep" : "text-ink",
+                  ].join(" ")}
+                >
+                  <AdminIcon name={item.label} />
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </Sheet>
+    </>
   );
 }
 

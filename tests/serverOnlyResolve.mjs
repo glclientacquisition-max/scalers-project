@@ -1,6 +1,6 @@
 /**
  * Lets node:test import dashboard modules that mark themselves server-only,
- * and resolves extensionless TypeScript imports.
+ * and resolves extensionless TypeScript and CommonJS imports.
  */
 export async function resolve(specifier, context, nextResolve) {
   if (specifier === "server-only") {
@@ -17,11 +17,14 @@ export async function resolve(specifier, context, nextResolve) {
     !specifier.endsWith(".mjs") &&
     !specifier.endsWith(".json")
   ) {
-    try {
-      return await nextResolve(`${specifier}.ts`, context);
-    } catch {
-      return nextResolve(specifier, context);
+    for (const ext of [".ts", ".js"]) {
+      try {
+        return await nextResolve(`${specifier}${ext}`, context);
+      } catch {
+        // try the next extension
+      }
     }
+    return nextResolve(specifier, context);
   }
   return nextResolve(specifier, context);
 }

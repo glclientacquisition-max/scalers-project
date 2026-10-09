@@ -8,6 +8,8 @@ const {
   topFailureFromChecks,
   rollupBusiness,
   rollupBusinesses,
+  rollupReleases,
+  CHECK_LABELS,
 } = require("../dashboard/src/lib/quality/rollup");
 const {
   callsFromRows,
@@ -79,7 +81,7 @@ describe("quality rollup", () => {
       label: null,
     });
     assert.match(RELEASE_GAP, /git SHA/);
-    assert.match(RELEASE_GAP, /Nairobi/);
+    assert.match(RELEASE_GAP, /left out/);
   });
 
   it("breaks top-failure ties toward the heavier check", () => {
@@ -134,14 +136,14 @@ describe("quality rollup", () => {
     assert.deepEqual(one.topFailure, { check: "languageMismatch", count: 2 });
     assert.equal(one.callCount, 2);
     assert.equal(one.priorCallCount, 1);
+    // Day buckets carry no git SHA, so they never show up as releases.
     assert.deepEqual(
       one.releases.map((row) => ({ key: row.key, score: row.score, delta: row.delta, callCount: row.callCount })),
-      [
-        { key: "sha-old", score: 90, delta: null, callCount: 1 },
-        { key: "2026-10-05", score: 60, delta: -30, callCount: 1 },
-        { key: "2026-10-06", score: 80, delta: 20, callCount: 1 },
-      ],
+      [],
     );
+    assert.deepEqual(one.scores, [60, 80]);
+    assert.equal(one.lastCallAt, new Date(NOW - DAY).toISOString());
+    assert.equal(one.checkedCount, 2);
 
     const home = rollupBusinesses(calls, NOW, 7 * DAY);
     assert.deepEqual(
@@ -174,7 +176,7 @@ describe("quality rollup", () => {
     }));
     const dropped = rollupBusiness([...recent, ...prior], NOW, 7 * DAY);
     assert.equal(dropped.dropping, true);
-    assert.equal(dropped.droppingReason, "Average fell 20 points versus the prior 7 days.");
+    assert.equal(dropped.droppingReason, "Score fell 20 points versus the prior 7 days.");
 
     const short = rollupBusiness(
       [...recent.slice(0, 4), ...prior],
@@ -206,8 +208,51 @@ describe("quality rollup", () => {
     assert.equal(body.dropping, true);
     assert.equal(
       body.droppingReason,
-      "silence showed up on 3 calls and was absent in the prior 7 days.",
+      "Silence on 3 calls, none in the prior 7 days.",
     );
+  });
+
+  it("compares releases by git SHA and skips calls with none", () => {
+    const sha = (key, at, score, checks = {}) => ({
+      callId: `${key}-${at}`,
+      tenantId: "biz-1",
+      at: NOW - at * DAY,
+      score,
+      checks,
+      release: { key, source: "release", gitSha: key, branch: "main", label: null },
+    });
+    const day = (at, score) => ({
+      callId: `day-${at}`,
+      tenantId: "biz-1",
+      at: NOW - at * DAY,
+      score,
+      checks: null,
+      release: { key: "2026-10-03", source: "day", gitSha: null, branch: null, label: null },
+    });
+    const releases = rollupReleases([sha("aaa", 6, 40, { silence: 2 }), day(5, 99), sha("bbb", 4, 60, { silence: 1 })]);
+    assert.deepEqual(
+      releases.map((row) => [row.key, row.score, row.delta, row.checks.silence]),
+      [
+        ["aaa", 40, null, 2],
+        ["bbb", 60, 20, 1],
+      ],
+    );
+    assert.equal(releases[1].firstCallAt, new Date(NOW - 4 * DAY).toISOString());
+  });
+
+  it("uses plain check words in a Dropping reason", () => {
+    for (const check of Object.keys(CHECK_LABELS)) {
+      const recent = Array.from({ length: 3 }, (_, index) => ({
+        callId: `${check}${index}`,
+        tenantId: "biz-1",
+        at: NOW - DAY - index * 1000,
+        score: 80,
+        checks: { [check]: 1 },
+      }));
+      const reason = rollupBusiness(recent, NOW, 7 * DAY).droppingReason;
+      assert.equal(reason, `${CHECK_LABELS[check]} on 3 calls, none in the prior 7 days.`);
+      assert.doesNotMatch(reason, new RegExp(`\\b${check}\\b`));
+    }
   });
 
   it("leaves an empty recent window unscored", () => {
@@ -322,7 +367,7 @@ describe("quality trace assembly", () => {
     assert.equal(timeline.turns[0].spoken, spoken);
     assert.equal(timeline.turns[0].outcome, "replay");
     assert.equal(timeline.turns[0].score, null);
-    assert.deepEqual(timeline.turns[0].checks, {});
+    assert.equal(timeline.turns[0].checks, null);
     assert.equal(timeline.turns[0].latency.callerStopToFirstTtsPcmMs, 900);
     assert.equal(timeline.turns[0].stages.some((stage) => stage.stage === "tts"), true);
     assert.equal("omit" in timeline.turns[0], false);

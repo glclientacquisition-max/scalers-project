@@ -9,9 +9,10 @@ import {
   failingChecks,
   fillerLines,
   finalStt,
-  geminiRaw,
   languageLine,
   latencyMs,
+  modelOutput,
+  screenStages,
   spokenLine,
   toolFacts,
   transformRows,
@@ -31,7 +32,7 @@ function turnTitle(turn: VoiceTurnTrace, turns: readonly VoiceTurnTrace[]): stri
 function TurnTimeline({ turn, turns }: { turn: VoiceTurnTrace; turns: readonly VoiceTurnTrace[] }) {
   const heard = finalStt(turn);
   const spoken = spokenLine(turn);
-  const raw = geminiRaw(turn);
+  const raw = modelOutput(turn);
   const transforms = transformRows(turn);
   const latency = latencyMs(turn);
   const barge = bargeReason(turn);
@@ -43,13 +44,13 @@ function TurnTimeline({ turn, turns }: { turn: VoiceTurnTrace; turns: readonly V
     <article className="border-b border-hairline py-4">
       <header className="flex flex-wrap items-center gap-2">
         <h3 className="text-body font-medium text-ink">{turnTitle(turn, turns)}</h3>
-        {"score" in turn ? <ScoreMark score={turn.score ?? null} /> : null}
+        <ScoreMark score={turn.score ?? null} />
         <span className="text-caption tabular-nums text-ink-3">{formatCallWhen(turn.at)}</span>
         {turn.checks && failed.length > 0 ? <FailChips checks={turn.checks} /> : null}
       </header>
       <dl className="mt-3 space-y-3">
         <TurnFact label="Caller said">{turn.caller.text || <Unlogged />}</TurnFact>
-        <TurnFact label="STT heard">
+        <TurnFact label="Heard">
           {heard.heard || <Unlogged />}
           {heard.language ? <span className="ms-2 text-meta text-ink-3">{heard.language}</span> : null}
         </TurnFact>
@@ -81,7 +82,7 @@ function TurnTimeline({ turn, turns }: { turn: VoiceTurnTrace; turns: readonly V
             </ul>
           )}
         </TurnFact>
-        <TurnFact label="Gemini">{raw || <Unlogged />}</TurnFact>
+        <TurnFact label="Model output">{raw || <Unlogged />}</TurnFact>
         <TurnFact label="Transforms">
           {transforms.length === 0 ? (
             <Unlogged />
@@ -130,7 +131,7 @@ function TurnTimeline({ turn, turns }: { turn: VoiceTurnTrace; turns: readonly V
           Raw
         </summary>
         <pre className="mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-xl bg-surface-2 p-3 text-caption text-ink-2">
-          {JSON.stringify(turn.rawStages ?? turn.stages, null, 2)}
+          {JSON.stringify(screenStages(turn.rawStages ?? turn.stages), null, 2)}
         </pre>
       </details>
     </article>

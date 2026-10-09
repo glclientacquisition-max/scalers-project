@@ -1,6 +1,6 @@
 # Super Admin Quality read API
 
-Platform contract for Desk. There is no `/admin/quality` screen in this change. Desk Engineer renders the page from these readers.
+Contract for the Super Admin Quality reads. `dashboard/src/lib/quality/readQuality.ts` is the only code that reads `voice_turn_traces` for Super Admin. The `/api/admin/quality*` routes call it directly. The `/admin/quality*` screens, Overview, and Businesses call it through `dashboard/src/lib/adminQuality.ts`, which only reshapes the bodies for the desk view model. `dashboard/src/lib/quality/rollup.js` owns the Dropping and release math. Nothing else computes them.
 
 Auth matches the other Super Admin APIs: `isLegacyAuthenticated()` (Better Auth session, or the leftover HMAC cookie). A miss returns `403` `{ "error": "ops_only" }`. Reads use the server service-role client. The service key never goes to the browser. `voice_turn_traces` stays service-role only, with no owner RLS policy.
 
@@ -11,9 +11,12 @@ Desk imports these from `@/lib/quality/readQuality`:
 | Function | HTTP | Purpose |
 | --- | --- | --- |
 | `listBusinessQuality({ windowDays })` | `GET /api/admin/quality?windowDays=7` | Per-business rollup for the Quality home |
-| `getBusinessQuality({ businessId, limit })` | `GET /api/admin/quality/businesses/{businessId}?limit=30` | One business: rollup, dropping flag, recent calls |
+| `getBusinessQuality({ businessId, limit, windowDays })` | `GET /api/admin/quality/businesses/{businessId}?limit=30&windowDays=7` | One business: rollup, dropping flag, calls in the window |
 | `getCallTrace(callId)` | `GET /api/admin/quality/calls/{callId}` | Call record plus turn timeline |
 | `listReleaseDeltas({ windowDays, businessId })` | `GET /api/admin/quality/releases?windowDays=7&businessId=` | Per-release score delta. `businessId` is optional |
+| `listCallTurns(callIds)` | none | Turn rows for a set of calls (Couldn't answer on the business screen) |
+| `readCallMedia(callIds)` | none | Duration and recording URL from `calls` |
+| `readBusinessNames(ids)` | none | Business names from `tenants` |
 
 `windowDays` defaults to 7 and must be an integer from 1 to 30. Trend compares that window with the one before it. The fetch lookback is `max(windowDays, 7) * 2` days so the dropping rule can see both weeks. `limit` defaults to 30 and must be an integer from 1 to 100. `businessId` is a tenant uuid. `callId` is the voice call id (`HD_…`).
 
@@ -25,7 +28,7 @@ Voice writes `score`, `checks`, `diagnosis`, and `release` `{ gitSha, branch, la
 
 `listBusinessQuality`, `getBusinessQuality`, `listReleaseDeltas`, and the dropping rule read call rows only. The column wins. If the column is null, the same field on the call payload wins. `scoreSource` is `"stored"` when that score is a number, and `null` when it is not. A call with a null score stays on the business call list and stays out of averages, `callCount`, dropping, top failure, and release deltas.
 
-Turn rows currently store null `score` and empty `checks`. Per-turn check hits are pending. Voice will persist them in a follow-up. Until then, `getCallTrace` returns each turn's stages, caller text, spoken line, outcome, and latency from the payload, and copies `score` and `checks` from the turn row when they are present. Empty stays `score: null` and `checks: {}`. The timeline does not run `scoreTurns`, so a spoken line that would fail a check does not change the call score or invent a per-turn hit.
+Turn rows carry their own `score` and `checks` since #605: Voice writes them on each turn row at `finishCall` (`src/speech/voiceTrace.js`, `sink.update`). `getCallTrace` copies them from the turn row, then the turn payload. Calls written before #605, or turns Voice did not rescore, have none. Those stay `score: null` and `checks: null`, and Desk shows "Not logged". Missing checks are never `{}`, so "no checks stored" and "no check failed" stay different. The timeline does not run `scoreTurns` and never copies call-level checks onto a turn.
 
 If the score columns are not on the table yet, the read retries without them and uses the payload copies. It still does not score turns.
 
@@ -42,10 +45,10 @@ If the score columns are not on the table yet, the read retries without them and
 
 Reason copy:
 
-- `Average fell 20 points versus the prior 7 days.`
-- `silence showed up on 3 calls and was absent in the prior 7 days.`
+- `Score fell 20 points versus the prior 7 days.`
+- `Silence on 3 calls, none in the prior 7 days.`
 
-Both sentences are joined with a space when both rules hit. Check names are the scorecard ids.
+Both sentences are joined with a space when both rules hit. Check names use the plain labels in `rollup.js` `CHECK_LABELS` (`Wrong language`, `Incomplete answer`, `Repeated question`, `Silence`, `Deleted answer`, `Respelling`, `Cut off early`, `Slow reply`), the same words Desk shows on chips. A call with no stored checks never counts as a hit.
 
 ## Home
 
@@ -58,7 +61,7 @@ Both sentences are joined with a space when both rules hit. Check names are the 
   "windowDays": 7,
   "truncated": false,
   "release": {
-    "gap": "Release buckets use release.gitSha from the call row when Voice stored it. Branch and label ride along. An empty git SHA falls back to the Africa/Nairobi calendar day."
+    "gap": "Release groups use release.gitSha from the call row. Branch and label ride along. Calls with no stored git SHA are left out of release before/after."
   },
   "businesses": [
     {
@@ -69,10 +72,13 @@ Both sentences are joined with a space when both rules hit. Check names are the 
       "trend": -20,
       "trendDirection": "down",
       "dropping": true,
-      "droppingReason": "Average fell 20 points versus the prior 7 days.",
+      "droppingReason": "Score fell 20 points versus the prior 7 days.",
       "topFailure": { "check": "languageMismatch", "count": 2 },
       "callCount": 5,
+      "checkedCount": 5,
       "priorCallCount": 5,
+      "scores": [80, 74, 70, 66, 60],
+      "lastCallAt": "2026-10-07T08:59:00.000Z",
       "releases": [
         {
           "key": "abc1234",
@@ -80,9 +86,11 @@ Both sentences are joined with a space when both rules hit. Check names are the 
           "gitSha": "abc1234",
           "branch": "main",
           "label": "staging",
+          "firstCallAt": "2026-10-03T07:12:00.000Z",
           "score": 70,
           "delta": -20,
-          "callCount": 5
+          "callCount": 5,
+          "checks": { "languageMismatch": 2 }
         }
       ]
     }
@@ -92,11 +100,13 @@ Both sentences are joined with a space when both rules hit. Check names are the 
 
 `currentScore` is the mean of call rows with a numeric score in the recent `windowDays`, one decimal, same rounding as the voice scorecard. `priorScore` is the previous window of the same length. `trend` is `currentScore - priorScore`. It is `null` when either window has no scored calls. `trendDirection` is `up`, `down`, `flat`, or `unknown`. `callCount` counts those scored call rows, not turns and not unscored calls. A business with only unscored call rows is left off the home list.
 
+`checkedCount` counts the recent scored calls that stored a `checks` object. `scores` is those calls' scores, oldest first, for the sparkline. `lastCallAt` is the newest recent scored call.
+
 `topFailure` is the check with the highest count in the recent trend window. Ties go to the heavier check: silence, deletedAnswer, languageMismatch, incomplete, repeatedQuestion, respelling, prematureTurn, slow. `null` when every recent count is 0.
 
-`releases` is chronological (oldest first). `delta` is this bucket's mean minus the previous bucket. The first bucket's delta is `null`.
+`releases` is chronological (oldest first) and holds only groups with a git SHA. Calls with no SHA are skipped, so they never form a release and never sit between two releases. `delta` is this group's mean minus the previous group. The first group's delta is `null`. `checks` sums the check counts of the group's calls. `firstCallAt` is the group's first call, which Desk uses to name a release that has no label ("Release of 3 Oct"). Desk does not show the SHA.
 
-`source` is `release` when `release.gitSha` or `release.label` supplied the key, `payload` for a legacy git SHA on the call payload, or `day` for the `YYYY-MM-DD` in Africa/Nairobi (UTC+3). `gitSha` comes from `RAILWAY_GIT_COMMIT_SHA` or `GIT_SHA`. `branch` is `RAILWAY_GIT_BRANCH`. `label` is `VOICE_RELEASE_LABEL` when set.
+`source` is `release` when `release.gitSha` supplied the key, or `payload` for a legacy git SHA on the call payload. A call key can still fall back to the `YYYY-MM-DD` day in Africa/Nairobi (UTC+3), source `day`, but day keys are not release groups. `gitSha` comes from `RAILWAY_GIT_COMMIT_SHA` or `GIT_SHA`. `branch` is `RAILWAY_GIT_BRANCH`. `label` is `VOICE_RELEASE_LABEL` when set.
 
 Missing table (`42P01` or schema cache for the table): `ready: false`, `businesses: []`, HTTP 200. No rows: `ready: true`, `businesses: []`.
 
@@ -104,7 +114,7 @@ Missing table (`42P01` or schema cache for the table): `ready: false`, `business
 
 `getBusinessQuality`
 
-Same rollup fields as one home row, plus `calls` (newest first, within the last 14 days):
+Same rollup fields as one home row, for `windowDays` (default 7), plus `calls`: newest first, inside that window, up to `limit`. Unscored calls stay on the list.
 
 ```json
 {
@@ -161,8 +171,8 @@ Unknown business and no traces: `404` `{ "error": "No business." }`. Known busin
       "caller": { "text": "Ni huduma gani?", "language": "sw" },
       "spoken": "Tuna usafi wa nyumba.",
       "outcome": "ok",
-      "score": null,
-      "checks": {},
+      "score": 72,
+      "checks": { "slow": 1 },
       "latency": {
         "callerStopToModelFirstTokenMs": null,
         "callerStopToFirstTtsPcmMs": 900
@@ -173,7 +183,7 @@ Unknown business and no traces: `404` `{ "error": "No business." }`. Known busin
 }
 ```
 
-The call header uses the call row. Per-turn `score` and `checks` are pending: today they are null and `{}` unless Voice has already written them on that turn row. `stages` is the writer payload, unchanged. `pii` is `transcript`. Names stay. The writer already redacts emails and phone numbers of 8 digits or more. This API does not redact again.
+The call header uses the call row. Per-turn `score` and `checks` come from the turn row (written by #605), and are `null` on turns Voice did not score. `caller` also carries `confidence`, `detected`, and `sticky` when the writer stored them. `stages` is the writer payload, unchanged. `pii` is `transcript`. Names stay. The writer already redacts emails and phone numbers of 8 digits or more. This API does not redact again.
 
 No rows for that call: `404` `{ "error": "No trace for that call." }`. Missing table: `ready: false`, `call: null`, `turns: []`.
 
@@ -183,11 +193,17 @@ No rows for that call: `404` `{ "error": "No trace for that call." }`. Missing t
 
 ## Checks
 
-Same names as the voice scorecard, read from the call row: `languageMismatch`, `incomplete`, `repeatedQuestion`, `silence`, `deletedAnswer`, `respelling`, `prematureTurn`, `slow`. Per-turn hits of those checks are pending. This API does not recompute a call average from turn payloads.
+Same names as the voice scorecard: `languageMismatch`, `incomplete`, `repeatedQuestion`, `silence`, `deletedAnswer`, `respelling`, `prematureTurn`, `slow`. Call rows and, since #605, turn rows store them. This API does not recompute a call average from turn payloads, and it does not score spoken text to fill a missing turn.
 
-## Per-turn checks
+## Desk view rules
 
-Pending. Turn rows have null `score` and empty `checks` until Voice persists per-turn hits. `getCallTrace` must keep returning the turn timeline from `payload.stages` in the meantime, and must not fill those fields by scoring the spoken text.
+- The diagnosis line is the stored `diagnosis`. Null means Voice could not score the call (#621) and reads "Not scored".
+- Missing checks read "Not logged". "No failures" means checks were stored and none failed.
+- A filler reads "Played" only when its stage stored `played: true`, "Not played" for `false`, and "Not logged" otherwise. Voice does not write `played` yet, so today every filler reads "Not logged".
+- Couldn't answer lists caller questions from turns whose outcome stage is `error`, `stream_timeout`, `speech_guarantee`, or `speech_quiet`, or that played the canned line `llm_recovery`, `llm_unavailable`, or `speech_guarantee`. Both compare lowercase. `speech_repair` does not count, and neither do silence or deleted-answer checks. The call-level `calls.resolution` is not used. Literals are from Brain (`COULDNT_ANSWER_OUTCOMES`, `COULDNT_ANSWER_CANNED` in `adminQualityModel.ts`).
+- Save as test writes `null` for provider, model, and prompt id when the trace did not store them.
+- The call screen says "Heard" and "Model output", and the Raw view drops provider, model, and voice ids. Releases show the label or the first-call date, not the git SHA.
+- Overview and Businesses wrap the Quality read in `.catch(noQualityBadges(...))`, so a Quality failure logs and leaves the badges empty.
 
 ## Staging SQL
 

@@ -258,7 +258,7 @@ test.describe("/dev/kit interactions", () => {
   });
 });
 
-test("More opens from the keyboard and Escape returns focus", async ({ page }) => {
+test("More opens a bottom sheet from the keyboard and Escape returns focus", async ({ page }) => {
   const width = page.viewportSize()?.width ?? 0;
   test.skip(width >= 768, "phone tab bar only");
   await page.goto("/dev/quality");
@@ -266,8 +266,10 @@ test("More opens from the keyboard and Escape returns focus", async ({ page }) =
   const more = page.getByRole("button", { name: "More" });
   await more.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("menu")).toBeVisible();
+  const sheet = page.getByRole("dialog", { name: "More" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("link", { name: /Platform/ })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(sheet).toBeHidden();
   await expect(more).toBeFocused();
 });

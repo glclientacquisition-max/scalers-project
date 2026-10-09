@@ -1,7 +1,7 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
 // Pure Quality rollup. Scores are the numbers Voice stored on call rows.
 // Release keys prefer release.gitSha on the call row. An empty git SHA
-// falls back to the Africa/Nairobi calendar day.
+// falls back to the Africa/Nairobi calendar day for the key, but release
+// before/after only compares groups that carry a git SHA.
 
 const FAILURE_RANK = [
   "silence",
@@ -13,6 +13,22 @@ const FAILURE_RANK = [
   "prematureTurn",
   "slow",
 ];
+
+/** Plain words for each check. Desk shows the same labels on chips. */
+const CHECK_LABELS = {
+  languageMismatch: "Wrong language",
+  incomplete: "Incomplete answer",
+  repeatedQuestion: "Repeated question",
+  silence: "Silence",
+  deletedAnswer: "Deleted answer",
+  respelling: "Respelling",
+  prematureTurn: "Cut off early",
+  slow: "Slow reply",
+};
+
+function checkLabel(check) {
+  return CHECK_LABELS[check] || check;
+}
 
 const NAIROBI_OFFSET_MS = 3 * 60 * 60 * 1000;
 const DROP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -127,14 +143,14 @@ function droppingFor(calls, nowMs) {
     const previous = meanScore(prior.map((call) => call.score));
     const fell = current != null && previous != null ? round1(previous - current) : null;
     if (fell != null && fell >= DROP_POINTS) {
-      reasons.push(`Average fell ${fell} points versus the prior 7 days.`);
+      reasons.push(`Score fell ${fell} points versus the prior 7 days.`);
     }
   }
   for (const check of FAILURE_RANK) {
     if (callsHitting(prior, check) > 0) continue;
     const hits = callsHitting(recent, check);
     if (hits >= NEW_CHECK_CALLS) {
-      reasons.push(`${check} showed up on ${hits} calls and was absent in the prior 7 days.`);
+      reasons.push(`${checkLabel(check)} on ${hits} calls, none in the prior 7 days.`);
     }
   }
   return {
@@ -143,30 +159,46 @@ function droppingFor(calls, nowMs) {
   };
 }
 
+function isoAt(call) {
+  if (typeof call.atIso === "string" && call.atIso) return call.atIso;
+  return Number.isFinite(call.at) && call.at > 0 ? new Date(call.at).toISOString() : null;
+}
+
+/**
+ * Release groups, oldest first. Calls with no stored git SHA are left out,
+ * so a day bucket never shows up as a release and never splits two releases.
+ */
 function rollupReleases(calls) {
   const groups = new Map();
   for (const call of calls) {
-    const key = call.release?.key || "unknown";
-    const source =
-      call.release?.source === "release" || call.release?.source === "payload" ? call.release.source : "day";
+    const gitSha = call.release?.gitSha || null;
+    if (!gitSha) continue;
+    const key = gitSha;
     let group = groups.get(key);
     if (!group) {
       group = {
         key,
-        source,
-        gitSha: call.release?.gitSha || null,
+        source: call.release?.source === "payload" ? "payload" : "release",
+        gitSha,
         branch: call.release?.branch || null,
         label: call.release?.label || null,
         scores: [],
+        checks: {},
         at: call.at,
+        firstCallAt: isoAt(call),
       };
       groups.set(key, group);
     }
-    if (!group.gitSha && call.release?.gitSha) group.gitSha = call.release.gitSha;
     if (!group.branch && call.release?.branch) group.branch = call.release.branch;
     if (!group.label && call.release?.label) group.label = call.release.label;
     if (typeof call.score === "number") group.scores.push(call.score);
-    if (call.at < group.at) group.at = call.at;
+    for (const [check, count] of Object.entries(call.checks || {})) {
+      group.checks[check] = (group.checks[check] || 0) + Number(count || 0);
+    }
+    if (call.at < group.at) {
+      group.at = call.at;
+      group.firstCallAt = isoAt(call);
+    }
   }
   const ordered = [...groups.values()].sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
   let previous = null;
@@ -180,9 +212,11 @@ function rollupReleases(calls) {
       gitSha: group.gitSha,
       branch: group.branch,
       label: group.label,
+      firstCallAt: group.firstCallAt,
       score,
       delta,
       callCount: group.scores.length,
+      checks: group.checks,
     };
   });
 }
@@ -200,6 +234,8 @@ function rollupBusiness(calls, nowMs, windowMs) {
   const priorScore = meanScore(prior.map((call) => call.score));
   const trend = currentScore == null || priorScore == null ? null : round1(currentScore - priorScore);
   const drop = droppingFor(calls, nowMs);
+  const recentSorted = recent.slice().sort((a, b) => a.at - b.at);
+  const last = recentSorted[recentSorted.length - 1];
   return {
     businessId: calls.find((call) => call.tenantId)?.tenantId || null,
     currentScore,
@@ -210,7 +246,10 @@ function rollupBusiness(calls, nowMs, windowMs) {
     droppingReason: drop.droppingReason,
     topFailure: topFailureFromChecks(sumChecks(recent)),
     callCount: recent.length,
+    checkedCount: recent.filter((call) => call.checks && typeof call.checks === "object").length,
     priorCallCount: prior.length,
+    scores: recentSorted.flatMap((call) => (typeof call.score === "number" && Number.isFinite(call.score) ? [call.score] : [])),
+    lastCallAt: last ? isoAt(last) : null,
     releases: rollupReleases(calls),
   };
 }
@@ -228,6 +267,8 @@ function rollupBusinesses(calls, nowMs, windowMs) {
 
 module.exports = {
   FAILURE_RANK,
+  CHECK_LABELS,
+  checkLabel,
   meanScore,
   releaseKeyFromCall,
   topFailureFromChecks,

@@ -5,7 +5,7 @@
 const { releaseKeyFromCall, rollupBusiness, rollupBusinesses, listReleaseDeltas, topFailureFromChecks } = require("./rollup");
 
 const RELEASE_GAP =
-  "Release buckets use release.gitSha from the call row when Voice stored it. Branch and label ride along. An empty git SHA falls back to the Africa/Nairobi calendar day.";
+  "Release groups use release.gitSha from the call row. Branch and label ride along. Calls with no stored git SHA are left out of release before/after.";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -118,7 +118,7 @@ function callFromRow(row) {
     turnCount: payload.turnCount ?? null,
     release: releaseKeyFromCall(columnRelease ? { ...payload, release: columnRelease } : payload, atIso),
     score,
-    checks: checksOf(row.checks, payload.checks) || {},
+    checks: checksOf(row.checks, payload.checks),
     diagnosis: textOf(row.diagnosis, payload.diagnosis),
     scoreSource: score != null ? "stored" : null,
   };
@@ -168,10 +168,12 @@ function listBusinessQuality({ rows, names, now, windowDays, truncated }) {
   };
 }
 
-function getBusinessQuality({ rows, businessId, businessName, limit, now }) {
+function getBusinessQuality({ rows, businessId, businessName, limit, now, windowDays = 7 }) {
+  const windowMs = windowDays * DAY_MS;
   const mine = callsFromRows(rows).filter((call) => call.tenantId === businessId);
-  const summary = rollupBusiness(scoredCalls(mine), now, 7 * DAY_MS);
+  const summary = rollupBusiness(scoredCalls(mine), now, windowMs);
   const calls = mine
+    .filter((call) => call.at >= now - windowMs && call.at <= now)
     .slice()
     .sort((a, b) => b.at - a.at)
     .slice(0, limit)
@@ -180,6 +182,7 @@ function getBusinessQuality({ rows, businessId, businessName, limit, now }) {
     ok: true,
     ready: true,
     ...summary,
+    windowDays,
     businessId,
     businessName: businessName || null,
     calls,
@@ -191,17 +194,23 @@ function turnFromRow(row) {
   const latency = stage(payload, "latency");
   const outcome = stage(payload, "outcome");
   const tts = stage(payload, "tts");
+  const caller = payload.caller && typeof payload.caller === "object" ? payload.caller : {};
   return {
+    callId: textOf(payload.callId, row?.call_id),
+    tenantId: textOf(row?.tenant_id, payload.tenantId),
     turnIndex: payload.turnIndex ?? row.turn_index ?? null,
     at: payload.at || row.created_at || null,
     caller: {
-      text: payload.caller?.text || "",
-      language: payload.caller?.language || null,
+      text: caller.text || "",
+      language: caller.language || null,
+      confidence: finiteScore(caller.confidence),
+      detected: textOf(caller.detected),
+      sticky: textOf(caller.sticky),
     },
     spoken: typeof tts?.text === "string" ? tts.text : "",
     outcome: outcome?.value || null,
     score: finiteScore(row.score) ?? finiteScore(payload.score),
-    checks: checksOf(row.checks, payload.checks) || {},
+    checks: checksOf(row.checks, payload.checks),
     latency: {
       callerStopToModelFirstTokenMs: latency?.callerStopToModelFirstTokenMs ?? null,
       callerStopToFirstTtsPcmMs: latency?.callerStopToFirstTtsPcmMs ?? null,
@@ -220,7 +229,7 @@ function getCallTrace({ rows }) {
     .sort((a, b) => Number(a.turn_index ?? 0) - Number(b.turn_index ?? 0));
   const payload = callRow?.payload && typeof callRow.payload === "object" ? callRow.payload : {};
   const score = callRow ? finiteScore(callRow.score) ?? finiteScore(payload.score) : null;
-  const checks = callRow ? checksOf(callRow.checks, payload.checks) || {} : {};
+  const checks = callRow ? checksOf(callRow.checks, payload.checks) : null;
   const atIso = payload.startedAt || callRow?.created_at || turnRows[0]?.created_at || null;
   const columnRelease = asObject(callRow?.release);
   return {
@@ -246,6 +255,19 @@ function getCallTrace({ rows }) {
     },
     turns: turnRows.map(turnFromRow),
   };
+}
+
+/** Turn rows for many calls, in call then turn order. */
+function turnsFromRows(rows) {
+  return (rows || [])
+    .filter((row) => row?.record_kind === "turn")
+    .slice()
+    .sort(
+      (a, b) =>
+        String(a.call_id || "").localeCompare(String(b.call_id || "")) ||
+        Number(a.turn_index ?? 0) - Number(b.turn_index ?? 0),
+    )
+    .map(turnFromRow);
 }
 
 function listReleaseDeltasFromRows({ rows, businessId }) {
@@ -314,6 +336,7 @@ module.exports = {
   listBusinessQuality,
   getBusinessQuality,
   getCallTrace,
+  turnsFromRows,
   listReleaseDeltasFromRows,
   emptyHome,
   emptyBusiness,

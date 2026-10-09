@@ -17,7 +17,7 @@ import {
   formatScore,
   qualityBusinessHref,
   qualityListHref,
-  shortSha,
+  releaseName,
   sortWorstFirst,
   VOICE_CHECKS,
   type BusinessQualityRow,
@@ -25,8 +25,13 @@ import {
   type ReleaseDelta,
 } from "@/lib/adminQualityModel";
 
+function failureText(row: BusinessQualityRow): string {
+  if (row.topFailure) return checkLabel(row.topFailure);
+  return row.checksLogged ? "No failures" : "Checks not logged";
+}
+
 function phonePreview(row: BusinessQualityRow): string {
-  const failure = row.topFailure ? checkLabel(row.topFailure) : "No failures";
+  const failure = failureText(row);
   const calls = callCountLabel(row.callsTraced);
   if (row.dropping) return `${calls}. ${failure}. ${row.droppingReason}`;
   return `${calls}. ${failure}`;
@@ -129,7 +134,7 @@ export function QualityIndex({
                         <Td>
                           <QualitySpark points={row.trend} dropping={row.dropping} />
                         </Td>
-                        <Td>{row.topFailure ? checkLabel(row.topFailure) : <Unlogged>No failures</Unlogged>}</Td>
+                        <Td>{row.topFailure ? checkLabel(row.topFailure) : <Unlogged>{failureText(row)}</Unlogged>}</Td>
                         <Td>
                           <DroppingMark dropping={row.dropping} reason={row.droppingReason} />
                         </Td>
@@ -191,10 +196,12 @@ export function QualityIndex({
                         ? null
                         : row.after.avgScore - row.before.avgScore;
                     return (
-                      <tr key={row.release.gitSha + row.release.label}>
+                      <tr key={row.release.gitSha}>
                         <Td>
-                          <span className="block font-medium text-ink">{row.release.label}</span>
-                          <span className="text-caption tabular-nums text-ink-3">{shortSha(row.release.gitSha)}</span>
+                          <span className="block font-medium text-ink">{releaseName(row)}</span>
+                          {row.release.label && row.at ? (
+                            <span className="text-caption tabular-nums text-ink-3">{formatCallWhen(row.at)}</span>
+                          ) : null}
                         </Td>
                         <Td num>
                           <ScoreText score={row.before.avgScore} />
@@ -228,10 +235,12 @@ export function QualityIndex({
                     ? null
                     : row.after.avgScore - row.before.avgScore;
                 return (
-                  <li key={row.release.gitSha + row.release.label} className="space-y-1 px-4 py-3">
+                  <li key={row.release.gitSha} className="space-y-1 px-4 py-3">
                     <p className="flex items-baseline gap-3">
-                      <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">{row.release.label}</span>
-                      <span className="shrink-0 text-caption tabular-nums text-ink-3">{shortSha(row.release.gitSha)}</span>
+                      <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">{releaseName(row)}</span>
+                      {row.release.label && row.at ? (
+                        <span className="shrink-0 text-caption tabular-nums text-ink-3">{formatCallWhen(row.at)}</span>
+                      ) : null}
                     </p>
                     <p className="text-meta tabular-nums text-ink-2">
                       Score <ScoreText score={row.before.avgScore} /> to <ScoreText score={row.after.avgScore} /> (

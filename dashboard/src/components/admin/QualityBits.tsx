@@ -114,7 +114,9 @@ export function QualitySpark({ points, dropping = false }: { points: number[]; d
   );
 }
 
-export function FailChips({ checks }: { checks: VoiceCheckCounts }) {
+/** Null checks were never stored, so they read "Not logged", not "No failures". */
+export function FailChips({ checks }: { checks: VoiceCheckCounts | null }) {
+  if (!checks) return <Unlogged />;
   const names = failingChecks(checks);
   if (names.length === 0) return <Unlogged>No failures</Unlogged>;
   return (

@@ -4,10 +4,12 @@
  * plus the call row: score, per-check counts, diagnosis, and release.
  * A turn score, per-turn checks, detected language, tool stages, and filler
  * stages are optional. Older calls omit them. Business rows add
- * `dropping` and `droppingReason`, computed in `adminQuality.ts`.
+ * `dropping` and `droppingReason`, computed once in `quality/rollup.js`.
+ * Checks that were never stored stay null and read "Not logged".
  *
- * Reads live in `adminQuality.ts` (server-only). This file is pure so the
- * desk, the dev harness, and tests can share it.
+ * Reads live in `quality/readQuality.ts` (server-only); `adminQuality.ts`
+ * reshapes them for these types. This file is pure so the desk, the dev
+ * harness, and tests can share it.
  */
 
 export const VOICE_CHECKS = [
@@ -30,10 +32,13 @@ export type QualityRange = "7d" | "30d";
 export const LATENCY_BUDGET_MS = 1200;
 
 /**
- * Caller outcomes that count as Couldn't answer.
- * Match is case-insensitive. Brain confirms these literals.
+ * Turn outcomes that count as Couldn't answer. Literals from Brain.
+ * Compared lowercase. `speech_repair` is a retry, not a miss, so it stays out.
  */
-export const COULDNT_ANSWER_OUTCOMES = ["unknown", "escalation"] as const;
+export const COULDNT_ANSWER_OUTCOMES = ["error", "stream_timeout", "speech_guarantee", "speech_quiet"] as const;
+
+/** Canned paths that count as Couldn't answer. Literals from Brain. Compared lowercase. */
+export const COULDNT_ANSWER_CANNED = ["llm_recovery", "llm_unavailable", "speech_guarantee"] as const;
 
 /** Higher impact first. Ties in `topCheck` break toward this order. */
 const CHECK_SEVERITY: readonly VoiceCheckName[] = [
@@ -47,7 +52,8 @@ const CHECK_SEVERITY: readonly VoiceCheckName[] = [
   "slow",
 ];
 
-const CHECK_LABELS: Record<VoiceCheckName, string> = {
+/** Same words as `quality/rollup.js` CHECK_LABELS, which writes Dropping reasons. */
+export const CHECK_LABELS: Record<VoiceCheckName, string> = {
   languageMismatch: "Wrong language",
   incomplete: "Incomplete answer",
   repeatedQuestion: "Repeated question",
@@ -131,14 +137,11 @@ export type VoiceTurnTrace = {
   };
   stages: VoiceStage[];
   /**
-   * Per-turn check hits. Present only when the turn payload or turn row
-   * carries `checks`. Absent means the timeline does not pin a check.
+   * Per-turn check hits. Null or absent when the turn row stored none, which
+   * reads "Not logged". Never filled from call-level checks.
    */
-  checks?: VoiceCheckCounts;
-  /**
-   * Per-turn score. Present only when the turn row stores `score`, including
-   * an explicit null. Absent on calls from before that write.
-   */
+  checks?: VoiceCheckCounts | null;
+  /** Per-turn score Voice stored. Null reads "Not logged". */
   score?: number | null;
   /** Persisted stage list, including stages the timeline does not render. */
   rawStages?: unknown;
@@ -167,7 +170,8 @@ export type VoiceCallTrace = {
   greeting: VoiceStage[];
   turns: VoiceTurnTrace[];
   score: number | null;
-  checks: VoiceCheckCounts;
+  /** Null when the call row stored no checks. */
+  checks: VoiceCheckCounts | null;
   /** Persisted one-line read. Null until the scorer stores one. */
   diagnosis: string | null;
   release: VoiceRelease | null;
@@ -185,6 +189,8 @@ export type BusinessQualityRow = {
   /** Oldest to newest scores inside the selected range. */
   trend: number[];
   topFailure: VoiceCheckName | null;
+  /** True when at least one call in the range stored its checks. */
+  checksLogged: boolean;
   dropping: boolean;
   droppingReason: string;
   callsTraced: number;
@@ -194,7 +200,7 @@ export type BusinessQualityRow = {
 export type QualityCallSummary = {
   callId: string;
   score: number | null;
-  checks: VoiceCheckCounts;
+  checks: VoiceCheckCounts | null;
   durationSec: number | null;
   at: string;
 };
@@ -217,6 +223,8 @@ export type ReleaseSide = {
 
 export type ReleaseDelta = {
   release: VoiceRelease;
+  /** First call on this release. Names the release on screen instead of the git SHA. */
+  at: string | null;
   before: ReleaseSide;
   after: ReleaseSide;
 };
@@ -230,10 +238,11 @@ export type QualityBadge = {
 export type VoiceFixtureTurn = {
   caller: string;
   flushed: boolean;
+  /** Null when the trace did not store it. Never filled with a guess. */
   model: {
-    provider: string;
-    model: string;
-    promptId: string;
+    provider: string | null;
+    model: string | null;
+    promptId: string | null;
     outputText: string | null;
     chars: number;
     spokenEmitted: number | null;
@@ -286,7 +295,8 @@ export function failingChecks(checks: VoiceCheckCounts | null | undefined): Voic
   return CHECK_SEVERITY.filter((check) => (checks[check] || 0) > 0);
 }
 
-export function topCheck(checks: VoiceCheckCounts): VoiceCheckName | null {
+export function topCheck(checks: VoiceCheckCounts | null | undefined): VoiceCheckName | null {
+  if (!checks) return null;
   let best: VoiceCheckName | null = null;
   let bestCount = 0;
   for (const check of CHECK_SEVERITY) {
@@ -299,12 +309,12 @@ export function topCheck(checks: VoiceCheckCounts): VoiceCheckName | null {
   return best;
 }
 
-/** Persisted diagnosis, or the top check in plain words when that is null. */
-export function diagnosisLine(call: { diagnosis: string | null; checks: VoiceCheckCounts }): string {
-  const stored = call.diagnosis?.trim() || "";
-  if (stored) return stored;
-  const top = topCheck(call.checks);
-  return top ? checkLabel(top) : "No failing checks";
+/**
+ * The diagnosis Voice stored. Null means Voice could not score the call
+ * (#621), so it reads "Not scored". Failing checks still show as chips.
+ */
+export function diagnosisLine(call: { diagnosis: string | null; checks?: VoiceCheckCounts | null }): string {
+  return call.diagnosis?.trim() || "Not scored";
 }
 
 /** 0 calls, 1 call, 2 calls. */
@@ -337,10 +347,19 @@ export function formatDuration(sec: number | null): string {
   return `${minutes}m ${seconds}s`;
 }
 
-export function shortSha(sha: string): string {
-  const clean = sha.trim();
-  if (!clean) return "Not logged";
-  return clean.length <= 7 ? clean : clean.slice(0, 7);
+const releaseDay = new Intl.DateTimeFormat("en-KE", {
+  day: "numeric",
+  month: "short",
+  timeZone: "Africa/Nairobi",
+});
+
+/** The release label, else "Release of 8 Oct". The git SHA stays off screen. */
+export function releaseName(delta: { release: VoiceRelease; at: string | null }): string {
+  const label = delta.release.label.trim();
+  if (label) return label;
+  const when = delta.at ? new Date(delta.at) : null;
+  if (when && !Number.isNaN(when.getTime())) return `Release of ${releaseDay.format(when)}`;
+  return "Release";
 }
 
 export function sortWorstFirst<T extends { score: number | null }>(rows: readonly T[]): T[] {
@@ -379,21 +398,19 @@ function isCouldntAnswerOutcome(value: string): boolean {
 }
 
 function turnMissed(turn: VoiceTurnTrace): boolean {
-  const checks = turn.checks;
-  if (checks && ((checks.incomplete || 0) > 0 || (checks.silence || 0) > 0 || (checks.deletedAnswer || 0) > 0)) {
-    return true;
-  }
   for (const stage of turn.stages) {
-    if (stage.stage === "canned" && stage.path === "llm_recovery") return true;
+    if (stage.stage === "canned" && (COULDNT_ANSWER_CANNED as readonly string[]).includes(stage.path.trim().toLowerCase())) {
+      return true;
+    }
     if (stage.stage === "outcome" && isCouldntAnswerOutcome(stage.value)) return true;
   }
   return false;
 }
 
 /**
- * Caller questions from turns that failed incomplete, silence, or deleted
- * answer, used the recovery line, or closed UNKNOWN / escalation.
- * Deduped by the caller question.
+ * Caller questions from turns whose outcome is in COULDNT_ANSWER_OUTCOMES, or
+ * that played a COULDNT_ANSWER_CANNED line. Silence and deleted answer checks
+ * do not count. Deduped by the caller question.
  */
 export function couldntAnswerQuestions(turns: readonly VoiceTurnTrace[]): string[] {
   const seen = new Set<string>();
@@ -411,9 +428,10 @@ export function couldntAnswerQuestions(turns: readonly VoiceTurnTrace[]): string
 }
 
 /** A check counts once per call, and only checks on more than one call repeat. */
-export function repeatFailuresFromCalls(calls: readonly { checks: VoiceCheckCounts }[]): RepeatFailure[] {
+export function repeatFailuresFromCalls(calls: readonly { checks: VoiceCheckCounts | null }[]): RepeatFailure[] {
   const hits = emptyChecks();
   for (const call of calls) {
+    if (!call.checks) continue;
     for (const check of VOICE_CHECKS) {
       if ((call.checks[check] || 0) > 0) hits[check] += 1;
     }
@@ -503,13 +521,14 @@ export function toolLines(turn: VoiceTurnTrace): string[] {
 export function fillerLines(turn: VoiceTurnTrace): string[] {
   return turn.stages.flatMap((stage) => {
     if (stage.stage !== "filler") return [];
-    const head = stage.played === false ? "Not played" : "Played";
+    const head = stage.played === true ? "Played" : stage.played === false ? "Not played" : "Not logged";
     const text = stage.text.trim();
     return [text ? `${head}. ${text}` : head];
   });
 }
 
-export function geminiRaw(turn: VoiceTurnTrace): string | null {
+/** What the model wrote before any transform. */
+export function modelOutput(turn: VoiceTurnTrace): string | null {
   const row = lastStage(turn.stages, "model", "output");
   if (!row || row.stage !== "model" || row.phase !== "output") return null;
   const text = row.outputText?.trim() || "";
@@ -582,9 +601,9 @@ export function callToFixture(call: VoiceCallTrace): VoiceFixture {
         caller: turn.caller.text,
         flushed: end ? end.decision !== "hold" : true,
         model: {
-          provider: outputRow?.provider || requestRow?.provider || (canned ? "canned" : "gemini"),
-          model: outputRow?.model || requestRow?.model || canned?.path || "recorded",
-          promptId: outputRow?.promptId || requestRow?.promptId || "voice.system",
+          provider: outputRow?.provider || requestRow?.provider || null,
+          model: outputRow?.model || requestRow?.model || null,
+          promptId: outputRow?.promptId || requestRow?.promptId || null,
           outputText: unlogged ? null : (outputRow?.outputText ?? null),
           chars: outputRow?.chars ?? (outputRow?.outputText?.length || 0),
           spokenEmitted: outputRow?.spokenEmitted ?? null,
@@ -597,4 +616,15 @@ export function callToFixture(call: VoiceCallTrace): VoiceFixture {
       return fixture;
     }),
   };
+}
+
+const OFF_SCREEN_KEYS = new Set(["provider", "model", "voiceId", "sttModel", "ttsModel"]);
+
+/** Stored stages for the Raw view, without vendor or model names. */
+export function screenStages(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  return value.map((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+    return Object.fromEntries(Object.entries(row).filter(([key]) => !OFF_SCREEN_KEYS.has(key)));
+  });
 }
