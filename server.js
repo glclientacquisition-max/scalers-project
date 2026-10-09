@@ -450,6 +450,19 @@ const {
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
+const {
+  detectFarewell,
+  farewellGraceMs,
+  farewellHangupEnabled,
+  isClosingAck,
+  planFarewellClose,
+} = require('./src/speech/farewell');
+const {
+  isMediaStalled,
+  mediaDurationSeconds,
+  mediaStallMs,
+  preferVendorDuration,
+} = require('./src/speech/mediaWatch');
 const { speechVerdict, outageHandlingAllowed } = require('./src/speech/callOver');
 const { recordSpokenLine, spokenLineReachedCaller } = require('./src/speech/spokenHistory');
 const { shapeFileReadOut } = require('./src/speech/fileReadOut');
@@ -1287,19 +1300,55 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
   }
 }
 
+/** 'media' for the socket close, 'vendor' for carrier webhooks; null = legacy max-wins. */
+function callDurationSource(source, durationSeconds) {
+  if (!preferVendorDuration()) return undefined;
+  if (source === 'ws/media') return 'media';
+  if (durationSeconds == null || !Number.isFinite(Number(durationSeconds))) return undefined;
+  return 'vendor';
+}
+
+const mediaSettleTimers = new Map();
+
+/** If the carrier's figure never arrives, bill the media figure after a wait. */
+function scheduleMediaDurationSettle(callSid) {
+  if (!callSid || mediaSettleTimers.has(callSid)) return;
+  const n = Number(process.env.VOICE_DURATION_SETTLE_WAIT_MS);
+  const waitMs = Number.isFinite(n) && n >= 5000 && n <= 600000 ? n : 120000;
+  const timer = setTimeout(() => {
+    mediaSettleTimers.delete(callSid);
+    db.settleCallDuration(callSid).catch((err) =>
+      console.warn(`[${callSid}] media duration settle failed:`, err?.message || err)
+    );
+  }, waitMs);
+  if (typeof timer.unref === 'function') timer.unref();
+  mediaSettleTimers.set(callSid, timer);
+}
+
 async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, source, turns }) {
   if (!callSid) {
     console.warn(`[${source}] termination detected but no callSid — skipping DB update`);
     return null;
   }
   try {
+    // The carrier's duration is final and billable; the media socket's is a
+    // fallback that waits for it (HD_b82fbfef7649: socket 193 s, carrier 162 s).
+    const durationSource = callDurationSource(source, durationSeconds);
     const updated = await db.updateCallStatus({
       callSid,
       status,
       durationSeconds,
+      durationSource,
+      settle: durationSource !== 'media',
     });
+    if (durationSource === 'media') scheduleMediaDurationSettle(callSid);
+    if (durationSource === 'vendor' && mediaSettleTimers.has(callSid)) {
+      clearTimeout(mediaSettleTimers.get(callSid));
+      mediaSettleTimers.delete(callSid);
+    }
     console.log(`[${source}] marked call ${callSid} status=${status}`, {
       durationSeconds: durationSeconds ?? null,
+      durationSource: durationSource || 'legacy',
       found: Boolean(updated),
     });
     // Best-effort outcome while Brain state may still be in memory.
@@ -1901,6 +1950,8 @@ function sendPcmToMedia(ws, pcm) {
   if (!ws || ws.readyState !== WebSocket.OPEN || !pcm || !pcm.length) return;
   // Fixed phone gain on the whole utterance. Do not even-out 20 ms frames (pumping).
   const boosted = applyPcmGain(pcm, resolveVoiceProfile().gain);
+  // When the caller will have heard the last byte sent (farewell hang-up).
+  ws.playheadEndsAt = Math.max(Number(ws.playheadEndsAt) || 0, Date.now()) + boosted.length / 32;
   // Prefer small frames for smoother playback on the telephony side.
   for (let offset = 0; offset < boosted.length; offset += OUTBOUND_PCM_FRAME_BYTES) {
     const slice = boosted.subarray(offset, offset + OUTBOUND_PCM_FRAME_BYTES);
@@ -1969,6 +2020,10 @@ mediaWss.on('connection', (ws, req) => {
 
   let textFrames = 0;
   let binaryFrames = 0;
+  // Caller audio frames. The carrier streams ~50/s for the whole call, so the
+  // span first..last is talk time, and a long gap means the caller is gone.
+  let firstBinaryAt = 0;
+  let lastBinaryAt = 0;
   let stt = null;
   let tts = null;
   let speaking = false;
@@ -1987,6 +2042,11 @@ mediaWss.on('connection', (ws, req) => {
   let heardCallerUtterance = false;
   /** Brain END is in flight. No idle nudge and no next caller turn. */
   let callEnding = false;
+  /**
+   * The agent said goodbye; hang-up timer pending. No idle nudge from here
+   * on. A caller "Okay."/"Haya." does not reopen; anything else cancels.
+   */
+  let farewellClose = null;
   const overlapHold = createOverlapHold();
   const lateFinals = createLateFinalHold();
   const agentReplay = createAgentReplayMemory();
@@ -2011,6 +2071,7 @@ mediaWss.on('connection', (ws, req) => {
     canFire: () =>
       ws.readyState === WebSocket.OPEN &&
       !callEnding &&
+      !farewellClose &&
       !speaking &&
       !turnBusy &&
       !speechOutageStarted &&
@@ -2037,6 +2098,7 @@ mediaWss.on('connection', (ws, req) => {
     canFire: () =>
       ws.readyState === WebSocket.OPEN &&
       !callEnding &&
+      !farewellClose &&
       !speaking &&
       !turnBusy &&
       !speechOutageStarted &&
@@ -2099,6 +2161,16 @@ mediaWss.on('connection', (ws, req) => {
     if (snap.pendingIsQuestion) {
       console.log(`[ws/media][${sidLabel()}] agent_question_committed`);
     }
+    // A committed goodbye ends the call (HD_b82fbfef7649). The agent saying
+    // more after it cancels the pending hang-up.
+    if (snap.pendingSpeech && !opts.isIdleNudge && heardCallerUtterance && !callEnding) {
+      const bye = detectFarewell(snap.pendingSpeech);
+      if (bye.farewell) {
+        beginFarewellClose({ line: snap.pendingSpeech, source: 'phrase' });
+        return committed;
+      }
+      if (farewellClose) cancelFarewellClose('agent_continued');
+    }
     // Any committed line arms "still there?": a question on the long delay,
     // a statement on the short one (HD_ceba9d9b3f37). Not after the greeting.
     if (snap.pendingSpeech || snap.pendingIsQuestion) {
@@ -2114,7 +2186,7 @@ mediaWss.on('connection', (ws, req) => {
     const plan = idleNudgeArmPlan({
       ...input,
       heardCaller: heardCallerUtterance,
-      callEnding: callEnding || callIsOver(),
+      callEnding: callEnding || Boolean(farewellClose) || callIsOver(),
       callerPending: input.event === 'turn_end' && (Boolean(pendingUtterance) || utteranceParts.length > 0),
       armed: idleNudge.armed(),
       questionDelayMs: idleQuestionDelayMs,
@@ -2130,6 +2202,76 @@ mediaWss.on('connection', (ws, req) => {
     }
     return plan;
   }
+  function playbackRemainingMs() {
+    const ends = Number(ws.playheadEndsAt) || 0;
+    return Math.min(10000, Math.max(0, ends - Date.now()));
+  }
+  function hangupMedia(reason) {
+    try {
+      ws.close(1000, reason);
+    } catch {
+      /* ignore */
+    }
+  }
+  function cancelFarewellClose(reason) {
+    if (!farewellClose) return;
+    clearTimeout(farewellClose.timer);
+    farewellClose = null;
+    if (reason) console.log(`[ws/media][${sidLabel()}] farewell hangup cancelled reason=${reason}`);
+  }
+  /**
+   * Hang up after the goodbye has played plus a short grace. The idle nudge
+   * is closed for good: never "still there?" after a goodbye.
+   * VOICE_FAREWELL_RESPECT_END_CALL=on and owner end_call off: stay on
+   * quietly, close after a longer silence.
+   */
+  function beginFarewellClose({ line, source = 'phrase' } = {}) {
+    if (!farewellHangupEnabled() || callEnding || callIsOver()) return null;
+    // A cold Dial is waiting on this socket; closing it would drop the transfer.
+    if (hasPendingLiveTransfer(sessionCallSid)) return null;
+    const tools = callAgentTools.get(sidLabel()) || parseAgentTools(null);
+    const plan = planFarewellClose({
+      endCallAllowed: tools.end_call !== false,
+      playbackRemainingMs: playbackRemainingMs(),
+      source,
+    });
+    cancelFarewellClose(null);
+    idleNudge.close();
+    waitReprompt.close();
+    const timer = setTimeout(() => {
+      if (!farewellClose || farewellClose.timer !== timer) return;
+      farewellClose = null;
+      if (callIsOver()) return;
+      callEnding = true;
+      console.log(`[ws/media][${sidLabel()}] farewell hangup mode=${plan.mode}`);
+      hangupMedia('farewell');
+    }, plan.delayMs);
+    farewellClose = { timer, mode: plan.mode, at: Date.now() };
+    console.log(
+      `[ws/media][${sidLabel()}] farewell source=${source} mode=${plan.mode} hangup in ${plan.delayMs}ms: ${String(line || '').slice(0, 80)}`
+    );
+    return plan;
+  }
+  // Caller gone: the carrier keeps the socket open after hangup (~30 s on
+  // HD_b82fbfef7649) while caller audio has stopped. Stop talking and close.
+  const stallMs = mediaStallMs();
+  const mediaStallTimer = stallMs
+    ? setInterval(() => {
+        if (ws.readyState !== WebSocket.OPEN || simTap) return;
+        if (hasPendingLiveTransfer(sessionCallSid)) return;
+        if (!isMediaStalled({ lastFrameAt: lastBinaryAt, stallMs })) return;
+        clearInterval(mediaStallTimer);
+        console.warn(
+          `[ws/media][${sidLabel()}] no caller audio for ${Date.now() - lastBinaryAt}ms, caller gone, closing media`
+        );
+        callEnding = true;
+        cancelFarewellClose(null);
+        idleNudge.close();
+        waitReprompt.close();
+        hangupMedia('media_stall');
+      }, 1000)
+    : null;
+  if (mediaStallTimer && typeof mediaStallTimer.unref === 'function') mediaStallTimer.unref();
   function noteCallerSpeechForIdle(text) {
     const sample = String(text || '').trim();
     if (!sample || sample.length < 3) return;
@@ -2188,7 +2330,6 @@ mediaWss.on('connection', (ws, req) => {
     tokenLanguages: [],
   };
   let systemPrompt = buildSystemPrompt();
-  let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
   let agentName = process.env.AGENT_NAME || 'Receptionist';
   let spokenName = '';
@@ -2345,10 +2486,31 @@ mediaWss.on('connection', (ws, req) => {
     return buildSttContext(sttTenantSnapshot);
   }
 
-  async function ensureTenantPrompt() {
+  // One load per call. The bind path and the greeting both call this; two
+  // concurrent loads each rebuilt the prompt and Brain state
+  // (HD_b82fbfef7649).
+  let tenantPromptInFlight = null;
+  let tenantPromptInFlightSid = null;
+  function ensureTenantPrompt() {
     if (profileLoaded && profileCallSid === sessionCallSid) {
-      return buildSttContext(sttTenantSnapshot);
+      return Promise.resolve(buildSttContext(sttTenantSnapshot));
     }
+    if (tenantPromptInFlight && tenantPromptInFlightSid === sessionCallSid) {
+      return tenantPromptInFlight;
+    }
+    const sid = sessionCallSid;
+    const run = loadTenantPrompt().finally(() => {
+      if (tenantPromptInFlight === run) {
+        tenantPromptInFlight = null;
+        tenantPromptInFlightSid = null;
+      }
+    });
+    tenantPromptInFlight = run;
+    tenantPromptInFlightSid = sid;
+    return run;
+  }
+
+  async function loadTenantPrompt() {
     try {
       const profile = await db.getTenantProfile({ callSid: sessionCallSid });
       await hydrateCallerMemory(profile, sessionCallSid);
@@ -2376,16 +2538,6 @@ mediaWss.on('connection', (ws, req) => {
           capabilitiesForProfile(profile, parsedTools)
         );
       }
-      greetingLine = buildGreeting(businessName, {
-        agentName,
-        spokenName,
-        greetingInvite,
-        isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
-        afterHoursMode,
-        closureNotice,
-        callerFileName:
-          afterHoursMode === 'message' ? messageFileOwnerName(profile) : '',
-      });
       messages = [{ role: 'system', content: systemPrompt }];
       profileLoaded = true;
       profileCallSid = sessionCallSid;
@@ -2964,6 +3116,7 @@ mediaWss.on('connection', (ws, req) => {
     bargeCancelledText = lastAgentText;
     playbackGeneration += 1;
     speaking = false;
+    ws.playheadEndsAt = 0;
     interimBargeText = '';
     fillerStreamId = null;
     activeOutboundStreamId = null;
@@ -3182,6 +3335,8 @@ mediaWss.on('connection', (ws, req) => {
     if (!clean) return;
     idleNudge.clear();
     waitReprompt.cancel();
+    // Real words after a goodbye reopen the call before any reply path runs.
+    if (farewellClose && !isClosingAck(clean)) cancelFarewellClose('caller_spoke');
     if (turnBusy) {
       supersedeStaleReply(clean, 'turn_while_busy');
       // Merge continuation fragments into one pending utterance (don't drop context).
@@ -3420,6 +3575,19 @@ mediaWss.on('connection', (ws, req) => {
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
       turnBusy = false;
       return;
+    }
+    // After a goodbye, "Haya." / "Okay, bye" is observed, not answered: no
+    // second goodbye (HD_b82fbfef7649). Anything else reopens the call.
+    if (farewellClose) {
+      if (isClosingAck(clean)) {
+        console.log(`[ws/media][${callKey}] caller ack after farewell: observed, nothing spoken`);
+        voiceTrace.noteTurnEnd({ decision: 'skip', reason: 'after_farewell' });
+        logTurnTiming(turnTiming, { outcome: 'after_farewell' });
+        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+        turnBusy = false;
+        return;
+      }
+      cancelFarewellClose('caller_spoke');
     }
 
     const turnMatches = selectProductsForTurn({
@@ -3695,6 +3863,7 @@ mediaWss.on('connection', (ws, req) => {
         state: brainState,
       });
       if (planned.farewell) {
+        cancelFarewellClose(null);
         callEnding = true;
         waitReprompt.close();
         unfinishedHold.close();
@@ -3722,6 +3891,7 @@ mediaWss.on('connection', (ws, req) => {
             const delay = farewellHangupDelayMs({
               bytes: playbackBytes,
               startedAt: playbackStartedAt,
+              padMs: farewellGraceMs(),
             });
             console.log(`[ws/media][${sidLabel()}] brain-end hangup in ${delay}ms`);
             setTimeout(() => {
@@ -4720,14 +4890,13 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       if (result?.shouldEndCall && !bargeInActive) {
-        console.log(`[ws/media][${sidLabel()}] end-call marker — closing media shortly`);
-        setTimeout(() => {
-          try {
-            ws.close(1000, 'end_call');
-          } catch {
-            /* ignore */
-          }
-        }, 800);
+        cancelFarewellClose(null);
+        callEnding = true;
+        idleNudge.close();
+        waitReprompt.close();
+        const endDelay = playbackRemainingMs() + farewellGraceMs();
+        console.log(`[ws/media][${sidLabel()}] end-call marker — closing media in ${endDelay}ms`);
+        setTimeout(() => hangupMedia('end_call'), endDelay);
       } else if (hasPendingLiveTransfer(sessionCallSid) && !bargeInActive) {
         // Staging spikes proved SautiKit does not continue the voice document
         // after Stream (no Redirect, no StreamStopped on /voice/incoming).
@@ -5232,7 +5401,9 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       // Instant local greeting (correct tenant name). Do not wait on Gemini.
-      greetingLine = await generateDynamicGreeting({
+      // Keep exactly what is spoken. spokenGreeting is shared with the prompt
+      // loader; the transcript stores this line, not a later rebuild.
+      const spokenGreeting = await generateDynamicGreeting({
         businessName,
         agentName,
         spokenName,
@@ -5250,29 +5421,29 @@ mediaWss.on('connection', (ws, req) => {
       });
       if (speechOutageStarted) return;
       console.log(
-        `[ws/media][${sidLabel()}] greeting mode=instant agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)}: ${greetingLine}`
+        `[ws/media][${sidLabel()}] greeting mode=instant agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)}: ${spokenGreeting}`
       );
 
       const found = lookupGreetingPcm({
         voiceId: tenantSonioxVoiceId,
-        text: greetingLine,
+        text: spokenGreeting,
         extraLexicon: ttsLexiconOverrides,
         businessName,
         agentName,
       });
-      voiceTrace.noteCall({ stage: 'canned', path: 'greeting', text: greetingLine });
+      voiceTrace.noteCall({ stage: 'canned', path: 'greeting', text: spokenGreeting });
       if (found.pcm && isGreetingCacheEnabled()) {
         noteGreetingPcm({ cached: true });
         voiceTrace.noteCall({
           stage: 'tts',
           path: 'greeting',
-          text: greetingLine,
+          text: spokenGreeting,
           language: callLanguage,
         });
-        await playCachedFillerPcm(found.pcm, { text: greetingLine, trace: false });
-        callTranscript.pushAgent(greetingLine);
-        recordSpokenLine(messages, greetingLine, { source: 'greeting' });
-        if (!greetingInterrupted) markGreetingFileNameAsk(greetingLine);
+        await playCachedFillerPcm(found.pcm, { text: spokenGreeting, trace: false });
+        callTranscript.pushAgent(spokenGreeting);
+        recordSpokenLine(messages, spokenGreeting, { source: 'greeting' });
+        if (!greetingInterrupted) markGreetingFileNameAsk(spokenGreeting);
       } else {
         let readyTts = await ttsReadyPromise;
         if (speechOutageStarted) return;
@@ -5307,15 +5478,15 @@ mediaWss.on('connection', (ws, req) => {
         }
 
         greetingAwaitingFirstPcm = true;
-        const spoken = await speakGreetingSentences(greetingLine, {
+        const spoken = await speakGreetingSentences(spokenGreeting, {
           greetingCacheKey: found.key,
           extraLexicon: found.extraLexicon,
         });
         if (spoken?.outage || speechOutageStarted) return;
         if (spoken?.ok) {
-          callTranscript.pushAgent(greetingLine);
-          recordSpokenLine(messages, greetingLine, { source: 'greeting' });
-          if (!greetingInterrupted && !spoken.cancelled) markGreetingFileNameAsk(greetingLine);
+          callTranscript.pushAgent(spokenGreeting);
+          recordSpokenLine(messages, spokenGreeting, { source: 'greeting' });
+          if (!greetingInterrupted && !spoken.cancelled) markGreetingFileNameAsk(spokenGreeting);
         }
       }
       if (tts && isFillerCacheEnabled()) {
@@ -5355,7 +5526,8 @@ mediaWss.on('connection', (ws, req) => {
           closureNotice,
         });
         greetingAwaitingFirstPcm = true;
-        await speakGreetingSentences(fallback);
+        const fallbackSpoken = await speakGreetingSentences(fallback);
+        if (fallbackSpoken?.ok) callTranscript.pushAgent(fallback);
         recordSpokenLine(messages, fallback, { source: 'greeting_fallback' });
       } catch {
         /* ignore */
@@ -5429,6 +5601,8 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       binaryFrames += 1;
+      lastBinaryAt = Date.now();
+      if (!firstBinaryAt) firstBinaryAt = lastBinaryAt;
       if (binaryFrames <= 5 || binaryFrames % 50 === 0) {
         console.log(
           `[ws/media] binary audio frame #${binaryFrames} (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
@@ -5455,6 +5629,8 @@ mediaWss.on('connection', (ws, req) => {
     idleNudge.close();
     waitReprompt.close();
     unfinishedHold.close();
+    if (mediaStallTimer) clearInterval(mediaStallTimer);
+    cancelFarewellClose(null);
     if (utteranceTimer) {
       clearTimeout(utteranceTimer);
       utteranceTimer = null;
@@ -5486,7 +5662,14 @@ mediaWss.on('connection', (ws, req) => {
     // Fallback: if SautiKit never posts call.completed, still leave the row finished.
     // Do not close the desk row while a cold Dial is waiting on Redirect.
     if (sessionCallSid && !hasPendingLiveTransfer(sessionCallSid)) {
-      const durationSeconds = Math.max(0, Math.round(ms / 1000));
+      // Caller-audio span, not socket lifetime: the socket can outlive the
+      // caller by ~30 s (HD_b82fbfef7649). Fallback only; the carrier's wins.
+      const durationSeconds = mediaDurationSeconds({
+        firstFrameAt: firstBinaryAt,
+        lastFrameAt: lastBinaryAt,
+        connectedAt,
+        closedAt: connectedAt + ms,
+      });
       markCallTerminalFromWebhook({
         callSid: sessionCallSid,
         status: 'complete',
