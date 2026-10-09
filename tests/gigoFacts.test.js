@@ -369,6 +369,67 @@ describe('gigo P2 default shelf life (FACT_HASH_MODE)', () => {
   });
 });
 
+describe('gigo catalogue leaf paths (.price / .site_visit)', () => {
+  const daysAgo = (n) => new Date(NOW.getTime() - n * 86400000).toISOString();
+  const services = [
+    { id: 'svc_carpet', name: 'Carpet cleaning', price_range: 'KES 1,500 - 3,000', site_visit_required: true },
+  ];
+  function setup(extraRows, hashMode) {
+    const p = profile({ servicesCatalog: services, productCatalog: [] });
+    const row = tenantRowFromProfile(p);
+    const owner = (path, more = {}) => ({
+      field_path: path,
+      source: 'owner',
+      confirmed_at: daysAgo(1),
+      value_hash: hashFactValue(factValueForPath(path, row)),
+      ...more,
+    });
+    const rows = [owner('catalog.service.svc_carpet.name'), ...extraRows.map(([path, more]) => owner(path, more))];
+    return { ...p, fieldMeta: indexFieldMeta(rows, { hashMode }) };
+  }
+  const carpet = (p) => readCatalog(p, { now: NOW }).services[0];
+
+  it('reads site visit as a service leaf', () => {
+    const item = carpet(setup([], true));
+    assert.deepEqual([item.site_visit.status, item.site_visit.value], ['known', true]);
+    assert.equal(carpet(setup([], false)).site_visit.value, true);
+  });
+
+  it('hash mode: no leaf row means the leaf follows the row; a matching leaf row keeps it known', () => {
+    assert.equal(carpet(setup([], true)).price.status, 'known');
+    const item = carpet(setup([['catalog.service.svc_carpet.price'], ['catalog.service.svc_carpet.site_visit']], true));
+    assert.equal(item.price.status, 'known');
+    assert.equal(item.site_visit.status, 'known');
+  });
+
+  it('hash mode: a reopened or mismatched leaf row makes only that leaf unknown', () => {
+    const item = carpet(
+      setup(
+        [
+          ['catalog.service.svc_carpet.price', { value_hash: null }],
+          ['catalog.service.svc_carpet.site_visit', { value_hash: hashFactValue(false) }],
+        ],
+        true
+      )
+    );
+    assert.equal(item.name, 'Carpet cleaning');
+    assert.deepEqual([item.price.status, item.price.reason], ['unknown', 'unconfirmed']);
+    assert.deepEqual([item.site_visit.status, item.site_visit.reason], ['unknown', 'unconfirmed']);
+  });
+
+  it('hash mode: the price leaf row carries its own freshness (30 day default)', () => {
+    const item = carpet(setup([['catalog.service.svc_carpet.price', { confirmed_at: daysAgo(31) }]], true));
+    assert.deepEqual([item.price.status, item.price.reason], ['unknown', 'stale']);
+    assert.equal(item.reconfirm, true);
+  });
+
+  it('flag off: leaf rows are ignored', () => {
+    const item = carpet(setup([['catalog.service.svc_carpet.price', { value_hash: null, source: 'seed' }]], false));
+    assert.equal(item.price.status, 'known');
+    assert.equal('reconfirm' in item, false);
+  });
+});
+
 describe('gigo unknown speech', () => {
   it('serve confirms with the owner; message mode takes a message; no callback promise', () => {
     const serve = unknownFactLine({ topic: 'Price' });

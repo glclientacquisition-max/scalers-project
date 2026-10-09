@@ -123,6 +123,10 @@ Desk owns the SQL (`docs/supabase/tenant_field_confirm_v2.sql`: `tenant_field_me
 - Booleans as JSON. `null` as null. `undefined` is dropped from objects and is `null` at the top level or in arrays.
 - Arrays keep their order. Object keys are NFC and sorted by UTF-16 code units (`Array.prototype.sort`).
 
+Path vectors: `tests/fixtures/factHashVectors.json` `pathVectors` (value + sha256 per path over `pathTenant`), checked by both twins.
+
+**Leaf rows in the readers (hash mode only).** No `.price` / `.site_visit` meta row: the leaf follows its row. With a leaf row, the leaf is known only when that row is owner and its hash matches, and its own freshness (price default 30 days) replaces the row's for that leaf. Flag off: leaf rows are ignored. Services carry a `site_visit` leaf reading (not volatile).
+
 JS: `src/conversation/factHash.js` (node crypto). TS: `dashboard/src/lib/factHash.ts` (pure sync sha256, `TextEncoder` only, safe in the client graph because `provenance.ts` is imported by client components through `onboarding.ts` / `promptCompiler.ts`). Both pass `tests/fixtures/factHashVectors.json` (36 vectors).
 
 **What a path hashes** (`factValueForPath(path, tenantsRow)`, the same in both twins):
@@ -134,7 +138,9 @@ JS: `src/conversation/factHash.js` (node crypto). TS: `dashboard/src/lib/factHas
 | `policies.holds`, `policies.holds.allowed` | `holds.allowed ?? holds.enabled ?? holds_allowed` |
 | `policies.coverage_areas` | the stored array, order kept |
 | `faqs.<n>` | `{ question, answer }` only |
-| `catalog.service.<id\|n>.name`, `catalog.product.<sku\|n>.name` | the whole row minus envelope keys (`source, status, confirmed*, envelope, field_meta, meta, provenance, value_hash`) and minus empty leaves (`""`, `null`, `[]`). A price, stock, or lead-time edit reopens the row. |
+| `catalog.service.<id\|n>.name`, `catalog.product.<sku\|n>.name` | the whole row minus envelope keys (`source, status, confirmed*, envelope, field_meta, meta, provenance, value_hash`) and minus empty leaves (`""`, `null`, `[]`). The row's `id` is part of the hash. A price, stock, or lead-time edit reopens the row. |
+| `catalog.service.<id\|n>.price`, `catalog.product.<sku\|n>.price` | `{ price, mode }` minus empty leaves, else null. Service price = `price_range ?? priceRange ?? price`; product price = `price ?? price_range`; mode = `price_mode ?? pricing_mode ?? priceMode ?? pricingMode` (the reader's alias order). |
+| `catalog.service.<id\|n>.site_visit` | `true` / `false` from `site_visit_required ?? siteVisitRequired` (`true`/`"true"`/`"yes"`, `false`/`"false"`/`"no"`, case-insensitive), else null. No product `site_visit` path (unknown path). |
 
 **Readers: `FACT_HASH_MODE` flag.** Hash mode is on only when `FACT_HASH_MODE` is exactly `on` (default off; `true`, `ON`, `1` are off).
 
@@ -151,10 +157,13 @@ node scripts/backfillFactHashes.js --tenant <uuid> [--tenant <uuid> ...]      # 
 node scripts/backfillFactHashes.js --all-except <uuid,uuid> --apply           # write
   --sample N            rows to print in the sample (default 5; paths + hashes only, never values)
   --i-have-alvin-ok     required for any target that is not staging or local
+  --allow-missing-ids   apply even when services rows have no stable id (see Order)
 ```
 
 - A scope is required: `--tenant` (repeatable) or `--all-except`.
 - Guard: host `sgcdncjxauhsbunobmob.supabase.co` (staging) and local hosts (`localhost`, `127.0.0.1`, `::1`, `*.localhost`, `host.docker.internal`) run. Anything else, including prod ALCR `fjxcdccgyhnvnnlnovcl` (`docs/operations/ENVIRONMENTS.md`), is refused (dry run too) unless `--i-have-alvin-ok` is passed. The guard runs before a client is created.
+- Order: `tenant_field_confirm_v2.sql`, then `services_catalog_stable_ids.sql`, then this script (a service row's hash includes its id; the ids SQL clears `value_hash` on the paths it moves). Services rows without a stable id are listed per tenant; `--apply` refuses with exit 2 unless `--allow-missing-ids`.
+- Leaf paths (`.price`, `.site_visit`): a missing row is `row_not_found`; an empty leaf on an existing row is skipped.
 - It skips empty values (null, blank text, `[]`, `{}`, a catalogue row with no name, a FAQ missing a question or answer), so it never confirms an empty value. It reports unresolved rows (`unknown_path`, `row_not_found`, `tenant_not_found`). It never overwrites an existing `value_hash` (counted as `kept_existing`), so it is idempotent and won't re-confirm an edited value. Updates are guarded with `.is('value_hash', null)`.
 - Exit codes: 0 ok, 1 write errors, 2 bad args or guard refusal, 3 `value_hash` column missing, 4 read error.
 

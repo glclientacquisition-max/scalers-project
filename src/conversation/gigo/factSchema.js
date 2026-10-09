@@ -304,6 +304,8 @@ const CATALOG_LEAVES = Object.freeze({
   price: Object.freeze({ topic: 'Price', volatile: true }),
   in_stock: Object.freeze({ topic: 'Stock', volatile: true }),
   lead_time: Object.freeze({ topic: 'Delivery or lead time', volatile: true }),
+  // Services only. Path catalog.service.<id>.site_visit; not volatile.
+  site_visit: Object.freeze({ topic: 'Site visit', volatile: false }),
 });
 
 /** Domains whose facts the faqs/catalog readers own (no scalar FACTS entry). */

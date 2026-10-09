@@ -143,6 +143,38 @@ function faqFactValue(faq) {
   };
 }
 
+function firstDefined(...values) {
+  for (const v of values) if (v !== undefined && v !== null) return v;
+  return undefined;
+}
+
+/**
+ * catalog.<kind>.<key>.price: { price, mode } minus empty leaves, or null.
+ * Same alias order as the Brain catalogue reader (factReaders.catalogRows).
+ */
+function priceFactValue(row, kind) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+  const price =
+    kind === 'product'
+      ? firstDefined(row.price, row.price_range)
+      : firstDefined(row.price_range, row.priceRange, row.price);
+  const mode = firstDefined(row.price_mode, row.pricing_mode, row.priceMode, row.pricingMode);
+  const out = {};
+  if (!isEmptyLeaf(price)) out.price = price;
+  if (!isEmptyLeaf(mode)) out.mode = mode;
+  return Object.keys(out).length ? out : null;
+}
+
+/** catalog.service.<key>.site_visit: true / false, or null when not set. */
+function siteVisitFactValue(row) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+  const raw = firstDefined(row.site_visit_required, row.siteVisitRequired);
+  const text = String(raw ?? '').trim().toLowerCase();
+  if (raw === true || text === 'true' || text === 'yes') return true;
+  if (raw === false || text === 'false' || text === 'no') return false;
+  return null;
+}
+
 function holdsFactValue(policies) {
   const holds = policies?.holds;
   if (holds && typeof holds === 'object' && !Array.isArray(holds)) {
@@ -243,6 +275,17 @@ function factValueForPath(fieldPath, tenant = {}) {
     const row = findCatalogRow(list, m[2], m[1]);
     return row ? catalogRowFactValue(row) : null;
   }
+  m = path.match(/^catalog\.(service)\.(.+)\.site_visit$/);
+  if (m) {
+    const row = findCatalogRow(asList(t.services_catalog), m[2], 'service');
+    return row ? siteVisitFactValue(row) : null;
+  }
+  m = path.match(/^catalog\.(service|product)\.(.+)\.price$/);
+  if (m) {
+    const list = asList(m[1] === 'service' ? t.services_catalog : t.product_catalog);
+    const row = findCatalogRow(list, m[2], m[1]);
+    return row ? priceFactValue(row, m[1]) : null;
+  }
   return undefined;
 }
 
@@ -279,6 +322,8 @@ module.exports = {
   catalogRowFactValue,
   faqFactValue,
   holdsFactValue,
+  priceFactValue,
+  siteVisitFactValue,
   stableRowId,
   tenantRowFromProfile,
   ROW_META_KEYS,

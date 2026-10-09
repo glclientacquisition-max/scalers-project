@@ -12,6 +12,13 @@
 //   node scripts/backfillFactHashes.js --tenant <uuid> [--tenant <uuid> ...] [--apply]
 //   node scripts/backfillFactHashes.js --all-except <uuid,uuid> [--apply]
 //   Options: --sample <n> (default 5)  --i-have-alvin-ok (non-staging targets)
+//            --allow-missing-ids (apply even when services rows have no stable id)
+//
+// Order: tenant_field_confirm_v2.sql, then services_catalog_stable_ids.sql,
+// then this script. A service row's hash includes its id, and the ids SQL
+// clears value_hash on the paths it moves, so hashing a row before it has an id
+// is wasted. Services rows without a stable id are reported per tenant, and
+// --apply refuses (exit 2) unless --allow-missing-ids is passed.
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
 //
 // Target guard: staging (sgcdncjxauhsbunobmob) and local URLs run. Anything
@@ -21,7 +28,7 @@
 // Exit codes: 0 ok, 1 write errors, 2 bad arguments or guard refusal,
 // 3 value_hash column missing (apply docs/supabase/tenant_field_confirm_v2.sql), 4 read error.
 
-const { hashFactValue, factValueForPath } = require('../src/conversation/factHash');
+const { hashFactValue, factValueForPath, stableRowId } = require('../src/conversation/factHash');
 
 const STAGING_REF = 'sgcdncjxauhsbunobmob';
 const PROD_REF = 'fjxcdccgyhnvnnlnovcl';
@@ -30,13 +37,22 @@ const UUIDISH = /^[0-9a-f-]{8,64}$/i;
 
 function usage() {
   return [
-    'Usage: node scripts/backfillFactHashes.js (--tenant <id> ... | --all-except <id,id>) [--apply] [--sample N] [--i-have-alvin-ok]',
+    'Usage: node scripts/backfillFactHashes.js (--tenant <id> ... | --all-except <id,id>) [--apply] [--sample N] [--i-have-alvin-ok] [--allow-missing-ids]',
     'Dry run unless --apply. Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.',
   ].join('\n');
 }
 
 function parseArgs(argv) {
-  const out = { apply: false, tenants: [], allExcept: null, iHaveAlvinOk: false, sample: 5, help: false, errors: [] };
+  const out = {
+    apply: false,
+    tenants: [],
+    allExcept: null,
+    iHaveAlvinOk: false,
+    allowMissingIds: false,
+    sample: 5,
+    help: false,
+    errors: [],
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     const next = () => {
@@ -50,6 +66,7 @@ function parseArgs(argv) {
     };
     if (a === '--apply') out.apply = true;
     else if (a === '--i-have-alvin-ok') out.iHaveAlvinOk = true;
+    else if (a === '--allow-missing-ids') out.allowMissingIds = true;
     else if (a === '--help' || a === '-h') out.help = true;
     else if (a === '--tenant') {
       const v = next().trim();
@@ -137,12 +154,33 @@ function namesARow(path) {
   return /^(catalog\.(service|product)\..+\.name|faqs\.\d+)$/.test(path);
 }
 
+/** catalog.<kind>.<key>.price / .site_visit -> its row's name path, else null. */
+function leafRowPath(path) {
+  return /^catalog\.(service|product)\..+\.(price|site_visit)$/.test(path)
+    ? path.replace(/\.(price|site_visit)$/, '.name')
+    : null;
+}
+
+/** services_catalog object rows without a stable (non-numeric) id. */
+function servicesMissingIds(tenant) {
+  let list = tenant?.services_catalog;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      list = [];
+    }
+  }
+  if (!Array.isArray(list)) return 0;
+  return list.filter((row) => row && typeof row === 'object' && !Array.isArray(row) && !stableRowId(row)).length;
+}
+
 function isEmptyFactValue(path, value) {
   if (value == null) return true;
   if (typeof value === 'string') return !value.trim();
   if (Array.isArray(value)) return value.length === 0;
   if (typeof value === 'object') {
-    if (/^catalog\./.test(path)) return !String(value.name ?? '').trim();
+    if (/^catalog\..+\.name$/.test(path)) return !String(value.name ?? '').trim();
     if (/^faqs\./.test(path)) return !String(value.question ?? '').trim() || !String(value.answer ?? '').trim();
     return Object.keys(value).length === 0;
   }
@@ -197,7 +235,21 @@ async function runBackfill({ client, supabaseUrl, args, log = console.log }) {
     for (const t of data || []) tenants.set(t.id, t);
   }
 
-  const summary = { tenants: [], totals: { owner_rows: 0, to_write: 0, written: 0, unchanged: 0, kept_existing: 0, skipped_empty: 0, unresolved: 0, write_errors: 0 } };
+  const missingIds = [];
+  for (const tenantId of tenantIds) {
+    const n = servicesMissingIds(tenants.get(tenantId));
+    if (n) missingIds.push({ tenant_id: tenantId, rows: n });
+  }
+  if (missingIds.length) {
+    log(`warning: services rows without a stable id (run services_catalog_stable_ids.sql first; a service hash includes its id):`);
+    for (const m of missingIds) log(`  ${m.tenant_id}: ${m.rows} row(s)`);
+    if (args.apply && !args.allowMissingIds) {
+      log('error: refusing --apply while services rows lack ids. Pass --allow-missing-ids to override.');
+      return { code: 2, summary: { missingIds } };
+    }
+  }
+
+  const summary = { missingIds, tenants: [], totals: { owner_rows: 0, to_write: 0, written: 0, unchanged: 0, kept_existing: 0, skipped_empty: 0, unresolved: 0, write_errors: 0 } };
   const samples = [];
   const unresolved = [];
   for (const tenantId of tenantIds) {
@@ -217,7 +269,8 @@ async function runBackfill({ client, supabaseUrl, args, log = console.log }) {
         unresolved.push({ tenant_id: tenantId, field_path: path, reason: 'unknown_path' });
         continue;
       }
-      if (value === null && namesARow(path)) {
+      const rowPath = leafRowPath(path);
+      if (value === null && (namesARow(path) || (rowPath && factValueForPath(rowPath, tenant) === null))) {
         counts.unresolved += 1;
         unresolved.push({ tenant_id: tenantId, field_path: path, reason: 'row_not_found' });
         continue;

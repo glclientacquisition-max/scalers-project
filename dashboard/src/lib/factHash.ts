@@ -191,7 +191,7 @@ function isEmptyLeaf(v: any): boolean {
   return false;
 }
 
-/** Catalogue row minus envelope keys and empty leaves ("" / null / []). */
+/** Catalogue row minus envelope keys and empty leaves ('' / null / []). */
 export function catalogRowFactValue(row: any): Record<string, any> | null {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
   const out: Record<string, any> = {};
@@ -207,6 +207,38 @@ export function faqFactValue(faq: any): { question: string; answer: string } {
     question: String(faq?.question ?? ''),
     answer: String(faq?.answer ?? ''),
   };
+}
+
+function firstDefined(...values: any[]): any {
+  for (const v of values) if (v !== undefined && v !== null) return v;
+  return undefined;
+}
+
+/**
+ * catalog.<kind>.<key>.price: { price, mode } minus empty leaves, or null.
+ * Same alias order as the Brain catalogue reader (factReaders.catalogRows).
+ */
+export function priceFactValue(row: any, kind: 'service' | 'product'): Record<string, any> | null {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+  const price =
+    kind === 'product'
+      ? firstDefined(row.price, row.price_range)
+      : firstDefined(row.price_range, row.priceRange, row.price);
+  const mode = firstDefined(row.price_mode, row.pricing_mode, row.priceMode, row.pricingMode);
+  const out: Record<string, any> = {};
+  if (!isEmptyLeaf(price)) out.price = price;
+  if (!isEmptyLeaf(mode)) out.mode = mode;
+  return Object.keys(out).length ? out : null;
+}
+
+/** catalog.service.<key>.site_visit: true / false, or null when not set. */
+export function siteVisitFactValue(row: any): boolean | null {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+  const raw = firstDefined(row.site_visit_required, row.siteVisitRequired);
+  const text = String(raw ?? '').trim().toLowerCase();
+  if (raw === true || text === 'true' || text === 'yes') return true;
+  if (raw === false || text === 'false' || text === 'no') return false;
+  return null;
 }
 
 export function holdsFactValue(policies: any): any {
@@ -308,6 +340,18 @@ export function factValueForPath(fieldPath: string, tenant: any = {}): any {
     const list = asList(m[1] === 'service' ? t.services_catalog : t.product_catalog);
     const row = findCatalogRow(list, m[2], m[1]);
     return row ? catalogRowFactValue(row) : null;
+  }
+  m = path.match(/^catalog\.(service)\.(.+)\.site_visit$/);
+  if (m) {
+    const row = findCatalogRow(asList(t.services_catalog), m[2], 'service');
+    return row ? siteVisitFactValue(row) : null;
+  }
+  m = path.match(/^catalog\.(service|product)\.(.+)\.price$/);
+  if (m) {
+    const kind = m[1] as 'service' | 'product';
+    const list = asList(kind === 'service' ? t.services_catalog : t.product_catalog);
+    const row = findCatalogRow(list, m[2], kind);
+    return row ? priceFactValue(row, kind) : null;
   }
   return undefined;
 }
