@@ -27,6 +27,8 @@ const PHONE_PARSE = [
 ];
 
 const JUNK_NAMES = [
+  'Like',
+  'like um',
   'Haijawekwa',
   'Calling',
   'Callings',
