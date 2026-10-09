@@ -38,6 +38,15 @@ describe("package state rules SQL", () => {
     assert.match(rules, /drop function if exists public\.assign_tenant_package\(uuid, uuid, text\);/);
   });
 
+  it("annual terms bill yearly but usage rolls monthly in EAT", () => {
+    assert.match(rules, /create or replace function public\.billing_add_months/);
+    assert.match(rules, /at time zone 'Africa\/Nairobi'\) \+ make_interval\(months => p_months\)/);
+    assert.match(rules, /add column if not exists term_start timestamptz/);
+    assert.match(roll, /v_end := public\.billing_add_months\(v_start, 1\);/);
+    assert.match(roll, /while v_term_end <= v_start loop/);
+    assert.doesNotMatch(roll, /interval '12 months'/);
+  });
+
   it("rollover applies pending changes, rolls no-package rows and never deletes grants", () => {
     assert.match(roll, /s\.status in \('active', 'cancelled'\)/);
     assert.match(roll, /r\.pending_change = 'unassign'/);
@@ -48,7 +57,7 @@ describe("package state rules SQL", () => {
     assert.match(view, /with \(security_invoker = true\)/);
     assert.match(view, /to_regclass\('public\.notify_sms_billable'\)/);
     assert.match(view, /grant select \(tenant_id, minutes, period_start, period_end\) on public\.tenant_minute_grants to authenticated/);
-    for (const col of ["period_start", "period_end", "package_state", "included_minutes", "granted_minutes",
+    for (const col of ["billing_term", "term_start", "term_end", "period_start", "period_end", "package_state", "included_minutes", "granted_minutes",
       "remaining_minutes", "sms_used", "on_demand_enabled", "enforcement_mode", "mode_label", "spend_cap_kes", "overage_owed_kes"]) {
       assert.match(view, new RegExp(`as ${col}\\b|b\\.${col},`), `missing column ${col}`);
     }

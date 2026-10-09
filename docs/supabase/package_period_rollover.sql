@@ -48,6 +48,8 @@
 
 -- ---------------------------------------------------------------------------
 -- 1. Function
+--    Usage periods are always one calendar month (EAT); annual tenants roll
+--    monthly and their billing term (term_start/term_end) moves only at its end.
 --    Rolls active AND no-package (cancelled) rows: a no-package tenant still
 --    needs its usage clock for on-demand billing. At the boundary it applies a
 --    pending change (downgrade / period_change / unassign, see
@@ -73,7 +75,8 @@ returns table (
   whatsapp_used_before integer,
   applied_change text,
   package_id_after uuid,
-  minutes_included_after integer
+  minutes_included_after integer,
+  term_end_after timestamptz
 )
 language plpgsql
 security definer
@@ -82,7 +85,6 @@ as $$
 #variable_conflict use_column
 declare
   r record;
-  v_step interval;
   v_start timestamptz;
   v_end timestamptz;
   v_period text;
@@ -91,10 +93,12 @@ declare
   v_change text;
   v_minutes integer;
   v_grants integer;
+  v_term_start timestamptz;
+  v_term_end timestamptz;
 begin
   for r in
     select s.tenant_id, s.period, s.status, s.package_id,
-           s.current_period_start, s.current_period_end,
+           s.current_period_start, s.current_period_end, s.term_start, s.term_end,
            s.pending_change, s.pending_package_id, s.pending_period, s.pending_effective_at,
            t.seconds_used, t.sms_used_units, t.email_used_units, t.whatsapp_used_units
     from public.tenant_subscriptions s
@@ -119,13 +123,27 @@ begin
       end if;
     end if;
 
-    v_step := case when v_period = 'year' then interval '12 months' else interval '1 month' end;
+    -- Usage always rolls one calendar month (EAT), for monthly and annual terms.
     v_start := r.current_period_end;
-    v_end := r.current_period_end + v_step;
+    v_end := public.billing_add_months(v_start, 1);
     while v_end <= now() loop
       v_start := v_end;
-      v_end := v_end + v_step;
+      v_end := public.billing_add_months(v_start, 1);
     end loop;
+
+    -- Billing term: a term switch starts a new term with the new usage month;
+    -- otherwise the term moves only once it has ended.
+    if v_change = 'period_change' or r.term_end is null then
+      v_term_start := v_start;
+      v_term_end := public.billing_add_months(v_start, case when v_period = 'year' then 12 else 1 end);
+    else
+      v_term_start := r.term_start;
+      v_term_end := r.term_end;
+      while v_term_end <= v_start loop
+        v_term_start := v_term_end;
+        v_term_end := public.billing_add_months(v_term_start, case when v_period = 'year' then 12 else 1 end);
+      end loop;
+    end if;
 
     v_grants := public.billing_grant_minutes_for_period(r.tenant_id, v_start, v_end);
     if v_status = 'active' then
@@ -147,12 +165,15 @@ begin
     applied_change := v_change;
     package_id_after := case when v_status = 'active' then v_package end;
     minutes_included_after := v_minutes;
+    term_end_after := v_term_end;
 
     if not p_dry_run then
       update public.tenant_subscriptions s
         set current_period_start = v_start,
             current_period_end = v_end,
             period = v_period,
+            term_start = v_term_start,
+            term_end = v_term_end,
             package_id = v_package,
             status = v_status,
             ended_at = case when v_change = 'unassign' then r.current_period_end else s.ended_at end,
@@ -193,6 +214,8 @@ begin
             'old_end', r.current_period_end,
             'new_start', v_start,
             'new_end', v_end,
+            'term_start', v_term_start,
+            'term_end', v_term_end,
             'applied_change', v_change,
             'package_id', case when v_status = 'active' then v_package end,
             'minutes_included_after', v_minutes,

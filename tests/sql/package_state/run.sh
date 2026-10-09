@@ -13,6 +13,7 @@ sed '/^-- 2. Schedule/,$d' docs/supabase/package_period_rollover.sql > "$tmp"   
 $P -c "drop database if exists $DB" -c "create database $DB"
 $P -d $DB -f $D/00_stub_schema.sql
 $P -d $DB -f docs/supabase/package_catalog.sql
+$P -d $DB -f $D/05_legacy_rows.sql
 for pass in 1 2; do
   for f in docs/supabase/fix_grant_package_minutes.sql docs/supabase/package_state_rules.sql "$tmp" docs/supabase/tenant_billing_state.sql; do
     $P -d $DB -f "$f"
