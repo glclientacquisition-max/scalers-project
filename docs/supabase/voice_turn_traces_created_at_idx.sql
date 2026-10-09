@@ -1,5 +1,6 @@
 -- Index for the 30-day trace purge.
 -- Run after: voice_turn_traces.sql.
+-- Applied on scalers-staging and prod (ALCR) 2026-10-09.
 -- purge_voice_turn_traces filters on created_at alone. The only index with
 -- created_at is voice_turn_traces_tenant_idx (tenant_id, created_at desc), which
 -- leads with tenant_id, so Postgres 17 cannot range-scan it for

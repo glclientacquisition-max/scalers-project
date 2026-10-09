@@ -3,8 +3,9 @@
 -- and voice_turn_traces_created_at_idx.sql.
 -- First applied on prod (ALCR) 2026-10-09 with Alvin's OK as
 -- "select public.purge_voice_turn_traces(30)" (job id 1). This version calls the
--- batched procedure instead, which commits every 5000 rows. Re-running it needs
--- Alvin's GO on prod. Not applied on scalers-staging (no pg_cron there).
+-- batched procedure instead, which commits every 5000 rows. Applied on prod
+-- 2026-10-09 13:38 EAT with Alvin's GO (job id 1 kept). Not applied on
+-- scalers-staging (no pg_cron there).
 --
 -- pg_cron runs in UTC: '17 0 * * *' = 00:17 UTC = 03:17 EAT.
 -- The job runs as postgres (table owner), so the service_role-only grant on the
