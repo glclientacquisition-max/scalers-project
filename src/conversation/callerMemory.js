@@ -194,6 +194,9 @@ function buildCallerMemoryCard({
 /** Past-dated: the lived time has passed, or the refreshed when reads "past ...". */
 function livedItemPast(item) {
   if (!item || typeof item !== 'object') return false;
+  // A hold or order waits for pickup; a past date does not close it.
+  const type = String(item.row?.request_type || item.row?.type || '').toLowerCase();
+  if (type === 'hold' || type === 'order') return false;
   if (item.lived?.past) return true;
   const when = String(item.row?.when_text || item.row?.whenText || '');
   return /^past\b/i.test(when.trim());

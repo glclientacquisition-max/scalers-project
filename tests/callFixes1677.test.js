@@ -153,6 +153,8 @@ describe('HD_1677e57f73f9 replay, BRAIN_CALL_FIXES_D199=on', () => {
       const plan = guardToolPlan(JSON.parse(JSON.stringify(T30_PLAN)), state, {});
       assert.equal(plan.appointment, undefined);
       assert.equal(plan.needsVisitTime, 'today');
+      assert.equal(plan.rejectedAppointment.serviceName, 'Kitchen and Wardrobe Cleaning');
+      assert.equal(plan.rejectedAppointment.whenText, 'today');
       // Had the caller said "saa nane mchana", the 2 PM is theirs.
       const said = JSON.parse(JSON.stringify(state));
       said.conversation.answersReceived = [...said.conversation.answersReceived, 'Leo saa nane mchana.'];

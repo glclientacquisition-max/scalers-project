@@ -325,6 +325,14 @@ function guardToolPlan(parsed, state = {}, capabilities = {}) {
       };
     } else if (bareDay) {
       next.needsVisitTime = whenText;
+      // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): keep the rejected create
+      // so Brain can re-ask and retry it, or save it as a callback.
+      if (require('./callFixesD199').callFixesD199Enabled()) {
+        Object.defineProperty(next, 'rejectedAppointment', {
+          value: next.appointment,
+          enumerable: false,
+        });
+      }
       delete next.appointment;
     }
   }

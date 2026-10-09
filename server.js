@@ -5825,12 +5825,15 @@ async function applyGeminiTools(callSid, parsed) {
   // Tool contract: required tools first, then the guard strips what the caller
   // never consented to or never said (ack turns, invented quantity, day-only
   // visits). Gemini's own markers pass through the same gate as injected ones.
-  const requiredParsed = ensureRequiredEscalate(
-    ensureRequiredCreateRequest(parsed, state, capabilities),
+  const enforcedParsed = guardToolPlan(
+    ensureRequiredEscalate(
+      ensureRequiredCreateRequest(parsed, state, capabilities),
+      state,
+      capabilities
+    ),
     state,
     capabilities
   );
-  const enforcedParsed = guardToolPlan(requiredParsed, state, capabilities);
   if (enforcedParsed.consentBlocked || enforcedParsed.needsVisitTime) {
     console.log(
       `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : 'needs_visit_time'}`
@@ -5975,7 +5978,7 @@ async function applyGeminiTools(callSid, parsed) {
     const held = noteRejectedCreate(updatedState, {
       slot: 'when',
       whenText: String(enforcedParsed.needsVisitTime),
-      appointment: requiredParsed?.appointment || null,
+      appointment: enforcedParsed.rejectedAppointment || null,
     });
     if (held) {
       const reask = reaskSlotLine(updatedState, updatedState.language?.current || 'en');
