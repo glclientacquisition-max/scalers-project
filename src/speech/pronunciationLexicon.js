@@ -377,17 +377,39 @@ function envLexiconOverrides() {
  * @param {'en'|'sw'|string} [lang]
  * @param {LexiconEntry[]} [extraEntries]
  */
-function applyLexicon(text, lang = 'en', extraEntries = []) {
+/**
+ * A built-in entry that respells a word into hyphenated syllables
+ * ("Kee-ten-geh-la"). Brand spellings (priority 100) and fixed forms such as
+ * M-Pesa, Co-op and e-book are not respellings.
+ * @param {{ say: string, priority?: number }} entry
+ */
+function isSyllableRespelling(entry) {
+  if (!entry || (entry.priority ?? 50) >= 100) return false;
+  const hyphens = (String(entry.say || '').match(/\p{L}-\p{L}/gu) || []).length;
+  if (!hyphens) return false;
+  return !/^(?:e-book|handy-man)$/i.test(entry.say);
+}
+
+/**
+ * @param {string} text
+ * @param {'en'|'sw'|string} [lang]
+ * @param {unknown[]} [extraEntries] tenant / env overrides (always applied)
+ * @param {{ builtinRespell?: boolean }} [opts] builtinRespell false skips the
+ *   built-in syllable respellings and leaves the word as written.
+ */
+function applyLexicon(text, lang = 'en', extraEntries = [], opts = {}) {
   let out = String(text || '');
   if (!out) return out;
 
   const ttsLang = lang === 'sw' ? 'sw' : 'en';
   const allowSheng = ttsLang === 'en';
   const extras = Array.isArray(extraEntries) ? extraEntries : [];
+  const skipRespell = opts && opts.builtinRespell === false;
+  const builtins = skipRespell ? COMPILED.filter((entry) => !isSyllableRespelling(entry)) : COMPILED;
   const compiled =
     extras.length > 0
-      ? [...compileEntries(extras), ...COMPILED].sort(sortCompiled)
-      : COMPILED;
+      ? [...compileEntries(extras), ...builtins].sort(sortCompiled)
+      : builtins;
 
   for (const entry of compiled) {
     const ok =
@@ -454,6 +476,7 @@ function mergeIdentityLexicon(extra, identity = {}) {
 }
 
 module.exports = {
+  isSyllableRespelling,
   KENYA_LEXICON,
   PLACE_LEXICON,
   applyLexicon,

@@ -11,6 +11,18 @@ const { utteranceLooksIncomplete } = require('./turnTaking');
 
 const LATENCY_BUDGET_MS = 1200;
 
+// Mouth checks (Phase 1 top-up). They are counted next to the legacy checks
+// and do not change the legacy score, so existing baselines keep their numbers.
+const MONOLOGUE_MAX_SECONDS = 25;
+const MONOLOGUE_MAX_SENTENCES = 3;
+// Phone-paced speech is about 2.6 words a second (HD_015b t8: ~90 words in 29.5 s).
+const WORDS_PER_SECOND = 2.6;
+const SPOKEN_CHAR = /[\p{L}\p{N}]/u;
+const LOST_TURN_REASONS = new Set(['thinking_continuation', 'weak_thinking_interrupt']);
+// Transforms that change pronunciation or spacing only. They never count as
+// replacing an answer.
+const NORMALIZE_TRANSFORMS = new Set(['tts_normalize', 'speech_boundary', 'structured_boundary']);
+
 const SERVICE_ASK =
   /\b(services?|huduma|mnafanya|mna\s*offer|mnaofa|mna\s*ofa|offer|unafanya|mnayofanya)\b/i;
 const SERVICE_NOUN =
@@ -282,6 +294,184 @@ function appendSpeakNotes(turn, notes) {
   }
 }
 
+function emptyMouthChecks() {
+  return {
+    gluedPiece: 0,
+    letterlessPiece: 0,
+    monologue: 0,
+    lostTurn: 0,
+    stackedQuestion: 0,
+    replacedAnswer: 0,
+  };
+}
+
+function ttsPieces(turn) {
+  return stages(turn, 'tts').filter((row) => row.filler !== true);
+}
+
+function wireOf(row) {
+  if (row && typeof row.wire === 'string') return row.wire;
+  return String(row?.text || '');
+}
+
+/**
+ * Pieces of one Soniox stream that touch with no word gap ("windowWhat").
+ * A row with `wire` is the exact text sent. A legacy row has only the
+ * trimmed text that pushText sent, so a second piece in the same turn is
+ * glued unless it carries its own leading space (inferred: legacy traces do
+ * not record the stream id).
+ */
+function gluedPieces(turn) {
+  const rows = ttsPieces(turn);
+  const glued = [];
+  for (let i = 1; i < rows.length; i += 1) {
+    const prev = rows[i - 1];
+    const row = rows[i];
+    if (prev.stream && row.stream && prev.stream !== row.stream) continue;
+    if (row.streamStart === true) continue;
+    const prevWire = wireOf(prev);
+    const wire = wireOf(row);
+    if (!prevWire.trim() || !wire.trim()) continue;
+    const prevEnd = prevWire.slice(-1);
+    const head = wire.slice(0, 1);
+    if (SPOKEN_CHAR.test(prevEnd) && SPOKEN_CHAR.test(head)) {
+      glued.push(`${prevWire.trim().split(/\s+/).pop()}${wire.trim().split(/\s+/)[0]}`);
+    }
+  }
+  return glued;
+}
+
+function letterlessPieces(turn) {
+  return ttsPieces(turn)
+    .map((row) => wireOf(row))
+    .filter((wire) => wire.trim() && !SPOKEN_CHAR.test(wire));
+}
+
+function sentenceCount(text) {
+  return String(text || '')
+    .split(/(?<=[.!?？])\s+/)
+    .map((part) => part.trim())
+    .filter((part) => SPOKEN_CHAR.test(part)).length;
+}
+
+function monologueOf(turn) {
+  // A barged reply still played: replay records it as a `played` row.
+  const rows = ttsPieces(turn).concat(stages(turn, 'played'));
+  if (!rows.length) return null;
+  const spoken = rows.map((row) => String(row.text || '').trim()).filter(Boolean).join(' ');
+  const words = spoken.split(/\s+/).filter((word) => SPOKEN_CHAR.test(word)).length;
+  const measured = rows.reduce((sum, row) => sum + (Number(row.durationMs) || 0), 0);
+  const seconds = measured > 0 ? measured / 1000 : words / WORDS_PER_SECOND;
+  const sentences = rows.reduce(
+    (sum, row) => sum + Math.max(1, sentenceCount(row.before != null ? row.before : row.text)),
+    0
+  );
+  if (seconds > MONOLOGUE_MAX_SECONDS || sentences > MONOLOGUE_MAX_SENTENCES) {
+    return { seconds: Math.round(seconds * 10) / 10, sentences, measured: measured > 0 };
+  }
+  return null;
+}
+
+function lostFinals(turn) {
+  const rows = turn?.stages || [];
+  const lost = [];
+  rows.forEach((row, index) => {
+    if (row.stage !== 'turn_end') return;
+    if (row.decision !== 'ignore' && row.decision !== 'drop') return;
+    if (!LOST_TURN_REASONS.has(row.reason)) return;
+    if (row.queued === true) return;
+    let text = String(row.text || '').trim();
+    if (!text) {
+      for (let j = index - 1; j >= 0; j -= 1) {
+        if (rows[j].stage === 'stt' && rows[j].kind === 'final') {
+          text = String(rows[j].text || '').trim();
+          break;
+        }
+      }
+    }
+    if (!text || isBackchannel(text)) return;
+    const words = normalizeSpeech(text).split(' ').filter(Boolean);
+    if (words.length >= 2 || /[?？]/.test(text)) lost.push(text);
+  });
+  return lost;
+}
+
+function spokenQuestions(turn) {
+  const seen = new Set();
+  const out = [];
+  for (const row of ttsPieces(turn)) {
+    const source = row.before != null ? row.before : row.text;
+    for (const question of questionsOf(source)) {
+      const key = normalizeSpeech(question);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(question);
+    }
+  }
+  return out;
+}
+
+function contentWords(text) {
+  return normalizeSpeech(text)
+    .split(' ')
+    .filter((word) => word.length > 2);
+}
+
+function replacedAnswers(turn) {
+  const out = [];
+  for (const row of turn?.stages || []) {
+    if (row.stage !== 'transform' || row.dropped) continue;
+    if (NORMALIZE_TRANSFORMS.has(row.name)) continue;
+    const before = String(row.before || '');
+    const after = String(row.after || '');
+    if (!after.trim()) continue;
+    const substantive = looksLikeKeptAnswer(before) || /\d/.test(before);
+    if (!substantive) continue;
+    const beforeWords = contentWords(before);
+    if (beforeWords.length < 5) continue;
+    const afterSet = new Set(contentWords(after));
+    const kept = beforeWords.filter((word) => afterSet.has(word)).length;
+    if (kept / beforeWords.length < 0.5) out.push({ name: row.name, reason: row.reason });
+  }
+  return out;
+}
+
+function scoreMouthTurn(turn) {
+  const checks = emptyMouthChecks();
+  const notes = [];
+  const glued = gluedPieces(turn);
+  if (glued.length) {
+    checks.gluedPiece = glued.length;
+    notes.push(`glued ${glued.slice(0, 3).join(', ')}`);
+  }
+  const letterless = letterlessPieces(turn);
+  if (letterless.length) {
+    checks.letterlessPiece = letterless.length;
+    notes.push(`letterless piece ${JSON.stringify(letterless[0])}`);
+  }
+  const mono = monologueOf(turn);
+  if (mono) {
+    checks.monologue = 1;
+    notes.push(`monologue ${mono.sentences} sentences ~${mono.seconds}s`);
+  }
+  const lost = lostFinals(turn);
+  if (lost.length) {
+    checks.lostTurn = lost.length;
+    notes.push(`lost caller turn ${JSON.stringify(lost[0])}`);
+  }
+  const questions = spokenQuestions(turn);
+  if (questions.length > 1) {
+    checks.stackedQuestion = 1;
+    notes.push(`stacked questions ${questions.length}`);
+  }
+  const replaced = replacedAnswers(turn);
+  if (replaced.length) {
+    checks.replacedAnswer = replaced.length;
+    notes.push(`answer replaced by ${replaced[0].name}${replaced[0].reason ? ` (${replaced[0].reason})` : ''}`);
+  }
+  return { checks, notes };
+}
+
 function emptyChecks() {
   return {
     languageMismatch: 0,
@@ -320,7 +510,20 @@ function scoreTurn(turn, opts = {}) {
     notes.push(`language ${callerLang} caller, ${spokenLang} reply`);
   }
 
-  const modelChars = modelText.trim().length;
+  // Structured mouth: a dropped second question is intentional, and a
+  // sentence answered from data counts at the length of the data line.
+  const modelChars = Math.max(
+    0,
+    (turn.stages || [])
+      .filter((row) => row.stage === 'transform')
+      .reduce((chars, row) => {
+        if (row.reason === 'stacked_question') return chars - String(row.before || '').trim().length - 1;
+        if (row.name === 'structured_verify' && String(row.after || '').trim()) {
+          return chars - String(row.before || '').trim().length + String(row.after).trim().length;
+        }
+        return chars;
+      }, modelText.trim().length)
+  );
   const spokenChars = spoken.trim().length;
   if (!held && modelChars >= 40 && spokenChars / modelChars < 0.5) {
     checks.incomplete = 1;
@@ -350,12 +553,26 @@ function scoreTurn(turn, opts = {}) {
   const droppedAnswer = (turn.stages || []).some(
     (row) => row.stage === 'transform' && row.dropped && looksLikeKeptAnswer(row.before)
   );
+  // The structured mouth keeps one question per reply. A second question it
+  // dropped on purpose (reason stacked_question) is not a deleted answer.
+  const stackedDrops = (turn.stages || [])
+    .filter((row) => row.stage === 'transform' && row.reason === 'stacked_question')
+    .map((row) => normalizeSpeech(row.before));
   const droppedQuestion = (turn.stages || []).some(
-    (row) => row.stage === 'transform' && row.dropped && questionMissing(row.before, spoken)
+    (row) =>
+      row.stage === 'transform' &&
+      row.dropped &&
+      row.reason !== 'stacked_question' &&
+      questionMissing(row.before, spoken)
   );
   const modelAnswerMissing =
     looksLikeKeptAnswer(modelText) && !looksLikeKeptAnswer(spoken) && modelText.trim() !== spoken.trim();
-  const modelQuestionMissing = questionMissing(model?.outputText || '', spoken);
+  const modelQuestionMissing = stackedDrops.length
+    ? questionsOf(modelProse(model?.outputText || '')).some((question) => {
+        const body = normalizeSpeech(question);
+        return body.length > 0 && !stackedDrops.includes(body) && !normalizeSpeech(spoken).includes(body);
+      })
+    : questionMissing(model?.outputText || '', spoken);
   const droppedFact = factSentenceDropped(turn);
   if (!held && (droppedAnswer || droppedQuestion || modelAnswerMissing || modelQuestionMissing || droppedFact)) {
     checks.deletedAnswer = 1;
@@ -398,6 +615,7 @@ function scoreTurn(turn, opts = {}) {
   }
 
   appendSpeakNotes(turn, notes);
+  const mouth = scoreMouthTurn(turn);
 
   if (stage(turn, 'outcome')?.value === 'unlogged') {
     return {
@@ -407,7 +625,23 @@ function scoreTurn(turn, opts = {}) {
       score: null,
       omit: true,
       checks: emptyChecks(),
-      notes: ['raw model text was not logged'],
+      mouth: mouth.checks,
+      notes: ['raw model text was not logged', ...mouth.notes],
+    };
+  }
+  // Structured replay of a MOCK whose recorded legacy text is in another
+  // language than the lock: only a live structured recording can say what
+  // the model would write, so the turn is not scored either way.
+  if (stage(turn, 'outcome')?.value === 'needs_recording') {
+    return {
+      turnIndex: turn.turnIndex,
+      caller,
+      spoken,
+      score: null,
+      omit: true,
+      checks: emptyChecks(),
+      mouth: mouth.checks,
+      notes: ['needs a live structured recording (mock language differs from the lock)', ...mouth.notes],
     };
   }
 
@@ -426,7 +660,8 @@ function scoreTurn(turn, opts = {}) {
     spoken,
     score: Math.max(0, 100 - penalty),
     checks,
-    notes,
+    mouth: mouth.checks,
+    notes: notes.concat(mouth.notes),
   };
 }
 
@@ -454,9 +689,13 @@ function scoreTurns(turns = []) {
   for (const count of seen.values()) {
     if (count > 1) checks.repeatedQuestion += count - 1;
   }
+  const mouth = emptyMouthChecks();
   for (const turn of scored) {
     for (const key of Object.keys(checks)) {
       checks[key] += turn.checks[key] || 0;
+    }
+    for (const key of Object.keys(mouth)) {
+      mouth[key] += turn.mouth?.[key] || 0;
     }
   }
   const counted = scored.filter((turn) => !turn.omit);
@@ -465,7 +704,7 @@ function scoreTurns(turns = []) {
     : 100;
   const callPenalty = Math.min(30, checks.repeatedQuestion * 8);
   const score = Math.round((Math.max(0, avg - callPenalty) + Number.EPSILON) * 10) / 10;
-  return { score, checks, turns: scored, nameAsks, nameAskTurns };
+  return { score, checks, mouth, turns: scored, nameAsks, nameAskTurns };
 }
 
 const CHECK_WEIGHT = {
@@ -556,6 +795,7 @@ function scoreFixtureReplay(replay, fixture) {
     mode: replay.mode || 'recorded',
     score: body.score,
     checks: body.checks,
+    mouth: body.mouth,
     nameAsks: body.nameAsks,
     turns: body.turns,
     historical: historicalNotes(fixture),
@@ -585,6 +825,15 @@ function compareToBaseline(scorecard, baseline) {
         failures.push(`${call.callId} ${key} ${count} > baseline ${allowed}`);
       }
     }
+    // Mouth checks gate only once a baseline has recorded them.
+    if (base.mouth && call.mouth) {
+      for (const [key, count] of Object.entries(call.mouth)) {
+        const allowed = base.mouth[key] ?? 0;
+        if (count > allowed) {
+          failures.push(`${call.callId} mouth.${key} ${count} > baseline ${allowed}`);
+        }
+      }
+    }
   }
   return failures;
 }
@@ -597,6 +846,11 @@ function formatSummary(scorecard) {
       .map(([key, count]) => `${key}=${count}`)
       .join(' ');
     lines.push(`${call.callId}  ${call.score}  nameAsks=${call.nameAsks || 0}  ${bits}`.trim());
+    const mouthBits = Object.entries(call.mouth || {})
+      .filter(([, count]) => count > 0)
+      .map(([key, count]) => `${key}=${count}`)
+      .join(' ');
+    if (mouthBits) lines.push(`  mouth: ${mouthBits}`);
     for (const note of call.historical || []) lines.push(`  historical: ${note}`);
     for (const turn of call.turns || []) {
       if (!turn.notes?.length) continue;
@@ -612,6 +866,10 @@ function formatSummary(scorecard) {
 
 module.exports = {
   LATENCY_BUDGET_MS,
+  MONOLOGUE_MAX_SECONDS,
+  MONOLOGUE_MAX_SENTENCES,
+  scoreMouthTurn,
+  emptyMouthChecks,
   scoreTurn,
   scoreTurns,
   lostCallerFinals,

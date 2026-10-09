@@ -522,3 +522,148 @@ describe('voice score', () => {
     assert.ok(replay.turns[0].stages.some((row) => row.stage === 'tts'));
   });
 });
+
+describe('mouth checks (Phase 1 top-up)', () => {
+  const { scoreMouthTurn } = require('../src/speech/voiceScore');
+  function mouthTurn(stages) {
+    return { turnIndex: 1, caller: { text: 'hi' }, stages };
+  }
+
+  it('flags pieces of one stream sent with no word gap (HD_015b t2)', () => {
+    const out = scoreMouthTurn(
+      mouthTurn([
+        { stage: 'tts', text: 'Yes we cover Kitengela' },
+        { stage: 'tts', text: 'Interior window cleaning is two hundred shillings per window' },
+        { stage: 'tts', text: 'What day and time would work for you' },
+      ])
+    );
+    assert.equal(out.checks.gluedPiece, 2);
+    assert.match(out.notes.join(' '), /KitengelaInterior/);
+  });
+
+  it('does not flag pieces whose wire text carries the gap', () => {
+    const out = scoreMouthTurn(
+      mouthTurn([
+        { stage: 'tts', text: 'Yes we cover Kitengela', wire: 'Yes we cover Kitengela', stream: 's1' },
+        { stage: 'tts', text: 'What day works', wire: ' What day works', stream: 's1' },
+      ])
+    );
+    assert.equal(out.checks.gluedPiece, 0);
+  });
+
+  it('does not flag pieces from different streams', () => {
+    const out = scoreMouthTurn(
+      mouthTurn([
+        { stage: 'tts', text: 'Okay', stream: 's1' },
+        { stage: 'tts', text: 'Saved', stream: 's2' },
+      ])
+    );
+    assert.equal(out.checks.gluedPiece, 0);
+  });
+
+  it('flags a piece with no letter or digit', () => {
+    const out = scoreMouthTurn(mouthTurn([{ stage: 'tts', text: '-' }]));
+    assert.equal(out.checks.letterlessPiece, 1);
+  });
+
+  it('flags a monologue by sentences or by estimated length (HD_015b t8)', () => {
+    const many = scoreMouthTurn(
+      mouthTurn([{ stage: 'tts', text: 'x', before: 'One. Two. Three. Four.' }])
+    );
+    assert.equal(many.checks.monologue, 1);
+    const long = scoreMouthTurn(
+      mouthTurn([{ stage: 'played', text: Array(80).fill('word').join(' '), before: 'Long one.' }])
+    );
+    assert.equal(long.checks.monologue, 1);
+    const short = scoreMouthTurn(
+      mouthTurn([{ stage: 'tts', text: 'Sure', before: 'Sure. What day works?' }])
+    );
+    assert.equal(short.checks.monologue, 0);
+  });
+
+  it('flags a caller final ignored as a thinking continuation (HD_015b t6)', () => {
+    const out = scoreMouthTurn(
+      mouthTurn([
+        { stage: 'stt', kind: 'final', text: 'How much is it?' },
+        { stage: 'turn_end', decision: 'ignore', reason: 'thinking_continuation' },
+      ])
+    );
+    assert.equal(out.checks.lostTurn, 1);
+    const queued = scoreMouthTurn(
+      mouthTurn([
+        { stage: 'turn_end', decision: 'ignore', reason: 'thinking_continuation', text: 'How much is it?', queued: true },
+      ])
+    );
+    assert.equal(queued.checks.lostTurn, 0);
+    const ack = scoreMouthTurn(
+      mouthTurn([{ stage: 'turn_end', decision: 'ignore', reason: 'thinking_continuation', text: 'Okay.' }])
+    );
+    assert.equal(ack.checks.lostTurn, 0);
+  });
+
+  it('flags two questions in one reply (HD_015b t9)', () => {
+    const out = scoreMouthTurn(
+      mouthTurn([
+        { stage: 'tts', text: 'My apologies for that', before: 'My apologies for that.' },
+        { stage: 'tts', text: 'What do you need done', before: 'What do you need done?' },
+        { stage: 'tts', text: 'What would you like done', before: 'What would you like done?' },
+      ])
+    );
+    assert.equal(out.checks.stackedQuestion, 1);
+  });
+
+  it('flags a model answer rewritten into a different line, not a pronunciation change', () => {
+    const replaced = scoreMouthTurn(
+      mouthTurn([
+        {
+          stage: 'transform',
+          name: 'polish',
+          reason: 'slop',
+          before: 'We offer sofa, carpet, mattress and office cleaning across Nairobi.',
+          after: 'Which service do you need?',
+          dropped: false,
+        },
+      ])
+    );
+    assert.equal(replaced.checks.replacedAnswer, 1);
+    const normalized = scoreMouthTurn(
+      mouthTurn([
+        {
+          stage: 'transform',
+          name: 'tts_normalize',
+          before: 'Window cleaning is KSh 200 per window in Kitengela.',
+          after: 'Window cleaning is two hundred shillings per window in Kitengela',
+          dropped: false,
+        },
+      ])
+    );
+    assert.equal(normalized.checks.replacedAnswer, 0);
+  });
+
+  it('keeps the legacy score unchanged when mouth checks fire', () => {
+    const card = scoreTurns([
+      {
+        turnIndex: 1,
+        caller: { text: 'What do you do?' },
+        stages: [
+          { stage: 'turn_end', decision: 'flush' },
+          { stage: 'model', phase: 'output', outputText: 'We do sofa cleaning. When?' },
+          { stage: 'tts', text: 'We do sofa cleaning', language: 'en' },
+          { stage: 'tts', text: 'When', language: 'en' },
+          { stage: 'outcome', value: 'replay' },
+        ],
+      },
+    ]);
+    assert.equal(card.score, 100);
+    assert.equal(card.mouth.gluedPiece, 1);
+  });
+
+  it('gates mouth counts only when the baseline recorded them', () => {
+    const call = { callId: 'X', score: 90, checks: {}, mouth: { gluedPiece: 2 } };
+    assert.deepEqual(compareToBaseline({ calls: [call] }, { calls: { X: { score: 90, checks: {} } } }), []);
+    assert.deepEqual(
+      compareToBaseline({ calls: [call] }, { calls: { X: { score: 90, checks: {}, mouth: { gluedPiece: 0 } } } }),
+      ['X mouth.gluedPiece 2 > baseline 0']
+    );
+  });
+});
