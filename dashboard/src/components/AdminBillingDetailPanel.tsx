@@ -75,6 +75,9 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
 
   const [grantMinutes, setGrantMinutes] = useState("60");
   const [grantNote, setGrantNote] = useState("");
+  // One idempotency key per open Sheet: a double click or retry of the same
+  // grant replays instead of granting twice. A fresh key after success.
+  const [grantKey, setGrantKey] = useState(() => crypto.randomUUID());
 
   const [mode, setMode] = useState<BillingMode>(detail.row.billing_enforcement);
   const [modeNote, setModeNote] = useState(
@@ -149,6 +152,7 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
     const ok = await post(body, okText);
     setBusy(false);
     if (ok) setTask(null);
+    return ok;
   }
 
   async function submitCharging() {
@@ -416,10 +420,12 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
                   business_id: row.id,
                   minutes: Math.floor(Number(grantMinutes)),
                   note: grantNote.trim(),
-                  idempotency_key: crypto.randomUUID(),
+                  idempotency_key: grantKey,
                 },
                 "Minutes granted."
-              )
+              ).then((ok) => {
+                if (ok) setGrantKey(crypto.randomUUID());
+              })
             }
           >
             Grant minutes
