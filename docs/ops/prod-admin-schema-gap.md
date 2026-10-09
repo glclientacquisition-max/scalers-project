@@ -33,7 +33,7 @@ Main does not read `voice_turn_traces` from Admin yet. The Quality pages in #602
 
 | Item | Prod | Staging | Source |
 | --- | --- | --- | --- |
-| `calls.inbox_assignee_name`, `calls.inbox_assignee_phone` | missing | present | **No SQL file in the repo** (not in any git history). Staging-only manual change. Leave prod alone until a file exists. |
+| `calls.inbox_assignee_name`, `calls.inbox_assignee_phone` | missing | present | Staging-only manual change with no file in git history. It now has one: `docs/supabase/calls_inbox_assignee.sql` (text, nullable, no default, matching staging). See optional step 4. |
 | fn `refresh_line_status(uuid)`, fn `suspend_line_for_nonpayment(uuid)` | missing | present | `docs/supabase/line_rental_grace.sql` sections 4 and 5. Prod already has the section 1 columns and `apply_line_rental`. **Do not re-run the whole file:** section 2 replaces `tenants_protect_wallet_columns()` with an older body than the one from `package_catalog.sql`. Only sections 4 and 5 would be needed. No app code calls these yet. |
 
 ## Apply order (draft, for Alvin's OK)
@@ -44,7 +44,9 @@ Each file is idempotent (`if not exists` / `on conflict do nothing`). The new ta
 2. `docs/supabase/platform_ops_people.sql` (24m). Depends on 1. Adds `platform_ops_settings.people` and backfills it from `emails`.
 3. `docs/supabase/voice_turn_traces.sql` (24n). README lists it after 2, but it has no hard dependency. Creates `voice_turn_traces` with its indexes. Needed for the Quality pages (#602/#603), not for today's Admin.
 
-Optional, separately: `line_rental_grace.sql` sections 4 and 5 only, if line suspension ships. `calls.inbox_assignee_*` needs a SQL file first.
+4. *(Optional)* `docs/supabase/calls_inbox_assignee.sql`. Depends on `inbox_triage.sql`, which prod already has (`calls.inbox_assignee` is present). Adds `calls.inbox_assignee_name` and `calls.inbox_assignee_phone` (text, nullable). Admin does not read them. Apply only when the owner inbox code that writes them ships.
+
+Optional, separately: `line_rental_grace.sql` sections 4 and 5 only, if line suspension ships.
 
 Verify after applying (read-only):
 
@@ -52,6 +54,8 @@ Verify after applying (read-only):
 select table_name from information_schema.tables
 where table_schema = 'public'
   and table_name in ('platform_ops_settings', 'platform_ops_notices', 'voice_turn_traces');
+select column_name from information_schema.columns
+where table_schema = 'public' and table_name = 'calls' and column_name like 'inbox_assignee%';
 select column_name from information_schema.columns
 where table_schema = 'public' and table_name = 'platform_ops_settings';
 ```
@@ -64,4 +68,4 @@ Done in #613 (merged): `isMissingTableError()` and `adminErrorParts()` now read 
 
 1. OK to apply steps 1 and 2 on prod? With #613 live, the page no longer breaks without them. Without them, though, prod cannot save ops-mail people or settings, and it keeps no open notices.
 2. OK to apply step 3 now, or wait until Quality (#602/#603) is approved?
-3. Should `calls.inbox_assignee_name` / `inbox_assignee_phone` on staging get a SQL file, or be dropped from staging?
+3. Apply optional step 4 (`calls_inbox_assignee.sql`) on prod now, or wait for the inbox code that uses it?
