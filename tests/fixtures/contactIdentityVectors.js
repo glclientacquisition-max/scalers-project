@@ -27,6 +27,8 @@ const PHONE_PARSE = [
 ];
 
 const JUNK_NAMES = [
+  'Like',
+  'like um',
   'Haijawekwa',
   'Calling',
   'Callings',
@@ -35,9 +37,13 @@ const JUNK_NAMES = [
   'Where are you',
   'customer',
   'unknown',
+  'not a',
+  'okay',
+  'Rudia tena',
+  'Al',
 ];
 
-const REAL_NAMES = ['Amina', 'Alvin.', 'Jane'];
+const REAL_NAMES = ['Amina', 'Alvin.', 'Jane', 'Bwana Alvin', 'Shy'];
 
 const NAME_SAME = [
   { a: 'Isha', b: 'Aisha', same: true },
@@ -121,7 +127,8 @@ const MERGE_CASES = [
   },
 ];
 
-const ALT_CAP_NAMES = ['B', 'C', 'D', 'E', 'F', 'G'];
+// Real names: one-letter names are junk now (HD_23445a4f780c).
+const ALT_CAP_NAMES = ['Brian', 'Cynthia', 'Dennis', 'Esther', 'Faith', 'Grace'];
 
 module.exports = {
   ALT_CAP_NAMES,

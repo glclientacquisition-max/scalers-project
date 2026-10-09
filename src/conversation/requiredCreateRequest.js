@@ -9,6 +9,7 @@ const { clockPhrase, dayCue } = require('./visitTime');
 const { formatDayOnlyWhen, parseAbsoluteWhenDate } = require('./appointmentHours');
 const { numbersIn } = require('./numberWords');
 const { callbackNotesWithoutClock, heldMessageCallerName } = require('./messageOnly');
+const { offerNoteFromCallerTurns } = require('./requestNoteContent');
 
 const REQUEST_INTENTS = new Set([
   'hold',
@@ -341,12 +342,17 @@ function offerConsentRequest(state = {}, capabilities = {}) {
   if (!state.conversation?.consentAck) return null;
   const ask = state.conversation?.pendingAsk;
   if (!ask || ask.kind !== 'offer') return null;
+  // The note is what the caller asked, never the agent's own offer line
+  // (HD_23445a4f780c saved "Should I note it for the team?"). No caller
+  // content, no hold, and so no "I've saved your request".
+  const asked = offerNoteFromCallerTurns(state.conversation?.answersReceived, ask.line);
+  if (!asked) return null;
   return {
     type: 'callback',
     name: callerName(state),
     phone: callerPhone(state),
     item: 'message',
-    notes: clean(ask.line, 400),
+    notes: clean(`Caller asked: ${asked}`, 400),
   };
 }
 

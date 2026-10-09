@@ -48,7 +48,7 @@ describe('mergeContactIdentity', () => {
 
   it('keeps the 5 most recent distinct alternates', () => {
     let existing = { name: 'Amina', metadata: { alternate_names: [] } };
-    for (const name of ['B', 'C', 'D', 'E', 'F', 'G']) {
+    for (const name of ['Brian', 'Cynthia', 'Dennis', 'Esther', 'Faith', 'Grace']) {
       existing = {
         name: existing.name,
         metadata: mergeContactIdentity(existing, { name }).metadata,
@@ -56,7 +56,7 @@ describe('mergeContactIdentity', () => {
     }
     const names = existing.metadata.alternate_names.map((row) => row.name);
     assert.equal(names.length, 5);
-    assert.deepEqual(names, ['G', 'F', 'E', 'D', 'C']);
+    assert.deepEqual(names, ['Grace', 'Faith', 'Esther', 'Dennis', 'Cynthia']);
   });
 
   it('treats Isha as the same person as Aisha and upgrades the file spelling', () => {

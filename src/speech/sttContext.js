@@ -5,6 +5,8 @@
 const { normalizeServices } = require('../conversation/liveKnowledge');
 const { normalizeLocations } = require('../conversation/businessLocations');
 const { coverageAreaNames } = require('../conversation/coverageAreas');
+const { isJunkCallerName } = require('../conversation/callerNameQuality');
+const { isSavedAlternateName } = require('../conversation/alternateNameQuality');
 
 /** Soft cap — Soniox context biasing degrades with huge unrelated term lists. */
 const MAX_STT_TERMS = Number(process.env.SONIOX_STT_CONTEXT_MAX_TERMS || 40);
@@ -68,14 +70,20 @@ function callerHearingNames(tenant = {}) {
     tenant.caller_name,
     card.fileOwnerName,
     card.name,
-    ...(Array.isArray(card.alternateNames) ? card.alternateNames : []),
-    ...(Array.isArray(tenant.alternateNames) ? tenant.alternateNames : []),
+    // Saved alternates are checked again here: a card built elsewhere may
+    // still carry phrases like "impressed by your".
+    ...[
+      ...(Array.isArray(card.alternateNames) ? card.alternateNames : []),
+      ...(Array.isArray(tenant.alternateNames) ? tenant.alternateNames : []),
+    ].filter((alt) => isSavedAlternateName(alt, { primary: [card.fileOwnerName, card.name, tenant.callerName, tenant.caller_name] })),
   ];
   const seen = new Set();
   const names = [];
   for (const value of values) {
-    const term = cleanTerm(value);
+    const term = cleanTerm(typeof value === 'string' ? value : value?.name);
     if (term.length < 2 || term.length > 80) continue;
+    // Junk like "not a" would bias the recognizer toward hearing it again.
+    if (isJunkCallerName(term)) continue;
     const key = term.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
