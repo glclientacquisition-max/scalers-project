@@ -69,6 +69,21 @@ describe('structured turn engine', () => {
     assert.deepEqual(said.map((s) => s.text), ['Yes, we cover Kitengela.']);
   });
 
+  it('HD_23445a4f780c: an "outside Nairobi" answer is spoken, not swapped for "Ndiyo, tunafika Syokimau."', async () => {
+    const good = {
+      lang: 'sw',
+      intent: 'coverage',
+      facts_used: [],
+      say: ['Kama uko nje ya Nairobi, tunafika Kiambu, Kitengela, Juja, Ongata Rongai na Syokimau.'],
+    };
+    const { said, calls } = await run([good, good], { callerText: 'Mmh, na kama niko outside Nairobi, how is it done?', locked: 'sw' });
+    assert.equal(calls.length, 1);
+    assert.deepEqual(said.map((s) => s.text), good.say);
+    const denied = { lang: 'sw', intent: 'coverage', facts_used: [], say: ['Hatufiki Syokimau.'] };
+    const second = await run([denied, denied], { callerText: 'Mmh, na kama niko outside Nairobi, how is it done?', locked: 'sw' });
+    assert.ok(!second.said.some((s) => /tunafika Syokimau/.test(s.text)), JSON.stringify(second.said));
+  });
+
   it('a wrong lang field triggers the one retry before anything is spoken', async () => {
     const wrong = { lang: 'sw', intent: 'other', facts_used: [], say: ['Sawa.'] };
     const right = { lang: 'en', intent: 'other', facts_used: [], say: ['Okay, noted.'] };

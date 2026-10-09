@@ -51,7 +51,37 @@ function languageProblem(sentence, locked) {
 }
 
 const CLAUSE_BREAK =
-  /\s*(?:[,;:]|\s—\s|\s-\s)\s*|\s+(?=(?:but|although|though|since|because|while|whereas|lakini|ila|kwani|kwa sababu|ingawa)\b)/i;
+  /\s*(?:[,;:]|\s—\s|\s-\s)\s*|\s+(?=(?:but|although|though|since|because|while|whereas|except|apart from|other than|lakini|ila|kwani|kwa sababu|ingawa|isipokuwa|mbali na)\b)/i;
+
+// "outside Nairobi" / "nje ya Nairobi" names a reference point, not a claim
+// about that place. HD_23445a4f780c: the caller asked "kama niko outside
+// Nairobi"; a reply listing the nearby areas we reach was read as denying
+// Nairobi and Syokimau, and the whole reply became "Ndiyo, tunafika Syokimau."
+const PLACE_REFERENCE =
+  /\b(?:outside(?:\s+of)?|beyond|nje\s+ya)\s+((?:the\s+)?(?:county\s+of\s+|city\s+of\s+|kaunti\s+ya\s+|jiji\s+la\s+|mji\s+wa\s+)?[\p{L}'-]+(?:\s+[\p{L}'-]+)?)/giu;
+// A clause about where the caller is ("if you're outside...", "kama uko nje
+// ya...") describes the caller, not our coverage.
+const CALLER_LOCATION_LEAD =
+  /^(?:(?:and|so|na|sasa)\s+)?(?:if|when|in case|for (?:those|anyone|people|customers)|kama|ukiwa|iwapo|endapo|kwa wale|kwa watu)\b.{0,40}?\b(?:you(?:'re| are)?|you live|you stay|uko|unaishi|unakaa|mko|wako|they(?:'re| are)?|located|living|based)\b/i;
+
+/** The clause with "outside <place>" spans removed, and whether any were. */
+function withoutPlaceReferences(clause) {
+  let stripped = false;
+  const text = String(clause || '').replace(PLACE_REFERENCE, (whole, tail) => {
+    const words = String(tail).split(/\s+/);
+    // "outside Nairobi county" or "nje ya Nairobi": a place follows. "outside
+    // our area" / "nje ya maeneo yetu" is a real coverage negation; keep it.
+    for (let n = words.length; n >= 1; n -= 1) {
+      const head = words.slice(0, n).join(' ');
+      if (placesIn(head).length) {
+        stripped = true;
+        return ` ${words.slice(n).join(' ')} `;
+      }
+    }
+    return whole;
+  });
+  return { text: text.replace(/\s+/g, ' ').trim(), stripped };
+}
 
 function coverageClauses(sentence) {
   return String(sentence || '')
@@ -114,8 +144,10 @@ function verifySay(sentence, ctx) {
     // Judge each clause on its own: "Nakuru is outside our area since we
     // work in Nairobi only" negates Nakuru, not Nairobi.
     const seen = new Set();
-    for (const clause of coverageClauses(text)) {
-      const negates = NEGATES_COVERAGE.test(clause);
+    for (const raw of coverageClauses(text)) {
+      const callerLocation = CALLER_LOCATION_LEAD.test(raw);
+      const { text: clause } = withoutPlaceReferences(raw);
+      const negates = !callerLocation && NEGATES_COVERAGE.test(clause);
       const asserts = ASSERTS_COVERAGE.test(clause);
       for (const place of placesIn(clause)) {
         if (seen.has(place)) continue;
@@ -148,11 +180,27 @@ function verifySay(sentence, ctx) {
   return { ok: problems.length === 0, problems };
 }
 
-/** A grounded line to speak in place of a sentence that failed, or ''. */
-function dataLineFor(sentence, problems, { table, pack }) {
+/** The caller named this place in their own words. */
+function callerNamedPlace(callerText, place) {
+  const key = String(place || '').toLowerCase();
+  if (!key || !String(callerText || '').trim()) return false;
+  return placesIn(String(callerText)).some((p) => String(p).toLowerCase() === key);
+}
+
+/**
+ * A grounded line to speak in place of a sentence that failed, or ''.
+ * A coverage line ("Ndiyo, tunafika X.") replaces the reply only for a place
+ * the caller named; otherwise it answers a question nobody asked.
+ */
+function dataLineFor(sentence, problems, { table, pack, callerText = '' }) {
   const codes = new Set(problems.map((p) => p.code));
-  const coverage = problems.find((p) => p.code === 'coverage_contradiction' || p.code === 'coverage_unbacked');
-  if (coverage?.place) {
+  const coverage = problems.find(
+    (p) =>
+      (p.code === 'coverage_contradiction' || p.code === 'coverage_unbacked') &&
+      p.place &&
+      callerNamedPlace(callerText, p.place)
+  );
+  if (coverage) {
     const place = titleName(coverage.place);
     return coverage.code === 'coverage_contradiction' ? pack.coveredLine(place) : pack.notCoveredLine(place);
   }
@@ -182,4 +230,4 @@ function dataLineFor(sentence, problems, { table, pack }) {
   return '';
 }
 
-module.exports = { verifySay, dataLineFor, placesIn };
+module.exports = { verifySay, dataLineFor, placesIn, callerNamedPlace };
