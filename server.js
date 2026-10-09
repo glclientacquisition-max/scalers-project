@@ -413,6 +413,7 @@ const {
 } = require('./src/speech/toolHold');
 const { appendFinalPart, joinUtteranceParts } = require('./src/speech/utteranceJoin');
 const { queueToolOutcome, takeToolOutcome } = require('./src/conversation/toolOutcomeQueue');
+const { splitOwedOutcome, noteReaskResult, reaskSnapshot, keepUnheardReask } = require('./src/speech/pendingReask');
 const { coverageNextStepFor } = require('./src/conversation/coverageNextStep');
 const {
   createSpokenStreamBuffer,
@@ -3300,6 +3301,7 @@ mediaWss.on('connection', (ws, req) => {
       state: previousBrainState,
     });
     const fileStamp = liveCallerFileStamp(brainProfile?.callerMemory);
+    const reaskBefore = reaskSnapshot(previousBrainState);
     let brainState = observeCallerTurn(
       previousBrainState,
       observeCallerInput(
@@ -3319,6 +3321,12 @@ mediaWss.on('connection', (ws, req) => {
         }
       )
     );
+    // A re-ask the caller never heard (barged, discarded) is not counted:
+    // Brain re-asks, or retries when these words filled the slot
+    // (src/speech/pendingReask.js, HD_1677e57f73f9).
+    if (keepUnheardReask(reaskBefore, brainState)) {
+      console.log(`[ws/media][${callKey}] unheard re-ask kept pending`);
+    }
     if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
       systemPrompt = buildSystemPrompt(brainProfile);
     }
@@ -3460,7 +3468,14 @@ mediaWss.on('connection', (ws, req) => {
       }
       // A booking or callback confirmed after a barge-in is still owed.
       // Speak it first, before a local fact or the model reply.
-      const owedOutcome = takeToolOutcome(brainState);
+      // While a rejected create is held, its re-ask is not replayed from the
+      // queue; Brain's re-ask path below decides (re-ask, retry, callback).
+      const owedSplit = splitOwedOutcome(takeToolOutcome(brainState), brainState);
+      if (owedSplit.reask) {
+        console.log(`[ws/media][${callKey}] owed re-ask left to the held create: ${owedSplit.reask}`);
+        brainState.conversation.rejectedCreate.reaskUnheard = true;
+      }
+      const owedOutcome = owedSplit.outcome;
       if (owedOutcome) {
         callBrainStates.set(callKey, brainState);
         console.log(`[ws/media][${callKey}] speaking queued tool outcome`);
@@ -3609,7 +3624,10 @@ mediaWss.on('connection', (ws, req) => {
           suppressReplyRemainder = false;
           callTranscript.pushAgent(rescue.line);
           turnTiming.markFirstSpokenChunk();
-          await speakText(rescue.line);
+          const reaskSpoken = noteSpokenLine(rescue.line, 'reask_slot', await speakText(rescue.line));
+          // Barged again: still pending, not counted next turn.
+          noteReaskResult(brainState, rescue.line, reaskSpoken);
+          callBrainStates.set(callKey, brainState);
           spokeThisTurn = true;
           return;
         }
