@@ -324,6 +324,75 @@
         "replacedAnswer": 0
       },
       "nameAsks": 1
+    },
+    "HD_1b3a67ea7ee9": {
+      "score": 68.2,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 10,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 5,
+        "slow": 0,
+        "lostCallerFinal": 0
+      },
+      "mouth": {
+        "gluedPiece": 0,
+        "letterlessPiece": 0,
+        "monologue": 0,
+        "lostTurn": 0,
+        "stackedQuestion": 0,
+        "replacedAnswer": 0
+      },
+      "nameAsks": 0
+    },
+    "HD_23445a4f780c": {
+      "score": 76,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 4,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 0,
+        "lostCallerFinal": 0
+      },
+      "mouth": {
+        "gluedPiece": 0,
+        "letterlessPiece": 0,
+        "monologue": 0,
+        "lostTurn": 0,
+        "stackedQuestion": 0,
+        "replacedAnswer": 0
+      },
+      "nameAsks": 0
+    },
+    "HD_d199dbbf6b79": {
+      "score": 78.8,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 11,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 1,
+        "slow": 0,
+        "lostCallerFinal": 0
+      },
+      "mouth": {
+        "gluedPiece": 0,
+        "letterlessPiece": 0,
+        "monologue": 0,
+        "lostTurn": 0,
+        "stackedQuestion": 0,
+        "replacedAnswer": 0
+      },
+      "nameAsks": 0
     }
   }
 }
