@@ -190,15 +190,22 @@ async function getTenantPackageUsage(tenantId) {
   }
   if (!data) return null;
   let periodStart = null;
+  // null = unknown (lookup failed). false = explicit no package: no row or
+  // status 'cancelled'. Never treat 0 included minutes as unlimited.
+  let hasPackage = null;
   try {
     const { data: sub, error: subErr } = await supabase
       .from('tenant_subscriptions')
-      .select('current_period_start')
+      .select('current_period_start, status')
       .eq('tenant_id', tenantId)
       .maybeSingle();
-    if (!subErr) periodStart = sub?.current_period_start || null;
+    if (!subErr) {
+      periodStart = sub?.current_period_start || null;
+      hasPackage = Boolean(sub && sub.status === 'active');
+    }
   } catch {
     periodStart = null;
+    hasPackage = null;
   }
   return {
     tenantId: data.id,
@@ -208,6 +215,7 @@ async function getTenantPackageUsage(tenantId) {
     onDemand: Boolean(data.on_demand_usage_enabled),
     enforcement: data.billing_enforcement || 'off',
     periodStart,
+    hasPackage,
   };
 }
 
@@ -242,6 +250,7 @@ async function packageInboundOpen({ toNumber, fromNumber, tenantId } = {}) {
       secondsUsed: usage.secondsUsed,
       onDemand: usage.onDemand,
       enforcement: usage.enforcement,
+      hasPackage: usage.hasPackage,
     }),
     usage,
   };

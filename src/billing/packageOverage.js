@@ -53,23 +53,59 @@ function isEnforced(enforcement) {
 
 /**
  * Inbound gate at the package minute cap.
- * Beta (`billing_enforcement` off or unknown) never rejects: usage keeps
- * metering and ops get the 80% / 100% notices instead. Only soft / hard with
- * on-demand off stop a new call once included minutes are used.
+ *
+ * hasPackage comes from tenant_subscriptions.status ('active' = true,
+ * 'cancelled' or no row = false). No package is explicit and is NEVER
+ * unlimited: included minutes are then only this period's grants, and 0
+ * included minutes is a cap of 0. Only an unknown package state (lookup
+ * failed, hasPackage null/undefined) with 0 minutes fails open.
+ *
+ * Past the included minutes (or with none):
+ *   on-demand on               -> answer (on_demand / on_demand_no_package)
+ *   beta (enforcement off)     -> answer, metered not charged
+ *                                 (beta_over_cap / beta_no_package)
+ *   enforced, on-demand off    -> refuse (package_exhausted / no_package)
  */
 function inboundOpen({
   minutesIncluded = 0,
   secondsUsed = 0,
   onDemand = false,
   enforcement = "off",
+  hasPackage = null,
 } = {}) {
   const includedMinutes = Math.max(0, Math.round(Number(minutesIncluded) || 0));
-  if (includedMinutes <= 0) return { open: true, reason: "no_package_minutes" };
+  const known = hasPackage === true || hasPackage === false;
+  if (!known && includedMinutes <= 0) return { open: true, reason: "package_unknown" };
   const used = Math.max(0, Math.round(Number(secondsUsed) || 0));
   if (used < includedMinutes * 60) return { open: true, reason: "included" };
-  if (onDemand) return { open: true, reason: "on_demand" };
-  if (!isEnforced(enforcement)) return { open: true, reason: "beta_over_cap" };
-  return { open: false, reason: "package_exhausted" };
+  const none = hasPackage === false;
+  if (onDemand) return { open: true, reason: none ? "on_demand_no_package" : "on_demand" };
+  if (!isEnforced(enforcement)) return { open: true, reason: none ? "beta_no_package" : "beta_over_cap" };
+  return { open: false, reason: none ? "no_package" : "package_exhausted" };
+}
+
+const REJECT_XML = '<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>';
+
+/**
+ * Caller-facing XML when inboundOpen refuses (package_exhausted / no_package).
+ * Default is #631's <Reject/>. PACKAGE_REFUSAL_VOICEMAIL=1 switches to the
+ * plan's no-stream polite message + voicemail (<= 60 s) + hangup. Keep it off
+ * until Voice confirms SautiKit honours <Say>/<Record> on this path and wires
+ * the recording callback to the owner alert.
+ */
+function packageRefusalXml({ businessName = "", env = process.env } = {}) {
+  if (String(env.PACKAGE_REFUSAL_VOICEMAIL || "") !== "1") return REJECT_XML;
+  const name = String(businessName || "")
+    .replace(/[<>&"']/g, "")
+    .trim()
+    .slice(0, 80);
+  const who = name ? `${name} can't take your call right now` : "We can't take your call right now";
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n' +
+    `  <Say>Thank you for calling. ${who}. Please leave your name, number and a short message after the tone, and they will get back to you.</Say>\n` +
+    '  <Record maxLength="60" playBeep="true"/>\n' +
+    "  <Hangup/>\n</Response>"
+  );
 }
 
 /** Highest usage notice crossed: 0, 80, or 100 (percent of included minutes). */
@@ -86,6 +122,7 @@ module.exports = {
   billableTalkSeconds,
   quoteCallOverage,
   inboundOpen,
+  packageRefusalXml,
   isEnforced,
   packageUsageThreshold,
 };

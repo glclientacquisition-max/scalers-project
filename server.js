@@ -220,6 +220,7 @@ const {
 } = require('./src/notifications/platformOpsAlert');
 const { platformOpsRecipients } = require('./src/notifications/platformOpsRecipients');
 const { maybeAlertPackageUsage } = require('./src/billing/packageUsageAlerts');
+const { packageRefusalXml } = require('./src/billing/packageOverage');
 const {
   selectProductsForTurn,
   formatTargetedProductsForPrompt,
@@ -1385,11 +1386,16 @@ async function handleVoiceIncoming(req, res) {
       if (gate?.reason === 'beta_over_cap') {
         console.log(`[${callSid}] package minutes used, billing in beta — answering (metered, not charged)`);
       }
+      if (gate?.reason === 'beta_no_package') {
+        console.log(`[${callSid}] no package, billing in beta — answering (metered, not charged)`);
+      }
       if (gate && gate.open === false) {
-        console.warn(`[${callSid}] package exhausted (billing ${gate.usage?.enforcement || '?'}, on-demand off) — reject`);
+        console.warn(
+          `[${callSid}] ${gate.reason === 'no_package' ? 'no package' : 'package exhausted'} (billing ${gate.usage?.enforcement || '?'}, on-demand off) — refuse`
+        );
         return res
           .type('text/xml')
-          .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+          .send(packageRefusalXml({ businessName: gate.usage?.businessName }));
       }
     } catch (gateErr) {
       console.warn(

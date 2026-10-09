@@ -6,6 +6,7 @@ const {
   billableTalkSeconds,
   quoteCallOverage,
   inboundOpen,
+  packageRefusalXml,
   packageUsageThreshold,
 } = require("../src/billing/packageOverage");
 
@@ -99,10 +100,51 @@ describe("package overage", () => {
         { open: true, reason: "on_demand" }
       );
     }
+    // Package state unknown (lookup failed) with 0 minutes: fail open.
     assert.deepEqual(
       inboundOpen({ minutesIncluded: 0, secondsUsed: 100, onDemand: false, enforcement: "soft" }),
-      { open: true, reason: "no_package_minutes" }
+      { open: true, reason: "package_unknown" }
     );
+  });
+
+  it("0 included minutes on an active package is a cap of 0, not unlimited", () => {
+    assert.deepEqual(
+      inboundOpen({ minutesIncluded: 0, secondsUsed: 0, onDemand: false, enforcement: "hard", hasPackage: true }),
+      { open: false, reason: "package_exhausted" }
+    );
+  });
+
+  it("no package is explicit: beta answers, metered bills on-demand, capped refuses", () => {
+    const none = { minutesIncluded: 0, secondsUsed: 0, hasPackage: false };
+    assert.deepEqual(inboundOpen({ ...none, enforcement: "off" }), { open: true, reason: "beta_no_package" });
+    for (const enforcement of ["soft", "hard"]) {
+      assert.deepEqual(inboundOpen({ ...none, enforcement, onDemand: true }), {
+        open: true,
+        reason: "on_demand_no_package",
+      });
+      assert.deepEqual(inboundOpen({ ...none, enforcement, onDemand: false }), { open: false, reason: "no_package" });
+    }
+    // Grants still count with no package (minutes_included = this period's grants).
+    assert.deepEqual(
+      inboundOpen({ minutesIncluded: 30, secondsUsed: 29 * 60, hasPackage: false, enforcement: "hard" }),
+      { open: true, reason: "included" }
+    );
+    assert.deepEqual(
+      inboundOpen({ minutesIncluded: 30, secondsUsed: 30 * 60, hasPackage: false, enforcement: "hard" }),
+      { open: false, reason: "no_package" }
+    );
+  });
+
+  it("refusal XML is #631's Reject by default; voicemail only behind the flag", () => {
+    assert.equal(
+      packageRefusalXml({ env: {} }),
+      '<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>'
+    );
+    const vm = packageRefusalXml({ businessName: 'Esga <Stationery> & "Co"', env: { PACKAGE_REFUSAL_VOICEMAIL: "1" } });
+    assert.match(vm, /<Say>Thank you for calling\. Esga Stationery  Co can't take your call right now\./);
+    assert.match(vm, /<Record maxLength="60" playBeep="true"\/>/);
+    assert.match(vm, /<Hangup\/>/);
+    assert.doesNotMatch(vm, /<Stream|<Connect|<Dial/);
   });
 
   it("never rejects at the cap while billing is off (beta)", () => {
