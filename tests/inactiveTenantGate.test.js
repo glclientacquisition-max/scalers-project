@@ -18,6 +18,8 @@ const {
   usableClipUrl,
   allowedPlayHosts,
   resetClipProbeCache,
+  LINE_UNAVAILABLE_CLIP_PATHS,
+  configuredClipUrl,
 } = require('../src/sautikit/inactiveTenantGate');
 
 const SERVER = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
@@ -102,6 +104,40 @@ describe('lineUnavailableXml', () => {
     });
     assert.match(xml, /<Play>https:\/\/cdn\.example\.com\/a\/en\.wav<\/Play><Say language="sw-KE">/);
     assert.match(xml, /<Hangup\/><\/Response>$/);
+  });
+});
+
+describe('clip defaults: line-unavailable-* names, never the downtime clips', () => {
+  it('approved copy, same words as the recorded clips', () => {
+    assert.equal(LINE_UNAVAILABLE_EN, 'Hello. This line is not available right now. Thank you for calling.');
+    assert.equal(LINE_UNAVAILABLE_SW, 'Habari. Nambari hii haipatikani kwa sasa. Asante kwa kupiga.');
+    assert.deepEqual(LINE_UNAVAILABLE_CLIP_PATHS, { en: '/audio/line-unavailable-en.v1.wav', sw: '/audio/line-unavailable-sw.v1.wav' });
+  });
+
+  it('base URL fills the line-unavailable paths; explicit URLs win; nothing set is no clip', () => {
+    const base = { VOICE_LINE_UNAVAILABLE_CLIP_BASE_URL: 'https://scalers-staging.vercel.app/' };
+    assert.equal(configuredClipUrl('en', base), 'https://scalers-staging.vercel.app/audio/line-unavailable-en.v1.wav');
+    assert.equal(configuredClipUrl('sw', base), 'https://scalers-staging.vercel.app/audio/line-unavailable-sw.v1.wav');
+    const both = { ...base, VOICE_LINE_UNAVAILABLE_CLIP_URL_SW: 'https://storage.sautikit.com/x/sw.wav' };
+    assert.equal(configuredClipUrl('sw', both), 'https://storage.sautikit.com/x/sw.wav');
+    assert.equal(configuredClipUrl('en', {}), '');
+    assert.doesNotMatch(configuredClipUrl('en', base) + configuredClipUrl('sw', base), /downtime/);
+  });
+
+  it('base URL on an allowed, fetchable host plays both clips', async () => {
+    resetClipProbeCache();
+    const env = { VOICE_LINE_UNAVAILABLE_CLIP_BASE_URL: 'https://www.scalers.co.ke', VOICE_PLAY_ALLOWED_HOSTS: 'www.scalers.co.ke' };
+    const seen = [];
+    const fetchImpl = async (url) => {
+      seen.push(url);
+      return { status: 206, headers: { get: () => 'audio/wave' }, body: null };
+    };
+    const xml = await lineUnavailableResponse({ env, fetchImpl, log: () => {} });
+    assert.ok(xml.includes('<Play>https://www.scalers.co.ke/audio/line-unavailable-en.v1.wav</Play><Play>https://www.scalers.co.ke/audio/line-unavailable-sw.v1.wav</Play><Hangup/>'));
+    assert.deepEqual(seen.sort(), [
+      'https://www.scalers.co.ke/audio/line-unavailable-en.v1.wav',
+      'https://www.scalers.co.ke/audio/line-unavailable-sw.v1.wav',
+    ]);
   });
 });
 
