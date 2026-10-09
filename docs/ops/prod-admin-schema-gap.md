@@ -1,6 +1,6 @@
 # Prod Admin schema gap ("Setup is incomplete")
 
-**Status:** draft. Nothing has been applied. Prod SQL needs Alvin's OK.
+**Status:** APPLIED on prod (ALCR) 2026-10-09 ~11:15-11:25 EAT with Alvin's OK, via apply_migration: `platform_ops_notices`, `platform_ops_people`, `calls_inbox_assignee`, `voice_turn_traces` (with the 30-day purge function). `line_rental_grace.sql` NOT applied. After apply, the prod and staging `public` column sets match exactly (282 columns, same hash). `purge_voice_turn_traces()` exists on prod only, and it is not scheduled yet: pg_cron is not enabled on prod.
 **Compared:** 2026-10-09 10:30 EAT. Read-only `information_schema` SELECTs on prod `ALCR` (`fjxcdccgyhnvnnlnovcl`) and staging `scalers-staging` (`sgcdncjxauhsbunobmob`). Compared against main `87cd6f94`. Main moved to `db84f5ca` (#613) at 10:41 EAT.
 
 ## What prod shows
