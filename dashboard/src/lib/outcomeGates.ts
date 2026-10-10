@@ -79,37 +79,21 @@ function productMode(product: CaptureProduct): PriceMode | null {
   return asMode(product.price_mode) || inferPriceMode(product.price);
 }
 
+/** Owner decision (QA fixes): one named product with a valid price (or "ask") is enough to continue. */
 export function shopCatalogPasses(products: CaptureProduct[]): boolean {
-  const priced = products.filter((product) => {
-    return Boolean(String(product.name || "").trim()) && productMode(product) != null;
-  });
-  if (priced.length >= 10) return true;
-  const categories = new Set(
-    priced
-      .map((product) => String(product.category || "").trim().toLowerCase())
-      .filter(Boolean)
+  return products.some(
+    (product) => Boolean(String(product.name || "").trim()) && productMode(product) != null
   );
-  return categories.size >= 3;
 }
 
 /** Owner-facing reason Continue is disabled on the shop catalog step (null when it passes). */
 export function shopCatalogGap(products: CaptureProduct[]): string | null {
   if (shopCatalogPasses(products)) return null;
   const named = products.filter((p) => String(p.name || "").trim());
-  const unpriced = named.filter((p) => productMode(p) == null).length;
-  const priced = named.length - unpriced;
-  const categories = new Set(
-    named
-      .filter((p) => productMode(p) != null)
-      .map((p) => String(p.category || "").trim().toLowerCase())
-      .filter(Boolean)
-  ).size;
-  const parts: string[] = [];
-  if (unpriced) parts.push(`${unpriced} product${unpriced === 1 ? " needs" : "s need"} a valid price (e.g. 150, from 300, 200-400)`);
-  parts.push(
-    `add ${10 - priced} more priced product${10 - priced === 1 ? "" : "s"}, or use 3 categories (${categories} so far)`
-  );
-  return `To continue: ${parts.join("; ")}. Or skip and add them later in Settings.`;
+  if (!named.length) {
+    return "To continue: add at least one product with a price (e.g. 150, from 300, 200-400, or ask). Or skip and add them later in Settings.";
+  }
+  return "To continue: give at least one product a valid price (e.g. 150, from 300, 200-400, or ask). Negative or text-only prices don't count. Or skip.";
 }
 
 export function homeCatalogPasses(services: CaptureService[]): boolean {
