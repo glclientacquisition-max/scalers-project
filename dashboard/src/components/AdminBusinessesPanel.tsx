@@ -3,9 +3,13 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminBusiness } from "@/lib/admin";
+import type { QualityBadge } from "@/lib/adminQualityModel";
+import { formatScore } from "@/lib/adminQualityModel";
 import type { PendingTenant } from "@/lib/didPool";
 import type { WalletLedgerRow } from "@/lib/wallet";
+import { archiveState, releaseBlockReason } from "@/lib/adminBusinessModel";
 import { Button, ButtonLink } from "@/components/ui/Button";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Empty } from "@/components/ui/Empty";
 import { Field, Input } from "@/components/ui/Field";
 import { ListRow } from "@/components/ui/ListRow";
@@ -21,7 +25,16 @@ const createdLabel = new Intl.DateTimeFormat("en-KE", {
 });
 
 type ShopFilter = "all" | "waiting" | "active" | "archived";
-type SheetKind = "shop" | "assign" | "release" | "plan" | "charges" | "remove" | "package";
+type SheetKind =
+  | "shop"
+  | "assign"
+  | "release"
+  | "plan"
+  | "charges"
+  | "package"
+  | "archive"
+  | "restore"
+  | "delete";
 type PlanChoice = "beta" | "on";
 type PackOption = { id: string; name: string; isActive?: boolean };
 
@@ -81,6 +94,22 @@ function phoneLine(b: AdminBusiness) {
   return number;
 }
 
+function hasLiveNumber(b: AdminBusiness) {
+  const number = b.sautikit_virtual_number.trim();
+  return Boolean(number) && !number.startsWith("pending:");
+}
+
+/** Release is refused while the business is active. Same rule as the server. */
+function releaseReason(b: AdminBusiness) {
+  return releaseBlockReason({ linked: true, businessName: b.business_name, isActive: b.is_active });
+}
+
+function deleteOpensLabel(iso: string | null) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "" : `Opens ${createdLabel.format(date)},`;
+}
+
 function previewLine(b: AdminBusiness) {
   const pack = packLabel(b);
   if (b.status === "waiting") return pack === "None" ? "Waiting" : pack;
@@ -100,10 +129,12 @@ export function AdminBusinessesPanel({
   businesses,
   pendingBusinesses,
   availableDids,
+  badges = {},
 }: {
   businesses: AdminBusiness[];
   pendingBusinesses: PendingTenant[];
   availableDids: { e164: string }[];
+  badges?: Record<string, QualityBadge>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -114,6 +145,7 @@ export function AdminBusinessesPanel({
   const [status, setStatus] = useState("");
   const [sheet, setSheet] = useState<{ kind: SheetKind; id: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
+  const [archiveReason, setArchiveReason] = useState("");
   const [plan, setPlan] = useState<PlanChoice>("beta");
   const [charges, setCharges] = useState<WalletLedgerRow[]>([]);
   const [packs, setPacks] = useState<PackOption[]>([]);
@@ -169,6 +201,7 @@ export function AdminBusinessesPanel({
       return false;
     }
     setConfirmText("");
+    setArchiveReason("");
     setSheet(next === "shop" && shopId ? { kind: "shop", id: shopId } : null);
     setStatus("Saved.");
     startTransition(() => router.refresh());
@@ -318,16 +351,25 @@ export function AdminBusinessesPanel({
           <Empty title={emptyTitle} line={emptyLine} />
         ) : (
           <ul className="divide-y divide-hairline">
-            {pageRows.map((b) => (
-              <ListRow
-                key={b.id}
-                id={`biz-${b.id}`}
-                title={b.business_name}
-                preview={previewLine(b)}
-                stamp={<Stamp tone={statusTone(b.status)}>{statusLabel(b.status)}</Stamp>}
-                onOpen={() => openShop(b.id)}
-              />
-            ))}
+            {pageRows.map((b) => {
+              const badge = badges[b.id];
+              return (
+                <ListRow
+                  key={b.id}
+                  id={`biz-${b.id}`}
+                  title={b.business_name}
+                  preview={badge?.dropping ? `${previewLine(b)} · ${badge.droppingReason}` : previewLine(b)}
+                  when={badge && badge.score != null ? formatScore(badge.score) : undefined}
+                  stamp={
+                    <span className="inline-flex items-center gap-2">
+                      {badge?.dropping ? <Stamp tone="attention">Dropping</Stamp> : null}
+                      <Stamp tone={statusTone(b.status)}>{statusLabel(b.status)}</Stamp>
+                    </span>
+                  }
+                  onOpen={() => openShop(b.id)}
+                />
+              );
+            })}
           </ul>
         )}
         {filtered.length > PAGE_SIZE ? (
@@ -369,8 +411,31 @@ export function AdminBusinessesPanel({
         {open ? (
           <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
             <ListRow title="Number" preview={phoneLine(open)} />
+            {badges[open.id] ? (
+              <ListRow
+                title="Quality"
+                href={`/admin/quality/${open.id}`}
+                preview={
+                  badges[open.id]?.dropping
+                    ? badges[open.id]?.droppingReason
+                    : formatScore(badges[open.id]?.score ?? null)
+                }
+                stamp={
+                  badges[open.id]?.dropping ? (
+                    <Stamp tone="attention">Dropping</Stamp>
+                  ) : (
+                    <Stamp tone="neutral">{formatScore(badges[open.id]?.score ?? null)}</Stamp>
+                  )
+                }
+              />
+            ) : null}
             <ListRow title="Notify" preview={notifyLabel(open.whatsapp_notification_number)} />
             <ListRow title="Created" preview={formatCreated(open.created_at)} />
+            <ListRow
+              title="Activity"
+              href={`/admin/activity?business=${open.id}`}
+              preview="Who changed what, and when"
+            />
             <ListRow
               title="Package"
               preview={packLabel(open)}
@@ -404,14 +469,82 @@ export function AdminBusinessesPanel({
                 href={freeCount > 0 ? undefined : "/admin/numbers"}
               />
             ) : null}
-            {open.status === "active" ? (
-              <ListRow
-                title="Release"
-                preview={open.sautikit_virtual_number}
-                onOpen={() => openKind("release", open.id)}
-              />
+            {hasLiveNumber(open) ? (
+              releaseReason(open) ? (
+                <ListRow
+                  title="Release number"
+                  preview={
+                    <span id={`release-why-${open.id}`} title={releaseReason(open) || undefined}>
+                      Live. Archive the business first.
+                    </span>
+                  }
+                  actions={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled
+                      aria-describedby={`release-why-${open.id}`}
+                    >
+                      Release
+                    </Button>
+                  }
+                />
+              ) : (
+                <ListRow
+                  title="Release number"
+                  preview={open.sautikit_virtual_number}
+                  onOpen={() => openKind("release", open.id)}
+                />
+              )
             ) : null}
-            <ListRow title="Remove" preview="Frees the number" onOpen={() => openKind("remove", open.id)} />
+            {open.status === "archived" ? (
+              <>
+                <ListRow
+                  title="Restore"
+                  preview="Back to the active list"
+                  onOpen={() => openKind("restore", open.id)}
+                />
+                {(() => {
+                  const state = archiveState({ isActive: open.is_active, archivedAt: open.archived_at });
+                  if (state.canDelete) {
+                    return (
+                      <ListRow
+                        title="Delete permanently"
+                        preview="Deletes its calls. Can't be undone."
+                        onOpen={() => openKind("delete", open.id)}
+                      />
+                    );
+                  }
+                  const why = state.deleteOpensAt
+                    ? `${deleteOpensLabel(state.deleteOpensAt)} 30 days after archive.`
+                    : "Off. No archive date on file.";
+                  return (
+                    <ListRow
+                      title="Delete permanently"
+                      preview={<span id={`delete-why-${open.id}`}>{why}</span>}
+                      actions={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled
+                          aria-describedby={`delete-why-${open.id}`}
+                        >
+                          Delete
+                        </Button>
+                      }
+                    />
+                  );
+                })()}
+              </>
+            ) : (
+              <ListRow
+                title="Archive"
+                preview="Hides it from active lists. Restore any time."
+                onOpen={() => openKind("archive", open.id)}
+              />
+            )}
           </ul>
         ) : null}
       </Sheet>
@@ -462,43 +595,23 @@ export function AdminBusinessesPanel({
         )}
       </Sheet>
 
-      <Sheet
+      <ConfirmSheet
         open={sheet?.kind === "release"}
-        onOpenChange={(next) => {
-          if (!next) setSheet(open ? { kind: "shop", id: open.id } : null);
-        }}
-        title="Release this number?"
-        description={
-          open
-            ? `${open.sautikit_virtual_number} returns to Available. ${open.business_name} waits.`
-            : undefined
-        }
         theme="admin"
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              block
-              onClick={() => open && openKind("shop", open.id)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="danger"
-              block
-              pending={pending}
-              onClick={() => open && void run({ action: "release_did", business_id: open.id })}
-            >
-              Release
-            </Button>
-          </>
-        }
+        title="Release this number?"
+        confirmLabel="Release"
+        danger
+        pending={pending}
+        onClose={() => setSheet(open ? { kind: "shop", id: open.id } : null)}
+        onConfirm={() => open && void run({ action: "release_did", business_id: open.id })}
       >
         <SheetNote error={error} />
-        <p className="text-body text-ink-2">The number stays in the pool as Available.</p>
-      </Sheet>
+        <p>
+          {open
+            ? `${open.sautikit_virtual_number} returns to Available. ${open.business_name} waits for a new number.`
+            : ""}
+        </p>
+      </ConfirmSheet>
 
       <Sheet
         open={sheet?.kind === "plan"}
@@ -520,7 +633,6 @@ export function AdminBusinessesPanel({
                   business_id: open.id,
                   mode: plan === "on" ? "soft" : "off",
                   note: plan === "on" ? "On-demand" : "Beta",
-                  actor: "ops",
                 },
                 "/api/admin/wallets",
               )
@@ -628,47 +740,79 @@ export function AdminBusinessesPanel({
         )}
       </Sheet>
 
-      <Sheet
-        open={sheet?.kind === "remove"}
-        onOpenChange={(next) => {
-          if (!next) {
-            setConfirmText("");
-            setSheet(open ? { kind: "shop", id: open.id } : null);
-          }
-        }}
-        title="Remove this business?"
-        description="Frees the number and deletes its calls. Type REMOVE."
+      <ConfirmSheet
+        open={sheet?.kind === "archive"}
         theme="admin"
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              block
-              onClick={() => {
-                setConfirmText("");
-                if (open) openKind("shop", open.id);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="danger"
-              block
-              pending={pending}
-              disabled={confirmText !== "REMOVE"}
-              onClick={() =>
-                open && void run({ action: "remove", business_id: open.id }, "/api/admin/businesses", "close")
-              }
-            >
-              Remove
-            </Button>
-          </>
+        title="Archive this business?"
+        confirmLabel="Archive"
+        pending={pending}
+        confirmDisabled={archiveReason.trim().length < 3}
+        onClose={() => {
+          setArchiveReason("");
+          setSheet(open ? { kind: "shop", id: open.id } : null);
+        }}
+        onConfirm={() =>
+          open && void run({ action: "archive", business_id: open.id, reason: archiveReason.trim() })
         }
       >
         <SheetNote error={error} />
-        <Field id="biz-remove" label="Confirm">
+        <p className="pb-3">
+          It leaves the active lists and keeps its calls and number. Restore any time. Permanent delete
+          opens 30 days after today.
+        </p>
+        <Field id="biz-archive-reason" label="Reason" hint="Shows in the audit log">
+          {(props) => (
+            <Input
+              {...props}
+              autoComplete="off"
+              value={archiveReason}
+              onChange={(event) => setArchiveReason(event.target.value)}
+            />
+          )}
+        </Field>
+      </ConfirmSheet>
+
+      <ConfirmSheet
+        open={sheet?.kind === "restore"}
+        theme="admin"
+        title="Restore this business?"
+        confirmLabel="Restore"
+        pending={pending}
+        onClose={() => setSheet(open ? { kind: "shop", id: open.id } : null)}
+        onConfirm={() => open && void run({ action: "restore", business_id: open.id })}
+      >
+        <SheetNote error={error} />
+        <p>{open ? `${open.business_name} goes back on the active list.` : ""}</p>
+      </ConfirmSheet>
+
+      <ConfirmSheet
+        open={sheet?.kind === "delete"}
+        theme="admin"
+        title="Delete permanently?"
+        confirmLabel="Delete"
+        danger
+        pending={pending}
+        confirmDisabled={!open || confirmText.trim() !== open.business_name.trim()}
+        onClose={() => {
+          setConfirmText("");
+          setSheet(open ? { kind: "shop", id: open.id } : null);
+        }}
+        onConfirm={() =>
+          open &&
+          void run(
+            { action: "delete_permanently", business_id: open.id, confirm_name: confirmText.trim() },
+            "/api/admin/businesses",
+            "close",
+          )
+        }
+      >
+        <SheetNote error={error} />
+        <p className="pb-3">
+          {open
+            ? `Deletes ${open.business_name}, its members, calls, and transcripts, and frees its number. This can't be undone.`
+            : ""}
+        </p>
+        <Field id="biz-delete-name" label="Type the business name">
           {(props) => (
             <Input
               {...props}
@@ -679,7 +823,7 @@ export function AdminBusinessesPanel({
             />
           )}
         </Field>
-      </Sheet>
+      </ConfirmSheet>
     </>
   );
 }

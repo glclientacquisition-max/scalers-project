@@ -96,7 +96,7 @@ describe("admin console polish", () => {
       if (/bg-\[var\(--accent\)\]/.test(source)) offenders.push(rel);
     }
     assert.deepEqual(offenders, []);
-    assert.match(read("dashboard/src/components/AdminOverviewPanel.tsx"), /ButtonLink/);
+    assert.match(read("dashboard/src/components/AdminTodayPanel.tsx"), /ButtonLink/);
     assert.match(read("dashboard/src/components/DidPoolManager.tsx"), /<Button/);
     assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /<Button/);
     assert.match(read("dashboard/src/components/AdminBillingDetailPanel.tsx"), /<Button/);
@@ -106,21 +106,20 @@ describe("admin console polish", () => {
     assert.match(read("dashboard/src/components/BuyNumberPanel.tsx"), /ConfirmSheet/);
   });
 
-  it("renders overview attention as ListRow work items", () => {
+  it("renders Today attention as ListRow work items", () => {
     const page = read("dashboard/src/app/admin/(console)/page.tsx");
-    const panel = read("dashboard/src/components/AdminOverviewPanel.tsx");
-    assert.match(page, /AdminOverviewPanel/);
+    const panel = read("dashboard/src/components/AdminTodayPanel.tsx");
+    assert.match(page, /AdminTodayPanel/);
     assert.match(page, /packageName: b\.package_name/);
-    assert.match(page, /evaluatePlatformOps/);
-    assert.match(panel, /text-caption text-ink-3">Needs you/);
-    assert.match(panel, /text-caption text-ink-3">Glance/);
+    assert.match(page, /readPlatformOps/);
+    assert.doesNotMatch(page, /evaluatePlatformOps/);
+    assert.match(panel, /Needs you/);
+    assert.match(panel, /Calls today/);
     assert.match(panel, /ListRow/);
     assert.match(panel, /row\.href/);
     assert.match(panel, /Nothing waiting\./);
-    assert.match(panel, /Add a number when a business needs one/);
-    assert.match(panel, /Assign a package when a shop has none/);
-    assert.match(panel, /href="\/admin\/packages"/);
-    assert.match(panel, /title="Calls"/);
+    assert.match(panel, /href="\/admin\/platform"/);
+    assert.match(panel, /id="calls"/);
     assert.doesNotMatch(page, /lg:grid-cols-4/);
     assert.doesNotMatch(page, /function Kpi/);
     assert.doesNotMatch(page, /<h2/);
@@ -156,7 +155,9 @@ describe("admin console polish", () => {
     assert.doesNotMatch(panel, /title="Ledger"/);
     assert.match(panel, /b\.package_name/);
     assert.doesNotMatch(panel, /wallet_balance_kes/);
-    assert.match(panel, /REMOVE/);
+    // Remove became Archive (A0). Permanent delete only after the grace period, typed name.
+    assert.doesNotMatch(panel, /REMOVE/);
+    assert.match(panel, /Archive this business\?/);
     assert.doesNotMatch(panel, /disabled=\{pending \|\| availableDidCount === 0\}/);
   });
 
@@ -252,17 +253,17 @@ describe("admin console polish", () => {
     assert.doesNotMatch(wallets, /AdminWalletsPanel/);
     assert.doesNotMatch(wallets, /deskListTitleClass/);
     const overview = read("dashboard/src/app/admin/(console)/page.tsx");
-    const overviewPanel = read("dashboard/src/components/AdminOverviewPanel.tsx");
+    const overviewPanel = read("dashboard/src/components/AdminTodayPanel.tsx");
     assert.match(overviewPanel, /Add number/);
     assert.match(overviewPanel, /href="\/admin\/platform"/);
-    assert.match(overviewPanel, /href="\/admin\/packages"/);
-    assert.match(overview, /evaluatePlatformOps/);
+    assert.match(read("dashboard/src/components/AdminBillingListPanel.tsx"), /href="\/admin\/packages"/);
+    assert.match(overview, /readPlatformOps/);
     assert.doesNotMatch(overview, /PlatformRunBoard/);
     assert.doesNotMatch(overview, /href="\/admin\/billing"/);
     const poolApi = read("dashboard/src/app/api/did-pool/route.ts");
     assert.match(poolApi, /action === "release"/);
-    assert.match(poolApi, /releaseAssignedDid/);
-    assert.match(read("dashboard/src/lib/didPool.ts"), /export async function releaseAssignedDid/);
+    assert.match(poolApi, /releasePoolNumber/);
+    assert.doesNotMatch(read("dashboard/src/lib/didPool.ts"), /export async function releaseAssignedDid/);
     const opsApi = read("dashboard/src/app/api/admin/platform-ops/route.ts");
     assert.match(opsApi, /prepare_resend/);
     assert.match(opsApi, /verify_resend/);

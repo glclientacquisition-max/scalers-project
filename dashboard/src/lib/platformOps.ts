@@ -240,7 +240,7 @@ async function mailKinds(
   }
 }
 
-export async function evaluatePlatformOps(): Promise<{
+type PlatformOpsSnapshot = {
   settings: OpsSettings;
   persisted: boolean;
   signals: OpsSignal[];
@@ -248,8 +248,10 @@ export async function evaluatePlatformOps(): Promise<{
   notices: OpsNotice[];
   infra: ReturnType<typeof infraFromEnv>;
   mailConfigured: boolean;
-}> {
-  await requireSuperAdmin();
+};
+
+/** Health reads and derived signals. Reads only: nothing here writes a notice or sends mail. */
+async function gatherPlatformSignals() {
   const [{ settings, persisted }, pool, pending, expiredBeta, voice, telecom] = await Promise.all([
     loadOpsSettings(),
     listDidPool().catch(() => []),
@@ -272,7 +274,43 @@ export async function evaluatePlatformOps(): Promise<{
     waitingBusinesses: pending.length,
     expiredBetaCount: expiredBeta,
   });
-  const strip = deriveStatusStrip(signals);
+  return { settings, persisted, signals, strip: deriveStatusStrip(signals), voice };
+}
+
+function snapshotInfra(voice: Awaited<ReturnType<typeof fetchVoiceHealthz>>) {
+  return infraFromEnv({
+    voiceReachable: voice.status === "ok" ? true : voice.status === "unreachable" ? false : null,
+    supabaseUrl: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    vercelEnv: process.env.VERCEL_ENV || "",
+  });
+}
+
+/**
+ * Today's view of the platform. Same signals as Platform, plus the notices already open.
+ * Reads only: it never opens, updates, or resolves a notice and never sends mail.
+ */
+export async function readPlatformOps(): Promise<PlatformOpsSnapshot> {
+  await requireSuperAdmin();
+  const { settings, persisted, signals, strip, voice } = await gatherPlatformSignals();
+  const notices = persisted ? await listOpenOpsNotices() : [];
+  return {
+    settings,
+    persisted,
+    signals,
+    strip,
+    notices,
+    infra: snapshotInfra(voice),
+    mailConfigured: isOpsMailConfigured(),
+  };
+}
+
+/**
+ * Platform's check: reads the same signals, then opens, updates, and resolves notices and mails
+ * the alert people. Runs when Platform loads. Today uses readPlatformOps instead.
+ */
+export async function evaluatePlatformOps(): Promise<PlatformOpsSnapshot> {
+  await requireSuperAdmin();
+  const { settings, persisted, signals, strip, voice } = await gatherPlatformSignals();
   const existing = persisted ? await readOpenOpsNotices() : null;
   // Without the notices table there is nothing to open, dedupe, or mail against.
   const noticesReady = existing !== null;
@@ -303,11 +341,7 @@ export async function evaluatePlatformOps(): Promise<{
     signals,
     strip,
     notices: noticesReady ? await listOpenOpsNotices() : [],
-    infra: infraFromEnv({
-      voiceReachable: voice.status === "ok" ? true : voice.status === "unreachable" ? false : null,
-      supabaseUrl: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-      vercelEnv: process.env.VERCEL_ENV || "",
-    }),
+    infra: snapshotInfra(voice),
     mailConfigured: isOpsMailConfigured(),
   };
 }

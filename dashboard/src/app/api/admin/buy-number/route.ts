@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { adminActorName } from "@/lib/adminActor";
+import { recordAdminAction } from "@/lib/adminAudit";
+import { logAdminError, operatorError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { buyNumberIntoPool } from "@/lib/didPool";
 import {
@@ -14,10 +17,8 @@ export async function GET() {
     return NextResponse.json({ error: "ops_only" }, { status: 403 });
   }
   if (!isSautikitConfigured()) {
-    return NextResponse.json(
-      { error: "SAUTIKIT_API_KEY is not set", diagnostics: getSautikitKeyDiagnostics() },
-      { status: 500 }
-    );
+    logAdminError("buy-number", { message: "phone line key missing", diagnostics: getSautikitKeyDiagnostics() });
+    return NextResponse.json({ error: "Buying is not set up on this server yet." }, { status: 500 });
   }
 
   try {
@@ -35,8 +36,7 @@ export async function GET() {
       })),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: operatorError("buy-number-list", err, "Could not load numbers to buy.") }, { status: 500 });
   }
 }
 
@@ -45,34 +45,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "ops_only" }, { status: 403 });
   }
   if (!isSautikitBuyConfigured()) {
-    return NextResponse.json(
-      {
-        error:
-          "Buying requires SAUTIKIT_ADMIN_OPS_KEY (or SAUTIKIT_API_KEY) with numbers.claim scope.",
-        diagnostics: getSautikitKeyDiagnostics(),
-      },
-      { status: 500 }
-    );
+    logAdminError("buy-number", { message: "buy key missing", diagnostics: getSautikitKeyDiagnostics() });
+    return NextResponse.json({ error: "Buying is not set up on this server yet." }, { status: 500 });
   }
 
   const body = await request.json().catch(() => ({}));
   const inventoryId = String(body.inventory_id || "");
   if (!inventoryId) {
-    return NextResponse.json({ error: "inventory_id required" }, { status: 400 });
+    return NextResponse.json({ error: "Pick a number to buy." }, { status: 400 });
   }
 
   try {
     const row = await buyNumberIntoPool(inventoryId);
+    await recordAdminAction({
+      actor: await adminActorName(),
+      action: "buy_number",
+      before: null,
+      after: { number: (row as { e164?: string } | null)?.e164 ?? null, pool: "available" },
+      detail: { inventory_id: inventoryId },
+    });
     return NextResponse.json({ ok: true, did: row });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const code = (err as { code?: string }).code;
-    const hint =
-      code === "api_key.scope_denied" || /numbers\.claim|scope_denied/i.test(message)
-        ? " Mint Key B (SAUTIKIT_ADMIN_OPS_KEY) with numbers.claim on Vercel."
-        : /insufficient|balance|wallet/i.test(message)
-          ? " Top up the phone line platform balance first."
-          : "";
-    return NextResponse.json({ error: `${message}${hint}`, code: code || null }, { status: 500 });
+    return NextResponse.json({ error: operatorError("buy-number", err, "Could not buy this number.") }, { status: 500 });
   }
 }

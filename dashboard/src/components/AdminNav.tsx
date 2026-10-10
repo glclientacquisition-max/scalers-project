@@ -2,20 +2,56 @@
 
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { AdminAccountMenu } from "@/components/AdminAccountMenu";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
+import { Sheet } from "@/components/ui/Sheet";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   ADMIN_LINKS,
+  adminHidesShellBack,
   adminMainClass,
   adminParentTarget,
+  adminPhoneMore,
+  adminPhoneTabs,
   adminRouteActive,
   adminShellClass,
 } from "@/lib/adminLinks";
 import { PHONE_TAB_REFRESH_EVENT } from "@/lib/endlessList";
+
+type AdminChrome = {
+  path: string;
+  href: (href: string) => string;
+};
+
+const AdminChromeContext = createContext<AdminChrome | null>(null);
+
+/**
+ * Harness only. Production Admin uses the live path and the real hrefs.
+ * `path` maps the browser path onto an admin route so Quality stays active.
+ */
+export function AdminChromeProvider({
+  path,
+  href,
+  children,
+}: {
+  path: (pathname: string) => string;
+  href: (href: string) => string;
+  children: ReactNode;
+}) {
+  const pathname = usePathname();
+  const value = useMemo(() => ({ path: path(pathname), href }), [href, path, pathname]);
+  return <AdminChromeContext.Provider value={value}>{children}</AdminChromeContext.Provider>;
+}
+
+function useAdminChrome(): AdminChrome {
+  const pathname = usePathname();
+  const chrome = useContext(AdminChromeContext);
+  if (!chrome) return { path: pathname, href: (link) => link };
+  return chrome;
+}
 
 function AdminIcon({ name }: { name: string }) {
   const cls = "h-5 w-5";
@@ -27,7 +63,7 @@ function AdminIcon({ name }: { name: string }) {
       </svg>
     );
   }
-  if (name === "Overview") {
+  if (name === "Today") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
         <path
@@ -38,16 +74,51 @@ function AdminIcon({ name }: { name: string }) {
       </svg>
     );
   }
-  if (name === "Packages") {
+  if (name === "Calls") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
         <path
-          d="M4 7.5 10 4.5l6 3v7L10 17.5 4 14.5v-7Z"
+          d="M5.5 3.5h2l1 3.5-1.5 1a8 8 0 0 0 5 5l1-1.5 3.5 1v2a1.5 1.5 0 0 1-1.5 1.5A12.5 12.5 0 0 1 4 5a1.5 1.5 0 0 1 1.5-1.5Z"
           stroke="currentColor"
           strokeWidth="1.5"
           strokeLinejoin="round"
         />
-        <path d="M4 7.5 10 10.5 16 7.5M10 10.5V17" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+  if (name === "Billing") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <rect x="3" y="5" width="14" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M3 8.5h14M6 12.5h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === "Activity") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <path d="M6.5 5.5h9M6.5 10h9M6.5 14.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="3.75" cy="5.5" r="0.9" fill="currentColor" />
+        <circle cx="3.75" cy="10" r="0.9" fill="currentColor" />
+        <circle cx="3.75" cy="14.5" r="0.9" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (name === "Settings") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <path d="M4 6h7M15 6h1M4 14h1M9 14h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="13" cy="6" r="2" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="7" cy="14" r="2" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+  if (name === "More") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <circle cx="5" cy="10" r="1.25" fill="currentColor" />
+        <circle cx="10" cy="10" r="1.25" fill="currentColor" />
+        <circle cx="15" cy="10" r="1.25" fill="currentColor" />
       </svg>
     );
   }
@@ -59,11 +130,28 @@ function AdminIcon({ name }: { name: string }) {
       </svg>
     );
   }
+  if (name === "Quality") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <path d="M3.5 13.5 7.5 9l2.5 2.5L16.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M12.5 5H16.5V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
   if (name === "Numbers") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
         <rect x="6" y="2.5" width="8" height="15" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
         <path d="M9 15h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === "More") {
+    return (
+      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className={cls}>
+        <circle cx="4.5" cy="10" r="1.25" />
+        <circle cx="10" cy="10" r="1.25" />
+        <circle cx="15.5" cy="10" r="1.25" />
       </svg>
     );
   }
@@ -120,13 +208,13 @@ function AdminDestinationLink({
   labelClassName: string;
   onRetap?: () => void;
 }) {
-  const pathname = usePathname();
-  const current = adminRouteActive(pathname, href, exact);
+  const { path, href: mapHref } = useAdminChrome();
+  const current = adminRouteActive(path, href, exact);
   const active = pendingHref ? pendingHref === href : current;
 
   return (
     <Link
-      href={href}
+      href={mapHref(href)}
       scroll={false}
       aria-current={active ? "page" : undefined}
       aria-label={label}
@@ -177,20 +265,33 @@ export function AdminRail() {
         </DeskHint>
       </div>
       <nav aria-label="Super Admin" className="flex flex-1 flex-col items-center gap-1 px-1 pt-1">
-        {ADMIN_LINKS.map((item) => (
-          <AdminDestinationLink
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            exact={item.exact}
-            pendingHref={pendingHref}
-            setPendingHref={setPendingHref}
-            className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5"
-            activeClassName="bg-accent/10 text-accent-deep"
-            idleClassName="text-ink-soft hover:bg-surface-muted hover:text-ink"
-            labelClassName="max-w-full truncate text-[10px] font-medium leading-none"
-          />
-        ))}
+        {ADMIN_LINKS.map((item) =>
+          item.pending ? (
+            <DeskHint key={item.href} label={item.pending}>
+              <span
+                aria-disabled="true"
+                className="flex min-h-12 w-full cursor-default flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-ink-3"
+              >
+                <AdminIcon name={item.label} />
+                <span className="max-w-full truncate text-[10px] font-medium leading-none">{item.label}</span>
+                <span className="sr-only">{item.pending}</span>
+              </span>
+            </DeskHint>
+          ) : (
+            <AdminDestinationLink
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              exact={item.exact}
+              pendingHref={pendingHref}
+              setPendingHref={setPendingHref}
+              className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5"
+              activeClassName="bg-accent/10 text-accent-deep"
+              idleClassName="text-ink-soft hover:bg-surface-muted hover:text-ink"
+              labelClassName="max-w-full truncate text-[10px] font-medium leading-none"
+            />
+          ),
+        )}
       </nav>
     </div>
   );
@@ -202,21 +303,98 @@ function retapAdminTab() {
   window.dispatchEvent(new Event(PHONE_TAB_REFRESH_EVENT));
 }
 
+const phoneTabClass =
+  "flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 pt-1.5";
+const phoneLabelClass = "max-w-full truncate text-center text-caption leading-none";
+
+/**
+ * Numbers, Platform, Activity, and Settings. The bar itself stays five items wide.
+ * The chooser is the same bottom drawer as every other overlay.
+ */
+function AdminPhoneMore() {
+  const { path, href: mapHref } = useAdminChrome();
+  const [open, setOpen] = useState(false);
+  const more = adminPhoneMore();
+  const active = more.some((item) => !item.pending && adminRouteActive(path, item.href, item.exact));
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="More"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+        className={[
+          phoneTabClass,
+          deskShiftClass,
+          focusRingVisible,
+          active ? "font-semibold text-accent-deep" : "font-medium text-ink-soft",
+        ].join(" ")}
+      >
+        <AdminIcon name="More" />
+        <span className={phoneLabelClass}>More</span>
+      </button>
+      <Sheet open={open} onOpenChange={setOpen} title="More" theme="admin">
+        <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
+          {more.map((item) => {
+            if (item.pending) {
+              return (
+                <li
+                  key={item.href}
+                  aria-disabled="true"
+                  className="flex min-h-12 items-center gap-3 px-5 py-2.5 text-body text-ink-3 sm:px-6"
+                >
+                  <AdminIcon name={item.label} />
+                  <span className="min-w-0">
+                    <span className="block">{item.label}</span>
+                    <span className="block text-meta">{item.pending}</span>
+                  </span>
+                </li>
+              );
+            }
+            const current = adminRouteActive(path, item.href, item.exact);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={mapHref(item.href)}
+                  scroll={false}
+                  aria-current={current ? "page" : undefined}
+                  onClick={() => setOpen(false)}
+                  className={[
+                    "flex min-h-12 items-center gap-3 px-5 text-body outline-none sm:px-6",
+                    deskShiftClass,
+                    "hover:bg-surface-2 active:bg-surface-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
+                    current ? "font-semibold text-accent-deep" : "text-ink",
+                  ].join(" ")}
+                >
+                  <AdminIcon name={item.label} />
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </Sheet>
+    </>
+  );
+}
+
 /** Phone destinations. Hidden on a nested admin screen so the parent control owns the thumb zone. */
 export function AdminTabBar() {
-  const pathname = usePathname();
+  const { path } = useAdminChrome();
   const { pendingHref, setPendingHref } = useAdminPending();
-  if (adminParentTarget(pathname)) return null;
+  if (adminParentTarget(path)) return null;
 
   return (
     <nav
       data-admin-tabbar=""
       aria-label="Super Admin"
-      className="glass-chrome fixed inset-x-0 bottom-0 z-50 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-visible border-t border-line/80 pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="glass-chrome fixed inset-x-0 bottom-0 z-tabbar isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-hidden border-t border-line/80 pb-[env(safe-area-inset-bottom)] md:hidden"
     >
-      <ul className="flex">
-        {ADMIN_LINKS.map((item) => (
-          <li key={item.href} className="min-w-0 flex-1 overflow-visible">
+      <ul className="flex w-full">
+        {adminPhoneTabs().map((item) => (
+          <li key={item.href} className="min-w-0 flex-1">
             <AdminDestinationLink
               href={item.href}
               label={item.label}
@@ -224,13 +402,16 @@ export function AdminTabBar() {
               pendingHref={pendingHref}
               setPendingHref={setPendingHref}
               onRetap={retapAdminTab}
-              className="flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 overflow-visible px-0.5 pt-1.5 text-[10px] leading-tight"
+              className={phoneTabClass}
               activeClassName="font-semibold text-accent-deep"
               idleClassName="font-medium text-ink-soft"
-              labelClassName="max-w-full whitespace-nowrap text-center"
+              labelClassName={phoneLabelClass}
             />
           </li>
         ))}
+        <li className="min-w-0 flex-1">
+          <AdminPhoneMore />
+        </li>
       </ul>
     </nav>
   );
@@ -238,13 +419,13 @@ export function AdminTabBar() {
 
 /** One control back to the parent admin list. The destination name is the accessible label. */
 export function AdminNestedBack() {
-  const pathname = usePathname();
-  const parent = adminParentTarget(pathname);
-  if (!parent) return null;
+  const { path, href } = useAdminChrome();
+  const parent = adminParentTarget(path);
+  if (!parent || adminHidesShellBack(path)) return null;
 
   return (
     <div className="mb-3">
-      <DeskBack href={parent.href}>{parent.label}</DeskBack>
+      <DeskBack href={href(parent.href)}>{parent.label}</DeskBack>
     </div>
   );
 }
@@ -256,8 +437,8 @@ export function AdminShell({
   operatorName: string;
   children: ReactNode;
 }) {
-  const pathname = usePathname();
-  const nested = Boolean(adminParentTarget(pathname));
+  const { path } = useAdminChrome();
+  const nested = Boolean(adminParentTarget(path));
 
   return (
     <div data-admin-shell="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>
