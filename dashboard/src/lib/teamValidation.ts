@@ -41,7 +41,6 @@ export function validateTeamSave(input: {
   submitted: TeamRowInput[];
   stored: TeamRowInput[];
   ownerPhone?: string | null;
-  seatLimit?: number | null;
 }): TeamValidationResult {
   const rows: TeamRowInput[] = [];
   const seenPhones = new Map<string, number>();
@@ -89,18 +88,6 @@ export function validateTeamSave(input: {
     const ownerStillListed = rows.some((row) => phoneKey(row.phone) === ownerKey);
     if (ownerWasListed && !ownerStillListed) {
       return { ok: false, error: "The owner can't be removed from the team. Change the owner's alert phone first." };
-    }
-  }
-
-  const limit = Number(input.seatLimit || 0);
-  if (limit > 0 && rows.length > limit) {
-    const storedCount = input.stored.filter((row) => String(row.name ?? "").trim()).length;
-    // Grandfather workspaces already over the limit: block only growth.
-    if (rows.length > storedCount) {
-      return {
-        ok: false,
-        error: `Your plan includes ${limit} team seat${limit === 1 ? "" : "s"}. Remove someone or upgrade to add more.`,
-      };
     }
   }
 

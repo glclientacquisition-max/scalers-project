@@ -64,7 +64,6 @@ import { overlayFieldMeta, planFactConfirm } from "@/lib/factConfirm";
 import { normalizeFactRow } from "@/lib/factRowNormalize";
 import { assignServiceIds } from "@/lib/serviceIds";
 import { ownerAlertPhone, validateTeamSave, type TeamRowInput } from "@/lib/teamValidation";
-import { getSupabaseAdmin } from "@/lib/supabase";
 import { catalogSaveError } from "@/lib/catalogValidation";
 import { validatePublicContacts } from "@/lib/contactValidation";
 import { faqsLengthError, policiesLengthError } from "@/lib/lengthLimits";
@@ -76,22 +75,6 @@ function safeJsonRows(raw: FormDataEntryValue | null): TeamRowInput[] {
     return Array.isArray(parsed) ? parsed.filter((r) => r && typeof r === "object") : [];
   } catch {
     return [];
-  }
-}
-
-/** Plan seats (tenants.seat_included). 0/unknown = no limit enforced. */
-async function loadSeatLimit(tenantId: string): Promise<number> {
-  try {
-    const { data, error } = await getSupabaseAdmin()
-      .from("tenants")
-      .select("seat_included")
-      .eq("id", tenantId)
-      .maybeSingle();
-    if (error || !data) return 0;
-    const n = Number((data as { seat_included?: unknown }).seat_included);
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  } catch {
-    return 0;
   }
 }
 
@@ -222,13 +205,12 @@ export async function saveAndCompileSettings(
   );
   if (settingsFieldFromScope(scope, "teamDirectory", true, false)) {
     // Validate the raw rows so bad email/phone, nameless rows, duplicates, owner
-    // removal and the seat limit return a visible error (not a silent drop).
-    const seatLimit = await loadSeatLimit(tenant.id);
+    // removal return a visible error (not a silent drop). Team contacts are not
+    // paid seats (owner decision); login-member seats are tracked elsewhere.
     const team = validateTeamSave({
       submitted: safeJsonRows(formData.get("team_directory")),
       stored: Array.isArray(tenant.team_directory) ? (tenant.team_directory as TeamRowInput[]) : [],
       ownerPhone: ownerAlertPhone(tenant),
-      seatLimit,
     });
     if (!team.ok) return { error: team.error };
     teamDirectory = parseTeamDirectoryField(JSON.stringify(team.rows));

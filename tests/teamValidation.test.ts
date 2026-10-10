@@ -29,14 +29,10 @@ it("blocks removing the owner", () => {
   assert.equal(r.ok, false);
 });
 
-it("enforces the seat limit on growth only", () => {
-  const four = [owner, ...[1, 2, 3].map((i) => ({ name: `T${i}`, phone: `072200000${i}` }))];
-  const six = [...four, { name: "T4", phone: "0722000004" }, { name: "T5", phone: "0722000005" }];
-  assert.equal(validateTeamSave({ submitted: six, stored: four, seatLimit: 4 }).ok, false);
-  assert.equal(validateTeamSave({ submitted: four, stored: four, seatLimit: 4 }).ok, true);
-  assert.equal(validateTeamSave({ submitted: six, stored: six, seatLimit: 4 }).ok, true);
+it("team contacts are not seat-limited (owner decision)", () => {
+  const six = [owner, ...[1, 2, 3, 4, 5].map((i) => ({ name: `T${i}`, phone: `072200000${i}` }))];
+  assert.equal(validateTeamSave({ submitted: six, stored: [owner] }).ok, true);
 });
-
 it("ignores blank rows and normalizes stored phones", () => {
   const r = validateTeamSave({ submitted: [owner, { name: "", phone: "", email: "", role: "" }], stored: [] });
   assert.ok(r.ok);
