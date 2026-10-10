@@ -66,6 +66,7 @@ import { assignServiceIds } from "@/lib/serviceIds";
 import { validateTeamSave, type TeamRowInput } from "@/lib/teamValidation";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { catalogSaveError } from "@/lib/catalogValidation";
+import { validatePublicContacts } from "@/lib/contactValidation";
 
 function safeJsonRows(raw: FormDataEntryValue | null): TeamRowInput[] {
   try {
@@ -155,11 +156,16 @@ export async function saveAndCompileSettings(
     });
     if (catalogError) return { error: catalogError };
   }
-  const socialHandles = pick(
+  let socialHandles = pick(
     "socialHandles",
     parseSocialHandlesField(formData.get("social_handles")),
     parseSocialHandlesField(JSON.stringify(tenant.social_handles || {}))
   );
+  if (settingsFieldFromScope(scope, "socialHandles", true, false)) {
+    const contacts = validatePublicContacts(socialHandles);
+    if (!contacts.ok) return { error: contacts.error };
+    socialHandles = contacts.handles;
+  }
   const servicesBlock = formatServicesForCompiler(servicesCatalog, servicesNotes);
   const productsBlock = formatProductsForCompiler(productCatalog);
   const socialBlock = formatSocialHandlesForCompiler(socialHandles);

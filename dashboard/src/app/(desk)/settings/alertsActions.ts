@@ -5,6 +5,7 @@ import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import { parseNotifyChannelsField } from "@/lib/notifyChannels";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { alertPhoneWrite, alertsPersistMatchesSubmit } from "@/lib/alertsSave";
+import { validateAlertsSave } from "@/lib/contactValidation";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import { fieldPathsAttestedOnAlertsSave } from "@/lib/fieldPathsFromSettingsSave";
 import { ownerAttestFields } from "@/lib/ownerAttestFields";
@@ -40,16 +41,19 @@ export async function saveAlertsAction(
     .trim()
     .toLowerCase();
   const notifyChannels = parseNotifyChannelsField(formData.get("notify_channels"));
-  const writtenPhone = alertPhoneWrite(submittedPhone);
-  const writtenEmail = submittedEmail || null;
-
-  if (submittedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submittedEmail)) {
-    return { error: "Alert email looks invalid." };
-  }
+  const checked = validateAlertsSave({
+    phone: submittedPhone,
+    email: submittedEmail,
+    channels: notifyChannels,
+  });
+  if (!checked.ok) return { error: checked.error };
+  // Stored as E.164 (+2547...), so compare against the normalized submit.
+  const writtenPhone = alertPhoneWrite(checked.phone);
+  const writtenEmail = checked.email;
 
   if (
     !alertsPersistMatchesSubmit({
-      submittedPhone,
+      submittedPhone: checked.phone,
       writtenPhone,
       submittedEmail,
       writtenEmail,
