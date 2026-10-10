@@ -63,6 +63,20 @@ import { factHashModeFromEnv, loadCompileProvenance } from "@/lib/tenantFieldPro
 import { overlayFieldMeta, planFactConfirm } from "@/lib/factConfirm";
 import { normalizeFactRow } from "@/lib/factRowNormalize";
 import { assignServiceIds } from "@/lib/serviceIds";
+import { ownerAlertPhone, validateTeamSave, type TeamRowInput } from "@/lib/teamValidation";
+import { catalogSaveError } from "@/lib/catalogValidation";
+import { validatePublicContacts } from "@/lib/contactValidation";
+import { faqsLengthError, policiesLengthError } from "@/lib/lengthLimits";
+import { POLICY_FIELDS } from "@/lib/businessPolicies";
+
+function safeJsonRows(raw: FormDataEntryValue | null): TeamRowInput[] {
+  try {
+    const parsed = JSON.parse(String(raw || "[]"));
+    return Array.isArray(parsed) ? parsed.filter((r) => r && typeof r === "object") : [];
+  } catch {
+    return [];
+  }
+}
 
 export type SettingsCompileState = {
   error?: string;
@@ -117,11 +131,26 @@ export async function saveAndCompileSettings(
     parseProductCatalogField(formData.get("product_catalog")),
     normalizeProductCatalog(tenant.product_catalog).filter((row) => row.name)
   );
-  const socialHandles = pick(
+  if (
+    settingsFieldFromScope(scope, "productCatalog", true, false) ||
+    settingsFieldFromScope(scope, "servicesCatalog", true, false)
+  ) {
+    const catalogError = catalogSaveError({
+      products: settingsFieldFromScope(scope, "productCatalog", true, false) ? productCatalog : [],
+      services: settingsFieldFromScope(scope, "servicesCatalog", true, false) ? servicesCatalog : [],
+    });
+    if (catalogError) return { error: catalogError };
+  }
+  let socialHandles = pick(
     "socialHandles",
     parseSocialHandlesField(formData.get("social_handles")),
     parseSocialHandlesField(JSON.stringify(tenant.social_handles || {}))
   );
+  if (settingsFieldFromScope(scope, "socialHandles", true, false)) {
+    const contacts = validatePublicContacts(socialHandles);
+    if (!contacts.ok) return { error: contacts.error };
+    socialHandles = contacts.handles;
+  }
   const servicesBlock = formatServicesForCompiler(servicesCatalog, servicesNotes);
   const productsBlock = formatProductsForCompiler(productCatalog);
   const socialBlock = formatSocialHandlesForCompiler(socialHandles);
@@ -169,11 +198,23 @@ export async function saveAndCompileSettings(
     String(formData.get("unknown_answer_fallback") || "").trim(),
     String(tenant.unknown_answer_fallback || "").trim()
   );
-  const teamDirectory = pick(
+  let teamDirectory = pick(
     "teamDirectory",
     parseTeamDirectoryField(formData.get("team_directory")),
     parseTeamDirectoryField(JSON.stringify(tenant.team_directory || []))
   );
+  if (settingsFieldFromScope(scope, "teamDirectory", true, false)) {
+    // Validate the raw rows so bad email/phone, nameless rows, duplicates, owner
+    // removal return a visible error (not a silent drop). Team contacts are not
+    // paid seats (owner decision); login-member seats are tracked elsewhere.
+    const team = validateTeamSave({
+      submitted: safeJsonRows(formData.get("team_directory")),
+      stored: Array.isArray(tenant.team_directory) ? (tenant.team_directory as TeamRowInput[]) : [],
+      ownerPhone: ownerAlertPhone(tenant),
+    });
+    if (!team.ok) return { error: team.error };
+    teamDirectory = parseTeamDirectoryField(JSON.stringify(team.rows));
+  }
   const faqs = pick(
     "faqs",
     parseFaqsField(formData.get("faqs")),
@@ -278,6 +319,17 @@ export async function saveAndCompileSettings(
     voiceLabel: String(formData.get("soniox_voice_label") || "").trim(),
   });
   if (scopeError) return { error: scopeError };
+  if (settingsFieldFromScope(scope, "faqs", true, false)) {
+    const faqLen = faqsLengthError(formData.get("faqs"));
+    if (faqLen) return { error: faqLen };
+  }
+  if (settingsFieldFromScope(scope, "businessPolicies", true, false)) {
+    const policyLen = policiesLengthError(
+      formData.get("business_policies"),
+      Object.fromEntries(POLICY_FIELDS.map((f) => [f.id, f.label]))
+    );
+    if (policyLen) return { error: policyLen };
+  }
 
   const ownerPathsFromForm = (() => {
     try {

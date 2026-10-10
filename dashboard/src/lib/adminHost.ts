@@ -121,6 +121,18 @@ export function marketingHomeHref(env: NodeJS.ProcessEnv = process.env): string 
   return `https://${configuredSiteHost(env)}/`;
 }
 
+/**
+ * Marketing -> app entry links (/login, /signup, /home). When hosts are split these
+ * must be absolute and rendered as plain <a>: a relative next/link prefetches
+ * /login with the 'rsc' header on the site host, gets a 308 to the app host, and
+ * the browser blocks that cross-origin redirect (CORS errors in the console).
+ */
+export function appEntryHref(path: string, env: NodeJS.ProcessEnv = process.env): string {
+  const clean = path.startsWith("/") ? path : `/${path}`;
+  if (!appHostSplitEnabled(env)) return clean;
+  return `https://${configuredAppHost(env)}${clean}`;
+}
+
 /** Supabase email confirmation lands on the desk host. */
 export function ownerAuthRedirectUrl(env: NodeJS.ProcessEnv = process.env): string | undefined {
   if (!appHostSplitEnabled(env)) return undefined;

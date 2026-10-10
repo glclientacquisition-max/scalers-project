@@ -66,6 +66,8 @@ export function inferPriceMode(price: string | null | undefined): PriceMode | nu
   const raw = String(price || "").trim();
   if (!raw) return null;
   const lower = raw.toLowerCase();
+  // Negative amounts ("-100", "KSh -50") are never a real price.
+  if (/(^|[^\d])-\s*\d/.test(lower) && !/\d\s*(?:-|to)\s*\d/.test(lower)) return null;
   if (/\b(ask|on request|quoted)\b/.test(lower) && !/\d/.test(lower)) return "ask";
   if (/^from\b/.test(lower) && /\d/.test(lower)) return "from";
   if (/\d/.test(lower) && /(?:\bto\b|[-–—])/.test(lower)) return "range";
@@ -77,17 +79,21 @@ function productMode(product: CaptureProduct): PriceMode | null {
   return asMode(product.price_mode) || inferPriceMode(product.price);
 }
 
+/** Owner decision (QA fixes): one named product with a valid price (or "ask") is enough to continue. */
 export function shopCatalogPasses(products: CaptureProduct[]): boolean {
-  const priced = products.filter((product) => {
-    return Boolean(String(product.name || "").trim()) && productMode(product) != null;
-  });
-  if (priced.length >= 10) return true;
-  const categories = new Set(
-    priced
-      .map((product) => String(product.category || "").trim().toLowerCase())
-      .filter(Boolean)
+  return products.some(
+    (product) => Boolean(String(product.name || "").trim()) && productMode(product) != null
   );
-  return categories.size >= 3;
+}
+
+/** Owner-facing reason Continue is disabled on the shop catalog step (null when it passes). */
+export function shopCatalogGap(products: CaptureProduct[]): string | null {
+  if (shopCatalogPasses(products)) return null;
+  const named = products.filter((p) => String(p.name || "").trim());
+  if (!named.length) {
+    return "To continue: add at least one product with a price (e.g. 150, from 300, 200-400, or ask). Or skip and add them later in Settings.";
+  }
+  return "To continue: give at least one product a valid price (e.g. 150, from 300, 200-400, or ask). Negative or text-only prices don't count. Or skip.";
 }
 
 export function homeCatalogPasses(services: CaptureService[]): boolean {
@@ -166,7 +172,9 @@ export function parseCaptureHours(text: string): CaptureHours | null {
   if (openH == null || closeH == null) return null;
 
   if (!openMer && !closeMer && closeH * 60 + closeMinute <= openH * 60 + openMinute) {
-    if (closeH < 12) closeH += 12;
+    // "9-5" means 09:00-17:00. "18:00-09:00" is a closing time before opening: reject.
+    if (closeH < 12 && openH < 12) closeH += 12;
+    else return null;
   } else if (openMer === "am" && !closeMer && closeH < 12 && closeH <= openH) {
     closeH += 12;
   }

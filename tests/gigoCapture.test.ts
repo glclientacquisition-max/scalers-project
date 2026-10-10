@@ -25,36 +25,14 @@ describe("outcome gates", () => {
     assert.equal(hoursCapturePasses("8-7"), false);
   });
 
-  it("rejects we sell stuff and passes a real shop catalog", () => {
+  it("rejects we sell stuff and passes one priced product (owner decision)", () => {
     assert.equal(inferPriceMode("we sell stuff"), null);
     assert.equal(shopCatalogPasses([{ name: "we sell stuff", price: "we sell stuff" }]), false);
-    assert.equal(
-      shopCatalogPasses(
-        Array.from({ length: 9 }, (_, index) => ({
-          name: `Item ${index + 1}`,
-          price: "500",
-          category: "phones",
-        }))
-      ),
-      false
-    );
-    assert.equal(
-      shopCatalogPasses(
-        Array.from({ length: 10 }, (_, index) => ({
-          name: `Item ${index + 1}`,
-          price: "500",
-        }))
-      ),
-      true
-    );
-    assert.equal(
-      shopCatalogPasses([
-        { name: "Charger", category: "Power", price: "500" },
-        { name: "Case", category: "Protection", price: "from 300" },
-        { name: "Cable", category: "Power leads", price: "200-400" },
-      ]),
-      true
-    );
+    assert.equal(shopCatalogPasses([{ name: "Test Notebook", price: "150" }]), true);
+    assert.equal(shopCatalogPasses([{ name: "Pen", price: "ask" }]), true);
+    assert.equal(shopCatalogPasses([{ name: "Pen", price: "-100" }]), false);
+    assert.equal(shopCatalogPasses([{ name: "", price: "150" }]), false);
+    assert.equal(shopCatalogPasses([]), false);
   });
 
   it("requires price mode and a site visit for home services", () => {
@@ -140,5 +118,26 @@ describe("completeness stub", () => {
       business_policies: { holds: { allowed: true } },
     });
     assert.equal(catalogueHold.allowed, true);
+  });
+});
+
+import { shopCatalogGap } from "../dashboard/src/lib/outcomeGates.ts";
+describe("QA fixes: onboarding gates", () => {
+  it("rejects negative prices but keeps ranges", () => {
+    assert.equal(inferPriceMode("-100"), null);
+    assert.equal(inferPriceMode("KSh -50"), null);
+    assert.equal(inferPriceMode("abc"), null);
+    assert.equal(inferPriceMode("200-400"), "range");
+    assert.equal(inferPriceMode("150"), "fixed");
+  });
+  it("explains why the shop step is blocked", () => {
+    assert.equal(shopCatalogGap([{ name: "Test Notebook", price: "150" }]), null);
+    assert.match(String(shopCatalogGap([])), /at least one product/);
+    assert.match(String(shopCatalogGap([{ name: "X", price: "abc" }])), /valid price/);
+    assert.match(String(shopCatalogGap([{ name: "X", price: "-50" }])), /valid price/);
+  });
+  it("rejects closing before opening in 24h form", () => {
+    assert.equal(parseCaptureHours("Mon-Fri 18:00-09:00"), null);
+    assert.equal(parseCaptureHours("Mon-Fri 9-5")?.days.mon?.close, "17:00");
   });
 });
