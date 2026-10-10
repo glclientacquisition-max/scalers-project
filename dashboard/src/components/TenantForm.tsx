@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizeContactPhone } from "@/lib/teamValidation";
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
@@ -290,6 +291,11 @@ function CatalogPager({
       className="border-t border-line bg-surface-canvas px-3 py-3"
     />
   );
+}
+
+function isOwnerTeamRow(phone: string, ownerPhone: string | null | undefined): boolean {
+  const a = normalizeContactPhone(phone);
+  return Boolean(a && a === normalizeContactPhone(ownerPhone));
 }
 
 export function TenantForm({
@@ -2268,7 +2274,9 @@ export function TenantForm({
                 </label>
                 <input
                   id={`team-email-${index}`}
-                  type="email"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="off"
                   value={member.email || ""}
                   onChange={(e) => updateTeam(index, "email", e.target.value)}
                   placeholder="wanjiku@shop.co.ke"
@@ -2300,6 +2308,9 @@ export function TenantForm({
                 })}
               </div>
               <div className="flex items-start justify-end lg:pt-1">
+                {isOwnerTeamRow(member.phone, tenant.whatsapp_notification_number) ? (
+                  <span className="pt-2 text-xs text-ink-soft" title="The owner always stays on the team">Owner</span>
+                ) : (
                 <button
                   type="button"
                   onClick={() =>
@@ -2320,6 +2331,7 @@ export function TenantForm({
                 >
                   <TrashIcon className="h-4 w-4" />
                 </button>
+                )}
               </div>
             </div>
           ))}

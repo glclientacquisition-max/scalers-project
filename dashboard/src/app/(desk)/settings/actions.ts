@@ -63,6 +63,33 @@ import { factHashModeFromEnv, loadCompileProvenance } from "@/lib/tenantFieldPro
 import { overlayFieldMeta, planFactConfirm } from "@/lib/factConfirm";
 import { normalizeFactRow } from "@/lib/factRowNormalize";
 import { assignServiceIds } from "@/lib/serviceIds";
+import { validateTeamSave, type TeamRowInput } from "@/lib/teamValidation";
+import { getSupabaseAdmin } from "@/lib/supabase";
+
+function safeJsonRows(raw: FormDataEntryValue | null): TeamRowInput[] {
+  try {
+    const parsed = JSON.parse(String(raw || "[]"));
+    return Array.isArray(parsed) ? parsed.filter((r) => r && typeof r === "object") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Plan seats (tenants.seat_included). 0/unknown = no limit enforced. */
+async function loadSeatLimit(tenantId: string): Promise<number> {
+  try {
+    const { data, error } = await getSupabaseAdmin()
+      .from("tenants")
+      .select("seat_included")
+      .eq("id", tenantId)
+      .maybeSingle();
+    if (error || !data) return 0;
+    const n = Number((data as { seat_included?: unknown }).seat_included);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
 
 export type SettingsCompileState = {
   error?: string;
@@ -169,11 +196,24 @@ export async function saveAndCompileSettings(
     String(formData.get("unknown_answer_fallback") || "").trim(),
     String(tenant.unknown_answer_fallback || "").trim()
   );
-  const teamDirectory = pick(
+  let teamDirectory = pick(
     "teamDirectory",
     parseTeamDirectoryField(formData.get("team_directory")),
     parseTeamDirectoryField(JSON.stringify(tenant.team_directory || []))
   );
+  if (settingsFieldFromScope(scope, "teamDirectory", true, false)) {
+    // Validate the raw rows so bad email/phone, nameless rows, duplicates, owner
+    // removal and the seat limit return a visible error (not a silent drop).
+    const seatLimit = await loadSeatLimit(tenant.id);
+    const team = validateTeamSave({
+      submitted: safeJsonRows(formData.get("team_directory")),
+      stored: Array.isArray(tenant.team_directory) ? (tenant.team_directory as TeamRowInput[]) : [],
+      ownerPhone: tenant.whatsapp_notification_number,
+      seatLimit,
+    });
+    if (!team.ok) return { error: team.error };
+    teamDirectory = parseTeamDirectoryField(JSON.stringify(team.rows));
+  }
   const faqs = pick(
     "faqs",
     parseFaqsField(formData.get("faqs")),
