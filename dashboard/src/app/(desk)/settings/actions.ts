@@ -63,7 +63,7 @@ import { factHashModeFromEnv, loadCompileProvenance } from "@/lib/tenantFieldPro
 import { overlayFieldMeta, planFactConfirm } from "@/lib/factConfirm";
 import { normalizeFactRow } from "@/lib/factRowNormalize";
 import { assignServiceIds } from "@/lib/serviceIds";
-import { validateTeamSave, type TeamRowInput } from "@/lib/teamValidation";
+import { ownerAlertPhone, validateTeamSave, type TeamRowInput } from "@/lib/teamValidation";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { catalogSaveError } from "@/lib/catalogValidation";
 import { validatePublicContacts } from "@/lib/contactValidation";
@@ -227,7 +227,7 @@ export async function saveAndCompileSettings(
     const team = validateTeamSave({
       submitted: safeJsonRows(formData.get("team_directory")),
       stored: Array.isArray(tenant.team_directory) ? (tenant.team_directory as TeamRowInput[]) : [],
-      ownerPhone: tenant.whatsapp_notification_number,
+      ownerPhone: ownerAlertPhone(tenant),
       seatLimit,
     });
     if (!team.ok) return { error: team.error };

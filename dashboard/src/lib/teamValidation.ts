@@ -106,3 +106,8 @@ export function validateTeamSave(input: {
 
   return { ok: true, rows: rows.map((r) => Object.fromEntries(Object.entries(r).filter(([, v]) => v !== undefined))) };
 }
+
+/** The owner's alert phone (tenants.whatsapp_notification_number) identifies the owner team row. */
+export function ownerAlertPhone(tenant: { whatsapp_notification_number?: string | null }): string | null {
+  return tenant.whatsapp_notification_number ?? null;
+}
