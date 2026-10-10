@@ -65,6 +65,7 @@ import { normalizeFactRow } from "@/lib/factRowNormalize";
 import { assignServiceIds } from "@/lib/serviceIds";
 import { validateTeamSave, type TeamRowInput } from "@/lib/teamValidation";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { catalogSaveError } from "@/lib/catalogValidation";
 
 function safeJsonRows(raw: FormDataEntryValue | null): TeamRowInput[] {
   try {
@@ -144,6 +145,16 @@ export async function saveAndCompileSettings(
     parseProductCatalogField(formData.get("product_catalog")),
     normalizeProductCatalog(tenant.product_catalog).filter((row) => row.name)
   );
+  if (
+    settingsFieldFromScope(scope, "productCatalog", true, false) ||
+    settingsFieldFromScope(scope, "servicesCatalog", true, false)
+  ) {
+    const catalogError = catalogSaveError({
+      products: settingsFieldFromScope(scope, "productCatalog", true, false) ? productCatalog : [],
+      services: settingsFieldFromScope(scope, "servicesCatalog", true, false) ? servicesCatalog : [],
+    });
+    if (catalogError) return { error: catalogError };
+  }
   const socialHandles = pick(
     "socialHandles",
     parseSocialHandlesField(formData.get("social_handles")),
