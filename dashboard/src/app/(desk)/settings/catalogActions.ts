@@ -1,5 +1,6 @@
 "use server";
 
+import { filterPageProducts } from "@/lib/ingest/pageProducts";
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -59,7 +60,8 @@ function extractJsonObject(text: string): unknown {
 async function extractProductsFromText(
   sourceText: string
 ): Promise<{ products: ProductItem[]; social: SocialHandles }> {
-  const localProducts = parseBulkProducts(sourceText);
+  // Page text: titles and paragraphs are not products. Local parse keeps priced item rows only.
+  const localProducts = filterPageProducts(parseBulkProducts(sourceText), { requirePrice: true });
   const channels: SocialHandles["channels"] = [];
   const ig = sourceText.match(/@[a-z0-9._]{2,40}/i)?.[0];
   if (ig) channels.push({ kind: "instagram", label: "Instagram", value: ig });
@@ -91,7 +93,10 @@ Rules: products are individual sellable items (books, SKUs), NOT services like "
       timeoutMs: 20_000,
     });
     const obj = extractJsonObject(raw) as Record<string, unknown>;
-    const products = normalizeProductCatalog(obj.products).filter((p) => p.name);
+    const products = filterPageProducts(
+      normalizeProductCatalog(obj.products).filter((p) => p.name),
+      { requirePrice: false }
+    );
     const gemSocial = normalizeSocialHandles(obj.social || {});
     const mergedChannels = normalizeSocialHandles({
       channels: [...social.channels, ...gemSocial.channels],
@@ -170,7 +175,7 @@ export async function previewCatalogImportAction(
         ok: true,
         products: products.slice(0, PRODUCT_CATALOG_MAX),
         social,
-        message: `Found ${Math.min(products.length, PRODUCT_CATALOG_MAX)} products from the page.`,
+        message: `Found ${Math.min(products.length, PRODUCT_CATALOG_MAX)} possible products on the page. Nothing is added until you confirm. Untick anything that isn't a product.`,
       };
     }
 
