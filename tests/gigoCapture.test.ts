@@ -142,3 +142,31 @@ describe("completeness stub", () => {
     assert.equal(catalogueHold.allowed, true);
   });
 });
+
+import { shopCatalogGap } from "../dashboard/src/lib/outcomeGates.ts";
+describe("QA fixes: onboarding gates", () => {
+  it("rejects negative prices but keeps ranges", () => {
+    assert.equal(inferPriceMode("-100"), null);
+    assert.equal(inferPriceMode("KSh -50"), null);
+    assert.equal(inferPriceMode("abc"), null);
+    assert.equal(inferPriceMode("200-400"), "range");
+    assert.equal(inferPriceMode("150"), "fixed");
+  });
+  it("explains why the shop step is blocked", () => {
+    const gap = shopCatalogGap([{ name: "Test Notebook", price: "150" }]);
+    assert.match(String(gap), /9 more priced products/);
+    assert.match(String(shopCatalogGap([{ name: "X", price: "abc" }])), /valid price/);
+    assert.equal(
+      shopCatalogGap([
+        { name: "A", category: "a", price: "1" },
+        { name: "B", category: "b", price: "1" },
+        { name: "C", category: "c", price: "1" },
+      ]),
+      null
+    );
+  });
+  it("rejects closing before opening in 24h form", () => {
+    assert.equal(parseCaptureHours("Mon-Fri 18:00-09:00"), null);
+    assert.equal(parseCaptureHours("Mon-Fri 9-5")?.days.mon?.close, "17:00");
+  });
+});
