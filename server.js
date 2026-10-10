@@ -47,14 +47,12 @@ const { mergeIdentityLexicon } = require('./src/speech/pronunciationLexicon');
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
 const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
 const {
-  pickSpeechOutageLine,
-  synthesizeEmergencyPcm,
+  planSpeechOutagePlayback,
   pcmDurationMs,
 } = require('./src/speech/emergencyTts');
 const {
   scheduleOutageClipWarm,
   warmOutageClips,
-  loadOutageClip,
   getOutageClipStatus,
 } = require('./src/speech/outageClips');
 const { noteSpeechOutage } = require('./src/speech/speechOutageNotify');
@@ -2319,6 +2317,7 @@ mediaWss.on('connection', (ws, req) => {
    */
   async function playLocalPcm(pcm) {
     if (!pcm || !pcm.length) return 0;
+    if (ws.readyState !== WebSocket.OPEN) return 0;
     speaking = true;
     speakStartedAt = Date.now();
     activePlaybackGeneration = ++playbackGeneration;
@@ -2386,15 +2385,20 @@ mediaWss.on('connection', (ws, req) => {
   /**
    * Soniox STT+TTS are billed out (402) or otherwise dead. Speak the clone-voice
    * downtime recording (same voice as the greeting) and hang up.
+   * Packaged PCM, then espeak. Gemini TTS is skipped when billing is exhausted.
+   * Do not log a spoken line unless PCM was sent. Silent 800ms hangup only
+   * when both the clip and espeak produced nothing.
    */
-  async function handleSpeechProviderOutage(reason) {
+  async function handleSpeechProviderOutage(reason, opts = {}) {
     if (speechOutageStarted) return { ok: false, outage: true };
     speechOutageStarted = true;
     unfinishedHold.close();
     greetingStarted = true;
+    greetingAwaitingFirstPcm = false;
     idleNudge.close();
-    const clip = loadOutageClip(callLanguage, { voiceId: tenantSonioxVoiceId });
-    const line = pickSpeechOutageLine(clip?.language || callLanguage);
+    const billing = Boolean(
+      opts.billing || getSonioxProviderHealth().billingExhausted
+    );
     console.error(
       `[ws/media][${sidLabel()}] speech provider outage (${reason}): speaking clone-voice downtime clip`
     );
@@ -2404,18 +2408,23 @@ mediaWss.on('connection', (ws, req) => {
         err?.message || err
       );
     });
+    let hangMs = 800;
     try {
-      const pcm = await synthesizeEmergencyPcm(line, {
+      const plan = await planSpeechOutagePlayback({
         language: callLanguage,
         voiceId: tenantSonioxVoiceId,
+        skipGemini: billing,
       });
-      if (pcm?.length) {
-        const waitMs = await playLocalPcm(pcm);
-        callTranscript.pushAgent(line);
-        messages.push({ role: 'assistant', content: line, local: true });
-        hangupAfterSpeechOutage(waitMs);
-        return { ok: true, outage: true, emergency: true };
+      if (plan.speak) {
+        const waitMs = await playLocalPcm(plan.pcm);
+        if (waitMs > 0) {
+          callTranscript.pushAgent(plan.line);
+          messages.push({ role: 'assistant', content: plan.line, local: true });
+          hangupAfterSpeechOutage(waitMs);
+          return { ok: true, outage: true, emergency: true, spoke: true };
+        }
       }
+      hangMs = plan.hangupMs || 800;
       console.error(
         `[ws/media][${sidLabel()}] emergency TTS produced no audio after ${reason}`
       );
@@ -2425,8 +2434,8 @@ mediaWss.on('connection', (ws, req) => {
         err?.message || err
       );
     }
-    hangupAfterSpeechOutage(800);
-    return { ok: false, outage: true };
+    hangupAfterSpeechOutage(hangMs);
+    return { ok: false, outage: true, spoke: false };
   }
 
 
@@ -2529,7 +2538,8 @@ mediaWss.on('connection', (ws, req) => {
       const classified = classifySonioxError(err);
       if (classified.billing || classified.fatal) {
         return handleSpeechProviderOutage(
-          `tts ${classified.code || classified.message}`
+          `tts ${classified.code || classified.message}`,
+          { billing: classified.billing }
         );
       }
       return { ok: false };
@@ -2716,7 +2726,8 @@ mediaWss.on('connection', (ws, req) => {
       const classified = classifySonioxError(err);
       if (classified.billing || classified.fatal) {
         return handleSpeechProviderOutage(
-          `tts ${classified.code || classified.message}`
+          `tts ${classified.code || classified.message}`,
+          { billing: classified.billing }
         );
       }
       return { ok: false };
@@ -4376,7 +4387,8 @@ mediaWss.on('connection', (ws, req) => {
       const classified = evt.classified || classifySonioxError(evt.raw);
       if (classified.billing || classified.fatal) {
         void handleSpeechProviderOutage(
-          `stt ${classified.code || classified.message}`
+          `stt ${classified.code || classified.message}`,
+          { billing: classified.billing }
         );
       }
       return;
@@ -4806,8 +4818,11 @@ mediaWss.on('connection', (ws, req) => {
           closureNotice,
         });
         greetingAwaitingFirstPcm = true;
-        await speakGreetingSentences(fallback);
-        messages.push({ role: 'assistant', content: fallback, local: true });
+        const spoken = await speakGreetingSentences(fallback);
+        if (spoken?.ok) {
+          callTranscript.pushAgent(fallback);
+          messages.push({ role: 'assistant', content: fallback, local: true });
+        }
       } catch {
         /* ignore */
       }
@@ -6461,8 +6476,23 @@ async function runGeminiTurn(
   };
 }
 
+function logPackagedOutageClips() {
+  const clips = getOutageClipStatus();
+  if (clips.packaged?.missing) {
+    console.warn(
+      '⚠ Packaged downtime WAVs missing (src/speech/pcm/downtime-en.wav and downtime-sw.wav). ' +
+        'Cold boot cannot play the clone voice if Soniox is already down.'
+    );
+    return;
+  }
+  console.log(
+    `✓ Packaged downtime clips on disk en=${clips.packaged.en} sw=${clips.packaged.sw}`
+  );
+}
+
 server.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);
+  logPackagedOutageClips();
   console.log(`📞 Voice webhook: POST /voice/incoming (SautiKit XML Stream → /ws/media)`);
   console.log(`📡 Media WebSocket: /ws/media (Host-based wss URL for Localtunnel)`);
   if (PUBLIC_BASE_URL) {
