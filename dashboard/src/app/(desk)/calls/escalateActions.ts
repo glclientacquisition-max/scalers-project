@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { formatEscalationDelivery } from "@/lib/escalationDelivery";
@@ -32,6 +34,7 @@ export async function pingTeammateAction(opts: {
   callId: string;
   teammateName: string;
 }): Promise<PingTeammateResult> {
+  await requireMember("inbox.act");
   if (!(await isAuthenticated())) {
     return { error: "Not signed in." };
   }

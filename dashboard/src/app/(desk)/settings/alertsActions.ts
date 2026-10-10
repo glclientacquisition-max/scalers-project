@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import { parseNotifyChannelsField } from "@/lib/notifyChannels";
@@ -19,6 +21,7 @@ export async function saveAlertsAction(
   _prev: AlertsActionState,
   formData: FormData
 ): Promise<AlertsActionState> {
+  await requireMember("settings.edit");
   if (!(await isAuthenticated())) {
     return { error: "Sign in to save settings." };
   }

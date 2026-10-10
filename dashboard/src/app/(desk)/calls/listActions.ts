@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import { loadCachedInboxItems } from "@/lib/inboxLoad";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import { getCurrentTenant } from "@/lib/tenant";
@@ -10,6 +12,7 @@ export async function refreshInboxList(): Promise<{
   error: string | null;
   partialError: string | null;
 }> {
+  await requireMember("inbox.view");
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return { items: [], error: "Not signed in.", partialError: null };
