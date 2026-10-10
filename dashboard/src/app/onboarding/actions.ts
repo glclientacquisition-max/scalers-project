@@ -83,7 +83,7 @@ export async function completeOnboardingAction(
       };
     }
     if (vertical !== "home_services" && !shopCatalogPasses(products)) {
-      return { error: "Add priced products, or skip.", step: 1 };
+      return { error: "Add at least one product with a valid price, or skip.", step: 1 };
     }
   }
   const schedule = hoursSkipped ? null : parseCaptureHours(hoursRaw);
