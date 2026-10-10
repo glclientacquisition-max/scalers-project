@@ -65,7 +65,8 @@ describe("desk resilience and anti-slop", () => {
     assert.match(home, /DeskNoWorkspace/);
     assert.doesNotMatch(home, /No workspace linked to this account yet/);
     assert.match(empty, /No workspace/);
-    assert.match(empty, /href="\/signup"/);
+    // QA fix: signed-in users create a workspace in-session, not via public /signup.
+    assert.match(empty, /href="\/onboarding"/);
     assert.match(offline, /No connection/);
     assert.match(offline, /navigator\.onLine/);
     assert.match(layout, /DeskOffline/);
