@@ -11,6 +11,8 @@ import { adminRowActionClass, adminTdClass, adminThClass } from "@/components/Ad
 import { deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
+import { ListRow } from "@/components/ui/ListRow";
+import { numberLabel, searchableNumber } from "@/lib/adminBillingCopy";
 import { usedOfIncluded } from "@/lib/packageUsageAlign";
 
 type BillingFilter = "all" | "beta" | "charging" | "low" | "exhausted";
@@ -44,7 +46,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
       if (!q) return true;
       return (
         r.business_name.toLowerCase().includes(q) ||
-        r.sautikit_virtual_number.toLowerCase().includes(q) ||
+        searchableNumber(r.sautikit_virtual_number).includes(q) ||
         (r.packageName || "").toLowerCase().includes(q)
       );
     });
@@ -63,8 +65,8 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
       </section>
 
       <p className="text-sm text-ink-2">
-        Observe every client: package minutes and on-demand charging mode. Edit SKUs, rates, and
-        assignments on{" "}
+        Package minutes and charging for every business. Open a business to change its package.
+        Prices and rates live on{" "}
         <Link href="/admin/packages" className="font-medium text-accent underline-offset-2 hover:underline">
           Packages
         </Link>
@@ -94,7 +96,29 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="sm:hidden">
+        {filtered.length === 0 ? (
+          <Empty title="No businesses match." line="Widen your filter or search for another name." />
+        ) : (
+          <ul className="divide-y divide-line/70 border-y border-line/70" aria-label="Businesses">
+            {filtered.map((r) => (
+              <ListRow
+                key={r.id}
+                href={`/admin/billing/${r.id}`}
+                title={r.business_name}
+                when={r.statusLabel}
+                preview={[
+                  `${r.packageName || "No package"}${r.period ? ` / ${r.period}` : ""}`,
+                  `${usedOfIncluded(r.minutesUsed, r.minutesIncluded)} min`,
+                  chargingModeLabel(r.billing_enforcement),
+                ].join(" · ")}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[880px] text-left text-sm">
           <thead className="text-ink-2">
             <tr className="border-b border-line/70">
@@ -111,7 +135,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7}>
-                  <Empty title="No businesses match." line="Widen your filter or assign a package from a client row." />
+                  <Empty title="No businesses match." line="Widen your filter or search for another name." />
                 </td>
               </tr>
             ) : (
@@ -119,7 +143,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
                 <tr key={r.id} className="border-t border-line/70">
                   <td className={adminTdClass}>
                     <p className={`text-body font-medium text-ink ${deskPreviewClass}`}>{r.business_name}</p>
-                    <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>{r.sautikit_virtual_number}</p>
+                    <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>{numberLabel(r.sautikit_virtual_number)}</p>
                   </td>
                   <td className={`${adminTdClass} text-ink-2`}>
                     {r.packageName || "No package"}
