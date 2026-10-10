@@ -6,6 +6,7 @@ import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getCurrentTenant } from "@/lib/tenant";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import { OnboardingWizard } from "./OnboardingWizard";
+import { CreateWorkspaceForm } from "./CreateWorkspaceForm";
 
 // instant = false: owner cookie session must run before the wizard.
 export const instant = false;
@@ -49,9 +50,11 @@ export default async function OnboardingPage() {
               <OnboardingExit />
             </div>
           </div>
-          <p className="mt-6 text-ink-soft leading-relaxed">
-            No workspace linked to this account. Sign up again or contact support.
+          <h1 className="mt-8 font-display text-2xl text-ink">Create your workspace</h1>
+          <p className="mt-2 text-ink-soft leading-relaxed">
+            This account isn&apos;t linked to a business yet. Add one to continue.
           </p>
+          <CreateWorkspaceForm />
         </div>
       </main>
     );
