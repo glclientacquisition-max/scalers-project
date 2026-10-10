@@ -133,6 +133,7 @@ export async function sendOpsMail(opts: {
   to: string[];
   subject: string;
   text: string;
+  html?: string;
 }): Promise<{ sent: number; skipped: string }> {
   const apiKey = resendKey();
   const from = opsFromAddress();
@@ -151,6 +152,7 @@ export async function sendOpsMail(opts: {
       to,
       subject: opts.subject,
       text: opts.text,
+      ...(opts.html ? { html: opts.html } : {}),
     }),
   });
   const json = (await res.json().catch(() => ({}))) as { message?: string };
