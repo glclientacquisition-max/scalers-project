@@ -24,6 +24,8 @@ import {
   shopCatalogPasses,
 } from "@/lib/outcomeGates";
 import { upsertTenantFieldMeta } from "@/lib/deskProvenance";
+import { updateWithColumnPeel } from "@/lib/peelMissingColumns";
+import { validateAgentName } from "@/lib/onboardingDraft";
 
 export type OnboardingState = {
   error?: string;
@@ -110,12 +112,15 @@ export async function completeOnboardingAction(
     whatsapp: tenant.whatsapp_notification_number,
     email: tenant.alert_email,
   });
-  const agentName = agentNameInput || "Receptionist";
+  const agentNameCheck = validateAgentName(agentNameInput);
+  if (!agentNameCheck.ok) {
+    return { error: agentNameCheck.error, step: 3 };
+  }
+  const agentName = agentNameCheck.name;
   const servicesOffered =
     vertical === "home_services"
       ? formatServicesForCompiler(services, "")
       : formatProductsForCompiler(products);
-  const servicesPricing = servicesOffered;
   const hoursLocation = schedule ? formatHoursForCompiler(schedule) : "";
   const unknownAnswerFallback = "I'll check with the owner.";
   const productsText = formatProductsForCompiler(products);
@@ -189,99 +194,21 @@ export async function completeOnboardingAction(
     patch.team_directory = teamDirectory;
   }
 
-  const { error } = await workspace.client
-    .from("tenants")
-    .update(patch)
-    .eq("id", tenant.id);
-
+  // Previously any missing optional column triggered a "core" fallback that silently
+  // dropped hours_schedule, agent_name, faqs, catalogs, etc. Peel only what is missing.
+  const { error, dropped } = await updateWithColumnPeel(
+    patch,
+    (next) => workspace.client.from("tenants").update(next).eq("id", tenant.id),
+    ["llm_system_prompt"]
+  );
   if (error) {
-    // Peel optional retail pack columns if migrations are not applied yet.
-    if (
-      /faqs|business_policies|services_catalog|product_catalog|hours_schedule|unknown_answer_fallback|column/i.test(
-        error.message
-      )
-    ) {
-      const corePatch: Record<string, unknown> = {
-        services_offered: servicesOffered,
-        business_hours: hoursLocation,
-        agent_tone: tone,
-        vertical,
-        handoff_mode: handoffMode,
-        business_locations: businessLocations,
-        llm_system_prompt: prompt,
-      };
-      const { error: coreErr } = await workspace.client
-        .from("tenants")
-        .update(corePatch)
-        .eq("id", tenant.id);
-      if (!coreErr) {
-        redirect("/home");
-      }
-      if (/vertical|handoff_mode|business_locations/i.test(coreErr.message)) {
-        const { error: fallbackErr } = await workspace.client
-          .from("tenants")
-          .update({
-            services_offered: servicesPricing,
-            business_hours: hoursLocation,
-            agent_tone: tone,
-            llm_system_prompt: prompt,
-          })
-          .eq("id", tenant.id);
-        if (!fallbackErr) redirect("/home");
-      }
-    }
-    if (/vertical|handoff_mode|business_locations/i.test(error.message)) {
-      // Columns not applied yet — still save core profile + prompt.
-      const { error: fallbackErr } = await workspace.client
-        .from("tenants")
-        .update({
-          services_offered: servicesPricing,
-          business_hours: hoursLocation,
-          agent_tone: tone,
-          llm_system_prompt: prompt,
-        })
-        .eq("id", tenant.id);
-      if (fallbackErr) {
-        const missingCol = /business_hours|services_offered|agent_tone|column/i.test(
-          fallbackErr.message
-        );
-        if (missingCol) {
-          const { error: promptErr } = await workspace.client
-            .from("tenants")
-            .update({ llm_system_prompt: prompt })
-            .eq("id", tenant.id);
-          if (promptErr) {
-            return {
-              error: ownerFacingError(error.message, "Could not save business details."),
-              step: 3,
-            };
-          }
-          redirect("/home");
-        }
-        return { error: fallbackErr.message, step: 3 };
-      }
-      redirect("/home");
-    }
-    const missingCol = /business_hours|services_offered|agent_tone|column/i.test(
-      error.message
-    );
-    if (missingCol) {
-      const { error: promptErr } = await workspace.client
-        .from("tenants")
-        .update({ llm_system_prompt: prompt })
-        .eq("id", tenant.id);
-      if (promptErr) {
-        return {
-          error: ownerFacingError(error.message, "Could not save business details."),
-          step: 3,
-        };
-      }
-      redirect("/home");
-    }
     return {
-      error: ownerFacingError(error.message, "Could not save business details."),
+      error: ownerFacingError(error, "Could not save business details."),
       step: 3,
     };
+  }
+  if (dropped.length) {
+    console.warn("[onboarding] saved without missing columns:", dropped.join(", "));
   }
 
   await recordCaptureMeta({
