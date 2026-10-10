@@ -77,11 +77,11 @@ export function CatalogImportSheet({
         <div className="mt-4 space-y-2">
           <p className="text-meta text-ink-2">
             {cleanupCount
-              ? `Suggested cleanup on ${cleanupCount} row${cleanupCount === 1 ? "" : "s"}`
+              ? `Suggested cleanup on ${cleanupCount} of ${previewRows.length} row${previewRows.length === 1 ? "" : "s"}`
               : `Ready to add ${previewRows.length} row${previewRows.length === 1 ? "" : "s"}`}
           </p>
-          <ul className="divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
-            {previewRows.slice(0, 8).map((row, i) => (
+          <ul className="divide-y divide-hairline max-h-[min(20rem,50vh)] overflow-y-auto overscroll-contain rounded-2xl border border-hairline bg-surface">
+            {previewRows.map((row, i) => (
               <li key={`${row.name}-${i}`} className="px-4 py-2.5">
                 <p className="truncate text-body font-medium text-ink">{row.name}</p>
                 {"price_range" in row && row.price_range ? (
