@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { ACTIONS, assignableRoles, can, canManageMember, normalizeRole, type Action, type Role } from "../dashboard/src/lib/permissions.ts";
+import { hiddenDeskHrefs } from "../dashboard/src/lib/permissions.ts";
 import { teamInvitesEnabled } from "../dashboard/src/lib/teamInvitesFlag.ts";
 
 const EXPECT: Record<Role, Action[]> = {
@@ -43,4 +44,12 @@ it("feature flag defaults off; env or tenant list enables", () => {
   assert.equal(teamInvitesEnabled("t1", { TEAM_INVITES_ENABLED: "true" } as unknown as NodeJS.ProcessEnv), true);
   assert.equal(teamInvitesEnabled("t1", { TEAM_INVITES_TENANTS: "t0, t1" } as unknown as NodeJS.ProcessEnv), true);
   assert.equal(teamInvitesEnabled("t2", { TEAM_INVITES_TENANTS: "t0,t1" } as unknown as NodeJS.ProcessEnv), false);
+});
+
+it("nav hiding per role", () => {
+  assert.deepEqual(hiddenDeskHrefs("owner"), []);
+  assert.deepEqual(hiddenDeskHrefs("admin"), []);
+  assert.deepEqual(hiddenDeskHrefs("staff"), ["/wallet", "/settings"]);
+  assert.deepEqual(hiddenDeskHrefs("viewer"), ["/wallet"]);
+  assert.deepEqual(hiddenDeskHrefs(null), []);
 });

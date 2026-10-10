@@ -11,6 +11,22 @@ export class AccessDeniedError extends Error {
   }
 }
 
+/** Light role lookup for the desk shell (no getCurrentTenant; flag off => owner, no query). */
+export async function deskMemberRole(tenantId: string | null | undefined): Promise<Role | null> {
+  if (!tenantId) return null;
+  if (!teamInvitesEnabled(tenantId)) return "owner";
+  const user = await getAuthUser();
+  if (!user) return null;
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("tenant_members")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  return data ? normalizeRole(data.role) : null;
+}
+
 /** Current member's role in the current workspace. Flag off => "owner" (legacy behaviour). */
 export async function currentMemberRole(): Promise<Role | null> {
   const user = await getAuthUser();
@@ -38,4 +54,10 @@ export async function requireMember(action: Action): Promise<Role | null> {
   if (role === null) return null;
   if (!can(role, action)) throw new AccessDeniedError(action);
   return role;
+}
+
+/** Page-level check: null role (signed out / no workspace) passes so the page's own handling runs. */
+export async function memberCan(action: Action): Promise<boolean> {
+  const role = await currentMemberRole();
+  return role === null || can(role, action);
 }

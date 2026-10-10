@@ -73,3 +73,20 @@ export const ROLE_BLURBS: Record<Role, string> = {
   staff: "Inbox and contacts. No usage, billing or settings.",
   viewer: "Can look, can't change anything.",
 };
+
+/** Desk destinations and the permission needed to see them. */
+export const DESK_PAGE_ACTION: Record<string, Action> = {
+  "/home": "overview.view",
+  "/calls": "inbox.view",
+  "/contacts": "contacts.view",
+  "/wallet": "usage.view",
+  "/settings": "settings.view",
+};
+
+/** Hrefs to hide from the desk rail / tab bar for this role. */
+export function hiddenDeskHrefs(role: Role | null): string[] {
+  if (!role) return [];
+  return Object.entries(DESK_PAGE_ACTION)
+    .filter(([, action]) => !can(role, action))
+    .map(([href]) => href);
+}
