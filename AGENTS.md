@@ -91,3 +91,17 @@ GitHub for humans; Cloud Agents write specs under `docs/specs/` (read-only `gh`)
 
 Single-context glossary at `CONTEXT.md`. ADRs stay in `docs/adr/`. Lane contracts stay in `docs/agents/`. See `docs/agents/domain.md`.
 
+## Cursor Cloud specific instructions
+
+Two package roots. Install with `npm ci` at the repo root, then `npm ci --prefix dashboard`. Node 22. Do not use a workspace install.
+
+Voice engine listens on port 3000 (`npm start`). It exits unless `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set. Placeholders are enough for `GET /healthz` and `POST /voice/incoming` (SautiKit Stream XML). A missing database still returns the stream document. Live speech needs `SONIOX_API_KEY` and `GEMINI_API_KEY`. `npm run smoke:db` needs a real Supabase project. `npm run test:voice`, `npm run test:mvp`, and `npm run eval:brain` do not.
+
+Owner desk listens on port 3001:
+
+```bash
+cd dashboard && DASHBOARD_OPEN=true npm run dev -- --hostname 0.0.0.0 --port 3001
+```
+
+Open `http://localhost:3001`. Next.js 16 blocks dev assets when the host is `127.0.0.1`, so client controls (theme, hydration) only attach on `localhost`. `DASHBOARD_OPEN=true` unlocks `/dev/home`, `/dev/desk-shell`, and `/dev/inbox` without a login. `/dev/home` logs a pre-existing `new Date()` prerender warning and still renders. Desk production check is `npm run build` in `dashboard/`.
+
