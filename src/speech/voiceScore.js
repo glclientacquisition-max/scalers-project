@@ -22,6 +22,37 @@ const NAME_ASK =
 const RESPELL = /\b[A-Za-z]{2,}(?:-[A-Za-z]{2,})+\b/g;
 const NEUTRAL_ACK = /^(?:sawa|poa|asante|ndio|ndiyo|haya|okay|ok|yes|alright)[.!]?$/i;
 
+const { finalCarriesContent } = require('./turnTaking');
+
+// A caller final with content whose turn-taking decision threw it away
+// (HD_054e4f7ff253 t3: "Unawashangaa apartment?" ignored as
+// thinking_continuation). Echo and duplicate drops are the agent's own audio.
+const LOST_FINAL_DECISIONS = new Set(['ignore', 'skip', 'drop']);
+const LOST_FINAL_EXEMPT = new Set(['echo', 'duplicate', 'empty']);
+
+function lostCallerFinals(turn) {
+  const rows = Array.isArray(turn?.stages) ? turn.stages : [];
+  const lost = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i];
+    if (row?.stage !== 'stt' || row.kind !== 'final') continue;
+    const text = String(row.text || '').trim();
+    if (!finalCarriesContent(text)) continue;
+    let end = null;
+    for (let j = i + 1; j < rows.length; j += 1) {
+      if (rows[j]?.stage === 'stt' && rows[j].kind === 'final') break;
+      if (rows[j]?.stage === 'turn_end') {
+        end = rows[j];
+        break;
+      }
+    }
+    if (!end || !LOST_FINAL_DECISIONS.has(end.decision)) continue;
+    if (LOST_FINAL_EXEMPT.has(end.reason)) continue;
+    lost.push({ text, reason: end.reason || end.decision });
+  }
+  return lost;
+}
+
 function stages(turn, name, phase) {
   const rows = (turn?.stages || []).filter((row) => row.stage === name);
   if (!phase) return rows;
@@ -187,6 +218,8 @@ function lateTokenCut(turn) {
     (row) =>
       row.stage === 'turn_end' &&
       ((row.decision === 'ignore' && row.reason === 'grace') ||
+        // A grace final that is now kept still means the turn closed early.
+        (row.decision === 'queue' && row.reason === 'kept_grace') ||
         (row.decision === 'hold' && row.reason === 'late_final'))
   );
   if (!late) return null;
@@ -259,10 +292,11 @@ function emptyChecks() {
     respelling: 0,
     prematureTurn: 0,
     slow: 0,
+    lostCallerFinal: 0,
   };
 }
 
-function scoreTurn(turn) {
+function scoreTurn(turn, opts = {}) {
   const checks = emptyChecks();
   const notes = [];
   const caller = String(turn?.caller?.text || '');
@@ -350,6 +384,19 @@ function scoreTurn(turn) {
     notes.push(`first reply pcm ${pcm}ms`);
   }
 
+  // A dropped caller question counts unless that text reached a caller turn
+  // (this one or a later one), i.e. it was answered after all.
+  const reached = normalizeSpeech(
+    [turn?.caller?.text || '', ...(Array.isArray(opts.laterCallerTexts) ? opts.laterCallerTexts : [])].join(' ')
+  );
+  const lost = lostCallerFinals(turn).filter(
+    (row) => !reached.includes(normalizeSpeech(row.text))
+  );
+  if (lost.length) {
+    checks.lostCallerFinal = 1;
+    notes.push(`caller final dropped (${lost[0].reason}): ${lost[0].text}`);
+  }
+
   appendSpeakNotes(turn, notes);
 
   if (stage(turn, 'outcome')?.value === 'unlogged') {
@@ -371,7 +418,8 @@ function scoreTurn(turn) {
     checks.deletedAnswer * 25 +
     Math.min(checks.respelling, 3) * 10 +
     checks.prematureTurn * 10 +
-    checks.slow * 10;
+    checks.slow * 10 +
+    checks.lostCallerFinal * 25;
   return {
     turnIndex: turn.turnIndex,
     caller,
@@ -383,7 +431,10 @@ function scoreTurn(turn) {
 }
 
 function scoreTurns(turns = []) {
-  const scored = turns.map(scoreTurn);
+  const callerTexts = turns.map((turn) => String(turn?.caller?.text || ''));
+  const scored = turns.map((turn, index) =>
+    scoreTurn(turn, { laterCallerTexts: callerTexts.slice(index + 1) })
+  );
   const checks = emptyChecks();
   const asked = [];
   const nameAskTurns = [];
@@ -422,6 +473,7 @@ function scoreTurns(turns = []) {
 
 const CHECK_WEIGHT = {
   silence: 30,
+  lostCallerFinal: 25,
   deletedAnswer: 25,
   languageMismatch: 20,
   incomplete: 20,
@@ -431,6 +483,7 @@ const CHECK_WEIGHT = {
 
 const CHECK_LINE = {
   silence: 'Silence after a caller turn',
+  lostCallerFinal: 'A caller question was dropped',
   deletedAnswer: 'A correct answer was deleted',
   languageMismatch: 'Reply language did not match the caller',
   incomplete: 'The answer was incomplete',
@@ -567,6 +620,7 @@ module.exports = {
   LATENCY_BUDGET_MS,
   scoreTurn,
   scoreTurns,
+  lostCallerFinals,
   diagnoseCall,
   scoreFixtureReplay,
   compareToBaseline,

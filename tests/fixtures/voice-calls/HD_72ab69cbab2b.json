@@ -1,0 +1,354 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "tenantId": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+  "businessName": "Done and Dusted",
+  "callerName": "Alvin",
+  "nameOnFile": false,
+  "vertical": "home_services",
+  "servicesCatalog": [
+    {
+      "name": "Mattress cleaning",
+      "notes": "Vary by size",
+      "source": "owner",
+      "category": "Cleaning",
+      "in_stock": "",
+      "price_range": "Ksh 800-1200",
+      "out_of_scope": ""
+    },
+    {
+      "name": "1-Bedroom Apartment (Standard)",
+      "notes": "Dusting, vacuuming, mopping, bathroom sanitation, kitchen surfaces",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 3,000 flat",
+      "out_of_scope": ""
+    },
+    {
+      "name": "2-Bedroom Apartment (Standard)",
+      "notes": "Dusting, vacuuming, mopping, up to 2 bathrooms, kitchen surfaces",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 4,500 flat",
+      "out_of_scope": ""
+    },
+    {
+      "name": "3-Bedroom House (Standard)",
+      "notes": "Full house vacuum/mop, dust all rooms, up to 2.5 bathrooms, kitchen counters",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 6,000 flat",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Hourly Housekeeping",
+      "notes": "Custom chores: laundry, dishwashing, organizing",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 500 per hour (min 3 hours)",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Deep Cleaning Package (add-on)",
+      "notes": "Inside oven, fridge, baseboards, interior windows, light fixtures",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "Base + KSh 3,000 to 6,000",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Move-In / Move-Out Clean",
+      "notes": "Empty premises, cabinets/drawers, doors and windows",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 5,000 flat (2-bed unit)",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Post-Construction Clean",
+      "notes": "Dust mitigation, paint/sticker removal, high-pile vacuum, site sanitation",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 40 per sq ft",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Small Office (up to 1,500 sq ft)",
+      "notes": "Trash, desk dusting, restrooms, breakroom, floors",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 15,000 per visit",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Medium Office (1,501-3,500 sq ft)",
+      "notes": "Workspace sanitation, common areas, conference rooms, floors",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 25,000 per visit",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Large Commercial Contract",
+      "notes": "Daily or weekly custodians, windows, floor buffing",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "Custom quote (KSh 35-150 per sq m per month)",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Sofa Cleaning (per seat)",
+      "notes": "",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 800 per seat",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Carpet Cleaning (per room)",
+      "notes": "",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 2,000 per room",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Interior Window Cleaning",
+      "notes": "",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 200 per window",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Refrigerator Internal Deep Clean",
+      "notes": "",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 1,000 per unit",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Oven Internal Deep Clean",
+      "notes": "",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 1,200 per unit",
+      "out_of_scope": ""
+    }
+  ],
+  "businessPolicies": {
+    "coverage_areas": [
+      "county:nairobi",
+      "place:kitengela",
+      "county:kiambu",
+      "place:juja",
+      "place:ongata rongai",
+      "place:syokimau"
+    ]
+  },
+  "socialHandles": {
+    "channels": [
+      {
+        "kind": "phone",
+        "label": "Main",
+        "value": "0790381872"
+      }
+    ]
+  },
+  "hoursSchedule": {
+    "days": {
+      "fri": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "mon": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "sat": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "sun": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "thu": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "tue": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "wed": {
+        "open": "08:00",
+        "close": "18:00"
+      }
+    },
+    "location": "Main · Nairobi and the close surroundings",
+    "timezone": "Africa/Nairobi"
+  },
+  "callId": "HD_72ab69cbab2b",
+  "source": "staging, 2026-10-08 16:01 EAT (pre-#612 build), voice_turn_traces. The #612 call: unfinished turn cut by the name ask (t1), punctuation-stripped TTS, Kitengela with no next step (t5), size rows as the catalogue (t6).",
+  "turns": [
+    {
+      "caller": "Nilikuwa nauliza,",
+      "soniox": "sw",
+      "flushed": true,
+      "canned": {
+        "path": "file_name_ask",
+        "text": "Je, naongea na Alvin?"
+      },
+      "model": {
+        "provider": "canned",
+        "model": "file_name_ask",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "observed": {
+        "firstPcmMs": 395,
+        "firstReplyPcmMs": 395
+      },
+      "outcome": "early_return",
+      "liveTts": [
+        "Je, naongea na Alvin?"
+      ]
+    },
+    {
+      "caller": "juu.",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Done and Dusted Cleaning Services, hapa ni Shy. Ungependa tusaidie na usafi gani leo?",
+        "chars": 85,
+        "spokenEmitted": 85
+      },
+      "filler": "Mm.",
+      "observed": {
+        "firstPcmMs": 656,
+        "firstReplyPcmMs": 1685,
+        "firstTokenMs": 1127
+      },
+      "outcome": "barge_in",
+      "liveTts": [
+        "Done and Dusted Cleaning Services, hapa ni Shy.",
+        "Ungependa tusaidie na usafi gani leo?"
+      ]
+    },
+    {
+      "caller": "Yeah, yeah. Unaongea na Alvin?Do.",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "filler": "Sawa.",
+      "observed": {
+        "firstPcmMs": 409,
+        "firstReplyPcmMs": null
+      },
+      "outcome": "barge_in"
+    },
+    {
+      "caller": "Guys cover, like, Rongai?",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Yes, Alvin, we cover Ongata Rongai. Which cleaning service would you like to get today?",
+        "chars": 87,
+        "spokenEmitted": 87
+      },
+      "filler": "Alright.",
+      "observed": {
+        "firstPcmMs": 404,
+        "firstReplyPcmMs": 1730,
+        "firstTokenMs": 1235
+      },
+      "outcome": "ok",
+      "liveTts": [
+        "Yes, Alvin, we cover Ongata Rongai.",
+        "Which cleaning service would you like to get today?"
+      ]
+    },
+    {
+      "caller": "What about Kitengela?",
+      "soniox": "en",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "Yes, we cover Kitengela."
+      },
+      "model": {
+        "provider": "canned",
+        "model": "speak_packet",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "observed": {
+        "firstPcmMs": 316,
+        "firstReplyPcmMs": 316
+      },
+      "outcome": "early_return",
+      "liveTts": [
+        "Yes, we cover Kitengela."
+      ]
+    },
+    {
+      "caller": "And what are the services you offer?",
+      "soniox": "en",
+      "flushed": true,
+      "canned": {
+        "path": "speak_packet",
+        "text": "We offer Mattress cleaning, 1-Bedroom Apartment, 2-Bedroom Apartment, and 3-Bedroom House, and more. Which one do you need?"
+      },
+      "model": {
+        "provider": "canned",
+        "model": "speak_packet",
+        "promptId": "voice.system",
+        "outputText": null,
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "observed": {
+        "firstPcmMs": 335,
+        "firstReplyPcmMs": 335
+      },
+      "outcome": "early_return",
+      "liveTts": [
+        "We offer Mattress cleaning, 1-Bedroom Apartment, 2-Bedroom Apartment, and 3-Bedroom House, and more. Which one do you need?"
+      ]
+    }
+  ]
+}

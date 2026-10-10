@@ -10,6 +10,7 @@ const { prepareForTts } = require('./ttsNormalize');
 const { analyzeCallerLanguage, languageDirective } = require('../conversation/language');
 const { SCHEMA, SCHEMA_VERSION } = require('./voiceTrace');
 const { coverageNextStepFor } = require('../conversation/coverageNextStep');
+const { decideCallerEvent, finalDisposition } = require('./turnTaking');
 
 function initialState(fixture = {}) {
   const name = String(fixture.callerName || '').trim();
@@ -228,11 +229,31 @@ function replayTurn(turn, ctx) {
       text: String(turn.lateFinal),
       tokens: [],
     });
+    // A grace-window final the late-final hold did not merge goes through the
+    // same keep rule as voice (server.js): content is queued, not dropped.
     stages.push({
       stage: 'turn_end',
-      decision: turn.lateFinalMerged ? 'hold' : 'ignore',
-      reason: turn.lateFinalMerged ? 'late_final' : 'grace',
+      ...(turn.lateFinalMerged
+        ? { decision: 'hold', reason: 'late_final' }
+        : finalDisposition({ action: 'ignore', reason: 'grace' }, String(turn.lateFinal))),
     });
+  }
+  // Finals the caller spoke while this turn was in flight (phase thinking or
+  // speaking). Each runs through the live turn-taking table (HD_054e4f7ff253 t3).
+  for (const final of Array.isArray(turn.overlapFinals) ? turn.overlapFinals : []) {
+    const text = String(final?.text || '').trim();
+    if (!text) continue;
+    const phase = final.phase === 'speaking' ? 'speaking' : 'thinking';
+    const decision = decideCallerEvent({
+      text,
+      isFinal: true,
+      phase,
+      lastAgentText: ctx.lastSpoken || '',
+      speakStartedAt: 0,
+      now: Number(final.spokenForMs ?? 2000),
+    });
+    stages.push({ stage: 'stt', kind: 'final', text, tokens: [] });
+    stages.push({ stage: 'turn_end', ...finalDisposition(decision, text) });
   }
   if (turn.filler) {
     stages.push({
@@ -290,6 +311,7 @@ function replayTurn(turn, ctx) {
   ctx.language = sticky;
   ctx.history.push({ role: 'user', content: caller });
   ctx.history.push({ role: 'model', content: mouth.spoken });
+  if (mouth.spoken) ctx.lastSpoken = mouth.spoken;
 
   return {
     schema: SCHEMA,
