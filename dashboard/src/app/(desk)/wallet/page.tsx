@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { memberCan } from "@/lib/requireMember";
+import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
 import { getCurrentTenant, createWorkspaceDataClient } from "@/lib/tenant";
 import { getTenantUsageSummary } from "@/lib/wallet";
 import {
@@ -48,6 +50,7 @@ export default function WalletPage(props: WalletPageProps) {
 }
 
 async function WalletBody({ searchParams }: WalletPageProps) {
+  if (!(await memberCan("usage.view"))) return <DeskNoAccess what="Usage" />;
   const sp = await searchParams;
   const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
   const tenant = await getCurrentTenant();

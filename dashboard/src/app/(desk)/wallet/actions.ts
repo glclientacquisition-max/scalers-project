@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -19,6 +21,7 @@ export async function saveOnDemandUsage(
   _prev: OnDemandUsageState,
   formData: FormData
 ): Promise<OnDemandUsageState> {
+  await requireMember("billing.manage");
   if (!(await isAuthenticated())) {
     return { error: "Sign in to change on-demand usage." };
   }

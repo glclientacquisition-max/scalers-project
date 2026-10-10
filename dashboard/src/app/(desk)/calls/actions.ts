@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { parseLeadStatus, type LeadStatus } from "@/lib/supabase";
@@ -17,6 +19,7 @@ export async function updateLeadStatus(
   callId: string,
   nextStatus: string
 ): Promise<LeadStatusResult> {
+  await requireMember("inbox.act");
   if (!(await isAuthenticated())) {
     return { error: "Not signed in." };
   }
@@ -59,6 +62,7 @@ export type WhatsAppFollowUpResult = LeadStatusResult & {
 export async function logWhatsAppFollowUp(
   callId: string
 ): Promise<WhatsAppFollowUpResult> {
+  await requireMember("inbox.act");
   if (!(await isAuthenticated())) {
     return { error: "Not signed in." };
   }

@@ -1,4 +1,12 @@
 import { cookies } from "next/headers";
+import { memberCan } from "@/lib/requireMember";
+import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
+import { MembersPanel } from "@/components/MembersPanel";
+import { loadMembers } from "@/lib/membersLoad";
+import { currentMemberRole } from "@/lib/requireMember";
+import { teamInvitesEnabled } from "@/lib/teamInvitesFlag";
+import { can } from "@/lib/permissions";
+import { getAuthUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { BusinessSettingsShell } from "@/components/BusinessSettingsShell";
 import { DESK_MD_COOKIE } from "@/lib/deskMdBoot";
@@ -33,6 +41,7 @@ export default function SettingsPage(props: SettingsPageProps) {
 }
 
 async function SettingsBody({ searchParams }: SettingsPageProps) {
+  if (!(await memberCan("settings.view"))) return <DeskNoAccess what="Settings" />;
   const params = (await searchParams) || {};
   const tabRaw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const panelRaw = Array.isArray(params.panel) ? params.panel[0] : params.panel;
@@ -66,6 +75,20 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     }
   }
 
+  // Team & access: Members (logins, paid seats) when the feature flag is on.
+  let membersSlot = null;
+  if (tab === "train" && trainPanel === "team" && teamInvitesEnabled(tenant.id)) {
+    const [role, user] = await Promise.all([currentMemberRole(), getAuthUser()]);
+    if (role && user && can(role, "members.view")) {
+      try {
+        const data = await loadMembers(tenant.id);
+        membersSlot = <MembersPanel data={data} viewerRole={role} viewerId={user.id} />;
+      } catch {
+        membersSlot = null;
+      }
+    }
+  }
+
   const navTargets = SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target));
 
   return (
@@ -76,6 +99,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
       curatedVoices={curatedVoices}
       optionStatus={settingsIndexStatuses(tenant, curatedVoices, navTargets)}
       liveTransferExecutor={deskLiveTransferExecutorEnabled()}
+      membersSlot={membersSlot}
     />
   );
 }

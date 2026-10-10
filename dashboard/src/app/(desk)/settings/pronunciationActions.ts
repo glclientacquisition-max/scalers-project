@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import { isAuthenticated } from "@/lib/auth";
 import { normalizeAudioMimeForGemini } from "@/lib/gemini";
 import { deriveLexiconFromRecording } from "@/lib/pronunciationFromRecording";
@@ -79,6 +81,7 @@ export async function screenPronunciationSuggestionsAction(
   _prev: ScreenPronunciationState,
   formData: FormData
 ): Promise<ScreenPronunciationState> {
+  await requireMember("settings.edit");
   if (!(await isAuthenticated())) {
     return { error: "Sign in to refresh suggestions." };
   }
@@ -167,6 +170,7 @@ export async function confirmPronunciationRecording(
   _prev: ConfirmPronunciationState,
   formData: FormData
 ): Promise<ConfirmPronunciationState> {
+  await requireMember("settings.edit");
   if (!(await isAuthenticated())) {
     return { error: "Sign in to save pronunciation." };
   }
@@ -295,6 +299,7 @@ export async function persistPronunciationLexicon(
   _prev: ConfirmPronunciationState,
   formData: FormData
 ): Promise<ConfirmPronunciationState> {
+  await requireMember("settings.edit");
   if (!(await isAuthenticated())) {
     return { error: "Sign in to save pronunciation." };
   }
@@ -349,6 +354,7 @@ export async function minePronunciationFromCallsAction(
   _prev: MinePronunciationState,
   formData: FormData
 ): Promise<MinePronunciationState> {
+  await requireMember("settings.edit");
   if (!(await isAuthenticated())) {
     return { error: "Sign in to scan calls." };
   }
@@ -459,6 +465,7 @@ export async function quickAddPronunciationAction(
   _prev: ConfirmPronunciationState,
   formData: FormData
 ): Promise<ConfirmPronunciationState> {
+  await requireMember("settings.edit");
   if (!(await isAuthenticated())) {
     return { error: "Sign in to add pronunciation." };
   }

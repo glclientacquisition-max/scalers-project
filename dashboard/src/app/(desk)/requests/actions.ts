@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
@@ -17,6 +19,7 @@ export async function updateServiceRequestStatus(
   _prev: RequestStatusState,
   formData: FormData
 ): Promise<RequestStatusState> {
+  await requireMember("inbox.act");
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "Not signed in." };
 
@@ -87,6 +90,7 @@ export async function updateServiceRequestSchedule(
   _prev: RequestScheduleState,
   formData: FormData
 ): Promise<RequestScheduleState> {
+  await requireMember("inbox.act");
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "Not signed in." };
 

@@ -300,6 +300,7 @@ export function TenantForm({
   sidebar = null,
   liveTransferExecutor = false,
   showBack = true,
+  membersSlot = null,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -308,6 +309,8 @@ export function TenantForm({
   sidebar?: ReactNode;
   liveTransferExecutor?: boolean;
   showBack?: boolean;
+  /** Team & access: Members section (feature flag TEAM_INVITES_ENABLED). */
+  membersSlot?: ReactNode;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -2170,6 +2173,7 @@ export function TenantForm({
       </section>
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
+        {membersSlot}
         {liveTransferExecutor || handoffMode === "live_transfer" ? (
           <>
             <SettingsGroup>

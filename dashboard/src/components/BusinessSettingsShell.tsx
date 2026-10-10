@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import Link from "next/link";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import type { TenantRow } from "@/lib/supabase";
@@ -144,6 +146,7 @@ export function BusinessSettingsShell({
   curatedVoices = [],
   optionStatus = {},
   liveTransferExecutor = false,
+  membersSlot = null,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -151,6 +154,7 @@ export function BusinessSettingsShell({
   curatedVoices?: CuratedSonioxVoice[];
   optionStatus?: Record<string, SettingsListStatus>;
   liveTransferExecutor?: boolean;
+  membersSlot?: ReactNode;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
@@ -225,6 +229,7 @@ export function BusinessSettingsShell({
           heading={heading}
           sidebar={rail}
           liveTransferExecutor={liveTransferExecutor}
+          membersSlot={formPanel === "team" ? membersSlot : null}
         />
       ) : (
         <div className={settingsConsoleClass}>

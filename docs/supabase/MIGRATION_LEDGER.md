@@ -283,3 +283,9 @@ CLI version timestamps are **INFERRED** from version string `YYYYMMDDHHMMSS` (UT
 - [`DATABASE_EVOLUTION.md`](../database/DATABASE_EVOLUTION.md)
 - [`DATABASE_APPLY_ORDER.md`](../database/DATABASE_APPLY_ORDER.md)
 - [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../operations/STAGING_REBUILD_EXECUTION_REPORT.md)
+
+## Pending (not applied): team invites
+
+| File | Purpose | Status |
+| --- | --- | --- |
+| `supabase/migrations/20261011000000_team_invites.sql` | Roles owner/admin/staff/viewer (member→staff), one owner per tenant, `tenant_invites`, `tenant_member_audit`, seat/invite/accept/transfer RPCs, restrictive RLS (owner/admin settings; viewer read-only), signup trigger skips invitees. | **Not applied.** Staging first. App flag `TEAM_INVITES_ENABLED` default off. Re-check `handle_new_user_tenant` body against production before applying. |

@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { deskMemberRole } from "@/lib/requireMember";
+import { hiddenDeskHrefs } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 import { DeskAccountBar } from "@/components/DeskAccountBar";
 import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
@@ -51,11 +53,13 @@ export default async function AppShell({ children }: { children: React.ReactNode
     redirect("/onboarding");
   }
 
+  const hideHrefs = hiddenDeskHrefs(await deskMemberRole(tenant?.id));
+
   return (
     <DeskNavHost>
       <div className={deskShellClass}>
         {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
-        <DeskRail />
+        <DeskRail hideHrefs={hideHrefs} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <Suspense
             fallback={
@@ -83,7 +87,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
               <DeskRouteChrome />
             </Suspense>
           </main>
-          <DeskTabBar />
+          <DeskTabBar hideHrefs={hideHrefs} />
         </div>
         <Suspense fallback={null}>
           <DeskNeedsCountLive tenantId={tenant?.id} vertical={tenant?.vertical} />

@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import {
@@ -22,6 +24,7 @@ export async function initiateWalletTopUp(
   _prev: WalletTopUpState,
   formData: FormData
 ): Promise<WalletTopUpState> {
+  await requireMember("billing.manage");
   if (!(await isAuthenticated())) {
     return { error: "Sign in to top up." };
   }
