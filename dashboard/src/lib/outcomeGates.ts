@@ -66,6 +66,8 @@ export function inferPriceMode(price: string | null | undefined): PriceMode | nu
   const raw = String(price || "").trim();
   if (!raw) return null;
   const lower = raw.toLowerCase();
+  // Negative amounts ("-100", "KSh -50") are never a real price.
+  if (/(^|[^\d])-\s*\d/.test(lower) && !/\d\s*(?:-|to)\s*\d/.test(lower)) return null;
   if (/\b(ask|on request|quoted)\b/.test(lower) && !/\d/.test(lower)) return "ask";
   if (/^from\b/.test(lower) && /\d/.test(lower)) return "from";
   if (/\d/.test(lower) && /(?:\bto\b|[-–—])/.test(lower)) return "range";
@@ -88,6 +90,26 @@ export function shopCatalogPasses(products: CaptureProduct[]): boolean {
       .filter(Boolean)
   );
   return categories.size >= 3;
+}
+
+/** Owner-facing reason Continue is disabled on the shop catalog step (null when it passes). */
+export function shopCatalogGap(products: CaptureProduct[]): string | null {
+  if (shopCatalogPasses(products)) return null;
+  const named = products.filter((p) => String(p.name || "").trim());
+  const unpriced = named.filter((p) => productMode(p) == null).length;
+  const priced = named.length - unpriced;
+  const categories = new Set(
+    named
+      .filter((p) => productMode(p) != null)
+      .map((p) => String(p.category || "").trim().toLowerCase())
+      .filter(Boolean)
+  ).size;
+  const parts: string[] = [];
+  if (unpriced) parts.push(`${unpriced} product${unpriced === 1 ? " needs" : "s need"} a valid price (e.g. 150, from 300, 200-400)`);
+  parts.push(
+    `add ${10 - priced} more priced product${10 - priced === 1 ? "" : "s"}, or use 3 categories (${categories} so far)`
+  );
+  return `To continue: ${parts.join("; ")}. Or skip and add them later in Settings.`;
 }
 
 export function homeCatalogPasses(services: CaptureService[]): boolean {
@@ -166,7 +188,9 @@ export function parseCaptureHours(text: string): CaptureHours | null {
   if (openH == null || closeH == null) return null;
 
   if (!openMer && !closeMer && closeH * 60 + closeMinute <= openH * 60 + openMinute) {
-    if (closeH < 12) closeH += 12;
+    // "9-5" means 09:00-17:00. "18:00-09:00" is a closing time before opening: reject.
+    if (closeH < 12 && openH < 12) closeH += 12;
+    else return null;
   } else if (openMer === "am" && !closeMer && closeH < 12 && closeH <= openH) {
     closeH += 12;
   }
