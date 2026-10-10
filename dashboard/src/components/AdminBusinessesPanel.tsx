@@ -432,6 +432,11 @@ export function AdminBusinessesPanel({
             <ListRow title="Notify" preview={notifyLabel(open.whatsapp_notification_number)} />
             <ListRow title="Created" preview={formatCreated(open.created_at)} />
             <ListRow
+              title="Activity"
+              href={`/admin/activity?business=${open.id}`}
+              preview="Who changed what, and when"
+            />
+            <ListRow
               title="Package"
               preview={packLabel(open)}
               onOpen={() => {

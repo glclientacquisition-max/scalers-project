@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { adminActorName } from "@/lib/adminActor";
+import { recordAdminAction } from "@/lib/adminAudit";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import {
@@ -7,7 +9,7 @@ import {
   sendOpsMail,
   verifyOpsResendDomain,
 } from "@/lib/opsMail";
-import { ackOpsNotice, saveOpsSettings } from "@/lib/platformOps";
+import { ackOpsNotice, loadOpsSettings, saveOpsSettings } from "@/lib/platformOps";
 import {
   DEFAULT_SAUTIKIT_WARN_MINOR,
   OPS_NOTICE_KINDS,
@@ -36,9 +38,11 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const action = String(body.action || "");
+  const actor = await adminActorName();
 
   try {
     if (action === "save_settings") {
+      const before = (await loadOpsSettings().catch(() => null))?.settings ?? null;
       const settings = await saveOpsSettings({
         people: parsePeople(body.people, parseOpsEmails(
           Array.isArray(body.emails) ? body.emails.join(",") : String(body.emails || ""),
@@ -48,6 +52,7 @@ export async function POST(request: Request) {
           ? Number(body.sautikit_warn_minor)
           : DEFAULT_SAUTIKIT_WARN_MINOR,
       });
+      await recordAdminAction({ actor, action: "save_alert_settings", before, after: settings });
       return NextResponse.json({ ok: true, settings });
     }
 
@@ -66,15 +71,20 @@ export async function POST(request: Request) {
       if (result.skipped === "no_recipients") {
         return NextResponse.json({ error: "Add a person first." }, { status: 400 });
       }
+      await recordAdminAction({ actor, action: "test_alert_mail", after: { sent_to: emails.length } });
       return NextResponse.json({ ok: true });
     }
 
     if (action === "prepare_resend") {
-      return NextResponse.json({ ok: true, domain: await ensureOpsResendDomain() });
+      const domain = await ensureOpsResendDomain();
+      await recordAdminAction({ actor, action: "prepare_mail_domain", after: { status: domain.status } });
+      return NextResponse.json({ ok: true, domain });
     }
 
     if (action === "verify_resend") {
-      return NextResponse.json({ ok: true, domain: await verifyOpsResendDomain() });
+      const domain = await verifyOpsResendDomain();
+      await recordAdminAction({ actor, action: "verify_mail_domain", after: { status: domain.status } });
+      return NextResponse.json({ ok: true, domain });
     }
 
     if (action === "ack") {
@@ -83,6 +93,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Unknown notice." }, { status: 400 });
       }
       await ackOpsNotice(kind);
+      await recordAdminAction({ actor, action: "ack_notice", before: { kind, status: "open" }, after: { kind, status: "acked" } });
       return NextResponse.json({ ok: true });
     }
 

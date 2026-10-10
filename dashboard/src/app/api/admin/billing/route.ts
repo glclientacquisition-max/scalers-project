@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
+import { recordAdminAction } from "@/lib/adminAudit";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import {
   grantTenantPackageMinutes,
@@ -7,7 +8,7 @@ import {
   loadBillingHistory,
 } from "@/lib/adminBilling";
 import { isLegacyAuthenticated } from "@/lib/auth";
-import { assignBusinessPackage } from "@/lib/packageCatalog";
+import { assignBusinessPackage, loadBusinessPackageNames } from "@/lib/packageCatalog";
 import {
   setTenantBillingMode,
   type BillingMode,
@@ -83,7 +84,10 @@ export async function POST(request: Request) {
       if (period !== "month" && period !== "year") {
         return NextResponse.json({ error: "Period must be month or year" }, { status: 400 });
       }
+      const before = (await loadBusinessPackageNames().catch(() => null))?.get(businessId) ?? null;
       await assignBusinessPackage({ tenantId: businessId, packageId, period });
+      const after = (await loadBusinessPackageNames().catch(() => null))?.get(businessId) ?? { packageId, period };
+      await recordAdminAction({ actor, action: "assign_package", businessId, before, after });
       return NextResponse.json({ ok: true });
     }
 

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { adminActorName } from "@/lib/adminActor";
+import { recordAdminAction } from "@/lib/adminAudit";
 import { logAdminError, operatorError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { syncPoolFromSautikit } from "@/lib/didPool";
@@ -16,6 +18,12 @@ export async function POST() {
 
   try {
     const result = await syncPoolFromSautikit();
+    await recordAdminAction({
+      actor: await adminActorName(),
+      action: "sync_numbers",
+      after: { added: result.added, linked: result.linked },
+      detail: { skipped: result.skipped.length },
+    });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     logAdminError("number-sync-diagnostics", { message: "sync failed", diagnostics: getSautikitKeyDiagnostics() });

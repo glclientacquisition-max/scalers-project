@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { adminActorName } from "@/lib/adminActor";
+import { recordAdminAction } from "@/lib/adminAudit";
 import { logAdminError, operatorError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { buyNumberIntoPool } from "@/lib/didPool";
@@ -55,6 +57,13 @@ export async function POST(request: Request) {
 
   try {
     const row = await buyNumberIntoPool(inventoryId);
+    await recordAdminAction({
+      actor: await adminActorName(),
+      action: "buy_number",
+      before: null,
+      after: { number: (row as { e164?: string } | null)?.e164 ?? null, pool: "available" },
+      detail: { inventory_id: inventoryId },
+    });
     return NextResponse.json({ ok: true, did: row });
   } catch (err) {
     return NextResponse.json({ error: operatorError("buy-number", err, "Could not buy this number.") }, { status: 500 });

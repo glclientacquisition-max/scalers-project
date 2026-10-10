@@ -150,7 +150,7 @@ describe("Super Admin nav: eight destinations, phone 4 + More", () => {
     assert.deepEqual(links.ADMIN_MORE_LINKS.map((l) => l.label), ["Numbers", "Platform", "Activity", "Settings"]);
   });
 
-  it("links only to screens that exist; Activity says it is not built", () => {
+  it("links only to screens that exist; nothing is pending now Activity ships", () => {
     const consoleDir = path.join(ROOT, "dashboard/src/app/admin/(console)");
     for (const item of links.ADMIN_LINKS) {
       if (item.pending) {
@@ -163,7 +163,7 @@ describe("Super Admin nav: eight destinations, phone 4 + More", () => {
       assert.ok(fs.existsSync(path.join(consoleDir, rel)), `${item.label} → ${item.href}`);
       if (hash) assert.match(read("dashboard/src/components/AdminTodayPanel.tsx"), new RegExp(`id="${hash}"`));
     }
-    assert.equal(links.ADMIN_LINKS.find((l) => l.label === "Activity").pending.length > 0, true);
+    assert.equal(links.ADMIN_LINKS.filter((l) => l.pending).length, 0);
   });
 
   it("opens More as a bottom Sheet, not a centred dialog", () => {

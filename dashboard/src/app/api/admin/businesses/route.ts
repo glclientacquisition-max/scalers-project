@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordAdminAction } from "@/lib/adminAudit";
 import { adminActorName } from "@/lib/adminActor";
 import {
   archiveBusiness,
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
       if (!data) {
         return NextResponse.json({ error: "No available numbers in the pool" }, { status: 409 });
       }
+      await recordAdminAction({ actor, action: "assign_number", businessId, before: { number: null }, after: { number: data } });
       return NextResponse.json({ ok: true, e164: data });
     }
 
