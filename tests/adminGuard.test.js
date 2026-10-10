@@ -128,6 +128,9 @@ describe("requireSuperAdmin (server, before any data)", () => {
   for (const [rel, fn] of [
     ["dashboard/src/lib/admin.ts", "getAdminOverview"],
     ["dashboard/src/lib/platformOps.ts", "evaluatePlatformOps"],
+    ["dashboard/src/lib/platformOps.ts", "readPlatformOps"],
+    ["dashboard/src/lib/adminToday.ts", "loadTodayCallCounts"],
+    ["dashboard/src/lib/adminToday.ts", "businessesWithRecentCalls"],
   ]) {
     it(`${fn} guards itself before reading data`, () => {
       const src = read(rel);

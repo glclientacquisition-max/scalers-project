@@ -63,7 +63,7 @@ function AdminIcon({ name }: { name: string }) {
       </svg>
     );
   }
-  if (name === "Overview") {
+  if (name === "Today") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
         <path
@@ -74,16 +74,51 @@ function AdminIcon({ name }: { name: string }) {
       </svg>
     );
   }
-  if (name === "Packages") {
+  if (name === "Calls") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
         <path
-          d="M4 7.5 10 4.5l6 3v7L10 17.5 4 14.5v-7Z"
+          d="M5.5 3.5h2l1 3.5-1.5 1a8 8 0 0 0 5 5l1-1.5 3.5 1v2a1.5 1.5 0 0 1-1.5 1.5A12.5 12.5 0 0 1 4 5a1.5 1.5 0 0 1 1.5-1.5Z"
           stroke="currentColor"
           strokeWidth="1.5"
           strokeLinejoin="round"
         />
-        <path d="M4 7.5 10 10.5 16 7.5M10 10.5V17" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+  if (name === "Billing") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <rect x="3" y="5" width="14" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M3 8.5h14M6 12.5h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === "Activity") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <path d="M6.5 5.5h9M6.5 10h9M6.5 14.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="3.75" cy="5.5" r="0.9" fill="currentColor" />
+        <circle cx="3.75" cy="10" r="0.9" fill="currentColor" />
+        <circle cx="3.75" cy="14.5" r="0.9" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (name === "Settings") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <path d="M4 6h7M15 6h1M4 14h1M9 14h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="13" cy="6" r="2" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="7" cy="14" r="2" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+  if (name === "More") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <circle cx="5" cy="10" r="1.25" fill="currentColor" />
+        <circle cx="10" cy="10" r="1.25" fill="currentColor" />
+        <circle cx="15" cy="10" r="1.25" fill="currentColor" />
       </svg>
     );
   }
@@ -230,20 +265,33 @@ export function AdminRail() {
         </DeskHint>
       </div>
       <nav aria-label="Super Admin" className="flex flex-1 flex-col items-center gap-1 px-1 pt-1">
-        {ADMIN_LINKS.map((item) => (
-          <AdminDestinationLink
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            exact={item.exact}
-            pendingHref={pendingHref}
-            setPendingHref={setPendingHref}
-            className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5"
-            activeClassName="bg-accent/10 text-accent-deep"
-            idleClassName="text-ink-soft hover:bg-surface-muted hover:text-ink"
-            labelClassName="max-w-full truncate text-[10px] font-medium leading-none"
-          />
-        ))}
+        {ADMIN_LINKS.map((item) =>
+          item.pending ? (
+            <DeskHint key={item.href} label={item.pending}>
+              <span
+                aria-disabled="true"
+                className="flex min-h-12 w-full cursor-default flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-ink-3"
+              >
+                <AdminIcon name={item.label} />
+                <span className="max-w-full truncate text-[10px] font-medium leading-none">{item.label}</span>
+                <span className="sr-only">{item.pending}</span>
+              </span>
+            </DeskHint>
+          ) : (
+            <AdminDestinationLink
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              exact={item.exact}
+              pendingHref={pendingHref}
+              setPendingHref={setPendingHref}
+              className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5"
+              activeClassName="bg-accent/10 text-accent-deep"
+              idleClassName="text-ink-soft hover:bg-surface-muted hover:text-ink"
+              labelClassName="max-w-full truncate text-[10px] font-medium leading-none"
+            />
+          ),
+        )}
       </nav>
     </div>
   );
@@ -260,14 +308,14 @@ const phoneTabClass =
 const phoneLabelClass = "max-w-full truncate text-center text-caption leading-none";
 
 /**
- * Platform, Packages, and Voices. The bar itself stays five items wide.
+ * Numbers, Platform, Activity, and Settings. The bar itself stays five items wide.
  * The chooser is the same bottom drawer as every other overlay.
  */
 function AdminPhoneMore() {
   const { path, href: mapHref } = useAdminChrome();
   const [open, setOpen] = useState(false);
   const more = adminPhoneMore();
-  const active = more.some((item) => adminRouteActive(path, item.href, item.exact));
+  const active = more.some((item) => !item.pending && adminRouteActive(path, item.href, item.exact));
 
   return (
     <>
@@ -290,6 +338,21 @@ function AdminPhoneMore() {
       <Sheet open={open} onOpenChange={setOpen} title="More" theme="admin">
         <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
           {more.map((item) => {
+            if (item.pending) {
+              return (
+                <li
+                  key={item.href}
+                  aria-disabled="true"
+                  className="flex min-h-12 items-center gap-3 px-5 py-2.5 text-body text-ink-3 sm:px-6"
+                >
+                  <AdminIcon name={item.label} />
+                  <span className="min-w-0">
+                    <span className="block">{item.label}</span>
+                    <span className="block text-meta">{item.pending}</span>
+                  </span>
+                </li>
+              );
+            }
             const current = adminRouteActive(path, item.href, item.exact);
             return (
               <li key={item.href}>
