@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -98,6 +100,7 @@ export async function extractKnowledgeAction(
   _prev: IngestExtractState,
   formData: FormData
 ): Promise<IngestExtractState> {
+  await requireMember("settings.edit");
   if (!(await isAuthenticated())) {
     return { error: "Sign in to import knowledge." };
   }
@@ -203,6 +206,7 @@ export async function applyIngestAction(
   _prev: IngestApplyState,
   formData: FormData
 ): Promise<IngestApplyState> {
+  await requireMember("settings.edit");
   if (!(await isAuthenticated())) {
     return { error: "Sign in to save." };
   }

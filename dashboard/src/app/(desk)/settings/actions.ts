@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
@@ -74,6 +76,7 @@ export async function saveAndCompileSettings(
   _prev: SettingsCompileState,
   formData: FormData
 ): Promise<SettingsCompileState> {
+  await requireMember("settings.edit");
   if (!(await isAuthenticated())) {
     return { error: "Sign in to save settings." };
   }

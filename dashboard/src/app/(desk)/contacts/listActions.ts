@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import {
   loadContactsPage,
   resolveContactSavedFilter,
@@ -15,6 +17,7 @@ export async function loadContactsSlice(input: {
   sort?: string;
   q?: string;
 }): Promise<{ rows: ContactListRow[]; total: number; error: string | null }> {
+  await requireMember("contacts.view");
   const page = Math.min(500, Math.max(1, Math.floor(Number(input?.page) || 1)));
   const tenant = await getCurrentTenant();
   const workspace = tenant ? await createWorkspaceDataClient() : null;

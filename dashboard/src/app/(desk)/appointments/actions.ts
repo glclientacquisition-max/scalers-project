@@ -1,5 +1,7 @@
 "use server";
 
+import { requireMember } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
@@ -19,6 +21,7 @@ export async function updateAppointmentStatus(
   _prev: AppointmentStatusState,
   formData: FormData
 ): Promise<AppointmentStatusState> {
+  await requireMember("inbox.act");
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "Not signed in." };
 
@@ -91,6 +94,7 @@ export async function updateAppointmentSchedule(
   _prev: AppointmentScheduleState,
   formData: FormData
 ): Promise<AppointmentScheduleState> {
+  await requireMember("inbox.act");
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "Not signed in." };
 
