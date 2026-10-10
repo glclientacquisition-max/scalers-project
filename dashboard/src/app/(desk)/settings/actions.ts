@@ -67,6 +67,8 @@ import { validateTeamSave, type TeamRowInput } from "@/lib/teamValidation";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { catalogSaveError } from "@/lib/catalogValidation";
 import { validatePublicContacts } from "@/lib/contactValidation";
+import { faqsLengthError, policiesLengthError } from "@/lib/lengthLimits";
+import { POLICY_FIELDS } from "@/lib/businessPolicies";
 
 function safeJsonRows(raw: FormDataEntryValue | null): TeamRowInput[] {
   try {
@@ -335,6 +337,17 @@ export async function saveAndCompileSettings(
     voiceLabel: String(formData.get("soniox_voice_label") || "").trim(),
   });
   if (scopeError) return { error: scopeError };
+  if (settingsFieldFromScope(scope, "faqs", true, false)) {
+    const faqLen = faqsLengthError(formData.get("faqs"));
+    if (faqLen) return { error: faqLen };
+  }
+  if (settingsFieldFromScope(scope, "businessPolicies", true, false)) {
+    const policyLen = policiesLengthError(
+      formData.get("business_policies"),
+      Object.fromEntries(POLICY_FIELDS.map((f) => [f.id, f.label]))
+    );
+    if (policyLen) return { error: policyLen };
+  }
 
   const ownerPathsFromForm = (() => {
     try {
