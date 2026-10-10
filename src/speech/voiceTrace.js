@@ -405,6 +405,10 @@ function createVoiceTrace(opts = {}) {
       before: info.before != null ? redactText(info.before) : null,
       language: info.language || null,
       voiceId: info.voiceId || voiceOf() || null,
+      // VOICE_SPOKEN_FACTS: a spoken time or amount that disagreed with the stored facts.
+      ...(Array.isArray(info.factMismatches) && info.factMismatches.length
+        ? { factMismatches: info.factMismatches.map((row) => ({ kind: row.kind, said: redactText(row.said || '') })) }
+        : {}),
     });
   }
 
