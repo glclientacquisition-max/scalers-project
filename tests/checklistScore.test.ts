@@ -36,3 +36,11 @@ it("policies: cancellation fills the third slot", () => {
   );
   assert.equal(s.domains.policies, 100);
 });
+
+it("Alerts is not 100% when no channel can deliver", () => {
+  const meta = { "team.notify": "owner", "team.notify.whatsapp": "owner" } as const;
+  const none = scoreCaptureTenant({ notify_channels: { email: true, sms: false, whatsapp: false } }, meta);
+  assert.equal(none.domains.team_notify, 0);
+  const ok = scoreCaptureTenant({ whatsapp_notification_number: "+254712345678" }, meta);
+  assert.equal(ok.domains.team_notify, 100);
+});

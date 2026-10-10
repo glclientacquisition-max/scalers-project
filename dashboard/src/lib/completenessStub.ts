@@ -199,14 +199,15 @@ function confirmedFaqCount(faqs: unknown, meta: ProvenanceMeta = {}): number {
   }).length;
 }
 
-export function hasVerifiedNotify(tenant: ScoreTenant, meta: ProvenanceMeta = {}): boolean {
+/** A deliverable alert channel exists. Owner attestation alone no longer counts (QA fix). */
+export function hasVerifiedNotify(tenant: ScoreTenant, ...rest: [ProvenanceMeta?]): boolean {
+  void rest;
   const channels = tenant.notify_channels || {};
   const whatsapp = textOf(tenant.whatsapp_notification_number);
   const email = textOf(tenant.alert_email);
   const whatsappOk = Boolean(whatsapp) && channels.whatsapp !== false;
   const emailOk = Boolean(email) && channels.email !== false;
   const smsOk = Boolean(whatsapp) && channels.sms !== false;
-  if (meta["team.notify.whatsapp"] === "owner") return true;
   return whatsappOk || emailOk || smsOk;
 }
 
@@ -328,7 +329,8 @@ export function scoreCaptureTenant(
 
   const teamOwner =
     meta["team.notify"] === "owner" || meta["team.notify.whatsapp"] === "owner";
-  const team = teamOwner ? 100 : 0;
+  // Never 100% when no channel can actually deliver (e.g. email on, no address).
+  const team = teamOwner && hasVerifiedNotify(tenant, meta) ? 100 : 0;
 
   const assistant =
     ((fieldScore(Boolean(textOf(tenant.agent_name)), "assistant.agent_name", meta, null) +

@@ -40,13 +40,14 @@ export async function saveAlertsAction(
   const submittedEmail = String(formData.get("alert_email") || "")
     .trim()
     .toLowerCase();
-  const notifyChannels = parseNotifyChannelsField(formData.get("notify_channels"));
+  const submittedChannels = parseNotifyChannelsField(formData.get("notify_channels"));
   const checked = validateAlertsSave({
     phone: submittedPhone,
     email: submittedEmail,
-    channels: notifyChannels,
+    channels: submittedChannels,
   });
   if (!checked.ok) return { error: checked.error };
+  const notifyChannels = checked.channels;
   // Stored as E.164 (+2547...), so compare against the normalized submit.
   const writtenPhone = alertPhoneWrite(checked.phone);
   const writtenEmail = checked.email;
@@ -92,5 +93,5 @@ export async function saveAlertsAction(
   );
 
   revalidatePath("/settings");
-  return { ok: true, message: "Saved" };
+  return { ok: true, message: checked.note || "Saved" };
 }

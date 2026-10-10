@@ -30,13 +30,16 @@ export function validatePublicContacts(
 
 /**
  * Alerts save. Phone empty clears it; non-empty must normalize to E.164.
- * A channel switched on with nothing to deliver to is an error, not a silent no-op.
+ * Owner decision: a channel switched on with nothing to deliver to is turned
+ * off automatically (not a blocking error), and `note` explains why.
  */
-export function validateAlertsSave(input: {
+export function validateAlertsSave<C extends { sms?: boolean; whatsapp?: boolean; email?: boolean }>(input: {
   phone: string;
   email: string;
-  channels: { sms?: boolean; whatsapp?: boolean; email?: boolean };
-}): { ok: true; phone: string; email: string | null } | { ok: false; error: string } {
+  channels: C;
+}):
+  | { ok: true; phone: string; email: string | null; channels: C; note: string | null }
+  | { ok: false; error: string } {
   const rawPhone = String(input.phone || "").trim();
   const email = String(input.email || "").trim().toLowerCase();
   let phone = "";
@@ -46,11 +49,24 @@ export function validateAlertsSave(input: {
     phone = normalized;
   }
   if (email && !isValidEmail(email)) return { ok: false, error: "Alert email looks invalid." };
-  if (input.channels.email && !email) {
-    return { ok: false, error: "Add an alert email, or turn off Email alerts." };
+  const channels = { ...input.channels };
+  const off: string[] = [];
+  if (channels.email && !email) {
+    channels.email = false;
+    off.push("Email alerts (no alert email)");
   }
-  if ((input.channels.sms || input.channels.whatsapp) && !phone) {
-    return { ok: false, error: "Add an alert phone, or turn off SMS and WhatsApp alerts." };
+  const phoneOff: string[] = [];
+  if (!phone && channels.sms) {
+    channels.sms = false;
+    phoneOff.push("SMS");
   }
-  return { ok: true, phone, email: email || null };
+  if (!phone && channels.whatsapp) {
+    channels.whatsapp = false;
+    phoneOff.push("WhatsApp");
+  }
+  if (phoneOff.length) off.push(`${phoneOff.join(" and ")} alerts (no alert phone)`);
+  const note = off.length
+    ? `Saved. We turned off ${off.join(" and ")}. Add the missing contact to turn ${off.length === 1 && phoneOff.length < 2 ? "it" : "them"} back on.`
+    : null;
+  return { ok: true, phone, email: email || null, channels, note };
 }
