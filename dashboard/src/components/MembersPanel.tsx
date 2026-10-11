@@ -283,7 +283,8 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
               <Button
                 variant="primary"
                 size="md"
-                disabled={pending || !email.trim()}
+                pending={pending}
+                disabled={!email.trim()}
                 onClick={() => run(() => inviteMemberAction(email, role))}
               >
                 {pending ? "Sending…" : "Send invite"}

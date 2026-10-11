@@ -8,10 +8,9 @@ import {
   signUpAndAcceptAction,
   type InviteActionState,
 } from "./actions";
-import { deskFieldClass } from "@/components/ui/deskChrome";
-import { buttonClass } from "@/components/ui/Button";
+import { controlClass } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
 
-const primary = buttonClass({ variant: "primary", size: "lg", block: true });
 
 const initial: InviteActionState = {};
 
@@ -36,7 +35,7 @@ function LockedEmail({ email }: { email: string }) {
         readOnly
         aria-readonly="true"
         autoComplete="username"
-        className={`mt-2 ${deskFieldClass} cursor-not-allowed opacity-80`}
+        className={`mt-2 ${controlClass} cursor-not-allowed opacity-80`}
       />
       <p className="mt-1 text-meta text-ink-2">This invite is for this email only.</p>
     </div>
@@ -48,14 +47,14 @@ export function AcceptButton({ token, businessName }: { token: string; businessN
   const [pending, start] = useTransition();
   return (
     <div className="space-y-3">
-      <button
+      <Button
         type="button"
-        className={primary}
-        disabled={pending}
+        variant="primary" size="lg" block
+        pending={pending}
         onClick={() => start(async () => setState(await acceptInviteAction(token)))}
       >
         {pending ? "Joining…" : `Join ${businessName}`}
-      </button>
+      </Button>
       <ErrorLine text={state.error} />
     </div>
   );
@@ -81,13 +80,13 @@ export function SignInForm({ token, email }: { token: string; email: string }) {
           required
           autoFocus
           autoComplete="current-password"
-          className={`mt-2 ${deskFieldClass}`}
+          className={`mt-2 ${controlClass}`}
         />
       </div>
       <ErrorLine text={state.error} />
-      <button type="submit" className={primary} disabled={pending}>
+      <Button type="submit" variant="primary" size="lg" block pending={pending}>
         {pending ? "Signing in…" : "Sign in and join"}
-      </button>
+      </Button>
       <p className="text-meta text-ink-2">
         Forgot your password? Reset it from the{" "}
         <Link href="/login" className="font-medium text-accent hover:underline">
@@ -129,7 +128,7 @@ export function CreateAccountForm({ token, email }: { token: string; email: stri
           autoFocus
           maxLength={80}
           autoComplete="name"
-          className={`mt-2 ${deskFieldClass}`}
+          className={`mt-2 ${controlClass}`}
         />
       </div>
       <LockedEmail email={email} />
@@ -145,16 +144,16 @@ export function CreateAccountForm({ token, email }: { token: string; email: stri
           minLength={8}
           autoComplete="new-password"
           aria-describedby="invite-pw-hint"
-          className={`mt-2 ${deskFieldClass}`}
+          className={`mt-2 ${controlClass}`}
         />
         <p id="invite-pw-hint" className="mt-1 text-meta text-ink-2">
           At least 8 characters.
         </p>
       </div>
       <ErrorLine text={state.error} />
-      <button type="submit" className={primary} disabled={pending}>
+      <Button type="submit" variant="primary" size="lg" block pending={pending}>
         {pending ? "Creating account…" : "Create account and join"}
-      </button>
+      </Button>
     </form>
   );
 }
