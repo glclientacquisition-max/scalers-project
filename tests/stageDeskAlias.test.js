@@ -142,7 +142,7 @@ describe("assignStagingDesk", () => {
           sha: SHA,
           timeoutMs: 10,
           fetchImpl: async (url) => {
-            if (url.includes("/v9/projects/")) return jsonResponse({});
+            if (url.includes("/v9/projects/")) return jsonResponse({ link: { repoId: 1 } });
             return jsonResponse({ deployments: [] });
           },
           sleep: async () => {},
@@ -150,6 +150,54 @@ describe("assignStagingDesk", () => {
         }),
       /No READY deployment/
     );
+  });
+});
+
+describe("one API deploy per staging rebuild", () => {
+  it("creates the staging deploy when the push did not, then aliases it", async () => {
+    const calls = [];
+    let created = false;
+    const res = await assignStagingDesk({
+      token: "t",
+      sha: SHA,
+      fetchImpl: async (url, init = {}) => {
+        calls.push(`${init.method || "GET"} ${url.split("?")[0]}`);
+        if (url.includes("/v9/projects/")) return jsonResponse({ link: { repoId: 42 } });
+        if (init.method === "POST" && url.includes("/v13/deployments")) {
+          created = JSON.parse(init.body).gitSource;
+          return jsonResponse({ id: "dpl_new" });
+        }
+        if (url.includes("/v6/deployments")) {
+          return jsonResponse({
+            deployments: created
+              ? [{ uid: "dpl_new", state: "READY", projectId: STAGING_PROJECT_ID, meta: { githubCommitSha: SHA, githubCommitRef: STAGING_BRANCH } }]
+              : [],
+          });
+        }
+        if (url.includes("/aliases")) return jsonResponse({});
+        return jsonResponse({ id: "dpl_new", projectId: STAGING_PROJECT_ID, meta: { githubCommitSha: SHA, githubCommitRef: STAGING_BRANCH } });
+      },
+      sleep: async () => {},
+    });
+    assert.deepEqual(created, { type: "github", repoId: 42, ref: STAGING_BRANCH, sha: SHA });
+    assert.equal(res.deploymentId, "dpl_new");
+    assert.equal(calls.filter((c) => c.startsWith("POST") && c.endsWith("/v13/deployments")).length, 1);
+  });
+
+  it("skips the deploy when dashboard/ did not change since the aliased build", async () => {
+    let posted = 0;
+    const res = await assignStagingDesk({
+      token: "t",
+      sha: SHA,
+      deskUnchanged: () => true,
+      fetchImpl: async (url, init = {}) => {
+        if (init.method === "POST" && url.includes("/v13/deployments")) posted++;
+        if (url.includes("/v9/projects/")) return jsonResponse({ link: { repoId: 42 } });
+        return jsonResponse({ id: "dpl_old", projectId: STAGING_PROJECT_ID, meta: { githubCommitSha: "a".repeat(40), githubCommitRef: STAGING_BRANCH } });
+      },
+    });
+    assert.equal(posted, 0);
+    assert.match(res.skipped, /no dashboard\/ change/);
   });
 });
 
