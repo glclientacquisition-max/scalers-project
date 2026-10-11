@@ -80,3 +80,8 @@ describe("migration", () => {
     assert.match(mig, /set search_path = ''/);
   });
 });
+
+it("alert contact chevron points up when the row is open", () => {
+  const ac = read("dashboard/src/components/AlertContactsList.tsx");
+  assert.match(ac, /expanded \? \(\s*<ChevronUpIcon/);
+});

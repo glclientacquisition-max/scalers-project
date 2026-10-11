@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDownIcon, PlusIcon } from "@heroicons/react/20/solid";
+import { ChevronDownIcon, ChevronUpIcon, PlusIcon } from "@heroicons/react/20/solid";
 import type { TeamDirectoryEntry } from "@/lib/supabase";
 import { Button } from "@/components/ui/Button";
 import { ToolSwitch, settingsDenseFieldClass, settingsGroupTitleClass } from "@/components/settingsUi";
@@ -79,10 +79,11 @@ export function AlertContactsList({
                   <span className="block text-meta text-ink-2 sm:hidden">{alertSummary(member, flags)}</span>
                 </span>
                 <span className="hidden shrink-0 text-meta text-ink-2 sm:block">{alertSummary(member, flags)}</span>
-                <ChevronDownIcon
-                  className={`size-5 shrink-0 text-ink-3 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
-                  aria-hidden
-                />
+                {expanded ? (
+                  <ChevronUpIcon className="size-5 shrink-0 text-ink-3" aria-hidden data-chevron="up" />
+                ) : (
+                  <ChevronDownIcon className="size-5 shrink-0 text-ink-3" aria-hidden data-chevron="down" />
+                )}
               </button>
               <div id={panelId} hidden={!expanded} className="space-y-3 border-t border-hairline bg-surface-2/40 px-4 py-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
