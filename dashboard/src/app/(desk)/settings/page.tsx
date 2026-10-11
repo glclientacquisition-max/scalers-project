@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { memberCan } from "@/lib/requireMember";
 import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
-import { MembersPanel } from "@/components/MembersPanel";
+import { MembersLoadError, MembersPanel } from "@/components/MembersPanel";
 import { loadMembers } from "@/lib/membersLoad";
 import { currentMemberRole } from "@/lib/requireMember";
 import { teamInvitesEnabled } from "@/lib/teamInvitesFlag";
@@ -81,10 +81,11 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     const [role, user] = await Promise.all([currentMemberRole(), getAuthUser()]);
     if (role && user && can(role, "members.view")) {
       try {
-        const data = await loadMembers(tenant.id);
+        const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+        const data = await loadMembers(tenant.id, { members: one(params.members), invites: one(params.invites) });
         membersSlot = <MembersPanel data={data} viewerRole={role} viewerId={user.id} />;
       } catch {
-        membersSlot = null;
+        membersSlot = <MembersLoadError />;
       }
     }
   }

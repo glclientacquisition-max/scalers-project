@@ -117,9 +117,9 @@ export function ViewOnlyBanner() {
     <div
       role="note"
       data-view-only-banner=""
-      className="border-b border-line bg-accent/10 px-4 py-2 text-center text-sm text-ink"
+      className="border-b border-hairline bg-surface-2 px-4 py-2 text-center text-meta text-ink-2"
     >
-      You have <strong className="font-medium">view-only access</strong>. You can look around, but changes are switched off.
+      View only. You can look around, but you can&apos;t make changes.
     </div>
   );
 }

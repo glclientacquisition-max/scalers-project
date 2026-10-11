@@ -8,13 +8,16 @@ import {
   signUpAndAcceptAction,
   type InviteActionState,
 } from "./actions";
-import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
+import { deskFieldClass } from "@/components/ui/deskChrome";
+import { buttonClass } from "@/components/ui/Button";
+
+const primary = buttonClass({ variant: "primary", size: "lg", block: true });
 
 const initial: InviteActionState = {};
 
 function ErrorLine({ text }: { text?: string }) {
   return text ? (
-    <p role="alert" className="text-sm text-warn">
+    <p role="alert" className="text-meta text-attention">
       {text}
     </p>
   ) : null;
@@ -23,7 +26,7 @@ function ErrorLine({ text }: { text?: string }) {
 function LockedEmail({ email }: { email: string }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-ink" htmlFor="invite-email">
+      <label className="block text-body font-medium text-ink" htmlFor="invite-email">
         Email
       </label>
       <input
@@ -35,7 +38,7 @@ function LockedEmail({ email }: { email: string }) {
         autoComplete="username"
         className={`mt-2 ${deskFieldClass} cursor-not-allowed opacity-80`}
       />
-      <p className="mt-1 text-xs text-ink-soft">The invite is tied to this email.</p>
+      <p className="mt-1 text-meta text-ink-2">This invite is for this email only.</p>
     </div>
   );
 }
@@ -47,7 +50,7 @@ export function AcceptButton({ token, businessName }: { token: string; businessN
     <div className="space-y-3">
       <button
         type="button"
-        className={`${btnPrimary} w-full`}
+        className={primary}
         disabled={pending}
         onClick={() => start(async () => setState(await acceptInviteAction(token)))}
       >
@@ -61,14 +64,14 @@ export function AcceptButton({ token, businessName }: { token: string; businessN
 export function SignInForm({ token, email }: { token: string; email: string }) {
   const [state, action, pending] = useActionState(signInAndAcceptAction.bind(null, token), initial);
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-4" aria-busy={pending}>
       <div>
-        <h2 className="text-base font-medium text-ink">Sign in to accept</h2>
-        <p className="mt-1 text-sm text-ink-soft">You already have a Scalers account with this email.</p>
+        <h2 className="text-title text-ink">Sign in to accept</h2>
+        <p className="mt-1 text-body text-ink-2">You already have a Scalers account with this email.</p>
       </div>
       <LockedEmail email={email} />
       <div>
-        <label className="block text-sm font-medium text-ink" htmlFor="invite-password">
+        <label className="block text-body font-medium text-ink" htmlFor="invite-password">
           Password
         </label>
         <input
@@ -82,12 +85,12 @@ export function SignInForm({ token, email }: { token: string; email: string }) {
         />
       </div>
       <ErrorLine text={state.error} />
-      <button type="submit" className={`${btnPrimary} w-full`} disabled={pending}>
+      <button type="submit" className={primary} disabled={pending}>
         {pending ? "Signing in…" : "Sign in and join"}
       </button>
-      <p className="text-xs text-ink-soft">
+      <p className="text-meta text-ink-2">
         Forgot your password? Reset it from the{" "}
-        <Link href="/login" className="font-medium text-accent-deep hover:underline">
+        <Link href="/login" className="font-medium text-accent hover:underline">
           sign-in page
         </Link>
         , then open this link again.
@@ -102,22 +105,21 @@ export function CreateAccountForm({ token, email }: { token: string; email: stri
   if (state.checkEmail) {
     return (
       <div className="space-y-2" role="status">
-        <h2 className="text-base font-medium text-ink">Check your email</h2>
-        <p className="text-sm text-ink-soft">
-          We sent a confirmation link to <strong className="text-ink">{email}</strong>. Open it on this device and
+        <h2 className="text-title text-ink">Check your email</h2>
+        <p className="text-body text-ink-2">
+          We sent a confirmation link to {email}. Open it on this device and
           you&apos;ll join straight away. Opened it somewhere else? Come back to this link and sign in.
         </p>
       </div>
     );
   }
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-4" aria-busy={pending}>
       <div>
-        <h2 className="text-base font-medium text-ink">Create your account</h2>
-        <p className="mt-1 text-sm text-ink-soft">One step, then you&apos;re in.</p>
+        <h2 className="text-title text-ink">Create your account</h2>
       </div>
       <div>
-        <label className="block text-sm font-medium text-ink" htmlFor="invite-name">
+        <label className="block text-body font-medium text-ink" htmlFor="invite-name">
           Your name
         </label>
         <input
@@ -132,7 +134,7 @@ export function CreateAccountForm({ token, email }: { token: string; email: stri
       </div>
       <LockedEmail email={email} />
       <div>
-        <label className="block text-sm font-medium text-ink" htmlFor="invite-new-password">
+        <label className="block text-body font-medium text-ink" htmlFor="invite-new-password">
           Password
         </label>
         <input
@@ -145,12 +147,12 @@ export function CreateAccountForm({ token, email }: { token: string; email: stri
           aria-describedby="invite-pw-hint"
           className={`mt-2 ${deskFieldClass}`}
         />
-        <p id="invite-pw-hint" className="mt-1 text-xs text-ink-soft">
+        <p id="invite-pw-hint" className="mt-1 text-meta text-ink-2">
           At least 8 characters.
         </p>
       </div>
       <ErrorLine text={state.error} />
-      <button type="submit" className={`${btnPrimary} w-full`} disabled={pending}>
+      <button type="submit" className={primary} disabled={pending}>
         {pending ? "Creating account…" : "Create account and join"}
       </button>
     </form>

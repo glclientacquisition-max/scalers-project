@@ -12,7 +12,7 @@ export function WelcomeToast() {
   const welcome = params.get("welcome");
   useEffect(() => {
     if (!welcome) return;
-    notify(`Welcome to ${welcome.slice(0, 80)}. You're on the team.`);
+    notify(`Welcome to ${welcome.slice(0, 80)}.`);
     const next = new URLSearchParams(params);
     next.delete("welcome");
     const q = next.toString();

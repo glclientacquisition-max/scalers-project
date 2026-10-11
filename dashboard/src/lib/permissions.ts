@@ -39,7 +39,7 @@ const MATRIX: Record<Role, ReadonlySet<Action>> = {
 /** Plain-words refusal shown in the UI when a role lacks a permission. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function deniedMessage(role: Role | null | undefined, _action?: Action): string {
-  if (role === "viewer") return "You have view-only access. Ask the owner or an admin if something needs changing.";
+  if (role === "viewer") return "View only. Ask the owner or an admin to change this.";
   return "Your role can't do this. Ask the owner or an admin.";
 }
 

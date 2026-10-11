@@ -34,7 +34,7 @@ describe("per-role matrix", () => {
     assert.deepEqual(hiddenDeskHrefs("viewer").sort(), ["/contacts/import", "/wallet"]);
   });
   it("denied copy is plain words and role-specific", () => {
-    assert.match(deniedMessage("viewer"), /view-only access/);
+    assert.match(deniedMessage("viewer"), /^View only\. /);
     assert.match(deniedMessage("staff"), /Ask the owner or an admin/);
   });
 });
@@ -118,7 +118,7 @@ describe("role-aware UI", () => {
   it("RoleGate locks controls with the denial as tooltip; viewer banner in the desk shell", () => {
     const g = read("dashboard/src/components/DeskRole.tsx");
     assert.match(g, /<LockedRegion why=\{deniedMessage\(role, action\)\}/);
-    assert.match(g, /view-only access/);
+    assert.match(g, /View only\. You can look around/);
     const layout = read("dashboard/src/app/(desk)/layout.tsx");
     assert.match(layout, /<DeskRoleProvider role=\{role\}>/);
     assert.match(layout, /<ViewOnlyBanner \/>/);

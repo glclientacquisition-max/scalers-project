@@ -108,8 +108,10 @@ describe("completeness stub", () => {
     assert.equal(backfill.ready_badge, false);
     assert.equal(
       reviewGapCopy("Add products or services with owner-confirmed names and prices."),
-      "Review and confirm your catalogue."
+      // #598: Save attests owner facts (no separate Confirm step), so the copy says "save".
+      "Add your catalogue, then save."
     );
+    assert.equal(reviewGapCopy("  unknown gap  "), "unknown gap");
   });
 
   it("keeps a seeds-only tenant under 20 with no ready badge and holds locked", () => {

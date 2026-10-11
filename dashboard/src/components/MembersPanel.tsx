@@ -1,11 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
-import { notify } from "@/components/ui/DeskNotice";
-import { transferConfirmMatches } from "@/lib/memberConfirm";
 import {
   changeMemberRoleAction,
   inviteMemberAction,
@@ -18,33 +15,49 @@ import {
 import { ROLE_BLURBS, ROLE_LABELS, assignableRoles, canManageMember, type Role } from "@/lib/permissions";
 import { daysLeft } from "@/lib/invites";
 import type { MembersData } from "@/lib/membersLoad";
-import {
-  settingsActionClass,
-  settingsBlockTitleClass,
-  settingsFieldClass,
-  settingsPrimaryButtonClass,
-} from "@/components/settingsUi";
+import { transferConfirmMatches } from "@/lib/memberConfirm";
+import { INVITES_PAGE, MEMBERS_PAGE } from "@/lib/teamLimits";
+import { Button } from "@/components/ui/Button";
+import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
+import { notify } from "@/components/ui/DeskNotice";
+import { SettingsGroup, settingsFieldClass } from "@/components/settingsUi";
+
+type Pending = {
+  title: string;
+  body: ReactNode;
+  confirmLabel: string;
+  danger?: boolean;
+  typeToConfirm?: string;
+  refreshAll?: boolean;
+  fn: () => Promise<MembersActionResult>;
+};
+
+const rowClass = "flex min-h-14 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5";
+const linkClass =
+  "flex min-h-11 items-center justify-center px-4 text-body font-medium text-accent hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
 
 /**
- * Settings > Team & access > Members (logins, paid seats). No <form> elements:
- * this renders inside the Settings <form>, so actions are called directly.
+ * Settings > Team & access > Members. Renders inside the Settings <form>, so there are
+ * no nested forms: every action is called directly and confirmed in a drawer.
  */
 export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData; viewerRole: Role; viewerId: string }) {
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("staff");
+  const roles = assignableRoles(viewerRole);
+  const [role, setRole] = useState<Role>(roles.includes("staff") ? "staff" : roles[0] || "viewer");
   const [flash, setFlash] = useState<MembersActionResult | null>(null);
   const [pending, start] = useTransition();
-  const roles = assignableRoles(viewerRole);
-  const canInvite = roles.length > 0;
-  const { seats } = data;
-
-  const router = useRouter();
-  type Pending = { title: string; body: React.ReactNode; confirmLabel: string; danger?: boolean; typeToConfirm?: string; fn: () => Promise<MembersActionResult>; refreshAll?: boolean };
   const [confirming, setConfirming] = useState<Pending | null>(null);
   const [typed, setTyped] = useState("");
+  const busy = useRef(false);
+  const router = useRouter();
+  const canInvite = roles.length > 0;
+  const { seats, totals, limits } = data;
 
-  /** Runs an action and ALWAYS surfaces the outcome: inline + desk toast (survives a re-render/remount). */
+  /** Runs one action at a time and always shows the outcome: inline + desk toast (survives a re-render). */
   function run(fn: () => Promise<MembersActionResult>, opts?: { refreshAll?: boolean; onDone?: () => void }) {
+    if (busy.current) return; // double-click safe
+    busy.current = true;
     start(async () => {
       let result: MembersActionResult;
       try {
@@ -53,6 +66,7 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
         result = { error: "Something went wrong. Nothing was changed. Try again." };
       }
       if (!result.ok && !result.error) result = { ...result, error: "Something went wrong. Try again." };
+      busy.current = false;
       setFlash(result);
       notify(result.error || result.message || "Done.");
       opts?.onDone?.();
@@ -69,185 +83,222 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
     setConfirming(p);
   }
 
-  return (
-    <section className="space-y-3" aria-labelledby="members-title">
-      <div className="flex flex-wrap items-end justify-between gap-2 px-1">
-        <p id="members-title" className={settingsBlockTitleClass}>
-          Members
-          <span className="ml-2 font-medium normal-case tracking-normal text-ink-soft">
-            Seats {seats.used} of {seats.included}
-            {seats.pending ? ` (incl. ${seats.pending} invited)` : ""}
-          </span>
-        </p>
-      </div>
-      <p className="px-1 text-sm text-ink-soft">
-        Members sign in with their own account and use a paid seat. Alert contacts below only get notified.
-      </p>
+  function moreHref(key: "members" | "invites", next: number) {
+    const params = new URLSearchParams({ tab: "train", panel: "team", members: String(limits.members), invites: String(limits.invites) });
+    params.set(key, String(next));
+    return `/settings?${params.toString()}`;
+  }
 
-      <ul className="divide-y divide-line rounded-panel border border-line">
-        {data.members.map((m) => {
-          const self = m.userId === viewerId;
-          const manageable = !self && canManageMember(viewerRole, m.role);
-          return (
-            <li key={m.userId} className="flex flex-wrap items-center gap-3 px-3 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink" title={m.email}>
-                  {m.name || m.email}
-                  {self ? <span className="ml-2 text-xs text-ink-soft">(you)</span> : null}
-                </p>
-                {m.name ? <p className="truncate text-xs text-ink-soft">{m.email}</p> : null}
-              </div>
-              {manageable ? (
-                <select
-                  aria-label={`Role for ${m.email}`}
-                  value={m.role}
-                  disabled={pending}
-                  onChange={(e) => run(() => changeMemberRoleAction(m.userId, e.target.value))}
-                  className={`${settingsFieldClass} mt-0 w-36`}
-                >
-                  {roles.map((r) => (
-                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className="text-sm text-ink-soft">{ROLE_LABELS[m.role]}</span>
-              )}
-              {viewerRole === "owner" && m.role === "admin" ? (
-                <button
-                  type="button"
-                  className={settingsActionClass}
-                  disabled={pending}
-                  onClick={() =>
-                    ask({
-                      title: `Make ${m.name || m.email} the owner?`,
-                      confirmLabel: "Transfer ownership",
-                      danger: true,
-                      typeToConfirm: m.email,
-                      refreshAll: true,
-                      fn: () => transferOwnershipAction(m.userId),
-                      body: (
-                        <div className="space-y-2" data-transfer-consequences="">
-                          <p>
-                            <strong className="text-ink">{m.email}</strong> becomes the owner of this business. This takes effect straight away.
-                          </p>
-                          <ul className="list-disc space-y-1 pl-5">
-                            <li>You become an <strong className="text-ink">Admin</strong>. You keep access to the inbox, settings, usage and top-ups.</li>
-                            <li>You can no longer transfer ownership. Only the new owner can, including giving it back to you.</li>
-                            <li>The new owner holds the account and its billing. They can change your role or remove you.</li>
-                          </ul>
-                        </div>
-                      ),
-                    })
-                  }
-                >
-                  Make owner
-                </button>
-              ) : null}
-              {manageable ? (
-                <button
-                  type="button"
-                  className={settingsActionClass}
-                  disabled={pending}
-                  onClick={() =>
-                    ask({
-                      title: `Remove ${m.name || m.email}?`,
-                      confirmLabel: "Remove",
-                      danger: true,
-                      fn: () => removeMemberAction(m.userId),
-                      body: <p>They lose access right away and their seat is freed. You can invite them again later.</p>,
-                    })
-                  }
-                >
-                  Remove
-                </button>
-              ) : null}
-            </li>
-          );
-        })}
-        {data.invites.map((i) => (
-          <li key={i.id} className="flex flex-wrap items-center gap-3 px-3 py-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm text-ink">{i.email}</p>
-              <p className="text-xs text-ink-soft">
-                Invited as {ROLE_LABELS[i.role]} · expires in {daysLeft(i.expiresAt)} day{daysLeft(i.expiresAt) === 1 ? "" : "s"}
-              </p>
-            </div>
-            {canInvite && canManageMember(viewerRole, i.role) ? (
-              <>
-                <button type="button" className={settingsActionClass} disabled={pending} onClick={() => run(() => resendInviteAction(i.id))}>
-                  Resend
-                </button>
-                <button
-                  type="button"
-                  className={settingsActionClass}
-                  disabled={pending}
-                  onClick={() =>
-                    ask({
-                      title: `Cancel the invite to ${i.email}?`,
-                      confirmLabel: "Cancel invite",
-                      fn: () => revokeInviteAction(i.id),
-                      body: <p>The link in their email stops working and the seat is freed.</p>,
-                    })
-                  }
-                >
-                  Revoke
-                </button>
-              </>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+  const roleOptions = roles.map((r) => ({ value: r, label: ROLE_LABELS[r], detail: ROLE_BLURBS[r] }));
+
+  return (
+    <div className="space-y-6" aria-busy={pending}>
+      <SettingsGroup
+        title="Members"
+        action={
+          <span className="text-meta text-ink-2" aria-label={`${seats.used} of ${seats.included} seats used`}>
+            {seats.used} of {seats.included} seats
+          </span>
+        }
+      >
+        <ul aria-label="Members">
+          {data.members.map((m) => {
+            const self = m.userId === viewerId;
+            const manageable = !self && canManageMember(viewerRole, m.role);
+            const display = m.name || m.email;
+            return (
+              <li key={m.userId} className={`${rowClass} border-b border-hairline last:border-b-0`}>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-body text-ink" title={m.email}>
+                    {display}
+                    {self ? <span className="text-ink-2"> (you)</span> : null}
+                  </p>
+                  {m.name ? <p className="truncate text-meta text-ink-2">{m.email}</p> : null}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {manageable ? (
+                    <div className="w-32">
+                      <ChoiceSheet
+                        title={`Role for ${display}`}
+                        label={`Role for ${m.email}`}
+                        value={m.role}
+                        options={roleOptions}
+                        onChange={(next) => {
+                          if (next !== m.role) run(() => changeMemberRoleAction(m.userId, next));
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <span className="px-1 text-body text-ink-2">{ROLE_LABELS[m.role]}</span>
+                  )}
+                  {viewerRole === "owner" && m.role === "admin" ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={pending}
+                      onClick={() =>
+                        ask({
+                          title: `Make ${display} the owner?`,
+                          confirmLabel: "Transfer ownership",
+                          danger: true,
+                          typeToConfirm: m.email,
+                          refreshAll: true,
+                          fn: () => transferOwnershipAction(m.userId),
+                          body: (
+                            <div className="space-y-3" data-transfer-consequences="">
+                              <p>{m.email} becomes the owner straight away.</p>
+                              <ul className="list-disc space-y-1.5 pl-5">
+                                <li>You become an Admin. You keep the inbox, settings, usage and top-ups.</li>
+                                <li>You can no longer transfer ownership. Only the new owner can, including back to you.</li>
+                                <li>The new owner holds the account and its billing, and can change your role or remove you.</li>
+                              </ul>
+                            </div>
+                          ),
+                        })
+                      }
+                    >
+                      Make owner
+                    </Button>
+                  ) : null}
+                  {manageable ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-attention"
+                      disabled={pending}
+                      aria-label={`Remove ${m.email}`}
+                      onClick={() =>
+                        ask({
+                          title: `Remove ${display}?`,
+                          confirmLabel: "Remove",
+                          danger: true,
+                          fn: () => removeMemberAction(m.userId),
+                          body: <p>They lose access straight away and their seat is freed.</p>,
+                        })
+                      }
+                    >
+                      Remove
+                    </Button>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {totals.members > data.members.length ? (
+          <Link href={moreHref("members", limits.members + MEMBERS_PAGE)} scroll={false} className={linkClass}>
+            Show more ({totals.members - data.members.length})
+          </Link>
+        ) : null}
+      </SettingsGroup>
+
+      {data.invites.length ? (
+        <SettingsGroup title="Invited">
+          <ul aria-label="Pending invites">
+            {data.invites.map((i) => {
+              const days = daysLeft(i.expiresAt);
+              return (
+                <li key={i.id} className={`${rowClass} border-b border-hairline last:border-b-0`}>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-body text-ink">{i.email}</p>
+                    <p className="text-meta text-ink-2">
+                      {ROLE_LABELS[i.role]} · expires in {days} day{days === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  {canInvite && canManageMember(viewerRole, i.role) ? (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button variant="ghost" size="sm" disabled={pending} aria-label={`Resend invite to ${i.email}`} onClick={() => run(() => resendInviteAction(i.id))}>
+                        Resend
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-attention"
+                        disabled={pending}
+                        aria-label={`Cancel invite to ${i.email}`}
+                        onClick={() =>
+                          ask({
+                            title: `Cancel the invite to ${i.email}?`,
+                            confirmLabel: "Cancel invite",
+                            danger: true,
+                            fn: () => revokeInviteAction(i.id),
+                            body: <p>The link in their email stops working and the seat is freed.</p>,
+                          })
+                        }
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          {totals.invites > data.invites.length ? (
+            <Link href={moreHref("invites", limits.invites + INVITES_PAGE)} scroll={false} className={linkClass}>
+              Show more ({totals.invites - data.invites.length})
+            </Link>
+          ) : null}
+        </SettingsGroup>
+      ) : null}
 
       {canInvite ? (
         seats.full ? (
-          <div className="rounded-panel border border-line px-3 py-3 text-sm">
-            <p className="text-ink">All {seats.included} seats are in use.</p>
-            <Link href="/wallet" className="mt-1 inline-block font-medium text-accent-deep hover:underline">
-              Upgrade your package to invite more people
-            </Link>
-          </div>
+          <SettingsGroup title="Invite">
+            <div className="space-y-1 px-4 py-3 text-body">
+              <p className="text-ink">All {seats.included} seats are in use.</p>
+              <Link href="/wallet" className="inline-block font-medium text-accent hover:underline">
+                Upgrade your package to invite more people
+              </Link>
+            </div>
+          </SettingsGroup>
         ) : (
-          <div className="space-y-2 rounded-panel border border-line px-3 py-3">
-            <label className="block text-sm font-medium text-ink" htmlFor="invite-email">Invite by email</label>
-            <input
-              id="invite-email"
-              type="text"
-              inputMode="email"
-              autoComplete="off"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@business.co.ke"
-              className={settingsFieldClass}
-            />
-            <fieldset className="space-y-1">
-              <legend className="text-sm font-medium text-ink">Role</legend>
-              {roles.map((r) => (
-                <label key={r} className="flex items-start gap-2 text-sm">
-                  <input type="radio" name="invite-role" checked={role === r} onChange={() => setRole(r)} className="mt-1" />
-                  <span>
-                    <span className="font-medium text-ink">{ROLE_LABELS[r]}</span>
-                    <span className="block text-ink-soft">{ROLE_BLURBS[r]}</span>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-            <button
-              type="button"
-              className={settingsPrimaryButtonClass}
-              disabled={pending || !email.trim()}
-              onClick={() => run(() => inviteMemberAction(email, role))}
-            >
-              {pending ? "Sending…" : "Send invite"}
-            </button>
-          </div>
+          <SettingsGroup title="Invite">
+            <div className="px-4 py-3">
+              <label className="block text-body font-medium text-ink" htmlFor="invite-email">Email</label>
+              <input
+                id="invite-email"
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter would submit the surrounding Settings form.
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (email.trim()) run(() => inviteMemberAction(email, role));
+                  }
+                }}
+                placeholder="name@business.co.ke"
+                className={settingsFieldClass}
+              />
+            </div>
+            <div className="px-3">
+              <ChoiceSheet title="Role" rowLabel="Role" value={role} options={roleOptions} onChange={setRole} />
+            </div>
+            <p className="px-4 py-2 text-meta text-ink-2" aria-live="polite">{ROLE_BLURBS[role]}</p>
+            <div className="flex justify-end px-4 py-3">
+              <Button
+                variant="primary"
+                size="md"
+                disabled={pending || !email.trim()}
+                onClick={() => run(() => inviteMemberAction(email, role))}
+              >
+                {pending ? "Sending…" : "Send invite"}
+              </Button>
+            </div>
+          </SettingsGroup>
         )
       ) : null}
 
-      {flash ? (
-        <p role={flash.error ? "alert" : "status"} className={`text-sm ${flash.error ? "text-warn" : "text-accent-deep"}`}>
-          {flash.error || flash.message}
-        </p>
-      ) : null}
+      <p role={flash?.error ? "alert" : "status"} aria-live="polite" className={`min-h-5 px-1 text-meta ${flash?.error ? "text-attention" : "text-ink-2"}`}>
+        {flash ? flash.error || flash.message : ""}
+      </p>
+
+      <p className="px-1 text-meta text-ink-2">Members sign in and use a seat. Alert contacts only get notified.</p>
 
       <ConfirmSheet
         open={!!confirming}
@@ -266,8 +317,8 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
         {confirming?.body}
         {confirming?.typeToConfirm ? (
           <div className="mt-4">
-            <label htmlFor="confirm-type" className="block text-sm font-medium text-ink">
-              Type <span className="font-mono">{confirming.typeToConfirm}</span> to confirm
+            <label htmlFor="confirm-type" className="block text-body font-medium text-ink">
+              Type {confirming.typeToConfirm} to confirm
             </label>
             <input
               id="confirm-type"
@@ -282,8 +333,18 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
           </div>
         ) : null}
       </ConfirmSheet>
+    </div>
+  );
+}
 
-      <p className={`${settingsBlockTitleClass} px-1 pt-4`}>Alert contacts</p>
-    </section>
+/** Members couldn&apos;t load. say so plainly, offer a retry, keep the rest of Settings usable. */
+export function MembersLoadError() {
+  return (
+    <SettingsGroup title="Members">
+      <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <p className="text-body text-ink-2" role="alert">Members couldn&apos;t load.</p>
+        <a href="" className="text-body font-medium text-accent hover:underline">Try again</a>
+      </div>
+    </SettingsGroup>
   );
 }

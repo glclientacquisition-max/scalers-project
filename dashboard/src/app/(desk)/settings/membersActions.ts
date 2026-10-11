@@ -16,6 +16,7 @@ import {
 } from "@/lib/invites";
 import { sendOpsMail } from "@/lib/opsMail";
 import { configuredAppHost } from "@/lib/adminHost";
+import { RATE_WINDOW_MS, isFreshDuplicate, rateLimitMessage, type RateCounts } from "@/lib/teamLimits";
 
 export type MembersActionResult = { ok?: boolean; error?: string; message?: string };
 
@@ -38,6 +39,25 @@ async function roleOf(tenantId: string, userId: string): Promise<Role | null> {
     .eq("user_id", userId)
     .maybeSingle();
   return data ? normalizeRole((data as { role: string }).role) : null;
+}
+
+/** Invite + resend counts in the last hour, from the audit log (shared across server instances). */
+async function recentInviteCounts(tenantId: string, actor: string, targetEmail?: string): Promise<RateCounts> {
+  const admin = getSupabaseAdmin();
+  const since = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
+  const base = () =>
+    admin
+      .from("tenant_member_audit")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .in("action", ["invite", "resend"])
+      .gte("created_at", since);
+  const [w, a, i] = await Promise.all([
+    base(),
+    base().eq("actor", actor),
+    targetEmail ? base().eq("action", "resend").eq("target_email", targetEmail) : Promise.resolve({ count: 0 }),
+  ]);
+  return { workspace: w.count ?? 0, actor: a.count ?? 0, invite: i.count ?? 0 };
 }
 
 async function audit(row: Record<string, unknown>) {
@@ -64,6 +84,8 @@ export async function inviteMemberAction(email: string, role: string): Promise<M
   const cleanEmail = normalizeInviteEmail(email);
   if (!cleanEmail) return { error: "Enter a valid email address." };
   if (!actorRole || !assignableRoles(actorRole).includes(target)) return { error: "You can't invite someone with that role." };
+  const limited = rateLimitMessage(await recentInviteCounts(ctx.tenantId, ctx.userId), "invite");
+  if (limited) return { error: limited };
 
   const token = generateInviteToken();
   const { error } = await getSupabaseAdmin().rpc("create_tenant_invite", {
@@ -76,6 +98,16 @@ export async function inviteMemberAction(email: string, role: string): Promise<M
   if (error) {
     if (/\balready_member\b/.test(error.message)) return { error: `${cleanEmail} is already on this team.` };
     if (/\balready_invited\b/.test(error.message)) {
+      // Double-click / retry: the first request already created it. Report success, don't send twice.
+      const { data: dup } = await getSupabaseAdmin()
+        .from("tenant_invites")
+        .select("created_at, invited_by")
+        .eq("tenant_id", ctx.tenantId)
+        .eq("email", cleanEmail)
+        .eq("status", "pending")
+        .maybeSingle();
+      const d = dup as { created_at?: string; invited_by?: string } | null;
+      if (isFreshDuplicate(d?.created_at, d?.invited_by, ctx.userId)) return { ok: true, message: "Invite sent." };
       return { error: `${cleanEmail} already has a pending invite. Use Resend in the invites list instead.` };
     }
     return { error: inviteErrorCopy(error.message) };
@@ -90,16 +122,12 @@ export async function inviteMemberAction(email: string, role: string): Promise<M
   }
 }
 
-const resendHits = new Map<string, number[]>();
-
 export async function resendInviteAction(inviteId: string): Promise<MembersActionResult> {
   const denied = await memberDenied("members.invite");
   if (denied) return denied;
   const ctx = await context();
   if (!ctx.ok) return { error: ctx.error };
   const now = Date.now();
-  const hits = (resendHits.get(inviteId) || []).filter((t) => now - t < 3_600_000);
-  if (hits.length >= 3) return { error: "You've resent this invite 3 times in the last hour. Try later." };
   const admin = getSupabaseAdmin();
   const { data: inv } = await admin
     .from("tenant_invites")
@@ -111,6 +139,8 @@ export async function resendInviteAction(inviteId: string): Promise<MembersActio
   if (!row || row.status !== "pending") return { error: "That invite is no longer pending." };
   const actorRole = await roleOf(ctx.tenantId, ctx.userId);
   if (!actorRole || !canManageMember(actorRole, normalizeRole(row.role))) return { error: "You don't have access to do that." };
+  const limited = rateLimitMessage(await recentInviteCounts(ctx.tenantId, ctx.userId, row.email), "resend");
+  if (limited) return { error: limited };
   const token = generateInviteToken();
   const expires = new Date(now + 7 * 86_400_000).toISOString();
   const { error } = await admin
@@ -118,8 +148,6 @@ export async function resendInviteAction(inviteId: string): Promise<MembersActio
     .update({ token_hash: hashInviteToken(token), expires_at: expires })
     .eq("id", row.id);
   if (error) return { error: "Couldn't resend. Try again." };
-  hits.push(now);
-  resendHits.set(inviteId, hits);
   await audit({ tenant_id: ctx.tenantId, actor: ctx.userId, action: "resend", target_email: row.email, to_role: row.role });
   try {
     const sent = await sendInvite({ email: row.email, role: normalizeRole(row.role), token, businessName: ctx.businessName });
@@ -138,12 +166,14 @@ export async function revokeInviteAction(inviteId: string): Promise<MembersActio
   // Admins may only cancel invites for roles they could have sent (not an owner-sent Admin invite).
   const { data: pendingRow } = await admin
     .from("tenant_invites")
-    .select("role")
+    .select("role, status")
     .eq("id", inviteId)
     .eq("tenant_id", ctx.tenantId)
-    .eq("status", "pending")
     .maybeSingle();
-  if (!pendingRow) return { error: "That invite is no longer pending." };
+  if (!pendingRow) return { error: "That invite no longer exists." };
+  const pendingState = (pendingRow as { status: string }).status;
+  if (pendingState === "revoked") return { ok: true, message: "Invite cancelled." };
+  if (pendingState !== "pending") return { error: "That invite is no longer pending." };
   const actorRole = await roleOf(ctx.tenantId, ctx.userId);
   if (!actorRole || !canManageMember(actorRole, normalizeRole((pendingRow as { role: string }).role))) {
     return { error: "Only the owner can cancel an Admin invite." };
@@ -156,7 +186,7 @@ export async function revokeInviteAction(inviteId: string): Promise<MembersActio
     .eq("status", "pending")
     .select("email, role")
     .maybeSingle();
-  if (!data) return { error: "That invite is no longer pending." };
+  if (!data) return { ok: true, message: "Invite cancelled." };
   const row = data as { email: string; role: string };
   await audit({ tenant_id: ctx.tenantId, actor: ctx.userId, action: "revoke", target_email: row.email, from_role: row.role });
   revalidatePath("/settings");
@@ -173,6 +203,7 @@ export async function changeMemberRoleAction(userId: string, role: string): Prom
   const current = await roleOf(ctx.tenantId, userId);
   const next = normalizeRole(role);
   if (!actorRole || !current) return { error: "Member not found." };
+  if (current === next) return { ok: true, message: "Role updated." };
   if (!canManageMember(actorRole, current) || !assignableRoles(actorRole).includes(next)) {
     return { error: "You don't have access to do that." };
   }
@@ -195,7 +226,8 @@ export async function removeMemberAction(userId: string): Promise<MembersActionR
   if (userId === ctx.userId) return { error: "You can't remove yourself." };
   const actorRole = await roleOf(ctx.tenantId, ctx.userId);
   const current = await roleOf(ctx.tenantId, userId);
-  if (!actorRole || !current) return { error: "Member not found." };
+  if (!actorRole) return { error: "Member not found." };
+  if (!current) return { ok: true, message: "Removed." }; // already gone (double-click)
   if (current === "owner") return { error: "The owner can't be removed. Transfer ownership first." };
   if (!canManageMember(actorRole, current)) return { error: "You don't have access to do that." };
   const { error } = await getSupabaseAdmin()

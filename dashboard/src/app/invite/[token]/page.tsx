@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BrandWordmark } from "@/components/brand/BrandMark";
-import { btnPrimary, metaLabelClass } from "@/components/ui/deskChrome";
+import { buttonClass } from "@/components/ui/Button";
 import { getAuthUser } from "@/lib/auth";
 import { lookupInvite } from "@/lib/inviteLookup";
 import { expiryLabel, invitePageKind } from "@/lib/invitePageState";
@@ -11,9 +11,11 @@ import { AcceptButton, CreateAccountForm, SignInForm } from "./InviteForms";
 
 export const instant = false;
 
+const primary = buttonClass({ variant: "primary", size: "lg", block: true });
+
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex min-h-dvh items-center justify-center px-6 py-16">
+    <main className="flex min-h-dvh justify-center bg-surface-canvas px-4 pb-16 pt-10 sm:items-center sm:px-6 sm:pt-16">
       <div className="w-full max-w-md">
         <BrandWordmark href="/login" context="Invite" variant="lockup" priority />
         {children}
@@ -24,16 +26,28 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 function Notice({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) {
   return (
-    <section className="glass-chrome mt-8 rounded-panel border border-line p-6" aria-live="polite">
-      <h1 className="font-display text-xl tracking-tight text-ink">{title}</h1>
-      <p className="mt-2 text-sm text-ink-soft">{body}</p>
-      {action ? <div className="mt-5">{action}</div> : null}
+    <section className="mt-8 space-y-5" aria-live="polite">
+      <div className="space-y-2 px-1">
+        <h1 className="text-page text-ink">{title}</h1>
+        <p className="text-body text-ink-2">{body}</p>
+      </div>
+      {action}
     </section>
   );
 }
 
+/** Grouped inset row: label left, value right (iOS settings style). */
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-11 items-baseline justify-between gap-4 px-4 py-2.5">
+      <dt className="shrink-0 text-body text-ink">{label}</dt>
+      <dd className="min-w-0 break-all text-end text-body text-ink-2">{children}</dd>
+    </div>
+  );
+}
+
 const signInLink = (
-  <Link href="/login" className={`${btnPrimary} inline-flex`}>
+  <Link href="/login" className={primary}>
     Go to sign in
   </Link>
 );
@@ -75,7 +89,7 @@ export default async function InvitePage({
   if (kind === "invalid" || !invite.found) {
     return (
       <Shell>
-        <Notice title="This invite link isn't valid" body="Check you opened the full link from the email, or ask for a new invite." />
+        <Notice title="This link isn't valid" body="Open the full link from the email, or ask for a new invite." />
       </Shell>
     );
   }
@@ -99,7 +113,7 @@ export default async function InvitePage({
         <Notice
           title={`You're already in ${invite.businessName}`}
           body="This invite has been accepted."
-          action={<Link href="/home" className={`${btnPrimary} inline-flex`}>Open the dashboard</Link>}
+          action={<Link href="/home" className={primary}>Open the dashboard</Link>}
         />
       </Shell>
     );
@@ -115,65 +129,50 @@ export default async function InvitePage({
   const role = ROLE_LABELS[invite.role];
   return (
     <Shell>
-      <section className="glass-chrome mt-8 rounded-panel border border-line p-6">
-        <p className={metaLabelClass}>Team invite</p>
-        <h1 className="mt-1 font-display text-2xl tracking-tight text-ink">Join {invite.businessName}</h1>
-        <p className="mt-2 text-sm text-ink-soft">
-          {invite.invitedByName ? (
-            <>
-              <strong className="font-medium text-ink">{invite.invitedByName}</strong> invited you to the team on Scalers.
-            </>
-          ) : (
-            "You've been invited to the team on Scalers."
-          )}
-        </p>
-        <dl className="mt-5 space-y-3 border-t border-line pt-4 text-sm">
-          <div>
-            <dt className={metaLabelClass}>Your role</dt>
-            <dd className="mt-1 text-ink">
-              <span className="font-medium">{role}</span>
-              <span className="text-ink-soft"> · {ROLE_BLURBS[invite.role]}</span>
-            </dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-3">
-            <div>
-              <dt className={metaLabelClass}>Invite for</dt>
-              <dd className="mt-1 break-all text-ink">{invite.email}</dd>
-            </div>
-            <dd className="shrink-0 text-xs text-ink-soft">{expiryLabel(invite.expiresAt)}</dd>
-          </div>
-        </dl>
+      <section className="mt-8 space-y-6">
+        <div className="space-y-2 px-1">
+          <h1 className="text-page text-ink">Join {invite.businessName}</h1>
+          <p className="text-body text-ink-2">
+            {invite.invitedByName ? `${invite.invitedByName} invited you to the team.` : "You've been invited to the team."}
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <dl className="divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
+            <Row label="Role">{role}</Row>
+            <Row label="Email">{invite.email}</Row>
+            <Row label="Expires">{expiryLabel(invite.expiresAt)}</Row>
+          </dl>
+          <p className="px-4 text-meta text-ink-2">{ROLE_BLURBS[invite.role]}</p>
+        </div>
 
         {confirmed === "1" && !user ? (
-          <p className="mt-5 rounded-md border border-line bg-accent/10 px-3 py-2 text-sm text-ink" role="status">
+          <p className="rounded-2xl bg-accent-tonal px-4 py-3 text-body text-ink" role="status">
             Email confirmed. Sign in to finish joining.
           </p>
         ) : null}
 
-        <div className="mt-6 border-t border-line pt-5">
-          {kind === "accept" ? (
-            <AcceptButton token={token} businessName={invite.businessName} />
-          ) : kind === "wrong_account" ? (
-            <div className="space-y-3 text-sm text-ink-soft">
-              <p>
-                You&apos;re signed in as <strong className="text-ink">{user?.email}</strong>, but this invite is for{" "}
-                <strong className="text-ink">{invite.email}</strong>.
-              </p>
-              <form action="/api/logout" method="post">
-                <input type="hidden" name="next" value={`/invite/${encodeURIComponent(token)}`} />
-                <button type="submit" className={`${btnPrimary} w-full`}>
-                  Sign out and continue
-                </button>
-              </form>
-            </div>
-          ) : kind === "signin" ? (
-            <SignInForm token={token} email={invite.email} />
-          ) : (
-            <CreateAccountForm token={token} email={invite.email} />
-          )}
-        </div>
+        {kind === "accept" ? (
+          <AcceptButton token={token} businessName={invite.businessName} />
+        ) : kind === "wrong_account" ? (
+          <div className="space-y-4">
+            <p className="px-1 text-body text-ink-2">
+              You&apos;re signed in as {user?.email}. This invite is for {invite.email}.
+            </p>
+            <form action="/api/logout" method="post">
+              <input type="hidden" name="next" value={`/invite/${encodeURIComponent(token)}`} />
+              <button type="submit" className={primary}>
+                Sign out and continue
+              </button>
+            </form>
+          </div>
+        ) : kind === "signin" ? (
+          <SignInForm token={token} email={invite.email} />
+        ) : (
+          <CreateAccountForm token={token} email={invite.email} />
+        )}
       </section>
-      <p className="mt-4 text-center text-xs text-ink-soft">Not expecting this? You can ignore it. Nothing happens until you accept.</p>
+      <p className="mt-6 px-1 text-center text-meta text-ink-2">Not expecting this? Ignore it. Nothing happens until you accept.</p>
     </Shell>
   );
 }

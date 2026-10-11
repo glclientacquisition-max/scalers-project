@@ -19,7 +19,7 @@ it("no window.confirm; transfer uses the in-app ConfirmSheet with consequences +
   assert.doesNotMatch(panel, /window\.confirm/);
   assert.match(panel, /<ConfirmSheet/);
   assert.match(panel, /typeToConfirm: m\.email/);
-  assert.match(panel, /You become an <strong className="text-ink">Admin<\/strong>/);
+  assert.match(panel, /You become an Admin\. You keep the inbox/);
   assert.match(panel, /You can no longer transfer ownership/);
   assert.match(panel, /holds the account and its billing/);
   assert.match(panel, /confirmDisabled=\{!!confirming\?\.typeToConfirm && !transferConfirmMatches/);

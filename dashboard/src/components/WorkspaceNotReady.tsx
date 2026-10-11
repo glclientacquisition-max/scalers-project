@@ -1,20 +1,21 @@
 import { BrandWordmark } from "@/components/brand/BrandMark";
+import { buttonClass } from "@/components/ui/Button";
 
 /** Staff / view-only members of a workspace whose owner hasn't finished setup. */
 export function WorkspaceNotReady({ businessName }: { businessName: string | null }) {
   return (
-    <main className="flex min-h-dvh items-center justify-center px-6 py-16" data-workspace-not-ready="">
+    <main className="flex min-h-dvh justify-center bg-surface-canvas px-4 pb-16 pt-10 sm:items-center sm:px-6" data-workspace-not-ready="">
       <div className="w-full max-w-md">
         <BrandWordmark href="/" context="Desk" variant="lockup" priority />
-        <section className="glass-chrome mt-8 rounded-panel border border-line p-6">
-          <h1 className="font-display text-xl tracking-tight text-ink">
-            {businessName ? `${businessName} isn't set up yet` : "This workspace isn't set up yet"}
-          </h1>
-          <p className="mt-2 text-sm text-ink-soft">
-            The owner still needs to finish setting up the business. Ask them to complete setup, then come back here.
-          </p>
-          <form action="/api/logout" method="post" className="mt-5">
-            <button type="submit" className="text-sm font-medium text-accent-deep hover:underline">
+        <section className="mt-8 space-y-5">
+          <div className="space-y-2 px-1">
+            <h1 className="text-page text-ink">
+              {businessName ? `${businessName} isn't set up yet` : "This workspace isn't set up yet"}
+            </h1>
+            <p className="text-body text-ink-2">The owner needs to finish setup. Come back once they have.</p>
+          </div>
+          <form action="/api/logout" method="post">
+            <button type="submit" className={buttonClass({ variant: "tonal", size: "lg", block: true })}>
               Sign out
             </button>
           </form>

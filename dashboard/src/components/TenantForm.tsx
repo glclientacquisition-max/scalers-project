@@ -122,6 +122,7 @@ import {
   ToolSwitch,
   TrashIcon,
   settingsBlockTitleClass,
+  settingsGroupTitleClass,
   settingsConsoleClass,
   settingsFormBodyClass,
   settingsDenseFieldClass,
@@ -2197,7 +2198,7 @@ function TenantFormInner({
 
         <div className="space-y-1">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <p className={settingsBlockTitleClass}>People</p>
+            <h3 className={`${settingsGroupTitleClass} px-1`}>Alert contacts</h3>
             <button
               type="button"
               onClick={() => setTeam((prev) => [...prev, emptyMember()])}
@@ -2211,8 +2212,8 @@ function TenantFormInner({
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-line">
-          <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+        <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
+          <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-center lg:gap-x-3 border-b border-hairline px-3 py-2 text-meta font-medium text-ink-2">
             <span>Name</span>
             <span>Role</span>
             <span>Phone</span>
