@@ -50,9 +50,10 @@ describe("onboarding craft", () => {
     assert.match(flow, /draftStorageKey\(tenantId, userId\)/);
   });
 
-  it("respects reduced motion and announces progress", () => {
-    assert.match(flow, /prefers-reduced-motion/);
-    assert.match(flow, /motion-safe:/);
+  it("uses desk motion verbs only and announces progress", () => {
+    // MASTER Motion: no width/route animation, no smooth scroll, no ad-hoc durations.
+    assert.doesNotMatch(flow, /transition-\[width\]|duration-\d|behavior: .smooth|animate-(?!spin)/);
+    assert.match(flow, /pendingSpinnerClass|pending=\{/);
     assert.match(flow, /role="progressbar"/);
     assert.match(flow, /tabIndex=\{-1\}/);
   });

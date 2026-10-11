@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BrandWordmark } from "@/components/brand/BrandMark";
-import { btnPrimary } from "@/components/ui/deskChrome";
+import { ButtonLink } from "@/components/ui/Button";
 import { loadSetupContext } from "@/lib/setupServer";
 import { formatKenyaNumber, numberPending } from "@/lib/setupFlow";
 import { PendingNumber } from "./PendingNumber";
@@ -36,9 +35,9 @@ export default async function SetupLinePage() {
         ) : (
           <section aria-labelledby="line-label" className="mt-6 rounded-2xl bg-surface p-5">
             <h2 id="line-label" className="text-meta font-medium text-ink-2">
-              Your receptionist&apos;s number
+              Your Business Assistant&apos;s number
             </h2>
-            <p className="mt-1 text-[2rem] font-semibold leading-tight tracking-tight tabular-nums text-ink">{pretty}</p>
+            <p className="mt-1 text-display font-semibold tabular-nums text-ink">{pretty}</p>
             <p className="mt-3 text-body text-ink-2">
               Call it from your phone to hear how it answers. Then share it with customers, or forward your business line to it.
             </p>
@@ -51,9 +50,9 @@ export default async function SetupLinePage() {
           </section>
         )}
 
-        <Link href="/home" prefetch className={`${btnPrimary} mt-8 w-full text-body`}>
+        <ButtonLink href="/home" prefetch variant="primary" size="lg" block className="mt-8">
           Go to Overview
-        </Link>
+        </ButtonLink>
         <p className="mt-3 text-center text-meta text-ink-2">You can change any answer later in Settings.</p>
       </div>
     </main>

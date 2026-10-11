@@ -16,6 +16,7 @@ import {
   notifyChannelsFor,
   numberPending,
   parseDraft,
+  policiesFromFaqs,
   saveErrorMessage,
   SETUP_STEPS,
   stepIndex,
@@ -208,6 +209,7 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     });
 
   const tPrep = Date.now();
+  const fromFaqs = policiesFromFaqs(faqs.map((f) => ({ question: String(f.question || ""), answer: String(f.answer || "") })), vertical);
   const patch: Record<string, unknown> = {
     services_offered: servicesOffered,
     services_catalog: servicesCatalog,
@@ -231,6 +233,9 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
   };
   if (hoursOn) patch.hours_schedule = hoursSchedule(draft.hours.days, draft.business.landmark);
   if (teamDirectory.length) patch.team_directory = teamDirectory;
+  if (Object.keys(fromFaqs).length) {
+    patch.business_policies = { ...(row.business_policies && typeof row.business_policies === "object" ? row.business_policies : {}), ...fromFaqs };
+  }
 
   const { data: updated, error } = await auth.client
     .from("tenants")
@@ -288,6 +293,9 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
       "identity.business_name",
       "identity.language",
       "assistant.tools",
+      ...(fromFaqs.payment ? ["policies.payment", "payments.methods"] : []),
+      ...(fromFaqs.delivery ? ["policies.delivery"] : []),
+      ...(fromFaqs.coverage_areas ? ["policies.coverage_areas", "locations.branches"] : []),
       ...fieldPathsAttestedOnAlertsSave({
         whatsappNumber: alerts.phone || null,
         alertEmail: alerts.email || null,

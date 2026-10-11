@@ -1,5 +1,8 @@
 "use client";
 
+import { CheckIcon } from "@heroicons/react/20/solid";
+import { controlClass } from "@/components/ui/Field";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
 
@@ -37,15 +40,13 @@ export function ChoiceList<T extends string>({
             role="radio"
             aria-checked={on}
             onClick={() => onChange(opt.value)}
-            className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-2 focus-visible:relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+            className={`flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left ${deskShiftClass} hover:bg-surface-2 focus-visible:relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand`}
           >
             <span className="min-w-0 flex-1">
               <span className="block text-body font-medium text-ink">{opt.title}</span>
               {opt.detail ? <span className="mt-0.5 block text-meta text-ink-2">{opt.detail}</span> : null}
             </span>
-            <svg aria-hidden viewBox="0 0 20 20" className={cx("h-5 w-5 shrink-0 text-accent", on ? "opacity-100" : "opacity-0")}>
-              <path fill="currentColor" d="M7.6 13.6 4.3 10.3l-1.1 1.1 4.4 4.4 9.2-9.2-1.1-1.1z" />
-            </svg>
+            <CheckIcon aria-hidden className={cx("h-5 w-5 shrink-0 text-accent", on ? "opacity-100" : "opacity-0")} />
           </button>
         );
       })}
@@ -82,5 +83,5 @@ export function TextButton({ children, onClick, tone = "accent", label, disabled
   );
 }
 
-export const inputClass =
-  "block w-full min-h-11 rounded-xl border border-hairline bg-canvas px-3 py-2.5 text-body text-ink outline-none placeholder:font-normal placeholder:text-ink-3/70 focus:border-accent focus:ring-2 focus:ring-brand/40 aria-[invalid=true]:border-attention";
+/** The kit control (components/ui/Field), so setup fields match every other form. */
+export const inputClass = controlClass;

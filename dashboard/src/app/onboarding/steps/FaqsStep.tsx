@@ -1,5 +1,6 @@
 "use client";
 
+import { deskShiftClass } from "@/components/ui/deskChrome";
 import { useRef } from "react";
 import { LIMITS, suggestedQuestions, type Vertical, type FaqsStep as Value, type FieldErrors } from "@/lib/setupFlow";
 import { FieldError, TextButton, inputClass } from "./ui";
@@ -36,7 +37,7 @@ export function FaqsStep({
               type="button"
               disabled={has(q)}
               onClick={() => add(q)}
-              className="min-h-11 rounded-full bg-surface px-4 text-meta font-medium text-ink hover:bg-surface-2 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className={`min-h-11 rounded-md bg-surface px-4 text-meta font-medium text-ink ${deskShiftClass} hover:bg-surface-2 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
             >
               {q}
             </button>
@@ -108,7 +109,7 @@ export function FaqsStep({
         </button>
       </div>
       <p className="mt-4 px-1 text-meta text-ink-2">
-        Your receptionist already knows your hours, prices and location. Add anything else callers ask.
+        Your Business Assistant already knows your hours, prices and location. Add anything else callers ask.
       </p>
     </>
   );

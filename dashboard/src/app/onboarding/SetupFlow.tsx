@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { BrandWordmark } from "@/components/brand/BrandMark";
-import { btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
+import { CheckCircleIcon, ChevronLeftIcon } from "@heroicons/react/20/solid";
+import { Button } from "@/components/ui/Button";
+import { pendingSpinnerClass } from "@/components/ui/deskChrome";
 import {
   DEFAULT_AGENT_NAME,
   draftStorageKey,
@@ -29,10 +31,10 @@ function isRedirect(err: unknown): boolean {
 }
 
 const LEADS: Record<StepKey, (business: string) => string> = {
-  business: (b) => `Tell your receptionist what ${b} does and where callers can find you.`,
-  catalogue: () => "Your receptionist quotes these prices to callers.",
+  business: (b) => `Tell your Business Assistant what ${b} does and where callers can find you.`,
+  catalogue: () => "Your Business Assistant quotes these prices to callers.",
   hours: () => "Callers hear these when they ask if you're open.",
-  voice: () => "Choose how your receptionist sounds and what happens when a caller needs you.",
+  voice: () => "Choose how your Business Assistant sounds and what happens when a caller needs you.",
   faqs: () => "Answer the questions you get every day, so callers don't have to wait for you.",
   alerts: () => "Where we reach you when a caller needs you.",
 };
@@ -112,8 +114,8 @@ export function SetupFlow({
       firstRender.current = false;
       return;
     }
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    // Route-like change: instant, no smooth scroll (desk motion: route has no motion).
+    window.scrollTo({ top: 0 });
     headingRef.current?.focus({ preventScroll: true });
   }, [index]);
 
@@ -325,9 +327,7 @@ export function SetupFlow({
                 disabled={busy || index === 0}
                 className={`inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-body text-accent-deep disabled:opacity-50 ${index === 0 ? "invisible" : ""} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
               >
-                <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5">
-                  <path fill="currentColor" d="M12.7 4.3 7 10l5.7 5.7-1.1 1.1L4.8 10l6.8-6.8z" />
-                </svg>
+                <ChevronLeftIcon aria-hidden className="h-5 w-5" />
                 Back
               </button>
             )}
@@ -347,7 +347,7 @@ export function SetupFlow({
           aria-valuenow={index + 1}
           aria-valuetext={`Step ${index + 1} of ${SETUP_STEPS.length}: ${step.title}`}
         >
-          <div className="h-full bg-accent motion-safe:transition-[width] motion-safe:duration-300" style={{ width: `${((index + 1) / SETUP_STEPS.length) * 100}%` }} />
+          <div className="h-full bg-accent" style={{ width: `${((index + 1) / SETUP_STEPS.length) * 100}%` }} />
         </div>
       </header>
 
@@ -379,26 +379,20 @@ export function SetupFlow({
       <footer className="fixed inset-x-0 bottom-0 z-10 border-t border-hairline bg-canvas/90 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur supports-[backdrop-filter]:bg-canvas/75">
         <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4">
           {step.skippable ? (
-            <button
-              type="button"
-              onClick={onSkip}
-              disabled={busy}
-              className="min-h-11 rounded-xl px-4 text-body font-medium text-ink-2 hover:bg-surface disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            >
+            <Button variant="ghost" onClick={onSkip} disabled={busy} className="text-ink-2">
               Skip for now
-            </button>
+            </Button>
           ) : null}
-          <button type="button" onClick={onContinue} disabled={busy} aria-busy={busy || undefined} className={`${btnPrimary} ml-auto min-w-36 gap-2 text-body`}>
-            {busy ? <span aria-hidden className={pendingSpinnerClass} /> : null}
+          <Button variant="primary" onClick={onContinue} pending={busy} className="ml-auto min-w-36">
             {isLast ? (busy ? "Finishing…" : "Finish setup") : busy ? "Saving…" : "Continue"}
-          </button>
+          </Button>
         </div>
       </footer>
     </main>
   );
 }
 
-const FINISH_STAGES = ["Saving your answers", "Writing your receptionist's script", "Getting your phone number"] as const;
+const FINISH_STAGES = ["Saving your answers", "Writing your Business Assistant's script", "Getting your phone number"] as const;
 
 /** Step-by-step progress while Finish runs. Stages advance on a timer; the last waits for the redirect. */
 function FinishingScreen() {
@@ -410,16 +404,14 @@ function FinishingScreen() {
   return (
     <main className="flex min-h-dvh items-center justify-center px-6">
       <div className="w-full max-w-xs">
-        <p className="text-title text-ink">Setting up your receptionist</p>
+        <p className="text-title text-ink">Setting up your Business Assistant</p>
         <ol className="mt-4 space-y-3" aria-label="Setup progress">
           {FINISH_STAGES.map((label, i) => {
             const state = i < stage ? "done" : i === stage ? "current" : "todo";
             return (
               <li key={label} className="flex items-center gap-3 text-body" aria-current={state === "current" ? "step" : undefined}>
                 {state === "done" ? (
-                  <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5 text-accent">
-                    <path fill="currentColor" d="M8 13.6 4.4 10l-1.1 1.1L8 15.8l9-9-1.1-1.1z" />
-                  </svg>
+                  <CheckCircleIcon aria-hidden className="h-5 w-5 text-accent" />
                 ) : state === "current" ? (
                   <span aria-hidden className={`${pendingSpinnerClass} block h-5 w-5`} />
                 ) : (

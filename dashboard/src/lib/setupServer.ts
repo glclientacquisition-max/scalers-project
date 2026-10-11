@@ -8,7 +8,7 @@ import { parseDraft, type SetupDraft } from "@/lib/setupFlow";
 
 /** Everything setup needs, in one row read. */
 export const SETUP_SELECT =
-  "id, business_name, whatsapp_notification_number, alert_email, sautikit_virtual_number, setup_completed_at, onboarding_draft, onboarding_step, onboarding_draft_version";
+  "id, business_name, whatsapp_notification_number, alert_email, sautikit_virtual_number, setup_completed_at, onboarding_draft, onboarding_step, onboarding_draft_version, business_policies";
 
 export type SetupRow = {
   id: string;
@@ -20,6 +20,7 @@ export type SetupRow = {
   onboarding_draft: unknown;
   onboarding_step: number;
   onboarding_draft_version: number;
+  business_policies?: Record<string, unknown> | null;
 };
 
 export type SetupContext =

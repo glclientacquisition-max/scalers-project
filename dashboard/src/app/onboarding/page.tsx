@@ -22,7 +22,7 @@ function OnboardingExit() {
       <button
         type="submit"
         className={[
-          "min-h-11 rounded-md px-2 text-sm text-ink-soft hover:text-warn",
+          "min-h-11 rounded-md px-2 text-meta text-ink-2 hover:text-attention",
           deskShiftClass,
           focusRingVisible,
         ].join(" ")}
@@ -61,8 +61,8 @@ export default async function OnboardingPage({
               <OnboardingExit />
             </div>
           </div>
-          <h1 className="mt-8 font-display text-2xl text-ink">Create your workspace</h1>
-          <p className="mt-2 text-ink-soft leading-relaxed">
+          <h1 className="mt-8 text-display text-ink">Create your workspace</h1>
+          <p className="mt-2 text-body text-ink-2">
             This account isn&apos;t linked to a business yet. Add one to continue.
           </p>
           <CreateWorkspaceForm />
@@ -110,7 +110,7 @@ export default async function OnboardingPage({
             <OnboardingExit />
           </div>
         </div>
-        <h1 className="mt-8 font-display text-2xl text-ink">
+        <h1 className="mt-8 text-display text-ink">
           Set up {legacyTenant.business_name}
         </h1>
         <OnboardingWizard />

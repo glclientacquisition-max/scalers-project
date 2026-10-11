@@ -927,7 +927,7 @@ function TenantFormInner({
       <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
       <section className={panel === "identity" ? "space-y-3" : "hidden"}>
-        <SettingsGroup title="Assistant">
+        <SettingsGroup title="Business Assistant">
           <SettingsRow label="Assistant name" htmlFor="agent_name">
             <input
               id="agent_name"

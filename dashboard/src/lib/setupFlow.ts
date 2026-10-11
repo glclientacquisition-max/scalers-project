@@ -21,7 +21,7 @@ export const SETUP_STEPS: ReadonlyArray<{ key: StepKey; title: string; skippable
   { key: "business", title: "Your business", skippable: false },
   { key: "catalogue", title: "What you sell", skippable: true },
   { key: "hours", title: "Opening hours", skippable: true },
-  { key: "voice", title: "Your receptionist", skippable: true },
+  { key: "voice", title: "Your Business Assistant", skippable: true },
   { key: "faqs", title: "Common questions", skippable: true },
   { key: "alerts", title: "Alerts", skippable: false },
 ];
@@ -425,7 +425,7 @@ export function validateBusiness(input: BusinessStep): StepResult<BusinessStep> 
 
 export function validateVoice(input: VoiceStep): StepResult<VoiceStep> {
   const name = input.agentName.trim();
-  if (!name) return fail("Give your receptionist a name.", { agentName: "Give your receptionist a name." });
+  if (!name) return fail("Give your Business Assistant a name.", { agentName: "Give your Business Assistant a name." });
   if (name.length > LIMITS.agentName) return fail("Use 40 characters or fewer.", { agentName: "Use 40 characters or fewer." });
   if (input.tone !== "warm" && input.tone !== "professional") return fail("Choose a tone.");
   return { ok: true, value: { agentName: name, tone: input.tone, handoff: input.handoff === "live_transfer" ? "live_transfer" : "callback" } };
@@ -670,4 +670,33 @@ export function readLocalDraft(raw: string | null | undefined, serverVersion: nu
     /* corrupt entry */
   }
   return null;
+}
+
+/**
+ * Facts the owner already answered as FAQs, filed where Overview and the Business Assistant
+ * look for them: how customers pay (both niches), delivery (shops), areas covered (home services).
+ */
+export function policiesFromFaqs(
+  items: ReadonlyArray<{ question: string; answer: string }>,
+  vertical: Vertical | string
+): { payment?: string; delivery?: string; coverage_areas?: string[] } {
+  const out: { payment?: string; delivery?: string; coverage_areas?: string[] } = {};
+  for (const { question, answer } of items) {
+    const q = question.toLowerCase();
+    const a = answer.trim();
+    if (!a) continue;
+    if (!out.payment && /m-?pesa|\bpay(ment)?s?\b|\bcash\b/.test(q)) out.payment = a;
+    else if (vertical !== "home_services" && !out.delivery && /\bdeliver/.test(q)) out.delivery = a;
+    else if (vertical === "home_services" && !out.coverage_areas && /\b(areas?|cover|come to)\b/.test(q)) {
+      const areas = a
+        .replace(/^(yes|yeah|sure)[,.!]?\s*/i, "")
+        .replace(/^(we (cover|serve|come to)|all of)\s*/i, "")
+        .split(/,|\band\b|;|\//i)
+        .map((x) => x.replace(/[.!]+$/, "").trim())
+        .filter((x) => x.length > 1 && x.length <= 60)
+        .slice(0, 20);
+      if (areas.length) out.coverage_areas = areas;
+    }
+  }
+  return out;
 }

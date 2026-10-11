@@ -2,6 +2,7 @@
 
 import { Switch } from "@/components/ui/Switch";
 import { PHONE_COUNTRIES, dialCode, phoneForInput, type AlertsStep as Value, type FieldErrors } from "@/lib/setupFlow";
+import { Select } from "@/components/ui/Field";
 import { FieldError, inputClass } from "./ui";
 
 export function AlertsStep({ value, onChange, errors }: { value: Value; onChange: (v: Value) => void; errors: FieldErrors }) {
@@ -18,20 +19,21 @@ export function AlertsStep({ value, onChange, errors }: { value: Value; onChange
         </label>
         <div className="flex flex-col gap-2 sm:flex-row">
         <label htmlFor="alert-country" className="sr-only">Country</label>
-        <select
+        <div className="sm:w-44 sm:shrink-0">
+          <Select
           id="alert-country"
           data-field="country"
           value={value.country}
           onChange={(e) => onChange({ ...value, country: e.target.value })}
           autoComplete="tel-country-code"
-          className={`${inputClass} sm:w-44 sm:shrink-0`}
         >
           {PHONE_COUNTRIES.map((c) => (
             <option key={c.code} value={c.code}>
               {c.name} ({dialCode(c.code)})
             </option>
           ))}
-        </select>
+        </Select>
+        </div>
         <input
           id="alert-phone"
           data-field="phone"

@@ -18,7 +18,7 @@ const DOMAINS: Array<{ key: string; label: string; href: string; fallback: strin
   { key: "policies", label: "Policies", href: businessSettingsHref("train", "policies"), fallback: "Add returns and delivery" },
   { key: "faqs", label: "FAQs", href: businessSettingsHref("train", "faqs"), fallback: "Confirm three answers" },
   { key: "team_notify", label: "Alerts", href: businessSettingsHref("alerts"), fallback: "Set a WhatsApp or email alert" },
-  { key: "assistant", label: "Assistant", href: businessSettingsHref("train", "tools"), fallback: "Name the assistant" },
+  { key: "assistant", label: "Business Assistant", href: businessSettingsHref("train", "tools"), fallback: "Name your Business Assistant" },
   { key: "bulletin", label: "Bulletin", href: "/home#updates", fallback: "Add today's note" },
 ];
 

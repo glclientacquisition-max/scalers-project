@@ -1,5 +1,6 @@
 "use client";
 
+import { deskShiftClass } from "@/components/ui/deskChrome";
 import { Switch } from "@/components/ui/Switch";
 import {
   DAY_NAME,
@@ -47,7 +48,7 @@ export function HoursStep({ value, onChange, errors }: { value: Value; onChange:
             type="button"
             onClick={() => applyPreset(p)}
             aria-pressed={DAYS.every((k) => { const d = value.days[k]; return p.days.includes(k) ? !d.closed && d.shifts.length === 1 && d.shifts[0].open === p.open && d.shifts[0].close === p.close : d.closed; })}
-            className="min-h-11 rounded-full bg-surface px-4 text-meta font-medium text-ink hover:bg-surface-2 aria-pressed:bg-accent-soft aria-pressed:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className={`min-h-11 rounded-md bg-surface px-4 text-meta font-medium text-ink ${deskShiftClass} hover:bg-surface-2 aria-pressed:bg-accent-soft aria-pressed:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
           >
             {p.label}
           </button>
@@ -144,7 +145,7 @@ export function HoursStep({ value, onChange, errors }: { value: Value; onChange:
         })}
       </ul>
       <p className="mt-2 px-4 text-meta text-ink-2">
-        Use a break for lunch or split shifts. Outside these hours your receptionist still answers and takes messages.
+        Use a break for lunch or split shifts. Outside these hours your Business Assistant still answers and takes messages.
       </p>
     </>
   );

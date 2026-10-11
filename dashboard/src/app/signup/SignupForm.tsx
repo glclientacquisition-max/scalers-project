@@ -4,8 +4,8 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { signupAction, type SignupState } from "./actions";
 import { ResendLink } from "./ResendLink";
-import { Field, Input } from "@/components/ui/Field";
-import { btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
+import { Field, Input, Select } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
 import { PHONE_COUNTRIES, dialCode } from "@/lib/setupFlow";
 
 const initial: SignupState = {};
@@ -59,7 +59,7 @@ export function SignupForm() {
   return (
     <>
       <h1 className="mt-8 text-display text-ink">Create your account</h1>
-      <p className="mt-2 text-body text-ink-2">Set up your receptionist in about five minutes.</p>
+      <p className="mt-2 text-body text-ink-2">Set up your Business Assistant in about five minutes.</p>
       <form
         ref={formRef}
         key={restart}
@@ -110,20 +110,21 @@ export function SignupForm() {
           {(p) => (
             <div className="flex flex-col gap-2 sm:flex-row">
               <label htmlFor="phone_country" className="sr-only">Country</label>
-              <select
+              <div className="sm:w-32 sm:shrink-0">
+                <Select
                 id="phone_country"
                 name="phone_country"
                 value={form.phone_country}
                 onChange={set("phone_country")}
                 autoComplete="tel-country-code"
-                className="min-h-11 w-full rounded-xl sm:w-32 sm:shrink-0 border border-hairline bg-surface px-3 text-body text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 {PHONE_COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.code} {dialCode(c.code)}
                   </option>
                 ))}
-              </select>
+              </Select>
+              </div>
               <Input
                 {...p}
                 name="notification_phone"
@@ -145,10 +146,9 @@ export function SignupForm() {
           </p>
         ) : null}
 
-        <button type="submit" disabled={pending} className={`${btnPrimary} w-full gap-2`}>
-          {pending ? <span aria-hidden="true" className={pendingSpinnerClass} /> : null}
+        <Button type="submit" variant="primary" size="lg" block pending={pending}>
           {pending ? "Creating account…" : "Create account"}
-        </button>
+        </Button>
       </form>
     </>
   );

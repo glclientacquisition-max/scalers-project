@@ -17,7 +17,7 @@ export function PendingNumber({ tenantId }: { tenantId: string }) {
       </h2>
       <p className="mt-2 text-body text-ink-2">
         All our numbers are in use right now. We&apos;ve told our team, and your number will show here and on Overview as
-        soon as it&apos;s assigned. Your receptionist is ready and starts answering the moment it is.
+        soon as it&apos;s assigned. Your Business Assistant is ready and starts answering the moment it is.
       </p>
       <p role="status" aria-live="polite" className="mt-3 min-h-5 text-meta text-ink-2">
         {note}

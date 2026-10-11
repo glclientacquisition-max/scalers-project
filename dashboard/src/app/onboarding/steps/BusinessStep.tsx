@@ -21,7 +21,7 @@ export function BusinessStep({ value, onChange }: { value: Value; onChange: (v: 
           ]}
         />
       </div>
-      <Group title="Where to find you" footer="Optional. Your receptionist reads this to callers who ask for directions.">
+      <Group title="Where to find you" footer="Optional. Your Business Assistant reads this to callers who ask for directions.">
         <div className="p-4">
           <label htmlFor="landmark" className="mb-1.5 block text-meta font-medium text-ink">
             Landmark

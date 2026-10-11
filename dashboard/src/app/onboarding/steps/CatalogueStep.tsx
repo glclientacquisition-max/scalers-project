@@ -1,5 +1,6 @@
 "use client";
 
+import { deskShiftClass } from "@/components/ui/deskChrome";
 import { useRef, useState } from "react";
 import { SegmentedControl } from "@/components/ui/Segmented";
 import { HOME_SUGGESTED_SERVICES, SHOP_SUGGESTED_PRODUCTS } from "@/lib/catalogSeeds";
@@ -90,7 +91,7 @@ export function CatalogueStep({
               type="button"
               disabled={has(name)}
               onClick={() => add(name)}
-              className="min-h-11 rounded-full bg-surface px-4 text-meta font-medium text-ink hover:bg-surface-2 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className={`min-h-11 rounded-md bg-surface px-4 text-meta font-medium text-ink ${deskShiftClass} hover:bg-surface-2 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
             >
               {name}
             </button>
@@ -117,7 +118,7 @@ export function CatalogueStep({
                     maxLength={LIMITS.name}
                     autoFocus={lastAdded.current === i && !row.name}
                     onChange={(ev) => update(i, { name: ev.target.value })}
-                    placeholder={home ? "e.g. Plumbing call-out" : "e.g. Maize flour 2kg"}
+                    placeholder={home ? "e.g. Sofa cleaning, 3 seater" : "e.g. Fast charger, 20W"}
                     aria-invalid={e("name") ? true : undefined}
                     aria-describedby={e("name") ? id("name-err") : undefined}
                     className={`${inputClass} font-medium`}
@@ -153,7 +154,7 @@ export function CatalogueStep({
                       inputMode="decimal"
                       maxLength={12}
                       onChange={(ev) => update(i, { price: ev.target.value })}
-                      placeholder="e.g. 1500"
+                      placeholder={home ? "e.g. 2500" : "e.g. 650"}
                       aria-invalid={e("price") ? true : undefined}
                       aria-describedby={e("price") ? id("price-err") : undefined}
                       className={`${inputClass} tabular-nums`}
@@ -172,7 +173,7 @@ export function CatalogueStep({
                         inputMode="decimal"
                         maxLength={12}
                         onChange={(ev) => update(i, { price_max: ev.target.value })}
-                        placeholder="e.g. 3000"
+                        placeholder={home ? "e.g. 6000" : "e.g. 1200"}
                         aria-invalid={e("price_max") ? true : undefined}
                         aria-describedby={e("price_max") ? id("price_max-err") : undefined}
                         className={`${inputClass} tabular-nums`}
@@ -182,7 +183,11 @@ export function CatalogueStep({
                   ) : null}
                 </div>
               ) : (
-                <p className="mt-3 text-meta text-ink-2">Your receptionist will say the price depends on the job and take the caller&apos;s details.</p>
+                <p className="mt-3 text-meta text-ink-2">
+                  {home
+                    ? "Your Business Assistant will say the price depends on the job and take the caller's details."
+                    : "Your Business Assistant will say you'll confirm the price and take the caller's details."}
+                </p>
               )}
 
               {home ? (

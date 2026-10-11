@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
+import { buttonClass, pendingDotClass } from "@/components/ui/Button";
 
 /** Submit for a native POST form: shows progress and blocks a second submit. Resets on back/forward cache. */
 export function PendingSubmit({ label, pendingLabel }: { label: string; pendingLabel: string }) {
@@ -28,8 +28,8 @@ export function PendingSubmit({ label, pendingLabel }: { label: string; pendingL
   }, [pending]);
 
   return (
-    <button ref={ref} type="submit" aria-disabled={pending || undefined} className={`${btnPrimary} w-full gap-2`}>
-      {pending ? <span aria-hidden="true" className={pendingSpinnerClass} /> : null}
+    <button ref={ref} type="submit" aria-disabled={pending || undefined} className={buttonClass({ variant: "primary", size: "lg", block: true })}>
+      {pending ? <span aria-hidden="true" className={pendingDotClass} /> : null}
       {pending ? pendingLabel : label}
     </button>
   );

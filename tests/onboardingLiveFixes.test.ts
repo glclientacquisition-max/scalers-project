@@ -126,9 +126,12 @@ describe("polish pass 2 (staging e2e, 11 Oct)", () => {
   it("placeholders read as hints", () => {
     for (const f of ["CatalogueStep", "VoiceStep", "BusinessStep"]) {
       const src = read(`dashboard/src/app/onboarding/steps/${f}.tsx`);
-      for (const m of src.matchAll(/placeholder="([^"]+)"/g)) assert.match(m[1], /^e\.g\. /, `${f}: ${m[1]}`);
+      for (const m of src.matchAll(/placeholder=(\{[^}]*\}|"[^"]*")/g)) {
+        for (const q of m[1].matchAll(/"([^"]+)"/g)) assert.match(q[1], /^e\.g\. /, `${f}: ${q[1]}`);
+      }
     }
-    assert.match(read("dashboard/src/app/onboarding/steps/ui.tsx"), /placeholder:text-ink-3\/70/);
+    // Placeholder colour is the kit token (ink-3, 4.5:1); the "e.g." prefix marks it as a hint.
+    assert.match(read("dashboard/src/app/onboarding/steps/ui.tsx"), /inputClass = controlClass/);
   });
   it("receptionist has a real default name and clean preview punctuation", async () => {
     const { DEFAULT_AGENT_NAME } = await import("../dashboard/src/lib/setupFlow.ts");
@@ -246,5 +249,69 @@ describe("polish pass 3 (second live run, 11 Oct)", () => {
   });
   it("Overview is prefetched from the number screen", () => {
     assert.match(read("dashboard/src/app/onboarding/line/page.tsx"), /href="\/home" prefetch/);
+  });
+});
+
+describe("design compliance + Business Assistant + niches (11 Oct)", () => {
+  const read = (p: string) => readFileSync(join(root, p), "utf8");
+  const onboardingFiles = [
+    "dashboard/src/app/onboarding/SetupFlow.tsx",
+    "dashboard/src/app/onboarding/CreateWorkspaceForm.tsx",
+    "dashboard/src/app/onboarding/line/page.tsx",
+    "dashboard/src/app/onboarding/line/PendingNumber.tsx",
+    "dashboard/src/app/signup/SignupForm.tsx",
+    "dashboard/src/app/login/PendingSubmit.tsx",
+    ...["ui", "BusinessStep", "CatalogueStep", "HoursStep", "VoiceStep", "FaqsStep", "AlertsStep"].map(
+      (f) => `dashboard/src/app/onboarding/steps/${f}.tsx`
+    ),
+  ];
+  it("kit only: no inline SVG, no legacy class strings, no glass, no arbitrary type, no pills", () => {
+    for (const f of onboardingFiles) {
+      const src = read(f);
+      assert.doesNotMatch(src, /<svg/, `${f} inline svg (use Heroicons)`);
+      assert.doesNotMatch(src, /\bbtnPrimary\b|deskFieldClass|glass-chrome/, `${f} legacy class string`);
+      assert.doesNotMatch(src, /text-\[\d/, `${f} arbitrary type size`);
+      assert.doesNotMatch(src, /rounded-full bg-surface px-4/, `${f} pill chip`);
+      assert.doesNotMatch(src, /#[0-9a-fA-F]{6}\b/, `${f} raw hex`);
+      assert.doesNotMatch(src, /[\u2013\u2014]/, `${f} en/em dash`);
+      assert.doesNotMatch(src, /framer|motion\/react|gsap|lottie/i, `${f} motion library`);
+    }
+    assert.match(read("dashboard/src/app/onboarding/steps/AlertsStep.tsx"), /<Select/);
+    assert.match(read("dashboard/src/app/signup/SignupForm.tsx"), /<Select/);
+  });
+  it("team invites use kit fields and pending buttons", () => {
+    const f = read("dashboard/src/app/invite/[token]/InviteForms.tsx");
+    assert.doesNotMatch(f, /deskFieldClass/);
+    assert.match(f, /pending=\{pending\}/);
+    assert.match(read("dashboard/src/components/MembersPanel.tsx"), /pending=\{pending\}\s*disabled=\{!email\.trim\(\)\}/);
+  });
+  it("product term is Business Assistant in user-facing copy", () => {
+    for (const f of [...onboardingFiles, "dashboard/src/lib/setupFlow.ts", "dashboard/src/components/HomeCapture.tsx", "dashboard/src/components/CallTranscript.tsx"]) {
+      const code = read(f).replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, "");
+      assert.doesNotMatch(code.replace(/compileReceptionistPrompt/g, ""), /receptionist/i, f);
+    }
+    assert.match(read("dashboard/src/lib/setupFlow.ts"), /title: "Your Business Assistant"/);
+    assert.match(read("dashboard/src/app/onboarding/SetupFlow.tsx"), /Writing your Business Assistant's script/);
+  });
+  it("FAQ answers file payment, delivery (shops) and coverage (home services)", async () => {
+    const { policiesFromFaqs } = await import("../dashboard/src/lib/setupFlow.ts");
+    const shop = policiesFromFaqs(
+      [
+        { question: "Do you accept M-Pesa?", answer: "Yes, till 123456." },
+        { question: "Do you deliver?", answer: "Same day in Nairobi." },
+      ],
+      "retail"
+    );
+    assert.equal(shop.payment, "Yes, till 123456.");
+    assert.equal(shop.delivery, "Same day in Nairobi.");
+    assert.equal(shop.coverage_areas, undefined);
+    const home = policiesFromFaqs([{ question: "Which areas do you cover?", answer: "We cover Kilimani, Westlands and Lavington." }], "home_services");
+    assert.deepEqual(home.coverage_areas, ["Kilimani", "Westlands", "Lavington"]);
+    assert.equal(policiesFromFaqs([{ question: "Do you deliver?", answer: "Yes" }], "home_services").delivery, undefined);
+  });
+  it("catalogue examples and ask-price copy fit each niche", () => {
+    const src = read("dashboard/src/app/onboarding/steps/CatalogueStep.tsx");
+    assert.match(src, /home \? "e\.g\. Sofa cleaning, 3 seater" : "e\.g\. Fast charger, 20W"/);
+    assert.match(src, /you'll confirm the price/);
   });
 });
