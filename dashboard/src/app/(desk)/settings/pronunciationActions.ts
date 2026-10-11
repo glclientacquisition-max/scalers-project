@@ -3,6 +3,7 @@
 import { isAuthenticated } from "@/lib/auth";
 import { normalizeAudioMimeForGemini } from "@/lib/gemini";
 import { deriveLexiconFromRecording } from "@/lib/pronunciationFromRecording";
+import { lexiconLengthError } from "@/lib/lengthLimits";
 import {
   isBlockedMatch,
   lexiconForStorage,
@@ -309,6 +310,9 @@ export async function persistPronunciationLexicon(
     return { error: "Forbidden." };
   }
 
+  // parseTtsLexicon drops over-long rows; say so instead of showing "Saved".
+  const tooLong = lexiconLengthError(formData.get("tts_lexicon"));
+  if (tooLong) return { error: tooLong };
   const stored = lexiconForStorage(parseTtsLexicon(formData.get("tts_lexicon")));
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {

@@ -1,5 +1,7 @@
 "use client";
 
+import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
+import { normalizeContactPhone } from "@/lib/teamValidation";
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
@@ -253,12 +255,28 @@ function PolicyTextarea({
   placeholder: string;
 }) {
   return (
-    <ExpandTextarea
-      id={id}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-    />
+    <div>
+      <ExpandTextarea
+        id={id}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        maxLength={POLICY_TEXT_MAX}
+      />
+      <CharCount value={value} max={POLICY_TEXT_MAX} />
+    </div>
+  );
+}
+
+function CharCount({ value, max }: { value: string; max: number }) {
+  const n = value.length;
+  return (
+    <p
+      className={`mt-1 text-right text-xs ${n >= max ? "text-warn" : "text-ink-soft"}`}
+      aria-live="polite"
+    >
+      {n}/{max}
+    </p>
   );
 }
 
@@ -290,6 +308,11 @@ function CatalogPager({
       className="border-t border-line bg-surface-canvas px-3 py-3"
     />
   );
+}
+
+function isOwnerTeamRow(phone: string, ownerPhone: string | null | undefined): boolean {
+  const a = normalizeContactPhone(phone);
+  return Boolean(a && a === normalizeContactPhone(ownerPhone));
 }
 
 export function TenantForm({
@@ -2268,7 +2291,9 @@ export function TenantForm({
                 </label>
                 <input
                   id={`team-email-${index}`}
-                  type="email"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="off"
                   value={member.email || ""}
                   onChange={(e) => updateTeam(index, "email", e.target.value)}
                   placeholder="wanjiku@shop.co.ke"
@@ -2300,6 +2325,9 @@ export function TenantForm({
                 })}
               </div>
               <div className="flex items-start justify-end lg:pt-1">
+                {isOwnerTeamRow(member.phone, tenant.whatsapp_notification_number) ? (
+                  <span className="pt-2 text-xs text-ink-soft" title="The owner always stays on the team">Owner</span>
+                ) : (
                 <button
                   type="button"
                   onClick={() =>
@@ -2320,6 +2348,7 @@ export function TenantForm({
                 >
                   <TrashIcon className="h-4 w-4" />
                 </button>
+                )}
               </div>
             </div>
           ))}
@@ -2398,6 +2427,7 @@ export function TenantForm({
                   rows={2}
                   className={`${fieldClass} py-2 leading-relaxed`}
                 />
+                <CharCount value={faq.answer} max={FAQ_ANSWER_MAX} />
               </div>
               <div className="flex items-start justify-end">
                 <button

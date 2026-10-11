@@ -434,6 +434,7 @@ const {
   appointmentCallerEvent,
   requestCallerEvent,
 } = require('./src/notifications/callerSms');
+const { trustedToolPhone } = require('./src/conversation/callerPhoneGuard');
 const {
   TEXTBACK_META_KEY,
   SUPPRESS_WINDOW_MS,
@@ -5830,7 +5831,7 @@ async function applyGeminiTools(callSid, parsed) {
           callSid,
           type: request.type,
           name: request.name || parsed.name,
-          phone: request.phone,
+          phone: trustedToolPhone(request.phone, state.caller?.phone),
           item: request.item,
           quantity: request.quantity,
           whenText: request.whenText,
@@ -5851,7 +5852,7 @@ async function applyGeminiTools(callSid, parsed) {
           id: request.id,
           type: request.type,
           name: request.name || parsed.name,
-          phone: request.phone,
+          phone: trustedToolPhone(request.phone, state.caller?.phone),
           item: request.item,
           quantity: request.quantity,
           whenText: request.whenText,
@@ -5869,7 +5870,7 @@ async function applyGeminiTools(callSid, parsed) {
           callSid,
           serviceName: appointment.serviceName,
           name: appointment.name || parsed.name,
-          phone: appointment.phone,
+          phone: trustedToolPhone(appointment.phone, state.caller?.phone),
           whenText: appointment.whenText,
           landmark: appointment.landmark,
           notes: appointment.notes || parsed.reason,
@@ -5890,7 +5891,7 @@ async function applyGeminiTools(callSid, parsed) {
         const updated = await db.updateAppointment({
           callSid,
           appointmentId: appointment.appointmentId,
-          phone: appointment.phone,
+          phone: trustedToolPhone(appointment.phone, state.caller?.phone),
           status: appointment.status,
           whenText: appointment.whenText,
           landmark: appointment.landmark,

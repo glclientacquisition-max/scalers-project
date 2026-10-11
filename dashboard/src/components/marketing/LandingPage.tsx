@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import { appEntryHref } from "@/lib/adminHost";
 import { brandAssets } from "@/components/brand/assets";
 import { HeroCall, HowStage } from "@/components/marketing/LandingStory";
 import { ThemeDock } from "@/components/ThemePicker";
@@ -43,26 +43,26 @@ export function LandingPage({
           <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
             <ThemeDock tone="onDark" />
             {signedIn ? (
-              <Link
-                href={actionHref}
+              <a
+                href={appEntryHref(actionHref)}
                 className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus sm:px-4"
               >
                 {actionLabel}
-              </Link>
+              </a>
             ) : (
               <>
-                <Link
-                  href="/login"
+                <a
+                  href={appEntryHref("/login")}
                   className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl px-2 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus sm:px-3"
                 >
                   Sign in
-                </Link>
-                <Link
-                  href={actionHref}
+                </a>
+                <a
+                  href={appEntryHref(actionHref)}
                   className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus sm:px-4"
                 >
                   {actionLabel}
-                </Link>
+                </a>
               </>
             )}
           </nav>
@@ -100,19 +100,19 @@ export function LandingPage({
             </p>
 
             <div className="landing-rise landing-rise-delay-4 mt-10 flex flex-wrap items-center gap-3">
-              <Link
-                href={actionHref}
+              <a
+                href={appEntryHref(actionHref)}
                 className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-6 py-3 text-base font-medium text-brand-900 transition hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus"
               >
                 {actionLabel}
-              </Link>
+              </a>
               {!signedIn ? (
-                <Link
-                  href="/login"
+                <a
+                  href={appEntryHref("/login")}
                   className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/30 px-6 py-3 text-base font-medium text-white transition hover:border-white/55 hover:bg-white/5 focus-visible:outline-none focus-visible:shadow-focus"
                 >
                   Sign in
-                </Link>
+                </a>
               ) : null}
             </div>
           </div>
@@ -136,12 +136,12 @@ export function LandingPage({
               Scalers is a business assistant that actually helps you run the business, from the
               client call through to the booking, the order, or whatever comes next.
             </p>
-            <Link
-              href={actionHref}
+            <a
+              href={appEntryHref(actionHref)}
               className="mt-6 inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-900 px-6 py-3 text-base font-medium text-white transition hover:bg-brand-800 focus-visible:outline-none focus-visible:shadow-focus"
             >
               {actionLabel}
-            </Link>
+            </a>
           </div>
         </div>
       </section>

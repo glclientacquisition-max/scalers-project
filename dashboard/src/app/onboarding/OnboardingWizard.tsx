@@ -29,11 +29,14 @@ import {
 } from "@/components/OnboardingCapture";
 import { SUGGESTED_FAQ_CHIPS } from "@/lib/catalogSeeds";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
-import { homeCatalogPasses, hoursCapturePasses, shopCatalogPasses } from "@/lib/outcomeGates";
+import { homeCatalogPasses, hoursCapturePasses, shopCatalogGap, shopCatalogPasses } from "@/lib/outcomeGates";
+import { ONBOARDING_DRAFT_KEY, parseOnboardingDraft, validateAgentName } from "@/lib/onboardingDraft";
+import { parseVertical } from "@/lib/vertical";
+import { parseHandoffMode } from "@/lib/handoffMode";
 
 const STEPS = [
   "Business type",
-  "Services & pricing",
+  "Catalogue & pricing",
   "Hours & location",
   "Tone & handoff",
 ] as const;
@@ -65,6 +68,36 @@ export function OnboardingWizard() {
   const [agentName, setAgentName] = useState("Receptionist");
   const [state, formAction, pending] = useActionState(completeOnboardingAction, initial);
   const [visible, setVisible] = useState(true);
+
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
+  // Restore draft after refresh.
+  useEffect(() => {
+    const draft = parseOnboardingDraft(window.localStorage.getItem(ONBOARDING_DRAFT_KEY));
+    if (draft) {
+      if (draft.vertical) setVertical(parseVertical(draft.vertical));
+      if (draft.products) setProducts(draft.products as ProductDraft[]);
+      if (draft.services) setServices(draft.services as ServiceDraft[]);
+      if (draft.faqAnswers) setFaqAnswers(draft.faqAnswers);
+      if (draft.hoursLocation) setHoursLocation(draft.hoursLocation);
+      if (draft.landmark) setLandmark(draft.landmark);
+      if (draft.directions) setDirections(draft.directions);
+      const t = TONE_OPTIONS.find((opt) => opt.id === draft.tone);
+      if (t) setTone(t.id);
+      if (draft.handoffMode) setHandoffMode(parseHandoffMode(draft.handoffMode));
+      if (draft.agentName !== undefined) setAgentName(draft.agentName);
+      if (draft.step) setStep(draft.step);
+    }
+    setDraftLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftLoaded) return;
+    window.localStorage.setItem(
+      ONBOARDING_DRAFT_KEY,
+      JSON.stringify({ step, vertical, products, services, faqAnswers, hoursLocation, landmark, directions, tone, handoffMode, agentName })
+    );
+  }, [draftLoaded, step, vertical, products, services, faqAnswers, hoursLocation, landmark, directions, tone, handoffMode, agentName]);
 
   useEffect(() => {
     if (typeof state.step === "number" && state.step !== step) {
@@ -104,11 +137,18 @@ export function OnboardingWizard() {
       ? homeStakes({ services: gatedServices, coverage: landmark })
       : shopStakes({ products, hoursText: hoursLocation, holdsAllowed: false });
 
+  const agentNameCheck = validateAgentName(agentName);
+  const catalogGap = shop && !catalogSkipped ? shopCatalogGap(products) : null;
+  const hoursGap =
+    step === 2 && !hoursSkipped && hoursLocation.trim() && !hoursReady
+      ? "We couldn't read those hours. Use a form like \"Mon-Sat 9:00-18:00\". Closing must be after opening."
+      : null;
+
   function canAdvance(): boolean {
     if (step === 0) return Boolean(vertical);
     if (step === 1) return catalogSkipped || catalogReady;
     if (step === 2) return hoursSkipped || hoursReady;
-    if (step === 3) return Boolean(tone);
+    if (step === 3) return Boolean(tone) && agentNameCheck.ok;
     return false;
   }
 
@@ -154,6 +194,7 @@ export function OnboardingWizard() {
 
       <form
         action={formAction}
+        onSubmit={() => window.localStorage.removeItem(ONBOARDING_DRAFT_KEY)}
         className={[
           `rounded-2xl border border-line bg-surface p-6 sm:p-8 ${deskShiftClass}`,
           visible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
@@ -216,7 +257,7 @@ export function OnboardingWizard() {
         {step === 1 ? (
           <div>
             <h2 className="font-display text-2xl text-ink">
-              {vertical === "retail" ? "Products & pricing" : "Services & pricing"}
+              {vertical === "home_services" ? "Services & pricing" : "Products & pricing"}
             </h2>
             <OnboardingCapture
               vertical={vertical}
@@ -308,6 +349,9 @@ export function OnboardingWizard() {
               </label>
               <input
                 id="agent_name_field"
+                required
+                maxLength={40}
+                aria-invalid={!agentNameCheck.ok}
                 value={agentName}
                 onChange={(e) => setAgentName(e.target.value)}
                 placeholder="Receptionist"
@@ -404,6 +448,15 @@ export function OnboardingWizard() {
           </div>
         ) : null}
 
+        {step === 1 && catalogGap ? (
+          <p className="mt-5 text-sm text-ink-soft" role="status">{catalogGap}</p>
+        ) : null}
+        {hoursGap ? (
+          <p className="mt-5 text-sm text-warn" role="status">{hoursGap}</p>
+        ) : null}
+        {step === 3 && !agentNameCheck.ok ? (
+          <p className="mt-5 text-sm text-warn" role="status">{agentNameCheck.error}</p>
+        ) : null}
         {state.error ? (
           <p className="mt-5 text-sm text-warn" role="alert">
             {state.error}
@@ -414,7 +467,11 @@ export function OnboardingWizard() {
           {step > 0 ? (
             <button
               type="button"
-              onClick={() => goTo(step - 1)}
+              onClick={() => {
+                if (step - 1 === 1) setCatalogSkipped(false);
+                if (step - 1 === 2) setHoursSkipped(false);
+                goTo(step - 1);
+              }}
               disabled={pending}
               className={`min-h-11 text-sm text-ink-soft ${deskShiftClass} ${focusRingVisible} hover:text-ink disabled:opacity-50`}
             >
