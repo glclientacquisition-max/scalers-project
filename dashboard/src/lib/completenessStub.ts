@@ -75,7 +75,7 @@ function fieldScore(
 /** Calm copy when Platform still returns the pre-confirm gap strings. */
 const GAP_REVIEW: Record<string, string> = {
   "Add products or services with owner-confirmed names and prices.":
-    "Add your catalogue, then save.",
+    "Review and confirm your catalogue.",
   "Confirm at least three FAQs with owner source (not seed).":
     "Review and confirm your answers.",
   "Set a WhatsApp or email alert and confirm notify routing.":
@@ -370,7 +370,7 @@ export function scoreCaptureTenant(
     gaps.push({
       domain: "catalog",
       action: namedCatalog
-        ? "Add your catalogue, then save."
+        ? "Review and confirm your catalogue."
         : "Add products or services with prices.",
     });
   }
@@ -441,4 +441,43 @@ export function holdCaptureTenant(
     reasons.push("Need a verified notify target (WhatsApp or email alerts).");
   }
   return { allowed: reasons.length === 0, reasons };
+}
+
+function hasNamedCatalog(tenant: ScoreTenant): boolean {
+  return (
+    rows(tenant.product_catalog).some((item) => textOf(item.name)) ||
+    rows(tenant.services_catalog).some((item) => textOf(item.name))
+  );
+}
+
+/**
+ * The live Platform score (tenant_completeness_score SQL) only counts service
+ * rows with `price` and `site_visit_required`, but Settings saves service
+ * prices as `price_range`. A workspace with a full saved catalogue therefore
+ * scores catalog 0 and Overview told owners to "add" a catalogue they have.
+ * Re-score the catalog domain from the real rows and provenance, keep the
+ * better of the two, and never ask to add a catalogue that has named rows.
+ */
+export function reconcileCatalogScore(
+  live: CaptureScore,
+  tenant: ScoreTenant,
+  meta: ProvenanceMeta = {}
+): CaptureScore {
+  const local = scoreCaptureTenant(tenant, meta).domains.catalog || 0;
+  const liveCatalog = Number(live.domains?.catalog ?? 0);
+  const catalog = Math.max(liveCatalog, local);
+  const named = hasNamedCatalog(tenant);
+  const next_gaps = (live.next_gaps || [])
+    .filter((gap) => !(gap.domain === "catalog" && catalog >= 40))
+    .map((gap) =>
+      gap.domain === "catalog"
+        ? {
+            ...gap,
+            action: named
+              ? "Review and confirm your catalogue."
+              : "Add products or services with prices.",
+          }
+        : gap
+    );
+  return { ...live, domains: { ...live.domains, catalog }, next_gaps };
 }

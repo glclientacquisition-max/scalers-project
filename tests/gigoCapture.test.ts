@@ -9,6 +9,7 @@ import {
 } from "../dashboard/src/lib/outcomeGates.ts";
 import {
   holdCaptureTenant,
+  reconcileCatalogScore,
   reviewGapCopy,
   scoreCaptureTenant,
 } from "../dashboard/src/lib/completenessStub.ts";
@@ -139,5 +140,46 @@ describe("QA fixes: onboarding gates", () => {
   it("rejects closing before opening in 24h form", () => {
     assert.equal(parseCaptureHours("Mon-Fri 18:00-09:00"), null);
     assert.equal(parseCaptureHours("Mon-Fri 9-5")?.days.mon?.close, "17:00");
+  });
+});
+
+describe("reconcileCatalogScore (Overview catalogue card)", () => {
+  const services = Array.from({ length: 16 }, (_, i) => ({
+    name: `Cleaning ${i + 1}`,
+    price_range: "KES 2,000",
+  }));
+  const liveGap = {
+    overall: 30,
+    domains: { catalog: 0 },
+    ready_badge: false,
+    next_gaps: [
+      { domain: "catalog", action: "Add products or services with owner-confirmed names and prices." },
+      { domain: "faqs", action: "Confirm three answers." },
+    ],
+  };
+  it("drops the catalogue gap when saved, owner-attested rows score it", () => {
+    const meta = Object.fromEntries(
+      services.map((_, i) => [`catalog.service.${i + 1}.name`, "owner" as const])
+    );
+    const out = reconcileCatalogScore(
+      liveGap,
+      { vertical: "home_services", services_catalog: services.map((s) => ({ ...s, site_visit_required: true })) },
+      meta
+    );
+    assert.ok(out.domains.catalog >= 40);
+    assert.equal(out.next_gaps[0].domain, "faqs");
+  });
+  it("never says 'add' when the catalogue has named rows", () => {
+    const out = reconcileCatalogScore(liveGap, { vertical: "home_services", services_catalog: services });
+    assert.equal(out.next_gaps[0].action, "Review and confirm your catalogue.");
+    assert.equal(reviewGapCopy(out.next_gaps[0].action || ""), "Review and confirm your catalogue.");
+  });
+  it("keeps the gap for an empty catalogue", () => {
+    const out = reconcileCatalogScore(liveGap, { vertical: "home_services" });
+    assert.equal(out.next_gaps[0].domain, "catalog");
+    assert.equal(
+      reviewGapCopy(out.next_gaps[0].action || ""),
+      "Add products or services with prices."
+    );
   });
 });
