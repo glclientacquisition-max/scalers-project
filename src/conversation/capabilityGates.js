@@ -1,7 +1,7 @@
 // Unified capability gates for the Business Assistant.
 //
 // One model for every action the assistant can only take once the owner has set
-// it up: holds, site visits, booked time slots, live transfer. Each gate lists
+// it up: holds, site visits, booked time slots, callbacks. Each gate lists
 // the requirements that are still missing, keyed by stable ids shared with the
 // dashboard twin (dashboard/src/lib/capabilityGates.ts), so the owner's
 // "Needs setup" sheet and the call brain always agree.
@@ -12,7 +12,7 @@
 
 const { holdOrdersEnabled, confirmedSlotEnabled, factServices } = require('./provenance');
 
-const CAPABILITY_IDS = Object.freeze(['holds', 'site_visits', 'booking_slots', 'live_transfer']);
+const CAPABILITY_IDS = Object.freeze(['holds', 'site_visits', 'booking_slots', 'callbacks']);
 
 /** Map one tenant_hold_gate reason string to a requirement id. */
 function holdReasonId(reason) {
@@ -34,12 +34,23 @@ function holdMissing(profile = {}) {
   return holdOrdersEnabled(profile) ? [] : ['holds_policy_on', 'holdable_item'];
 }
 
+/** A teammate who gets alerts and can be reached on WhatsApp (phone) or email. */
+function teamHasCallbackContact(raw) {
+  if (!Array.isArray(raw)) return false;
+  return raw.some((row) => {
+    const r = row || {};
+    if (r.receives_escalation === false) return false;
+    const phone = String(r.phone || '').replace(/[^\d]/g, '');
+    const email = String(r.email || '').trim();
+    return phone.length >= 9 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  });
+}
+
 /**
  * @param {object} profile tenant profile (camelCase, as built by tenantProfile.js)
- * @param {{ liveTransferReady?: { ready: boolean, reason?: string } }} [runtime]
  * @returns {Record<string, { allowed: boolean, missing: string[] }>}
  */
-function evaluateCapabilityGates(profile = {}, runtime = {}) {
+function evaluateCapabilityGates(profile = {}) {
   const fieldMeta = profile.fieldMeta || null;
   const holdsAllowed = holdOrdersEnabled(profile);
   const holds = {
@@ -54,33 +65,25 @@ function evaluateCapabilityGates(profile = {}, runtime = {}) {
   const slots = confirmedSlotEnabled(profile);
   const bookingSlots = { allowed: slots, missing: slots ? [] : ['booking_mode_confirmed'] };
 
-  const ready = runtime.liveTransferReady || null;
-  const transferMissing = [];
-  if (ready && !ready.ready) {
-    const map = {
-      handoff_callback: 'handoff_live',
-      escalate_off: 'escalate_on',
-      no_destination: 'transfer_phone',
-      closed_or_unknown: 'open_hours',
-    };
-    if (map[ready.reason]) transferMissing.push(map[ready.reason]);
-    else transferMissing.push('platform');
-  }
-  const liveTransfer = {
-    allowed: Boolean(ready && ready.ready),
-    missing: ready ? transferMissing : ['handoff_live'],
-  };
+  // Callbacks only (no live transfer): a teammate who gets alerts on WhatsApp or
+  // email, and the escalate tool on. Same ids as the dashboard twin.
+  const callbackMissing = [];
+  if (!teamHasCallbackContact(profile.teamDirectory)) callbackMissing.push('callback_contact');
+  const tools = profile.agentTools;
+  if (tools && typeof tools === 'object' && tools.escalate === false) callbackMissing.push('escalate_on');
+  const callbacks = { allowed: callbackMissing.length === 0, missing: callbackMissing };
 
   return {
     holds,
     site_visits: siteVisits,
     booking_slots: bookingSlots,
-    live_transfer: liveTransfer,
+    callbacks,
   };
 }
 
 module.exports = {
   CAPABILITY_IDS,
   holdReasonId,
+  teamHasCallbackContact,
   evaluateCapabilityGates,
 };

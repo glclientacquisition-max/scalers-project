@@ -1,7 +1,7 @@
 // Unified capability gates. Twin of src/conversation/capabilityGates.js.
 //
 // Every action the Business Assistant can only take once the owner sets it up
-// (holds, site visits, booked time slots, putting a caller through) has one gate.
+// (holds, site visits, booked time slots, callbacks) has one gate.
 // A gate is Live or Needs setup, lists what is missing with a link to the exact
 // field that fixes it, and says what callers hear in each state. Requirement ids
 // match the call brain, so the Overview and the phone line always agree.
@@ -12,7 +12,7 @@
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { confirmedSlotEnabled, factServices, holdOrdersEnabled } from "@/lib/provenance";
 
-export type CapabilityId = "holds" | "site_visits" | "booking_slots" | "live_transfer";
+export type CapabilityId = "holds" | "site_visits" | "booking_slots" | "callbacks";
 
 export type RequirementId =
   | "holds_policy_on"
@@ -20,11 +20,8 @@ export type RequirementId =
   | "verified_alert"
   | "owner_service"
   | "booking_mode_confirmed"
-  | "handoff_live"
-  | "transfer_phone"
-  | "escalate_on"
-  | "open_hours"
-  | "platform";
+  | "callback_contact"
+  | "escalate_on";
 
 export type Requirement = {
   id: RequirementId;
@@ -53,7 +50,6 @@ const CATALOG = businessSettingsHref("catalog");
 const ALERTS = businessSettingsHref("alerts");
 const TEAM = businessSettingsHref("train", "team");
 const TOOLS = businessSettingsHref("train", "tools");
-const HOURS = businessSettingsHref("train", "hours");
 
 export const REQUIREMENT_COPY: Record<RequirementId, { label: string; href: string | null; fixLabel: string }> = {
   holds_policy_on: { label: "Say you hold items for customers", href: `${POLICIES}#holds`, fixLabel: "Open Policies" },
@@ -61,11 +57,8 @@ export const REQUIREMENT_COPY: Record<RequirementId, { label: string; href: stri
   verified_alert: { label: "Set up WhatsApp or email alerts so you hear about each hold", href: ALERTS, fixLabel: "Open Alerts" },
   owner_service: { label: "Add at least one service you offer", href: CATALOG, fixLabel: "Open Catalogue" },
   booking_mode_confirmed: { label: "Let callers book a time slot directly", href: `${POLICIES}#bookings`, fixLabel: "Open Policies" },
-  handoff_live: { label: "Choose to put callers through to you", href: `${TEAM}#handoff`, fixLabel: "Open Team" },
-  transfer_phone: { label: "Add a phone number for the person who takes calls", href: TEAM, fixLabel: "Open Team" },
+  callback_contact: { label: "Add a team contact with WhatsApp or email who gets callback alerts", href: TEAM, fixLabel: "Open Team" },
   escalate_on: { label: "Allow the Business Assistant to alert you", href: TOOLS, fixLabel: "Open Voice" },
-  open_hours: { label: "Set your opening hours", href: HOURS, fixLabel: "Open Hours" },
-  platform: { label: "Scalers turns on call transfer for your line", href: null, fixLabel: "" },
 };
 
 /** Map one tenant_hold_gate reason to a requirement id (same as the call brain). */
@@ -102,12 +95,20 @@ export type GateTenant = {
   agent_tools?: unknown;
 };
 
-function teamHasPhone(raw: unknown): boolean {
+/** A teammate who gets alerts and can be reached on WhatsApp (phone) or email. */
+export function teamHasCallbackContact(raw: unknown): boolean {
   if (!Array.isArray(raw)) return false;
   return raw.some((row) => {
-    const phone = String((row as { phone?: unknown })?.phone || "").replace(/[^\d]/g, "");
-    return phone.length >= 9;
+    const r = (row || {}) as { phone?: unknown; email?: unknown; receives_escalation?: unknown };
+    if (r.receives_escalation === false) return false;
+    const phone = String(r.phone || "").replace(/[^\d]/g, "");
+    const email = String(r.email || "").trim();
+    return phone.length >= 9 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   });
+}
+
+function escalateOn(raw: unknown): boolean {
+  return (raw as { escalate?: unknown } | null)?.escalate !== false;
 }
 
 function holdHours(policies: unknown): number | null {
@@ -123,7 +124,7 @@ function holdHours(policies: unknown): number | null {
  */
 export function capabilityGates(
   tenant: GateTenant,
-  opts: { holdGate?: { allowed: boolean; reasons: string[] } | null; liveTransferExecutor?: boolean; fieldMeta?: unknown } = {},
+  opts: { holdGate?: { allowed: boolean; reasons: string[] } | null; fieldMeta?: unknown } = {},
 ): CapabilityGate[] {
   const vertical = tenant.vertical === "home_services" ? "home_services" : "retail";
   const out: CapabilityGate[] = [];
@@ -192,21 +193,22 @@ export function capabilityGates(
     );
   }
 
-  const transferMissing: RequirementId[] = [];
-  if (String(tenant.handoff_mode || "") !== "live_transfer") transferMissing.push("handoff_live");
-  if (!teamHasPhone(tenant.team_directory)) transferMissing.push("transfer_phone");
-  if (!opts.liveTransferExecutor) transferMissing.push("platform");
+  // Scalers does not put callers through live. The Business Assistant takes the
+  // caller's name and reason, and the team is alerted by WhatsApp or email to call back.
+  const callbackMissing: RequirementId[] = [];
+  if (!teamHasCallbackContact(tenant.team_directory)) callbackMissing.push("callback_contact");
+  if (!escalateOn(tenant.agent_tools)) callbackMissing.push("escalate_on");
   out.push(
     gate(
       {
-        id: "live_transfer",
-        title: "Put callers through",
+        id: "callbacks",
+        title: "Callbacks",
         question: "Can I talk to the owner?",
-        callerHearsLive: `"Let me put you through now." (during opening hours)`,
-        callerHearsLocked: `"I'll ask the owner to call you back."`,
+        callerHearsLive: `"I've taken your details. The owner will call you back."`,
+        callerHearsLocked: `"I've noted your question. Please call again later."`,
       },
-      ["handoff_live", "transfer_phone", "platform"],
-      transferMissing,
+      ["callback_contact", "escalate_on"],
+      callbackMissing,
     ),
   );
   return out;

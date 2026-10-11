@@ -42,7 +42,6 @@ import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { getTenantCompletenessScore, getTenantHoldGate } from "@/lib/deskProvenance";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
 import { capabilityGates } from "@/lib/capabilityGates";
-import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { CapabilityGatesPanel } from "@/components/CapabilityGatesPanel";
 import { parseHoursSchedule } from "@/lib/hoursSchedule";
 import { isBetaBilling } from "@/lib/wallet";
@@ -134,7 +133,6 @@ async function HomeOverviewBody() {
   const work = summarizeInboxWork(inbox.items);
   const gates = capabilityGates(tenant, {
     holdGate: hold,
-    liveTransferExecutor: deskLiveTransferExecutorEnabled(),
   });
   const holdsGate = gates.find((g) => g.id === "holds") || null;
   const slotsGate = gates.find((g) => g.id === "booking_slots") || null;
