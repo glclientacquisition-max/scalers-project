@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
 import { memberCan } from "@/lib/requireMember";
+import { structuredSettingsSlots } from "@/components/structured/StructuredSettingsSlots";
+import { readBusinessType } from "@/lib/structuredServer";
 import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
 import { MembersLoadError, MembersPanel } from "@/components/MembersPanel";
 import { loadMembers } from "@/lib/membersLoad";
@@ -90,6 +92,18 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     }
   }
 
+  // Typed data (payments, price checks, category). The columns may not exist before the migration: then null.
+  let structuredSlot = null;
+  if (tab === "train" && (trainPanel === "identity" || trainPanel === "catalog" || trainPanel === "policies")) {
+    const [canEdit, typed] = await Promise.all([memberCan("settings.edit"), readBusinessType(tenant.id)]);
+    structuredSlot = structuredSettingsSlots({
+      tenant,
+      canEdit,
+      businessType: typed?.business_type || (tenant.vertical === "home_services" || tenant.vertical === "retail" ? tenant.vertical : "general"),
+      businessCategory: typed?.business_category ?? null,
+    });
+  }
+
   const navTargets = SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target));
 
   return (
@@ -101,6 +115,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
       optionStatus={settingsIndexStatuses(tenant, curatedVoices, navTargets)}
       liveTransferExecutor={deskLiveTransferExecutorEnabled()}
       membersSlot={membersSlot}
+      structuredSlot={structuredSlot}
     />
   );
 }

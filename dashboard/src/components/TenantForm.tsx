@@ -327,6 +327,7 @@ function TenantFormInner({
   liveTransferExecutor = false,
   showBack = true,
   membersSlot = null,
+  structuredSlot = null,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -337,6 +338,8 @@ function TenantFormInner({
   showBack?: boolean;
   /** Team & access: Members section (feature flag TEAM_INVITES_ENABLED). */
   membersSlot?: ReactNode;
+  /** Typed-data groups (payments, price checks, category) rendered by the server page per panel. */
+  structuredSlot?: Partial<Record<"identity" | "catalog" | "policies", ReactNode>> | null;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -927,6 +930,7 @@ function TenantFormInner({
       <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
       <section className={panel === "identity" ? "space-y-3" : "hidden"}>
+        {panel === "identity" ? structuredSlot?.identity : null}
         <SettingsGroup title="Business Assistant">
           <SettingsRow label="Assistant name" htmlFor="agent_name">
             <input
@@ -1225,6 +1229,7 @@ function TenantFormInner({
       </section>
 
       <section className={panel === "catalog" ? "space-y-4" : "hidden"}>
+        {panel === "catalog" ? structuredSlot?.catalog : null}
         <CatalogSectionShell
           vertical={vertical}
           title="Catalogue"
@@ -1982,6 +1987,7 @@ function TenantFormInner({
       <section
         className={panel === "policies" ? "space-y-6" : "hidden"}
       >
+        {panel === "policies" ? structuredSlot?.policies : null}
         <SettingsGroup title="Rules">
           {vertical === "home_services" ? (
             <SettingsStack label="Coverage" htmlFor="policy-coverage">
