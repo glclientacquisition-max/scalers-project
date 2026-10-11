@@ -2,11 +2,7 @@
 
 const { parseVertical } = require('../vertical');
 const { parseHandoffMode } = require('../handoffMode');
-const {
-  holdOrdersEnabled,
-  confirmedSlotEnabled,
-  factServices,
-} = require('../provenance');
+const { evaluateCapabilityGates } = require('../capabilityGates');
 const { formatRetailPlaybookForPrompt } = require('./retail');
 const {
   formatHomeServicesPlaybookForPrompt,
@@ -19,18 +15,19 @@ const {
 function formatPlaybookForPrompt(profile = {}) {
   const vertical = parseVertical(profile.vertical);
   const handoffMode = parseHandoffMode(profile.handoffMode);
+  const gates = evaluateCapabilityGates(profile);
 
   if (vertical === 'retail') {
     return formatRetailPlaybookForPrompt({
       handoffMode,
-      placeHold: holdOrdersEnabled(profile),
+      placeHold: gates.holds.allowed,
     });
   }
   if (vertical === 'home_services') {
     return formatHomeServicesPlaybookForPrompt({
       handoffMode,
-      confirmVisit: factServices(profile.servicesCatalog, profile.fieldMeta || null).length > 0,
-      confirmedSlot: confirmedSlotEnabled(profile),
+      confirmVisit: gates.site_visits.allowed,
+      confirmedSlot: gates.booking_slots.allowed,
     });
   }
 

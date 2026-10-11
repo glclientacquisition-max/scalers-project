@@ -8,6 +8,7 @@ import { assignDidFromPool } from "@/lib/tenant";
 import { allowRate } from "@/lib/rateLimit";
 import { readSetupRow, emailConfirmed } from "@/lib/setupServer";
 import {
+  capabilityPoliciesFromSetup,
   catalogueForTenant,
   faqsForTenant,
   firstInvalidStep,
@@ -233,8 +234,13 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
   };
   if (hoursOn) patch.hours_schedule = hoursSchedule(draft.hours.days, draft.business.landmark);
   if (teamDirectory.length) patch.team_directory = teamDirectory;
-  if (Object.keys(fromFaqs).length) {
-    patch.business_policies = { ...(row.business_policies && typeof row.business_policies === "object" ? row.business_policies : {}), ...fromFaqs };
+  const capabilityPolicies = capabilityPoliciesFromSetup(draft.catalogue, vertical);
+  if (Object.keys(fromFaqs).length || Object.keys(capabilityPolicies).length) {
+    patch.business_policies = {
+      ...(row.business_policies && typeof row.business_policies === "object" ? row.business_policies : {}),
+      ...fromFaqs,
+      ...capabilityPolicies,
+    };
   }
 
   const { data: updated, error } = await auth.client
@@ -295,6 +301,8 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
       "assistant.tools",
       ...(fromFaqs.payment ? ["policies.payment", "payments.methods"] : []),
       ...(fromFaqs.delivery ? ["policies.delivery"] : []),
+      ...(capabilityPolicies.holds ? ["policies.holds", "policies.holds.allowed"] : []),
+      ...(capabilityPolicies.booking_mode ? ["policies.booking_mode"] : []),
       ...(fromFaqs.coverage_areas ? ["policies.coverage_areas", "locations.branches"] : []),
       ...fieldPathsAttestedOnAlertsSave({
         whatsappNumber: alerts.phone || null,

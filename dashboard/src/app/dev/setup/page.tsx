@@ -12,6 +12,7 @@ export default async function DevSetupPage({ searchParams }: { searchParams: Pro
   const draft: SetupDraft = defaultDraft({ phone: "+254790381872", email: "owner@shop.co.ke" });
   draft.business = { vertical: home ? "home_services" : "retail", landmark: "Opposite Naivas, Westlands", directions: "" };
   draft.catalogue = {
+    ...draft.catalogue,
     skipped: false,
     rows: [{ ...emptyRow(home ? "Sofa cleaning" : "Fast charger, 20W"), price: home ? "2500" : "650" }],
   };

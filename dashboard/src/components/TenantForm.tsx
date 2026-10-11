@@ -101,7 +101,12 @@ import {
   type BusinessLocation,
 } from "@/lib/businessLocations";
 import {
+  bookingModePatch,
+  HOLD_HOURS_OPTIONS,
+  holdRulesValue,
   normalizeBusinessPolicies,
+  readBookingMode,
+  readHoldRules,
   POLICY_FIELDS,
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
@@ -675,6 +680,16 @@ function TenantFormInner({
         }
         return carrySavedRow({ ...row, [key]: value, source: "owner" }, row);
       })
+    );
+  }
+
+  function setProductHoldable(index: number, holdable: boolean) {
+    const current = products[index];
+    if (current && current.name.trim()) {
+      queueOwnerPath(`catalog.product.${current.sku.trim() || String(index + 1)}.name`);
+    }
+    setProducts((prev) =>
+      prev.map((row, i) => (i === index ? carrySavedRow({ ...row, holdable, source: "owner" }, row) : row))
     );
   }
 
@@ -1507,6 +1522,9 @@ function TenantFormInner({
 
           {products.length === 0 ? null : (
             <>
+            <p id="holdable" className="scroll-mt-24 px-1 text-meta text-ink-2">
+              Turn on Hold for items your Business Assistant may hold for a caller.
+            </p>
             <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
               {visibleProducts.map((product, localIndex) => {
                 const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
@@ -1555,6 +1573,14 @@ function TenantFormInner({
                         className={denseFieldClass}
                         options={STOCK_OPTIONS}
                         onChange={(next) => updateProduct(index, "in_stock", next)}
+                      />
+                    </div>
+                    <div className="col-span-3 flex min-h-11 items-center justify-between gap-3">
+                      <span className="text-meta text-ink-2">Hold</span>
+                      <ToolSwitch
+                        checked={product.holdable === true}
+                        label={`Can hold ${product.name.trim() || `product ${index + 1}`}`}
+                        onChange={(next) => setProductHoldable(index, next)}
                       />
                     </div>
                   </div>
@@ -1645,6 +1671,14 @@ function TenantFormInner({
                                 updateProduct(index, "in_stock", next)
                               }
                             />
+                            <span className="mt-1 flex items-center justify-between gap-2 text-meta text-ink-2">
+                              Hold
+                              <ToolSwitch
+                                checked={product.holdable === true}
+                                label={`Can hold ${product.name.trim() || `product ${index + 1}`}`}
+                                onChange={(next) => setProductHoldable(index, next)}
+                              />
+                            </span>
                           </td>
                           <td className="px-2 py-2">
                             <button
@@ -1982,6 +2016,82 @@ function TenantFormInner({
       <section
         className={panel === "policies" ? "space-y-6" : "hidden"}
       >
+        {vertical === "home_services" ? (
+          <div id="bookings" className="scroll-mt-24">
+            <SettingsGroup title="Bookings">
+              <SettingsRow
+                label="Book a time slot directly"
+                control="switch"
+                hint="Off: callers ask for a time and you confirm it. On: your Business Assistant books the time."
+              >
+                <ToolSwitch
+                  checked={readBookingMode(policies) === "confirmed_slot"}
+                  label="Book a time slot directly"
+                  onChange={(next) => {
+                    queueOwnerPath("policies.booking_mode");
+                    setPolicies((prev) => ({ ...prev, ...bookingModePatch(next ? "confirmed_slot" : "request") }));
+                  }}
+                />
+              </SettingsRow>
+            </SettingsGroup>
+          </div>
+        ) : (
+          <div id="holds" className="scroll-mt-24">
+            <SettingsGroup title="Holds">
+              <SettingsRow label="Hold items for customers" control="switch" hint="Your Business Assistant can hold a holdable item and alerts you each time.">
+                <ToolSwitch
+                  checked={readHoldRules(policies.holds).allowed === "yes"}
+                  label="Hold items for customers"
+                  onChange={(next) => {
+                    const prevRules = readHoldRules(policies.holds);
+                    queueOwnerPath("policies.holds.allowed");
+                    queueOwnerPath("policies.holds");
+                    setPolicies((prev) => ({
+                      ...prev,
+                      holds: holdRulesValue({
+                        allowed: next ? "yes" : "no",
+                        max_hours: prevRules.max_hours ?? 24,
+                        deposit_required: prevRules.deposit_required || "no",
+                      }),
+                    }));
+                  }}
+                />
+              </SettingsRow>
+              {readHoldRules(policies.holds).allowed === "yes" ? (
+                <>
+                  <SettingsStack label="Longest hold">
+                    <SettingsSegmented
+                      label="Longest hold"
+                      value={String(readHoldRules(policies.holds).max_hours ?? 24)}
+                      options={HOLD_HOURS_OPTIONS.map((h) => ({ id: String(h), label: h < 24 ? `${h} hours` : h === 24 ? "1 day" : `${h / 24} days` }))}
+                      onChange={(id) => {
+                        queueOwnerPath("policies.holds");
+                        setPolicies((prev) => ({
+                          ...prev,
+                          holds: holdRulesValue({ ...readHoldRules(prev.holds), max_hours: Number(id) }),
+                        }));
+                      }}
+                    />
+                  </SettingsStack>
+                  <SettingsRow label="Deposit needed" control="switch">
+                    <ToolSwitch
+                      checked={readHoldRules(policies.holds).deposit_required === "yes"}
+                      label="Deposit needed"
+                      onChange={(next) => {
+                        queueOwnerPath("policies.holds");
+                        setPolicies((prev) => ({
+                          ...prev,
+                          holds: holdRulesValue({ ...readHoldRules(prev.holds), deposit_required: next ? "yes" : "no" }),
+                        }));
+                      }}
+                    />
+                  </SettingsRow>
+                </>
+              ) : null}
+            </SettingsGroup>
+          </div>
+        )}
+
         <SettingsGroup title="Rules">
           {vertical === "home_services" ? (
             <SettingsStack label="Coverage" htmlFor="policy-coverage">
@@ -2203,6 +2313,7 @@ function TenantFormInner({
         {membersSlot}
         {liveTransferExecutor || handoffMode === "live_transfer" ? (
           <>
+            <div id="handoff" className="scroll-mt-24">
             <SettingsGroup>
               <SettingsRow label="Live connect" control="switch">
                 <ToolSwitch
@@ -2214,6 +2325,7 @@ function TenantFormInner({
                 />
               </SettingsRow>
             </SettingsGroup>
+            </div>
             <p className="px-1 text-xs text-ink-soft">
               {liveConnectBlurb(liveDest?.name)}
             </p>

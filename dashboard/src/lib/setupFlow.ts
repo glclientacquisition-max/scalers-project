@@ -45,8 +45,14 @@ export type CatalogueRow = {
   /** Home services only: does the job need a site visit before a quote? */
   site_visit: "yes" | "no" | "";
   notes: string;
+  /** Shops only: the Business Assistant may hold this item. */
+  holdable: boolean;
 };
-export type CatalogueStep = { skipped: boolean; rows: CatalogueRow[] };
+/** Shops: "Do you hold items for customers?" */
+export type SetupHolds = { allowed: "yes" | "no" | ""; maxHours: number; deposit: "yes" | "no" | "" };
+/** Home services: can the Business Assistant book a time slot, or does the owner confirm? */
+export type SetupBookingMode = "confirmed_slot" | "request" | "";
+export type CatalogueStep = { skipped: boolean; rows: CatalogueRow[]; holds: SetupHolds; bookingMode: SetupBookingMode };
 export type Shift = { open: string; close: string };
 export type DayPlan = { closed: boolean; shifts: Shift[] };
 export type HoursStep = { skipped: boolean; days: Record<DayKey, DayPlan> };
@@ -120,15 +126,32 @@ export function defaultWeek(): Record<DayKey, DayPlan> {
 /** Prefilled receptionist name; the owner can change it. */
 export const DEFAULT_AGENT_NAME = "Amani";
 
+export const SETUP_HOLD_HOURS = [2, 6, 24, 48, 72] as const;
+
+export function defaultHolds(): SetupHolds {
+  return { allowed: "", maxHours: 24, deposit: "no" };
+}
+
+function parseHolds(raw: unknown): SetupHolds {
+  const h = obj(raw);
+  const yn = (v: unknown) => (v === "yes" || v === "no" ? v : "");
+  const hours = Number(h.maxHours);
+  return {
+    allowed: yn(h.allowed),
+    maxHours: (SETUP_HOLD_HOURS as readonly number[]).includes(hours) ? hours : 24,
+    deposit: yn(h.deposit) || "no",
+  };
+}
+
 export function emptyRow(name = ""): CatalogueRow {
-  return { name, category: "", pricing_mode: "fixed", price: "", price_max: "", site_visit: "no", notes: "" };
+  return { name, category: "", pricing_mode: "fixed", price: "", price_max: "", site_visit: "no", notes: "", holdable: false };
 }
 
 export function defaultDraft(seed: { phone?: string | null; email?: string | null } = {}): SetupDraft {
   const phone = String(seed.phone || "");
   return {
     business: { vertical: "retail", landmark: "", directions: "" },
-    catalogue: { skipped: false, rows: [] },
+    catalogue: { skipped: false, rows: [], holds: defaultHolds(), bookingMode: "" },
     hours: { skipped: false, days: defaultWeek() },
     voice: { agentName: DEFAULT_AGENT_NAME, tone: "warm", handoff: "callback" },
     faqs: { skipped: false, items: [] },
@@ -158,6 +181,7 @@ function parseRow(raw: unknown): CatalogueRow {
     price_max: str(r.price_max, 20),
     site_visit: visit,
     notes: str(r.notes, LIMITS.notes),
+    holdable: r.holdable === true,
   };
 }
 
@@ -197,6 +221,8 @@ export function parseDraft(raw: unknown, seed: { phone?: string | null; email?: 
     out.catalogue = {
       skipped: bool(c.skipped, false),
       rows: Array.isArray(c.rows) ? c.rows.slice(0, LIMITS.rows).map(parseRow) : [],
+      holds: parseHolds(c.holds),
+      bookingMode: c.bookingMode === "confirmed_slot" || c.bookingMode === "request" ? c.bookingMode : "",
     };
   }
   const h = obj(d.hours);
@@ -362,7 +388,10 @@ function rowErrors(row: CatalogueRow, index: number, vertical: Vertical, fields:
 
 export function validateCatalogue(input: CatalogueStep, vertical: Vertical): StepResult<CatalogueStep> {
   const rows = input.rows.filter(rowHasContent).map((r) => ({ ...r, name: r.name.trim(), category: r.category.trim(), notes: r.notes.trim() }));
-  if (input.skipped) return { ok: true, value: { skipped: true, rows } };
+  const holds = input.holds ? parseHolds(input.holds) : defaultHolds();
+  const bookingMode: SetupBookingMode =
+    input.bookingMode === "confirmed_slot" || input.bookingMode === "request" ? input.bookingMode : "";
+  if (input.skipped) return { ok: true, value: { skipped: true, rows, holds, bookingMode } };
   if (rows.length > LIMITS.rows) return fail(`You can add up to ${LIMITS.rows} items here. Add the rest in Settings.`);
   const fields: FieldErrors = {};
   const seen = new Map<string, number>();
@@ -376,8 +405,22 @@ export function validateCatalogue(input: CatalogueStep, vertical: Vertical): Ste
   });
   const noun = vertical === "home_services" ? "service" : "product";
   if (!rows.length) return fail(`Add at least one ${noun} with a price, or skip this step.`);
+  if (vertical === "retail") {
+    if (!holds.allowed) fields["holds.allowed"] = "Say whether you hold items for customers.";
+    else if (holds.allowed === "yes" && !rows.some((r) => r.holdable)) {
+      fields["holds.items"] = "Turn on Hold for at least one item.";
+    }
+  } else if (!bookingMode) fields["bookingMode"] = "Choose how bookings work.";
   if (Object.keys(fields).length) return fail("Fix the highlighted items.", fields);
-  return { ok: true, value: { skipped: false, rows } };
+  return {
+    ok: true,
+    value: {
+      skipped: false,
+      rows: vertical === "retail" && holds.allowed !== "yes" ? rows.map((r) => ({ ...r, holdable: false })) : rows,
+      holds,
+      bookingMode,
+    },
+  };
 }
 
 function minutes(t: string): number {
@@ -567,6 +610,7 @@ export function catalogueForTenant(step: CatalogueStep, vertical: Vertical) {
       price: priceText(r),
       price_mode: r.pricing_mode || "ask",
       notes: r.notes,
+      ...(r.holdable ? { holdable: true } : {}),
       source: "owner",
     })),
   };
@@ -699,4 +743,24 @@ export function policiesFromFaqs(
     }
   }
   return out;
+}
+
+/** business_policies keys setup writes from the catalogue step (holds or booking mode). */
+export function capabilityPoliciesFromSetup(step: CatalogueStep, vertical: Vertical): Record<string, unknown> {
+  if (step.skipped) return {};
+  if (vertical === "retail") {
+    if (!step.holds.allowed) return {};
+    const on = step.holds.allowed === "yes";
+    return {
+      holds: {
+        allowed: step.holds.allowed,
+        max_hours: on ? step.holds.maxHours : null,
+        deposit_required: on ? step.holds.deposit : "",
+        source: "owner",
+        confirmed: true,
+      },
+    };
+  }
+  if (!step.bookingMode) return {};
+  return { booking_mode: step.bookingMode, booking: { source: "owner", confirmed: true } };
 }

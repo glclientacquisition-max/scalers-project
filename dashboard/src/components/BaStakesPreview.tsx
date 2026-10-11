@@ -21,7 +21,7 @@ export function BaStakesPreview({
               <p className="mt-0.5 text-meta text-ink-2">{line.answer}</p>
             </div>
             <Stamp tone={line.state === "live" ? "ok" : line.state === "locked" ? "attention" : "neutral"}>
-              {line.state === "live" ? "Live" : line.state === "locked" ? "Locked" : "Unknown"}
+              {line.state === "live" ? "Live" : line.state === "locked" ? "Needs setup" : "Unknown"}
             </Stamp>
           </li>
         ))}
