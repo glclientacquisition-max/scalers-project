@@ -115,9 +115,9 @@ describe("role-aware UI", () => {
     assert.match(read("dashboard/src/app/(desk)/contacts/page.tsx"), /<RoleGate action="contacts\.import" mode="hide">/);
     assert.match(read("dashboard/src/components/AddContactPanel.tsx"), /useCan\("contacts\.import"\)/);
   });
-  it("RoleGate uses a disabled fieldset with the denial as tooltip; viewer banner in the desk shell", () => {
+  it("RoleGate locks controls with the denial as tooltip; viewer banner in the desk shell", () => {
     const g = read("dashboard/src/components/DeskRole.tsx");
-    assert.match(g, /<fieldset disabled aria-disabled="true" title=\{why\}/);
+    assert.match(g, /<LockedRegion why=\{deniedMessage\(role, action\)\}/);
     assert.match(g, /view-only access/);
     const layout = read("dashboard/src/app/(desk)/layout.tsx");
     assert.match(layout, /<DeskRoleProvider role=\{role\}>/);

@@ -1842,6 +1842,7 @@ function TenantFormInner({
                 <button
                   type="button"
                   aria-expanded={placeOpen}
+                  data-role-exempt=""
                   aria-label={placeDetailLabel}
                   onClick={() => toggleLocationDetails(index)}
                   className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
