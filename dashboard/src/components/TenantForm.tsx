@@ -2106,7 +2106,7 @@ function TenantFormInner({
           ) : null}
           {openPolicyIds.length === 0 ? (
             <p className="px-4 py-2 text-sm text-ink-soft" role="status">
-              No rules yet. Add payment or cancellation to start - write what callers should hear.
+              No rules yet. Add payment or cancellation to start, and write what callers should hear.
             </p>
           ) : null}
           {POLICY_FIELDS.filter((field) => openPolicyIds.includes(field.id)).map((field) => (

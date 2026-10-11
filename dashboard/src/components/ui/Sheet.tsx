@@ -8,8 +8,9 @@ import { cx } from "@/lib/cx";
 /**
  * Bottom drawer at every width. The finger tracks the panel 1:1. A downward
  * flick, or a drag past halfway, dismisses it along the same path it entered.
- * From `sm` the panel is width-capped and centered. Focus trap, Escape, and
- * scroll lock come from Base UI. No motion package.
+ * Focus trap, Escape, and
+ * scroll lock come from Base UI. No motion package. Anchored to the bottom edge at
+ * every width (never a floating centred card); from `sm` only the width is capped.
  */
 export function Sheet({
   open,
@@ -57,7 +58,6 @@ export function Sheet({
               className={cx(
                 "desk-drawer glass-chrome pointer-events-auto flex max-h-[85dvh] w-full flex-col rounded-t-2xl text-ink shadow-sheet outline-none motion-reduce:transition-none",
                 themeClass,
-                "sm:mb-4 sm:rounded-2xl",
                 size === "lg" ? "sm:max-w-2xl" : "sm:max-w-md",
               )}
             >

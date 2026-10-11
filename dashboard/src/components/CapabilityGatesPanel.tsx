@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CheckCircleIcon } from "@heroicons/react/24/solid";
+import { CheckCircleIcon, ExclamationCircleIcon } from "@heroicons/react/24/solid";
 import { buttonClass } from "@/components/ui/Button";
 import { ListRow } from "@/components/ui/ListRow";
 import { Sheet } from "@/components/ui/Sheet";
@@ -53,14 +53,19 @@ export function CapabilityGateSheet({
                 {req.done ? (
                   <CheckCircleIcon className="h-5 w-5 shrink-0 text-ok" aria-hidden="true" />
                 ) : (
-                  <span className="h-5 w-5 shrink-0 rounded-full border-2 border-ink-3" aria-hidden="true" />
+                  <ExclamationCircleIcon className="h-5 w-5 shrink-0 text-attention" aria-hidden="true" />
                 )}
                 <span className={req.done ? "min-w-0 flex-1 text-body text-ink-2" : "min-w-0 flex-1 text-body text-ink"}>
                   <span className="sr-only">{req.done ? "Done: " : "Missing: "}</span>
                   {req.label}
                 </span>
                 {!req.done && req.href ? (
-                  <Link href={req.href} className={buttonClass({ variant: "tonal", size: "sm" })} onClick={() => onOpenChange(false)}>
+                  <Link
+                    href={req.href}
+                    aria-label={`${req.fixLabel} to ${req.label.toLowerCase()}`}
+                    className={buttonClass({ variant: "tonal", size: "sm" })}
+                    onClick={() => onOpenChange(false)}
+                  >
                     {req.fixLabel}
                   </Link>
                 ) : null}
@@ -68,10 +73,18 @@ export function CapabilityGateSheet({
               </li>
             ))}
           </ul>
+          {!live ? (
+            <p className="mt-2 text-meta text-ink-2">Each button opens the setting. Changes go live when you tap Save there.</p>
+          ) : null}
         </div>
       </div>
     </Sheet>
   );
+}
+
+/** The spoken line without its quote marks, for a one-line preview. */
+function callerLine(text: string): string {
+  return text.replace(/^"|"(?=\s|$)/g, "").trim();
 }
 
 /** "What your Business Assistant can do": one tappable row per gate. */
@@ -91,7 +104,7 @@ export function CapabilityGatesPanel({ gates, title = "What your Business Assist
             onOpen={() => setOpenId(g.id)}
             ariaLabel={`${g.title}: ${gateStatusLabel(g)}. Show details`}
             title={g.title}
-            preview={g.status === "live" ? g.question : `${g.missing.length} ${g.missing.length === 1 ? "step" : "steps"} left`}
+            preview={callerLine(g.status === "live" ? g.callerHearsLive : g.callerHearsLocked)}
             stamp={<CapabilityStamp gate={g} />}
           />
         ))}

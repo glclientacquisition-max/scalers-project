@@ -56,15 +56,15 @@ const TOOLS = businessSettingsHref("train", "tools");
 const HOURS = businessSettingsHref("train", "hours");
 
 export const REQUIREMENT_COPY: Record<RequirementId, { label: string; href: string | null; fixLabel: string }> = {
-  holds_policy_on: { label: "Say you hold items for customers", href: `${POLICIES}#holds`, fixLabel: "Turn on" },
-  holdable_item: { label: "Mark at least one catalogue item as holdable", href: `${CATALOG}#holdable`, fixLabel: "Choose items" },
-  verified_alert: { label: "Set up WhatsApp or email alerts so you hear about each hold", href: ALERTS, fixLabel: "Set up alerts" },
-  owner_service: { label: "Add at least one service you offer", href: CATALOG, fixLabel: "Add a service" },
-  booking_mode_confirmed: { label: "Let callers book a time slot directly", href: `${POLICIES}#bookings`, fixLabel: "Turn on" },
-  handoff_live: { label: "Choose to put callers through to you", href: `${TEAM}#handoff`, fixLabel: "Turn on" },
-  transfer_phone: { label: "Add a phone number for the person who takes calls", href: TEAM, fixLabel: "Add number" },
-  escalate_on: { label: "Allow the Business Assistant to alert you", href: TOOLS, fixLabel: "Turn on" },
-  open_hours: { label: "Set your opening hours", href: HOURS, fixLabel: "Set hours" },
+  holds_policy_on: { label: "Say you hold items for customers", href: `${POLICIES}#holds`, fixLabel: "Open Policies" },
+  holdable_item: { label: "Mark at least one catalogue item as holdable", href: `${CATALOG}#holdable`, fixLabel: "Open Catalogue" },
+  verified_alert: { label: "Set up WhatsApp or email alerts so you hear about each hold", href: ALERTS, fixLabel: "Open Alerts" },
+  owner_service: { label: "Add at least one service you offer", href: CATALOG, fixLabel: "Open Catalogue" },
+  booking_mode_confirmed: { label: "Let callers book a time slot directly", href: `${POLICIES}#bookings`, fixLabel: "Open Policies" },
+  handoff_live: { label: "Choose to put callers through to you", href: `${TEAM}#handoff`, fixLabel: "Open Team" },
+  transfer_phone: { label: "Add a phone number for the person who takes calls", href: TEAM, fixLabel: "Open Team" },
+  escalate_on: { label: "Allow the Business Assistant to alert you", href: TOOLS, fixLabel: "Open Voice" },
+  open_hours: { label: "Set your opening hours", href: HOURS, fixLabel: "Open Hours" },
   platform: { label: "Scalers turns on call transfer for your line", href: null, fixLabel: "" },
 };
 
