@@ -1,10 +1,13 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import { parseNotifyChannelsField } from "@/lib/notifyChannels";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { alertPhoneWrite, alertsPersistMatchesSubmit } from "@/lib/alertsSave";
+import { validateAlertsSave } from "@/lib/contactValidation";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import { fieldPathsAttestedOnAlertsSave } from "@/lib/fieldPathsFromSettingsSave";
 import { ownerAttestFields } from "@/lib/ownerAttestFields";
@@ -19,6 +22,8 @@ export async function saveAlertsAction(
   _prev: AlertsActionState,
   formData: FormData
 ): Promise<AlertsActionState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to save settings." };
   }
@@ -39,17 +44,21 @@ export async function saveAlertsAction(
   const submittedEmail = String(formData.get("alert_email") || "")
     .trim()
     .toLowerCase();
-  const notifyChannels = parseNotifyChannelsField(formData.get("notify_channels"));
-  const writtenPhone = alertPhoneWrite(submittedPhone);
-  const writtenEmail = submittedEmail || null;
-
-  if (submittedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submittedEmail)) {
-    return { error: "Alert email looks invalid." };
-  }
+  const submittedChannels = parseNotifyChannelsField(formData.get("notify_channels"));
+  const checked = validateAlertsSave({
+    phone: submittedPhone,
+    email: submittedEmail,
+    channels: submittedChannels,
+  });
+  if (!checked.ok) return { error: checked.error };
+  const notifyChannels = checked.channels;
+  // Stored as E.164 (+2547...), so compare against the normalized submit.
+  const writtenPhone = alertPhoneWrite(checked.phone);
+  const writtenEmail = checked.email;
 
   if (
     !alertsPersistMatchesSubmit({
-      submittedPhone,
+      submittedPhone: checked.phone,
       writtenPhone,
       submittedEmail,
       writtenEmail,
@@ -88,5 +97,5 @@ export async function saveAlertsAction(
   );
 
   revalidatePath("/settings");
-  return { ok: true, message: "Saved" };
+  return { ok: true, message: checked.note || "Saved" };
 }

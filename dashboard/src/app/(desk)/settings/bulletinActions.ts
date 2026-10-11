@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
 import { isAuthenticated } from "@/lib/auth";
@@ -73,6 +75,8 @@ export async function postBulletinAction(
   _prev: BulletinActionState,
   formData: FormData
 ): Promise<BulletinActionState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   const loaded = await loadBulletin();
   if ("error" in loaded) return { error: loaded.error };
 
@@ -132,6 +136,8 @@ export async function clearBulletinAction(
   _prev: BulletinActionState,
   formData: FormData
 ): Promise<BulletinActionState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   const loaded = await loadBulletin();
   if ("error" in loaded) return { error: loaded.error };
 

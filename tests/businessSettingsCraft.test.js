@@ -165,7 +165,7 @@ describe("business settings craft", () => {
     assert.match(shell, /variant: "index" \| "rail"/);
     assert.match(shell, /settingsRailWrapClass/);
     assert.match(ui, /hidden min-w-0 shrink-0 md:block md:w-64/);
-    assert.match(ui, /md:sticky md:top-4/);
+    assert.match(ui, /md:sticky md:top-0 md:pt-4/);
   });
 
   it("parks Sign out in the account menu and Appearance off the settings index", () => {
@@ -291,7 +291,9 @@ describe("business settings craft", () => {
     assert.match(form, /SettingsGroup/);
     assert.match(form, /lg:grid-cols-\[minmax\(5\.5rem,7rem\)_3\.5rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);
     assert.match(form, /grid-cols-\[minmax\(0,7rem\)_minmax\(0,1fr\)_2\.75rem_2\.75rem\]/);
-    assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_auto_2\.5rem\]/);
+    // Alert contacts are a grouped list (no table columns), so nothing truncates.
+    assert.match(form, /<AlertContactsList/);
+    assert.doesNotMatch(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /grid-cols-\[/);
     assert.match(form, /grid-cols-\[minmax\(0,1fr\)_minmax\(0,1\.2fr\)_2\.75rem\]/);
     assert.match(shell, /rounded-2xl border border-hairline bg-surface/);
     assert.match(shell, /bg-accent-tonal/);
@@ -470,7 +472,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(form, /min-w-\[720px\]/);
     assert.doesNotMatch(form, /min-w-\[640px\]/);
     assert.doesNotMatch(form, /minmax\(10rem,auto\)/);
-    assert.match(form, /\{flag\.label\}/);
+    assert.match(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /\{flag\.label\}/);
     assert.match(form, /label: "Urgent"/);
     assert.match(form, /label: "Follow-up"/);
     assert.match(form, /label: "Ops"/);
@@ -484,13 +486,13 @@ describe("business settings craft", () => {
       form.indexOf('panel === "team"'),
       form.indexOf('panel === "faqs"')
     );
-    assert.match(team, /<span>Role<\/span>/);
-    assert.match(team, />\s*Role\s*</);
+    const contacts = require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8");
+    // "Job" (not "Role") so it isn't confused with member roles.
+    assert.match(contacts, /\["role", "Job",/);
     assert.doesNotMatch(team, /Handles/);
-    // Batch B: email/name carry title + wrap — no silent truncate data loss.
-    assert.match(team, /title=\{member\.email \|\| undefined\}/);
-    assert.match(team, /title=\{member\.name \|\| undefined\}/);
-    assert.match(team, /break-words \[overflow-wrap:anywhere\]/);
+    // Name/email wrap in the list row: no silent truncation.
+    assert.match(contacts, /\[overflow-wrap:anywhere\]/);
+    assert.doesNotMatch(contacts, /\btruncate\b/);
     assert.doesNotMatch(team, /min-w-0 truncate/);
   });
 

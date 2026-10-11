@@ -9,6 +9,8 @@ import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getCurrentTenant } from "@/lib/tenant";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import { OnboardingWizard } from "./OnboardingWizard";
+import { memberCan } from "@/lib/requireMember";
+import { WorkspaceNotReady } from "@/components/WorkspaceNotReady";
 import { CreateWorkspaceForm } from "./CreateWorkspaceForm";
 
 // instant = false: owner cookie session must run before the wizard.
@@ -71,6 +73,9 @@ export default async function OnboardingPage({
 
   if (ctx.kind === "ready") {
     if (ctx.row.setup_completed_at) redirect("/home");
+    if (!(await memberCan("settings.edit"))) {
+      return <WorkspaceNotReady businessName={ctx.row.business_name || null} />;
+    }
     const { step } = await searchParams;
     return (
       <SetupFlow
@@ -87,6 +92,9 @@ export default async function OnboardingPage({
 
   // Database without the setup migration: previous wizard, previous completion check.
   const legacyTenant = await getCurrentTenant();
+  if (legacyTenant && tenantNeedsOnboarding(legacyTenant) && !(await memberCan("settings.edit"))) {
+    return <WorkspaceNotReady businessName={legacyTenant.business_name || null} />;
+  }
   if (!legacyTenant || !tenantNeedsOnboarding(legacyTenant)) {
     redirect("/home");
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { PaperAirplaneIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import {
@@ -16,7 +17,7 @@ import { emptyInboxSmsFacts } from "@/lib/polishInboxSms";
 const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
 
-export function InboxSmsDock({
+function InboxSmsDockInner({
   callId,
   callerPhone,
   facts = emptyInboxSmsFacts(),
@@ -150,3 +151,5 @@ export function InboxSmsDock({
     </div>
   );
 }
+
+export const InboxSmsDock = withRoleGate("inbox.act", InboxSmsDockInner);

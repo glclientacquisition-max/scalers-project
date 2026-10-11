@@ -32,6 +32,8 @@ import { seedOwnerCatchAllTeam } from "@/lib/retailOnboardingPack";
 import { ownerAttestFields } from "@/lib/ownerAttestFields";
 import { fieldPathsAttestedOnAlertsSave, fieldPathsAttestedOnSettingsSave } from "@/lib/fieldPathsFromSettingsSave";
 import { notifyNumberPending } from "@/lib/setupNotify";
+import { deskMemberRole } from "@/lib/requireMember";
+import { can } from "@/lib/permissions";
 
 export type SaveStepResult =
   | { ok: true; version: number; furthest: number }
@@ -40,6 +42,14 @@ export type SaveStepResult =
   | { ok: false; conflict: true; error: string; draft: SetupDraft; version: number; furthest: number };
 
 const UNAVAILABLE = "Couldn't save. Check your connection and try again.";
+
+const SETUP_DENIED = "Only the owner or an admin can set up this business.";
+
+/** One membership read (none when team invites are off). Viewers and staff can't run setup. */
+async function canEditSetup(tenantId: string): Promise<boolean> {
+  const role = await deskMemberRole(tenantId);
+  return role !== null && can(role, "settings.edit");
+}
 
 async function signedInClient() {
   const user = await getAuthUser();
@@ -61,6 +71,7 @@ export async function saveSetupStepAction(input: {
 }): Promise<SaveStepResult> {
   const auth = await signedInClient();
   if (!auth) return { ok: false, error: "Your session ended. Sign in again to keep going." };
+  if (!(await canEditSetup(input.tenantId))) return { ok: false, error: SETUP_DENIED };
   const index = stepIndex(input.key);
   if (index < 0) return { ok: false, error: UNAVAILABLE };
 
@@ -107,6 +118,7 @@ export type FinishResult = { ok: false; error: string; step?: StepKey; conflict?
 export async function finishSetupAction(input: { tenantId: string; version: number }): Promise<FinishResult> {
   const auth = await signedInClient();
   if (!auth) return { ok: false, error: "Your session ended. Sign in again to finish." };
+  if (!(await canEditSetup(input.tenantId))) return { ok: false, error: SETUP_DENIED };
 
   const { data: row, error: readErr } = await readSetupRow(auth.client, input.tenantId);
   if (readErr || !row) return { ok: false, error: UNAVAILABLE };

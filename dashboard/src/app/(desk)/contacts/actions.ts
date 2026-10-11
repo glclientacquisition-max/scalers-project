@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
@@ -76,6 +78,8 @@ export async function ensureInboxContact(input: {
   phone?: string | null;
   name?: string | null;
 }): Promise<CreateContactResult & { stub?: boolean }> {
+  const denied = await memberDenied("contacts.edit");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -108,6 +112,8 @@ export async function updateContactNotes(
   contactId: string,
   notes: string
 ): Promise<ContactNotesResult> {
+  const denied = await memberDenied("contacts.edit");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -131,6 +137,8 @@ export async function updateContactNotes(
 }
 
 export async function createContact(formData: FormData): Promise<CreateContactResult> {
+  const denied = await memberDenied("contacts.edit");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -193,6 +201,8 @@ export async function previewContactCsv(
   _prev: ContactImportPreviewState,
   formData: FormData
 ): Promise<ContactImportPreviewState> {
+  const denied = await memberDenied("contacts.import");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -247,6 +257,8 @@ export async function applyContactCsv(
   _prev: ContactImportApplyState,
   formData: FormData
 ): Promise<ContactImportApplyState> {
+  const denied = await memberDenied("contacts.import");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
   if (String(formData.get("confirm") || "") !== "1") {
@@ -290,6 +302,8 @@ export async function updateContactName(
   contactId: string,
   name: string
 ): Promise<ContactNotesResult> {
+  const denied = await memberDenied("contacts.edit");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -337,6 +351,8 @@ export async function updateContactFavourite(
   contactId: string,
   favourite: boolean
 ): Promise<ContactNotesResult> {
+  const denied = await memberDenied("contacts.edit");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 

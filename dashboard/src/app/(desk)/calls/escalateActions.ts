@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { formatEscalationDelivery } from "@/lib/escalationDelivery";
@@ -32,6 +34,8 @@ export async function pingTeammateAction(opts: {
   callId: string;
   teammateName: string;
 }): Promise<PingTeammateResult> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Not signed in." };
   }

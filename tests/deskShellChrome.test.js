@@ -93,8 +93,8 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(chrome, /deskNavBadgeClass =\s*"[^"]*bg-accent-fill/);
     assert.match(layout, /DeskNeedsCountLive/);
     assert.match(layout, /DeskNavHost/);
-    assert.match(layout, /<DeskRail \/>/);
-    assert.match(layout, /<DeskTabBar \/>/);
+    assert.match(layout, /<DeskRail(?: hideHrefs=\{hideHrefs\})? \/>/);
+    assert.match(layout, /<DeskTabBar(?: hideHrefs=\{hideHrefs\})? \/>/);
     assert.doesNotMatch(layout, /fallback=\{<DeskRail/);
     assert.doesNotMatch(layout, /fallback=\{<DeskTabBar/);
     assert.match(layout, /loadCachedInboxNeedsCount/);

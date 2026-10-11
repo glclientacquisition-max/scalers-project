@@ -229,9 +229,12 @@ function DeskDestinationLink({
 export function DeskRail({
   needsCount = 0,
   homeHref = "/home",
+  hideHrefs = [],
 }: {
   needsCount?: number;
   homeHref?: string;
+  /** Team roles: destinations this member can't open. */
+  hideHrefs?: readonly string[];
 }) {
   const fromShell = useDeskNeedsCount();
   const count = needsCount || fromShell;
@@ -255,7 +258,7 @@ export function DeskRail({
         </DeskHint>
       </div>
       <nav aria-label="Workspace" className="flex flex-1 flex-col items-center gap-1 px-1 pt-1">
-        {DESK_LINKS.map((item) => (
+        {DESK_LINKS.filter((item) => !hideHrefs.includes(item.href)).map((item) => (
           <DeskDestinationLink
             key={item.href}
             href={item.href}
@@ -280,7 +283,13 @@ function retapPhoneTab() {
 }
 
 /** Phone thumb destinations. Same DESK_LINKS as the desktop rail. Hidden on nested insides. */
-export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
+export function DeskTabBar({
+  needsCount = 0,
+  hideHrefs = [],
+}: {
+  needsCount?: number;
+  hideHrefs?: readonly string[];
+}) {
   const pathname = usePathname();
   const fromShell = useDeskNeedsCount();
   const count = needsCount || fromShell;
@@ -293,7 +302,7 @@ export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
       className="glass-chrome fixed inset-x-0 bottom-0 z-50 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-visible border-t border-line/80 pb-[env(safe-area-inset-bottom)] shadow-none md:hidden"
     >
       <ul className="flex">
-        {DESK_LINKS.map((item) => (
+        {DESK_LINKS.filter((item) => !hideHrefs.includes(item.href)).map((item) => (
           <li key={item.href} className="min-w-0 flex-1 overflow-visible">
             <DeskDestinationLink
               href={deskPhoneTabHref(item.href, pathname)}

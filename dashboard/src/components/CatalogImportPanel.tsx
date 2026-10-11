@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
@@ -29,7 +30,7 @@ const initial: CatalogImportState = {};
 
 type Mode = "paste" | "csv" | "url";
 
-export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
+function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("paste");
   const [paste, setPaste] = useState("");
@@ -39,6 +40,8 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [mergeMode, setMergeMode] = useState<"merge" | "replace">("merge");
   const [includeSocial, setIncludeSocial] = useState(false);
+  // Preview result the owner already finished with (Start over / applied): never re-show its message.
+  const [dismissed, setDismissed] = useState<CatalogImportState | null>(null);
 
   const [previewState, previewAction, previewPending] = useActionState(
     previewCatalogImportAction,
@@ -67,12 +70,13 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
 
   useEffect(() => {
     if (applyState.ok) {
+      setDismissed(previewState);
       setProducts(null);
       setPaste("");
       setUrl("");
       router.refresh();
     }
-  }, [applyState, router]);
+  }, [applyState, router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedProducts = useMemo(() => {
     if (!products) return [];
@@ -85,7 +89,11 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
   const flash =
     applyState.error ||
     applyState.message ||
-    (!products ? previewState.error || previewState.message : previewState.error);
+    (!products
+      ? previewState === dismissed
+        ? null
+        : previewState.error || (previewState.ok && !previewState.products?.length ? previewState.message : null)
+      : previewState.error);
   const flashIsError = Boolean(applyState.error || previewState.error);
 
   return (
@@ -245,7 +253,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
               value={includeSocial ? "1" : "0"}
             />
             <p className="w-full text-sm text-ink">
-              {selectedProducts.length} products imported. Confirm all or review.
+              {selectedProducts.length} of {products.length} selected. Nothing is added until you confirm.
             </p>
             <button
               type="submit"
@@ -271,7 +279,10 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
             </button>
             <button
               type="button"
-              onClick={() => setProducts(null)}
+              onClick={() => {
+                setDismissed(previewState);
+                setProducts(null);
+              }}
               className={settingsActionClass}
             >
               Start over
@@ -293,3 +304,5 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
     </section>
   );
 }
+
+export const CatalogImportPanel = withRoleGate("settings.edit", CatalogImportPanelInner);

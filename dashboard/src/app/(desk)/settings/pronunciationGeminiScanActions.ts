@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
   appendDismissal,
@@ -174,6 +176,8 @@ export async function loadPronunciationReviewQueueAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
+  const denied = await memberDenied("settings.view");
+  if (denied) return denied;
   try {
     if (!(await isAuthenticated())) {
       return { error: "Sign in to load review queue." };
@@ -205,6 +209,8 @@ export async function geminiScanRecentCallsAction(
   _prev: GeminiScanState,
   formData: FormData
 ): Promise<GeminiScanState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   try {
     return await runGeminiScanRecentCalls(formData);
   } catch (err) {
@@ -368,6 +374,8 @@ export async function approveGeminiScanCandidateAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to approve." };
   }
@@ -483,6 +491,8 @@ export async function dismissGeminiScanCandidateAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to dismiss." };
   }
@@ -541,6 +551,8 @@ export async function queueGeminiCandidateForRecordingAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState & { practicePrompt?: string; practicePhrase?: string }> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in first." };
   }

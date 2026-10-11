@@ -24,6 +24,7 @@ import {
   shopCatalogPasses,
 } from "@/lib/outcomeGates";
 import { upsertTenantFieldMeta } from "@/lib/deskProvenance";
+import { memberDenied } from "@/lib/requireMember";
 import { updateWithColumnPeel } from "@/lib/peelMissingColumns";
 import { validateAgentName } from "@/lib/onboardingDraft";
 
@@ -48,6 +49,8 @@ export async function completeOnboardingAction(
   if (!tenant) {
     return { error: "No workspace linked to this account yet." };
   }
+  const denied = await memberDenied("settings.edit");
+  if (denied) return { error: "Only the owner or an admin can finish setting up this business." };
 
   if (!tenantNeedsOnboarding(tenant)) {
     redirect("/home");

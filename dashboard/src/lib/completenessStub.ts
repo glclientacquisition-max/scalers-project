@@ -75,7 +75,7 @@ function fieldScore(
 /** Calm copy when Platform still returns the pre-confirm gap strings. */
 const GAP_REVIEW: Record<string, string> = {
   "Add products or services with owner-confirmed names and prices.":
-    "Add your catalogue, then save.",
+    "Review and confirm your catalogue.",
   "Confirm at least three FAQs with owner source (not seed).":
     "Review and confirm your answers.",
   "Set a WhatsApp or email alert and confirm notify routing.":
@@ -137,8 +137,10 @@ function productScore(
   return Math.min(60, avg * 60);
 }
 
-function serviceOk(item: Record<string, unknown>): boolean {
-  const pricing = textOf(item.price) !== "" || textOf(item.pricing_mode) !== "";
+function serviceOk(item: Record<string, unknown>, requireSite = true): boolean {
+  // Settings stores service prices as price_range, not price.
+  const pricing =
+    textOf(item.price) !== "" || textOf(item.price_range) !== "" || textOf(item.pricing_mode) !== "";
   const visitRaw = item.site_visit_required;
   const visitText = textOf(visitRaw).toLowerCase();
   const hasSite =
@@ -147,19 +149,20 @@ function serviceOk(item: Record<string, unknown>): boolean {
     visitText === "false" ||
     visitText === "yes" ||
     visitText === "no";
-  return pricing && hasSite;
+  return pricing && (hasSite || !requireSite);
 }
 
 function serviceScore(
   catalog: unknown,
   isHome: boolean,
-  meta: ProvenanceMeta
+  meta: ProvenanceMeta,
+  requireSite = true
 ): number {
   if (!isHome) return 0;
   let ok = 0;
   let scored = 0;
   rows(catalog).forEach((item, index) => {
-    if (!textOf(item.name) || !serviceOk(item)) return;
+    if (!textOf(item.name) || !serviceOk(item, requireSite)) return;
     ok += 1;
     scored += fieldScore(
       true,
@@ -174,8 +177,17 @@ function serviceScore(
   return Math.min(50, avg * 50);
 }
 
-function confirmedFaqCount(faqs: unknown): number {
-  return rows(faqs).filter((item) => {
+/** First owner-attested path among aliases (scorer and Settings save used different names). */
+function ownerPath(paths: string[], meta: ProvenanceMeta): string {
+  return paths.find((path) => meta[path] === "owner") || paths[0];
+}
+
+function confirmedFaqCount(faqs: unknown, meta: ProvenanceMeta = {}): number {
+  return rows(faqs).filter((item, index) => {
+    // Settings saves attest faqs.N rather than rewriting status/source in the JSON.
+    if (textOf(item.question) && textOf(item.answer) && meta[`faqs.${index + 1}`] === "owner") {
+      return true;
+    }
     const status = textOf(item.status).toLowerCase();
     const source = textOf(item.source).toLowerCase();
     return (
@@ -187,14 +199,15 @@ function confirmedFaqCount(faqs: unknown): number {
   }).length;
 }
 
-export function hasVerifiedNotify(tenant: ScoreTenant, meta: ProvenanceMeta = {}): boolean {
+/** A deliverable alert channel exists. Owner attestation alone no longer counts (QA fix). */
+export function hasVerifiedNotify(tenant: ScoreTenant, ...rest: [ProvenanceMeta?]): boolean {
+  void rest;
   const channels = tenant.notify_channels || {};
   const whatsapp = textOf(tenant.whatsapp_notification_number);
   const email = textOf(tenant.alert_email);
   const whatsappOk = Boolean(whatsapp) && channels.whatsapp !== false;
   const emailOk = Boolean(email) && channels.email !== false;
   const smsOk = Boolean(whatsapp) && channels.sms !== false;
-  if (meta["team.notify.whatsapp"] === "owner") return true;
   return whatsappOk || emailOk || smsOk;
 }
 
@@ -262,7 +275,7 @@ export function scoreCaptureTenant(
       ) +
       fieldScore(
         languages > 0 || Boolean(textOf(tenant.agent_name)),
-        "identity.language",
+        ownerPath(["identity.language", "identity.spoken_name", "assistant.agent_name"], meta),
         meta,
         null
       )) /
@@ -271,7 +284,7 @@ export function scoreCaptureTenant(
 
   let catalog = Math.max(
     productScore(tenant.product_catalog, isRetail, meta),
-    serviceScore(tenant.services_catalog, isHome, meta)
+    serviceScore(tenant.services_catalog, isHome || isRetail, meta, isHome)
   );
   if (!isRetail && !isHome) {
     catalog =
@@ -304,25 +317,26 @@ export function scoreCaptureTenant(
     ((policyFieldScore("policies.returns", textOf(policies.returns), meta) +
       policyFieldScore("policies.delivery", textOf(policies.delivery), meta) +
       policyFieldScore(
-        "policies.other",
-        textOf(policies.other) || textOf(policies.warranty),
+        ownerPath(["policies.other", "policies.warranty", "policies.cancellation"], meta),
+        textOf(policies.other) || textOf(policies.warranty) || textOf(policies.cancellation),
         meta
       )) /
       3) *
     100;
 
-  const faqCount = confirmedFaqCount(tenant.faqs);
+  const faqCount = confirmedFaqCount(tenant.faqs, meta);
   const faqs = Math.min(100, (faqCount / 3) * 100);
 
   const teamOwner =
     meta["team.notify"] === "owner" || meta["team.notify.whatsapp"] === "owner";
-  const team = teamOwner ? 100 : 0;
+  // Never 100% when no channel can actually deliver (e.g. email on, no address).
+  const team = teamOwner && hasVerifiedNotify(tenant, meta) ? 100 : 0;
 
   const assistant =
     ((fieldScore(Boolean(textOf(tenant.agent_name)), "assistant.agent_name", meta, null) +
       fieldScore(
         Boolean(textOf(tenant.agent_tone)) || tenant.agent_tools != null,
-        "assistant.language",
+        ownerPath(["assistant.language", "assistant.tone"], meta),
         meta,
         null
       ) +
@@ -356,7 +370,7 @@ export function scoreCaptureTenant(
     gaps.push({
       domain: "catalog",
       action: namedCatalog
-        ? "Add your catalogue, then save."
+        ? "Review and confirm your catalogue."
         : "Add products or services with prices.",
     });
   }
@@ -427,4 +441,43 @@ export function holdCaptureTenant(
     reasons.push("Need a verified notify target (WhatsApp or email alerts).");
   }
   return { allowed: reasons.length === 0, reasons };
+}
+
+function hasNamedCatalog(tenant: ScoreTenant): boolean {
+  return (
+    rows(tenant.product_catalog).some((item) => textOf(item.name)) ||
+    rows(tenant.services_catalog).some((item) => textOf(item.name))
+  );
+}
+
+/**
+ * The live Platform score (tenant_completeness_score SQL) only counts service
+ * rows with `price` and `site_visit_required`, but Settings saves service
+ * prices as `price_range`. A workspace with a full saved catalogue therefore
+ * scores catalog 0 and Overview told owners to "add" a catalogue they have.
+ * Re-score the catalog domain from the real rows and provenance, keep the
+ * better of the two, and never ask to add a catalogue that has named rows.
+ */
+export function reconcileCatalogScore(
+  live: CaptureScore,
+  tenant: ScoreTenant,
+  meta: ProvenanceMeta = {}
+): CaptureScore {
+  const local = scoreCaptureTenant(tenant, meta).domains.catalog || 0;
+  const liveCatalog = Number(live.domains?.catalog ?? 0);
+  const catalog = Math.max(liveCatalog, local);
+  const named = hasNamedCatalog(tenant);
+  const next_gaps = (live.next_gaps || [])
+    .filter((gap) => !(gap.domain === "catalog" && catalog >= 40))
+    .map((gap) =>
+      gap.domain === "catalog"
+        ? {
+            ...gap,
+            action: named
+              ? "Review and confirm your catalogue."
+              : "Add products or services with prices.",
+          }
+        : gap
+    );
+  return { ...live, domains: { ...live.domains, catalog }, next_gaps };
 }

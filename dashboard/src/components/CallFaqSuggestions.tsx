@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FAQ_ANSWER_MAX, FAQ_QUESTION_MAX } from "@/lib/faqs";
@@ -19,7 +20,7 @@ const applyInitial: FaqApplyState = {};
 
 type EditableSuggestion = FaqSuggestion & { selected: boolean };
 
-export function CallFaqSuggestions({
+function CallFaqSuggestionsInner({
   tenantId,
   callId,
   hasTranscript,
@@ -343,3 +344,5 @@ export function CallFaqSuggestions({
     </section>
   );
 }
+
+export const CallFaqSuggestions = withRoleGate("settings.edit", CallFaqSuggestionsInner, "hide");
