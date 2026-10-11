@@ -16,6 +16,7 @@ import {
   notifyChannelsFor,
   numberPending,
   parseDraft,
+  saveErrorMessage,
   SETUP_STEPS,
   stepIndex,
   validateStep,
@@ -41,7 +42,7 @@ export type SaveStepResult =
   /** Another tab saved first. The client replaces its draft with this one. */
   | { ok: false; conflict: true; error: string; draft: SetupDraft; version: number; furthest: number };
 
-const UNAVAILABLE = "Couldn't save. Check your connection and try again.";
+const UNAVAILABLE = "Couldn't save because of a server error. Try again, or contact support.";
 
 const SETUP_DENIED = "Only the owner or an admin can set up this business.";
 
@@ -87,8 +88,8 @@ export async function saveSetupStepAction(input: {
     p_expected_version: input.version,
   });
   if (error) {
-    console.error("[setup] save step:", error.message);
-    return { ok: false, error: UNAVAILABLE };
+    console.error("[setup] save step:", error.code, error.message);
+    return { ok: false, error: saveErrorMessage(error) };
   }
   if (typeof data === "number") {
     return { ok: true, version: data, furthest: Math.min(index + 1, SETUP_STEPS.length - 1) };
@@ -121,7 +122,11 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
   if (!(await canEditSetup(input.tenantId))) return { ok: false, error: SETUP_DENIED };
 
   const { data: row, error: readErr } = await readSetupRow(auth.client, input.tenantId);
-  if (readErr || !row) return { ok: false, error: UNAVAILABLE };
+  if (readErr) {
+    console.error("[setup] finish read:", readErr.code, readErr.message);
+    return { ok: false, error: saveErrorMessage(readErr, "finish") };
+  }
+  if (!row) return { ok: false, error: "You don't have access to this workspace." };
   if (row.setup_completed_at) redirect("/onboarding/line");
   if (row.onboarding_draft_version !== input.version) {
     return { ok: false, conflict: true, error: "Setup was changed in another tab. Review this step, then finish again." };
@@ -226,8 +231,8 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     .eq("onboarding_draft_version", input.version)
     .select("id, sautikit_virtual_number");
   if (error) {
-    console.error("[setup] finish:", error.message);
-    return { ok: false, error: "Couldn't finish setup. Your answers are saved. Try again." };
+    console.error("[setup] finish:", error.code, error.message);
+    return { ok: false, error: `${saveErrorMessage(error, "finish")} Your answers are saved.` };
   }
   if (!updated?.length) {
     // Lost a race with another tab: either it finished (go on) or it edited (review).

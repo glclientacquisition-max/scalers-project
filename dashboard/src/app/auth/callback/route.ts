@@ -3,7 +3,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { hostOnlyCookieOptions } from "@/lib/adminHost";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
-import { callbackFailurePath, safeNext } from "@/lib/authCallback";
+import { callbackFailurePath, safeNext, staleSessionCookies } from "@/lib/authCallback";
 
 const OTP_TYPES = new Set(["signup", "email", "magiclink", "email_change"]);
 
@@ -47,5 +47,14 @@ export async function GET(request: NextRequest) {
   const dest = signedIn ? next : callbackFailurePath(supabaseError);
   const res = NextResponse.redirect(new URL(dest, request.url), 303);
   for (const { name, value, options } of jar) res.cookies.set(name, value, hostOnlyCookieOptions(options));
+  // Never leave someone in a different account than the one they just confirmed: on success drop
+  // leftover chunks of the old session; on failure sign the old session out so /login shows the
+  // "email confirmed, sign in" screen instead of bouncing into the previous account.
+  const stale = staleSessionCookies(
+    request.cookies.getAll().map((c) => c.name),
+    jar.map((c) => c.name),
+    signedIn
+  );
+  for (const name of stale) res.cookies.set(name, "", hostOnlyCookieOptions<CookieOptions>({ path: "/", maxAge: 0 }));
   return res;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { Switch } from "@/components/ui/Switch";
-import type { AlertsStep as Value, FieldErrors } from "@/lib/setupFlow";
+import { PHONE_COUNTRIES, dialCode, type AlertsStep as Value, type FieldErrors } from "@/lib/setupFlow";
 import { FieldError, inputClass } from "./ui";
 
 export function AlertsStep({ value, onChange, errors }: { value: Value; onChange: (v: Value) => void; errors: FieldErrors }) {
@@ -16,6 +16,22 @@ export function AlertsStep({ value, onChange, errors }: { value: Value; onChange
         <label htmlFor="alert-phone" className="mb-1.5 block text-meta font-medium text-ink">
           Mobile number
         </label>
+        <div className="flex gap-2">
+        <label htmlFor="alert-country" className="sr-only">Country</label>
+        <select
+          id="alert-country"
+          data-field="country"
+          value={value.country}
+          onChange={(e) => onChange({ ...value, country: e.target.value })}
+          autoComplete="tel-country-code"
+          className={`${inputClass} w-auto shrink-0 pr-8`}
+        >
+          {PHONE_COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.name} ({dialCode(c.code)})
+            </option>
+          ))}
+        </select>
         <input
           id="alert-phone"
           data-field="phone"
@@ -24,11 +40,12 @@ export function AlertsStep({ value, onChange, errors }: { value: Value; onChange
           autoComplete="tel"
           value={value.phone}
           onChange={(e) => onChange({ ...value, phone: e.target.value })}
-          placeholder="0712 345 678"
+          placeholder={PHONE_COUNTRIES.find((c) => c.code === value.country)?.example ?? "0712 345 678"}
           aria-invalid={errors.phone ? true : undefined}
           aria-describedby={errors.phone ? "alert-phone-err" : undefined}
-          className={inputClass}
+          className={`${inputClass} min-w-0 flex-1`}
         />
+        </div>
         <FieldError id="alert-phone-err" message={errors.phone} />
         <label htmlFor="alert-email" className="mb-1.5 mt-4 block text-meta font-medium text-ink">
           Email

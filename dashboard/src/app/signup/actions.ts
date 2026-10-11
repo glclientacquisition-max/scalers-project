@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/lib/tenant";
 import { allowAll, clientIpFrom } from "@/lib/rateLimit";
 import { requestOrigin, signupConfirmUrl } from "@/lib/authCallback";
-import { isEmail, normalizeKenyaPhone } from "@/lib/setupFlow";
+import { isEmail, normalizePhone, phoneCountry, phoneHint } from "@/lib/setupFlow";
 import { signupErrorMessage } from "@/lib/signupErrors";
 
 export type SignupState = {
@@ -34,9 +34,10 @@ export async function signupAction(_prev: SignupState, formData: FormData): Prom
   if (!isEmail(email)) return { error: "Enter a valid email address.", field: "email", values };
   if (password.length < 8) return { error: "Use at least 8 characters.", field: "password", values };
   if (password.length > 72) return { error: "Use 72 characters or fewer.", field: "password", values };
-  const notificationPhone = normalizeKenyaPhone(phoneRaw);
+  const country = phoneCountry(formData.get("phone_country"));
+  const notificationPhone = normalizePhone(phoneRaw, country);
   if (!notificationPhone) {
-    return { error: "Enter a Kenyan mobile number, like 0712 345 678.", field: "notification_phone", values };
+    return { error: phoneHint(country), field: "notification_phone", values };
   }
 
   const h = await headers();

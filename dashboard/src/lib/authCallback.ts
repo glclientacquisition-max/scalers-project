@@ -27,3 +27,14 @@ export function callbackFailurePath(errorCode: string | null | undefined): strin
   if (/expired/i.test(code)) return "/login?link=expired";
   return "/login?link=confirmed";
 }
+
+/**
+ * Session cookies to clear after a confirmation link. Supabase auth cookies are
+ * sb-<ref>-auth-token (optionally chunked .0, .1). The PKCE code-verifier is left alone.
+ * signedIn: drop old chunks the new session did not rewrite. Not signed in: drop them all.
+ */
+export function staleSessionCookies(existing: string[], written: string[], signedIn: boolean): string[] {
+  const isSession = (n: string) => /^sb-.+-auth-token(\.\d+)?$/.test(n);
+  const wrote = new Set(written);
+  return existing.filter((n) => isSession(n) && (!signedIn || !wrote.has(n)));
+}

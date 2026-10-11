@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
 import {
+  draftStorageKey,
+  readLocalDraft,
+  parseDraft,
   resumeStep,
   SETUP_STEPS,
   stepIndex,
@@ -33,8 +36,17 @@ const LEADS: Record<StepKey, (business: string) => string> = {
   alerts: () => "Where we reach you when a caller needs you.",
 };
 
+/** Shown only when the request never reached us (thrown fetch), not for server errors. */
+function unreachableMessage(verb: string): string {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return `You're offline. Your answers are kept on this device. Reconnect, then ${verb} again.`;
+  }
+  return `Couldn't reach Scalers to ${verb}. Your answers are kept on this device. Try again.`;
+}
+
 export function SetupFlow({
   tenantId,
+  userId,
   businessName,
   initialDraft,
   initialVersion,
@@ -43,6 +55,7 @@ export function SetupFlow({
   signOut,
 }: {
   tenantId: string;
+  userId: string;
   businessName: string;
   initialDraft: SetupDraft;
   initialVersion: number;
@@ -105,6 +118,37 @@ export function SetupFlow({
 
   // Warn before leaving with an unsaved edit on this step.
   const dirty = useRef(false);
+
+  // Unsaved typing survives reloads: kept per account + workspace on this device, and only
+  // restored on top of the same server version it was typed against (another device's save wins).
+  const storageKey = draftStorageKey(tenantId, userId);
+  const restored = useRef(false);
+  useEffect(() => {
+    const local = readLocalDraft(window.localStorage.getItem(storageKey), initialVersion);
+    if (local) {
+      dirty.current = true;
+      setDraft(parseDraft(local, {}));
+    } else {
+      window.localStorage.removeItem(storageKey);
+    }
+    restored.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!restored.current || !dirty.current) return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify({ base: version, draft }));
+    } catch {
+      /* storage full or blocked: the server draft still has every saved step */
+    }
+  }, [draft, version, storageKey]);
+  const clearLocal = () => {
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      /* ignore */
+    }
+  };
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (dirty.current && !finishing) e.preventDefault();
@@ -156,6 +200,7 @@ export function SetupFlow({
         const res = await saveSetupStepAction({ tenantId, key, value: local.value, version, vertical: draft.business.vertical });
         if (res.ok) {
           dirty.current = false;
+          clearLocal();
           setDraft((d) => ({ ...d, [key]: local.value as SetupDraft[typeof key] }));
           setVersion(res.version);
           setFurthest((f) => Math.max(f, res.furthest));
@@ -164,6 +209,7 @@ export function SetupFlow({
         }
         if (res.conflict) {
           dirty.current = false;
+          clearLocal();
           setDraft(res.draft);
           setVersion(res.version);
           setFurthest(Math.min(res.furthest, SETUP_STEPS.length - 1));
@@ -174,7 +220,7 @@ export function SetupFlow({
         setMessage({ tone: "warn", text: res.error });
         focusFirstError(res.fields || {});
       } catch {
-        setMessage({ tone: "warn", text: "Couldn't save. Check your connection and try again." });
+        setMessage({ tone: "warn", text: unreachableMessage("save") });
       }
     });
   }
@@ -224,12 +270,13 @@ export function SetupFlow({
           return;
         }
         dirty.current = false;
+        clearLocal();
         setVersion(res.version);
         await runFinish(res.version);
       } catch (err) {
         if (isRedirect(err)) throw err;
         setFinishing(false);
-        setMessage({ tone: "warn", text: "Couldn't finish setup. Your answers are saved. Try again." });
+        setMessage({ tone: "warn", text: unreachableMessage("finish setup") });
       }
     });
   }
@@ -269,7 +316,7 @@ export function SetupFlow({
   }
 
   return (
-    <main className="min-h-dvh pb-[calc(6rem+env(safe-area-inset-bottom))]">
+    <main className="min-h-dvh pb-[calc(10rem+env(safe-area-inset-bottom))]">
       <header className="sticky top-0 z-10 border-b border-hairline bg-canvas/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-canvas/75">
         <div className="mx-auto flex h-14 w-full max-w-xl items-center justify-between gap-2 px-3">
           {index > 0 ? (

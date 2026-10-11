@@ -80,6 +80,7 @@ export default async function OnboardingPage({
     return (
       <SetupFlow
         tenantId={ctx.row.id}
+        userId={ctx.user.id}
         businessName={ctx.row.business_name}
         initialDraft={ctx.draft}
         initialVersion={ctx.row.onboarding_draft_version}

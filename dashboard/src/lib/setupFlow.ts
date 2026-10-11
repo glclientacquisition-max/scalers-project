@@ -1,7 +1,10 @@
 /**
  * Onboarding setup flow: steps, draft shape, validation, and the text the receptionist reads.
- * Pure and dependency-free so the server action, the client and node tests share one contract.
+ * Pure (one dependency: libphonenumber-js mobile metadata) so the server action, the client and node
+ * tests share one contract.
  */
+
+import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/mobile";
 
 export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 export const DAYS: DayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -50,7 +53,7 @@ export type HoursStep = { skipped: boolean; days: Record<DayKey, DayPlan> };
 export type VoiceStep = { agentName: string; tone: Tone; handoff: Handoff };
 export type FaqRow = { question: string; answer: string };
 export type FaqsStep = { skipped: boolean; items: FaqRow[] };
-export type AlertsStep = { phone: string; email: string; whatsapp: boolean; sms: boolean; emailOn: boolean };
+export type AlertsStep = { country: string; phone: string; email: string; whatsapp: boolean; sms: boolean; emailOn: boolean };
 
 export type SetupDraft = {
   business: BusinessStep;
@@ -111,6 +114,7 @@ export function defaultDraft(seed: { phone?: string | null; email?: string | nul
     voice: { agentName: "", tone: "warm", handoff: "callback" },
     faqs: { skipped: false, items: [] },
     alerts: {
+      country: countryOfPhone(phone),
       phone: phone && !/^pending/i.test(phone) ? phone : "",
       email: String(seed.email || ""),
       whatsapp: true,
@@ -198,7 +202,8 @@ export function parseDraft(raw: unknown, seed: { phone?: string | null; email?: 
   const a = obj(d.alerts);
   if (Object.keys(a).length) {
     out.alerts = {
-      phone: str(a.phone, 20),
+      country: phoneCountry(a.country),
+      phone: str(a.phone, 24),
       email: str(a.email, 254),
       whatsapp: bool(a.whatsapp, true),
       sms: bool(a.sms, true),
@@ -219,15 +224,56 @@ function fail<T>(error: string, fields: FieldErrors = {}): StepResult<T> {
   return { ok: false, error, fields };
 }
 
-export function normalizeKenyaPhone(raw: unknown): string | null {
+/** Countries offered in the mobile-number picker. Kenya first (default). */
+export const PHONE_COUNTRIES: ReadonlyArray<{ code: CountryCode; name: string; example: string }> = [
+  { code: "KE", name: "Kenya", example: "0712 345 678" },
+  { code: "UG", name: "Uganda", example: "0772 123 456" },
+  { code: "TZ", name: "Tanzania", example: "0712 345 678" },
+  { code: "RW", name: "Rwanda", example: "0781 234 567" },
+  { code: "ET", name: "Ethiopia", example: "091 123 4567" },
+  { code: "SS", name: "South Sudan", example: "0977 123 456" },
+  { code: "SO", name: "Somalia", example: "61 1234567" },
+  { code: "NG", name: "Nigeria", example: "0802 123 4567" },
+  { code: "GH", name: "Ghana", example: "023 123 4567" },
+  { code: "ZA", name: "South Africa", example: "071 123 4567" },
+  { code: "AE", name: "United Arab Emirates", example: "050 123 4567" },
+  { code: "GB", name: "United Kingdom", example: "07400 123456" },
+  { code: "US", name: "United States", example: "(201) 555-0123" },
+  { code: "IN", name: "India", example: "081234 56789" },
+];
+
+export function phoneCountry(raw: unknown): CountryCode {
+  const c = String(raw || "").toUpperCase();
+  return (PHONE_COUNTRIES.find((x) => x.code === c)?.code ?? "KE") as CountryCode;
+}
+
+export function dialCode(country: unknown): string {
+  return `+${getCountryCallingCode(phoneCountry(country))}`;
+}
+
+/** Validate a number for the chosen country (or any +international number). E.164 or null. */
+export function normalizePhone(raw: unknown, country: unknown = "KE"): string | null {
   const trimmed = String(raw || "").trim();
-  if (!trimmed) return null;
-  let digits = trimmed.replace(/[^\d+]/g, "");
-  if (digits.startsWith("+")) digits = digits.slice(1);
-  if (digits.startsWith("0") && digits.length === 10) digits = `254${digits.slice(1)}`;
-  else if (/^[17]\d{8}$/.test(digits)) digits = `254${digits}`;
-  if (!/^254[17]\d{8}$/.test(digits)) return null;
-  return `+${digits}`;
+  if (!trimmed || trimmed.length > 24) return null;
+  const parsed = parsePhoneNumberFromString(trimmed, phoneCountry(country));
+  return parsed && parsed.isValid() ? parsed.number : null;
+}
+
+/** Country an E.164 number belongs to (for showing a stored number back in the picker). */
+export function countryOfPhone(e164: unknown, fallback: string = "KE"): CountryCode {
+  const parsed = parsePhoneNumberFromString(String(e164 || ""));
+  return phoneCountry(parsed?.country ?? fallback);
+}
+
+export function phoneHint(country: unknown): string {
+  const c = PHONE_COUNTRIES.find((x) => x.code === phoneCountry(country))!;
+  return `Enter a valid ${c.name} mobile number, like ${c.example}.`;
+}
+
+/** Back-compat: Kenyan numbers only. */
+export function normalizeKenyaPhone(raw: unknown): string | null {
+  const n = normalizePhone(raw, "KE");
+  return n && n.startsWith("+254") ? n : null;
 }
 
 export function isEmail(raw: unknown): boolean {
@@ -375,14 +421,16 @@ export function validateFaqs(input: FaqsStep): StepResult<FaqsStep> {
 
 export function validateAlerts(input: AlertsStep): StepResult<AlertsStep> {
   const fields: FieldErrors = {};
-  const phone = normalizeKenyaPhone(input.phone);
+  const country = phoneCountry(input.country);
+  const phone = normalizePhone(input.phone, country);
   const email = input.email.trim().toLowerCase();
-  if ((input.whatsapp || input.sms) && !phone) fields.phone = "Enter a Kenyan mobile number, like 0712 345 678.";
+  if ((input.whatsapp || input.sms) && !phone) fields.phone = phoneHint(country);
+  else if (input.phone.trim() && !phone) fields.phone = phoneHint(country);
   if (email && !isEmail(email)) fields.email = "Enter a valid email address.";
   if (input.emailOn && !email) fields.email = "Add an email, or turn off email alerts.";
   if (!input.whatsapp && !input.sms && !input.emailOn) return fail("Turn on at least one way to reach you.");
   if (Object.keys(fields).length) return fail("Fix the highlighted fields.", fields);
-  return { ok: true, value: { phone: phone || "", email, whatsapp: input.whatsapp, sms: input.sms, emailOn: input.emailOn } };
+  return { ok: true, value: { country: phone ? countryOfPhone(phone, country) : country, phone: phone || "", email, whatsapp: input.whatsapp, sms: input.sms, emailOn: input.emailOn } };
 }
 
 /** Validate one step's value against the rest of the draft. */
@@ -553,4 +601,40 @@ export function splitLast(shifts: Shift[]): Shift[] {
   }
   const start = Math.min(b + 60, 22 * 60);
   return [...shifts, { open: toTime(start), close: toTime(Math.min(start + 120, 23 * 60 + 45)) }];
+}
+
+/**
+ * Owner-facing reason for a failed database save. Never blames the connection: the request
+ * reached us. The short code lets support find the log line.
+ */
+export function saveErrorMessage(err: { code?: string | null; message?: string | null } | null | undefined, verb = "save"): string {
+  const code = String(err?.code || "").trim();
+  const msg = String(err?.message || "").toLowerCase();
+  const ref = code ? ` (ref ${code})` : "";
+  if (code === "42501" || msg.includes("permission denied") || msg.includes("row-level security")) {
+    return `Your account isn't allowed to ${verb} this workspace's setup. Ask the owner, or contact support${ref}.`;
+  }
+  if (code === "PGRST202" || code === "42883" || code === "42703" || msg.includes("could not find the function")) {
+    return `Setup can't ${verb} right now because the server is being updated. Try again in a few minutes, or contact support${ref}.`;
+  }
+  if (code === "57014" || msg.includes("timeout")) return `The ${verb} took too long. Try again${ref}.`;
+  if (code === "PGRST301" || msg.includes("jwt")) return "Your session ended. Sign in again to keep going.";
+  return `Couldn't ${verb} because of a server error. Try again, or contact support${ref || ""}.`;
+}
+
+/** localStorage key for unsaved setup typing: one per account and workspace. */
+export function draftStorageKey(tenantId: string, userId: string): string {
+  return `scalers:setup-draft:v1:${tenantId}:${userId}`;
+}
+
+/** The locally kept draft, only if it was typed on top of the server version we just loaded. */
+export function readLocalDraft(raw: string | null | undefined, serverVersion: number): unknown | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { base?: unknown; draft?: unknown };
+    if (parsed && parsed.base === serverVersion && parsed.draft && typeof parsed.draft === "object") return parsed.draft;
+  } catch {
+    /* corrupt entry */
+  }
+  return null;
 }

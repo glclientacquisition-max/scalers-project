@@ -45,7 +45,8 @@ describe("onboarding craft", () => {
     assert.match(flow, /searchParams\.set\("step"/);
     assert.match(flow, /popstate/);
     assert.match(flow, /safe-area-inset-bottom/);
-    assert.doesNotMatch(flow, /localStorage/);
+    // Local copy only for unsaved typing, keyed per workspace + account; server stays the source of truth.
+    assert.match(flow, /draftStorageKey\(tenantId, userId\)/);
   });
 
   it("respects reduced motion and announces progress", () => {

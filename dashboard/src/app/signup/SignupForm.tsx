@@ -6,6 +6,7 @@ import { signupAction, type SignupState } from "./actions";
 import { ResendLink } from "./ResendLink";
 import { Field, Input } from "@/components/ui/Field";
 import { btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
+import { PHONE_COUNTRIES, dialCode } from "@/lib/setupFlow";
 
 const initial: SignupState = {};
 
@@ -14,6 +15,10 @@ export function SignupForm() {
   const [restart, setRestart] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  // Controlled fields: React resets uncontrolled inputs after a form action, which wiped the
+  // password (and anything typed) whenever sign-up failed.
+  const [form, setForm] = useState({ business_name: "", email: "", password: "", phone_country: "KE", notification_phone: "" });
+  const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => {
     if (!state.field) return;
@@ -48,7 +53,6 @@ export function SignupForm() {
     );
   }
 
-  const v = state.values;
   const err = (field: SignupState["field"]) => (state.field === field ? state.error : undefined);
   const generalError = state.error && !state.field ? state.error : null;
 
@@ -66,12 +70,12 @@ export function SignupForm() {
       >
         <Field id="business_name" label="Business name" error={err("business_name")}>
           {(p) => (
-            <Input {...p} name="business_name" defaultValue={v?.business_name} autoComplete="organization" maxLength={120} autoFocus />
+            <Input {...p} name="business_name" value={form.business_name} onChange={set("business_name")} autoComplete="organization" maxLength={120} autoFocus />
           )}
         </Field>
         <Field id="email" label="Email" error={err("email")}>
           {(p) => (
-            <Input {...p} name="email" type="email" defaultValue={v?.email} autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false} />
+            <Input {...p} name="email" type="email" value={form.email} onChange={set("email")} autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false} />
           )}
         </Field>
         {state.signIn ? (
@@ -84,7 +88,7 @@ export function SignupForm() {
         <Field id="password" label="Password" hint="At least 8 characters." error={err("password")}>
           {(p) => (
             <div className="relative">
-              <Input {...p} name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={8} maxLength={72} className="pr-20" />
+              <Input {...p} name="password" value={form.password} onChange={set("password")} type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={8} maxLength={72} className="pr-20" />
               <button
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
@@ -104,7 +108,34 @@ export function SignupForm() {
           error={err("notification_phone")}
         >
           {(p) => (
-            <Input {...p} name="notification_phone" type="tel" defaultValue={v?.notification_phone} autoComplete="tel" inputMode="tel" placeholder="0712 345 678" />
+            <div className="flex gap-2">
+              <label htmlFor="phone_country" className="sr-only">Country</label>
+              <select
+                id="phone_country"
+                name="phone_country"
+                value={form.phone_country}
+                onChange={set("phone_country")}
+                autoComplete="tel-country-code"
+                className="min-h-11 shrink-0 rounded-xl border border-hairline bg-surface px-3 text-body text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                {PHONE_COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} {dialCode(c.code)}
+                  </option>
+                ))}
+              </select>
+              <Input
+                {...p}
+                name="notification_phone"
+                type="tel"
+                value={form.notification_phone}
+                onChange={set("notification_phone")}
+                autoComplete="tel-national"
+                inputMode="tel"
+                placeholder={PHONE_COUNTRIES.find((c) => c.code === form.phone_country)?.example}
+                className="min-w-0 flex-1"
+              />
+            </div>
           )}
         </Field>
 
