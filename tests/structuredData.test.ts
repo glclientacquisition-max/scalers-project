@@ -23,7 +23,8 @@ test("taxonomy: SQL CHECK lists match the taxonomy ids", () => {
   assert.deepEqual(sqlList("intent"), ids(sd.INTENTS));
   assert.deepEqual(sqlList("outcome"), ids(sd.OUTCOMES));
   assert.deepEqual(sqlList("lost_reason"), ids(sd.LOST_REASONS));
-  for (const m of sd.PAYMENT_METHODS) assert.ok(MIGRATION.includes(`'${m.id}'`), m.id);
+  const V2 = read("supabase/migrations/20261012090000_payments_policies_v2.sql");
+  for (const m of sd.PAYMENT_METHODS) assert.ok(V2.includes(`'${m.id}'`), m.id);
 });
 
 test("legacy intents all map into the taxonomy", () => {
@@ -83,19 +84,19 @@ test("payments: parse prose, validate till/paybill/deposit", () => {
   assert.deepEqual(p.methods, ["mpesa_till", "cash"]);
   assert.equal(p.mpesa_till, "123456");
   assert.equal(p.deposit_percent, 30);
-  assert.equal(p.timing, "on_delivery");
+  assert.deepEqual(p.timings, ["on_delivery", "deposit_then_balance"]);
   assert.equal(p.source, "parsed");
   assert.equal(sd.parsePaymentsText("Paybill 247247 account 0712345")!.mpesa_paybill!.account, "0712345");
   assert.equal(sd.parsePaymentsText("we are friendly"), null);
-  const bad = { ...sd.emptyPayments(), methods: ["mpesa_till", "mpesa_paybill"] as sd.PaymentMethod[], mpesa_till: "12", mpesa_paybill: { business_no: "abc", account: null }, deposit_percent: 150 };
+  const bad = { ...sd.emptyPayments(), methods: ["mpesa_till", "mpesa_paybill"] as sd.PaymentMethod[], mpesa_till: "12", mpesa_paybill: { business_no: "abc", account_mode: "fixed" as const, account: null }, timings: ["deposit_then_balance"] as sd.PaymentTiming[], deposit_percent: 150 };
   const e = sd.validatePayments(bad);
-  assert.ok(e.mpesa_till && e.paybill && e.deposit_percent);
-  const ok = sd.cleanPayments({ ...sd.emptyPayments(), methods: ["cash", "mpesa_till"], mpesa_till: "123 456", mpesa_paybill: { business_no: "1", account: null } });
+  assert.ok(e.mpesa_till && e.paybill && e.paybill_account && e.deposit_percent);
+  const ok = sd.cleanPayments({ ...sd.emptyPayments(), methods: ["cash", "mpesa_till"], mpesa_till: "123 456", mpesa_paybill: { business_no: "1", account_mode: "fixed", account: null } });
   assert.deepEqual(ok.methods, ["mpesa_till", "cash"]);
   assert.equal(ok.mpesa_till, "123456");
   assert.equal(ok.mpesa_paybill, null);
   assert.deepEqual(sd.validatePayments(ok), {});
-  assert.equal(sd.paymentsSentence(ok), "We take M-Pesa Till 123456, Cash.");
+  assert.equal(sd.paymentsSentence(ok), "You can pay by M-Pesa Buy Goods Till 123456 or cash.");
 });
 
 test("timeOfDay uses Nairobi time", () => {

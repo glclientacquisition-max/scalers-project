@@ -240,8 +240,10 @@ describe("business settings depth", () => {
       form.indexOf('panel === "policies"'),
       form.indexOf('panel === "tools"')
     );
-    assert.match(block, /No rules yet\. Add payment or cancellation/);
-    assert.match(block, /Add rule/);
+    const editor = fs.readFileSync(path.join(__dirname, "..", "dashboard/src/components/structured/PolicyRulesEditor.tsx"), "utf8");
+    assert.match(editor, /No rules yet\. Add the ones callers ask about/);
+    assert.match(editor, /Add a rule/);
+    assert.match(block, /<PolicyRulesEditor/);
     assert.doesNotMatch(block, /Paybill|Till number|KES 500|same-day guarantee/);
   });
 });

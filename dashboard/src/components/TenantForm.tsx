@@ -114,6 +114,8 @@ import {
 import { CoverageAreaField } from "@/components/CoverageAreaField";
 import { stableRowId } from "@/lib/factHash";
 import { DeskSelect } from "@/components/ui/DeskSelect";
+import { PaymentsEditor } from "@/components/structured/PaymentsEditor";
+import { PolicyRulesEditor } from "@/components/structured/PolicyRulesEditor";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
@@ -217,7 +219,6 @@ const TEAM_NOTIFY_FLAGS: Array<{
 ];
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 
-type PolicyFieldId = (typeof POLICY_FIELDS)[number]["id"];
 
 /** Pull location prose from legacy free-text hours when schedule.location is empty. */
 function extractLocationFallback(businessHours: string): string {
@@ -339,7 +340,7 @@ function TenantFormInner({
   /** Team & access: Members section (feature flag TEAM_INVITES_ENABLED). */
   membersSlot?: ReactNode;
   /** Typed-data groups (payments, price checks, category) rendered by the server page per panel. */
-  structuredSlot?: Partial<Record<"identity" | "catalog" | "policies", ReactNode>> | null;
+  structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -410,12 +411,6 @@ function TenantFormInner({
   const [policies, setPolicies] = useState<BusinessPolicies>(() =>
     normalizeBusinessPolicies(tenant.business_policies)
   );
-  const [openPolicyIds, setOpenPolicyIds] = useState<PolicyFieldId[]>(() => {
-    const initial = normalizeBusinessPolicies(tenant.business_policies);
-    return POLICY_FIELDS.filter((field) => String(initial[field.id] || "").trim()).map(
-      (field) => field.id
-    );
-  });
   const [agentTools, setAgentTools] = useState<AgentTools>(() =>
     parseAgentTools(tenant.agent_tools)
   );
@@ -2042,7 +2037,17 @@ function TenantFormInner({
       <section
         className={panel === "policies" ? "space-y-6" : "hidden"}
       >
-        {panel === "policies" ? structuredSlot?.policies : null}
+        {panel === "policies" ? (
+          <PaymentsEditor
+            value={policies.payments ?? null}
+            legacyText={policies.payment}
+            errors={state.fields}
+            onChange={(payments) => {
+              queueOwnerPath("policies.payment");
+              setPolicies((prev) => ({ ...prev, payments }));
+            }}
+          />
+        ) : null}
         {vertical === "home_services" ? (
           <div id="bookings" className="scroll-mt-24">
             <SettingsGroup title="Bookings">
@@ -2115,12 +2120,29 @@ function TenantFormInner({
                   </SettingsRow>
                 </>
               ) : null}
+              {policies.deposit ? (
+                <SettingsStack label="Hold note" htmlFor="policy-deposit">
+                  <PolicyTextarea
+                    id="policy-deposit"
+                    value={policies.deposit}
+                    onChange={(value) => {
+                      if (value !== policies.deposit) queueOwnerPath("policies.deposit");
+                      setPolicies((prev) => ({
+                        ...prev,
+                        deposit: value,
+                        provenance: { ...prev.provenance, deposit: { source: "owner", confirmed: true } },
+                      }));
+                    }}
+                    placeholder="Hold until 6pm with a name"
+                  />
+                </SettingsStack>
+              ) : null}
             </SettingsGroup>
           </div>
         )}
 
-        <SettingsGroup title="Rules">
-          {vertical === "home_services" ? (
+        {vertical === "home_services" ? (
+          <SettingsGroup title="Where you work">
             <SettingsStack label="Coverage" htmlFor="policy-coverage">
               <CoverageAreaField
                 id="policy-coverage"
@@ -2130,65 +2152,36 @@ function TenantFormInner({
                 }
               />
             </SettingsStack>
-          ) : null}
-          {openPolicyIds.length === 0 ? (
-            <p className="px-4 py-2 text-sm text-ink-soft" role="status">
-              No rules yet. Add payment or cancellation to start, and write what callers should hear.
-            </p>
-          ) : null}
-          {POLICY_FIELDS.filter((field) => openPolicyIds.includes(field.id)).map((field) => (
-            <SettingsStack
-              key={field.id}
-              label={field.label}
-              htmlFor={`policy-${field.id}`}
-            >
-              <PolicyTextarea
-                id={`policy-${field.id}`}
-                value={policies[field.id]}
-                onChange={(value) => {
-                  if (value !== policies[field.id]) queueOwnerPath(`policies.${field.id}`);
-                  setPolicies((prev) => ({
-                    ...prev,
-                    [field.id]: value,
-                    provenance: {
-                      ...prev.provenance,
-                      [field.id]: { source: "owner", confirmed: true },
-                    },
-                  }));
-                }}
-                placeholder={
-                  field.id === "delivery" && vertical === "home_services"
-                    ? "Same day before 2pm"
-                    : field.placeholder
-                }
-              />
-            </SettingsStack>
-          ))}
-          {openPolicyIds.length < POLICY_FIELDS.length ? (
-            <div className="px-4 py-2">
-              <label className="sr-only" htmlFor="add-policy-rule">
-                Add rule
-              </label>
-              <DeskSelect
-                id="add-policy-rule"
-                aria-label="Add rule"
-                value=""
-                placeholder="Add rule"
-                className={`${settingsGhostButtonClass} w-auto`}
-                options={POLICY_FIELDS.filter(
-                  (field) => !openPolicyIds.includes(field.id)
-                ).map((field) => ({
-                  value: field.id,
-                  label: field.label,
-                }))}
-                onChange={(id) => {
-                  setOpenPolicyIds((prev) =>
-                    prev.includes(id) ? prev : [...prev, id]
-                  );
-                }}
-              />
-            </div>
-          ) : null}
+          </SettingsGroup>
+        ) : null}
+
+        <PolicyRulesEditor
+          rules={policies.rules ?? {}}
+          legacy={{ returns: policies.returns, delivery: policies.delivery, cancellation: policies.cancellation, warranty: policies.warranty }}
+          vertical={vertical}
+          errors={state.fields}
+          onChange={(rules) => {
+            for (const key of ["returns", "delivery", "cancellation", "warranty"]) queueOwnerPath(`policies.${key}`);
+            setPolicies((prev) => ({ ...prev, rules }));
+          }}
+        />
+
+        <SettingsGroup title="Anything else">
+          <SettingsStack label="Other rules callers should know" htmlFor="policy-other">
+            <PolicyTextarea
+              id="policy-other"
+              value={policies.other}
+              onChange={(value) => {
+                if (value !== policies.other) queueOwnerPath("policies.other");
+                setPolicies((prev) => ({
+                  ...prev,
+                  other: value,
+                  provenance: { ...prev.provenance, other: { source: "owner", confirmed: true } },
+                }));
+              }}
+              placeholder={POLICY_FIELDS.find((f) => f.id === "other")?.placeholder ?? ""}
+            />
+          </SettingsStack>
         </SettingsGroup>
 
         <SettingsGroup title="When unsure">

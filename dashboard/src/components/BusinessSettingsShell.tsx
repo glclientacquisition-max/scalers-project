@@ -221,7 +221,7 @@ export function BusinessSettingsShell({
   optionStatus?: Record<string, SettingsListStatus>;
   liveTransferExecutor?: boolean;
   membersSlot?: ReactNode;
-  structuredSlot?: Partial<Record<"identity" | "catalog" | "policies", ReactNode>> | null;
+  structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";

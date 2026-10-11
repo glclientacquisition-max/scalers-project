@@ -494,8 +494,8 @@ describe("business settings craft", () => {
       form.indexOf('panel === "policies"'),
       form.indexOf('panel === "tools"')
     );
-    assert.match(policies, /No rules yet\. Add payment or cancellation/);
-    assert.match(policies, /openPolicyIds\.length === 0/);
+    assert.match(policies, /<PaymentsEditor/);
+    assert.match(policies, /<PolicyRulesEditor/);
     assert.doesNotMatch(policies, /M-Pesa Paybill|30% deposit required/);
 
     assert.match(test, /Add a business name in/);
