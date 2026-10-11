@@ -72,7 +72,13 @@ export async function inviteMemberAction(email: string, role: string): Promise<M
     p_token_hash: hashInviteToken(token),
     p_actor: ctx.userId,
   });
-  if (error) return { error: inviteErrorCopy(error.message) };
+  if (error) {
+    if (/\balready_member\b/.test(error.message)) return { error: `${cleanEmail} is already on this team.` };
+    if (/\balready_invited\b/.test(error.message)) {
+      return { error: `${cleanEmail} already has a pending invite. Use Resend in the invites list instead.` };
+    }
+    return { error: inviteErrorCopy(error.message) };
+  }
   try {
     const sent = await sendInvite({ email: cleanEmail, role: target, token, businessName: ctx.businessName });
     revalidatePath("/settings");

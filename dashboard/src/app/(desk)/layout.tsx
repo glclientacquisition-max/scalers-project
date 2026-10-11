@@ -10,6 +10,7 @@ import { DeskRouteChrome } from "@/components/DeskRouteChrome";
 import { DeskNavHost, DeskNeedsCountBridge, DeskPendingSlot, DeskScrollRestore } from "@/components/DeskNavState";
 import { LiveInbox } from "@/components/LiveInbox";
 import { DeskOffline } from "@/components/ui/DeskOffline";
+import { WelcomeToast } from "@/components/WelcomeToast";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { loadCachedInboxNeedsCount } from "@/lib/inboxLoad";
@@ -57,6 +58,9 @@ export default async function AppShell({ children }: { children: React.ReactNode
 
   return (
     <DeskNavHost>
+      <Suspense fallback={null}>
+        <WelcomeToast />
+      </Suspense>
       <div className={deskShellClass}>
         {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
         <DeskRail hideHrefs={hideHrefs} />
