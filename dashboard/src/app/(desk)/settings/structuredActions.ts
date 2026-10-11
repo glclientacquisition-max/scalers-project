@@ -22,9 +22,7 @@ export type StructuredResult = { ok: true; message: string } | { ok: false; erro
 
 const SAVE_FAILED = "Couldn't save. Nothing was changed. Try again.";
 
-async function workspaceFor(action: "settings.edit" | "inbox.act") {
-  const denied = await memberDenied(action);
-  if (denied) return { error: denied.error } as const;
+async function workspace() {
   const tenant = await getCurrentTenant();
   const workspace = await createWorkspaceDataClient();
   if (!tenant || !workspace) return { error: "Not signed in." } as const;
@@ -33,7 +31,9 @@ async function workspaceFor(action: "settings.edit" | "inbox.act") {
 
 /** Typed payments. The text line is rewritten from them so the Business Assistant says the same thing. */
 export async function savePaymentsAction(input: Payments): Promise<StructuredResult> {
-  const ws = await workspaceFor("settings.edit");
+  const denied = await memberDenied("settings.edit");
+  if (denied) return { ok: false, error: denied.error };
+  const ws = await workspace();
   if ("error" in ws) return { ok: false, error: ws.error ?? SAVE_FAILED };
   const payments: Payments = { ...cleanPayments(input), source: "owner", confirmed: true };
   const fields = validatePayments(payments);
@@ -50,7 +50,9 @@ export async function savePaymentsAction(input: Payments): Promise<StructuredRes
 
 /** Owner answers "Is this right?" for one item's typed price (yes, or a corrected price). */
 export async function confirmPriceAction(input: { kind: "product" | "service"; name: string; pricing: StructuredPrice }): Promise<StructuredResult> {
-  const ws = await workspaceFor("settings.edit");
+  const denied = await memberDenied("settings.edit");
+  if (denied) return { ok: false, error: denied.error };
+  const ws = await workspace();
   if ("error" in ws) return { ok: false, error: ws.error ?? SAVE_FAILED };
   const pricing = sanitizePricing({ ...input.pricing, source: "owner", confirmed: true });
   if (!pricing) return { ok: false, error: "Pick how this is priced." };
@@ -80,7 +82,9 @@ export async function confirmPriceAction(input: { kind: "product" | "service"; n
 }
 
 export async function saveBusinessCategoryAction(category: string): Promise<StructuredResult> {
-  const ws = await workspaceFor("settings.edit");
+  const denied = await memberDenied("settings.edit");
+  if (denied) return { ok: false, error: denied.error };
+  const ws = await workspace();
   if ("error" in ws) return { ok: false, error: ws.error ?? SAVE_FAILED };
   const type = (ws.tenant as { business_type?: string | null }).business_type || ws.tenant.vertical || "general";
   if (!categoriesFor(type === "retail" || type === "home_services" ? type : "general").some((c) => c.id === category))
@@ -93,7 +97,9 @@ export async function saveBusinessCategoryAction(category: string): Promise<Stru
 
 /** Owner correction of a call's intent/outcome. Stored as source=owner: trusted over the model. */
 export async function correctCallFactsAction(input: { callId: string; intent: string; outcome: string; lostReason: string | null }): Promise<StructuredResult> {
-  const ws = await workspaceFor("inbox.act");
+  const denied = await memberDenied("inbox.act");
+  if (denied) return { ok: false, error: denied.error };
+  const ws = await workspace();
   if ("error" in ws) return { ok: false, error: ws.error ?? SAVE_FAILED };
   if (!isIntent(input.intent) || !isOutcome(input.outcome)) return { ok: false, error: "Pick from the list." };
   const lost = input.outcome === "lost" ? (isLostReason(input.lostReason) ? input.lostReason : "other") : null;

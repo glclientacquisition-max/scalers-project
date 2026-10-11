@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { businessSettingsHref } from "@/lib/businessSettingsNav";
+import type { DataCheck } from "./DataChecksCard";
 import { BusinessCategoryPicker } from "./BusinessCategoryPicker";
 import { PaymentsEditor } from "./PaymentsEditor";
 import { PriceConfirmCards, type PriceToConfirm } from "./PriceConfirmCards";
@@ -57,4 +59,14 @@ export function structuredSettingsSlots({
     catalog: prices.length ? <PriceConfirmCards items={prices} canEdit={canEdit} save={confirmPriceAction} /> : null,
     policies: <PaymentsEditor initial={paymentsFrom(tenant.business_policies)} canEdit={canEdit} save={savePaymentsAction} />,
   };
+}
+
+/** Overview checks (same rules as the Settings cards). */
+export function dataChecksFor(tenant: { product_catalog?: unknown; services_catalog?: unknown; business_policies?: unknown }): DataCheck[] {
+  const out: DataCheck[] = [];
+  const prices = pricesToConfirm(tenant).length;
+  if (prices) out.push({ href: businessSettingsHref("train", "catalog"), label: `Check ${prices} price${prices === 1 ? "" : "s"}`, detail: "We read them from your notes. Callers hear these." });
+  const pay = paymentsFrom(tenant.business_policies);
+  if (pay && !pay.confirmed) out.push({ href: businessSettingsHref("train", "policies"), label: "Check how customers pay", detail: "We read it from your payment notes." });
+  return out;
 }
