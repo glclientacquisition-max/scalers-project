@@ -120,3 +120,30 @@ test("UI copy: says Business Assistant, chips not free text, Sheet for edits", (
   assert.doesNotMatch(all, /<textarea|<select/);
   assert.doesNotMatch(all, /transition-all|text-\[\d|#[0-9a-f]{6}/i);
 });
+
+test("prices: no price text is 'Add prices', never an 'Is this right?' card", () => {
+  const empty = { mode: "ask", amount_ksh: null, min_ksh: null, max_ksh: null, unit: null, in_stock: null, source: "parsed", confirmed: false } as never;
+  assert.equal(sd.needsPriceConfirm({ pricing: empty, text: "" }), false);
+  assert.equal(sd.isUnpriced({ pricing: empty, text: "" }), true);
+  assert.equal(sd.isUnpriced({ pricing: null, text: "" }), true);
+  // Ambiguous text is still a check, not "no price".
+  const vague = { ...(empty as object), parsed_from: "Varies by item" } as never;
+  assert.equal(sd.needsPriceConfirm({ pricing: vague, text: "Varies by item" }), true);
+  assert.equal(sd.isUnpriced({ pricing: vague, text: "Varies by item" }), false);
+  const parsed = { ...(empty as object), mode: "fixed", amount_ksh: 200, parsed_from: "KSh 200" } as never;
+  assert.equal(sd.needsPriceConfirm({ pricing: parsed, text: "KSh 200" }), true);
+  const owner = { ...(empty as object), source: "owner", confirmed: true } as never;
+  assert.equal(sd.isUnpriced({ pricing: owner, text: "" }), false);
+  assert.equal(sd.needsPriceConfirm({ pricing: owner, text: "" }), false);
+});
+
+test("prices: Overview shows one 'Add prices' row that opens the filtered catalogue", () => {
+  const slots = read("dashboard/src/components/structured/StructuredSettingsSlots.tsx");
+  assert.match(slots, /UNPRICED_HREF = `\$\{businessSettingsHref\("train", "catalog"\)\}&filter=unpriced`/);
+  assert.match(slots, /if \(unpriced\) out\.push\(\{ href: UNPRICED_HREF, label: unpricedLabelText\(unpriced\)/);
+  assert.match(read("dashboard/src/components/structured/unpricedCopy.ts"), /no price/);
+  const form = read("dashboard/src/components/TenantForm.tsx");
+  assert.match(form, /get\("filter"\) === "unpriced"/);
+  assert.match(form, /productIdx\[safeProductPage \* PRODUCT_PAGE_SIZE \+ localIndex\]/);
+  assert.match(MIGRATION, /coalesce\(btrim\(i->'pricing'->>'parsed_from'\), ''\) <> ''\)::int,/);
+});

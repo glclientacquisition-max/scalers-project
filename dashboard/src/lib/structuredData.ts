@@ -148,8 +148,24 @@ export function priceLabel(p: Pick<StructuredPrice, "mode" | "amount_ksh" | "min
 }
 
 /** Item needs an owner "Is this right?" when its price was read from text and not confirmed. */
-export function needsPriceConfirm(item: { pricing?: Partial<StructuredPrice> | null }): boolean {
-  return Boolean(item.pricing && item.pricing.source === "parsed" && !item.pricing.confirmed);
+/**
+ * "Is this right?" only when there was text to read: a parsed number, or ambiguous text we
+ * could not turn into one ("Varies", "Custom quote"). No text at all is not a check; it is
+ * an unpriced item and goes to the single "Add prices" prompt.
+ */
+export function needsPriceConfirm(item: { pricing?: Partial<StructuredPrice> | null; text?: string | null }): boolean {
+  const p = item.pricing;
+  if (!p || p.source !== "parsed" || p.confirmed) return false;
+  const read = String(p.parsed_from ?? item.text ?? "").trim();
+  return read !== "";
+}
+
+/** No price text and no owner price: counted once under "Add prices", never one card each. */
+export function isUnpriced(item: { pricing?: Partial<StructuredPrice> | null; text?: string | null }): boolean {
+  const p = item.pricing;
+  if (p && (p.source === "owner" || p.confirmed)) return false;
+  if (p && p.mode && p.mode !== "ask") return false;
+  return String(item.text ?? "").trim() === "" && String(p?.parsed_from ?? "").trim() === "";
 }
 
 /* ---------------- payments ---------------- */

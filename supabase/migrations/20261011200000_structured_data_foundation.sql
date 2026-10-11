@@ -335,7 +335,8 @@ returns table (
     (select count(*) from jsonb_array_elements(
        (case when jsonb_typeof(t.product_catalog) = 'array' then t.product_catalog else '[]' end)
        || (case when jsonb_typeof(t.services_catalog) = 'array' then t.services_catalog else '[]' end)) i
-       where i->'pricing'->>'source' = 'parsed' and coalesce((i->'pricing'->>'confirmed')::boolean, false) = false)::int,
+       where i->'pricing'->>'source' = 'parsed' and coalesce((i->'pricing'->>'confirmed')::boolean, false) = false
+         and coalesce(btrim(i->'pricing'->>'parsed_from'), '') <> '')::int,  -- empty text is "no price", not a check
     (select count(*) from calls c where c.tenant_id = t.id and c.created_at > now() - interval '30 days')::int,
     (select count(*) from calls c left join call_facts f on f.call_id = c.id
        where c.tenant_id = t.id and c.created_at > now() - interval '30 days' and coalesce(f.intent, 'other') = 'other')::int,

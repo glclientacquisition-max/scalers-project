@@ -5,7 +5,9 @@ import { BusinessCategoryPicker } from "./BusinessCategoryPicker";
 import { PaymentsEditor } from "./PaymentsEditor";
 import { PriceConfirmCards, type PriceToConfirm } from "./PriceConfirmCards";
 import { confirmPriceAction, saveBusinessCategoryAction, savePaymentsAction } from "@/app/(desk)/settings/structuredActions";
-import { needsPriceConfirm, sanitizePricing, type Payments } from "@/lib/structuredData";
+import { isUnpriced, needsPriceConfirm, sanitizePricing, type Payments } from "@/lib/structuredData";
+import { AddPricesRow } from "./AddPricesRow";
+import { unpricedLabelText } from "./unpricedCopy";
 
 type Row = Record<string, unknown>;
 
@@ -16,14 +18,33 @@ export function pricesToConfirm(tenant: { product_catalog?: unknown; services_ca
     for (const r of Array.isArray(rows) ? (rows as Row[]) : []) {
       const pricing = sanitizePricing(r?.pricing);
       const name = String(r?.name || "").trim();
-      if (!name || !pricing || !needsPriceConfirm({ pricing })) continue;
-      out.push({ kind, name, pricing, text: String(r?.[textKey] || "") });
+      const text = String(r?.[textKey] || "");
+      if (!name || !pricing || !needsPriceConfirm({ pricing, text })) continue;
+      out.push({ kind, name, pricing, text });
     }
   };
   add(tenant.product_catalog, "product", "price");
   add(tenant.services_catalog, "service", "price_range");
   return out;
 }
+
+/** Items with no price text at all. One "Add prices" prompt, not a card each. */
+export function unpricedCount(tenant: { product_catalog?: unknown; services_catalog?: unknown }): number {
+  let n = 0;
+  const add = (rows: unknown, textKey: string) => {
+    for (const r of Array.isArray(rows) ? (rows as Row[]) : []) {
+      if (!String(r?.name || "").trim()) continue;
+      if (isUnpriced({ pricing: sanitizePricing(r?.pricing), text: String(r?.[textKey] || "") })) n += 1;
+    }
+  };
+  add(tenant.product_catalog, "price");
+  add(tenant.services_catalog, "price_range");
+  return n;
+}
+
+export const UNPRICED_HREF = `${businessSettingsHref("train", "catalog")}&filter=unpriced`;
+
+export { unpricedLabelText as unpricedLabel } from "./unpricedCopy";
 
 export function paymentsFrom(policies: unknown): Payments | null {
   const p = policies && typeof policies === "object" ? (policies as Row).payments : null;
@@ -52,11 +73,18 @@ export function structuredSettingsSlots({
   businessCategory: string | null;
 }): Partial<Record<"identity" | "catalog" | "policies", ReactNode>> {
   const prices = pricesToConfirm(tenant);
+  const unpriced = unpricedCount(tenant);
   return {
     identity: (
       <BusinessCategoryPicker businessType={businessType} initial={businessCategory} canEdit={canEdit} save={saveBusinessCategoryAction} />
     ),
-    catalog: prices.length ? <PriceConfirmCards items={prices} canEdit={canEdit} save={confirmPriceAction} /> : null,
+    catalog:
+      prices.length || unpriced ? (
+        <div className="space-y-4">
+          {unpriced ? <AddPricesRow count={unpriced} href={UNPRICED_HREF} /> : null}
+          {prices.length ? <PriceConfirmCards items={prices} canEdit={canEdit} save={confirmPriceAction} /> : null}
+        </div>
+      ) : null,
     policies: <PaymentsEditor initial={paymentsFrom(tenant.business_policies)} canEdit={canEdit} save={savePaymentsAction} />,
   };
 }
@@ -66,6 +94,8 @@ export function dataChecksFor(tenant: { product_catalog?: unknown; services_cata
   const out: DataCheck[] = [];
   const prices = pricesToConfirm(tenant).length;
   if (prices) out.push({ href: businessSettingsHref("train", "catalog"), label: `Check ${prices} price${prices === 1 ? "" : "s"}`, detail: "We read them from your notes. Callers hear these." });
+  const unpriced = unpricedCount(tenant);
+  if (unpriced) out.push({ href: UNPRICED_HREF, label: unpricedLabelText(unpriced), detail: "Add a price, or choose Ask so callers get a call back." });
   const pay = paymentsFrom(tenant.business_policies);
   if (pay && !pay.confirmed) out.push({ href: businessSettingsHref("train", "policies"), label: "Check how customers pay", detail: "We read it from your payment notes." });
   return out;
