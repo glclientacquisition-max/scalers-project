@@ -9,16 +9,25 @@ import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { HomeCapture } from "@/components/HomeCapture";
 import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { LivePing } from "@/components/ui/deskRow";
-import { shopStakes } from "@/lib/baStakes";
+import { homeStakes, shopStakes } from "@/lib/baStakes";
+import { CapabilityGatesPanel } from "@/components/CapabilityGatesPanel";
+import { capabilityGates } from "@/lib/capabilityGates";
 import type { TenantRow } from "@/lib/supabase";
 
 /**
  * Local Overview identity harness (no desk login). DASHBOARD_OPEN=true only.
  */
-export default function DevHomePage() {
+export default async function DevHomePage({ searchParams }: { searchParams: Promise<{ vertical?: string }> }) {
   if (process.env.DASHBOARD_OPEN !== "true") {
     notFound();
   }
+  const home = (await searchParams).vertical === "home_services";
+  const gates = capabilityGates(
+    home
+      ? { vertical: "home_services", services_catalog: [{ name: "Sofa cleaning", source: "owner" }] }
+      : { vertical: "retail", business_policies: {} },
+    { holdGate: home ? null : { allowed: false, reasons: ["Holds are not enabled in policies."] } },
+  );
 
   return (
     <div className={deskShellClass}>
@@ -76,8 +85,13 @@ export default function DevHomePage() {
                   },
                 ],
               }}
-              stakes={shopStakes({ products: [], hoursText: "", holdsAllowed: false })}
+              stakes={
+                home
+                  ? homeStakes({ services: [], coverage: "Kilimani", bookingSlotsAllowed: false })
+                  : shopStakes({ products: [], hoursText: "", holdsAllowed: false })
+              }
             />
+            <CapabilityGatesPanel gates={gates} />
             <HomeReviewSettingsNudge
               tenantId="dev-home-live-nudge"
               vertical="retail"

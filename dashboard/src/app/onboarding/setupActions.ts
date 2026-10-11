@@ -9,6 +9,7 @@ import { assignDidFromPool } from "@/lib/tenant";
 import { allowRate } from "@/lib/rateLimit";
 import { readSetupRow, emailConfirmed } from "@/lib/setupServer";
 import {
+  capabilityPoliciesFromSetup,
   catalogueForTenant,
   faqsForTenant,
   firstInvalidStep,
@@ -237,10 +238,12 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
   if (teamDirectory.length) patch.team_directory = teamDirectory;
   // Typed payments read from the owner's own FAQ answer; Settings asks "Is this right?" before it's trusted.
   const parsedPayments = fromFaqs.payment ? parsePaymentsText(fromFaqs.payment) : null;
-  if (Object.keys(fromFaqs).length) {
+  const capabilityPolicies = capabilityPoliciesFromSetup(draft.catalogue, vertical);
+  if (Object.keys(fromFaqs).length || Object.keys(capabilityPolicies).length) {
     patch.business_policies = {
       ...(row.business_policies && typeof row.business_policies === "object" ? row.business_policies : {}),
       ...fromFaqs,
+      ...capabilityPolicies,
       ...(parsedPayments ? { payments: parsedPayments } : {}),
     };
   }
@@ -303,6 +306,8 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
       "assistant.tools",
       ...(fromFaqs.payment ? ["policies.payment", "payments.methods"] : []),
       ...(fromFaqs.delivery ? ["policies.delivery"] : []),
+      ...(capabilityPolicies.holds ? ["policies.holds", "policies.holds.allowed"] : []),
+      ...(capabilityPolicies.booking_mode ? ["policies.booking_mode"] : []),
       ...(fromFaqs.coverage_areas ? ["policies.coverage_areas", "locations.branches"] : []),
       ...fieldPathsAttestedOnAlertsSave({
         whatsappNumber: alerts.phone || null,

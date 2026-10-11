@@ -139,7 +139,7 @@ export function HomeCapture({
         })}
       </ul>
 
-      <BaStakesPreview title="What your BA will say" lines={stakes} />
+      <BaStakesPreview title="What your Business Assistant will say" lines={stakes} />
     </section>
   );
 }

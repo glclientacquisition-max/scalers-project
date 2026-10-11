@@ -139,11 +139,11 @@ function inboxCaption(items) {
     return toConfirm === 1 ? "1 to confirm" : `${toConfirm} to confirm`;
   }
   if (toFulfill === needs) {
-    return toFulfill === 1 ? "1 Hold Done" : `${toFulfill} Hold Done`;
+    return toFulfill === 1 ? "1 to fulfil" : `${toFulfill} to fulfil`;
   }
   const bits = [`${needs} need you`];
   if (toConfirm > 0) bits.push(`${toConfirm} to confirm`);
-  else if (toFulfill > 0) bits.push(`${toFulfill} Hold Done`);
+  else if (toFulfill > 0) bits.push(`${toFulfill} to fulfil`);
   return bits.length === 1 ? bits[0] : `${bits[0]}. ${bits[1]}.`;
 }
 
@@ -182,7 +182,7 @@ function orderInboxItems(items, filter) {
 function homeBriefing({ toReturn, toFulfill, toConfirm }) {
   const bits = [];
   if (toConfirm > 0) bits.push(`${toConfirm} to confirm`);
-  if (toFulfill > 0) bits.push(`${toFulfill} Hold Done`);
+  if (toFulfill > 0) bits.push(`${toFulfill} to fulfil`);
   if (toReturn > 0) bits.push(`${toReturn} to return`);
   if (bits.length === 0) return "Clear";
   return `${bits.join(". ")}.`;
@@ -507,7 +507,7 @@ describe("inbox signal", () => {
     );
     assert.equal(
       inboxCaption([{ needsYou: true, hold: { status: "open" } }]),
-      "1 Hold Done"
+      "1 to fulfil"
     );
     assert.equal(
       inboxCaption([
@@ -658,9 +658,9 @@ describe("inbox signal", () => {
   it("briefs Home by the sharpest queue", () => {
     assert.equal(
       homeBriefing({ toReturn: 1, toFulfill: 2, toConfirm: 3 }),
-      "3 to confirm. 2 Hold Done. 1 to return."
+      "3 to confirm. 2 to fulfil. 1 to return."
     );
-    assert.equal(homeBriefing({ toReturn: 0, toFulfill: 2, toConfirm: 0 }), "2 Hold Done.");
+    assert.equal(homeBriefing({ toReturn: 0, toFulfill: 2, toConfirm: 0 }), "2 to fulfil.");
     assert.equal(homeBriefing({ toReturn: 0, toFulfill: 0, toConfirm: 0 }), "Clear");
     assert.equal(homeQueueUnit(1, "to confirm", "Tue 14:00"), "Tue 14:00");
     assert.equal(homeQueueUnit(2, "to confirm", "Tue 14:00"), "to confirm");

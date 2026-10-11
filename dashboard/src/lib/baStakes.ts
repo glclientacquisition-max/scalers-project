@@ -24,7 +24,7 @@ function unknown(question: string): StakeLine {
 }
 
 function locked(question: string): StakeLine {
-  return { question, state: "locked", answer: "Locked" };
+  return { question, state: "locked", answer: "Needs setup" };
 }
 
 function saturdayLine(schedule: CaptureHours | null): StakeLine {
@@ -57,6 +57,8 @@ export function shopStakes(input: {
 export function homeStakes(input: {
   services: CaptureService[];
   coverage?: string;
+  /** booking_slots capability gate. */
+  bookingSlotsAllowed?: boolean;
 }): StakeLine[] {
   const cover = String(input.coverage || "").trim();
   const coverageLine = cover
@@ -74,6 +76,8 @@ export function homeStakes(input: {
   return [
     coverageLine,
     visitLine,
-    locked("Can you book me in for Thursday?"),
+    input.bookingSlotsAllowed
+      ? live("Can you book me in for Thursday?", "Yes, you're booked.")
+      : locked("Can you book me in for Thursday?"),
   ];
 }

@@ -1,6 +1,6 @@
 // Deterministic authority and capability policy for Brain decisions.
 
-const { holdOrdersEnabled, confirmedSlotEnabled, factServices } = require('./provenance');
+const { evaluateCapabilityGates } = require('./capabilityGates');
 
 const ACTIONS = Object.freeze({
   ANSWER: 'ANSWER',
@@ -16,15 +16,17 @@ const ACTIONS = Object.freeze({
 
 function buildBrainCapabilities(profile = {}, runtime = {}) {
   const tools = profile.agentTools || {};
+  // Same gate model the owner sees on Overview (Live / Needs setup).
+  const gates = evaluateCapabilityGates(profile);
   return {
     answerFromKnowledge: true,
     saveCallerInfo: true,
     createServiceRequest: runtime.createServiceRequest !== false,
     // Holds/orders need an owner-confirmed catalogue and hold rules. Enquiry stays on.
-    placeHold: holdOrdersEnabled(profile),
+    placeHold: gates.holds.allowed,
     // Seed-only services cannot confirm a visit. Unmarked owner services still can.
-    confirmVisit: factServices(profile.servicesCatalog, profile.fieldMeta || null).length > 0,
-    confirmedSlot: confirmedSlotEnabled(profile),
+    confirmVisit: gates.site_visits.allowed,
+    confirmedSlot: gates.booking_slots.allowed,
     createAppointment: runtime.createAppointment !== false,
     updateAppointment: runtime.updateAppointment !== false,
     notifyCallback: runtime.notifyCallback !== false,

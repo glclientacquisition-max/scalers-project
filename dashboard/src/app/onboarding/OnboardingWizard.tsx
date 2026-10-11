@@ -444,7 +444,7 @@ export function OnboardingWizard() {
                 </Field>
               ))}
             </div>
-            <BaStakesPreview title="What your BA will say" lines={stakes} />
+            <BaStakesPreview title="What your Business Assistant will say" lines={stakes} />
           </div>
         ) : null}
 

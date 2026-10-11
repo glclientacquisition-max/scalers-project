@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  capabilityPoliciesFromSetup,
   catalogueForTenant,
   defaultDraft,
   emptyRow,
@@ -52,11 +53,48 @@ describe("prices", () => {
   });
 });
 
+const NO_HOLDS = { holds: { allowed: "no" as const, maxHours: 24, deposit: "no" as const }, bookingMode: "" as const };
+const REQUEST_BOOKINGS = { holds: { allowed: "" as const, maxHours: 24, deposit: "no" as const }, bookingMode: "request" as const };
+
+describe("capability questions in the catalogue step", () => {
+  it("asks shops whether they hold items", () => {
+    const res = validateCatalogue({ skipped: false, rows: [row({ name: "Charger", price: "500" })] } as never, "retail");
+    assert.equal(res.ok, false);
+    assert.ok(!res.ok && res.fields["holds.allowed"]);
+  });
+  it("needs one holdable item when holds are on, and writes structured hold rules", () => {
+    const on = { holds: { allowed: "yes" as const, maxHours: 6, deposit: "yes" as const }, bookingMode: "" as const };
+    const none = validateCatalogue({ ...on, skipped: false, rows: [row({ name: "Charger", price: "500" })] }, "retail");
+    assert.ok(!none.ok && none.fields["holds.items"]);
+    const step = { ...on, skipped: false, rows: [row({ name: "Charger", price: "500", holdable: true })] };
+    const ok = validateCatalogue(step, "retail");
+    assert.equal(ok.ok, true);
+    assert.equal(catalogueForTenant(step, "retail").products[0].holdable, true);
+    assert.deepEqual(capabilityPoliciesFromSetup(step, "retail").holds, {
+      allowed: "yes", max_hours: 6, deposit_required: "yes", source: "owner", confirmed: true,
+    });
+  });
+  it("clears holdable when the shop does not hold", () => {
+    const res = validateCatalogue({ ...NO_HOLDS, skipped: false, rows: [row({ name: "Charger", price: "500", holdable: true })] }, "retail");
+    assert.equal(res.ok && res.value.rows[0].holdable, false);
+  });
+  it("asks home services how bookings work and stores booking_mode", () => {
+    const missing = validateCatalogue({ ...NO_HOLDS, skipped: false, rows: [row({ name: "Clean", price: "500", site_visit: "no" })] }, "home_services");
+    assert.ok(!missing.ok && missing.fields["bookingMode"]);
+    const step = { ...NO_HOLDS, bookingMode: "confirmed_slot" as const, skipped: false, rows: [row({ name: "Clean", price: "500", site_visit: "no" })] };
+    assert.equal(validateCatalogue(step, "home_services").ok, true);
+    assert.deepEqual(capabilityPoliciesFromSetup(step, "home_services"), {
+      booking_mode: "confirmed_slot",
+      booking: { source: "owner", confirmed: true },
+    });
+  });
+});
+
 describe("catalogue step", () => {
   it("one priced item is enough for shops and home services", () => {
-    assert.equal(validateCatalogue({ skipped: false, rows: [row({ name: "Charger", price: "500" })] }, "retail").ok, true);
+    assert.equal(validateCatalogue({ ...NO_HOLDS, skipped: false, rows: [row({ name: "Charger", price: "500" })] }, "retail").ok, true);
     assert.equal(
-      validateCatalogue({ skipped: false, rows: [row({ name: "Cleaning", pricing_mode: "ask", site_visit: "yes" })] }, "home_services").ok,
+      validateCatalogue({ ...REQUEST_BOOKINGS, skipped: false, rows: [row({ name: "Cleaning", pricing_mode: "ask", site_visit: "yes" })] }, "home_services").ok,
       true
     );
   });
@@ -88,7 +126,7 @@ describe("catalogue step", () => {
     assert.ok(res.fields["rows.2.price"]);
   });
   it("drops blank rows", () => {
-    const res = validateCatalogue({ skipped: false, rows: [row({ name: "A", price: "10" }), row({})] }, "retail");
+    const res = validateCatalogue({ ...NO_HOLDS, skipped: false, rows: [row({ name: "A", price: "10" }), row({})] }, "retail");
     assert.equal(res.ok && res.value.rows.length, 1);
   });
   it("shapes rows for the tenant columns", () => {

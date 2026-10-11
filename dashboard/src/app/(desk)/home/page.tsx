@@ -41,6 +41,9 @@ import { HomeCapture } from "@/components/HomeCapture";
 import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { getTenantCompletenessScore, getTenantHoldGate } from "@/lib/deskProvenance";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
+import { capabilityGates } from "@/lib/capabilityGates";
+import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
+import { CapabilityGatesPanel } from "@/components/CapabilityGatesPanel";
 import { parseHoursSchedule } from "@/lib/hoursSchedule";
 import { isBetaBilling } from "@/lib/wallet";
 import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
@@ -129,6 +132,12 @@ async function HomeOverviewBody() {
 
   const todayCount = todayRes.error ? null : todayRes.count ?? 0;
   const work = summarizeInboxWork(inbox.items);
+  const gates = capabilityGates(tenant, {
+    holdGate: hold,
+    liveTransferExecutor: deskLiveTransferExecutorEnabled(),
+  });
+  const holdsGate = gates.find((g) => g.id === "holds") || null;
+  const slotsGate = gates.find((g) => g.id === "booking_slots") || null;
   const todayWork = visitBoardForDay(inbox.items, eatYmd()).length;
   const waitingCount = work.needs;
   const visitQueue = showsVisitQueue(vertical);
@@ -259,8 +268,8 @@ async function HomeOverviewBody() {
                 >
                   <span className="flex min-w-0 items-center gap-2 text-ink">
                     <span>{queue.label}</span>
-                    {queue.id === "hold" && hold && !hold.allowed ? (
-                      <Stamp tone="attention">Locked</Stamp>
+                    {queue.id === "hold" && holdsGate && !holdsGate.allowed ? (
+                      <Stamp tone="attention">Needs setup</Stamp>
                     ) : null}
                   </span>
                   <span className="flex min-w-0 items-center gap-3 text-ink-soft">
@@ -404,15 +413,17 @@ async function HomeOverviewBody() {
                     coverage: [...(tenant.business_policies?.coverage_areas || [])]
                       .filter(Boolean)
                       .join(", "),
+                    bookingSlotsAllowed: Boolean(slotsGate?.allowed),
                   })
                 : shopStakes({
                     products: tenant.product_catalog || [],
                     schedule: parseHoursSchedule(tenant.hours_schedule),
-                    holdsAllowed: Boolean(hold?.allowed),
+                    holdsAllowed: Boolean(holdsGate?.allowed),
                   })
             }
           />
         ) : null}
+        <CapabilityGatesPanel gates={gates} />
         {score && line === "live" && !score.ready_badge ? (
           <HomeReviewSettingsNudge
             tenantId={tenant.id}

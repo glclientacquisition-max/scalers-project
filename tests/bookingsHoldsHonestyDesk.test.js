@@ -6,7 +6,7 @@ const path = require("path");
 /**
  * Desk UX slice of bookings+holds honesty P0.
  * K4: gate hospitality Confirm booking until reservations exist.
- * A1: requested visit is Confirm language; open hold is Hold Done.
+ * A1: requested visit is Confirm language; open holds are "to fulfil" (owner review, Oct 2026).
  * Keep in lockstep with dashboard/src/lib/inboxNiche.ts and whose-turn.
  */
 function read(rel) {
@@ -70,9 +70,9 @@ describe("bookings + holds honesty desk copy", () => {
     assert.doesNotMatch(hospitality, /booked a visit|you're booked|Confirm booking/);
   });
 
-  it("uses Hold Done on Home CTAs and the ticket banner (A1)", () => {
-    assert.match(niche, /holdCtaOne: "Hold Done"/);
-    assert.match(niche, /holdCtaMany: "Hold Done"/);
+  it("uses Fulfil hold on Home CTAs and Hold Done on the ticket banner (A1)", () => {
+    assert.match(niche, /holdCtaOne: "Fulfil hold"/);
+    assert.match(niche, /holdCtaMany: "Fulfil holds"/);
     assert.doesNotMatch(niche, /Fulfill hold/);
     assert.match(home, /copy\.holdCtaOne/);
     assert.match(home, /copy\.holdCtaMany/);
@@ -81,11 +81,11 @@ describe("bookings + holds honesty desk copy", () => {
     assert.doesNotMatch(jobActions, /Confirm booking/);
   });
 
-  it("uses Hold Done on Home hold units, never to fulfill (A1 residual)", () => {
+  it("uses to fulfil on Home hold units (never the ambiguous Hold Done)", () => {
     const holdUnits = [...niche.matchAll(/holdUnit: "([^"]+)"/g)].map((m) => m[1]);
     assert.ok(holdUnits.length >= 4, "every niche sets holdUnit");
     for (const unit of holdUnits) {
-      assert.equal(unit, "Hold Done");
+      assert.equal(unit, "to fulfil");
     }
     assert.doesNotMatch(niche, /holdUnit: "to fulfill"/);
     assert.doesNotMatch(home, /to fulfill/);

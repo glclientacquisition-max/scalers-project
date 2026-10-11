@@ -3,11 +3,14 @@
 import { deskShiftClass } from "@/components/ui/deskChrome";
 import { useRef, useState } from "react";
 import { SegmentedControl } from "@/components/ui/Segmented";
+import { Switch } from "@/components/ui/Switch";
 import { HOME_SUGGESTED_SERVICES, SHOP_SUGGESTED_PRODUCTS } from "@/lib/catalogSeeds";
 import { parseProductCsv } from "@/lib/productCatalog";
 import {
+  defaultHolds,
   emptyRow,
   LIMITS,
+  SETUP_HOLD_HOURS,
   priceText,
   rowFromImport,
   type CatalogueRow,
@@ -16,7 +19,7 @@ import {
   type PriceMode,
   type Vertical,
 } from "@/lib/setupFlow";
-import { FieldError, TextButton, inputClass } from "./ui";
+import { ChoiceList, FieldError, Group, TextButton, inputClass } from "./ui";
 
 const MODES: Array<{ value: PriceMode; label: string }> = [
   { value: "fixed", label: "Fixed" },
@@ -45,7 +48,12 @@ export function CatalogueStep({
   const lastAdded = useRef<number | null>(null);
   const rows = value.rows;
 
-  const set = (next: CatalogueRow[]) => onChange({ skipped: false, rows: next });
+  const holds = value.holds || defaultHolds();
+  const bookingMode = value.bookingMode || "";
+  const holdsOn = holds.allowed === "yes";
+  const set = (next: CatalogueRow[]) => onChange({ ...value, holds, bookingMode, skipped: false, rows: next });
+  const setHolds = (patch: Partial<typeof holds>) =>
+    onChange({ ...value, rows, bookingMode, skipped: false, holds: { ...holds, ...patch } });
   const update = (i: number, patch: Partial<CatalogueRow>) => set(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const add = (name = "") => {
     if (rows.length >= LIMITS.rows) return;
@@ -208,6 +216,17 @@ export function CatalogueStep({
                 </>
               ) : null}
 
+              {!home && holdsOn ? (
+                <div className="mt-4 flex min-h-11 items-center justify-between gap-3">
+                  <span className="text-meta font-medium text-ink">Can be held</span>
+                  <Switch
+                    checked={row.holdable}
+                    onCheckedChange={(next) => update(i, { holdable: next })}
+                    label={`${row.name || `Item ${i + 1}`} can be held`}
+                  />
+                </div>
+              ) : null}
+
               {preview ? <p className="mt-3 text-meta text-ink-2">Callers hear: {preview}</p> : null}
             </li>
           );
@@ -235,6 +254,60 @@ export function CatalogueStep({
           {importNote}
         </p>
       ) : null}
+      {!home ? (
+        <Group title="Holds" footer={holdsOn ? "Turn on Can be held for the items above. You get an alert for every hold." : "You can change this any time in Settings, Policies."}>
+          <div className="px-4 py-3" data-field="holds.allowed">
+            <p className="mb-2 text-body font-medium text-ink" id="holds-q">Do you hold items for customers?</p>
+            <SegmentedControl
+              label="Do you hold items for customers?"
+              value={holds.allowed}
+              onChange={(v) => setHolds({ allowed: v as "yes" | "no" })}
+              items={[
+                { value: "yes", label: "Yes" },
+                { value: "no", label: "No" },
+              ]}
+              className="w-full"
+            />
+            <FieldError id="holds-allowed-err" message={errors["holds.allowed"]} />
+            <span data-field="holds.items" />
+            <FieldError id="holds-items-err" message={errors["holds.items"]} />
+          </div>
+          {holdsOn ? (
+            <>
+              <div className="px-4 py-3">
+                <p className="mb-2 text-meta font-medium text-ink">Longest hold</p>
+                <SegmentedControl
+                  label="Longest hold"
+                  value={String(holds.maxHours)}
+                  onChange={(v) => setHolds({ maxHours: Number(v) })}
+                  items={SETUP_HOLD_HOURS.map((h) => ({ value: String(h), label: h < 24 ? `${h}h` : h === 24 ? "1 day" : `${h / 24} days` }))}
+                  className="w-full"
+                />
+              </div>
+              <div className="flex min-h-12 items-center justify-between gap-3 px-4 py-2">
+                <span className="text-body text-ink">Deposit needed</span>
+                <Switch checked={holds.deposit === "yes"} onCheckedChange={(next) => setHolds({ deposit: next ? "yes" : "no" })} label="Deposit needed" />
+              </div>
+            </>
+          ) : null}
+        </Group>
+      ) : (
+        <div className="mt-6" data-field="bookingMode">
+          <h2 className="mb-2 px-4 text-meta font-medium text-ink-2">Bookings</h2>
+          <ChoiceList
+            label="How bookings work"
+            value={bookingMode}
+            onChange={(v) => onChange({ ...value, rows, holds, skipped: false, bookingMode: v })}
+            options={[
+              { value: "request", title: "I confirm each time", detail: "Callers ask for a time. You confirm it." },
+              { value: "confirmed_slot", title: "Book the time for me", detail: "Your Business Assistant books the time the caller asks for." },
+            ]}
+          />
+          <div className="px-4">
+            <FieldError id="booking-mode-err" message={errors["bookingMode"]} />
+          </div>
+        </div>
+      )}
       <p className="mt-4 px-1 text-meta text-ink-2">One item with a price is enough to start. Add the rest any time in Settings.</p>
     </>
   );

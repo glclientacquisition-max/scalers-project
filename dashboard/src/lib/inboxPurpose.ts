@@ -367,6 +367,13 @@ export function homeDigestLine(
   return bits.length ? `Today: ${bits.join(", ")}.` : null;
 }
 
+const HOLD_REQUEST_TYPES = new Set(["hold", "order", "hold_or_pickup"]);
+
+/** service_requests.request_type values that are a hold or an order (not an enquiry or callback). */
+export function isHoldRequestType(type: unknown): boolean {
+  return HOLD_REQUEST_TYPES.has(String(type || "").trim().toLowerCase());
+}
+
 export function summarizeInboxWork(items: InboxItem[]): {
   needs: number;
   toReturn: number;
@@ -386,11 +393,16 @@ export function summarizeInboxWork(items: InboxItem[]): {
   const requested = visits.filter(
     (item) => String(item.job?.status || "").toLowerCase() === "requested"
   );
-  const toFulfill = live.filter(
-    (item) => String(item.hold?.status || "").toLowerCase() === "open"
-  );
+  const openRequest = (item: InboxItem) => String(item.hold?.status || "").toLowerCase() === "open";
+  // Only a real hold or order is something to fulfil. An open enquiry or callback
+  // request is a caller to get back to: counting it as a hold made Overview show
+  // "1 Hold" while holds were locked (Aris Kenya, Oct 2026).
+  const toFulfill = live.filter((item) => openRequest(item) && isHoldRequestType(item.hold?.request_type));
   const toReturn = live.filter(
-    (item) => item.purpose === "human" || item.purpose === "missed"
+    (item) =>
+      item.purpose === "human" ||
+      item.purpose === "missed" ||
+      (openRequest(item) && !isHoldRequestType(item.hold?.request_type))
   );
   return {
     needs: needs.length,
