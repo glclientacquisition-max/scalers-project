@@ -1,9 +1,9 @@
 "use server";
 
-import { lexiconLengthError } from "@/lib/lengthLimits";
 import { isAuthenticated } from "@/lib/auth";
 import { normalizeAudioMimeForGemini } from "@/lib/gemini";
 import { deriveLexiconFromRecording } from "@/lib/pronunciationFromRecording";
+import { lexiconLengthError } from "@/lib/lengthLimits";
 import {
   isBlockedMatch,
   lexiconForStorage,

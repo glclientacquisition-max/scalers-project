@@ -1,9 +1,9 @@
 "use server";
 
-import { filterPageProducts } from "@/lib/ingest/pageProducts";
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { filterPageProducts } from "@/lib/ingest/pageProducts";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import { inferPriceMode } from "@/lib/outcomeGates";
 import { recompileAfterCatalogImport, upsertTenantFieldMeta } from "@/lib/deskProvenance";
