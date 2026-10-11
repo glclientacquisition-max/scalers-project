@@ -927,7 +927,7 @@ function TenantFormInner({
       <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
       <section className={panel === "identity" ? "space-y-3" : "hidden"}>
-        <SettingsGroup title="Assistant">
+        <SettingsGroup title="Business Assistant">
           <SettingsRow label="Assistant name" htmlFor="agent_name">
             <input
               id="agent_name"
@@ -1295,7 +1295,7 @@ function TenantFormInner({
                       requestRemove(
                         service,
                         `Remove ${service.name.trim() || "this service"}?`,
-                        "It leaves the catalog when you save.",
+                        "It leaves the catalogue when you save.",
                         () =>
                           setServices((prev) =>
                             prev.length <= 1
@@ -1412,7 +1412,7 @@ function TenantFormInner({
                               requestRemove(
                                 service,
                                 `Remove ${service.name.trim() || "this service"}?`,
-                                "It leaves the catalog when you save.",
+                                "It leaves the catalogue when you save.",
                                 () =>
                                   setServices((prev) =>
                                     prev.length <= 1
@@ -1526,7 +1526,7 @@ function TenantFormInner({
                         requestRemove(
                           product,
                           `Remove ${product.name.trim() || "this product"}?`,
-                          "It leaves the catalog when you save.",
+                          "It leaves the catalogue when you save.",
                           () => setProducts((prev) => prev.filter((_, i) => i !== index))
                         )
                       }
@@ -1653,7 +1653,7 @@ function TenantFormInner({
                                 requestRemove(
                                   product,
                                   `Remove ${product.name.trim() || "this product"}?`,
-                                  "It leaves the catalog when you save.",
+                                  "It leaves the catalogue when you save.",
                                   () => setProducts((prev) => prev.filter((_, i) => i !== index))
                                 )
                               }

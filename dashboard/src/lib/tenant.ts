@@ -110,7 +110,7 @@ export const listOwnerWorkspaces = cache(async (): Promise<OwnerWorkspace[]> => 
   return ids.map((id) => ({ id, business_name: names.get(id) || null }));
 });
 
-async function ownerTenantId(
+export async function ownerTenantId(
   supabase: SupabaseClient,
   userId: string
 ): Promise<string | null> {
@@ -131,6 +131,8 @@ async function ownerTenantId(
 
 const SHELL_SELECT =
   "id, business_name, vertical, services_offered, business_hours, agent_tone";
+/** Adds the setup flag (migration 20261011150000). Falls back to SHELL_SELECT before it is applied. */
+const SHELL_SELECT_SETUP = `${SHELL_SELECT}, setup_completed_at`;
 
 export type DeskShellTenant = {
   id: string;
@@ -140,6 +142,8 @@ export type DeskShellTenant = {
   business_hours: string | null;
   agent_tone: string | null;
   llm_system_prompt: string | null;
+  /** Present (string or null) once the setup migration is applied; undefined before. */
+  setup_completed_at?: string | null;
 };
 
 function shellProfileComplete(row: {
@@ -167,9 +171,17 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
 
   let { data, error } = await supabase
     .from("tenants")
-    .select(SHELL_SELECT)
+    .select(SHELL_SELECT_SETUP)
     .eq("id", tenantId)
     .maybeSingle();
+
+  if (error && /setup_completed_at/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from("tenants")
+      .select(SHELL_SELECT)
+      .eq("id", tenantId)
+      .maybeSingle());
+  }
 
   if (error && /vertical|services_offered|business_hours|agent_tone|column/i.test(error.message)) {
     ({ data, error } = await supabase
@@ -192,6 +204,10 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
     agent_tone: row.agent_tone ?? null,
     llm_system_prompt: null,
   };
+  if (row.setup_completed_at !== undefined) {
+    shell.setup_completed_at = row.setup_completed_at ?? null;
+    return shell;
+  }
   if (shellProfileComplete(shell)) return shell;
 
   const prompt = await supabase

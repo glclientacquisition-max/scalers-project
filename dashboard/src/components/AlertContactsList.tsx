@@ -53,7 +53,7 @@ export function AlertContactsList({
   return (
     <section className="min-w-0 space-y-1.5" aria-labelledby="alert-contacts-title">
       <div className="px-1">
-        <h3 id="alert-contacts-title" className={settingsGroupTitleClass}>Alert contacts</h3>
+        <h2 id="alert-contacts-title" className={settingsGroupTitleClass}>Alert contacts</h2>
         <p id="team-notify-channels" className="text-meta text-ink-2">{note}</p>
       </div>
       <ul className="overflow-hidden rounded-2xl border border-hairline bg-surface" data-alert-contacts="">

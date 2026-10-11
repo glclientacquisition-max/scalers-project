@@ -2,33 +2,31 @@
 
 import { useActionState } from "react";
 import { createWorkspaceForSessionAction, type CreateWorkspaceState } from "./createWorkspaceAction";
-import { btnPrimary, deskFieldClass, pendingSpinnerClass } from "@/components/ui/deskChrome";
+import { Button } from "@/components/ui/Button";
+import { Field, Input } from "@/components/ui/Field";
 
 const initial: CreateWorkspaceState = {};
 
 export function CreateWorkspaceForm() {
   const [state, formAction, pending] = useActionState(createWorkspaceForSessionAction, initial);
   return (
-    <form action={formAction} className="mt-6 space-y-4 rounded-panel border border-line glass-chrome p-6">
-      <div>
-        <label className="block text-sm font-medium text-ink" htmlFor="business_name">
-          Business name
-        </label>
-        <input id="business_name" name="business_name" required maxLength={120} autoFocus className={`mt-2 ${deskFieldClass}`} />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-ink" htmlFor="notification_phone">
-          Phone for alerts
-        </label>
-        <input id="notification_phone" name="notification_phone" type="tel" required inputMode="tel" className={`mt-2 ${deskFieldClass}`} placeholder="0712 345 678" />
-      </div>
+    <form action={formAction} className="mt-6 space-y-4 rounded-2xl bg-surface p-4 sm:p-6">
+      <Field id="business_name" label="Business name">
+        {(p) => <Input {...p} name="business_name" required maxLength={120} autoFocus autoComplete="organization" />}
+      </Field>
+      <Field id="notification_phone" label="Mobile number for alerts">
+        {(p) => (
+          <Input {...p} name="notification_phone" type="tel" required inputMode="tel" autoComplete="tel" placeholder="e.g. 0712 345 678" />
+        )}
+      </Field>
       {state.error ? (
-        <p role="alert" className="text-sm text-warn">{state.error}</p>
+        <p role="alert" className="text-meta text-attention">
+          {state.error}
+        </p>
       ) : null}
-      <button type="submit" disabled={pending} className={btnPrimary}>
-        {pending ? <span className={pendingSpinnerClass} aria-hidden /> : null}
+      <Button type="submit" variant="primary" size="lg" block pending={pending}>
         Create workspace
-      </button>
+      </Button>
     </form>
   );
 }

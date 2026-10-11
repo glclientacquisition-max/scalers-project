@@ -12,7 +12,7 @@ const siteUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Scalers, your 24-hour call assistant",
+    default: "Scalers, your 24-hour Business Assistant",
     template: "%s · Scalers",
   },
   description:
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     apple: [{ url: "/brand/favicon.png" }],
   },
   openGraph: {
-    title: "Scalers, your 24-hour call assistant",
+    title: "Scalers, your 24-hour Business Assistant",
     description:
       "It answers when you are busy, after hours, on another call, or the line is off, so you do not miss the client.",
     siteName: "Scalers",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "Scalers, your 24-hour call assistant",
+    title: "Scalers, your 24-hour Business Assistant",
     description:
       "It answers when you are busy, after hours, on another call, or the line is off, so you do not miss the client.",
     images: ["/og.png"],

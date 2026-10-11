@@ -1,3 +1,6 @@
+import { loadSetupContext } from "@/lib/setupServer";
+import { SetupFlow } from "./SetupFlow";
+import { ConfirmEmailScreen } from "./ConfirmEmailScreen";
 import { redirect } from "next/navigation";
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { ThemeDock } from "@/components/ThemePicker";
@@ -19,7 +22,7 @@ function OnboardingExit() {
       <button
         type="submit"
         className={[
-          "min-h-11 rounded-md px-2 text-sm text-ink-soft hover:text-warn",
+          "min-h-11 rounded-md px-2 text-meta text-ink-2 hover:text-attention",
           deskShiftClass,
           focusRingVisible,
         ].join(" ")}
@@ -30,7 +33,11 @@ function OnboardingExit() {
   );
 }
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ step?: string }>;
+}) {
   if (!(await isAuthenticated())) {
     redirect("/login");
   }
@@ -40,7 +47,9 @@ export default async function OnboardingPage() {
     redirect("/admin");
   }
 
-  const tenant = await getCurrentTenant();
+  const ctx = await loadSetupContext();
+  if (ctx.kind === "unconfirmed") return <ConfirmEmailScreen email={ctx.user.email || ""} />;
+  const tenant = ctx.kind === "ready" ? ctx.row : ctx.kind === "legacy" ? await getCurrentTenant() : null;
   if (!tenant) {
     return (
       <main className="flex min-h-dvh items-center justify-center px-6 py-16">
@@ -52,8 +61,8 @@ export default async function OnboardingPage() {
               <OnboardingExit />
             </div>
           </div>
-          <h1 className="mt-8 font-display text-2xl text-ink">Create your workspace</h1>
-          <p className="mt-2 text-ink-soft leading-relaxed">
+          <h1 className="mt-8 text-display text-ink">Create your workspace</h1>
+          <p className="mt-2 text-body text-ink-2">
             This account isn&apos;t linked to a business yet. Add one to continue.
           </p>
           <CreateWorkspaceForm />
@@ -62,11 +71,32 @@ export default async function OnboardingPage() {
     );
   }
 
-  if (tenantNeedsOnboarding(tenant) && !(await memberCan("settings.edit"))) {
-    return <WorkspaceNotReady businessName={tenant.business_name || null} />;
+  if (ctx.kind === "ready") {
+    if (ctx.row.setup_completed_at) redirect("/home");
+    if (!(await memberCan("settings.edit"))) {
+      return <WorkspaceNotReady businessName={ctx.row.business_name || null} />;
+    }
+    const { step } = await searchParams;
+    return (
+      <SetupFlow
+        tenantId={ctx.row.id}
+        userId={ctx.user.id}
+        businessName={ctx.row.business_name}
+        initialDraft={ctx.draft}
+        initialVersion={ctx.row.onboarding_draft_version}
+        furthestStep={ctx.row.onboarding_step}
+        requestedStep={step || null}
+        signOut={<OnboardingExit />}
+      />
+    );
   }
 
-  if (!tenantNeedsOnboarding(tenant)) {
+  // Database without the setup migration: previous wizard, previous completion check.
+  const legacyTenant = await getCurrentTenant();
+  if (legacyTenant && tenantNeedsOnboarding(legacyTenant) && !(await memberCan("settings.edit"))) {
+    return <WorkspaceNotReady businessName={legacyTenant.business_name || null} />;
+  }
+  if (!legacyTenant || !tenantNeedsOnboarding(legacyTenant)) {
     redirect("/home");
   }
 
@@ -80,8 +110,8 @@ export default async function OnboardingPage() {
             <OnboardingExit />
           </div>
         </div>
-        <h1 className="mt-8 font-display text-2xl text-ink">
-          Set up {tenant.business_name}
+        <h1 className="mt-8 text-display text-ink">
+          Set up {legacyTenant.business_name}
         </h1>
         <OnboardingWizard />
       </div>

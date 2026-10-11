@@ -21,7 +21,7 @@ function SpeechBubble({
   lead: boolean;
 }) {
   const isCaller = item.speaker === "caller";
-  const who = isCaller ? "Caller" : "Receptionist";
+  const who = isCaller ? "Caller" : "Business Assistant";
   return (
     <div
       className={[

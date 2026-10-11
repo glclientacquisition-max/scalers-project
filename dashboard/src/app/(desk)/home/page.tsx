@@ -400,12 +400,8 @@ async function HomeOverviewBody() {
                         site_visit_required: extra.site_visit_required,
                       };
                     }),
-                    coverage: [
-                      ...(tenant.business_locations || []).map(
-                        (place) => place.landmark || place.address || ""
-                      ),
-                      ...(tenant.business_policies?.coverage_areas || []),
-                    ]
+                    // Areas served only: where the business is located is not where it goes.
+                    coverage: [...(tenant.business_policies?.coverage_areas || [])]
                       .filter(Boolean)
                       .join(", "),
                   })
@@ -457,7 +453,7 @@ async function HomeOverviewBody() {
 
             <RoleGate action="usage.view" mode="hide">
             <section aria-label="Usage" className="border-t border-line px-4 py-4">
-              <p className="font-mono text-sm font-medium text-ink">
+              <p className="text-sm font-medium tabular-nums text-ink">
                 {minutesLeft.toLocaleString("en-KE")} min left
               </p>
               <p className="mt-0.5 text-xs text-ink-soft">{packLabel}</p>

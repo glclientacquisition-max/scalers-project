@@ -7,28 +7,60 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
+const DIR = "dashboard/src/app/onboarding";
+const files = [
+  `${DIR}/SetupFlow.tsx`,
+  `${DIR}/steps/BusinessStep.tsx`,
+  `${DIR}/steps/CatalogueStep.tsx`,
+  `${DIR}/steps/HoursStep.tsx`,
+  `${DIR}/steps/VoiceStep.tsx`,
+  `${DIR}/steps/FaqsStep.tsx`,
+  `${DIR}/steps/AlertsStep.tsx`,
+  `${DIR}/line/page.tsx`,
+  `${DIR}/line/PendingNumber.tsx`,
+  `${DIR}/ConfirmEmailScreen.tsx`,
+  "dashboard/src/app/signup/SignupForm.tsx",
+  "dashboard/src/app/login/page.tsx",
+];
+
 describe("onboarding craft", () => {
-  const page = read("dashboard/src/app/onboarding/page.tsx");
-  const wizard = read("dashboard/src/app/onboarding/OnboardingWizard.tsx");
+  const page = read(`${DIR}/page.tsx`);
+  const flow = read(`${DIR}/SetupFlow.tsx`);
+  const all = files.map((f) => [f, read(f)]);
 
-  it("drops e.g. placeholders and unused tone blurbs", () => {
-    assert.doesNotMatch(wizard, /e\.g\./);
-    assert.doesNotMatch(wizard, /blurb:/);
-    assert.doesNotMatch(wizard, /TONE_OPTIONS/);
-    assert.match(wizard, /TONE_LABELS/);
+  it("has no AI-slop copy or template chrome", () => {
+    for (const [file, src] of all) {
+      // "e.g." only as a hint inside placeholders (owner request), never in body copy.
+      assert.doesNotMatch(src.replace(/placeholder=(\{[^}]*\}|"[^"]*")/g, ""), /e\.g\./, file);
+      assert.doesNotMatch(src, /\bBA\b|Opening your line|Answers you can confirm/, file);
+      assert.doesNotMatch(src, /\b(seamless|effortless|supercharge|leverage|unlock|elevate)\b/i, file);
+      assert.doesNotMatch(src, /\s·\s/, file);
+      assert.doesNotMatch(src, /→/, file);
+      assert.doesNotMatch(src, /uppercase tracking|tracking-widest/, file);
+      assert.doesNotMatch(src, /window\.(confirm|alert)\(/, file);
+    }
   });
 
-  it("keeps step chrome decorative and the card on desk surfaces", () => {
-    const steps = wizard.slice(wizard.indexOf("aria-label=\"Setup progress\""), wizard.indexOf("<form"));
-    assert.match(steps, /<span/);
-    assert.doesNotMatch(steps, /<button/);
-    assert.match(wizard, /rounded-2xl border border-line/);
-    assert.doesNotMatch(wizard, /shadow-\[0_20px/);
+  it("keeps state on the server, steps in the URL, and one primary action in a safe-area bar", () => {
+    assert.match(flow, /saveSetupStepAction/);
+    assert.match(flow, /searchParams\.set\("step"/);
+    assert.match(flow, /popstate/);
+    assert.match(flow, /safe-area-inset-bottom/);
+    // Local copy only for unsaved typing, keyed per workspace + account; server stays the source of truth.
+    assert.match(flow, /draftStorageKey\(tenantId, userId\)/);
   });
 
-  it("offers a muted Sign out exit in the header", () => {
+  it("uses desk motion verbs only and announces progress", () => {
+    // MASTER Motion: no width/route animation, no smooth scroll, no ad-hoc durations.
+    assert.doesNotMatch(flow, /transition-\[width\]|duration-\d|behavior: .smooth|animate-(?!spin)/);
+    assert.match(flow, /pendingSpinnerClass|pending=\{/);
+    assert.match(flow, /role="progressbar"/);
+    assert.match(flow, /tabIndex=\{-1\}/);
+  });
+
+  it("offers a muted Sign out exit and gates on email confirmation", () => {
     assert.match(page, /\/api\/logout/);
     assert.match(page, />\s*Sign out\s*</);
-    assert.match(page, /text-ink-soft/);
+    assert.match(page, /ConfirmEmailScreen/);
   });
 });

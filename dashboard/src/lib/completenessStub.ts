@@ -132,9 +132,9 @@ function productScore(
   });
   if (!named) return 0;
   const avg = scored / named;
-  if (named >= 10) return Math.min(100, avg * 100);
-  if (categories.length >= 3) return Math.min(100, avg * 100 * 0.85);
-  return Math.min(60, avg * 60);
+  // One confirmed, priced item is a complete catalogue (owner decision; matches SQL scorer).
+  void categories;
+  return Math.min(100, avg * 100);
 }
 
 function serviceOk(item: Record<string, unknown>, requireSite = true): boolean {
@@ -173,8 +173,7 @@ function serviceScore(
   });
   if (!ok) return 0;
   const avg = scored / ok;
-  if (ok >= 3) return Math.min(100, avg * 100);
-  return Math.min(50, avg * 50);
+  return Math.min(100, avg * 100);
 }
 
 /** First owner-attested path among aliases (scorer and Settings save used different names). */

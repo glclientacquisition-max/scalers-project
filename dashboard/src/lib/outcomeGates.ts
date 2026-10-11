@@ -103,7 +103,8 @@ export function homeCatalogPasses(services: CaptureService[]): boolean {
     const visit = service.site_visit_required;
     return Boolean(name) && Boolean(mode) && (visit === true || visit === false);
   });
-  return ready.length >= 3;
+  // Owner decision: one service with a price mode and a site-visit answer is enough (same as shops).
+  return ready.length >= 1;
 }
 
 function meridiem(raw: string | undefined): "am" | "pm" | null {
