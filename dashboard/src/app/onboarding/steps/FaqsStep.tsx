@@ -3,7 +3,8 @@
 import { deskShiftClass } from "@/components/ui/deskChrome";
 import { useRef } from "react";
 import { LIMITS, suggestedQuestions, type Vertical, type FaqsStep as Value, type FieldErrors } from "@/lib/setupFlow";
-import { FieldError, TextButton, inputClass } from "./ui";
+import { TextButton } from "./ui";
+import { FieldCard, TextAreaField, TextField } from "@/components/ui/TextField";
 
 export function FaqsStep({
   value,
@@ -50,49 +51,36 @@ export function FaqsStep({
           const qErr = errors[`items.${i}.question`];
           const aErr = errors[`items.${i}.answer`];
           return (
-            <li key={i} className="rounded-2xl bg-surface p-4">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <label htmlFor={`faq-${i}-q`} className="mb-1.5 block text-meta font-medium text-ink">
-                    Question<span className="sr-only"> {i + 1}</span>
-                  </label>
-                  <input
-                    id={`faq-${i}-q`}
-                    data-field={`items.${i}.question`}
-                    value={item.question}
-                    maxLength={LIMITS.question}
-                    onChange={(e) => set(items.map((x, j) => (j === i ? { ...x, question: e.target.value } : x)))}
-                    aria-invalid={qErr ? true : undefined}
-                    aria-describedby={qErr ? `faq-${i}-q-err` : undefined}
-                    className={inputClass}
-                  />
-                  <FieldError id={`faq-${i}-q-err`} message={qErr} />
-                </div>
-                <TextButton tone="danger" label={`Remove question ${i + 1}`} onClick={() => set(items.filter((_, j) => j !== i))}>
-                  Remove
-                </TextButton>
-              </div>
-              <label htmlFor={`faq-${i}-a`} className="mb-1.5 mt-3 block text-meta font-medium text-ink">
-                Answer<span className="sr-only"> to question {i + 1}</span>
-              </label>
-              <textarea
-                id={`faq-${i}-a`}
-                data-field={`items.${i}.answer`}
-                value={item.answer}
-                rows={2}
-                maxLength={LIMITS.answer}
-                autoFocus={focusIndex.current === i && Boolean(item.question) && !item.answer}
-                onChange={(e) => set(items.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)))}
-                aria-invalid={aErr ? true : undefined}
-                aria-describedby={`faq-${i}-a-count${aErr ? ` faq-${i}-a-err` : ""}`}
-                className={`${inputClass} [field-sizing:content] max-h-48 leading-relaxed`}
-              />
-              <div className="flex items-start justify-between gap-2">
-                <FieldError id={`faq-${i}-a-err`} message={aErr} />
-                <p id={`faq-${i}-a-count`} className="ml-auto mt-1.5 text-meta tabular-nums text-ink-3">
-                  {item.answer.length}/{LIMITS.answer}
-                </p>
-              </div>
+            <li key={i} data-faq-card="">
+              <FieldCard
+                title={`Question ${i + 1}`}
+                action={
+                  <TextButton tone="danger" label={`Remove question ${i + 1}`} onClick={() => set(items.filter((_, j) => j !== i))}>
+                    Remove
+                  </TextButton>
+                }
+              >
+                <TextField
+                  id={`faq-${i}-q`}
+                  data-field={`items.${i}.question`}
+                  label={<>Question<span className="sr-only"> {i + 1}</span></>}
+                  value={item.question}
+                  maxLength={LIMITS.question}
+                  error={qErr}
+                  onChange={(e) => set(items.map((x, j) => (j === i ? { ...x, question: e.target.value } : x)))}
+                />
+                <TextAreaField
+                  id={`faq-${i}-a`}
+                  data-field={`items.${i}.answer`}
+                  label={<>Answer<span className="sr-only"> to question {i + 1}</span></>}
+                  value={item.answer}
+                  rows={3}
+                  maxLength={LIMITS.answer}
+                  error={aErr}
+                  autoFocus={focusIndex.current === i && Boolean(item.question) && !item.answer}
+                  onChange={(e) => set(items.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)))}
+                />
+              </FieldCard>
             </li>
           );
         })}

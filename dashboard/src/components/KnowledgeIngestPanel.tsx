@@ -521,7 +521,7 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
           ) : null}
 
           <div className="space-y-1.5">
-            <p className="px-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+            <p className="px-1 text-meta font-medium text-ink-2">
               Keep or replace
             </p>
             <SettingsSegmented

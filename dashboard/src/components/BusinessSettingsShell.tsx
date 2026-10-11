@@ -4,6 +4,20 @@ import type { ReactNode } from "react";
 
 import Link from "next/link";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
+import {
+  ArrowDownTrayIcon,
+  BellIcon,
+  BuildingStorefrontIcon,
+  ClockIcon,
+  DocumentTextIcon,
+  LanguageIcon,
+  MapPinIcon,
+  MicrophoneIcon,
+  PhoneArrowUpRightIcon,
+  QuestionMarkCircleIcon,
+  ShoppingBagIcon,
+  UsersIcon,
+} from "@heroicons/react/24/outline";
 import type { TenantRow } from "@/lib/supabase";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
@@ -46,6 +60,29 @@ function SettingsChevron({ active }: { active: boolean }) {
 const settingsMenuRowClass =
   "flex min-h-11 w-full items-center gap-3 px-3 text-body font-medium text-ink";
 
+/** One icon per section, keyed like the status map. */
+const SETTINGS_ICON: Record<string, typeof ClockIcon> = {
+  "train:identity": BuildingStorefrontIcon,
+  "train:hours": ClockIcon,
+  "train:locations": MapPinIcon,
+  "train:policies": DocumentTextIcon,
+  catalog: ShoppingBagIcon,
+  import: ArrowDownTrayIcon,
+  "train:faqs": QuestionMarkCircleIcon,
+  "train:tools": MicrophoneIcon,
+  "train:pronunciation": LanguageIcon,
+  test: PhoneArrowUpRightIcon,
+  "train:team": UsersIcon,
+  alerts: BellIcon,
+};
+
+/** Statuses that ask the owner to act get the attention colour; the rest stay quiet. */
+const needsAction = (text: string) => /^(needs|not )/i.test(text);
+
+/**
+ * Settings home (phone screen and the md+ right pane) and the md+ rail share this list.
+ * Home rows: icon, name, one plain line, status. Rail rows: name and status only.
+ */
 function SettingsMenu({
   tab,
   trainPanel,
@@ -62,10 +99,18 @@ function SettingsMenu({
     <nav
       aria-label="Settings sections"
       data-settings-menu={variant}
-      className={isRail ? settingsRailClass : "min-w-0 w-full"}
+      className={isRail ? settingsRailClass : "grid min-w-0 w-full gap-6 xl:grid-cols-2 xl:items-start xl:gap-x-8"}
     >
+      {isRail ? (
+        <Link
+          href="/settings"
+          className="mb-4 flex min-h-11 items-center rounded-lg px-1 text-title text-ink hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          Settings
+        </Link>
+      ) : null}
       {SETTINGS_NAV.map((section, index) => (
-        <section key={section.id} className={index === 0 ? undefined : "mt-6"}>
+        <section key={section.id} className={isRail && index > 0 ? "mt-6" : undefined}>
           <h2 className="pointer-events-none mb-2 select-none px-1 text-meta font-medium text-ink-2">
             {section.title}
           </h2>
@@ -82,16 +127,27 @@ function SettingsMenu({
                     aria-current={active ? "page" : undefined}
                     className={[
                       settingsMenuRowClass,
+                      isRail ? "" : "min-h-16",
                       deskShiftClass,
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
                       active ? "bg-accent-tonal" : "hover:bg-surface-2 active:bg-surface-2",
                     ].join(" ")}
                   >
-                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    {isRail ? (
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    ) : (
+                      <>
+                        <SettingsRowIcon statusKey={key} />
+                        <span className="min-w-0 flex-1 py-2">
+                          <span className="block truncate">{item.label}</span>
+                          <span className="block text-meta font-normal text-ink-2">{item.description}</span>
+                        </span>
+                      </>
+                    )}
                     {statusText ? (
                       <span
                         title={status?.title || statusText}
-                        className="max-w-[45%] shrink-0 truncate text-meta font-normal tabular-nums text-ink-2"
+                        className={`max-w-[40%] shrink-0 truncate text-meta font-normal tabular-nums ${needsAction(statusText) ? "text-attention" : "text-ink-2"}`}
                       >
                         {statusText}
                       </span>
@@ -105,6 +161,15 @@ function SettingsMenu({
         </section>
       ))}
     </nav>
+  );
+}
+
+function SettingsRowIcon({ statusKey }: { statusKey: string }) {
+  const Icon = SETTINGS_ICON[statusKey] ?? DocumentTextIcon;
+  return (
+    <span aria-hidden="true" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-tonal text-accent">
+      <Icon className="h-5 w-5" />
+    </span>
   );
 }
 
@@ -185,29 +250,6 @@ export function BusinessSettingsShell({
     JSON.stringify(tenant.social_handles || {}),
   ].join(":");
 
-  if (isMenu) {
-    return (
-      <SettingsLeaveGuard>
-      <div className="w-full min-w-0 md:hidden" data-settings-console="" data-pull-dirty-guard="">
-        <SettingsPageHeader
-          businessName={businessName}
-          lineLive={lineLive}
-          lineDetail={lineDetail}
-          index
-        />
-        <div>
-          <SettingsMenu
-            tab={tab}
-            trainPanel={trainPanel}
-            variant="index"
-            optionStatus={optionStatus}
-          />
-        </div>
-      </div>
-      </SettingsLeaveGuard>
-    );
-  }
-
   const rail = (
     <div className={settingsRailWrapClass}>
       <SettingsMenu
@@ -218,6 +260,33 @@ export function BusinessSettingsShell({
       />
     </div>
   );
+
+  if (isMenu) {
+    // No section chosen: Settings home on every width, full content width (no rail).
+    // Server-rendered with no viewport script, so nothing shifts after paint.
+    return (
+      <SettingsLeaveGuard>
+      <div className="w-full min-w-0" data-settings-console="" data-settings-home="" data-pull-dirty-guard="">
+        <div className="w-full min-w-0">
+          <div className={`${settingsPanelClass} mx-auto w-full md:max-w-3xl md:pt-4 xl:max-w-6xl`}>
+            <SettingsPageHeader
+              businessName={businessName}
+              lineLive={lineLive}
+              lineDetail={lineDetail}
+              index
+            />
+            <SettingsMenu
+              tab={tab}
+              trainPanel={trainPanel}
+              variant="index"
+              optionStatus={optionStatus}
+            />
+          </div>
+        </div>
+      </div>
+      </SettingsLeaveGuard>
+    );
+  }
 
   return (
     <SettingsLeaveGuard>

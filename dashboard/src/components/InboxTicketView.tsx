@@ -518,7 +518,9 @@ export function InboxTicketView({
         <div
           ref={paneRef}
           data-pull-scroll=""
-          className="absolute inset-0 overflow-y-auto lg:contents"
+          tabIndex={0}
+          aria-label="Conversation"
+          className="absolute inset-0 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand lg:contents"
         >
           <aside
             data-ticket-summary=""
@@ -637,7 +639,9 @@ export function InboxTicketView({
             <div
               ref={threadRef}
               data-pull-scroll=""
-              className="space-y-2.5 px-4 py-4 sm:px-6 lg:absolute lg:inset-0 lg:overflow-y-auto"
+              tabIndex={0}
+              aria-label="Transcript"
+              className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand space-y-2.5 px-4 py-4 sm:px-6 lg:absolute lg:inset-0 lg:overflow-y-auto"
             >
               <CallTranscript turns={turns} mode="thread" />
             </div>

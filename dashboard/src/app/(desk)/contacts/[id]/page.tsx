@@ -211,7 +211,7 @@ async function ContactDetailBody({ params, searchParams }: ContactDetailPageProp
                 <Link
                   href={threadsHref}
                   data-contact-inbox-threads=""
-                  className={`text-sm font-medium text-accent ${deskShiftClass} hover:underline focus:outline-none focus:ring-2 focus:ring-brand`}
+                  className={`inline-flex min-h-11 items-center text-body font-medium text-accent ${deskShiftClass} hover:underline focus:outline-none focus:ring-2 focus:ring-brand`}
                 >
                   Inbox threads
                 </Link>
