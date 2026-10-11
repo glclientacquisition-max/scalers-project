@@ -13,10 +13,10 @@ describe("auth craft", () => {
   const form = read("dashboard/src/app/signup/SignupForm.tsx");
 
   it("offers a muted Scalers home link and tokenized login accents", () => {
-    assert.match(login, /href="\/"/);
+    assert.match(login, /marketingHomeHref\(\)/); // host-aware home link (marketing vs app host)
+    assert.match(login, /href=\{homeHref\}/);
     assert.match(login, />\s*Scalers home\s*</);
-    assert.match(login, /text-ink-soft/);
-    assert.match(login, /text-accent-deep/);
+    assert.match(login, /text-ink-2/); // Frontend 2.0 ink tokens
     assert.doesNotMatch(login, /text-\[#005CCC\]/);
   });
 

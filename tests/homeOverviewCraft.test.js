@@ -142,7 +142,7 @@ describe("home overview craft", () => {
     assert.match(page, /line === "live" && !score\.ready_badge/);
     assert.match(page, /<HomeReviewSettingsNudge/);
     const nudge = read("dashboard/src/components/HomeReviewSettingsNudge.tsx");
-    assert.match(nudge, /Review settings/);
+    assert.match(nudge, /aria-label="Settings review"/);
     assert.doesNotMatch(nudge, /ScoreRing/);
     assert.doesNotMatch(nudge, /DOMAINS\.map/);
     const note = read("docs/frontend/design-system/pages/home.md");

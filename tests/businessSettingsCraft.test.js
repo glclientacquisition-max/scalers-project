@@ -450,7 +450,6 @@ describe("business settings craft", () => {
     assert.match(coach, /fixHasUsePrimary/);
     assert.match(form, /settingsGhostButtonClass/);
     assert.match(form, /Add service/);
-    assert.match(form, /Add 3 blank rows/);
     assert.match(save, /min-h-11/);
     assert.doesNotMatch(save, /min-h-14/);
     assert.doesNotMatch(save, /w-full/);
@@ -512,8 +511,7 @@ describe("business settings craft", () => {
     assert.match(form, /id="business_name"[\s\S]{0,240}title=\{businessName/);
     assert.match(ui, /title=\{businessName\}/);
     assert.match(ui, /break-words text-sm font-medium text-ink/);
-    assert.match(shell, /title=\{status\}/);
-    assert.match(form, /title="Add 3 blank rows"/);
+    assert.match(shell, /title=\{status\?\.title \|\| statusText\}/); // truncated status keeps its full text on hover
   });
 
   it("packs Profile sub-strips instead of stretching them across the pane", () => {
