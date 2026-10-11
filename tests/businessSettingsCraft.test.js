@@ -13,7 +13,6 @@ function loadSettingsNav() {
   const script = `
     import {
       SETTINGS_NAV,
-      settingsWideDefaultHref,
       businessSettingsHref,
       parseBusinessSettingsPanel,
     } from ${JSON.stringify(nav)};
@@ -25,11 +24,6 @@ function loadSettingsNav() {
     console.log(JSON.stringify({
       sections,
       labels: sections.flatMap((section) => section.labels),
-      hoursWide: settingsWideDefaultHref(undefined, "1"),
-      phoneIndex: settingsWideDefaultHref(undefined, "0"),
-      missingCookie: settingsWideDefaultHref(undefined, undefined),
-      trainStays: settingsWideDefaultHref("train", "1"),
-      testStays: settingsWideDefaultHref("test", "1"),
       trainHref: businessSettingsHref("train"),
       testHref: businessSettingsHref("test"),
       trainPanel: parseBusinessSettingsPanel(undefined, "train"),
@@ -159,7 +153,7 @@ describe("business settings craft", () => {
     assert.match(ui, /settingsBlockTitleClass =\s*"text-meta font-medium text-ink-2"/);
     assert.match(ui, /pointer-events-none/);
     assert.match(shell, /data-settings-menu=\{variant\}/);
-    assert.match(shell, /md:hidden/);
+    assert.match(shell, /data-settings-home=""/);
     assert.match(shell, /SettingsChevron/);
     assert.match(shell, /min-h-11/);
     assert.match(shell, /variant: "index" \| "rail"/);
@@ -394,39 +388,32 @@ describe("business settings craft", () => {
     assert.equal(people.id, "people");
     assert.notEqual(people.id, "alerts");
     assert.equal(got.sections.some((section) => section.title === "How we notify" || section.title === "Alerts" || section.id === "alerts"), false);
-    assert.equal(got.hoursWide, "/settings?tab=train&panel=hours");
-    assert.equal(got.phoneIndex, null);
-    assert.equal(got.missingCookie, null);
-    assert.equal(got.trainStays, null);
-    assert.equal(got.testStays, null);
     assert.equal(got.trainHref, "/settings?tab=train");
     assert.equal(got.testHref, "/settings?tab=test");
     assert.equal(got.trainPanel, "identity");
   });
 
-  it("opens wide /settings on Hours and does not mount Identity on the index", () => {
-    const boot = read("dashboard/src/lib/deskMdBoot.ts");
+  it("shows the Settings home on every width with no auto-open, and deep links still land", () => {
     const layout = read("dashboard/src/app/layout.tsx");
+    assert.equal(fs.existsSync(path.join(__dirname, "../dashboard/src/lib/deskMdBoot.ts")), false);
+    assert.equal(fs.existsSync(path.join(__dirname, "../dashboard/src/components/SettingsWideOpen.tsx")), false);
+    assert.doesNotMatch(layout, /DESK_MD_BOOT_SCRIPT/);
+    assert.doesNotMatch(page, /settingsWideDefaultHref|desk-md|DESK_MD_COOKIE/);
+    assert.doesNotMatch(nav, /SETTINGS_HOURS_HREF|settingsWideDefaultHref/);
+    assert.match(page, /parseBusinessSettingsPanel\(panelRaw, tabRaw\)/);
+    for (const item of nav.match(/\{ label: "[^"]+", description: "[^"]+"/g) || []) assert.ok(item.length < 120, item);
+    assert.equal((nav.match(/description: "/g) || []).length, 12);
     const activeFn = nav.slice(
       nav.indexOf("export function settingsNavItemActive"),
       nav.indexOf("export function settingsNavItems")
     );
-    const menu = shell.slice(shell.indexOf("if (isMenu)"), shell.indexOf("const rail ="));
-    assert.match(page, /settingsWideDefaultHref/);
-    assert.ok(page.indexOf("settingsWideDefaultHref") < page.indexOf("getCurrentTenant()"));
-    assert.match(page, /if \(!tabRaw\)/);
-    assert.match(nav, /export const SETTINGS_HOURS_HREF = businessSettingsHref\("train", "hours"\)/);
-    assert.match(nav, /if \(deskMd !== "1"\) return null/);
-    assert.match(boot, /min-width: 768px/);
-    assert.match(boot, /location\.search/);
-    assert.match(boot, /SETTINGS_HOURS_HREF/);
-    assert.match(layout, /DESK_MD_BOOT_SCRIPT/);
+    const menu = shell.slice(shell.indexOf("if (isMenu)"), shell.indexOf("data-desk-nested"));
     assert.doesNotMatch(shell, /SettingsIdentityRedirect/);
     assert.doesNotMatch(shell, /panel=identity/);
     assert.doesNotMatch(shell, /panel="identity"/);
     assert.doesNotMatch(shell, /selectHubIdentity/);
     assert.doesNotMatch(menu, /TenantForm/);
-    assert.match(menu, /md:hidden/);
+    assert.match(menu, /<SettingsMenu[\s\S]*variant="index"/);
     assert.match(activeFn, /tab === "train" && trainPanel === target\.panel/);
     assert.doesNotMatch(activeFn, /selectHubIdentity/);
     assert.doesNotMatch(shell, /selectHubAppearance/);

@@ -4,12 +4,25 @@ import type { ReactNode } from "react";
 
 import Link from "next/link";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
+import {
+  ArrowDownTrayIcon,
+  BellIcon,
+  BuildingStorefrontIcon,
+  ClockIcon,
+  DocumentTextIcon,
+  LanguageIcon,
+  MapPinIcon,
+  MicrophoneIcon,
+  PhoneArrowUpRightIcon,
+  QuestionMarkCircleIcon,
+  ShoppingBagIcon,
+  UsersIcon,
+} from "@heroicons/react/24/outline";
 import type { TenantRow } from "@/lib/supabase";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
 import { CatalogImportPanel } from "@/components/CatalogImportPanel";
 import { SettingsLeaveGuard } from "@/components/SettingsLeaveGuard";
-import { SettingsWideOpen } from "@/components/SettingsWideOpen";
 import { TenantForm } from "@/components/TenantForm";
 import { TestLinePanel } from "@/components/TestLinePanel";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
@@ -47,6 +60,29 @@ function SettingsChevron({ active }: { active: boolean }) {
 const settingsMenuRowClass =
   "flex min-h-11 w-full items-center gap-3 px-3 text-body font-medium text-ink";
 
+/** One icon per section, keyed like the status map. */
+const SETTINGS_ICON: Record<string, typeof ClockIcon> = {
+  "train:identity": BuildingStorefrontIcon,
+  "train:hours": ClockIcon,
+  "train:locations": MapPinIcon,
+  "train:policies": DocumentTextIcon,
+  catalog: ShoppingBagIcon,
+  import: ArrowDownTrayIcon,
+  "train:faqs": QuestionMarkCircleIcon,
+  "train:tools": MicrophoneIcon,
+  "train:pronunciation": LanguageIcon,
+  test: PhoneArrowUpRightIcon,
+  "train:team": UsersIcon,
+  alerts: BellIcon,
+};
+
+/** Statuses that ask the owner to act get the attention colour; the rest stay quiet. */
+const needsAction = (text: string) => /^(needs|not )/i.test(text);
+
+/**
+ * Settings home (phone screen and the md+ right pane) and the md+ rail share this list.
+ * Home rows: icon, name, one plain line, status. Rail rows: name and status only.
+ */
 function SettingsMenu({
   tab,
   trainPanel,
@@ -83,16 +119,27 @@ function SettingsMenu({
                     aria-current={active ? "page" : undefined}
                     className={[
                       settingsMenuRowClass,
+                      isRail ? "" : "min-h-16",
                       deskShiftClass,
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
                       active ? "bg-accent-tonal" : "hover:bg-surface-2 active:bg-surface-2",
                     ].join(" ")}
                   >
-                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    {isRail ? (
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    ) : (
+                      <>
+                        <SettingsRowIcon statusKey={key} />
+                        <span className="min-w-0 flex-1 py-2">
+                          <span className="block truncate">{item.label}</span>
+                          <span className="block text-meta font-normal text-ink-2">{item.description}</span>
+                        </span>
+                      </>
+                    )}
                     {statusText ? (
                       <span
                         title={status?.title || statusText}
-                        className="max-w-[45%] shrink-0 truncate text-meta font-normal tabular-nums text-ink-2"
+                        className={`max-w-[40%] shrink-0 truncate text-meta font-normal tabular-nums ${needsAction(statusText) ? "text-attention" : "text-ink-2"}`}
                       >
                         {statusText}
                       </span>
@@ -106,6 +153,15 @@ function SettingsMenu({
         </section>
       ))}
     </nav>
+  );
+}
+
+function SettingsRowIcon({ statusKey }: { statusKey: string }) {
+  const Icon = SETTINGS_ICON[statusKey] ?? DocumentTextIcon;
+  return (
+    <span aria-hidden="true" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-tonal text-accent">
+      <Icon className="h-5 w-5" />
+    </span>
   );
 }
 
@@ -148,7 +204,6 @@ export function BusinessSettingsShell({
   optionStatus = {},
   liveTransferExecutor = false,
   membersSlot = null,
-  wideOpenHref,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -157,8 +212,6 @@ export function BusinessSettingsShell({
   optionStatus?: Record<string, SettingsListStatus>;
   liveTransferExecutor?: boolean;
   membersSlot?: ReactNode;
-  /** Where md+ lands from the bare list. Defaults to Hours. */
-  wideOpenHref?: string;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
@@ -187,30 +240,6 @@ export function BusinessSettingsShell({
     JSON.stringify(tenant.social_handles || {}),
   ].join(":");
 
-  if (isMenu) {
-    return (
-      <SettingsLeaveGuard>
-      <SettingsWideOpen href={wideOpenHref} />
-      <div className="w-full min-w-0 md:hidden" data-settings-console="" data-pull-dirty-guard="">
-        <SettingsPageHeader
-          businessName={businessName}
-          lineLive={lineLive}
-          lineDetail={lineDetail}
-          index
-        />
-        <div>
-          <SettingsMenu
-            tab={tab}
-            trainPanel={trainPanel}
-            variant="index"
-            optionStatus={optionStatus}
-          />
-        </div>
-      </div>
-      </SettingsLeaveGuard>
-    );
-  }
-
   const rail = (
     <div className={settingsRailWrapClass}>
       <SettingsMenu
@@ -221,6 +250,33 @@ export function BusinessSettingsShell({
       />
     </div>
   );
+
+  if (isMenu) {
+    // No section chosen: Settings home on every width. md+ keeps the rail beside it.
+    return (
+      <SettingsLeaveGuard>
+      <div className="w-full min-w-0" data-settings-console="" data-settings-home="" data-pull-dirty-guard="">
+        <div className={settingsConsoleClass}>
+          {rail}
+          <div className={`${settingsPanelClass} md:max-w-2xl md:pt-4`}>
+            <SettingsPageHeader
+              businessName={businessName}
+              lineLive={lineLive}
+              lineDetail={lineDetail}
+              index
+            />
+            <SettingsMenu
+              tab={tab}
+              trainPanel={trainPanel}
+              variant="index"
+              optionStatus={optionStatus}
+            />
+          </div>
+        </div>
+      </div>
+      </SettingsLeaveGuard>
+    );
+  }
 
   return (
     <SettingsLeaveGuard>

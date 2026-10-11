@@ -75,7 +75,6 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             <DeskPhonePull />
           </Suspense>
           <BusinessSettingsShell
-            wideOpenHref="/dev/settings-jobs?tab=train&panel=hours"
             tenant={tenant}
             tab={tab}
             trainPanel={trainPanel}
