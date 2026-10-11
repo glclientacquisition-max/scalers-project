@@ -1,26 +1,17 @@
 import Link from "next/link";
 import { BrandWordmark } from "@/components/brand/BrandMark";
-import { ThemeDock } from "@/components/ThemePicker";
 import { marketingHomeHref } from "@/lib/adminHost";
 import { SignupForm } from "./SignupForm";
 
 export default function SignupPage() {
   return (
-    <main className="flex min-h-dvh items-center justify-center px-6 py-16">
+    <main className="flex min-h-dvh justify-center px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2.5rem,env(safe-area-inset-top))] sm:items-center sm:py-16">
       <div className="w-full max-w-md">
-        <div className="flex items-start justify-between gap-3">
-          <BrandWordmark href={marketingHomeHref()} context="New workspace" variant="lockup" priority />
-          <ThemeDock />
-        </div>
-        <h1 className="sr-only">Create a Scalers workspace</h1>
-
-        <div className="mt-8">
-          <SignupForm />
-        </div>
-
-        <p className="mt-6 text-sm text-ink-soft">
+        <BrandWordmark href={marketingHomeHref()} context="New account" variant="lockup" priority />
+        <SignupForm />
+        <p className="mt-8 text-meta text-ink-2">
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-accent-deep hover:underline">
+          <Link href="/login" className="inline-flex min-h-11 items-center font-medium text-accent-deep underline-offset-2 hover:underline">
             Sign in
           </Link>
         </p>

@@ -52,6 +52,9 @@ describe("outcome gates", () => {
       ]),
       true
     );
+    // Owner decision: one ready service is enough, same as shops.
+    assert.equal(homeCatalogPasses([{ name: "Deep clean", pricing_mode: "from", site_visit_required: true }]), true);
+    assert.equal(homeCatalogPasses([{ name: "Deep clean", pricing_mode: "from" }]), false);
   });
 });
 
