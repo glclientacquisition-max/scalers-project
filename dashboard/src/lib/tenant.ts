@@ -111,19 +111,28 @@ export const listOwnerWorkspaces = cache(async (): Promise<OwnerWorkspace[]> => 
   return ids.map((id) => ({ id, business_name: names.get(id) || null }));
 });
 
+/**
+ * The signed-in user's memberships, oldest first, read once per request.
+ * The shell, the page, and every role check share this one round trip.
+ */
+export const memberRowsForUser = cache(
+  async (userId: string): Promise<Array<{ tenant_id: string; role: string | null }>> => {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("tenant_members")
+      .select("tenant_id, role")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data || []).filter((row): row is { tenant_id: string; role: string | null } => Boolean(row?.tenant_id));
+  }
+);
+
 export async function ownerTenantId(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   userId: string
 ): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("tenant_members")
-    .select("tenant_id")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  const ids = (data || [])
-    .map((row) => row.tenant_id)
-    .filter((id): id is string => Boolean(id));
+  const ids = (await memberRowsForUser(userId)).map((row) => row.tenant_id);
   if (!ids.length) return null;
   const picked = (await cookies()).get(DESK_TENANT_COOKIE)?.value || "";
   if (picked && ids.includes(picked)) return picked;
