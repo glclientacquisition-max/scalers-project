@@ -244,3 +244,50 @@ export function timeOfDay(at: Date | string, tz = "Africa/Nairobi"): string {
   const h = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: tz }).format(new Date(at))) % 24;
   return (taxonomy.time_of_day.find((b) => h >= b.from && h < b.to) || taxonomy.time_of_day[0]).id;
 }
+
+/* ---------------- keeping typed prices in step with the text ---------------- */
+
+const num = (v: unknown): number | null => {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 && n <= MAX_KSH ? Math.round(n) : null;
+};
+
+/** Accepts only a well-formed typed price; anything else is dropped (and re-derived). */
+export function sanitizePricing(raw: unknown): StructuredPrice | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const mode = String(r.mode || "");
+  if (!["fixed", "from", "range", "ask"].includes(mode)) return null;
+  const unit = typeof r.unit === "string" && UNITS.some((u) => u.id === r.unit) ? r.unit : null;
+  return {
+    mode: mode as PricingMode,
+    amount_ksh: num(r.amount_ksh),
+    min_ksh: num(r.min_ksh),
+    max_ksh: num(r.max_ksh),
+    unit,
+    in_stock: typeof r.in_stock === "boolean" ? r.in_stock : null,
+    source: r.source === "parsed" ? "parsed" : "owner",
+    confirmed: r.confirmed === true,
+    ...(typeof r.parsed_from === "string" && r.parsed_from ? { parsed_from: r.parsed_from.slice(0, 120) } : {}),
+  };
+}
+
+/**
+ * Typed price for an item saved from Settings. Unchanged text keeps the stored typed price
+ * (and its confirmation); new text is read now. The owner just typed it, so a clear amount is
+ * trusted; text we can't read ("depends on size") stays unconfirmed and gets an "Is this right?" card.
+ */
+export function syncPricing(item: { pricing?: unknown; unit?: string }, text: string, inStockRaw: unknown): StructuredPrice {
+  const prev = sanitizePricing(item.pricing);
+  const stock = stockBool(inStockRaw);
+  const t = String(text || "").trim();
+  if (prev && (t === (prev.parsed_from || "") || t === priceLabel(prev) || (!t && prev.mode === "ask"))) {
+    return { ...prev, in_stock: stock ?? prev.in_stock };
+  }
+  const parsed = parsePriceText(t);
+  const unitWord = String(item.unit || "").trim().toLowerCase();
+  const unit = parsed.unit || UNITS.find((u) => u.id === unitWord || u.label === unitWord)?.id || null;
+  const readable = parsed.mode !== "ask" || /^(ask|call|varies|on request)\b/i.test(t);
+  return { ...parsed, unit, in_stock: stock, source: "owner", confirmed: readable && Boolean(t) };
+}
