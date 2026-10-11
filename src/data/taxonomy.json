@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "business_types": [
+    { "id": "retail", "label": "Shop", "categories": [
+      { "id": "phones_electronics", "label": "Phones and electronics" },
+      { "id": "fashion", "label": "Clothes and shoes" },
+      { "id": "beauty", "label": "Beauty and cosmetics" },
+      { "id": "books_stationery", "label": "Books and stationery" },
+      { "id": "hardware", "label": "Hardware and building" },
+      { "id": "grocery", "label": "Groceries and food" },
+      { "id": "pharmacy", "label": "Pharmacy and health" },
+      { "id": "furniture_home", "label": "Furniture and home" },
+      { "id": "auto_parts", "label": "Auto parts" },
+      { "id": "other_retail", "label": "Other shop" }
+    ] },
+    { "id": "home_services", "label": "Home services", "categories": [
+      { "id": "cleaning", "label": "Cleaning" },
+      { "id": "plumbing", "label": "Plumbing" },
+      { "id": "electrical", "label": "Electrical" },
+      { "id": "pest_control", "label": "Pest control" },
+      { "id": "appliance_repair", "label": "Appliance repair" },
+      { "id": "painting_renovation", "label": "Painting and renovation" },
+      { "id": "moving", "label": "Moving" },
+      { "id": "gardening", "label": "Gardening" },
+      { "id": "security_installs", "label": "CCTV and security" },
+      { "id": "other_service", "label": "Other service" }
+    ] },
+    { "id": "general", "label": "Other business", "categories": [
+      { "id": "other", "label": "Other" }
+    ] }
+  ],
+  "pricing_modes": [
+    { "id": "fixed", "label": "Fixed" },
+    { "id": "from", "label": "From" },
+    { "id": "range", "label": "Range" },
+    { "id": "ask", "label": "Ask" }
+  ],
+  "units": [
+    { "id": "item", "label": "each" },
+    { "id": "pack", "label": "pack" },
+    { "id": "kg", "label": "kg" },
+    { "id": "litre", "label": "litre" },
+    { "id": "metre", "label": "metre" },
+    { "id": "hour", "label": "hour" },
+    { "id": "visit", "label": "visit" },
+    { "id": "job", "label": "job" },
+    { "id": "room", "label": "room" },
+    { "id": "sqm", "label": "m²" },
+    { "id": "seat", "label": "seat" }
+  ],
+  "intents": [
+    { "id": "price_check", "label": "Price check" },
+    { "id": "availability", "label": "In stock or available" },
+    { "id": "product_info", "label": "Product or service details" },
+    { "id": "order_place", "label": "Wants to order" },
+    { "id": "order_status", "label": "Order follow-up" },
+    { "id": "hold_or_pickup", "label": "Hold or pickup" },
+    { "id": "book_visit", "label": "Book a visit" },
+    { "id": "quote_request", "label": "Quote" },
+    { "id": "delivery_question", "label": "Delivery" },
+    { "id": "payment_question", "label": "Payment" },
+    { "id": "directions", "label": "Directions" },
+    { "id": "hours", "label": "Opening hours" },
+    { "id": "complaint", "label": "Complaint" },
+    { "id": "return_refund", "label": "Return or refund" },
+    { "id": "warranty", "label": "Warranty or repair" },
+    { "id": "emergency", "label": "Emergency" },
+    { "id": "human_request", "label": "Asked for a person" },
+    { "id": "general_enquiry", "label": "General question" },
+    { "id": "wrong_number", "label": "Wrong number" },
+    { "id": "spam", "label": "Spam" },
+    { "id": "other", "label": "Other" }
+  ],
+  "legacy_intents": {
+    "hours_open": "hours",
+    "product_inquiry": "product_info",
+    "price": "price_check",
+    "booking": "book_visit",
+    "order_enquiry": "order_status",
+    "human": "human_request",
+    "availability": "availability",
+    "directions": "directions",
+    "general_enquiry": "general_enquiry",
+    "complaint": "complaint",
+    "emergency": "emergency",
+    "hold_or_pickup": "hold_or_pickup",
+    "book_visit": "book_visit",
+    "other": "other"
+  },
+  "outcomes": [
+    { "id": "sale_or_order", "label": "Order taken" },
+    { "id": "hold", "label": "Item held" },
+    { "id": "booking", "label": "Visit booked" },
+    { "id": "callback", "label": "Callback needed" },
+    { "id": "info_only", "label": "Answered" },
+    { "id": "transferred", "label": "Passed to a person" },
+    { "id": "lost", "label": "Lost sale" },
+    { "id": "abandoned", "label": "Hung up" }
+  ],
+  "lost_reasons": [
+    { "id": "price_too_high", "label": "Price too high" },
+    { "id": "out_of_stock", "label": "Out of stock" },
+    { "id": "not_offered", "label": "We don't offer it" },
+    { "id": "outside_coverage", "label": "Outside our area" },
+    { "id": "closed_hours", "label": "We were closed" },
+    { "id": "delivery_fee", "label": "Delivery fee or time" },
+    { "id": "wanted_human", "label": "Wanted a person" },
+    { "id": "competitor", "label": "Went elsewhere" },
+    { "id": "other", "label": "Other" }
+  ],
+  "sentiments": [
+    { "id": "positive", "label": "Positive" },
+    { "id": "neutral", "label": "Neutral" },
+    { "id": "negative", "label": "Negative" }
+  ],
+  "languages": [
+    { "id": "en", "label": "English" },
+    { "id": "sw", "label": "Swahili" },
+    { "id": "sheng", "label": "Sheng" },
+    { "id": "mixed", "label": "Mixed" }
+  ],
+  "sheng_markers": ["niaje", "sasa", "poa", "mbogi", "doh", "ganji", "manze", "maze", "fiti", "msee", "wasee", "form", "rada", "bazu", "ngori", "si unajua", "chapaa", "mullah", "keja", "ndai", "nduthi"],
+  "swahili_markers": ["habari", "bei", "ngapi", "naomba", "nataka", "asante", "karibu", "tafadhali", "iko", "kuna", "duka", "pesa", "leo", "kesho", "saa", "mimi", "wewe", "sawa", "ndio", "hapana"],
+  "time_of_day": [
+    { "id": "night", "label": "Night", "from": 0, "to": 6 },
+    { "id": "morning", "label": "Morning", "from": 6, "to": 12 },
+    { "id": "afternoon", "label": "Afternoon", "from": 12, "to": 17 },
+    { "id": "evening", "label": "Evening", "from": 17, "to": 24 }
+  ],
+  "payment_methods": [
+    { "id": "mpesa_till", "label": "M-Pesa Till" },
+    { "id": "mpesa_paybill", "label": "M-Pesa Paybill" },
+    { "id": "mpesa_send", "label": "M-Pesa Send Money" },
+    { "id": "cash", "label": "Cash" },
+    { "id": "card", "label": "Card" },
+    { "id": "bank", "label": "Bank transfer" }
+  ],
+  "payment_timing": [
+    { "id": "before_delivery", "label": "Before delivery" },
+    { "id": "on_delivery", "label": "On delivery" },
+    { "id": "after_service", "label": "After the job" },
+    { "id": "deposit_then_balance", "label": "Deposit, then balance" }
+  ]
+}

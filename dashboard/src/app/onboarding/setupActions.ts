@@ -1,5 +1,6 @@
 "use server";
 
+import { parsePaymentsText } from "@/lib/structuredData";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/auth";
@@ -218,6 +219,7 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     agent_tone: voice.tone,
     agent_name: voice.agentName,
     vertical,
+    business_type: vertical,
     handoff_mode: voice.handoff,
     business_locations: locations,
     faqs,
@@ -233,8 +235,14 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
   };
   if (hoursOn) patch.hours_schedule = hoursSchedule(draft.hours.days, draft.business.landmark);
   if (teamDirectory.length) patch.team_directory = teamDirectory;
+  // Typed payments read from the owner's own FAQ answer; Settings asks "Is this right?" before it's trusted.
+  const parsedPayments = fromFaqs.payment ? parsePaymentsText(fromFaqs.payment) : null;
   if (Object.keys(fromFaqs).length) {
-    patch.business_policies = { ...(row.business_policies && typeof row.business_policies === "object" ? row.business_policies : {}), ...fromFaqs };
+    patch.business_policies = {
+      ...(row.business_policies && typeof row.business_policies === "object" ? row.business_policies : {}),
+      ...fromFaqs,
+      ...(parsedPayments ? { payments: parsedPayments } : {}),
+    };
   }
 
   const { data: updated, error } = await auth.client

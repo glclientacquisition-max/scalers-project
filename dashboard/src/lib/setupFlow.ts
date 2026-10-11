@@ -4,6 +4,7 @@
  * tests share one contract.
  */
 
+import { priceFromSetup } from "./structuredData";
 import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/mobile";
 
 export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
@@ -549,6 +550,7 @@ export function catalogueForTenant(step: CatalogueStep, vertical: Vertical) {
         name: r.name,
         price_range: priceText(r),
         pricing_mode: r.pricing_mode || "ask",
+        pricing: priceFromSetup(r, "job"),
         site_visit_required: r.site_visit === "yes",
         notes: r.notes,
         category: r.category,
@@ -566,6 +568,7 @@ export function catalogueForTenant(step: CatalogueStep, vertical: Vertical) {
       category: r.category,
       price: priceText(r),
       price_mode: r.pricing_mode || "ask",
+      pricing: priceFromSetup(r),
       notes: r.notes,
       source: "owner",
     })),
