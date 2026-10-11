@@ -56,3 +56,14 @@ Telephony wallet: `POST /internal/telephony/wallet-probe` with the same secret.
 - Public status page
 - Per-call ops SMS
 - Merging into owner `speechOutageNotify`
+
+## Desk scheduled check (Admin notices)
+
+Separate from the Voice alerts above. Desk opens and resolves `platform_ops_notices` and emails the Admin list from a Vercel cron, not from page load.
+
+- Route: `dashboard/src/app/api/cron/ops-alerts/route.ts`, scheduled `*/10 * * * *` in `dashboard/vercel.json`. Vercel runs crons on the production deployment of each project only.
+- Auth: `Authorization: Bearer $CRON_SECRET`. No `CRON_SECRET` (or one under 16 characters) means every call gets 401.
+- Once per notice: the run claims `notified_at` (null to now) before it sends; a failed send releases the claim. Recovery mail goes once, from the run that resolves the notice, and only if the opening alert was sent. Acked notices are not mailed.
+- Dry run: `OPS_ALERTS_DRY_RUN` unset or anything but `false` sends nothing and claims nothing, so the first live run still sends each open notice once. Missing `RESEND_API_KEY` / `OPS_EMAIL_FROM` also counts as dry run.
+- Recipients: `platform_ops_settings` row only (people emails, else `emails`). No `SCALERS_OPS_ALERT_EMAILS` fallback here.
+- Admin Today and Platform only read notices; neither sends.
