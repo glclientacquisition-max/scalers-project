@@ -2,6 +2,10 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
+import { notify } from "@/components/ui/DeskNotice";
+import { transferConfirmMatches } from "@/lib/memberConfirm";
 import {
   changeMemberRoleAction,
   inviteMemberAction,
@@ -34,13 +38,35 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
   const canInvite = roles.length > 0;
   const { seats } = data;
 
-  function run(fn: () => Promise<MembersActionResult>, confirmText?: string) {
-    if (confirmText && !window.confirm(confirmText)) return;
+  const router = useRouter();
+  type Pending = { title: string; body: React.ReactNode; confirmLabel: string; danger?: boolean; typeToConfirm?: string; fn: () => Promise<MembersActionResult>; refreshAll?: boolean };
+  const [confirming, setConfirming] = useState<Pending | null>(null);
+  const [typed, setTyped] = useState("");
+
+  /** Runs an action and ALWAYS surfaces the outcome: inline + desk toast (survives a re-render/remount). */
+  function run(fn: () => Promise<MembersActionResult>, opts?: { refreshAll?: boolean; onDone?: () => void }) {
     start(async () => {
-      const result = await fn();
+      let result: MembersActionResult;
+      try {
+        result = await fn();
+      } catch {
+        result = { error: "Something went wrong. Nothing was changed. Try again." };
+      }
+      if (!result.ok && !result.error) result = { ...result, error: "Something went wrong. Try again." };
       setFlash(result);
-      if (result.ok) setEmail("");
+      notify(result.error || result.message || "Done.");
+      opts?.onDone?.();
+      if (result.ok) {
+        setEmail("");
+        // Roles changed (e.g. you're now an Admin): reload server data so nav and controls match.
+        if (opts?.refreshAll) router.refresh();
+      }
     });
+  }
+
+  function ask(p: Pending) {
+    setTyped("");
+    setConfirming(p);
   }
 
   return (
@@ -92,10 +118,26 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
                   className={settingsActionClass}
                   disabled={pending}
                   onClick={() =>
-                    run(
-                      () => transferOwnershipAction(m.userId),
-                      `Make ${m.email} the owner? You'll become an Admin.`
-                    )
+                    ask({
+                      title: `Make ${m.name || m.email} the owner?`,
+                      confirmLabel: "Transfer ownership",
+                      danger: true,
+                      typeToConfirm: m.email,
+                      refreshAll: true,
+                      fn: () => transferOwnershipAction(m.userId),
+                      body: (
+                        <div className="space-y-2" data-transfer-consequences="">
+                          <p>
+                            <strong className="text-ink">{m.email}</strong> becomes the owner of this business. This takes effect straight away.
+                          </p>
+                          <ul className="list-disc space-y-1 pl-5">
+                            <li>You become an <strong className="text-ink">Admin</strong>. You keep access to the inbox, settings, usage and top-ups.</li>
+                            <li>You can no longer transfer ownership. Only the new owner can, including giving it back to you.</li>
+                            <li>The new owner holds the account and its billing. They can change your role or remove you.</li>
+                          </ul>
+                        </div>
+                      ),
+                    })
                   }
                 >
                   Make owner
@@ -106,7 +148,15 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
                   type="button"
                   className={settingsActionClass}
                   disabled={pending}
-                  onClick={() => run(() => removeMemberAction(m.userId), `Remove ${m.email}? They lose access right away.`)}
+                  onClick={() =>
+                    ask({
+                      title: `Remove ${m.name || m.email}?`,
+                      confirmLabel: "Remove",
+                      danger: true,
+                      fn: () => removeMemberAction(m.userId),
+                      body: <p>They lose access right away and their seat is freed. You can invite them again later.</p>,
+                    })
+                  }
                 >
                   Remove
                 </button>
@@ -131,7 +181,14 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
                   type="button"
                   className={settingsActionClass}
                   disabled={pending}
-                  onClick={() => run(() => revokeInviteAction(i.id), `Cancel the invite to ${i.email}?`)}
+                  onClick={() =>
+                    ask({
+                      title: `Cancel the invite to ${i.email}?`,
+                      confirmLabel: "Cancel invite",
+                      fn: () => revokeInviteAction(i.id),
+                      body: <p>The link in their email stops working and the seat is freed.</p>,
+                    })
+                  }
                 >
                   Revoke
                 </button>
@@ -191,6 +248,40 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
           {flash.error || flash.message}
         </p>
       ) : null}
+
+      <ConfirmSheet
+        open={!!confirming}
+        title={confirming?.title || ""}
+        confirmLabel={confirming?.confirmLabel || "Confirm"}
+        danger={confirming?.danger}
+        pending={pending}
+        confirmDisabled={!!confirming?.typeToConfirm && !transferConfirmMatches(typed, confirming.typeToConfirm)}
+        onClose={() => setConfirming(null)}
+        onConfirm={() => {
+          const c = confirming;
+          if (!c) return;
+          run(c.fn, { refreshAll: c.refreshAll, onDone: () => setConfirming(null) });
+        }}
+      >
+        {confirming?.body}
+        {confirming?.typeToConfirm ? (
+          <div className="mt-4">
+            <label htmlFor="confirm-type" className="block text-sm font-medium text-ink">
+              Type <span className="font-mono">{confirming.typeToConfirm}</span> to confirm
+            </label>
+            <input
+              id="confirm-type"
+              type="text"
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              className={settingsFieldClass}
+            />
+          </div>
+        ) : null}
+      </ConfirmSheet>
 
       <p className={`${settingsBlockTitleClass} px-1 pt-4`}>Alert contacts</p>
     </section>

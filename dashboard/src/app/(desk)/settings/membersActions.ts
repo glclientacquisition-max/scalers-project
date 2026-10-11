@@ -215,10 +215,13 @@ export async function transferOwnershipAction(newOwnerUserId: string): Promise<M
   if (denied) return denied;
   const ctx = await context();
   if (!ctx.ok) return { error: ctx.error };
+  const target = String(newOwnerUserId || "").trim();
+  if (!target) return { error: "Pick who should become the owner." };
+  if (target === ctx.userId) return { error: "You're already the owner." };
   const { error } = await getSupabaseAdmin().rpc("transfer_tenant_ownership", {
     p_tenant: ctx.tenantId,
     p_actor: ctx.userId,
-    p_new_owner: newOwnerUserId,
+    p_new_owner: target,
   });
   if (error) return { error: inviteErrorCopy(error.message) };
   revalidatePath("/settings");
