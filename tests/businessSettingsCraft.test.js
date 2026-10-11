@@ -414,6 +414,12 @@ describe("business settings craft", () => {
     assert.doesNotMatch(shell, /selectHubIdentity/);
     assert.doesNotMatch(menu, /TenantForm/);
     assert.match(menu, /<SettingsMenu[\s\S]*variant="index"/);
+    // Settings home has the full content width: no rail beside it, two columns of groups on wide desktop.
+    assert.doesNotMatch(menu, /\{rail\}/);
+    assert.match(shell, /xl:grid-cols-2/);
+    // Inside a section: rail with a "Settings" title link, and the back link shows on every width.
+    assert.match(shell, /href="\/settings"[\s\S]{0,240}>\s*Settings\s*<\/Link>/);
+    assert.match(ui, /<DeskBack href="\/settings">/);
     assert.match(activeFn, /tab === "train" && trainPanel === target\.panel/);
     assert.doesNotMatch(activeFn, /selectHubIdentity/);
     assert.doesNotMatch(shell, /selectHubAppearance/);

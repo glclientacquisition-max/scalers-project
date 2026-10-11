@@ -99,10 +99,18 @@ function SettingsMenu({
     <nav
       aria-label="Settings sections"
       data-settings-menu={variant}
-      className={isRail ? settingsRailClass : "min-w-0 w-full"}
+      className={isRail ? settingsRailClass : "grid min-w-0 w-full gap-6 xl:grid-cols-2 xl:items-start xl:gap-x-8"}
     >
+      {isRail ? (
+        <Link
+          href="/settings"
+          className="mb-4 flex min-h-11 items-center rounded-lg px-1 text-title text-ink hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          Settings
+        </Link>
+      ) : null}
       {SETTINGS_NAV.map((section, index) => (
-        <section key={section.id} className={index === 0 ? undefined : "mt-6"}>
+        <section key={section.id} className={isRail && index > 0 ? "mt-6" : undefined}>
           <h2 className="pointer-events-none mb-2 select-none px-1 text-meta font-medium text-ink-2">
             {section.title}
           </h2>
@@ -252,13 +260,13 @@ export function BusinessSettingsShell({
   );
 
   if (isMenu) {
-    // No section chosen: Settings home on every width. md+ keeps the rail beside it.
+    // No section chosen: Settings home on every width, full content width (no rail).
+    // Server-rendered with no viewport script, so nothing shifts after paint.
     return (
       <SettingsLeaveGuard>
       <div className="w-full min-w-0" data-settings-console="" data-settings-home="" data-pull-dirty-guard="">
-        <div className={settingsConsoleClass}>
-          {rail}
-          <div className={`${settingsPanelClass} md:max-w-2xl md:pt-4`}>
+        <div className="w-full min-w-0">
+          <div className={`${settingsPanelClass} mx-auto w-full md:max-w-3xl md:pt-4 xl:max-w-6xl`}>
             <SettingsPageHeader
               businessName={businessName}
               lineLive={lineLive}
