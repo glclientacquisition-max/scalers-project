@@ -442,7 +442,8 @@ describe("settings save scope", () => {
     );
     assert.equal(match, true);
     const actions = read("dashboard/src/app/(desk)/settings/alertsActions.ts");
-    assert.match(actions, /alertPhoneWrite\(submittedPhone\)/);
+    // The write now goes through validateAlertsSave first, so it reads the checked phone.
+    assert.match(actions, /alertPhoneWrite\(checked\.phone\)/);
     assert.match(actions, /alertsPersistMatchesSubmit/);
     assert.doesNotMatch(
       actions,
