@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useState, useTransition } from "react";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import type { LeadStatus } from "@/lib/supabase";
@@ -29,7 +30,7 @@ const STYLES: Record<
   },
 };
 
-export function LeadStatusToggle({
+function LeadStatusToggleInner({
   callId,
   initial,
   size = "sm",
@@ -104,3 +105,5 @@ export function LeadStatusToggle({
     </div>
   );
 }
+
+export const LeadStatusToggle = withRoleGate("inbox.act", LeadStatusToggleInner);

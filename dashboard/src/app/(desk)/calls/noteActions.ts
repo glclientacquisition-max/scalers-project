@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { generateGeminiText } from "@/lib/gemini";
 import {
@@ -31,6 +33,8 @@ export async function polishCallerNoteAction(
   _prev: PolishCallerNoteState,
   formData: FormData
 ): Promise<PolishCallerNoteState> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "Not signed in." };
 
@@ -79,6 +83,8 @@ export async function polishInboxSmsAction(
   _prev: PolishCallerNoteState,
   formData: FormData
 ): Promise<PolishCallerNoteState> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   let tenant = null;
   try {
     tenant = await getCurrentTenant();
@@ -218,6 +224,8 @@ export async function sendCallerNoteAction(
   _prev: SendCallerNoteState,
   formData: FormData
 ): Promise<SendCallerNoteState> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   return sendOwnerCallerSms(formData, "caller_note");
 }
 
@@ -226,6 +234,8 @@ export async function sendInboxReplySms(
   _prev: SendCallerNoteState,
   formData: FormData
 ): Promise<SendCallerNoteState> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   const replyId = String(formData.get("reply_id") || "")
     .trim()
     .replace(/[^a-zA-Z0-9:_-]/g, "")

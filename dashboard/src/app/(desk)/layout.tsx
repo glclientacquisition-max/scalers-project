@@ -1,4 +1,8 @@
 import { Suspense } from "react";
+import { deskMemberRole } from "@/lib/requireMember";
+import { can, hiddenDeskHrefs } from "@/lib/permissions";
+import { DeskRoleProvider, ViewOnlyBanner } from "@/components/DeskRole";
+import { WorkspaceNotReady } from "@/components/WorkspaceNotReady";
 import { redirect } from "next/navigation";
 import { DeskAccountBar } from "@/components/DeskAccountBar";
 import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
@@ -8,6 +12,7 @@ import { DeskRouteChrome } from "@/components/DeskRouteChrome";
 import { DeskNavHost, DeskNeedsCountBridge, DeskPendingSlot, DeskScrollRestore } from "@/components/DeskNavState";
 import { LiveInbox } from "@/components/LiveInbox";
 import { DeskOffline } from "@/components/ui/DeskOffline";
+import { WelcomeToast } from "@/components/WelcomeToast";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { loadCachedInboxNeedsCount } from "@/lib/inboxLoad";
@@ -47,15 +52,26 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const tenant = await getDeskShellTenant();
   timer.mark("shell");
   console.info(timer.line("desk-shell"));
+  const role = await deskMemberRole(tenant?.id);
   if (tenant && tenantNeedsOnboarding(tenant)) {
+    // Only people who can edit settings can finish setup; everyone else waits for them.
+    if (role && !can(role, "settings.edit")) {
+      return <WorkspaceNotReady businessName={tenant.business_name || null} />;
+    }
     redirect("/onboarding");
   }
 
+  const hideHrefs = hiddenDeskHrefs(role);
+
   return (
+    <DeskRoleProvider role={role}>
     <DeskNavHost>
+      <Suspense fallback={null}>
+        <WelcomeToast />
+      </Suspense>
       <div className={deskShellClass}>
         {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
-        <DeskRail />
+        <DeskRail hideHrefs={hideHrefs} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <Suspense
             fallback={
@@ -71,6 +87,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
             />
           </Suspense>
           <DeskOffline />
+          <ViewOnlyBanner />
           <main data-desk-main="" className={deskMainClass}>
             <Suspense fallback={null}>
               <DeskPhonePull />
@@ -83,12 +100,13 @@ export default async function AppShell({ children }: { children: React.ReactNode
               <DeskRouteChrome />
             </Suspense>
           </main>
-          <DeskTabBar />
+          <DeskTabBar hideHrefs={hideHrefs} />
         </div>
         <Suspense fallback={null}>
           <DeskNeedsCountLive tenantId={tenant?.id} vertical={tenant?.vertical} />
         </Suspense>
       </div>
     </DeskNavHost>
+    </DeskRoleProvider>
   );
 }

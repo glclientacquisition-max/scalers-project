@@ -30,7 +30,7 @@ describe("business settings depth", () => {
     assert.doesNotMatch(form, />Alerts</);
     assert.match(form, /placeholder="Aisha"/);
     assert.match(form, /placeholder="Westlands Books"/);
-    assert.match(form, /placeholder="\+254 700 000 000"/);
+    assert.match(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /"\+254 700 000 000"/);
     assert.doesNotMatch(form, /e\.g\. Aisha|Used for SMS|Owner alert phone/);
   });
 
@@ -47,7 +47,7 @@ describe("business settings depth", () => {
     assert.doesNotMatch(modes, /missing access|upgrade|Gemini|Soniox|GPT/i);
     assert.match(form, /title="When unsure"/);
     assert.match(form, /What to say/);
-    assert.match(form, /placeholder="Wanjiku Mwangi"/);
+    assert.match(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /"Wanjiku Mwangi"/);
     assert.match(form, /Add service/);
     assert.match(form, /placeholder="Shop voice"/);
     assert.match(form, /placeholder="Opposite Naivas"/);

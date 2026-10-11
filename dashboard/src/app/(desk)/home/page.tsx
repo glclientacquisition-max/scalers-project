@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RoleGate } from "@/components/DeskRole";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import {
   callsHref,
@@ -454,6 +455,7 @@ async function HomeOverviewBody() {
               ) : null}
             </section>
 
+            <RoleGate action="usage.view" mode="hide">
             <section aria-label="Usage" className="border-t border-line px-4 py-4">
               <p className="font-mono text-sm font-medium text-ink">
                 {minutesLeft.toLocaleString("en-KE")} min left
@@ -471,6 +473,7 @@ async function HomeOverviewBody() {
                 </Link>
               ) : null}
             </section>
+            </RoleGate>
 
             {showCta ? (
               <div className="border-t border-line px-4 py-4">

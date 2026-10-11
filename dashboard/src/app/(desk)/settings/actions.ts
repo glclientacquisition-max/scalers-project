@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
@@ -88,6 +90,8 @@ export async function saveAndCompileSettings(
   _prev: SettingsCompileState,
   formData: FormData
 ): Promise<SettingsCompileState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to save settings." };
   }

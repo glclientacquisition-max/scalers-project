@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { TTS_MATCH_MAX, TTS_SAY_MAX } from "@/lib/pronunciationLexicon";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
@@ -126,7 +127,7 @@ function blobToFile(blob: Blob, name: string): File {
   return new File([blob], name, { type: blob.type || "audio/webm" });
 }
 
-export function PronunciationCoach({
+function PronunciationCoachInner({
   tenantId,
   businessName,
   agentName,
@@ -1773,3 +1774,5 @@ export function PronunciationCoach({
     </section>
   );
 }
+
+export const PronunciationCoach = withRoleGate("settings.edit", PronunciationCoachInner);

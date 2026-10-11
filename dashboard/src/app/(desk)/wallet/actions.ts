@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -19,6 +21,8 @@ export async function saveOnDemandUsage(
   _prev: OnDemandUsageState,
   formData: FormData
 ): Promise<OnDemandUsageState> {
+  const denied = await memberDenied("billing.manage");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to change on-demand usage." };
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
@@ -49,7 +50,7 @@ function tonightParts() {
   return { date: eatDateLocal(end), time: eatTimeLocal(end) };
 }
 
-export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
+function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
   const callersHearExample = useMountedPoolPick(
     placeholderPool(CALLERS_HEAR_POOLS, parseVertical(tenant.vertical))
@@ -265,3 +266,5 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
     </section>
   );
 }
+
+export const DailyBulletinPanel = withRoleGate("settings.edit", DailyBulletinPanelInner);

@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -114,6 +116,8 @@ export async function previewCatalogImportAction(
   _prev: CatalogImportState,
   formData: FormData
 ): Promise<CatalogImportState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) return { error: "Sign in to import." };
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "No workspace linked." };
@@ -191,6 +195,8 @@ export async function applyCatalogImportAction(
   _prev: CatalogImportState,
   formData: FormData
 ): Promise<CatalogImportState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) return { error: "Sign in to save." };
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "No workspace linked." };

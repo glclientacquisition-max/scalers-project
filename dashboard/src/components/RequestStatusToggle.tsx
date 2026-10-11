@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState } from "react";
 import {
   updateServiceRequestStatus,
@@ -15,7 +16,7 @@ function ownerError(error?: string) {
   return "Could not save.";
 }
 
-export function RequestStatusToggle({
+function RequestStatusToggleInner({
   id,
   status,
   extra = false,
@@ -125,3 +126,5 @@ export function RequestStatusToggle({
     </form>
   );
 }
+
+export const RequestStatusToggle = withRoleGate("inbox.act", RequestStatusToggleInner);

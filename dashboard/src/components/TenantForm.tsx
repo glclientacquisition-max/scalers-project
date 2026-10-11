@@ -1,5 +1,8 @@
 "use client";
 
+import { AlertContactsList } from "@/components/AlertContactsList";
+
+import { withRoleGate } from "@/components/DeskRole";
 import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -315,7 +318,7 @@ function isOwnerTeamRow(phone: string, ownerPhone: string | null | undefined): b
   return Boolean(a && a === normalizeContactPhone(ownerPhone));
 }
 
-export function TenantForm({
+function TenantFormInner({
   tenant,
   panel = "identity",
   curatedVoices,
@@ -323,6 +326,7 @@ export function TenantForm({
   sidebar = null,
   liveTransferExecutor = false,
   showBack = true,
+  membersSlot = null,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -331,6 +335,8 @@ export function TenantForm({
   sidebar?: ReactNode;
   liveTransferExecutor?: boolean;
   showBack?: boolean;
+  /** Team & access: Members section (feature flag TEAM_INVITES_ENABLED). */
+  membersSlot?: ReactNode;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -1861,6 +1867,7 @@ export function TenantForm({
                 <button
                   type="button"
                   aria-expanded={placeOpen}
+                  data-role-exempt=""
                   aria-label={placeDetailLabel}
                   onClick={() => toggleLocationDetails(index)}
                   className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
@@ -2193,6 +2200,7 @@ export function TenantForm({
       </section>
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
+        {membersSlot}
         {liveTransferExecutor || handoffMode === "live_transfer" ? (
           <>
             <SettingsGroup>
@@ -2212,147 +2220,25 @@ export function TenantForm({
           </>
         ) : null}
 
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <p className={settingsBlockTitleClass}>People</p>
-            <button
-              type="button"
-              onClick={() => setTeam((prev) => [...prev, emptyMember()])}
-              className={settingsGhostButtonClass}
-            >
-              Add person
-            </button>
-          </div>
-          <p id="team-notify-channels" className="px-1 text-xs text-ink-soft">
-            {TEAM_NOTIFY_CHANNEL_NOTE}
-          </p>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border border-line">
-          <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
-            <span>Name</span>
-            <span>Role</span>
-            <span>Phone</span>
-            <span>Email</span>
-            <span className="grid w-[15rem] grid-cols-3 gap-1 text-center text-caption font-medium normal-case tracking-normal">
-              {TEAM_NOTIFY_FLAGS.map((flag) => (
-                <span key={flag.key} title={TEAM_NOTIFY_CHANNEL_NOTE}>
-                  {flag.label}
-                </span>
-              ))}
-            </span>
-            <span className="sr-only">Remove</span>
-          </div>
-          {team.map((member, index) => (
-            <div
-              key={`team-${index}`}
-              className="grid grid-cols-1 gap-3 border-b border-line px-3 py-3 last:border-b-0 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-start lg:gap-x-3 lg:py-2"
-            >
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-name-${index}`}>
-                  Name
-                </label>
-                <input
-                  id={`team-name-${index}`}
-                  value={member.name}
-                  onChange={(e) => updateTeam(index, "name", e.target.value)}
-                  placeholder="Wanjiku Mwangi"
-                  title={member.name || undefined}
-                  className={`${denseFieldClass} mt-1 min-w-0 break-words [overflow-wrap:anywhere] lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-role-${index}`}>
-                  Role
-                </label>
-                <input
-                  id={`team-role-${index}`}
-                  value={member.role}
-                  onChange={(e) => updateTeam(index, "role", e.target.value)}
-                  placeholder="Orders and payments"
-                  className={`${denseFieldClass} mt-1 lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-phone-${index}`}>
-                  Phone
-                </label>
-                <input
-                  id={`team-phone-${index}`}
-                  value={member.phone}
-                  onChange={(e) => updateTeam(index, "phone", e.target.value)}
-                  placeholder="+254 700 000 000"
-                  className={`${denseFieldClass} mt-1 lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-email-${index}`}>
-                  Email
-                </label>
-                <input
-                  id={`team-email-${index}`}
-                  type="text"
-                  inputMode="email"
-                  autoComplete="off"
-                  value={member.email || ""}
-                  onChange={(e) => updateTeam(index, "email", e.target.value)}
-                  placeholder="wanjiku@shop.co.ke"
-                  title={member.email || undefined}
-                  className={`${denseFieldClass} mt-1 min-w-0 break-words [overflow-wrap:anywhere] lg:mt-0`}
-                />
-              </div>
-              <div
-                className="grid w-[15rem] grid-cols-3 gap-1"
-                role="group"
-                aria-label={`Notify for ${member.name || `teammate ${index + 1}`}`}
-                aria-describedby="team-notify-channels"
-              >
-                {TEAM_NOTIFY_FLAGS.map((flag) => {
-                  const selected = member[flag.key] === true;
-                  return (
-                    <div key={flag.key} className="flex min-h-11 flex-col items-center justify-center">
-                      <span className="text-xs font-medium text-ink-soft lg:sr-only" title={TEAM_NOTIFY_CHANNEL_NOTE}>
-                        {flag.label}
-                      </span>
-                      <ToolSwitch
-                        checked={selected}
-                        label={`${flag.label} for ${member.name || `teammate ${index + 1}`}`}
-                        hint={TEAM_NOTIFY_CHANNEL_NOTE}
-                        onChange={(next) => updateTeam(index, flag.key, next)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex items-start justify-end lg:pt-1">
-                {isOwnerTeamRow(member.phone, tenant.whatsapp_notification_number) ? (
-                  <span className="pt-2 text-xs text-ink-soft" title="The owner always stays on the team">Owner</span>
-                ) : (
-                <button
-                  type="button"
-                  onClick={() =>
-                    requestRemove(
-                      member,
-                      `Remove ${member.name.trim() || "this person"}?`,
-                      "They leave the team when you save.",
-                      () =>
-                        setTeam((prev) =>
-                          prev.length <= 1
-                            ? [emptyMember()]
-                            : prev.filter((_, i) => i !== index)
-                        )
-                    )
-                  }
-                  className={settingsTrashButtonClass}
-                  aria-label={`Remove teammate ${index + 1}`}
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <AlertContactsList
+          team={team}
+          flags={TEAM_NOTIFY_FLAGS}
+          note={TEAM_NOTIFY_CHANNEL_NOTE}
+          addLabel="Add person"
+          onChange={updateTeam}
+          canRemove={(m) => !isOwnerTeamRow(m.phone, tenant.whatsapp_notification_number)}
+          onAdd={() => setTeam((prev) => [...prev, emptyMember()])}
+          onRemove={(index) => {
+            const member = team[index];
+            if (!member) return;
+            requestRemove(
+              member,
+              `Remove ${member.name.trim() || "this person"}?`,
+              "They leave the team when you save.",
+              () => setTeam((prev) => (prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)))
+            );
+          }}
+        />
       </section>
 
       <section
@@ -2481,3 +2367,5 @@ export function TenantForm({
     </form>
   );
 }
+
+export const TenantForm = withRoleGate("settings.edit", TenantFormInner);

@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BellAlertIcon } from "@heroicons/react/24/outline";
@@ -16,7 +17,7 @@ export type InboxPingPerson = {
   email?: string;
 };
 
-export function InboxPingTeammate({
+function InboxPingTeammateInner({
   callId,
   people,
   archived,
@@ -161,3 +162,5 @@ export function InboxPingTeammate({
     </div>
   );
 }
+
+export const InboxPingTeammate = withRoleGate("inbox.act", InboxPingTeammateInner);

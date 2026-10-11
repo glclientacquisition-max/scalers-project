@@ -61,10 +61,10 @@ export function Sheet({
                 size === "lg" ? "sm:max-w-2xl" : "sm:max-w-md",
               )}
             >
-              <div className="flex h-6 items-center justify-center" aria-hidden="true">
+              <div className="flex h-7 items-center justify-center pt-1" aria-hidden="true">
                 <span className="h-1 w-9 rounded-full bg-ink-3" />
               </div>
-              <div className="flex items-start gap-3 px-5 sm:px-6">
+              <div className="flex items-start gap-3 px-5 pt-3 sm:px-6">
                 <div className="min-w-0 flex-1">
                   <Drawer.Title className="text-title text-ink">{title}</Drawer.Title>
                   {description ? (
