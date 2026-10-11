@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
-import { BrandWordmark } from "@/components/brand/BrandMark";
-import { ButtonLink } from "@/components/ui/Button";
 import { loadSetupContext } from "@/lib/setupServer";
-import { formatKenyaNumber, numberPending } from "@/lib/setupFlow";
-import { PendingNumber } from "./PendingNumber";
+import { LineView } from "./LineView";
 
 export const instant = false;
 
@@ -14,47 +11,5 @@ export default async function SetupLinePage() {
   if (ctx.kind !== "ready") redirect("/onboarding");
   if (!ctx.row.setup_completed_at) redirect("/onboarding");
 
-  const raw = ctx.row.sautikit_virtual_number;
-  const pending = numberPending(raw);
-  const pretty = formatKenyaNumber(raw);
-
-  return (
-    <main className="min-h-dvh pb-[max(2rem,env(safe-area-inset-bottom))]">
-      {/* Same header as the setup steps, so the logo stays put from step 1 to the number. */}
-      <header className="sticky top-0 z-10 border-b border-hairline bg-canvas/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-canvas/75">
-        <div className="mx-auto flex h-14 w-full max-w-xl items-center gap-2 px-3">
-          <span aria-hidden className="inline-flex min-h-11 w-[4.5rem] shrink-0" />
-          <BrandWordmark href="/home" context="Setup" variant="lockup" priority />
-        </div>
-      </header>
-      <div className="mx-auto w-full max-w-xl px-4 pt-6">
-        <h1 className="text-display text-ink">{ctx.row.business_name} is set up</h1>
-
-        {pending ? (
-          <PendingNumber tenantId={ctx.row.id} />
-        ) : (
-          <section aria-labelledby="line-label" className="mt-6 rounded-2xl bg-surface p-5">
-            <h2 id="line-label" className="text-meta font-medium text-ink-2">
-              Your Business Assistant&apos;s number
-            </h2>
-            <p className="mt-1 text-display font-semibold tabular-nums text-ink">{pretty}</p>
-            <p className="mt-3 text-body text-ink-2">
-              Call it from your phone to hear how it answers. Then share it with customers, or forward your business line to it.
-            </p>
-            <a
-              href={`tel:${String(raw).replace(/\s/g, "")}`}
-              className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-surface-2 px-4 text-body font-medium text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            >
-              Call {pretty}
-            </a>
-          </section>
-        )}
-
-        <ButtonLink href="/home" prefetch variant="primary" size="lg" block className="mt-8">
-          Go to Overview
-        </ButtonLink>
-        <p className="mt-3 text-center text-meta text-ink-2">You can change any answer later in Settings.</p>
-      </div>
-    </main>
-  );
+  return <LineView businessName={ctx.row.business_name} tenantId={ctx.row.id} raw={ctx.row.sautikit_virtual_number} />;
 }

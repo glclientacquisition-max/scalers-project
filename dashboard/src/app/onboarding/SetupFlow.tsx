@@ -395,7 +395,7 @@ export function SetupFlow({
 const FINISH_STAGES = ["Saving your answers", "Writing your Business Assistant's script", "Getting your phone number"] as const;
 
 /** Step-by-step progress while Finish runs. Stages advance on a timer; the last waits for the redirect. */
-function FinishingScreen() {
+export function FinishingScreen() {
   const [stage, setStage] = useState(0);
   useEffect(() => {
     const id = window.setInterval(() => setStage((s) => Math.min(s + 1, FINISH_STAGES.length - 1)), 900);
@@ -404,7 +404,7 @@ function FinishingScreen() {
   return (
     <main className="flex min-h-dvh items-center justify-center px-6">
       <div className="w-full max-w-xs">
-        <p className="text-title text-ink">Setting up your Business Assistant</p>
+        <h1 className="text-title text-ink">Setting up your Business Assistant</h1>
         <ol className="mt-4 space-y-3" aria-label="Setup progress">
           {FINISH_STAGES.map((label, i) => {
             const state = i < stage ? "done" : i === stage ? "current" : "todo";

@@ -219,7 +219,7 @@ describe("polish pass 3 (second live run, 11 Oct)", () => {
   it("Back keeps its slot so the logo does not move; number screen has the logo header", () => {
     const flow = read("dashboard/src/app/onboarding/SetupFlow.tsx");
     assert.match(flow, /index === 0 \? "invisible" : ""/);
-    const line = read("dashboard/src/app/onboarding/line/page.tsx");
+    const line = read("dashboard/src/app/onboarding/line/LineView.tsx");
     assert.match(line, /<header[\s\S]*<BrandWordmark/);
   });
   it("first hours chip matches the default week", async () => {
@@ -248,7 +248,7 @@ describe("polish pass 3 (second live run, 11 Oct)", () => {
     assert.match(src, /Answer<span className="sr-only"> to question \{i \+ 1\}<\/span>/);
   });
   it("Overview is prefetched from the number screen", () => {
-    assert.match(read("dashboard/src/app/onboarding/line/page.tsx"), /href="\/home" prefetch/);
+    assert.match(read("dashboard/src/app/onboarding/line/LineView.tsx"), /href="\/home" prefetch/);
   });
 });
 
@@ -257,7 +257,7 @@ describe("design compliance + Business Assistant + niches (11 Oct)", () => {
   const onboardingFiles = [
     "dashboard/src/app/onboarding/SetupFlow.tsx",
     "dashboard/src/app/onboarding/CreateWorkspaceForm.tsx",
-    "dashboard/src/app/onboarding/line/page.tsx",
+    "dashboard/src/app/onboarding/line/LineView.tsx",
     "dashboard/src/app/onboarding/line/PendingNumber.tsx",
     "dashboard/src/app/signup/SignupForm.tsx",
     "dashboard/src/app/login/PendingSubmit.tsx",
@@ -283,7 +283,7 @@ describe("design compliance + Business Assistant + niches (11 Oct)", () => {
     const f = read("dashboard/src/app/invite/[token]/InviteForms.tsx");
     assert.doesNotMatch(f, /deskFieldClass/);
     assert.match(f, /pending=\{pending\}/);
-    assert.match(read("dashboard/src/components/MembersPanel.tsx"), /pending=\{pending\}\s*disabled=\{!email\.trim\(\)\}/);
+    assert.match(read("dashboard/src/components/MembersPanel.tsx"), /pending=\{spinning\("invite"\)\}\s*disabled=\{pending \|\| !email\.trim\(\)\}/);
   });
   it("product term is Business Assistant in user-facing copy", () => {
     for (const f of [...onboardingFiles, "dashboard/src/lib/setupFlow.ts", "dashboard/src/components/HomeCapture.tsx", "dashboard/src/components/CallTranscript.tsx"]) {
@@ -313,5 +313,35 @@ describe("design compliance + Business Assistant + niches (11 Oct)", () => {
     const src = read("dashboard/src/app/onboarding/steps/CatalogueStep.tsx");
     assert.match(src, /home \? "e\.g\. Sofa cleaning, 3 seater" : "e\.g\. Fast charger, 20W"/);
     assert.match(src, /you'll confirm the price/);
+  });
+});
+
+const read = (p: string) => readFileSync(join(root, p), "utf8");
+
+describe("Business Assistant naming on the marketing site", () => {
+  it("titles, OG/Twitter and landing copy say Business Assistant, never call assistant", () => {
+    const layout = read("dashboard/src/app/layout.tsx");
+    assert.equal((layout.match(/Scalers, your 24-hour Business Assistant/g) || []).length, 3);
+    for (const f of ["dashboard/src/app/layout.tsx", "dashboard/src/components/marketing/LandingPage.tsx", "dashboard/src/components/marketing/LandingStory.tsx"]) {
+      assert.doesNotMatch(read(f), /[Cc]all assistant|\bbusiness assistant\b/, f);
+    }
+  });
+});
+
+describe("Team page per-row pending", () => {
+  it("only the control that started an action spins; the rest disable", () => {
+    const src = read("dashboard/src/components/MembersPanel.tsx");
+    assert.match(src, /const spinning = \(key: string\) => pending && activeKey === key/);
+    for (const k of ["owner:", "remove:", "resend:", "revoke:", "role:"]) assert.ok(src.includes(`spinning(\`${k}`), k);
+    assert.match(src, /key: c\.key/);
+    assert.match(src, /pending=\{spinning\("invite"\)\}/);
+  });
+  it("settings groups are h2 under the page h1 (axe heading-order)", () => {
+    for (const f of ["dashboard/src/components/MembersPanel.tsx", "dashboard/src/components/AlertContactsList.tsx", "dashboard/src/components/settingsUi.tsx"]) {
+      assert.doesNotMatch(read(f), /<h3[ >]/, f);
+    }
+  });
+  it("finishing screen has an h1", () => {
+    assert.match(read("dashboard/src/app/onboarding/SetupFlow.tsx"), /<h1 className="text-title text-ink">Setting up your Business Assistant<\/h1>/);
   });
 });

@@ -87,7 +87,7 @@ export function LandingPage({
             </div>
 
             <h1 className="landing-rise landing-rise-delay-2 mt-8 font-display text-3xl leading-tight tracking-tight text-white sm:text-4xl md:text-[2.75rem] text-balance">
-              Your 24-hour call assistant, so you do not miss the client.
+              Your 24-hour Business Assistant, so you do not miss the client.
             </h1>
 
             <p className="landing-rise landing-rise-delay-3 mt-4 max-w-md text-base leading-relaxed text-sky-100/90 sm:text-lg">
@@ -95,7 +95,7 @@ export function LandingPage({
             </p>
 
             <p className="landing-rise landing-rise-delay-3 mt-3 max-w-md text-sm leading-relaxed text-sky-100/65">
-              Scalers is a business assistant that actually helps you run the business, from the
+              Scalers is a Business Assistant that actually helps you run the business, from the
               client call through to the booking, the order, or whatever comes next.
             </p>
 
@@ -133,7 +133,7 @@ export function LandingPage({
         <div className="mx-auto max-w-desk">
           <div className="max-w-xl">
             <p className="text-base leading-relaxed text-ink">
-              Scalers is a business assistant that actually helps you run the business, from the
+              Scalers is a Business Assistant that actually helps you run the business, from the
               client call through to the booking, the order, or whatever comes next.
             </p>
             <a

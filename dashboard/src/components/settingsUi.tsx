@@ -217,7 +217,7 @@ export function SettingsGroup({
               : "flex min-h-8 items-end justify-between gap-3 px-1"
           }
         >
-          {title ? <h3 className={settingsGroupTitleClass}>{title}</h3> : <span />}
+          {title ? <h2 className={settingsGroupTitleClass}>{title}</h2> : <span />}
           {action}
         </div>
       ) : null}

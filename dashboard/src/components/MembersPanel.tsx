@@ -17,7 +17,7 @@ import { daysLeft } from "@/lib/invites";
 import type { MembersData } from "@/lib/membersLoad";
 import { transferConfirmMatches } from "@/lib/memberConfirm";
 import { INVITES_PAGE, MEMBERS_PAGE } from "@/lib/teamLimits";
-import { Button } from "@/components/ui/Button";
+import { Button, pendingDotClass } from "@/components/ui/Button";
 import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { notify } from "@/components/ui/DeskNotice";
@@ -30,6 +30,8 @@ type Pending = {
   danger?: boolean;
   typeToConfirm?: string;
   refreshAll?: boolean;
+  /** Which row control shows the spinner while this runs. */
+  key: string;
   fn: () => Promise<MembersActionResult>;
 };
 
@@ -49,15 +51,19 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
   const [pending, start] = useTransition();
   const [confirming, setConfirming] = useState<Pending | null>(null);
   const [typed, setTyped] = useState("");
+  /** The control whose action is in flight; only it shows a spinner, the rest just disable. */
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const spinning = (key: string) => pending && activeKey === key;
   const busy = useRef(false);
   const router = useRouter();
   const canInvite = roles.length > 0;
   const { seats, totals, limits } = data;
 
   /** Runs one action at a time and always shows the outcome: inline + desk toast (survives a re-render). */
-  function run(fn: () => Promise<MembersActionResult>, opts?: { refreshAll?: boolean; onDone?: () => void }) {
+  function run(fn: () => Promise<MembersActionResult>, opts?: { refreshAll?: boolean; onDone?: () => void; key?: string }) {
     if (busy.current) return; // double-click safe
     busy.current = true;
+    setActiveKey(opts?.key ?? null);
     start(async () => {
       let result: MembersActionResult;
       try {
@@ -67,6 +73,7 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
       }
       if (!result.ok && !result.error) result = { ...result, error: "Something went wrong. Try again." };
       busy.current = false;
+      setActiveKey(null);
       setFlash(result);
       notify(result.error || result.message || "Done.");
       opts?.onDone?.();
@@ -96,7 +103,7 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
       <section className="min-w-0 space-y-1.5" aria-labelledby="members-title">
         <div className="flex items-end justify-between gap-3 px-1">
           <div className="min-w-0">
-            <h3 id="members-title" className={settingsGroupTitleClass}>Members</h3>
+            <h2 id="members-title" className={settingsGroupTitleClass}>Members</h2>
             <p className="text-meta text-ink-2">Members sign in and use a seat. Alert contacts only get notified.</p>
           </div>
           <span className="shrink-0 text-meta text-ink-2" aria-label={`${seats.used} of ${seats.included} seats used`}>
@@ -128,9 +135,15 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
                         value={m.role}
                         options={roleOptions}
                         onChange={(next) => {
-                          if (next !== m.role) run(() => changeMemberRoleAction(m.userId, next));
+                          if (next !== m.role) run(() => changeMemberRoleAction(m.userId, next), { key: `role:${m.userId}` });
                         }}
                       />
+                      {spinning(`role:${m.userId}`) ? (
+                        <span role="status" className="mt-1 flex justify-end">
+                          <span aria-hidden="true" className={pendingDotClass} />
+                          <span className="sr-only">Changing role</span>
+                        </span>
+                      ) : null}
                     </div>
                   ) : (
                     <span className="px-1 text-body text-ink-2">{ROLE_LABELS[m.role]}</span>
@@ -140,8 +153,10 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
                       variant="tonal"
                       size="sm"
                       disabled={pending}
+                      pending={spinning(`owner:${m.userId}`)}
                       onClick={() =>
                         ask({
+                          key: `owner:${m.userId}`,
                           title: `Make ${display} the owner?`,
                           confirmLabel: "Transfer ownership",
                           danger: true,
@@ -169,9 +184,11 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
                       variant="danger"
                       size="sm"
                       disabled={pending}
+                      pending={spinning(`remove:${m.userId}`)}
                       aria-label={`Remove ${m.email}`}
                       onClick={() =>
                         ask({
+                          key: `remove:${m.userId}`,
                           title: `Remove ${display}?`,
                           confirmLabel: "Remove",
                           danger: true,
@@ -211,16 +228,18 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
                   </div>
                   {canInvite && canManageMember(viewerRole, i.role) ? (
                     <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto">
-                      <Button variant="tonal" size="sm" disabled={pending} aria-label={`Resend invite to ${i.email}`} onClick={() => run(() => resendInviteAction(i.id))}>
+                      <Button variant="tonal" size="sm" disabled={pending} pending={spinning(`resend:${i.id}`)} aria-label={`Resend invite to ${i.email}`} onClick={() => run(() => resendInviteAction(i.id), { key: `resend:${i.id}` })}>
                         Resend
                       </Button>
                       <Button
                         variant="danger"
                         size="sm"
                         disabled={pending}
+                        pending={spinning(`revoke:${i.id}`)}
                         aria-label={`Cancel invite to ${i.email}`}
                         onClick={() =>
                           ask({
+                            key: `revoke:${i.id}`,
                             title: `Cancel the invite to ${i.email}?`,
                             confirmLabel: "Cancel invite",
                             danger: true,
@@ -270,7 +289,7 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
                   // Enter would submit the surrounding Settings form.
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    if (email.trim()) run(() => inviteMemberAction(email, role));
+                    if (email.trim()) run(() => inviteMemberAction(email, role), { key: "invite" });
                   }
                 }}
                 placeholder="name@business.co.ke"
@@ -283,9 +302,9 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
               <Button
                 variant="primary"
                 size="md"
-                pending={pending}
-                disabled={!email.trim()}
-                onClick={() => run(() => inviteMemberAction(email, role))}
+                pending={spinning("invite")}
+                disabled={pending || !email.trim()}
+                onClick={() => run(() => inviteMemberAction(email, role), { key: "invite" })}
               >
                 {pending ? "Sending…" : "Send invite"}
               </Button>
@@ -311,7 +330,7 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
         onConfirm={() => {
           const c = confirming;
           if (!c) return;
-          run(c.fn, { refreshAll: c.refreshAll, onDone: () => setConfirming(null) });
+          run(c.fn, { refreshAll: c.refreshAll, key: c.key, onDone: () => setConfirming(null) });
         }}
       >
         {confirming?.body}
