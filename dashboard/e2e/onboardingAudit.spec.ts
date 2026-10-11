@@ -33,7 +33,19 @@ const FIXTURES: Array<readonly [string, string]> = [
   ["team-full", "/dev/team?full=1"],
 ];
 
-const routes = SET === "public" ? PUBLIC : FIXTURES;
+// Typed-data UI (structured-data branch). "#click" opens a sheet before the check.
+const STRUCTURED: Array<readonly [string, string]> = [
+  ["structured-shop", "/dev/structured"],
+  ["structured-home", "/dev/structured?vertical=home_services"],
+  ["structured-price-sheet", "/dev/structured#click=Change the price of A4 printing paper, 500 sheets"],
+  ["structured-category-sheet", "/dev/structured#click=Category"],
+  ["structured-call", "/dev/structured?view=call"],
+  ["structured-call-lost", "/dev/structured?view=call-lost"],
+  ["structured-call-sheet", "/dev/structured?view=call#click=Wanted"],
+  ["structured-call-viewer", "/dev/structured?view=call-viewer"],
+];
+
+const routes = SET === "public" ? PUBLIC : SET === "structured" ? STRUCTURED : FIXTURES;
 
 async function settle(page: Page) {
   await page.waitForLoadState("networkidle").catch(() => {});
@@ -43,8 +55,13 @@ async function settle(page: Page) {
 
 for (const [name, path] of routes) {
   test(`${name}`, async ({ page }, info) => {
-    const res = await page.goto(path);
+    const [url, click] = path.split("#click=");
+    const res = await page.goto(url);
     await settle(page);
+    if (click) {
+      await page.getByRole("button", { name: new RegExp(click.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();
+      await page.waitForTimeout(500);
+    }
     const dir = join(OUT, info.project.name);
     mkdirSync(dir, { recursive: true });
     await page.screenshot({ path: join(dir, `${name}.png`), fullPage: true });

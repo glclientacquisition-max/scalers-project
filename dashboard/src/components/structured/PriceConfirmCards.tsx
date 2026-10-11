@@ -16,6 +16,8 @@ export type PriceToConfirm = { kind: "product" | "service"; name: string; pricin
 type SaveFn = (input: { kind: "product" | "service"; name: string; pricing: StructuredPrice }) => Promise<StructuredResult>;
 
 const SHOWN = 5;
+const PRODUCT_UNITS = ["item", "pack", "kg", "litre", "metre"];
+const SERVICE_UNITS = ["job", "visit", "hour", "room", "sqm", "seat"];
 
 /** "Is this right?" for prices read from old text. Yes keeps it; Change opens a bottom sheet. */
 export function PriceConfirmCards({ items, save, canEdit }: { items: PriceToConfirm[]; save: SaveFn; canEdit: boolean }) {
@@ -52,7 +54,7 @@ export function PriceConfirmCards({ items, save, canEdit }: { items: PriceToConf
                 <p className="truncate text-body text-ink">{item.name}</p>
                 <p className="text-meta text-ink-2">
                   <span className="tabular-nums">{priceLabel(item.pricing)}</span>
-                  {item.text && item.text !== priceLabel(item.pricing) ? <span> · from &ldquo;{item.text}&rdquo;</span> : null}
+                  {item.text && item.text.trim().toLowerCase() !== priceLabel(item.pricing).toLowerCase() ? <span> · from &ldquo;{item.text}&rdquo;</span> : null}
                 </p>
               </div>
               {canEdit ? (
@@ -149,7 +151,7 @@ function PriceSheet({
         {mode !== "ask" ? (
           <div className="space-y-2">
             <p className="text-meta font-medium text-ink">Per</p>
-            <Chips<string> label="Price per" options={UNITS} value={unit} onChange={setUnit} />
+            <Chips<string> label="Price per" options={UNITS.filter((u) => (item.kind === "product" ? PRODUCT_UNITS : SERVICE_UNITS).includes(u.id))} value={unit} onChange={setUnit} />
           </div>
         ) : null}
       </div>
