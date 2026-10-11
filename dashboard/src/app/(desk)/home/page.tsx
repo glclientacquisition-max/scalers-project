@@ -1,3 +1,5 @@
+import { DataChecksCard } from "@/components/structured/DataChecksCard";
+import { dataChecksFor } from "@/components/structured/StructuredSettingsSlots";
 import Link from "next/link";
 import { RoleGate } from "@/components/DeskRole";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -388,6 +390,7 @@ async function HomeOverviewBody() {
             </>
           ) : null}
         </section>
+        <DataChecksCard checks={dataChecksFor(tenant)} />
         {score && line !== "live" ? (
           <HomeCapture
             tenantId={tenant.id}

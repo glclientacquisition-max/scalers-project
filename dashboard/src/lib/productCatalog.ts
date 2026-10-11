@@ -1,3 +1,4 @@
+import { sanitizePricing, type StructuredPrice } from "./structuredData";
 export type ProductItem = {
   name: string;
   sku: string;
@@ -15,6 +16,8 @@ export type ProductItem = {
   /** Owner confirmed this row can be held. */
   holdable?: boolean;
   /** owner | seed | import | inferred | call_suggested */
+  /** Typed price (structuredData.ts). Text field stays for old readers. */
+  pricing?: StructuredPrice;
   source?: "owner" | "seed" | "import" | "inferred" | "call_suggested";
 };
 
@@ -112,6 +115,8 @@ export function normalizeProductCatalog(raw: unknown): ProductItem[] {
       ) {
         item.source = source;
       }
+      const pricing = sanitizePricing(r.pricing);
+      if (pricing) item.pricing = pricing;
       // Absent holdable stays unset. Do not default it to false.
       const holdRaw = r.holdable;
       const holdText = String(holdRaw ?? "").trim().toLowerCase();

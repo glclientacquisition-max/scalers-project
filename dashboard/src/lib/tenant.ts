@@ -6,6 +6,7 @@ import { defaultTenantLlmPrompt } from "@/lib/prompts";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { DESK_TENANT_COOKIE } from "@/lib/deskTenantCookie";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizePhone } from "@/lib/setupFlow";
 
 const TENANT_SELECT_NO_GREETING_IDENTITY =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, sms_included_units, sms_used_units, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
@@ -441,7 +442,8 @@ export async function ensureTenantForUser(opts: {
   }
 
   const businessName = opts.businessName.trim();
-  const phone = opts.notificationPhone.trim() || "pending";
+  const rawPhone = opts.notificationPhone.trim();
+  const phone = rawPhone ? normalizePhone(rawPhone) || rawPhone : "pending";
 
   const row: Record<string, unknown> = {
     business_name: businessName,

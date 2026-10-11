@@ -2374,7 +2374,38 @@ async function confirmTenantField({ tenantId, fieldPath, userId = null } = {}) {
   return data || null;
 }
 
+/** Per-call structured record. Owner-corrected rows keep their intent/outcome (trusted). */
+async function upsertCallFacts(row) {
+  if (!row?.call_id || !row?.tenant_id) return null;
+  const { mergeWithExisting } = require('./conversation/callFacts');
+  const { data: existing, error: readErr } = await supabase
+    .from('call_facts')
+    .select('source, intent, outcome, lost_reason, owner_corrected_by, owner_corrected_at')
+    .eq('call_id', row.call_id)
+    .maybeSingle();
+  throwIfError('upsertCallFacts.read', readErr);
+  const next = mergeWithExisting(row, existing);
+  const { error } = await supabase.from('call_facts').upsert(next, { onConflict: 'call_id' });
+  throwIfError('upsertCallFacts', error);
+  return next;
+}
+
+async function getTenantCatalogue(tenantId) {
+  if (!tenantId) return [];
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('product_catalog, services_catalog')
+    .eq('id', tenantId)
+    .maybeSingle();
+  throwIfError('getTenantCatalogue', error);
+  const a = Array.isArray(data?.product_catalog) ? data.product_catalog : [];
+  const b = Array.isArray(data?.services_catalog) ? data.services_catalog : [];
+  return [...a, ...b];
+}
+
 module.exports = {
+  upsertCallFacts,
+  getTenantCatalogue,
   resolveTenantId,
   inboundTenantLine,
   getPlatformAudio,

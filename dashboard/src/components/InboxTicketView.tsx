@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
 import { CallRecording } from "@/components/CallRecording";
@@ -216,6 +216,7 @@ export function InboxTicketView({
   archived,
   leadStatus,
   businessName,
+  factsSlot = null,
 }: {
   callId: string;
   backHref: string;
@@ -247,6 +248,8 @@ export function InboxTicketView({
   archived: boolean;
   leadStatus: string | null;
   businessName: string;
+  /** "About this call" (typed intent/outcome; owner can correct). */
+  factsSlot?: ReactNode;
 }) {
   const paneRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -572,6 +575,7 @@ export function InboxTicketView({
                 </p>
               ) : null}
               <CallRecording recordingUrl={recordingUrl} />
+              {factsSlot ? <div className="pt-2">{factsSlot}</div> : null}
             </div>
           </aside>
           <DeskHint
