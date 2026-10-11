@@ -310,10 +310,24 @@ export function SetupFlow({
     window.history.replaceState(window.history.state, "", url);
   }
 
+  // The header and the docked Continue bar are fixed. Scroll padding keeps a focused field,
+  // price segment or Remove link clear of both when the browser scrolls it into view.
+  useEffect(() => {
+    const root = document.documentElement;
+    const prevTop = root.style.scrollPaddingTop;
+    const prevBottom = root.style.scrollPaddingBottom;
+    root.style.scrollPaddingTop = "calc(4.5rem + env(safe-area-inset-top))";
+    root.style.scrollPaddingBottom = "calc(6.5rem + env(safe-area-inset-bottom))";
+    return () => {
+      root.style.scrollPaddingTop = prevTop;
+      root.style.scrollPaddingBottom = prevBottom;
+    };
+  }, []);
+
   if (finishing) return <FinishingScreen />;
 
   return (
-    <main className="min-h-dvh pb-[calc(10rem+env(safe-area-inset-bottom))]">
+    <main data-setup-flow="" className="min-h-dvh pb-[calc(10rem+env(safe-area-inset-bottom))]">
       <header className="sticky top-0 z-10 border-b border-hairline bg-canvas/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-canvas/75">
         <div className="mx-auto flex h-14 w-full max-w-xl items-center justify-between gap-2 px-3">
           <div className="flex min-w-0 items-center gap-1">

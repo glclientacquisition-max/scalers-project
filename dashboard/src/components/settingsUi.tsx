@@ -1,4 +1,5 @@
 "use client";
+import { AutoGrowTextarea } from "@/components/ui/TextField";
 
 /**
  * Shared Business Settings UI tokens and primitives.
@@ -20,7 +21,7 @@ import {
 export const settingsFieldClass = `mt-1 ${deskFieldClass}`;
 
 export const settingsDenseFieldClass =
-  `w-full min-h-11 min-w-0 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent`;
+  `w-full min-h-11 min-w-0 rounded-xl border border-hairline bg-surface px-3 py-2 text-body text-ink outline-none ${deskShiftClass} placeholder:text-ink-3 hover:border-ink-3 focus:outline-none focus:border-accent focus:ring-2 focus:ring-brand/40 aria-[invalid=true]:border-attention`;
 
 export const settingsTableFieldClass =
   `w-full min-w-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent`;
@@ -72,7 +73,7 @@ export const settingsPanelHeadingClass =
   "font-display text-xl font-semibold tracking-tight text-ink";
 
 export const settingsBlockTitleClass =
-  "text-[11px] font-bold uppercase tracking-wide text-gray-500";
+  "text-meta font-medium text-ink-2";
 
 /** Non-clickable group header. Same dialect as the settings rail. */
 export const settingsGroupTitleClass =
@@ -478,22 +479,14 @@ export function ExpandTextarea({
   className?: string;
 }) {
   return (
-    <textarea
+    <AutoGrowTextarea
       id={id}
       value={value}
       maxLength={maxLength}
       onChange={(e) => onChange(e.target.value)}
-      rows={2}
-      onFocus={(e) => {
-        e.currentTarget.rows = 4;
-      }}
-      onBlur={(e) => {
-        e.currentTarget.rows = 2;
-      }}
+      rows={3}
       placeholder={placeholder}
-      className={[settingsFieldClass, "leading-relaxed", className]
-        .filter(Boolean)
-        .join(" ")}
+      className={[settingsFieldClass, "min-h-[5.5rem]", className].filter(Boolean).join(" ")}
     />
   );
 }

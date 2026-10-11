@@ -9,6 +9,7 @@ import { AlertsPanel } from "@/components/AlertsPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
 import { CatalogImportPanel } from "@/components/CatalogImportPanel";
 import { SettingsLeaveGuard } from "@/components/SettingsLeaveGuard";
+import { SettingsWideOpen } from "@/components/SettingsWideOpen";
 import { TenantForm } from "@/components/TenantForm";
 import { TestLinePanel } from "@/components/TestLinePanel";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
@@ -147,6 +148,7 @@ export function BusinessSettingsShell({
   optionStatus = {},
   liveTransferExecutor = false,
   membersSlot = null,
+  wideOpenHref,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -155,6 +157,8 @@ export function BusinessSettingsShell({
   optionStatus?: Record<string, SettingsListStatus>;
   liveTransferExecutor?: boolean;
   membersSlot?: ReactNode;
+  /** Where md+ lands from the bare list. Defaults to Hours. */
+  wideOpenHref?: string;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
@@ -186,6 +190,7 @@ export function BusinessSettingsShell({
   if (isMenu) {
     return (
       <SettingsLeaveGuard>
+      <SettingsWideOpen href={wideOpenHref} />
       <div className="w-full min-w-0 md:hidden" data-settings-console="" data-pull-dirty-guard="">
         <SettingsPageHeader
           businessName={businessName}

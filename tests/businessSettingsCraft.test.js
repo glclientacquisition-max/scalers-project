@@ -156,7 +156,7 @@ describe("business settings craft", () => {
 
   it("uses non-clickable group headers and a phone index of destination rows", () => {
     assert.match(shell, /text-meta font-medium text-ink-2/);
-    assert.match(ui, /uppercase tracking-wide text-gray-500/);
+    assert.match(ui, /settingsBlockTitleClass =\s*"text-meta font-medium text-ink-2"/);
     assert.match(ui, /pointer-events-none/);
     assert.match(shell, /data-settings-menu=\{variant\}/);
     assert.match(shell, /md:hidden/);
@@ -294,7 +294,8 @@ describe("business settings craft", () => {
     // Alert contacts are a grouped list (no table columns), so nothing truncates.
     assert.match(form, /<AlertContactsList/);
     assert.doesNotMatch(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /grid-cols-\[/);
-    assert.match(form, /grid-cols-\[minmax\(0,1fr\)_minmax\(0,1\.2fr\)_2\.75rem\]/);
+    // FAQs are grouped cards (kit FieldCard + TextField + TextAreaField), not a two-column table.
+    assert.match(form, /data-faq-list=""[\s\S]*<FieldCard[\s\S]*<TextAreaField/);
     assert.match(shell, /rounded-2xl border border-hairline bg-surface/);
     assert.match(shell, /bg-accent-tonal/);
     assert.doesNotMatch(shell, /border-l-2/);

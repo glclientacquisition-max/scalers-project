@@ -84,7 +84,7 @@ export const pendingSpinnerInkClass =
   "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-ink/20 border-t-ink motion-reduce:animate-none";
 
 export const deskFieldClass =
-  `w-full min-h-11 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-brand`;
+  `w-full min-h-11 rounded-xl border border-hairline bg-surface px-3 py-2.5 text-body text-ink outline-none ${deskShiftClass} placeholder:text-ink-3 hover:border-ink-3 focus:border-accent focus:ring-2 focus:ring-brand/40 disabled:opacity-50 aria-[invalid=true]:border-attention aria-[invalid=true]:focus:ring-attention/30`;
 
 export const deskErrorClass =
   "rounded-2xl border border-warn/40 bg-warn-soft p-6 text-warn";

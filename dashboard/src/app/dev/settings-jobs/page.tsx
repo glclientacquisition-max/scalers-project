@@ -34,7 +34,10 @@ const tenant = {
   soniox_voice_id: "7b197f3c-84b4-4404-986f-114e4dac1432",
   vertical: "retail",
   team_directory: [{ name: "Amina", role: "Desk", phone: "+254700000001" }],
-  faqs: [],
+  faqs: [
+    { question: "Do you print on Sundays?", answer: "Yes, from 10 to 2. Bigger jobs are ready on Monday." },
+    { question: "Can I pay by M-Pesa?", answer: "Yes. Use the till number on the counter, then show the message to the cashier before you collect your prints. We also take cash and card for orders over KSh 1,000, and we can send an invoice to your company if you print with us every month." },
+  ],
   business_locations: [{ label: "Westlands", address: "Opposite Naivas" }],
   is_active: true,
 } as TenantRow;
@@ -72,6 +75,7 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             <DeskPhonePull />
           </Suspense>
           <BusinessSettingsShell
+            wideOpenHref="/dev/settings-jobs?tab=train&panel=hours"
             tenant={tenant}
             tab={tab}
             trainPanel={trainPanel}
