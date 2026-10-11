@@ -72,7 +72,7 @@ describe('capability gates (Overview twin)', () => {
   it('shares requirement ids with the call brain', () => {
     const ts = read('dashboard/src/lib/capabilityGates.ts');
     const js = read('src/conversation/capabilityGates.js');
-    for (const id of ['holds_policy_on', 'holdable_item', 'verified_alert', 'owner_service', 'booking_mode_confirmed', 'handoff_live', 'transfer_phone']) {
+    for (const id of ['holds_policy_on', 'holdable_item', 'verified_alert', 'owner_service', 'booking_mode_confirmed', 'callback_contact', 'escalate_on']) {
       assert.match(ts, new RegExp(`"${id}"`), `${id} in twin`);
       assert.match(js, new RegExp(`'${id}'`), `${id} in brain`);
     }
@@ -102,19 +102,36 @@ describe('capability gates (Overview twin)', () => {
 
   it('home services get visit requests and bookings, not holds', { skip: !twin }, () => {
     const ids = twin.capabilityGates({ vertical: 'home_services' }).map((g) => g.id);
-    assert.deepEqual(ids, ['site_visits', 'booking_slots', 'live_transfer']);
+    assert.deepEqual(ids, ['site_visits', 'booking_slots', 'callbacks']);
     const slots = twin
       .capabilityGates({ vertical: 'home_services', business_policies: { booking_mode: 'confirmed_slot', booking: { source: 'owner' } } })
       .find((g) => g.id === 'booking_slots');
     assert.equal(slots.status, 'live');
   });
 
-  it('live transfer names Scalers when only the platform switch is missing', { skip: !twin }, () => {
-    const g = twin
-      .capabilityGates({ vertical: 'retail', handoff_mode: 'live_transfer', team_directory: [{ name: 'Aris', phone: '0790381872' }] }, { liveTransferExecutor: false })
-      .find((x) => x.id === 'live_transfer');
-    assert.deepEqual(g.missing.map((r) => r.id), ['platform']);
-    assert.equal(g.missing[0].href, null);
+  it('callbacks, never a live transfer: needs an alert contact with WhatsApp or email', { skip: !twin }, () => {
+    const none = twin.capabilityGates({ vertical: 'retail', handoff_mode: 'live_transfer' }).find((x) => x.id === 'callbacks');
+    assert.equal(none.title, 'Callbacks');
+    assert.deepEqual(none.missing.map((r) => r.id), ['callback_contact']);
+    assert.match(none.missing[0].href, /team/);
+    const ok = twin
+      .capabilityGates({ vertical: 'retail', team_directory: [{ name: 'Aris', phone: '', email: 'aris@example.com' }] })
+      .find((x) => x.id === 'callbacks');
+    assert.equal(ok.status, 'live');
+    assert.match(ok.callerHearsLive, /call you back/);
+    for (const g of twin.capabilityGates({ vertical: 'home_services' })) {
+      assert.doesNotMatch(`${g.title} ${g.callerHearsLive} ${g.callerHearsLocked}`, /put you through|transfer/i);
+    }
+    const off = twin
+      .capabilityGates({ team_directory: [{ name: 'A', phone: '0790381872' }], agent_tools: { escalate: false } })
+      .find((x) => x.id === 'callbacks');
+    assert.deepEqual(off.missing.map((r) => r.id), ['escalate_on']);
+  });
+
+  it('call brain callbacks gate matches the twin', () => {
+    assert.deepEqual(evaluateCapabilityGates({}).callbacks, { allowed: false, missing: ['callback_contact'] });
+    assert.equal(evaluateCapabilityGates({ teamDirectory: [{ phone: '0790381872', receives_escalation: true }] }).callbacks.allowed, true);
+    assert.equal(evaluateCapabilityGates({ teamDirectory: [{ phone: '0790381872', receives_escalation: false }] }).callbacks.allowed, false);
   });
 });
 

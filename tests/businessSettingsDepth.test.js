@@ -210,7 +210,8 @@ describe("business settings depth", () => {
       form.indexOf('panel === "faqs"')
     );
     assert.match(team, /Add person/);
-    assert.match(team, /liveTransferExecutor \|\| handoffMode === "live_transfer"/);
+    assert.match(team, /\{liveTransferExecutor \? \(/);
+    assert.doesNotMatch(team, /handoffMode === "live_transfer" \? \(/);
     assert.match(
       team,
       /liveTransferExecutor \|\| handoffMode === "live_transfer"[\s\S]*liveConnectBlurb\(liveDest\?\.name\)/

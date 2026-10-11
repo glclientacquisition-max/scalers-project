@@ -2311,7 +2311,8 @@ function TenantFormInner({
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
         {membersSlot}
-        {liveTransferExecutor || handoffMode === "live_transfer" ? (
+        {/* Live connect only appears once the runtime supports it. Today Scalers is callbacks only. */}
+        {liveTransferExecutor ? (
           <>
             <div id="handoff" className="scroll-mt-24">
             <SettingsGroup>
