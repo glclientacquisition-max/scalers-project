@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState } from "react";
 import {
   updateAppointmentSchedule,
@@ -12,7 +13,7 @@ const initial: AppointmentScheduleState = {};
 
 const fieldClass = deskFieldClass;
 
-export function InboxJobEditor({
+function InboxJobEditorInner({
   id,
   whenText,
   landmark,
@@ -58,3 +59,5 @@ export function InboxJobEditor({
     </div>
   );
 }
+
+export const InboxJobEditor = withRoleGate("inbox.act", InboxJobEditorInner);

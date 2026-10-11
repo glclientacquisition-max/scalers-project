@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
@@ -66,7 +67,7 @@ function DoneGlyph({ className }: { className?: string }) {
  * Archive = archived (leaves Needs you, All, Visits, Holds, Human, Answered; sits on Archived).
  * Unarchive = new (back on Needs you).
  */
-export function MarkLeadActionButton({
+function MarkLeadActionButtonInner({
   callId,
   action,
   disabled = false,
@@ -193,7 +194,7 @@ export function MarkLeadActionButton({
   );
 }
 
-export function MarkLeadDoneButton({
+function MarkLeadDoneButtonInner({
   callId,
   disabled = false,
   variant = "default",
@@ -203,7 +204,7 @@ export function MarkLeadDoneButton({
   variant?: "default" | "icon" | "button";
 }) {
   return (
-    <MarkLeadActionButton
+    <MarkLeadActionButtonInner
       callId={callId}
       action="resolved"
       disabled={disabled}
@@ -212,7 +213,7 @@ export function MarkLeadDoneButton({
   );
 }
 
-export function MarkLeadArchiveButton({
+function MarkLeadArchiveButtonInner({
   callId,
   disabled = false,
   variant = "default",
@@ -222,7 +223,7 @@ export function MarkLeadArchiveButton({
   variant?: "default" | "icon" | "button";
 }) {
   return (
-    <MarkLeadActionButton
+    <MarkLeadActionButtonInner
       callId={callId}
       action="archived"
       disabled={disabled}
@@ -231,7 +232,7 @@ export function MarkLeadArchiveButton({
   );
 }
 
-export function MarkLeadUnarchiveButton({
+function MarkLeadUnarchiveButtonInner({
   callId,
   disabled = false,
   variant = "default",
@@ -241,7 +242,7 @@ export function MarkLeadUnarchiveButton({
   variant?: "default" | "icon" | "button";
 }) {
   return (
-    <MarkLeadActionButton
+    <MarkLeadActionButtonInner
       callId={callId}
       action="new"
       disabled={disabled}
@@ -249,3 +250,11 @@ export function MarkLeadUnarchiveButton({
     />
   );
 }
+
+export const MarkLeadActionButton = withRoleGate("inbox.act", MarkLeadActionButtonInner);
+
+export const MarkLeadDoneButton = withRoleGate("inbox.act", MarkLeadDoneButtonInner);
+
+export const MarkLeadArchiveButton = withRoleGate("inbox.act", MarkLeadArchiveButtonInner);
+
+export const MarkLeadUnarchiveButton = withRoleGate("inbox.act", MarkLeadUnarchiveButtonInner);

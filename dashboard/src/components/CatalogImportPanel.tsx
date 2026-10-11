@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
@@ -29,7 +30,7 @@ const initial: CatalogImportState = {};
 
 type Mode = "paste" | "csv" | "url";
 
-export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
+function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("paste");
   const [paste, setPaste] = useState("");
@@ -293,3 +294,5 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
     </section>
   );
 }
+
+export const CatalogImportPanel = withRoleGate("settings.edit", CatalogImportPanelInner);

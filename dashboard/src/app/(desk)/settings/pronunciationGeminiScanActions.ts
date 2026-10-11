@@ -1,6 +1,6 @@
 "use server";
 
-import { requireMember } from "@/lib/requireMember";
+import { memberDenied } from "@/lib/requireMember";
 
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
@@ -176,7 +176,8 @@ export async function loadPronunciationReviewQueueAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
-  await requireMember("settings.view");
+  const denied = await memberDenied("settings.view");
+  if (denied) return denied;
   try {
     if (!(await isAuthenticated())) {
       return { error: "Sign in to load review queue." };
@@ -208,7 +209,8 @@ export async function geminiScanRecentCallsAction(
   _prev: GeminiScanState,
   formData: FormData
 ): Promise<GeminiScanState> {
-  await requireMember("settings.edit");
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   try {
     return await runGeminiScanRecentCalls(formData);
   } catch (err) {
@@ -372,7 +374,8 @@ export async function approveGeminiScanCandidateAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
-  await requireMember("settings.edit");
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to approve." };
   }
@@ -488,7 +491,8 @@ export async function dismissGeminiScanCandidateAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
-  await requireMember("settings.edit");
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to dismiss." };
   }
@@ -547,7 +551,8 @@ export async function queueGeminiCandidateForRecordingAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState & { practicePrompt?: string; practicePhrase?: string }> {
-  await requireMember("settings.edit");
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in first." };
   }

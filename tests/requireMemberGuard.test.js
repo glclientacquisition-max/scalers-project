@@ -1,5 +1,6 @@
 /**
- * Every desk server action must call requireMember(action) as its first statement.
+ * Every desk server action must call memberDenied(action) as its first statement and return
+ * the denial (never throw: thrown errors are redacted by Next and crash the page).
  * Fails when a new "use server" export under dashboard/src/app/(desk) lacks it.
  */
 const assert = require('node:assert/strict');
@@ -32,12 +33,12 @@ function actionsMissingGuard(src) {
     }
     const body = src.indexOf(' {\n', j) + 3;
     const first = src.slice(body, src.indexOf('\n', body));
-    if (!ALLOW.has(m[1]) && !/^\s*await requireMember\("[a-z.]+"\);/.test(first)) missing.push(m[1]);
+    if (!ALLOW.has(m[1]) && !/^\s*const denied = await memberDenied\("[a-z.]+"\);/.test(first)) missing.push(m[1]);
   }
   return missing;
 }
 
-it('every desk server action calls requireMember first', () => {
+it('every desk server action calls memberDenied first', () => {
   const offenders = [];
   for (const file of walk(ROOT)) {
     const src = fs.readFileSync(file, 'utf8');
@@ -49,4 +50,15 @@ it('every desk server action calls requireMember first', () => {
 
 it('the guard detector catches a missing call', () => {
   assert.deepEqual(actionsMissingGuard('export async function x(a: string): Promise<void> {\n  return;\n}\n'), ['x']);
+});
+
+it('the next line returns the denial', () => {
+  for (const file of walk(ROOT)) {
+    const src = fs.readFileSync(file, 'utf8');
+    if (!/^"use server";/m.test(src)) continue;
+    const re = /const denied = await memberDenied\("[a-z.]+"\);\n(.*)\n/g;
+    let m;
+    while ((m = re.exec(src))) assert.match(m[1], /^\s*if \(denied\) return\b/, path.relative(ROOT, file));
+    assert.doesNotMatch(src, /await requireMember\(/, `${path.relative(ROOT, file)} still throws via requireMember`);
+  }
 });

@@ -1,6 +1,6 @@
 "use server";
 
-import { requireMember } from "@/lib/requireMember";
+import { memberDenied } from "@/lib/requireMember";
 import { revalidatePath } from "next/cache";
 import { getAuthUser } from "@/lib/auth";
 import { getCurrentTenant } from "@/lib/tenant";
@@ -55,7 +55,8 @@ function mailNote(result: { sent: number; skipped: string }): string {
 }
 
 export async function inviteMemberAction(email: string, role: string): Promise<MembersActionResult> {
-  await requireMember("members.invite");
+  const denied = await memberDenied("members.invite");
+  if (denied) return denied;
   const ctx = await context();
   if (!ctx.ok) return { error: ctx.error };
   const actorRole = await roleOf(ctx.tenantId, ctx.userId);
@@ -92,7 +93,8 @@ export async function inviteMemberAction(email: string, role: string): Promise<M
 const resendHits = new Map<string, number[]>();
 
 export async function resendInviteAction(inviteId: string): Promise<MembersActionResult> {
-  await requireMember("members.invite");
+  const denied = await memberDenied("members.invite");
+  if (denied) return denied;
   const ctx = await context();
   if (!ctx.ok) return { error: ctx.error };
   const now = Date.now();
@@ -128,10 +130,24 @@ export async function resendInviteAction(inviteId: string): Promise<MembersActio
 }
 
 export async function revokeInviteAction(inviteId: string): Promise<MembersActionResult> {
-  await requireMember("members.invite");
+  const denied = await memberDenied("members.invite");
+  if (denied) return denied;
   const ctx = await context();
   if (!ctx.ok) return { error: ctx.error };
   const admin = getSupabaseAdmin();
+  // Admins may only cancel invites for roles they could have sent (not an owner-sent Admin invite).
+  const { data: pendingRow } = await admin
+    .from("tenant_invites")
+    .select("role")
+    .eq("id", inviteId)
+    .eq("tenant_id", ctx.tenantId)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (!pendingRow) return { error: "That invite is no longer pending." };
+  const actorRole = await roleOf(ctx.tenantId, ctx.userId);
+  if (!actorRole || !canManageMember(actorRole, normalizeRole((pendingRow as { role: string }).role))) {
+    return { error: "Only the owner can cancel an Admin invite." };
+  }
   const { data } = await admin
     .from("tenant_invites")
     .update({ status: "revoked", revoked_at: new Date().toISOString() })
@@ -148,7 +164,8 @@ export async function revokeInviteAction(inviteId: string): Promise<MembersActio
 }
 
 export async function changeMemberRoleAction(userId: string, role: string): Promise<MembersActionResult> {
-  await requireMember("members.manage");
+  const denied = await memberDenied("members.manage");
+  if (denied) return denied;
   const ctx = await context();
   if (!ctx.ok) return { error: ctx.error };
   if (userId === ctx.userId) return { error: "You can't change your own role." };
@@ -171,7 +188,8 @@ export async function changeMemberRoleAction(userId: string, role: string): Prom
 }
 
 export async function removeMemberAction(userId: string): Promise<MembersActionResult> {
-  await requireMember("members.manage");
+  const denied = await memberDenied("members.manage");
+  if (denied) return denied;
   const ctx = await context();
   if (!ctx.ok) return { error: ctx.error };
   if (userId === ctx.userId) return { error: "You can't remove yourself." };
@@ -193,7 +211,8 @@ export async function removeMemberAction(userId: string): Promise<MembersActionR
 }
 
 export async function transferOwnershipAction(newOwnerUserId: string): Promise<MembersActionResult> {
-  await requireMember("ownership.transfer");
+  const denied = await memberDenied("ownership.transfer");
+  if (denied) return denied;
   const ctx = await context();
   if (!ctx.ok) return { error: ctx.error };
   const { error } = await getSupabaseAdmin().rpc("transfer_tenant_ownership", {

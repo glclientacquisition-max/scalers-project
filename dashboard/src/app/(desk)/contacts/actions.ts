@@ -1,6 +1,6 @@
 "use server";
 
-import { requireMember } from "@/lib/requireMember";
+import { memberDenied } from "@/lib/requireMember";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
@@ -78,7 +78,8 @@ export async function ensureInboxContact(input: {
   phone?: string | null;
   name?: string | null;
 }): Promise<CreateContactResult & { stub?: boolean }> {
-  await requireMember("contacts.edit");
+  const denied = await memberDenied("contacts.edit");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -111,7 +112,8 @@ export async function updateContactNotes(
   contactId: string,
   notes: string
 ): Promise<ContactNotesResult> {
-  await requireMember("contacts.edit");
+  const denied = await memberDenied("contacts.edit");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -135,7 +137,8 @@ export async function updateContactNotes(
 }
 
 export async function createContact(formData: FormData): Promise<CreateContactResult> {
-  await requireMember("contacts.edit");
+  const denied = await memberDenied("contacts.edit");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -198,7 +201,8 @@ export async function previewContactCsv(
   _prev: ContactImportPreviewState,
   formData: FormData
 ): Promise<ContactImportPreviewState> {
-  await requireMember("contacts.import");
+  const denied = await memberDenied("contacts.import");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -253,7 +257,8 @@ export async function applyContactCsv(
   _prev: ContactImportApplyState,
   formData: FormData
 ): Promise<ContactImportApplyState> {
-  await requireMember("contacts.import");
+  const denied = await memberDenied("contacts.import");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
   if (String(formData.get("confirm") || "") !== "1") {
@@ -297,7 +302,8 @@ export async function updateContactName(
   contactId: string,
   name: string
 ): Promise<ContactNotesResult> {
-  await requireMember("contacts.edit");
+  const denied = await memberDenied("contacts.edit");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -345,7 +351,8 @@ export async function updateContactFavourite(
   contactId: string,
   favourite: boolean
 ): Promise<ContactNotesResult> {
-  await requireMember("contacts.edit");
+  const denied = await memberDenied("contacts.edit");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 

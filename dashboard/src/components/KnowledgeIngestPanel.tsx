@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { KNOWLEDGE_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
@@ -68,7 +69,7 @@ function serviceCsvPlaceholder(vertical: string | null | undefined): string {
   return "name,price\nHome cleaning,2500 KES\nSofa cleaning,1500 KES";
 }
 
-export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
+function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
   const knowledgePasteExample = useMountedPoolPick(
     placeholderPool(KNOWLEDGE_PASTE_POOLS, parseVertical(tenant.vertical))
@@ -614,3 +615,5 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
     </section>
   );
 }
+
+export const KnowledgeIngestPanel = withRoleGate("settings.edit", KnowledgeIngestPanelInner);

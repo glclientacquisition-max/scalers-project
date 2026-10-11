@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
@@ -292,7 +293,7 @@ function CatalogPager({
   );
 }
 
-export function TenantForm({
+function TenantFormInner({
   tenant,
   panel = "identity",
   curatedVoices,
@@ -2455,3 +2456,5 @@ export function TenantForm({
     </form>
   );
 }
+
+export const TenantForm = withRoleGate("settings.edit", TenantFormInner);

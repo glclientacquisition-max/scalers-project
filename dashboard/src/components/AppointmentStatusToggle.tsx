@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect } from "react";
 import {
   updateAppointmentStatus,
@@ -16,7 +17,7 @@ const OPTIONS = [
 
 const initial: AppointmentStatusState = {};
 
-export function AppointmentStatusToggle({
+function AppointmentStatusToggleInner({
   id,
   status,
 }: {
@@ -60,3 +61,5 @@ export function AppointmentStatusToggle({
     </form>
   );
 }
+
+export const AppointmentStatusToggle = withRoleGate("inbox.act", AppointmentStatusToggleInner);

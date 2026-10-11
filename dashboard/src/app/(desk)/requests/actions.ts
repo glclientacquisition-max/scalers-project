@@ -1,6 +1,6 @@
 "use server";
 
-import { requireMember } from "@/lib/requireMember";
+import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -19,7 +19,8 @@ export async function updateServiceRequestStatus(
   _prev: RequestStatusState,
   formData: FormData
 ): Promise<RequestStatusState> {
-  await requireMember("inbox.act");
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "Not signed in." };
 
@@ -90,7 +91,8 @@ export async function updateServiceRequestSchedule(
   _prev: RequestScheduleState,
   formData: FormData
 ): Promise<RequestScheduleState> {
-  await requireMember("inbox.act");
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "Not signed in." };
 

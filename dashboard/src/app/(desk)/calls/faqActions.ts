@@ -1,6 +1,6 @@
 "use server";
 
-import { requireMember } from "@/lib/requireMember";
+import { memberDenied } from "@/lib/requireMember";
 
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -71,7 +71,8 @@ export async function suggestFaqsFromCallAction(
   _prev: FaqSuggestState,
   formData: FormData
 ): Promise<FaqSuggestState> {
-  await requireMember("inbox.act");
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to find FAQ ideas." };
   }
@@ -152,7 +153,8 @@ export async function applyFaqSuggestionsAction(
   _prev: FaqApplyState,
   formData: FormData
 ): Promise<FaqApplyState> {
-  await requireMember("settings.edit");
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to save." };
   }

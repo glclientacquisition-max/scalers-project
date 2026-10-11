@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useState, useTransition } from "react";
 import { updateContactNotes } from "@/app/(desk)/contacts/actions";
 import {
@@ -9,7 +10,7 @@ import {
 } from "@/components/settingsUi";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 
-export function ContactNotesForm({
+function ContactNotesFormInner({
   contactId,
   initial,
 }: {
@@ -70,3 +71,4 @@ export function ContactNotesForm({
     </section>
   );
 }
+export const ContactNotesForm = withRoleGate("contacts.edit", ContactNotesFormInner);

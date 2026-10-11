@@ -6,6 +6,8 @@ import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getCurrentTenant } from "@/lib/tenant";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import { OnboardingWizard } from "./OnboardingWizard";
+import { memberCan } from "@/lib/requireMember";
+import { WorkspaceNotReady } from "@/components/WorkspaceNotReady";
 
 // instant = false: owner cookie session must run before the wizard.
 export const instant = false;
@@ -55,6 +57,10 @@ export default async function OnboardingPage() {
         </div>
       </main>
     );
+  }
+
+  if (tenantNeedsOnboarding(tenant) && !(await memberCan("settings.edit"))) {
+    return <WorkspaceNotReady businessName={tenant.business_name || null} />;
   }
 
   if (!tenantNeedsOnboarding(tenant)) {

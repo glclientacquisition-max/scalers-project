@@ -36,6 +36,13 @@ const MATRIX: Record<Role, ReadonlySet<Action>> = {
   viewer: new Set<Action>(["overview.view", "inbox.view", "contacts.view", "settings.view"]),
 };
 
+/** Plain-words refusal shown in the UI when a role lacks a permission. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function deniedMessage(role: Role | null | undefined, _action?: Action): string {
+  if (role === "viewer") return "You have view-only access. Ask the owner or an admin if something needs changing.";
+  return "Your role can't do this. Ask the owner or an admin.";
+}
+
 export function can(role: Role | null | undefined, action: Action): boolean {
   if (!role) return false;
   return MATRIX[role]?.has(action) ?? false;
@@ -80,6 +87,7 @@ export const DESK_PAGE_ACTION: Record<string, Action> = {
   "/calls": "inbox.view",
   "/contacts": "contacts.view",
   "/wallet": "usage.view",
+  "/contacts/import": "contacts.import",
   "/settings": "settings.view",
 };
 

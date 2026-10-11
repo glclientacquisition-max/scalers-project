@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,7 +28,7 @@ import {
 const previewInitial: ContactImportPreviewState = {};
 const applyInitial: ContactImportApplyState = {};
 
-export function ContactImportForm() {
+function ContactImportFormInner() {
   const router = useRouter();
   const [csvText, setCsvText] = useState("");
   const [pickerOn, setPickerOn] = useState(false);
@@ -196,3 +197,5 @@ export function ContactImportForm() {
     </div>
   );
 }
+
+export const ContactImportForm = withRoleGate("contacts.import", ContactImportFormInner);

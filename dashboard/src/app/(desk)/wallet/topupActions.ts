@@ -1,6 +1,6 @@
 "use server";
 
-import { requireMember } from "@/lib/requireMember";
+import { memberDenied } from "@/lib/requireMember";
 
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -24,7 +24,8 @@ export async function initiateWalletTopUp(
   _prev: WalletTopUpState,
   formData: FormData
 ): Promise<WalletTopUpState> {
-  await requireMember("billing.manage");
+  const denied = await memberDenied("billing.manage");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to top up." };
   }

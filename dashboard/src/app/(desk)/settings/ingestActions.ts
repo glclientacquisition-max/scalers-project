@@ -1,6 +1,6 @@
 "use server";
 
-import { requireMember } from "@/lib/requireMember";
+import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
@@ -100,7 +100,8 @@ export async function extractKnowledgeAction(
   _prev: IngestExtractState,
   formData: FormData
 ): Promise<IngestExtractState> {
-  await requireMember("settings.edit");
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to import knowledge." };
   }
@@ -206,7 +207,8 @@ export async function applyIngestAction(
   _prev: IngestApplyState,
   formData: FormData
 ): Promise<IngestApplyState> {
-  await requireMember("settings.edit");
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to save." };
   }

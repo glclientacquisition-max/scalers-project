@@ -1,12 +1,13 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateContactFavourite } from "@/app/(desk)/contacts/actions";
 import { Button } from "@/components/ui/Button";
 import { pendingSpinnerInkClass } from "@/components/ui/deskChrome";
 
-export function ContactFavouriteButton({
+function ContactFavouriteButtonInner({
   contactId,
   favourite,
 }: {
@@ -52,3 +53,5 @@ export function ContactFavouriteButton({
     </div>
   );
 }
+
+export const ContactFavouriteButton = withRoleGate("contacts.edit", ContactFavouriteButtonInner);

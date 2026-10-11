@@ -49,7 +49,7 @@ it("feature flag defaults off; env or tenant list enables", () => {
 it("nav hiding per role", () => {
   assert.deepEqual(hiddenDeskHrefs("owner"), []);
   assert.deepEqual(hiddenDeskHrefs("admin"), []);
-  assert.deepEqual(hiddenDeskHrefs("staff"), ["/wallet", "/settings"]);
-  assert.deepEqual(hiddenDeskHrefs("viewer"), ["/wallet"]);
+  assert.deepEqual(hiddenDeskHrefs("staff"), ["/wallet", "/contacts/import", "/settings"]);
+  assert.deepEqual(hiddenDeskHrefs("viewer"), ["/wallet", "/contacts/import"]);
   assert.deepEqual(hiddenDeskHrefs(null), []);
 });

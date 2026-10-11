@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateContactName } from "@/app/(desk)/contacts/actions";
@@ -14,7 +15,7 @@ import {
   pendingSpinnerClass,
 } from "@/components/ui/deskChrome";
 
-export function ContactNameForm({
+function ContactNameFormInner({
   contactId,
   initialName = "",
   title,
@@ -125,3 +126,5 @@ export function ContactNameForm({
     </div>
   );
 }
+
+export const ContactNameForm = withRoleGate("contacts.edit", ContactNameFormInner);

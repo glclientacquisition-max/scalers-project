@@ -1,5 +1,7 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
+import { useCan } from "@/components/DeskRole";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,8 +22,9 @@ type Mode = "chooser" | "form";
 
 const emptyDraft = (): Draft => ({ name: "", phone: "", notes: "" });
 
-export function AddContactPanel() {
+function AddContactPanelInner() {
   const router = useRouter();
+  const canImport = useCan("contacts.import");
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("chooser");
   const [pickerOn, setPickerOn] = useState(false);
@@ -120,14 +123,16 @@ export function AddContactPanel() {
               >
                 New
               </button>
-              <Link
-                href="/contacts/import"
-                className={`${settingsActionClass} w-full`}
-                onClick={() => setOpen(false)}
-              >
-                Import
-              </Link>
-              {pickerOn ? (
+              {canImport ? (
+                <Link
+                  href="/contacts/import"
+                  className={`${settingsActionClass} w-full`}
+                  onClick={() => setOpen(false)}
+                >
+                  Import
+                </Link>
+              ) : null}
+              {pickerOn && canImport ? (
                 <button
                   type="button"
                   className={`${settingsActionClass} w-full`}
@@ -244,3 +249,5 @@ export function AddContactPanel() {
     </>
   );
 }
+
+export const AddContactPanel = withRoleGate("contacts.edit", AddContactPanelInner);

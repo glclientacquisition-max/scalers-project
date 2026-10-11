@@ -1,15 +1,17 @@
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { getCurrentTenant } from "@/lib/tenant";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { can, normalizeRole, type Action, type Role } from "@/lib/permissions";
+import { can, deniedMessage, normalizeRole, type Action, type Role } from "@/lib/permissions";
 import { teamInvitesEnabled } from "@/lib/teamInvitesFlag";
 
 export class AccessDeniedError extends Error {
-  constructor(public action: Action) {
-    super("You don't have access to do that. Ask the business owner.");
+  constructor(public action: Action, role?: Role | null) {
+    super(deniedMessage(role, action));
     this.name = "AccessDeniedError";
   }
 }
+
+export type DeniedResult = { ok: false; error: string; denied: true };
 
 /** Light role lookup for the desk shell (no getCurrentTenant; flag off => owner, no query). */
 export async function deskMemberRole(tenantId: string | null | undefined): Promise<Role | null> {
@@ -52,8 +54,20 @@ export async function currentMemberRole(): Promise<Role | null> {
 export async function requireMember(action: Action): Promise<Role | null> {
   const role = await currentMemberRole();
   if (role === null) return null;
-  if (!can(role, action)) throw new AccessDeniedError(action);
+  if (!can(role, action)) throw new AccessDeniedError(action, role);
   return role;
+}
+
+/**
+ * Preferred guard for server actions: returns a result the UI can show instead of throwing
+ * (a thrown error is redacted by Next and lands on the crash screen).
+ * Usage: `const denied = await memberDenied("settings.edit"); if (denied) return denied;`
+ * Signed-out / no-workspace callers return null so the action's own handling runs.
+ */
+export async function memberDenied(action: Action): Promise<DeniedResult | null> {
+  const role = await currentMemberRole();
+  if (role === null || can(role, action)) return null;
+  return { ok: false, error: deniedMessage(role, action), denied: true };
 }
 
 /** Page-level check: null role (signed out / no workspace) passes so the page's own handling runs. */

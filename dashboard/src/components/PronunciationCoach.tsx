@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { DeskSelect } from "@/components/ui/DeskSelect";
@@ -125,7 +126,7 @@ function blobToFile(blob: Blob, name: string): File {
   return new File([blob], name, { type: blob.type || "audio/webm" });
 }
 
-export function PronunciationCoach({
+function PronunciationCoachInner({
   tenantId,
   businessName,
   agentName,
@@ -1768,3 +1769,5 @@ export function PronunciationCoach({
     </section>
   );
 }
+
+export const PronunciationCoach = withRoleGate("settings.edit", PronunciationCoachInner);

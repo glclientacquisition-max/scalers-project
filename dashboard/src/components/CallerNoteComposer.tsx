@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useState } from "react";
 import {
   polishCallerNoteAction,
@@ -34,7 +35,7 @@ function SmsGlyph({ className }: { className?: string }) {
   );
 }
 
-export function CallerNoteComposer({
+function CallerNoteComposerInner({
   callId,
   callerPhone,
   callerName,
@@ -142,3 +143,5 @@ export function CallerNoteComposer({
     </div>
   );
 }
+
+export const CallerNoteComposer = withRoleGate("inbox.act", CallerNoteComposerInner);

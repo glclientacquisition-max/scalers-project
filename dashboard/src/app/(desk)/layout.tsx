@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { deskMemberRole } from "@/lib/requireMember";
-import { hiddenDeskHrefs } from "@/lib/permissions";
+import { can, hiddenDeskHrefs } from "@/lib/permissions";
+import { DeskRoleProvider, ViewOnlyBanner } from "@/components/DeskRole";
+import { WorkspaceNotReady } from "@/components/WorkspaceNotReady";
 import { redirect } from "next/navigation";
 import { DeskAccountBar } from "@/components/DeskAccountBar";
 import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
@@ -50,13 +52,19 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const tenant = await getDeskShellTenant();
   timer.mark("shell");
   console.info(timer.line("desk-shell"));
+  const role = await deskMemberRole(tenant?.id);
   if (tenant && tenantNeedsOnboarding(tenant)) {
+    // Only people who can edit settings can finish setup; everyone else waits for them.
+    if (role && !can(role, "settings.edit")) {
+      return <WorkspaceNotReady businessName={tenant.business_name || null} />;
+    }
     redirect("/onboarding");
   }
 
-  const hideHrefs = hiddenDeskHrefs(await deskMemberRole(tenant?.id));
+  const hideHrefs = hiddenDeskHrefs(role);
 
   return (
+    <DeskRoleProvider role={role}>
     <DeskNavHost>
       <Suspense fallback={null}>
         <WelcomeToast />
@@ -79,6 +87,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
             />
           </Suspense>
           <DeskOffline />
+          <ViewOnlyBanner />
           <main data-desk-main="" className={deskMainClass}>
             <Suspense fallback={null}>
               <DeskPhonePull />
@@ -98,5 +107,6 @@ export default async function AppShell({ children }: { children: React.ReactNode
         </Suspense>
       </div>
     </DeskNavHost>
+    </DeskRoleProvider>
   );
 }
