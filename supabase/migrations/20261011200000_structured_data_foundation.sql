@@ -393,6 +393,7 @@ begin
   return n;
 end $$;
 revoke all on function public.snapshot_data_quality() from public, anon, authenticated;
+grant execute on function public.snapshot_data_quality() to service_role;
 
 -- Daily at 03:15 EAT (00:15 UTC) when pg_cron is available; otherwise the server cron calls it.
 do $$ begin

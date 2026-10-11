@@ -80,7 +80,22 @@ Return ONLY valid JSON (no markdown fences):
   "needs_human": false,
   "needs_owner": false,
   "urgent": false,
-  "confidence": 0.0
+  "confidence": 0.0,
+  "facts": {
+    "intent": "price_check|availability|product_info|order_place|order_status|hold_or_pickup|book_visit|quote_request|delivery_question|payment_question|directions|hours|complaint|return_refund|warranty|emergency|human_request|general_enquiry|wrong_number|spam|other",
+    "secondary_intents": [],
+    "outcome": "sale_or_order|hold|booking|callback|info_only|transferred|lost|abandoned",
+    "lost_reason": "price_too_high|out_of_stock|not_offered|outside_coverage|closed_hours|delivery_fee|wanted_human|competitor|other|null",
+    "products_mentioned": [{ "name": "item as the caller said it", "qty": null, "quoted_price_ksh": null }],
+    "price_objection": false,
+    "objection_price_ksh": null,
+    "competitor_mentioned": null,
+    "est_value_ksh": null,
+    "caller_area": null,
+    "language": "en|sw|sheng|mixed",
+    "sentiment": "positive|neutral|negative",
+    "unanswered_question": null
+  }
 }
 
 Rules:
@@ -96,7 +111,16 @@ Rules:
 - If a hold or visit was clearly saved, primary_intent is hold_or_pickup or book_visit and needs_human is false.
 - A saved visit is a request until the owner Confirms. Say exactly: Visit request saved — confirm on desk. Do not say booked, confirmed, or scheduled as done. If visitSaved is false and no callback was saved, done is None.
 - If the caller asked for a person and no hold/visit was saved, needs_human is true.
-- Prefer the trusted Brain snapshot for tools that already succeeded.`;
+- Prefer the trusted Brain snapshot for tools that already succeeded.
+- facts: structured data for the owner's reports. Use only what was said. Unknown is null, never a guess.
+- facts.outcome: sale_or_order only when an order was clearly agreed; hold or booking only when saved; lost when the caller wanted to buy or book and did not (give lost_reason); info_only when a question was answered; callback when someone must call back; abandoned when they hung up early.
+- facts.products_mentioned: each item they asked about, as they named it. qty only if said. quoted_price_ksh is the price said on the call in Kenya shillings (number only).
+- facts.price_objection: true if the caller said it was too expensive or asked for a lower price; objection_price_ksh is the price they wanted, if said.
+- facts.competitor_mentioned: another shop or brand they compared with, short, or null.
+- facts.est_value_ksh: total value of what they wanted to buy or book, only from prices said or in the snapshot.
+- facts.caller_area: the estate, town or area the caller is in or wants service at, or null.
+- facts.language: the caller's language. sheng for Nairobi street slang (niaje, poa, doh, ganji, msee), sw for Swahili, mixed when they switch with English.
+- facts.unanswered_question: a question the Business Assistant could not answer, in the caller's words, short; null if none.`;
 
 const NAME_EXTRACT_SYSTEM = `You extract the caller's own name from ONE finished phone call.
 
@@ -107,6 +131,7 @@ If they spelled letter by letter, join those letters.
 Prefer the usual Kenyan spelling of the same name (Isha or Eisha is Aisha). Asha is not Aisha. Do not invent a name they never used.`;
 
 const { isVisitClassEscalateReason } = require('./playbooks/homeServices');
+const { buildCallFactsRow, normalizeCallFacts } = require('./callFacts');
 
 const pendingReviews = new Map();
 
@@ -445,6 +470,7 @@ function parseReviewJson(text) {
     needs_owner: needsOwner === true,
     urgent: urgent === true,
     confidence: clampConfidence(obj.confidence),
+    facts: normalizeCallFacts(obj.facts),
   };
 }
 
@@ -1069,6 +1095,26 @@ function withSummaryWriteLock(callSid, fn) {
   return run;
 }
 
+async function defaultSaveFacts({ callSid, ctx, review, turns }) {
+  const db = require('../db');
+  const call = ctx.call || (await db.getCall(callSid));
+  if (!call?.id || !call?.tenant_id) return null;
+  const catalogue = await db.getTenantCatalogue(call.tenant_id);
+  const callerText = (turns || [])
+    .filter((t) => String(t?.role || t?.speaker || '').toLowerCase().match(/caller|user/))
+    .map((t) => turnText(t))
+    .join(' ');
+  const row = buildCallFactsRow({
+    call,
+    facts: review.facts,
+    review,
+    callerText,
+    catalogue,
+    model: process.env.POST_CALL_REVIEW_MODEL || 'gemini',
+  });
+  return db.upsertCallFacts(row);
+}
+
 async function defaultSave({ callSid, merged, review, derived, summary }) {
   return withSummaryWriteLock(callSid, () =>
     writeReviewedSummary({ callSid, merged, review, derived, summary })
@@ -1259,6 +1305,13 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
     review,
     vertical: ctx.vertical,
   });
+
+  // Structured record for reports. Never blocks or fails the owner card.
+  try {
+    await (deps.saveFacts || defaultSaveFacts)({ callSid, ctx, review, turns });
+  } catch (err) {
+    console.warn(`[transcript-review] ${callSid} call_facts failed:`, err?.message || err);
+  }
 
   if (
     !merged.applied.reason &&
