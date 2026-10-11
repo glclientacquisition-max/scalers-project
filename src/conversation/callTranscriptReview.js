@@ -1308,7 +1308,9 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
 
   // Structured record for reports. Never blocks or fails the owner card.
   try {
-    await (deps.saveFacts || defaultSaveFacts)({ callSid, ctx, review, turns });
+    // Injected save (tests, replays) means no live db; facts then only via deps.saveFacts.
+    const saveFacts = deps.saveFacts || (deps.save ? null : defaultSaveFacts);
+    if (saveFacts) await saveFacts({ callSid, ctx, review, turns });
   } catch (err) {
     console.warn(`[transcript-review] ${callSid} call_facts failed:`, err?.message || err);
   }

@@ -86,3 +86,23 @@ test('daily data-quality tick runs once per EAT day after 03:00', async () => {
   assert.equal(await job.tick(new Date('2026-10-12T05:00:00Z')), false); // same day
   assert.equal(n, 1);
 });
+
+test('post-call review hands structured facts to saveFacts and a facts failure never blocks the card', async () => {
+  const { runPostCallTranscriptReview } = require('../src/conversation/callTranscriptReview');
+  const turns = [
+    { speaker: 'caller', text: 'Niaje, how much is the A4 ream? Ni doh ngapi?' },
+    { speaker: 'agent', text: 'It is 650 shillings.' },
+  ];
+  const seen = [];
+  const res = await runPostCallTranscriptReview(
+    { callSid: 'CA1', turns, derived: {}, summary: {}, toolFlags: {} },
+    {
+      generateText: async () => JSON.stringify({ want: 'Price of A4 ream', reason: 'Price of A4 ream', needs_human: false, confidence: 0.9, facts: { intent: 'price_check', outcome: 'info_only', products_mentioned: [{ name: 'A4 ream', quoted_price_ksh: 650 }] } }),
+      save: async () => {},
+      saveFacts: async (x) => { seen.push(x.review.facts); throw new Error('db down'); },
+    }
+  );
+  assert.equal(res.ok, true);
+  assert.equal(seen[0].intent, 'price_check');
+  assert.equal(seen[0].products_mentioned[0].quoted_price_ksh, 650);
+});
