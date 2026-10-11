@@ -17,6 +17,9 @@ export type BusinessPolicies = {
   >;
   /** Nested hold rules. Round-tripped so a settings save does not drop them. */
   holds?: unknown;
+  /** "confirmed_slot" lets the Business Assistant book a time; "request" means the owner confirms. Round-tripped. */
+  booking_mode?: string;
+  booking?: unknown;
 };
 
 type PolicyTextId =
@@ -111,6 +114,8 @@ export function normalizeBusinessPolicies(raw: unknown): BusinessPolicies {
     base.provenance = obj.provenance as BusinessPolicies["provenance"];
   }
   if (obj.holds !== undefined) base.holds = obj.holds;
+  if (typeof obj.booking_mode === "string") base.booking_mode = obj.booking_mode.slice(0, 40);
+  if (obj.booking !== undefined) base.booking = obj.booking;
   return base;
 }
 
@@ -139,4 +144,59 @@ export function formatPoliciesForCompiler(policies: BusinessPolicies): string {
     );
   }
   return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Structured hold rules (policies.holds). Read by tenant_hold_gate and the call brain.
+// ---------------------------------------------------------------------------
+
+export type YesNo = "yes" | "no" | "";
+
+export type HoldRules = {
+  allowed: YesNo;
+  /** Longest a hold lasts, in hours. */
+  max_hours: number | null;
+  deposit_required: YesNo;
+};
+
+export const HOLD_HOURS_OPTIONS = [2, 6, 24, 48, 72] as const;
+
+function yesNo(v: unknown): YesNo {
+  const t = String(v ?? "").trim().toLowerCase();
+  if (t === "yes" || t === "true" || t === "1") return "yes";
+  if (t === "no" || t === "false" || t === "0") return "no";
+  return "";
+}
+
+export function readHoldRules(holds: unknown): HoldRules {
+  const h = holds && typeof holds === "object" && !Array.isArray(holds) ? (holds as Record<string, unknown>) : {};
+  const hours = Number(h.max_hours);
+  return {
+    allowed: yesNo(h.allowed ?? h.enabled),
+    max_hours: Number.isFinite(hours) && hours > 0 && hours <= 720 ? Math.round(hours) : null,
+    deposit_required: yesNo(h.deposit_required),
+  };
+}
+
+/** Stored shape. Marked owner so the gate treats it as the owner's own answer. */
+export function holdRulesValue(rules: HoldRules): Record<string, unknown> {
+  return {
+    allowed: rules.allowed,
+    max_hours: rules.allowed === "yes" ? rules.max_hours : null,
+    deposit_required: rules.allowed === "yes" ? rules.deposit_required : "",
+    source: "owner",
+    confirmed: true,
+  };
+}
+
+export type BookingMode = "confirmed_slot" | "request" | "";
+
+export function readBookingMode(policies: { booking_mode?: unknown } | null | undefined): BookingMode {
+  const m = String(policies?.booking_mode ?? "").trim().toLowerCase();
+  return m === "confirmed_slot" || m === "request" ? m : "";
+}
+
+/** booking_mode plus the owner meta confirmedSlotEnabled reads. */
+export function bookingModePatch(mode: BookingMode): { booking_mode: string; booking: Record<string, unknown> } {
+  return { booking_mode: mode, booking: { source: "owner", confirmed: true } };
 }

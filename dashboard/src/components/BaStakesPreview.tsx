@@ -1,6 +1,8 @@
+import { ListRow } from "@/components/ui/ListRow";
 import { Stamp } from "@/components/ui/Stamp";
 import type { StakeLine } from "@/lib/baStakes";
 
+/** Same row recipe as the capability list: title, preview line, stamp beside the preview. */
 export function BaStakesPreview({
   title,
   lines,
@@ -15,15 +17,16 @@ export function BaStakesPreview({
       </h3>
       <ul className="mt-3 divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
         {lines.map((line) => (
-          <li key={line.question} className="flex items-start justify-between gap-3 px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-body text-ink">{line.question}</p>
-              <p className="mt-0.5 text-meta text-ink-2">{line.answer}</p>
-            </div>
-            <Stamp tone={line.state === "live" ? "ok" : line.state === "locked" ? "attention" : "neutral"}>
-              {line.state === "live" ? "Live" : line.state === "locked" ? "Locked" : "Unknown"}
-            </Stamp>
-          </li>
+          <ListRow
+            key={line.question}
+            title={line.question}
+            preview={line.answer}
+            stamp={
+              <Stamp tone={line.state === "live" ? "ok" : line.state === "locked" ? "attention" : "neutral"}>
+                {line.state === "live" ? "Live" : line.state === "locked" ? "Needs setup" : "Unknown"}
+              </Stamp>
+            }
+          />
         ))}
       </ul>
     </section>

@@ -7,7 +7,7 @@ export const FIELD_PATH_PATTERNS: readonly RegExp[] = [
   /^identity\.(business_name|vertical|primary_phone|language|spoken_name|social_handles)$/,
   /^hours\.weekly_grid$/,
   /^locations\.branches$/,
-  /^policies\.(payment|deposit|returns|delivery|cancellation|warranty|other|coverage_areas|holds|holds\.allowed)$/,
+  /^policies\.(payment|deposit|returns|delivery|cancellation|warranty|other|coverage_areas|holds|holds\.allowed|booking_mode)$/,
   /^payments\.methods$/,
   // Products: sku, else 1-based position. Services: stable id (svc_… or uuid),
   // else 1-based position (Brain's readers fall back to position).
