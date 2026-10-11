@@ -1,6 +1,7 @@
 "use client";
 
 import { withRoleGate } from "@/components/DeskRole";
+import { TTS_MATCH_MAX, TTS_SAY_MAX } from "@/lib/pronunciationLexicon";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { DeskSelect } from "@/components/ui/DeskSelect";
@@ -1308,6 +1309,7 @@ function PronunciationCoachInner({
                       <div className="flex w-full flex-wrap items-center gap-2">
                         <input
                           value={editSay}
+                          maxLength={TTS_SAY_MAX}
                           onChange={(e) => setEditSay(e.target.value)}
                           aria-label={`Say-as for ${label}`}
                           className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 font-mono text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:ring-2 focus:ring-brand"
@@ -1495,6 +1497,7 @@ function PronunciationCoachInner({
                       {spellingOpen && row.canApproveSpelling ? (
                         <input
                           value={reviewEdits[c.id] ?? c.suggested_form}
+                          maxLength={TTS_SAY_MAX}
                           onChange={(e) =>
                             setReviewEdits((prev) => ({
                               ...prev,
@@ -1551,6 +1554,7 @@ function PronunciationCoachInner({
               </label>
               <input
                 id="pron-add-phrase"
+                maxLength={TTS_MATCH_MAX}
                 value={addPhrase}
                 onChange={(e) => {
                   setAddPhrase(e.target.value);
@@ -1594,6 +1598,7 @@ function PronunciationCoachInner({
                 </label>
                 <input
                   id="pron-add-say"
+                  maxLength={TTS_SAY_MAX}
                   value={addSay}
                   onChange={(e) => {
                     setAddSay(e.target.value);

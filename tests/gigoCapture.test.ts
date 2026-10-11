@@ -9,6 +9,7 @@ import {
 } from "../dashboard/src/lib/outcomeGates.ts";
 import {
   holdCaptureTenant,
+  reconcileCatalogScore,
   reviewGapCopy,
   scoreCaptureTenant,
 } from "../dashboard/src/lib/completenessStub.ts";
@@ -25,36 +26,14 @@ describe("outcome gates", () => {
     assert.equal(hoursCapturePasses("8-7"), false);
   });
 
-  it("rejects we sell stuff and passes a real shop catalog", () => {
+  it("rejects we sell stuff and passes one priced product (owner decision)", () => {
     assert.equal(inferPriceMode("we sell stuff"), null);
     assert.equal(shopCatalogPasses([{ name: "we sell stuff", price: "we sell stuff" }]), false);
-    assert.equal(
-      shopCatalogPasses(
-        Array.from({ length: 9 }, (_, index) => ({
-          name: `Item ${index + 1}`,
-          price: "500",
-          category: "phones",
-        }))
-      ),
-      false
-    );
-    assert.equal(
-      shopCatalogPasses(
-        Array.from({ length: 10 }, (_, index) => ({
-          name: `Item ${index + 1}`,
-          price: "500",
-        }))
-      ),
-      true
-    );
-    assert.equal(
-      shopCatalogPasses([
-        { name: "Charger", category: "Power", price: "500" },
-        { name: "Case", category: "Protection", price: "from 300" },
-        { name: "Cable", category: "Power leads", price: "200-400" },
-      ]),
-      true
-    );
+    assert.equal(shopCatalogPasses([{ name: "Test Notebook", price: "150" }]), true);
+    assert.equal(shopCatalogPasses([{ name: "Pen", price: "ask" }]), true);
+    assert.equal(shopCatalogPasses([{ name: "Pen", price: "-100" }]), false);
+    assert.equal(shopCatalogPasses([{ name: "", price: "150" }]), false);
+    assert.equal(shopCatalogPasses([]), false);
   });
 
   it("requires price mode and a site visit for home services", () => {
@@ -108,10 +87,8 @@ describe("completeness stub", () => {
     assert.equal(backfill.ready_badge, false);
     assert.equal(
       reviewGapCopy("Add products or services with owner-confirmed names and prices."),
-      // #598: Save attests owner facts (no separate Confirm step), so the copy says "save".
-      "Add your catalogue, then save."
+      "Review and confirm your catalogue."
     );
-    assert.equal(reviewGapCopy("  unknown gap  "), "unknown gap");
   });
 
   it("keeps a seeds-only tenant under 20 with no ready badge and holds locked", () => {
@@ -142,5 +119,67 @@ describe("completeness stub", () => {
       business_policies: { holds: { allowed: true } },
     });
     assert.equal(catalogueHold.allowed, true);
+  });
+});
+
+import { shopCatalogGap } from "../dashboard/src/lib/outcomeGates.ts";
+describe("QA fixes: onboarding gates", () => {
+  it("rejects negative prices but keeps ranges", () => {
+    assert.equal(inferPriceMode("-100"), null);
+    assert.equal(inferPriceMode("KSh -50"), null);
+    assert.equal(inferPriceMode("abc"), null);
+    assert.equal(inferPriceMode("200-400"), "range");
+    assert.equal(inferPriceMode("150"), "fixed");
+  });
+  it("explains why the shop step is blocked", () => {
+    assert.equal(shopCatalogGap([{ name: "Test Notebook", price: "150" }]), null);
+    assert.match(String(shopCatalogGap([])), /at least one product/);
+    assert.match(String(shopCatalogGap([{ name: "X", price: "abc" }])), /valid price/);
+    assert.match(String(shopCatalogGap([{ name: "X", price: "-50" }])), /valid price/);
+  });
+  it("rejects closing before opening in 24h form", () => {
+    assert.equal(parseCaptureHours("Mon-Fri 18:00-09:00"), null);
+    assert.equal(parseCaptureHours("Mon-Fri 9-5")?.days.mon?.close, "17:00");
+  });
+});
+
+describe("reconcileCatalogScore (Overview catalogue card)", () => {
+  const services = Array.from({ length: 16 }, (_, i) => ({
+    name: `Cleaning ${i + 1}`,
+    price_range: "KES 2,000",
+  }));
+  const liveGap = {
+    overall: 30,
+    domains: { catalog: 0 },
+    ready_badge: false,
+    next_gaps: [
+      { domain: "catalog", action: "Add products or services with owner-confirmed names and prices." },
+      { domain: "faqs", action: "Confirm three answers." },
+    ],
+  };
+  it("drops the catalogue gap when saved, owner-attested rows score it", () => {
+    const meta = Object.fromEntries(
+      services.map((_, i) => [`catalog.service.${i + 1}.name`, "owner" as const])
+    );
+    const out = reconcileCatalogScore(
+      liveGap,
+      { vertical: "home_services", services_catalog: services.map((s) => ({ ...s, site_visit_required: true })) },
+      meta
+    );
+    assert.ok(out.domains.catalog >= 40);
+    assert.equal(out.next_gaps[0].domain, "faqs");
+  });
+  it("never says 'add' when the catalogue has named rows", () => {
+    const out = reconcileCatalogScore(liveGap, { vertical: "home_services", services_catalog: services });
+    assert.equal(out.next_gaps[0].action, "Review and confirm your catalogue.");
+    assert.equal(reviewGapCopy(out.next_gaps[0].action || ""), "Review and confirm your catalogue.");
+  });
+  it("keeps the gap for an empty catalogue", () => {
+    const out = reconcileCatalogScore(liveGap, { vertical: "home_services" });
+    assert.equal(out.next_gaps[0].domain, "catalog");
+    assert.equal(
+      reviewGapCopy(out.next_gaps[0].action || ""),
+      "Add products or services with prices."
+    );
   });
 });

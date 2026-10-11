@@ -26,6 +26,7 @@ export function AlertContactsList({
   onChange,
   onAdd,
   onRemove,
+  canRemove,
 }: {
   team: TeamDirectoryEntry[];
   flags: ReadonlyArray<{ key: FlagKey; label: string }>;
@@ -34,6 +35,8 @@ export function AlertContactsList({
   onChange: (index: number, key: keyof TeamDirectoryEntry, value: string | boolean) => void;
   onAdd: () => void;
   onRemove: (index: number) => void;
+  /** False for the owner's own row: the owner always stays on the alert list. */
+  canRemove?: (entry: TeamDirectoryEntry) => boolean;
 }) {
   // Blank rows (new contacts) open straight away; saved rows stay collapsed.
   const [open, setOpen] = useState<Set<number>>(
@@ -92,7 +95,7 @@ export function AlertContactsList({
                       ["name", "Name", "Wanjiku Mwangi", "text", "name"],
                       ["role", "Job", "Orders and payments", "text", "organization-title"],
                       ["phone", "Phone", "+254 700 000 000", "tel", "tel"],
-                      ["email", "Email", "wanjiku@shop.co.ke", "email", "email"],
+                      ["email", "Email", "wanjiku@shop.co.ke", "text", "off"],
                     ] as const
                   ).map(([key, label, placeholder, type, auto]) => (
                     <div key={key} className="min-w-0">
@@ -102,6 +105,7 @@ export function AlertContactsList({
                       <input
                         id={`team-${key}-${index}`}
                         type={type}
+                        inputMode={key === "email" ? "email" : undefined}
                         autoComplete={auto}
                         value={String(member[key] ?? "")}
                         onChange={(e) => onChange(index, key, e.target.value)}
@@ -129,9 +133,13 @@ export function AlertContactsList({
                   ))}
                 </div>
                 <div className="flex justify-end">
+                  {canRemove && !canRemove(member) ? (
+                    <span className="text-meta text-ink-2">The owner always stays on this list.</span>
+                  ) : (
                   <Button variant="danger" size="sm" onClick={() => onRemove(index)} aria-label={`Remove ${who}`}>
                     Remove
                   </Button>
+                  )}
                 </div>
               </div>
             </li>

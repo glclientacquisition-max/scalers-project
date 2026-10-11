@@ -3,6 +3,8 @@
 import { AlertContactsList } from "@/components/AlertContactsList";
 
 import { withRoleGate } from "@/components/DeskRole";
+import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
+import { normalizeContactPhone } from "@/lib/teamValidation";
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
@@ -256,12 +258,28 @@ function PolicyTextarea({
   placeholder: string;
 }) {
   return (
-    <ExpandTextarea
-      id={id}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-    />
+    <div>
+      <ExpandTextarea
+        id={id}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        maxLength={POLICY_TEXT_MAX}
+      />
+      <CharCount value={value} max={POLICY_TEXT_MAX} />
+    </div>
+  );
+}
+
+function CharCount({ value, max }: { value: string; max: number }) {
+  const n = value.length;
+  return (
+    <p
+      className={`mt-1 text-right text-xs ${n >= max ? "text-warn" : "text-ink-soft"}`}
+      aria-live="polite"
+    >
+      {n}/{max}
+    </p>
   );
 }
 
@@ -293,6 +311,11 @@ function CatalogPager({
       className="border-t border-line bg-surface-canvas px-3 py-3"
     />
   );
+}
+
+function isOwnerTeamRow(phone: string, ownerPhone: string | null | undefined): boolean {
+  const a = normalizeContactPhone(phone);
+  return Boolean(a && a === normalizeContactPhone(ownerPhone));
 }
 
 function TenantFormInner({
@@ -2203,6 +2226,7 @@ function TenantFormInner({
           note={TEAM_NOTIFY_CHANNEL_NOTE}
           addLabel="Add person"
           onChange={updateTeam}
+          canRemove={(m) => !isOwnerTeamRow(m.phone, tenant.whatsapp_notification_number)}
           onAdd={() => setTeam((prev) => [...prev, emptyMember()])}
           onRemove={(index) => {
             const member = team[index];
@@ -2289,6 +2313,7 @@ function TenantFormInner({
                   rows={2}
                   className={`${fieldClass} py-2 leading-relaxed`}
                 />
+                <CharCount value={faq.answer} max={FAQ_ANSWER_MAX} />
               </div>
               <div className="flex items-start justify-end">
                 <button
