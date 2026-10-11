@@ -72,7 +72,7 @@ import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
 type CallerProofRow = { name: string; say: string };
 
 const libraryMutedClass = `${settingsGhostButtonClass} w-auto shrink-0 whitespace-nowrap`;
-const libraryLinkClass = `inline-flex min-h-11 items-center justify-center px-3 text-sm font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`;
+const libraryLinkClass = `inline-flex min-h-11 items-center justify-center px-3 text-body font-medium text-ink-2 underline-offset-2 hover:text-ink hover:underline ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`;
 
 function HearButton({
   name,
@@ -948,13 +948,13 @@ function PronunciationCoachInner({
         ) : (
           <h2
             id="pronunciation-coach-heading"
-            className="font-display text-2xl tracking-tight text-ink"
+            className="font-display text-page tracking-tight text-ink"
           >
             Pronunciation
           </h2>
         )}
         {cleanNote ? (
-          <p className="mt-2 text-xs text-[var(--ok)]" role="status">
+          <p className="mt-2 text-meta text-[var(--ok)]" role="status">
             {cleanNote}
           </p>
         ) : null}
@@ -979,7 +979,7 @@ function PronunciationCoachInner({
             >
               {m.label}
               {m.hint ? (
-                <span className="ml-1.5 text-xs font-normal text-ink-soft">
+                <span className="ml-1.5 text-meta font-normal text-ink-2">
                   {m.hint}
                 </span>
               ) : null}
@@ -992,10 +992,10 @@ function PronunciationCoachInner({
         <div className="space-y-5">
           {callerProof?.length ? (
             <div data-testid="caller-proof">
-              <p className="text-sm font-medium text-ink" role="status">
+              <p className="text-body font-medium text-ink" role="status">
                 Callers hear this
               </p>
-              <ul className="mt-2 divide-y divide-line border-y border-line">
+              <ul className="mt-2 divide-y divide-hairline border-y border-hairline">
                 {callerProof.map((row, index) => {
                   const key = `proof:${row.name}:${row.say}:${index}`;
                   return (
@@ -1003,7 +1003,7 @@ function PronunciationCoachInner({
                       key={key}
                       className="flex items-center justify-between gap-3 py-2"
                     >
-                      <span className="min-w-0 truncate text-sm text-ink">
+                      <span className="min-w-0 truncate text-body text-ink">
                         {row.name}
                       </span>
                       <HearButton
@@ -1029,15 +1029,15 @@ function PronunciationCoachInner({
           ) : null}
           {!todoItems.length && !active ? (
             <div className="rounded-xl border border-dashed border-[var(--line)] bg-surface/60 px-4 py-5">
-              <p className="text-sm font-medium text-[var(--ink)]">Nothing left to practice</p>
+              <p className="text-body font-medium text-[var(--ink)]">Nothing left to practice</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
+                <Button
+                 
                   onClick={() => setMode("fix")}
-                  className={btnPrimary}
+                 
                 >
                   Fix a word
-                </button>
+                </Button>
                 <Button variant="ghost" onClick={() => setMode("library")}>
                   Open library
                 </Button>
@@ -1048,17 +1048,17 @@ function PronunciationCoachInner({
               {active ? (
                 <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-surface px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                    <p className="text-meta font-medium text-[var(--ink-soft)]">
                       {active.label}
                     </p>
                     {totalFocus ? (
-                      <p className="text-xs text-[var(--ink-soft)]">
+                      <p className="text-meta text-[var(--ink-soft)]">
                         {doneCount} of {totalFocus} done
                       </p>
                     ) : null}
                   </div>
                   <p
-                    className="mt-2 font-display text-xl leading-snug tracking-tight text-[var(--ink)] sm:text-2xl"
+                    className="mt-2 font-display text-title leading-snug tracking-tight text-[var(--ink)] sm:text-page"
                     aria-live="polite"
                   >
                     {active.prompt}
@@ -1066,26 +1066,26 @@ function PronunciationCoachInner({
 
                   <div className="mt-4 flex flex-wrap items-center gap-2">
                     {!recording && !audioBlob ? (
-                      <button
-                        type="button"
+                      <Button
+                       
                         onClick={startRecording}
-                        className={`${btnPrimary} w-auto shrink-0 gap-2`}
-                      >
+                       
+                       className="w-auto shrink-0 gap-2">
                         Record line
-                      </button>
+                      </Button>
                     ) : null}
                     {recording ? (
-                      <button
-                        type="button"
+                      <Button
+                       
                         onClick={stopRecording}
-                        className={`${btnPrimary} w-auto shrink-0 gap-2`}
-                      >
+                       
+                       className="w-auto shrink-0 gap-2">
                         <span
                           aria-hidden="true"
                           className="h-2.5 w-2.5 animate-pulse rounded-full bg-accent-on-fill"
                         />
                         Stop
-                      </button>
+                      </Button>
                     ) : null}
                     {audioBlob && audioUrl && !recording ? (
                       <>
@@ -1102,17 +1102,17 @@ function PronunciationCoachInner({
                         >
                           Retry
                         </button>
-                        <button
-                          type="button"
+                        <Button
+                         
                           onClick={keepRecording}
                           disabled={confirmPending}
-                          className={`${btnPrimary} w-auto shrink-0 gap-2`}
-                        >
+                         
+                         className="w-auto shrink-0 gap-2">
                           {confirmPending ? (
                             <span className={pendingSpinnerClass} aria-hidden="true" />
                           ) : null}
                           {confirmPending ? "Checking…" : "Use this take"}
-                        </button>
+                        </Button>
                       </>
                     ) : null}
                     <button
@@ -1125,17 +1125,17 @@ function PronunciationCoachInner({
                   </div>
 
                   {micError ? (
-                    <p className="mt-3 text-sm text-[var(--warn)]" role="alert">
+                    <p className="mt-3 text-body text-[var(--warn)]" role="alert">
                       {micError}
                     </p>
                   ) : null}
                   {showMismatch ? (
                     <div className="mt-3 rounded-xl border border-[var(--warn)]/30 bg-[var(--warn-soft)] px-3 py-2">
-                      <p className="text-sm text-[var(--warn)]" role="alert">
+                      <p className="text-body text-[var(--warn)]" role="alert">
                         {confirmState.error}
                       </p>
                       {confirmState.heard ? (
-                        <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                        <p className="mt-1 text-meta text-[var(--ink-soft)]">
                           We heard something like: “{confirmState.heard}”
                         </p>
                       ) : null}
@@ -1147,14 +1147,14 @@ function PronunciationCoachInner({
               {(todoItems.length > 1 || showFullQueue) && queueList.length > 0 ? (
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                    <p className="text-meta font-medium text-[var(--ink-soft)]">
                       Up next
                     </p>
                     {items.length > 5 || showFullQueue ? (
                       <button
                         type="button"
                         onClick={() => setShowFullQueue((v) => !v)}
-                        className="text-xs font-medium text-[var(--accent-deep)] hover:underline"
+                        className="text-meta font-medium text-[var(--accent-deep)] hover:underline"
                       >
                         {showFullQueue
                           ? "Show remaining only"
@@ -1184,7 +1184,7 @@ function PronunciationCoachInner({
                               clearTake();
                             }}
                             className={[
-                              "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-sm",
+                              "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-body",
                               deskShiftClass,
                               selected
                                 ? "border-[var(--accent)] bg-[var(--accent-soft)]"
@@ -1193,14 +1193,14 @@ function PronunciationCoachInner({
                             ].join(" ")}
                           >
                             <span className="min-w-0">
-                              <span className="block text-xs text-[var(--ink-soft)]">
+                              <span className="block text-meta text-[var(--ink-soft)]">
                                 {item.label}
                               </span>
                               <span className="mt-0.5 block truncate font-medium text-[var(--ink)]">
                                 {item.prompt}
                               </span>
                             </span>
-                            <span className="shrink-0 text-xs text-[var(--ink-soft)]">
+                            <span className="shrink-0 text-meta text-[var(--ink-soft)]">
                               {item.status === "done"
                                 ? "Done"
                                 : item.status === "skipped"
@@ -1223,7 +1223,7 @@ function PronunciationCoachInner({
         <div className="space-y-4">
           {lexicon.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[var(--line)] bg-surface/60 px-4 py-5">
-              <p className="text-sm font-medium text-[var(--ink)]">Nothing trained yet</p>
+              <p className="text-body font-medium text-[var(--ink)]">Nothing trained yet</p>
               <button
                 type="button"
                 onClick={() => setMode("practice")}
@@ -1234,7 +1234,7 @@ function PronunciationCoachInner({
             </div>
           ) : (
             <>
-              <ul className="divide-y divide-line border-y border-line">
+              <ul className="divide-y divide-hairline border-y border-hairline">
                 {visibleLexicon.map((entry) => {
                   const label = displayLexiconLabel(entry);
                   const isEditing = editingMatch === entry.match;
@@ -1243,9 +1243,9 @@ function PronunciationCoachInner({
                   <li key={entry.match} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-ink">{label}</p>
+                        <p className="truncate text-body font-medium text-ink">{label}</p>
                         {!isEditing ? (
-                          <p className="truncate font-mono text-xs text-ink-soft">{entry.say}</p>
+                          <p className="truncate font-mono text-meta text-ink-2">{entry.say}</p>
                         ) : null}
                       </div>
                       <HearButton
@@ -1312,22 +1312,22 @@ function PronunciationCoachInner({
                           maxLength={TTS_SAY_MAX}
                           onChange={(e) => setEditSay(e.target.value)}
                           aria-label={`Say-as for ${label}`}
-                          className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 font-mono text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:ring-2 focus:ring-brand"
+                          className="min-h-11 min-w-0 flex-1 rounded-xl border border-hairline bg-surface px-3 font-mono text-body text-ink outline-none placeholder:text-ink-2/70 focus:outline-none focus:ring-2 focus:ring-brand"
                         />
-                        <button
-                          type="button"
+                        <Button
+                         
                           onClick={() => saveEditedSay(entry.match)}
                           disabled={
                             persistPending ||
                             !sanitizeSayForm(editSay) ||
                             heardEdit !== `${entry.match}:${sanitizeSayForm(editSay)}`
                           }
-                          className={`${btnPrimary} w-auto shrink-0`}
-                        >
+                         
+                         className="w-auto shrink-0">
                           {persistPending ? "Saving…" : "Save"}
-                        </button>
+                        </Button>
                         {heardEdit === `${entry.match}:${sanitizeSayForm(editSay)}` ? null : (
-                          <p className="w-full text-xs text-ink-soft">Hear it first.</p>
+                          <p className="w-full text-meta text-ink-2">Hear it first.</p>
                         )}
                       </div>
                     ) : null}
@@ -1345,15 +1345,15 @@ function PronunciationCoachInner({
             </>
           )}
           {persistState.error ? (
-            <p className="text-xs text-[var(--warn)]">{persistState.error}</p>
+            <p className="text-meta text-[var(--warn)]">{persistState.error}</p>
           ) : null}
           {persistState.ok && !persistState.error ? (
-            <p className="text-xs text-[var(--ok)]" role="status">
+            <p className="text-meta text-[var(--ok)]" role="status">
               Updated. Next call will use it.
             </p>
           ) : null}
           {addError && mode === "library" ? (
-            <p className="text-xs text-[var(--warn)]" role="alert">
+            <p className="text-meta text-[var(--warn)]" role="alert">
               {addError}
             </p>
           ) : null}
@@ -1366,30 +1366,30 @@ function PronunciationCoachInner({
             <h3 className="font-medium text-ink">Needs review</h3>
 
             {geminiNote && (approveState.error || dismissState.error) ? (
-              <p className="text-xs text-[var(--warn)]" role="alert">
+              <p className="text-meta text-[var(--warn)]" role="alert">
                 {geminiNote}
               </p>
             ) : null}
             {geminiNote && !approveState.error && !dismissState.error ? (
-              <p className="text-xs text-[var(--ink-soft)]" role="status">
+              <p className="text-meta text-[var(--ink-soft)]" role="status">
                 {geminiNote}
               </p>
             ) : null}
             {loadQueueState.error ? (
-              <p className="text-xs text-[var(--warn)]" role="alert">
+              <p className="text-meta text-[var(--warn)]" role="alert">
                 {loadQueueState.error}
               </p>
             ) : null}
 
             {fixReviewRows.length === 0 ? (
               loadQueueState.error ? null : (
-                <p className="text-sm text-ink" role="status">
+                <p className="text-body text-ink" role="status">
                   Nothing waiting.
                 </p>
               )
             ) : (
               <ul
-                className="divide-y divide-line border-y border-line"
+                className="divide-y divide-hairline border-y border-hairline"
                 aria-label="Pronunciation review queue"
               >
                 {fixReviewRows.map((row) => {
@@ -1412,12 +1412,12 @@ function PronunciationCoachInner({
                       className="flex min-w-0 flex-wrap items-center gap-2 py-2"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-ink">
+                        <p className="truncate text-body font-medium text-ink">
                           {row.phrase}
                         </p>
                         {proposed ? (
                           <p
-                            className={`${deskPreviewClass} font-mono text-xs text-ink-soft`}
+                            className={`${deskPreviewClass} font-mono text-meta text-ink-2`}
                           >
                             {proposed}
                           </p>
@@ -1489,7 +1489,7 @@ function PronunciationCoachInner({
                           </button>
                         ) : null}
                         {row.primaryAction === "use" && !heardThis ? (
-                          <p className="basis-full text-xs text-ink-soft">
+                          <p className="basis-full text-meta text-ink-2">
                             Hear it first.
                           </p>
                         ) : null}
@@ -1508,7 +1508,7 @@ function PronunciationCoachInner({
                             if (e.key === "Enter") e.preventDefault();
                           }}
                           aria-label={`Spelling for ${row.phrase}`}
-                          className="min-h-11 w-40 max-w-full rounded-xl border border-line bg-surface px-3 font-mono text-sm text-ink outline-none focus:outline-none focus:ring-2 focus:ring-brand"
+                          className="min-h-11 w-40 max-w-full rounded-xl border border-hairline bg-surface px-3 font-mono text-body text-ink outline-none focus:outline-none focus:ring-2 focus:ring-brand"
                         />
                       ) : null}
                     </li>
@@ -1525,12 +1525,12 @@ function PronunciationCoachInner({
               {minePending ? "Scanning…" : "Scan"}
             </button>
             {mineState.error ? (
-              <p className="text-xs text-warn" role="alert">
+              <p className="text-meta text-warn" role="alert">
                 {mineState.error}
               </p>
             ) : null}
             {mineState.ok ? (
-              <p className="text-xs text-ink-soft" role="status">
+              <p className="text-meta text-ink-2" role="status">
                 Scan: {mineState.scannedLines ?? 0} lines
                 {mineState.suggestions?.length
                   ? ` · ${mineState.suggestions.length} sent to Practice`
@@ -1547,7 +1547,7 @@ function PronunciationCoachInner({
             </div>
             <div>
               <label
-                className="block text-xs font-medium text-[var(--ink-soft)]"
+                className="block text-meta font-medium text-[var(--ink-soft)]"
                 htmlFor="pron-add-phrase"
               >
                 Word or sentence
@@ -1564,7 +1564,7 @@ function PronunciationCoachInner({
                   if (e.key === "Enter") e.preventDefault();
                 }}
                 placeholder="Muindi Mbingu"
-                className="mt-1 w-full max-w-lg rounded-xl border border-[var(--line)] bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-[var(--accent)]"
+                className="mt-1 w-full max-w-lg rounded-xl border border-[var(--line)] bg-surface px-3 py-2 text-body text-ink outline-none placeholder:text-ink-2/70 focus:border-[var(--accent)]"
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -1583,7 +1583,7 @@ function PronunciationCoachInner({
               <button
                 type="button"
                 onClick={() => setShowTypedSave((v) => !v)}
-                className="text-sm font-medium text-[var(--ink-soft)] underline-offset-2 hover:underline"
+                className="text-body font-medium text-[var(--ink-soft)] underline-offset-2 hover:underline"
               >
                 {showTypedSave ? "Hide typed spelling" : "Or save a spelling…"}
               </button>
@@ -1591,7 +1591,7 @@ function PronunciationCoachInner({
             {showTypedSave ? (
               <div className="max-w-lg space-y-2">
                 <label
-                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  className="block text-meta font-medium text-[var(--ink-soft)]"
                   htmlFor="pron-add-say"
                 >
                   Say like
@@ -1605,30 +1605,30 @@ function PronunciationCoachInner({
                     setAddError(null);
                   }}
                   placeholder="Moo-in-dee Mbeen-goo"
-                  className="w-full rounded-xl border border-[var(--line)] bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-[var(--accent)]"
+                  className="w-full rounded-xl border border-[var(--line)] bg-surface px-3 py-2 text-body text-ink outline-none placeholder:text-ink-2/70 focus:border-[var(--accent)]"
                 />
                 <button
                   type="button"
                   onClick={() => submitQuickAdd("save")}
                   disabled={!addPhrase.trim() || !addSay.trim() || quickPending}
-                  className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2 text-sm font-medium text-[var(--ink)] disabled:opacity-60"
+                  className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2 text-body font-medium text-[var(--ink)] disabled:opacity-60"
                 >
                   {quickPending ? "Saving…" : "Save spelling"}
                 </button>
               </div>
             ) : null}
             {addError ? (
-              <p className="text-xs text-[var(--warn)]" role="alert">
+              <p className="text-meta text-[var(--warn)]" role="alert">
                 {addError}
               </p>
             ) : null}
             {quickState.error ? (
-              <p className="text-xs text-[var(--warn)]" role="alert">
+              <p className="text-meta text-[var(--warn)]" role="alert">
                 {quickState.error}
               </p>
             ) : null}
             {quickState.ok && !quickState.error ? (
-              <p className="text-xs text-[var(--ok)]" role="status">
+              <p className="text-meta text-[var(--ok)]" role="status">
                 Saved. Next call will use it. Confirm on{" "}
                 <Link
                   href={businessSettingsHref("test")}
@@ -1675,7 +1675,7 @@ function PronunciationCoachInner({
                 aria-label="Calls for AI listen"
                 value={String(geminiBatch)}
                 disabled={geminiPending || unsavedReview}
-                className="min-h-11 min-w-[7.5rem] rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
+                className="min-h-11 min-w-[7.5rem] rounded-xl border border-hairline bg-surface px-3 text-body text-ink focus:outline-none focus:ring-2 focus:ring-brand"
                 options={GEMINI_SCAN_BATCH_OPTIONS.map((n) => ({
                   value: String(n),
                   label: `Last ${n}`,
@@ -1683,7 +1683,7 @@ function PronunciationCoachInner({
                 onChange={(next) => setGeminiBatch(Number(next))}
               />
               {listenNote ? (
-                <p className="text-sm text-ink-soft" role="status">
+                <p className="text-body text-ink-2" role="status">
                   {listenNote}
                 </p>
               ) : null}
@@ -1691,7 +1691,7 @@ function PronunciationCoachInner({
 
             {geminiConfirmOpen ? (
               <div
-                className="rounded-xl border border-warn/40 px-3 py-3 text-sm"
+                className="rounded-xl border border-warn/40 px-3 py-3 text-body"
                 role="alertdialog"
                 aria-label="Confirm AI listen"
               >
@@ -1699,14 +1699,14 @@ function PronunciationCoachInner({
                   Listen to the last {geminiBatch} recordings.
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
+                  <Button
+                   
                     onClick={() => runGeminiScan(true)}
                     disabled={geminiPending}
-                    className={btnPrimary}
+                   
                   >
                     Confirm
-                  </button>
+                  </Button>
                   <button
                     type="button"
                     onClick={() => {
@@ -1722,7 +1722,7 @@ function PronunciationCoachInner({
             ) : null}
 
             {geminiState.error ? (
-              <p className="text-xs text-warn" role="alert">
+              <p className="text-meta text-warn" role="alert">
                 {geminiState.error}
               </p>
             ) : null}
@@ -1730,7 +1730,7 @@ function PronunciationCoachInner({
         </div>
       ) : null}
       {hearError ? (
-        <p className="text-sm text-warn" role="alert">
+        <p className="text-body text-warn" role="alert">
           {hearError}
         </p>
       ) : null}

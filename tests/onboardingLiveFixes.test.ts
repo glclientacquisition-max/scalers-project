@@ -186,7 +186,7 @@ describe("polish pass 2 (staging e2e, 11 Oct)", () => {
     assert.match(read("dashboard/src/app/onboarding/setupActions.ts"), /Promise\.all\(\[\s*canEditSetup/);
   });
   it("minutes meter is not monospace", () => {
-    assert.doesNotMatch(read("dashboard/src/app/(desk)/home/page.tsx"), /font-mono text-sm font-medium text-ink/);
+    assert.doesNotMatch(read("dashboard/src/app/(desk)/home/page.tsx"), /font-mono text-body font-medium text-ink/);
   });
   it("completeness: one confirmed priced item fills the catalogue; pending number not counted", () => {
     const sql = readFileSync(join(root, "supabase/migrations/20261011170000_completeness_matches_onboarding.sql"), "utf8");

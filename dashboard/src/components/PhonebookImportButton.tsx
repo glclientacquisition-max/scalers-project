@@ -87,7 +87,7 @@ export function PhonebookImportButton() {
   return (
     <span className="inline-flex flex-col items-end gap-1">
       <ContactPickButton available primary onPick={pick} />
-      {error ? <span className="text-xs text-warn">{error}</span> : null}
+      {error ? <span className="text-meta text-warn">{error}</span> : null}
     </span>
   );
 }

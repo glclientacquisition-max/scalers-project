@@ -18,15 +18,15 @@ const STYLES: Record<
 > = {
   new: {
     active: "bg-warn text-accent-on-fill border-warn",
-    idle: "border-line text-ink-soft hover:border-warn/60",
+    idle: "border-hairline text-ink-2 hover:border-warn/60",
   },
   contacted: {
     active: "bg-lead text-accent-on-fill border-lead",
-    idle: "border-line text-ink-soft hover:border-lead/60",
+    idle: "border-hairline text-ink-2 hover:border-lead/60",
   },
   resolved: {
     active: "bg-ok text-accent-on-fill border-ok",
-    idle: "border-line text-ink-soft hover:border-ok/60",
+    idle: "border-hairline text-ink-2 hover:border-ok/60",
   },
 };
 
@@ -57,7 +57,7 @@ function LeadStatusToggleInner({
     });
   }
 
-  const pad = size === "md" ? "px-3.5 py-1.5 text-sm" : "px-2.5 py-1 text-xs";
+  const pad = size === "md" ? "px-3.5 py-1.5 text-body" : "px-2.5 py-1 text-meta";
   const activeStep =
     status === "archived" ? null : (status as Exclude<LeadStatus, "archived">);
 
@@ -93,7 +93,7 @@ function LeadStatusToggleInner({
         {status === "archived" ? (
           <span
             className={[
-              "rounded-full border border-line bg-surface-muted font-medium text-ink-soft",
+              "rounded-full border border-hairline bg-surface-muted font-medium text-ink-2",
               pad,
             ].join(" ")}
           >
@@ -101,7 +101,7 @@ function LeadStatusToggleInner({
           </span>
         ) : null}
       </div>
-      {error ? <p className="mt-1.5 text-xs text-warn">{error}</p> : null}
+      {error ? <p className="mt-1.5 text-meta text-warn">{error}</p> : null}
     </div>
   );
 }

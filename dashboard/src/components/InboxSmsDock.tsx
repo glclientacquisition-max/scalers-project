@@ -80,7 +80,7 @@ function InboxSmsDockInner({
   }
 
   return (
-    <div className="shrink-0 border-t border-line bg-surface px-4 py-3">
+    <div className="shrink-0 border-t border-hairline bg-surface px-4 py-3">
       <form action={sendAction} className="flex items-end gap-2">
         <input type="hidden" name="call_id" value={callId} />
         <input type="hidden" name="caller_phone" value={callerPhone || ""} />

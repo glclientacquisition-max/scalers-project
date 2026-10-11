@@ -24,7 +24,7 @@ export const settingsDenseFieldClass =
   `w-full min-h-11 min-w-0 rounded-xl border border-hairline bg-surface px-3 py-2 text-body text-ink outline-none ${deskShiftClass} placeholder:text-ink-3 hover:border-ink-3 focus:outline-none focus:border-accent focus:ring-2 focus:ring-brand/40 aria-[invalid=true]:border-attention`;
 
 export const settingsTableFieldClass =
-  `w-full min-w-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent`;
+  `w-full min-w-0 rounded-lg border border-hairline bg-surface px-2 py-1.5 text-body text-ink outline-none ${deskShiftClass} placeholder:text-ink-2/70 hover:border-accent/35 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent`;
 
 /** Sole-panel sections stay flush (no top rule); use when stacking blocks inside one panel. */
 export const settingsSectionClass = "space-y-3";
@@ -62,15 +62,15 @@ export const settingsStickyHeaderClass =
   "sticky -top-4 z-30 -mt-4 mb-4 flex w-full max-w-2xl flex-wrap items-center justify-between gap-3 border-b border-hairline bg-canvas pb-3 pt-7 sm:-top-6 sm:-mt-6 sm:pt-9";
 
 export const settingsActionClass =
-  `inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] active:bg-accent/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
+  `inline-flex min-h-11 items-center justify-center rounded-lg border border-hairline px-3 text-body font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] active:bg-accent/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
 
 export const settingsTrashButtonClass =
-  `inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn active:bg-surface-muted active:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
+  `inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-2 ${deskShiftClass} hover:bg-surface hover:text-warn active:bg-surface-muted active:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
 
 export const settingsPrimaryButtonClass = btnPrimary;
 
 export const settingsPanelHeadingClass =
-  "font-display text-xl font-semibold tracking-tight text-ink";
+  "font-display text-title font-semibold tracking-tight text-ink";
 
 export const settingsBlockTitleClass =
   "text-meta font-medium text-ink-2";
@@ -84,16 +84,16 @@ export function settingsRadioCardClass(selected: boolean) {
     `w-full text-left rounded-xl border px-4 py-3 ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`,
     selected
       ? "border-transparent bg-accent/10 ring-2 ring-accent active:bg-accent/15"
-      : "border-line bg-surface text-ink hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
+      : "border-hairline bg-surface text-ink hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
   ].join(" ");
 }
 
 export function settingsChipClass(selected: boolean) {
   return [
-    `inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-left text-sm font-medium ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`,
+    `inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-left text-body font-medium ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`,
     selected
       ? "border-transparent bg-accent/10 text-accent-deep ring-1 ring-accent active:bg-accent/15"
-      : "border-line bg-surface text-ink hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
+      : "border-hairline bg-surface text-ink hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
   ].join(" ");
 }
 
@@ -183,7 +183,7 @@ export function ToolSwitch({
         aria-hidden
         className={[
           `relative inline-flex h-7 w-12 shrink-0 items-center rounded-full ${deskShiftClass}`,
-          checked && !disabled ? "bg-accent-fill" : "bg-line",
+          checked && !disabled ? "bg-accent-fill" : "bg-hairline",
         ].join(" ")}
       >
         <span
@@ -247,10 +247,10 @@ export function SettingsRow({
     return (
       <div className="flex min-h-12 w-full items-center gap-3 px-4 py-2 md:min-h-11 md:px-3 md:py-1.5">
         <div className="min-w-0 flex-1">
-          <label htmlFor={htmlFor} className="block text-sm font-medium text-ink">
+          <label htmlFor={htmlFor} className="block text-body font-medium text-ink">
             {label}
           </label>
-          {hint ? <p className="mt-0.5 text-xs text-ink-soft">{hint}</p> : null}
+          {hint ? <p className="mt-0.5 text-meta text-ink-2">{hint}</p> : null}
         </div>
         <div className="shrink-0">{children}</div>
       </div>
@@ -280,7 +280,7 @@ export function SettingsStack({
 }) {
   return (
     <div className="space-y-1.5 px-4 py-3">
-      <label htmlFor={htmlFor} className="block text-sm font-medium text-ink">
+      <label htmlFor={htmlFor} className="block text-body font-medium text-ink">
         {label}
       </label>
       {children}
@@ -325,7 +325,7 @@ export function SettingsSegmented<T extends string>({
               >
                 {opt.label}
                 {opt.hint ? (
-                  <span className="ml-1 text-xs font-normal text-ink-soft">{opt.hint}</span>
+                  <span className="ml-1 text-meta font-normal text-ink-2">{opt.hint}</span>
                 ) : null}
               </button>
             </li>
@@ -369,7 +369,7 @@ export function SettingsSelect<T extends string>({
 }
 
 export const settingsGhostButtonClass =
-  `inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-ink active:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
+  `inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-body font-medium text-ink-2 ${deskShiftClass} hover:bg-surface hover:text-ink active:bg-hairline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
 
 export function SettingsBackLink() {
   return (
@@ -401,12 +401,12 @@ export function SettingsPageHeader({
   title?: string | null;
 }) {
   const line = showLine ? (
-    <p className="text-[13px] text-ink-soft [overflow-wrap:anywhere]">
+    <p className="text-meta text-ink-2 [overflow-wrap:anywhere]">
       <span className="font-medium text-ink">
         {lineLive ? "Line live" : "Number pending"}
       </span>
       {lineLive && lineDetail ? (
-        <span className="mt-0.5 block truncate font-mono text-xs font-normal">
+        <span className="mt-0.5 block truncate font-mono text-meta font-normal">
           {lineDetail}
         </span>
       ) : null}
@@ -416,9 +416,9 @@ export function SettingsPageHeader({
   if (index) {
     return (
       <header className="mb-4 min-w-0">
-        <h1 className="font-display text-xl font-semibold tracking-tight text-ink">Settings</h1>
+        <h1 className="font-display text-title font-semibold tracking-tight text-ink">Settings</h1>
         <p
-          className="mt-1 min-w-0 break-words text-sm font-medium text-ink [overflow-wrap:anywhere]"
+          className="mt-1 min-w-0 break-words text-body font-medium text-ink [overflow-wrap:anywhere]"
           title={businessName}
         >
           {businessName}
@@ -445,7 +445,7 @@ export function SettingsPageHeader({
       </div>
       {action}
       {alert ? (
-        <p className="w-full text-sm text-warn" role="alert">
+        <p className="w-full text-body text-warn" role="alert">
           {alert}
         </p>
       ) : null}

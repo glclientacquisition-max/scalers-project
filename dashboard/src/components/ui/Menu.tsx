@@ -73,7 +73,7 @@ export function MenuSeparator() {
 
 export function MenuLabel({ children }: { children: ReactNode }) {
   return (
-    <BaseMenu.GroupLabel className="px-3 pb-1 pt-2 text-caption font-medium uppercase tracking-wide text-ink-3">
+    <BaseMenu.GroupLabel className="px-3 pb-1 pt-2 text-caption font-medium text-ink-3">
       {children}
     </BaseMenu.GroupLabel>
   );

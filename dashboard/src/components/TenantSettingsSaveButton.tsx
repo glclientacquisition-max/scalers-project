@@ -16,7 +16,7 @@ export function TenantSettingsSaveButton({ pending = false }: { pending?: boolea
       form={TENANT_SETTINGS_FORM_ID}
       disabled={pending}
       className={[
-        "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-sm",
+        "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-body",
         btnPrimaryFill,
         deskShiftClass,
         "active:scale-[0.99] motion-reduce:active:scale-100",

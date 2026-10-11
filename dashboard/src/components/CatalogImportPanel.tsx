@@ -120,7 +120,7 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
             <input type="hidden" name="source_mode" value={mode} />
             {mode === "url" ? (
               <div className="flex flex-col gap-1.5">
-                <label className="block text-sm font-medium" htmlFor="catalog_url">
+                <label className="block text-body font-medium" htmlFor="catalog_url">
                   Catalogue page URL
                 </label>
                 <input
@@ -144,7 +144,7 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
               </div>
             ) : (
               <div className="flex flex-col gap-1.5">
-                <label className="block text-sm font-medium" htmlFor="catalog_paste">
+                <label className="block text-body font-medium" htmlFor="catalog_paste">
                   {mode === "csv" ? "CSV" : "Text"}
                 </label>
                 <textarea
@@ -159,7 +159,7 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
                       ? "name,price,category,in_stock,sku\nA4 paper,500 KES,Paper,yes,\nBinding,300 KES,Print,yes,"
                       : "A4 paper - 500 KES\nBinding - 300 KES"
                   }
-                  className={`${fieldClass} mt-0 text-sm leading-relaxed`}
+                  className={`${fieldClass} mt-0 text-body leading-relaxed`}
                 />
                 <div className="flex justify-end self-end">
                   <button
@@ -176,7 +176,7 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-ink-soft">
+          <p className="text-body text-ink-2">
             {previewState.message || "Tick products to keep."}
           </p>
           <SettingsGroup title="Products">
@@ -252,7 +252,7 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
               name="include_social"
               value={includeSocial ? "1" : "0"}
             />
-            <p className="w-full text-sm text-ink">
+            <p className="w-full text-body text-ink">
               {selectedProducts.length} of {products.length} selected. Nothing is added until you confirm.
             </p>
             <button
@@ -294,7 +294,7 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
       {flash ? (
         <p
           className={
-            flashIsError ? "text-sm text-warn" : "text-sm text-accent-deep"
+            flashIsError ? "text-body text-warn" : "text-body text-accent-deep"
           }
           role={flashIsError ? "alert" : "status"}
         >

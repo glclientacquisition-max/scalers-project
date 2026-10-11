@@ -25,7 +25,7 @@ export function CallAudioPlayer({ src }: { src: string }) {
   }
 
   return (
-    <div className="sticky bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom))] z-20 -mx-4 mt-8 border-t border-line bg-surface px-4 py-3 shadow-none sm:-mx-6 sm:rounded-t-2xl sm:px-6 md:bottom-0">
+    <div className="sticky bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom))] z-20 -mx-4 mt-8 border-t border-hairline bg-surface px-4 py-3 shadow-none sm:-mx-6 sm:rounded-t-2xl sm:px-6 md:bottom-0">
       <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-2 md:flex-row md:items-center">
         <audio
           ref={audioRef}
@@ -45,7 +45,7 @@ export function CallAudioPlayer({ src }: { src: string }) {
               onClick={() => applySpeed(s)}
               aria-pressed={speed === s}
               className={[
-                "rounded-full border px-2.5 py-1 text-xs font-medium",
+                "rounded-full border px-2.5 py-1 text-meta font-medium",
                 deskShiftClass,
                 speed === s
                   ? "border-[var(--accent)] bg-accent-fill text-accent-on-fill"

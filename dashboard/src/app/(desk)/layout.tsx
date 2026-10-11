@@ -76,7 +76,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           <Suspense
             fallback={
               <div
-                className="min-h-12 shrink-0 border-b border-line bg-surface"
+                className="min-h-12 shrink-0 border-b border-hairline bg-surface"
                 aria-hidden="true"
               />
             }

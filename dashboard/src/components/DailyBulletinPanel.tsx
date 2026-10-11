@@ -157,7 +157,7 @@ function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
         {expiry === "schedule" ? (
           <div className="min-w-0 space-y-3">
             <div className="min-w-0 space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+              <p className="text-meta font-medium text-ink-2">
                 From
               </p>
               <SettingsSegmented
@@ -190,7 +190,7 @@ function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
               ) : null}
             </div>
             <div className="min-w-0 space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+              <p className="text-meta font-medium text-ink-2">
                 Until
               </p>
               <div className="grid min-w-0 grid-cols-2 gap-2">
@@ -217,11 +217,11 @@ function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
           </div>
         ) : null}
 
-        <p className="px-1 text-sm text-ink-soft">{preview}</p>
+        <p className="px-1 text-body text-ink-2">{preview}</p>
       </form>
 
       {items.length === 0 ? (
-        <p className="px-1 text-sm text-ink-soft">
+        <p className="px-1 text-body text-ink-2">
           No live updates.
         </p>
       ) : (
@@ -232,10 +232,10 @@ function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
               className="flex min-w-0 flex-wrap items-start justify-between gap-3 px-4 py-3"
             >
               <div className="min-w-0 flex-1 basis-[12rem]">
-                <p className="text-sm font-medium text-ink [overflow-wrap:anywhere]">
+                <p className="text-body font-medium text-ink [overflow-wrap:anywhere]">
                   {item.text}
                 </p>
-                <p className="mt-1 text-xs text-ink-soft">
+                <p className="mt-1 text-meta text-ink-2">
                   {formatBulletinWindowLabel(item)}
                 </p>
               </div>
@@ -257,7 +257,7 @@ function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
 
       {flash ? (
         <p
-          className={`text-sm [overflow-wrap:anywhere] ${flashIsError ? "text-warn" : "text-ok"}`}
+          className={`text-body [overflow-wrap:anywhere] ${flashIsError ? "text-warn" : "text-ok"}`}
           role={flashIsError ? "alert" : undefined}
         >
           {flash}

@@ -43,7 +43,7 @@ function ThemeMark({ id, size = "md" }: { id: DeskTheme; size?: "sm" | "md" }) {
   if (id === "light") {
     return (
       <span
-        className={`flex ${box} items-center justify-center rounded-full border border-line bg-surface`}
+        className={`flex ${box} items-center justify-center rounded-full border border-hairline bg-surface`}
         aria-hidden
       >
         <span className={`${dot} rounded-full border border-ink`} />
@@ -51,7 +51,7 @@ function ThemeMark({ id, size = "md" }: { id: DeskTheme; size?: "sm" | "md" }) {
     );
   }
   return (
-    <span className={`relative ${box} overflow-hidden rounded-full border border-line`} aria-hidden>
+    <span className={`relative ${box} overflow-hidden rounded-full border border-hairline`} aria-hidden>
       <span className="absolute inset-0 bg-surface" />
       <span className="absolute inset-y-0 right-0 w-1/2 bg-ink" />
     </span>

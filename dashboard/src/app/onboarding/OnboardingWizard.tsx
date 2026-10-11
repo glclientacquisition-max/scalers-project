@@ -18,7 +18,7 @@ import {
   type HandoffMode,
 } from "@/lib/handoffMode";
 import { compactTextareaExpandHandlers } from "@/components/settingsUi";
-import { btnPrimary, deskFieldClass, deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
+import { deskFieldClass, deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import { Button, buttonClass } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
 import { BaStakesPreview } from "@/components/BaStakesPreview";
@@ -46,7 +46,7 @@ function choiceClass(selected: boolean): string {
     `min-h-11 w-full rounded-xl border px-4 py-3 text-left ${deskShiftClass} ${focusRingVisible}`,
     selected
       ? "border-accent bg-accent-soft"
-      : "border-line bg-surface hover:border-accent/50",
+      : "border-hairline bg-surface hover:border-accent/50",
   ].join(" ");
 }
 
@@ -163,18 +163,18 @@ export function OnboardingWizard() {
               <span
                 aria-hidden
                 className={[
-                  `pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium ${deskShiftClass}`,
+                  `pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-body font-medium ${deskShiftClass}`,
                   done || active
                     ? "bg-accent-fill text-accent-on-fill"
-                    : "border border-line bg-surface text-ink-soft",
+                    : "border border-hairline bg-surface text-ink-2",
                 ].join(" ")}
               >
                 {i + 1}
               </span>
               <span
                 className={[
-                  `hidden text-sm sm:block ${deskShiftClass}`,
-                  active ? "font-medium text-ink" : "text-ink-soft",
+                  `hidden text-body sm:block ${deskShiftClass}`,
+                  active ? "font-medium text-ink" : "text-ink-2",
                 ].join(" ")}
               >
                 {label}
@@ -183,7 +183,7 @@ export function OnboardingWizard() {
                 <span
                   className={[
                     `mx-1 h-px flex-1 ${deskShiftClass}`,
-                    done ? "bg-accent" : "bg-line",
+                    done ? "bg-accent" : "bg-hairline",
                   ].join(" ")}
                 />
               ) : null}
@@ -196,7 +196,7 @@ export function OnboardingWizard() {
         action={formAction}
         onSubmit={() => window.localStorage.removeItem(ONBOARDING_DRAFT_KEY)}
         className={[
-          `rounded-2xl border border-line bg-surface p-6 sm:p-8 ${deskShiftClass}`,
+          `rounded-2xl border border-hairline bg-surface p-6 sm:p-8 ${deskShiftClass}`,
           visible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
         ].join(" ")}
       >
@@ -232,7 +232,7 @@ export function OnboardingWizard() {
 
         {step === 0 ? (
           <div>
-            <h2 className="font-display text-2xl text-ink">Business type</h2>
+            <h2 className="font-display text-page text-ink">Business type</h2>
             <div className="mt-5 space-y-3">
               {VERTICAL_OPTIONS.map((opt) => {
                 const selected = vertical === opt.id;
@@ -244,7 +244,7 @@ export function OnboardingWizard() {
                     className={choiceClass(selected)}
                   >
                     <span className="font-medium text-ink">{opt.label}</span>
-                    <span className="mt-0.5 block text-sm text-ink-soft">
+                    <span className="mt-0.5 block text-body text-ink-2">
                       {opt.blurb}
                     </span>
                   </button>
@@ -256,7 +256,7 @@ export function OnboardingWizard() {
 
         {step === 1 ? (
           <div>
-            <h2 className="font-display text-2xl text-ink">
+            <h2 className="font-display text-page text-ink">
               {vertical === "home_services" ? "Services & pricing" : "Products & pricing"}
             </h2>
             <OnboardingCapture
@@ -277,7 +277,7 @@ export function OnboardingWizard() {
 
         {step === 2 ? (
           <div>
-            <h2 className="font-display text-2xl text-ink">Hours & location</h2>
+            <h2 className="font-display text-page text-ink">Hours & location</h2>
             <div className="mt-5 flex flex-wrap gap-2">
               {["Mon-Sat 8-7", "Mon-Fri 9-5", "Mon-Sun 8-8"].map((preset) => (
                 <button
@@ -309,7 +309,7 @@ export function OnboardingWizard() {
                 />
               )}
             </Field>
-            <label className="mt-4 block text-sm font-medium text-ink" htmlFor="landmark">
+            <label className="mt-4 block text-body font-medium text-ink" htmlFor="landmark">
               Landmark (optional)
             </label>
             <input
@@ -320,7 +320,7 @@ export function OnboardingWizard() {
               className={`mt-2 ${deskFieldClass}`}
             />
             <label
-              className="mt-4 block text-sm font-medium text-ink"
+              className="mt-4 block text-body font-medium text-ink"
               htmlFor="directions"
             >
               Spoken directions (optional)
@@ -340,9 +340,9 @@ export function OnboardingWizard() {
         {step === 3 ? (
           <div className="space-y-8">
             <div>
-              <h2 className="font-display text-2xl text-ink">Receptionist name & tone</h2>
+              <h2 className="font-display text-page text-ink">Receptionist name & tone</h2>
               <label
-                className="mt-5 block text-sm font-medium text-ink"
+                className="mt-5 block text-body font-medium text-ink"
                 htmlFor="agent_name_field"
               >
                 Receptionist name
@@ -368,7 +368,7 @@ export function OnboardingWizard() {
                       className={choiceClass(selected)}
                     >
                       <span className="font-medium text-ink">{TONE_LABELS[opt.id]}</span>
-                      <span className="mt-0.5 block text-sm text-ink-soft">
+                      <span className="mt-0.5 block text-body text-ink-2">
                         {opt.blurb}
                       </span>
                     </button>
@@ -377,7 +377,7 @@ export function OnboardingWizard() {
               </div>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-ink">When a caller needs a human</h3>
+              <h3 className="text-body font-medium text-ink">When a caller needs a human</h3>
               <div className="mt-3 space-y-3">
                 {HANDOFF_OPTIONS.map((opt) => {
                   const selected = handoffMode === opt.id;
@@ -390,7 +390,7 @@ export function OnboardingWizard() {
                     >
                       <span className="font-medium text-ink">{opt.label}</span>
                       {opt.id === "live_transfer" ? (
-                        <span className="mt-0.5 block text-sm text-ink-soft">
+                        <span className="mt-0.5 block text-body text-ink-2">
                           {liveConnectBlurb()}
                         </span>
                       ) : null}
@@ -400,7 +400,7 @@ export function OnboardingWizard() {
               </div>
             </div>
             <div className="mt-8">
-              <h3 className="text-sm font-medium text-ink">Answers you can confirm</h3>
+              <h3 className="text-body font-medium text-ink">Answers you can confirm</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 {SUGGESTED_FAQ_CHIPS.map((question) => {
                   return (
@@ -449,16 +449,16 @@ export function OnboardingWizard() {
         ) : null}
 
         {step === 1 && catalogGap ? (
-          <p className="mt-5 text-sm text-ink-soft" role="status">{catalogGap}</p>
+          <p className="mt-5 text-body text-ink-2" role="status">{catalogGap}</p>
         ) : null}
         {hoursGap ? (
-          <p className="mt-5 text-sm text-warn" role="status">{hoursGap}</p>
+          <p className="mt-5 text-body text-warn" role="status">{hoursGap}</p>
         ) : null}
         {step === 3 && !agentNameCheck.ok ? (
-          <p className="mt-5 text-sm text-warn" role="status">{agentNameCheck.error}</p>
+          <p className="mt-5 text-body text-warn" role="status">{agentNameCheck.error}</p>
         ) : null}
         {state.error ? (
-          <p className="mt-5 text-sm text-warn" role="alert">
+          <p className="mt-5 text-body text-warn" role="alert">
             {state.error}
           </p>
         ) : null}
@@ -473,7 +473,7 @@ export function OnboardingWizard() {
                 goTo(step - 1);
               }}
               disabled={pending}
-              className={`min-h-11 text-sm text-ink-soft ${deskShiftClass} ${focusRingVisible} hover:text-ink disabled:opacity-50`}
+              className={`min-h-11 text-body text-ink-2 ${deskShiftClass} ${focusRingVisible} hover:text-ink disabled:opacity-50`}
             >
               Back
             </button>
@@ -497,22 +497,22 @@ export function OnboardingWizard() {
           ) : null}
 
           {step < STEPS.length - 1 ? (
-            <button
-              type="button"
+            <Button
+             
               disabled={!canAdvance()}
               onClick={() => goTo(step + 1)}
-              className={btnPrimary}
+             
             >
               Continue
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="submit"
               disabled={!canAdvance() || pending}
-              className={btnPrimary}
+             
             >
               {pending ? "Opening your line" : "Finish setup"}
-            </button>
+            </Button>
           )}
         </div>
       </form>
