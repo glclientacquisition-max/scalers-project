@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { memberDenied } from "@/lib/requireMember";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { upsertTenantFieldMeta } from "@/lib/deskProvenance";
+import { recompileAfterCatalogImport } from "@/lib/catalogImportRecompile";
 import {
   categoriesFor,
   cleanPayments,
@@ -44,8 +45,16 @@ export async function savePaymentsAction(input: Payments): Promise<StructuredRes
   const { error } = await ws.client.from("tenants").update({ business_policies: next }).eq("id", ws.tenant.id);
   if (error) return { ok: false, error: SAVE_FAILED };
   await upsertTenantFieldMeta({ tenantId: ws.tenant.id, fieldPath: "payments.methods", source: "owner", actor: "desk", newValue: payments }).catch(() => null);
+  // Rebuild the Business Assistant prompt now, so the next call quotes the new payment line.
+  const compiled = await recompileAfterCatalogImport({ client: ws.client, tenant: { ...ws.tenant, business_policies: next } }).catch(() => ({ ok: false }));
   revalidatePath("/settings");
-  return { ok: true, message: "Payments saved." };
+  revalidatePath("/home");
+  return {
+    ok: true,
+    message: compiled.ok
+      ? "Payments saved. Your Business Assistant uses them from the next call."
+      : "Payments saved. Your Business Assistant picks them up after the next Settings save.",
+  };
 }
 
 /** Owner answers "Is this right?" for one item's typed price (yes, or a corrected price). */
@@ -77,6 +86,12 @@ export async function confirmPriceAction(input: { kind: "product" | "service"; n
   if (!hit) return { ok: false, error: "That item is no longer in your catalogue." };
   const { error } = await ws.client.from("tenants").update({ [column]: next }).eq("id", ws.tenant.id);
   if (error) return { ok: false, error: SAVE_FAILED };
+  // Same as payments: the prompt quotes prices, so rebuild it with the confirmed one.
+  await recompileAfterCatalogImport({
+    client: ws.client,
+    tenant: { ...ws.tenant, [column]: next },
+    ...(column === "product_catalog" ? { productCatalog: next } : {}),
+  }).catch(() => null);
   revalidatePath("/settings");
   return { ok: true, message: "Price saved." };
 }
