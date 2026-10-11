@@ -89,7 +89,7 @@ export function ChoiceSheet<T extends string>({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-body text-ink">{opt.label}</span>
                     {opt.detail ? (
-                      <span className="mt-0.5 block truncate text-meta text-ink-2">{opt.detail}</span>
+                      <span className="mt-0.5 block text-meta text-ink-2">{opt.detail}</span>
                     ) : null}
                   </span>
                   {selected ? <CheckIcon className="size-5 shrink-0 text-accent" aria-hidden /> : null}

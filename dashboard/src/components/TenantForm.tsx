@@ -1,5 +1,7 @@
 "use client";
 
+import { AlertContactsList } from "@/components/AlertContactsList";
+
 import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
@@ -122,7 +124,6 @@ import {
   ToolSwitch,
   TrashIcon,
   settingsBlockTitleClass,
-  settingsGroupTitleClass,
   settingsConsoleClass,
   settingsFormBodyClass,
   settingsDenseFieldClass,
@@ -2196,141 +2197,24 @@ function TenantFormInner({
           </>
         ) : null}
 
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <h3 className={`${settingsGroupTitleClass} px-1`}>Alert contacts</h3>
-            <button
-              type="button"
-              onClick={() => setTeam((prev) => [...prev, emptyMember()])}
-              className={settingsGhostButtonClass}
-            >
-              Add person
-            </button>
-          </div>
-          <p id="team-notify-channels" className="px-1 text-xs text-ink-soft">
-            {TEAM_NOTIFY_CHANNEL_NOTE}
-          </p>
-        </div>
-
-        <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
-          <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-center lg:gap-x-3 border-b border-hairline px-3 py-2 text-meta font-medium text-ink-2">
-            <span>Name</span>
-            <span>Role</span>
-            <span>Phone</span>
-            <span>Email</span>
-            <span className="grid w-[15rem] grid-cols-3 gap-1 text-center text-caption font-medium normal-case tracking-normal">
-              {TEAM_NOTIFY_FLAGS.map((flag) => (
-                <span key={flag.key} title={TEAM_NOTIFY_CHANNEL_NOTE}>
-                  {flag.label}
-                </span>
-              ))}
-            </span>
-            <span className="sr-only">Remove</span>
-          </div>
-          {team.map((member, index) => (
-            <div
-              key={`team-${index}`}
-              className="grid grid-cols-1 gap-3 border-b border-line px-3 py-3 last:border-b-0 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-start lg:gap-x-3 lg:py-2"
-            >
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-name-${index}`}>
-                  Name
-                </label>
-                <input
-                  id={`team-name-${index}`}
-                  value={member.name}
-                  onChange={(e) => updateTeam(index, "name", e.target.value)}
-                  placeholder="Wanjiku Mwangi"
-                  title={member.name || undefined}
-                  className={`${denseFieldClass} mt-1 min-w-0 break-words [overflow-wrap:anywhere] lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-role-${index}`}>
-                  Role
-                </label>
-                <input
-                  id={`team-role-${index}`}
-                  value={member.role}
-                  onChange={(e) => updateTeam(index, "role", e.target.value)}
-                  placeholder="Orders and payments"
-                  className={`${denseFieldClass} mt-1 lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-phone-${index}`}>
-                  Phone
-                </label>
-                <input
-                  id={`team-phone-${index}`}
-                  value={member.phone}
-                  onChange={(e) => updateTeam(index, "phone", e.target.value)}
-                  placeholder="+254 700 000 000"
-                  className={`${denseFieldClass} mt-1 lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-email-${index}`}>
-                  Email
-                </label>
-                <input
-                  id={`team-email-${index}`}
-                  type="email"
-                  value={member.email || ""}
-                  onChange={(e) => updateTeam(index, "email", e.target.value)}
-                  placeholder="wanjiku@shop.co.ke"
-                  title={member.email || undefined}
-                  className={`${denseFieldClass} mt-1 min-w-0 break-words [overflow-wrap:anywhere] lg:mt-0`}
-                />
-              </div>
-              <div
-                className="grid w-[15rem] grid-cols-3 gap-1"
-                role="group"
-                aria-label={`Notify for ${member.name || `teammate ${index + 1}`}`}
-                aria-describedby="team-notify-channels"
-              >
-                {TEAM_NOTIFY_FLAGS.map((flag) => {
-                  const selected = member[flag.key] === true;
-                  return (
-                    <div key={flag.key} className="flex min-h-11 flex-col items-center justify-center">
-                      <span className="text-xs font-medium text-ink-soft lg:sr-only" title={TEAM_NOTIFY_CHANNEL_NOTE}>
-                        {flag.label}
-                      </span>
-                      <ToolSwitch
-                        checked={selected}
-                        label={`${flag.label} for ${member.name || `teammate ${index + 1}`}`}
-                        hint={TEAM_NOTIFY_CHANNEL_NOTE}
-                        onChange={(next) => updateTeam(index, flag.key, next)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex items-start justify-end lg:pt-1">
-                <button
-                  type="button"
-                  onClick={() =>
-                    requestRemove(
-                      member,
-                      `Remove ${member.name.trim() || "this person"}?`,
-                      "They leave the team when you save.",
-                      () =>
-                        setTeam((prev) =>
-                          prev.length <= 1
-                            ? [emptyMember()]
-                            : prev.filter((_, i) => i !== index)
-                        )
-                    )
-                  }
-                  className={settingsTrashButtonClass}
-                  aria-label={`Remove teammate ${index + 1}`}
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <AlertContactsList
+          team={team}
+          flags={TEAM_NOTIFY_FLAGS}
+          note={TEAM_NOTIFY_CHANNEL_NOTE}
+          addLabel="Add person"
+          onChange={updateTeam}
+          onAdd={() => setTeam((prev) => [...prev, emptyMember()])}
+          onRemove={(index) => {
+            const member = team[index];
+            if (!member) return;
+            requestRemove(
+              member,
+              `Remove ${member.name.trim() || "this person"}?`,
+              "They leave the team when you save.",
+              () => setTeam((prev) => (prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)))
+            );
+          }}
+        />
       </section>
 
       <section

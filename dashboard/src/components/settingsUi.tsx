@@ -35,7 +35,7 @@ export const settingsConsoleClass =
 export const settingsRailWrapClass =
   "hidden min-w-0 shrink-0 md:block md:w-64";
 
-export const settingsRailClass = "min-w-0 md:sticky md:top-4";
+export const settingsRailClass = "min-w-0 md:sticky md:top-0 md:pt-4";
 
 export const settingsPanelClass =
   "min-w-0 flex-1 pb-[var(--desk-tabbar-clearance)] md:pb-0";
@@ -58,7 +58,7 @@ export const settingsFormGridClass =
 
 /** Sticks to the panel so Save stays docked top-right while scrolling. */
 export const settingsStickyHeaderClass =
-  "sticky top-[var(--desk-header-h,0px)] z-30 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 py-3 backdrop-blur-sm";
+  "sticky -top-4 z-30 -mt-4 mb-4 flex w-full max-w-2xl flex-wrap items-center justify-between gap-3 border-b border-hairline bg-canvas pb-3 pt-7 sm:-top-6 sm:-mt-6 sm:pt-9";
 
 export const settingsActionClass =
   `inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] active:bg-accent/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`;

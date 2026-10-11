@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/Button";
 import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { notify } from "@/components/ui/DeskNotice";
-import { SettingsGroup, settingsFieldClass } from "@/components/settingsUi";
+import { SettingsGroup, settingsFieldClass, settingsGroupTitleClass } from "@/components/settingsUi";
 
 type Pending = {
   title: string;
@@ -93,31 +93,35 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
 
   return (
     <div className="space-y-6" aria-busy={pending}>
-      <SettingsGroup
-        title="Members"
-        action={
-          <span className="text-meta text-ink-2" aria-label={`${seats.used} of ${seats.included} seats used`}>
+      <section className="min-w-0 space-y-1.5" aria-labelledby="members-title">
+        <div className="flex items-end justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <h3 id="members-title" className={settingsGroupTitleClass}>Members</h3>
+            <p className="text-meta text-ink-2">Members sign in and use a seat. Alert contacts only get notified.</p>
+          </div>
+          <span className="shrink-0 text-meta text-ink-2" aria-label={`${seats.used} of ${seats.included} seats used`}>
             {seats.used} of {seats.included} seats
           </span>
-        }
-      >
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
         <ul aria-label="Members">
           {data.members.map((m) => {
             const self = m.userId === viewerId;
             const manageable = !self && canManageMember(viewerRole, m.role);
             const display = m.name || m.email;
+            const hasActions = manageable || (viewerRole === "owner" && m.role === "admin");
             return (
               <li key={m.userId} className={`${rowClass} border-b border-hairline last:border-b-0`}>
-                <div className="min-w-0 flex-1">
+                <div className={`min-w-0 flex-1 ${hasActions ? "basis-full sm:basis-0" : ""}`}>
                   <p className="truncate text-body text-ink" title={m.email}>
                     {display}
                     {self ? <span className="text-ink-2"> (you)</span> : null}
                   </p>
                   {m.name ? <p className="truncate text-meta text-ink-2">{m.email}</p> : null}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className={`flex shrink-0 items-center justify-end gap-2 ${hasActions ? "w-full sm:w-auto" : ""}`}>
                   {manageable ? (
-                    <div className="w-32">
+                    <div className="w-28">
                       <ChoiceSheet
                         title={`Role for ${display}`}
                         label={`Role for ${m.email}`}
@@ -133,7 +137,7 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
                   )}
                   {viewerRole === "owner" && m.role === "admin" ? (
                     <Button
-                      variant="ghost"
+                      variant="tonal"
                       size="sm"
                       disabled={pending}
                       onClick={() =>
@@ -162,9 +166,8 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
                   ) : null}
                   {manageable ? (
                     <Button
-                      variant="ghost"
+                      variant="danger"
                       size="sm"
-                      className="text-attention"
                       disabled={pending}
                       aria-label={`Remove ${m.email}`}
                       onClick={() =>
@@ -190,7 +193,8 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
             Show more ({totals.members - data.members.length})
           </Link>
         ) : null}
-      </SettingsGroup>
+        </div>
+      </section>
 
       {data.invites.length ? (
         <SettingsGroup title="Invited">
@@ -199,21 +203,20 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
               const days = daysLeft(i.expiresAt);
               return (
                 <li key={i.id} className={`${rowClass} border-b border-hairline last:border-b-0`}>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 basis-full sm:basis-0">
                     <p className="truncate text-body text-ink">{i.email}</p>
                     <p className="text-meta text-ink-2">
                       {ROLE_LABELS[i.role]} · expires in {days} day{days === 1 ? "" : "s"}
                     </p>
                   </div>
                   {canInvite && canManageMember(viewerRole, i.role) ? (
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button variant="ghost" size="sm" disabled={pending} aria-label={`Resend invite to ${i.email}`} onClick={() => run(() => resendInviteAction(i.id))}>
+                    <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto">
+                      <Button variant="tonal" size="sm" disabled={pending} aria-label={`Resend invite to ${i.email}`} onClick={() => run(() => resendInviteAction(i.id))}>
                         Resend
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="danger"
                         size="sm"
-                        className="text-attention"
                         disabled={pending}
                         aria-label={`Cancel invite to ${i.email}`}
                         onClick={() =>
@@ -245,12 +248,10 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
       {canInvite ? (
         seats.full ? (
           <SettingsGroup title="Invite">
-            <div className="space-y-1 px-4 py-3 text-body">
-              <p className="text-ink">All {seats.included} seats are in use.</p>
-              <Link href="/wallet" className="inline-block font-medium text-accent hover:underline">
-                Upgrade your package to invite more people
-              </Link>
-            </div>
+            <p className="flex min-h-12 items-center px-4 py-2.5 text-body text-ink">All {seats.included} seats are in use.</p>
+            <Link href="/wallet" className={linkClass + " justify-start"}>
+              Upgrade your package to invite more people
+            </Link>
           </SettingsGroup>
         ) : (
           <SettingsGroup title="Invite">
@@ -276,9 +277,7 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
                 className={settingsFieldClass}
               />
             </div>
-            <div className="px-3">
-              <ChoiceSheet title="Role" rowLabel="Role" value={role} options={roleOptions} onChange={setRole} />
-            </div>
+            <ChoiceSheet title="Role" rowLabel="Role" value={role} options={roleOptions} onChange={setRole} />
             <p className="px-4 py-2 text-meta text-ink-2" aria-live="polite">{ROLE_BLURBS[role]}</p>
             <div className="flex justify-end px-4 py-3">
               <Button
@@ -294,11 +293,11 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
         )
       ) : null}
 
-      <p role={flash?.error ? "alert" : "status"} aria-live="polite" className={`min-h-5 px-1 text-meta ${flash?.error ? "text-attention" : "text-ink-2"}`}>
-        {flash ? flash.error || flash.message : ""}
-      </p>
-
-      <p className="px-1 text-meta text-ink-2">Members sign in and use a seat. Alert contacts only get notified.</p>
+      {flash ? (
+        <p role={flash.error ? "alert" : "status"} className={`-mt-3 px-1 text-meta ${flash.error ? "text-attention" : "text-ink-2"}`}>
+          {flash.error || flash.message}
+        </p>
+      ) : null}
 
       <ConfirmSheet
         open={!!confirming}

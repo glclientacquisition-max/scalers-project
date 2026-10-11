@@ -98,7 +98,8 @@ describe("honest chrome P0", () => {
     assert.match(form, /key: "receives_inbox", label: "Follow-up"/);
     assert.match(form, /key: "receives_ops", label: "Ops"/);
     assert.match(form, /Channels follow How we notify\./);
-    assert.match(form, /hint=\{TEAM_NOTIFY_CHANNEL_NOTE\}/);
+    assert.match(form, /note=\{TEAM_NOTIFY_CHANNEL_NOTE\}/);
+    assert.match(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /aria-describedby="team-notify-channels"/);
     assert.doesNotMatch(form, /label: "SMS"/);
     assert.doesNotMatch(form, /label: "WhatsApp"/);
     assert.doesNotMatch(form, /label: "Email"/);
