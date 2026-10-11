@@ -21,7 +21,7 @@ export const SETUP_STEPS: ReadonlyArray<{ key: StepKey; title: string; skippable
   { key: "business", title: "Your business", skippable: false },
   { key: "catalogue", title: "What you sell", skippable: true },
   { key: "hours", title: "Opening hours", skippable: true },
-  { key: "voice", title: "Your receptionist", skippable: false },
+  { key: "voice", title: "Your receptionist", skippable: true },
   { key: "faqs", title: "Common questions", skippable: true },
   { key: "alerts", title: "Alerts", skippable: false },
 ];
@@ -75,7 +75,8 @@ export const LIMITS = {
   faqItems: 20,
   question: 200,
   answer: 400,
-  shiftsPerDay: 3,
+  /** Open block plus one break. */
+  shiftsPerDay: 2,
   priceMax: 10_000_000,
 } as const;
 
@@ -286,6 +287,19 @@ export function countryOfPhone(e164: unknown, fallback: string = "KE"): CountryC
 export function phoneHint(country: unknown): string {
   const c = PHONE_COUNTRIES.find((x) => x.code === phoneCountry(country))!;
   return `Enter a valid ${c.name} mobile number, like ${c.example}.`;
+}
+
+/** What the number field shows: national format (0790 381 872) when the stored E.164 number
+ * belongs to the selected country; anything else (typing, other countries) as is. */
+export function phoneForInput(value: unknown, country: unknown = "KE"): string {
+  const raw = String(value || "");
+  if (!raw.startsWith("+")) return raw;
+  const parsed = parsePhoneNumberFromString(raw);
+  if (!parsed || !parsed.isValid() || parsed.country !== phoneCountry(country)) return raw;
+  const n = String(parsed.nationalNumber);
+  // Kenyan mobiles read as 0790 381 872 (3-3-3), how people write them locally.
+  if (parsed.country === "KE" && n.length === 9) return `0${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}`;
+  return parsed.formatNational();
 }
 
 /** Back-compat: Kenyan numbers only. */

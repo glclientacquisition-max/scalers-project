@@ -20,10 +20,16 @@ export default async function SetupLinePage() {
   const pretty = formatKenyaNumber(raw);
 
   return (
-    <main className="flex min-h-dvh justify-center px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2.5rem,env(safe-area-inset-top))] sm:items-center">
-      <div className="w-full max-w-md">
-        <BrandWordmark href="/home" context="Setup" variant="lockup" priority />
-        <h1 className="mt-8 text-display text-ink">{ctx.row.business_name} is set up</h1>
+    <main className="min-h-dvh pb-[max(2rem,env(safe-area-inset-bottom))]">
+      {/* Same header as the setup steps, so the logo stays put from step 1 to the number. */}
+      <header className="sticky top-0 z-10 border-b border-hairline bg-canvas/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-canvas/75">
+        <div className="mx-auto flex h-14 w-full max-w-xl items-center gap-2 px-3">
+          <span aria-hidden className="inline-flex min-h-11 w-[4.5rem] shrink-0" />
+          <BrandWordmark href="/home" context="Setup" variant="lockup" priority />
+        </div>
+      </header>
+      <div className="mx-auto w-full max-w-xl px-4 pt-6">
+        <h1 className="text-display text-ink">{ctx.row.business_name} is set up</h1>
 
         {pending ? (
           <PendingNumber tenantId={ctx.row.id} />
@@ -45,7 +51,7 @@ export default async function SetupLinePage() {
           </section>
         )}
 
-        <Link href="/home" className={`${btnPrimary} mt-8 w-full text-body`}>
+        <Link href="/home" prefetch className={`${btnPrimary} mt-8 w-full text-body`}>
           Go to Overview
         </Link>
         <p className="mt-3 text-center text-meta text-ink-2">You can change any answer later in Settings.</p>

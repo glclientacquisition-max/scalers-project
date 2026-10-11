@@ -14,8 +14,9 @@ import {
 import { FieldError, TextButton, inputClass } from "./ui";
 
 const PRESETS: Array<{ label: string; days: DayKey[]; open: string; close: string }> = [
-  { label: "Mon-Fri, 9 to 5", days: ["mon", "tue", "wed", "thu", "fri"], open: "09:00", close: "17:00" },
+  // First chip = the default week (most Kenyan shops and trades open Saturday).
   { label: "Mon-Sat, 8 to 6", days: ["mon", "tue", "wed", "thu", "fri", "sat"], open: "08:00", close: "18:00" },
+  { label: "Mon-Fri, 9 to 5", days: ["mon", "tue", "wed", "thu", "fri"], open: "09:00", close: "17:00" },
   { label: "Every day, 8 to 8", days: DAYS, open: "08:00", close: "20:00" },
 ];
 
@@ -45,7 +46,8 @@ export function HoursStep({ value, onChange, errors }: { value: Value; onChange:
             key={p.label}
             type="button"
             onClick={() => applyPreset(p)}
-            className="min-h-11 rounded-full bg-surface px-4 text-meta font-medium text-ink hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-pressed={DAYS.every((k) => { const d = value.days[k]; return p.days.includes(k) ? !d.closed && d.shifts.length === 1 && d.shifts[0].open === p.open && d.shifts[0].close === p.close : d.closed; })}
+            className="min-h-11 rounded-full bg-surface px-4 text-meta font-medium text-ink hover:bg-surface-2 aria-pressed:bg-accent-soft aria-pressed:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             {p.label}
           </button>

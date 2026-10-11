@@ -53,7 +53,7 @@ export function FaqsStep({
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
                   <label htmlFor={`faq-${i}-q`} className="mb-1.5 block text-meta font-medium text-ink">
-                    Question
+                    Question<span className="sr-only"> {i + 1}</span>
                   </label>
                   <input
                     id={`faq-${i}-q`}
@@ -72,7 +72,7 @@ export function FaqsStep({
                 </TextButton>
               </div>
               <label htmlFor={`faq-${i}-a`} className="mb-1.5 mt-3 block text-meta font-medium text-ink">
-                Answer
+                Answer<span className="sr-only"> to question {i + 1}</span>
               </label>
               <textarea
                 id={`faq-${i}-a`}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
 import {
+  DEFAULT_AGENT_NAME,
   draftStorageKey,
   readLocalDraft,
   parseDraft,
@@ -283,7 +284,11 @@ export function SetupFlow({
 
   function onSkip() {
     // Skipping keeps what you typed (so Back brings it back) but setup ignores it.
-    const value = { ...(draft[key] as object), skipped: true };
+    // Receptionist has no "skipped" state: skipping keeps the ready-made defaults.
+    const value =
+      key === "voice"
+        ? { ...draft.voice, agentName: draft.voice.agentName.trim() || DEFAULT_AGENT_NAME }
+        : { ...(draft[key] as object), skipped: true };
     save(value, () => goTo(index + 1));
   }
 
@@ -303,36 +308,29 @@ export function SetupFlow({
     window.history.replaceState(window.history.state, "", url);
   }
 
-  if (finishing) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center px-6">
-        <div role="status" aria-live="polite" className="text-center">
-          <span aria-hidden className={`${pendingSpinnerClass} mx-auto block h-6 w-6`} />
-          <p className="mt-4 text-title text-ink">Setting up your receptionist</p>
-          <p className="mt-1 text-meta text-ink-2">This takes a few seconds.</p>
-        </div>
-      </main>
-    );
-  }
+  if (finishing) return <FinishingScreen />;
 
   return (
     <main className="min-h-dvh pb-[calc(10rem+env(safe-area-inset-bottom))]">
       <header className="sticky top-0 z-10 border-b border-hairline bg-canvas/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-canvas/75">
         <div className="mx-auto flex h-14 w-full max-w-xl items-center justify-between gap-2 px-3">
           <div className="flex min-w-0 items-center gap-1">
-            {index > 0 ? (
+            {/* Back keeps its slot on step 1 (invisible) so the logo never shifts. */}
+            {(
               <button
+                aria-hidden={index === 0 || undefined}
+                tabIndex={index === 0 ? -1 : undefined}
                 type="button"
                 onClick={onBack}
-                disabled={busy}
-                className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-body text-accent-deep disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                disabled={busy || index === 0}
+                className={`inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-body text-accent-deep disabled:opacity-50 ${index === 0 ? "invisible" : ""} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
               >
                 <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5">
                   <path fill="currentColor" d="M12.7 4.3 7 10l5.7 5.7-1.1 1.1L4.8 10l6.8-6.8z" />
                 </svg>
                 Back
               </button>
-            ) : null}
+            )}
             <BrandWordmark href="/onboarding" context="Setup" variant="lockup" priority />
           </div>
           <p className="ml-auto text-meta tabular-nums text-ink-2" aria-hidden>
@@ -396,6 +394,49 @@ export function SetupFlow({
           </button>
         </div>
       </footer>
+    </main>
+  );
+}
+
+const FINISH_STAGES = ["Saving your answers", "Writing your receptionist's script", "Getting your phone number"] as const;
+
+/** Step-by-step progress while Finish runs. Stages advance on a timer; the last waits for the redirect. */
+function FinishingScreen() {
+  const [stage, setStage] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setStage((s) => Math.min(s + 1, FINISH_STAGES.length - 1)), 900);
+    return () => window.clearInterval(id);
+  }, []);
+  return (
+    <main className="flex min-h-dvh items-center justify-center px-6">
+      <div className="w-full max-w-xs">
+        <p className="text-title text-ink">Setting up your receptionist</p>
+        <ol className="mt-4 space-y-3" aria-label="Setup progress">
+          {FINISH_STAGES.map((label, i) => {
+            const state = i < stage ? "done" : i === stage ? "current" : "todo";
+            return (
+              <li key={label} className="flex items-center gap-3 text-body" aria-current={state === "current" ? "step" : undefined}>
+                {state === "done" ? (
+                  <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5 text-accent">
+                    <path fill="currentColor" d="M8 13.6 4.4 10l-1.1 1.1L8 15.8l9-9-1.1-1.1z" />
+                  </svg>
+                ) : state === "current" ? (
+                  <span aria-hidden className={`${pendingSpinnerClass} block h-5 w-5`} />
+                ) : (
+                  <span aria-hidden className="block h-5 w-5 rounded-full border-2 border-hairline" />
+                )}
+                <span className={state === "todo" ? "text-ink-3" : "text-ink"}>
+                  {label}
+                  <span className="sr-only">{state === "done" ? ", done" : state === "current" ? ", in progress" : ""}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        <p role="status" aria-live="polite" className="sr-only">
+          {FINISH_STAGES[stage]}
+        </p>
+      </div>
     </main>
   );
 }

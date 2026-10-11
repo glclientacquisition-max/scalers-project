@@ -125,11 +125,16 @@ export type FinishResult = { ok: false; error: string; step?: StepKey; conflict?
  * second tab finds setup already done and goes straight to the line screen.
  */
 export async function finishSetupAction(input: { tenantId: string; version: number }): Promise<FinishResult> {
+  const t0 = Date.now();
   const auth = await signedInClient();
   if (!auth) return { ok: false, error: "Your session ended. Sign in again to finish." };
-  if (!(await canEditSetup(input.tenantId))) return { ok: false, error: SETUP_DENIED };
-
-  const { data: row, error: readErr } = await readSetupRow(auth.client, input.tenantId);
+  const tAuth = Date.now();
+  // Role check and the row read are independent: one round trip, not two.
+  const [allowed, { data: row, error: readErr }] = await Promise.all([
+    canEditSetup(input.tenantId),
+    readSetupRow(auth.client, input.tenantId),
+  ]);
+  if (!allowed) return { ok: false, error: SETUP_DENIED };
   if (readErr) {
     console.error("[setup] finish read:", readErr.code, readErr.message);
     return { ok: false, error: saveErrorMessage(readErr, "finish") };
@@ -172,29 +177,25 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
   const unknownAnswerFallback = "I'll check with the owner and get back to you.";
   const voice = draft.voice;
 
-  let prompt = "";
-  try {
-    ({ prompt } = await compileReceptionistPrompt({
-      businessName: row.business_name,
-      servicesOffered,
-      businessHours,
-      agentTone: voice.tone,
-      agentName: voice.agentName,
-      vertical,
-      handoffMode: voice.handoff,
-      locationsText,
-      policiesText: "",
-      productsText,
-      faqs,
-      unknownAnswerFallback,
-      teamDirectory,
-    }));
-  } catch (err) {
-    console.warn("[setup] prompt compile failed, using local:", err instanceof Error ? err.message : err);
-  }
+  // The local prompt is instant and complete; the model-written one (seconds) replaces it
+  // after the response, so the owner is not kept waiting for it.
+  const compileInput = {
+    businessName: row.business_name,
+    servicesOffered,
+    businessHours,
+    agentTone: voice.tone,
+    agentName: voice.agentName,
+    vertical,
+    handoffMode: voice.handoff,
+    locationsText,
+    policiesText: "",
+    productsText,
+    faqs,
+    unknownAnswerFallback,
+    teamDirectory,
+  };
   const answers: OnboardingAnswers = { servicesPricing: servicesOffered, hoursLocation: businessHours, tone: voice.tone };
-  if (!prompt || prompt.length < 80 || tenantNeedsOnboarding({ business_name: row.business_name, llm_system_prompt: prompt })) {
-    prompt = compilePromptLocally(row.business_name, answers, {
+  const prompt = compilePromptLocally(row.business_name, answers, {
       agentName: voice.agentName,
       faqs,
       unknownAnswerFallback,
@@ -205,8 +206,8 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
       policiesText: "",
       productsText,
     });
-  }
 
+  const tPrep = Date.now();
   const patch: Record<string, unknown> = {
     services_offered: servicesOffered,
     services_catalog: servicesCatalog,
@@ -249,13 +250,28 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     return { ok: false, conflict: true, error: "Setup was changed in another tab. Review this step, then finish again." };
   }
 
+  const tWrite = Date.now();
+  // Number assignment stays inline (one DB call) so the next screen can show it.
   let number = updated[0].sautikit_virtual_number as string | null;
   if (numberPending(number)) number = (await assignDidFromPool(row.id)) || number;
   const pending = numberPending(number);
   const userId = auth.user.id;
+  console.info(
+    `[setup] finish auth=${tAuth - t0}ms read=${tPrep - tAuth}ms write=${tWrite - tPrep}ms number=${Date.now() - tWrite}ms total=${Date.now() - t0}ms`
+  );
+  const client = auth.client;
 
   // Bookkeeping after the response: provenance (bounded list) and the ops heads-up.
   after(async () => {
+    // Upgrade to the model-written prompt only if nothing changed it meanwhile.
+    try {
+      const { prompt: better } = await compileReceptionistPrompt(compileInput);
+      if (better && better.length >= 80 && !tenantNeedsOnboarding({ business_name: row.business_name, llm_system_prompt: better })) {
+        await client.from("tenants").update({ llm_system_prompt: better }).eq("id", row.id).eq("llm_system_prompt", prompt);
+      }
+    } catch (err) {
+      console.warn("[setup] prompt upgrade skipped:", err instanceof Error ? err.message : err);
+    }
     const paths = [
       ...fieldPathsAttestedOnSettingsSave({
         scope: "all",

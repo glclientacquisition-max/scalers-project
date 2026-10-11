@@ -1,7 +1,7 @@
 "use client";
 
 import { Switch } from "@/components/ui/Switch";
-import { PHONE_COUNTRIES, dialCode, type AlertsStep as Value, type FieldErrors } from "@/lib/setupFlow";
+import { PHONE_COUNTRIES, dialCode, phoneForInput, type AlertsStep as Value, type FieldErrors } from "@/lib/setupFlow";
 import { FieldError, inputClass } from "./ui";
 
 export function AlertsStep({ value, onChange, errors }: { value: Value; onChange: (v: Value) => void; errors: FieldErrors }) {
@@ -38,7 +38,7 @@ export function AlertsStep({ value, onChange, errors }: { value: Value; onChange
           type="tel"
           inputMode="tel"
           autoComplete="tel"
-          value={value.phone}
+          value={phoneForInput(value.phone, value.country)}
           onChange={(e) => onChange({ ...value, phone: e.target.value })}
           placeholder={PHONE_COUNTRIES.find((c) => c.code === value.country)?.example ?? "0712 345 678"}
           aria-invalid={errors.phone ? true : undefined}

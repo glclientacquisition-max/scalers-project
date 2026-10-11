@@ -193,3 +193,58 @@ describe("polish pass 2 (staging e2e, 11 Oct)", () => {
     assert.match(read("dashboard/src/app/onboarding/setupActions.ts"), /"identity\.business_name",\s*"identity\.language",\s*"assistant\.tools"/);
   });
 });
+
+describe("polish pass 3 (second live run, 11 Oct)", () => {
+  const read = (p: string) => readFileSync(join(root, p), "utf8");
+  it("finish does not wait for the model prompt; logs timings; shows stages", () => {
+    const src = read("dashboard/src/app/onboarding/setupActions.ts");
+    const finish = src.slice(src.indexOf("export async function finishSetupAction"));
+    const beforeAfter = finish.slice(0, finish.indexOf("after(async"));
+    assert.doesNotMatch(beforeAfter, /await compileReceptionistPrompt/);
+    assert.match(finish.slice(finish.indexOf("after(async")), /compileReceptionistPrompt\(compileInput\)/);
+    assert.match(finish, /\[setup\] finish auth=/);
+    assert.match(finish, /Promise\.all\(\[\s*canEditSetup/);
+    assert.match(read("dashboard/src/app/onboarding/SetupFlow.tsx"), /FINISH_STAGES/);
+  });
+  it("phone shows national format when the country matches, E.164 otherwise", async () => {
+    const { phoneForInput } = await import("../dashboard/src/lib/setupFlow.ts");
+    assert.equal(phoneForInput("+254790381872", "KE"), "0790 381 872");
+    assert.equal(phoneForInput("+254790381872", "UG"), "+254790381872");
+    assert.equal(phoneForInput("0712", "KE"), "0712");
+    assert.match(read("dashboard/src/app/onboarding/steps/AlertsStep.tsx"), /value=\{phoneForInput\(value\.phone, value\.country\)\}/);
+  });
+  it("Back keeps its slot so the logo does not move; number screen has the logo header", () => {
+    const flow = read("dashboard/src/app/onboarding/SetupFlow.tsx");
+    assert.match(flow, /index === 0 \? "invisible" : ""/);
+    const line = read("dashboard/src/app/onboarding/line/page.tsx");
+    assert.match(line, /<header[\s\S]*<BrandWordmark/);
+  });
+  it("first hours chip matches the default week", async () => {
+    const { defaultWeek } = await import("../dashboard/src/lib/setupFlow.ts");
+    const w = defaultWeek();
+    assert.deepEqual(w.mon.shifts, [{ open: "08:00", close: "18:00" }]);
+    assert.equal(w.sat.closed, false);
+    assert.equal(w.sun.closed, true);
+    const src = read("dashboard/src/app/onboarding/steps/HoursStep.tsx");
+    assert.ok(src.indexOf('"Mon-Sat, 8 to 6"') < src.indexOf('"Mon-Fri, 9 to 5"'));
+    assert.match(src, /aria-pressed=/);
+  });
+  it("one break per day, so Add a break disappears once used", async () => {
+    const { LIMITS } = await import("../dashboard/src/lib/setupFlow.ts");
+    assert.equal(LIMITS.shiftsPerDay, 2);
+  });
+  it("receptionist step can be skipped and keeps the defaults", async () => {
+    const { SETUP_STEPS, validateStep, defaultDraft: dd } = await import("../dashboard/src/lib/setupFlow.ts");
+    assert.equal(SETUP_STEPS.find((s) => s.key === "voice")?.skippable, true);
+    assert.equal(validateStep("voice", dd().voice, dd()).ok, true);
+    assert.match(read("dashboard/src/app/onboarding/SetupFlow.tsx"), /key === "voice"\s*\?\s*\{ \.\.\.draft\.voice/);
+  });
+  it("FAQ fields have unique accessible names", () => {
+    const src = read("dashboard/src/app/onboarding/steps/FaqsStep.tsx");
+    assert.match(src, /Question<span className="sr-only"> \{i \+ 1\}<\/span>/);
+    assert.match(src, /Answer<span className="sr-only"> to question \{i \+ 1\}<\/span>/);
+  });
+  it("Overview is prefetched from the number screen", () => {
+    assert.match(read("dashboard/src/app/onboarding/line/page.tsx"), /href="\/home" prefetch/);
+  });
+});
