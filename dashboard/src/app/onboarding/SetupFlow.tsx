@@ -319,22 +319,23 @@ export function SetupFlow({
     <main className="min-h-dvh pb-[calc(10rem+env(safe-area-inset-bottom))]">
       <header className="sticky top-0 z-10 border-b border-hairline bg-canvas/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-canvas/75">
         <div className="mx-auto flex h-14 w-full max-w-xl items-center justify-between gap-2 px-3">
-          {index > 0 ? (
-            <button
-              type="button"
-              onClick={onBack}
-              disabled={busy}
-              className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-body text-accent-deep disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            >
-              <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5">
-                <path fill="currentColor" d="M12.7 4.3 7 10l5.7 5.7-1.1 1.1L4.8 10l6.8-6.8z" />
-              </svg>
-              Back
-            </button>
-          ) : (
+          <div className="flex min-w-0 items-center gap-1">
+            {index > 0 ? (
+              <button
+                type="button"
+                onClick={onBack}
+                disabled={busy}
+                className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-body text-accent-deep disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5">
+                  <path fill="currentColor" d="M12.7 4.3 7 10l5.7 5.7-1.1 1.1L4.8 10l6.8-6.8z" />
+                </svg>
+                Back
+              </button>
+            ) : null}
             <BrandWordmark href="/onboarding" context="Setup" variant="lockup" priority />
-          )}
-          <p className="text-meta tabular-nums text-ink-2" aria-hidden>
+          </div>
+          <p className="ml-auto text-meta tabular-nums text-ink-2" aria-hidden>
             {index + 1} of {SETUP_STEPS.length}
           </p>
           {signOut}
@@ -373,7 +374,7 @@ export function SetupFlow({
         ) : null}
         {key === "hours" ? <HoursStep value={draft.hours} onChange={(v) => patch("hours", v)} errors={errors} /> : null}
         {key === "voice" ? <VoiceStep value={draft.voice} onChange={(v) => patch("voice", v)} errors={errors} businessName={businessName} /> : null}
-        {key === "faqs" ? <FaqsStep value={draft.faqs} onChange={(v) => patch("faqs", v)} errors={errors} /> : null}
+        {key === "faqs" ? <FaqsStep value={draft.faqs} onChange={(v) => patch("faqs", v)} errors={errors} vertical={draft.business.vertical} /> : null}
         {key === "alerts" ? <AlertsStep value={draft.alerts} onChange={(v) => patch("alerts", v)} errors={errors} /> : null}
       </div>
 

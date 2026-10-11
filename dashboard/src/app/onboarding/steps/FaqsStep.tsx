@@ -1,10 +1,20 @@
 "use client";
 
 import { useRef } from "react";
-import { LIMITS, SUGGESTED_QUESTIONS, type FaqsStep as Value, type FieldErrors } from "@/lib/setupFlow";
+import { LIMITS, suggestedQuestions, type Vertical, type FaqsStep as Value, type FieldErrors } from "@/lib/setupFlow";
 import { FieldError, TextButton, inputClass } from "./ui";
 
-export function FaqsStep({ value, onChange, errors }: { value: Value; onChange: (v: Value) => void; errors: FieldErrors }) {
+export function FaqsStep({
+  value,
+  onChange,
+  errors,
+  vertical,
+}: {
+  value: Value;
+  onChange: (v: Value) => void;
+  errors: FieldErrors;
+  vertical: Vertical;
+}) {
   const items = value.items;
   const focusIndex = useRef<number | null>(null);
   const set = (next: Value["items"]) => onChange({ skipped: false, items: next });
@@ -20,7 +30,7 @@ export function FaqsStep({ value, onChange, errors }: { value: Value; onChange: 
       <div className="mt-6">
         <p className="px-4 text-meta text-ink-2">Questions callers often ask</p>
         <div className="mt-2 flex flex-wrap gap-2 px-1">
-          {SUGGESTED_QUESTIONS.map((q) => (
+          {suggestedQuestions(vertical).map((q) => (
             <button
               key={q}
               type="button"

@@ -117,7 +117,7 @@ export function CatalogueStep({
                     maxLength={LIMITS.name}
                     autoFocus={lastAdded.current === i && !row.name}
                     onChange={(ev) => update(i, { name: ev.target.value })}
-                    placeholder={home ? "Service name" : "Product name"}
+                    placeholder={home ? "e.g. Plumbing call-out" : "e.g. Maize flour 2kg"}
                     aria-invalid={e("name") ? true : undefined}
                     aria-describedby={e("name") ? id("name-err") : undefined}
                     className={`${inputClass} font-medium`}
@@ -153,7 +153,7 @@ export function CatalogueStep({
                       inputMode="decimal"
                       maxLength={12}
                       onChange={(ev) => update(i, { price: ev.target.value })}
-                      placeholder="1500"
+                      placeholder="e.g. 1500"
                       aria-invalid={e("price") ? true : undefined}
                       aria-describedby={e("price") ? id("price-err") : undefined}
                       className={`${inputClass} tabular-nums`}
@@ -172,7 +172,7 @@ export function CatalogueStep({
                         inputMode="decimal"
                         maxLength={12}
                         onChange={(ev) => update(i, { price_max: ev.target.value })}
-                        placeholder="3000"
+                        placeholder="e.g. 3000"
                         aria-invalid={e("price_max") ? true : undefined}
                         aria-describedby={e("price_max") ? id("price_max-err") : undefined}
                         className={`${inputClass} tabular-nums`}

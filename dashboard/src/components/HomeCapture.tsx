@@ -11,7 +11,7 @@ import { reviewGapCopy, type CaptureScore } from "@/lib/completenessStub";
 
 const DOMAINS: Array<{ key: string; label: string; href: string; fallback: string }> = [
   { key: "identity", label: "Identity", href: businessSettingsHref("train", "identity"), fallback: "Confirm the business name" },
-  { key: "catalog", label: "Catalog", href: businessSettingsHref("catalog"), fallback: "Add products or services with prices" },
+  { key: "catalog", label: "Catalogue", href: businessSettingsHref("catalog"), fallback: "Add products or services with prices" },
   { key: "hours", label: "Hours", href: businessSettingsHref("train", "hours"), fallback: "Add opening hours" },
   { key: "locations", label: "Location", href: businessSettingsHref("train", "locations"), fallback: "Add a landmark" },
   { key: "payments", label: "Payments", href: businessSettingsHref("train", "policies"), fallback: "Add how customers pay" },
@@ -123,12 +123,16 @@ export function HomeCapture({
           const gap = reviewGapCopy(
             score.next_gaps.find((item) => item.domain === domain.key)?.action || ""
           );
+          const fallback =
+            vertical === "home_services" && domain.key === "policies"
+              ? "Add call-out and cancellation terms"
+              : domain.fallback;
           return (
             <ListRow
               key={domain.key}
               href={domain.href}
               title={domain.label}
-              preview={pct >= 100 ? "Confirmed" : gap || domain.fallback}
+              preview={pct >= 100 ? "Confirmed" : gap || fallback}
               when={<span className="tabular-nums">{pct}%</span>}
             />
           );

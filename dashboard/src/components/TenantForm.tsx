@@ -1295,7 +1295,7 @@ function TenantFormInner({
                       requestRemove(
                         service,
                         `Remove ${service.name.trim() || "this service"}?`,
-                        "It leaves the catalog when you save.",
+                        "It leaves the catalogue when you save.",
                         () =>
                           setServices((prev) =>
                             prev.length <= 1
@@ -1412,7 +1412,7 @@ function TenantFormInner({
                               requestRemove(
                                 service,
                                 `Remove ${service.name.trim() || "this service"}?`,
-                                "It leaves the catalog when you save.",
+                                "It leaves the catalogue when you save.",
                                 () =>
                                   setServices((prev) =>
                                     prev.length <= 1
@@ -1526,7 +1526,7 @@ function TenantFormInner({
                         requestRemove(
                           product,
                           `Remove ${product.name.trim() || "this product"}?`,
-                          "It leaves the catalog when you save.",
+                          "It leaves the catalogue when you save.",
                           () => setProducts((prev) => prev.filter((_, i) => i !== index))
                         )
                       }
@@ -1653,7 +1653,7 @@ function TenantFormInner({
                                 requestRemove(
                                   product,
                                   `Remove ${product.name.trim() || "this product"}?`,
-                                  "It leaves the catalog when you save.",
+                                  "It leaves the catalogue when you save.",
                                   () => setProducts((prev) => prev.filter((_, i) => i !== index))
                                 )
                               }

@@ -16,7 +16,7 @@ export function AlertsStep({ value, onChange, errors }: { value: Value; onChange
         <label htmlFor="alert-phone" className="mb-1.5 block text-meta font-medium text-ink">
           Mobile number
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
         <label htmlFor="alert-country" className="sr-only">Country</label>
         <select
           id="alert-country"
@@ -24,7 +24,7 @@ export function AlertsStep({ value, onChange, errors }: { value: Value; onChange
           value={value.country}
           onChange={(e) => onChange({ ...value, country: e.target.value })}
           autoComplete="tel-country-code"
-          className={`${inputClass} w-auto shrink-0 pr-8`}
+          className={`${inputClass} sm:w-44 sm:shrink-0`}
         >
           {PHONE_COUNTRIES.map((c) => (
             <option key={c.code} value={c.code}>
@@ -43,7 +43,7 @@ export function AlertsStep({ value, onChange, errors }: { value: Value; onChange
           placeholder={PHONE_COUNTRIES.find((c) => c.code === value.country)?.example ?? "0712 345 678"}
           aria-invalid={errors.phone ? true : undefined}
           aria-describedby={errors.phone ? "alert-phone-err" : undefined}
-          className={`${inputClass} min-w-0 flex-1`}
+          className={`${inputClass} sm:min-w-0 sm:flex-1`}
         />
         </div>
         <FieldError id="alert-phone-err" message={errors.phone} />

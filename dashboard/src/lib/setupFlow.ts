@@ -79,13 +79,28 @@ export const LIMITS = {
   priceMax: 10_000_000,
 } as const;
 
-export const SUGGESTED_QUESTIONS = [
+const SHOP_QUESTIONS = [
   "Do you accept M-Pesa?",
   "Do you deliver?",
-  "Which areas do you cover?",
-  "Do you come to my location?",
   "Can you hold an item for me?",
+  "Do you have it in stock?",
 ] as const;
+
+const HOME_QUESTIONS = [
+  "Do you accept M-Pesa?",
+  "Which areas do you cover?",
+  "Do you charge a call-out fee?",
+  "How soon can you come?",
+  "Do you bring your own tools and supplies?",
+] as const;
+
+/** Suggested FAQ chips for the business type. Shops hold and deliver; home services visit. */
+export function suggestedQuestions(vertical: Vertical | string | null | undefined): readonly string[] {
+  return vertical === "home_services" ? HOME_QUESTIONS : SHOP_QUESTIONS;
+}
+
+/** @deprecated use suggestedQuestions(vertical) */
+export const SUGGESTED_QUESTIONS = SHOP_QUESTIONS;
 
 // ---------------------------------------------------------------------------
 // Defaults and parsing (loose: never throws, clamps sizes; validation is separate)
@@ -101,8 +116,11 @@ export function defaultWeek(): Record<DayKey, DayPlan> {
   return { mon: open(), tue: open(), wed: open(), thu: open(), fri: open(), sat: open(), sun: { closed: true, shifts: [] } };
 }
 
+/** Prefilled receptionist name; the owner can change it. */
+export const DEFAULT_AGENT_NAME = "Amani";
+
 export function emptyRow(name = ""): CatalogueRow {
-  return { name, category: "", pricing_mode: "fixed", price: "", price_max: "", site_visit: "", notes: "" };
+  return { name, category: "", pricing_mode: "fixed", price: "", price_max: "", site_visit: "no", notes: "" };
 }
 
 export function defaultDraft(seed: { phone?: string | null; email?: string | null } = {}): SetupDraft {
@@ -111,7 +129,7 @@ export function defaultDraft(seed: { phone?: string | null; email?: string | nul
     business: { vertical: "retail", landmark: "", directions: "" },
     catalogue: { skipped: false, rows: [] },
     hours: { skipped: false, days: defaultWeek() },
-    voice: { agentName: "", tone: "warm", handoff: "callback" },
+    voice: { agentName: DEFAULT_AGENT_NAME, tone: "warm", handoff: "callback" },
     faqs: { skipped: false, items: [] },
     alerts: {
       country: countryOfPhone(phone),
@@ -596,8 +614,9 @@ export function splitLast(shifts: Shift[]): Shift[] {
   const a = toMin(last.open);
   const b = toMin(last.close);
   if (b - a >= 180) {
-    const mid = Math.round((a + b) / 2 / 30) * 30;
-    return [...shifts.slice(0, -1), { open: last.open, close: toTime(mid - 30) }, { open: toTime(mid + 30), close: last.close }];
+    // Lunch 13:00–14:00 when the day covers it, else an hour in the middle of the range.
+    const start = a <= 12 * 60 && b >= 15 * 60 ? 13 * 60 : Math.round((a + b) / 2 / 30) * 30 - 30;
+    return [...shifts.slice(0, -1), { open: last.open, close: toTime(start) }, { open: toTime(start + 60), close: last.close }];
   }
   const start = Math.min(b + 60, 22 * 60);
   return [...shifts, { open: toTime(start), close: toTime(Math.min(start + 120, 23 * 60 + 45)) }];

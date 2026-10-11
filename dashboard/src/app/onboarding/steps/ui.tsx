@@ -83,4 +83,4 @@ export function TextButton({ children, onClick, tone = "accent", label, disabled
 }
 
 export const inputClass =
-  "block w-full min-h-11 rounded-xl border border-hairline bg-canvas px-3 py-2.5 text-body text-ink outline-none placeholder:text-ink-3 focus:border-accent focus:ring-2 focus:ring-brand/40 aria-[invalid=true]:border-attention";
+  "block w-full min-h-11 rounded-xl border border-hairline bg-canvas px-3 py-2.5 text-body text-ink outline-none placeholder:font-normal placeholder:text-ink-3/70 focus:border-accent focus:ring-2 focus:ring-brand/40 aria-[invalid=true]:border-attention";

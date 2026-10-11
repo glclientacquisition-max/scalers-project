@@ -73,7 +73,7 @@ describe("catalogue step", () => {
         skipped: false,
         rows: [
           row({ name: "", price: "100" }),
-          row({ name: "Fix", pricing_mode: "range", price: "500", price_max: "400" }),
+          row({ name: "Fix", pricing_mode: "range", price: "500", price_max: "400", site_visit: "" }),
           row({ name: "fix", price: "-1" }),
         ],
       },
@@ -132,7 +132,7 @@ describe("hours step", () => {
     assert.equal(validateHours({ skipped: true, days: allClosed }).ok, true);
   });
   it("Add a break splits the last block with a gap", () => {
-    assert.deepEqual(splitLast([{ open: "08:00", close: "18:00" }]), [{ open: "08:00", close: "12:30" }, { open: "13:30", close: "18:00" }]);
+    assert.deepEqual(splitLast([{ open: "08:00", close: "18:00" }]), [{ open: "08:00", close: "13:00" }, { open: "14:00", close: "18:00" }]);
     assert.deepEqual(splitLast([{ open: "08:00", close: "10:00" }]), [{ open: "08:00", close: "10:00" }, { open: "11:00", close: "13:00" }]);
   });
 });
@@ -189,14 +189,15 @@ describe("draft and resume", () => {
     const d = defaultDraft({ phone: "0712345678" });
     assert.equal(firstInvalidStep(d), 1); // no catalogue yet
     d.catalogue = { skipped: true, rows: [] };
-    assert.equal(firstInvalidStep(d), 3); // receptionist name missing
+    d.voice.agentName = "";
+    assert.equal(firstInvalidStep(d), 3); // receptionist name cleared
     d.voice.agentName = "Amani";
     assert.equal(firstInvalidStep(d), -1);
   });
   it("validateStep uses the draft's vertical for the catalogue", () => {
     const d = defaultDraft();
     d.business.vertical = "home_services";
-    const step = { skipped: false, rows: [row({ name: "Cleaning", price: "100" })] };
+    const step = { skipped: false, rows: [row({ name: "Cleaning", price: "100", site_visit: "" })] };
     assert.equal(validateStep("catalogue", step, d).ok, false); // site visit unanswered
   });
 });

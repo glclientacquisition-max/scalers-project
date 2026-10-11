@@ -70,23 +70,31 @@ export async function saveSetupStepAction(input: {
   version: number;
   vertical: string;
 }): Promise<SaveStepResult> {
-  const auth = await signedInClient();
-  if (!auth) return { ok: false, error: "Your session ended. Sign in again to keep going." };
-  if (!(await canEditSetup(input.tenantId))) return { ok: false, error: SETUP_DENIED };
+  const started = Date.now();
   const index = stepIndex(input.key);
   if (index < 0) return { ok: false, error: UNAVAILABLE };
-
+  // Validate before any network work: bad input answers instantly.
   const context = parseDraft({ business: { vertical: input.vertical } });
   const checked = validateStep(input.key, input.value, context);
   if (!checked.ok) return { ok: false, error: checked.error, fields: checked.fields };
 
-  const { data, error } = await auth.client.rpc("save_onboarding_step", {
-    p_tenant_id: input.tenantId,
-    p_key: input.key,
-    p_value: checked.value,
-    p_next_step: Math.min(index + 1, SETUP_STEPS.length - 1),
-    p_expected_version: input.version,
-  });
+  const auth = await signedInClient();
+  if (!auth) return { ok: false, error: "Your session ended. Sign in again to keep going." };
+  const authMs = Date.now() - started;
+  // Role check and save run together (one round trip instead of two). The tenants RLS
+  // update policy already refuses non-admins, so the parallel write is never a bypass.
+  const [allowed, { data, error }] = await Promise.all([
+    canEditSetup(input.tenantId),
+    auth.client.rpc("save_onboarding_step", {
+      p_tenant_id: input.tenantId,
+      p_key: input.key,
+      p_value: checked.value,
+      p_next_step: Math.min(index + 1, SETUP_STEPS.length - 1),
+      p_expected_version: input.version,
+    }),
+  ]);
+  console.info(`[setup] save ${input.key} auth=${authMs}ms total=${Date.now() - started}ms`);
+  if (!allowed) return { ok: false, error: SETUP_DENIED };
   if (error) {
     console.error("[setup] save step:", error.code, error.message);
     return { ok: false, error: saveErrorMessage(error) };
@@ -260,6 +268,10 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
         servicesCatalog: servicesCatalog.slice(0, 20),
         faqs,
       }),
+      // Setup is the owner's own confirmation of these too (Overview completeness).
+      "identity.business_name",
+      "identity.language",
+      "assistant.tools",
       ...fieldPathsAttestedOnAlertsSave({
         whatsappNumber: alerts.phone || null,
         alertEmail: alerts.email || null,

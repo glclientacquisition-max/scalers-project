@@ -120,3 +120,76 @@ describe("sticky Continue bar never covers content", () => {
     assert.match(src, /pb-\[calc\(10rem\+env\(safe-area-inset-bottom\)\)\]/);
   });
 });
+
+describe("polish pass 2 (staging e2e, 11 Oct)", () => {
+  const read = (p: string) => readFileSync(join(root, p), "utf8");
+  it("placeholders read as hints", () => {
+    for (const f of ["CatalogueStep", "VoiceStep", "BusinessStep"]) {
+      const src = read(`dashboard/src/app/onboarding/steps/${f}.tsx`);
+      for (const m of src.matchAll(/placeholder="([^"]+)"/g)) assert.match(m[1], /^e\.g\. /, `${f}: ${m[1]}`);
+    }
+    assert.match(read("dashboard/src/app/onboarding/steps/ui.tsx"), /placeholder:text-ink-3\/70/);
+  });
+  it("receptionist has a real default name and clean preview punctuation", async () => {
+    const { DEFAULT_AGENT_NAME } = await import("../dashboard/src/lib/setupFlow.ts");
+    assert.equal(defaultDraft().voice.agentName, DEFAULT_AGENT_NAME);
+    assert.ok(DEFAULT_AGENT_NAME.length > 1);
+    const src = read("dashboard/src/app/onboarding/steps/VoiceStep.tsx");
+    assert.doesNotMatch(src, /"…"/);
+  });
+  it("site visit defaults to No", async () => {
+    const { emptyRow } = await import("../dashboard/src/lib/setupFlow.ts");
+    assert.equal(emptyRow("Sofa cleaning").site_visit, "no");
+  });
+  it("break defaults to lunch 13:00–14:00, else the middle hour", async () => {
+    const { splitLast } = await import("../dashboard/src/lib/setupFlow.ts");
+    assert.deepEqual(splitLast([{ open: "08:00", close: "18:00" }]), [
+      { open: "08:00", close: "13:00" },
+      { open: "14:00", close: "18:00" },
+    ]);
+    assert.deepEqual(splitLast([{ open: "15:00", close: "21:00" }]), [
+      { open: "15:00", close: "17:30" },
+      { open: "18:30", close: "21:00" },
+    ]);
+  });
+  it("FAQ suggestions follow the business type", async () => {
+    const { suggestedQuestions } = await import("../dashboard/src/lib/setupFlow.ts");
+    const home = suggestedQuestions("home_services").join(" ");
+    assert.doesNotMatch(home, /deliver|hold an item/i);
+    assert.match(suggestedQuestions("retail").join(" "), /deliver/);
+    assert.match(read("dashboard/src/components/HomeCapture.tsx"), /call-out and cancellation/);
+  });
+  it("coverage preview never uses the landmark", () => {
+    const src = read("dashboard/src/app/(desk)/home/page.tsx");
+    const block = src.slice(src.indexOf("homeStakes({"), src.indexOf("shopStakes({"));
+    assert.doesNotMatch(block, /landmark/);
+  });
+  it("Catalogue spelling in user-facing labels", () => {
+    assert.match(read("dashboard/src/components/HomeCapture.tsx"), /label: "Catalogue"/);
+    assert.doesNotMatch(read("dashboard/src/lib/businessSettingsNav.ts"), /"Catalog"/);
+  });
+  it("country select stacks on mobile, input fills the row", () => {
+    const src = read("dashboard/src/app/onboarding/steps/AlertsStep.tsx");
+    assert.match(src, /flex flex-col gap-2 sm:flex-row/);
+    assert.match(src, /sm:flex-1/);
+  });
+  it("logo stays in the header beside Back", () => {
+    const src = read("dashboard/src/app/onboarding/SetupFlow.tsx");
+    const header = src.slice(src.indexOf("<header"), src.indexOf("</header>"));
+    assert.ok(header.indexOf("Back") < header.indexOf("<BrandWordmark"));
+    assert.doesNotMatch(header, /\) : \(\s*<BrandWordmark/);
+  });
+  it("step save does the role check and the write in parallel", () => {
+    assert.match(read("dashboard/src/app/onboarding/setupActions.ts"), /Promise\.all\(\[\s*canEditSetup/);
+  });
+  it("minutes meter is not monospace", () => {
+    assert.doesNotMatch(read("dashboard/src/app/(desk)/home/page.tsx"), /font-mono text-sm font-medium text-ink/);
+  });
+  it("completeness: one confirmed priced item fills the catalogue; pending number not counted", () => {
+    const sql = readFileSync(join(root, "supabase/migrations/20261011170000_completeness_matches_onboarding.sql"), "utf8");
+    assert.match(sql, /if v_ok >= 1 then\s+return least\(100/);
+    assert.match(sql, /_tenant_number_assigned/);
+    assert.match(sql, /if v_is_home then/);
+    assert.match(read("dashboard/src/app/onboarding/setupActions.ts"), /"identity\.business_name",\s*"identity\.language",\s*"assistant\.tools"/);
+  });
+});

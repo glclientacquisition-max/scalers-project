@@ -32,7 +32,7 @@ export function BusinessStep({ value, onChange }: { value: Value; onChange: (v: 
             value={value.landmark}
             maxLength={LIMITS.landmark}
             onChange={(e) => onChange({ ...value, landmark: e.target.value })}
-            placeholder="Opposite Naivas, Westlands"
+            placeholder="e.g. Opposite Naivas, Westlands"
             autoComplete="street-address"
             className={inputClass}
           />
@@ -46,7 +46,7 @@ export function BusinessStep({ value, onChange }: { value: Value; onChange: (v: 
             maxLength={LIMITS.directions}
             rows={3}
             onChange={(e) => onChange({ ...value, directions: e.target.value })}
-            placeholder="From Waiyaki Way, turn at the Shell station. We're on the left."
+            placeholder="e.g. From Waiyaki Way, turn at the Shell station. We're on the left."
             className={`${inputClass} [field-sizing:content] max-h-48 leading-relaxed`}
           />
         </div>

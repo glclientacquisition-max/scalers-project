@@ -105,7 +105,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(nav, /label: "Updates"/);
     assert.match(nav, /label: "Test"/);
     assert.match(nav, /label: "FAQs"/);
-    assert.match(nav, /label: "Catalog"/);
+    assert.match(nav, /label: "Catalogue"/);
     assert.match(nav, /label: "Import"/);
     assert.match(nav, /label: "How we notify"/);
     assert.match(nav, /label: "Team"/);
@@ -372,7 +372,7 @@ describe("business settings craft", () => {
       "Hours",
       "Locations",
       "Policies",
-      "Catalog",
+      "Catalogue",
       "Import",
       "FAQs",
       "Voice",
@@ -386,7 +386,7 @@ describe("business settings craft", () => {
       ["Business", "Knowledge", "Assistant", "People"]
     );
     assert.equal(new Set(got.sections.map((section) => section.id)).size, got.sections.length);
-    assert.equal(got.labels[got.labels.indexOf("Catalog") + 1], "Import");
+    assert.equal(got.labels[got.labels.indexOf("Catalogue") + 1], "Import");
     assert.equal(got.labels.indexOf("Identity") + 1, got.labels.indexOf("Hours"));
     const people = got.sections.find((section) => section.title === "People");
     assert.deepEqual(people.labels, ["Team", "How we notify"]);

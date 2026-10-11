@@ -30,7 +30,8 @@ describe("onboarding craft", () => {
 
   it("has no AI-slop copy or template chrome", () => {
     for (const [file, src] of all) {
-      assert.doesNotMatch(src, /e\.g\./, file);
+      // "e.g." only as a hint inside placeholders (owner request), never in body copy.
+      assert.doesNotMatch(src.replace(/placeholder=(\{[^}]*\}|"[^"]*")/g, ""), /e\.g\./, file);
       assert.doesNotMatch(src, /\bBA\b|Opening your line|Answers you can confirm/, file);
       assert.doesNotMatch(src, /\b(seamless|effortless|supercharge|leverage|unlock|elevate)\b/i, file);
       assert.doesNotMatch(src, /\s·\s/, file);

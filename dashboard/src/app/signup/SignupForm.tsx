@@ -108,7 +108,7 @@ export function SignupForm() {
           error={err("notification_phone")}
         >
           {(p) => (
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <label htmlFor="phone_country" className="sr-only">Country</label>
               <select
                 id="phone_country"
@@ -116,7 +116,7 @@ export function SignupForm() {
                 value={form.phone_country}
                 onChange={set("phone_country")}
                 autoComplete="tel-country-code"
-                className="min-h-11 shrink-0 rounded-xl border border-hairline bg-surface px-3 text-body text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                className="min-h-11 w-full rounded-xl sm:w-32 sm:shrink-0 border border-hairline bg-surface px-3 text-body text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 {PHONE_COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>
@@ -133,7 +133,7 @@ export function SignupForm() {
                 autoComplete="tel-national"
                 inputMode="tel"
                 placeholder={PHONE_COUNTRIES.find((c) => c.code === form.phone_country)?.example}
-                className="min-w-0 flex-1"
+                className="w-full sm:min-w-0 sm:flex-1"
               />
             </div>
           )}

@@ -107,7 +107,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     id: "knowledge",
     title: "Knowledge",
     items: [
-      { label: "Catalog", target: { tab: "catalog" } },
+      { label: "Catalogue", target: { tab: "catalog" } },
       { label: "Import", target: { tab: "import" } },
       { label: "FAQs", target: { tab: "train", panel: "faqs" } },
     ],
@@ -175,7 +175,7 @@ export function settingsPanelHeading(
   vertical?: string | null
 ): string | null {
   if (tab === "menu") return null;
-  if (tab === "catalog") return "Catalog";
+  if (tab === "catalog") return "Catalogue";
   if (tab === "alerts") return "How we notify";
   if (tab === "import") {
     const v = String(vertical || "")

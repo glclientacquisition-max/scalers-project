@@ -17,8 +17,8 @@ export function VoiceStep({
   const name = value.agentName.trim();
   const greeting =
     value.tone === "professional"
-      ? `Good morning, ${businessName}. ${name || "…"} speaking. How may I help you?`
-      : `Hi, you've reached ${businessName}. I'm ${name || "…"}. How can I help?`;
+      ? `Good morning, ${businessName}.${name ? ` ${name} speaking.` : ""} How may I help you?`
+      : `Hi, you've reached ${businessName}.${name ? ` I'm ${name}.` : ""} How can I help?`;
   return (
     <>
       <section className="mt-6">
@@ -32,7 +32,7 @@ export function VoiceStep({
             value={value.agentName}
             maxLength={LIMITS.agentName}
             onChange={(e) => onChange({ ...value, agentName: e.target.value })}
-            placeholder="Wanjiru"
+            placeholder="e.g. Wanjiru"
             autoComplete="off"
             aria-invalid={errors.agentName ? true : undefined}
             aria-describedby={errors.agentName ? "agentName-err" : "agentName-hint"}
