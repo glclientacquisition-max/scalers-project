@@ -115,13 +115,13 @@ declare
 begin
   if btrim(t) = '' then return null; end if;
   m := regexp_match(t, '(?:till|buy goods)(?:\s*(?:no\.?|number|#))?\s*[:\-]?\s*(\d{5,7})(?!\d)');
-  if m is not null then till := m[1]; methods := methods || 'mpesa_till'; elsif t ~ '\mtill\M|buy goods' then methods := methods || 'mpesa_till'; end if;
+  if m is not null then till := m[1]; methods := array_append(methods, 'mpesa_till'); elsif t ~ '\mtill\M|buy goods' then methods := array_append(methods, 'mpesa_till'); end if;
   m := regexp_match(t, 'pay\s*bill(?:\s*(?:no\.?|number|#))?\s*[:\-]?\s*(\d{5,7})(?!\d)');
-  if m is not null then pb := m[1]; methods := methods || 'mpesa_paybill'; elsif t ~ 'pay\s*bill' then methods := methods || 'mpesa_paybill'; end if;
-  if t ~ 'm-?pesa' and not (methods && array['mpesa_till', 'mpesa_paybill']) then methods := methods || 'mpesa_send'; end if;
-  if t ~ '\mcash\M' then methods := methods || 'cash'; end if;
-  if t ~ '\mcard|visa|mastercard' then methods := methods || 'card'; end if;
-  if t ~ '\mbank|\meft\M|rtgs|pesalink' then methods := methods || 'bank'; end if;
+  if m is not null then pb := m[1]; methods := array_append(methods, 'mpesa_paybill'); elsif t ~ 'pay\s*bill' then methods := array_append(methods, 'mpesa_paybill'); end if;
+  if t ~ 'm-?pesa' and not (methods && array['mpesa_till', 'mpesa_paybill']) then methods := array_append(methods, 'mpesa_send'); end if;
+  if t ~ '\mcash\M' then methods := array_append(methods, 'cash'); end if;
+  if t ~ '\mcard|visa|mastercard' then methods := array_append(methods, 'card'); end if;
+  if t ~ '\mbank|\meft\M|rtgs|pesalink' then methods := array_append(methods, 'bank'); end if;
   m := regexp_match(t, '(\d{1,3})\s*%\s*(?:deposit|down|upfront|advance)');
   if m is null then m := regexp_match(t, '(?:deposit|down|upfront|advance)[^\d%]{0,20}(\d{1,3})\s*%'); end if;
   if m is not null then dep := least(100, greatest(1, m[1]::int)); end if;
