@@ -1,6 +1,7 @@
 "use server";
 
 import { syncPricing } from "@/lib/structuredData";
+import { normalizePhone } from "@/lib/setupFlow";
 import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
@@ -229,7 +230,10 @@ export async function saveAndCompileSettings(
       ownerPhone: ownerAlertPhone(tenant),
     });
     if (!team.ok) return { error: team.error };
-    teamDirectory = parseTeamDirectoryField(JSON.stringify(team.rows));
+    // Store E.164 (+2547...) so calls, contacts and alerts match one format.
+    teamDirectory = parseTeamDirectoryField(
+      JSON.stringify(team.rows.map((r) => ({ ...r, phone: r.phone ? normalizePhone(r.phone) || r.phone : r.phone })))
+    );
   }
   const faqs = pick(
     "faqs",
