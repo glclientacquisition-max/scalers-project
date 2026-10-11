@@ -1,5 +1,6 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
 import { syncPricing } from "@/lib/structuredData";
 import { normalizePhone } from "@/lib/setupFlow";
 import { memberDenied } from "@/lib/requireMember";
@@ -436,6 +437,7 @@ export async function saveAndCompileSettings(
 
   patch.llm_system_prompt = prompt;
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   if (error) {
     return ownerSaveFailed("settings.save", error.message);

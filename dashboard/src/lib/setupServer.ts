@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { getAuthUser } from "@/lib/auth";
+import { getVerifiedAuthUser as getAuthUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ownerTenantId } from "@/lib/tenant";
 import { parseDraft, type SetupDraft } from "@/lib/setupFlow";

@@ -1,3 +1,4 @@
+import { bustTenantCache } from "@/lib/tenantCache";
 import "server-only";
 
 /**
@@ -99,6 +100,7 @@ export async function recompileAfterCatalogImport(opts: {
     .from("tenants")
     .update({ llm_system_prompt: prompt })
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   if (error) {
     return { ok: false, error: error.message };

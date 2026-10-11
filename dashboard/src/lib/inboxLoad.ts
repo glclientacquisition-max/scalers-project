@@ -165,17 +165,8 @@ export async function loadInboxItems(
   error: string | null;
   partialError: string | null;
 }> {
-  const callsRes = await fetchCallsTape(client, tenantId);
-  if (callsRes.error) {
-    return {
-      items: [],
-      callsTruncated: false,
-      error: callsRes.error.message,
-      partialError: null,
-    };
-  }
-
-  const [openHoldsRes, tapeHoldsRes, openJobsFirst, tapeJobsFirst] = await Promise.all([
+  // Calls tape, holds and jobs only need the tenant id: one round trip, not two.
+  const workPromise = Promise.all([
     fetchPagedOpenWork<InboxHold>((from, to) =>
       client
         .from("service_requests")
@@ -209,6 +200,18 @@ export async function loadInboxItems(
       .order("created_at", { ascending: false })
       .limit(INBOX_WINDOW),
   ]);
+  const [callsRes, work] = await Promise.all([fetchCallsTape(client, tenantId), workPromise]);
+  if (callsRes.error) {
+    return {
+      items: [],
+      callsTruncated: false,
+      error: callsRes.error.message,
+      partialError: null,
+    };
+  }
+
+  const [openHoldsRes, tapeHoldsRes, openJobsFirst, tapeJobsFirst] = work;
+
 
   let openHolds = openHoldsRes;
   let tapeHolds = tapeHoldsRes;

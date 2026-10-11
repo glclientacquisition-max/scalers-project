@@ -1,5 +1,6 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
@@ -253,6 +254,7 @@ export async function applyCatalogImportAction(
     .from("tenants")
     .update(patch)
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   if (error) {
     return ownerSaveFailed("catalog", error.message);
