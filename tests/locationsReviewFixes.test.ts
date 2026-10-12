@@ -29,9 +29,9 @@ test("areas and places save straight away from their drawers", () => {
 test("change fee: own drawer, only existing areas, current fee prefilled", async () => {
   const m = await sa();
   let v = m.applyFeeToAreas(m.emptyServiceAreas("retail"), ["place:ruaka", "place:kitengela"], { fee_mode: "fixed", fee_ksh: 300, eta: "Next day" }, "retail");
-  assert.deepEqual(m.commonFee(v.areas), { fee_mode: "fixed", fee_ksh: 300, eta: "Next day" });
+  assert.deepEqual(m.commonFee(v.areas), { fee_mode: "fixed", fee_ksh: 300, eta: "Next day", differ: false });
   v = m.applyFeeToAreas(v, ["place:ruaka"], { fee_mode: "free", fee_ksh: null, eta: null }, "retail");
-  assert.equal(m.commonFee(v.areas).fee_mode, "free", "first area's fee when they differ");
+  assert.equal(m.commonFee(v.areas).differ, true, "fees differ");
   const ed = read("../dashboard/src/components/structured/ServiceAreasEditor.tsx");
   assert.match(ed, /title="Change fee"/);
 });

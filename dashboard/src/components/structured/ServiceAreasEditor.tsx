@@ -17,6 +17,7 @@ import {
   applyFeeToAreas,
   areaSummary,
   commonFee,
+  withReach,
   serviceAreasSentence,
   validateServiceArea,
   type AreaMode,
@@ -90,6 +91,7 @@ export function ServiceAreasEditor({
   const [ticked, setTicked] = useState<string[]>([]);
   const [fee, setFee] = useState<BulkFee>(DEFAULT_FEE);
   const [error, setError] = useState<string>("");
+  const [feesDiffer, setFeesDiffer] = useState(false);
   const [draft, setDraft] = useState<ServiceArea | null>(null);
   const [more, setMore] = useState(false);
   const [who, setWho] = useState<{ by: DeliveredBy[]; paid: RiderPaid | null }>({ by: [], paid: null });
@@ -101,9 +103,10 @@ export function ServiceAreasEditor({
   );
   const options = [
     ...ticked.map((id) => ({ id, label: coverageAreaLabel(id) })),
-    ...results.map((o) => ({ id: o.id, label: o.label, detail: o.hint })),
+    ...results.filter((o) => !o.added && !ticked.includes(o.id)).map((o) => ({ id: o.id, label: o.label, detail: o.hint })),
   ];
-  const suggested = homeAreas.filter((id) => !listed.includes(id) && !ticked.includes(id));
+  const alreadyAdded = results.filter((o) => o.added);
+  const suggested = [...new Set(homeAreas)].filter((id) => !ticked.includes(id));
   const copy = reachCopy(value.reach);
   const unconfirmed = value.areas.filter((a) => !a.confirmed).length;
   const delivers = copy.riders && value.areas.some((a) => a.modes.includes("delivery"));
@@ -119,7 +122,9 @@ export function ServiceAreasEditor({
   function openChangeFee(ids: string[]) {
     const chosen = value.areas.filter((a) => ids.includes(a.id));
     setTicked(chosen.map((a) => a.id));
-    setFee(commonFee(chosen));
+    const { differ, ...shared } = commonFee(chosen);
+    setFee(shared);
+    setFeesDiffer(differ);
     setError("");
     setSheet("fee");
   }
@@ -156,7 +161,7 @@ export function ServiceAreasEditor({
         label="How customers get your service"
         options={REACH_OPTIONS}
         value={[value.reach]}
-        onChange={(v) => v[0] && canEdit && onChange({ ...value, reach: v[0], no_premises: v[0] === "visit" ? value.no_premises : false })}
+        onChange={(v) => v[0] && canEdit && onChange(withReach(value, v[0]))}
       />
       {value.reach !== "visit" ? (
         <p className="-mt-3 text-meta text-ink-2">
@@ -253,17 +258,34 @@ export function ServiceAreasEditor({
             <div className="space-y-1.5">
               <p className="text-meta font-medium text-ink">Suggested</p>
               <div className="flex flex-wrap gap-2">
-                {suggested.map((id) => (
-                  <Button key={id} variant="tonal" size="sm" onClick={() => setTicked([...ticked, id])}>
-                    + {coverageAreaLabel(id)}
-                  </Button>
-                ))}
+                {suggested.map((id) =>
+                  listed.includes(id) ? (
+                    <span key={id} className="inline-flex min-h-9 items-center rounded-full bg-surface-2 px-3 text-meta text-ink-2">
+                      {coverageAreaLabel(id)} · Added
+                    </span>
+                  ) : (
+                    <Button key={id} variant="tonal" size="sm" onClick={() => setTicked([...ticked, id])}>
+                      + {coverageAreaLabel(id)}
+                    </Button>
+                  )
+                )}
               </div>
             </div>
           ) : null}
           {options.length ? (
             <CheckList<string> label="Areas" multiple options={options} value={ticked} onChange={setTicked} />
-          ) : query.trim() ? (
+          ) : null}
+          {alreadyAdded.length ? (
+            <ul className="divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface" aria-label="Already added">
+              {alreadyAdded.map((o) => (
+                <li key={o.id} className="flex min-h-11 items-center gap-3 px-3 text-body text-ink-2">
+                  <span className="min-w-0 flex-1">{o.label}</span>
+                  <span className="text-meta">Added</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {!options.length && !alreadyAdded.length && query.trim() ? (
             <p className="text-meta text-ink-2">No match. Try the nearest town.</p>
           ) : null}
           {copy.perArea ? (
@@ -311,6 +333,11 @@ export function ServiceAreasEditor({
             value={ticked}
             onChange={setTicked}
           />
+          {feesDiffer ? (
+            <p className="rounded-xl bg-accent-tonal px-3 py-2 text-meta text-ink" role="note">
+              Fees differ between these areas. Enter one fee to use for all of them.
+            </p>
+          ) : null}
           <FeeFields
             fee={fee}
             label={copy.fee || "Fee"}

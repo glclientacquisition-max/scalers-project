@@ -144,7 +144,23 @@ export function normalizeServiceAreas(raw: unknown, vertical?: string | null): S
   const deliveredBy = (Array.isArray(obj.delivered_by) ? obj.delivered_by : []).map(String).filter((b): b is DeliveredBy => BY_IDS.has(b as DeliveredBy));
   const riderPaid = obj.rider_paid === "in_fee" || obj.rider_paid === "on_arrival" ? (obj.rider_paid as RiderPaid) : null;
   const reach = REACH_IDS.has(obj.reach as Reach) ? (obj.reach as Reach) : defaultReach(vertical);
-  return { version: 1, areas, delivered_by: [...new Set(deliveredBy)], rider_paid: riderPaid, reach, no_premises: obj.no_premises === true };
+  return withReach({ version: 1, areas, delivered_by: [...new Set(deliveredBy)], rider_paid: riderPaid, reach, no_premises: obj.no_premises === true }, reach);
+}
+
+/**
+ * Switch how customers get the service. Outside mixed mode every area follows it, so the
+ * list, "Callers hear" and the prompt never say "visit" for a business that delivers.
+ */
+export function withReach(v: ServiceAreas, reach: Reach): ServiceAreas {
+  const next = { ...v, reach, no_premises: reach === "visit" ? v.no_premises : false };
+  if (reach !== "deliver" && reach !== "visit") return next;
+  const from: AreaMode = reach === "deliver" ? "visit" : "delivery";
+  const to: AreaMode = reach === "deliver" ? "delivery" : "visit";
+  next.areas = v.areas.map((a) => {
+    const modes = [...new Set(a.modes.map((m) => (m === from ? to : m)))];
+    return { ...a, modes: modes.length ? modes : [to] };
+  });
+  return next;
 }
 
 /** Old Policies coverage list -> areas with "we confirm the fee", unconfirmed (owner checks them once). */
@@ -212,11 +228,14 @@ export function serviceAreasSentence(v: ServiceAreas | null | undefined): string
   return [...groups.values()].map((g) => `We ${g.verb} ${joinNames(g.names)}${g.tail}.`).join(" ");
 }
 
-/** The fee to prefill when changing several areas: the shared one, else the first area's. */
-export function commonFee(areas: readonly ServiceArea[]): BulkFee {
+/** The fee to prefill when changing several areas. When they differ: no amount, and say so. */
+export function commonFee(areas: readonly ServiceArea[]): BulkFee & { differ: boolean } {
   const a = areas[0];
-  if (!a) return { fee_mode: "free", fee_ksh: null, eta: null };
-  return { fee_mode: a.fee_mode, fee_ksh: a.fee_ksh, eta: a.eta };
+  if (!a) return { fee_mode: "free", fee_ksh: null, eta: null, differ: false };
+  const same = areas.every((b) => b.fee_mode === a.fee_mode && b.fee_ksh === a.fee_ksh);
+  const eta = areas.every((b) => b.eta === a.eta) ? a.eta : null;
+  if (!same) return { fee_mode: "fixed", fee_ksh: null, eta, differ: true };
+  return { fee_mode: a.fee_mode, fee_ksh: a.fee_ksh, eta, differ: false };
 }
 
 /** Prompt block. Fees are quoted only when the owner set and confirmed them. */

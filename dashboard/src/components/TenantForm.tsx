@@ -768,6 +768,17 @@ function TenantFormInner({
     [bulkProductsText]
   );
 
+  // Warn before leaving only while a save is actually in flight.
+  useEffect(() => {
+    if (!pending) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [pending]);
+
   // Locations drawers ("Save 3 areas", "Done") save the page straight away.
   const saveAfterLocationsRef = useRef(false);
   useEffect(() => {

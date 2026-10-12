@@ -7,6 +7,7 @@ import { normalizePhone } from "@/lib/setupFlow";
 import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
   parseAgentTone,
@@ -465,7 +466,7 @@ export async function saveAndCompileSettings(
         })
       )
     : provenance.fieldMeta;
-  const { prompt, source } = await compileReceptionistPrompt({
+  const compileInput = {
     businessName,
     servicesOffered,
     businessHours,
@@ -485,7 +486,12 @@ export async function saveAndCompileSettings(
     businessPolicies,
     fieldMeta: compileFieldMeta,
     holdGate: provenance.holdGate,
-  });
+  };
+  // Fast path: write the facts with the template prompt now (milliseconds), so the owner
+  // sees "Saved" quickly and a reload shows the new data. The model-written prompt and
+  // the fact bookkeeping run after the response (see after() below).
+  const { prompt } = await compileReceptionistPrompt({ ...compileInput, localOnly: true });
+  const source = "local" as const;
 
   patch.llm_system_prompt = prompt;
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
@@ -519,32 +525,46 @@ export async function saveAndCompileSettings(
     lineNumber: String(tenant.sautikit_virtual_number || "").trim(),
   });
 
-  if (hashMode) {
-    // Hash the stored row as saved. If it cannot be read back, confirm nothing:
-    // in hash mode a missing value_hash already reads as "Check this".
-    const saved = await readSavedFactRow(workspace.client, tenant.id);
-    if (saved) {
-      await ownerConfirmPlan(
-        tenant.id,
-        planFactConfirm({
-          scope,
-          before: storedFactRow,
-          after: saved,
-          explicitPaths,
-          normalize: normalizeFactRow,
-        })
-      );
-    } else {
-      console.warn("[settings.save] saved row unreadable, owner confirm skipped");
+  const client = workspace.client;
+  // Request-scoped reads (cookies) must happen before after().
+  const attestUser = hashMode ? null : await getAuthUser();
+  after(async () => {
+    // Upgrade to the model-written prompt only if no newer save replaced ours meanwhile.
+    try {
+      const { prompt: better, source: how } = await compileReceptionistPrompt(compileInput);
+      if (how === "gemini" && better && better !== prompt) {
+        await client.from("tenants").update({ llm_system_prompt: better }).eq("id", tenant.id).eq("llm_system_prompt", prompt);
+        bustTenantCache(tenant.id);
+      }
+    } catch (err) {
+      console.warn("[settings.save] prompt upgrade skipped:", err instanceof Error ? err.message : err);
     }
-  } else {
-    const user = await getAuthUser();
-    await ownerAttestFields(
-      tenant.id,
-      cleanFieldPaths([...pathsFromSave, ...ownerPathsFromForm]),
-      user?.id ?? null
-    );
-  }
+    if (hashMode) {
+      // Hash the stored row as saved. If it cannot be read back, confirm nothing:
+      // in hash mode a missing value_hash already reads as "Check this".
+      const saved = await readSavedFactRow(client, tenant.id);
+      if (saved) {
+        await ownerConfirmPlan(
+          tenant.id,
+          planFactConfirm({
+            scope,
+            before: storedFactRow,
+            after: saved,
+            explicitPaths,
+            normalize: normalizeFactRow,
+          })
+        );
+      } else {
+        console.warn("[settings.save] saved row unreadable, owner confirm skipped");
+      }
+    } else {
+      await ownerAttestFields(
+        tenant.id,
+        cleanFieldPaths([...pathsFromSave, ...ownerPathsFromForm]),
+        attestUser?.id ?? null
+      );
+    }
+  });
 
   revalidatePath("/settings");
 
