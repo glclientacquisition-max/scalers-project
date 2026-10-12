@@ -1,3 +1,4 @@
+import { AppearanceFooter } from "@/components/ThemePicker";
 import Link from "next/link";
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { marketingHomeHref } from "@/lib/adminHost";
@@ -15,6 +16,9 @@ export default function SignupPage() {
             Sign in
           </Link>
         </p>
+        <footer className="mt-10 flex justify-center">
+          <AppearanceFooter />
+        </footer>
       </div>
     </main>
   );

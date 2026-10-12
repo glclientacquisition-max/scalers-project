@@ -2,7 +2,7 @@ import Image from "next/image";
 import { appEntryHref } from "@/lib/adminHost";
 import { brandAssets } from "@/components/brand/assets";
 import { HeroCall, HowStage } from "@/components/marketing/LandingStory";
-import { ThemeDock } from "@/components/ThemePicker";
+import { AppearanceFooter } from "@/components/ThemePicker";
 
 /**
  * Marketing home: hero, how it works, then sign up.
@@ -41,7 +41,6 @@ export function LandingPage({
             Scalers
           </span>
           <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <ThemeDock tone="onDark" />
             {signedIn ? (
               <a
                 href={appEntryHref(actionHref)}
@@ -145,6 +144,9 @@ export function LandingPage({
           </div>
         </div>
       </section>
+      <footer className="flex justify-center border-t border-hairline bg-canvas px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
+        <AppearanceFooter />
+      </footer>
     </main>
   );
 }

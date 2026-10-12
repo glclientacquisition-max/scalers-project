@@ -1,7 +1,7 @@
+import { AppearanceFooter } from "@/components/ThemePicker";
 import { Button } from "@/components/ui/Button";
 import { redirect } from "next/navigation";
 import { BrandWordmark } from "@/components/brand/BrandMark";
-import { ThemeDock } from "@/components/ThemePicker";
 import { deskFieldClass } from "@/components/ui/deskChrome";
 import { isLegacyAuthenticated } from "@/lib/auth";
 
@@ -26,7 +26,6 @@ export default async function AdminLoginPage({
       <div className="w-full max-w-md">
         <div className="flex items-start justify-between gap-3">
           <BrandWordmark href="/admin/login" context="Super Admin" variant="lockup" priority />
-          <ThemeDock />
         </div>
         <h1 className="sr-only">Super Admin</h1>
 
@@ -73,6 +72,9 @@ export default async function AdminLoginPage({
             Sign in
           </Button>
         </form>
+        <footer className="mt-10 flex justify-center">
+          <AppearanceFooter />
+        </footer>
       </div>
     </main>
   );

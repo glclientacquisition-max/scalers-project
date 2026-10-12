@@ -1,4 +1,5 @@
 "use client";
+import { AppearanceFooter } from "@/components/ThemePicker";
 
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { BrandWordmark } from "@/components/brand/BrandMark";
@@ -388,6 +389,9 @@ export function SetupFlow({
         {key === "voice" ? <VoiceStep value={draft.voice} onChange={(v) => patch("voice", v)} errors={errors} businessName={businessName} /> : null}
         {key === "faqs" ? <FaqsStep value={draft.faqs} onChange={(v) => patch("faqs", v)} errors={errors} vertical={draft.business.vertical} /> : null}
         {key === "alerts" ? <AlertsStep value={draft.alerts} onChange={(v) => patch("alerts", v)} errors={errors} /> : null}
+        <div className="mt-10 flex justify-center">
+          <AppearanceFooter />
+        </div>
       </div>
 
       <footer className="fixed inset-x-0 bottom-0 z-10 border-t border-hairline bg-canvas/90 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur supports-[backdrop-filter]:bg-canvas/75">

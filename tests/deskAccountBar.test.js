@@ -49,14 +49,14 @@ describe("desk account bar", () => {
 
   it("shows a theme cluster on Appearance and keeps Line live off that control", () => {
     assert.match(picker, /<SegmentedControl/);
-    assert.match(picker, /label="This device"/);
+    assert.match(picker, /label="On this device"/);
     assert.match(picker, /data-theme-cluster=""/);
     for (const label of ["System", "Light", "Dark"]) {
       assert.match(picker, new RegExp(`label: "${label}"`));
     }
     assert.doesNotMatch(picker, /Line live|SettingsSegmented|bg-white|#[0-9a-fA-F]{6}/);
     assert.match(menu, /<ThemePicker \/>/);
-    assert.match(menu, />\s*This device\s*</);
+    assert.match(menu, /appearanceLabel\(/);
     assert.match(menu, /data-account-appearance=""/);
     assert.doesNotMatch(menu, /\/settings/);
     assert.doesNotMatch(shell, /<ThemePicker \/>/);

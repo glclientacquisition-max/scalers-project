@@ -1,3 +1,4 @@
+import { AppearanceFooter } from "@/components/ThemePicker";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BrandWordmark } from "@/components/brand/BrandMark";
@@ -69,6 +70,9 @@ export default async function LoginPage({
             Scalers home
           </Link>
         </p>
+        <footer className="mt-10 flex justify-center">
+          <AppearanceFooter />
+        </footer>
       </div>
     </main>
   );

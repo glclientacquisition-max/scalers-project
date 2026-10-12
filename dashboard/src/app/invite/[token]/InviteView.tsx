@@ -1,3 +1,4 @@
+import { AppearanceFooter } from "@/components/ThemePicker";
 import Link from "next/link";
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { buttonClass } from "@/components/ui/Button";
@@ -14,6 +15,9 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className="w-full max-w-md">
         <BrandWordmark href="/login" context="Invite" variant="lockup" priority />
         {children}
+        <footer className="mt-10 flex justify-center">
+          <AppearanceFooter />
+        </footer>
       </div>
     </main>
   );
