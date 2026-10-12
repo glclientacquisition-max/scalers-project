@@ -48,6 +48,8 @@ import {
 import {
   formatPoliciesForCompiler,
   parseBusinessPoliciesField,
+  applyStructuredPolicies,
+  businessPoliciesForStorage,
 } from "@/lib/businessPolicies";
 import {
   lexiconForStorage,
@@ -85,6 +87,8 @@ function safeJsonRows(raw: FormDataEntryValue | null): TeamRowInput[] {
 }
 
 export type SettingsCompileState = {
+  /** Field errors from typed payments and policy rules, keyed like the form ids. */
+  fields?: Record<string, string>;
   error?: string;
   ok?: boolean;
   source?: "gemini" | "local";
@@ -304,11 +308,18 @@ export async function saveAndCompileSettings(
     parseBusinessLocationsField(formData.get("business_locations")),
     parseBusinessLocationsField(JSON.stringify(tenant.business_locations || []))
   );
-  const businessPolicies = pick(
+  const policiesFromForm = settingsFieldFromScope(scope, "businessPolicies", true, false);
+  let businessPolicies = pick(
     "businessPolicies",
     parseBusinessPoliciesField(formData.get("business_policies")),
     parseBusinessPoliciesField(JSON.stringify(tenant.business_policies || {}))
   );
+  if (policiesFromForm) {
+    // Typed payments and rules: validate, then generate the spoken text from them.
+    const structured = applyStructuredPolicies(businessPolicies);
+    if (!structured.ok) return { error: structured.error, fields: structured.fields };
+    businessPolicies = structured.policies;
+  }
   const ttsLexicon = lexiconForStorage(
     pick(
       "ttsLexicon",
@@ -397,7 +408,7 @@ export async function saveAndCompileSettings(
     soniox_voice_id: sonioxVoiceId,
     soniox_voice_label: sonioxVoiceLabel,
     business_locations: businessLocations,
-    business_policies: businessPolicies,
+    business_policies: businessPoliciesForStorage(businessPolicies),
     tts_lexicon: ttsLexicon,
   };
 

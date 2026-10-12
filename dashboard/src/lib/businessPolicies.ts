@@ -1,4 +1,6 @@
-import { formatCoverageList, parseCoverageAreas } from "@/lib/coverageAreas";
+import { formatCoverageList, parseCoverageAreas } from "./coverageAreas";
+import { cleanPayments, normalizePayments, paymentsHaveContent, paymentsSentence, validatePayments, type Payments } from "./payments";
+import { normalizeRules, policyTextFromRules, validateRules, type PolicyRules } from "./policyRules";
 
 export type BusinessPolicies = {
   returns: string;
@@ -20,7 +22,19 @@ export type BusinessPolicies = {
   /** "confirmed_slot" lets the Business Assistant book a time; "request" means the owner confirms. Round-tripped. */
   booking_mode?: string;
   booking?: unknown;
+  /** Typed payments (v2). The `payment` text is generated from it on save. */
+  payments?: Payments | null;
+  /** Typed policy rules. returns / delivery / cancellation / warranty text is generated from them. */
+  rules?: PolicyRules;
+  /** Keys this form does not manage (extra, field_meta, ...). Round-tripped untouched. */
+  passthrough?: Record<string, unknown>;
 };
+
+/** Keys normalizeBusinessPolicies owns. Everything else rides in `passthrough`. */
+const MANAGED_KEYS = new Set([
+  "returns", "delivery", "payment", "deposit", "cancellation", "warranty", "other",
+  "coverage_areas", "provenance", "holds", "booking_mode", "booking", "payments", "rules", "passthrough",
+]);
 
 type PolicyTextId =
   | "returns"
@@ -116,7 +130,65 @@ export function normalizeBusinessPolicies(raw: unknown): BusinessPolicies {
   if (obj.holds !== undefined) base.holds = obj.holds;
   if (typeof obj.booking_mode === "string") base.booking_mode = obj.booking_mode.slice(0, 40);
   if (obj.booking !== undefined) base.booking = obj.booking;
+  // Typed payments and rules used to be dropped here, so any Settings save (Hours, FAQs...)
+  // wiped them and the Payments group "reverted". Keep them, and keep unknown keys too.
+  if (obj.payments !== undefined) base.payments = normalizePayments(obj.payments);
+  if (obj.rules !== undefined) base.rules = normalizeRules(obj.rules);
+  const passthrough: Record<string, unknown> = {};
+  const nested = obj.passthrough && typeof obj.passthrough === "object" && !Array.isArray(obj.passthrough) ? (obj.passthrough as Record<string, unknown>) : {};
+  for (const [k, v] of Object.entries({ ...nested, ...obj })) if (!MANAGED_KEYS.has(k)) passthrough[k] = v;
+  if (Object.keys(passthrough).length) base.passthrough = passthrough;
   return base;
+}
+
+/** Stored shape: managed keys plus the round-tripped extras at the top level again. */
+export function businessPoliciesForStorage(p: BusinessPolicies): Record<string, unknown> {
+  const { passthrough, ...rest } = p;
+  const out: Record<string, unknown> = { ...(passthrough || {}), ...rest };
+  if (out.payments === undefined) delete out.payments;
+  if (out.rules === undefined) delete out.rules;
+  return out;
+}
+
+export type StructuredPolicyResult = { ok: true; policies: BusinessPolicies; changedText: string[] } | { ok: false; error: string; fields: Record<string, string> };
+
+/**
+ * Settings save: validate typed payments and rules, then generate the spoken text keys
+ * from them (payment, returns, delivery, cancellation, warranty) and mark those keys as
+ * the owner's. Unconfirmed parsed payments keep the old payment text until confirmed.
+ */
+export function applyStructuredPolicies(input: BusinessPolicies): StructuredPolicyResult {
+  const p: BusinessPolicies = { ...input, provenance: { ...(input.provenance || {}) } };
+  const fields: Record<string, string> = {};
+  const changedText: string[] = [];
+  const setText = (key: "payment" | "returns" | "delivery" | "cancellation" | "warranty", value: string) => {
+    const v = value.trim().slice(0, 500);
+    if (p[key] === v) return;
+    p[key] = v;
+    p.provenance![key] = { source: "owner", confirmed: true };
+    changedText.push(key);
+  };
+  if (p.payments) {
+    const pay = cleanPayments(p.payments);
+    const trusted = pay.source === "owner" || pay.confirmed;
+    if (trusted) {
+      Object.assign(fields, validatePayments(pay));
+      p.payments = { ...pay, source: "owner", confirmed: true };
+      delete p.payments.parsed_from;
+      if (paymentsHaveContent(p.payments)) setText("payment", paymentsSentence(p.payments));
+      else if (input.payments && paymentsHaveContent(normalizePayments(input.payments))) setText("payment", "");
+    } else {
+      p.payments = pay;
+    }
+  }
+  if (p.rules) {
+    const rules = normalizeRules(p.rules);
+    for (const [k, v] of Object.entries(validateRules(rules))) fields[`rules.${k}`] = v;
+    p.rules = rules;
+    for (const [key, text] of Object.entries(policyTextFromRules(rules))) setText(key as "returns", text as string);
+  }
+  if (Object.keys(fields).length) return { ok: false, error: "Check the highlighted payment and policy fields.", fields };
+  return { ok: true, policies: p, changedText };
 }
 
 export function parseBusinessPoliciesField(
@@ -127,6 +199,8 @@ export function parseBusinessPoliciesField(
 
 export function policiesHaveContent(policies: BusinessPolicies): boolean {
   if (policies.coverage_areas && policies.coverage_areas.length > 0) return true;
+  if (paymentsHaveContent(policies.payments ?? null)) return true;
+  if (policies.rules && Object.keys(policies.rules).length) return true;
   return POLICY_FIELDS.some((field) => String(policies[field.id] || "").trim());
 }
 

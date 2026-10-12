@@ -8,16 +8,12 @@ import taxonomy from "./taxonomy.json" with { type: "json" };
 type Opt = { id: string; label: string };
 export const TAXONOMY = taxonomy;
 export type PricingMode = "fixed" | "from" | "range" | "ask";
-export type PaymentMethod = "mpesa_till" | "mpesa_paybill" | "mpesa_send" | "cash" | "card" | "bank";
-export type PaymentTiming = "before_delivery" | "on_delivery" | "after_service" | "deposit_then_balance";
 
 export const PRICING_MODES = taxonomy.pricing_modes as Array<Opt & { id: PricingMode }>;
 export const UNITS = taxonomy.units as Opt[];
 export const INTENTS = taxonomy.intents as Opt[];
 export const OUTCOMES = taxonomy.outcomes as Opt[];
 export const LOST_REASONS = taxonomy.lost_reasons as Opt[];
-export const PAYMENT_METHODS = taxonomy.payment_methods as Array<Opt & { id: PaymentMethod }>;
-export const PAYMENT_TIMING = taxonomy.payment_timing as Array<Opt & { id: PaymentTiming }>;
 export const BUSINESS_TYPES = taxonomy.business_types as Array<Opt & { categories: Opt[] }>;
 
 const ids = (list: Opt[]) => new Set(list.map((o) => o.id));
@@ -169,90 +165,22 @@ export function isUnpriced(item: { pricing?: Partial<StructuredPrice> | null; te
 }
 
 /* ---------------- payments ---------------- */
-
-export type Payments = {
-  methods: PaymentMethod[];
-  mpesa_till: string | null;
-  mpesa_paybill: { business_no: string; account: string | null } | null;
-  timing: PaymentTiming | null;
-  deposit_percent: number | null;
-  source: "owner" | "parsed";
-  confirmed: boolean;
-};
-
-export const TILL_RE = /^\d{5,7}$/;
-export const PAYBILL_RE = /^\d{5,7}$/;
-
-export function emptyPayments(): Payments {
-  return { methods: [], mpesa_till: null, mpesa_paybill: null, timing: null, deposit_percent: null, source: "owner", confirmed: true };
-}
-
-/** Field errors keyed by field. Empty object = valid. */
-export function validatePayments(p: Payments): Record<string, string> {
-  const e: Record<string, string> = {};
-  const has = (m: PaymentMethod) => p.methods.includes(m);
-  for (const m of p.methods) if (!PAYMENT_METHODS.some((o) => o.id === m)) e.methods = "Pick from the list.";
-  if (has("mpesa_till") && !TILL_RE.test(p.mpesa_till || "")) e.mpesa_till = "A till number is 5 to 7 digits.";
-  if (has("mpesa_paybill")) {
-    if (!PAYBILL_RE.test(p.mpesa_paybill?.business_no || "")) e.paybill = "A paybill number is 5 to 7 digits.";
-    if ((p.mpesa_paybill?.account || "").length > 40) e.paybill_account = "Keep the account under 40 characters.";
-  }
-  if (p.deposit_percent != null && !(Number.isInteger(p.deposit_percent) && p.deposit_percent >= 1 && p.deposit_percent <= 100))
-    e.deposit_percent = "Use a whole number from 1 to 100.";
-  if (p.timing && !PAYMENT_TIMING.some((o) => o.id === p.timing)) e.timing = "Pick from the list.";
-  return e;
-}
-
-/** Strip anything the owner didn't pick so stale numbers don't linger. */
-export function cleanPayments(p: Payments): Payments {
-  const has = (m: PaymentMethod) => p.methods.includes(m);
-  return {
-    ...p,
-    methods: PAYMENT_METHODS.map((o) => o.id).filter((id) => p.methods.includes(id)),
-    mpesa_till: has("mpesa_till") ? (p.mpesa_till || "").replace(/\D/g, "") || null : null,
-    mpesa_paybill: has("mpesa_paybill") && p.mpesa_paybill
-      ? { business_no: p.mpesa_paybill.business_no.replace(/\D/g, ""), account: p.mpesa_paybill.account?.trim() || null }
-      : null,
-  };
-}
-
-/** Read old payment/deposit prose ("M-Pesa till 123456, cash. 30% deposit") into typed payments. */
-export function parsePaymentsText(...texts: unknown[]): Payments | null {
-  const t = texts.map((x) => String(x ?? "")).join(" \n ").toLowerCase();
-  if (!t.trim()) return null;
-  const p = emptyPayments();
-  const till = t.match(/\b(?:till|buy goods)(?:\s*(?:no\.?|number|#))?\s*[:\-]?\s*(\d{5,7})\b/);
-  const paybill = t.match(/\bpay\s*bill(?:\s*(?:no\.?|number|#))?\s*[:\-]?\s*(\d{5,7})(?:[^\d]{1,20}(?:acc(?:ount)?|a\/c)(?:\s*(?:no\.?|number|#))?\s*[:\-]?\s*([a-z0-9-]{1,40}))?/);
-  if (till) { p.methods.push("mpesa_till"); p.mpesa_till = till[1]; }
-  else if (/\btill\b|buy goods/.test(t)) p.methods.push("mpesa_till");
-  if (paybill) { p.methods.push("mpesa_paybill"); p.mpesa_paybill = { business_no: paybill[1], account: paybill[2] || null }; }
-  else if (/pay\s*bill/.test(t)) p.methods.push("mpesa_paybill");
-  if (/m-?pesa|mpesa/.test(t) && !p.methods.some((m) => m.startsWith("mpesa"))) p.methods.push("mpesa_send");
-  if (/\bcash\b|pesa taslimu/.test(t)) p.methods.push("cash");
-  if (/\bcard|visa|mastercard\b/.test(t)) p.methods.push("card");
-  if (/\bbank|eft|rtgs|pesalink\b/.test(t)) p.methods.push("bank");
-  const dep = t.match(/(\d{1,3})\s*%\s*(?:deposit|down|upfront|advance)|(?:deposit|down|upfront|advance)[^\d%]{0,20}(\d{1,3})\s*%/);
-  if (dep) p.deposit_percent = Math.min(100, Number(dep[1] || dep[2]));
-  if (/before delivery|pay first|upfront|in advance|kabla/.test(t)) p.timing = "before_delivery";
-  else if (/on delivery|cash on delivery|\bcod\b|pay when (it|you) (arrive|receive)/.test(t)) p.timing = "on_delivery";
-  else if (/after (the )?(job|work|service)|baada ya kazi/.test(t)) p.timing = "after_service";
-  else if (p.deposit_percent != null) p.timing = "deposit_then_balance";
-  if (!p.methods.length && p.deposit_percent == null && !p.timing) return null;
-  return { ...p, source: "parsed", confirmed: false };
-}
-
-export function paymentsSentence(p: Payments): string {
-  const parts: string[] = [];
-  for (const m of p.methods) {
-    if (m === "mpesa_till") parts.push(p.mpesa_till ? `M-Pesa Till ${p.mpesa_till}` : "M-Pesa Till");
-    else if (m === "mpesa_paybill") parts.push(p.mpesa_paybill ? `M-Pesa Paybill ${p.mpesa_paybill.business_no}${p.mpesa_paybill.account ? `, account ${p.mpesa_paybill.account}` : ""}` : "M-Pesa Paybill");
-    else parts.push(labelOf(PAYMENT_METHODS, m));
-  }
-  let s = parts.length ? `We take ${parts.join(", ")}.` : "";
-  if (p.deposit_percent) s += ` ${p.deposit_percent}% deposit.`;
-  if (p.timing) s += ` Pay ${labelOf(PAYMENT_TIMING, p.timing).toLowerCase()}.`;
-  return s.trim();
-}
+// Payments live in ./payments (v2: phone numbers, Pochi, Airtel, bank, several timings, a note).
+export {
+  PAYMENT_METHODS,
+  PAYMENT_TIMING,
+  TILL_RE,
+  PAYBILL_RE,
+  emptyPayments,
+  normalizePayments,
+  validatePayments,
+  cleanPayments,
+  parsePaymentsText,
+  paymentsSentence,
+  type Payments,
+  type PaymentMethod,
+  type PaymentTiming,
+} from "./payments";
 
 /* ---------------- calls ---------------- */
 

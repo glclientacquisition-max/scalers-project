@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import type { DataCheck } from "./DataChecksCard";
 import { BusinessCategoryPicker } from "./BusinessCategoryPicker";
-import { PaymentsEditor } from "./PaymentsEditor";
 import { PriceConfirmCards, type PriceToConfirm } from "./PriceConfirmCards";
-import { confirmPriceAction, saveBusinessCategoryAction, savePaymentsAction } from "@/app/(desk)/settings/structuredActions";
-import { needsPriceConfirm, sanitizePricing, type Payments } from "@/lib/structuredData";
+import { confirmPriceAction, saveBusinessCategoryAction } from "@/app/(desk)/settings/structuredActions";
+import { needsPriceConfirm, sanitizePricing } from "@/lib/structuredData";
+import { normalizePayments, type Payments } from "@/lib/payments";
 import { AddPricesRow } from "./AddPricesRow";
 import { isUnpricedRow } from "@/lib/catalogPricing";
 import { unpricedLabelText } from "./unpricedCopy";
@@ -45,17 +45,7 @@ export { unpricedLabelText as unpricedLabel } from "./unpricedCopy";
 
 export function paymentsFrom(policies: unknown): Payments | null {
   const p = policies && typeof policies === "object" ? (policies as Row).payments : null;
-  if (!p || typeof p !== "object") return null;
-  const r = p as Row;
-  return {
-    methods: Array.isArray(r.methods) ? (r.methods as Payments["methods"]) : [],
-    mpesa_till: typeof r.mpesa_till === "string" ? r.mpesa_till : null,
-    mpesa_paybill: r.mpesa_paybill && typeof r.mpesa_paybill === "object" ? (r.mpesa_paybill as Payments["mpesa_paybill"]) : null,
-    timing: (r.timing as Payments["timing"]) ?? null,
-    deposit_percent: typeof r.deposit_percent === "number" ? r.deposit_percent : null,
-    source: r.source === "parsed" ? "parsed" : "owner",
-    confirmed: r.confirmed !== false,
-  };
+  return normalizePayments(p);
 }
 
 export function structuredSettingsSlots({
@@ -68,7 +58,7 @@ export function structuredSettingsSlots({
   canEdit: boolean;
   businessType: string;
   businessCategory: string | null;
-}): Partial<Record<"identity" | "catalog" | "policies", ReactNode>> {
+}): Partial<Record<"identity" | "catalog", ReactNode>> {
   const prices = pricesToConfirm(tenant);
   const unpriced = unpricedCount(tenant);
   return {
@@ -82,7 +72,6 @@ export function structuredSettingsSlots({
           {prices.length ? <PriceConfirmCards items={prices} canEdit={canEdit} save={confirmPriceAction} /> : null}
         </div>
       ) : null,
-    policies: <PaymentsEditor initial={paymentsFrom(tenant.business_policies)} canEdit={canEdit} save={savePaymentsAction} />,
   };
 }
 

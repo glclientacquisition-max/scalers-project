@@ -4,21 +4,16 @@ import { bustTenantCache } from "@/lib/tenantCache";
 import { revalidatePath } from "next/cache";
 import { memberDenied } from "@/lib/requireMember";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
-import { upsertTenantFieldMeta } from "@/lib/deskProvenance";
 import { recompileAfterCatalogImport } from "@/lib/catalogImportRecompile";
 import { readCatalogFresh } from "@/lib/catalogFresh";
 import { patchCatalogItem } from "@/lib/catalogPricing";
 import {
   categoriesFor,
-  cleanPayments,
   isIntent,
   isLostReason,
   isOutcome,
-  paymentsSentence,
   priceLabel,
   sanitizePricing,
-  validatePayments,
-  type Payments,
   type StructuredPrice,
 } from "@/lib/structuredData";
 
@@ -31,34 +26,6 @@ async function workspace() {
   const workspace = await createWorkspaceDataClient();
   if (!tenant || !workspace) return { error: "Not signed in." } as const;
   return { tenant, client: workspace.client } as const;
-}
-
-/** Typed payments. The text line is rewritten from them so the Business Assistant says the same thing. */
-export async function savePaymentsAction(input: Payments): Promise<StructuredResult> {
-  const denied = await memberDenied("settings.edit");
-  if (denied) return { ok: false, error: denied.error };
-  const ws = await workspace();
-  if ("error" in ws) return { ok: false, error: ws.error ?? SAVE_FAILED };
-  const payments: Payments = { ...cleanPayments(input), source: "owner", confirmed: true };
-  const fields = validatePayments(payments);
-  if (Object.keys(fields).length) return { ok: false, error: "Check the highlighted fields.", fields };
-  const policies = ws.tenant.business_policies && typeof ws.tenant.business_policies === "object" ? ws.tenant.business_policies : {};
-  const sentence = paymentsSentence(payments);
-  const next = { ...policies, payments, ...(sentence ? { payment: sentence } : {}) };
-  const { error } = await ws.client.from("tenants").update({ business_policies: next }).eq("id", ws.tenant.id);
-  bustTenantCache(ws.tenant.id);
-  if (error) return { ok: false, error: SAVE_FAILED };
-  await upsertTenantFieldMeta({ tenantId: ws.tenant.id, fieldPath: "payments.methods", source: "owner", actor: "desk", newValue: payments }).catch(() => null);
-  // Rebuild the Business Assistant prompt now, so the next call quotes the new payment line.
-  const compiled = await recompileAfterCatalogImport({ client: ws.client, tenant: { ...ws.tenant, business_policies: next } }).catch(() => ({ ok: false }));
-  revalidatePath("/settings");
-  revalidatePath("/home");
-  return {
-    ok: true,
-    message: compiled.ok
-      ? "Payments saved. Your Business Assistant uses them from the next call."
-      : "Payments saved. Your Business Assistant picks them up after the next Settings save.",
-  };
 }
 
 /** Owner answers "Is this right?" for one item's typed price (yes, or a corrected price). */

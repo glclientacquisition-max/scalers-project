@@ -86,7 +86,8 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
 
   // Typed data (payments, price checks, category). The columns may not exist before the migration: then null.
   let structuredSlot = null;
-  if (tab === "train" && (trainPanel === "identity" || trainPanel === "catalog" || trainPanel === "policies")) {
+  // Catalogue is its own tab (?tab=catalog), not a train panel: the old check never showed its price cards.
+  if (tab === "catalog" || (tab === "train" && trainPanel === "identity")) {
     const [canEdit, typed] = await Promise.all([memberCan("settings.edit"), readBusinessType(tenant.id)]);
     structuredSlot = structuredSettingsSlots({
       tenant,
