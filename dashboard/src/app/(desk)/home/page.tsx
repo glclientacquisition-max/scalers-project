@@ -1,5 +1,7 @@
 import { ButtonLink } from "@/components/ui/Button";
 import { DataChecksCard } from "@/components/structured/DataChecksCard";
+import { CallInsights } from "@/components/insights/CallInsights";
+import { loadCallInsights } from "@/lib/callInsightsLoad";
 import { dataChecksFor } from "@/components/structured/StructuredSettingsSlots";
 import Link from "next/link";
 import { RoleGate } from "@/components/DeskRole";
@@ -101,7 +103,7 @@ async function HomeOverviewBody() {
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const [todayRes, inbox, pack, score, hold] = await Promise.all([
+  const [todayRes, inbox, pack, score, hold, insights] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
@@ -111,6 +113,7 @@ async function HomeOverviewBody() {
     loadOwnerPackageMeter(tenant.id),
     getTenantCompletenessScore(tenant.id),
     getTenantHoldGate(tenant.id),
+    loadCallInsights(client, tenant.id),
   ]);
   timer.mark("data");
   console.info(timer.line("home"));
@@ -391,6 +394,9 @@ async function HomeOverviewBody() {
           ) : null}
         </section>
         <DataChecksCard checks={dataChecksFor(tenant)} />
+        {insights ? (
+          <CallInsights insights={insights} />
+        ) : null}
         {score && line !== "live" ? (
           <HomeCapture
             tenantId={tenant.id}
