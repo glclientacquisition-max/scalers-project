@@ -1,5 +1,6 @@
 "use client";
 
+import { policiesFormKey } from "@/lib/serviceAreas";
 import { catalogContentKey } from "@/lib/catalogPricing";
 import type { ReactNode } from "react";
 
@@ -251,7 +252,7 @@ export function BusinessSettingsShell({
     Array.isArray(tenant.team_directory) ? tenant.team_directory.length : 0,
     Array.isArray(tenant.business_locations) ? tenant.business_locations.length : 0,
     Array.isArray(tenant.tts_lexicon) ? tenant.tts_lexicon.length : 0,
-    JSON.stringify(tenant.business_policies || {}),
+    policiesFormKey(tenant.business_policies),
     String(tenant.llm_system_prompt || "").length,
     tenant.vertical || "",
     JSON.stringify(tenant.social_handles || {}),

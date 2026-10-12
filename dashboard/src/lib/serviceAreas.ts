@@ -339,3 +339,15 @@ export function areaPickerRows(
     alreadyAdded: results.filter((o) => o.added && !ticked.includes(o.id)),
   };
 }
+
+/**
+ * Policies as part of the Settings form key. coverage_areas is left out: it follows
+ * service_areas on every Locations save, and a key change remounts the form (closing an
+ * open drawer and dropping the Saved toast).
+ */
+export function policiesFormKey(policies: unknown): string {
+  if (!policies || typeof policies !== "object") return "{}";
+  const { coverage_areas: _skip, ...rest } = policies as Record<string, unknown>;
+  void _skip;
+  return JSON.stringify(rest);
+}

@@ -257,7 +257,10 @@ async function saveSettingsSafely(
   formData: FormData
 ): Promise<SettingsCompileState> {
   try {
-    return await saveAndCompileSettings(prev, formData);
+    const res = await saveAndCompileSettings(prev, formData);
+    // Toast here, not from component state: a save can remount the form.
+    if (res.ok) notify("Saved · training line");
+    return res;
   } catch (err) {
     console.warn("[settings] save response lost:", err instanceof Error ? err.message : err);
     return { networkError: true };
@@ -601,7 +604,6 @@ function TenantFormInner({
 
   useEffect(() => {
     // Compile finished before ok - owners should hear the line was trained, not only "Saved".
-    if (state.ok) notify("Saved · training line");
     if (state.networkError) {
       notify("Connection dropped. Showing your latest saved details.");
       router.refresh();
