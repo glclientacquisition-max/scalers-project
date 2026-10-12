@@ -104,7 +104,7 @@ export function DeskAccountMenu({
   const avatar = (lit: boolean) => (
     <span
       className={cx(
-        "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-on",
+        "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-meta font-semibold text-accent-on",
         lit ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : "",
       )}
     >
@@ -157,7 +157,7 @@ export function DeskAccountMenu({
           <button type="button" aria-label={name} className={iconButtonClass()}>
             <span
               className={cx(
-                "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-on",
+                "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-meta font-semibold text-accent-on",
                 open ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : "",
               )}
             >

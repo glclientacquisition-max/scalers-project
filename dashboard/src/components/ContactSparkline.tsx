@@ -8,7 +8,7 @@ export function ContactSparkline({
   const track = 32;
   return (
     <div className="min-w-0" data-contact-sparkline="">
-      <p className="text-xs font-medium text-ink-soft">Daily interactions</p>
+      <p className="text-meta font-medium text-ink-2">Daily interactions</p>
       <ol aria-label="Daily interactions" className="mt-2 flex h-8 min-w-0 items-end gap-0.5">
         {days.map((day) => (
           <li

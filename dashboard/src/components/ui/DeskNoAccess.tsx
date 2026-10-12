@@ -5,8 +5,8 @@ import { btnGhost, deskEmptyClass } from "@/components/ui/deskChrome";
 export function DeskNoAccess({ what = "this page" }: { what?: string }) {
   return (
     <div className={deskEmptyClass} data-desk-no-access="">
-      <p className="font-display text-2xl tracking-tight text-ink">No access</p>
-      <p className="mt-2 text-sm text-ink-soft">
+      <p className="font-display text-page tracking-tight text-ink">No access</p>
+      <p className="mt-2 text-body text-ink-2">
         Your role can&apos;t open {what}. Ask the business owner if you need it.
       </p>
       <Link href="/home" className={`${btnGhost} mt-6`}>

@@ -1,5 +1,6 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
 import { revalidatePath } from "next/cache";
 import { memberDenied } from "@/lib/requireMember";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -53,6 +54,7 @@ export async function confirmPriceAction(input: { kind: "product" | "service"; n
   });
   if (!hit) return { ok: false, error: "That item is no longer in your catalogue." };
   const { error } = await ws.client.from("tenants").update({ [column]: next }).eq("id", ws.tenant.id);
+  bustTenantCache(ws.tenant.id);
   if (error) return { ok: false, error: SAVE_FAILED };
   // Same as payments: the prompt quotes prices, so rebuild it with the confirmed one.
   await recompileAfterCatalogImport({
@@ -73,6 +75,7 @@ export async function saveBusinessCategoryAction(category: string): Promise<Stru
   if (!categoriesFor(type === "retail" || type === "home_services" ? type : "general").some((c) => c.id === category))
     return { ok: false, error: "Pick from the list." };
   const { error } = await ws.client.from("tenants").update({ business_category: category }).eq("id", ws.tenant.id);
+  bustTenantCache(ws.tenant.id);
   if (error) return { ok: false, error: SAVE_FAILED };
   revalidatePath("/settings");
   return { ok: true, message: "Business type saved." };

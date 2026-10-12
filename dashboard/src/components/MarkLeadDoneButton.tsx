@@ -1,5 +1,6 @@
 "use client";
 
+import { ArchiveBoxIcon, ArchiveBoxXMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { withRoleGate } from "@/components/DeskRole";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -9,56 +10,15 @@ import { btnGhost, deskShiftClass } from "@/components/ui/deskChrome";
 type SoftAction = "resolved" | "archived" | "new";
 
 function ArchiveGlyph({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-      className={className}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3 7h18M5 7l1 12h12l1-12M9 7V5h6v2"
-      />
-    </svg>
-  );
+  return <ArchiveBoxIcon aria-hidden="true" className={className} />;
 }
 
 function UnarchiveGlyph({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-      className={className}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3 7h18M5 7l1 12h12l1-12M9 7V5h6v2M12 18v-6m0 0-2.5 2.5M12 12l2.5 2.5"
-      />
-    </svg>
-  );
+  return <ArchiveBoxXMarkIcon aria-hidden="true" className={className} />;
 }
 
 function DoneGlyph({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-      className={className}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4 10-10" />
-    </svg>
-  );
+  return <CheckIcon aria-hidden="true" className={className} />;
 }
 
 /**
@@ -102,19 +62,19 @@ function MarkLeadActionButtonInner({
   if (done) {
     if (variant === "button") {
       return (
-        <span className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-ok-soft text-sm font-semibold text-ok">
+        <span className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-ok-soft text-body font-semibold text-ok">
           {successLabel}
         </span>
       );
     }
-    return <span className="text-xs font-medium text-ok">{successLabel}</span>;
+    return <span className="text-meta font-medium text-ok">{successLabel}</span>;
   }
 
   const iconButtonClass =
-    `inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`;
+    `inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-2 ${deskShiftClass} hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`;
   const chromeButtonClass = `${btnGhost} w-full gap-2`;
   const linkButtonClass =
-    `text-xs font-medium text-ink-soft underline-offset-2 ${deskShiftClass} hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`;
+    `text-meta font-medium text-ink-2 underline-offset-2 ${deskShiftClass} hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`;
 
   return (
     <span
@@ -179,7 +139,7 @@ function MarkLeadActionButtonInner({
       {error ? (
         <span
           className={[
-            "text-xs text-warn",
+            "text-meta text-warn",
             variant === "icon"
               ? "mt-1 max-w-[9rem] text-center"
               : variant === "button"

@@ -1,3 +1,4 @@
+import { bustTenantCache } from "@/lib/tenantCache";
 import "server-only";
 
 /**
@@ -182,6 +183,7 @@ export async function persistOwnerConfirm(
   }
 
   const updated = await client.from("tenants").update(patch).eq("id", tenantId);
+  bustTenantCache(tenantId);
   return !updated.error;
 }
 

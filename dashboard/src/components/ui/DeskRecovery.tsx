@@ -1,5 +1,6 @@
-import Link from "next/link";
-import { btnPrimary, deskEmptyClass } from "@/components/ui/deskChrome";
+import { ButtonLink } from "@/components/ui/Button";
+
+import { deskEmptyClass } from "@/components/ui/deskChrome";
 
 /**
  * Page-slot miss: one title, an optional line, one filled action.
@@ -20,11 +21,11 @@ export function DeskRecovery({
 }) {
   const block = (
     <div className={screen ? "w-full max-w-md text-center" : deskEmptyClass}>
-      <h1 className="font-display text-2xl tracking-tight text-ink">{title}</h1>
-      {line ? <p className="mx-auto mt-2 max-w-sm text-sm text-ink-soft">{line}</p> : null}
-      <Link href={href} className={`${btnPrimary} mt-6`}>
+      <h1 className="font-display text-page tracking-tight text-ink">{title}</h1>
+      {line ? <p className="mx-auto mt-2 max-w-sm text-body text-ink-2">{line}</p> : null}
+      <ButtonLink href={href} className="mt-6">
         {action}
-      </Link>
+      </ButtonLink>
     </div>
   );
 

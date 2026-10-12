@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getAuthUser } from "@/lib/auth";
+import { getVerifiedAuthUser as getAuthUser } from "@/lib/auth";
 import { parseCreateWorkspaceInput } from "@/lib/createWorkspace";
 import { ensureTenantForUser, getCurrentTenant } from "@/lib/tenant";
 

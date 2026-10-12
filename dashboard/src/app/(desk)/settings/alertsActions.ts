@@ -1,5 +1,6 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
@@ -80,6 +81,7 @@ export async function saveAlertsAction(
       notify_channels: notifyChannels,
     })
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   if (error) {
     return ownerSaveFailed("alerts.save", error.message);

@@ -38,8 +38,8 @@ export function RowIdentity({
   const initials = deskRowInitials(name);
   const box =
     size === "lg"
-      ? "flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-line bg-surface-muted text-lg font-semibold text-ink-soft"
-      : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-surface-muted text-xs font-semibold text-ink-soft";
+      ? "flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-hairline bg-surface-muted text-title font-semibold text-ink-2"
+      : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-hairline bg-surface-muted text-meta font-semibold text-ink-2";
   return (
     <span aria-hidden className={box}>
       {initials || <PersonGlyph size={size} />}
@@ -93,7 +93,7 @@ export function InboxPinMark({ show }: { show: boolean }) {
       data-inbox-pin=""
       role="img"
       aria-label="Pinned"
-      className="inline-flex h-3.5 w-3.5 shrink-0 text-ink-soft"
+      className="inline-flex h-3.5 w-3.5 shrink-0 text-ink-2"
     >
       <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden className="h-full w-full">
         <path d="M5.2 1.6h5.6c.4 0 .7.3.7.7v1.1c0 1.4-.8 2.6-2 3.2v.6h1.4v1.2H8.7V14.4H7.3V8.4H5.3V7.2h1.4v-.6c-1.2-.6-2-1.8-2-3.2V2.3c0-.4.3-.7.7-.7Z" />

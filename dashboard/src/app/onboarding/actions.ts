@@ -1,7 +1,8 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
 import { redirect } from "next/navigation";
-import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
+import { getVerifiedAuthUser as getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import {
   compilePromptLocally,
   type OnboardingAnswers,
@@ -204,6 +205,7 @@ export async function completeOnboardingAction(
     (next) => workspace.client.from("tenants").update(next).eq("id", tenant.id),
     ["llm_system_prompt"]
   );
+  bustTenantCache(tenant.id);
   if (error) {
     return {
       error: ownerFacingError(error, "Could not save business details."),

@@ -1,5 +1,6 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
 
 import { isAuthenticated } from "@/lib/auth";
@@ -271,6 +272,7 @@ export async function confirmPronunciationRecording(
     .from("tenants")
     .update({ tts_lexicon: stored })
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   if (error) {
     return ownerSaveFailed(
@@ -331,6 +333,7 @@ export async function persistPronunciationLexicon(
     .from("tenants")
     .update({ tts_lexicon: stored })
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   if (error) {
     return ownerSaveFailed(
@@ -539,6 +542,7 @@ export async function quickAddPronunciationAction(
     .from("tenants")
     .update({ tts_lexicon: stored })
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   if (error) {
     return ownerSaveFailed(

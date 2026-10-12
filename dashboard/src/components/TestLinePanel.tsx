@@ -134,11 +134,11 @@ export function TestLinePanel({
       <SettingsGroup title="Preview">
         <div className="space-y-3 px-4 py-3">
           {greetingPreview ? (
-            <blockquote className="border-l-2 border-accent/50 pl-4 text-base leading-relaxed text-ink">
+            <blockquote className="border-l-2 border-accent/50 pl-4 text-body leading-relaxed text-ink">
               “{greetingPreview}”
             </blockquote>
           ) : (
-            <p className="text-sm text-ink-soft" role="status">
+            <p className="text-body text-ink-2" role="status">
               Add a business name in{" "}
               <Link
                 href={businessSettingsHref("train", "identity")}
@@ -152,7 +152,7 @@ export function TestLinePanel({
           {greetingPreview ? (
             <>
               {voiceLabel ? (
-                <p className="text-xs text-ink-soft">
+                <p className="text-meta text-ink-2">
                   Voice · <span className="text-ink">{voiceLabel}</span>
                   {lexicon.length
                     ? ` · ${lexicon.length} pronunciation override${lexicon.length === 1 ? "" : "s"}`
@@ -185,7 +185,7 @@ export function TestLinePanel({
                   <source src={phonePreviewUrl} type="audio/wav" />
                 </audio>
               ) : phonePreviewError ? (
-                <p className="text-sm text-warn" role="alert">
+                <p className="text-body text-warn" role="alert">
                   {phonePreviewError}
                 </p>
               ) : null}
@@ -204,7 +204,7 @@ export function TestLinePanel({
               Call {did}
             </a>
           ) : (
-            <p className="text-sm text-ink-soft">Number pending.</p>
+            <p className="text-body text-ink-2">Number pending.</p>
           )}
         </div>
       </SettingsGroup>

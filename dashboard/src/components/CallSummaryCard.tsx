@@ -17,7 +17,7 @@ function Field({
   return (
     <div className={wide ? "sm:col-span-3" : undefined}>
       <dt className={metaLabelClass}>{label}</dt>
-      <dd className="mt-1 text-sm leading-relaxed text-ink">{value}</dd>
+      <dd className="mt-1 text-body leading-relaxed text-ink">{value}</dd>
     </div>
   );
 }
@@ -51,7 +51,7 @@ export function CallSummaryCard({
   const structured = Boolean(nextText || doneText || moodLabel);
 
   if (!structured) {
-    return <p className="mt-3 text-base leading-relaxed text-ink">{wantText}</p>;
+    return <p className="mt-3 text-body leading-relaxed text-ink">{wantText}</p>;
   }
 
   return (

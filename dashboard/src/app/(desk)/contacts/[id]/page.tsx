@@ -195,9 +195,9 @@ async function ContactDetailBody({ params, searchParams }: ContactDetailPageProp
                 <RowIdentity name={contact.name} size="lg" />
                 <div className="min-w-0 flex-1">
                   <ContactNameForm contactId={contact.id} initialName={contact.name} />
-                  <p className="mt-2 font-mono text-sm text-ink">{contact.phone || "No phone"}</p>
+                  <p className="mt-2 font-mono text-body text-ink">{contact.phone || "No phone"}</p>
                   {lastCallFact ? (
-                    <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
+                    <p className="mt-1 text-body text-ink-2">{lastCallFact}</p>
                   ) : null}
                 </div>
               </div>
@@ -224,7 +224,7 @@ async function ContactDetailBody({ params, searchParams }: ContactDetailPageProp
           </div>
 
           {showLastReason && (latestCall?.ownerCard || lastReason) ? (
-            <section className="rounded-2xl border border-line bg-surface p-5">
+            <section className="rounded-2xl border border-hairline bg-surface p-5">
               <h2 className="text-caption font-medium text-ink-2">
                 Last want
               </h2>
@@ -251,7 +251,7 @@ async function ContactDetailBody({ params, searchParams }: ContactDetailPageProp
             <div className="space-y-3">
               <ContactSparkline days={spark} />
               {insight ? (
-                <p className="rounded-2xl border border-warn/40 bg-warn-soft px-3 py-3 text-sm text-warn">
+                <p className="rounded-2xl border border-warn/40 bg-warn-soft px-3 py-3 text-body text-warn">
                   {insight}
                 </p>
               ) : null}

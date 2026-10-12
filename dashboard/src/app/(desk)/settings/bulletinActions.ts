@@ -1,5 +1,6 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
@@ -54,6 +55,7 @@ async function saveBulletin(
     .from("tenants")
     .update({ daily_bulletin: items })
     .eq("id", tenantId);
+  bustTenantCache(tenantId);
 
   if (error) {
     return ownerSaveFailed("bulletin", error.message);

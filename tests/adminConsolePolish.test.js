@@ -200,7 +200,7 @@ describe("admin console polish", () => {
     assert.match(panel, /Line rental \/ month/);
     assert.match(panel, /getSautikitKeyDiagnostics/);
     assert.doesNotMatch(panel, /rounded-2xl/);
-    assert.doesNotMatch(panel, /font-display text-2xl/);
+    assert.doesNotMatch(panel, /font-display text-page/);
     assert.doesNotMatch(panel, /\bp-6\b/);
     assert.doesNotMatch(panel, /bg-white/);
     assert.doesNotMatch(panel, /—|–/);

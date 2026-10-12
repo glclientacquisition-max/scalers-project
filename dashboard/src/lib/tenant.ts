@@ -1,4 +1,6 @@
 import { cache } from "react";
+import { cacheLife, cacheTag } from "next/cache";
+import { tenantCacheTag } from "@/lib/tenantCache";
 import { cookies } from "next/headers";
 import { getSupabaseAdmin, type TenantRow } from "@/lib/supabase";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -111,19 +113,28 @@ export const listOwnerWorkspaces = cache(async (): Promise<OwnerWorkspace[]> => 
   return ids.map((id) => ({ id, business_name: names.get(id) || null }));
 });
 
+/**
+ * The signed-in user's memberships, oldest first, read once per request.
+ * The shell, the page, and every role check share this one round trip.
+ */
+export const memberRowsForUser = cache(
+  async (userId: string): Promise<Array<{ tenant_id: string; role: string | null }>> => {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("tenant_members")
+      .select("tenant_id, role")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data || []).filter((row): row is { tenant_id: string; role: string | null } => Boolean(row?.tenant_id));
+  }
+);
+
 export async function ownerTenantId(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   userId: string
 ): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("tenant_members")
-    .select("tenant_id")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  const ids = (data || [])
-    .map((row) => row.tenant_id)
-    .filter((id): id is string => Boolean(id));
+  const ids = (await memberRowsForUser(userId)).map((row) => row.tenant_id);
   if (!ids.length) return null;
   const picked = (await cookies()).get(DESK_TENANT_COOKIE)?.value || "";
   if (picked && ids.includes(picked)) return picked;
@@ -223,15 +234,18 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
 });
 
 /** Resolve the signed-in user's tenant (via tenant_members), or legacy first-active. */
-export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
-  const user = await getAuthUser();
-
-  if (user) {
-    // Owner path: Auth session client — RLS enforces membership.
-    const supabase = await createSupabaseServerClient();
-    const tenantId = await ownerTenantId(supabase, user.id);
-    if (!tenantId) return null;
-
+/**
+ * Tenant row by id, cached across requests for a short window and busted on save
+ * (bustTenantCache). Only ever called with an id the signed-in user is a member of
+ * (ownerTenantId checks tenant_members under RLS), so the key is the tenant and no row
+ * can be served to another workspace. Writers outside this app (voice server, SQL) are
+ * covered by the 15 s revalidate.
+ */
+async function cachedTenantRow(tenantId: string): Promise<TenantRow | null> {
+  "use cache";
+  cacheTag(tenantCacheTag(tenantId));
+  cacheLife({ stale: 15, revalidate: 15, expire: 60 });
+  const supabase = getSupabaseAdmin();
     let { data, error } = await supabase
       .from("tenants")
       .select(TENANT_SELECT)
@@ -304,6 +318,20 @@ export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
 
     if (error) throw error;
     return (data as TenantRow) || null;
+}
+
+export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
+  const user = await getAuthUser();
+
+  if (user) {
+    // Owner path: Auth session client — RLS enforces membership.
+    const supabase = await createSupabaseServerClient();
+    const tenantId = await ownerTenantId(supabase, user.id);
+    if (!tenantId) return null;
+
+    // Membership is checked above under RLS; the row read is cached per tenant.
+    void supabase;
+    return cachedTenantRow(tenantId);
   }
 
   // Legacy shared-password desk: first active tenant (ops/demo). Service role.

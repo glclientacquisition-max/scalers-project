@@ -19,7 +19,7 @@ export function FilterTabs({
   active: string;
 }) {
   return (
-    <nav aria-label={label} className="border-b border-line">
+    <nav aria-label={label} className="border-b border-hairline">
       <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]">
         {items.map((item) => {
           const isActive = active === item.id;
@@ -28,7 +28,7 @@ export function FilterTabs({
               key={item.id}
               className={
                 item.divide
-                  ? "ml-2 shrink-0 border-l border-line pl-3"
+                  ? "ml-2 shrink-0 border-l border-hairline pl-3"
                   : "shrink-0"
               }
             >
