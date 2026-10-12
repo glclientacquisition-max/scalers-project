@@ -225,6 +225,8 @@ export type TenantRow = {
     directions?: string;
     coverage_notes?: string;
   }> | null;
+  /** Areas you serve (Settings › Locations). See lib/serviceAreas.ts. */
+  service_areas?: unknown;
   business_policies?: {
     returns?: string;
     delivery?: string;

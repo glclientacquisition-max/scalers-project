@@ -111,7 +111,8 @@ import {
   POLICY_FIELDS,
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
-import { CoverageAreaField } from "@/components/CoverageAreaField";
+import { ServiceAreasEditor } from "@/components/structured/ServiceAreasEditor";
+import { serviceAreasForForm, type ServiceAreas } from "@/lib/serviceAreas";
 import { stableRowId } from "@/lib/factHash";
 import { catalogBaseline, isUnpricedRow } from "@/lib/catalogPricing";
 import { DeskSelect } from "@/components/ui/DeskSelect";
@@ -410,6 +411,9 @@ function TenantFormInner({
     const rows = normalizeBusinessLocations(tenant.business_locations);
     return rows.length ? rows.map((row) => markSavedRow(row)) : [emptyLocation()];
   });
+  const [serviceAreas, setServiceAreas] = useState<ServiceAreas>(() =>
+    serviceAreasForForm(tenant.service_areas, tenant.business_policies?.coverage_areas, tenant.vertical)
+  );
   const [openLocationIndexes, setOpenLocationIndexes] = useState<number[]>([]);
   const [policies, setPolicies] = useState<BusinessPolicies>(() =>
     normalizeBusinessPolicies(tenant.business_policies)
@@ -967,6 +971,7 @@ function TenantFormInner({
       <input type="hidden" name="vertical" value={vertical} />
       <input type="hidden" name="handoff_mode" value={handoffMode} />
       <input type="hidden" name="business_locations" value={locationsJson} />
+      <input type="hidden" name="service_areas" value={JSON.stringify(serviceAreas)} />
       <input type="hidden" name="business_policies" value={policiesJson} />
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="spoken_name" value={spokenName} />
@@ -2068,6 +2073,7 @@ function TenantFormInner({
             );
           })}
         </div>
+        <ServiceAreasEditor value={serviceAreas} vertical={vertical} onChange={setServiceAreas} />
       </section>
 
       <section
@@ -2176,20 +2182,6 @@ function TenantFormInner({
             </SettingsGroup>
           </div>
         )}
-
-        {vertical === "home_services" ? (
-          <SettingsGroup title="Where you work">
-            <SettingsStack label="Coverage" htmlFor="policy-coverage">
-              <CoverageAreaField
-                id="policy-coverage"
-                value={policies.coverage_areas || []}
-                onChange={(coverage_areas) =>
-                  setPolicies((prev) => ({ ...prev, coverage_areas }))
-                }
-              />
-            </SettingsStack>
-          </SettingsGroup>
-        ) : null}
 
         <PolicyRulesEditor
           rules={policies.rules ?? {}}

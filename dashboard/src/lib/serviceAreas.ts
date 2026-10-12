@@ -1,0 +1,200 @@
+/**
+ * Areas you serve (Settings › Locations). Each area is a directory id (county:<id> or
+ * place:<id>) with how you serve it, the fee, how long it takes and a minimum order.
+ *
+ * Stored in tenants.service_areas. business_policies.coverage_areas is kept in step from
+ * here for one release so the voice server's coverage check keeps working unchanged.
+ *
+ * Pure and browser-safe. Relative imports only so node tests can load it.
+ */
+import { coverageAreaLabel, parseCoverageAreas, COVERAGE_AREA_MAX } from "./coverageAreas";
+
+export type AreaMode = "delivery" | "visit" | "pickup";
+export type FeeMode = "free" | "fixed" | "ask";
+export type DeliveredBy = "self" | "rider" | "courier";
+export type RiderPaid = "in_fee" | "on_arrival";
+
+export type ServiceArea = {
+  id: string;
+  modes: AreaMode[];
+  fee_mode: FeeMode;
+  fee_ksh: number | null;
+  eta: string | null;
+  min_order_ksh: number | null;
+  source: "owner" | "import";
+  confirmed: boolean;
+};
+
+export type ServiceAreas = {
+  version: 1;
+  areas: ServiceArea[];
+  delivered_by: DeliveredBy[];
+  rider_paid: RiderPaid | null;
+};
+
+export const AREA_MODES: ReadonlyArray<{ id: AreaMode; label: string; verb: string }> = [
+  { id: "delivery", label: "Delivery", verb: "deliver to" },
+  { id: "visit", label: "Home visit", verb: "visit" },
+  { id: "pickup", label: "Pickup only", verb: "serve customers from" },
+];
+export const FEE_MODES: ReadonlyArray<{ id: FeeMode; label: string }> = [
+  { id: "fixed", label: "Set fee" },
+  { id: "free", label: "Free" },
+  { id: "ask", label: "We confirm it" },
+];
+export const DELIVERED_BY: ReadonlyArray<{ id: DeliveredBy; label: string; detail: string }> = [
+  { id: "self", label: "We deliver ourselves", detail: "Your own staff or vehicle" },
+  { id: "rider", label: "Rider", detail: "Bolt, Uber, Glovo or a boda rider" },
+  { id: "courier", label: "Courier", detail: "G4S, Wells Fargo, Fargo or matatu parcel" },
+];
+export const RIDER_PAID: ReadonlyArray<{ id: RiderPaid; label: string }> = [
+  { id: "in_fee", label: "Included in the delivery fee" },
+  { id: "on_arrival", label: "Customer pays the rider on arrival" },
+];
+
+export const ETA_MAX = 40;
+export const MAX_KSH = 1_000_000;
+
+const MODE_IDS = new Set(AREA_MODES.map((m) => m.id));
+const FEE_IDS = new Set(FEE_MODES.map((m) => m.id));
+const BY_IDS = new Set(DELIVERED_BY.map((m) => m.id));
+
+export function defaultMode(vertical: string | null | undefined): AreaMode {
+  return vertical === "home_services" ? "visit" : "delivery";
+}
+
+function ksh(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(String(v).replace(/[,\s]/g, "").replace(/^ksh/i, ""));
+  return Number.isFinite(n) && n >= 0 && n <= MAX_KSH ? Math.round(n) : null;
+}
+
+export function emptyServiceAreas(): ServiceAreas {
+  return { version: 1, areas: [], delivered_by: [], rider_paid: null };
+}
+
+export function newServiceArea(id: string, vertical?: string | null): ServiceArea {
+  return { id, modes: [defaultMode(vertical)], fee_mode: "ask", fee_ksh: null, eta: null, min_order_ksh: null, source: "owner", confirmed: true };
+}
+
+/** Accepts only well-formed areas with ids in the place directory. Null when nothing was ever saved. */
+export function normalizeServiceAreas(raw: unknown, vertical?: string | null): ServiceAreas {
+  const obj = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const list = Array.isArray(obj.areas) ? obj.areas : [];
+  const valid = new Set(parseCoverageAreas(list.map((a) => (a && typeof a === "object" ? (a as Record<string, unknown>).id : null))));
+  const seen = new Set<string>();
+  const areas: ServiceArea[] = [];
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const r = item as Record<string, unknown>;
+    const id = String(r.id || "").trim().toLowerCase();
+    if (!valid.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    const modes = (Array.isArray(r.modes) ? r.modes : []).map(String).filter((m): m is AreaMode => MODE_IDS.has(m as AreaMode));
+    const fee = ksh(r.fee_ksh);
+    let feeMode = FEE_IDS.has(r.fee_mode as FeeMode) ? (r.fee_mode as FeeMode) : "ask";
+    if (feeMode === "fixed" && fee == null) feeMode = "ask";
+    const eta = String(r.eta ?? "").trim().slice(0, ETA_MAX);
+    areas.push({
+      id,
+      modes: modes.length ? [...new Set(modes)] : [defaultMode(vertical)],
+      fee_mode: feeMode,
+      fee_ksh: feeMode === "fixed" ? fee : null,
+      eta: eta || null,
+      min_order_ksh: ksh(r.min_order_ksh),
+      source: r.source === "import" ? "import" : "owner",
+      confirmed: r.confirmed === true,
+    });
+    if (areas.length >= COVERAGE_AREA_MAX) break;
+  }
+  const deliveredBy = (Array.isArray(obj.delivered_by) ? obj.delivered_by : []).map(String).filter((b): b is DeliveredBy => BY_IDS.has(b as DeliveredBy));
+  const riderPaid = obj.rider_paid === "in_fee" || obj.rider_paid === "on_arrival" ? (obj.rider_paid as RiderPaid) : null;
+  return { version: 1, areas, delivered_by: [...new Set(deliveredBy)], rider_paid: riderPaid };
+}
+
+/** Old Policies coverage list -> areas with "we confirm the fee", unconfirmed (owner checks them once). */
+export function serviceAreasFromCoverage(ids: unknown, vertical?: string | null): ServiceAreas | null {
+  if (!Array.isArray(ids)) return null;
+  const areas = parseCoverageAreas(ids).map((id) => ({ ...newServiceArea(id, vertical), source: "import" as const, confirmed: false }));
+  return { ...emptyServiceAreas(), areas };
+}
+
+/** Stored value, or a value read from the old coverage list when Locations was never saved. */
+export function serviceAreasForForm(stored: unknown, coverage: unknown, vertical?: string | null): ServiceAreas {
+  if (stored && typeof stored === "object") return normalizeServiceAreas(stored, vertical);
+  return serviceAreasFromCoverage(coverage, vertical) ?? emptyServiceAreas();
+}
+
+/** business_policies.coverage_areas for the voice server: area ids, or null when none are listed. */
+export function coverageIdsFrom(value: ServiceAreas | null | undefined): string[] | null {
+  if (!value || !value.areas.length) return null;
+  return value.areas.map((a) => a.id);
+}
+
+const shortName = (id: string) => coverageAreaLabel(id).split(",")[0].trim();
+const money = (n: number) => `KSh ${n.toLocaleString("en-US")}`;
+
+function feeText(a: ServiceArea, forPrompt: boolean): string {
+  const trusted = !forPrompt || (a.source === "owner" && a.confirmed);
+  if (!trusted) return "fee confirmed on callback";
+  if (a.fee_mode === "free") return "free";
+  if (a.fee_mode === "fixed" && a.fee_ksh != null) return money(a.fee_ksh);
+  return "fee confirmed on callback";
+}
+
+/** One line under the area in the list: "Delivery · KSh 200 · Same day". */
+export function areaSummary(a: ServiceArea): string {
+  const modes = a.modes.map((m) => AREA_MODES.find((o) => o.id === m)?.label).filter(Boolean).join(", ");
+  const fee = a.fee_mode === "free" ? "Free" : a.fee_mode === "fixed" && a.fee_ksh != null ? money(a.fee_ksh) : "";
+  return [modes, fee, a.eta, a.min_order_ksh ? `From ${money(a.min_order_ksh)} orders` : ""].filter(Boolean).join(" · ");
+}
+
+/** What callers hear, shown under the editor. */
+export function serviceAreasSentence(v: ServiceAreas | null | undefined): string {
+  if (!v || !v.areas.length) return "";
+  const parts = v.areas.map((a) => {
+    const verb = AREA_MODES.find((o) => o.id === a.modes[0])?.verb || "deliver to";
+    const fee = a.fee_mode === "free" ? " for free" : a.fee_mode === "fixed" && a.fee_ksh != null ? ` for ${money(a.fee_ksh)}` : "";
+    const eta = a.eta ? `, ${a.eta}` : "";
+    return `We ${verb} ${shortName(a.id)}${fee}${eta}.`;
+  });
+  return parts.join(" ");
+}
+
+/** Prompt block. Fees are quoted only when the owner set and confirmed them. */
+export function formatServiceAreasForCompiler(v: ServiceAreas | null | undefined): string {
+  if (!v || !v.areas.length) return "";
+  const lines = v.areas.map((a) => {
+    const bits = [a.modes.map((m) => (m === "visit" ? "home visit" : m === "pickup" ? "pickup only" : "delivery")).join(" or "), feeText(a, true)];
+    if (a.eta) bits.push(a.eta);
+    if (a.min_order_ksh) bits.push(`orders from ${money(a.min_order_ksh)}`);
+    return `- ${shortName(a.id)}: ${bits.join(", ")}`;
+  });
+  const out = ["Areas you serve:", ...lines];
+  if (v.delivered_by.length) {
+    out.push(`Delivered by: ${v.delivered_by.map((b) => DELIVERED_BY.find((o) => o.id === b)?.label.toLowerCase()).join(", ")}.`);
+  }
+  if (v.rider_paid === "on_arrival") out.push("The customer pays the rider on arrival.");
+  if (v.rider_paid === "in_fee") out.push("The rider is paid from the delivery fee.");
+  out.push("A place not on this list is not covered: say so and offer a callback. Never guess a fee that is not listed.");
+  return out.join("\n");
+}
+
+export function validateServiceArea(a: ServiceArea): Record<string, string> {
+  const e: Record<string, string> = {};
+  if (!a.modes.length) e.modes = "Pick how you serve this area.";
+  if (a.fee_mode === "fixed" && (a.fee_ksh == null || a.fee_ksh <= 0)) e.fee_ksh = "Add the fee in KSh, or pick Free.";
+  if (a.min_order_ksh != null && (!Number.isInteger(a.min_order_ksh) || a.min_order_ksh < 0)) e.min_order_ksh = "Use a whole amount in KSh.";
+  if (a.eta && a.eta.length > ETA_MAX) e.eta = `Keep it under ${ETA_MAX} characters.`;
+  return e;
+}
+
+export function parseServiceAreasField(raw: unknown, vertical?: string | null): ServiceAreas | null {
+  const text = String(raw ?? "").trim();
+  if (!text) return null;
+  try {
+    return normalizeServiceAreas(JSON.parse(text), vertical);
+  } catch {
+    return null;
+  }
+}

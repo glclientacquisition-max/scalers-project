@@ -76,6 +76,14 @@ import { catalogSaveError } from "@/lib/catalogValidation";
 import { validatePublicContacts } from "@/lib/contactValidation";
 import { faqsLengthError, policiesLengthError } from "@/lib/lengthLimits";
 import { POLICY_FIELDS } from "@/lib/businessPolicies";
+import {
+  coverageIdsFrom,
+  formatServiceAreasForCompiler,
+  normalizeServiceAreas,
+  parseServiceAreasField,
+  serviceAreasFromCoverage,
+  validateServiceArea,
+} from "@/lib/serviceAreas";
 
 function safeJsonRows(raw: FormDataEntryValue | null): TeamRowInput[] {
   try {
@@ -320,6 +328,27 @@ export async function saveAndCompileSettings(
     if (!structured.ok) return { error: structured.error, fields: structured.fields };
     businessPolicies = structured.policies;
   }
+  // Areas you serve (Settings › Locations). Until Locations is saved once, the old Policies
+  // coverage list is read as areas with "we confirm the fee".
+  const ownsAreas = settingsFieldFromScope(scope, "serviceAreas", true, false);
+  const storedAreas =
+    tenant.service_areas && typeof tenant.service_areas === "object"
+      ? normalizeServiceAreas(tenant.service_areas, vertical)
+      : serviceAreasFromCoverage(
+          (tenant.business_policies as { coverage_areas?: unknown } | null)?.coverage_areas,
+          vertical
+        );
+  const formAreas = ownsAreas ? parseServiceAreasField(formData.get("service_areas"), vertical) : null;
+  const serviceAreas = formAreas ?? storedAreas;
+  if (formAreas) {
+    for (const area of formAreas.areas) {
+      const fields = validateServiceArea(area);
+      const first = Object.values(fields)[0];
+      if (first) return { error: first };
+    }
+  }
+  // The voice server reads business_policies.coverage_areas: keep it in step with the areas.
+  if (serviceAreas) businessPolicies = { ...businessPolicies, coverage_areas: coverageIdsFrom(serviceAreas) };
   const ttsLexicon = lexiconForStorage(
     pick(
       "ttsLexicon",
@@ -345,7 +374,9 @@ export async function saveAndCompileSettings(
       String(formData.get("business_hours") || "").trim(),
       String(tenant.business_hours || "").trim()
     );
-  const locationsText = formatLocationsForCompiler(businessLocations);
+  const locationsText = [formatLocationsForCompiler(businessLocations), formatServiceAreasForCompiler(serviceAreas)]
+    .filter(Boolean)
+    .join("\n\n");
   const policiesText = formatPoliciesForCompiler(businessPolicies);
 
   const scopeError = settingsScopeValidationError(scope, {
@@ -409,6 +440,7 @@ export async function saveAndCompileSettings(
     soniox_voice_label: sonioxVoiceLabel,
     business_locations: businessLocations,
     business_policies: businessPoliciesForStorage(businessPolicies),
+    ...(formAreas ? { service_areas: formAreas } : {}),
     tts_lexicon: ttsLexicon,
   };
 
