@@ -1,5 +1,8 @@
 import { sanitizePricing, type StructuredPrice } from "./structuredData";
+import { stableRowId } from "./factHash";
 export type ProductItem = {
+  /** Stable, non-numeric id (prd_…). Assigned on save so a rename keeps its price. */
+  id?: string;
   name: string;
   sku: string;
   category: string;
@@ -117,6 +120,8 @@ export function normalizeProductCatalog(raw: unknown): ProductItem[] {
       }
       const pricing = sanitizePricing(r.pricing);
       if (pricing) item.pricing = pricing;
+      const id = stableRowId(r);
+      if (id) item.id = id;
       // Absent holdable stays unset. Do not default it to false.
       const holdRaw = r.holdable;
       const holdText = String(holdRaw ?? "").trim().toLowerCase();
