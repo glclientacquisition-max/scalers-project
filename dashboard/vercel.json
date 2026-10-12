@@ -4,5 +4,12 @@
   "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
   "regions": [
     "lhr1"
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "main": true,
+      "cursor/staging-voice-468b": true
+    }
+  }
 }

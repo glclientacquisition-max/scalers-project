@@ -248,7 +248,8 @@ describe("theme activation", () => {
     const adminMenu = read("dashboard/src/components/AdminAccountMenu.tsx");
     assert.match(picker, /export function ThemeDock/);
     assert.match(landing, /<ThemeDock/);
-    assert.match(login, /<ThemeDock/);
+    // Login dropped the theme dock in the onboarding rebuild (#656); it follows the system theme.
+    assert.doesNotMatch(login, /data-theme="(light|dark)"/);
     assert.match(adminLogin, /<ThemeDock/);
     assert.match(adminMenu, /<ThemePicker \/>/);
     assert.match(adminMenu, />\s*This device\s*</);

@@ -98,7 +98,7 @@ function CallerNoteComposerInner({
           Hide SMS
         </button>
       ) : (
-        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">SMS</p>
+        <p className="text-meta font-medium text-ink-2">SMS</p>
       )}
       <form action={polishAction}>
         <input type="hidden" name="caller_name" value={callerName || ""} />

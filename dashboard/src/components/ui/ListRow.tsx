@@ -20,6 +20,7 @@ export function ListRow({
   className,
   ariaLabel,
   id,
+  below,
 }: {
   href?: string;
   onOpen?: () => void;
@@ -38,6 +39,8 @@ export function ListRow({
   ariaLabel?: string;
   /** Hash target for ops queues. */
   id?: string;
+  /** Inline controls (e.g. a name field). Sits under the row, outside the tap target, so it is never nested in the link. */
+  below?: ReactNode;
 }) {
   const bodyClass =
     "flex min-w-0 flex-1 items-center gap-3 py-3 ps-4 pe-2 text-start outline-none transition-colors duration-fast ease-out focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
@@ -71,14 +74,8 @@ export function ListRow({
     </>
   );
 
-  return (
-    <li
-      id={id}
-      className={cx(
-        "flex items-stretch bg-surface transition-colors duration-fast ease-out hover:bg-surface-2/60 has-[a:active]:bg-surface-2 has-[button:active]:bg-surface-2",
-        className,
-      )}
-    >
+  const row = (
+    <>
       {href ? (
         <Link href={href} aria-label={ariaLabel} className={bodyClass}>
           {content}
@@ -91,6 +88,23 @@ export function ListRow({
         <div className={bodyClass}>{content}</div>
       )}
       {actions ? <div className="flex shrink-0 items-center gap-1 pe-3">{actions}</div> : null}
+    </>
+  );
+  const liClass = cx(
+    "bg-surface transition-colors duration-fast ease-out hover:bg-surface-2/60 has-[a:active]:bg-surface-2 has-[button:active]:bg-surface-2",
+    className,
+  );
+  if (below) {
+    return (
+      <li id={id} className={liClass}>
+        <div className="flex items-stretch">{row}</div>
+        <div className="pb-3 pe-4 ps-[4.25rem]">{below}</div>
+      </li>
+    );
+  }
+  return (
+    <li id={id} className={cx("flex items-stretch", liClass)}>
+      {row}
     </li>
   );
 }
