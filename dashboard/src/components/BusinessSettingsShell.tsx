@@ -1,5 +1,6 @@
 "use client";
 
+import { catalogContentKey } from "@/lib/catalogPricing";
 import type { ReactNode } from "react";
 
 import Link from "next/link";
@@ -243,8 +244,9 @@ export function BusinessSettingsShell({
   const tenantFormKey = [
     tenant.id,
     formPanel,
-    Array.isArray(tenant.services_catalog) ? tenant.services_catalog.length : 0,
-    Array.isArray(tenant.product_catalog) ? tenant.product_catalog.length : 0,
+    // Catalogue content, not lengths: a price confirm changes no length, and a form that kept
+    // the old rows would post them back on Save and undo the confirm.
+    catalogContentKey(tenant.services_catalog, tenant.product_catalog),
     Array.isArray(tenant.faqs) ? tenant.faqs.length : 0,
     Array.isArray(tenant.team_directory) ? tenant.team_directory.length : 0,
     Array.isArray(tenant.business_locations) ? tenant.business_locations.length : 0,

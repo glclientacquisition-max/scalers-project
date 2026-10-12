@@ -11,9 +11,9 @@ import { PRICING_MODES, UNITS, priceLabel, type PricingMode, type StructuredPric
 import type { StructuredResult } from "@/app/(desk)/settings/structuredActions";
 import { Chips } from "./Chips";
 
-export type PriceToConfirm = { kind: "product" | "service"; name: string; pricing: StructuredPrice; text: string };
+export type PriceToConfirm = { kind: "product" | "service"; id?: string | null; name: string; pricing: StructuredPrice; text: string };
 
-type SaveFn = (input: { kind: "product" | "service"; name: string; pricing: StructuredPrice }) => Promise<StructuredResult>;
+type SaveFn = (input: { kind: "product" | "service"; id?: string | null; name: string; pricing: StructuredPrice }) => Promise<StructuredResult>;
 
 const SHOWN = 5;
 const PRODUCT_UNITS = ["item", "pack", "kg", "litre", "metre"];
@@ -25,14 +25,14 @@ export function PriceConfirmCards({ items, save, canEdit }: { items: PriceToConf
   const [editing, setEditing] = useState<PriceToConfirm | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const left = items.filter((i) => !done.includes(`${i.kind}:${i.name}`));
+  const left = items.filter((i) => !done.includes(`${i.kind}:${i.id || i.name}`));
   if (!left.length) return null;
 
   function run(item: PriceToConfirm, pricing: StructuredPrice, after?: () => void) {
-    const key = `${item.kind}:${item.name}`;
+    const key = `${item.kind}:${item.id || item.name}`;
     setBusy(key);
     start(async () => {
-      const res = await save({ kind: item.kind, name: item.name, pricing });
+      const res = await save({ kind: item.kind, id: item.id ?? null, name: item.name, pricing });
       setBusy(null);
       notify(res.ok ? res.message : res.error);
       if (res.ok) {
@@ -47,7 +47,7 @@ export function PriceConfirmCards({ items, save, canEdit }: { items: PriceToConf
       <p className="px-4 pt-3 text-meta text-ink-2">We read these from your price notes. Is each one right?</p>
       <ul aria-label="Prices to check">
         {left.slice(0, SHOWN).map((item) => {
-          const key = `${item.kind}:${item.name}`;
+          const key = `${item.kind}:${item.id || item.name}`;
           return (
             <li key={key} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 last:border-b-0">
               <div className="min-w-0 flex-1 basis-full sm:basis-0">

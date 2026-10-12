@@ -6,6 +6,8 @@ import { memberDenied } from "@/lib/requireMember";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { upsertTenantFieldMeta } from "@/lib/deskProvenance";
 import { recompileAfterCatalogImport } from "@/lib/catalogImportRecompile";
+import { readCatalogFresh } from "@/lib/catalogFresh";
+import { patchCatalogItem } from "@/lib/catalogPricing";
 import {
   categoriesFor,
   cleanPayments,
@@ -60,7 +62,7 @@ export async function savePaymentsAction(input: Payments): Promise<StructuredRes
 }
 
 /** Owner answers "Is this right?" for one item's typed price (yes, or a corrected price). */
-export async function confirmPriceAction(input: { kind: "product" | "service"; name: string; pricing: StructuredPrice }): Promise<StructuredResult> {
+export async function confirmPriceAction(input: { kind: "product" | "service"; id?: string | null; name: string; pricing: StructuredPrice }): Promise<StructuredResult> {
   const denied = await memberDenied("settings.edit");
   if (denied) return { ok: false, error: denied.error };
   const ws = await workspace();
@@ -76,23 +78,25 @@ export async function confirmPriceAction(input: { kind: "product" | "service"; n
 
   const column = input.kind === "product" ? "product_catalog" : "services_catalog";
   const textKey = input.kind === "product" ? "price" : "price_range";
-  const rows = Array.isArray(ws.tenant[column]) ? (ws.tenant[column] as Array<Record<string, unknown>>) : [];
-  const name = input.name.trim().toLowerCase();
-  let hit = false;
-  const next = rows.map((row) => {
-    if (hit || String(row?.name || "").trim().toLowerCase() !== name) return row;
-    hit = true;
-    const label = priceLabel(pricing);
-    return { ...row, pricing: { ...pricing, parsed_from: label }, [textKey]: label, source: "owner" };
-  });
-  if (!hit) return { ok: false, error: "That item is no longer in your catalogue." };
+  // Read the column as stored now (not the cached tenant) and patch only this item, found by id.
+  const fresh = await readCatalogFresh(ws.client, ws.tenant.id);
+  if (!fresh) return { ok: false, error: SAVE_FAILED };
+  const rows = Array.isArray(fresh[column]) ? (fresh[column] as Array<Record<string, unknown>>) : [];
+  const label = priceLabel(pricing);
+  const next = patchCatalogItem(rows, { id: input.id, name: input.name }, (row) => ({
+    ...row,
+    pricing: { ...pricing, parsed_from: label },
+    [textKey]: label,
+    source: "owner",
+  }));
+  if (!next) return { ok: false, error: "That item is no longer in your catalogue." };
   const { error } = await ws.client.from("tenants").update({ [column]: next }).eq("id", ws.tenant.id);
   bustTenantCache(ws.tenant.id);
   if (error) return { ok: false, error: SAVE_FAILED };
   // Same as payments: the prompt quotes prices, so rebuild it with the confirmed one.
   await recompileAfterCatalogImport({
     client: ws.client,
-    tenant: { ...ws.tenant, [column]: next },
+    tenant: { ...ws.tenant, ...fresh, [column]: next },
     ...(column === "product_catalog" ? { productCatalog: next } : {}),
   }).catch(() => null);
   revalidatePath("/settings");
