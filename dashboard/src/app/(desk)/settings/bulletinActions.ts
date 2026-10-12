@@ -140,8 +140,14 @@ export async function editBulletinAction(_prev: BulletinActionState, formData: F
   if (!compose.ok) return fail(compose.error);
   const res = await mutateBulletin(formData, (items) => {
     if (!items.some((item) => item.id === id && item.active)) return { error: "That update was cleared. Post it again." };
-    const { ok: _ok, ...patch } = compose;
-    return { next: applyBulletinEdit(items, id, patch) };
+    return {
+      next: applyBulletinEdit(items, id, {
+        text: compose.text,
+        announce: compose.announce,
+        starts_at: compose.starts_at,
+        ends_at: compose.ends_at,
+      }),
+    };
   });
   if (res.error) return fail(res.error);
   return done("Update saved.");
