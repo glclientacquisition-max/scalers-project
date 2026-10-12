@@ -154,7 +154,8 @@ function eatClock(d: Date): string {
 
 export function formatBulletinEndLabel(
   endsAt: string | null,
-  now = new Date()
+  now = new Date(),
+  opts: { exact?: boolean } = {}
 ): string {
   if (!endsAt) return "Until cleared";
   const end = new Date(endsAt);
@@ -167,7 +168,8 @@ export function formatBulletinEndLabel(
     a.getUTCFullYear() === b.getUTCFullYear() &&
     a.getUTCMonth() === b.getUTCMonth() &&
     a.getUTCDate() === b.getUTCDate();
-  const endOfDay = eatEnd.getUTCHours() === 23 && eatEnd.getUTCMinutes() >= 59;
+  // Pick shows the clock time the owner chose, even 11:59 pm.
+  const endOfDay = !opts.exact && eatEnd.getUTCHours() === 23 && eatEnd.getUTCMinutes() >= 59;
   const tomorrow = new Date(eatNow.getTime());
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
@@ -192,6 +194,16 @@ export function applyBulletinEdit(
   return items.map((item) =>
     item.id === id ? { ...item, ...patch, active: true } : item
   );
+}
+
+/** Which duration button an existing update was posted with, so Edit opens on it. */
+export function bulletinExpiryPreset(endsAt: string | null, now = new Date()): BulletinExpiry {
+  if (!endsAt) return "manual";
+  const t = new Date(endsAt).getTime();
+  if (Number.isNaN(t)) return "manual";
+  if (t === new Date(endOfEatDay(now, 0)).getTime()) return "today";
+  if (t === new Date(endOfEatDay(now, 1)).getTime()) return "tomorrow";
+  return "schedule";
 }
 
 export function resolveExpiryEndsAt(
@@ -275,7 +287,7 @@ export function formatBulletinComposePreview(opts: {
     !Number.isNaN(start.getTime()) && start > now
       ? `From ${formatEatStamp(window.starts_at)}`
       : "From now";
-  return `${from}. ${formatBulletinEndLabel(window.ends_at, now)}.`;
+  return `${from}. ${formatBulletinEndLabel(window.ends_at, now, { exact: opts.expiry === "schedule" })}.`;
 }
 
 export function canPostBulletin(

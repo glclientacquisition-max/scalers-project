@@ -8,6 +8,7 @@ import { CALLERS_HEAR_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
 import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import { parseVertical } from "@/lib/vertical";
 import {
+  bulletinExpiryPreset,
   deskBulletinItems,
   eatDateLocal,
   eatTimeLocal,
@@ -66,6 +67,7 @@ function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
   const [text, setText] = useState("");
   const [announce, setAnnounce] = useState<BulletinAnnounce>("ask");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [clearingId, setClearingId] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState<"post" | "edit" | "clear" | null>(null);
   const [expiry, setExpiry] = useState<BulletinExpiry>("today");
   const [startWhen, setStartWhen] = useState<(typeof START_OPTIONS)[number]["id"]>(
@@ -125,8 +127,7 @@ function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
     if (!editState.at) return;
     setLastAction("edit");
     if (editState.ok) {
-      setText("");
-      setEditingId(null);
+      resetCompose();
       router.refresh();
     }
   }, [editState, router]);
@@ -135,7 +136,13 @@ function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
     if (!clearState.at) return;
     setLastAction("clear");
     if (clearState.ok) router.refresh();
+    else setClearingId(null);
   }, [clearState, router]);
+
+  // Once the refreshed list no longer has it, the optimistic hide is done.
+  useEffect(() => {
+    if (clearingId && !items.some((i) => i.id === clearingId)) setClearingId(null);
+  }, [items, clearingId]);
 
   // Only the latest action speaks, so a clear never shows the earlier post's message.
   const latest = lastAction === "post" ? postState : lastAction === "edit" ? editState : lastAction === "clear" ? clearState : initial;
@@ -143,25 +150,33 @@ function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
   const flashIsError = Boolean(latest.error);
   const composePending = postPending || editPending;
 
+  function resetCompose() {
+    setEditingId(null);
+    setText("");
+    setAnnounce("ask");
+    setExpiry("today");
+    setStartWhen("now");
+    const t = tonightParts();
+    setEndDate(t.date);
+    setEndTime(t.time);
+  }
+
   const startEdit = (item: BulletinItem) => {
     setEditingId(item.id);
     setText(item.text);
     setAnnounce(item.announce ?? "ask");
-    if (item.ends_at) {
+    const preset = bulletinExpiryPreset(item.ends_at);
+    setExpiry(preset);
+    setStartWhen("now");
+    if (preset === "schedule" && item.ends_at) {
       const end = new Date(item.ends_at);
-      setExpiry("schedule");
-      setStartWhen("now");
       setEndDate(eatDateLocal(end));
       setEndTime(eatTimeLocal(end));
-    } else {
-      setExpiry("manual");
     }
     if (typeof window !== "undefined") document.getElementById("bulletin_text")?.focus();
   };
-  const cancelEdit = () => {
-    setEditingId(null);
-    setText("");
-  };
+  const cancelEdit = () => resetCompose();
+  const shown = items;
 
   return (
     <section className="min-w-0 w-full space-y-3">
@@ -287,16 +302,16 @@ function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
         <p className="px-1 text-body text-ink-2">{preview}</p>
       </form>
 
-      {items.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="px-1 text-body text-ink-2">
           No live updates.
         </p>
       ) : (
         <SettingsGroup title="Posted">
-          {items.map((item) => (
+          {shown.map((item) => (
             <div
               key={item.id}
-              className="flex min-w-0 flex-wrap items-start justify-between gap-3 px-4 py-3"
+              className={`flex min-w-0 flex-wrap items-start justify-between gap-3 px-4 py-3 transition-opacity ${clearingId === item.id ? "opacity-50" : ""}`}
             >
               <div className="min-w-0 flex-1 basis-[12rem]">
                 <p className="text-body font-medium text-ink [overflow-wrap:anywhere]">
@@ -311,20 +326,21 @@ function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
               <button
                 type="button"
                 onClick={() => startEdit(item)}
-                disabled={composePending || clearPending}
+                disabled={composePending || clearPending || clearingId === item.id}
                 className={settingsGhostButtonClass}
               >
                 Edit
               </button>
-              <form action={clearAction} className="shrink-0">
+              <form action={clearAction} onSubmit={() => setClearingId(item.id)} className="shrink-0">
                 <input type="hidden" name="tenant_id" value={tenant.id} />
                 <input type="hidden" name="bulletin_id" value={item.id} />
                 <button
                   type="submit"
-                  disabled={clearPending}
+                  disabled={clearPending || clearingId === item.id}
+                  aria-busy={clearingId === item.id}
                   className={settingsGhostButtonClass}
                 >
-                  Clear
+                  {clearingId === item.id ? "Clearing…" : "Clear"}
                 </button>
               </form>
             </div>

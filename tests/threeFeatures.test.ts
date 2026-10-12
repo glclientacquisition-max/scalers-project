@@ -232,3 +232,51 @@ test("updates panel: example placeholder, edit, flash of the latest action, two-
   assert.match(act, /rpc\("save_daily_bulletin"/);
   assert.match(act, /Someone else just changed/);
 });
+
+// ---------- Staging click-through fixes ----------
+import { bulletinExpiryPreset, formatBulletinComposePreview, endOfEatDay } from "../dashboard/src/lib/dailyBulletin.ts";
+import { homeStakes, shopStakes } from "../dashboard/src/lib/baStakes.ts";
+
+test("edit opens on the update's own duration preset", () => {
+  const now = new Date("2026-10-12T15:00:00Z");
+  assert.equal(bulletinExpiryPreset(endOfEatDay(now, 0), now), "today");
+  assert.equal(bulletinExpiryPreset(endOfEatDay(now, 1), now), "tomorrow");
+  assert.equal(bulletinExpiryPreset(null, now), "manual");
+  assert.equal(bulletinExpiryPreset("2026-10-13T11:00:00Z", now), "schedule");
+});
+
+test("Pick summary always names the picked clock time", () => {
+  const now = new Date("2026-10-12T15:00:00Z"); // 18:00 EAT
+  assert.equal(formatBulletinComposePreview({ expiry: "schedule", endsLocal: "2026-10-12T23:59", now }), "From now. Until 11:59 pm.");
+  assert.equal(formatBulletinComposePreview({ expiry: "schedule", endsLocal: "2026-10-13T14:00", now }), "From now. Until tomorrow, 2:00 pm.");
+  assert.equal(formatBulletinComposePreview({ expiry: "today", now }), "From now. Until tonight.");
+});
+
+test("updates panel: form resets after an edit; clear is optimistic with a pending label", () => {
+  const ui = read("dashboard/src/components/DailyBulletinPanel.tsx");
+  assert.match(ui, /bulletinExpiryPreset\(/);
+  assert.match(ui, /function resetCompose\(/);
+  assert.match(ui, /if \(editState\.ok\) \{\s*resetCompose\(\)/);
+  assert.match(ui, /clearingId/);
+  assert.match(ui, /Clearing…/);
+});
+
+test("Updates heading shows the live dot only when an update is live", () => {
+  const home = read("dashboard/src/app/(desk)/home/page.tsx");
+  assert.match(home, /liveBulletinItems\(tenant\.daily_bulletin\)\.length > 0 \? <LivePing \/> : null/);
+});
+
+test("will-say preview: a locked action shows what callers hear today, not 'Needs setup'", () => {
+  for (const line of [...homeStakes({ services: [], bookingSlotsAllowed: false }), ...shopStakes({ products: [], holdsAllowed: false })]) {
+    assert.notEqual(line.answer, "Needs setup", line.question);
+  }
+  const book = homeStakes({ services: [], bookingSlotsAllowed: false }).at(-1)!;
+  assert.equal(book.state, "locked");
+  assert.match(book.answer, /owner will call to confirm/i);
+});
+
+test("/inbox redirects to /calls", () => {
+  const cfg = read("dashboard/next.config.ts");
+  assert.match(cfg, /source: "\/inbox", destination: "\/calls"/);
+  assert.match(cfg, /source: "\/inbox\/:path\*", destination: "\/calls\/:path\*"/);
+});
