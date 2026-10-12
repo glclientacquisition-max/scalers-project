@@ -3,10 +3,9 @@
 import { useState } from "react";
 import { switchDeskTenant } from "@/app/(desk)/tenantActions";
 import { BrandLockup } from "@/components/brand/BrandMark";
-import { ThemePicker, useThemeChoice } from "@/components/ThemePicker";
-import type { DeskTheme } from "@/lib/deskTheme";
+import { ThemePicker, appearanceLabel, useThemeChoice } from "@/components/ThemePicker";
 import { iconButtonClass } from "@/components/ui/IconButton";
-import { Menu, MenuGroup, MenuItem, MenuLabel, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@/components/ui/Menu";
+import { Menu, MenuGroup, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import { Sheet } from "@/components/ui/Sheet";
 import { useIsPhone } from "@/components/ui/useIsPhone";
@@ -38,6 +37,7 @@ function AccountSheet({
   workspaces: Array<{ id: string; name: string }>;
 }) {
   const many = workspaces.length > 1;
+  const theme = useThemeChoice();
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title={name}>
       <div data-account-sheet="" className="space-y-6">
@@ -46,7 +46,7 @@ function AccountSheet({
             <h3 id="account-sheet-workspace" className="mb-2 px-1 text-meta font-medium text-ink-2">
               Workspace
             </h3>
-            <ul className="overflow-hidden rounded-2xl border border-hairline bg-surface">
+            <ul className="overflow-hidden rounded-2xl border border-line bg-canvas">
               {workspaces.map((row) => {
                 const current = row.id === tenantId;
                 return (
@@ -68,15 +68,13 @@ function AccountSheet({
             </ul>
           </section>
         ) : null}
-        <section aria-labelledby="account-sheet-appearance">
-          <h3 id="account-sheet-appearance" className="mb-2 px-1 text-meta font-medium text-ink-2">
-            Appearance on this device
+        <section aria-labelledby="account-sheet-appearance" data-account-sheet-card="" className="rounded-2xl border border-line bg-canvas p-3">
+          <h3 id="account-sheet-appearance" className="mb-2 ps-1 text-body font-medium text-ink">
+            {appearanceLabel(theme.choice)}
           </h3>
-          <div className="rounded-2xl border border-hairline bg-surface p-3">
-            <ThemePicker />
-          </div>
+          <ThemePicker />
         </section>
-        <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
+        <div className="overflow-hidden rounded-2xl border border-line bg-canvas">
           <SignOutButton layout="sheet" />
         </div>
       </div>
@@ -196,16 +194,11 @@ export function DeskAccountMenu({
             aria-expanded={themeOpen}
             onClick={() => setThemeOpen((current) => !current)}
           >
-            Appearance
+            {appearanceLabel(theme.choice)}
           </MenuItem>
           {themeOpen ? (
-            <div data-account-appearance="" role="none">
-              <MenuRadioGroup value={theme.choice} onValueChange={(next) => theme.pick(next as DeskTheme)}>
-                <MenuLabel>This device</MenuLabel>
-                <MenuRadioItem value="system" closeOnClick={false}>System</MenuRadioItem>
-                <MenuRadioItem value="light" closeOnClick={false}>Light</MenuRadioItem>
-                <MenuRadioItem value="dark" closeOnClick={false}>Dark</MenuRadioItem>
-              </MenuRadioGroup>
+            <div data-account-appearance="" className="px-2 pb-2">
+              <ThemePicker />
             </div>
           ) : null}
           <MenuSeparator />

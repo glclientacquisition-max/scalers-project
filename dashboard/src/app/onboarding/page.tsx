@@ -3,7 +3,7 @@ import { SetupFlow } from "./SetupFlow";
 import { ConfirmEmailScreen } from "./ConfirmEmailScreen";
 import { redirect } from "next/navigation";
 import { BrandWordmark } from "@/components/brand/BrandMark";
-import { ThemeDock } from "@/components/ThemePicker";
+import { AppearanceFooter } from "@/components/ThemePicker";
 import { getAuthUser, isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
 import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getCurrentTenant } from "@/lib/tenant";
@@ -56,16 +56,16 @@ export default async function OnboardingPage({
         <div className="w-full max-w-lg">
           <div className="flex items-start justify-between gap-3">
             <BrandWordmark href="/onboarding" context="Workspace" variant="lockup" priority />
-            <div className="flex items-center gap-1">
-              <ThemeDock />
-              <OnboardingExit />
-            </div>
+            <OnboardingExit />
           </div>
           <h1 className="mt-8 text-display text-ink">Create your workspace</h1>
           <p className="mt-2 text-body text-ink-2">
             This account isn&apos;t linked to a business yet. Add one to continue.
           </p>
           <CreateWorkspaceForm />
+          <footer className="mt-10 flex justify-center">
+            <AppearanceFooter />
+          </footer>
         </div>
       </main>
     );
@@ -105,15 +105,15 @@ export default async function OnboardingPage({
       <div className="w-full max-w-xl">
         <div className="flex items-start justify-between gap-3">
           <BrandWordmark href="/onboarding" context="Setup" variant="lockup" priority />
-          <div className="flex items-center gap-1">
-            <ThemeDock />
-            <OnboardingExit />
-          </div>
+          <OnboardingExit />
         </div>
         <h1 className="mt-8 text-display text-ink">
           Set up {legacyTenant.business_name}
         </h1>
         <OnboardingWizard />
+        <footer className="mt-10 flex justify-center">
+          <AppearanceFooter />
+        </footer>
       </div>
     </main>
   );

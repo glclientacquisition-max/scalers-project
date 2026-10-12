@@ -138,7 +138,7 @@ export function SegmentedControl({
             aria-checked={active}
             onClick={() => onChange(item.value)}
             className={cx(
-              "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-meta font-medium transition-[background-color,color,box-shadow] duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand [&>svg]:h-4 [&>svg]:w-4",
+              "inline-flex min-h-11 lg:min-h-9 [@media(pointer:coarse)]:min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 text-meta font-medium transition-[background-color,color,box-shadow] duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand [&>svg]:h-4 [&>svg]:w-4",
               active ? "bg-surface text-ink shadow-[0_1px_2px_rgb(10_25_47/0.12)]" : "text-ink-2 hover:text-ink",
             )}
           >

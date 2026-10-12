@@ -42,7 +42,7 @@ export function Menu({
         {triggerChildren}
       </BaseMenu.Trigger>
       <BaseMenu.Portal>
-        <BaseMenu.Positioner side={side} align={align} sideOffset={6} collisionPadding={12} className="z-menu">
+        <BaseMenu.Positioner side={side} align={align} sideOffset={6} collisionPadding={{ top: 12, bottom: 12, left: 12, right: 24 }} className="z-menu">
           <BaseMenu.Popup className={cx(popupClass, popupClassName)}>{children}</BaseMenu.Popup>
         </BaseMenu.Positioner>
       </BaseMenu.Portal>

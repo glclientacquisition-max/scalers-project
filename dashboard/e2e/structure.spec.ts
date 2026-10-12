@@ -240,7 +240,7 @@ test.describe("/dev/kit interactions", () => {
     expect(measured.themeColor).toBe(measured.canvas);
   });
 
-  test("keeps This device pick after reload and on login", async ({ page, context }) => {
+  test("keeps the On this device pick after reload and on login", async ({ page, context }) => {
     await page.goto("/dev/kit");
     await settle(page);
     await page.getByRole("radio", { name: "Dark" }).click();
@@ -254,6 +254,7 @@ test.describe("/dev/kit interactions", () => {
     await page.goto("/login");
     await settle(page);
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await page.getByRole("button", { name: "Appearance · Dark" }).click();
     await expect(page.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
   });
 });

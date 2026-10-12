@@ -732,3 +732,15 @@ h3,
   field-sizing: content;
   max-height: 50dvh;
 }
+
+/* Dark scrollbars on the desk and admin scroll wells (the account menu sits next to them). */
+:root[data-theme="dark"] [data-desk-main],
+:root[data-theme="dark"] [data-admin-main] {
+  scrollbar-color: var(--hairline) var(--canvas);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-desk-main],
+  :root:not([data-theme="light"]) [data-admin-main] {
+    scrollbar-color: var(--hairline) var(--canvas);
+  }
+}
