@@ -1,5 +1,6 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
@@ -47,6 +48,7 @@ export async function saveOnDemandUsage(
     p_tenant_id: tenant.id,
     p_enabled: enabled,
   });
+  bustTenantCache(tenant.id);
 
   if (error) {
     return ownerSaveFailed(

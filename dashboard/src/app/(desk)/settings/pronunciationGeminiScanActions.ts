@@ -1,5 +1,6 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
 
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
@@ -139,6 +140,7 @@ async function persistQueueFields(opts: {
     .from("tenants")
     .update(patch)
     .eq("id", opts.tenantId);
+  bustTenantCache(opts.tenantId);
   if (error) {
     logDeskError("pronunciation-scan", error.message);
     return pronunciationWriteError("review", error.message);
@@ -345,6 +347,7 @@ async function runGeminiScanRecentCalls(
       pronunciation_gemini_scan_logs: nextLogs,
     })
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   const pending = nextQueue.filter((c) => c.status === "pending");
 
@@ -468,6 +471,7 @@ export async function approveGeminiScanCandidateAction(
       pronunciation_review_queue: nextQueue,
     })
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   if (error) {
     return ownerSaveFailed(

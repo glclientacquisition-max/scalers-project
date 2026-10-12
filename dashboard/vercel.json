@@ -2,6 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
+  "regions": [
+    "lhr1"
+  ],
   "git": {
     "deploymentEnabled": {
       "**": false,

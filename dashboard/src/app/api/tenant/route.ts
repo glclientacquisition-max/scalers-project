@@ -1,3 +1,4 @@
+import { bustTenantCache } from "@/lib/tenantCache";
 import { NextResponse } from "next/server";
 import { isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
 import { canonicalizeAgentTone } from "@/lib/onboarding";
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
       "id, business_name, whatsapp_notification_number, services_offered, business_hours, agent_tone"
     )
     .single();
+  bustTenantCache(id);
 
   if (error) {
     const hint =

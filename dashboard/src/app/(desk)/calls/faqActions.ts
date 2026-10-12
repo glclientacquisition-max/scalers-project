@@ -1,5 +1,6 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
 
 import { isAuthenticated } from "@/lib/auth";
@@ -244,6 +245,7 @@ export async function applyFaqSuggestionsAction(
       llm_system_prompt: prompt,
     })
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   if (error) return { error: error.message };
 

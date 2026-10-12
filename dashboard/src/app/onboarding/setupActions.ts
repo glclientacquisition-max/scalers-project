@@ -1,9 +1,10 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
 import { parsePaymentsText } from "@/lib/structuredData";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
-import { getAuthUser } from "@/lib/auth";
+import { getVerifiedAuthUser as getAuthUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { assignDidFromPool } from "@/lib/tenant";
 import { allowRate } from "@/lib/rateLimit";
@@ -96,6 +97,7 @@ export async function saveSetupStepAction(input: {
       p_expected_version: input.version,
     }),
   ]);
+  bustTenantCache(input.tenantId);
   console.info(`[setup] save ${input.key} auth=${authMs}ms total=${Date.now() - started}ms`);
   if (!allowed) return { ok: false, error: SETUP_DENIED };
   if (error) {
@@ -255,6 +257,7 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     .is("setup_completed_at", null)
     .eq("onboarding_draft_version", input.version)
     .select("id, sautikit_virtual_number");
+  bustTenantCache(row.id);
   if (error) {
     console.error("[setup] finish:", error.code, error.message);
     return { ok: false, error: `${saveErrorMessage(error, "finish")} Your answers are saved.` };
@@ -284,6 +287,7 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
       const { prompt: better } = await compileReceptionistPrompt(compileInput);
       if (better && better.length >= 80 && !tenantNeedsOnboarding({ business_name: row.business_name, llm_system_prompt: better })) {
         await client.from("tenants").update({ llm_system_prompt: better }).eq("id", row.id).eq("llm_system_prompt", prompt);
+        bustTenantCache(row.id);
       }
     } catch (err) {
       console.warn("[setup] prompt upgrade skipped:", err instanceof Error ? err.message : err);

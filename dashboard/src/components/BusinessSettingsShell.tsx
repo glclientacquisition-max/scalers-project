@@ -20,11 +20,16 @@ import {
 } from "@heroicons/react/24/outline";
 import type { TenantRow } from "@/lib/supabase";
 import { AlertsPanel } from "@/components/AlertsPanel";
-import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
-import { CatalogImportPanel } from "@/components/CatalogImportPanel";
+import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/Skeleton";
+
+// Heavy panels load only when their section opens (keeps them out of the Settings home and form bundle).
+const panelLoading = () => <Skeleton className="h-64 w-full rounded-2xl" />;
+const KnowledgeIngestPanel = dynamic(() => import("@/components/KnowledgeIngestPanel").then((m) => m.KnowledgeIngestPanel), { loading: panelLoading });
+const CatalogImportPanel = dynamic(() => import("@/components/CatalogImportPanel").then((m) => m.CatalogImportPanel), { loading: panelLoading });
+const TestLinePanel = dynamic(() => import("@/components/TestLinePanel").then((m) => m.TestLinePanel), { loading: panelLoading });
 import { SettingsLeaveGuard } from "@/components/SettingsLeaveGuard";
 import { TenantForm } from "@/components/TenantForm";
-import { TestLinePanel } from "@/components/TestLinePanel";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { parseVertical } from "@/lib/vertical";
 import {

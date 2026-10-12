@@ -114,7 +114,9 @@ import {
 import { CoverageAreaField } from "@/components/CoverageAreaField";
 import { stableRowId } from "@/lib/factHash";
 import { DeskSelect } from "@/components/ui/DeskSelect";
-import { PronunciationCoach } from "@/components/PronunciationCoach";
+import dynamic from "next/dynamic";
+// Pronunciation is one panel of many; load it only when that panel renders.
+const PronunciationCoach = dynamic(() => import("@/components/PronunciationCoach").then((m) => m.PronunciationCoach));
 import { deskShiftClass } from "@/components/ui/deskChrome";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { notify } from "@/components/ui/DeskNotice";
