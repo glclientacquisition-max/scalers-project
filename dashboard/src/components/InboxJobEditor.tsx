@@ -31,7 +31,7 @@ function InboxJobEditorInner({
     <div className="space-y-3">
       <form action={formAction} data-pull-dirty-guard="" className="space-y-2">
         <input type="hidden" name="id" value={id} />
-        <label className="block text-xs font-medium text-ink-soft" htmlFor={`when-${id}`}>
+        <label className="block text-meta font-medium text-ink-2" htmlFor={`when-${id}`}>
           When
         </label>
         <input
@@ -41,7 +41,7 @@ function InboxJobEditorInner({
           placeholder="Tuesday 10:00 AM"
           className={fieldClass}
         />
-        <label className="block text-xs font-medium text-ink-soft" htmlFor={`where-${id}`}>
+        <label className="block text-meta font-medium text-ink-2" htmlFor={`where-${id}`}>
           Where
         </label>
         <input
@@ -54,7 +54,7 @@ function InboxJobEditorInner({
         <Button type="submit" variant="ghost" size="md" block pending={pending}>
           {pending ? "Saving" : "Save"}
         </Button>
-        {state.error ? <p className="text-sm text-warn">Could not save.</p> : null}
+        {state.error ? <p className="text-body text-warn">Could not save.</p> : null}
       </form>
     </div>
   );

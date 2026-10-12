@@ -49,7 +49,7 @@ function ContactFavouriteButtonInner({
       >
         {favourite ? "Favourited" : "Add to Favourites"}
       </Button>
-      {error ? <p className="mt-2 text-sm text-warn">{error}</p> : null}
+      {error ? <p className="mt-2 text-body text-warn">{error}</p> : null}
     </div>
   );
 }

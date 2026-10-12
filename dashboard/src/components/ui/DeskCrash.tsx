@@ -1,6 +1,6 @@
 "use client";
 
-import { btnPrimary } from "@/components/ui/deskChrome";
+import { Button } from "@/components/ui/Button";
 import { DeskError } from "@/components/ui/DeskError";
 
 export function DeskCrash({
@@ -13,11 +13,11 @@ export function DeskCrash({
   return (
     <div className="max-w-xl">
       <DeskError>
-        <p className="font-display text-2xl tracking-tight text-ink">{title}</p>
+        <p className="font-display text-page tracking-tight text-ink">{title}</p>
       </DeskError>
-      <button type="button" onClick={onRetry} className={`${btnPrimary} mt-4`}>
+      <Button onClick={onRetry} className="mt-4">
         Try again
-      </button>
+      </Button>
     </div>
   );
 }

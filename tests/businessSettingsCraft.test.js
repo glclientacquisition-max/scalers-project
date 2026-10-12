@@ -199,7 +199,7 @@ describe("business settings craft", () => {
     assert.match(signOut, /action="\/api\/logout"/);
     assert.match(signOut, /method="post"/);
     assert.match(signOut, /type="submit"/);
-    assert.match(signOut, /btnPrimary/);
+    assert.match(signOut, /btnPrimary|<Button\b/); // kit Button replaced the one-off class
     assert.match(signOut, /type="button"/);
     assert.doesNotMatch(
       signOut.slice(0, signOut.indexOf("if (!confirming)")),
@@ -232,14 +232,14 @@ describe("business settings craft", () => {
   });
 
   it("shows dense catalog rows below lg and the table from lg", () => {
-    assert.doesNotMatch(form, /rounded-xl border border-line bg-surface p-3/);
+    assert.doesNotMatch(form, /rounded-xl border border-hairline bg-surface p-3/);
     assert.match(form, /lg:hidden/);
     assert.match(form, /svc-name-m-/);
     assert.match(form, /svc-notes-m-/);
     assert.match(form, /svc-oos-m-/);
     assert.match(form, /prod-name-m-/);
     assert.match(form, /prod-cat-m-/);
-    assert.match(form, /className="hidden overflow-hidden rounded-xl border border-line lg:block"/);
+    assert.match(form, /className="hidden overflow-hidden rounded-xl border border-hairline lg:block"/);
     assert.match(form, /table-fixed/);
     assert.doesNotMatch(form, /min-w-\[720px\]/);
     assert.doesNotMatch(form, /min-w-\[640px\]/);
@@ -281,7 +281,7 @@ describe("business settings craft", () => {
     assert.match(ui, /md:flex-row/);
     assert.match(ui, /grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2/);
     assert.match(ui, /min-w-0 flex-1/);
-    assert.match(ui, /text-xl font-semibold/);
+    assert.match(ui, /text-title font-semibold/);
     assert.match(form, /SettingsGroup/);
     assert.match(form, /lg:grid-cols-\[minmax\(5\.5rem,7rem\)_3\.5rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);
     assert.match(form, /grid-cols-\[minmax\(0,7rem\)_minmax\(0,1fr\)_2\.75rem_2\.75rem\]/);
@@ -440,7 +440,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(catalogScan, /settingsPrimaryButtonClass/);
     assert.match(form, /Saves live - no sticky Save/);
     assert.doesNotMatch(form, /panel === "pronunciation" \? undefined/);
-    assert.match(coach, /btnPrimary/);
+    assert.match(coach, /btnPrimary|<Button\b/); // kit Button replaced the one-off class
     assert.match(coach, /fixHasUsePrimary/);
     assert.match(form, /settingsGhostButtonClass/);
     assert.match(form, /Add service/);
@@ -504,7 +504,7 @@ describe("business settings craft", () => {
 
     assert.match(form, /id="business_name"[\s\S]{0,240}title=\{businessName/);
     assert.match(ui, /title=\{businessName\}/);
-    assert.match(ui, /break-words text-sm font-medium text-ink/);
+    assert.match(ui, /break-words text-body font-medium text-ink/);
     assert.match(shell, /title=\{status\?\.title \|\| statusText\}/); // truncated status keeps its full text on hover
   });
 

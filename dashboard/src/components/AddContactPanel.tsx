@@ -141,7 +141,7 @@ function AddContactPanelInner() {
                   From this phone
                 </button>
               ) : null}
-              {error ? <p className="text-sm text-warn">{error}</p> : null}
+              {error ? <p className="text-body text-warn">{error}</p> : null}
             </div>
           ) : (
             <form
@@ -154,9 +154,9 @@ function AddContactPanelInner() {
               {drafts.map((draft, i) => (
                 <div
                   key={i}
-                  className={drafts.length > 1 ? "border-b border-line pb-4" : ""}
+                  className={drafts.length > 1 ? "border-b border-hairline pb-4" : ""}
                 >
-                  <label className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  <label className="text-meta font-medium text-ink-2">
                     Name
                     <input
                       value={draft.name}
@@ -168,7 +168,7 @@ function AddContactPanelInner() {
                       className={settingsFieldClass}
                     />
                   </label>
-                  <label className="mt-3 block text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  <label className="mt-3 block text-meta font-medium text-ink-2">
                     Phone
                     <input
                       value={draft.phone}
@@ -183,7 +183,7 @@ function AddContactPanelInner() {
                       className={settingsFieldClass}
                     />
                   </label>
-                  <label className="mt-3 block text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  <label className="mt-3 block text-meta font-medium text-ink-2">
                     Notes
                     <textarea
                       value={draft.notes}
@@ -228,7 +228,7 @@ function AddContactPanelInner() {
               </div>
 
               {error ? (
-                <p className="text-sm text-warn">
+                <p className="text-body text-warn">
                   {error}
                   {existingId ? (
                     <>

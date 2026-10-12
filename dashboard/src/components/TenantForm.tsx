@@ -310,7 +310,7 @@ function CatalogPager({
       total={total}
       noun={noun}
       onPage={(next) => onPage(next - 1)}
-      className="border-t border-line bg-surface-canvas px-3 py-3"
+      className="border-t border-hairline bg-surface-canvas px-3 py-3"
     />
   );
 }
@@ -913,7 +913,7 @@ function TenantFormInner({
             alert={state.error}
             action={
               panel === "pronunciation" ? (
-                <p className="max-w-[11rem] text-right text-xs leading-snug text-ink-soft">
+                <p className="max-w-[11rem] text-right text-meta leading-snug text-ink-2">
                   Saves live - no sticky Save
                 </p>
               ) : (
@@ -1065,7 +1065,7 @@ function TenantFormInner({
         >
           {socialHandles.channels.length === 0 ? (
             <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p className="text-sm text-ink-soft">No public contacts yet</p>
+              <p className="text-body text-ink-2">No public contacts yet</p>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -1092,7 +1092,7 @@ function TenantFormInner({
             </div>
           ) : (
             <div className="min-w-0">
-            <div className="divide-y divide-line lg:hidden">
+            <div className="divide-y divide-hairline lg:hidden">
               {socialHandles.channels.map((channel, index) => (
                 <div
                   key={`social-m-${index}`}
@@ -1161,9 +1161,9 @@ function TenantFormInner({
             </div>
             <div className="hidden lg:block">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-sm">
+                <table className="w-full min-w-[520px] text-body">
                   <thead>
-                    <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
+                    <tr className="border-b border-hairline bg-surface-canvas text-left text-meta font-medium text-ink-2">
                       <th className="px-3 py-2 font-medium w-36">Type</th>
                       <th className="px-3 py-2 font-medium w-28">Label</th>
                       <th className="px-3 py-2 font-medium">Handle / URL</th>
@@ -1172,7 +1172,7 @@ function TenantFormInner({
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line bg-surface">
+                  <tbody className="divide-y divide-hairline bg-surface">
                     {socialHandles.channels.map((channel, index) => (
                       <tr key={`social-ch-${index}`} className="align-middle">
                         <td className="px-3 py-1.5">
@@ -1300,12 +1300,12 @@ function TenantFormInner({
             applyLabel="Add to services"
           />
           {bulkServicesError ? (
-            <p className="text-sm text-warn" role="alert">
+            <p className="text-body text-warn" role="alert">
               {bulkServicesError}
             </p>
           ) : null}
 
-          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
+          <div className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline lg:hidden">
             {visibleServices.map((service, localIndex) => {
               const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
               return (
@@ -1358,11 +1358,11 @@ function TenantFormInner({
             />
           </div>
 
-          <div className="hidden overflow-hidden rounded-xl border border-line lg:block">
+          <div className="hidden overflow-hidden rounded-xl border border-hairline lg:block">
             <div className="overflow-x-auto">
-              <table className="w-full table-fixed text-sm">
+              <table className="w-full table-fixed text-body">
                 <thead>
-                  <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  <tr className="border-b border-hairline bg-surface-canvas text-left text-meta font-medium text-ink-2">
                     <th className="min-w-0 px-3 py-2.5 font-medium">Name</th>
                     <th className="px-3 py-2.5 font-medium">Price</th>
                     <th className="px-3 py-2.5 font-medium">Notes</th>
@@ -1372,7 +1372,7 @@ function TenantFormInner({
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line bg-surface">
+                <tbody className="divide-y divide-hairline bg-surface">
                   {visibleServices.map((service, localIndex) => {
                     const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
                     return (
@@ -1472,7 +1472,7 @@ function TenantFormInner({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-ink-soft" htmlFor="services_notes">
+            <label className="block text-meta font-medium text-ink-2" htmlFor="services_notes">
               Notes
             </label>
             <textarea
@@ -1529,7 +1529,7 @@ function TenantFormInner({
             applyLabel="Add to catalogue"
           />
           {bulkProductsError ? (
-            <p className="text-sm text-warn" role="alert">
+            <p className="text-body text-warn" role="alert">
               {bulkProductsError}
             </p>
           ) : null}
@@ -1553,7 +1553,7 @@ function TenantFormInner({
             <p id="holdable" className="scroll-mt-24 px-1 text-meta text-ink-2">
               Turn on Hold for items your Business Assistant may hold for a caller.
             </p>
-            <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
+            <div className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline lg:hidden">
               {visibleProducts.map((product, localIndex) => {
                 const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
                 return (
@@ -1622,11 +1622,11 @@ function TenantFormInner({
                 onPage={setProductPage}
               />
             </div>
-            <div className="hidden overflow-hidden rounded-xl border border-line lg:block">
+            <div className="hidden overflow-hidden rounded-xl border border-hairline lg:block">
               <div className="overflow-x-auto">
-                <table className="w-full table-fixed text-sm">
+                <table className="w-full table-fixed text-body">
                   <thead>
-                    <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
+                    <tr className="border-b border-hairline bg-surface-canvas text-left text-meta font-medium text-ink-2">
                       <th className="min-w-0 px-3 py-2.5 font-medium">Name</th>
                       <th className="px-3 py-2.5 font-medium">Price</th>
                       <th className="px-3 py-2.5 font-medium">Category</th>
@@ -1636,7 +1636,7 @@ function TenantFormInner({
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line bg-surface">
+                  <tbody className="divide-y divide-hairline bg-surface">
                     {visibleProducts.map((product, localIndex) => {
                       const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
                       return (
@@ -1760,7 +1760,7 @@ function TenantFormInner({
             return (
               <div key={day} className="px-4 py-2 lg:px-3 lg:py-1.5">
                 <div className="flex min-h-12 items-center justify-between gap-3 lg:hidden">
-                  <span className="min-w-0 truncate text-sm font-medium text-ink">
+                  <span className="min-w-0 truncate text-body font-medium text-ink">
                     {DAY_LABELS[day]}
                   </span>
                   <ToolSwitch
@@ -1773,7 +1773,7 @@ function TenantFormInner({
                   <div className="mt-2 grid grid-cols-2 gap-2 lg:hidden">
                     <div className="min-w-0">
                       <label
-                        className="block text-xs font-medium text-ink-soft"
+                        className="block text-meta font-medium text-ink-2"
                         htmlFor={`open-m-${day}`}
                       >
                         Opens
@@ -1783,12 +1783,12 @@ function TenantFormInner({
                         type="time"
                         value={slot.open}
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="mt-1 min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                        className="mt-1 min-h-11 min-w-0 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-body text-ink outline-none placeholder:text-ink-2/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
                       />
                     </div>
                     <div className="min-w-0">
                       <label
-                        className="block text-xs font-medium text-ink-soft"
+                        className="block text-meta font-medium text-ink-2"
                         htmlFor={`close-m-${day}`}
                       >
                         Closes
@@ -1798,13 +1798,13 @@ function TenantFormInner({
                         type="time"
                         value={slot.close}
                         onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="mt-1 min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                        className="mt-1 min-h-11 min-w-0 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-body text-ink outline-none placeholder:text-ink-2/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
                       />
                     </div>
                   </div>
                 ) : null}
                 <div className="hidden lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
-                  <span className="min-w-0 truncate text-sm font-medium text-ink">
+                  <span className="min-w-0 truncate text-body font-medium text-ink">
                     {DAY_LABELS[day]}
                   </span>
                   <ToolSwitch
@@ -1822,7 +1822,7 @@ function TenantFormInner({
                         type="time"
                         value={slot.open}
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-body text-ink outline-none placeholder:text-ink-2/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
                       />
                       <label className="sr-only" htmlFor={`close-${day}`}>
                         Closes
@@ -1832,11 +1832,11 @@ function TenantFormInner({
                         type="time"
                         value={slot.close}
                         onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-body text-ink outline-none placeholder:text-ink-2/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
                       />
                     </>
                   ) : (
-                    <span className="col-span-2 text-xs text-ink-soft">Closed</span>
+                    <span className="col-span-2 text-meta text-ink-2">Closed</span>
                   )}
                 </div>
               </div>
@@ -1863,8 +1863,8 @@ function TenantFormInner({
             Add place
           </button>
         </div>
-        <div className="overflow-hidden rounded-xl border border-line">
-          <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem] items-center gap-2 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+        <div className="overflow-hidden rounded-xl border border-hairline">
+          <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem] items-center gap-2 border-b border-hairline bg-surface-canvas px-3 py-2 text-meta font-medium text-ink-2">
             <span>Label</span>
             <span>Area</span>
             <span className="sr-only">Details</span>
@@ -1877,7 +1877,7 @@ function TenantFormInner({
                 ? "Landmark, directions, and notes"
                 : "Landmark, directions, and coverage";
             return (
-            <div key={`loc-${index}`} className="border-b border-line last:border-b-0">
+            <div key={`loc-${index}`} className="border-b border-hairline last:border-b-0">
               <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem] items-center gap-2 px-3 py-2">
                 <div className="min-w-0">
                   <label className="sr-only" htmlFor={`loc-label-${index}`}>
@@ -1932,7 +1932,7 @@ function TenantFormInner({
                   data-role-exempt=""
                   aria-label={placeDetailLabel}
                   onClick={() => toggleLocationDetails(index)}
-                  className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
+                  className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-2 ${deskShiftClass} hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -1971,7 +1971,7 @@ function TenantFormInner({
                 <div className="grid grid-cols-1 gap-3 px-3 pb-3">
                   <div className="min-w-0">
                     <label
-                      className="block text-xs font-medium text-ink-soft"
+                      className="block text-meta font-medium text-ink-2"
                       htmlFor={`loc-landmark-${index}`}
                     >
                       Landmark
@@ -1997,7 +1997,7 @@ function TenantFormInner({
                   </div>
                   <div className="min-w-0">
                     <label
-                      className="block text-xs font-medium text-ink-soft"
+                      className="block text-meta font-medium text-ink-2"
                       htmlFor={`loc-directions-${index}`}
                     >
                       Directions
@@ -2013,7 +2013,7 @@ function TenantFormInner({
                   </div>
                   <div className="min-w-0">
                     <label
-                      className="block text-xs font-medium text-ink-soft"
+                      className="block text-meta font-medium text-ink-2"
                       htmlFor={`loc-coverage-${index}`}
                     >
                       {vertical === "home_services" ? "Notes" : "Coverage"}
@@ -2134,7 +2134,7 @@ function TenantFormInner({
             </SettingsStack>
           ) : null}
           {openPolicyIds.length === 0 ? (
-            <p className="px-4 py-2 text-sm text-ink-soft" role="status">
+            <p className="px-4 py-2 text-body text-ink-2" role="status">
               No rules yet. Add payment or cancellation to start, and write what callers should hear.
             </p>
           ) : null}
@@ -2219,7 +2219,7 @@ function TenantFormInner({
               }))}
             />
           ) : (
-            <p className="px-4 py-3 text-sm text-ink-soft">No voices loaded.</p>
+            <p className="px-4 py-3 text-body text-ink-2">No voices loaded.</p>
           )}
           <SettingsRow label="Voice label" htmlFor="soniox_voice_label">
             <input
@@ -2233,7 +2233,7 @@ function TenantFormInner({
             />
           </SettingsRow>
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2">
-            <p className="text-sm text-ink-soft">
+            <p className="text-body text-ink-2">
               {sonioxVoiceLabel.trim() || sonioxVoiceId
                 ? displaySonioxVoiceLabel(
                     sonioxVoiceLabel,
@@ -2267,12 +2267,12 @@ function TenantFormInner({
               </audio>
             </div>
           ) : voiceSampleError ? (
-            <p className="px-4 py-2 text-xs text-warn" role="alert" data-testid="voice-sample-empty">
+            <p className="px-4 py-2 text-meta text-warn" role="alert" data-testid="voice-sample-empty">
               {voiceSampleError}
             </p>
           ) : null}
           <div className="space-y-1.5 px-4 py-3">
-            <p className="text-sm font-medium text-ink">On a call</p>
+            <p className="text-body font-medium text-ink">On a call</p>
             <SettingsSegmented
               label="On a call"
               value={afterHoursMode}
@@ -2356,7 +2356,7 @@ function TenantFormInner({
               </SettingsRow>
             </SettingsGroup>
             </div>
-            <p className="px-1 text-xs text-ink-soft">
+            <p className="px-1 text-meta text-ink-2">
               {liveConnectBlurb(liveDest?.name)}
             </p>
           </>
@@ -2390,7 +2390,7 @@ function TenantFormInner({
         <div className="flex flex-wrap items-end justify-between gap-2 px-1">
           <p className={settingsBlockTitleClass} aria-live="polite">
             FAQs
-            <span className="ml-2 font-medium normal-case tracking-normal text-ink-soft">
+            <span className="ml-2 font-medium normal-case tracking-normal text-ink-2">
               {filledFaqCount} of {FAQ_MAX}
             </span>
           </p>

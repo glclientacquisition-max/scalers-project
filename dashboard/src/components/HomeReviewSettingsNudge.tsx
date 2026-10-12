@@ -58,7 +58,7 @@ export function HomeReviewSettingsNudge({
       aria-label="Settings review"
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 text-sm text-ink-2">
+        <p className="min-w-0 text-body text-ink-2">
           {preview}{" "}
           <Link
             href={href}

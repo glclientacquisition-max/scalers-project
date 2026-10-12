@@ -44,7 +44,7 @@ export function AdminAccountMenu({ name }: { name: string }) {
           <button type="button" aria-label={name} className={iconButtonClass()}>
             <span
               className={cx(
-                "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-on",
+                "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-meta font-semibold text-accent-on",
                 open ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : "",
               )}
             >
@@ -65,7 +65,7 @@ export function AdminAccountMenu({ name }: { name: string }) {
           </MenuItem>
           {themeOpen ? (
             <div data-account-appearance="" className="px-2 pb-2">
-              <p className="pointer-events-none px-1 pb-2 pt-1 text-caption font-medium uppercase tracking-wide text-ink-3">
+              <p className="pointer-events-none px-1 pb-2 pt-1 text-caption font-medium text-ink-3">
                 This device
               </p>
               <ThemePicker />

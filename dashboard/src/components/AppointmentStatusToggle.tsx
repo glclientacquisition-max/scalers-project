@@ -46,7 +46,7 @@ function AppointmentStatusToggleInner({
             value={opt.id}
             disabled={pending || active}
             className={[
-              "rounded-lg border px-2.5 py-1 text-xs font-medium",
+              "rounded-lg border px-2.5 py-1 text-meta font-medium",
               deskShiftClass,
               active
                 ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"

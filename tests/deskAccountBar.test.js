@@ -21,7 +21,7 @@ describe("desk account bar", () => {
     assert.match(menu, /from "@\/components\/ui\/Menu"/);
     assert.match(menu, /<button type="button" aria-label=\{name\} className=\{iconButtonClass\(\)\}>/);
     assert.match(menu, /h-7 w-7/);
-    assert.match(menu, /bg-accent text-xs font-semibold text-accent-on/);
+    assert.match(menu, /bg-accent text-meta font-semibold text-accent-on/);
     assert.match(menu, /ring-2 ring-accent ring-offset-2 ring-offset-surface/);
     assert.match(read("dashboard/src/components/ui/Menu.tsx"), /shadow-menu/);
     assert.match(menu, /md:hidden/);

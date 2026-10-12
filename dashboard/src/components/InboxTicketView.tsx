@@ -73,19 +73,19 @@ function TicketSummaryFacts({
       {want ? (
         <div>
           <dt className={metaLabelClass}>Want</dt>
-          <dd className="mt-1 text-sm text-ink [overflow-wrap:anywhere]">{plainOwnerCopy(want)}</dd>
+          <dd className="mt-1 text-body text-ink [overflow-wrap:anywhere]">{plainOwnerCopy(want)}</dd>
         </div>
       ) : null}
       {mood ? (
         <div>
-          <dt className="text-xs font-medium text-ink-soft">Mood</dt>
-          <dd className="mt-1 text-sm text-ink">{plainOwnerCopy(mood)}</dd>
+          <dt className="text-meta font-medium text-ink-2">Mood</dt>
+          <dd className="mt-1 text-body text-ink">{plainOwnerCopy(mood)}</dd>
         </div>
       ) : null}
       {done ? (
         <div>
-          <dt className="text-xs font-medium text-ink-soft">Done</dt>
-          <dd className="mt-1 text-sm text-ink [overflow-wrap:anywhere]">{plainOwnerCopy(done)}</dd>
+          <dt className="text-meta font-medium text-ink-2">Done</dt>
+          <dd className="mt-1 text-body text-ink [overflow-wrap:anywhere]">{plainOwnerCopy(done)}</dd>
         </div>
       ) : null}
     </dl>
@@ -467,7 +467,7 @@ export function InboxTicketView({
       data-ticket-chat=""
       className="flex h-full min-h-0 flex-1 flex-col pt-[var(--desk-header-h)] pb-[env(safe-area-inset-bottom,0px)] md:pb-0"
     >
-      <header className="shrink-0 border-b border-line bg-surface px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] sm:px-4">
+      <header className="shrink-0 border-b border-hairline bg-surface px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] sm:px-4">
         <DeskRecordLead
           align="center"
           back={
@@ -491,7 +491,7 @@ export function InboxTicketView({
       </header>
 
       {needsYou && (urgency || bannerWhen) ? (
-        <p className="shrink-0 border-b border-warn/40 bg-warn-soft px-4 py-2 text-sm font-medium text-warn sm:px-6">
+        <p className="shrink-0 border-b border-warn/40 bg-warn-soft px-4 py-2 text-body font-medium text-warn sm:px-6">
           {urgency ? plainOwnerCopy(urgency) : null}
           {bannerWhen ? (
             <span className={urgency ? "font-normal" : undefined}>
@@ -539,7 +539,7 @@ export function InboxTicketView({
                 <InboxHoldEditor id={hold.id} whenText={hold.when_text} />
               </div>
             ) : null}
-            <div className="space-y-2 text-xs text-ink-soft">
+            <div className="space-y-2 text-meta text-ink-2">
               <p>Duration: {plainOwnerCopy(durationLabel)}</p>
               {(() => {
                 const assist = ownerAssistLabel(assistLabel);
@@ -630,7 +630,7 @@ export function InboxTicketView({
                 aria-hidden="true"
                 className={[
                   "absolute inset-y-0 left-1/2 w-px -translate-x-1/2",
-                  dragging ? "bg-accent" : "bg-line",
+                  dragging ? "bg-accent" : "bg-hairline",
                 ].join(" ")}
               />
             </div>
@@ -654,7 +654,7 @@ export function InboxTicketView({
                 type="button"
                 onClick={jumpLatest}
                 aria-label="Jump to latest"
-                className={`inline-flex h-12 w-12 items-center justify-center rounded-full border border-line bg-surface text-ink shadow-md ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-brand`}
+                className={`inline-flex h-12 w-12 items-center justify-center rounded-full border border-hairline bg-surface text-ink shadow-md ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-brand`}
               >
                 <JumpGlyph />
                 <span className="sr-only">Jump to latest</span>
@@ -665,7 +665,7 @@ export function InboxTicketView({
               type="button"
               onClick={jumpLatest}
               aria-label="Jump to latest"
-              className={`absolute right-4 bottom-3 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink shadow-md ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-brand`}
+              className={`absolute right-4 bottom-3 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full border border-hairline bg-surface px-4 text-body font-semibold text-ink shadow-md ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-brand`}
             >
               Jump to latest
             </button>
@@ -683,11 +683,11 @@ export function InboxTicketView({
       />
 
       {canConfirm && job ? (
-        <div className="shrink-0 border-t border-line bg-surface px-4 py-3 sm:px-6">
+        <div className="shrink-0 border-t border-hairline bg-surface px-4 py-3 sm:px-6">
           <InboxJobActions id={job.id} status={job.status} banner />
         </div>
       ) : canHoldDone && hold ? (
-        <div className="shrink-0 border-t border-line bg-surface px-4 py-3 sm:px-6">
+        <div className="shrink-0 border-t border-hairline bg-surface px-4 py-3 sm:px-6">
           <RequestStatusToggle id={hold.id} status={hold.status} banner />
         </div>
       ) : null}

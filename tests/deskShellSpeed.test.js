@@ -520,6 +520,6 @@ describe("settings save scope", () => {
     assert.equal(empty, "Needs setup");
     assert.match(shell, /variant="index"/);
     assert.match(shell, /data-settings-menu=\{variant\}/);
-    assert.doesNotMatch(shell, /overflow-hidden rounded-xl border border-line bg-surface/);
+    assert.doesNotMatch(shell, /overflow-hidden rounded-xl border border-hairline bg-surface/);
   });
 });

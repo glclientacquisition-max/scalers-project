@@ -1,3 +1,4 @@
+import { buttonClass } from "@/components/ui/Button";
 /**
  * Shared desk class strings. Canon: docs/frontend/design-system/MASTER.md
  * Focus ring matches the platform mandate exactly.
@@ -17,14 +18,11 @@ export const focusRingVisible =
 export const btnPrimaryFill =
   "bg-accent-fill font-semibold text-accent-on-fill shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] hover:bg-accent-fill-hover active:bg-accent-fill-active disabled:opacity-60";
 
-/** Filled primary: on-fill on `--accent-fill` (~6:1 light, inverted on dark). `--accent` fails AA at `text-sm`. */
-export const btnPrimary = [
-  "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm",
-  btnPrimaryFill,
-  deskShiftClass,
-  "active:scale-[0.99] motion-reduce:active:scale-100",
-  focusRingVisible,
-].join(" ");
+/**
+ * Legacy name for the kit primary Button. New code: `<Button>` / `<ButtonLink>`.
+ * Kept as a class string for the few conditional call sites that swap variants.
+ */
+export const btnPrimary = buttonClass({ variant: "primary" });
 
 /** One Action-dock hit. Confirm, Done, Call, and WhatsApp share this box. */
 export const deskHitClass =
@@ -33,7 +31,7 @@ export const deskHitClass =
 /** Filled list verb in `deskHitClass`. */
 export const btnDock = [
   deskHitClass,
-  "px-0 text-xs font-semibold leading-none",
+  "px-0 text-meta font-semibold leading-none",
   btnPrimaryFill,
   deskShiftClass,
   "active:scale-[0.99] motion-reduce:active:scale-100",
@@ -45,7 +43,7 @@ export const btnDoneFill =
   "border border-ok bg-ok-soft font-semibold text-ok hover:border-ok disabled:opacity-60";
 
 export const btnDone = [
-  "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm",
+  "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-body",
   btnDoneFill,
   deskShiftClass,
   "active:scale-[0.99] motion-reduce:active:scale-100",
@@ -54,7 +52,7 @@ export const btnDone = [
 
 export const btnDockDone = [
   deskHitClass,
-  "px-0 text-xs font-semibold leading-none",
+  "px-0 text-meta font-semibold leading-none",
   btnDoneFill,
   deskShiftClass,
   "active:scale-[0.99] motion-reduce:active:scale-100",
@@ -63,18 +61,14 @@ export const btnDockDone = [
 
 export const btnDockGhost = [
   deskHitClass,
-  "border border-line px-0 text-[11px] font-medium leading-none text-ink",
+  "border border-hairline px-0 text-caption font-medium leading-none text-ink",
   deskShiftClass,
   "hover:border-accent disabled:opacity-50",
   focusRingVisible,
 ].join(" ");
 
-export const btnGhost = [
-  "inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-medium text-ink",
-  deskShiftClass,
-  "hover:border-accent",
-  focusRingVisible,
-].join(" ");
+/** Legacy name for the kit ghost Button with a hairline border. */
+export const btnGhost = buttonClass({ variant: "ghost", className: "border border-hairline font-medium" });
 
 export const pendingSpinnerClass =
   "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-accent-on-fill/40 border-t-accent-on-fill motion-reduce:animate-none";
@@ -89,14 +83,14 @@ export const deskFieldClass =
 export const deskErrorClass =
   "rounded-2xl border border-warn/40 bg-warn-soft p-6 text-warn";
 
-export const deskEmptyClass = "mt-8 border-y border-line py-12 text-center";
+export const deskEmptyClass = "mt-8 border-y border-hairline py-12 text-center";
 
 export const pageTitleClass =
   "font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink";
 
 /** Large in-page title: Inbox, Contacts, Usage list roots. Not sticky. */
 export const deskListTitleClass =
-  "font-display text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-4xl";
+  "font-display text-display font-semibold leading-tight tracking-tight text-ink sm:text-4xl";
 
 /** Corner overlay on the Inbox nav icon. 16px, not a second 44px control.
  * Ribbon wash matches the S mark: brand → accent-fill. */
@@ -110,7 +104,7 @@ export const deskPreviewClass = "min-w-0 truncate";
 export const deskPreviewCellClass = "w-full max-w-0";
 
 export const metaLabelClass =
-  "text-xs font-medium uppercase tracking-wide text-ink-soft";
+  "text-meta font-medium text-ink-2";
 
 export const tableHeadCellClass = "px-4 py-3 font-medium";
 
@@ -119,7 +113,7 @@ export const tableCellClass = "px-4 py-3.5";
 /** Inbox / Contacts / Settings exclusive chips. Filled active. Not underline tabs. */
 export function deskRateCardClass(active: boolean) {
   return [
-    "inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-medium",
+    "inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-body font-medium",
     deskShiftClass,
     "focus:outline-none focus:ring-2 focus:ring-brand",
     active
@@ -130,8 +124,8 @@ export function deskRateCardClass(active: boolean) {
 
 export function deskRateCardCountClass(active: boolean) {
   return [
-    "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-xs tabular-nums",
-    active ? "bg-accent-on/20 text-accent-on" : "bg-surface text-ink-soft",
+    "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-meta tabular-nums",
+    active ? "bg-accent-on/20 text-accent-on" : "bg-surface text-ink-2",
   ].join(" ");
 }
 
@@ -140,21 +134,21 @@ export const deskRateCardRowClass =
 
 export function filterTabClass(active: boolean) {
   return [
-    "group inline-flex min-h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium",
+    "group inline-flex min-h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-body font-medium",
     deskShiftClass,
     focusRingVisible,
     active
       ? "border-accent text-accent-deep"
-      : "border-transparent text-ink-soft hover:border-line hover:text-ink",
+      : "border-transparent text-ink-2 hover:border-hairline hover:text-ink",
   ].join(" ");
 }
 
 export function filterTabCountClass(active: boolean) {
   return [
-    "rounded-md px-1.5 py-0.5 text-xs tabular-nums",
+    "rounded-md px-1.5 py-0.5 text-meta tabular-nums",
     deskShiftClass,
     active
       ? "bg-accent/10 text-accent-deep"
-      : "bg-surface-muted text-ink-soft group-hover:bg-accent/10 group-hover:text-ink",
+      : "bg-surface-muted text-ink-2 group-hover:bg-accent/10 group-hover:text-ink",
   ].join(" ");
 }

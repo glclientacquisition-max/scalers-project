@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
 import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -130,7 +131,7 @@ function CallFaqSuggestionsInner({
         <div>
           <h2
             id="call-faq-heading"
-            className="font-display text-2xl tracking-tight"
+            className="font-display text-page tracking-tight"
           >
             FAQ ideas from this call
           </h2>
@@ -147,7 +148,7 @@ function CallFaqSuggestionsInner({
             aria-describedby={!hasTranscript ? "call-faq-no-transcript" : undefined}
             className={
               thread
-                ? "min-h-11 text-xs font-medium text-ink-soft focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-50"
+                ? "min-h-11 text-meta font-medium text-ink-2 focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-50"
                 : btnPrimary
             }
           >
@@ -156,12 +157,12 @@ function CallFaqSuggestionsInner({
           {!hasTranscript ? (
             <p
               id="call-faq-no-transcript"
-              className="mt-2 text-xs text-[var(--ink-soft)]"
+              className="mt-2 text-meta text-[var(--ink-soft)]"
             >
               Needs a conversation transcript first.
             </p>
           ) : suggestPending && !thread ? (
-            <p className="mt-2 text-xs text-[var(--ink-soft)]" aria-live="polite">
+            <p className="mt-2 text-meta text-[var(--ink-soft)]" aria-live="polite">
               Usually a few seconds.
             </p>
           ) : null}
@@ -171,17 +172,17 @@ function CallFaqSuggestionsInner({
           <h3
             ref={resultsHeadingRef}
             tabIndex={-1}
-            className="text-sm font-medium text-[var(--ink)] outline-none"
+            className="text-body font-medium text-[var(--ink)] outline-none"
           >
             Results
           </h3>
-          <p className="text-sm text-[var(--ink-soft)]">
+          <p className="text-body text-[var(--ink-soft)]">
             {suggestState.message || "No new FAQ ideas from this call."}
           </p>
           <button
             type="button"
             onClick={() => setItems(null)}
-            className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2.5 text-sm text-[var(--ink-soft)]"
+            className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2.5 text-body text-[var(--ink-soft)]"
           >
             Back
           </button>
@@ -197,7 +198,7 @@ function CallFaqSuggestionsInner({
           </h3>
           {suggestState.message ? (
             <p
-              className="rounded-xl border border-[var(--accent)]/30 bg-accent-soft px-4 py-3 text-sm text-[var(--ink)]"
+              className="rounded-xl border border-[var(--accent)]/30 bg-accent-soft px-4 py-3 text-body text-[var(--ink)]"
               role="status"
             >
               {suggestState.message}
@@ -231,13 +232,13 @@ function CallFaqSuggestionsInner({
                         .join(" ")}
                     />
                     <div className="min-w-0 flex-1 space-y-2">
-                      <p id={reasonId} className="text-xs text-[var(--ink-soft)]">
+                      <p id={reasonId} className="text-meta text-[var(--ink-soft)]">
                         {item.reason}
                       </p>
                       {item.needsOwnerAnswer ? (
                         <p
                           id={warnId}
-                          className="text-xs font-medium text-[var(--warn)]"
+                          className="text-meta font-medium text-[var(--warn)]"
                           role="status"
                         >
                           Fill in your answer before adding
@@ -246,7 +247,7 @@ function CallFaqSuggestionsInner({
                       <div>
                         <label
                           id={`${questionId}-label`}
-                          className="block text-xs font-medium text-[var(--ink-soft)]"
+                          className="block text-meta font-medium text-[var(--ink-soft)]"
                           htmlFor={questionId}
                         >
                           Question callers ask
@@ -263,7 +264,7 @@ function CallFaqSuggestionsInner({
                       </div>
                       <div>
                         <label
-                          className="block text-xs font-medium text-[var(--ink-soft)]"
+                          className="block text-meta font-medium text-[var(--ink-soft)]"
                           htmlFor={answerId}
                         >
                           What the receptionist should say
@@ -284,7 +285,7 @@ function CallFaqSuggestionsInner({
                         {incomplete ? (
                           <p
                             id={`${answerId}-err`}
-                            className="mt-1 text-xs text-[var(--warn)]"
+                            className="mt-1 text-meta text-[var(--warn)]"
                             role="alert"
                           >
                             Add an answer, or untick this FAQ.
@@ -301,27 +302,27 @@ function CallFaqSuggestionsInner({
           <form action={applyAction} className="flex flex-wrap gap-2">
             <input type="hidden" name="tenant_id" value={tenantId} />
             <input type="hidden" name="faqs_json" value={faqsJson} />
-            <button
+            <Button
               type="submit"
               disabled={applyPending || selectedReady === 0}
               aria-describedby="call-faq-add-help"
-              className={btnPrimary}
+             
             >
               {applyPending
                 ? "Adding…"
                 : selectedReady === 1
                   ? "Add 1 FAQ"
                   : `Add ${selectedReady} FAQs`}
-            </button>
+            </Button>
             <button
               type="button"
               disabled={applyPending}
               onClick={() => setItems(null)}
-              className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2.5 text-sm text-[var(--ink-soft)]"
+              className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2.5 text-body text-[var(--ink-soft)]"
             >
               Start over
             </button>
-            <p id="call-faq-add-help" className="w-full text-xs text-[var(--ink-soft)]">
+            <p id="call-faq-add-help" className="w-full text-meta text-[var(--ink-soft)]">
               {selectedReady === 0
                 ? "Tick a FAQ with both a question and answer to enable Add."
                 : "Selected FAQs are added for the next call."}
@@ -333,7 +334,7 @@ function CallFaqSuggestionsInner({
       {flash ? (
         <p
           className={[
-            "mt-3 text-sm",
+            "mt-3 text-body",
             flashIsError ? "text-[var(--warn)]" : "text-[var(--accent-deep)]",
           ].join(" ")}
           role={flashIsError ? "alert" : "status"}

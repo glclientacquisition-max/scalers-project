@@ -14,8 +14,8 @@ export default function PricingPage() {
     <main className="flex min-h-dvh items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
         <BrandWordmark href={marketingHomeHref()} context="Pricing" variant="lockup" priority />
-        <h1 className="mt-8 font-display text-2xl tracking-tight text-ink">Free beta</h1>
-        <p className="mt-3 leading-relaxed text-ink-soft">
+        <h1 className="mt-8 font-display text-page tracking-tight text-ink">Free beta</h1>
+        <p className="mt-3 leading-relaxed text-ink-2">
           Scalers is free while we&apos;re in beta. We&apos;ll tell you before any charges start.
         </p>
         <a href={appEntryHref("/signup")} className={`${btnPrimary} mt-6 inline-flex`}>

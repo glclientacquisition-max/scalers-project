@@ -197,7 +197,7 @@ export async function ContactPersonFilePane({
           <div className="space-y-3">
             <ContactSparkline days={spark} />
             {insight ? (
-              <p className="rounded-2xl border border-warn/40 bg-warn-soft px-3 py-3 text-sm text-warn">
+              <p className="rounded-2xl border border-warn/40 bg-warn-soft px-3 py-3 text-body text-warn">
                 {insight}
               </p>
             ) : null}

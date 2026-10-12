@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/ui/Button";
 import { DataChecksCard } from "@/components/structured/DataChecksCard";
 import { CallInsights } from "@/components/insights/CallInsights";
 import { loadCallInsights } from "@/lib/callInsightsLoad";
@@ -17,7 +18,6 @@ import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { assessMvpAnswerReadiness } from "@/lib/mvpAnswerReadiness";
 import { lineStatusLabel, resolveLineStatus } from "@/lib/lineStatus";
 import {
-  btnPrimary,
   deskPreviewClass,
   deskShiftClass,
   focusRingVisible,
@@ -244,26 +244,26 @@ async function HomeOverviewBody() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <h2
               id="work-heading"
-              className="font-display text-xl tracking-tight text-ink"
+              className="font-display text-title tracking-tight text-ink"
             >
               Work
             </h2>
-            <p className={`text-[13px] text-ink-soft ${deskPreviewClass}`}>{briefing}</p>
+            <p className={`text-meta text-ink-2 ${deskPreviewClass}`}>{briefing}</p>
           </div>
           {digest ? (
-            <p className={`mt-1 text-[13px] text-ink-soft ${deskPreviewClass}`}>{digest}</p>
+            <p className={`mt-1 text-meta text-ink-2 ${deskPreviewClass}`}>{digest}</p>
           ) : null}
 
-          <ul className="mt-3 overflow-hidden rounded-2xl border border-line bg-surface">
+          <ul className="mt-3 overflow-hidden rounded-2xl border border-hairline bg-surface">
             {queues.map((queue, index) => (
               <li
                 key={queue.id}
-                className={index === 0 ? undefined : "border-t border-line"}
+                className={index === 0 ? undefined : "border-t border-hairline"}
               >
                 <Link
                   href={queue.href}
                   className={[
-                    "flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium lg:min-h-11",
+                    "flex min-h-12 items-center justify-between gap-3 px-4 text-body font-medium lg:min-h-11",
                     deskShiftClass,
                     "hover:bg-accent/[0.04] active:bg-accent/[0.08]",
                     focusRingVisible,
@@ -275,9 +275,9 @@ async function HomeOverviewBody() {
                       <Stamp tone="attention">Needs setup</Stamp>
                     ) : null}
                   </span>
-                  <span className="flex min-w-0 items-center gap-3 text-ink-soft">
+                  <span className="flex min-w-0 items-center gap-3 text-ink-2">
                     <span className={`min-w-0 ${deskPreviewClass}`}>
-                      <span className="tabular-nums text-base font-semibold text-ink">
+                      <span className="tabular-nums text-body font-semibold text-ink">
                         {queue.count}
                       </span>
                       {queue.unit ? ` ${queue.unit}` : ""}
@@ -307,7 +307,7 @@ async function HomeOverviewBody() {
             <section
               id="next-return-phone"
               aria-labelledby="next-return-heading-phone"
-              className="relative mt-3 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden"
+              className="relative mt-3 overflow-hidden rounded-2xl border border-hairline bg-surface lg:hidden"
             >
               <DeskRowHit
                 href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { from: "home" }) : null}
@@ -317,18 +317,18 @@ async function HomeOverviewBody() {
                 <div className="min-w-0 flex-1">
                   <h2
                     id="next-return-heading-phone"
-                    className={`${deskRowMutedClass} text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft`}
+                    className={`${deskRowMutedClass} text-caption font-semibold text-ink-2`}
                   >
                     Next to return
                   </h2>
-                  <p className={`${deskRowMutedClass} mt-0.5 text-sm font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
+                  <p className={`${deskRowMutedClass} mt-0.5 text-body font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
                     {nextReturn.callerName || nextReturn.callerPhone || "Caller"}
                     {nextReturnWhen ? (
-                      <span className="font-normal text-ink-soft"> · {nextReturnWhen}</span>
+                      <span className="font-normal text-ink-2"> · {nextReturnWhen}</span>
                     ) : null}
                   </p>
                   {nextReturnReason ? (
-                    <p className={`${deskRowMutedClass} text-sm text-ink-soft ${deskPreviewClass}`}>
+                    <p className={`${deskRowMutedClass} text-body text-ink-2 ${deskPreviewClass}`}>
                       {nextReturnReason}
                     </p>
                   ) : null}
@@ -351,7 +351,7 @@ async function HomeOverviewBody() {
             </section>
             <section
               aria-labelledby="next-return-heading"
-              className="relative mt-6 hidden rounded-2xl border border-line bg-surface p-4 lg:block"
+              className="relative mt-6 hidden rounded-2xl border border-hairline bg-surface p-4 lg:block"
             >
               <DeskRowHit
                 href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { from: "home" }) : null}
@@ -359,18 +359,18 @@ async function HomeOverviewBody() {
               />
               <h2
                 id="next-return-heading"
-                className={`${deskRowMutedClass} text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft`}
+                className={`${deskRowMutedClass} text-caption font-semibold text-ink-2`}
               >
                 Next to return
               </h2>
-              <p className={`${deskRowMutedClass} mt-2 text-sm font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
+              <p className={`${deskRowMutedClass} mt-2 text-body font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
                 {nextReturn.callerName || nextReturn.callerPhone || "Caller"}
                 {nextReturnWhen ? (
-                  <span className="font-normal text-ink-soft"> · {nextReturnWhen}</span>
+                  <span className="font-normal text-ink-2"> · {nextReturnWhen}</span>
                 ) : null}
               </p>
               {nextReturnReason ? (
-                <p className={`${deskRowMutedClass} mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
+                <p className={`${deskRowMutedClass} mt-0.5 text-body text-ink-2 ${deskPreviewClass}`}>
                   {nextReturnReason}
                 </p>
               ) : null}
@@ -441,12 +441,12 @@ async function HomeOverviewBody() {
         </div>
 
         <aside className="min-w-0 lg:sticky lg:top-24 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1">
-          <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+          <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
             <section aria-label="Today" className="px-3 py-3">
               <Link
                 href={callsHref({ purpose: "all" })}
                 className={[
-                  `flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft ${deskShiftClass} hover:bg-accent/[0.04] hover:text-ink`,
+                  `flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-body text-ink-2 ${deskShiftClass} hover:bg-accent/[0.04] hover:text-ink`,
                   "active:bg-accent/[0.08]",
                   focusRingVisible,
                 ].join(" ")}
@@ -458,30 +458,30 @@ async function HomeOverviewBody() {
               </Link>
             </section>
 
-            <section aria-label="Line" className="border-t border-line px-4 py-4">
-              <p className="text-sm font-medium text-ink">
+            <section aria-label="Line" className="border-t border-hairline px-4 py-4">
+              <p className="text-body font-medium text-ink">
                 {lineStatusLabel(line)}
               </p>
               {line === "live" ? (
-                <p className="mt-0.5 truncate font-mono text-xs text-ink-soft">
+                <p className="mt-0.5 truncate font-mono text-meta text-ink-2">
                   {didDisplay || tenant.sautikit_virtual_number}
                 </p>
               ) : null}
             </section>
 
             <RoleGate action="usage.view" mode="hide">
-            <section aria-label="Usage" className="border-t border-line px-4 py-4">
-              <p className="text-sm font-medium tabular-nums text-ink">
+            <section aria-label="Usage" className="border-t border-hairline px-4 py-4">
+              <p className="text-body font-medium tabular-nums text-ink">
                 {minutesLeft.toLocaleString("en-KE")} min left
               </p>
-              <p className="mt-0.5 text-xs text-ink-soft">{packLabel}</p>
+              <p className="mt-0.5 text-meta text-ink-2">{packLabel}</p>
               {minuteStatus ? (
-                <p className="mt-0.5 text-xs font-medium text-ink">{minuteStatus}</p>
+                <p className="mt-0.5 text-meta font-medium text-ink">{minuteStatus}</p>
               ) : null}
               {minuteStatus && !isBeta ? (
                 <Link
                   href="/wallet"
-                  className={`mt-1 inline-flex min-h-11 items-center text-sm font-medium text-warn hover:underline ${focusRingVisible}`}
+                  className={`mt-1 inline-flex min-h-11 items-center text-body font-medium text-warn hover:underline ${focusRingVisible}`}
                 >
                   Usage
                 </Link>
@@ -490,10 +490,10 @@ async function HomeOverviewBody() {
             </RoleGate>
 
             {showCta ? (
-              <div className="border-t border-line px-4 py-4">
-                <Link href={ctaHref} className={`${btnPrimary} w-full`}>
+              <div className="border-t border-hairline px-4 py-4">
+                <ButtonLink href={ctaHref} className="w-full">
                   {ctaLabel}
-                </Link>
+                </ButtonLink>
               </div>
             ) : null}
           </div>
@@ -505,7 +505,7 @@ async function HomeOverviewBody() {
         >
           <h2
             id="updates-heading"
-            className="flex items-center gap-2 font-display text-xl tracking-tight text-ink"
+            className="flex items-center gap-2 font-display text-title tracking-tight text-ink"
           >
             <LivePing />
             Updates

@@ -15,7 +15,7 @@ const SIZE: Record<
   xs: {
     box: "h-6 w-6",
     img: "h-6 w-6",
-    type: "text-base leading-none",
+    type: "text-body leading-none",
     gap: "gap-1.5",
     width: 24,
     height: 24,
@@ -24,7 +24,7 @@ const SIZE: Record<
   sm: {
     box: "h-8 w-8",
     img: "h-8 w-8",
-    type: "text-lg leading-none",
+    type: "text-title leading-none",
     gap: "gap-2",
     width: 32,
     height: 32,
@@ -33,20 +33,20 @@ const SIZE: Record<
   md: {
     box: "h-10 w-10",
     img: "h-10 w-10",
-    type: "text-2xl leading-none",
+    type: "text-page leading-none",
     gap: "gap-3",
     width: 40,
     height: 40,
-    context: "text-[11px]",
+    context: "text-caption",
   },
   lg: {
     box: "h-12 w-12",
     img: "h-12 w-12",
-    type: "text-3xl leading-none",
+    type: "text-display leading-none",
     gap: "gap-3.5",
     width: 48,
     height: 48,
-    context: "text-xs",
+    context: "text-meta",
   },
 };
 
@@ -123,9 +123,9 @@ export function BrandLockup({
         {context ? (
           <span
             className={[
-              "truncate font-medium uppercase tracking-[0.14em]",
+              "truncate font-medium",
               s.context,
-              onDark ? "text-sky-200/80" : "text-ink-soft",
+              onDark ? "text-sky-200/80" : "text-ink-2",
             ].join(" ")}
           >
             {context}
@@ -211,7 +211,7 @@ export function BrandWordmark({
         onError={() => setFailed(true)}
       />
       {context ? (
-        <span className="mt-2 text-xs font-medium uppercase tracking-[0.14em] text-ink-soft">
+        <span className="mt-2 text-meta font-medium text-ink-2">
           {context}
         </span>
       ) : null}

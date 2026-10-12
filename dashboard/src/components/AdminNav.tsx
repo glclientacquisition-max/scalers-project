@@ -249,7 +249,7 @@ export function AdminRail() {
   return (
     <div
       data-admin-rail=""
-      className="glass-chrome hidden h-full w-[5.5rem] shrink-0 flex-col border-r border-line/80 md:flex"
+      className="glass-chrome hidden h-full w-[5.5rem] shrink-0 flex-col border-r border-hairline/80 md:flex"
     >
       <div className="flex h-14 items-center justify-center">
         <DeskHint label="Scalers">
@@ -287,7 +287,7 @@ export function AdminRail() {
               setPendingHref={setPendingHref}
               className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5"
               activeClassName="bg-accent/10 text-accent-deep"
-              idleClassName="text-ink-soft hover:bg-surface-muted hover:text-ink"
+              idleClassName="text-ink-2 hover:bg-surface-muted hover:text-ink"
               labelClassName="max-w-full truncate text-[10px] font-medium leading-none"
             />
           ),
@@ -329,7 +329,7 @@ function AdminPhoneMore() {
           phoneTabClass,
           deskShiftClass,
           focusRingVisible,
-          active ? "font-semibold text-accent-deep" : "font-medium text-ink-soft",
+          active ? "font-semibold text-accent-deep" : "font-medium text-ink-2",
         ].join(" ")}
       >
         <AdminIcon name="More" />
@@ -390,7 +390,7 @@ export function AdminTabBar() {
     <nav
       data-admin-tabbar=""
       aria-label="Super Admin"
-      className="glass-chrome fixed inset-x-0 bottom-0 z-tabbar isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-hidden border-t border-line/80 pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="glass-chrome fixed inset-x-0 bottom-0 z-tabbar isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-hidden border-t border-hairline/80 pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <ul className="flex w-full">
         {adminPhoneTabs().map((item) => (
@@ -404,7 +404,7 @@ export function AdminTabBar() {
               onRetap={retapAdminTab}
               className={phoneTabClass}
               activeClassName="font-semibold text-accent-deep"
-              idleClassName="font-medium text-ink-soft"
+              idleClassName="font-medium text-ink-2"
               labelClassName={phoneLabelClass}
             />
           </li>
