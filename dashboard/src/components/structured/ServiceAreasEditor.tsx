@@ -302,7 +302,7 @@ export function ServiceAreasEditor({
             value={fee.eta ?? ""}
             onChange={(e) => setFee({ ...fee, eta: e.target.value || null })}
           />
-          {error && fee.fee_mode !== "fixed" ? <p className="text-meta text-danger">{error}</p> : null}
+          {error && fee.fee_mode !== "fixed" ? <p className="text-meta text-attention">{error}</p> : null}
         </div>
       </Sheet>
 
@@ -345,7 +345,7 @@ export function ServiceAreasEditor({
             value={fee.eta ?? ""}
             onChange={(e) => setFee({ ...fee, eta: e.target.value || null })}
           />
-          {error && fee.fee_mode !== "fixed" ? <p className="text-meta text-danger">{error}</p> : null}
+          {error && fee.fee_mode !== "fixed" ? <p className="text-meta text-attention">{error}</p> : null}
         </div>
       </Sheet>
 

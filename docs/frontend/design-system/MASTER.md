@@ -23,7 +23,7 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | Card | `--card` `#FFFFFF` | `surface` |
 | Line | `--line` `#D5DEE9` | `line` |
 | Accent wash | `--accent-soft` `#EAF6FF` | `accent-soft` / `brand-50` |
-| Warn | `--warn` `#C2410C` | `warn` |
+| Warn | `--warn` (`--attention`) `#B13A0A` (AA 4.5:1+ on canvas, surface, surface-2, tonal) | `warn` |
 | Ok | `--ok` `#15803D` | `ok` |
 | Lead | `--lead` `#B98A1F` | `lead` |
 | WhatsApp glyph | `--whatsapp` `#25D366` | `whatsapp` |
