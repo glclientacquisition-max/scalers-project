@@ -3,6 +3,7 @@
 import { AlertContactsList } from "@/components/AlertContactsList";
 
 import { withRoleGate } from "@/components/DeskRole";
+import { CharCount as KitCharCount, FieldCard, TextAreaField, TextField } from "@/components/ui/TextField";
 import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -135,7 +136,6 @@ import {
   settingsFormBodyClass,
   settingsDenseFieldClass,
   settingsValueFieldClass,
-  settingsFieldClass,
   settingsGhostButtonClass,
   settingsPanelClass,
   settingsTableFieldClass,
@@ -241,7 +241,6 @@ function placeLocationLine(loc: Pick<BusinessLocation, "label" | "address" | "la
 
 const initial: SettingsCompileState = {};
 
-const fieldClass = settingsFieldClass;
 const tableFieldClass = settingsTableFieldClass;
 const denseFieldClass = settingsDenseFieldClass;
 
@@ -277,14 +276,10 @@ function PolicyTextarea({
 }
 
 function CharCount({ value, max }: { value: string; max: number }) {
-  const n = value.length;
   return (
-    <p
-      className={`mt-1 text-right text-xs ${n >= max ? "text-warn" : "text-ink-soft"}`}
-      aria-live="polite"
-    >
-      {n}/{max}
-    </p>
+    <div className="mt-1.5 flex justify-end">
+      <KitCharCount length={value.length} max={max} />
+    </div>
   );
 }
 
@@ -1751,7 +1746,7 @@ function TenantFormInner({
 
       <section className={panel === "hours" ? "space-y-6" : "hidden"}>
         <SettingsGroup title="Hours">
-          <div className="hidden bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-500 lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
+          <div className="hidden bg-surface-canvas px-3 py-2 text-meta font-medium text-ink-2 lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
             <span>Day</span>
             <span>Open</span>
             <span>Opens</span>
@@ -2412,82 +2407,66 @@ function TenantFormInner({
 
         {faqs.length > 0 ? (
         <>
-        <div className="overflow-hidden rounded-xl border border-line">
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.75rem] items-center gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
-            <span>Question</span>
-            <span>Answer</span>
-            <span className="sr-only">Remove</span>
-          </div>
+        <ol className="space-y-3" aria-label="FAQs" data-faq-list="">
           {visibleFaqs.map((faq, localIndex) => {
             const index = safeFaqPage * FAQ_PAGE_SIZE + localIndex;
+            const dup = faqDupIndexes.has(index);
             return (
-            <div
-              key={`faq-${index}`}
-              className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.75rem] items-start gap-x-3 border-b border-line px-3 py-2.5 last:border-b-0"
-            >
-              <div className="min-w-0">
-                <label className="sr-only" htmlFor={`faq-q-${index}`}>
-                  Question
-                </label>
-                <input
+            <li key={`faq-${index}`}>
+              <FieldCard
+                data-faq-card=""
+                title={`FAQ ${index + 1}`}
+                action={
+                  <button
+                    type="button"
+                    onClick={() =>
+                      requestRemove(
+                        faq,
+                        "Remove this FAQ?",
+                        "It leaves the list when you save.",
+                        () => setFaqs((prev) => prev.filter((_, i) => i !== index))
+                      )
+                    }
+                    className={settingsTrashButtonClass}
+                    aria-label={`Remove FAQ ${index + 1}`}
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                }
+              >
+                <TextField
                   id={`faq-q-${index}`}
+                  label={<>Question<span className="sr-only"> {index + 1}</span></>}
                   value={faq.question}
                   maxLength={FAQ_QUESTION_MAX}
+                  placeholder="Do you deliver on Sundays?"
                   onChange={(e) => updateFaq(index, "question", e.target.value)}
-                  aria-invalid={faqDupIndexes.has(index) || undefined}
-                  aria-describedby={
-                    faqDupIndexes.has(index) ? `faq-dup-${index}` : undefined
-                  }
-                  className={`${fieldClass} py-2`}
+                  error={dup ? "Same as another FAQ. Keep one clear wording." : null}
                 />
-                {faqDupIndexes.has(index) ? (
-                  <p id={`faq-dup-${index}`} className="mt-1 text-xs text-warn" role="status">
-                    Same as another FAQ. Keep one clear wording.
-                  </p>
-                ) : null}
-              </div>
-              <div className="min-w-0">
-                <label className="sr-only" htmlFor={`faq-a-${index}`}>
-                  Answer
-                </label>
-                <textarea
+                <TextAreaField
                   id={`faq-a-${index}`}
+                  label={<>Answer<span className="sr-only"> to FAQ {index + 1}</span></>}
                   value={faq.answer}
                   maxLength={FAQ_ANSWER_MAX}
+                  rows={3}
+                  hint="Write it the way you would say it on the phone."
                   onChange={(e) => updateFaq(index, "answer", e.target.value)}
-                  rows={2}
-                  className={`${fieldClass} py-2 leading-relaxed`}
                 />
-                <CharCount value={faq.answer} max={FAQ_ANSWER_MAX} />
-              </div>
-              <div className="flex items-start justify-end">
-                <button
-                  type="button"
-                  onClick={() =>
-                    requestRemove(
-                      faq,
-                      "Remove this FAQ?",
-                      "It leaves the list when you save.",
-                      () => setFaqs((prev) => prev.filter((_, i) => i !== index))
-                    )
-                  }
-                  className={settingsTrashButtonClass}
-                  aria-label={`Remove FAQ ${index + 1}`}
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
+              </FieldCard>
+            </li>
             );
           })}
-          <CatalogPager
-            page={safeFaqPage}
-            pageSize={FAQ_PAGE_SIZE}
-            total={faqs.length}
-            noun="FAQ"
-            onPage={setFaqPage}
-          />
-        </div>
+        </ol>
+        {faqs.length > FAQ_PAGE_SIZE ? (
+        <Pagination
+          page={safeFaqPage + 1}
+          pageSize={FAQ_PAGE_SIZE}
+          total={faqs.length}
+          noun="FAQ"
+          onPage={(next) => setFaqPage(next - 1)}
+          className="rounded-2xl border border-hairline bg-surface px-3 py-3"
+        />
+        ) : null}
         </>
         ) : null}
       </section>

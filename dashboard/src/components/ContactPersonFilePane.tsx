@@ -155,7 +155,7 @@ export async function ContactPersonFilePane({
           {threadsHref ? (
             <Link
               href={threadsHref}
-              className={`text-sm font-medium text-accent ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
+              className={`inline-flex min-h-11 items-center text-body font-medium text-accent ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
             >
               Inbox threads
             </Link>

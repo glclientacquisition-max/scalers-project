@@ -16,7 +16,7 @@ const stayClass = [
 ].join(" ");
 
 /** Confirm, then POST `/api/logout`. The account menu uses `layout="menu"`. */
-export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu" }) {
+export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu" | "sheet" }) {
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
@@ -37,6 +37,21 @@ export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu
         <MenuItem closeOnClick={false} tone="attention" onClick={() => setConfirming(true)}>
           Sign out
         </MenuItem>
+      );
+    }
+    if (layout === "sheet") {
+      return (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className={[
+            "flex min-h-12 w-full items-center px-4 text-start text-body font-medium text-attention",
+            deskShiftClass,
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
+          ].join(" ")}
+        >
+          Sign out
+        </button>
       );
     }
     return (
@@ -68,9 +83,9 @@ export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu
     </>
   );
 
-  if (layout === "menu") {
+  if (layout === "menu" || layout === "sheet") {
     return (
-      <div role="group" aria-label="Sign out?" className="flex flex-wrap items-center gap-2 px-2 py-2">
+      <div role="group" aria-label="Sign out?" className={layout === "sheet" ? "flex flex-wrap items-center gap-2 px-4 py-3" : "flex flex-wrap items-center gap-2 px-2 py-2"}>
         {confirm}
       </div>
     );
