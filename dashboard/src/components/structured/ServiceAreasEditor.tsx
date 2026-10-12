@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { TextField } from "@/components/ui/TextField";
 import { SettingsGroup } from "@/components/settingsUi";
-import { COVERAGE_AREA_MAX, coverageAreaLabel, searchAreaOptions } from "@/lib/coverageAreas";
+import { COVERAGE_AREA_MAX, coverageAreaLabel } from "@/lib/coverageAreas";
 import {
   AREA_MODES,
   DELIVERED_BY,
@@ -16,6 +16,7 @@ import {
   reachCopy,
   applyFeeToAreas,
   areaSummary,
+  areaPickerRows,
   commonFee,
   withReach,
   serviceAreasSentence,
@@ -97,15 +98,7 @@ export function ServiceAreasEditor({
   const [who, setWho] = useState<{ by: DeliveredBy[]; paid: RiderPaid | null }>({ by: [], paid: null });
 
   const listed = value.areas.map((a) => a.id);
-  const results = useMemo(
-    () => (query.trim() ? searchAreaOptions(query, [...ticked, ...listed], 8) : []),
-    [query, ticked, listed]
-  );
-  const options = [
-    ...ticked.map((id) => ({ id, label: coverageAreaLabel(id) })),
-    ...results.filter((o) => !o.added && !ticked.includes(o.id)).map((o) => ({ id: o.id, label: o.label, detail: o.hint })),
-  ];
-  const alreadyAdded = results.filter((o) => o.added);
+  const { options, alreadyAdded } = useMemo(() => areaPickerRows(query, ticked, listed), [query, ticked, listed]);
   const suggested = [...new Set(homeAreas)].filter((id) => !ticked.includes(id));
   const copy = reachCopy(value.reach);
   const unconfirmed = value.areas.filter((a) => !a.confirmed).length;

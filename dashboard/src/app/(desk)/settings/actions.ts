@@ -101,19 +101,30 @@ export type SettingsCompileState = {
   error?: string;
   ok?: boolean;
   source?: "gemini" | "local";
+  /** Client only: the response was lost (connection dropped). The save may have landed. */
+  networkError?: boolean;
 };
+
+/** Background model rewrite of the prompt; the settings page allows 60 s in total. */
+const PROMPT_UPGRADE_BUDGET_MS = 25_000;
 
 export async function saveAndCompileSettings(
   _prev: SettingsCompileState,
   formData: FormData
 ): Promise<SettingsCompileState> {
-  const denied = await memberDenied("settings.edit");
+  const t0 = Date.now();
+  // Independent request-scoped checks: run together, not one after another.
+  const [denied, signedIn, tenant] = await Promise.all([
+    memberDenied("settings.edit"),
+    isAuthenticated(),
+    getCurrentTenant(),
+  ]);
+  const tAuth = Date.now();
   if (denied) return denied;
-  if (!(await isAuthenticated())) {
+  if (!signedIn) {
     return { error: "Sign in to save settings." };
   }
 
-  const tenant = await getCurrentTenant();
   if (!tenant) {
     return { error: "No workspace linked to this account." };
   }
@@ -451,9 +462,13 @@ export async function saveAndCompileSettings(
   // sees that pending confirm; the write hashes the stored row as saved.
   const hashMode = factHashModeFromEnv();
   const explicitPaths = cleanFieldPaths(ownerPathsFromForm);
-  const storedFactRow: Record<string, unknown> =
-    (hashMode ? await readSavedFactRow(workspace.client, tenant.id) : null) ?? { ...tenant };
-  const provenance = await loadCompileProvenance(tenant.id);
+  const tPrep = Date.now();
+  const [savedBefore, provenance] = await Promise.all([
+    hashMode ? readSavedFactRow(workspace.client, tenant.id) : Promise.resolve(null),
+    loadCompileProvenance(tenant.id),
+  ]);
+  const storedFactRow: Record<string, unknown> = savedBefore ?? { ...tenant };
+  const tReads = Date.now();
   const compileFieldMeta = hashMode
     ? overlayFieldMeta(
         provenance.fieldMeta,
@@ -494,8 +509,10 @@ export async function saveAndCompileSettings(
   const source = "local" as const;
 
   patch.llm_system_prompt = prompt;
+  const tCompile = Date.now();
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
   bustTenantCache(tenant.id);
+  const tWrite = Date.now();
 
   if (error) {
     return ownerSaveFailed("settings.save", error.message);
@@ -528,10 +545,20 @@ export async function saveAndCompileSettings(
   const client = workspace.client;
   // Request-scoped reads (cookies) must happen before after().
   const attestUser = hashMode ? null : await getAuthUser();
+  console.info(
+    `[settings-save timing] scope=${scope || "all"} auth=${tAuth - t0}ms parse=${tPrep - tAuth}ms reads=${tReads - tPrep}ms compile=${tCompile - tReads}ms write=${tWrite - tCompile}ms total=${Date.now() - t0}ms`
+  );
   after(async () => {
+   try {
     // Upgrade to the model-written prompt only if no newer save replaced ours meanwhile.
+    // Bounded so the background work always ends well inside the function's time limit.
     try {
-      const { prompt: better, source: how } = await compileReceptionistPrompt(compileInput);
+      const upgraded = await Promise.race([
+        compileReceptionistPrompt(compileInput),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), PROMPT_UPGRADE_BUDGET_MS)),
+      ]);
+      const better = upgraded?.prompt;
+      const how = upgraded?.source;
       if (how === "gemini" && better && better !== prompt) {
         await client.from("tenants").update({ llm_system_prompt: better }).eq("id", tenant.id).eq("llm_system_prompt", prompt);
         bustTenantCache(tenant.id);
@@ -564,6 +591,9 @@ export async function saveAndCompileSettings(
         attestUser?.id ?? null
       );
     }
+   } catch (err) {
+    console.warn("[settings.save] background work failed:", err instanceof Error ? err.message : err);
+   }
   });
 
   revalidatePath("/settings");

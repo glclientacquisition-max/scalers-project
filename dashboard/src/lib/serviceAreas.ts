@@ -7,7 +7,7 @@
  *
  * Pure and browser-safe. Relative imports only so node tests can load it.
  */
-import { coverageAreaLabel, parseCoverageAreas, COVERAGE_AREA_MAX } from "./coverageAreas";
+import { coverageAreaLabel, parseCoverageAreas, searchAreaOptions, COVERAGE_AREA_MAX, type AreaOption } from "./coverageAreas";
 
 export type AreaMode = "delivery" | "visit" | "pickup";
 export type FeeMode = "free" | "fixed" | "ask";
@@ -319,4 +319,23 @@ export function suggestHomeAreas(address: string): string[] {
     }
   }
   return out.slice(0, 2);
+}
+
+/**
+ * Rows for the Add areas drawer. Ticked (not yet saved) areas stay in the list, ticked;
+ * only areas already saved on the page show as "Added".
+ */
+export function areaPickerRows(
+  query: string,
+  ticked: readonly string[],
+  listed: readonly string[]
+): { options: Array<{ id: string; label: string; detail?: string }>; alreadyAdded: AreaOption[] } {
+  const results = query.trim() ? searchAreaOptions(query, listed, 8) : [];
+  return {
+    options: [
+      ...ticked.map((id) => ({ id, label: coverageAreaLabel(id) })),
+      ...results.filter((o) => !o.added && !ticked.includes(o.id)).map((o) => ({ id: o.id, label: o.label, detail: o.hint })),
+    ],
+    alreadyAdded: results.filter((o) => o.added && !ticked.includes(o.id)),
+  };
 }

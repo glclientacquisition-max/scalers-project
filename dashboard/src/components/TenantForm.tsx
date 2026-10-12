@@ -7,6 +7,7 @@ import { CharCount as KitCharCount, FieldCard, TextAreaField, TextField } from "
 import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
   canonicalizeAgentTone,
@@ -247,6 +248,22 @@ function placeLocationLine(loc: Pick<BusinessLocation, "label" | "address" | "la
 
 const initial: SettingsCompileState = {};
 
+/**
+ * A dropped connection (TypeError: network error) must not throw the page into the error
+ * boundary: the write has usually landed, so report it and let the form refetch.
+ */
+async function saveSettingsSafely(
+  prev: SettingsCompileState,
+  formData: FormData
+): Promise<SettingsCompileState> {
+  try {
+    return await saveAndCompileSettings(prev, formData);
+  } catch (err) {
+    console.warn("[settings] save response lost:", err instanceof Error ? err.message : err);
+    return { networkError: true };
+  }
+}
+
 const tableFieldClass = settingsTableFieldClass;
 const denseFieldClass = settingsDenseFieldClass;
 
@@ -443,7 +460,8 @@ function TenantFormInner({
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
   );
-  const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
+  const router = useRouter();
+  const [state, formAction, pending] = useActionState(saveSettingsSafely, initial);
   // Price text as loaded. The server keeps the stored (maybe just confirmed) price for any row
   // whose text the owner did not touch in this form.
   const [catalogBaseJson] = useState(() =>
@@ -584,7 +602,11 @@ function TenantFormInner({
   useEffect(() => {
     // Compile finished before ok - owners should hear the line was trained, not only "Saved".
     if (state.ok) notify("Saved · training line");
-  }, [state]);
+    if (state.networkError) {
+      notify("Connection dropped. Showing your latest saved details.");
+      router.refresh();
+    }
+  }, [state, router]);
 
   useEffect(() => {
     return () => {
