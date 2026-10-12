@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test:tts": "node tests/ttsNormalize.test.js",
+    "test:tts": "node tests/ttsNormalize.test.js && node --test tests/swahiliClock.test.js tests/spokenFacts.test.js",
     "test:phonetic": "node --test tests/pronunciation/phoneticEngine.test.js",
     "test:tts-fixture": "node tests/ttsNormalizationFixture.test.js",
     "tts:listen-harness": "node scripts/soniox-tts-listen-harness.js",

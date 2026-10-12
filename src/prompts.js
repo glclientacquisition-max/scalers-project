@@ -11,6 +11,8 @@ const {
   formatScheduleSummary,
 } = require('./conversation/businessHours');
 const { buildLiveGroundTruth } = require('./conversation/liveKnowledge');
+const { swahiliClock } = require('./conversation/swahiliClock');
+const { spokenFactsEnabled } = require('./speech/spokenFacts/flag');
 const {
   formatBulletinForPrompt,
   bulletinImpliesClosed,
@@ -224,6 +226,18 @@ Enquiry and take-a-message always work, even when the file is incomplete.
 If you append create_service_request, create_appointment, or update_appointment, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome. If you append ONLY save_caller_info, you MUST speak your natural response. Do not read open visits, holds, callbacks, or orders unless they just asked about them.`;
 }
 
+const CLOCK_EXAMPLE_OLD = '("3 P M" / "saa 3 jioni")';
+
+/**
+ * Conversation rules for this prompt. VOICE_SPOKEN_FACTS on: the time example
+ * uses the Kiswahili clock (15:00 is "saa tisa mchana", not "saa 3 jioni").
+ * Flag off: CONVERSATION_RULES unchanged.
+ */
+function conversationRules(env = process.env) {
+  if (!spokenFactsEnabled(env)) return CONVERSATION_RULES;
+  return CONVERSATION_RULES.replace(CLOCK_EXAMPLE_OLD, `("3 P M" / "${swahiliClock(15 * 60)}")`);
+}
+
 function buildSystemPrompt(profile = {}) {
   const businessName =
     profile.businessName || process.env.BUSINESS_NAME || 'the business';
@@ -261,7 +275,7 @@ ${liveBlock}
 ${playbookBlock}
 ${String(profile.llmSystemPrompt).trim()}
 
-${CONVERSATION_RULES}
+${conversationRules()}
 
 ${languagePolicy}
 
@@ -305,7 +319,7 @@ Your job on this call:
 4. Collect name/reason only when required for that action. Confirm unclear names once.
 5. Never claim an action succeeded until the backend confirmation is spoken.
 
-${CONVERSATION_RULES}
+${conversationRules()}
 
 ${languagePolicy}
 
@@ -340,6 +354,7 @@ module.exports = {
   buildContextHeader,
   DEFAULT_KNOWLEDGE,
   CONVERSATION_RULES,
+  conversationRules,
   VOICE_SYSTEM_PROMPT_ID,
   VOICE_SYSTEM_PROMPT_VERSION,
 };
