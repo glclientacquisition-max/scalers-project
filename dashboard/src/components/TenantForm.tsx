@@ -7,6 +7,7 @@ import { CharCount as KitCharCount, FieldCard, TextAreaField, TextField } from "
 import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
   canonicalizeAgentTone,
@@ -21,6 +22,7 @@ import {
   scheduleForForm,
   type DayKey,
   type HoursSchedule,
+  formatHoursForOwner,
 } from "@/lib/hoursSchedule";
 import {
   AFTER_HOURS_OPTIONS,
@@ -97,7 +99,7 @@ import {
 } from "@/lib/sonioxVoiceCatalog";
 import {
   emptyLocation,
-  LOCATIONS_MAX,
+  upgradeLegacyPlace,
   normalizeBusinessLocations,
   type BusinessLocation,
 } from "@/lib/businessLocations";
@@ -111,7 +113,9 @@ import {
   POLICY_FIELDS,
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
-import { CoverageAreaField } from "@/components/CoverageAreaField";
+import { PlacesEditor } from "@/components/structured/PlacesEditor";
+import { ServiceAreasEditor } from "@/components/structured/ServiceAreasEditor";
+import { serviceAreasForForm, suggestHomeAreas, type ServiceAreas } from "@/lib/serviceAreas";
 import { stableRowId } from "@/lib/factHash";
 import { catalogBaseline, isUnpricedRow } from "@/lib/catalogPricing";
 import { DeskSelect } from "@/components/ui/DeskSelect";
@@ -120,7 +124,6 @@ import { PolicyRulesEditor } from "@/components/structured/PolicyRulesEditor";
 import dynamic from "next/dynamic";
 // Pronunciation is one panel of many; load it only when that panel renders.
 const PronunciationCoach = dynamic(() => import("@/components/PronunciationCoach").then((m) => m.PronunciationCoach));
-import { deskShiftClass } from "@/components/ui/deskChrome";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { notify } from "@/components/ui/DeskNotice";
 import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
@@ -244,6 +247,25 @@ function placeLocationLine(loc: Pick<BusinessLocation, "label" | "address" | "la
 }
 
 const initial: SettingsCompileState = {};
+
+/**
+ * A dropped connection (TypeError: network error) must not throw the page into the error
+ * boundary: the write has usually landed, so report it and let the form refetch.
+ */
+async function saveSettingsSafely(
+  prev: SettingsCompileState,
+  formData: FormData
+): Promise<SettingsCompileState> {
+  try {
+    const res = await saveAndCompileSettings(prev, formData);
+    // Toast here, not from component state: a save can remount the form.
+    if (res.ok) notify("Saved · training line");
+    return res;
+  } catch (err) {
+    console.warn("[settings] save response lost:", err instanceof Error ? err.message : err);
+    return { networkError: true };
+  }
+}
 
 const tableFieldClass = settingsTableFieldClass;
 const denseFieldClass = settingsDenseFieldClass;
@@ -407,10 +429,12 @@ function TenantFormInner({
     parseHandoffMode(tenant.handoff_mode)
   );
   const [locations, setLocations] = useState<BusinessLocation[]>(() => {
-    const rows = normalizeBusinessLocations(tenant.business_locations);
+    const rows = normalizeBusinessLocations(tenant.business_locations).map(upgradeLegacyPlace);
     return rows.length ? rows.map((row) => markSavedRow(row)) : [emptyLocation()];
   });
-  const [openLocationIndexes, setOpenLocationIndexes] = useState<number[]>([]);
+  const [serviceAreas, setServiceAreas] = useState<ServiceAreas>(() =>
+    serviceAreasForForm(tenant.service_areas, tenant.business_policies?.coverage_areas, tenant.vertical)
+  );
   const [policies, setPolicies] = useState<BusinessPolicies>(() =>
     normalizeBusinessPolicies(tenant.business_policies)
   );
@@ -439,7 +463,8 @@ function TenantFormInner({
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
   );
-  const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
+  const router = useRouter();
+  const [state, formAction, pending] = useActionState(saveSettingsSafely, initial);
   // Price text as loaded. The server keeps the stored (maybe just confirmed) price for any row
   // whose text the owner did not touch in this form.
   const [catalogBaseJson] = useState(() =>
@@ -579,8 +604,11 @@ function TenantFormInner({
 
   useEffect(() => {
     // Compile finished before ok - owners should hear the line was trained, not only "Saved".
-    if (state.ok) notify("Saved · training line");
-  }, [state]);
+    if (state.networkError) {
+      notify("Connection dropped. Showing your latest saved details.");
+      router.refresh();
+    }
+  }, [state, router]);
 
   useEffect(() => {
     return () => {
@@ -755,34 +783,6 @@ function TenantFormInner({
     }));
   }
 
-  function toggleLocationDetails(index: number) {
-    setOpenLocationIndexes((prev) =>
-      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
-    );
-  }
-
-  function removeLocation(index: number) {
-    setLocations((prev) => prev.filter((_, i) => i !== index));
-    setOpenLocationIndexes((prev) =>
-      prev.flatMap((i) => {
-        if (i === index) return [];
-        return [i > index ? i - 1 : i];
-      })
-    );
-  }
-
-  function updateLocation(
-    index: number,
-    key: keyof BusinessLocation,
-    value: string
-  ) {
-    setLocations((prev) =>
-      prev.map((row, i) =>
-        i === index ? carrySavedRow({ ...row, [key]: value }, row) : row
-      )
-    );
-  }
-
   const bulkPreview = useMemo(
     () => previewSuggestedServices(parseBulkServices(bulkServicesText), vertical),
     [bulkServicesText, vertical]
@@ -791,6 +791,26 @@ function TenantFormInner({
     () => previewSuggestedProducts(parseBulkProducts(bulkProductsText)),
     [bulkProductsText]
   );
+
+  // Warn before leaving only while a save is actually in flight.
+  useEffect(() => {
+    if (!pending) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [pending]);
+
+  // Locations drawers ("Save 3 areas", "Done") save the page straight away.
+  const saveAfterLocationsRef = useRef(false);
+  useEffect(() => {
+    if (!saveAfterLocationsRef.current) return;
+    saveAfterLocationsRef.current = false;
+    const form = document.getElementById(TENANT_SETTINGS_FORM_ID);
+    if (form instanceof HTMLFormElement) form.requestSubmit();
+  }, [serviceAreas, locations]);
 
   // A pasted list is saved straight away (the sheet says "Add and save"), not left pending.
   const saveAfterPasteRef = useRef(false);
@@ -967,6 +987,7 @@ function TenantFormInner({
       <input type="hidden" name="vertical" value={vertical} />
       <input type="hidden" name="handoff_mode" value={handoffMode} />
       <input type="hidden" name="business_locations" value={locationsJson} />
+      <input type="hidden" name="service_areas" value={JSON.stringify(serviceAreas)} />
       <input type="hidden" name="business_policies" value={policiesJson} />
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="spoken_name" value={spokenName} />
@@ -1877,197 +1898,37 @@ function TenantFormInner({
       <section
         className={panel === "locations" ? "space-y-3" : "hidden"}
       >
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <p className={settingsBlockTitleClass}>Places</p>
-          <button
-            type="button"
-            disabled={locations.length >= LOCATIONS_MAX}
-            onClick={() =>
-              setLocations((prev) =>
-                prev.length >= LOCATIONS_MAX ? prev : [...prev, emptyLocation()]
-              )
-            }
-            className={`${settingsGhostButtonClass} disabled:opacity-50`}
-          >
-            Add place
-          </button>
-        </div>
-        <div className="overflow-hidden rounded-xl border border-hairline">
-          <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem] items-center gap-2 border-b border-hairline bg-surface-canvas px-3 py-2 text-meta font-medium text-ink-2">
-            <span>Label</span>
-            <span>Area</span>
-            <span className="sr-only">Details</span>
-            <span className="sr-only">Remove</span>
-          </div>
-          {locations.map((loc, index) => {
-            const placeOpen = openLocationIndexes.includes(index);
-            const placeDetailLabel =
-              vertical === "home_services"
-                ? "Landmark, directions, and notes"
-                : "Landmark, directions, and coverage";
-            return (
-            <div key={`loc-${index}`} className="border-b border-hairline last:border-b-0">
-              <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem] items-center gap-2 px-3 py-2">
-                <div className="min-w-0">
-                  <label className="sr-only" htmlFor={`loc-label-${index}`}>
-                    Label
-                  </label>
-                  <input
-                    id={`loc-label-${index}`}
-                    value={loc.label}
-                    onChange={(e) => {
-                      updateLocation(index, "label", e.target.value);
-                      if (index === 0) {
-                        setLocationNotes(
-                          placeLocationLine({
-                            label: e.target.value,
-                            address: loc.address,
-                            landmark: loc.landmark,
-                          })
-                        );
-                      }
-                    }}
-                    placeholder="Main shop"
-                    className={`${denseFieldClass} min-w-0 truncate`}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <label className="sr-only" htmlFor={`loc-address-${index}`}>
-                    Area
-                  </label>
-                  <ExpandTextarea
-                    id={`loc-address-${index}`}
-                    value={loc.address}
-                    maxLength={200}
-                    onChange={(value) => {
-                      updateLocation(index, "address", value);
-                      if (index === 0) {
-                        setLocationNotes(
-                          placeLocationLine({
-                            label: loc.label,
-                            address: value,
-                            landmark: loc.landmark,
-                          })
-                        );
-                      }
-                    }}
-                    placeholder="Westlands, Nairobi"
-                    className="min-w-0 truncate break-words [overflow-wrap:anywhere]"
-                  />
-                </div>
-                <button
-                  type="button"
-                  aria-expanded={placeOpen}
-                  data-role-exempt=""
-                  aria-label={placeDetailLabel}
-                  onClick={() => toggleLocationDetails(index)}
-                  className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-2 ${deskShiftClass} hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    className={`h-4 w-4 ${placeOpen ? "rotate-90" : ""}`}
-                    aria-hidden="true"
-                  >
-                    <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <div className="flex items-start justify-end">
-                  {locations.length > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        requestRemove(
-                          loc,
-                          `Remove ${loc.label.trim() || "this place"}?`,
-                          "It leaves the places when you save.",
-                          () => removeLocation(index)
-                        )
-                      }
-                      className={settingsTrashButtonClass}
-                      aria-label={`Remove location ${index + 1}`}
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  ) : (
-                    <span className="h-11 w-11" aria-hidden />
-                  )}
-                </div>
-              </div>
-              {placeOpen ? (
-                <div className="grid grid-cols-1 gap-3 px-3 pb-3">
-                  <div className="min-w-0">
-                    <label
-                      className="block text-meta font-medium text-ink-2"
-                      htmlFor={`loc-landmark-${index}`}
-                    >
-                      Landmark
-                    </label>
-                    <input
-                      id={`loc-landmark-${index}`}
-                      value={loc.landmark}
-                      onChange={(e) => {
-                        updateLocation(index, "landmark", e.target.value);
-                        if (index === 0) {
-                          setLocationNotes(
-                            placeLocationLine({
-                              label: loc.label,
-                              address: loc.address,
-                              landmark: e.target.value,
-                            })
-                          );
-                        }
-                      }}
-                      placeholder="Opposite Naivas"
-                      className={`${denseFieldClass} mt-1`}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label
-                      className="block text-meta font-medium text-ink-2"
-                      htmlFor={`loc-directions-${index}`}
-                    >
-                      Directions
-                    </label>
-                    <textarea
-                      id={`loc-directions-${index}`}
-                      value={loc.directions}
-                      onChange={(e) => updateLocation(index, "directions", e.target.value)}
-                      rows={2}
-                      placeholder="From Waiyaki Way, turn at the Shell. Left side."
-                      className={`${denseFieldClass} mt-1 leading-relaxed`}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label
-                      className="block text-meta font-medium text-ink-2"
-                      htmlFor={`loc-coverage-${index}`}
-                    >
-                      {vertical === "home_services" ? "Notes" : "Coverage"}
-                    </label>
-                    <ExpandTextarea
-                      id={`loc-coverage-${index}`}
-                      value={loc.coverage_notes}
-                      maxLength={300}
-                      onChange={(value) =>
-                        updateLocation(index, "coverage_notes", value)
-                      }
-                      placeholder={
-                        vertical === "home_services"
-                          ? "Call ahead for the gate"
-                          : "Kiambu and Ruiru"
-                      }
-                      className="min-w-0 break-words [overflow-wrap:anywhere]"
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            );
-          })}
-        </div>
+        <ServiceAreasEditor
+          value={serviceAreas}
+          vertical={vertical}
+          homeAreas={[
+            ...locations.map((l) => l.area_id || "").filter(Boolean),
+            ...suggestHomeAreas(locations.map((l) => l.address).join(", ")),
+          ]}
+          onChange={setServiceAreas}
+          onSave={(next) => {
+            setServiceAreas(next);
+            saveAfterLocationsRef.current = true;
+          }}
+        />
+        <PlacesEditor
+          value={locations}
+          title={serviceAreas.no_premises ? "Your base (optional)" : locations.length > 1 ? "Branches" : "Your places"}
+          hint={
+            serviceAreas.no_premises
+              ? "For reference only. Callers are not sent here."
+              : locations.length > 1
+                ? "Your Business Assistant sends callers to the nearest branch."
+                : undefined
+          }
+          businessHours={formatHoursForOwner(hoursSchedule)}
+          onSave={(rows) => {
+            setLocations(rows);
+            const first = rows[0];
+            setLocationNotes(first ? placeLocationLine(first) : "");
+            saveAfterLocationsRef.current = true;
+          }}
+        />
       </section>
 
       <section
@@ -2176,20 +2037,6 @@ function TenantFormInner({
             </SettingsGroup>
           </div>
         )}
-
-        {vertical === "home_services" ? (
-          <SettingsGroup title="Where you work">
-            <SettingsStack label="Coverage" htmlFor="policy-coverage">
-              <CoverageAreaField
-                id="policy-coverage"
-                value={policies.coverage_areas || []}
-                onChange={(coverage_areas) =>
-                  setPolicies((prev) => ({ ...prev, coverage_areas }))
-                }
-              />
-            </SettingsStack>
-          </SettingsGroup>
-        ) : null}
 
         <PolicyRulesEditor
           rules={policies.rules ?? {}}

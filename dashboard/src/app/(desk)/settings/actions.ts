@@ -7,6 +7,7 @@ import { normalizePhone } from "@/lib/setupFlow";
 import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
   parseAgentTone,
@@ -76,6 +77,14 @@ import { catalogSaveError } from "@/lib/catalogValidation";
 import { validatePublicContacts } from "@/lib/contactValidation";
 import { faqsLengthError, policiesLengthError } from "@/lib/lengthLimits";
 import { POLICY_FIELDS } from "@/lib/businessPolicies";
+import {
+  coverageIdsFrom,
+  formatServiceAreasForCompiler,
+  normalizeServiceAreas,
+  parseServiceAreasField,
+  serviceAreasFromCoverage,
+  validateServiceArea,
+} from "@/lib/serviceAreas";
 
 function safeJsonRows(raw: FormDataEntryValue | null): TeamRowInput[] {
   try {
@@ -92,19 +101,30 @@ export type SettingsCompileState = {
   error?: string;
   ok?: boolean;
   source?: "gemini" | "local";
+  /** Client only: the response was lost (connection dropped). The save may have landed. */
+  networkError?: boolean;
 };
+
+/** Background model rewrite of the prompt; the settings page allows 60 s in total. */
+const PROMPT_UPGRADE_BUDGET_MS = 25_000;
 
 export async function saveAndCompileSettings(
   _prev: SettingsCompileState,
   formData: FormData
 ): Promise<SettingsCompileState> {
-  const denied = await memberDenied("settings.edit");
+  const t0 = Date.now();
+  // Independent request-scoped checks: run together, not one after another.
+  const [denied, signedIn, tenant] = await Promise.all([
+    memberDenied("settings.edit"),
+    isAuthenticated(),
+    getCurrentTenant(),
+  ]);
+  const tAuth = Date.now();
   if (denied) return denied;
-  if (!(await isAuthenticated())) {
+  if (!signedIn) {
     return { error: "Sign in to save settings." };
   }
 
-  const tenant = await getCurrentTenant();
   if (!tenant) {
     return { error: "No workspace linked to this account." };
   }
@@ -320,6 +340,27 @@ export async function saveAndCompileSettings(
     if (!structured.ok) return { error: structured.error, fields: structured.fields };
     businessPolicies = structured.policies;
   }
+  // Areas you serve (Settings › Locations). Until Locations is saved once, the old Policies
+  // coverage list is read as areas with "we confirm the fee".
+  const ownsAreas = settingsFieldFromScope(scope, "serviceAreas", true, false);
+  const storedAreas =
+    tenant.service_areas && typeof tenant.service_areas === "object"
+      ? normalizeServiceAreas(tenant.service_areas, vertical)
+      : serviceAreasFromCoverage(
+          (tenant.business_policies as { coverage_areas?: unknown } | null)?.coverage_areas,
+          vertical
+        );
+  const formAreas = ownsAreas ? parseServiceAreasField(formData.get("service_areas"), vertical) : null;
+  const serviceAreas = formAreas ?? storedAreas;
+  if (formAreas) {
+    for (const area of formAreas.areas) {
+      const fields = validateServiceArea(area);
+      const first = Object.values(fields)[0];
+      if (first) return { error: first };
+    }
+  }
+  // The voice server reads business_policies.coverage_areas: keep it in step with the areas.
+  if (serviceAreas) businessPolicies = { ...businessPolicies, coverage_areas: coverageIdsFrom(serviceAreas) };
   const ttsLexicon = lexiconForStorage(
     pick(
       "ttsLexicon",
@@ -345,7 +386,9 @@ export async function saveAndCompileSettings(
       String(formData.get("business_hours") || "").trim(),
       String(tenant.business_hours || "").trim()
     );
-  const locationsText = formatLocationsForCompiler(businessLocations);
+  const locationsText = [formatLocationsForCompiler(businessLocations, { noPremises: serviceAreas?.no_premises }), formatServiceAreasForCompiler(serviceAreas)]
+    .filter(Boolean)
+    .join("\n\n");
   const policiesText = formatPoliciesForCompiler(businessPolicies);
 
   const scopeError = settingsScopeValidationError(scope, {
@@ -409,6 +452,7 @@ export async function saveAndCompileSettings(
     soniox_voice_label: sonioxVoiceLabel,
     business_locations: businessLocations,
     business_policies: businessPoliciesForStorage(businessPolicies),
+    ...(formAreas ? { service_areas: formAreas } : {}),
     tts_lexicon: ttsLexicon,
   };
 
@@ -418,9 +462,13 @@ export async function saveAndCompileSettings(
   // sees that pending confirm; the write hashes the stored row as saved.
   const hashMode = factHashModeFromEnv();
   const explicitPaths = cleanFieldPaths(ownerPathsFromForm);
-  const storedFactRow: Record<string, unknown> =
-    (hashMode ? await readSavedFactRow(workspace.client, tenant.id) : null) ?? { ...tenant };
-  const provenance = await loadCompileProvenance(tenant.id);
+  const tPrep = Date.now();
+  const [savedBefore, provenance] = await Promise.all([
+    hashMode ? readSavedFactRow(workspace.client, tenant.id) : Promise.resolve(null),
+    loadCompileProvenance(tenant.id),
+  ]);
+  const storedFactRow: Record<string, unknown> = savedBefore ?? { ...tenant };
+  const tReads = Date.now();
   const compileFieldMeta = hashMode
     ? overlayFieldMeta(
         provenance.fieldMeta,
@@ -433,7 +481,7 @@ export async function saveAndCompileSettings(
         })
       )
     : provenance.fieldMeta;
-  const { prompt, source } = await compileReceptionistPrompt({
+  const compileInput = {
     businessName,
     servicesOffered,
     businessHours,
@@ -453,11 +501,18 @@ export async function saveAndCompileSettings(
     businessPolicies,
     fieldMeta: compileFieldMeta,
     holdGate: provenance.holdGate,
-  });
+  };
+  // Fast path: write the facts with the template prompt now (milliseconds), so the owner
+  // sees "Saved" quickly and a reload shows the new data. The model-written prompt and
+  // the fact bookkeeping run after the response (see after() below).
+  const { prompt } = await compileReceptionistPrompt({ ...compileInput, localOnly: true });
+  const source = "local" as const;
 
   patch.llm_system_prompt = prompt;
+  const tCompile = Date.now();
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
   bustTenantCache(tenant.id);
+  const tWrite = Date.now();
 
   if (error) {
     return ownerSaveFailed("settings.save", error.message);
@@ -487,32 +542,59 @@ export async function saveAndCompileSettings(
     lineNumber: String(tenant.sautikit_virtual_number || "").trim(),
   });
 
-  if (hashMode) {
-    // Hash the stored row as saved. If it cannot be read back, confirm nothing:
-    // in hash mode a missing value_hash already reads as "Check this".
-    const saved = await readSavedFactRow(workspace.client, tenant.id);
-    if (saved) {
-      await ownerConfirmPlan(
-        tenant.id,
-        planFactConfirm({
-          scope,
-          before: storedFactRow,
-          after: saved,
-          explicitPaths,
-          normalize: normalizeFactRow,
-        })
-      );
-    } else {
-      console.warn("[settings.save] saved row unreadable, owner confirm skipped");
+  const client = workspace.client;
+  // Request-scoped reads (cookies) must happen before after().
+  const attestUser = hashMode ? null : await getAuthUser();
+  console.info(
+    `[settings-save timing] scope=${scope || "all"} auth=${tAuth - t0}ms parse=${tPrep - tAuth}ms reads=${tReads - tPrep}ms compile=${tCompile - tReads}ms write=${tWrite - tCompile}ms total=${Date.now() - t0}ms`
+  );
+  after(async () => {
+   try {
+    // Upgrade to the model-written prompt only if no newer save replaced ours meanwhile.
+    // Bounded so the background work always ends well inside the function's time limit.
+    try {
+      const upgraded = await Promise.race([
+        compileReceptionistPrompt(compileInput),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), PROMPT_UPGRADE_BUDGET_MS)),
+      ]);
+      const better = upgraded?.prompt;
+      const how = upgraded?.source;
+      if (how === "gemini" && better && better !== prompt) {
+        await client.from("tenants").update({ llm_system_prompt: better }).eq("id", tenant.id).eq("llm_system_prompt", prompt);
+        bustTenantCache(tenant.id);
+      }
+    } catch (err) {
+      console.warn("[settings.save] prompt upgrade skipped:", err instanceof Error ? err.message : err);
     }
-  } else {
-    const user = await getAuthUser();
-    await ownerAttestFields(
-      tenant.id,
-      cleanFieldPaths([...pathsFromSave, ...ownerPathsFromForm]),
-      user?.id ?? null
-    );
-  }
+    if (hashMode) {
+      // Hash the stored row as saved. If it cannot be read back, confirm nothing:
+      // in hash mode a missing value_hash already reads as "Check this".
+      const saved = await readSavedFactRow(client, tenant.id);
+      if (saved) {
+        await ownerConfirmPlan(
+          tenant.id,
+          planFactConfirm({
+            scope,
+            before: storedFactRow,
+            after: saved,
+            explicitPaths,
+            normalize: normalizeFactRow,
+          })
+        );
+      } else {
+        console.warn("[settings.save] saved row unreadable, owner confirm skipped");
+      }
+    } else {
+      await ownerAttestFields(
+        tenant.id,
+        cleanFieldPaths([...pathsFromSave, ...ownerPathsFromForm]),
+        attestUser?.id ?? null
+      );
+    }
+   } catch (err) {
+    console.warn("[settings.save] background work failed:", err instanceof Error ? err.message : err);
+   }
+  });
 
   revalidatePath("/settings");
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { formatServiceAreasForCompiler, normalizeServiceAreas, serviceAreasFromCoverage } from "@/lib/serviceAreas";
 import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
 
@@ -378,7 +379,13 @@ export async function applyIngestAction(
   const agentName = String(tenant.agent_name || "Receptionist").trim() || "Receptionist";
   const vertical = draftVertical || parseVertical(tenant.vertical);
   const handoffMode = parseHandoffMode(tenant.handoff_mode);
-  const locationsText = formatLocationsForCompiler(nextLocations);
+  const areas =
+    tenant.service_areas && typeof tenant.service_areas === "object"
+      ? normalizeServiceAreas(tenant.service_areas, vertical)
+      : serviceAreasFromCoverage(nextPolicies.coverage_areas, vertical);
+  const locationsText = [formatLocationsForCompiler(nextLocations, { noPremises: areas?.no_premises }), formatServiceAreasForCompiler(areas)]
+    .filter(Boolean)
+    .join("\n\n");
   const policiesText = formatPoliciesForCompiler(nextPolicies);
   const businessName = nameSuggestion || tenant.business_name;
 

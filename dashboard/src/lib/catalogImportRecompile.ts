@@ -33,6 +33,7 @@ import { normalizeTeamDirectory } from "@/lib/teamNotify";
 import { loadCompileProvenance } from "@/lib/tenantFieldProvenance";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_AGENT_TONE } from "@/lib/onboarding";
+import { formatServiceAreasForCompiler, normalizeServiceAreas, serviceAreasFromCoverage } from "@/lib/serviceAreas";
 
 function normalizeFaqs(raw: unknown): FaqEntry[] {
   if (!Array.isArray(raw)) return [];
@@ -64,9 +65,16 @@ export async function recompileAfterCatalogImport(opts: {
   const agentTone = parseAgentTone(String(tenant.agent_tone || "")) ?? DEFAULT_AGENT_TONE;
   const agentTools = parseAgentTools(tenant.agent_tools);
   const policies = normalizeBusinessPolicies(tenant.business_policies);
-  const locationsText = formatLocationsForCompiler(
-    normalizeBusinessLocations(tenant.business_locations)
-  );
+  const areas =
+    tenant.service_areas && typeof tenant.service_areas === "object"
+      ? normalizeServiceAreas(tenant.service_areas, tenant.vertical)
+      : serviceAreasFromCoverage(policies.coverage_areas, tenant.vertical);
+  const locationsText = [
+    formatLocationsForCompiler(normalizeBusinessLocations(tenant.business_locations), { noPremises: areas?.no_premises }),
+    formatServiceAreasForCompiler(areas),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const policiesText = formatPoliciesForCompiler(policies);
   const productsBlock = formatProductsForCompiler(productCatalog);
   const socialBlock = formatSocialHandlesForCompiler(
