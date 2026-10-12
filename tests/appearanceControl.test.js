@@ -34,8 +34,8 @@ describe("Appearance control", () => {
     assert.match(picker, /data-appearance-footer=""/);
   });
 
-  it("popover opens below the footer button (flips up only without room) so it never covers the page's own links", () => {
-    assert.match(picker, /<Popover\.Positioner side="bottom" align="center"/);
+  it("popover opens beside the footer button, bottom-aligned, so it never covers the page form or links above", () => {
+    assert.match(picker, /<Popover\.Positioner side="right" align="end"/);
     assert.match(picker, /collisionPadding=\{12\}/);
   });
 
