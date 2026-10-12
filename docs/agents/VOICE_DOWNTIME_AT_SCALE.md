@@ -29,7 +29,7 @@ Shared catalog voices serve many tenants. Agent names differ. Pre-rendered audio
 Keep one voice-generic sentence:
 
 - EN: `Hello. This line is on a short downtime. Please call back in a few minutes.`
-- SW: `Habari. Simu hii ina downtime fupi. Tafadhali piga tena baada ya dakika chache.`
+- SW: `Habari. Simu hii haipatikani kwa muda mfupi. Tafadhali piga tena baada ya dakika chache.`
 
 The caller already dialed that DID. Voice continuity is the identity. A wrong name is worse than no name.
 
@@ -73,8 +73,8 @@ Key clips by curated `soniox_voice_id` and language.
 
 1. Boot warms the platform default voice only.
 2. First live PCM for another catalog voice warms that voice (60s debounce).
-3. Playback order: that voice's clip → default clone clip → espeak → Gemini TTS.
-4. Packaged `src/speech/pcm/downtime-{en,sw}.wav` is the default clone only.
+3. Playback order: that voice's clip → default clone clip → espeak. When Soniox billing is exhausted, do not call Gemini TTS. It adds delay and does not restore speech. If the clip and espeak both return no PCM, hang up. Do not sit in silence.
+4. Packaged `src/speech/pcm/downtime-{en,sw}.wav` is the default clone only. Both files are required in git (`node scripts/check-outage-clips.js`). A memory warm is lost on the next cold boot. If Soniox is already at 402, those WAVs are what the caller hears.
 
 Do not render N tenants × 2 languages at boot. Do not bake `agent_name` into a clip.
 
@@ -90,6 +90,7 @@ No vendor names. No "add funds" (that is wallet, a different incident). Uses the
 
 - `soniox.lastError.billingExhausted`
 - `soniox.outageClips` (default voice ready flags plus per-voice map)
+- `soniox.outageClips.packaged` (`en`, `sw`, `missing`). `missing` is true when the git WAVs are absent, even if this process already warmed clips in memory. Boot logs the same gap without waiting for a successful warm.
 - `gemini.lastError` (`billingExhausted`, `denied`, last error kind)
 - `telephony.lastError` (SautiKit wallet probe: empty balance or 402)
 

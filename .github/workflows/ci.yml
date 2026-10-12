@@ -32,6 +32,9 @@ jobs:
       - name: test:voice
         run: npm run test:voice
 
+      - name: Packaged downtime clips
+        run: node scripts/check-outage-clips.js
+
       - name: test:mvp
         run: npm run test:mvp
 

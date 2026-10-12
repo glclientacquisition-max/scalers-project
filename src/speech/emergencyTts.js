@@ -1,5 +1,6 @@
 // Last-resort spoken audio when Soniox TTS is down (billing 402, auth, etc.).
-// Prefers a recording of the cloned receptionist voice, then espeak-ng, then Gemini.
+// Prefers a recording of the cloned receptionist voice, then espeak-ng.
+// Gemini TTS is only for non-billing failures. A 402 must not wait on it.
 // Output: mono pcm_s16le @ 16 kHz for SautiKit /ws/media.
 
 const { spawn } = require('child_process');
@@ -12,6 +13,8 @@ const {
 const { loadOutageClip } = require('./outageClips');
 
 const SAMPLE_RATE = 16000;
+/** Hang up this soon when neither a clip nor espeak produced PCM. */
+const SILENT_OUTAGE_HANGUP_MS = 800;
 
 function espeakVoice(language) {
   const lang = String(language || 'en').toLowerCase();
@@ -126,9 +129,11 @@ async function synthesizeWithGemini(text, language) {
 }
 
 /**
- * Synthesize emergency PCM. Returns null if every backend fails.
+ * Synthesize emergency PCM. Returns null if every allowed backend fails.
+ * Order: packaged/memory/tmp clip, then espeak. Gemini runs only when
+ * `skipGemini` is false (Soniox billing must pass skipGemini: true).
  * @param {string} text
- * @param {{ language?: string }} [opts]
+ * @param {{ language?: string, voiceId?: string, skipGemini?: boolean, synthesizeEspeak?: Function, synthesizeGemini?: Function }} [opts]
  * @returns {Promise<Buffer|null>}
  */
 async function synthesizeEmergencyPcm(text, opts = {}) {
@@ -146,8 +151,9 @@ async function synthesizeEmergencyPcm(text, opts = {}) {
     .trim();
   if (!clean) return null;
 
+  const espeak = opts.synthesizeEspeak || synthesizeWithEspeak;
   try {
-    const pcm = await synthesizeWithEspeak(clean, language);
+    const pcm = await espeak(clean, language);
     if (pcm?.length) {
       console.warn(
         `[emergency-tts] espeak-ng chars=${clean.length} bytes=${pcm.length} lang=${language}`
@@ -160,8 +166,14 @@ async function synthesizeEmergencyPcm(text, opts = {}) {
     }
   }
 
+  if (opts.skipGemini) {
+    console.warn('[emergency-tts] skip gemini (soniox billing)');
+    return null;
+  }
+
+  const gemini = opts.synthesizeGemini || synthesizeWithGemini;
   try {
-    const pcm = await synthesizeWithGemini(clean, language);
+    const pcm = await gemini(clean, language);
     if (pcm?.length) {
       console.warn(
         `[emergency-tts] gemini chars=${clean.length} bytes=${pcm.length} lang=${language}`
@@ -175,12 +187,45 @@ async function synthesizeEmergencyPcm(text, opts = {}) {
   return null;
 }
 
+/**
+ * Billing/fatal speech-down plan. Speak when a clip or espeak returns PCM.
+ * The 800ms hangup is only for the case where both produced nothing.
+ * @param {{ language?: string, voiceId?: string, skipGemini?: boolean, synthesizeEspeak?: Function, synthesizeGemini?: Function }} [opts]
+ */
+async function planSpeechOutagePlayback(opts = {}) {
+  const language = opts.language || 'en';
+  const line = pickSpeechOutageLine(language);
+  const pcm = await synthesizeEmergencyPcm(line, {
+    language,
+    voiceId: opts.voiceId,
+    skipGemini: Boolean(opts.skipGemini),
+    synthesizeEspeak: opts.synthesizeEspeak,
+    synthesizeGemini: opts.synthesizeGemini,
+  });
+  if (pcm?.length) {
+    return {
+      speak: true,
+      pcm,
+      line,
+      hangupMs: pcmDurationMs(pcm, SAMPLE_RATE) + 200,
+    };
+  }
+  return {
+    speak: false,
+    pcm: null,
+    line,
+    hangupMs: SILENT_OUTAGE_HANGUP_MS,
+  };
+}
+
 module.exports = {
   SAMPLE_RATE,
+  SILENT_OUTAGE_HANGUP_MS,
   OUTAGE_LINE_EN,
   OUTAGE_LINE_SW,
   pickSpeechOutageLine,
   synthesizeEmergencyPcm,
+  planSpeechOutagePlayback,
   synthesizeWithEspeak,
   synthesizeWithGemini,
   pcmDurationMs,
