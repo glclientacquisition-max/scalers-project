@@ -155,7 +155,7 @@ export function serviceAreasSentence(v: ServiceAreas | null | undefined): string
   const parts = v.areas.map((a) => {
     const verb = AREA_MODES.find((o) => o.id === a.modes[0])?.verb || "deliver to";
     const fee = a.fee_mode === "free" ? " for free" : a.fee_mode === "fixed" && a.fee_ksh != null ? ` for ${money(a.fee_ksh)}` : "";
-    const eta = a.eta ? `, ${a.eta}` : "";
+    const eta = a.eta ? `, ${a.eta.charAt(0).toLowerCase()}${a.eta.slice(1)}` : "";
     return `We ${verb} ${shortName(a.id)}${fee}${eta}.`;
   });
   return parts.join(" ");
