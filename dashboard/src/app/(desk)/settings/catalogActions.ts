@@ -32,6 +32,9 @@ import {
   type SocialHandles,
 } from "@/lib/socialHandles";
 import { generateGeminiText } from "@/lib/gemini";
+import { readCatalogFresh } from "@/lib/catalogFresh";
+import { PRODUCT_ID_PREFIX, withImportedPricing } from "@/lib/catalogPricing";
+import { assignServiceIds } from "@/lib/serviceIds";
 
 export type CatalogImportState = {
   error?: string;
@@ -232,16 +235,27 @@ export async function applyCatalogImportAction(
   }
 
   const confirm = String(formData.get("confirm") || "") === "1";
-  const stamped = products.map((product) => ({
-    ...product,
-    source: confirm ? ("owner" as const) : ("import" as const),
-    price_mode: product.price_mode || inferPriceMode(product.price) || undefined,
-  }));
-  const existing = normalizeProductCatalog(tenant.product_catalog);
-  const merged = mergeProductCatalog(existing, stamped, mode);
+  // Imported rows get a typed price now. Owner-reviewed imports count as the owner's price;
+  // anything else stays unconfirmed so the owner gets "Is this right?".
+  const stamped = products.map((product) =>
+    withImportedPricing(
+      {
+        ...product,
+        source: confirm ? ("owner" as const) : ("import" as const),
+        price_mode: product.price_mode || inferPriceMode(product.price) || undefined,
+      },
+      "product",
+      confirm ? "owner" : "parsed"
+    )
+  );
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return { error: "Not signed in." };
+  // Merge into the catalogue as stored now, not the cached tenant row.
+  const fresh = await readCatalogFresh(workspace.client, tenant.id);
+  if (!fresh) return ownerSaveFailed("catalog", "fresh read failed");
+  const existing = normalizeProductCatalog(fresh.product_catalog);
+  const merged = assignServiceIds(mergeProductCatalog(existing, stamped, mode), existing, PRODUCT_ID_PREFIX);
 
   const patch: Record<string, unknown> = {
     product_catalog: merged,
@@ -285,7 +299,7 @@ export async function applyCatalogImportAction(
     try {
       const compiled = await recompileAfterCatalogImport({
         client: workspace.client,
-        tenant: { ...tenant, product_catalog: merged },
+        tenant: { ...tenant, ...fresh, product_catalog: merged },
         productCatalog: merged,
       });
       message = compiled.ok

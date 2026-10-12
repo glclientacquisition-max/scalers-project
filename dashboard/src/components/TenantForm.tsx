@@ -113,6 +113,7 @@ import {
 } from "@/lib/businessPolicies";
 import { CoverageAreaField } from "@/components/CoverageAreaField";
 import { stableRowId } from "@/lib/factHash";
+import { catalogBaseline, isUnpricedRow } from "@/lib/catalogPricing";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import dynamic from "next/dynamic";
 // Pronunciation is one panel of many; load it only when that panel renders.
@@ -444,6 +445,14 @@ function TenantFormInner({
     parseTtsLexicon(tenant.tts_lexicon)
   );
   const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
+  // Price text as loaded. The server keeps the stored (maybe just confirmed) price for any row
+  // whose text the owner did not touch in this form.
+  const [catalogBaseJson] = useState(() =>
+    JSON.stringify({
+      ...catalogBaseline(normalizeServicesCatalog(tenant.services_catalog) as unknown as Record<string, unknown>[], "service"),
+      ...catalogBaseline(normalizeProductCatalog(tenant.product_catalog) as unknown as Record<string, unknown>[], "product"),
+    })
+  );
 
   const ttsLexiconJson = useMemo(
     () => JSON.stringify(lexiconForStorage(ttsLexicon)),
@@ -509,14 +518,27 @@ function TenantFormInner({
     () => JSON.stringify(products.filter((p) => p.name.trim())),
     [products]
   );
-  // ?filter=unpriced (from the Overview "Add prices" row) shows only items with no price text.
+  // ?filter=unpriced (from the Overview "Add prices" row) shows only items with no price.
+  // The set is frozen while you type (a row must not vanish on its first digit) and is
+  // re-read only when rows are added or removed. Same "no price" rule as the count.
+  const unpricedFrozen = useMemo(
+    () =>
+      unpricedOnly
+        ? {
+            services: services.flatMap((row, i) => (isUnpricedRow(row, "service") ? [i] : [])),
+            products: products.flatMap((row, i) => (isUnpricedRow(row, "product") ? [i] : [])),
+          }
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- frozen on purpose: lengths only, not text
+    [unpricedOnly, services.length, products.length]
+  );
   const serviceIdx = useMemo(
-    () => services.map((_, i) => i).filter((i) => !unpricedOnly || !String(services[i]?.price_range || "").trim()),
-    [services, unpricedOnly]
+    () => unpricedFrozen?.services.filter((i) => i < services.length) ?? services.map((_, i) => i),
+    [services, unpricedFrozen]
   );
   const productIdx = useMemo(
-    () => products.map((_, i) => i).filter((i) => !unpricedOnly || !String(products[i]?.price || "").trim()),
-    [products, unpricedOnly]
+    () => unpricedFrozen?.products.filter((i) => i < products.length) ?? products.map((_, i) => i),
+    [products, unpricedFrozen]
   );
   const servicePageCount = Math.max(1, Math.ceil(serviceIdx.length / SERVICE_PAGE_SIZE));
   const productPageCount = Math.max(1, Math.ceil(productIdx.length / PRODUCT_PAGE_SIZE));
@@ -775,6 +797,15 @@ function TenantFormInner({
     [bulkProductsText]
   );
 
+  // A pasted list is saved straight away (the sheet says "Add and save"), not left pending.
+  const saveAfterPasteRef = useRef(false);
+  useEffect(() => {
+    if (!saveAfterPasteRef.current) return;
+    saveAfterPasteRef.current = false;
+    const form = document.getElementById(TENANT_SETTINGS_FORM_ID);
+    if (form instanceof HTMLFormElement) form.requestSubmit();
+  }, [services, products]);
+
   function applyBulkServices() {
     const parsed = suggestImportedServices(parseBulkServices(bulkServicesText), vertical);
     if (!parsed.length) {
@@ -787,6 +818,7 @@ function TenantFormInner({
       const existing = prev.filter((s) => s.name.trim());
       return [...existing, ...parsed].slice(0, 40);
     });
+    saveAfterPasteRef.current = true;
     setBulkServicesText("");
     setBulkServicesError(null);
   }
@@ -807,6 +839,7 @@ function TenantFormInner({
       }
       return [...map.values()].slice(0, PRODUCT_CATALOG_MAX);
     });
+    saveAfterPasteRef.current = true;
     setBulkProductsText("");
     setBulkProductsError(null);
   }
@@ -929,6 +962,7 @@ function TenantFormInner({
       <input type="hidden" name="services_offered" value={servicesOfferedSummary} />
       <input type="hidden" name="services_catalog" value={servicesJson} />
       <input type="hidden" name="product_catalog" value={productsJson} />
+      <input type="hidden" name="catalog_baseline" value={catalogBaseJson} />
       <input type="hidden" name="social_handles" value={socialJson} />
       <input type="hidden" name="services_notes" value={servicesNotes} />
       <input type="hidden" name="business_hours" value={businessHoursSummary} />
@@ -1275,7 +1309,7 @@ function TenantFormInner({
                 type="button"
                 onClick={() => {
                   setServices((prev) => [...prev, emptyService()]);
-                  setServicePage(Math.floor(services.length / SERVICE_PAGE_SIZE));
+                  setServicePage(Math.floor(serviceIdx.length / SERVICE_PAGE_SIZE));
                 }}
                 className={settingsGhostButtonClass}
               >
@@ -1297,7 +1331,7 @@ function TenantFormInner({
             }}
             previewRows={bulkPreview}
             onApply={applyBulkServices}
-            applyLabel="Add to services"
+            applyLabel="Add and save"
           />
           {bulkServicesError ? (
             <p className="text-body text-warn" role="alert">
@@ -1502,7 +1536,7 @@ function TenantFormInner({
                 type="button"
                 onClick={() => {
                   setProducts((prev) => [...prev, emptyProduct()]);
-                  setProductPage(Math.floor(products.length / PRODUCT_PAGE_SIZE));
+                  setProductPage(Math.floor(productIdx.length / PRODUCT_PAGE_SIZE));
                 }}
                 className={settingsGhostButtonClass}
               >
@@ -1526,7 +1560,7 @@ function TenantFormInner({
             }}
             previewRows={bulkProductPreview}
             onApply={applyBulkProducts}
-            applyLabel="Add to catalogue"
+            applyLabel="Add and save"
           />
           {bulkProductsError ? (
             <p className="text-body text-warn" role="alert">

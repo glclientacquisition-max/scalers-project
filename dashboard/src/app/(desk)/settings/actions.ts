@@ -1,7 +1,8 @@
 "use server";
 
 import { bustTenantCache } from "@/lib/tenantCache";
-import { syncPricing } from "@/lib/structuredData";
+import { PRODUCT_ID_PREFIX, parseBaseline, settleCatalogPrices } from "@/lib/catalogPricing";
+import { readCatalogFresh } from "@/lib/catalogFresh";
 import { normalizePhone } from "@/lib/setupFlow";
 import { memberDenied } from "@/lib/requireMember";
 
@@ -123,31 +124,44 @@ export async function saveAndCompileSettings(
     String(formData.get("services_notes") || "").trim(),
     extractServicesNotes(tenant.services_offered || "")
   );
-  const storedServices = normalizeServicesCatalog(tenant.services_catalog).filter((row) => row.name);
+  const ownsServices = settingsFieldFromScope(scope, "servicesCatalog", true, false);
+  const ownsProducts = settingsFieldFromScope(scope, "productCatalog", true, false);
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) {
+    return { error: "Not signed in." };
+  }
+  // Catalogue saves settle prices against the row as stored now (not the 15 s cached copy):
+  // a price confirmed a moment ago must not be undone by a form that loaded before it.
+  const fresh =
+    ownsServices || ownsProducts ? await readCatalogFresh(workspace.client, tenant.id) : null;
+  const storedServices = normalizeServicesCatalog(fresh?.services_catalog ?? tenant.services_catalog).filter((row) => row.name);
   const pickedServices = pick(
     "servicesCatalog",
     parseServicesCatalogField(formData.get("services_catalog")),
     storedServices
   );
-  // Catalogue saves give every service a stable id; other panels keep the stored rows as-is.
-  const servicesCatalog = settingsFieldFromScope(scope, "servicesCatalog", true, false)
-    ? assignServiceIds(pickedServices, storedServices).map((row) => {
-        const prev = row.pricing ? row : storedServices.find((p) => (row.id && p.id === row.id) || p.name.toLowerCase() === row.name.toLowerCase());
-        return { ...row, pricing: syncPricing({ pricing: prev?.pricing, unit: prev?.pricing?.unit || "job" }, row.price_range, row.in_stock) };
-      })
+  const baseline = parseBaseline(formData.get("catalog_baseline"));
+  // Catalogue saves give every row a stable id; other panels keep the stored rows as-is.
+  // The browser's typed price is never trusted: unchanged text keeps the stored price (and its
+  // confirmation), edited text is read now (lib/catalogPricing.ts).
+  const servicesCatalog = ownsServices
+    ? assignServiceIds(
+        settleCatalogPrices(pickedServices, storedServices, "service", { baseline, unitFallback: "job" }),
+        storedServices
+      )
     : pickedServices;
+  const storedProducts = normalizeProductCatalog(fresh?.product_catalog ?? tenant.product_catalog).filter((row) => row.name);
   const pickedProducts = pick(
     "productCatalog",
     parseProductCatalogField(formData.get("product_catalog")),
-    normalizeProductCatalog(tenant.product_catalog).filter((row) => row.name)
+    storedProducts
   );
-  // Typed prices ride beside the text: unchanged text keeps its typed price, edited text is read now.
-  const storedProducts = normalizeProductCatalog(tenant.product_catalog);
-  const productCatalog = settingsFieldFromScope(scope, "productCatalog", true, false)
-    ? pickedProducts.map((row) => {
-        const prev = row.pricing ? row : storedProducts.find((p) => p.name.toLowerCase() === row.name.toLowerCase());
-        return { ...row, pricing: syncPricing({ pricing: prev?.pricing, unit: row.unit }, row.price, row.in_stock) };
-      })
+  const productCatalog = ownsProducts
+    ? assignServiceIds(
+        settleCatalogPrices(pickedProducts, storedProducts, "product", { baseline }),
+        storedProducts,
+        PRODUCT_ID_PREFIX
+      )
     : pickedProducts;
   if (
     settingsFieldFromScope(scope, "productCatalog", true, false) ||
@@ -386,11 +400,6 @@ export async function saveAndCompileSettings(
     business_policies: businessPolicies,
     tts_lexicon: ttsLexicon,
   };
-
-  const workspace = await createWorkspaceDataClient();
-  if (!workspace) {
-    return { error: "Not signed in." };
-  }
 
   // FACT_HASH_MODE: confirm only what changed (plus "Looks right" paths). Both
   // sides go through normalizeFactRow before the diff, so a raw seed or import

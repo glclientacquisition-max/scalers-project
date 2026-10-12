@@ -5,8 +5,9 @@ import { BusinessCategoryPicker } from "./BusinessCategoryPicker";
 import { PaymentsEditor } from "./PaymentsEditor";
 import { PriceConfirmCards, type PriceToConfirm } from "./PriceConfirmCards";
 import { confirmPriceAction, saveBusinessCategoryAction, savePaymentsAction } from "@/app/(desk)/settings/structuredActions";
-import { isUnpriced, needsPriceConfirm, sanitizePricing, type Payments } from "@/lib/structuredData";
+import { needsPriceConfirm, sanitizePricing, type Payments } from "@/lib/structuredData";
 import { AddPricesRow } from "./AddPricesRow";
+import { isUnpricedRow } from "@/lib/catalogPricing";
 import { unpricedLabelText } from "./unpricedCopy";
 
 type Row = Record<string, unknown>;
@@ -20,7 +21,8 @@ export function pricesToConfirm(tenant: { product_catalog?: unknown; services_ca
       const name = String(r?.name || "").trim();
       const text = String(r?.[textKey] || "");
       if (!name || !pricing || !needsPriceConfirm({ pricing, text })) continue;
-      out.push({ kind, name, pricing, text });
+      const id = typeof r?.id === "string" && r.id.trim() ? r.id.trim() : null;
+      out.push({ kind, id, name, pricing, text });
     }
   };
   add(tenant.product_catalog, "product", "price");
@@ -30,16 +32,11 @@ export function pricesToConfirm(tenant: { product_catalog?: unknown; services_ca
 
 /** Items with no price text at all. One "Add prices" prompt, not a card each. */
 export function unpricedCount(tenant: { product_catalog?: unknown; services_catalog?: unknown }): number {
-  let n = 0;
-  const add = (rows: unknown, textKey: string) => {
-    for (const r of Array.isArray(rows) ? (rows as Row[]) : []) {
-      if (!String(r?.name || "").trim()) continue;
-      if (isUnpriced({ pricing: sanitizePricing(r?.pricing), text: String(r?.[textKey] || "") })) n += 1;
-    }
-  };
-  add(tenant.product_catalog, "price");
-  add(tenant.services_catalog, "price_range");
-  return n;
+  const rows = (v: unknown) => (Array.isArray(v) ? (v as Row[]) : []);
+  return (
+    rows(tenant.product_catalog).filter((r) => isUnpricedRow(r, "product")).length +
+    rows(tenant.services_catalog).filter((r) => isUnpricedRow(r, "service")).length
+  );
 }
 
 export const UNPRICED_HREF = `${businessSettingsHref("train", "catalog")}&filter=unpriced`;
