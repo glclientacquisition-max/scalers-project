@@ -212,6 +212,7 @@ export function BusinessSettingsShell({
   optionStatus = {},
   liveTransferExecutor = false,
   membersSlot = null,
+  structuredSlot = null,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -220,6 +221,7 @@ export function BusinessSettingsShell({
   optionStatus?: Record<string, SettingsListStatus>;
   liveTransferExecutor?: boolean;
   membersSlot?: ReactNode;
+  structuredSlot?: Partial<Record<"identity" | "catalog" | "policies", ReactNode>> | null;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
@@ -299,6 +301,7 @@ export function BusinessSettingsShell({
           sidebar={rail}
           liveTransferExecutor={liveTransferExecutor}
           membersSlot={formPanel === "team" ? membersSlot : null}
+          structuredSlot={structuredSlot}
         />
       ) : (
         <div className={settingsConsoleClass}>

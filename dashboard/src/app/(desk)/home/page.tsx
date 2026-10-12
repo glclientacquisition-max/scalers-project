@@ -1,4 +1,6 @@
 import { ButtonLink } from "@/components/ui/Button";
+import { DataChecksCard } from "@/components/structured/DataChecksCard";
+import { dataChecksFor } from "@/components/structured/StructuredSettingsSlots";
 import Link from "next/link";
 import { RoleGate } from "@/components/DeskRole";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -42,7 +44,6 @@ import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { getTenantCompletenessScore, getTenantHoldGate } from "@/lib/deskProvenance";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
 import { capabilityGates } from "@/lib/capabilityGates";
-import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { CapabilityGatesPanel } from "@/components/CapabilityGatesPanel";
 import { parseHoursSchedule } from "@/lib/hoursSchedule";
 import { isBetaBilling } from "@/lib/wallet";
@@ -134,7 +135,6 @@ async function HomeOverviewBody() {
   const work = summarizeInboxWork(inbox.items);
   const gates = capabilityGates(tenant, {
     holdGate: hold,
-    liveTransferExecutor: deskLiveTransferExecutorEnabled(),
   });
   const holdsGate = gates.find((g) => g.id === "holds") || null;
   const slotsGate = gates.find((g) => g.id === "booking_slots") || null;
@@ -390,6 +390,7 @@ async function HomeOverviewBody() {
             </>
           ) : null}
         </section>
+        <DataChecksCard checks={dataChecksFor(tenant)} />
         {score && line !== "live" ? (
           <HomeCapture
             tenantId={tenant.id}

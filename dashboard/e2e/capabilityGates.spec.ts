@@ -19,6 +19,9 @@ for (const vertical of ["retail", "home_services"] as const) {
     await expect(list).toBeVisible();
     await expect(page.getByText("What your Business Assistant will say")).toBeVisible();
     await expect(page.getByText(/\bBA\b/)).toHaveCount(0);
+    // Callbacks only: nothing promises a live transfer.
+    await expect(page.getByRole("button", { name: /^Callbacks: / })).toBeVisible();
+    await expect(page.getByText(/put you through|put callers through|transfer the call/i)).toHaveCount(0);
     await list.scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(dir, `gates-${vertical}-list.png`), fullPage: true });
     const pageAxe = await new AxeBuilder({ page }).withTags(TAGS).analyze();

@@ -4893,6 +4893,14 @@ const mediaKeepalive = setInterval(() => {
 
 mediaWss.on('close', () => clearInterval(mediaKeepalive));
 
+// Daily data-quality snapshot (no pg_cron on our projects). Service role only.
+try {
+  const { supabase: dqClient } = require('./src/lib/supabaseClient');
+  if (dqClient) require('./src/lib/dataQualityDaily').startDataQualityDaily({ rpc: (fn) => dqClient.rpc(fn) });
+} catch (err) {
+  console.warn('[data-quality] not started:', err?.message || err);
+}
+
 // ---------------------------------------------------------------------------
 // Owner lead notification (Telegram interim; WhatsApp when Business is linked).
 // Fires from save_caller_info and recording/events webhooks. Sends once per call.

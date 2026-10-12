@@ -327,6 +327,7 @@ function TenantFormInner({
   liveTransferExecutor = false,
   showBack = true,
   membersSlot = null,
+  structuredSlot = null,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -337,6 +338,8 @@ function TenantFormInner({
   showBack?: boolean;
   /** Team & access: Members section (feature flag TEAM_INVITES_ENABLED). */
   membersSlot?: ReactNode;
+  /** Typed-data groups (payments, price checks, category) rendered by the server page per panel. */
+  structuredSlot?: Partial<Record<"identity" | "catalog" | "policies", ReactNode>> | null;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -366,6 +369,11 @@ function TenantFormInner({
   const [bulkProductsError, setBulkProductsError] = useState<string | null>(null);
   const [servicePage, setServicePage] = useState(0);
   const [productPage, setProductPage] = useState(0);
+  const [unpricedOnly, setUnpricedOnly] = useState(false);
+  useEffect(() => {
+    // Read after mount so server and first client render agree.
+    if (new URLSearchParams(window.location.search).get("filter") === "unpriced") setUnpricedOnly(true);
+  }, []);
   const [faqPage, setFaqPage] = useState(0);
   const [unknownFallback, setUnknownFallback] = useState(
     tenant.unknown_answer_fallback || ""
@@ -499,20 +507,27 @@ function TenantFormInner({
     () => JSON.stringify(products.filter((p) => p.name.trim())),
     [products]
   );
-  const servicePageCount = Math.max(1, Math.ceil(services.length / SERVICE_PAGE_SIZE));
-  const productPageCount = Math.max(1, Math.ceil(products.length / PRODUCT_PAGE_SIZE));
+  // ?filter=unpriced (from the Overview "Add prices" row) shows only items with no price text.
+  const serviceIdx = useMemo(
+    () => services.map((_, i) => i).filter((i) => !unpricedOnly || !String(services[i]?.price_range || "").trim()),
+    [services, unpricedOnly]
+  );
+  const productIdx = useMemo(
+    () => products.map((_, i) => i).filter((i) => !unpricedOnly || !String(products[i]?.price || "").trim()),
+    [products, unpricedOnly]
+  );
+  const servicePageCount = Math.max(1, Math.ceil(serviceIdx.length / SERVICE_PAGE_SIZE));
+  const productPageCount = Math.max(1, Math.ceil(productIdx.length / PRODUCT_PAGE_SIZE));
   const faqPageCount = Math.max(1, Math.ceil(faqs.length / FAQ_PAGE_SIZE));
   const safeServicePage = Math.min(servicePage, servicePageCount - 1);
   const safeProductPage = Math.min(productPage, productPageCount - 1);
   const safeFaqPage = Math.min(faqPage, faqPageCount - 1);
-  const visibleServices = services.slice(
-    safeServicePage * SERVICE_PAGE_SIZE,
-    safeServicePage * SERVICE_PAGE_SIZE + SERVICE_PAGE_SIZE
-  );
-  const visibleProducts = products.slice(
-    safeProductPage * PRODUCT_PAGE_SIZE,
-    safeProductPage * PRODUCT_PAGE_SIZE + PRODUCT_PAGE_SIZE
-  );
+  const visibleServices = serviceIdx
+    .slice(safeServicePage * SERVICE_PAGE_SIZE, safeServicePage * SERVICE_PAGE_SIZE + SERVICE_PAGE_SIZE)
+    .map((i) => services[i]);
+  const visibleProducts = productIdx
+    .slice(safeProductPage * PRODUCT_PAGE_SIZE, safeProductPage * PRODUCT_PAGE_SIZE + PRODUCT_PAGE_SIZE)
+    .map((i) => products[i]);
   const visibleFaqs = faqs.slice(
     safeFaqPage * FAQ_PAGE_SIZE,
     safeFaqPage * FAQ_PAGE_SIZE + FAQ_PAGE_SIZE
@@ -937,6 +952,7 @@ function TenantFormInner({
       <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
       <section className={panel === "identity" ? "space-y-3" : "hidden"}>
+        {panel === "identity" ? structuredSlot?.identity : null}
         <SettingsGroup title="Business Assistant">
           <SettingsRow label="Assistant name" htmlFor="agent_name">
             <input
@@ -1235,6 +1251,7 @@ function TenantFormInner({
       </section>
 
       <section className={panel === "catalog" ? "space-y-4" : "hidden"}>
+        {panel === "catalog" ? structuredSlot?.catalog : null}
         <CatalogSectionShell
           vertical={vertical}
           title="Catalogue"
@@ -1288,7 +1305,7 @@ function TenantFormInner({
 
           <div className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline lg:hidden">
             {visibleServices.map((service, localIndex) => {
-              const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
+              const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
               return (
                 <div key={`service-m-${index}`} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2">
                   <div className="min-w-0">
@@ -1333,7 +1350,7 @@ function TenantFormInner({
             <CatalogPager
               page={safeServicePage}
               pageSize={SERVICE_PAGE_SIZE}
-              total={services.length}
+              total={serviceIdx.length}
               noun="service"
               onPage={setServicePage}
             />
@@ -1355,7 +1372,7 @@ function TenantFormInner({
                 </thead>
                 <tbody className="divide-y divide-hairline bg-surface">
                   {visibleServices.map((service, localIndex) => {
-                    const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
+                    const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
                     return (
                       <tr key={`service-${index}`} className="align-middle">
                         <td className="min-w-0 px-3 py-2">
@@ -1446,7 +1463,7 @@ function TenantFormInner({
             <CatalogPager
               page={safeServicePage}
               pageSize={SERVICE_PAGE_SIZE}
-              total={services.length}
+              total={serviceIdx.length}
               noun="service"
               onPage={setServicePage}
             />
@@ -1515,6 +1532,20 @@ function TenantFormInner({
             </p>
           ) : null}
 
+          {unpricedOnly ? (
+            <div data-unpriced-filter="" className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-accent-tonal px-4 py-2">
+              <p className="text-meta text-ink">
+                Showing {productIdx.length + serviceIdx.length} without a price. Add one, or choose Ask so callers get a call back.
+              </p>
+              <button
+                type="button"
+                onClick={() => setUnpricedOnly(false)}
+                className="inline-flex min-h-11 shrink-0 items-center text-meta font-medium text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                Show all
+              </button>
+            </div>
+          ) : null}
           {products.length === 0 ? null : (
             <>
             <p id="holdable" className="scroll-mt-24 px-1 text-meta text-ink-2">
@@ -1522,7 +1553,7 @@ function TenantFormInner({
             </p>
             <div className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline lg:hidden">
               {visibleProducts.map((product, localIndex) => {
-                const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
+                const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
                 return (
                   <div key={`product-m-${index}`} className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_2.75rem] items-center gap-2 px-3 py-2">
                     <div className="min-w-0">
@@ -1584,7 +1615,7 @@ function TenantFormInner({
               <CatalogPager
                 page={safeProductPage}
                 pageSize={PRODUCT_PAGE_SIZE}
-                total={products.length}
+                total={productIdx.length}
                 noun="product"
                 onPage={setProductPage}
               />
@@ -1605,7 +1636,7 @@ function TenantFormInner({
                   </thead>
                   <tbody className="divide-y divide-hairline bg-surface">
                     {visibleProducts.map((product, localIndex) => {
-                      const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
+                      const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
                       return (
                         <tr key={`product-${index}`} className="align-middle">
                           <td className="min-w-0 px-3 py-2">
@@ -1701,7 +1732,7 @@ function TenantFormInner({
               <CatalogPager
                 page={safeProductPage}
                 pageSize={PRODUCT_PAGE_SIZE}
-                total={products.length}
+                total={productIdx.length}
                 noun="product"
                 onPage={setProductPage}
               />
@@ -2011,6 +2042,7 @@ function TenantFormInner({
       <section
         className={panel === "policies" ? "space-y-6" : "hidden"}
       >
+        {panel === "policies" ? structuredSlot?.policies : null}
         {vertical === "home_services" ? (
           <div id="bookings" className="scroll-mt-24">
             <SettingsGroup title="Bookings">
@@ -2306,7 +2338,8 @@ function TenantFormInner({
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
         {membersSlot}
-        {liveTransferExecutor || handoffMode === "live_transfer" ? (
+        {/* Live connect only appears once the runtime supports it. Today Scalers is callbacks only. */}
+        {liveTransferExecutor ? (
           <>
             <div id="handoff" className="scroll-mt-24">
             <SettingsGroup>

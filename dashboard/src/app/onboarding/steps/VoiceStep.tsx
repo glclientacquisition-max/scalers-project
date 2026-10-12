@@ -68,11 +68,12 @@ export function VoiceStep({
         <h2 className="mb-2 px-4 text-meta font-medium text-ink-2">When a caller needs you</h2>
         <ChoiceList
           label="When a caller needs you"
-          value={value.handoff}
+          // Callbacks only: Scalers does not put callers through live. A saved
+          // live_transfer preference still shows as the callback choice.
+          value="callback"
           onChange={(handoff) => onChange({ ...value, handoff })}
           options={[
-            { value: "callback", title: "Take a message", detail: "Your Business Assistant takes the details and alerts you right away." },
-            { value: "live_transfer", title: "Transfer the call", detail: "Rings your phone during opening hours. Takes a message if you don't answer." },
+            { value: "callback", title: "Take a message for a callback", detail: "Your Business Assistant takes their name and reason, then alerts you on WhatsApp or email to call back." },
           ]}
         />
       </section>

@@ -1,5 +1,7 @@
 "use server";
 
+import { syncPricing } from "@/lib/structuredData";
+import { normalizePhone } from "@/lib/setupFlow";
 import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
@@ -128,13 +130,24 @@ export async function saveAndCompileSettings(
   );
   // Catalogue saves give every service a stable id; other panels keep the stored rows as-is.
   const servicesCatalog = settingsFieldFromScope(scope, "servicesCatalog", true, false)
-    ? assignServiceIds(pickedServices, storedServices)
+    ? assignServiceIds(pickedServices, storedServices).map((row) => {
+        const prev = row.pricing ? row : storedServices.find((p) => (row.id && p.id === row.id) || p.name.toLowerCase() === row.name.toLowerCase());
+        return { ...row, pricing: syncPricing({ pricing: prev?.pricing, unit: prev?.pricing?.unit || "job" }, row.price_range, row.in_stock) };
+      })
     : pickedServices;
-  const productCatalog = pick(
+  const pickedProducts = pick(
     "productCatalog",
     parseProductCatalogField(formData.get("product_catalog")),
     normalizeProductCatalog(tenant.product_catalog).filter((row) => row.name)
   );
+  // Typed prices ride beside the text: unchanged text keeps its typed price, edited text is read now.
+  const storedProducts = normalizeProductCatalog(tenant.product_catalog);
+  const productCatalog = settingsFieldFromScope(scope, "productCatalog", true, false)
+    ? pickedProducts.map((row) => {
+        const prev = row.pricing ? row : storedProducts.find((p) => p.name.toLowerCase() === row.name.toLowerCase());
+        return { ...row, pricing: syncPricing({ pricing: prev?.pricing, unit: row.unit }, row.price, row.in_stock) };
+      })
+    : pickedProducts;
   if (
     settingsFieldFromScope(scope, "productCatalog", true, false) ||
     settingsFieldFromScope(scope, "servicesCatalog", true, false)
@@ -217,7 +230,10 @@ export async function saveAndCompileSettings(
       ownerPhone: ownerAlertPhone(tenant),
     });
     if (!team.ok) return { error: team.error };
-    teamDirectory = parseTeamDirectoryField(JSON.stringify(team.rows));
+    // Store E.164 (+2547...) so calls, contacts and alerts match one format.
+    teamDirectory = parseTeamDirectoryField(
+      JSON.stringify(team.rows.map((r) => ({ ...r, phone: r.phone ? normalizePhone(r.phone) || r.phone : r.phone })))
+    );
   }
   const faqs = pick(
     "faqs",
