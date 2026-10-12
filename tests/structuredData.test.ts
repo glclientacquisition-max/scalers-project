@@ -21,7 +21,10 @@ test("taxonomy: SQL CHECK lists match the taxonomy ids", () => {
   };
   const ids = (l: { id: string }[]) => l.map((o) => o.id).sort();
   assert.deepEqual(sqlList("intent"), ids(sd.INTENTS));
-  assert.deepEqual(sqlList("outcome"), ids(sd.OUTCOMES));
+  // Outcome check was replaced when "transferred" was removed (callbacks only).
+  const TF = read("supabase/migrations/20261012210000_three_features.sql");
+  const out = TF.match(/check \(outcome is null or outcome in \(([^)]*)\)/)!;
+  assert.deepEqual(out[1].match(/'([a-z_]+)'/g)!.map((s) => s.replace(/'/g, "")).sort(), ids(sd.OUTCOMES));
   assert.deepEqual(sqlList("lost_reason"), ids(sd.LOST_REASONS));
   const V2 = read("supabase/migrations/20261012090000_payments_policies_v2.sql");
   for (const m of sd.PAYMENT_METHODS) assert.ok(V2.includes(`'${m.id}'`), m.id);

@@ -83,7 +83,8 @@ describe('Brain production safety', () => {
         active: true,
       },
     ]);
-    assert.match(block, /\[promo\]/);
-    assert.match(block, /NEVER volunteer a promo/i);
+    // Updates posted before the owner's choice existed: promos wait for the topic.
+    assert.match(block, /\[only if asked\]/);
+    assert.match(block, /Never volunteer it/i);
   });
 });

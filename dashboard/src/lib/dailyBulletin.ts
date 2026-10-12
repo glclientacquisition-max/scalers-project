@@ -1,6 +1,11 @@
+/** always: tell every caller early in the call. ask: only when the caller asks about it. */
+export type BulletinAnnounce = "always" | "ask";
+
 export type BulletinItem = {
   id: string;
   text: string;
+  /** Null on updates posted before the choice existed. */
+  announce: BulletinAnnounce | null;
   active: boolean;
   starts_at: string | null;
   ends_at: string | null;
@@ -12,6 +17,11 @@ export type BulletinExpiry = "today" | "tomorrow" | "manual" | "schedule";
 const MAX_ACTIVE = 5;
 const MAX_TEXT = 160;
 
+export function parseAnnounce(raw: unknown): BulletinAnnounce | null {
+  const v = String(raw ?? "").trim().toLowerCase();
+  return v === "always" || v === "ask" ? v : null;
+}
+
 export function normalizeBulletin(raw: unknown): BulletinItem[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -22,6 +32,7 @@ export function normalizeBulletin(raw: unknown): BulletinItem[] {
       return {
         id: String(r.id || `item-${index}`),
         text: text.slice(0, MAX_TEXT),
+        announce: parseAnnounce(r.announce),
         active: r.active !== false,
         starts_at: r.starts_at ? String(r.starts_at) : null,
         ends_at: r.ends_at ? String(r.ends_at) : null,
@@ -135,6 +146,12 @@ export function deskBulletinItems(
   );
 }
 
+function eatClock(d: Date): string {
+  const h = d.getUTCHours();
+  const m = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${h % 12 === 0 ? 12 : h % 12}:${m} ${h < 12 ? "am" : "pm"}`;
+}
+
 export function formatBulletinEndLabel(
   endsAt: string | null,
   now = new Date()
@@ -143,33 +160,38 @@ export function formatBulletinEndLabel(
   const end = new Date(endsAt);
   if (Number.isNaN(end.getTime())) return "Until cleared";
 
-  const eatEndMs = end.getTime() + 3 * 60 * 60 * 1000;
-  const eatNowMs = now.getTime() + 3 * 60 * 60 * 1000;
-  const eatEnd = new Date(eatEndMs);
-  const eatNow = new Date(eatNowMs);
-  const sameDay =
-    eatEnd.getUTCFullYear() === eatNow.getUTCFullYear() &&
-    eatEnd.getUTCMonth() === eatNow.getUTCMonth() &&
-    eatEnd.getUTCDate() === eatNow.getUTCDate();
-
-  if (sameDay && eatEnd.getUTCHours() >= 23) return "Until tonight";
-
-  const tomorrow = new Date(eatNowMs);
+  // Shift both to Nairobi wall time, then read the UTC fields.
+  const eatEnd = new Date(end.getTime() + 3 * 60 * 60 * 1000);
+  const eatNow = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+  const sameDate = (a: Date, b: Date) =>
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth() &&
+    a.getUTCDate() === b.getUTCDate();
+  const endOfDay = eatEnd.getUTCHours() === 23 && eatEnd.getUTCMinutes() >= 59;
+  const tomorrow = new Date(eatNow.getTime());
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-  const isTomorrow =
-    eatEnd.getUTCFullYear() === tomorrow.getUTCFullYear() &&
-    eatEnd.getUTCMonth() === tomorrow.getUTCMonth() &&
-    eatEnd.getUTCDate() === tomorrow.getUTCDate() &&
-    eatEnd.getUTCHours() >= 23;
 
-  if (isTomorrow) return "Until tomorrow night";
+  if (sameDate(eatEnd, eatNow)) return endOfDay ? "Until tonight" : `Until ${eatClock(eatEnd)}`;
+  if (sameDate(eatEnd, tomorrow)) return endOfDay ? "Until tomorrow night" : `Until tomorrow, ${eatClock(eatEnd)}`;
 
-  return `Until ${eatEnd.toLocaleDateString("en-KE", {
+  const day = eatEnd.toLocaleDateString("en-KE", {
     weekday: "short",
     day: "numeric",
     month: "short",
     timeZone: "UTC",
-  })}`;
+  }).replace(",", "");
+  return endOfDay ? `Until ${day}` : `Until ${day}, ${eatClock(eatEnd)}`;
+}
+
+/** Replace one update's words, choice and window; the id stays so the list keeps its place. */
+export function applyBulletinEdit(
+  items: BulletinItem[],
+  id: string,
+  patch: { text: string; announce: BulletinAnnounce; starts_at: string; ends_at: string | null }
+): BulletinItem[] {
+  return items.map((item) =>
+    item.id === id ? { ...item, ...patch, active: true } : item
+  );
 }
 
 export function resolveExpiryEndsAt(

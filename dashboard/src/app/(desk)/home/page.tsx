@@ -113,7 +113,7 @@ async function HomeOverviewBody() {
     loadOwnerPackageMeter(tenant.id),
     getTenantCompletenessScore(tenant.id),
     getTenantHoldGate(tenant.id),
-    loadCallInsights(client, tenant.id),
+    loadCallInsights(client, tenant.id, 30, tenant.faqs),
   ]);
   timer.mark("data");
   console.info(timer.line("home"));

@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { Button } from "@/components/ui/Button";
+import { notify } from "@/components/ui/DeskNotice";
+import { deskFieldClass } from "@/components/ui/deskChrome";
+import { addFaqFromInsightAction } from "@/app/(desk)/home/insightActions";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import { Sheet } from "@/components/ui/Sheet";
 import { inboxRecordHref } from "@/lib/inboxHref";
@@ -74,26 +78,22 @@ function InsightDetail({ section }: { section: InsightSection }) {
           {group ? <h3 className="px-1 text-meta font-medium text-ink-2">{group}</h3> : null}
           <ul className="divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
             {bars.map((b) => (
-              <BarRow key={b.id} bar={b} max={Math.max(...bars.map((x) => x.count))} />
+              <BarRow key={b.id} bar={b} max={Math.max(...bars.map((x) => x.count))} answerable={section.id === "unanswered"} />
             ))}
           </ul>
         </div>
       ))}
       {section.id === "unanswered" ? (
-        <p className="px-1 text-meta text-ink-2">
-          Add an answer in{" "}
-          <Link href="/settings?tab=train&panel=faqs" className="font-medium text-accent underline-offset-2 hover:underline">
-            Settings, FAQs
-          </Link>{" "}
-          and your Business Assistant uses it on the next call.
-        </p>
+        <p className="px-1 text-meta text-ink-2">Answers you add here are used from the next call.</p>
       ) : null}
     </div>
   );
 }
 
-function BarRow({ bar, max }: { bar: InsightBar; max: number }) {
+function BarRow({ bar, max, answerable = false }: { bar: InsightBar; max: number; answerable?: boolean }) {
   const [shown, setShown] = useState(false);
+  const [done, setDone] = useState(Boolean(bar.done));
+  const [adding, setAdding] = useState(false);
   const id = `bar-${bar.id.replace(/[^a-z0-9-]/gi, "")}`;
   return (
     <li>
@@ -106,6 +106,18 @@ function BarRow({ bar, max }: { bar: InsightBar; max: number }) {
           <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.max(4, (bar.count / Math.max(1, max)) * 100)}%` }} />
         </span>
       </button>
+      {answerable ? (
+        <div className="flex min-h-11 items-center justify-end px-4 pb-2">
+          {done ? (
+            <span className="text-meta text-ink-2">In your FAQs</span>
+          ) : (
+            <Button variant="tonal" size="sm" onClick={() => setAdding(true)}>
+              Add answer
+            </Button>
+          )}
+        </div>
+      ) : null}
+      {answerable ? <AddAnswerSheet bar={bar} open={adding} onOpenChange={setAdding} onSaved={() => setDone(true)} /> : null}
       {shown ? (
         <ul id={id} className="space-y-0.5 px-4 pb-3">
           {bar.calls.slice(0, 8).map((c) => (
@@ -120,5 +132,61 @@ function BarRow({ bar, max }: { bar: InsightBar; max: number }) {
         </ul>
       ) : null}
     </li>
+  );
+}
+
+/** Question filled in from the call; the owner writes the answer. */
+function AddAnswerSheet({ bar, open, onOpenChange, onSaved }: { bar: InsightBar; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
+  const [question, setQuestion] = useState(bar.label);
+  const [answer, setAnswer] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const save = () =>
+    start(async () => {
+      const res = await addFaqFromInsightAction({ question, answer });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setError(null);
+      notify(res.message);
+      onSaved();
+      onOpenChange(false);
+    });
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Add answer"
+      description={`Asked in ${bar.count} ${bar.count === 1 ? "call" : "calls"}.`}
+      footer={
+        <Button variant="primary" size="lg" block pending={pending} disabled={!question.trim() || !answer.trim()} onClick={save}>
+          Save answer
+        </Button>
+      }
+    >
+      <div className="space-y-3 pb-2">
+        <label className="block">
+          <span className="text-meta font-medium text-ink-2">Question</span>
+          <input value={question} onChange={(e) => setQuestion(e.target.value)} maxLength={200} className={`mt-1 ${deskFieldClass}`} />
+        </label>
+        <label className="block">
+          <span className="text-meta font-medium text-ink-2">Callers hear</span>
+          <textarea
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            maxLength={400}
+            rows={4}
+            placeholder="e.g. Yes, we deliver to Rongai for KSh 300."
+            className={`mt-1 min-h-28 py-3 ${deskFieldClass}`}
+          />
+        </label>
+        {error ? (
+          <p role="alert" className="text-meta text-attention">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </Sheet>
   );
 }
