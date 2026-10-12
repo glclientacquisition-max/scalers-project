@@ -374,7 +374,7 @@ export async function saveAndCompileSettings(
       String(formData.get("business_hours") || "").trim(),
       String(tenant.business_hours || "").trim()
     );
-  const locationsText = [formatLocationsForCompiler(businessLocations), formatServiceAreasForCompiler(serviceAreas)]
+  const locationsText = [formatLocationsForCompiler(businessLocations, { noPremises: serviceAreas?.no_premises }), formatServiceAreasForCompiler(serviceAreas)]
     .filter(Boolean)
     .join("\n\n");
   const policiesText = formatPoliciesForCompiler(businessPolicies);

@@ -13,6 +13,8 @@ export type AreaMode = "delivery" | "visit" | "pickup";
 export type FeeMode = "free" | "fixed" | "ask";
 export type DeliveredBy = "self" | "rider" | "courier";
 export type RiderPaid = "in_fee" | "on_arrival";
+/** How customers reach the business. Defaults from the business type. */
+export type Reach = "deliver" | "visit" | "walk_in" | "both";
 
 export type ServiceArea = {
   id: string;
@@ -30,7 +32,39 @@ export type ServiceAreas = {
   areas: ServiceArea[];
   delivered_by: DeliveredBy[];
   rider_paid: RiderPaid | null;
+  reach: Reach;
+  /** Home services with no premises: "We come to you"; places are a base for reference only. */
+  no_premises: boolean;
 };
+
+export const REACH_OPTIONS: ReadonlyArray<{ id: Reach; label: string; detail: string }> = [
+  { id: "deliver", label: "We deliver", detail: "Shops and suppliers" },
+  { id: "visit", label: "We visit customers", detail: "Cleaners, fundis, salons at home" },
+  { id: "both", label: "We deliver and visit", detail: "Pick per area" },
+  { id: "walk_in", label: "Customers come to us", detail: "No delivery or visits" },
+];
+
+export function defaultReach(vertical: string | null | undefined): Reach {
+  if (vertical === "home_services") return "visit";
+  if (vertical === "hospitality") return "walk_in";
+  return "deliver";
+}
+
+/** Labels for the Locations page, by how customers reach you. */
+export function reachCopy(r: Reach): { title: string; fee: string; empty: string; areas: boolean; riders: boolean; perArea: boolean } {
+  switch (r) {
+    case "visit":
+      return { title: "Where do you visit customers?", fee: "Call-out fee", empty: "Add the areas you visit and one call-out fee.", areas: true, riders: false, perArea: false };
+    case "both":
+      return { title: "Where do you deliver or visit?", fee: "Fee", empty: "Add your areas, then mark each one delivery or visit.", areas: true, riders: true, perArea: true };
+    case "walk_in":
+      return { title: "Customers come to us", fee: "", empty: "", areas: false, riders: false, perArea: false };
+    default:
+      return { title: "Where do you deliver?", fee: "Delivery fee", empty: "Add your areas and one delivery fee.", areas: true, riders: true, perArea: false };
+  }
+}
+
+const REACH_IDS = new Set<Reach>(["deliver", "visit", "walk_in", "both"]);
 
 export const AREA_MODES: ReadonlyArray<{ id: AreaMode; label: string; verb: string }> = [
   { id: "delivery", label: "Delivery", verb: "deliver to" },
@@ -69,8 +103,8 @@ function ksh(v: unknown): number | null {
   return Number.isFinite(n) && n >= 0 && n <= MAX_KSH ? Math.round(n) : null;
 }
 
-export function emptyServiceAreas(): ServiceAreas {
-  return { version: 1, areas: [], delivered_by: [], rider_paid: null };
+export function emptyServiceAreas(vertical?: string | null): ServiceAreas {
+  return { version: 1, areas: [], delivered_by: [], rider_paid: null, reach: defaultReach(vertical), no_premises: false };
 }
 
 export function newServiceArea(id: string, vertical?: string | null): ServiceArea {
@@ -109,20 +143,21 @@ export function normalizeServiceAreas(raw: unknown, vertical?: string | null): S
   }
   const deliveredBy = (Array.isArray(obj.delivered_by) ? obj.delivered_by : []).map(String).filter((b): b is DeliveredBy => BY_IDS.has(b as DeliveredBy));
   const riderPaid = obj.rider_paid === "in_fee" || obj.rider_paid === "on_arrival" ? (obj.rider_paid as RiderPaid) : null;
-  return { version: 1, areas, delivered_by: [...new Set(deliveredBy)], rider_paid: riderPaid };
+  const reach = REACH_IDS.has(obj.reach as Reach) ? (obj.reach as Reach) : defaultReach(vertical);
+  return { version: 1, areas, delivered_by: [...new Set(deliveredBy)], rider_paid: riderPaid, reach, no_premises: obj.no_premises === true };
 }
 
 /** Old Policies coverage list -> areas with "we confirm the fee", unconfirmed (owner checks them once). */
 export function serviceAreasFromCoverage(ids: unknown, vertical?: string | null): ServiceAreas | null {
   if (!Array.isArray(ids)) return null;
   const areas = parseCoverageAreas(ids).map((id) => ({ ...newServiceArea(id, vertical), source: "import" as const, confirmed: false }));
-  return { ...emptyServiceAreas(), areas };
+  return { ...emptyServiceAreas(vertical), areas };
 }
 
 /** Stored value, or a value read from the old coverage list when Locations was never saved. */
 export function serviceAreasForForm(stored: unknown, coverage: unknown, vertical?: string | null): ServiceAreas {
   if (stored && typeof stored === "object") return normalizeServiceAreas(stored, vertical);
-  return serviceAreasFromCoverage(coverage, vertical) ?? emptyServiceAreas();
+  return serviceAreasFromCoverage(coverage, vertical) ?? emptyServiceAreas(vertical);
 }
 
 /** business_policies.coverage_areas for the voice server: area ids, or null when none are listed. */
@@ -137,8 +172,9 @@ const money = (n: number) => `KSh ${n.toLocaleString("en-US")}`;
 function feeText(a: ServiceArea, forPrompt: boolean): string {
   const trusted = !forPrompt || (a.source === "owner" && a.confirmed);
   if (!trusted) return "fee confirmed on callback";
-  if (a.fee_mode === "free") return "free";
-  if (a.fee_mode === "fixed" && a.fee_ksh != null) return money(a.fee_ksh);
+  const visit = a.modes[0] === "visit";
+  if (a.fee_mode === "free") return visit ? "no call-out fee" : "free";
+  if (a.fee_mode === "fixed" && a.fee_ksh != null) return visit ? `call-out fee ${money(a.fee_ksh)}` : money(a.fee_ksh);
   return "fee confirmed on callback";
 }
 
@@ -151,10 +187,17 @@ export function areaSummary(a: ServiceArea): string {
 
 /** What callers hear, shown under the editor. */
 export function serviceAreasSentence(v: ServiceAreas | null | undefined): string {
+  if (v?.reach === "walk_in") return "We don't deliver or visit. Customers come to us.";
   if (!v || !v.areas.length) return "";
   const parts = v.areas.map((a) => {
     const verb = AREA_MODES.find((o) => o.id === a.modes[0])?.verb || "deliver to";
-    const fee = a.fee_mode === "free" ? " for free" : a.fee_mode === "fixed" && a.fee_ksh != null ? ` for ${money(a.fee_ksh)}` : "";
+    const visit = a.modes[0] === "visit";
+    const fee =
+      a.fee_mode === "free"
+        ? visit ? " with no call-out fee" : " for free"
+        : a.fee_mode === "fixed" && a.fee_ksh != null
+          ? visit ? ` for a call-out fee of ${money(a.fee_ksh)}` : ` for ${money(a.fee_ksh)}`
+          : "";
     const eta = a.eta ? `, ${a.eta.charAt(0).toLowerCase()}${a.eta.slice(1)}` : "";
     return `We ${verb} ${shortName(a.id)}${fee}${eta}.`;
   });
@@ -163,6 +206,9 @@ export function serviceAreasSentence(v: ServiceAreas | null | undefined): string
 
 /** Prompt block. Fees are quoted only when the owner set and confirmed them. */
 export function formatServiceAreasForCompiler(v: ServiceAreas | null | undefined): string {
+  if (v?.reach === "walk_in") {
+    return "Customers come to us. We do not deliver or visit: point callers to the nearest branch below.";
+  }
   if (!v || !v.areas.length) return "";
   const lines = v.areas.map((a) => {
     const bits = [a.modes.map((m) => (m === "visit" ? "home visit" : m === "pickup" ? "pickup only" : "delivery")).join(" or "), feeText(a, true)];
@@ -170,12 +216,14 @@ export function formatServiceAreasForCompiler(v: ServiceAreas | null | undefined
     if (a.min_order_ksh) bits.push(`orders from ${money(a.min_order_ksh)}`);
     return `- ${shortName(a.id)}: ${bits.join(", ")}`;
   });
-  const out = ["Areas you serve:", ...lines];
-  if (v.delivered_by.length) {
+  const head = v.reach === "visit" ? "Areas we visit:" : v.reach === "both" ? "Areas you serve:" : "Delivery areas:";
+  const out = [head, ...lines];
+  const riders = reachCopy(v.reach).riders && v.areas.some((a) => a.modes.includes("delivery"));
+  if (riders && v.delivered_by.length) {
     out.push(`Delivered by: ${v.delivered_by.map((b) => DELIVERED_BY.find((o) => o.id === b)?.label.toLowerCase()).join(", ")}.`);
   }
-  if (v.rider_paid === "on_arrival") out.push("The customer pays the rider on arrival.");
-  if (v.rider_paid === "in_fee") out.push("The rider is paid from the delivery fee.");
+  if (riders && v.rider_paid === "on_arrival") out.push("The customer pays the rider on arrival.");
+  if (riders && v.rider_paid === "in_fee") out.push("The rider is paid from the delivery fee.");
   out.push("A place not on this list is not covered: say so and offer a callback. Never guess a fee that is not listed.");
   return out.join("\n");
 }
@@ -199,7 +247,7 @@ export function parseServiceAreasField(raw: unknown, vertical?: string | null): 
   }
 }
 
-export type BulkFee = { fee_mode: FeeMode; fee_ksh: number | null; eta: string | null };
+export type BulkFee = { fee_mode: FeeMode; fee_ksh: number | null; eta: string | null; mode?: AreaMode };
 
 /** Set one fee (and time) on many areas at once; areas not yet listed are added. */
 export function applyFeeToAreas(v: ServiceAreas, ids: readonly string[], fee: BulkFee, vertical?: string | null): ServiceAreas {
@@ -208,6 +256,7 @@ export function applyFeeToAreas(v: ServiceAreas, ids: readonly string[], fee: Bu
     ...a,
     fee_mode: fee.fee_mode,
     fee_ksh: fee.fee_mode === "fixed" ? fee.fee_ksh : null,
+    modes: fee.mode ? [fee.mode] : a.modes,
     eta: fee.eta && fee.eta.trim() ? fee.eta.trim().slice(0, ETA_MAX) : null,
     source: "owner",
     confirmed: true,
@@ -215,7 +264,12 @@ export function applyFeeToAreas(v: ServiceAreas, ids: readonly string[], fee: Bu
   const have = new Set(v.areas.map((a) => a.id));
   const areas = v.areas.map((a) => (want.has(a.id) ? set(a) : a));
   for (const id of ids) {
-    if (!have.has(id) && areas.length < COVERAGE_AREA_MAX) areas.push(set(newServiceArea(id, vertical)));
+    if (!have.has(id) && areas.length < COVERAGE_AREA_MAX) {
+      const fresh = newServiceArea(id, vertical);
+      if (v.reach === "visit") fresh.modes = ["visit"];
+      if (v.reach === "deliver") fresh.modes = ["delivery"];
+      areas.push(set(fresh));
+    }
   }
   return { ...v, areas };
 }

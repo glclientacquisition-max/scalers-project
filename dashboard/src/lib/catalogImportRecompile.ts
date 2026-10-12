@@ -70,7 +70,7 @@ export async function recompileAfterCatalogImport(opts: {
       ? normalizeServiceAreas(tenant.service_areas, tenant.vertical)
       : serviceAreasFromCoverage(policies.coverage_areas, tenant.vertical);
   const locationsText = [
-    formatLocationsForCompiler(normalizeBusinessLocations(tenant.business_locations)),
+    formatLocationsForCompiler(normalizeBusinessLocations(tenant.business_locations), { noPremises: areas?.no_premises }),
     formatServiceAreasForCompiler(areas),
   ]
     .filter(Boolean)

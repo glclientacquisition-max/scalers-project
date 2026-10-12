@@ -11,7 +11,9 @@ import {
   DELIVERED_BY,
   ETA_MAX,
   FEE_MODES,
+  REACH_OPTIONS,
   RIDER_PAID,
+  reachCopy,
   applyFeeToAreas,
   areaSummary,
   serviceAreasSentence,
@@ -20,6 +22,7 @@ import {
   type BulkFee,
   type DeliveredBy,
   type FeeMode,
+  type Reach,
   type RiderPaid,
   type ServiceArea,
   type ServiceAreas,
@@ -34,11 +37,11 @@ function kshInput(v: string): number | null {
 const DEFAULT_FEE: BulkFee = { fee_mode: "free", fee_ksh: null, eta: "Same day" };
 
 /** Fee picker shared by the "Add areas" drawer and one area's drawer. */
-function FeeFields({ fee, onChange, error }: { fee: BulkFee; onChange: (f: BulkFee) => void; error?: string }) {
+function FeeFields({ fee, label, onChange, error }: { fee: BulkFee; label: string; onChange: (f: BulkFee) => void; error?: string }) {
   return (
     <div className="space-y-3">
       <CheckList<FeeMode>
-        label="Delivery fee"
+        label={label}
         options={FEE_MODES}
         value={[fee.fee_mode]}
         onChange={(v) => v[0] && onChange({ ...fee, fee_mode: v[0] })}
@@ -92,12 +95,13 @@ export function ServiceAreasEditor({
     ...ticked.map((id) => ({ id, label: coverageAreaLabel(id) })),
     ...results.map((o) => ({ id: o.id, label: o.label })),
   ];
+  const copy = reachCopy(value.reach);
   const unconfirmed = value.areas.filter((a) => !a.confirmed).length;
-  const delivers = value.areas.some((a) => a.modes.includes("delivery"));
+  const delivers = copy.riders && value.areas.some((a) => a.modes.includes("delivery"));
 
   function openBulk(ids: string[]) {
     setTicked(ids);
-    setFee(DEFAULT_FEE);
+    setFee({ ...DEFAULT_FEE, mode: value.reach === "both" ? "delivery" : undefined });
     setQuery("");
     setError("");
     setSheet("bulk");
@@ -131,10 +135,25 @@ export function ServiceAreasEditor({
 
   return (
     <div className="space-y-6" data-service-areas-editor="">
-      {value.areas.length === 0 ? (
+      <CheckList<Reach>
+        label="How customers get your service"
+        options={REACH_OPTIONS}
+        value={[value.reach]}
+        onChange={(v) => v[0] && canEdit && onChange({ ...value, reach: v[0], no_premises: v[0] === "visit" ? value.no_premises : false })}
+      />
+      {value.reach === "visit" ? (
+        <CheckList<"none">
+          label="Your premises"
+          multiple
+          options={[{ id: "none", label: "We come to you", detail: "No shop or office for callers to visit" }]}
+          value={value.no_premises ? ["none"] : []}
+          onChange={(v) => canEdit && onChange({ ...value, no_premises: v.includes("none") })}
+        />
+      ) : null}
+      {!copy.areas ? null : value.areas.length === 0 ? (
         <div className="space-y-3 rounded-2xl border border-hairline bg-surface px-4 py-5 text-center">
-          <p className="text-body font-medium text-ink">Where do you deliver?</p>
-          <p className="text-meta text-ink-2">Add your areas and one fee. Your Business Assistant tells callers the price.</p>
+          <p className="text-body font-medium text-ink">{copy.title}</p>
+          <p className="text-meta text-ink-2">{copy.empty} Your Business Assistant tells callers the price.</p>
           {canEdit ? (
             <Button onClick={() => openBulk(homeAreas)} data-areas-add="">
               Add areas
@@ -142,7 +161,7 @@ export function ServiceAreasEditor({
           ) : null}
         </div>
       ) : (
-        <SettingsGroup title="Areas you serve">
+        <SettingsGroup title={copy.title}>
           {unconfirmed ? (
             <div className="space-y-2 bg-accent-tonal px-4 py-3" role="note">
               <p className="text-body font-medium text-ink">Add your fee</p>
@@ -191,7 +210,7 @@ export function ServiceAreasEditor({
         open={sheet === "bulk"}
         onOpenChange={(o) => !o && setSheet(null)}
         title="Add areas"
-        description="Tick the places you deliver to. One fee for all."
+        description="Tick the places, then one fee for all."
         footer={
           <Button block onClick={saveBulk} data-areas-save="">
             {ticked.length ? `Save ${ticked.length} ${ticked.length === 1 ? "area" : "areas"}` : "Save"}
@@ -213,7 +232,20 @@ export function ServiceAreasEditor({
           ) : (
             <p className="text-meta text-ink-2">No match. Try the nearest town.</p>
           )}
-          <FeeFields fee={fee} onChange={setFee} error={error && fee.fee_mode === "fixed" ? error : undefined} />
+          {copy.perArea ? (
+            <CheckList<AreaMode>
+              label="For these areas"
+              options={AREA_MODES.filter((o) => o.id !== "pickup")}
+              value={fee.mode ? [fee.mode] : []}
+              onChange={(v) => v[0] && setFee({ ...fee, mode: v[0] })}
+            />
+          ) : null}
+          <FeeFields
+            fee={fee}
+            label={copy.perArea ? (fee.mode === "visit" ? "Call-out fee" : "Delivery fee") : copy.fee}
+            onChange={setFee}
+            error={error && fee.fee_mode === "fixed" ? error : undefined}
+          />
           <TextField
             id="area-eta"
             label="How long it takes"
@@ -250,6 +282,7 @@ export function ServiceAreasEditor({
           <div className="space-y-5">
             <FeeFields
               fee={{ fee_mode: editing.fee_mode, fee_ksh: editing.fee_ksh, eta: editing.eta }}
+              label={editing.modes[0] === "visit" ? "Call-out fee" : "Delivery fee"}
               onChange={(f) => setDraft({ ...editing, fee_mode: f.fee_mode, fee_ksh: f.fee_mode === "fixed" ? f.fee_ksh : null })}
               error={error}
             />

@@ -4,6 +4,8 @@ export type BusinessLocation = {
   landmark: string;
   directions: string;
   coverage_notes: string;
+  /** This branch's opening hours, read to callers. */
+  hours?: string;
 };
 
 export const LOCATIONS_MAX = 8;
@@ -40,6 +42,7 @@ export function normalizeBusinessLocations(raw: unknown): BusinessLocation[] {
         address: String(r.address ?? "").trim().slice(0, 200),
         landmark: String(r.landmark ?? "").trim().slice(0, 200),
         directions: String(r.directions ?? "").trim().slice(0, 400),
+        hours: String(r.hours ?? "").trim().slice(0, 80),
         coverage_notes: String(
           r.coverage_notes ?? r.coverageNotes ?? ""
         )
@@ -51,6 +54,7 @@ export function normalizeBusinessLocations(raw: unknown): BusinessLocation[] {
         !loc.address &&
         !loc.landmark &&
         !loc.directions &&
+        !loc.hours &&
         !loc.coverage_notes
       ) {
         return null;
@@ -82,17 +86,31 @@ export function locationFromNotes(notes: string, label = "Main"): BusinessLocati
   ];
 }
 
-export function formatLocationsForCompiler(locations: BusinessLocation[]): string {
+export function formatLocationsForCompiler(
+  locations: BusinessLocation[],
+  opts: { noPremises?: boolean } = {}
+): string {
   const rows = normalizeBusinessLocations(locations);
+  if (opts.noPremises) {
+    const out = ["We come to you: there is no shop or office for callers to visit."];
+    const base = rows[0];
+    if (base) {
+      out.push(`Base (for reference only, do not send callers there): ${[base.label, base.address].filter(Boolean).join(", ")}`);
+    }
+    return out.join("\n");
+  }
   if (!rows.length) return "";
-  return rows
-    .map((loc, i) => {
-      const bits = [`${i + 1}. ${loc.label || "Location"}`];
-      if (loc.address) bits.push(`Address: ${loc.address}`);
-      if (loc.landmark) bits.push(`Landmark: ${loc.landmark}`);
-      if (loc.directions) bits.push(`Directions: ${loc.directions}`);
-      if (loc.coverage_notes) bits.push(`Coverage: ${loc.coverage_notes}`);
-      return bits.join(" | ");
-    })
-    .join("\n");
+  const lines = rows.map((loc, i) => {
+    const bits = [`${i + 1}. ${loc.label || "Location"}`];
+    if (loc.address) bits.push(`Address: ${loc.address}`);
+    if (loc.hours) bits.push(`Hours: ${loc.hours}`);
+    if (loc.landmark) bits.push(`Landmark: ${loc.landmark}`);
+    if (loc.directions) bits.push(`Find us: ${loc.directions}`);
+    if (loc.coverage_notes) bits.push(`Coverage: ${loc.coverage_notes}`);
+    return bits.join(" | ");
+  });
+  if (rows.length > 1) {
+    lines.push("Several branches: ask where the caller is, then point them to the nearest branch that serves them, with its hours and Find us line.");
+  }
+  return lines.join("\n");
 }

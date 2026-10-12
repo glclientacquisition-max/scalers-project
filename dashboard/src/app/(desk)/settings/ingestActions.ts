@@ -383,7 +383,7 @@ export async function applyIngestAction(
     tenant.service_areas && typeof tenant.service_areas === "object"
       ? normalizeServiceAreas(tenant.service_areas, vertical)
       : serviceAreasFromCoverage(nextPolicies.coverage_areas, vertical);
-  const locationsText = [formatLocationsForCompiler(nextLocations), formatServiceAreasForCompiler(areas)]
+  const locationsText = [formatLocationsForCompiler(nextLocations, { noPremises: areas?.no_premises }), formatServiceAreasForCompiler(areas)]
     .filter(Boolean)
     .join("\n\n");
   const policiesText = formatPoliciesForCompiler(nextPolicies);

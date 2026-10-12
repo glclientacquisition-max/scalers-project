@@ -1882,8 +1882,23 @@ function TenantFormInner({
       <section
         className={panel === "locations" ? "space-y-3" : "hidden"}
       >
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <p className={settingsBlockTitleClass}>Places</p>
+        <ServiceAreasEditor
+          value={serviceAreas}
+          vertical={vertical}
+          homeAreas={suggestHomeAreas(locations.map((l) => l.address).join(", "))}
+          onChange={setServiceAreas}
+        />
+        <div className="flex flex-wrap items-end justify-between gap-3 pt-3">
+          <div className="min-w-0">
+            <p className={settingsBlockTitleClass}>
+              {serviceAreas.no_premises ? "Your base (optional)" : locations.length > 1 ? "Branches" : "Places"}
+            </p>
+            {serviceAreas.no_premises ? (
+              <p className="mt-0.5 text-meta text-ink-2">For reference only. Callers are not sent here.</p>
+            ) : locations.length > 1 ? (
+              <p className="mt-0.5 text-meta text-ink-2">Your Business Assistant sends callers to the nearest branch.</p>
+            ) : null}
+          </div>
           <button
             type="button"
             disabled={locations.length >= LOCATIONS_MAX}
@@ -2006,6 +2021,22 @@ function TenantFormInner({
                   <div className="min-w-0">
                     <label
                       className="block text-meta font-medium text-ink-2"
+                      htmlFor={`loc-hours-${index}`}
+                    >
+                      Hours
+                    </label>
+                    <input
+                      id={`loc-hours-${index}`}
+                      value={loc.hours ?? ""}
+                      maxLength={80}
+                      onChange={(e) => updateLocation(index, "hours", e.target.value)}
+                      placeholder="Mon–Sat 8am–7pm"
+                      className={`${denseFieldClass} mt-1`}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label
+                      className="block text-meta font-medium text-ink-2"
                       htmlFor={`loc-landmark-${index}`}
                     >
                       Landmark
@@ -2034,7 +2065,7 @@ function TenantFormInner({
                       className="block text-meta font-medium text-ink-2"
                       htmlFor={`loc-directions-${index}`}
                     >
-                      Directions
+                      Find us (read to callers)
                     </label>
                     <textarea
                       id={`loc-directions-${index}`}
@@ -2073,12 +2104,6 @@ function TenantFormInner({
             );
           })}
         </div>
-        <ServiceAreasEditor
-          value={serviceAreas}
-          vertical={vertical}
-          homeAreas={suggestHomeAreas(locations.map((l) => l.address).join(", "))}
-          onChange={setServiceAreas}
-        />
       </section>
 
       <section

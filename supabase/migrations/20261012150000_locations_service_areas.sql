@@ -1,7 +1,8 @@
 -- Locations: "Areas you serve" moves out of Policies into its own column.
 --
 -- tenants.service_areas = { version: 1, areas: [{ id, modes[], fee_mode, fee_ksh, eta,
---   min_order_ksh, source, confirmed }], delivered_by[], rider_paid }.
+--   min_order_ksh, source, confirmed }], delivered_by[], rider_paid,
+--   reach deliver|visit|walk_in|both (default from the business type), no_premises }.
 -- business_policies.coverage_areas stays and is kept in step by the dashboard for one release,
 -- so the voice server's coverage check keeps working without a change.
 -- ADDITIVE and safe to re-run. Also pins search_path on the payments/policies functions (#663).
@@ -27,6 +28,8 @@ returns boolean language sql immutable as $$
     and not exists (
       select 1 from jsonb_array_elements_text(coalesce(v->'delivered_by', '[]')) b where b not in ('self', 'rider', 'courier'))
     and coalesce(v->>'rider_paid', 'in_fee') in ('in_fee', 'on_arrival')
+    and coalesce(v->>'reach', 'deliver') in ('deliver', 'visit', 'walk_in', 'both')
+    and coalesce(jsonb_typeof(v->'no_premises'), 'boolean') in ('boolean', 'null')
   );
 $$;
 
@@ -51,10 +54,18 @@ update public.tenants t
               order by lower(btrim(e)), ord
               limit 40) x), '[]'::jsonb),
      'delivered_by', '[]'::jsonb,
-     'rider_paid', null)
+     'rider_paid', null,
+     'reach', case t.vertical when 'home_services' then 'visit' when 'hospitality' then 'walk_in' else 'deliver' end,
+     'no_premises', false)
  where t.service_areas is null
    and jsonb_typeof(t.business_policies) = 'object'
    and jsonb_typeof(t.business_policies->'coverage_areas') = 'array';
+
+-- 2b. Rows backfilled before reach existed (staging) get it from the business type
+update public.tenants t
+   set service_areas = t.service_areas
+     || jsonb_build_object('reach', case t.vertical when 'home_services' then 'visit' when 'hospitality' then 'walk_in' else 'deliver' end)
+ where jsonb_typeof(t.service_areas) = 'object' and not (t.service_areas ? 'reach');
 
 -- 3. Pin search_path (advisor: function_search_path_mutable) ---------------------------
 alter function public.service_areas_valid(jsonb) set search_path = public;
