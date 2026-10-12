@@ -21,6 +21,7 @@ import {
   scheduleForForm,
   type DayKey,
   type HoursSchedule,
+  formatScheduleSummary,
 } from "@/lib/hoursSchedule";
 import {
   AFTER_HOURS_OPTIONS,
@@ -97,7 +98,6 @@ import {
 } from "@/lib/sonioxVoiceCatalog";
 import {
   emptyLocation,
-  LOCATIONS_MAX,
   normalizeBusinessLocations,
   type BusinessLocation,
 } from "@/lib/businessLocations";
@@ -111,6 +111,7 @@ import {
   POLICY_FIELDS,
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
+import { PlacesEditor } from "@/components/structured/PlacesEditor";
 import { ServiceAreasEditor } from "@/components/structured/ServiceAreasEditor";
 import { serviceAreasForForm, suggestHomeAreas, type ServiceAreas } from "@/lib/serviceAreas";
 import { stableRowId } from "@/lib/factHash";
@@ -121,7 +122,6 @@ import { PolicyRulesEditor } from "@/components/structured/PolicyRulesEditor";
 import dynamic from "next/dynamic";
 // Pronunciation is one panel of many; load it only when that panel renders.
 const PronunciationCoach = dynamic(() => import("@/components/PronunciationCoach").then((m) => m.PronunciationCoach));
-import { deskShiftClass } from "@/components/ui/deskChrome";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { notify } from "@/components/ui/DeskNotice";
 import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
@@ -414,7 +414,6 @@ function TenantFormInner({
   const [serviceAreas, setServiceAreas] = useState<ServiceAreas>(() =>
     serviceAreasForForm(tenant.service_areas, tenant.business_policies?.coverage_areas, tenant.vertical)
   );
-  const [openLocationIndexes, setOpenLocationIndexes] = useState<number[]>([]);
   const [policies, setPolicies] = useState<BusinessPolicies>(() =>
     normalizeBusinessPolicies(tenant.business_policies)
   );
@@ -757,34 +756,6 @@ function TenantFormInner({
     setSocialHandles((prev) => ({
       channels: prev.channels.filter((_, i) => i !== index),
     }));
-  }
-
-  function toggleLocationDetails(index: number) {
-    setOpenLocationIndexes((prev) =>
-      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
-    );
-  }
-
-  function removeLocation(index: number) {
-    setLocations((prev) => prev.filter((_, i) => i !== index));
-    setOpenLocationIndexes((prev) =>
-      prev.flatMap((i) => {
-        if (i === index) return [];
-        return [i > index ? i - 1 : i];
-      })
-    );
-  }
-
-  function updateLocation(
-    index: number,
-    key: keyof BusinessLocation,
-    value: string
-  ) {
-    setLocations((prev) =>
-      prev.map((row, i) =>
-        i === index ? carrySavedRow({ ...row, [key]: value }, row) : row
-      )
-    );
   }
 
   const bulkPreview = useMemo(
@@ -1888,222 +1859,23 @@ function TenantFormInner({
           homeAreas={suggestHomeAreas(locations.map((l) => l.address).join(", "))}
           onChange={setServiceAreas}
         />
-        <div className="flex flex-wrap items-end justify-between gap-3 pt-3">
-          <div className="min-w-0">
-            <p className={settingsBlockTitleClass}>
-              {serviceAreas.no_premises ? "Your base (optional)" : locations.length > 1 ? "Branches" : "Places"}
-            </p>
-            {serviceAreas.no_premises ? (
-              <p className="mt-0.5 text-meta text-ink-2">For reference only. Callers are not sent here.</p>
-            ) : locations.length > 1 ? (
-              <p className="mt-0.5 text-meta text-ink-2">Your Business Assistant sends callers to the nearest branch.</p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            disabled={locations.length >= LOCATIONS_MAX}
-            onClick={() =>
-              setLocations((prev) =>
-                prev.length >= LOCATIONS_MAX ? prev : [...prev, emptyLocation()]
-              )
-            }
-            className={`${settingsGhostButtonClass} disabled:opacity-50`}
-          >
-            Add place
-          </button>
-        </div>
-        <div className="overflow-hidden rounded-xl border border-hairline">
-          <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem] items-center gap-2 border-b border-hairline bg-surface-canvas px-3 py-2 text-meta font-medium text-ink-2">
-            <span>Label</span>
-            <span>Area</span>
-            <span className="sr-only">Details</span>
-            <span className="sr-only">Remove</span>
-          </div>
-          {locations.map((loc, index) => {
-            const placeOpen = openLocationIndexes.includes(index);
-            const placeDetailLabel =
-              vertical === "home_services"
-                ? "Landmark, directions, and notes"
-                : "Landmark, directions, and coverage";
-            return (
-            <div key={`loc-${index}`} className="border-b border-hairline last:border-b-0">
-              <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem] items-center gap-2 px-3 py-2">
-                <div className="min-w-0">
-                  <label className="sr-only" htmlFor={`loc-label-${index}`}>
-                    Label
-                  </label>
-                  <input
-                    id={`loc-label-${index}`}
-                    value={loc.label}
-                    onChange={(e) => {
-                      updateLocation(index, "label", e.target.value);
-                      if (index === 0) {
-                        setLocationNotes(
-                          placeLocationLine({
-                            label: e.target.value,
-                            address: loc.address,
-                            landmark: loc.landmark,
-                          })
-                        );
-                      }
-                    }}
-                    placeholder="Main shop"
-                    className={`${denseFieldClass} min-w-0 truncate`}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <label className="sr-only" htmlFor={`loc-address-${index}`}>
-                    Area
-                  </label>
-                  <ExpandTextarea
-                    id={`loc-address-${index}`}
-                    value={loc.address}
-                    maxLength={200}
-                    onChange={(value) => {
-                      updateLocation(index, "address", value);
-                      if (index === 0) {
-                        setLocationNotes(
-                          placeLocationLine({
-                            label: loc.label,
-                            address: value,
-                            landmark: loc.landmark,
-                          })
-                        );
-                      }
-                    }}
-                    placeholder="Westlands, Nairobi"
-                    className="min-w-0 truncate break-words [overflow-wrap:anywhere]"
-                  />
-                </div>
-                <button
-                  type="button"
-                  aria-expanded={placeOpen}
-                  data-role-exempt=""
-                  aria-label={placeDetailLabel}
-                  onClick={() => toggleLocationDetails(index)}
-                  className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-2 ${deskShiftClass} hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    className={`h-4 w-4 ${placeOpen ? "rotate-90" : ""}`}
-                    aria-hidden="true"
-                  >
-                    <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <div className="flex items-start justify-end">
-                  {locations.length > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        requestRemove(
-                          loc,
-                          `Remove ${loc.label.trim() || "this place"}?`,
-                          "It leaves the places when you save.",
-                          () => removeLocation(index)
-                        )
-                      }
-                      className={settingsTrashButtonClass}
-                      aria-label={`Remove location ${index + 1}`}
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  ) : (
-                    <span className="h-11 w-11" aria-hidden />
-                  )}
-                </div>
-              </div>
-              {placeOpen ? (
-                <div className="grid grid-cols-1 gap-3 px-3 pb-3">
-                  <div className="min-w-0">
-                    <label
-                      className="block text-meta font-medium text-ink-2"
-                      htmlFor={`loc-hours-${index}`}
-                    >
-                      Hours
-                    </label>
-                    <input
-                      id={`loc-hours-${index}`}
-                      value={loc.hours ?? ""}
-                      maxLength={80}
-                      onChange={(e) => updateLocation(index, "hours", e.target.value)}
-                      placeholder="Mon–Sat 8am–7pm"
-                      className={`${denseFieldClass} mt-1`}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label
-                      className="block text-meta font-medium text-ink-2"
-                      htmlFor={`loc-landmark-${index}`}
-                    >
-                      Landmark
-                    </label>
-                    <input
-                      id={`loc-landmark-${index}`}
-                      value={loc.landmark}
-                      onChange={(e) => {
-                        updateLocation(index, "landmark", e.target.value);
-                        if (index === 0) {
-                          setLocationNotes(
-                            placeLocationLine({
-                              label: loc.label,
-                              address: loc.address,
-                              landmark: e.target.value,
-                            })
-                          );
-                        }
-                      }}
-                      placeholder="Opposite Naivas"
-                      className={`${denseFieldClass} mt-1`}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label
-                      className="block text-meta font-medium text-ink-2"
-                      htmlFor={`loc-directions-${index}`}
-                    >
-                      Find us (read to callers)
-                    </label>
-                    <textarea
-                      id={`loc-directions-${index}`}
-                      value={loc.directions}
-                      onChange={(e) => updateLocation(index, "directions", e.target.value)}
-                      rows={2}
-                      placeholder="From Waiyaki Way, turn at the Shell. Left side."
-                      className={`${denseFieldClass} mt-1 leading-relaxed`}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label
-                      className="block text-meta font-medium text-ink-2"
-                      htmlFor={`loc-coverage-${index}`}
-                    >
-                      {vertical === "home_services" ? "Notes" : "Coverage"}
-                    </label>
-                    <ExpandTextarea
-                      id={`loc-coverage-${index}`}
-                      value={loc.coverage_notes}
-                      maxLength={300}
-                      onChange={(value) =>
-                        updateLocation(index, "coverage_notes", value)
-                      }
-                      placeholder={
-                        vertical === "home_services"
-                          ? "Call ahead for the gate"
-                          : "Kiambu and Ruiru"
-                      }
-                      className="min-w-0 break-words [overflow-wrap:anywhere]"
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            );
-          })}
-        </div>
+        <PlacesEditor
+          value={locations}
+          title={serviceAreas.no_premises ? "Your base (optional)" : locations.length > 1 ? "Branches" : "Your places"}
+          hint={
+            serviceAreas.no_premises
+              ? "For reference only. Callers are not sent here."
+              : locations.length > 1
+                ? "Your Business Assistant sends callers to the nearest branch."
+                : undefined
+          }
+          businessHours={formatScheduleSummary(hoursSchedule)}
+          onChange={(rows) => {
+            setLocations(rows);
+            const first = rows[0];
+            setLocationNotes(first ? placeLocationLine(first) : "");
+          }}
+        />
       </section>
 
       <section

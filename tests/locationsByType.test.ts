@@ -88,6 +88,7 @@ test("UI wiring: reach choice and branch hours in Locations", async () => {
   assert.match(ed, /reachCopy\(/);
   assert.match(ed, /REACH_OPTIONS/);
   const form = fs.readFileSync(new URL("../dashboard/src/components/TenantForm.tsx", import.meta.url), "utf8");
-  assert.match(form, /loc-hours-/);
+  const places = fs.readFileSync(new URL("../dashboard/src/components/structured/PlacesEditor.tsx", import.meta.url), "utf8");
+  assert.match(places, /place-hours/);
   assert.match(form, /noPremises|no_premises/);
 });
