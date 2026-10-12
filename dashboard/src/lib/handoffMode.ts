@@ -13,13 +13,8 @@ export const HANDOFF_OPTIONS: {
 }[] = [
   {
     id: "callback",
-    label: "Message teammate",
-    blurb: "AI stays on the line. SMS, WhatsApp, or email.",
-  },
-  {
-    id: "live_transfer",
-    label: "Connect live call",
-    blurb: liveConnectBlurb(),
+    label: "Take a message for a callback",
+    blurb: "Your Business Assistant takes their details and alerts you on WhatsApp or email.",
   },
 ];
 

@@ -442,7 +442,8 @@ describe("settings save scope", () => {
     );
     assert.equal(match, true);
     const actions = read("dashboard/src/app/(desk)/settings/alertsActions.ts");
-    assert.match(actions, /alertPhoneWrite\(submittedPhone\)/);
+    // The write now goes through validateAlertsSave first, so it reads the checked phone.
+    assert.match(actions, /alertPhoneWrite\(checked\.phone\)/);
     assert.match(actions, /alertsPersistMatchesSubmit/);
     assert.doesNotMatch(
       actions,
@@ -510,11 +511,13 @@ describe("settings save scope", () => {
       "dashboard/src/lib/settingsOptionStatus.ts",
       `mod.settingsOptionStatus({ tab: "test" }, { sautikit_virtual_number: "pending:1" })`
     );
-    assert.equal(pending, "");
+    assert.equal(pending, "Not live yet");
     const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
-    // Phone index is md:hidden menu; form mounts only after drill-in (isMenu early return).
+    // Settings home on every width; the form mounts only after drill-in (isMenu early return).
     assert.match(shell, /if \(isMenu\)/);
-    assert.match(shell, /md:hidden/);
+    assert.match(shell, /data-settings-home=""/);
+    const empty = load("dashboard/src/lib/settingsOptionStatus.ts", `mod.settingsOptionStatus({ tab: "train", panel: "hours" }, {})`);
+    assert.equal(empty, "Needs setup");
     assert.match(shell, /variant="index"/);
     assert.match(shell, /data-settings-menu=\{variant\}/);
     assert.doesNotMatch(shell, /overflow-hidden rounded-xl border border-line bg-surface/);

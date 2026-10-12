@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { memberCan } from "@/lib/requireMember";
 import { structuredSettingsSlots } from "@/components/structured/StructuredSettingsSlots";
 import { readBusinessType } from "@/lib/structuredServer";
@@ -11,12 +10,10 @@ import { can } from "@/lib/permissions";
 import { getAuthUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { BusinessSettingsShell } from "@/components/BusinessSettingsShell";
-import { DESK_MD_COOKIE } from "@/lib/deskMdBoot";
 import {
   SETTINGS_NAV,
   parseBusinessSettingsPanel,
   parseBusinessSettingsTab,
-  settingsWideDefaultHref,
 } from "@/lib/businessSettingsNav";
 import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { settingsIndexStatuses } from "@/lib/settingsOptionStatus";
@@ -48,11 +45,6 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const tabRaw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const panelRaw = Array.isArray(params.panel) ? params.panel[0] : params.panel;
   if (tabRaw === "appearance") redirect("/settings");
-  if (!tabRaw) {
-    const deskMd = (await cookies()).get(DESK_MD_COOKIE)?.value;
-    const wide = settingsWideDefaultHref(tabRaw, deskMd);
-    if (wide) redirect(wide);
-  }
 
   let tenant;
   try {

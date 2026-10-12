@@ -96,7 +96,8 @@ test('dashboard parses and saves the toggle', () => {
   assert.match(ts, /missed_textback: boolean/);
   assert.match(ts, /missed_textback: false/);
   assert.match(ts, /obj\.missed_textback/);
-  const form = read('dashboard/src/components/TenantForm.tsx');
+  // The toggle moved from the Settings form to the Alerts panel (Alerts is its own Settings tab).
+  const form = read('dashboard/src/components/AlertsPanel.tsx');
   assert.match(form, /Text back missed calls/);
   assert.match(form, /notifyChannels\.missed_textback/);
 });

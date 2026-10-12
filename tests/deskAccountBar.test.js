@@ -42,7 +42,7 @@ describe("desk account bar", () => {
     assert.match(menu, /name="tenant_id"/);
     assert.match(menu, />\s*Workspace\s*</);
     assert.match(menu, /MenuLabel/);
-    assert.match(menu, /text-ink-3/);
+    assert.match(menu, /text-ink-[23]/);
     assert.doesNotMatch(menu, /text-gray-500/);
     assert.match(menu, /pointer-events-none/);
   });

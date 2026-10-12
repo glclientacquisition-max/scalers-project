@@ -198,7 +198,7 @@ describe("business settings depth", () => {
     assert.match(voice, /title="Voice"/);
     assert.match(voice, /title="Tools"/);
     assert.match(voice, /Hear sample/);
-    assert.match(voice, /htmlFor="soniox_voice_id"/);
+    assert.match(voice, /id="soniox_voice_id"/); // SettingsSelect wires its own label
     assert.match(voice, /htmlFor="soniox_voice_label"/);
     assert.doesNotMatch(voice, /Handoff/);
     assert.doesNotMatch(voice, /HANDOFF_OPTIONS/);
@@ -210,7 +210,8 @@ describe("business settings depth", () => {
       form.indexOf('panel === "faqs"')
     );
     assert.match(team, /Add person/);
-    assert.match(team, /liveTransferExecutor \|\| handoffMode === "live_transfer"/);
+    assert.match(team, /\{liveTransferExecutor \? \(/);
+    assert.doesNotMatch(team, /handoffMode === "live_transfer" \? \(/);
     assert.match(
       team,
       /liveTransferExecutor \|\| handoffMode === "live_transfer"[\s\S]*liveConnectBlurb\(liveDest\?\.name\)/
@@ -225,7 +226,8 @@ describe("business settings depth", () => {
     assert.doesNotMatch(team, /Message teammate/);
     assert.doesNotMatch(team, />Handoff</);
     assert.doesNotMatch(team, /btnPrimaryFill|settingsPrimaryButtonClass/);
-    assert.match(team, /<span>Role<\/span>/);
+    // #655 moved roles to Members (logins); the alert contact list has no Role column.
+    assert.match(team, /<AlertContactsList/);
     assert.doesNotMatch(team, /Handles/);
     assert.match(form, /name="handoff_mode"/);
     assert.doesNotMatch(team, /Alert phone/);
