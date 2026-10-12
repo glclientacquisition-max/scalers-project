@@ -100,3 +100,27 @@ test("wiring: Locations owns service areas; Policies no longer edits coverage; p
   assert.match(payload, /locations: \[[^\]]*"service_areas"/);
   assert.ok(read("dashboard/src/lib/catalogImportRecompile.ts").includes("formatServiceAreasForCompiler("));
 });
+
+test("bulk: one fee for many areas, new areas added owner-confirmed", async () => {
+  const m = await import("../dashboard/src/lib/serviceAreas.ts");
+  const start = m.serviceAreasFromCoverage(["place:ruaka"], "retail");
+  const next = m.applyFeeToAreas(start, ["place:ruaka", "place:kitengela"], { fee_mode: "fixed", fee_ksh: 200, eta: "Same day" }, "retail");
+  assert.equal(next.areas.length, 2);
+  for (const a of next.areas) {
+    assert.equal(a.fee_ksh, 200);
+    assert.equal(a.eta, "Same day");
+    assert.equal(a.confirmed, true);
+    assert.deepEqual(a.modes, ["delivery"]);
+  }
+  const free = m.applyFeeToAreas(next, ["place:ruaka"], { fee_mode: "free", fee_ksh: 999, eta: null }, "retail");
+  assert.equal(free.areas[0].fee_ksh, null);
+  assert.equal(free.areas[1].fee_ksh, 200);
+});
+
+test("home area suggestion comes from the shop address", async () => {
+  const m = await import("../dashboard/src/lib/serviceAreas.ts");
+  const ids = m.suggestHomeAreas("Shop 4, Moi Avenue, Nairobi");
+  assert.ok(ids.includes("county:nairobi"), ids.join(","));
+  assert.deepEqual(m.suggestHomeAreas(""), []);
+  assert.deepEqual(m.suggestHomeAreas("Shop 4, Nowhereville"), []);
+});

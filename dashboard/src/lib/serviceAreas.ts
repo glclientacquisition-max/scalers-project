@@ -38,8 +38,8 @@ export const AREA_MODES: ReadonlyArray<{ id: AreaMode; label: string; verb: stri
   { id: "pickup", label: "Pickup only", verb: "serve customers from" },
 ];
 export const FEE_MODES: ReadonlyArray<{ id: FeeMode; label: string }> = [
-  { id: "fixed", label: "Set fee" },
   { id: "free", label: "Free" },
+  { id: "fixed", label: "Set fee" },
   { id: "ask", label: "We confirm it" },
 ];
 export const DELIVERED_BY: ReadonlyArray<{ id: DeliveredBy; label: string; detail: string }> = [
@@ -197,4 +197,38 @@ export function parseServiceAreasField(raw: unknown, vertical?: string | null): 
   } catch {
     return null;
   }
+}
+
+export type BulkFee = { fee_mode: FeeMode; fee_ksh: number | null; eta: string | null };
+
+/** Set one fee (and time) on many areas at once; areas not yet listed are added. */
+export function applyFeeToAreas(v: ServiceAreas, ids: readonly string[], fee: BulkFee, vertical?: string | null): ServiceAreas {
+  const want = new Set(ids);
+  const set = (a: ServiceArea): ServiceArea => ({
+    ...a,
+    fee_mode: fee.fee_mode,
+    fee_ksh: fee.fee_mode === "fixed" ? fee.fee_ksh : null,
+    eta: fee.eta && fee.eta.trim() ? fee.eta.trim().slice(0, ETA_MAX) : null,
+    source: "owner",
+    confirmed: true,
+  });
+  const have = new Set(v.areas.map((a) => a.id));
+  const areas = v.areas.map((a) => (want.has(a.id) ? set(a) : a));
+  for (const id of ids) {
+    if (!have.has(id) && areas.length < COVERAGE_AREA_MAX) areas.push(set(newServiceArea(id, vertical)));
+  }
+  return { ...v, areas };
+}
+
+/** The county or town in the shop address, to pre-select on first setup. */
+export function suggestHomeAreas(address: string): string[] {
+  const parts = String(address || "").split(/[,\n]/).map((p) => p.trim().toLowerCase()).filter(Boolean).reverse();
+  const out: string[] = [];
+  for (const p of parts) {
+    for (const kind of ["county", "place"]) {
+      const id = `${kind}:${p}`;
+      if (parseCoverageAreas([id]).length && !out.includes(id)) out.push(id);
+    }
+  }
+  return out.slice(0, 2);
 }

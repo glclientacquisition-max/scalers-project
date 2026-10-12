@@ -112,7 +112,7 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { ServiceAreasEditor } from "@/components/structured/ServiceAreasEditor";
-import { serviceAreasForForm, type ServiceAreas } from "@/lib/serviceAreas";
+import { serviceAreasForForm, suggestHomeAreas, type ServiceAreas } from "@/lib/serviceAreas";
 import { stableRowId } from "@/lib/factHash";
 import { catalogBaseline, isUnpricedRow } from "@/lib/catalogPricing";
 import { DeskSelect } from "@/components/ui/DeskSelect";
@@ -2073,7 +2073,12 @@ function TenantFormInner({
             );
           })}
         </div>
-        <ServiceAreasEditor value={serviceAreas} vertical={vertical} onChange={setServiceAreas} />
+        <ServiceAreasEditor
+          value={serviceAreas}
+          vertical={vertical}
+          homeAreas={suggestHomeAreas(locations.map((l) => l.address).join(", "))}
+          onChange={setServiceAreas}
+        />
       </section>
 
       <section
