@@ -86,3 +86,21 @@ export function searchCoverageAreas(
 ): CoverageAreaOption[] {
   return rankCoverageAreas(DIRECTORY, query, selected, limit);
 }
+
+export type AreaOption = { id: string; label: string; kind: CoverageAreaKind; hint: string };
+
+/**
+ * Search for pickers: counties read "Kiambu County", estates and towns "Ruaka, Kiambu".
+ * Directory rows whose name just repeats a word ("Kiambu Kiambu") are left out.
+ */
+export function searchAreaOptions(query: string, selected: readonly string[], limit = 8): AreaOption[] {
+  return searchCoverageAreas(query, selected, limit * 2)
+    .filter((o) => !/\b(\w+) \1\b/i.test(o.label))
+    .slice(0, limit)
+    .map((o) => ({
+      id: o.id,
+      kind: o.kind,
+      label: o.kind === "county" ? `${o.label} County` : o.label,
+      hint: o.kind === "county" ? "Whole county" : "Estate or town",
+    }));
+}

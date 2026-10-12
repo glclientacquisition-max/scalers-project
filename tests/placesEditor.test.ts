@@ -39,7 +39,7 @@ test("validatePlace needs a name or an area", async () => {
 test("UI: places use kit fields in a Sheet with the area picker and hours toggle", async () => {
   const fs = await import("node:fs");
   const src = fs.readFileSync(new URL("../dashboard/src/components/structured/PlacesEditor.tsx", import.meta.url), "utf8");
-  for (const s of ["<Sheet", "TextField", "TextAreaField", "searchCoverageAreas", "<Switch", "Same as business hours", "Opposite Hilton, Kimathi St"]) {
+  for (const s of ["<Sheet", "TextField", "TextAreaField", "searchAreaOptions", "<Switch", "Same as business hours", "Opposite Hilton, Kimathi St"]) {
     assert.ok(src.includes(s), s);
   }
   const form = fs.readFileSync(new URL("../dashboard/src/components/TenantForm.tsx", import.meta.url), "utf8");

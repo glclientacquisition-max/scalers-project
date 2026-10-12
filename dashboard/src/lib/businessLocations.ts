@@ -122,11 +122,43 @@ export function formatLocationsForCompiler(
   return lines.join("\n");
 }
 
-/** One line under a place in the list: "Nairobi · Opposite Hilton · Own hours". */
+/** One line under a place in the list: "Nairobi CBD, Nairobi · Kenyatta Avenue · Opposite Hilton · Own hours". No repeats. */
 export function placeSummary(loc: BusinessLocation): string {
-  return [loc.area_id ? coverageAreaLabel(loc.area_id) : loc.address, loc.landmark, loc.hours ? "Own hours" : ""]
-    .filter(Boolean)
-    .join(" · ");
+  const seen = new Set<string>();
+  const parts = [loc.area_id ? coverageAreaLabel(loc.area_id) : "", loc.address, loc.landmark, loc.hours ? "Own hours" : ""];
+  const out: string[] = [];
+  for (const raw of parts) {
+    const p = String(raw || "").trim();
+    const key = p.toLowerCase();
+    if (!p || seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
+  }
+  return out.join(" · ");
+}
+
+/**
+ * Old places kept the area inside free text ("Kenyatta Avenue, Nairobi CBD") and often
+ * copied it into Landmark. Move the area into area_id, keep the rest as the street, and
+ * drop a landmark that only repeats the address.
+ */
+export function upgradeLegacyPlace(loc: BusinessLocation): BusinessLocation {
+  if (loc.area_id) return loc;
+  const next = { ...loc };
+  const same = next.landmark.trim().toLowerCase() === next.address.trim().toLowerCase();
+  const parts = (next.address || next.landmark).split(",").map((p) => p.trim()).filter(Boolean);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const key = parts[i].toLowerCase();
+    const id = parseCoverageAreas([`place:${key}`])[0] ?? parseCoverageAreas([`county:${key}`])[0];
+    if (id) {
+      next.area_id = id;
+      parts.splice(i, 1);
+      if (next.address) next.address = parts.join(", ");
+      break;
+    }
+  }
+  if (same) next.landmark = "";
+  return next;
 }
 
 export function validatePlace(loc: BusinessLocation): Record<string, string> {

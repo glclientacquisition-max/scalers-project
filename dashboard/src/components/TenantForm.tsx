@@ -21,7 +21,7 @@ import {
   scheduleForForm,
   type DayKey,
   type HoursSchedule,
-  formatScheduleSummary,
+  formatHoursForOwner,
 } from "@/lib/hoursSchedule";
 import {
   AFTER_HOURS_OPTIONS,
@@ -98,6 +98,7 @@ import {
 } from "@/lib/sonioxVoiceCatalog";
 import {
   emptyLocation,
+  upgradeLegacyPlace,
   normalizeBusinessLocations,
   type BusinessLocation,
 } from "@/lib/businessLocations";
@@ -408,7 +409,7 @@ function TenantFormInner({
     parseHandoffMode(tenant.handoff_mode)
   );
   const [locations, setLocations] = useState<BusinessLocation[]>(() => {
-    const rows = normalizeBusinessLocations(tenant.business_locations);
+    const rows = normalizeBusinessLocations(tenant.business_locations).map(upgradeLegacyPlace);
     return rows.length ? rows.map((row) => markSavedRow(row)) : [emptyLocation()];
   });
   const [serviceAreas, setServiceAreas] = useState<ServiceAreas>(() =>
@@ -766,6 +767,15 @@ function TenantFormInner({
     () => previewSuggestedProducts(parseBulkProducts(bulkProductsText)),
     [bulkProductsText]
   );
+
+  // Locations drawers ("Save 3 areas", "Done") save the page straight away.
+  const saveAfterLocationsRef = useRef(false);
+  useEffect(() => {
+    if (!saveAfterLocationsRef.current) return;
+    saveAfterLocationsRef.current = false;
+    const form = document.getElementById(TENANT_SETTINGS_FORM_ID);
+    if (form instanceof HTMLFormElement) form.requestSubmit();
+  }, [serviceAreas, locations]);
 
   // A pasted list is saved straight away (the sheet says "Add and save"), not left pending.
   const saveAfterPasteRef = useRef(false);
@@ -1856,8 +1866,15 @@ function TenantFormInner({
         <ServiceAreasEditor
           value={serviceAreas}
           vertical={vertical}
-          homeAreas={suggestHomeAreas(locations.map((l) => l.address).join(", "))}
+          homeAreas={[
+            ...locations.map((l) => l.area_id || "").filter(Boolean),
+            ...suggestHomeAreas(locations.map((l) => l.address).join(", ")),
+          ]}
           onChange={setServiceAreas}
+          onSave={(next) => {
+            setServiceAreas(next);
+            saveAfterLocationsRef.current = true;
+          }}
         />
         <PlacesEditor
           value={locations}
@@ -1869,11 +1886,12 @@ function TenantFormInner({
                 ? "Your Business Assistant sends callers to the nearest branch."
                 : undefined
           }
-          businessHours={formatScheduleSummary(hoursSchedule)}
-          onChange={(rows) => {
+          businessHours={formatHoursForOwner(hoursSchedule)}
+          onSave={(rows) => {
             setLocations(rows);
             const first = rows[0];
             setLocationNotes(first ? placeLocationLine(first) : "");
+            saveAfterLocationsRef.current = true;
           }}
         />
       </section>

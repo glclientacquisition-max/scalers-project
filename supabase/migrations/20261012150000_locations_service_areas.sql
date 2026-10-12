@@ -68,6 +68,9 @@ update public.tenants t
  where jsonb_typeof(t.service_areas) = 'object' and not (t.service_areas ? 'reach');
 
 -- 3. Pin search_path (advisor: function_search_path_mutable) ---------------------------
+-- 2c. Owners save Locations as role authenticated; tenants uses column-level UPDATE grants.
+grant update (service_areas) on public.tenants to authenticated;
+
 alter function public.service_areas_valid(jsonb) set search_path = public;
 alter function public.payments_valid(jsonb) set search_path = public;
 alter function public.policy_rules_valid(jsonb) set search_path = public;

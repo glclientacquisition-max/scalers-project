@@ -6,7 +6,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Switch } from "@/components/ui/Switch";
 import { TextAreaField, TextField } from "@/components/ui/TextField";
 import { SettingsGroup } from "@/components/settingsUi";
-import { coverageAreaLabel, searchCoverageAreas } from "@/lib/coverageAreas";
+import { coverageAreaLabel, searchAreaOptions } from "@/lib/coverageAreas";
 import {
   LOCATIONS_MAX,
   emptyLocation,
@@ -25,14 +25,15 @@ const FIND_US_MAX = 400;
  */
 export function PlacesEditor({
   value,
-  onChange,
+  onSave,
   title,
   hint,
   businessHours,
   canEdit = true,
 }: {
   value: BusinessLocation[];
-  onChange: (next: BusinessLocation[]) => void;
+  /** Change and save the page now: the drawer's Done and Remove commit with this. */
+  onSave: (next: BusinessLocation[]) => void;
   title: string;
   hint?: string;
   /** Summary of the business hours, shown on the "Same as business hours" switch. */
@@ -46,7 +47,7 @@ export function PlacesEditor({
   const [error, setError] = useState("");
   const rows = value.filter((l) => validatePlace(l).label === undefined);
   const results = useMemo(
-    () => (areaQuery.trim() ? searchCoverageAreas(areaQuery, draft.area_id ? [draft.area_id] : [], 6) : []),
+    () => (areaQuery.trim() ? searchAreaOptions(areaQuery, draft.area_id ? [draft.area_id] : [], 6) : []),
     [areaQuery, draft.area_id]
   );
 
@@ -67,13 +68,13 @@ export function PlacesEditor({
     const list = [...value];
     if (index < list.length) list[index] = next;
     else list.push(next);
-    onChange(list);
+    onSave(list);
     setIndex(null);
   }
 
   function remove() {
     if (index == null) return;
-    onChange(value.filter((_, i) => i !== index));
+    onSave(value.filter((_, i) => i !== index));
     setIndex(null);
   }
 
@@ -126,7 +127,7 @@ export function PlacesEditor({
           <TextField
             id="place-name"
             label="Name"
-            placeholder="Main shop, CBD branch"
+            placeholder="Main shop or CBD"
             maxLength={80}
             autoComplete="organization"
             enterKeyHint="next"
@@ -152,7 +153,7 @@ export function PlacesEditor({
                   id="place-area"
                   label="Area"
                   hint="Search an estate, town or county."
-                  placeholder="Westlands, Ruaka, Nyali…"
+                  placeholder="Search estate or town"
                   autoComplete="off"
                   enterKeyHint="search"
                   value={areaQuery}
@@ -164,13 +165,14 @@ export function PlacesEditor({
                       <li key={o.id}>
                         <button
                           type="button"
-                          className="flex min-h-11 w-full items-center px-3 text-start text-body text-ink hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+                          className="flex min-h-11 w-full items-center gap-3 px-3 text-start text-body text-ink hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
                           onClick={() => {
                             setDraft({ ...draft, area_id: o.id });
                             setAreaQuery("");
                           }}
                         >
-                          {o.label}
+                          <span className="min-w-0 flex-1">{o.label}</span>
+                          <span className="text-meta text-ink-2">{o.hint}</span>
                         </button>
                       </li>
                     ))}
@@ -183,7 +185,7 @@ export function PlacesEditor({
           <TextField
             id="place-street"
             label="Street or building (optional)"
-            placeholder="Kimathi St, Jubilee House, 2nd floor"
+            placeholder="Kimathi St, 2nd floor"
             maxLength={200}
             autoComplete="street-address"
             enterKeyHint="next"
@@ -204,7 +206,7 @@ export function PlacesEditor({
             id="place-find-us"
             label="Find us (optional)"
             hint="Read to callers. One or two short sentences."
-            placeholder="Take the stairs next to Naivas. We are the second shop on the left."
+            placeholder="Stairs by Naivas, 2nd door"
             rows={3}
             maxLength={FIND_US_MAX}
             value={draft.directions}
@@ -222,7 +224,7 @@ export function PlacesEditor({
               <TextField
                 id="place-hours"
                 label="This place's hours"
-                placeholder="Mon–Sat 8am–7pm, Sun closed"
+                placeholder="Mon–Sat 8am–7pm"
                 maxLength={80}
                 autoComplete="off"
                 value={draft.hours ?? ""}

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { TextField } from "@/components/ui/TextField";
 import { SettingsGroup } from "@/components/settingsUi";
-import { COVERAGE_AREA_MAX, coverageAreaLabel, searchCoverageAreas } from "@/lib/coverageAreas";
+import { COVERAGE_AREA_MAX, coverageAreaLabel, searchAreaOptions } from "@/lib/coverageAreas";
 import {
   AREA_MODES,
   DELIVERED_BY,
@@ -16,6 +16,7 @@ import {
   reachCopy,
   applyFeeToAreas,
   areaSummary,
+  commonFee,
   serviceAreasSentence,
   validateServiceArea,
   type AreaMode,
@@ -71,16 +72,20 @@ export function ServiceAreasEditor({
   vertical,
   homeAreas = [],
   onChange,
+  onSave,
   canEdit = true,
 }: {
   value: ServiceAreas;
   vertical?: string | null;
   /** Ticked on first setup, from the shop address. */
   homeAreas?: string[];
+  /** Edit without saving (the page Save button saves it). */
   onChange: (next: ServiceAreas) => void;
+  /** Change and save the page now: drawers commit with this. */
+  onSave: (next: ServiceAreas) => void;
   canEdit?: boolean;
 }) {
-  const [sheet, setSheet] = useState<null | "bulk" | "who" | string>(null);
+  const [sheet, setSheet] = useState<null | "bulk" | "fee" | "who" | string>(null);
   const [query, setQuery] = useState("");
   const [ticked, setTicked] = useState<string[]>([]);
   const [fee, setFee] = useState<BulkFee>(DEFAULT_FEE);
@@ -90,27 +95,39 @@ export function ServiceAreasEditor({
   const [who, setWho] = useState<{ by: DeliveredBy[]; paid: RiderPaid | null }>({ by: [], paid: null });
 
   const listed = value.areas.map((a) => a.id);
-  const results = useMemo(() => searchCoverageAreas(query, ticked, 8), [query, ticked]);
+  const results = useMemo(
+    () => (query.trim() ? searchAreaOptions(query, [...ticked, ...listed], 8) : []),
+    [query, ticked, listed]
+  );
   const options = [
     ...ticked.map((id) => ({ id, label: coverageAreaLabel(id) })),
-    ...results.map((o) => ({ id: o.id, label: o.label })),
+    ...results.map((o) => ({ id: o.id, label: o.label, detail: o.hint })),
   ];
+  const suggested = homeAreas.filter((id) => !listed.includes(id) && !ticked.includes(id));
   const copy = reachCopy(value.reach);
   const unconfirmed = value.areas.filter((a) => !a.confirmed).length;
   const delivers = copy.riders && value.areas.some((a) => a.modes.includes("delivery"));
 
-  function openBulk(ids: string[]) {
-    setTicked(ids);
+  function openBulk() {
+    setTicked([]);
     setFee({ ...DEFAULT_FEE, mode: value.reach === "both" ? "delivery" : undefined });
     setQuery("");
     setError("");
     setSheet("bulk");
   }
 
+  function openChangeFee(ids: string[]) {
+    const chosen = value.areas.filter((a) => ids.includes(a.id));
+    setTicked(chosen.map((a) => a.id));
+    setFee(commonFee(chosen));
+    setError("");
+    setSheet("fee");
+  }
+
   function saveBulk() {
     if (!ticked.length) return setError("Tick at least one area.");
     if (fee.fee_mode === "fixed" && !(fee.fee_ksh && fee.fee_ksh > 0)) return setError("Add the fee in KSh, or pick Free.");
-    onChange(applyFeeToAreas(value, ticked, fee, vertical));
+    onSave(applyFeeToAreas(value, ticked, fee, vertical));
     setSheet(null);
   }
 
@@ -126,7 +143,7 @@ export function ServiceAreasEditor({
     const first = Object.values(validateServiceArea(draft))[0];
     if (first) return setError(first);
     const next = { ...draft, source: "owner" as const, confirmed: true };
-    onChange({ ...value, areas: value.areas.map((a) => (a.id === next.id ? next : a)) });
+    onSave({ ...value, areas: value.areas.map((a) => (a.id === next.id ? next : a)) });
     setSheet(null);
   }
 
@@ -141,6 +158,11 @@ export function ServiceAreasEditor({
         value={[value.reach]}
         onChange={(v) => v[0] && canEdit && onChange({ ...value, reach: v[0], no_premises: v[0] === "visit" ? value.no_premises : false })}
       />
+      {value.reach !== "visit" ? (
+        <p className="-mt-3 text-meta text-ink-2">
+          No shop? “We come to you” shows when you pick We visit customers.
+        </p>
+      ) : null}
       {value.reach === "visit" ? (
         <CheckList<"none">
           label="Your premises"
@@ -155,7 +177,7 @@ export function ServiceAreasEditor({
           <p className="text-body font-medium text-ink">{copy.title}</p>
           <p className="text-meta text-ink-2">{copy.empty} Your Business Assistant tells callers the price.</p>
           {canEdit ? (
-            <Button onClick={() => openBulk(homeAreas)} data-areas-add="">
+            <Button onClick={() => openBulk()} data-areas-add="">
               Add areas
             </Button>
           ) : null}
@@ -165,9 +187,9 @@ export function ServiceAreasEditor({
           {unconfirmed ? (
             <div className="space-y-2 bg-accent-tonal px-4 py-3" role="note">
               <p className="text-body font-medium text-ink">Add your fee</p>
-              <p className="text-meta text-ink-2">We moved these from Policies. Until you set a fee, callers hear it is confirmed on a callback.</p>
+              <p className="text-meta text-ink">We moved these from Policies. Until you set a fee, callers hear it is confirmed on a callback.</p>
               {canEdit ? (
-                <Button variant="tonal" size="sm" onClick={() => openBulk(value.areas.filter((a) => !a.confirmed).map((a) => a.id))}>
+                <Button variant="tonal" size="sm" onClick={() => openChangeFee(value.areas.filter((a) => !a.confirmed).map((a) => a.id))}>
                   Set one fee for all
                 </Button>
               ) : null}
@@ -183,8 +205,8 @@ export function ServiceAreasEditor({
               onOpen={() => openArea(a)}
             />
           ))}
-          {canEdit && value.areas.length < COVERAGE_AREA_MAX ? <AddRow label="Add areas" onOpen={() => openBulk([])} /> : null}
-          {canEdit && value.areas.length > 1 ? <AddRow label="Change fee for several" onOpen={() => openBulk(listed)} /> : null}
+          {canEdit && value.areas.length < COVERAGE_AREA_MAX ? <AddRow label="Add areas" onOpen={() => openBulk()} /> : null}
+          {canEdit && value.areas.length > 1 ? <AddRow label="Change fee for several" onOpen={() => openChangeFee(listed)} /> : null}
         </SettingsGroup>
       )}
 
@@ -222,16 +244,28 @@ export function ServiceAreasEditor({
             id="area-search"
             label="Find an area"
             hideLabel
-            placeholder="Search: Ruaka, Kitengela, Nyali…"
+            placeholder="Search area"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoComplete="off"
           />
+          {suggested.length ? (
+            <div className="space-y-1.5">
+              <p className="text-meta font-medium text-ink">Suggested</p>
+              <div className="flex flex-wrap gap-2">
+                {suggested.map((id) => (
+                  <Button key={id} variant="tonal" size="sm" onClick={() => setTicked([...ticked, id])}>
+                    + {coverageAreaLabel(id)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {options.length ? (
             <CheckList<string> label="Areas" multiple options={options} value={ticked} onChange={setTicked} />
-          ) : (
+          ) : query.trim() ? (
             <p className="text-meta text-ink-2">No match. Try the nearest town.</p>
-          )}
+          ) : null}
           {copy.perArea ? (
             <CheckList<AreaMode>
               label="For these areas"
@@ -257,6 +291,44 @@ export function ServiceAreasEditor({
         </div>
       </Sheet>
 
+      {/* Change fee for existing areas */}
+      <Sheet
+        open={sheet === "fee"}
+        onOpenChange={(o) => !o && setSheet(null)}
+        title="Change fee"
+        description="Pick the areas, then the new fee."
+        footer={
+          <Button block onClick={saveBulk} data-areas-fee-save="">
+            {ticked.length ? `Save fee for ${ticked.length} ${ticked.length === 1 ? "area" : "areas"}` : "Save"}
+          </Button>
+        }
+      >
+        <div className="space-y-5">
+          <CheckList<string>
+            label="Areas"
+            multiple
+            options={value.areas.map((a) => ({ id: a.id, label: coverageAreaLabel(a.id), detail: a.confirmed ? areaSummary(a) : "Fee not set" }))}
+            value={ticked}
+            onChange={setTicked}
+          />
+          <FeeFields
+            fee={fee}
+            label={copy.fee || "Fee"}
+            onChange={setFee}
+            error={error && fee.fee_mode === "fixed" ? error : undefined}
+          />
+          <TextField
+            id="area-eta-fee"
+            label="How long it takes"
+            placeholder="Same day"
+            maxLength={ETA_MAX}
+            value={fee.eta ?? ""}
+            onChange={(e) => setFee({ ...fee, eta: e.target.value || null })}
+          />
+          {error && fee.fee_mode !== "fixed" ? <p className="text-meta text-danger">{error}</p> : null}
+        </div>
+      </Sheet>
+
       {/* One area */}
       <Sheet
         open={Boolean(editing)}
@@ -267,7 +339,7 @@ export function ServiceAreasEditor({
             <Button
               variant="ghost"
               onClick={() => {
-                if (editing) onChange({ ...value, areas: value.areas.filter((a) => a.id !== editing.id) });
+                if (editing) onSave({ ...value, areas: value.areas.filter((a) => a.id !== editing.id) });
                 setSheet(null);
               }}
             >
@@ -329,7 +401,7 @@ export function ServiceAreasEditor({
           <Button
             block
             onClick={() => {
-              onChange({ ...value, delivered_by: who.by, rider_paid: who.by.includes("rider") ? who.paid : null });
+              onSave({ ...value, delivered_by: who.by, rider_paid: who.by.includes("rider") ? who.paid : null });
               setSheet(null);
             }}
           >

@@ -185,11 +185,16 @@ export function areaSummary(a: ServiceArea): string {
   return [modes, fee, a.eta, a.min_order_ksh ? `From ${money(a.min_order_ksh)} orders` : ""].filter(Boolean).join(" · ");
 }
 
-/** What callers hear, shown under the editor. */
+function joinNames(names: string[]): string {
+  return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** What callers hear, shown under the editor. Areas with the same terms are grouped. */
 export function serviceAreasSentence(v: ServiceAreas | null | undefined): string {
   if (v?.reach === "walk_in") return "We don't deliver or visit. Customers come to us.";
   if (!v || !v.areas.length) return "";
-  const parts = v.areas.map((a) => {
+  const groups = new Map<string, { verb: string; tail: string; names: string[] }>();
+  for (const a of v.areas) {
     const verb = AREA_MODES.find((o) => o.id === a.modes[0])?.verb || "deliver to";
     const visit = a.modes[0] === "visit";
     const fee =
@@ -199,9 +204,19 @@ export function serviceAreasSentence(v: ServiceAreas | null | undefined): string
           ? visit ? ` for a call-out fee of ${money(a.fee_ksh)}` : ` for ${money(a.fee_ksh)}`
           : "";
     const eta = a.eta ? `, ${a.eta.charAt(0).toLowerCase()}${a.eta.slice(1)}` : "";
-    return `We ${verb} ${shortName(a.id)}${fee}${eta}.`;
-  });
-  return parts.join(" ");
+    const key = `${verb}|${fee}|${eta}`;
+    const g = groups.get(key) ?? { verb, tail: `${fee}${eta}`, names: [] };
+    g.names.push(shortName(a.id));
+    groups.set(key, g);
+  }
+  return [...groups.values()].map((g) => `We ${g.verb} ${joinNames(g.names)}${g.tail}.`).join(" ");
+}
+
+/** The fee to prefill when changing several areas: the shared one, else the first area's. */
+export function commonFee(areas: readonly ServiceArea[]): BulkFee {
+  const a = areas[0];
+  if (!a) return { fee_mode: "free", fee_ksh: null, eta: null };
+  return { fee_mode: a.fee_mode, fee_ksh: a.fee_ksh, eta: a.eta };
 }
 
 /** Prompt block. Fees are quoted only when the owner set and confirmed them. */
