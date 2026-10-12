@@ -34,6 +34,16 @@ describe("Appearance control", () => {
     assert.match(picker, /data-appearance-footer=""/);
   });
 
+  it("popover opens below the footer button (flips up only without room) so it never covers the page's own links", () => {
+    assert.match(picker, /<Popover\.Positioner side="bottom" align="center"/);
+    assert.match(picker, /collisionPadding=\{12\}/);
+  });
+
+  it("phones (below md) get the Sheet, md and up the popover; the trigger stays a 44px hit", () => {
+    assert.match(read(D + "components/ui/useIsPhone.ts"), /max-width: 767\.98px/);
+    assert.match(picker, /min-h-11/);
+  });
+
   for (const [name, file] of Object.entries(OUTSIDE)) {
     it(`${name} mounts the footer control once and no icon dock`, () => {
       const src = read(D + file);

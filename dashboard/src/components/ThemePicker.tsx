@@ -77,7 +77,7 @@ export function AppearanceFooter({ tone = "ink", className }: { tone?: "ink" | "
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger className={buttonClass}>{label}</Popover.Trigger>
         <Popover.Portal>
-          <Popover.Positioner side="top" align="center" sideOffset={6} collisionPadding={12} className="z-menu">
+          <Popover.Positioner side="bottom" align="center" sideOffset={8} collisionPadding={12} className="z-menu">
             <Popover.Popup className={popupClass}>
               <Popover.Title className="sr-only">Appearance</Popover.Title>
               <ThemePicker />
