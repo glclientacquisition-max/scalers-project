@@ -8,7 +8,7 @@ Index for the repo. Product behavior is in `product/`. Runbooks are in `operatio
 | --- | --- |
 | [`STATUS.md`](STATUS.md) | **Start here.** Where we are now, what's done, in flight, and next |
 | [`../README.md`](../README.md) | What is live, how to run voice and Desk, short repo map |
-| [`../CONTEXT.md`](../CONTEXT.md) | Glossary |
+| [`product/CLIENT_BUSINESS_DETAILS.md`](product/CLIENT_BUSINESS_DETAILS.md) | What we collect from a client, Settings IA, methods, onboarding |
 | [`../AGENTS.md`](../AGENTS.md) | Lane ownership |
 | [`architecture/SYSTEM_ARCHITECTURE.md`](architecture/SYSTEM_ARCHITECTURE.md) | How voice, Desk, and Supabase fit together |
 | [`architecture/CURRENT_STATE.md`](architecture/CURRENT_STATE.md) | File-level facts. Read the system picture first. |
@@ -18,7 +18,7 @@ Index for the repo. Product behavior is in `product/`. Runbooks are in `operatio
 
 | Folder | Contents |
 | --- | --- |
-| `product/` | Call messages, escalation (shipped), live transfer (spec), WhatsApp templates, home-services bar, MVP gate, business-intelligence roadmap |
+| `product/` | Client business details and onboarding map, call messages, escalation (shipped), live transfer (spec), WhatsApp templates, home-services bar, MVP gate, business-intelligence roadmap |
 | `operations/` | Deploy, environments, local tunnel, packages, wallet, DID pool, Super Admin requirements, production cutover |
 | `architecture/` | Entry picture (`SYSTEM_ARCHITECTURE.md`), fact inventory, data flow, historical blueprint, target module layout |
 | `agents/` | Lane contracts (Voice, Brain, Desk, Ops & Billing, Platform) |
