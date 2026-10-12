@@ -81,3 +81,39 @@ describe("Appearance control", () => {
     assert.doesNotMatch(master, /ThemeDock/);
   });
 });
+
+describe("Appearance polish (signed-in review)", () => {
+  const seg = read(D + "components/ui/Segmented.tsx");
+  const picker = read(D + "components/ThemePicker.tsx");
+  const desk = read(D + "components/DeskAccountMenu.tsx");
+  const menu = read(D + "components/ui/Menu.tsx");
+  const css = read(D + "app/globals.css");
+
+  it("segmented options are 44px on touch and below lg, compact only on lg+ fine pointers", () => {
+    const seg2 = seg.slice(seg.indexOf("export function SegmentedControl"));
+    assert.match(seg2, /min-h-11 lg:min-h-9 \[@media\(pointer:coarse\)\]:min-h-11/);
+  });
+
+  it("caption sits on the same left edge as the option buttons", () => {
+    assert.match(picker, /<p className="pb-2 ps-1 text-meta text-ink-2">On this device<\/p>/);
+    assert.match(picker, /SegmentedControl[\s\S]*className="grid w-full p-1/);
+  });
+
+  it("phone sheet: Appearance heading lives in the same card as the switch", () => {
+    const sec = desk.slice(desk.indexOf('aria-labelledby="account-sheet-appearance"'));
+    const card = sec.indexOf("data-account-sheet-card");
+    assert.ok(card > -1 && card < sec.indexOf('id="account-sheet-appearance"'), "heading inside card");
+    assert.ok(sec.indexOf('id="account-sheet-appearance"') < sec.indexOf("<ThemePicker />"));
+  });
+
+  it("sheet cards use the MASTER line token on an inset canvas so dark borders read", () => {
+    const sheet = desk.slice(desk.indexOf("function AccountSheet"), desk.indexOf("export function DeskAccountMenu"));
+    assert.doesNotMatch(sheet, /border-hairline bg-surface/);
+    assert.match(sheet, /border border-line bg-canvas/);
+  });
+
+  it("menus keep clear of the scrollbar, and dark scrollbars are dark", () => {
+    assert.match(menu, /collisionPadding=\{\{ top: 12, bottom: 12, left: 12, right: 24 \}\}/);
+    assert.match(css, /\[data-desk-main\][\s\S]{0,200}scrollbar-color: var\(--hairline\) var\(--canvas\)/);
+  });
+});

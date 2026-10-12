@@ -100,7 +100,7 @@ export function ThemePicker() {
         label="On this device"
         value={choice}
         onChange={(value) => pick(value as DeskTheme)}
-        className="grid w-full [&_button]:min-h-11"
+        className="grid w-full p-1 [&_button]:min-h-11"
         items={CHOICES.map((opt) => ({ value: opt.id, label: opt.label }))}
       />
     </div>

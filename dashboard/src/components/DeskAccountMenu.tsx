@@ -46,7 +46,7 @@ function AccountSheet({
             <h3 id="account-sheet-workspace" className="mb-2 px-1 text-meta font-medium text-ink-2">
               Workspace
             </h3>
-            <ul className="overflow-hidden rounded-2xl border border-hairline bg-surface">
+            <ul className="overflow-hidden rounded-2xl border border-line bg-canvas">
               {workspaces.map((row) => {
                 const current = row.id === tenantId;
                 return (
@@ -68,15 +68,13 @@ function AccountSheet({
             </ul>
           </section>
         ) : null}
-        <section aria-labelledby="account-sheet-appearance">
-          <h3 id="account-sheet-appearance" className="mb-2 px-1 text-meta font-medium text-ink-2">
+        <section aria-labelledby="account-sheet-appearance" data-account-sheet-card="" className="rounded-2xl border border-line bg-canvas p-3">
+          <h3 id="account-sheet-appearance" className="mb-2 ps-1 text-body font-medium text-ink">
             {appearanceLabel(theme.choice)}
           </h3>
-          <div className="rounded-2xl border border-hairline bg-surface p-3">
-            <ThemePicker />
-          </div>
+          <ThemePicker />
         </section>
-        <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
+        <div className="overflow-hidden rounded-2xl border border-line bg-canvas">
           <SignOutButton layout="sheet" />
         </div>
       </div>
