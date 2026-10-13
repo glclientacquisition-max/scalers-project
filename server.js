@@ -348,6 +348,7 @@ const {
   looksLikeEcho: turnLooksLikeEcho,
   classifyFinalDuringAgentSpeech,
   agentAwaitingReply,
+  isHearAgainUtterance,
 } = require('./src/speech/turnTaking');
 const {
   labelFlushedCallerTurn,
@@ -410,6 +411,12 @@ const {
   mediaStallGapMs,
   createMediaStallWatchdog,
 } = require('./src/speech/mediaStallWatchdog');
+const { repairWhoEnabled, isRepairWhoUtterance } = require('./src/speech/repairWho');
+const {
+  carrierDropCallbackEnabled,
+  isCarrierDropClose,
+  requestInFlight,
+} = require('./src/speech/carrierDrop');
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
@@ -3390,6 +3397,20 @@ mediaWss.on('connection', (ws, req) => {
           `[ws/media][${callKey}] ${localReply.outcome} local line not spoken lang=${callLanguage}: ${localReply.line}`
         );
       }
+      // VOICE_REPAIR_WHO: "who" / "hmm" / "nani" replay the last agent line
+      // instead of jumping to the file-name ask (HD_cc455b0ce145).
+      if (repairWhoEnabled() && (isRepairWhoUtterance(clean) || isHearAgainUtterance(clean))) {
+        const replay = hearAgainReplayText() || lastAgentText;
+        if (replay) {
+          console.log(`[ws/media][${callKey}] repair_who replay`);
+          callTranscript.pushAgent(replay);
+          await speakText(replay, { isReplay: true });
+          if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+          turnBusy = false;
+          kickPendingTurn();
+          return;
+        }
+      }
       // Phone file already has a name: ask only that. Do not let the model
       // ask as if the name were missing, and do not attach visits.
       // A greeting barge reaches this gate before Gemini. The model does not run.
@@ -5103,6 +5124,62 @@ mediaWss.on('connection', (ws, req) => {
     console.log(
       `[ws/media] closed after ${ms}ms code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
     );
+    // VOICE_CARRIER_DROP_CALLBACK / carrier_drop flag on abnormal close without Completed.
+    try {
+      const completed = sessionCallSid
+        ? callTerminalSince(sessionCallSid, connectedAt)
+        : null;
+      if (
+        sessionCallSid &&
+        isCarrierDropClose({ code, completedBeforeClose: Boolean(completed) })
+      ) {
+        // Log always (ops signal). Summary flag + callback task stay behind
+        // VOICE_CARRIER_DROP_CALLBACK so flags-off keeps main side-effects.
+        console.warn(
+          `[ws/media][${sessionCallSid}] carrier_drop code=${code} ms=${ms}`
+        );
+        if (carrierDropCallbackEnabled()) {
+          db.mergeCallSummaryMeta({
+            callSid: sessionCallSid,
+            patch: {
+              carrier_drop: true,
+              disconnect_code: Number(code) || 1006,
+              disconnect_ms: ms,
+            },
+          }).catch((err) => {
+            console.warn(
+              `[ws/media] carrier_drop summary failed:`,
+              err?.message || err
+            );
+          });
+          const brain = callBrainStates.get(sessionCallSid);
+          if (requestInFlight(brain)) {
+            db.createServiceRequest({
+              callSid: sessionCallSid,
+              type: 'callback',
+              name: brain?.caller?.name || '',
+              phone: brain?.caller?.phone || '',
+              notes: 'Auto callback after carrier media drop (ws 1006)',
+            })
+              .then((created) => {
+                if (created) {
+                  console.log(
+                    `[ws/media][${sessionCallSid}] carrier_drop callback id=${created.id}`
+                  );
+                }
+              })
+              .catch((err) => {
+                console.warn(
+                  `[ws/media] carrier_drop callback failed:`,
+                  err?.message || err
+                );
+              });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[ws/media] carrier_drop handler error:`, err?.message || err);
+    }
     clearFillerTimer();
     speakCommit.clear();
     idleNudge.close();

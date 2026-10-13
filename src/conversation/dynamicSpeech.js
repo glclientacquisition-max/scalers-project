@@ -786,7 +786,7 @@ function looksLikeBareCallerName(text) {
   if (!t || PURE_NOISE.has(t) || CONFIRM_ANSWERS.has(t)) return false;
   const hearAgain = t.replace(/[?'!.,]+$/g, '').trim();
   if (
-    /^(pardon( me)?|sorry|what|huh|eh|come again|say( that)? again|repeat( that)?|nini|sema tena)$/i.test(
+    /^(pardon( me)?|sorry|what|huh|eh|come again|say( that)? again|repeat( that)?|nini|sema tena|who|hmm+|nani)$/i.test(
       hearAgain
     )
   ) {
