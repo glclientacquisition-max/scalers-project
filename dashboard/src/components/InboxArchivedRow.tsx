@@ -21,7 +21,7 @@ function ArchiveMark() {
   return (
     <span
       aria-hidden
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface-muted text-ink-soft"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-hairline bg-surface-muted text-ink-2"
     >
       <ArchiveGlyph />
     </span>
@@ -38,7 +38,7 @@ export function InboxArchivedPhoneRow({
   return (
     <li
       className={[
-        "relative flex min-h-12 min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
+        "relative flex min-h-12 min-w-0 items-center gap-3 border-t border-hairline/70 px-4 py-3 first:border-t-0",
         deskShiftClass,
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
       ].join(" ")}
@@ -50,8 +50,8 @@ export function InboxArchivedPhoneRow({
       </div>
       <div className={`${deskRowMutedClass} min-w-0 flex-1`}>
         <div className="flex items-baseline justify-between gap-3">
-          <p className={`text-sm font-medium tracking-tight ${deskPreviewClass}`}>Archived</p>
-          <p className="shrink-0 text-xs tabular-nums text-ink-soft">{count}</p>
+          <p className={`text-body font-medium tracking-tight ${deskPreviewClass}`}>Archived</p>
+          <p className="shrink-0 text-meta tabular-nums text-ink-2">{count}</p>
         </div>
       </div>
     </li>
@@ -68,7 +68,7 @@ export function InboxArchivedTableRow({
   return (
     <tr
       className={[
-        "relative border-t border-line/70",
+        "relative border-t border-hairline/70",
         deskShiftClass,
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
       ].join(" ")}
@@ -79,10 +79,10 @@ export function InboxArchivedTableRow({
           <div className={deskRowMutedClass}>
             <ArchiveMark />
           </div>
-          <p className={`${deskRowMutedClass} min-w-0 text-sm font-medium tracking-tight ${deskPreviewClass}`}>
+          <p className={`${deskRowMutedClass} min-w-0 text-body font-medium tracking-tight ${deskPreviewClass}`}>
             Archived
           </p>
-          <p className={`${deskRowMutedClass} ml-auto shrink-0 text-sm tabular-nums text-ink-soft`}>{count}</p>
+          <p className={`${deskRowMutedClass} ml-auto shrink-0 text-body tabular-nums text-ink-2`}>{count}</p>
         </div>
       </td>
     </tr>

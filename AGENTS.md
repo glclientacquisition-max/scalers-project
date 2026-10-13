@@ -1,5 +1,7 @@
 # Scalers agent lanes
 
+> **New agent? Start at [`docs/STATUS.md`](docs/STATUS.md)**: where we are, what's done, what's in flight, and what's next.
+
 Specialized Cursor agents / chats. One task → one lane → one PR.
 
 | Lane | Scope | Contract |

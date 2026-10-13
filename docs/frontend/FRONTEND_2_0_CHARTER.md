@@ -117,7 +117,7 @@ Color roles
   --accent-tonal    tonal button bg            #E3EEFF   dark #12294A
   --accent-on       label on accent            #FFFFFF   dark #071426
   --brand           mark, focus ring, active   #0096FF   dark #2AA8FF
-  --attention       needs the owner            #C2410C   dark #F4955A
+  --attention       needs the owner            #B13A0A   dark #F4955A
   --attention-tonal                            #FDF0E8   dark #2B1A12
   --ok              done, live                 #15803D   dark #4ADE80
   --ok-tonal                                   #E8F5EE   dark #122A1C

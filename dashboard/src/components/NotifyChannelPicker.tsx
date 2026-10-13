@@ -1,5 +1,6 @@
 "use client";
 
+import { ChatBubbleLeftEllipsisIcon, EnvelopeIcon } from "@heroicons/react/24/solid";
 import type { ReactNode } from "react";
 import {
   NOTIFY_CHANNEL_META,
@@ -9,12 +10,7 @@ import {
 import { SettingsGroup, SettingsRow, ToolSwitch } from "@/components/settingsUi";
 
 function SmsLogo({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z" />
-      <path d="M7 9h10v2H7zm0-3h10v2H7zm0 6h7v2H7z" />
-    </svg>
-  );
+  return <ChatBubbleLeftEllipsisIcon aria-hidden="true" className={className} />;
 }
 
 function WhatsAppLogo({ className = "h-4 w-4" }: { className?: string }) {
@@ -26,11 +22,7 @@ function WhatsAppLogo({ className = "h-4 w-4" }: { className?: string }) {
 }
 
 function EmailLogo({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z" />
-    </svg>
-  );
+  return <EnvelopeIcon aria-hidden="true" className={className} />;
 }
 
 const LOGO: Record<NotifyChannelId, (p: { className?: string }) => ReactNode> = {
@@ -59,10 +51,10 @@ export function NotifyChannelPicker({
             key={meta.id}
             label={
               <span className="inline-flex items-center gap-2">
-                <Logo className="h-4 w-4 text-ink-soft" />
+                <Logo className="h-4 w-4 text-ink-2" />
                 {meta.label}
                 {locked ? (
-                  <span className="rounded-md bg-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                  <span className="rounded-md bg-hairline px-1.5 py-0.5 text-[10px] font-semibold text-ink-2">
                     Unavailable
                   </span>
                 ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { CheckIcon } from "@heroicons/react/24/outline";
@@ -66,7 +67,7 @@ function DockMarkDone({ callId }: { callId: string }) {
   );
 }
 
-export function InboxTicketActionDock({
+function InboxTicketActionDockInner({
   callId,
   callerPhone,
   waMessage,
@@ -121,3 +122,5 @@ export function InboxTicketActionDock({
     </nav>
   );
 }
+
+export const InboxTicketActionDock = withRoleGate("inbox.act", InboxTicketActionDockInner);

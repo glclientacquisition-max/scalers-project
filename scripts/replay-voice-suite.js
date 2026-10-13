@@ -3,6 +3,9 @@
 // Recorded mode is the CI gate. --live asks Gemini. --update-baseline rewrites
 // the committed scorecard after an intentional gain.
 
+// Fixtures use P0 owner rows (no value_hash). An ambient FACT_HASH_MODE=on in the
+// shell must not change the scenarios or the baseline scores.
+delete process.env.FACT_HASH_MODE;
 const fs = require('fs');
 const path = require('path');
 const { replayCall } = require('../src/speech/replayVoice');

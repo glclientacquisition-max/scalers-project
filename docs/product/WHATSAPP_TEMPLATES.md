@@ -182,7 +182,7 @@ Template **Footer: `Scalers`** is already in every body we submit. That brands t
 
 Do not add a template HEADER called Scalers thinking that fills the chat list. It does not.
 
-Voice on this E.164 is still Done and Dusted until a second DID exists. WhatsApp Cloud identity on the same number is Scalers. Keep those split. Park Calling.
+Staging voice is +254709221537 (Done and Dusted). Prod voice is +254709221536 (Aris Kenya). WhatsApp Cloud identity on +254709221536 is Scalers. Keep those split. Park Calling.
 
 ## Inbound is not these templates
 

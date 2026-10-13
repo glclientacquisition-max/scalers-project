@@ -42,7 +42,7 @@ Use for packages catalog, on-demand rate card, DID pool assign/release, phone-li
 
 ## Rate card defaults (env)
 
-- `WALLET_RATE_KES_PER_MINUTE` (inbound, default **0**; SautiKit inbound is currently free)
+- `WALLET_RATE_KES_PER_MINUTE` (inbound, default **0**; legacy fallback only when `consume_call_seconds` is missing). SautiKit is **not** free on inbound: the call leg is KES 0, but streaming audio to Voice costs about **KES 0.50 / min**, so every answered minute costs us about KES 0.50, including included package minutes.
 - `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (legacy fallback only when `consume_call_seconds` is missing; default **4**)
 - Package rate card (`billing_rate_card`): inbound **KES 0.10/sec** (KES 6/min), outbound **KES 0.15/sec** (KES 9/min). Outbound is stored and hidden until live transfer. SautiKit outbound cost is **KES 3 / min** answered.
 - `WALLET_LINE_FEE_KES_PER_MONTH` (default 1000)

@@ -1,8 +1,8 @@
 import Image from "next/image";
-import Link from "next/link";
+import { appEntryHref } from "@/lib/adminHost";
 import { brandAssets } from "@/components/brand/assets";
 import { HeroCall, HowStage } from "@/components/marketing/LandingStory";
-import { ThemeDock } from "@/components/ThemePicker";
+import { AppearanceFooter } from "@/components/ThemePicker";
 
 /**
  * Marketing home: hero, how it works, then sign up.
@@ -41,28 +41,27 @@ export function LandingPage({
             Scalers
           </span>
           <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <ThemeDock tone="onDark" />
             {signedIn ? (
-              <Link
-                href={actionHref}
+              <a
+                href={appEntryHref(actionHref)}
                 className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus sm:px-4"
               >
                 {actionLabel}
-              </Link>
+              </a>
             ) : (
               <>
-                <Link
-                  href="/login"
+                <a
+                  href={appEntryHref("/login")}
                   className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl px-2 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus sm:px-3"
                 >
                   Sign in
-                </Link>
-                <Link
-                  href={actionHref}
+                </a>
+                <a
+                  href={appEntryHref(actionHref)}
                   className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus sm:px-4"
                 >
                   {actionLabel}
-                </Link>
+                </a>
               </>
             )}
           </nav>
@@ -87,7 +86,7 @@ export function LandingPage({
             </div>
 
             <h1 className="landing-rise landing-rise-delay-2 mt-8 font-display text-3xl leading-tight tracking-tight text-white sm:text-4xl md:text-[2.75rem] text-balance">
-              Your 24-hour call assistant, so you do not miss the client.
+              Your 24-hour Business Assistant, so you do not miss the client.
             </h1>
 
             <p className="landing-rise landing-rise-delay-3 mt-4 max-w-md text-base leading-relaxed text-sky-100/90 sm:text-lg">
@@ -95,24 +94,24 @@ export function LandingPage({
             </p>
 
             <p className="landing-rise landing-rise-delay-3 mt-3 max-w-md text-sm leading-relaxed text-sky-100/65">
-              Scalers is a business assistant that actually helps you run the business, from the
+              Scalers is a Business Assistant that actually helps you run the business, from the
               client call through to the booking, the order, or whatever comes next.
             </p>
 
             <div className="landing-rise landing-rise-delay-4 mt-10 flex flex-wrap items-center gap-3">
-              <Link
-                href={actionHref}
+              <a
+                href={appEntryHref(actionHref)}
                 className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-6 py-3 text-base font-medium text-brand-900 transition hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus"
               >
                 {actionLabel}
-              </Link>
+              </a>
               {!signedIn ? (
-                <Link
-                  href="/login"
+                <a
+                  href={appEntryHref("/login")}
                   className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/30 px-6 py-3 text-base font-medium text-white transition hover:border-white/55 hover:bg-white/5 focus-visible:outline-none focus-visible:shadow-focus"
                 >
                   Sign in
-                </Link>
+                </a>
               ) : null}
             </div>
           </div>
@@ -133,18 +132,21 @@ export function LandingPage({
         <div className="mx-auto max-w-desk">
           <div className="max-w-xl">
             <p className="text-base leading-relaxed text-ink">
-              Scalers is a business assistant that actually helps you run the business, from the
+              Scalers is a Business Assistant that actually helps you run the business, from the
               client call through to the booking, the order, or whatever comes next.
             </p>
-            <Link
-              href={actionHref}
+            <a
+              href={appEntryHref(actionHref)}
               className="mt-6 inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-900 px-6 py-3 text-base font-medium text-white transition hover:bg-brand-800 focus-visible:outline-none focus-visible:shadow-focus"
             >
               {actionLabel}
-            </Link>
+            </a>
           </div>
         </div>
       </section>
+      <footer className="flex justify-center border-t border-hairline bg-canvas px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
+        <AppearanceFooter />
+      </footer>
     </main>
   );
 }

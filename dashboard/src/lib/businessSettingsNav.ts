@@ -75,6 +75,8 @@ export type SettingsNavTarget =
 
 export type SettingsNavItem = {
   label: string;
+  /** One plain line for the Settings home list. */
+  description: string;
   target: SettingsNavTarget;
 };
 
@@ -85,8 +87,8 @@ export type SettingsNavSection = {
 };
 
 /**
- * Settings destinations. /settings is the phone index.
- * Wide screens open Hours, the second Business row.
+ * Settings destinations. /settings with no section is the Settings home on every width
+ * (phone: the whole screen; tablet and desktop: the right pane beside the rail).
  * One header each: Business, Knowledge, Assistant, People.
  * Import sits directly under Catalog. Team is People, ahead of Alerts.
  * Appearance is the account-menu theme cluster. It is not a settings tab.
@@ -97,56 +99,39 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     id: "business",
     title: "Business",
     items: [
-      { label: "Identity", target: { tab: "train", panel: "identity" } },
-      { label: "Hours", target: { tab: "train", panel: "hours" } },
-      { label: "Locations", target: { tab: "train", panel: "locations" } },
-      { label: "Policies", target: { tab: "train", panel: "policies" } },
+      { label: "Identity", description: "Name, type of business and how callers hear it", target: { tab: "train", panel: "identity" } },
+      { label: "Hours", description: "When you are open, including holidays", target: { tab: "train", panel: "hours" } },
+      { label: "Locations", description: "Where callers can find you", target: { tab: "train", panel: "locations" } },
+      { label: "Policies", description: "Payments, delivery, returns and other rules", target: { tab: "train", panel: "policies" } },
     ],
   },
   {
     id: "knowledge",
     title: "Knowledge",
     items: [
-      { label: "Catalog", target: { tab: "catalog" } },
-      { label: "Import", target: { tab: "import" } },
-      { label: "FAQs", target: { tab: "train", panel: "faqs" } },
+      { label: "Catalogue", description: "What you sell and what it costs", target: { tab: "catalog" } },
+      { label: "Import", description: "Add items from a file or your website", target: { tab: "import" } },
+      { label: "FAQs", description: "Answers to the questions callers ask most", target: { tab: "train", panel: "faqs" } },
     ],
   },
   {
     id: "assistant",
     title: "Assistant",
     items: [
-      { label: "Voice", target: { tab: "train", panel: "tools" } },
-      { label: "Pronunciation", target: { tab: "train", panel: "pronunciation" } },
-      { label: "Test", target: { tab: "test" } },
+      { label: "Voice", description: "How your Business Assistant sounds", target: { tab: "train", panel: "tools" } },
+      { label: "Pronunciation", description: "Names and words it should say a certain way", target: { tab: "train", panel: "pronunciation" } },
+      { label: "Test", description: "Call your line and hear it answer", target: { tab: "test" } },
     ],
   },
   {
     id: "people",
     title: "People",
     items: [
-      { label: "Team", target: { tab: "train", panel: "team" } },
-      { label: "How we notify", target: { tab: "alerts" } },
+      { label: "Team", description: "Who can use the desk and what they can do", target: { tab: "train", panel: "team" } },
+      { label: "How we notify", description: "Where new calls and leads reach you", target: { tab: "alerts" } },
     ],
   },
 ];
-
-/** Wide-screen destination for `/settings` with no tab. */
-export const SETTINGS_HOURS_HREF = businessSettingsHref("train", "hours");
-
-/**
- * md+ visits to `/settings` with no tab open Hours.
- * No cookie (phone, or a first paint the server cannot see) stays on the index.
- * `?tab=train` stays Identity so Home Train does not jump to Hours.
- */
-export function settingsWideDefaultHref(
-  tabRaw: string | undefined | null,
-  deskMd: string | undefined | null
-): string | null {
-  if (tabRaw) return null;
-  if (deskMd !== "1") return null;
-  return SETTINGS_HOURS_HREF;
-}
 
 export function settingsNavHref(target: SettingsNavTarget): string {
   return target.tab === "train"
@@ -175,7 +160,7 @@ export function settingsPanelHeading(
   vertical?: string | null
 ): string | null {
   if (tab === "menu") return null;
-  if (tab === "catalog") return "Catalog";
+  if (tab === "catalog") return "Catalogue";
   if (tab === "alerts") return "How we notify";
   if (tab === "import") {
     const v = String(vertical || "")

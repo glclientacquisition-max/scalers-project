@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createPortal } from "react-dom";
+import { CheckIcon } from "@heroicons/react/16/solid";
 import { ensureInboxContact } from "@/app/(desk)/contacts/actions";
 import { DeskDialog } from "@/components/ui/DeskDialog";
 import { useInboxRowUi } from "@/components/InboxRowUi";
@@ -64,20 +64,18 @@ export function InboxRowAvatar({
         <RowIdentity name={name} />
         {selected ? (
           <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-accent-on">
-            <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" aria-hidden="true">
-              <path d="M3.4 8.2 6.4 11.2 12.6 4.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+            <CheckIcon className="h-3 w-3" aria-hidden="true" />
           </span>
         ) : null}
       </button>
     );
   }
-  const stub = createPortal(
+  // DeskDialog is the Sheet, which portals itself. A createPortal here read `document` during SSR.
+  const stub = (
     <DeskDialog open={open} title={who} onClose={() => setOpen(false)}>
-      <p className="mt-2 font-mono text-sm text-ink">{phone?.trim() || "No phone"}</p>
-      <p className="mt-4 text-sm text-ink-soft">{error || "No history yet"}</p>
-    </DeskDialog>,
-    document.body
+      <p className="mt-2 font-mono text-body text-ink">{phone?.trim() || "No phone"}</p>
+      <p className="mt-4 text-meta text-ink-2">{error || "No history yet"}</p>
+    </DeskDialog>
   );
 
   if (contactHref) {

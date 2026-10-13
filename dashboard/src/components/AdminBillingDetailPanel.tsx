@@ -75,6 +75,9 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
 
   const [grantMinutes, setGrantMinutes] = useState("60");
   const [grantNote, setGrantNote] = useState("");
+  // One idempotency key per open Sheet: a double click or retry of the same
+  // grant replays instead of granting twice. A fresh key after success.
+  const [grantKey, setGrantKey] = useState(() => crypto.randomUUID());
 
   const [mode, setMode] = useState<BillingMode>(detail.row.billing_enforcement);
   const [modeNote, setModeNote] = useState(
@@ -149,6 +152,7 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
     const ok = await post(body, okText);
     setBusy(false);
     if (ok) setTask(null);
+    return ok;
   }
 
   async function submitCharging() {
@@ -201,17 +205,17 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
       </div>
 
       {error ? (
-        <p className="text-sm text-warn" role="alert">
+        <p className="text-body text-warn" role="alert">
           {error}
         </p>
       ) : null}
       {status ? (
-        <p className="text-sm text-ok" role="status">
+        <p className="text-body text-ok" role="status">
           {status}
         </p>
       ) : null}
 
-      <label className="block max-w-xs text-sm">
+      <label className="block max-w-xs text-body">
         Ops actor
         <input
           value={actor}
@@ -221,41 +225,41 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
         />
       </label>
 
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Package</h2>
-        <p className="mt-1 text-sm text-ink-2">{nowPackage}</p>
+        <p className="mt-1 text-body text-ink-2">{nowPackage}</p>
         <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("package")}>
           Assign or change
         </Button>
       </section>
 
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Usage</h2>
-        <p className="mt-2 text-sm tabular-nums text-ink">
+        <p className="mt-2 text-body tabular-nums text-ink">
           Minutes {minutesLine}
           {sub
             ? ` · SMS ${usedOfIncluded(sub.usage.smsUsed, sub.usage.smsIncluded)} · Email ${usedOfIncluded(sub.usage.emailUsed, sub.usage.emailIncluded)}`
             : null}
         </p>
-        <p className="mt-2 text-sm text-ink-2">
+        <p className="mt-2 text-body text-ink-2">
           On-demand rates (read-only): inbound KES {inboundKesPerMinute(rates.inboundKesPerSecond)}/min,
           outbound KES {outboundKesPerMinute(rates.outboundKesPerSecond)}/min. Owner opted in:{" "}
           {row.on_demand_usage_enabled ? "Yes" : "No"}.
         </p>
-        {sub?.gap ? <p className="mt-2 text-sm text-attention">{sub.gap}</p> : null}
+        {sub?.gap ? <p className="mt-2 text-body text-attention">{sub.gap}</p> : null}
       </section>
 
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Charging</h2>
-        <p className="mt-1 text-sm text-ink-2">{planConsequence(row.billing_enforcement)}</p>
+        <p className="mt-1 text-body text-ink-2">{planConsequence(row.billing_enforcement)}</p>
         <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("charging")}>
           Change charging
         </Button>
       </section>
 
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Grant minutes</h2>
-        <p className="mt-1 text-sm text-ink-2">
+        <p className="mt-1 text-body text-ink-2">
           Adds to included minutes for this period.
         </p>
         <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("grant")}>
@@ -266,13 +270,13 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
       <section>
         <h2 className="text-title font-medium text-ink">History</h2>
         {!historyLoaded ? (
-          <p className="mt-2 text-sm text-ink-2">Loading…</p>
+          <p className="mt-2 text-body text-ink-2">Loading…</p>
         ) : history.length === 0 ? (
           <Empty title="No history yet." />
         ) : (
-          <ul className="mt-4 divide-y divide-line/70">
+          <ul className="mt-4 divide-y divide-hairline/70">
             {history.map((entry) => (
-              <li key={entry.id} className={`flex justify-between gap-3 py-2 text-sm ${adminTdClass}`}>
+              <li key={entry.id} className={`flex justify-between gap-3 py-2 text-body ${adminTdClass}`}>
                 <div>
                   <p className="font-medium text-ink">{entry.summary}</p>
                   <p className="text-meta text-ink-2">
@@ -416,10 +420,12 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
                   business_id: row.id,
                   minutes: Math.floor(Number(grantMinutes)),
                   note: grantNote.trim(),
-                  idempotency_key: crypto.randomUUID(),
+                  idempotency_key: grantKey,
                 },
                 "Minutes granted."
-              )
+              ).then((ok) => {
+                if (ok) setGrantKey(crypto.randomUUID());
+              })
             }
           >
             Grant minutes

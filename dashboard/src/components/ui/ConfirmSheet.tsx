@@ -15,6 +15,7 @@ export function ConfirmSheet({
   confirmLabel,
   cancelLabel = "Cancel",
   pending = false,
+  confirmDisabled = false,
   danger = false,
   theme = "desk",
   onClose,
@@ -26,6 +27,8 @@ export function ConfirmSheet({
   confirmLabel: string;
   cancelLabel?: string;
   pending?: boolean;
+  /** Keep the confirm off until the drawer's own check passes (a reason, a typed name). */
+  confirmDisabled?: boolean;
   danger?: boolean;
   theme?: "desk" | "admin";
   onClose: () => void;
@@ -45,7 +48,7 @@ export function ConfirmSheet({
           <Button variant="ghost" size="md" onClick={onClose} disabled={pending}>
             {cancelLabel}
           </Button>
-          <Button variant={danger ? "danger" : "primary"} size="md" pending={pending} onClick={onConfirm}>
+          <Button variant={danger ? "danger" : "primary"} size="md" pending={pending} disabled={confirmDisabled} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </>

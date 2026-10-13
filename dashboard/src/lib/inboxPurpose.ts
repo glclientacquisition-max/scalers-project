@@ -121,6 +121,8 @@ export type InboxItem = {
   hold: InboxHold | null;
   job: InboxJob | null;
   intent: string | null;
+  /** Owner's corrected Wanted label ("Quote"); the row label uses it over the old intent. */
+  ownerWanted?: string | null;
   urgent: boolean;
   unread: boolean;
   muted: boolean;
@@ -226,6 +228,7 @@ export function itemSignalLabel(
   item: InboxItem,
   vertical?: string | null
 ): string {
+  if (item.ownerWanted && (item.purpose === "answered" || item.purpose === "human")) return item.ownerWanted;
   return signalLabel({
     purpose: item.purpose,
     hold: item.hold,
@@ -367,6 +370,13 @@ export function homeDigestLine(
   return bits.length ? `Today: ${bits.join(", ")}.` : null;
 }
 
+const HOLD_REQUEST_TYPES = new Set(["hold", "order", "hold_or_pickup"]);
+
+/** service_requests.request_type values that are a hold or an order (not an enquiry or callback). */
+export function isHoldRequestType(type: unknown): boolean {
+  return HOLD_REQUEST_TYPES.has(String(type || "").trim().toLowerCase());
+}
+
 export function summarizeInboxWork(items: InboxItem[]): {
   needs: number;
   toReturn: number;
@@ -386,11 +396,16 @@ export function summarizeInboxWork(items: InboxItem[]): {
   const requested = visits.filter(
     (item) => String(item.job?.status || "").toLowerCase() === "requested"
   );
-  const toFulfill = live.filter(
-    (item) => String(item.hold?.status || "").toLowerCase() === "open"
-  );
+  const openRequest = (item: InboxItem) => String(item.hold?.status || "").toLowerCase() === "open";
+  // Only a real hold or order is something to fulfil. An open enquiry or callback
+  // request is a caller to get back to: counting it as a hold made Overview show
+  // "1 Hold" while holds were locked (Aris Kenya, Oct 2026).
+  const toFulfill = live.filter((item) => openRequest(item) && isHoldRequestType(item.hold?.request_type));
   const toReturn = live.filter(
-    (item) => item.purpose === "human" || item.purpose === "missed"
+    (item) =>
+      item.purpose === "human" ||
+      item.purpose === "missed" ||
+      (openRequest(item) && !isHoldRequestType(item.hold?.request_type))
   );
   return {
     needs: needs.length,
@@ -533,7 +548,8 @@ export function buildInboxItem(opts: {
     job?.caller_phone || hold?.caller_phone || lead?.call.caller_number || null;
 
   let headline = ownerLine(lead?.reason || purposeLabel(purpose, vertical));
-  let detail: string | null = lead?.primaryIntent || null;
+  let detail: string | null =
+    lead?.ownerWanted ? [lead.ownerWanted, lead.ownerResult].filter(Boolean).join(" · ") : lead?.primaryIntent || null;
   if (job) {
     headline = ownerLine(jobHeadline(job, vertical));
     detail = jobDetail(job);
@@ -565,6 +581,7 @@ export function buildInboxItem(opts: {
     hold,
     job,
     intent: intent || canonicalInboxIntent(hold?.request_type) || null,
+    ownerWanted: !job && !hold ? lead?.ownerWanted ?? null : null,
     urgent: Boolean(lead?.urgent),
     unread: inboxIsUnread({
       lastCustomerEventAt: inboxLastCustomerEventAt({

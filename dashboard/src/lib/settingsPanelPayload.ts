@@ -13,7 +13,7 @@ const KEEP: Record<string, readonly (keyof TenantRow)[]> = {
   identity: ["social_handles", "business_locations", "business_policies"],
   catalog: ["services_catalog", "product_catalog", "services_offered"],
   hours: [],
-  locations: ["business_locations"],
+  locations: ["business_locations", "service_areas", "business_policies"],
   policies: ["business_policies"],
   // Voice Hear sample reads the stored lexicon. Save scope still omits ttsLexicon.
   tools: ["tts_lexicon"],

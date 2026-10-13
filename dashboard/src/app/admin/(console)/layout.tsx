@@ -1,8 +1,8 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/AdminNav";
 import { AdminPhonePull } from "@/components/PhonePullSurface";
-import { getAdminSession, getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
+import { requireSuperAdmin } from "@/lib/adminGuard";
+import { getAdminSession } from "@/lib/auth";
 
 // instant = false: Super Admin cookie session must run before chrome. Do not wrap the gate in Suspense.
 export const instant = false;
@@ -12,9 +12,8 @@ export const instant = false;
  * md+: own icon rail. Phone: the same list as bottom tabs. Nested screens lead with the parent list.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  if (!(await isLegacyAuthenticated())) {
-    redirect((await getAuthUser()) ? "/home" : "/admin/login");
-  }
+  // Signed out, or an owner session only: always the admin login (folds in #434). Pages repeat this.
+  await requireSuperAdmin();
 
   const adminSession = await getAdminSession();
   const operatorName = adminSession?.user?.name || "ops";

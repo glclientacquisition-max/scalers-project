@@ -30,10 +30,10 @@ export function ContactStrip({
         <RowIdentity name={avatarName} />
       </div>
       <div className={`${deskRowMutedClass} min-w-0 flex-1`}>
-        <p className={`text-sm font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
+        <p className={`text-body font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
           {title}
         </p>
-        <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>{fact}</p>
+        <p className={`mt-0.5 text-body text-ink-2 ${deskPreviewClass}`}>{fact}</p>
       </div>
     </div>
   );

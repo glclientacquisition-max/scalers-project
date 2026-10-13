@@ -27,7 +27,7 @@ export function Th({ className, num = false, ...rest }: ThHTMLAttributes<HTMLTab
     <th
       scope="col"
       className={cx(
-        "border-b border-hairline px-4 py-2.5 text-caption font-medium uppercase tracking-wide text-ink-2",
+        "border-b border-hairline px-4 py-2.5 text-caption font-medium text-ink-2",
         num ? "text-end" : "text-start",
         className,
       )}

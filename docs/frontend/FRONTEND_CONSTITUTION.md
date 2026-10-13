@@ -96,7 +96,7 @@ Base unit **8px**, same as IBM Carbon, Atlassian, and Material. Tailwind already
 | Canvas | `#F4F7FB` | Page |
 | Surface | `#FFFFFF` | Tables, forms |
 | Line | `#D5DEE9` | 1px |
-| Ok / Warn / Lead | `#15803D` / `#C2410C` / `#B98A1F` | Status only |
+| Ok / Warn / Lead | `#15803D` / `#B13A0A` / `#B98A1F` | Status only |
 | WhatsApp glyph | `#25D366` | Icon on white/canvas only. On the blue CTA use a white glyph (green-on-blue fails SC 1.4.11). |
 
 No Plus Jakarta Sans. No third family. No purple.

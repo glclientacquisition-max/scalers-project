@@ -5,6 +5,7 @@
  * It never assigns a production desk host.
  */
 const fs = require("node:fs");
+const { execFileSync } = require("node:child_process");
 
 const STAGING_PROJECT_ID = "prj_koYxAaXjOZ9QYA7hVB2SUOEAmyoB";
 const STAGING_TEAM_ID = "team_pZLbtKTricc6PI2UG9KutoFN";
@@ -121,6 +122,7 @@ async function assignStagingDesk({
   intervalMs = 15 * 1000,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now = Date.now,
+  deskUnchanged = null,
 }) {
   if (!token) {
     throw new Error(
@@ -128,10 +130,36 @@ async function assignStagingDesk({
     );
   }
   assertStagingTarget({ projectId, alias, branch });
-  await vercel(fetchImpl, token, `/v9/projects/${projectId}?${teamQuery(teamId)}`, {
+  const project = await vercel(fetchImpl, token, `/v9/projects/${projectId}?${teamQuery(teamId)}`, {
     method: "PATCH",
     body: stagingProjectPinBody(),
   });
+
+  // Git pushes no longer auto-deploy this branch (vercel.json git.deploymentEnabled), so this
+  // step creates the one deploy per staging rebuild. Skip it when no Desk file changed since the
+  // deploy the alias serves now: the voice-only or docs-only batch costs zero Vercel deploys.
+  if (deskUnchanged) {
+    const current = confirmedMeta(
+      await vercel(fetchImpl, token, `/v13/deployments/${encodeURIComponent(alias)}?${teamQuery(teamId)}`)
+    );
+    if (current.sha && current.ref === branch && deskUnchanged(current.sha, sha)) {
+      return { deploymentId: null, sha: current.sha, alias, skipped: `no dashboard/ change since ${current.sha}` };
+    }
+  }
+  const existing = await vercel(
+    fetchImpl,
+    token,
+    `/v6/deployments?${teamQuery(teamId)}&projectId=${encodeURIComponent(projectId)}&sha=${encodeURIComponent(sha)}&limit=20`
+  );
+  const live = (existing?.deployments || []).filter((d) => !["CANCELED", "ERROR"].includes(String(d.state || d.readyState)));
+  if (live.length === 0) {
+    const repoId = project?.link?.repoId;
+    if (!repoId) throw new Error("scalers-staging has no linked GitHub repo id; cannot create the deploy");
+    await vercel(fetchImpl, token, `/v13/deployments?${teamQuery(teamId)}`, {
+      method: "POST",
+      body: { name: "scalers-staging", project: projectId, gitSource: { type: "github", repoId, ref: branch, sha } },
+    });
+  }
 
   const deadline = now() + timeoutMs;
   let ready = null;
@@ -168,6 +196,18 @@ async function assignStagingDesk({
   return { deploymentId: id, sha, alias };
 }
 
+/** True when git shows no dashboard/ change between the two commits. Any git error: false (deploy). */
+function gitDeskUnchanged(fromSha, toSha) {
+  if (!fromSha || fromSha === toSha) return fromSha === toSha;
+  try {
+    execFileSync("git", ["fetch", "--quiet", "origin", STAGING_BRANCH], { stdio: "ignore" });
+    execFileSync("git", ["diff", "--quiet", fromSha, toSha, "--", "dashboard/"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function readStagingSha(resultPath) {
   if (!resultPath || !fs.existsSync(resultPath)) return "";
   const result = JSON.parse(fs.readFileSync(resultPath, "utf8"));
@@ -177,7 +217,11 @@ function readStagingSha(resultPath) {
 async function main() {
   const sha = process.env.STAGING_SHA || readStagingSha(process.env.STAGE_RESULT_PATH);
   if (!sha) throw new Error("Staging sha is missing");
-  const assigned = await assignStagingDesk({ token: process.env.VERCEL_TOKEN, sha });
+  const assigned = await assignStagingDesk({ token: process.env.VERCEL_TOKEN, sha, deskUnchanged: gitDeskUnchanged });
+  if (assigned.skipped) {
+    console.log(`staging_desk_alias=${assigned.alias} unchanged (${assigned.skipped})`);
+    return;
+  }
   console.log(
     `staging_desk_alias=${assigned.alias} sha=${assigned.sha} deployment=${assigned.deploymentId}`
   );
@@ -200,4 +244,5 @@ module.exports = {
   pickReadyDeployment,
   assignStagingDesk,
   readStagingSha,
+  gitDeskUnchanged,
 };

@@ -38,7 +38,7 @@ describe("Super Admin Better Auth", () => {
     assert.doesNotMatch(owner, /action="\/api\/admin\/session"/);
     assert.doesNotMatch(owner, /name="accessCode"/);
     assert.match(login, /name="username"/);
-    assert.match(login, /text-base/);
+    assert.match(login, /text-body/);
     assert.doesNotMatch(login, /—|–/);
   });
 

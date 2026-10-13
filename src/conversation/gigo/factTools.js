@@ -129,7 +129,7 @@ function runFactTool(name, args = {}, profileIn = {}, opts = {}) {
       };
     }
     if (name === 'check_coverage') {
-      const res = checkCoverage(profile, String(args?.place || ''), { now, hashMode });
+      const res = checkCoverage(profile, String(args?.place || ''), { now, hashMode, language: speakOpts(profile, opts).language });
       return {
         ok: true,
         tool: name,
@@ -137,9 +137,10 @@ function runFactTool(name, args = {}, profileIn = {}, opts = {}) {
         reason: res.reason,
         value: res.status === 'unknown' ? null : { areas: res.areas },
         say:
-          res.status === 'unknown'
+          res.say ||
+          (res.status === 'unknown'
             ? unknownFactLine({ ...speakOpts(profile, opts), topic: 'areas we serve' })
-            : undefined,
+            : undefined),
       };
     }
     return { ok: false, tool: String(name || ''), status: 'unknown', reason: 'no_such_tool' };

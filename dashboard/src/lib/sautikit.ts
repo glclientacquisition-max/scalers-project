@@ -267,7 +267,9 @@ export async function claimSautikitNumber(inventoryId: string): Promise<Sautikit
 
 /**
  * Prepaid platform wallet. Requires an API key with the `wallet.read` scope —
- * returns null when the current key lacks it (403 api_key.scope_denied).
+ * returns null when the current key lacks it (403 api_key.scope_denied) and logs
+ * one server-side warning so the blind low-balance alert leaves a trace.
+ * Never logs the key.
  */
 export async function getSautikitWallet(): Promise<SautikitWallet | null> {
   try {
@@ -275,7 +277,13 @@ export async function getSautikitWallet(): Promise<SautikitWallet | null> {
   } catch (err) {
     const status = (err as { status?: number }).status;
     const code = (err as { code?: string }).code;
-    if (status === 403 || code === "api_key.scope_denied") return null;
+    if (status === 403 || code === "api_key.scope_denied") {
+      console.warn(
+        `[sautikit:wallet] GET /v1/wallet denied (HTTP ${status ?? "?"}, ${code || "no code"}). ` +
+          "SAUTIKIT_API_KEY needs the wallet.read scope; balance and low-balance alerts are blind until then."
+      );
+      return null;
+    }
     throw err;
   }
 }

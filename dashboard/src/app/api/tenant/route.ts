@@ -1,12 +1,17 @@
+import { bustTenantCache } from "@/lib/tenantCache";
 import { NextResponse } from "next/server";
 import { isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
 import { canonicalizeAgentTone } from "@/lib/onboarding";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { memberDenied } from "@/lib/requireMember";
 
 export async function POST(request: Request) {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+
+  const denied = await memberDenied("settings.edit");
+  if (denied) return NextResponse.json({ error: denied.error }, { status: 403 });
 
   const body = await request.json();
   const id = String(body.id || "");
@@ -49,6 +54,7 @@ export async function POST(request: Request) {
       "id, business_name, whatsapp_notification_number, services_offered, business_hours, agent_tone"
     )
     .single();
+  bustTenantCache(id);
 
   if (error) {
     const hint =

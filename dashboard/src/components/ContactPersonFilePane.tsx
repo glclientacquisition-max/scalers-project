@@ -155,7 +155,7 @@ export async function ContactPersonFilePane({
           {threadsHref ? (
             <Link
               href={threadsHref}
-              className={`text-sm font-medium text-accent ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
+              className={`inline-flex min-h-11 items-center text-body font-medium text-accent ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
             >
               Inbox threads
             </Link>
@@ -197,7 +197,7 @@ export async function ContactPersonFilePane({
           <div className="space-y-3">
             <ContactSparkline days={spark} />
             {insight ? (
-              <p className="rounded-2xl border border-warn/40 bg-warn-soft px-3 py-3 text-sm text-warn">
+              <p className="rounded-2xl border border-warn/40 bg-warn-soft px-3 py-3 text-body text-warn">
                 {insight}
               </p>
             ) : null}

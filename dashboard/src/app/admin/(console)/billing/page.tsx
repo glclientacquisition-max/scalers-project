@@ -3,10 +3,12 @@ import { AdminBillingListPanel } from "@/components/AdminBillingListPanel";
 import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { logAdminError } from "@/lib/adminErrors";
 import { loadAdminBillingOverview } from "@/lib/adminBilling";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 
 export const instant = false;
 
 export default async function AdminBillingPage() {
+  await requireSuperAdmin();
   let overview;
   try {
     overview = await loadAdminBillingOverview();

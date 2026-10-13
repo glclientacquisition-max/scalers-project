@@ -6,6 +6,7 @@ Index for the repo. Product behavior is in `product/`. Runbooks are in `operatio
 
 | Doc | Use it for |
 | --- | --- |
+| [`STATUS.md`](STATUS.md) | **Start here.** Where we are now, what's done, in flight, and next |
 | [`../README.md`](../README.md) | What is live, how to run voice and Desk, short repo map |
 | [`../CONTEXT.md`](../CONTEXT.md) | Glossary |
 | [`../AGENTS.md`](../AGENTS.md) | Lane ownership |

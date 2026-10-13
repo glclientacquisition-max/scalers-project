@@ -53,7 +53,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
   return (
     <div className="space-y-4">
       <section
-        className="grid grid-cols-2 border-y border-line/70 sm:grid-cols-4"
+        className="grid grid-cols-2 border-y border-hairline/70 sm:grid-cols-4"
         aria-label="Billing totals"
       >
         <Kpi label="Beta (free)" value={overview.betaCount} />
@@ -62,7 +62,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
         <Kpi label="Exhausted" value={overview.exhaustedCount} warn={overview.exhaustedCount > 0} />
       </section>
 
-      <p className="text-sm text-ink-2">
+      <p className="text-body text-ink-2">
         Observe every client: package minutes and on-demand charging mode. Edit SKUs, rates, and
         assignments on{" "}
         <Link href="/admin/packages" className="font-medium text-accent underline-offset-2 hover:underline">
@@ -72,7 +72,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
       </p>
 
       <div className="flex flex-wrap items-end gap-2 sm:gap-3">
-        <label className="min-w-[200px] grow text-sm">
+        <label className="min-w-[200px] grow text-body">
           Search
           <input
             value={query}
@@ -81,7 +81,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
             placeholder="Business, number, or package"
           />
         </label>
-        <div className="text-sm">
+        <div className="text-body">
           <span className="font-medium text-ink">Filter</span>
           <DeskSelect
             aria-label="Filter businesses"
@@ -95,9 +95,9 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[880px] text-left text-sm">
+        <table className="w-full min-w-[880px] text-left text-body">
           <thead className="text-ink-2">
-            <tr className="border-b border-line/70">
+            <tr className="border-b border-hairline/70">
               <th className={adminThClass}>Business</th>
               <th className={adminThClass}>Package</th>
               <th className={adminThClass}>Minutes</th>
@@ -116,7 +116,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
               </tr>
             ) : (
               filtered.map((r) => (
-                <tr key={r.id} className="border-t border-line/70">
+                <tr key={r.id} className="border-t border-hairline/70">
                   <td className={adminTdClass}>
                     <p className={`text-body font-medium text-ink ${deskPreviewClass}`}>{r.business_name}</p>
                     <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>{r.sautikit_virtual_number}</p>
@@ -150,7 +150,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
 
 function Kpi({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
   return (
-    <div className="border-t border-line/70 px-3 py-2 sm:border-t-0 sm:border-l sm:px-4 sm:py-2.5 sm:first:border-l-0">
+    <div className="border-t border-hairline/70 px-3 py-2 sm:border-t-0 sm:border-l sm:px-4 sm:py-2.5 sm:first:border-l-0">
       <p className={`text-body font-medium tabular-nums ${warn ? "text-attention" : "text-ink"}`}>{value}</p>
       <p className="mt-0.5 truncate text-meta text-ink-2">{label}</p>
     </div>

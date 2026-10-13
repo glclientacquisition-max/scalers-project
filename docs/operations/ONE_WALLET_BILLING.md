@@ -30,7 +30,7 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 
 | Line item | Ledger kind | Amount |
 |---|---|---|
-| Receptionist minutes (inbound on-demand) | `call_charge` via `consume_call_seconds` | **KES 6 / min** (`billing_rate_card` 0.10/sec) past included minutes. Included seconds are free. SautiKit inbound is currently free. |
+| Receptionist minutes (inbound on-demand) | `call_charge` via `consume_call_seconds` | **KES 6 / min** (`billing_rate_card` 0.10/sec) past included minutes. Included seconds are free to the tenant. Our SautiKit cost is not zero: the inbound call leg is KES 0, but streaming audio to Voice costs about **KES 0.50 / min** (SautiKit rate card). |
 | Live transfer outbound | `call_charge` on a **second** `calls` row | **KES 9 / min** stored (`billing_rate_card` 0.15/sec). Not offered until live transfer. SautiKit costs **KES 3 / min**. Never fold into the inbound `call_id`. Beta does not originate outbound. See [`LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) §8. |
 | Line rental | `line_rental` | Fixed KES / calendar month (UTC) |
 | Ops seed / correction | `admin_adjustment` | Signed KES |

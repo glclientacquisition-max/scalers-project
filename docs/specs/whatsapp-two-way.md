@@ -1,18 +1,17 @@
 # WhatsApp two-way and Scalers-as-tenant
 
-**Status:** Phase 1 implementing. First Utility template is Active. Phase 2 cutover blocked on a second DID.  
+**Status:** Phase 1 implementing. First Utility template is Active.  
 **Do not:** enable WhatsApp Calling, POST `/whatsapp/retry`, Chatwoot, or SautiKit-DELETE `+254709221536`.
 
-## Phase 0 dual-use (live until Phase 2)
-
-Same E.164 `+254709221536` (0709221536):
+## Numbers
 
 | Path | Identity |
 | --- | --- |
-| Voice (`resolveTenantId` on `tenants.sautikit_virtual_number`) | Done and Dusted Cleaning Services (agent Shy) |
-| WhatsApp Cloud (`metadata.phone_number_id` `1237105982825100`) | Scalers platform |
+| Staging voice | `+254709221537`, Done and Dusted Cleaning Services (agent Shy). The staging `+254709221536` row is disabled: production workspace number, not assigned in staging. |
+| Prod voice | `+254709221536`, Aris Kenya (agent Lynn) |
+| WhatsApp Cloud (`metadata.phone_number_id` `1237105982825100`) | Scalers platform sender `+254709221536` |
 
-Keep `tenants.sautikit_virtual_number` and `sautikit_did_pool` assigned to Done and Dusted. Pool status must never be `available` for this DID.
+Inbound chat routes on `phone_number_id`, never `resolveTenantId(DID)`. Pool status for `+254709221536` must never be `available`.
 
 Ops:
 
@@ -56,14 +55,9 @@ If Meta approved a different first name, pass it: `sendWhatsAppTemplate({ templa
 
 Helpers: `sendOwnerWhatsApp` (window-aware), `sendWhatsAppTemplate` (always template). Catalog: [`../WHATSAPP_TEMPLATES.md`](../product/WHATSAPP_TEMPLATES.md).
 
-## Phase 2 (separate PR, after a new Kenya DID exists)
+## Phase 2
 
-1. Insert tenant Scalers / Scalers Support
-2. Buy DID, `assign_specific_did_to_tenant` Done and Dusted to the new number, confirm Shy still answers there
-3. Point Scalers `sautikit_virtual_number` at `+254709221536`; pool assigned-to-Scalers (never `available`)
-4. Do not DELETE the SautiKit number
-5. Retarget any shop call-forward
-6. Then publish 0709221536 as Scalers voice support
+Not the live voice assignment. Staging voice is already `+254709221537` (Done and Dusted, agent Shy). Prod voice on `+254709221536` is Aris Kenya (agent Lynn). Do not reassign that prod row to a Scalers voice tenant. Do not DELETE the SautiKit number. Do not enable Calling.
 
 ## Phase 3 (out of scope)
 

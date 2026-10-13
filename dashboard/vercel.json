@@ -1,5 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "ignoreCommand": "bash scripts/vercel-ignore-build.sh"
+  "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
+  "regions": [
+    "lhr1"
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "main": true,
+      "cursor/staging-voice-468b": true
+    }
+  }
 }

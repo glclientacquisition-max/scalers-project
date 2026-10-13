@@ -1,5 +1,9 @@
 "use server";
 
+import { formatServiceAreasForCompiler, normalizeServiceAreas, serviceAreasFromCoverage } from "@/lib/serviceAreas";
+import { bustTenantCache } from "@/lib/tenantCache";
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -35,6 +39,7 @@ import {
 import type { FaqEntry, TeamDirectoryEntry } from "@/lib/supabase";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
 import { parseAgentTools } from "@/lib/agentTools";
+import { assignServiceIds } from "@/lib/serviceIds";
 import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
 import {
@@ -97,6 +102,8 @@ export async function extractKnowledgeAction(
   _prev: IngestExtractState,
   formData: FormData
 ): Promise<IngestExtractState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to import knowledge." };
   }
@@ -202,6 +209,8 @@ export async function applyIngestAction(
   _prev: IngestApplyState,
   formData: FormData
 ): Promise<IngestApplyState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to save." };
   }
@@ -370,7 +379,13 @@ export async function applyIngestAction(
   const agentName = String(tenant.agent_name || "Receptionist").trim() || "Receptionist";
   const vertical = draftVertical || parseVertical(tenant.vertical);
   const handoffMode = parseHandoffMode(tenant.handoff_mode);
-  const locationsText = formatLocationsForCompiler(nextLocations);
+  const areas =
+    tenant.service_areas && typeof tenant.service_areas === "object"
+      ? normalizeServiceAreas(tenant.service_areas, vertical)
+      : serviceAreasFromCoverage(nextPolicies.coverage_areas, vertical);
+  const locationsText = [formatLocationsForCompiler(nextLocations, { noPremises: areas?.no_premises }), formatServiceAreasForCompiler(areas)]
+    .filter(Boolean)
+    .join("\n\n");
   const policiesText = formatPoliciesForCompiler(nextPolicies);
   const businessName = nameSuggestion || tenant.business_name;
 
@@ -399,7 +414,10 @@ export async function applyIngestAction(
     llm_system_prompt: prompt,
   };
   if (merged.touched.services) {
-    patch.services_catalog = merged.services;
+    patch.services_catalog = assignServiceIds(
+      merged.services,
+      normalizeServicesCatalog(tenant.services_catalog)
+    );
     patch.services_offered = servicesOffered;
   }
   if (merged.touched.faqs) {
@@ -438,6 +456,7 @@ export async function applyIngestAction(
     .from("tenants")
     .update(patch)
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   if (error) {
     return ownerSaveFailed("ingest", error.message);
