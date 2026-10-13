@@ -768,7 +768,18 @@ async function executeBrainTools({
     if (holdish && holdsLocked) {
       parsed.serviceRequest = { ...parsed.serviceRequest, type: 'enquiry' };
     }
-    const validation = validateServiceRequest(parsed.serviceRequest, identityOpts);
+    let validation = validateServiceRequest(parsed.serviceRequest, identityOpts);
+    // BRAIN_TRUST_P1 (T1): empty or garbled item on a non-callback save → no
+    // row, repair ask.
+    const trustP1 = require('./trustP1');
+    if (
+      trustP1.trustP1Enabled() &&
+      validation.valid &&
+      String(validation.value.type || '') !== 'callback' &&
+      trustP1.isGarbledContent(validation.value.item)
+    ) {
+      validation = { valid: false, reason: 'Item is empty or garbled.', missingSlots: ['item'], code: 'trust_garbled' };
+    }
     const fingerprint = validation.valid
       ? stableFingerprint('create_service_request', validation.value)
       : null;
@@ -1295,6 +1306,21 @@ function formatToolConfirmation(results = [], language = 'en') {
   // cut-off turn speaks the ask_need line; nothing was written.
   if (meaningful.code === 'fragment_turn' && require('./callFixesD199').callFixesD199Enabled()) {
     return String(meaningful.askLine || '');
+  }
+  // BRAIN_TRUST_P1 (T1): success speech only as a receipt readback; a
+  // garbled save is a repair ask.
+  const trustP1 = require('./trustP1');
+  if (trustP1.trustP1Enabled()) {
+    if (meaningful.code === 'trust_garbled') return trustP1.repairAskLine(lang);
+    if (
+      // Visits keep their receipt line (spoken when/place in the call
+      // language); the generic request line becomes the readback.
+      meaningful.action === 'create_service_request' &&
+      meaningful.status === 'succeeded'
+    ) {
+      const readback = trustP1.receiptReadback([meaningful], lang);
+      if (readback) return readback;
+    }
   }
   if (meaningful.action === 'tool_request') {
     if (sw) return 'Sijaweza kukamilisha hatua hiyo.';

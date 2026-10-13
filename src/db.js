@@ -1667,6 +1667,39 @@ async function listTenantStaffNames({ tenantId } = {}) {
   return data || [];
 }
 
+/**
+ * BRAIN_TRUST_P1: what the call needs from caller memory v2 in one read.
+ * { contactId, file, tasks, staffNames }. Missing tables / new number → empty.
+ */
+async function loadTrustContext({ tenantId, phone } = {}) {
+  const out = { contactId: null, file: null, tasks: [], staffNames: [] };
+  if (!tenantId) return out;
+  out.staffNames = await listTenantStaffNames({ tenantId }).catch(() => []);
+  const phoneNorm = normalizeStoredPhone(phone);
+  if (!phoneNorm) return out;
+  const { data: contact, error } = await supabase
+    .from('contacts')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .in('phone', storedPhoneLookupKeys(phoneNorm))
+    .order('phone', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error || !contact) return out;
+  out.contactId = contact.id;
+  out.file = await getCallerFile({ tenantId, contactId: contact.id }).catch(() => null);
+  out.tasks = await listOpenTasksForCaller({ tenantId, contactId: contact.id }).catch(() => []);
+  return out;
+}
+
+/** BRAIN_TRUST_P1 (T4): store that the notes notice was spoken to this caller. */
+async function markMemoryNoticeShown({ tenantId, phone } = {}) {
+  const ctx = await loadTrustContext({ tenantId, phone });
+  if (!ctx.contactId) return null;
+  if (ctx.file?.memory_notice_shown_at) return ctx.file;
+  return upsertCallerFile({ tenantId, contactId: ctx.contactId, memoryNoticeShownAt: new Date().toISOString() });
+}
+
 async function getCallerMemoryV2({ tenantId, phone, tier = 1 } = {}) {
   const phoneNorm = normalizeStoredPhone(phone);
   if (!tenantId || !phoneNorm) return null;
@@ -2639,6 +2672,8 @@ module.exports = {
   buildTieredCallerMemoryCard,
   callerMemoryV2Enabled,
   listTenantStaffNames,
+  loadTrustContext,
+  markMemoryNoticeShown,
   listOpenTasksForCaller,
   upsertCallerFile,
   getCallerFile,

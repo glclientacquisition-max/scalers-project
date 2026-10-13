@@ -459,6 +459,20 @@ function polishSpokenDetail(text, opts = {}) {
       callerText,
     });
   }
+  // BRAIN_TRUST_P1: last mouth — receipt gate, recall guard, name-ask cap,
+  // staff-name redaction, hours anchor, length trim. Flag off: unchanged.
+  const trustP1 = require('./trustP1');
+  if (trustP1.trustP1Enabled() && out) {
+    const shaped = trustP1.shapeSpeech(out, {
+      state: opts.state,
+      profile: opts.profile,
+      toolResults: opts.toolResults || [],
+      language: opts.language,
+      receiptLine: opts.receiptLine,
+    });
+    out = shaped.text;
+    dropReasons.push(...shaped.drops);
+  }
   const before = String(text || '').trim();
   const after = String(out || '').trim();
   let reason = '';

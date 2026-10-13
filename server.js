@@ -542,6 +542,7 @@ if (missingEnvironmentVariables.length > 0) {
 }
 
 const db = require('./src/db');
+const trustP1 = require('./src/conversation/trustP1');
 
 async function hydrateCallerMemory(profile, callSid) {
   return attachCallerMemory(profile, {
@@ -549,6 +550,38 @@ async function hydrateCallerMemory(profile, callSid) {
     getCall: (sid) => db.getCall(sid),
     getCallerMemory: (opts) => db.getCallerMemory(opts),
   });
+}
+
+// BRAIN_TRUST_P1: staff names (redaction), caller file (notice flag, tier) and
+// open tasks for the code answers. Flag off: nothing is loaded.
+async function hydrateTrustContext(profile, callSid) {
+  if (!trustP1.trustP1Enabled() || !profile) return profile;
+  try {
+    const call = await db.getCall(callSid);
+    const tenantId = profile.id || call?.tenant_id;
+    const phone = call?.from_number && String(call.from_number).toLowerCase() !== 'unknown' ? call.from_number : '';
+    const ctx = await db.loadTrustContext({ tenantId, phone });
+    profile.staffNames = ctx.staffNames || [];
+    profile.trustP1Context = { tenantId, phone, contactId: ctx.contactId, file: ctx.file, tasks: ctx.tasks || [] };
+  } catch (err) {
+    console.warn(`[${callSid}] trust context load failed:`, err?.message || err);
+  }
+  return profile;
+}
+
+/** BRAIN_TRUST_P1: welcome-back line for a known number + once-per-caller notice. */
+function trustGreetingLine(greetingLine, profile, state, language) {
+  if (!trustP1.trustP1Enabled()) return greetingLine;
+  const ctx = profile?.trustP1Context || {};
+  const lang = ctx.file?.preferred_lang || language;
+  let line = trustP1.tieredGreeting(greetingLine, { card: profile?.callerMemory || (ctx.contactId ? { known: true, sharedLine: ctx.file?.shared_line } : null), language: lang });
+  if (trustP1.shouldSpeakNotice({ file: ctx.file, card: profile?.callerMemory, state })) {
+    const parts = line.split(/(?<=[.!?])\s+/);
+    const q = parts.length > 1 && /\?$/.test(parts[parts.length - 1]) ? parts.pop() : '';
+    line = [...parts, trustP1.noticeLine(lang), q].filter(Boolean).join(' ');
+    if (state) trustP1.markNoticeSpoken(state);
+  }
+  return line;
 }
 
 async function loadVisitReviewAppointments(callSid, profile) {
@@ -2178,6 +2211,7 @@ mediaWss.on('connection', (ws, req) => {
     try {
       const profile = await db.getTenantProfile({ callSid: sessionCallSid });
       await hydrateCallerMemory(profile, sessionCallSid);
+      await hydrateTrustContext(profile, sessionCallSid);
       brainProfile = profile;
       businessName = profile.businessName || businessName;
       agentName = profile.agentName || agentName;
@@ -3272,6 +3306,38 @@ mediaWss.on('connection', (ws, req) => {
         callTranscript.pushAgent(confirmRead.line);
         turnTiming.markFirstSpokenChunk();
         await speakText(confirmRead.line, { tracePath: 'visit_read' });
+        spokeThisTurn = true;
+        return;
+      }
+      // BRAIN_TRUST_P1: correction, address/payment change → owner callback,
+      // "do you remember me", resume offer after bind. Code-authored lines.
+      const trustPlan = trustP1.planTrustTurn({
+        text: clean,
+        state: brainState,
+        card: brainProfile?.callerMemory || null,
+        tasks: brainProfile?.trustP1Context?.tasks || [],
+        language: callLanguage,
+        nameJustConfirmed,
+      });
+      if (trustPlan?.line) {
+        let trustLine = trustPlan.line;
+        if (trustPlan.kind === 'callback' && trustPlan.parsed) {
+          callBrainStates.set(callKey, brainState);
+          const saved = await applyGeminiTools(callKey, trustPlan.parsed);
+          const ok = trustP1.receiptsOf(saved?.results || []).length > 0;
+          if (ok) trustP1.noteChangeTask(brainState, trustPlan.change);
+          else trustLine = /^(?:sw|sheng)/.test(String(callLanguage))
+            ? 'Siwezi kubadilisha hiyo kwa simu. Naomba jina lako ili mwenye duka akupigie kuthibitisha.'
+            : "I can't change that on a call. May I have your name so the owner can call you back to confirm?";
+          brainState = callBrainStates.get(callKey) || brainState;
+        }
+        callBrainStates.set(callKey, brainState);
+        console.log(`[ws/media][${callKey}] trust ${trustPlan.kind} before model: ${trustLine}`);
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(trustLine);
+        turnTiming.markFirstSpokenChunk();
+        await speakText(trustLine);
         spokeThisTurn = true;
         return;
       }
@@ -4692,6 +4758,12 @@ mediaWss.on('connection', (ws, req) => {
         callSid: sidLabel(),
         mode: 'instant',
       });
+      greetingLine = trustGreetingLine(
+        greetingLine,
+        brainProfile,
+        sessionCallSid ? callBrainStates.get(sessionCallSid) : null,
+        callLanguage
+      );
       if (speechOutageStarted) return;
       console.log(
         `[ws/media][${sidLabel()}] greeting mode=instant agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)}: ${greetingLine}`
@@ -4887,6 +4959,15 @@ mediaWss.on('connection', (ws, req) => {
 
   ws.on('close', (code, reason) => {
     const ms = Date.now() - connectedAt;
+    if (trustP1.trustP1Enabled() && sessionCallSid) {
+      const st = callBrainStates.get(sessionCallSid);
+      const tctx = brainProfile?.trustP1Context;
+      if (st?.trust?.noticeSpoken && tctx?.tenantId && tctx?.phone) {
+        db.markMemoryNoticeShown({ tenantId: tctx.tenantId, phone: tctx.phone }).catch((err) =>
+          console.warn(`[ws/media] notice flag save failed:`, err?.message || err)
+        );
+      }
+    }
     console.log(
       `[ws/media] closed after ${ms}ms code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
     );
