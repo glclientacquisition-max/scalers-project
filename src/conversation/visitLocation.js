@@ -269,12 +269,41 @@ function assessCoverageFromFile(text, profile = {}) {
  * list, is 'unconfirmed' ("I'll have the team confirm {place}"). A landmark
  * with no area stays 'unknown' so the ladder still asks for the area.
  */
+function rawCoverageOutside(profile = {}) {
+  let p = profile?.businessPolicies;
+  if (typeof p === 'string') {
+    try {
+      p = JSON.parse(p);
+    } catch {
+      p = null;
+    }
+  }
+  return p && typeof p === 'object' && !Array.isArray(p) ? p.coverage_outside : undefined;
+}
+
+/**
+ * The profile coverage is judged on. Flag off: the profile as is. Flag on: the
+ * owner-confirmed list plus coverage_outside when the list is confirmed, else
+ * null (no claim). coverageStatus and coverageAskSpeech both read this.
+ */
+function coverageProfile(profile = {}) {
+  if (!confirmedCoverageEnabled()) return profile || {};
+  const reading = confirmedCoverageReading(profile || {});
+  if (!reading.confirmed) return null;
+  const outside = rawCoverageOutside(profile);
+  return {
+    vertical: profile?.vertical,
+    businessPolicies: {
+      coverage_areas: reading.areas,
+      ...(outside !== undefined ? { coverage_outside: outside } : {}),
+    },
+  };
+}
+
 function coverageStatus(text, profile = {}) {
   if (!confirmedCoverageEnabled()) return assessCoverageFromFile(text, profile);
-  const reading = confirmedCoverageReading(profile || {});
-  if (reading.confirmed) {
-    return assessCoverageFromFile(text, { businessPolicies: { coverage_areas: reading.areas } });
-  }
+  const judged = coverageProfile(profile);
+  if (judged) return assessCoverageFromFile(text, judged);
   if (!coverageTokens(text).length) return 'unknown';
   return countiesForPlace(text).length ? 'unconfirmed' : 'unknown';
 }
@@ -669,9 +698,12 @@ function coverageAskSpeech(text, profile = {}, language = 'en', state = null) {
   const lang = String(language || 'en').toLowerCase();
   const sw = lang === 'sw' || lang.startsWith('swahili');
   const sheng = lang === 'sheng';
-  const anywhere = readCoverageOutside(profile.businessPolicies);
+  // Flag on: the anywhere-in-Kenya answer counts only on a confirmed list
+  // (coverageProfile null -> the 'team will confirm' branch below).
+  const judged = coverageProfile(profile);
+  const anywhere = judged ? readCoverageOutside(judged.businessPolicies) : null;
   if (anywhere) {
-    const detail = coverageDetail(place, profile);
+    const detail = coverageDetail(place, judged);
     if (detail === 'kenya') {
       return `${kenyaCoverageLine({ place, homeServices: true, language })} ${noteJobQuestion(language)}`;
     }
