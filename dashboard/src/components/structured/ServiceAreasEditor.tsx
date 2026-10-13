@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { TextField } from "@/components/ui/TextField";
@@ -20,6 +20,7 @@ import {
   commonFee,
   withReach,
   serviceAreasSentence,
+  outsideFeeHint,
   validateServiceArea,
   type AreaMode,
   type BulkFee,
@@ -104,6 +105,10 @@ export function ServiceAreasEditor({
   const unconfirmed = value.areas.filter((a) => !a.confirmed).length;
   const travelQuoted = value.reach === "visit" || value.reach === "both";
   const [outsideFee, setOutsideFee] = useState(value.outside_fee_ksh != null ? String(value.outside_fee_ksh) : "");
+  // One answer for every mode: the field follows the stored fee (after a save, a remount or a mode toggle).
+  useEffect(() => {
+    setOutsideFee((cur) => (kshInput(cur) === value.outside_fee_ksh ? cur : value.outside_fee_ksh != null ? String(value.outside_fee_ksh) : ""));
+  }, [value.outside_fee_ksh]);
   const delivers = copy.riders && value.areas.some((a) => a.modes.includes("delivery"));
 
   function openBulk() {
@@ -226,8 +231,7 @@ export function ServiceAreasEditor({
             onChange={(v) => {
               if (!canEdit || !v[0]) return;
               const yes = v[0] === "kenya";
-              onChange({ ...value, anywhere_kenya: yes, outside_fee_ksh: yes ? value.outside_fee_ksh : null });
-              if (!yes) setOutsideFee("");
+              onChange({ ...value, anywhere_kenya: yes });
             }}
           />
           {value.anywhere_kenya && !travelQuoted ? (
@@ -236,7 +240,7 @@ export function ServiceAreasEditor({
               label="Fee for the rest of Kenya (KSh, optional)"
               inputMode="numeric"
               placeholder="e.g. 350"
-              hint="Leave blank and the team quotes it on a callback."
+              hint={outsideFeeHint(value.outside_fee_ksh)}
               disabled={!canEdit}
               value={outsideFee}
               onChange={(e) => {

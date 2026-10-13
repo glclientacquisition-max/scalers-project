@@ -169,10 +169,6 @@ export function normalizeServiceAreas(raw: unknown, vertical?: string | null): S
  */
 export function withReach(v: ServiceAreas, reach: Reach): ServiceAreas {
   const next = { ...v, reach, no_premises: reach === "visit" ? v.no_premises : false };
-  if (reach === "walk_in") {
-    next.anywhere_kenya = false;
-    next.outside_fee_ksh = null;
-  }
   if (reach !== "deliver" && reach !== "visit") return next;
   const from: AreaMode = reach === "deliver" ? "visit" : "delivery";
   const to: AreaMode = reach === "deliver" ? "delivery" : "visit";
@@ -295,6 +291,16 @@ export function formatServiceAreasForCompiler(v: ServiceAreas | null | undefined
 export function coverageOutsideFrom(value: ServiceAreas | null | undefined): { anywhere_kenya: true; fee_ksh: number | null } | null {
   if (!value || !value.anywhere_kenya || value.reach === "walk_in") return null;
   return { anywhere_kenya: true, fee_ksh: value.outside_fee_ksh };
+}
+
+/** Hint under the optional fee: what callers hear, or that the team quotes it. */
+export function outsideFeeHint(fee: number | null): string {
+  return fee != null ? `Callers outside your areas hear: delivery there is ${money(fee)}.` : "Leave blank and the team quotes it on a callback.";
+}
+
+/** Baseline for unsaved changes: a successful save makes the current form the saved one. */
+export function savedBaseline(state: { ok?: boolean } | null | undefined, draftKey: string, baseline: string): string {
+  return state?.ok ? draftKey : baseline;
 }
 
 /** Visit-only businesses always quote travel on a callback; "both" quotes it too. */
