@@ -1,3 +1,4 @@
+const { readCoverageOutside, coverageDetail, kenyaCoverageLine, noteJobQuestion } = require('./outsideAreas');
 // Validate and execute model-proposed actions, returning backend-confirmed outcomes.
 
 const { findProductMatch, normalizeProducts } = require('./productCatalog');
@@ -457,6 +458,17 @@ function validateCreateAppointment(
     windowStart: clean(raw.windowStart || raw.window_start, 64),
     windowEnd: clean(raw.windowEnd || raw.window_end, 64),
   };
+  // Outside the listed areas on "anywhere in Kenya": the team calls back with the
+  // travel price. The Business Assistant never books a time for these.
+  if (place && readCoverageOutside(businessPolicies) && coverageDetail(place, visitCoverageProfile({ businessPolicies, businessLocations })) === 'kenya') {
+    return {
+      valid: false,
+      reason: 'Travel price first: the team calls back.',
+      code: 'travel_quote',
+      missingSlots: [],
+      value,
+    };
+  }
   const missing = [];
   if (!value.serviceName) missing.push('service');
   if (!value.name || isReservedCallerName(value.name)) {
@@ -1248,6 +1260,10 @@ function formatToolConfirmation(results = [], language = 'en') {
       const hours = meaningful.hours || {};
       if (code === 'outside_coverage') {
         return visitBlockSpeech('outside', lang);
+      }
+      if (code === 'travel_quote') {
+        const place = String(meaningful.value?.landmark || '').trim() || 'that area';
+        return `${kenyaCoverageLine({ place, homeServices: true, language: lang })} ${noteJobQuestion(lang)}`;
       }
       const timeProblem = formatVisitTimeProblem(
         code,

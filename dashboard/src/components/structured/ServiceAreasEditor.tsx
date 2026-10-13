@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { TextField } from "@/components/ui/TextField";
@@ -20,6 +20,7 @@ import {
   commonFee,
   withReach,
   serviceAreasSentence,
+  outsideFeeHint,
   validateServiceArea,
   type AreaMode,
   type BulkFee,
@@ -102,6 +103,12 @@ export function ServiceAreasEditor({
   const suggested = [...new Set(homeAreas)].filter((id) => !ticked.includes(id));
   const copy = reachCopy(value.reach);
   const unconfirmed = value.areas.filter((a) => !a.confirmed).length;
+  const travelQuoted = value.reach === "visit" || value.reach === "both";
+  const [outsideFee, setOutsideFee] = useState(value.outside_fee_ksh != null ? String(value.outside_fee_ksh) : "");
+  // One answer for every mode: the field follows the stored fee (after a save, a remount or a mode toggle).
+  useEffect(() => {
+    setOutsideFee((cur) => (kshInput(cur) === value.outside_fee_ksh ? cur : value.outside_fee_ksh != null ? String(value.outside_fee_ksh) : ""));
+  }, [value.outside_fee_ksh]);
   const delivers = copy.riders && value.areas.some((a) => a.modes.includes("delivery"));
 
   function openBulk() {
@@ -207,6 +214,48 @@ export function ServiceAreasEditor({
           {canEdit && value.areas.length > 1 ? <AddRow label="Change fee for several" onOpen={() => openChangeFee(listed)} /> : null}
         </SettingsGroup>
       )}
+
+      {copy.areas && value.areas.length > 0 ? (
+        <div className="space-y-3" data-outside-areas="">
+          <CheckList<"no" | "kenya">
+            label="Do you go outside these areas?"
+            options={[
+              { id: "no", label: "No", detail: "Only the areas above" },
+              {
+                id: "kenya",
+                label: "Yes, anywhere in Kenya",
+                detail: travelQuoted ? "The team calls back with the travel price" : "One fee for the rest of Kenya",
+              },
+            ]}
+            value={[value.anywhere_kenya ? "kenya" : "no"]}
+            onChange={(v) => {
+              if (!canEdit || !v[0]) return;
+              const yes = v[0] === "kenya";
+              onChange({ ...value, anywhere_kenya: yes });
+            }}
+          />
+          {value.anywhere_kenya && !travelQuoted ? (
+            <TextField
+              id="outside-fee"
+              label="Fee for the rest of Kenya (KSh, optional)"
+              inputMode="numeric"
+              placeholder="e.g. 350"
+              hint={outsideFeeHint(value.outside_fee_ksh)}
+              disabled={!canEdit}
+              value={outsideFee}
+              onChange={(e) => {
+                const text = e.target.value.replace(/[^\d,\s]/g, "");
+                setOutsideFee(text);
+                const n = kshInput(text);
+                onChange({ ...value, outside_fee_ksh: n != null && n >= 0 ? n : null });
+              }}
+            />
+          ) : null}
+          {value.anywhere_kenya && travelQuoted ? (
+            <p className="text-meta text-ink-2">Callers outside your areas get a callback with the travel price. Your Business Assistant never books a time for them.</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {delivers ? (
         <SettingsGroup title="Who delivers">

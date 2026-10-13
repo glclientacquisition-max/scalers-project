@@ -79,6 +79,7 @@ import { faqsLengthError, policiesLengthError } from "@/lib/lengthLimits";
 import { POLICY_FIELDS } from "@/lib/businessPolicies";
 import {
   coverageIdsFrom,
+  coverageOutsideFrom,
   formatServiceAreasForCompiler,
   normalizeServiceAreas,
   parseServiceAreasField,
@@ -360,7 +361,13 @@ export async function saveAndCompileSettings(
     }
   }
   // The voice server reads business_policies.coverage_areas: keep it in step with the areas.
-  if (serviceAreas) businessPolicies = { ...businessPolicies, coverage_areas: coverageIdsFrom(serviceAreas) };
+  if (serviceAreas) {
+    businessPolicies = {
+      ...businessPolicies,
+      coverage_areas: coverageIdsFrom(serviceAreas),
+      coverage_outside: coverageOutsideFrom(serviceAreas),
+    };
+  }
   const ttsLexicon = lexiconForStorage(
     pick(
       "ttsLexicon",

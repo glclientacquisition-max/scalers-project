@@ -115,7 +115,7 @@ import {
 } from "@/lib/businessPolicies";
 import { PlacesEditor } from "@/components/structured/PlacesEditor";
 import { ServiceAreasEditor } from "@/components/structured/ServiceAreasEditor";
-import { serviceAreasForForm, suggestHomeAreas, type ServiceAreas } from "@/lib/serviceAreas";
+import { savedBaseline, serviceAreasForForm, suggestHomeAreas, type ServiceAreas } from "@/lib/serviceAreas";
 import { stableRowId } from "@/lib/factHash";
 import { catalogBaseline, isUnpricedRow } from "@/lib/catalogPricing";
 import { DeskSelect } from "@/components/ui/DeskSelect";
@@ -514,6 +514,7 @@ function TenantFormInner({
     [locations]
   );
   const policiesJson = useMemo(() => JSON.stringify(policies), [policies]);
+  const serviceAreasJson = useMemo(() => JSON.stringify(serviceAreas), [serviceAreas]);
   const faqDupIndexes = useMemo(() => {
     const seen = new Map<string, number>();
     const dups = new Set<number>();
@@ -899,6 +900,7 @@ function TenantFormInner({
     vertical,
     handoffMode,
     locationsJson,
+    serviceAreasJson,
     policiesJson,
     agentName,
     spokenName,
@@ -919,7 +921,7 @@ function TenantFormInner({
   useEffect(() => {
     if (!state.ok || savedStateRef.current === state) return;
     savedStateRef.current = state;
-    setBaseline(draftKey);
+    setBaseline((prev) => savedBaseline(state, draftKey, prev));
   }, [state, draftKey]);
   useSettingsLeaveSource("form", formDirty);
   const [removeAsk, setRemoveAsk] = useState<{
