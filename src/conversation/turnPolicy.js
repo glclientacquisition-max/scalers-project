@@ -139,6 +139,12 @@ function planCallerModelTurn(state, opts = {}) {
   // A held fragment the caller left hanging is answered by the model, never
   // by an early-return line (HD_72ab69cbab2b T1). The name ask stays due.
   if (line && opts.holdTimedOut === true) {
+    // BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 7): a substantive turn that came
+    // through the hold timer still gets the one file-name ask.
+    const fixes = require('./callFixesD199');
+    if (fixes.callFixesD199Enabled() && fixes.substantiveCallerTurn(latest)) {
+      return { runModel: false, line };
+    }
     return { runModel: true, line: '', nameAskDeferred: true };
   }
   // Staging listen: Gemini speaks the catalogue even when a file name is pending.
@@ -146,8 +152,26 @@ function planCallerModelTurn(state, opts = {}) {
   if (line && geminiCatalogueEnabled() && freshCatalogueAsk(latest)) {
     return { runModel: true, line: '' };
   }
+  // BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 7): a pure greeting or small talk
+  // is answered by the model; the one file-name ask waits for the first
+  // substantive turn. The prompt keeps the model from asking it.
+  if (
+    line &&
+    require('./callFixesD199').callFixesD199Enabled() &&
+    require('./dynamicSpeech').looksLikePhaticCallerTurn(latest)
+  ) {
+    return { runModel: true, line: '', nameAskDeferred: true };
+  }
   if (line) return { runModel: false, line };
   return { runModel: true, line: '' };
+}
+
+function fileAnswerOwnsTurn(text, state) {
+  const fixes = require('./callFixesD199');
+  if (!fixes.callFixesD199Enabled()) return false;
+  if (state?.caller?.nameConfirmed !== true || state?.caller?.nameJustConfirmed === true) return false;
+  if (state?.messageOnly === true) return false;
+  return Boolean(fixes.planFileAnswer({ text, state })?.line);
 }
 
 function resolveLocalReply({
@@ -198,6 +222,12 @@ function resolveLocalReply({
   // Visit, hold, and order words are on conversation.fileReadSentence for Voice.
   // Do not speak them here. A local reply would end the turn before Gemini.
 
+  // BRAIN_CALL_FIXES_D199: a turn that names a file row or asks about the file
+  // ("what about the mansion one?", "when did I request that?") is the file
+  // read's (planVisitReadTurn), ahead of any fact, coverage or place-block
+  // branch here (HD_d199dbbf6b79 t4).
+  if (fileAnswerOwnsTurn(clean, state)) return null;
+
   const detailLine = serviceFactsLine(clean, profile, language);
   if (detailLine) return publish({ outcome: 'service_facts', line: detailLine });
 
@@ -238,6 +268,16 @@ function resolveLocalReply({
 
   const coverageLine = coverageAskSpeech(clean, profile, language, state);
   if (coverageLine) return publish({ outcome: 'coverage', line: coverageLine });
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 6): "Do you cover the shops?" names
+  // no real place. Ask which area (ask_area); no coverage claim either way.
+  {
+    const fixes = require('./callFixesD199');
+    const asked = fixes.coverageAskWithoutPlace(clean, profile);
+    if (asked) {
+      const area = fixes.askAreaLine(language, { asked });
+      if (area.line) return publish({ outcome: 'ask_area', line: area.line, lines: area.lines });
+    }
+  }
 
   const placeBlockLine = visitBlockSpeech(
     state?.visitPlace?.blocked,

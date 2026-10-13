@@ -121,8 +121,12 @@ function noteTracedGeminiTools(callSid, before, after, results) {
       args: summarizeToolArgs(argsSource),
     });
   }
-  if (after?.consentBlocked || after?.needsVisitTime) {
-    const status = after.consentBlocked ? 'consent_blocked' : 'needs_visit_time';
+  if (after?.consentBlocked || after?.needsVisitTime || after?.fragmentBlocked) {
+    const status = after.consentBlocked
+      ? 'consent_blocked'
+      : after.fragmentBlocked
+        ? 'fragment_turn'
+        : 'needs_visit_time';
     for (const [field, name] of TRACE_TOOL_FIELDS) {
       if (!before?.[field] || seen.has(name)) continue;
       trace.noteTool({
@@ -174,8 +178,17 @@ const { logBrainTrace } = require('./src/conversation/brainObservability');
 const {
   executeBrainTools,
   formatToolConfirmation,
+  brainLinesForResults,
 } = require('./src/conversation/toolExecution');
 const { deriveCallResolution } = require('./src/conversation/callResolution');
+const {
+  planConfirmFileRead,
+  planRejectedCreate,
+  markReaskSpoken,
+  noteRejectedCreate,
+  settleRejectedCreate,
+  reaskSlotLine,
+} = require('./src/conversation/callFixesD199');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
 const {
   schedulePostCallTranscriptReview,
@@ -3245,6 +3258,57 @@ mediaWss.on('connection', (ws, req) => {
       }
       const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
       const nameJustConfirmed = brainState?.caller?.nameJustConfirmed === true;
+      // BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 8): "Yeah" to the name ask
+      // after "About my booking": visit_open first, before any other content.
+      const confirmRead = nameJustConfirmed
+        ? planConfirmFileRead(brainState, { language: callLanguage, now: new Date() })
+        : null;
+      if (confirmRead?.line) {
+        callBrainStates.set(callKey, brainState);
+        console.log(`[ws/media][${callKey}] confirm read before model: ${confirmRead.line}`);
+        voiceTrace.noteBrainLines(confirmRead.lines);
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(confirmRead.line);
+        turnTiming.markFirstSpokenChunk();
+        await speakText(confirmRead.line, { tracePath: 'visit_read' });
+        spokeThisTurn = true;
+        return;
+      }
+      // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): a create the guard
+      // rejected is never left silent. Re-ask the slot once (reask_slot); the
+      // slot came in: save it; re-ask unanswered or a closing: save a callback.
+      const rescue = planRejectedCreate(brainState, { language: callLanguage, text: clean });
+      if (rescue && !(rescue.kind === 'reask' && !nameGate.runModel && fileNameAsk && !nameJustConfirmed)) {
+        if (rescue.kind === 'reask') {
+          markReaskSpoken(brainState);
+          callBrainStates.set(callKey, brainState);
+          console.log(`[ws/media][${callKey}] rejected create re-ask before model: ${rescue.line}`);
+          voiceTrace.noteBrainLines(rescue.lines);
+          bargeInActive = false;
+          suppressReplyRemainder = false;
+          callTranscript.pushAgent(rescue.line);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(rescue.line);
+          spokeThisTurn = true;
+          return;
+        }
+        callBrainStates.set(callKey, brainState);
+        const rescued = await applyGeminiTools(callKey, rescue.parsed);
+        const rescueLine = formatToolConfirmation(rescued?.results || [], callLanguage);
+        console.log(`[ws/media][${callKey}] rejected create ${rescue.kind}: ${rescueLine}`);
+        voiceTrace.noteBrainLines(brainLinesForResults(rescued?.results || [], callLanguage).lines);
+        if (rescueLine) {
+          bargeInActive = false;
+          suppressReplyRemainder = false;
+          callTranscript.pushAgent(rescueLine);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(rescueLine);
+          spokeThisTurn = true;
+          return;
+        }
+        brainState = callBrainStates.get(callKey) || brainState;
+      }
       const askingName = !nameGate.runModel && Boolean(fileNameAsk) && !nameJustConfirmed;
       const endClose = planBrainEndClose({
         action: nextBestAction.action,
@@ -3413,6 +3477,9 @@ mediaWss.on('connection', (ws, req) => {
         openVisits: brainState?.returning?.openVisits,
         appointments: visitAppointments,
         cursor: brainState?.conversation?.visitReview || null,
+        // BRAIN_CALL_FIXES_D199: requests with visits; code file answers.
+        openRequests: brainState?.returning?.openRequests,
+        fileState: brainState,
       });
       if (visitRead.runModel === false && visitRead.line) {
         if (!brainState.conversation || typeof brainState.conversation !== 'object') {
@@ -3421,6 +3488,7 @@ mediaWss.on('connection', (ws, req) => {
         brainState.conversation.visitReview = visitRead.cursor;
         callBrainStates.set(callKey, brainState);
         console.log(`[ws/media][${callKey}] visit read before model: ${visitRead.line}`);
+        if (Array.isArray(visitRead.lines)) voiceTrace.noteBrainLines(visitRead.lines);
         bargeInActive = false;
         suppressReplyRemainder = false;
         callTranscript.pushAgent(visitRead.line);
@@ -4060,6 +4128,10 @@ mediaWss.on('connection', (ws, req) => {
         }
       }
 
+      // BRAIN_CALL_FIXES_D199: the fact lines behind this reply (trace brain.lines[]).
+      if (Array.isArray(result?.brainLines) && result.brainLines.length) {
+        voiceTrace.noteBrainLines(result.brainLines);
+      }
       if (result?.actionConfirmation && !bargeInActive) {
         const confirmation = String(result.actionConfirmation).trim();
         const lookupSpoken = spokenChunks.join(' ').trim();
@@ -5624,6 +5696,9 @@ wss.on('connection', (ws) => {
           openVisits: brainState?.returning?.openVisits,
           appointments: promptAppointments,
           cursor: brainState?.conversation?.visitReview || null,
+          // BRAIN_CALL_FIXES_D199: requests with visits; code file answers.
+          openRequests: brainState?.returning?.openRequests,
+          fileState: brainState,
         });
         if (promptVisitRead.runModel === false && promptVisitRead.line) {
           if (!brainState.conversation || typeof brainState.conversation !== 'object') {
@@ -5806,9 +5881,9 @@ async function applyGeminiTools(callSid, parsed) {
     state,
     capabilities
   );
-  if (enforcedParsed.consentBlocked || enforcedParsed.needsVisitTime) {
+  if (enforcedParsed.consentBlocked || enforcedParsed.needsVisitTime || enforcedParsed.fragmentBlocked) {
     console.log(
-      `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : 'needs_visit_time'}`
+      `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : enforcedParsed.fragmentBlocked ? 'fragment_turn' : 'needs_visit_time'}`
     );
   }
   const execution = await executeBrainTools({
@@ -5850,7 +5925,15 @@ async function applyGeminiTools(callSid, parsed) {
           console.log(
             `[${callSid}] service_request created id=${created.id} type=${created.request_type}`
           );
-          maybeSendServiceRequestNotification(callSid, created).catch((err) => {
+          const fixesD199 = require('./src/conversation/callFixesD199');
+          const alertRow = fixesD199.callFixesD199Enabled()
+            ? {
+                ...created,
+                caller_name:
+                  fixesD199.alertCallerName({ state, rowName: created.caller_name }) || null,
+              }
+            : created;
+          maybeSendServiceRequestNotification(callSid, alertRow).catch((err) => {
             console.error(`[${callSid}] service request notify error:`, err?.message || err);
           });
         }
@@ -5890,15 +5973,38 @@ async function applyGeminiTools(callSid, parsed) {
           console.log(
             `[${callSid}] appointment created id=${created.id} service=${created.service_name}`
           );
-          maybeSendAppointmentNotification(callSid, created, 'created').catch((err) => {
+          const fixesD199 = require('./src/conversation/callFixesD199');
+          const alertRow = fixesD199.callFixesD199Enabled()
+            ? {
+                ...created,
+                caller_name:
+                  fixesD199.alertCallerName({ state, rowName: created.caller_name }) || null,
+              }
+            : created;
+          maybeSendAppointmentNotification(callSid, alertRow, 'created').catch((err) => {
             console.error(`[${callSid}] appointment notify error:`, err?.message || err);
           });
         }
         return created;
       },
       updateAppointment: async (appointment) => {
+        // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 1): the row and the VISIT
+        // UPDATED alert carry the code-held confirmed name, never the junk
+        // name an older call saved on the row ("Caller: like").
+        const fixesD199 = require('./src/conversation/callFixesD199');
+        const heldName = fixesD199.callFixesD199Enabled()
+          ? fixesD199.alertCallerName({ state })
+          : '';
         const updated = await db.updateAppointment({
           callSid,
+          ...(heldName
+            ? {
+                callerName: heldName,
+                // Only a junk row name ("like") is replaced, never a real one.
+                replaceCallerName: (rowName) =>
+                  !fixesD199.alertCallerName({ state: { caller: {} }, rowName }),
+              }
+            : {}),
           appointmentId: appointment.appointmentId,
           phone: trustedToolPhone(appointment.phone, state.caller?.phone),
           status: appointment.status,
@@ -5913,7 +6019,14 @@ async function applyGeminiTools(callSid, parsed) {
           console.log(
             `[${callSid}] appointment updated id=${updated.id} status=${updated.status}`
           );
-          maybeSendAppointmentNotification(callSid, updated, 'updated').catch((err) => {
+          const alertRow = fixesD199.callFixesD199Enabled()
+            ? {
+                ...updated,
+                caller_name:
+                  fixesD199.alertCallerName({ state, rowName: updated.caller_name }) || null,
+              }
+            : updated;
+          maybeSendAppointmentNotification(callSid, alertRow, 'updated').catch((err) => {
             console.error(`[${callSid}] appointment update notify error:`, err?.message || err);
           });
         }
@@ -5941,7 +6054,41 @@ async function applyGeminiTools(callSid, parsed) {
     });
   }
 
+  if (enforcedParsed.fragmentBlocked) {
+    // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 6): no write on a cut-off
+    // turn; the ask_need line asks what they need.
+    const ask = require('./src/conversation/callFixesD199').askNeedLine(
+      state.language?.current || 'en'
+    );
+    execution.results.unshift({
+      action: 'create_service_request',
+      status: 'blocked',
+      code: 'fragment_turn',
+      reason: 'The caller had not said what they need.',
+      askLine: ask.line,
+      askLines: ask.lines,
+    });
+  }
   let updatedState = recordActionResults(state, execution.results);
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): hold a rejected create until it
+  // is re-asked and saved, or saved as a callback. The invalid result carries
+  // the reask_slot line ("Saa nane usiku au saa nane mchana?").
+  settleRejectedCreate(updatedState, execution.results);
+  if (enforcedParsed.needsVisitTime) {
+    const held = noteRejectedCreate(updatedState, {
+      slot: 'when',
+      whenText: String(enforcedParsed.needsVisitTime),
+      appointment: enforcedParsed.rejectedAppointment || null,
+    });
+    if (held) {
+      const reask = reaskSlotLine(updatedState, updatedState.language?.current || 'en');
+      const invalid = execution.results.find((r) => r.code === 'unparsed_when' && r.status === 'invalid');
+      if (invalid && reask?.line) {
+        invalid.reaskLine = reask.line;
+        invalid.reaskLines = reask.lines;
+      }
+    }
+  }
   if (execution.shouldEndCall) {
     updatedState = setNextBestAction(updatedState, {
       action: 'END',
@@ -6234,6 +6381,11 @@ async function runGeminiTurnStreaming(
   // the caller is still owed it on the next one (toolOutcomeQueue).
   const bargedActionConfirmation = heldTools.toolHoldCancelled ? actionConfirmation : '';
   if (heldTools.toolHoldCancelled) actionConfirmation = '';
+  // BRAIN_CALL_FIXES_D199: fact lines behind the confirmation (trace brain.lines[]).
+  let brainLines = brainLinesForResults(
+    execution.results,
+    callBrainStates.get(callSid)?.language?.current || 'en'
+  ).lines;
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({
@@ -6244,6 +6396,14 @@ async function runGeminiTurnStreaming(
     }),
     finalSpeechGuardOpts(callSid, execution.results)
   );
+  // BRAIN_CALL_FIXES_D199: lines the speech guard put in (confirm_identity_first).
+  {
+    const conv = callBrainStates.get(callSid)?.conversation;
+    if (conv && Array.isArray(conv.pendingBrainLines) && conv.pendingBrainLines.length) {
+      brainLines = [...brainLines, ...conv.pendingBrainLines];
+      conv.pendingBrainLines = [];
+    }
+  }
 
   const geminiParts = modelPartsForHistory({
     geminiParts: modelParts,
@@ -6264,6 +6424,7 @@ async function runGeminiTurnStreaming(
     model,
     actionConfirmation,
     bargedActionConfirmation,
+    brainLines,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
     streamed: !streamFailed,
@@ -6350,6 +6511,11 @@ async function runGeminiTurn(
   // the caller is still owed it on the next one (toolOutcomeQueue).
   const bargedActionConfirmation = heldTools.toolHoldCancelled ? actionConfirmation : '';
   if (heldTools.toolHoldCancelled) actionConfirmation = '';
+  // BRAIN_CALL_FIXES_D199: fact lines behind the confirmation (trace brain.lines[]).
+  let brainLines = brainLinesForResults(
+    execution.results,
+    callBrainStates.get(callSid)?.language?.current || 'en'
+  ).lines;
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({
@@ -6360,6 +6526,14 @@ async function runGeminiTurn(
     }),
     finalSpeechGuardOpts(callSid, execution.results)
   );
+  // BRAIN_CALL_FIXES_D199: lines the speech guard put in (confirm_identity_first).
+  {
+    const conv = callBrainStates.get(callSid)?.conversation;
+    if (conv && Array.isArray(conv.pendingBrainLines) && conv.pendingBrainLines.length) {
+      brainLines = [...brainLines, ...conv.pendingBrainLines];
+      conv.pendingBrainLines = [];
+    }
+  }
 
   const thoughtSignature = extractThoughtSignature(response) || undefined;
   messages.push({
@@ -6381,6 +6555,7 @@ async function runGeminiTurn(
     model,
     actionConfirmation,
     bargedActionConfirmation,
+    brainLines,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
   };

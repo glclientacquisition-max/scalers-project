@@ -317,6 +317,27 @@ function validateServiceRequest(
   return { valid: true, value };
 }
 
+/**
+ * A name save_caller_info may store: #628's checks, not a copy of them.
+ * isSavedAlternateName (src/conversation/alternateNameQuality.js, #628) when it
+ * is on the branch; until then the same two checks it is built from:
+ * isJunkCallerName and isPlausibleCallerName.
+ */
+function savableCallerName(name) {
+  let alternate = null;
+  try {
+    // eslint-disable-next-line global-require
+    alternate = require('./alternateNameQuality');
+  } catch (err) {
+    if (err && err.code !== 'MODULE_NOT_FOUND') throw err;
+  }
+  if (alternate && typeof alternate.isSavedAlternateName === 'function') {
+    return alternate.isSavedAlternateName(name);
+  }
+  if (isJunkCallerName(name)) return false;
+  return require('./entityExtraction').isPlausibleCallerName(name);
+}
+
 function validateCallerInfo(parsed, { agentName = '', businessName = '', knownNames = [] } = {}) {
   const value = {
     name: canonicalCallerName(parsed?.name, knownNames),
@@ -324,6 +345,11 @@ function validateCallerInfo(parsed, { agentName = '', businessName = '', knownNa
   };
   if (value.name && isReservedCallerName(value.name, { agentName, businessName })) {
     // Keep reason-only capture; drop the bad name so we don't poison the lead.
+    value.name = '';
+  }
+  // BRAIN_CALL_FIXES_D199: #628's junk-name check gates the saved name too
+  // (HD_d199dbbf6b79 t9 saved "like"). The name stays code-held.
+  if (value.name && require('./callFixesD199').callFixesD199Enabled() && !savableCallerName(value.name)) {
     value.name = '';
   }
   return {
@@ -989,6 +1015,13 @@ async function executeBrainTools({
                 status: 'succeeded',
                 fingerprint,
                 id: updated.id || null,
+                // BRAIN_CALL_FIXES_D199: move_ok only for the filed visit the
+                // reschedule named (docs/specs/fact-lines.md).
+                ...(parsed.rescheduledFrom &&
+                validation.value.appointmentId === parsed.rescheduledFrom &&
+                require('./callFixesD199').callFixesD199Enabled()
+                  ? { movedFiledVisit: true }
+                  : {}),
                 appointmentStatus: updated.status || validation.value.status,
                 value: validation.value,
                 hours: validation.hours || null,
@@ -1219,6 +1252,27 @@ function toolOutcomeLine(results = [], language = 'en') {
   return sw ? 'Sawa.' : 'Okay.';
 }
 
+/**
+ * BRAIN_CALL_FIXES_D199: fact lines for tool results (move_ok / visit_updated),
+ * rendered. { line, lines } — lines go on the trace as brain.lines[].
+ */
+function brainLinesForResults(results = [], language = 'en') {
+  const fixes = require('./callFixesD199');
+  if (!fixes.callFixesD199Enabled()) return { line: '', lines: [] };
+  const lang = confirmationLanguage(language);
+  // The spoken confirmation stays formatToolConfirmation (Voice's spokenWhen).
+  // It says "moved" exactly when the update has a new time label, which is
+  // the move_ok gate; the trace line carries that spoken text.
+  const lines = fixes.updateResultLines(results, lang, {
+    newTimeLabel: (r) => formatRequestedWhenLabel(r.hours, lang),
+  });
+  const out = lines.map((line, i) => {
+    const r = (results || []).filter((x) => x?.action === 'update_appointment' && x.status === 'succeeded' && String(x.appointmentStatus || '').toLowerCase() !== 'cancelled')[i];
+    return { ...line, text: r ? formatToolConfirmation([r], language) : '' };
+  });
+  return { line: out.map((l) => l.text).filter(Boolean).join(' '), lines: out };
+}
+
 function formatToolConfirmation(results = [], language = 'en') {
   const meaningful = results.find((result) =>
     [
@@ -1236,6 +1290,11 @@ function formatToolConfirmation(results = [], language = 'en') {
   const sheng = lang === 'sheng';
   if (meaningful.code === 'message_only') {
     return messageOnlyCallbackLine(sheng ? 'sheng' : sw ? 'sw' : 'en');
+  }
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 6): a save blocked on a
+  // cut-off turn speaks the ask_need line; nothing was written.
+  if (meaningful.code === 'fragment_turn' && require('./callFixesD199').callFixesD199Enabled()) {
+    return String(meaningful.askLine || '');
   }
   if (meaningful.action === 'tool_request') {
     if (sw) return 'Sijaweza kukamilisha hatua hiyo.';
@@ -1267,6 +1326,10 @@ function formatToolConfirmation(results = [], language = 'en') {
     if (meaningful.status === 'invalid') {
       const code = String(meaningful.code || '');
       const hours = meaningful.hours || {};
+      // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): the held create's reask_slot.
+      if (meaningful.reaskLine && require('./callFixesD199').callFixesD199Enabled()) {
+        return String(meaningful.reaskLine);
+      }
       if (code === 'outside_coverage') {
         return visitBlockSpeech('outside', lang);
       }
@@ -1453,6 +1516,7 @@ module.exports = {
   validateUpdateAppointment,
   executeBrainTools,
   formatToolConfirmation,
+  brainLinesForResults,
   toolOutcomeLine,
   formatVisitTimeProblem,
 };

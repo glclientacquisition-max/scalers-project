@@ -637,7 +637,36 @@ function guardSpokenReply(text, ctx = {}) {
   const coverageGate = confirmedCoverageEnabled();
   const coverageConfirmed = coverageGate && confirmedCoverageReading(ctx.profile || {}).confirmed;
   let droppedCoverage = false;
+  // BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 6/7): never claim an empty file
+  // while it is masked or has rows; never ask the file name twice.
+  const fixes = require('./callFixesD199');
+  const fixesOn = fixes.callFixesD199Enabled();
+  const fileMasked = fixesOn && fixes.fileMasked(ctx.state);
+  const fileHasRows = fixesOn && fixes.fileHasRows(ctx.state);
+  const conv = ctx.state && typeof ctx.state === 'object' ? ctx.state.conversation : null;
+  const turnNow = Number(conv?.turnCount || 0);
+  const nameAskedBefore =
+    fixesOn &&
+    ctx.state?.caller?.nameConfirmed !== true &&
+    ctx.state?.caller?.fileNameAskSpoken === true &&
+    !(conv && conv.fileNameAskTurn === turnNow);
+  let droppedNoRecord = false;
   for (const sentence of splitSentences(raw)) {
+    if ((fileMasked || fileHasRows) && fixes.claimsNoRecord(sentence)) {
+      droppedNoRecord = true;
+      noteDrop(ctx, 'no_record_claim', sentence);
+      continue;
+    }
+    if (fixesOn && ctx.state?.caller?.nameConfirmed !== true && isPackIdentityAsk(sentence, pendingUnboundName(ctx.state))) {
+      if (nameAskedBefore) {
+        noteDrop(ctx, 'name_ask_repeat', sentence);
+        continue;
+      }
+      if (ctx.state?.caller && pendingUnboundName(ctx.state)) {
+        ctx.state.caller.fileNameAskSpoken = true;
+        if (conv) conv.fileNameAskTurn = turnNow;
+      }
+    }
     if (heldName && sentenceAsksForCallerName(sentence)) {
       droppedNameAsk = true;
       noteDrop(ctx, 'name_ask', sentence);
@@ -707,6 +736,27 @@ function guardSpokenReply(text, ctx = {}) {
     kept.push(sentence);
   }
   let out = kept.join(' ').trim();
+  if (droppedNoRecord) {
+    // Masked: confirm_identity_first (plus the ask when it is still due).
+    // Bound with rows: the open file read replaces the claim.
+    const asksAlready = splitSentences(out).some((s) => isPackIdentityAsk(s, pendingUnboundName(ctx.state)));
+    const replaced = fileMasked
+      ? fixes.confirmIdentityFirst(ctx.state, confirmationLanguage(ctx.language), { askAllowed: !asksAlready && !nameAskedBefore })
+      : fixes.openFileRead(ctx.state, confirmationLanguage(ctx.language)) || { line: '', lines: [] };
+    if (replaced.line) {
+      if (fileMasked && asksAlready) {
+        // Put the confirm line before the model's own ask.
+        const rest = splitSentences(out).filter((s) => !isPackIdentityAsk(s, pendingUnboundName(ctx.state)));
+        const askLine = splitSentences(out).find((s) => isPackIdentityAsk(s, pendingUnboundName(ctx.state)));
+        out = [replaced.line, askLine, ...rest].filter(Boolean).join(' ');
+      } else {
+        out = out ? `${replaced.line} ${out}` : replaced.line;
+      }
+      if (conv) {
+        conv.pendingBrainLines = [...(Array.isArray(conv.pendingBrainLines) ? conv.pendingBrainLines : []), ...replaced.lines];
+      }
+    }
+  }
   if (holdOpenSlot && droppedJob && BARE_CLOSER.test(out)) out = '';
   if (droppedCoverage) {
     // Flag on: the dropped coverage claim becomes "I'll have the team confirm
