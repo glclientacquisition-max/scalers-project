@@ -80,6 +80,54 @@ function isGarbledContent(value) {
   return false;
 }
 
+/** v3: the readback for a save already read back this call (or a duplicate). */
+function alreadySavedLine(language = 'en') {
+  return lang2(language) === 'sw' ? 'Hiyo tayari imehifadhiwa.' : "That's already saved.";
+}
+
+/** Key of a receipt for per-call readback dedupe. */
+function receiptKey(r) {
+  const v = r?.value || r?.record || {};
+  const item = String(v.item || v.summary_item || v.serviceName || v.service_name || '').trim().toLowerCase();
+  return `${r?.action || ''}|${item}` || String(r?.id || '');
+}
+
+/**
+ * v3 save gate: a booking-intent request (not a callback/hold) needs a when.
+ * Returns the missing slot or ''.
+ */
+function saveMissingSlot(request = {}, state = {}) {
+  if (!trustP1Enabled() || !request) return '';
+  const type = String(request.type || 'enquiry').toLowerCase();
+  if (['callback', 'hold', 'hold_or_pickup', 'address_change', 'payment_change'].includes(type)) return '';
+  const goal = String(state?.goal?.primary || '');
+  const booking = goal === 'make_booking_request' || /\b(?:book|booking|schedule|come)\b/i.test(String(request.notes || ''));
+  if (!booking) return '';
+  const when = String(request.whenText || '').trim();
+  return when ? '' : 'when_text';
+}
+
+const PLACE_ASK = /\b(?:where (?:should|shall|do|can) we come|which (?:estate|building|area|place|apartment)|what(?:'s| is) the (?:address|location|building|estate)|tukuje wapi|mahali gani|uko wapi)\b/i;
+
+/**
+ * v3: an address answer that came out as broken fragments ("Hamil. Tone.")
+ * is not saved; ask once to repeat it.
+ */
+function unclearPlaceAnswer(callerText, lastAgentText) {
+  if (!trustP1Enabled() || !PLACE_ASK.test(String(lastAgentText || ''))) return false;
+  const raw = String(callerText || '').trim();
+  const parts = raw.split(/[.!?]+/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return false;
+  const tiny = parts.filter((p) => p.split(/\s+/).length === 1 && p.length <= 6).length;
+  return tiny >= 2;
+}
+
+function placeRepairLine(language = 'en') {
+  return lang2(language) === 'sw'
+    ? 'Samahani, sikusikia jina la mahali vizuri. Tafadhali rudia jina la jengo au estate.'
+    : "Sorry, I didn't catch the place clearly. Could you say the building or estate name again?";
+}
+
 function repairAskLine(language = 'en') {
   return lang2(language) === 'sw'
     ? 'Samahani, sikusikia vizuri. Unahitaji nini hasa, na ngapi?'
@@ -213,6 +261,10 @@ function noteChangeTask(state, kind) {
 const PAST_CLAIM =
   /\b(?:you (?:asked|said|told|ordered|wanted|called|mentioned|booked|requested)|last time|(?:i|we) remember|as you (?:said|mentioned)|previously you|uliuliza|ulisema|uliagiza|uliomba|ulipiga|mara ya mwisho|nakumbuka|tunakumbuka)\b/i;
 
+const HISTORY_REF =
+  /\b(?:your (?:previous|last|past|earlier|old|other) (?:\w+ )?(?:inquiry|enquiry|request|booking|visit|order|call|callback)|previous (?:inquiry|enquiry|request|booking)|on (?:your|the) file|ombi lako la (?:awali|zamani)|booking yako ya (?:awali|zamani))\b/i;
+const CLOSED_TALK = /\b(?:was|were|has been|have been|is|are)\s+(?:fulfilled|cancell?ed|completed|closed|done)\b|\b(?:fulfilled|cancell?ed)\b|\bilikamilika\b|\bilighairiwa\b/i;
+
 const FILE_LINE_TEMPLATES = new Set(['visit_open', 'request_open', 'requested_at', 'past_open', 'past_row', 'more_open']);
 
 function turnHasFileLine(state) {
@@ -311,12 +363,9 @@ function relevantTasks(tasks = [], { topic = '', now = Date.now(), state = null 
   return (Array.isArray(tasks) ? tasks : []).filter((t) => {
     if (!t) return false;
     if (blocked.has(String(t.task_id || t.id))) return false;
-    const at = taskDate(t);
-    if (at == null) return false;
-    const age = (now - at) / DAY;
-    if (isClosed(t) && age > CLOSED_TTL_DAYS) return false;
-    if (age > TOPIC_TTL_DAYS) return false;
-    if (isClosed(t)) return false; // only open rows are offered
+    if (taskDate(t) == null) return false;
+    // v3: the one history policy decides open + recent.
+    if (!require('./callerHistoryPolicy').rowAllowed(t, now)) return false;
     if (!want.size) return true;
     const have = topicWords(`${t.summary_item || ''} ${t.type || ''} ${t.next_step || ''}`);
     for (const w of want) if (have.has(w)) return true;
@@ -510,10 +559,18 @@ function sentenceAsksName(sentence) {
 
 function noteCallerTurnForName(state, callerText) {
   const t = trustState(state);
-  if (NAME_REFUSAL.test(String(callerText || ''))) t.nameRefused = true;
+  if (NAME_REFUSAL.test(String(callerText || ''))) {
+    t.nameRefused = true;
+    if (t.nameAsk) t.nameAsk = { ...t.nameAsk, pending: false };
+  }
 }
 
-/** One counter across bind, file-name ask and save_caller_info. */
+/**
+ * v3 ONE identity / name-ask controller (D199 confirm-identity, trust
+ * remember-ask, file-name ask, model asks, save_caller_info all go here).
+ * state.trust.nameAsk = { pending, kind: 'open'|'file', fileName, turn }.
+ * Max 2 asks per call; never after a refusal or a bind.
+ */
 function nameAskAllowed(state) {
   if (!trustP1Enabled()) return true;
   const t = trustState(state);
@@ -522,12 +579,54 @@ function nameAskAllowed(state) {
   return (t.nameAsks || 0) < MAX_NAME_ASKS;
 }
 
-function noteNameAsk(state) {
+function noteNameAsk(state, { kind = 'open', fileName = '' } = {}) {
   const t = trustState(state);
   const turn = Number(state?.conversation?.turnCount || 0);
+  t.nameAsk = { pending: true, kind, fileName: String(fileName || '').trim() || null, turn };
   if (t.lastNameAskTurn === turn) return; // streamed sentences of one reply count once
   t.lastNameAskTurn = turn;
   t.nameAsks = (t.nameAsks || 0) + 1;
+}
+
+/** Ask for the name through the controller. false = do not ask (cap / refused / bound / already pending this turn). */
+function requestNameAsk(state, opts = {}) {
+  if (!trustP1Enabled()) return true;
+  const t = trustState(state);
+  const turn = Number(state?.conversation?.turnCount || 0);
+  // Idempotent within a turn: planner and guard both ask; it is one ask.
+  if (t.nameAsk?.pending && t.nameAsk.turn === turn) return true;
+  if (!nameAskAllowed(state)) return false;
+  noteNameAsk(state, opts);
+  return true;
+}
+
+function pendingNameAsk(state) {
+  const a = state?.trust?.nameAsk;
+  return trustP1Enabled() && a?.pending && state?.caller?.nameConfirmed !== true ? a : null;
+}
+
+const NAME_LEAD = /^(?:(?:uh+|um+|er+|ah+|eh+|yes|yeah|ndio|ndiyo|eeh|ok(?:ay)?|sawa)[, ]+)*(?:(?:my name is|my name's|i am|i'm|it'?s|this is|it is|ni|mimi ni|jina langu ni|naitwa)\s+)?/i;
+const NOT_A_NAME = /^(?:yes|no|yeah|okay|ok|sawa|ndio|hapana|hello|hi|sorry|what|why|who|because|i|me|the|a)$/i;
+
+/**
+ * The caller's answer to the pending ask → a name, or ''. Bare "Alvin.",
+ * "It's Alvin", "Alvin is the name", "Jina langu ni Wanjiru".
+ */
+function nameFromAnswer(text) {
+  let raw = String(text || '').trim().replace(/[.!?,]+$/g, '').trim();
+  raw = raw.replace(/\s+(?:is (?:the|my) name|ndio jina(?: langu)?|here|speaking)$/i, '').trim();
+  raw = raw.replace(NAME_LEAD, '').trim().replace(/[.!?,]+$/g, '');
+  const words = raw.split(/\s+/).filter(Boolean);
+  if (!words.length || words.length > 3) return '';
+  if (words.some((w) => !/^\p{L}[\p{L}'’-]*$/u.test(w) || NOT_A_NAME.test(w))) return '';
+  return words.map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+}
+
+/** Close the pending ask once the name is bound (or refused). */
+function settleNameAsk(state, { bound = false } = {}) {
+  const t = state?.trust;
+  if (!t?.nameAsk) return;
+  if (bound || state?.caller?.nameConfirmed === true || t.nameRefused) t.nameAsk = { ...t.nameAsk, pending: false };
 }
 
 // --------------------------------------------- T6 catalogue family + hours
@@ -698,6 +797,29 @@ function shapeSpeech(text, ctx = {}) {
       drops.push('trust_updated_sensitive');
       continue;
     }
+    // v3 history policy at the mouth: a closed row is never spoken; a
+    // history reference needs a policy-approved file line this turn; a row
+    // the policy blocks is never named with a history reference.
+    if (ctx.historyGuard !== false && state) {
+      const blocked = Array.isArray(ctx.blockedTerms) ? ctx.blockedTerms : [];
+      const low = s.toLowerCase();
+      const namesBlocked = blocked.some((term) => low.includes(term));
+      const historyRef = HISTORY_REF.test(s) || PAST_CLAIM.test(s);
+      if (CLOSED_TALK.test(s) && (historyRef || namesBlocked || /\byour\b/i.test(s))) {
+        drops.push('trust_closed_row');
+        if (!swappedPast) kept.push(notOnFileLine(language));
+        swappedPast = true;
+        continue;
+      }
+      // An identity check ("to check your inquiry, am I speaking with X?")
+      // reads nothing from the file; it is the gate, not a leak.
+      if (historyRef && (namesBlocked || !fileLine) && !sentenceAsksName(s)) {
+        drops.push('trust_history_blocked');
+        if (!swappedPast) kept.push(notOnFileLine(language));
+        swappedPast = true;
+        continue;
+      }
+    }
     if (PAST_CLAIM.test(s) && !fileLine) {
       drops.push('trust_past_claim');
       if (!swappedPast) kept.push(notOnFileLine(language));
@@ -705,20 +827,59 @@ function shapeSpeech(text, ctx = {}) {
       continue;
     }
     if (sentenceAsksName(s) && state) {
-      if (!nameAskAllowed(state)) {
+      const t = trustState(state);
+      const turn = Number(state?.conversation?.turnCount || 0);
+      const sameTurn = t.lastNameAskTurn === turn;
+      if (!sameTurn && !nameAskAllowed(state)) {
         drops.push('trust_name_ask_cap');
         continue;
       }
-      noteNameAsk(state);
+      noteNameAsk(state, { kind: /speaking with|naongea na|ni wewe/i.test(s) ? 'file' : 'open' });
     }
     s = fixSlotNoun(s, { item: lastItem, profile: ctx.profile, language });
     if (state) s = anchorHours(s, state);
     kept.push(s);
   }
-  let out = [...new Set(kept)].join(' ');
+  // v3: guard replacement lines (not-on-file, confirm-identity fallback) are
+  // said once per turn across streamed chunks. Model text is only deduped
+  // inside one shaping pass: shapeSpeech can run more than once on the same
+  // text, so remembering model sentences would delete real answers.
+  let deduped = [...new Set(kept)];
+  if (state) {
+    const t = trustState(state);
+    const turn = Number(state?.conversation?.turnCount || 0);
+    if (t.spokenTurn !== turn) { t.spokenTurn = turn; t.spokenSentences = []; }
+    const seen = new Set(t.spokenSentences || []);
+    const replacement = new Set([notOnFileLine('en'), notOnFileLine('sw'), 'I need to confirm who I am speaking with.'].map((x) => x.toLowerCase()));
+    const before = deduped;
+    deduped = [];
+    for (const k of before) {
+      const key = k.toLowerCase().replace(/\s+/g, ' ').trim();
+      if (replacement.has(key)) {
+        if (seen.has(key)) { drops.push('trust_dup_sentence'); continue; }
+        seen.add(key);
+      }
+      deduped.push(k);
+    }
+    t.spokenSentences = [...seen];
+  }
+  let out = [...new Set(deduped)].join(' ');
   out = redactStaffNames(out, ctx.profile || {}, language);
   out = trimLength(out);
+  // Remember that the guard removed model text this turn, so an empty
+  // reply is not repaired as if the caller went unheard (false hear_again).
+  if (state && drops.length) trustState(state).guardDroppedTurn = Number(state?.conversation?.turnCount || 0);
   return { text: out, drops };
+}
+
+/** The trust guard removed model text this turn (so empty != unheard). */
+function guardEmptiedTurn(state) {
+  if (!trustP1Enabled() || !state?.trust) return false;
+  return state.trust.guardDroppedTurn === Number(state?.conversation?.turnCount || 0);
+}
+
+function guardContinueLine(language = 'en') {
+  return lang2(language) === 'sw' ? 'Nikusaidie aje?' : 'How can I help?';
 }
 
 function isHonestChangeLine(s) {
@@ -747,9 +908,14 @@ function validateSummary(summary, results = []) {
  * Code answers before the model, in order: correction, address/payment
  * change, "do you remember me", resume offer after bind. null = model runs.
  */
-function planTrustTurn({ text = '', state = {}, card = null, tasks = [], language = 'en', byWhen = '', now = Date.now(), nameJustConfirmed = false } = {}) {
+function planTrustTurn({ text = '', state = {}, card = null, tasks = [], language = 'en', byWhen = '', now = Date.now(), nameJustConfirmed = false, lastAgentText = '' } = {}) {
   if (!trustP1Enabled()) return null;
   noteCallerTurnForName(state, text);
+  // v3 save pipeline: a broken address answer is repaired once, never saved.
+  if (unclearPlaceAnswer(text, lastAgentText) && !trustState(state).placeRepairAsked) {
+    trustState(state).placeRepairAsked = true;
+    return { kind: 'place_repair', line: placeRepairLine(language) };
+  }
   const ttl = tickResumePointer(state, text);
   const corr = planCorrection({ text, state, language });
   if (corr) return { kind: 'correction', ...corr };
@@ -758,8 +924,10 @@ function planTrustTurn({ text = '', state = {}, card = null, tasks = [], languag
   const remember = planRememberAsk({ text, card, tasks, state, language, now });
   if (remember) {
     if (remember.nameAsk) {
-      if (!nameAskAllowed(state)) return { kind: 'remember', line: notOnFileLine(language) };
-      noteNameAsk(state);
+      // Already asked (D199 "Am I speaking with…?" or a pending ask): do not ask again.
+      // One controller: a pending ask (D199 "Am I speaking with…?" included)
+      // or the cap means no second ask from this path.
+      if (pendingNameAsk(state) || !requestNameAsk(state, { kind: 'open' })) return null;
     }
     return { kind: 'remember', line: remember.line };
   }
@@ -788,6 +956,17 @@ function trustPromptFacts({ card = null, language = 'en' } = {}) {
 }
 
 module.exports = {
+  guardEmptiedTurn,
+  guardContinueLine,
+  requestNameAsk,
+  pendingNameAsk,
+  nameFromAnswer,
+  settleNameAsk,
+  alreadySavedLine,
+  receiptKey,
+  saveMissingSlot,
+  unclearPlaceAnswer,
+  placeRepairLine,
   trustPromptFacts,
   inviteLine,
   whenPhrase,

@@ -469,6 +469,7 @@ function polishSpokenDetail(text, opts = {}) {
       toolResults: opts.toolResults || [],
       language: opts.language,
       receiptLine: opts.receiptLine,
+      blockedTerms: require('./callerHistoryPolicy').blockedTerms(opts.profile?.callerMemory, opts.state),
     });
     out = shaped.text;
     dropReasons.push(...shaped.drops);
@@ -714,6 +715,12 @@ function planEmptyGeminiSpeech({
     };
   }
   if (alreadyOffered) return { speak: false, kind: 'quiet_continue', line: '' };
+  // eslint-disable-next-line global-require
+  const trustP1 = require('./trustP1');
+  const outcome0 = spokenToolOutcome(toolResults, language, userText);
+  if (!outcome0 && trustP1.guardEmptiedTurn(brainState)) {
+    return { speak: true, kind: 'guard_continue', line: trustP1.guardContinueLine(language) };
+  }
   const outcome = spokenToolOutcome(toolResults, language, userText);
   if (outcome) return { speak: true, kind: 'tool_outcome', line: outcome };
   return { speak: true, kind: 'hear_again', line: emptyTurnRepairLine(language) };
