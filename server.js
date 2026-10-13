@@ -417,6 +417,12 @@ const {
   isCarrierDropClose,
   requestInFlight,
 } = require('./src/speech/carrierDrop');
+const {
+  langHysteresisEnabled,
+  createLanguageLock,
+  observeTurn,
+  lockToCallLanguage,
+} = require('./src/conversation/languageHysteresis');
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
@@ -2229,6 +2235,8 @@ mediaWss.on('connection', (ws, req) => {
   /** Sticky call language: 'en' | 'sw' | 'sheng' | 'mixed' | 'unknown' */
   let callLanguage = 'unknown';
   let callLanguageState = createLanguageState();
+  // VOICE_LANG_HYSTERESIS lock (unused when the flag is off).
+  let languageLock = createLanguageLock();
   let brainProfile = {};
   /** Caller-requested TTS speed scale for this call (1 = profile default). */
   let ttsSpeedScale = 1;
@@ -2541,6 +2549,8 @@ mediaWss.on('connection', (ws, req) => {
   async function speakGreetingSentences(text, opts = {}) {
     if (!text) return { ok: false };
     if (speechOutageStarted) return { ok: false, outage: true };
+    // v2 (13 Oct): the opening is ONE string, ONE voice, ONE synthesis call.
+    // No per-sentence language split (it sounded like several speakers).
     if (!tts && ttsReadyPromise) {
       try {
         await Promise.race([
@@ -3132,8 +3142,31 @@ mediaWss.on('connection', (ws, req) => {
     const languageEvidence = analyzeCallerLanguage(clean, {
       tokenLanguages: opts.tokenLanguages,
     });
-    callLanguageState = resolveLanguageState(callLanguageState, languageEvidence);
-    callLanguage = callLanguageState.current;
+    if (langHysteresisEnabled()) {
+      const observed = observeTurn(languageLock, {
+        text: clean,
+        tokenLanguages: opts.tokenLanguages,
+      });
+      languageLock = observed.lock;
+      callLanguage = lockToCallLanguage(languageLock);
+      callLanguageState = {
+        ...callLanguageState,
+        current: callLanguage,
+        detected: observed.decision.turnLang,
+        confidence: Math.max(observed.decision.share?.en || 0, observed.decision.share?.sw || 0),
+      };
+      try {
+        voiceTrace.noteCall({
+          stage: 'language_decision',
+          ...observed.decision,
+        });
+      } catch {
+        /* ignore */
+      }
+    } else {
+      callLanguageState = resolveLanguageState(callLanguageState, languageEvidence);
+      callLanguage = callLanguageState.current;
+    }
 
     // Caller asking for slower/faster speech adjusts the actual voice speed,
     // so the model never needs "..." chains to pace itself.
@@ -5838,6 +5871,7 @@ wss.on('connection', (ws) => {
   let transcriptLog = [];
   let callLanguage = 'unknown';
   let callLanguageState = createLanguageState();
+  let languageLock = createLanguageLock();
   let brainProfile = {};
 
   ws.on('message', async (raw) => {
@@ -5886,8 +5920,19 @@ wss.on('connection', (ws) => {
         messages.push({ role: 'user', content: data.voicePrompt });
 
         const languageEvidence = analyzeCallerLanguage(data.voicePrompt);
-        callLanguageState = resolveLanguageState(callLanguageState, languageEvidence);
-        callLanguage = callLanguageState.current;
+        if (langHysteresisEnabled()) {
+          const observed = observeTurn(languageLock, { text: data.voicePrompt });
+          languageLock = observed.lock;
+          callLanguage = lockToCallLanguage(languageLock);
+          callLanguageState = {
+            ...callLanguageState,
+            current: callLanguage,
+            detected: observed.decision.turnLang,
+          };
+        } else {
+          callLanguageState = resolveLanguageState(callLanguageState, languageEvidence);
+          callLanguage = callLanguageState.current;
+        }
         const capabilities =
           callBrainCapabilities.get(callSid) ||
           capabilitiesForProfile(brainProfile, callAgentTools.get(callSid) || parseAgentTools(null));
