@@ -1,0 +1,284 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "tenantId": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+  "businessName": "Done and Dusted",
+  "callerName": "Alvin",
+  "nameOnFile": false,
+  "vertical": "home_services",
+  "servicesCatalog": [
+    {
+      "name": "Mattress cleaning",
+      "notes": "Vary by size",
+      "source": "owner",
+      "category": "Cleaning",
+      "in_stock": "",
+      "price_range": "Ksh 800-1200",
+      "out_of_scope": ""
+    },
+    {
+      "name": "1-Bedroom Apartment (Standard)",
+      "notes": "Dusting, vacuuming, mopping, bathroom sanitation, kitchen surfaces",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 3,000 flat",
+      "out_of_scope": ""
+    },
+    {
+      "name": "2-Bedroom Apartment (Standard)",
+      "notes": "Dusting, vacuuming, mopping, up to 2 bathrooms, kitchen surfaces",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 4,500 flat",
+      "out_of_scope": ""
+    },
+    {
+      "name": "3-Bedroom House (Standard)",
+      "notes": "Full house vacuum/mop, dust all rooms, up to 2.5 bathrooms, kitchen counters",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 6,000 flat",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Hourly Housekeeping",
+      "notes": "Custom chores: laundry, dishwashing, organizing",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 500 per hour (min 3 hours)",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Deep Cleaning Package (add-on)",
+      "notes": "Inside oven, fridge, baseboards, interior windows, light fixtures",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "Base + KSh 3,000 to 6,000",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Move-In / Move-Out Clean",
+      "notes": "Empty premises, cabinets/drawers, doors and windows",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 5,000 flat (2-bed unit)",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Post-Construction Clean",
+      "notes": "Dust mitigation, paint/sticker removal, high-pile vacuum, site sanitation",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 40 per sq ft",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Small Office (up to 1,500 sq ft)",
+      "notes": "Trash, desk dusting, restrooms, breakroom, floors",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 15,000 per visit",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Medium Office (1,501-3,500 sq ft)",
+      "notes": "Workspace sanitation, common areas, conference rooms, floors",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 25,000 per visit",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Large Commercial Contract",
+      "notes": "Daily or weekly custodians, windows, floor buffing",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "Custom quote (KSh 35-150 per sq m per month)",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Sofa Cleaning (per seat)",
+      "notes": "",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 800 per seat",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Carpet Cleaning (per room)",
+      "notes": "",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 2,000 per room",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Interior Window Cleaning",
+      "notes": "",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 200 per window",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Refrigerator Internal Deep Clean",
+      "notes": "",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 1,000 per unit",
+      "out_of_scope": ""
+    },
+    {
+      "name": "Oven Internal Deep Clean",
+      "notes": "",
+      "source": "owner",
+      "category": "",
+      "in_stock": "",
+      "price_range": "KSh 1,200 per unit",
+      "out_of_scope": ""
+    }
+  ],
+  "businessPolicies": {
+    "coverage_areas": [
+      "county:nairobi",
+      "place:kitengela",
+      "county:kiambu",
+      "place:juja",
+      "place:ongata rongai",
+      "place:syokimau"
+    ]
+  },
+  "socialHandles": {
+    "channels": [
+      {
+        "kind": "phone",
+        "label": "Main",
+        "value": "0790381872"
+      }
+    ]
+  },
+  "hoursSchedule": {
+    "days": {
+      "fri": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "mon": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "sat": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "sun": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "thu": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "tue": {
+        "open": "08:00",
+        "close": "18:00"
+      },
+      "wed": {
+        "open": "08:00",
+        "close": "18:00"
+      }
+    },
+    "location": "Main · Nairobi and the close surroundings",
+    "timezone": "Africa/Nairobi"
+  },
+  "callId": "HD_8bd4ebc460d4",
+  "source": "prod voice_turn_traces HD_8bd4ebc460d4",
+  "turns": [
+    {
+      "caller": "Hapana, huu umenikasirisha juu— Mbona unakata simu?",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Pole sana kwa kukukera, haikuwa nia yangu kukukatia simu. Niambie jinsi naweza kukusaidia sasa hivi.",
+        "chars": 100,
+        "spokenEmitted": 100
+      },
+      "filler": "Sawa.",
+      "observed": {
+        "firstPcmMs": 506,
+        "firstReplyPcmMs": 1769,
+        "firstTokenMs": 1215
+      },
+      "outcome": "ok",
+      "liveTts": [
+        "Pole sana kwa kukukera, haikuwa nia yangu kukukatia simu.",
+        "Niambie jinsi naweza kukusaidia sasa hivi."
+      ]
+    },
+    {
+      "caller": "Right, I want you to check on my past history.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Pole sana, sina rekodi za nyuma zilizohifadhiwa hapa. Naweza kusaidiaje kuhusu bidhaa au huduma zetu za Esga Stationery leo?",
+        "chars": 124,
+        "spokenEmitted": 124
+      },
+      "filler": "Alright.",
+      "observed": {
+        "firstPcmMs": 432,
+        "firstReplyPcmMs": 1715,
+        "firstTokenMs": 1103
+      },
+      "outcome": "ok",
+      "liveTts": [
+        "Pole sana, sina rekodi za nyuma zilizohifadhiwa hapa.",
+        "Naweza kusaidiaje kuhusu bidhaa au huduma zetu za Esga Stationery leo?"
+      ]
+    },
+    {
+      "caller": "Nilikuwa nafuatilia my order, I had made an order.",
+      "soniox": "sw",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Pole sana. Hatuna maelezo ya oda hiyo kwa mfumo wetu, lakini naweza kuchukua jina lako na maelezo ya oda nimpashie meneja wetu akupigie simu.",
+        "chars": 141,
+        "spokenEmitted": 141
+      },
+      "filler": "Mm.",
+      "observed": {
+        "firstPcmMs": 403,
+        "firstReplyPcmMs": 1863,
+        "firstTokenMs": 1069
+      },
+      "outcome": "ok",
+      "liveTts": [
+        "Pole sana.",
+        "Hatuna maelezo ya oda hiyo kwa mfumo wetu, lakini naweza kuchukua jina lako na maelezo ya oda nimpashie meneja wetu akupigie simu."
+      ]
+    }
+  ]
+}
