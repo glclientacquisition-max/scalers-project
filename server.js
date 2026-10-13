@@ -399,6 +399,17 @@ const {
 } = require('./src/speech/overlapHold');
 const { createLateFinalHold } = require('./src/speech/lateFinal');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
+const {
+  silentCallerPromptEnabled,
+  silentCallerPromptDelayMs,
+  pickSilentCallerPromptLine,
+  createSilentCallerPrompt,
+} = require('./src/speech/silentCallerPrompt');
+const {
+  mediaStallWatchdogEnabled,
+  mediaStallGapMs,
+  createMediaStallWatchdog,
+} = require('./src/speech/mediaStallWatchdog');
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
@@ -2033,6 +2044,53 @@ mediaWss.on('connection', (ws, req) => {
       });
     },
   });
+  // Post-greeting silence re-prompt (VOICE_SILENT_CALLER_PROMPT). Idle nudge still requires
+  // heardCallerUtterance; this one does not (HD_31d827427104 / HD_1af0738130bc).
+  const silentCallerPrompt = createSilentCallerPrompt({
+    delayMs: silentCallerPromptDelayMs(),
+    canFire: () =>
+      silentCallerPromptEnabled() &&
+      ws.readyState === WebSocket.OPEN &&
+      !callEnding &&
+      !speaking &&
+      !turnBusy &&
+      !speechOutageStarted &&
+      !heardCallerUtterance &&
+      !utteranceParts.length &&
+      !pendingUtterance &&
+      !callIsOver(),
+    speak: () => {
+      if (!silentCallerPromptEnabled() || callIsOver() || heardCallerUtterance) return null;
+      const line = pickSilentCallerPromptLine({ language: callLanguage });
+      console.log(`[ws/media][${sidLabel()}] silent_caller_prompt`);
+      return speakText(line, { isIdleNudge: true }).then((spoken) => {
+        if (spoken?.ok) {
+          callTranscript.pushAgent(line);
+          messages.push({ role: 'assistant', content: line, local: true });
+        }
+      });
+    },
+  });
+  // VOICE_MEDIA_STALL_WATCHDOG: log media_stall on inbound frame gaps.
+  const mediaStallWatchdog = createMediaStallWatchdog({
+    gapMs: mediaStallGapMs(),
+    isOpen: () => ws.readyState === WebSocket.OPEN && !callIsOver(),
+    onStall: ({ gapMs, frames }) => {
+      console.warn(
+        `[ws/media][${sidLabel()}] media_stall gapMs=${gapMs} frames=${frames}`
+      );
+      try {
+        voiceTrace.noteCall({
+          stage: 'media',
+          path: 'media_stall',
+          gapMs,
+          frames,
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+  });
   // An unfinished caller turn ("Nilikuwa nauliza,") is held, not answered.
   // New caller words merge with it. If the caller stays quiet for the hold
   // window, it is answered by the model (holdTimedOut), never by an
@@ -2078,6 +2136,7 @@ mediaWss.on('connection', (ws, req) => {
     if (!sample || sample.length < 3) return;
     if (looksLikeEcho(text)) return;
     idleNudge.clear();
+    silentCallerPrompt.clear();
   }
   let fillerTimer = null;
   /** When true, discard the in-flight Gemini/TTS reply and wait for the caller turn. */
@@ -4451,6 +4510,7 @@ mediaWss.on('connection', (ws, req) => {
     }
     console.log(`[ws/media][${sidLabel()}] caller_turn_processed`);
     heardCallerUtterance = true;
+    silentCallerPrompt.clear();
     if (!firstForward.firstCallerTurn) {
       firstForward.firstCallerTurn = text;
       firstForward.hasStt = true;
@@ -4920,6 +4980,15 @@ mediaWss.on('connection', (ws, req) => {
           })
           .catch(() => {});
       }
+      if (silentCallerPromptEnabled()) {
+        silentCallerPrompt.arm();
+        console.log(
+          `[ws/media][${sidLabel()}] silent_caller_prompt armed delayMs=${silentCallerPrompt.delayMs}`
+        );
+      }
+      if (mediaStallWatchdogEnabled()) {
+        mediaStallWatchdog.arm();
+      }
       greetingSettled = true;
     } catch (err) {
       greetingSettled = true;
@@ -5011,6 +5080,7 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       binaryFrames += 1;
+      if (mediaStallWatchdogEnabled()) mediaStallWatchdog.noteBinaryFrame();
       if (binaryFrames <= 5 || binaryFrames % 50 === 0) {
         console.log(
           `[ws/media] binary audio frame #${binaryFrames} (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
@@ -5036,6 +5106,8 @@ mediaWss.on('connection', (ws, req) => {
     clearFillerTimer();
     speakCommit.clear();
     idleNudge.close();
+    silentCallerPrompt.close();
+    mediaStallWatchdog.close();
     unfinishedHold.close();
     if (utteranceTimer) {
       clearTimeout(utteranceTimer);
