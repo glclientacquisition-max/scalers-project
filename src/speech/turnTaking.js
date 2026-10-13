@@ -86,6 +86,8 @@ const SOFT_BACKCHANNELS = new Set([
   'gemini',
 ]);
 
+const { isRepairWhoUtterance } = require('./repairWho');
+
 const WAIT_STOP_RE =
   /^(?:(?:no|nope|actually)\s+)?(?:please\s+)?(?:wait|stop|hold(?:\s+on)?|subiri|simama|acha|kusubiri)(?:\s+(?:wait|stop|hold(?:\s+on)?|subiri|simama|acha))*(?:\s+(?:a\s+)?(?:second|minute|moment|kidogo))?(?:\s+please)?$/i;
 
@@ -224,6 +226,8 @@ function isHearAgainUtterance(text) {
     .trim();
   if (!t) return false;
   if (HEAR_AGAIN_ONLY_RE.test(t)) return true;
+  // VOICE_REPAIR_WHO: who / hmm / nani mean "say that again" (HD_cc455b0ce145).
+  if (isRepairWhoUtterance(t)) return true;
   if (/^(sorry|pardon)\b/.test(t) && /\b(what|huh|again|say|repeat|didn'?t hear|did not hear)\b/.test(t)) {
     return true;
   }
@@ -909,6 +913,7 @@ module.exports = {
   looksLikeEcho,
   utteranceLooksIncomplete,
   isInterruptOnlyUtterance,
+  isHearAgainUtterance,
   agentAwaitingReply,
   hasBargeContent,
   adaptiveFlushMs,
