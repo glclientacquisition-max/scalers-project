@@ -244,20 +244,37 @@ function welcomeBackLine(language = 'en') {
   return lang2(language) === 'sw' ? 'Karibu tena.' : 'Welcome back.';
 }
 
-/** Greeting with the tier line. Tier 0/flag off: unchanged. Never names or details. */
-function tieredGreeting(greeting, { card = null, language = 'en' } = {}) {
-  const g = String(greeting || '').trim();
-  if (!trustP1Enabled() || !card) return g;
-  if (identityTier(card, {}) < 1) return g;
-  const wb = welcomeBackLine(language);
-  if (g.toLowerCase().includes(wb.toLowerCase().replace('.', ''))) return g;
-  // Put it before the closing question so the question stays last.
-  const parts = splitSentences(g);
-  if (parts.length > 1 && /\?$/.test(parts[parts.length - 1])) {
-    parts.splice(parts.length - 1, 0, wb);
-    return parts.join(' ');
+const SW_HINT = /\b(?:karibu|habari|tukusaidie|nikusaidie|naweza|vipi|leo|jina|lako|ninaongea|tunaweza|asante|sasa|tumefunga)\b/i;
+const INVITE_HINT = /\?\s*$|\b(?:how can (?:i|we) help|what can (?:i|we) do|help you|may i have your name|am i speaking with|tukusaidie|nikusaidie|tukuhudumie|naomba jina|ninaongea na)\b/i;
+
+function sentenceIsSwahili(sentence) {
+  return SW_HINT.test(String(sentence || ''));
+}
+
+function inviteLine(language = 'en') {
+  return lang2(language) === 'sw' ? 'Nikusaidie vipi?' : 'How can I help you today?';
+}
+
+/**
+ * v2 opening (Alvin 13 Oct): ONE string, tenant greeting as is. A known
+ * number gets a short "welcome back" clause placed right before the
+ * tenant's closing invitation, so the invitation is always the last
+ * sentence. No notice, no language invite, no name, no details.
+ */
+function tieredGreeting(greeting, { card = null } = {}) {
+  let g = String(greeting || '').trim();
+  if (!trustP1Enabled()) return g;
+  let parts = splitSentences(g);
+  if (parts.length && !INVITE_HINT.test(parts[parts.length - 1])) {
+    parts.push(inviteLine(sentenceIsSwahili(parts[parts.length - 1]) ? 'sw' : 'en'));
   }
-  return `${g} ${wb}`.trim();
+  if (card && identityTier(card, {}) >= 1) {
+    const closing = parts[parts.length - 1] || '';
+    const wb = welcomeBackLine(sentenceIsSwahili(closing) ? 'sw' : 'en');
+    const already = parts.some((p) => /\b(?:welcome back|karibu tena)\b/i.test(p));
+    if (!already) parts.splice(Math.max(parts.length - 1, 0), 0, wb);
+  }
+  return parts.join(' ').trim();
 }
 
 function taskDate(t) {
@@ -281,7 +298,7 @@ function topicWords(text) {
       .map((w) => w.replace(/s$/, ''))
   );
 }
-const STOP = new Set(['the', 'and', 'for', 'you', 'have', 'want', 'need', 'about', 'with', 'that', 'this', 'what', 'call', 'calling', 'nataka', 'kuhusu', 'hiyo', 'yangu', 'wako', 'your', 'my', 'still', 'please', 'can', 'there', 'are']);
+const STOP = new Set(['the', 'and', 'for', 'you', 'have', 'want', 'need', 'about', 'with', 'that', 'this', 'what', 'call', 'calling', 'nataka', 'kuhusu', 'hiyo', 'yangu', 'wako', 'your', 'my', 'still', 'please', 'can', 'there', 'are', 'yes', 'yeah', 'speaking', 'name', 'jina', 'langu', 'mimi', 'ndio', 'ndiyo', 'here', 'its', 'it\'s', 'sawa', 'okay']);
 
 /**
  * Relevance + recency: closed >30d and anything >60d never read; open rows
@@ -315,36 +332,68 @@ function usableLastTopic(file, now = Date.now()) {
   return (now - at) / DAY > TOPIC_TTL_DAYS ? '' : topic;
 }
 
+function whenPhrase(at, now, language) {
+  const days = Math.max(0, Math.floor((now - at) / DAY));
+  const sw = lang2(language) === 'sw';
+  if (days < 1) return sw ? 'leo' : 'today';
+  if (days < 2) return sw ? 'jana' : 'yesterday';
+  if (days < 7) return sw ? 'wiki hii' : 'earlier this week';
+  if (days < 14) return sw ? 'wiki iliyopita' : 'last week';
+  if (days < 31) return sw ? 'mwezi huu' : 'a few weeks ago';
+  return sw ? 'mwezi uliopita' : 'last month';
+}
+
+function newestFirst(rows) {
+  return [...rows].sort((a, b) => (taskDate(b) || 0) - (taskDate(a) || 0));
+}
+
 /**
- * After the name is confirmed (tier 2): offer the single most relevant recent
- * open task. Silent (null) when unsure: no tier 2, none or several candidates
- * with no topic to pick one.
+ * After the name is confirmed (tier 2), Alvin's rule (13 Oct):
+ * - exactly one recent, open, relevant task: one short question about it;
+ * - several: "is this about X, or something new?" (X = newest);
+ * - none / unsure: null (the normal "how can I help").
+ * A caller who already said a purpose that matches no task gets nothing.
  */
 function planResumeOffer({ card = null, tasks = [], state = {}, topic = '', language = 'en', now = Date.now() } = {}) {
   if (!trustP1Enabled()) return null;
   if (identityTier(card, state) < 2) return null;
   const t = trustState(state);
-  if (t.resumeOffered) return null;
+  if (t.resumeOffered || t.resumeDropped) return null;
+  // A bare name on the confirm turn is not a purpose; two content words are.
+  const stated = topicWords(topic).size >= 2;
   let rows = relevantTasks(tasks, { topic, now, state });
-  if (!rows.length) rows = relevantTasks(tasks, { now, state });
-  if (rows.length !== 1) return null;
+  if (!rows.length && !stated) rows = relevantTasks(tasks, { now, state });
+  if (!rows.length) return null;
+  // One row per thing (real DB: several "Carpet cleaning" rows for one need).
+  const seen = new Set();
+  rows = newestFirst(rows).filter((r) => {
+    const k = String(r.summary_item || r.type || '').trim().toLowerCase();
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  if (!rows.length) return null;
   const row = rows[0];
-  const item = String(row.summary_item || row.type || '').trim();
-  if (!item) return null;
+  const raw = String(row.summary_item || row.type || '').trim();
+  const item = /^[A-Z][a-z]/.test(raw) ? raw[0].toLowerCase() + raw.slice(1) : raw;
   t.resumeOffered = true;
   setResumePointer(state, row);
   t.fileReadTurn = Number(state?.conversation?.turnCount || 0);
   const l = lang2(language);
-  return {
-    line: l === 'sw'
-      ? `Bado una ombi la ${item} kwenye faili. Tuendelee nalo?`
-      : `You still have an open request for ${item}. Shall we pick that up?`,
-    taskId: row.task_id || row.id,
-  };
+  const when = whenPhrase(taskDate(row) || now, now, l);
+  let line;
+  if (rows.length === 1) {
+    line = l === 'sw'
+      ? `Bado unahitaji ${item} uliyoomba ${when}?`
+      : `Are you still interested in the ${item} from ${when}?`;
+  } else {
+    line = l === 'sw' ? `Ni kuhusu ${item}, au ni jambo jipya?` : `Is this about the ${item}, or something new?`;
+  }
+  return { line, taskId: row.task_id || row.id, count: rows.length };
 }
 
 /** "do you remember me / my order?" with nothing usable on file: no yes, no past claim. */
-const REMEMBER_ASK = /\b(?:do you remember|remember me|you know me|what did i (?:order|ask)|my last order|unanikumbuka|unakumbuka|nilikuwa nimeagiza|niliagiza nini)\b/i;
+const REMEMBER_ASK = /\b(?:do you (?:still )?(?:remember|recall|know (?:me|who))|(?:remember|recall)(?:ing)? (?:me|my|what|when|that|us)|you know me|know who (?:i am|this is)|what did i (?:order|ask|book|request)|my (?:last|previous) (?:order|request|call|booking|visit)|(?:have|did) i (?:call(?:ed)?|order(?:ed)?|book(?:ed)?|been|ask(?:ed)?) (?:you |here )?before|(?:any|my) (?:record|records|details|file)|on (?:your )?file|you have my (?:details|number|name)|(?:u|m)nanikumbuka|(?:u|m)nakumbuka|(?:u|m)nanijua|nilikuwa nimeagiza|niliagiza nini|nimewahi kupiga|kumbukumbu)\b/i;
 
 function planRememberAsk({ text = '', card = null, tasks = [], state = {}, language = 'en', now = Date.now() } = {}) {
   if (!trustP1Enabled() || !REMEMBER_ASK.test(String(text || ''))) return null;
@@ -407,8 +456,13 @@ function tickResumePointer(state, callerText = '') {
   const said = topicWords(callerText);
   const topic = new Set(t.resume.topic || []);
   const newTopic = [...said].filter((w) => !topic.has(w) && TOPIC_NOUN.test(w));
-  if (topic.size && newTopic.length && ![...said].some((w) => topic.has(w)) && /\b(?:also|another|instead|different|new|pia|nyingine|badala)\b/i.test(callerText)) {
+  const overlaps = [...said].some((w) => topic.has(w));
+  const affirm = /^\s*(?:yes|yeah|yep|sure|ok(?:ay)?|ndio|ndiyo|sawa|eeh|eh|right|correct)\b/i.test(callerText);
+  const cue = /\b(?:also|another|instead|different|new|something else|pia|nyingine|badala|jambo jipya|kitu kingine)\b/i.test(callerText);
+  if (topic.size && !overlaps && ((newTopic.length && cue) || (!affirm && newTopic.length >= 2))) {
+    // v2 rule: the caller stated a new purpose (or said no) — drop the resume.
     t.resume = null;
+    t.resumeDropped = true;
     return 'topic';
   }
   return null;
@@ -719,7 +773,24 @@ function planTrustTurn({ text = '', state = {}, card = null, tasks = [], languag
   return null;
 }
 
+/** v2 (bug 4): facts the model must know so it never contradicts the notice. */
+function trustPromptFacts({ card = null, language = 'en' } = {}) {
+  if (!trustP1Enabled()) return '';
+  const known = Boolean(card && identityTier(card, {}) >= 1);
+  return [
+    'CALLER MEMORY POLICY (code-enforced):',
+    '- This business keeps short notes of callers\' requests to help them next time. Never say you do not keep records, cannot remember callers, or that every call starts fresh.',
+    '- Only mention a past request or detail when it appears in a fact line this turn. If none does, say you don\'t have that on file (Swahili: "Sina hiyo kwenye rekodi.").',
+    known
+      ? '- This phone number has called before. Do not read any past detail until the caller\'s name is confirmed.'
+      : '- This phone number is new to this business. Do not claim to know or remember the caller.',
+  ].join('\n');
+}
+
 module.exports = {
+  trustPromptFacts,
+  inviteLine,
+  whenPhrase,
   FLAG,
   RESUME_TTL_TURNS,
   MAX_NAME_ASKS,

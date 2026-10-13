@@ -1739,10 +1739,10 @@ async function getCallerMemoryV2({ tenantId, phone, tier = 1 } = {}) {
   });
 }
 
-async function getCallerMemory({ tenantId, phone, tier = 1 } = {}) {
-  if (callerMemoryV2Enabled()) {
-    return getCallerMemoryV2({ tenantId, phone, tier });
-  }
+async function getCallerMemory({ tenantId, phone } = {}) {
+  // v2 plan B: ONE caller card. The legacy card is always built (it is what
+  // returningFileFromCard / D199 read); CALLER_MEMORY_V2 only adds the
+  // caller_files + open_tasks fields onto that same card.
   const phoneNorm = normalizeStoredPhone(phone);
   if (!tenantId || !phoneNorm) return null;
 
@@ -1785,13 +1785,27 @@ async function getCallerMemory({ tenantId, phone, tier = 1 } = {}) {
     contact.id,
     phoneNorm
   );
-  return buildCallerMemoryCard({
+  const card = buildCallerMemoryCard({
     contact,
     openRequests,
     openAppointments,
     nextAppointment,
     recentAppointments,
   });
+  if (!card) return card;
+  card.contactId = contact.id;
+  if (callerMemoryV2Enabled()) {
+    const file = await getCallerFile({ tenantId, contactId: contact.id }).catch(() => null);
+    const openTasks = await listOpenTasksForCaller({ tenantId, contactId: contact.id }).catch(
+      () => []
+    );
+    card.file = file || null;
+    card.openTasks = Array.isArray(openTasks) ? openTasks : [];
+    card.memoryNoticeShownAt = file?.memory_notice_shown_at || null;
+    card.preferredLang = file?.preferred_lang || null;
+    if (file?.shared_line) card.sharedLine = true;
+  }
+  return card;
 }
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'question', 'other']);

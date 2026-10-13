@@ -164,7 +164,7 @@ test('returning caller: known number → welcome back, no details; bound → res
   st.caller.nameConfirmed = true;
   const offer = trust.planTrustTurn({ text: 'yes it is Jane', state: st, card, tasks, nameJustConfirmed: true });
   assert.equal(offer.kind, 'resume');
-  assert.equal(offer.line, 'You still have an open request for blue pens. Shall we pick that up?');
+  assert.equal(offer.line, 'Are you still interested in the blue pens from earlier this week?');
   assert.equal(trust.resumedTaskId(st), 't9');
   // offered once only
   assert.equal(trust.planResumeOffer({ card, tasks, state: st }), null);
@@ -223,12 +223,38 @@ test('relevance + recency: closed >30d and topic >60d never read; caller correct
   assert.match(trust.planCorrection({ text: 'si hivyo', state: Object.assign(st, {}), language: 'sw' })?.line || 'Samahani', /Samahani/);
 }));
 
-test('silent when unsure: two candidate tasks and no topic → no offer', withFlag('on', async () => {
+test('v2 offer: several → "is this about X, or something new?"; new purpose → none', withFlag('on', async () => {
   const tasks = [
     { task_id: 'a', summary_item: 'pens', updated_at: iso(1) },
     { task_id: 'b', summary_item: 'printer', updated_at: iso(2) },
   ];
-  assert.equal(trust.planResumeOffer({ card: { known: true }, tasks, state: state({ caller: { nameConfirmed: true } }), topic: '' , now: NOW }), null);
+  const several = trust.planResumeOffer({ card: { known: true }, tasks, state: state({ caller: { nameConfirmed: true } }), topic: '', now: NOW });
+  assert.equal(several.line, 'Is this about the pens, or something new?');
+  const sw = trust.planResumeOffer({ card: { known: true }, tasks: [tasks[1]], state: state({ caller: { nameConfirmed: true } }), topic: 'Jane', language: 'sw', now: NOW });
+  assert.equal(sw.line, 'Bado unahitaji printer uliyoomba wiki hii?');
+  assert.equal(trust.planResumeOffer({ card: { known: true }, tasks, state: state({ caller: { nameConfirmed: true } }), topic: 'I need sofa cleaning tomorrow', now: NOW }), null);
+  assert.equal(trust.planResumeOffer({ card: null, tasks, state: state({ caller: { nameConfirmed: true } }), now: NOW }), null);
+  const st = state({ caller: { nameConfirmed: true } });
+  trust.planResumeOffer({ card: { known: true }, tasks: [tasks[0]], state: st, now: NOW });
+  st.conversation.turnCount += 1;
+  assert.equal(trust.tickResumePointer(st, 'Actually I want carpet cleaning booked'), 'topic');
+  assert.equal(trust.resumedTaskId(st), null);
+}));
+
+test('v2 greeting: tenant text as is, welcome back before the closing invite, invite always last', withFlag('on', async () => {
+  const g = "Good evening, Done and Dusted, this is Shy. We're closed now. Tukusaidie vipi.";
+  assert.equal(trust.tieredGreeting(g, { card: null }), g);
+  assert.equal(trust.tieredGreeting(g, { card: { known: true } }), "Good evening, Done and Dusted, this is Shy. We're closed now. Karibu tena. Tukusaidie vipi.");
+  assert.equal(trust.tieredGreeting('Done and Dusted, this is Shy. How can I help?', { card: { known: true } }), 'Done and Dusted, this is Shy. Welcome back. How can I help?');
+  assert.equal(trust.tieredGreeting('Done and Dusted, this is Shy.', { card: null }), 'Done and Dusted, this is Shy. How can I help you today?');
+  assert.doesNotMatch(trust.tieredGreeting(g, { card: { known: true } }), /notes|speak in English/i);
+}));
+
+test('v2 remember-ask: widened phrasing caught', withFlag('on', async () => {
+  for (const t of ['Do you still remember me?', 'Have I called you before?', 'do you recall what I booked', 'Do you have my details on file?', 'Mnanikumbuka?', 'Unanijua?', 'nimewahi kupiga hapa']) {
+    assert.ok(trust.planTrustTurn({ text: t, state: state(), card: null, tasks: [] }), t);
+  }
+  assert.match(trust.trustPromptFacts({ card: null }), /keeps short notes/);
 }));
 
 // ------------------------------------------------------------- notice
