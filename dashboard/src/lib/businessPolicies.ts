@@ -12,6 +12,8 @@ export type BusinessPolicies = {
   other: string;
   /** null until the owner saves the Coverage directory. */
   coverage_areas: string[] | null;
+  /** Mirror of Locations "Yes, anywhere in Kenya" for the voice server; null when No. */
+  coverage_outside?: { anywhere_kenya: true; fee_ksh: number | null } | null;
   /** Per-field owner confirm. Not spoken. */
   provenance?: Record<
     string,

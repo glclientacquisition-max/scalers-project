@@ -236,6 +236,8 @@ export type TenantRow = {
     warranty?: string;
     other?: string;
     coverage_areas?: string[] | null;
+    /** "Yes, anywhere in Kenya" from Locations (mirrored from tenants.service_areas). */
+    coverage_outside?: { anywhere_kenya: true; fee_ksh: number | null } | null;
   } | null;
   /** Per-tenant TTS pronunciation overrides: [{match, say, priority?}]. */
   tts_lexicon?: Array<{

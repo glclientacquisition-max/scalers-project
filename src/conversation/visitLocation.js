@@ -3,6 +3,14 @@
 // Delivery text is timing and other instructions. Until a directory is saved,
 // Delivery and Coverage notes still apply. The office address does not. No geocoder.
 
+const {
+  readCoverageOutside,
+  coverageDetail,
+  kenyaCoverageLine,
+  outsideKenyaLine,
+  whichCountyLine,
+  noteJobQuestion,
+} = require('./outsideAreas');
 const { normalizePolicies } = require('./businessPolicies');
 const { normalizeLocations } = require('./businessLocations');
 const {
@@ -224,7 +232,15 @@ function assessCoverage(text, profile = {}) {
   // Outside means the place is known and sits elsewhere. A landmark nobody
   // can place ("near Naivas") is unknown; the ladder confirms, never refuses.
   if (selected) {
-    if (!mentioned.length || !selected.length) return 'unknown';
+    if (!mentioned.length) return 'unknown';
+    // "Yes, anywhere in Kenya": a Kenyan place is covered; abroad is outside.
+    const anywhere = readCoverageOutside(profile.businessPolicies);
+    if (anywhere) {
+      const detail = coverageDetail(text, profile);
+      if (detail === 'listed' || detail === 'kenya') return 'inside';
+      return detail === 'outside_kenya' ? 'outside' : 'unknown';
+    }
+    if (!selected.length) return 'unknown';
     if (coveredByAreas(text, selected)) return 'inside';
     return countiesForPlace(text).length ? 'outside' : 'unknown';
   }
@@ -599,6 +615,15 @@ function coverageAskSpeech(text, profile = {}, language = 'en', state = null) {
   const lang = String(language || 'en').toLowerCase();
   const sw = lang === 'sw' || lang.startsWith('swahili');
   const sheng = lang === 'sheng';
+  const anywhere = readCoverageOutside(profile.businessPolicies);
+  if (anywhere) {
+    const detail = coverageDetail(place, profile);
+    if (detail === 'kenya') {
+      return `${kenyaCoverageLine({ place, homeServices: true, language })} ${noteJobQuestion(language)}`;
+    }
+    if (detail === 'outside_kenya') return outsideKenyaLine(language);
+    if (detail === 'unknown_place') return whichCountyLine(language);
+  }
   if (coverage === 'inside') {
     const next = coverageNextStepQuestion(language, state);
     if (sw) return `Ndiyo, tunafika ${place}. ${next}`;

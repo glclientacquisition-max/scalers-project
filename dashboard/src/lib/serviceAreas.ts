@@ -35,6 +35,9 @@ export type ServiceAreas = {
   reach: Reach;
   /** Home services with no premises: "We come to you"; places are a base for reference only. */
   no_premises: boolean;
+  /** "Do you go outside these areas?" Yes = anywhere in Kenya, on one fee (null: the team quotes it). */
+  anywhere_kenya: boolean;
+  outside_fee_ksh: number | null;
 };
 
 export const REACH_OPTIONS: ReadonlyArray<{ id: Reach; label: string; detail: string }> = [
@@ -104,7 +107,7 @@ function ksh(v: unknown): number | null {
 }
 
 export function emptyServiceAreas(vertical?: string | null): ServiceAreas {
-  return { version: 1, areas: [], delivered_by: [], rider_paid: null, reach: defaultReach(vertical), no_premises: false };
+  return { version: 1, areas: [], delivered_by: [], rider_paid: null, reach: defaultReach(vertical), no_premises: false, anywhere_kenya: false, outside_fee_ksh: null };
 }
 
 export function newServiceArea(id: string, vertical?: string | null): ServiceArea {
@@ -144,7 +147,20 @@ export function normalizeServiceAreas(raw: unknown, vertical?: string | null): S
   const deliveredBy = (Array.isArray(obj.delivered_by) ? obj.delivered_by : []).map(String).filter((b): b is DeliveredBy => BY_IDS.has(b as DeliveredBy));
   const riderPaid = obj.rider_paid === "in_fee" || obj.rider_paid === "on_arrival" ? (obj.rider_paid as RiderPaid) : null;
   const reach = REACH_IDS.has(obj.reach as Reach) ? (obj.reach as Reach) : defaultReach(vertical);
-  return withReach({ version: 1, areas, delivered_by: [...new Set(deliveredBy)], rider_paid: riderPaid, reach, no_premises: obj.no_premises === true }, reach);
+  const anywhere = obj.anywhere_kenya === true;
+  return withReach(
+    {
+      version: 1,
+      areas,
+      delivered_by: [...new Set(deliveredBy)],
+      rider_paid: riderPaid,
+      reach,
+      no_premises: obj.no_premises === true,
+      anywhere_kenya: anywhere,
+      outside_fee_ksh: anywhere ? ksh(obj.outside_fee_ksh) : null,
+    },
+    reach
+  );
 }
 
 /**
@@ -153,6 +169,10 @@ export function normalizeServiceAreas(raw: unknown, vertical?: string | null): S
  */
 export function withReach(v: ServiceAreas, reach: Reach): ServiceAreas {
   const next = { ...v, reach, no_premises: reach === "visit" ? v.no_premises : false };
+  if (reach === "walk_in") {
+    next.anywhere_kenya = false;
+    next.outside_fee_ksh = null;
+  }
   if (reach !== "deliver" && reach !== "visit") return next;
   const from: AreaMode = reach === "deliver" ? "visit" : "delivery";
   const to: AreaMode = reach === "deliver" ? "delivery" : "visit";
@@ -208,7 +228,7 @@ function joinNames(names: string[]): string {
 /** What callers hear, shown under the editor. Areas with the same terms are grouped. */
 export function serviceAreasSentence(v: ServiceAreas | null | undefined): string {
   if (v?.reach === "walk_in") return "We don't deliver or visit. Customers come to us.";
-  if (!v || !v.areas.length) return "";
+  if (!v || !v.areas.length) return v ? outsideSentence(v) : "";
   const groups = new Map<string, { verb: string; tail: string; names: string[] }>();
   for (const a of v.areas) {
     const verb = AREA_MODES.find((o) => o.id === a.modes[0])?.verb || "deliver to";
@@ -225,7 +245,7 @@ export function serviceAreasSentence(v: ServiceAreas | null | undefined): string
     g.names.push(shortName(a.id));
     groups.set(key, g);
   }
-  return [...groups.values()].map((g) => `We ${g.verb} ${joinNames(g.names)}${g.tail}.`).join(" ");
+  return [...[...groups.values()].map((g) => `We ${g.verb} ${joinNames(g.names)}${g.tail}.`), outsideSentence(v)].filter(Boolean).join(" ");
 }
 
 /** The fee to prefill when changing several areas. When they differ: no amount, and say so. */
@@ -258,8 +278,35 @@ export function formatServiceAreasForCompiler(v: ServiceAreas | null | undefined
   }
   if (riders && v.rider_paid === "on_arrival") out.push("The customer pays the rider on arrival.");
   if (riders && v.rider_paid === "in_fee") out.push("The rider is paid from the delivery fee.");
-  out.push("A place not on this list is not covered: say so and offer a callback. Never guess a fee that is not listed.");
+  if (v.anywhere_kenya) {
+    if (outsideIsVisit(v)) {
+      out.push("Anywhere else in Kenya: covered, and the team calls back with the travel price. Take the job and the place for a callback; never book a time for a place not listed.");
+    } else {
+      out.push(`Anywhere else in Kenya: delivery, ${v.outside_fee_ksh != null ? money(v.outside_fee_ksh) : "the team calls back with the fee"}.`);
+    }
+    out.push("Listed places keep their own terms. A place you cannot place in Kenya: ask which county it is in. Outside Kenya is not covered: say so and offer to note it. Never guess a fee that is not listed.");
+  } else {
+    out.push("A place not on this list is not covered: say so and offer a callback. Never guess a fee that is not listed.");
+  }
   return out.join("\n");
+}
+
+/** business_policies.coverage_outside for the voice server, or null when the answer is No. */
+export function coverageOutsideFrom(value: ServiceAreas | null | undefined): { anywhere_kenya: true; fee_ksh: number | null } | null {
+  if (!value || !value.anywhere_kenya || value.reach === "walk_in") return null;
+  return { anywhere_kenya: true, fee_ksh: value.outside_fee_ksh };
+}
+
+/** Visit-only businesses always quote travel on a callback; "both" quotes it too. */
+function outsideIsVisit(v: ServiceAreas): boolean {
+  return v.reach === "visit" || v.reach === "both";
+}
+
+function outsideSentence(v: ServiceAreas): string {
+  if (!v.anywhere_kenya || v.reach === "walk_in") return "";
+  if (outsideIsVisit(v)) return "Anywhere else in Kenya, the team calls back with the travel price.";
+  if (v.outside_fee_ksh != null) return `Anywhere else in Kenya, delivery is ${money(v.outside_fee_ksh)}.`;
+  return "Anywhere else in Kenya, the team calls back with the fee.";
 }
 
 export function validateServiceArea(a: ServiceArea): Record<string, string> {
@@ -347,7 +394,8 @@ export function areaPickerRows(
  */
 export function policiesFormKey(policies: unknown): string {
   if (!policies || typeof policies !== "object") return "{}";
-  const { coverage_areas: _skip, ...rest } = policies as Record<string, unknown>;
+  const { coverage_areas: _skip, coverage_outside: _skipOutside, ...rest } = policies as Record<string, unknown>;
   void _skip;
+  void _skipOutside;
   return JSON.stringify(rest);
 }

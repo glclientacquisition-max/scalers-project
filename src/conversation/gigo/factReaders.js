@@ -1,3 +1,4 @@
+const { readCoverageOutside, coverageDetail, kenyaCoverageLine, outsideKenyaLine, whichCountyLine } = require('../outsideAreas');
 // GIGO P1 readers: owner-confirmed business facts for the live call and the
 // prompt. GIGO P2 freshness rides on the same readings.
 //
@@ -372,11 +373,26 @@ function checkCoverage(profile = {}, place, opts = {}) {
   const reading = readFact(profile, 'locations.coverage_areas', opts);
   if (reading.status !== 'known') return { status: 'unknown', reason: reading.reason };
   if (!normalizePlaceKey(place)) return { status: 'unknown', reason: 'no_place' };
-  return {
-    status: coveredByAreas(place, reading.value) ? 'covered' : 'not_covered',
-    reason: null,
-    areas: formatCoverageList(reading.value),
-  };
+  const areas = formatCoverageList(reading.value);
+  if (coveredByAreas(place, reading.value)) return { status: 'covered', reason: null, areas };
+  // "Yes, anywhere in Kenya": listed areas keep their terms; other Kenyan places get these.
+  const anywhere = readCoverageOutside(profile.businessPolicies);
+  if (anywhere) {
+    const detail = coverageDetail(place, profile);
+    const home = String(profile.vertical || '').toLowerCase() === 'home_services';
+    const language = opts.language || 'en';
+    if (detail === 'kenya') {
+      return {
+        status: 'covered',
+        reason: 'anywhere_in_kenya',
+        areas,
+        say: kenyaCoverageLine({ place: String(place).trim(), feeKsh: anywhere.feeKsh, homeServices: home, language }),
+      };
+    }
+    if (detail === 'outside_kenya') return { status: 'not_covered', reason: 'outside_kenya', areas, say: outsideKenyaLine(language) };
+    return { status: 'unknown', reason: 'unknown_place', areas, say: whichCountyLine(language) };
+  }
+  return { status: 'not_covered', reason: null, areas };
 }
 
 /** Every reading, grouped by the 10 GIGO domains. */
