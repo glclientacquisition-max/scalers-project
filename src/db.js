@@ -2374,6 +2374,37 @@ async function confirmTenantField({ tenantId, fieldPath, userId = null } = {}) {
   return data || null;
 }
 
+/**
+ * Ended calls with speech that have no reviewed (or owner) call_facts row yet.
+ * Feeds the review sweep. Newest first; calls under 3 minutes old are left to the live timer.
+ */
+async function listUnreviewedCalls({ sinceDays = 14, limit = 20, minSeconds = 10 } = {}) {
+  const since = new Date(Date.now() - sinceDays * 86400000).toISOString();
+  const settled = new Date(Date.now() - 3 * 60000).toISOString();
+  const { data: calls, error } = await supabase
+    .from('calls')
+    .select('id, tenant_id, created_at, sautikit_call_sid, resolution, primary_intent, summary, duration_seconds')
+    .gte('created_at', since)
+    .lte('created_at', settled)
+    .gte('duration_seconds', minSeconds)
+    .order('created_at', { ascending: false })
+    .limit(Math.max(limit * 5, 50));
+  throwIfError('listUnreviewedCalls', error);
+  const list = calls || [];
+  if (!list.length) return [];
+  const { data: facts, error: factErr } = await supabase
+    .from('call_facts')
+    .select('call_id')
+    .in('call_id', list.map((c) => c.id))
+    .in('source', ['review', 'owner']);
+  throwIfError('listUnreviewedCalls.facts', factErr);
+  const done = new Set((facts || []).map((f) => f.call_id));
+  return list
+    .filter((c) => !done.has(c.id))
+    .map((c) => ({ ...c, summary: parseSummary(c.summary) }))
+    .slice(0, limit);
+}
+
 /** Per-call structured record. Owner-corrected rows keep their intent/outcome (trusted). */
 async function upsertCallFacts(row) {
   if (!row?.call_id || !row?.tenant_id) return null;
@@ -2440,6 +2471,7 @@ module.exports = {
   updateAppointment,
   listOpenAppointments,
   mergeCallSummaryMeta,
+  listUnreviewedCalls,
   insertNotifySend,
   findNotifySend,
   findNotifySendByProviderMessageId,

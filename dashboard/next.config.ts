@@ -10,6 +10,13 @@ const nextConfig: NextConfig = {
   },
   // Keep Next rooted on the dashboard package (monorepo-safe).
   outputFileTracingRoot: path.join(__dirname),
+  // Old links and muscle memory: the Inbox lives at /calls.
+  async redirects() {
+    return [
+      { source: "/inbox", destination: "/calls", permanent: false },
+      { source: "/inbox/:path*", destination: "/calls/:path*", permanent: false },
+    ];
+  },
   turbopack: {
     root: path.join(__dirname),
   },

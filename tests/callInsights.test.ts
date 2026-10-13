@@ -64,6 +64,6 @@ test("insights: Overview wiring uses the kit Sheet and links each call", () => {
   assert.match(ui, /inboxRecordHref\(c\.callId/);
   assert.doesNotMatch(ui, /text-(xs|sm|lg|xl)\b|uppercase/);
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
-  assert.match(home, /loadCallInsights\(client, tenant\.id\)/);
+  assert.match(home, /loadCallInsights\(client, tenant\.id, 30, tenant\.faqs\)/);
   assert.match(home, /\{insights \? \(\s*<CallInsights insights=\{insights\} \/>/);
 });

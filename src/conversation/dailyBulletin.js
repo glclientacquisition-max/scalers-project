@@ -38,6 +38,9 @@ function normalizeBulletin(raw) {
       return {
         id: String(row?.id || `item-${index}`),
         text: text.slice(0, 160),
+        announce: ['always', 'ask'].includes(String(row?.announce || '').toLowerCase())
+          ? String(row.announce).toLowerCase()
+          : null,
         active,
         starts_at: row?.starts_at ? String(row.starts_at) : null,
         ends_at: row?.ends_at ? String(row.ends_at) : null,
@@ -143,21 +146,26 @@ function formatBulletinForPrompt(raw, now = new Date()) {
   const items = activeBulletinItems(raw, now);
   if (!items.length) return '';
 
+  // The owner's choice decides. Updates posted before the choice existed fall back
+  // to the old reading: closures are told, everything else waits for the topic.
+  const tagOf = (item) => {
+    if (item.announce === 'always') return 'tell every caller';
+    if (item.announce === 'ask') return 'only if asked';
+    return bulletinKind(item.text) === 'operational' ? 'tell every caller' : 'only if asked';
+  };
   const lines = items.map((item) => {
     const until = formatEndLabel(item.ends_at, now);
-    const kind = bulletinKind(item.text);
-    return `- [${kind}] Fact: "${item.text}" [internal expiry: ${until} — do not read this expiry aloud]`;
+    return `- [${tagOf(item)}] Fact: "${item.text}" [internal expiry: ${until} — do not read this expiry aloud]`;
   });
 
-  return `DAILY BULLETIN (override conflicting menu/FAQs only when the fact applies):
+  return `TODAY'S UPDATES FROM THE OWNER (override conflicting menu/FAQs only when the fact applies):
 ${lines.join('\n')}
-SPEAKING RULES FOR BULLETIN:
-- Operational / closure facts: tell them when the caller asks about hours/open status, or when a bulletin says you are closed today.
-- Promo / offer / price-deal facts: ONLY mention when the caller asks about that product, that promo, today's offers, or a matching price/deal. NEVER volunteer a promo on unrelated turns (hours, location, holds for other titles, general chat, Sheng small-talk).
-- Notice facts: share only when the topic clearly matches.
-- Speak the owner's Fact text. Do NOT invent or speak the expiry/clear time unless the caller asks how long this lasts.
-- Do not say the word "bulletin". Do not say "until tonight" / clock times from the internal expiry.
-- Do not offer something a bulletin says is unavailable.
+SPEAKING RULES FOR UPDATES:
+- [tell every caller]: say it in your first reply, in natural words, once. Do not repeat it later unless asked.
+- [only if asked]: share it only when the caller asks about that topic. Never volunteer it.
+- Speak the owner's Fact text. Do NOT speak the expiry or clear time unless the caller asks how long this lasts.
+- Do not say the word "bulletin" or "update". Do not say "until tonight" / clock times from the internal expiry.
+- Do not offer something an update says is unavailable.
 - After stating a closure / interruption fact, NEVER go silent. In the SAME turn, say you can still help (or take a message) and ask one short next question (what they need).
 - Example shape: "<fact in natural words>. Even so, I can still help. What do you need?"`;
 }

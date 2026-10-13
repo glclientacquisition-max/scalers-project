@@ -44,18 +44,18 @@ export function CallFactsCorrection({
     <SettingsGroup title="About this call">
       {canEdit ? (
         <>
-          <ChoiceSheet title="What they wanted" rowLabel="Wanted" label="What they wanted" value={intent} options={opts(INTENTS)} onChange={setIntent} />
-          <ChoiceSheet title="How it ended" rowLabel="Result" label="How it ended" value={outcome} options={opts(OUTCOMES)} onChange={setOutcome} />
+          <ChoiceSheet wrap title="What they wanted" rowLabel="Wanted" label="What they wanted" value={intent} options={opts(INTENTS)} onChange={setIntent} />
+          <ChoiceSheet wrap title="How it ended" rowLabel="Result" label="How it ended" value={outcome} options={opts(OUTCOMES)} onChange={setOutcome} />
           {outcome === "lost" ? (
-            <ChoiceSheet title="Why it was lost" rowLabel="Why" label="Why it was lost" value={lost} options={opts(LOST_REASONS)} onChange={setLost} />
+            <ChoiceSheet wrap title="Why it was lost" rowLabel="Why" label="Why it was lost" value={lost} options={opts(LOST_REASONS)} onChange={setLost} />
           ) : null}
         </>
       ) : (
         <dl className="divide-y divide-hairline">
           {[["Wanted", INTENTS, intent], ["Result", OUTCOMES, outcome]].map(([k, list, v]) => (
-            <div key={k as string} className="flex min-h-11 items-center justify-between px-4 py-2">
+            <div key={k as string} className="flex min-h-11 items-center justify-between gap-3 px-4 py-2">
               <dt className="text-body text-ink">{k as string}</dt>
-              <dd className="text-body text-ink-2">{(list as typeof INTENTS).find((o) => o.id === v)?.label || "Not set"}</dd>
+              <dd className="min-w-0 text-end text-body text-ink-2 [overflow-wrap:anywhere]">{(list as typeof INTENTS).find((o) => o.id === v)?.label || "Not set"}</dd>
             </div>
           ))}
         </dl>

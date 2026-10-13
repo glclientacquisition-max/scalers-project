@@ -93,7 +93,8 @@ function catalogueKey(item) {
 /** Review JSON `facts` -> clean values. Unknown enums become null, never a guess. */
 function normalizeCallFacts(raw) {
   const f = raw && typeof raw === 'object' ? raw : {};
-  const outcome = pick(OUTCOMES, f.outcome);
+  // Callbacks only: Scalers never puts a caller through, so an old "transferred" is a callback.
+  const outcome = pick(OUTCOMES, String(f.outcome || '').trim().toLowerCase() === 'transferred' ? 'callback' : f.outcome);
   const products = (Array.isArray(f.products_mentioned) ? f.products_mentioned : [])
     .slice(0, 10)
     .map((p) => ({

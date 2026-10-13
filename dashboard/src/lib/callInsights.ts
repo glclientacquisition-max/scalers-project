@@ -18,10 +18,14 @@ export type CallFactRow = {
   time_of_day: string | null;
   hour_eat: number | null;
   dow: number | null;
+  /** review | owner | legacy. Legacy rows predate the review and carry no caller detail. */
+  source?: string | null;
+  /** From calls.duration_seconds. Zero means a smoke test or a call that never connected. */
+  duration_seconds?: number | null;
 };
 
 export type InsightCall = { callId: string; at: string; note: string | null };
-export type InsightBar = { id: string; label: string; count: number; calls: InsightCall[]; group?: string };
+export type InsightBar = { id: string; label: string; count: number; calls: InsightCall[]; group?: string; done?: boolean };
 export type InsightSection = {
   id: "lost" | "products" | "objections" | "unanswered" | "busiest" | "language";
   title: string;
@@ -61,6 +65,32 @@ export function hourLabel(h: number): string {
   return `${s(h)} to ${s(h + 1)}`;
 }
 
+/** Only calls the Business Assistant actually read (or the owner fixed) feed insights. */
+export function countsForInsights(row: Pick<CallFactRow, "source" | "duration_seconds">): boolean {
+  if (row.source === "legacy") return false;
+  if (row.duration_seconds != null && Number(row.duration_seconds) <= 0) return false;
+  return true;
+}
+
+const QUESTION_START =
+  /^(what|whats|what's|how|when|where|which|who|why|do|does|did|can|could|is|are|will|would|should|have|has|any|bei|ni|je|una|mna|kuna|naweza|mnauza|mnafanya|mko|uko|nini|ngapi|lini|wapi|gani)\b/i;
+
+/** A question an owner can answer, not speech-to-text noise. */
+export function isRealQuestion(raw: string | null | undefined): boolean {
+  const q = String(raw || "").trim().replace(/\s+/g, " ");
+  const words = q.split(" ").filter(Boolean);
+  if (words.length < 3 || q.length > 200) return false;
+  return q.endsWith("?") || QUESTION_START.test(q) || /\b(ngapi|gani|wapi|lini|how much)\b/i.test(q);
+}
+
+const STOP = new Set(["a","an","the","to","in","on","at","for","of","is","are","do","does","you","your","we","i","me","my","and","or","please","there","this","that","it","can","could","will","ya","na","ni","kwa"]);
+
+/** Same question in other words groups under one key: content words, sorted. */
+export function questionKey(raw: string): string {
+  const words = String(raw || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w && !STOP.has(w));
+  return [...new Set(words)].sort().join(" ");
+}
+
 function tally(rows: CallFactRow[], key: (r: CallFactRow) => Array<{ id: string; label: string; note?: string | null }>): InsightBar[] {
   const map = new Map<string, InsightBar>();
   for (const r of rows) {
@@ -85,8 +115,9 @@ function productNames(raw: unknown): string[] {
 
 const ksh = (n: number) => `KSh ${Math.round(n).toLocaleString("en-KE")}`;
 
-export function buildCallInsights(input: CallFactRow[], days = 30): CallInsights {
-  const rows = [...input].sort((a, b) => b.created_at.localeCompare(a.created_at));
+export function buildCallInsights(input: CallFactRow[], days = 30, opts: { faqQuestions?: string[] } = {}): CallInsights {
+  const faqKeys = new Set((opts.faqQuestions ?? []).map(questionKey).filter(Boolean));
+  const rows = input.filter(countsForInsights).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const n = rows.length;
 
   const lostRows = rows.filter((r) => r.outcome === "lost" || r.lost_reason);
@@ -104,11 +135,12 @@ export function buildCallInsights(input: CallFactRow[], days = 30): CallInsights
     return names.length ? names.map((name) => ({ id: name.toLowerCase(), label: name, note })) : [{ id: "_none", label: "No item named", note }];
   });
 
-  const unRows = rows.filter((r) => (r.unanswered_question || "").trim());
+  const unRows = rows.filter((r) => isRealQuestion(r.unanswered_question));
   const unanswered = tally(unRows, (r) => {
     const q = (r.unanswered_question || "").trim().replace(/\s+/g, " ");
-    return [{ id: q.toLowerCase().replace(/[?.!\s]+$/, ""), label: q }];
-  });
+    return [{ id: questionKey(q) || q.toLowerCase(), label: q }];
+  }).map((b) => (faqKeys.has(b.id) ? { ...b, done: true } : b));
+  const todo = unanswered.filter((b) => !b.done);
 
   const hours = tally(rows, (r) => {
     const h = eatHour(r);
@@ -160,7 +192,7 @@ export function buildCallInsights(input: CallFactRow[], days = 30): CallInsights
       basis: unRows.length,
       // A single unanswered question is already worth fixing, so this one never waits for a pattern.
       thin: "Your Business Assistant answered every question so far.",
-      summary: unRows.length ? `${plural(unanswered.length, "question")} to add to your FAQs` : null,
+      summary: todo.length ? `${plural(todo.length, "question")} to add to your FAQs` : unanswered.length ? "All answered in your FAQs" : null,
       bars: unanswered.slice(0, 30),
     },
     {

@@ -179,6 +179,7 @@ const { deriveCallResolution } = require('./src/conversation/callResolution');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
 const {
   schedulePostCallTranscriptReview,
+  sweepUnreviewedCalls,
   toolFlagsFromBrain,
   withSummaryWriteLock,
 } = require('./src/conversation/callTranscriptReview');
@@ -6385,8 +6386,30 @@ async function runGeminiTurn(
   };
 }
 
+/**
+ * Catch up post-call reviews lost to a restart, deploy or model timeout, from the
+ * stored transcript. Off with POST_CALL_REVIEW_SWEEP=off; never in tests.
+ */
+function startReviewSweep() {
+  const flag = String(process.env.POST_CALL_REVIEW_SWEEP || 'on').toLowerCase();
+  if (['off', '0', 'false', 'no'].includes(flag) || process.env.NODE_ENV === 'test') return;
+  let running = false;
+  const tick = () => {
+    if (running) return;
+    running = true;
+    sweepUnreviewedCalls()
+      .catch((err) => console.warn('[review-sweep] failed:', err?.message || err))
+      .finally(() => {
+        running = false;
+      });
+  };
+  setTimeout(tick, 60_000).unref?.();
+  setInterval(tick, 10 * 60_000).unref?.();
+}
+
 server.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);
+  startReviewSweep();
   console.log(`📞 Voice webhook: POST /voice/incoming (SautiKit XML Stream → /ws/media)`);
   console.log(`📡 Media WebSocket: /ws/media (Host-based wss URL for Localtunnel)`);
   if (PUBLIC_BASE_URL) {

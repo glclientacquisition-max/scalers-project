@@ -93,7 +93,6 @@
     { "id": "booking", "label": "Visit booked" },
     { "id": "callback", "label": "Callback needed" },
     { "id": "info_only", "label": "Answered" },
-    { "id": "transferred", "label": "Passed to a person" },
     { "id": "lost", "label": "Lost sale" },
     { "id": "abandoned", "label": "Hung up" }
   ],

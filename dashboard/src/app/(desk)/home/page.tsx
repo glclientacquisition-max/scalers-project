@@ -23,6 +23,7 @@ import {
   focusRingVisible,
 } from "@/components/ui/deskChrome";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
+import { liveBulletinItems } from "@/lib/dailyBulletin";
 import {
   homeBriefing,
   homeDigestLine,
@@ -113,7 +114,7 @@ async function HomeOverviewBody() {
     loadOwnerPackageMeter(tenant.id),
     getTenantCompletenessScore(tenant.id),
     getTenantHoldGate(tenant.id),
-    loadCallInsights(client, tenant.id),
+    loadCallInsights(client, tenant.id, 30, tenant.faqs),
   ]);
   timer.mark("data");
   console.info(timer.line("home"));
@@ -507,7 +508,7 @@ async function HomeOverviewBody() {
             id="updates-heading"
             className="flex items-center gap-2 font-display text-title tracking-tight text-ink"
           >
-            <LivePing />
+            {liveBulletinItems(tenant.daily_bulletin).length > 0 ? <LivePing /> : null}
             Updates
           </h2>
           <div className="mt-3">
