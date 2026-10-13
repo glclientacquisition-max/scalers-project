@@ -582,14 +582,28 @@ function trustGreetingLine(greetingLine, profile) {
   return trustP1.tieredGreeting(greetingLine, { card: profile?.callerMemory || null });
 }
 
-// BRAIN_TRUST_P1 v2 notice (Alvin 13 Oct): said once, at the first real save
-// on a call, after the readback, and stored right away. Per-call, outside
-// brain state so a profile reload can never reset it (bug 2).
+// BRAIN_TRUST_P1 v3 save readback, ONE place for every save path
+// (streaming, non-streaming, rescue, owner callback):
+// - a save already read back this call (or a duplicate) → "That's already saved.";
+// - the notice once, at the first real save, stored right away.
+// Per call, outside brain state, so a profile reload cannot reset it.
 const trustNoticeSpoken = new Map();
-function withNoticeOnFirstSave(callSid, line, results, language) {
+const trustReadbackKeys = new Map();
+function finalizeSaveReadback(callSid, line, results, language) {
   if (!line || !trustP1.trustP1Enabled() || !callSid) return line;
+  const receipts = trustP1.receiptsOf(results || []);
+  if (!receipts.length) return line;
+  const lang = /^(?:sw|sheng)/.test(String(language || '')) ? 'sw' : 'en';
+  const seen = trustReadbackKeys.get(callSid) || new Set();
+  const keys = receipts.map((r) => trustP1.receiptKey(r));
+  const repeat = receipts.every((r) => r.status === 'duplicate') || keys.every((k) => seen.has(k));
+  keys.forEach((k) => seen.add(k));
+  trustReadbackKeys.set(callSid, seen);
+  if (repeat) {
+    const rest = String(line).trim().split(/(?<=[.!?])\s+/).filter((x) => !/^(?:saved:|imehifadhiwa:|that's already on file:|tayari iko kwenye rekodi:|next:|hatua inayofuata:)/i.test(x));
+    return [trustP1.alreadySavedLine(lang), ...rest.filter((x) => /\?$/.test(x))].join(' ');
+  }
   if (trustNoticeSpoken.get(callSid)) return line;
-  if (!trustP1.receiptsOf(results || []).length) return line;
   const profile = callTenantProfiles.get(callSid) || {};
   const card = profile.callerMemory || null;
   const ctx = profile.trustP1Context || {};
@@ -601,7 +615,7 @@ function withNoticeOnFirstSave(callSid, line, results, language) {
       .then(() => console.log(`[${callSid}] memory notice stored`))
       .catch((err) => console.warn(`[${callSid}] notice flag save failed:`, err?.message || err));
   }
-  const notice = trustP1.noticeLine(/^(?:sw|sheng)/.test(String(language || '')) ? 'sw' : 'en');
+  const notice = trustP1.noticeLine(lang);
   const parts = String(line).trim().split(/(?<=[.!?])\s+/);
   const q = parts.length > 1 && /\?$/.test(parts[parts.length - 1]) ? parts.pop() : '';
   return [...parts, notice, q].filter(Boolean).join(' ');
@@ -3342,7 +3356,8 @@ mediaWss.on('connection', (ws, req) => {
         text: clean,
         state: brainState,
         card: brainProfile?.callerMemory || null,
-        tasks: brainProfile?.trustP1Context?.tasks || [],
+        tasks: require('./src/conversation/callerHistoryPolicy').allowedTasks(brainProfile?.callerMemory, brainState),
+        lastAgentText,
         language: callLanguage,
         nameJustConfirmed,
       });
@@ -3354,7 +3369,7 @@ mediaWss.on('connection', (ws, req) => {
           const ok = trustP1.receiptsOf(saved?.results || []).length > 0;
           if (ok) {
             trustP1.noteChangeTask(brainState, trustPlan.change);
-            trustLine = withNoticeOnFirstSave(callKey, trustLine, saved?.results || [], callLanguage);
+            trustLine = finalizeSaveReadback(callKey, trustLine, saved?.results || [], callLanguage);
           } else trustLine = /^(?:sw|sheng)/.test(String(callLanguage))
             ? 'Siwezi kubadilisha hiyo kwa simu. Naomba jina lako ili mwenye duka akupigie kuthibitisha.'
             : "I can't change that on a call. May I have your name so the owner can call you back to confirm?";
@@ -3390,7 +3405,7 @@ mediaWss.on('connection', (ws, req) => {
         }
         callBrainStates.set(callKey, brainState);
         const rescued = await applyGeminiTools(callKey, rescue.parsed);
-        const rescueLine = withNoticeOnFirstSave(callKey, formatToolConfirmation(rescued?.results || [], callLanguage), rescued?.results || [], callLanguage);
+        const rescueLine = finalizeSaveReadback(callKey, formatToolConfirmation(rescued?.results || [], callLanguage), rescued?.results || [], callLanguage);
         console.log(`[ws/media][${callKey}] rejected create ${rescue.kind}: ${rescueLine}`);
         voiceTrace.noteBrainLines(brainLinesForResults(rescued?.results || [], callLanguage).lines);
         if (rescueLine) {
@@ -4983,7 +4998,10 @@ mediaWss.on('connection', (ws, req) => {
 
   ws.on('close', (code, reason) => {
     const ms = Date.now() - connectedAt;
-    if (sessionCallSid) trustNoticeSpoken.delete(sessionCallSid);
+    if (sessionCallSid) {
+      trustNoticeSpoken.delete(sessionCallSid);
+      trustReadbackKeys.delete(sessionCallSid);
+    }
     console.log(
       `[ws/media] closed after ${ms}ms code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
     );
@@ -5978,6 +5996,11 @@ async function applyGeminiTools(callSid, parsed) {
     state,
     capabilities
   );
+  // BRAIN_TRUST_P1 v3 save gate: a booking-intent request waits for its time.
+  if (trustP1.trustP1Enabled() && enforcedParsed?.serviceRequest) {
+    const missing = trustP1.saveMissingSlot(enforcedParsed.serviceRequest, state);
+    if (missing) enforcedParsed.serviceRequest = { ...enforcedParsed.serviceRequest, __trustMissingSlot: missing };
+  }
   if (enforcedParsed.consentBlocked || enforcedParsed.needsVisitTime || enforcedParsed.fragmentBlocked) {
     console.log(
       `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : enforcedParsed.fragmentBlocked ? 'fragment_turn' : 'needs_visit_time'}`
@@ -6470,7 +6493,7 @@ async function runGeminiTurnStreaming(
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
   const heldTools = await applyToolsWithHold(callSid, parsed, { shouldAbort, onToolHold });
   const execution = heldTools.execution;
-  let actionConfirmation = withNoticeOnFirstSave(
+  let actionConfirmation = finalizeSaveReadback(
     callSid,
     formatToolConfirmation(execution.results, callBrainStates.get(callSid)?.language?.current || 'en'),
     execution.results,
@@ -6602,7 +6625,7 @@ async function runGeminiTurn(
   const parsed = parseGeminiResponse(outputText);
   const heldTools = await applyToolsWithHold(callSid, parsed, hooks);
   const execution = heldTools.execution;
-  let actionConfirmation = withNoticeOnFirstSave(
+  let actionConfirmation = finalizeSaveReadback(
     callSid,
     formatToolConfirmation(execution.results, callBrainStates.get(callSid)?.language?.current || 'en'),
     execution.results,

@@ -582,6 +582,23 @@ function observeCallerTurn(state, input = {}) {
       lastAgentText: input.lastAgentText,
     }
   );
+  // BRAIN_TRUST_P1 v3: the ONE name controller. An answer to the pending
+  // name ask (any path asked it) binds here, so "Alvin." after "May I have
+  // your name?" is never left unbound (HD_c19044667595).
+  {
+    const trustP1 = require('./trustP1');
+    const pending = trustP1.pendingNameAsk(state);
+    if (pending && !nameResolution.nameConfirmed && !state?.messageOnly) {
+      const answered = trustP1.nameFromAnswer(text);
+      if (answered) {
+        const { entity } = require('./entityExtraction');
+        nameResolution.name = answered;
+        nameResolution.nameConfirmed = true;
+        nameResolution.nameCollision = null;
+        nameResolution.entities = { ...(nameResolution.entities || {}), name: entity(answered, 'caller_name_answer', 0.95, true) };
+      }
+    }
+  }
   next.entities = { ...next.entities, ...nameResolution.entities };
   const wasNameConfirmed = Boolean(state?.caller?.nameConfirmed);
   next.caller.name = nameResolution.name || null;
@@ -606,6 +623,7 @@ function observeCallerTurn(state, input = {}) {
     delete next.entities.name;
   }
   next.caller.nameJustConfirmed = !wasNameConfirmed && next.caller.nameConfirmed === true;
+  if (next.caller.nameConfirmed && next.trust) require('./trustP1').settleNameAsk(next, { bound: true });
   applyLiveCallerFile(input.profile, next);
   next.caller.boundRole = next.caller.nameConfirmed
     ? next.returning?.fileRole || null

@@ -811,13 +811,15 @@ function applyLiveCallerFile(profile, state) {
   return { changed: liveCallerFileStamp(next) !== before };
 }
 
-function returningFileFromCard(card) {
-  if (!card || typeof card !== 'object') return null;
+function returningFileFromCard(rawCard) {
+  if (!rawCard || typeof rawCard !== 'object') return null;
+  // BRAIN_TRUST_P1: every D199 file line / call-state reader sees the policy view only.
+  const card = require('./callerHistoryPolicy').filterCard(rawCard);
   const identityBound = Boolean(card.identityBound);
   const fileRole = card.fileRole || null;
   const usable = returningFileUsable({ ...card, fileRole, identityBound });
   const fileOwnerName = fileOwnerNameOf(card);
-  const hasOpenRows = Boolean(
+  const hasOpenRows = card.historyPolicy ? Boolean(card.hasOpenRows) : Boolean(
     (Array.isArray(card.openVisits) && card.openVisits.length) ||
       (Array.isArray(card.openRequests) && card.openRequests.length) ||
       // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 3): only set with the flag on.
@@ -875,8 +877,10 @@ function stillOpenUseLine() {
   return '- Use: do not read open visits, holds, callbacks, or orders unless the caller asks about them. If they ask, say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. Do not read them on the turn the name is confirmed. If they want one moved or cancelled, update that one. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name. If they ask and no Open line remains, you may say nothing is still open.';
 }
 
-function formatReturningCallerForPrompt(card) {
-  if (!card || typeof card !== 'object') return '';
+function formatReturningCallerForPrompt(rawCard) {
+  if (!rawCard || typeof rawCard !== 'object') return '';
+  // BRAIN_TRUST_P1: the prompt card is the policy view only.
+  const card = require('./callerHistoryPolicy').filterCard(rawCard);
   const usable = returningFileUsable(card);
   const known = speakerKnownOnFile(card);
   const fileWho = card.fileOwnerName || card.name;
@@ -936,7 +940,8 @@ function formatReturningCallerForPrompt(card) {
       card.nextVisit ||
       card.lastReason ||
       (Array.isArray(card.openRequests) && card.openRequests.length) ||
-      (Array.isArray(card.recentBookings) && card.recentBookings.length)
+      (Array.isArray(card.recentBookings) && card.recentBookings.length) ||
+      (card.historyPolicy && card.hasOpenRows) // masked by the history policy
     );
     lines.push(
       mayHaveVisit

@@ -780,6 +780,17 @@ async function executeBrainTools({
     ) {
       validation = { valid: false, reason: 'Item is empty or garbled.', missingSlots: ['item'], code: 'trust_garbled' };
     }
+    // BRAIN_TRUST_P1 v3 save gate (server tags it): required slots first.
+    const trustMissing = parsed.serviceRequest.__trustMissingSlot;
+    if (trustP1.trustP1Enabled() && validation.valid && trustMissing) {
+      validation = {
+        valid: false,
+        reason: 'Ask the day and time before saving this booking request.',
+        missingSlots: [trustMissing],
+        code: 'trust_missing_slot',
+        value: validation.value,
+      };
+    }
     const fingerprint = validation.valid
       ? stableFingerprint('create_service_request', validation.value)
       : null;
