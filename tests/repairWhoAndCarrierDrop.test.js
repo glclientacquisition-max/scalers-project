@@ -36,13 +36,19 @@ describe('VOICE_REPAIR_WHO (HD_cc455b0ce145 / HD_f80ab5e17d83)', () => {
     assert.equal(classifyCallerUtteranceKind('who'), 'speech');
   });
 
-  it('on: who / hmm / nani are hear_again and replay', () => {
+  it('on: who / nani always; hmm only while a question is open', () => {
     process.env.VOICE_REPAIR_WHO = 'on';
     assert.equal(isRepairWhoUtterance('Who?'), true);
     assert.equal(isHearAgainUtterance('who'), true);
-    assert.equal(isHearAgainUtterance('hmm'), true);
     assert.equal(isHearAgainUtterance('nani'), true);
+    assert.equal(isHearAgainUtterance('hmm'), false, 'hmm without awaiting stays soft');
+    assert.equal(isHearAgainUtterance('hmm', { awaiting: true }), true);
     assert.equal(classifyCallerUtteranceKind('Who?'), 'hear_again');
+    assert.equal(classifyCallerUtteranceKind('hmm'), 'backchannel');
+    assert.equal(
+      classifyCallerUtteranceKind('hmm', { lastAgentAskedQuestion: true }),
+      'hear_again'
+    );
     const d = decideCallerEvent({
       text: 'Who?',
       speaking: false,

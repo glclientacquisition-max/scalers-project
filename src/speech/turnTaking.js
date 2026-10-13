@@ -219,15 +219,15 @@ function isLineCheckGreeting(text) {
   return t === 'hello' || t === 'hi' || t === 'hey';
 }
 
-function isHearAgainUtterance(text) {
+function isHearAgainUtterance(text, opts = {}) {
   const t = normalizeSpeech(text)
     .replace(/\?+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   if (!t) return false;
   if (HEAR_AGAIN_ONLY_RE.test(t)) return true;
-  // VOICE_REPAIR_WHO: who / hmm / nani mean "say that again" (HD_cc455b0ce145).
-  if (isRepairWhoUtterance(t)) return true;
+  // VOICE_REPAIR_WHO: who / nani always; hmm only while a question is open.
+  if (isRepairWhoUtterance(t, { awaiting: opts.awaiting === true })) return true;
   if (/^(sorry|pardon)\b/.test(t) && /\b(what|huh|again|say|repeat|didn'?t hear|did not hear)\b/.test(t)) {
     return true;
   }
@@ -340,7 +340,7 @@ function classifyCallerUtteranceKind(text, opts = {}) {
   const awaiting = resolveAwaiting(opts);
 
   if (WAIT_STOP_RE.test(t)) return 'wait_stop';
-  if (isHearAgainUtterance(t)) return 'hear_again';
+  if (isHearAgainUtterance(t, { awaiting })) return 'hear_again';
   if (isLetMeThinkUtterance(t)) return 'let_me_think';
   if (isNoCorrectionUtterance(t)) return 'no_correction';
   if (isISaidUtterance(t)) {
