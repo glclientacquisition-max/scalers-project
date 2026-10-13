@@ -323,3 +323,56 @@ describe('note-offer consent needs an explicit yes (flag on)', () => {
     assert.equal(state.conversation.consentAck, true);
   });
 });
+
+describe('BRAIN_CONFIRMED_COVERAGE + anywhere in Kenya: speech and decideVisitPlace agree', () => {
+  const OUTSIDE = { anywhere_kenya: true, fee_ksh: 1500 };
+  const withAnywhere = (p) => ({ ...p, businessPolicies: { ...p.businessPolicies, coverage_outside: OUTSIDE } });
+  const UNCONF = withAnywhere(SEED);
+  const CONF = { ...withAnywhere(SEED), fieldMeta: ownerMeta(SEED) };
+  const ask = (place, profile) => coverageAskSpeech(`Do you cover ${place}?`, profile, 'en', {});
+  const decide = (place, profile) => decideVisitPlace(place, { profile, detailAsked: true });
+
+  beforeEach(() => setEnv({ BRAIN_CONFIRMED_COVERAGE: 'on', FACT_HASH_MODE: null }));
+  afterEach(restoreEnv);
+
+  it('unconfirmed list + anywhere_kenya, Kenyan place: team will confirm, areaUnconfirmed', () => {
+    const say = ask('Nakuru', UNCONF);
+    assert.match(say, /team (?:to )?confirm/i);
+    assert.doesNotMatch(say, CLAIM);
+    const d = decide('Nakuru', UNCONF);
+    assert.equal(coverageStatus('Nakuru', UNCONF), 'unconfirmed');
+    assert.equal(d.areaUnconfirmed, true);
+    assert.notEqual(d.blocked, 'outside');
+  });
+
+  it('confirmed list + anywhere_kenya, in-list place: covered', () => {
+    assert.equal(coverageStatus('Juja', CONF), 'inside');
+    assert.equal(decide('Juja', CONF).coverage, 'inside');
+    assert.doesNotMatch(ask('Juja', CONF), /team (?:to )?confirm|not cover|outside/i);
+  });
+
+  it('confirmed list + anywhere_kenya, out-of-list Kenyan place: covered', () => {
+    assert.equal(coverageStatus('Nakuru', CONF), 'inside');
+    const d = decide('Nakuru', CONF);
+    assert.equal(d.coverage, 'inside');
+    assert.notEqual(d.blocked, 'outside');
+    assert.doesNotMatch(ask('Nakuru', CONF), /team (?:to )?confirm|outside/i);
+  });
+
+  it('confirmed list + anywhere_kenya, foreign place: not covered', () => {
+    assert.equal(coverageStatus('Uganda', CONF), 'outside');
+    assert.equal(decide('Uganda', CONF).blocked, 'outside');
+    assert.match(ask('Uganda', CONF), /only cover kenya/i);
+  });
+
+  it('flag off: identical to main (file profile, anywhere_kenya applies without an owner row)', () => {
+    setEnv({ BRAIN_CONFIRMED_COVERAGE: null });
+    for (const place of ['Juja', 'Nakuru', 'Uganda']) {
+      assert.equal(coverageStatus(place, UNCONF), assessCoverage(place, UNCONF));
+    }
+    assert.equal(coverageStatus('Nakuru', UNCONF), 'inside');
+    assert.equal(coverageStatus('Uganda', UNCONF), 'outside');
+    assert.equal(decide('Nakuru', UNCONF).coverage, 'inside');
+    assert.doesNotMatch(ask('Nakuru', UNCONF), /team (?:to )?confirm/i);
+  });
+});
