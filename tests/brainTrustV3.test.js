@@ -176,3 +176,34 @@ test('guard-emptied reply is not a false "say that again"', () => {
   st.conversation.turnCount = 5;
   assert.equal(planEmptyGeminiSpeech({ brainState: st, language: 'en', userText: 'hmm' }).kind, 'hear_again');
 });
+
+test('HD_9904b41a8ba9: fillers and non-names never bind (EN + SW)', () => {
+  const q = require('../src/conversation/callerNameQuality');
+  for (const x of ['Mmh.', 'Eeh.', 'h.', 'Sawa.', 'Ndio.', 'Ndiyo', 'Yes.', 'Pardon?', 'Hello.', 'Hmm', 'Mhm', 'Aah', 'Uhm', 'Asante', 'Habari', 'Okay okay']) {
+    assert.equal(trust.nameFromAnswer(x), '', x);
+    assert.equal(q.isJunkCallerName(x.replace(/[.?]$/, '')), true, x);
+  }
+  for (const [x, want] of [['Alvin.', 'Alvin'], ['Jina langu ni Wanjiru', 'Wanjiru'], ['Ian', 'Ian'], ['Eve', 'Eve'], ['Mwangi Kamau', 'Mwangi Kamau']]) {
+    assert.equal(trust.nameFromAnswer(x), want, x);
+  }
+  // The real turn: "kwa jina gani?" then "Mmh." leaves the name unbound.
+  const st = createBrainState({});
+  trust.noteNameAsk(st, { kind: 'open' });
+  const next = observeCallerTurn(st, { text: 'Mmh.', language: 'sw' });
+  assert.notEqual(String(next?.caller?.name || st.caller?.name || '').toLowerCase(), 'mmh');
+  assert.notEqual((next || st).caller?.nameConfirmed, true);
+});
+
+test('HD_9904b41a8ba9: an empty handover reply is not replaced by "Which service do you need?"', () => {
+  const { shapeCatalogueMouth } = require('../src/conversation/catalogueMouth');
+  const out = shapeCatalogueMouth('', { state: { caller: { nameJustConfirmed: true }, conversation: {} }, callerText: 'Connect, like, talk to your boss?', profile: {}, language: 'en' });
+  assert.equal(out, '');
+});
+
+test('HD_9904b41a8ba9: "Mnafika wapi Juja?" is answered as Juja, not "wapi Juja"', () => {
+  const { coverageAskSpeech } = require('../src/conversation/visitLocation');
+  const fx = require('./fixtures/voice-calls/HD_9904b41a8ba9.json');
+  const line = coverageAskSpeech('Mnafika wapi Juja?', { vertical: 'home_services', servicesCatalog: fx.servicesCatalog, businessPolicies: fx.businessPolicies }, 'en');
+  assert.match(line, /cover Juja\./);
+  assert.doesNotMatch(line, /wapi/i);
+});
