@@ -549,7 +549,7 @@ function markNoticeSpoken(state) {
 // ------------------------------------------------------------ T5 name asks
 
 const NAME_ASK =
-  /\b(?:(?:may|can|could) i (?:have|get|know|take) your (?:full )?name|what(?:'s| is) your (?:full )?name|who am i speaking (?:to|with)|your name,? please|(?:am i speaking|is this) (?:with|to)?\s*[A-Z]\w+\??|naomba jina|jina lako (?:ni nani|tafadhali)|unaitwa nani|naongea na nani|ni nani anaongea)\b/i;
+  /\b(?:(?:may|can|could) i (?:have|get|know|take) your (?:full )?name|what(?:'s| is) your (?:full )?name|who am i speaking (?:to|with)|your name,? please|(?:am i speaking|is this) (?:with|to)?\s*[A-Z]\w+\??|naomba jina|(?:kwa|na) jina gani|jina gani|jina lako ni|jina lako (?:ni nani|tafadhali)|unaitwa nani|naongea na nani|ni nani anaongea)\b/i;
 
 const NAME_REFUSAL = /\b(?:no name|i(?:'d| would) rather not|not giving (?:my|you) (?:my )?name|don'?t want to (?:give|say|share)|skip (?:the )?name|sitaki kusema jina|bila jina|sitaki kutoa jina|hapana,? jina)\b/i;
 
@@ -619,6 +619,8 @@ function nameFromAnswer(text) {
   const words = raw.split(/\s+/).filter(Boolean);
   if (!words.length || words.length > 3) return '';
   if (words.some((w) => !/^\p{L}[\p{L}'’-]*$/u.test(w) || NOT_A_NAME.test(w))) return '';
+  // eslint-disable-next-line global-require
+  if (require('./callerNameQuality').isNonNameUtterance(raw)) return '';
   return words.map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
 

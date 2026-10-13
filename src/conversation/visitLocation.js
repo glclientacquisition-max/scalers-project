@@ -695,7 +695,12 @@ function coverageNextStepQuestion(language = 'en', state = null) {
  */
 function coverageAskSpeech(text, profile = {}, language = 'en', state = null) {
   if (String(profile?.vertical || '').toLowerCase() !== 'home_services') return '';
-  const rawPlace = coverageAskPlace(text);
+  let rawPlace = coverageAskPlace(text);
+  // BRAIN_TRUST_P1: "Mnafika wapi Juja?" captured "wapi Juja" and was echoed
+  // as "we cover wapi Juja" (HD_9904b41a8ba9). Question words are not part of a place.
+  if (rawPlace && String(process.env.BRAIN_TRUST_P1 || '').trim() === 'on') {
+    rawPlace = String(rawPlace).replace(/^(?:(?:wapi|where|kwa|huko|hadi|mpaka|na|in|to|at|the|mtaa wa|area of)\s+)+/i, '').replace(/\s+(?:wapi|where)$/i, '').trim();
+  }
   if (!rawPlace) return '';
   const place = foldCanonicalPlace(rawPlace, profile) || rawPlace;
   const coverage = coverageStatus(place, profile);
