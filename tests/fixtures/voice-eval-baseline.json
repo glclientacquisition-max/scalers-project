@@ -1,7 +1,7 @@
 {
   "schema": "scalers.voice.eval-baseline",
   "schemaVersion": 1,
-  "recordedAt": "2026-10-08T12:34:24.714Z",
+  "recordedAt": "2026-10-13T10:44:41.784Z",
   "calls": {
     "HD_015bae4a4af2": {
       "score": 87.9,
@@ -182,6 +182,76 @@
         "respelling": 0,
         "prematureTurn": 1,
         "slow": 20
+      },
+      "nameAsks": 1
+    },
+    "HD_1af0738130bc": {
+      "score": 100,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 0,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 0
+      },
+      "nameAsks": 0
+    },
+    "HD_226f814d7ab0": {
+      "score": 100,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 0,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 0
+      },
+      "nameAsks": 0
+    },
+    "HD_31d827427104": {
+      "score": 100,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 0,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 0
+      },
+      "nameAsks": 0
+    },
+    "HD_9ed756701096": {
+      "score": 100,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 0,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 0
+      },
+      "nameAsks": 0
+    },
+    "HD_cc455b0ce145": {
+      "score": 94.3,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 0,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 1,
+        "slow": 3
       },
       "nameAsks": 1
     }
