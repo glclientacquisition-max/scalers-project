@@ -1,5 +1,6 @@
 import { type CallRow } from "@/lib/supabase";
 import { toLead } from "@/lib/callsTriage";
+import type { OwnerFacts } from "@/lib/ownerCallFacts";
 import { storedPhoneCandidates } from "@/lib/handoffMode";
 import {
   assembleInboxItems,
@@ -155,6 +156,20 @@ async function fetchCallsTape(
   return { data, error };
 }
 
+/** Owner-corrected Wanted/Result for these calls. Missing table or error: none (old fields stand). */
+async function loadOwnerFacts(client: SupabaseClient, callIds: string[]): Promise<Map<string, OwnerFacts>> {
+  const out = new Map<string, OwnerFacts>();
+  if (!callIds.length) return out;
+  const { data, error } = await client
+    .from("call_facts")
+    .select("call_id, intent, outcome, source")
+    .in("call_id", callIds)
+    .eq("source", "owner");
+  if (error) return out;
+  for (const row of (data || []) as Array<OwnerFacts & { call_id: string }>) out.set(row.call_id, row);
+  return out;
+}
+
 export async function loadInboxItems(
   client: SupabaseClient,
   tenantId: string,
@@ -271,7 +286,9 @@ export async function loadInboxItems(
         openJobs.rows,
         tapeJobs.error ? [] : ((tapeJobs.data || []) as InboxJob[])
       );
-  const leads = (callsRes.data || []).map(toLead);
+  const calls = (callsRes.data || []) as CallRow[];
+  const ownerFacts = await loadOwnerFacts(client, calls.map((c) => c.id));
+  const leads = calls.map((call) => toLead(call, ownerFacts.get(call.id)));
   const items = assembleInboxItems({
     leads,
     holds,

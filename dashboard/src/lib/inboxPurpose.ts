@@ -121,6 +121,8 @@ export type InboxItem = {
   hold: InboxHold | null;
   job: InboxJob | null;
   intent: string | null;
+  /** Owner's corrected Wanted label ("Quote"); the row label uses it over the old intent. */
+  ownerWanted?: string | null;
   urgent: boolean;
   unread: boolean;
   muted: boolean;
@@ -226,6 +228,7 @@ export function itemSignalLabel(
   item: InboxItem,
   vertical?: string | null
 ): string {
+  if (item.ownerWanted && (item.purpose === "answered" || item.purpose === "human")) return item.ownerWanted;
   return signalLabel({
     purpose: item.purpose,
     hold: item.hold,
@@ -545,7 +548,8 @@ export function buildInboxItem(opts: {
     job?.caller_phone || hold?.caller_phone || lead?.call.caller_number || null;
 
   let headline = ownerLine(lead?.reason || purposeLabel(purpose, vertical));
-  let detail: string | null = lead?.primaryIntent || null;
+  let detail: string | null =
+    lead?.ownerWanted ? [lead.ownerWanted, lead.ownerResult].filter(Boolean).join(" · ") : lead?.primaryIntent || null;
   if (job) {
     headline = ownerLine(jobHeadline(job, vertical));
     detail = jobDetail(job);
@@ -577,6 +581,7 @@ export function buildInboxItem(opts: {
     hold,
     job,
     intent: intent || canonicalInboxIntent(hold?.request_type) || null,
+    ownerWanted: !job && !hold ? lead?.ownerWanted ?? null : null,
     urgent: Boolean(lead?.urgent),
     unread: inboxIsUnread({
       lastCustomerEventAt: inboxLastCustomerEventAt({
