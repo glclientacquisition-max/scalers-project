@@ -10,7 +10,7 @@
 const { supabase } = require('./lib/supabaseClient');
 const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
 const { mergeContactIdentity } = require('./conversation/contactIdentity');
-const { buildCallerMemoryCard } = require('./conversation/callerMemory');
+const { buildCallerMemoryCard, buildTieredCallerMemoryCard } = require('./conversation/callerMemory');
 const { tenantProfileFromRow } = require('./tenantProfile');
 
 const RECORDINGS_BUCKET = process.env.SUPABASE_RECORDINGS_BUCKET || 'call-recordings';
@@ -19,6 +19,12 @@ const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 't
 const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 0);
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
 const { billableTalkSeconds, inboundOpen } = require('./billing/packageOverage');
+
+
+function callerMemoryV2Enabled(env = process.env) {
+  const raw = String(env.CALLER_MEMORY_V2 || '').trim().toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+}
 
 function throwIfError(context, error) {
   if (error) {
@@ -1563,7 +1569,147 @@ async function listCallerAppointmentsForReview({ tenantId, phone } = {}) {
  * Returns null when the number is new or the contacts table is missing.
  * This card stays small. A review of older visits uses listCallerAppointmentsForReview.
  */
-async function getCallerMemory({ tenantId, phone } = {}) {
+
+async function getCallerFile({ tenantId, contactId } = {}) {
+  if (!tenantId || !contactId) return null;
+  const { data, error } = await supabase
+    .from('caller_files')
+    .select(
+      'id, tenant_id, contact_id, names_seen, primary_name, shared_line, preferred_lang, last_topic, last_outcome, last_call_id, last_topic_at, forget_requested_at, memory_notice_shown_at, created_at, updated_at'
+    )
+    .eq('tenant_id', tenantId)
+    .eq('contact_id', contactId)
+    .maybeSingle();
+  if (error && /caller_files|relation/i.test(error.message)) return null;
+  throwIfError('getCallerFile', error);
+  return data || null;
+}
+
+async function upsertCallerFile({
+  tenantId,
+  contactId,
+  namesSeen,
+  primaryName,
+  sharedLine,
+  preferredLang,
+  lastTopic,
+  lastOutcome,
+  lastCallId,
+  lastTopicAt,
+  forgetRequestedAt,
+  memoryNoticeShownAt,
+} = {}) {
+  if (!tenantId || !contactId) {
+    throw new Error('[db] upsertCallerFile requires tenantId and contactId');
+  }
+  const patch = {
+    tenant_id: tenantId,
+    contact_id: contactId,
+    updated_at: new Date().toISOString(),
+  };
+  if (namesSeen !== undefined) patch.names_seen = namesSeen;
+  if (primaryName !== undefined) patch.primary_name = primaryName;
+  if (sharedLine !== undefined) patch.shared_line = Boolean(sharedLine);
+  if (preferredLang !== undefined) patch.preferred_lang = preferredLang;
+  if (lastTopic !== undefined) {
+    const topic = lastTopic == null ? null : String(lastTopic).slice(0, 60);
+    patch.last_topic = topic;
+  }
+  if (lastOutcome !== undefined) patch.last_outcome = lastOutcome;
+  if (lastCallId !== undefined) patch.last_call_id = lastCallId;
+  if (lastTopicAt !== undefined) patch.last_topic_at = lastTopicAt;
+  if (forgetRequestedAt !== undefined) patch.forget_requested_at = forgetRequestedAt;
+  if (memoryNoticeShownAt !== undefined) {
+    patch.memory_notice_shown_at = memoryNoticeShownAt;
+  }
+
+  const { data, error } = await supabase
+    .from('caller_files')
+    .upsert(patch, { onConflict: 'tenant_id,contact_id' })
+    .select(
+      'id, tenant_id, contact_id, names_seen, primary_name, shared_line, preferred_lang, last_topic, last_outcome, last_call_id, last_topic_at, forget_requested_at, memory_notice_shown_at, created_at, updated_at'
+    )
+    .single();
+  if (error && /caller_files|relation/i.test(error.message)) {
+    console.warn('[db] upsertCallerFile skipped (apply caller_files migration):', error.message);
+    return null;
+  }
+  throwIfError('upsertCallerFile', error);
+  return data || null;
+}
+
+async function listOpenTasksForCaller({ tenantId, contactId } = {}) {
+  if (!tenantId || !contactId) return [];
+  const { data, error } = await supabase
+    .from('open_tasks')
+    .select(
+      'task_id, tenant_id, contact_id, type, status, next_step, created_call_id, updated_at, closed_at, owner_action_by, summary_item, when_text'
+    )
+    .eq('tenant_id', tenantId)
+    .eq('contact_id', contactId)
+    .order('updated_at', { ascending: false })
+    .limit(40);
+  if (error && /open_tasks|relation/i.test(error.message)) return [];
+  throwIfError('listOpenTasksForCaller', error);
+  return data || [];
+}
+
+async function listTenantStaffNames({ tenantId } = {}) {
+  if (!tenantId) return [];
+  const { data, error } = await supabase
+    .from('tenant_staff_names')
+    .select('id, tenant_id, name, is_public, created_at, updated_at')
+    .eq('tenant_id', tenantId)
+    .order('name', { ascending: true })
+    .limit(200);
+  if (error && /tenant_staff_names|relation/i.test(error.message)) return [];
+  throwIfError('listTenantStaffNames', error);
+  return data || [];
+}
+
+async function getCallerMemoryV2({ tenantId, phone, tier = 1 } = {}) {
+  const phoneNorm = normalizeStoredPhone(phone);
+  if (!tenantId || !phoneNorm) return null;
+
+  const phoneKeys = storedPhoneLookupKeys(phoneNorm);
+  const { data: contact, error: findErr } = await supabase
+    .from('contacts')
+    .select('id, name, notes, last_reason, phone, metadata')
+    .eq('tenant_id', tenantId)
+    .in('phone', phoneKeys)
+    .order('phone', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (findErr && /contacts|relation/i.test(findErr.message)) return null;
+  throwIfError('getCallerMemoryV2(contact)', findErr);
+  if (!contact) return null;
+
+  const file = await getCallerFile({ tenantId, contactId: contact.id });
+  const openTasks = await listOpenTasksForCaller({
+    tenantId,
+    contactId: contact.id,
+  });
+  const sharedLine = Boolean(
+    file?.shared_line ||
+      (Array.isArray(contact.metadata?.alternate_names) &&
+        contact.metadata.alternate_names.length > 0)
+  );
+
+  return buildTieredCallerMemoryCard({
+    tier,
+    file: file || {
+      primary_name: contact.name || null,
+      shared_line: sharedLine,
+    },
+    openTasks,
+    sharedLine,
+  });
+}
+
+async function getCallerMemory({ tenantId, phone, tier = 1 } = {}) {
+  if (callerMemoryV2Enabled()) {
+    return getCallerMemoryV2({ tenantId, phone, tier });
+  }
   const phoneNorm = normalizeStoredPhone(phone);
   if (!tenantId || !phoneNorm) return null;
 
@@ -1615,7 +1761,7 @@ async function getCallerMemory({ tenantId, phone } = {}) {
   });
 }
 
-const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
+const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'question', 'other']);
 
 /**
  * Create a service request (hold / enquiry / order) for retail completion.
@@ -2464,6 +2610,12 @@ module.exports = {
   markEscalationSent,
   upsertContact,
   getCallerMemory,
+  buildTieredCallerMemoryCard,
+  callerMemoryV2Enabled,
+  listTenantStaffNames,
+  listOpenTasksForCaller,
+  upsertCallerFile,
+  getCallerFile,
   listCallerAppointmentsForReview,
   createServiceRequest,
   updateServiceRequest,
