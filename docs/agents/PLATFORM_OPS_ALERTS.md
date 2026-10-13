@@ -19,12 +19,13 @@ One alert per kind while that lane stays degraded. Cooldown backstop: `VOICE_PLA
 
 ## Recipients
 
-Comma-separated env on **Voice** (not tenant `team_directory`):
+**Email only for now.** No SMS or WhatsApp for platform ops alerts.
 
-- `SCALERS_OPS_ALERT_PHONES` — E.164 or local Kenya numbers
-- `SCALERS_OPS_ALERT_EMAILS` — ops inbox list
+1. **Super Admin list (source of truth).** Voice reads `public.platform_ops_settings` (row `id = 1`): `people[].email` first, else the `emails` array. Same rule as Desk `loadOpsSettings`. SQL: `docs/supabase/platform_ops_notices.sql` then `platform_ops_people.sql`. Read through the Voice service-role client, cached `VOICE_PLATFORM_OPS_RECIPIENTS_CACHE_MS` (default 180000, 3 minutes), so an Admin edit reaches Voice within a few minutes without a redeploy.
+2. **Fallback.** `SCALERS_OPS_ALERT_EMAILS` on Voice when the table is missing, the Admin list is empty, or the read fails (a warning names the error).
+3. **Empty.** If both are empty, Voice logs `[platform-ops] ops alert list is EMPTY` and the alert reaches nobody.
 
-Uses the same channel ladder as other staff alerts (`dispatchToStaff`: SMS → WhatsApp → email). Ledger kinds: `platform_ops_speech`, `platform_ops_reasoning`, `platform_ops_telephony` (platform-billed).
+`SCALERS_OPS_ALERT_PHONES` and Admin phone numbers are ignored for now. Code: `src/notifications/platformOpsRecipients.js`. Dispatch: `dispatchToStaff` with `{ sms: false, whatsapp: false, email: true }`. Ledger kinds: `platform_ops_speech`, `platform_ops_reasoning`, `platform_ops_telephony` (platform-billed).
 
 ## Health surface (Desk Platform board)
 
@@ -35,7 +36,7 @@ Uses the same channel ladder as other staff alerts (`dispatchToStaff`: SMS → W
 
 ## Staging proof
 
-1. Set `SCALERS_OPS_ALERT_EMAILS` (or phones) on staging Voice.
+1. Add an email under Super Admin Escalate on staging (or set `SCALERS_OPS_ALERT_EMAILS` on staging Voice).
 2. Option A — dry-run: `VOICE_PLATFORM_OPS_DRY_RUN=true`, trigger Soniox 402 or:
    ```bash
    curl -sS -X POST "$VOICE_HOST/internal/platform/ops-alert" \

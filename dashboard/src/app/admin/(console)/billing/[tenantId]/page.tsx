@@ -4,6 +4,7 @@ import { AdminBillingDetailPanel } from "@/components/AdminBillingDetailPanel";
 import { deskListTitleClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import { logAdminError } from "@/lib/adminErrors";
 import { loadAdminBillingClient } from "@/lib/adminBilling";
+import { requireSuperAdmin } from "@/lib/adminGuard";
 
 export const instant = false;
 
@@ -12,6 +13,7 @@ export default async function AdminBillingClientPage({
 }: {
   params: Promise<{ tenantId: string }>;
 }) {
+  await requireSuperAdmin();
   const { tenantId } = await params;
   let detail;
   try {

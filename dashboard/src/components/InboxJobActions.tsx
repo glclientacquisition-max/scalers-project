@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState } from "react";
 import {
   updateAppointmentStatus,
@@ -15,7 +16,7 @@ function ownerError(error?: string) {
   return "Could not save.";
 }
 
-export function InboxJobActions({
+function InboxJobActionsInner({
   id,
   status,
   extra = false,
@@ -133,3 +134,5 @@ export function InboxJobActions({
     </form>
   );
 }
+
+export const InboxJobActions = withRoleGate("inbox.act", InboxJobActionsInner);

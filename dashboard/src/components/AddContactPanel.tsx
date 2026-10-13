@@ -1,5 +1,7 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
+import { useCan } from "@/components/DeskRole";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,8 +22,9 @@ type Mode = "chooser" | "form";
 
 const emptyDraft = (): Draft => ({ name: "", phone: "", notes: "" });
 
-export function AddContactPanel() {
+function AddContactPanelInner() {
   const router = useRouter();
+  const canImport = useCan("contacts.import");
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("chooser");
   const [pickerOn, setPickerOn] = useState(false);
@@ -120,14 +123,16 @@ export function AddContactPanel() {
               >
                 New
               </button>
-              <Link
-                href="/contacts/import"
-                className={`${settingsActionClass} w-full`}
-                onClick={() => setOpen(false)}
-              >
-                Import
-              </Link>
-              {pickerOn ? (
+              {canImport ? (
+                <Link
+                  href="/contacts/import"
+                  className={`${settingsActionClass} w-full`}
+                  onClick={() => setOpen(false)}
+                >
+                  Import
+                </Link>
+              ) : null}
+              {pickerOn && canImport ? (
                 <button
                   type="button"
                   className={`${settingsActionClass} w-full`}
@@ -136,7 +141,7 @@ export function AddContactPanel() {
                   From this phone
                 </button>
               ) : null}
-              {error ? <p className="text-sm text-warn">{error}</p> : null}
+              {error ? <p className="text-body text-warn">{error}</p> : null}
             </div>
           ) : (
             <form
@@ -149,9 +154,9 @@ export function AddContactPanel() {
               {drafts.map((draft, i) => (
                 <div
                   key={i}
-                  className={drafts.length > 1 ? "border-b border-line pb-4" : ""}
+                  className={drafts.length > 1 ? "border-b border-hairline pb-4" : ""}
                 >
-                  <label className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  <label className="text-meta font-medium text-ink-2">
                     Name
                     <input
                       value={draft.name}
@@ -163,7 +168,7 @@ export function AddContactPanel() {
                       className={settingsFieldClass}
                     />
                   </label>
-                  <label className="mt-3 block text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  <label className="mt-3 block text-meta font-medium text-ink-2">
                     Phone
                     <input
                       value={draft.phone}
@@ -178,7 +183,7 @@ export function AddContactPanel() {
                       className={settingsFieldClass}
                     />
                   </label>
-                  <label className="mt-3 block text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  <label className="mt-3 block text-meta font-medium text-ink-2">
                     Notes
                     <textarea
                       value={draft.notes}
@@ -223,7 +228,7 @@ export function AddContactPanel() {
               </div>
 
               {error ? (
-                <p className="text-sm text-warn">
+                <p className="text-body text-warn">
                   {error}
                   {existingId ? (
                     <>
@@ -244,3 +249,5 @@ export function AddContactPanel() {
     </>
   );
 }
+
+export const AddContactPanel = withRoleGate("contacts.edit", AddContactPanelInner);

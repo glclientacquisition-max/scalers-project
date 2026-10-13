@@ -90,7 +90,7 @@ export function WhatsAppLink({
         aria-label={`WhatsApp ${number}`}
         onClick={onOpen}
         className={[
-          "inline-flex min-h-11 items-center justify-center text-sm font-semibold text-accent-deep hover:underline",
+          "inline-flex min-h-11 items-center justify-center text-body font-semibold text-accent-deep hover:underline",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
           className,
         ].join(" ")}

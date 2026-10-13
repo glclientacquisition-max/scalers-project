@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { parseLeadStatus, type LeadStatus } from "@/lib/supabase";
@@ -17,6 +19,8 @@ export async function updateLeadStatus(
   callId: string,
   nextStatus: string
 ): Promise<LeadStatusResult> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Not signed in." };
   }
@@ -59,6 +63,8 @@ export type WhatsAppFollowUpResult = LeadStatusResult & {
 export async function logWhatsAppFollowUp(
   callId: string
 ): Promise<WhatsAppFollowUpResult> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Not signed in." };
   }

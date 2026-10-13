@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect } from "react";
 import {
   updateAppointmentStatus,
@@ -16,7 +17,7 @@ const OPTIONS = [
 
 const initial: AppointmentStatusState = {};
 
-export function AppointmentStatusToggle({
+function AppointmentStatusToggleInner({
   id,
   status,
 }: {
@@ -45,7 +46,7 @@ export function AppointmentStatusToggle({
             value={opt.id}
             disabled={pending || active}
             className={[
-              "rounded-lg border px-2.5 py-1 text-xs font-medium",
+              "rounded-lg border px-2.5 py-1 text-meta font-medium",
               deskShiftClass,
               active
                 ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
@@ -60,3 +61,5 @@ export function AppointmentStatusToggle({
     </form>
   );
 }
+
+export const AppointmentStatusToggle = withRoleGate("inbox.act", AppointmentStatusToggleInner);

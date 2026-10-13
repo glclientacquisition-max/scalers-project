@@ -107,3 +107,12 @@ Desk Super Admin Platform board reads `/healthz`. No public status page. Voice d
 - Answering a telephony outage with a spoken clip (no call reaches us)
 - Opening `/ws/media` when the wallet probe says the prepaid balance is empty or returned 402
 - Handing the owner a new DID instead of restoring or forwarding the old one
+
+## Archived or suspended business (not an outage)
+
+A call to a DID whose tenant rows are all archived or `is_active = false` never takes the call (`src/sautikit/inactiveTenantGate.js`, #639): `/voice/incoming` returns the line-unavailable message and `<Hangup/>` before Stream and the call row. No minutes, no model, no owner or ops outage alert. Lookup errors fail open.
+
+- Clips: `src/speech/pcm/line-unavailable-en.v1.wav` ("Hello. This line is not available right now. Thank you for calling.", 5.03 s) and `line-unavailable-sw.v1.wav` ("Habari. Nambari hii haipatikani kwa sasa. Asante kwa kupiga.", 5.29 s), platform clone voice 7b197f3c, 16 kHz mono. The `downtime-*` files are the outage clips; never used for closed lines.
+- Hosting: SautiKit only (`POST /v1/uploads/audio`, the one supported way to give it audio). `src/sautikit/lineUnavailableAudio.js` uploads each clip and stores the presigned `storage.sautikit.com` URL and its expiry in `voice_platform_audio` ([`voice_platform_audio.sql`](../supabase/voice_platform_audio.sql)). Signed URLs are never logged or committed; logs show host and expiry.
+- Refresh: at boot (+30 s) and every 6 h (`VOICE_LINE_UNAVAILABLE_REFRESH_MS`). A clip is re-uploaded when it has no row, its file sha changed, or under 48 h remain (day 5 of the 7-day link). An upload failure keeps the old row, writes `last_error`, and sends one platform ops alert (kind `audio`, "Phone audio"; respects `VOICE_PLATFORM_OPS_DRY_RUN`). No key, a key without `numbers.claim` (403 `api_key.scope_denied`), or no table: one warn log, no alert. `VOICE_LINE_UNAVAILABLE_REFRESH=off` disables it.
+- Call time: the stored URLs (cached 1 min, ignored with under 10 min left), host must be `storage.sautikit.com`, then a ranged GET (1.5 s, cached 10 min ok / 1 min failed) must return audio. SautiKit reports no `<Play>` failure, so anything else uses `<Say>` with the same words, per language.

@@ -80,7 +80,7 @@ describe("DeskBack icon", () => {
     assert.match(contact, /<DeskRecordLead/);
     assert.match(imported, /<DeskRecordLead/);
     assert.match(toolbar, /<DeskRecordLead/);
-    assert.match(read("dashboard/src/components/AdminNav.tsx"), /<DeskBack href=\{parent\.href\}>/);
+    assert.match(read("dashboard/src/components/AdminNav.tsx"), /<DeskBack href=\{href\(parent\.href\)\}>/);
     assert.match(constitution, /Back never owns its own row/);
     assert.doesNotMatch(contact, /<DeskBack[\s\S]{0,80}<\/DeskBack>\s*<div className="mt-6 grid/);
     assert.doesNotMatch(imported, /<DeskBack[\s\S]{0,80}<\/DeskBack>\s*<h1 className="mt-4/);

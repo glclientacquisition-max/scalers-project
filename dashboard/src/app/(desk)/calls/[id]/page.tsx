@@ -1,3 +1,7 @@
+import { memberCan } from "@/lib/requireMember";
+import { CallFactsCorrection } from "@/components/structured/CallFactsCorrection";
+import { correctCallFactsAction } from "@/app/(desk)/settings/structuredActions";
+import { readCallFacts } from "@/lib/structuredServer";
 import {
   callResolutionLabel,
   parseCallResolution,
@@ -258,6 +262,8 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
     whenLabel: formatCallWhenRelative(row.created_at),
   });
 
+  const [facts, canCorrect] = await Promise.all([readCallFacts(row.id), memberCan("inbox.act")]);
+
   return (
     <>
       {workLoadError ? <DeskLoadError>Could not load visit or hold.</DeskLoadError> : null}
@@ -303,6 +309,11 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
         archived={archived}
         leadStatus={leadStatus}
         businessName={businessName}
+        factsSlot={
+          facts ? (
+            <CallFactsCorrection callId={row.id} facts={facts} canEdit={canCorrect} save={correctCallFactsAction} />
+          ) : null
+        }
       />
     </>
   );

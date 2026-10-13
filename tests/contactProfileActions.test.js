@@ -59,11 +59,11 @@ describe("contact profile Name this caller", () => {
     assert.match(form, /junk \? "Name this caller" : "Name"/);
     assert.match(form, />\s*Save\s*</);
     assert.match(form, /flex min-w-0 flex-wrap items-center gap-2/);
-    assert.match(form, /text-lg font-semibold/);
+    assert.match(form, /text-title font-semibold/);
     assert.match(form, /updateContactName/);
     assert.match(form, /router\.refresh\(/);
     assert.match(form, /pendingSpinnerClass/);
-    assert.match(form, /btnPrimary/);
+    assert.match(form, /btnPrimary|<Button\b/); // kit Button replaced the one-off class
     assert.doesNotMatch(form, /router\.push/);
     assert.doesNotMatch(form, /[\u2014\u2013]/);
   });

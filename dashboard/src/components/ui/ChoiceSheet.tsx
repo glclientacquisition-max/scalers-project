@@ -19,6 +19,8 @@ export function ChoiceSheet<T extends string>({
   placeholder = "Choose",
   label,
   rowLabel,
+  theme = "desk",
+  wrap = false,
 }: {
   id?: string;
   title: string;
@@ -29,6 +31,10 @@ export function ChoiceSheet<T extends string>({
   label?: string;
   /** When set, this control is the whole settings row: name, current value, chevron. */
   rowLabel?: string;
+  /** The drawer portals to body, so Super Admin passes its theme. */
+  theme?: "desk" | "admin";
+  /** Long values wrap onto a second line instead of being cut off (phone rows). */
+  wrap?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const current = options.find((opt) => opt.value === value);
@@ -52,7 +58,7 @@ export function ChoiceSheet<T extends string>({
         {rowLabel ? (
           <>
             <span className="shrink-0 text-body font-medium text-ink">{rowLabel}</span>
-            <span className={`min-w-0 flex-1 truncate text-end text-body ${current ? "text-ink-2" : "text-ink-3"}`}>
+            <span className={`min-w-0 flex-1 text-end text-body ${wrap ? "py-2 [overflow-wrap:anywhere]" : "truncate"} ${current ? "text-ink-2" : "text-ink-3"}`}>
               {valueText}
             </span>
           </>
@@ -67,6 +73,7 @@ export function ChoiceSheet<T extends string>({
         open={open}
         title={title}
         onOpenChange={setOpen}
+        theme={theme}
       >
         <ul>
           {options.map((opt) => {
@@ -85,7 +92,7 @@ export function ChoiceSheet<T extends string>({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-body text-ink">{opt.label}</span>
                     {opt.detail ? (
-                      <span className="mt-0.5 block truncate text-meta text-ink-2">{opt.detail}</span>
+                      <span className="mt-0.5 block text-meta text-ink-2">{opt.detail}</span>
                     ) : null}
                   </span>
                   {selected ? <CheckIcon className="size-5 shrink-0 text-accent" aria-hidden /> : null}

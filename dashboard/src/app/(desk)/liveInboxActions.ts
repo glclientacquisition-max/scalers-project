@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 
@@ -8,6 +10,8 @@ import { isAuthenticated } from "@/lib/auth";
  * the owner is on another desk route still shows the new row when they return.
  */
 export async function revalidateLiveDesk(): Promise<void> {
+  const denied = await memberDenied("inbox.view");
+  if (denied) return;
   if (!(await isAuthenticated())) return;
   revalidatePath("/home", "layout");
   revalidatePath("/calls", "layout");
@@ -19,6 +23,8 @@ export async function revalidateLiveDesk(): Promise<void> {
  * Does not run when a payment is only started.
  */
 export async function revalidateLiveUsage(): Promise<void> {
+  const denied = await memberDenied("usage.view");
+  if (denied) return;
   if (!(await isAuthenticated())) return;
   revalidatePath("/wallet", "layout");
   revalidatePath("/home", "layout");
@@ -28,6 +34,8 @@ export async function revalidateLiveUsage(): Promise<void> {
  * Drop one open ticket so a new transcript line can render in place.
  */
 export async function revalidateLiveTicket(callId: string): Promise<void> {
+  const denied = await memberDenied("inbox.view");
+  if (denied) return;
   if (!(await isAuthenticated())) return;
   const id = String(callId || "").trim();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;

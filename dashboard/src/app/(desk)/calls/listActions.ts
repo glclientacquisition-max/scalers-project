@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { loadCachedInboxItems } from "@/lib/inboxLoad";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import { getCurrentTenant } from "@/lib/tenant";
@@ -10,6 +12,8 @@ export async function refreshInboxList(): Promise<{
   error: string | null;
   partialError: string | null;
 }> {
+  const denied = await memberDenied("inbox.view");
+  if (denied) return { items: [], error: denied.error, partialError: null };
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return { items: [], error: "Not signed in.", partialError: null };

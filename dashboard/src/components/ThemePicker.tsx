@@ -1,8 +1,12 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { Popover } from "@base-ui/react/popover";
 import { useDeskThemeInitial } from "@/components/DeskThemeProvider";
-import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
+import { focusRingVisible } from "@/components/ui/deskChrome";
+import { Sheet } from "@/components/ui/Sheet";
+import { useIsPhone } from "@/components/ui/useIsPhone";
+import { cx } from "@/lib/cx";
 import { SegmentedControl } from "@/components/ui/Segmented";
 import {
   applyDeskTheme,
@@ -30,88 +34,73 @@ export function useThemeChoice() {
   return { choice, pick };
 }
 
-function ThemeMark({ id, size = "md" }: { id: DeskTheme; size?: "sm" | "md" }) {
-  const box = size === "sm" ? "h-6 w-6" : "h-8 w-8";
-  const dot = size === "sm" ? "h-2.5 w-2.5" : "h-3 w-3";
-  if (id === "dark") {
-    return (
-      <span className={`flex ${box} items-center justify-center rounded-full bg-ink text-surface`} aria-hidden>
-        <span className={`${dot} rounded-full bg-surface`} />
-      </span>
-    );
-  }
-  if (id === "light") {
-    return (
-      <span
-        className={`flex ${box} items-center justify-center rounded-full border border-line bg-surface`}
-        aria-hidden
-      >
-        <span className={`${dot} rounded-full border border-ink`} />
-      </span>
-    );
-  }
-  return (
-    <span className={`relative ${box} overflow-hidden rounded-full border border-line`} aria-hidden>
-      <span className="absolute inset-0 bg-surface" />
-      <span className="absolute inset-y-0 right-0 w-1/2 bg-ink" />
-    </span>
-  );
+/** "Appearance · System". The one worded entry point, inside and outside the desk. */
+export function appearanceLabel(choice: DeskTheme): string {
+  const name = CHOICES.find((c) => c.id === choice)?.label ?? "System";
+  return `Appearance · ${name}`;
 }
 
-/** Compact 44px hits for marketing and auth. Same per-device store as ThemePicker. */
-export function ThemeDock({ tone = "ink" }: { tone?: "ink" | "onDark" }) {
-  const { choice, pick } = useThemeChoice();
-  const onDark = tone === "onDark";
+const footerButtonClass = cx(
+  "inline-flex min-h-11 items-center rounded-lg px-2 text-meta text-ink-2 hover:text-ink",
+  focusRingVisible,
+);
+
+const popupClass =
+  "glass-chrome z-menu w-72 origin-[var(--transform-origin)] rounded-xl border border-hairline p-3 text-ink shadow-menu outline-none transition-[opacity,transform] duration-fast ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 motion-reduce:transition-none";
+
+/**
+ * Outside the desk (landing, login, signup, invite, onboarding, admin login): a quiet footer text
+ * button. Phones get a Sheet, desktop a popover. Same segmented choice as the account menu.
+ */
+export function AppearanceFooter({ tone = "ink", className }: { tone?: "ink" | "onDark"; className?: string }) {
+  const { choice } = useThemeChoice();
+  const phone = useIsPhone();
+  const [open, setOpen] = useState(false);
+  const label = appearanceLabel(choice);
+  const buttonClass = cx(footerButtonClass, tone === "onDark" && "text-white/80 hover:text-white", className);
+
+  if (phone) {
+    return (
+      <div data-appearance-footer="">
+        <button type="button" className={buttonClass} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+          {label}
+        </button>
+        <Sheet open={open} onOpenChange={setOpen} title="Appearance">
+          <ThemePicker />
+        </Sheet>
+      </div>
+    );
+  }
 
   return (
-    <div
-      role="radiogroup"
-      aria-label="This device"
-      data-theme-cluster=""
-      className="flex items-center gap-1"
-    >
-      {CHOICES.map((opt) => {
-        const selected = choice === opt.id;
-        return (
-          <button
-            key={opt.id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            aria-label={opt.label}
-            onClick={() => pick(opt.id)}
-            className={[
-              "inline-flex h-11 w-11 items-center justify-center rounded-full",
-              deskShiftClass,
-              focusRingVisible,
-              onDark
-                ? selected
-                  ? "bg-surface/25 text-white"
-                  : "text-white/80 hover:bg-surface/10 hover:text-white"
-                : selected
-                  ? "bg-accent/10 text-ink"
-                  : "text-ink-2 hover:bg-surface-2 hover:text-ink",
-            ].join(" ")}
-          >
-            <ThemeMark id={opt.id} size="sm" />
-          </button>
-        );
-      })}
+    <div data-appearance-footer="">
+      <Popover.Root open={open} onOpenChange={setOpen}>
+        <Popover.Trigger className={buttonClass}>{label}</Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Positioner side="right" align="end" sideOffset={8} collisionPadding={12} className="z-menu">
+            <Popover.Popup className={popupClass}>
+              <Popover.Title className="sr-only">Appearance</Popover.Title>
+              <ThemePicker />
+            </Popover.Popup>
+          </Popover.Positioner>
+        </Popover.Portal>
+      </Popover.Root>
     </div>
   );
 }
 
-/** Device theme. Instant apply. Never a tenant setting. iOS segmented: System, Light, Dark. */
+/** Device theme. Instant apply. Never a tenant setting. iOS segmented: System, Light, Dark, captioned On this device. */
 export function ThemePicker() {
   const { choice, pick } = useThemeChoice();
 
   return (
     <div data-theme-cluster="">
+      <p className="pb-2 ps-1 text-meta text-ink-2">On this device</p>
       <SegmentedControl
-        label="This device"
+        label="On this device"
         value={choice}
         onChange={(value) => pick(value as DeskTheme)}
-        className="grid w-full [&_button]:min-h-11"
+        className="grid w-full p-1 [&_button]:min-h-11"
         items={CHOICES.map((opt) => ({ value: opt.id, label: opt.label }))}
       />
     </div>

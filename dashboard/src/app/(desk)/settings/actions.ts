@@ -1,6 +1,13 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
+import { PRODUCT_ID_PREFIX, parseBaseline, settleCatalogPrices } from "@/lib/catalogPricing";
+import { readCatalogFresh } from "@/lib/catalogFresh";
+import { normalizePhone } from "@/lib/setupFlow";
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
   parseAgentTone,
@@ -42,36 +49,83 @@ import {
 import {
   formatPoliciesForCompiler,
   parseBusinessPoliciesField,
+  applyStructuredPolicies,
+  businessPoliciesForStorage,
 } from "@/lib/businessPolicies";
 import {
   lexiconForStorage,
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
-import { ownerAttestFields } from "@/lib/ownerAttestFields";
+import {
+  ownerAttestFields,
+  ownerConfirmPlan,
+  readSavedFactRow,
+} from "@/lib/ownerAttestFields";
 import { fieldPathsAttestedOnSettingsSave } from "@/lib/fieldPathsFromSettingsSave";
 import { cleanFieldPaths } from "@/lib/fieldPathRegistry";
 import {
   settingsFieldFromScope,
   settingsScopeValidationError,
 } from "@/lib/settingsSaveScope";
-import { loadCompileProvenance } from "@/lib/tenantFieldProvenance";
+import { factHashModeFromEnv, loadCompileProvenance } from "@/lib/tenantFieldProvenance";
+import { overlayFieldMeta, planFactConfirm } from "@/lib/factConfirm";
+import { normalizeFactRow } from "@/lib/factRowNormalize";
+import { assignServiceIds } from "@/lib/serviceIds";
+import { ownerAlertPhone, validateTeamSave, type TeamRowInput } from "@/lib/teamValidation";
+import { catalogSaveError } from "@/lib/catalogValidation";
+import { validatePublicContacts } from "@/lib/contactValidation";
+import { faqsLengthError, policiesLengthError } from "@/lib/lengthLimits";
+import { POLICY_FIELDS } from "@/lib/businessPolicies";
+import {
+  coverageIdsFrom,
+  coverageOutsideFrom,
+  formatServiceAreasForCompiler,
+  normalizeServiceAreas,
+  parseServiceAreasField,
+  serviceAreasFromCoverage,
+  validateServiceArea,
+} from "@/lib/serviceAreas";
+
+function safeJsonRows(raw: FormDataEntryValue | null): TeamRowInput[] {
+  try {
+    const parsed = JSON.parse(String(raw || "[]"));
+    return Array.isArray(parsed) ? parsed.filter((r) => r && typeof r === "object") : [];
+  } catch {
+    return [];
+  }
+}
 
 export type SettingsCompileState = {
+  /** Field errors from typed payments and policy rules, keyed like the form ids. */
+  fields?: Record<string, string>;
   error?: string;
   ok?: boolean;
   source?: "gemini" | "local";
+  /** Client only: the response was lost (connection dropped). The save may have landed. */
+  networkError?: boolean;
 };
+
+/** Background model rewrite of the prompt; the settings page allows 60 s in total. */
+const PROMPT_UPGRADE_BUDGET_MS = 25_000;
 
 export async function saveAndCompileSettings(
   _prev: SettingsCompileState,
   formData: FormData
 ): Promise<SettingsCompileState> {
-  if (!(await isAuthenticated())) {
+  const t0 = Date.now();
+  // Independent request-scoped checks: run together, not one after another.
+  const [denied, signedIn, tenant] = await Promise.all([
+    memberDenied("settings.edit"),
+    isAuthenticated(),
+    getCurrentTenant(),
+  ]);
+  const tAuth = Date.now();
+  if (denied) return denied;
+  if (!signedIn) {
     return { error: "Sign in to save settings." };
   }
 
-  const tenant = await getCurrentTenant();
   if (!tenant) {
     return { error: "No workspace linked to this account." };
   }
@@ -95,21 +149,65 @@ export async function saveAndCompileSettings(
     String(formData.get("services_notes") || "").trim(),
     extractServicesNotes(tenant.services_offered || "")
   );
-  const servicesCatalog = pick(
+  const ownsServices = settingsFieldFromScope(scope, "servicesCatalog", true, false);
+  const ownsProducts = settingsFieldFromScope(scope, "productCatalog", true, false);
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) {
+    return { error: "Not signed in." };
+  }
+  // Catalogue saves settle prices against the row as stored now (not the 15 s cached copy):
+  // a price confirmed a moment ago must not be undone by a form that loaded before it.
+  const fresh =
+    ownsServices || ownsProducts ? await readCatalogFresh(workspace.client, tenant.id) : null;
+  const storedServices = normalizeServicesCatalog(fresh?.services_catalog ?? tenant.services_catalog).filter((row) => row.name);
+  const pickedServices = pick(
     "servicesCatalog",
     parseServicesCatalogField(formData.get("services_catalog")),
-    normalizeServicesCatalog(tenant.services_catalog).filter((row) => row.name)
+    storedServices
   );
-  const productCatalog = pick(
+  const baseline = parseBaseline(formData.get("catalog_baseline"));
+  // Catalogue saves give every row a stable id; other panels keep the stored rows as-is.
+  // The browser's typed price is never trusted: unchanged text keeps the stored price (and its
+  // confirmation), edited text is read now (lib/catalogPricing.ts).
+  const servicesCatalog = ownsServices
+    ? assignServiceIds(
+        settleCatalogPrices(pickedServices, storedServices, "service", { baseline, unitFallback: "job" }),
+        storedServices
+      )
+    : pickedServices;
+  const storedProducts = normalizeProductCatalog(fresh?.product_catalog ?? tenant.product_catalog).filter((row) => row.name);
+  const pickedProducts = pick(
     "productCatalog",
     parseProductCatalogField(formData.get("product_catalog")),
-    normalizeProductCatalog(tenant.product_catalog).filter((row) => row.name)
+    storedProducts
   );
-  const socialHandles = pick(
+  const productCatalog = ownsProducts
+    ? assignServiceIds(
+        settleCatalogPrices(pickedProducts, storedProducts, "product", { baseline }),
+        storedProducts,
+        PRODUCT_ID_PREFIX
+      )
+    : pickedProducts;
+  if (
+    settingsFieldFromScope(scope, "productCatalog", true, false) ||
+    settingsFieldFromScope(scope, "servicesCatalog", true, false)
+  ) {
+    const catalogError = catalogSaveError({
+      products: settingsFieldFromScope(scope, "productCatalog", true, false) ? productCatalog : [],
+      services: settingsFieldFromScope(scope, "servicesCatalog", true, false) ? servicesCatalog : [],
+    });
+    if (catalogError) return { error: catalogError };
+  }
+  let socialHandles = pick(
     "socialHandles",
     parseSocialHandlesField(formData.get("social_handles")),
     parseSocialHandlesField(JSON.stringify(tenant.social_handles || {}))
   );
+  if (settingsFieldFromScope(scope, "socialHandles", true, false)) {
+    const contacts = validatePublicContacts(socialHandles);
+    if (!contacts.ok) return { error: contacts.error };
+    socialHandles = contacts.handles;
+  }
   const servicesBlock = formatServicesForCompiler(servicesCatalog, servicesNotes);
   const productsBlock = formatProductsForCompiler(productCatalog);
   const socialBlock = formatSocialHandlesForCompiler(socialHandles);
@@ -157,11 +255,26 @@ export async function saveAndCompileSettings(
     String(formData.get("unknown_answer_fallback") || "").trim(),
     String(tenant.unknown_answer_fallback || "").trim()
   );
-  const teamDirectory = pick(
+  let teamDirectory = pick(
     "teamDirectory",
     parseTeamDirectoryField(formData.get("team_directory")),
     parseTeamDirectoryField(JSON.stringify(tenant.team_directory || []))
   );
+  if (settingsFieldFromScope(scope, "teamDirectory", true, false)) {
+    // Validate the raw rows so bad email/phone, nameless rows, duplicates, owner
+    // removal return a visible error (not a silent drop). Team contacts are not
+    // paid seats (owner decision); login-member seats are tracked elsewhere.
+    const team = validateTeamSave({
+      submitted: safeJsonRows(formData.get("team_directory")),
+      stored: Array.isArray(tenant.team_directory) ? (tenant.team_directory as TeamRowInput[]) : [],
+      ownerPhone: ownerAlertPhone(tenant),
+    });
+    if (!team.ok) return { error: team.error };
+    // Store E.164 (+2547...) so calls, contacts and alerts match one format.
+    teamDirectory = parseTeamDirectoryField(
+      JSON.stringify(team.rows.map((r) => ({ ...r, phone: r.phone ? normalizePhone(r.phone) || r.phone : r.phone })))
+    );
+  }
   const faqs = pick(
     "faqs",
     parseFaqsField(formData.get("faqs")),
@@ -216,11 +329,45 @@ export async function saveAndCompileSettings(
     parseBusinessLocationsField(formData.get("business_locations")),
     parseBusinessLocationsField(JSON.stringify(tenant.business_locations || []))
   );
-  const businessPolicies = pick(
+  const policiesFromForm = settingsFieldFromScope(scope, "businessPolicies", true, false);
+  let businessPolicies = pick(
     "businessPolicies",
     parseBusinessPoliciesField(formData.get("business_policies")),
     parseBusinessPoliciesField(JSON.stringify(tenant.business_policies || {}))
   );
+  if (policiesFromForm) {
+    // Typed payments and rules: validate, then generate the spoken text from them.
+    const structured = applyStructuredPolicies(businessPolicies);
+    if (!structured.ok) return { error: structured.error, fields: structured.fields };
+    businessPolicies = structured.policies;
+  }
+  // Areas you serve (Settings › Locations). Until Locations is saved once, the old Policies
+  // coverage list is read as areas with "we confirm the fee".
+  const ownsAreas = settingsFieldFromScope(scope, "serviceAreas", true, false);
+  const storedAreas =
+    tenant.service_areas && typeof tenant.service_areas === "object"
+      ? normalizeServiceAreas(tenant.service_areas, vertical)
+      : serviceAreasFromCoverage(
+          (tenant.business_policies as { coverage_areas?: unknown } | null)?.coverage_areas,
+          vertical
+        );
+  const formAreas = ownsAreas ? parseServiceAreasField(formData.get("service_areas"), vertical) : null;
+  const serviceAreas = formAreas ?? storedAreas;
+  if (formAreas) {
+    for (const area of formAreas.areas) {
+      const fields = validateServiceArea(area);
+      const first = Object.values(fields)[0];
+      if (first) return { error: first };
+    }
+  }
+  // The voice server reads business_policies.coverage_areas: keep it in step with the areas.
+  if (serviceAreas) {
+    businessPolicies = {
+      ...businessPolicies,
+      coverage_areas: coverageIdsFrom(serviceAreas),
+      coverage_outside: coverageOutsideFrom(serviceAreas),
+    };
+  }
   const ttsLexicon = lexiconForStorage(
     pick(
       "ttsLexicon",
@@ -246,7 +393,9 @@ export async function saveAndCompileSettings(
       String(formData.get("business_hours") || "").trim(),
       String(tenant.business_hours || "").trim()
     );
-  const locationsText = formatLocationsForCompiler(businessLocations);
+  const locationsText = [formatLocationsForCompiler(businessLocations, { noPremises: serviceAreas?.no_premises }), formatServiceAreasForCompiler(serviceAreas)]
+    .filter(Boolean)
+    .join("\n\n");
   const policiesText = formatPoliciesForCompiler(businessPolicies);
 
   const scopeError = settingsScopeValidationError(scope, {
@@ -266,34 +415,26 @@ export async function saveAndCompileSettings(
     voiceLabel: String(formData.get("soniox_voice_label") || "").trim(),
   });
   if (scopeError) return { error: scopeError };
-
-  const provenance = await loadCompileProvenance(tenant.id);
-  const { prompt, source } = await compileReceptionistPrompt({
-    businessName,
-    servicesOffered,
-    businessHours,
-    agentTone: agentTone ?? DEFAULT_AGENT_TONE,
-    agentName,
-    teamDirectory,
-    faqs,
-    unknownAnswerFallback,
-    escalateEnabled: agentTools.escalate,
-    vertical,
-    handoffMode,
-    locationsText,
-    policiesText,
-    productsText: productsBlock,
-    socialText: socialBlock,
-    productCatalog,
-    businessPolicies,
-    fieldMeta: provenance.fieldMeta,
-    holdGate: provenance.holdGate,
-  });
-
-  const workspace = await createWorkspaceDataClient();
-  if (!workspace) {
-    return { error: "Not signed in." };
+  if (settingsFieldFromScope(scope, "faqs", true, false)) {
+    const faqLen = faqsLengthError(formData.get("faqs"));
+    if (faqLen) return { error: faqLen };
   }
+  if (settingsFieldFromScope(scope, "businessPolicies", true, false)) {
+    const policyLen = policiesLengthError(
+      formData.get("business_policies"),
+      Object.fromEntries(POLICY_FIELDS.map((f) => [f.id, f.label]))
+    );
+    if (policyLen) return { error: policyLen };
+  }
+
+  const ownerPathsFromForm = (() => {
+    try {
+      const parsed = JSON.parse(String(formData.get("owner_field_paths") || "[]"));
+      return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
+    } catch {
+      return [];
+    }
+  })();
 
   const patch: Record<string, unknown> = {
     business_name: businessName,
@@ -317,25 +458,72 @@ export async function saveAndCompileSettings(
     soniox_voice_id: sonioxVoiceId,
     soniox_voice_label: sonioxVoiceLabel,
     business_locations: businessLocations,
-    business_policies: businessPolicies,
+    business_policies: businessPoliciesForStorage(businessPolicies),
+    ...(formAreas ? { service_areas: formAreas } : {}),
     tts_lexicon: ttsLexicon,
-    llm_system_prompt: prompt,
   };
 
+  // FACT_HASH_MODE: confirm only what changed (plus "Looks right" paths). Both
+  // sides go through normalizeFactRow before the diff, so a raw seed or import
+  // row never looks changed against its parsed copy. The compile below already
+  // sees that pending confirm; the write hashes the stored row as saved.
+  const hashMode = factHashModeFromEnv();
+  const explicitPaths = cleanFieldPaths(ownerPathsFromForm);
+  const tPrep = Date.now();
+  const [savedBefore, provenance] = await Promise.all([
+    hashMode ? readSavedFactRow(workspace.client, tenant.id) : Promise.resolve(null),
+    loadCompileProvenance(tenant.id),
+  ]);
+  const storedFactRow: Record<string, unknown> = savedBefore ?? { ...tenant };
+  const tReads = Date.now();
+  const compileFieldMeta = hashMode
+    ? overlayFieldMeta(
+        provenance.fieldMeta,
+        planFactConfirm({
+          scope,
+          before: storedFactRow,
+          after: { ...storedFactRow, ...patch },
+          explicitPaths,
+          normalize: normalizeFactRow,
+        })
+      )
+    : provenance.fieldMeta;
+  const compileInput = {
+    businessName,
+    servicesOffered,
+    businessHours,
+    agentTone: agentTone ?? DEFAULT_AGENT_TONE,
+    agentName,
+    teamDirectory,
+    faqs,
+    unknownAnswerFallback,
+    escalateEnabled: agentTools.escalate,
+    vertical,
+    handoffMode,
+    locationsText,
+    policiesText,
+    productsText: productsBlock,
+    socialText: socialBlock,
+    productCatalog,
+    businessPolicies,
+    fieldMeta: compileFieldMeta,
+    holdGate: provenance.holdGate,
+  };
+  // Fast path: write the facts with the template prompt now (milliseconds), so the owner
+  // sees "Saved" quickly and a reload shows the new data. The model-written prompt and
+  // the fact bookkeeping run after the response (see after() below).
+  const { prompt } = await compileReceptionistPrompt({ ...compileInput, localOnly: true });
+  const source = "local" as const;
+
+  patch.llm_system_prompt = prompt;
+  const tCompile = Date.now();
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
+  bustTenantCache(tenant.id);
+  const tWrite = Date.now();
 
   if (error) {
     return ownerSaveFailed("settings.save", error.message);
   }
-
-  const ownerPathsFromForm = (() => {
-    try {
-      const parsed = JSON.parse(String(formData.get("owner_field_paths") || "[]"));
-      return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
-    } catch {
-      return [];
-    }
-  })();
 
   const socialChannels = socialHandles?.channels;
   const hasSocialHandles =
@@ -361,12 +549,59 @@ export async function saveAndCompileSettings(
     lineNumber: String(tenant.sautikit_virtual_number || "").trim(),
   });
 
-  const user = await getAuthUser();
-  await ownerAttestFields(
-    tenant.id,
-    cleanFieldPaths([...pathsFromSave, ...ownerPathsFromForm]),
-    user?.id ?? null
+  const client = workspace.client;
+  // Request-scoped reads (cookies) must happen before after().
+  const attestUser = hashMode ? null : await getAuthUser();
+  console.info(
+    `[settings-save timing] scope=${scope || "all"} auth=${tAuth - t0}ms parse=${tPrep - tAuth}ms reads=${tReads - tPrep}ms compile=${tCompile - tReads}ms write=${tWrite - tCompile}ms total=${Date.now() - t0}ms`
   );
+  after(async () => {
+   try {
+    // Upgrade to the model-written prompt only if no newer save replaced ours meanwhile.
+    // Bounded so the background work always ends well inside the function's time limit.
+    try {
+      const upgraded = await Promise.race([
+        compileReceptionistPrompt(compileInput),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), PROMPT_UPGRADE_BUDGET_MS)),
+      ]);
+      const better = upgraded?.prompt;
+      const how = upgraded?.source;
+      if (how === "gemini" && better && better !== prompt) {
+        await client.from("tenants").update({ llm_system_prompt: better }).eq("id", tenant.id).eq("llm_system_prompt", prompt);
+        bustTenantCache(tenant.id);
+      }
+    } catch (err) {
+      console.warn("[settings.save] prompt upgrade skipped:", err instanceof Error ? err.message : err);
+    }
+    if (hashMode) {
+      // Hash the stored row as saved. If it cannot be read back, confirm nothing:
+      // in hash mode a missing value_hash already reads as "Check this".
+      const saved = await readSavedFactRow(client, tenant.id);
+      if (saved) {
+        await ownerConfirmPlan(
+          tenant.id,
+          planFactConfirm({
+            scope,
+            before: storedFactRow,
+            after: saved,
+            explicitPaths,
+            normalize: normalizeFactRow,
+          })
+        );
+      } else {
+        console.warn("[settings.save] saved row unreadable, owner confirm skipped");
+      }
+    } else {
+      await ownerAttestFields(
+        tenant.id,
+        cleanFieldPaths([...pathsFromSave, ...ownerPathsFromForm]),
+        attestUser?.id ?? null
+      );
+    }
+   } catch (err) {
+    console.warn("[settings.save] background work failed:", err instanceof Error ? err.message : err);
+   }
+  });
 
   revalidatePath("/settings");
 

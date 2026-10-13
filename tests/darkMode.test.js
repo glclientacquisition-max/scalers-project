@@ -228,7 +228,7 @@ describe("theme activation", () => {
     const ui = read("dashboard/src/components/settingsUi.tsx");
     assert.match(ui, /role="radiogroup"/);
     assert.match(picker, /<SegmentedControl/);
-    assert.match(picker, /label="This device"/);
+    assert.match(picker, /label="On this device"/);
     assert.match(picker, /data-theme-cluster=""/);
     assert.match(picker, /readDeskTheme/);
     assert.match(picker, /writeDeskTheme/);
@@ -246,14 +246,15 @@ describe("theme activation", () => {
     const login = read("dashboard/src/app/login/page.tsx");
     const adminLogin = read("dashboard/src/app/admin/login/page.tsx");
     const adminMenu = read("dashboard/src/components/AdminAccountMenu.tsx");
-    assert.match(picker, /export function ThemeDock/);
-    assert.match(landing, /<ThemeDock/);
-    assert.match(login, /<ThemeDock/);
-    assert.match(adminLogin, /<ThemeDock/);
+    assert.match(picker, /export function AppearanceFooter/);
+    assert.match(landing, /<AppearanceFooter/);
+    // Login dropped the theme dock in the onboarding rebuild (#656); it follows the system theme.
+    assert.doesNotMatch(login, /data-theme="(light|dark)"/);
+    assert.match(adminLogin, /<AppearanceFooter/);
     assert.match(adminMenu, /<ThemePicker \/>/);
-    assert.match(adminMenu, />\s*This device\s*</);
+    assert.match(adminMenu, /appearanceLabel\(/);
     assert.match(account, /<ThemePicker \/>/);
-    assert.match(account, />\s*This device\s*</);
+    assert.match(account, /appearanceLabel\(/);
     assert.doesNotMatch(account, /\/settings/);
     assert.doesNotMatch(shell, /<ThemePicker \/>/);
     assert.doesNotMatch(shell, /title="This device"/);

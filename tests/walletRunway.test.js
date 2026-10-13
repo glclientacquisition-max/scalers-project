@@ -41,9 +41,9 @@ describe("owner usage surface", () => {
     assert.match(page, /recentLedger\.map/);
     assert.match(page, /<Pagination/);
     assert.match(read("dashboard/src/lib/wallet.ts"), /count: "exact"/);
-    assert.match(page, /<table className="mt-2 w-full text-left text-sm">/);
+    assert.match(page, /<table className="mt-2 w-full text-left text-body">/);
     assert.match(page, /px-4 py-2/);
-    assert.doesNotMatch(page, /divide-y divide-line/);
+    assert.doesNotMatch(page, /divide-y divide-hairline/);
     assert.doesNotMatch(page, /getWalletLedger|rpc\(/);
   });
 });

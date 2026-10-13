@@ -23,8 +23,9 @@ function unknown(question: string): StakeLine {
   return { question, state: "unknown", answer: UNKNOWN };
 }
 
-function locked(question: string): StakeLine {
-  return { question, state: "locked", answer: "Locked" };
+/** Not set up yet: the answer is the fallback callers hear today. The status pill says Needs setup. */
+function locked(question: string, fallback: string): StakeLine {
+  return { question, state: "locked", answer: fallback };
 }
 
 function saturdayLine(schedule: CaptureHours | null): StakeLine {
@@ -50,13 +51,15 @@ export function shopStakes(input: {
   const hours = input.schedule || parseCaptureHours(input.hoursText || "");
   const hold = input.holdsAllowed
     ? live("Can you hold this until evening?", "Yes, we can hold it.")
-    : locked("Can you hold this until evening?");
+    : locked("Can you hold this until evening?", "I can't hold items, but I'll pass your request to the owner.");
   return [priceLine, saturdayLine(hours), hold];
 }
 
 export function homeStakes(input: {
   services: CaptureService[];
   coverage?: string;
+  /** booking_slots capability gate. */
+  bookingSlotsAllowed?: boolean;
 }): StakeLine[] {
   const cover = String(input.coverage || "").trim();
   const coverageLine = cover
@@ -74,6 +77,8 @@ export function homeStakes(input: {
   return [
     coverageLine,
     visitLine,
-    locked("Can you book me in for Thursday?"),
+    input.bookingSlotsAllowed
+      ? live("Can you book me in for Thursday?", "Yes, you're booked.")
+      : locked("Can you book me in for Thursday?", "I've noted the day you want. The owner will call to confirm a time."),
   ];
 }

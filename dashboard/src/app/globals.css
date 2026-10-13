@@ -25,7 +25,7 @@
   --accent-tonal: #e3eeff;
   --accent-on: #ffffff;
   --brand: #0096ff;
-  --attention: #c2410c;
+  --attention: #b13a0a;
   --attention-tonal: #fdf0e8;
   --ok: #15803d;
   --ok-tonal: #e8f5ee;
@@ -723,5 +723,24 @@ h3,
     opacity: 1;
     transform: none;
     transition: none;
+  }
+}
+
+/* Every desk textarea grows with what is typed (kit AutoGrowTextarea adds a JS fallback).
+   :where() keeps this below utilities, so a fixed-height composer can still opt out. */
+:where(.desk-theme, .admin-theme) textarea {
+  field-sizing: content;
+  max-height: 50dvh;
+}
+
+/* Dark scrollbars on the desk and admin scroll wells (the account menu sits next to them). */
+:root[data-theme="dark"] [data-desk-main],
+:root[data-theme="dark"] [data-admin-main] {
+  scrollbar-color: var(--hairline) var(--canvas);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-desk-main],
+  :root:not([data-theme="light"]) [data-admin-main] {
+    scrollbar-color: var(--hairline) var(--canvas);
   }
 }

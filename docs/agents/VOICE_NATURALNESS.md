@@ -17,7 +17,7 @@ Staging Voice knobs (unchanged across this freeze):
 | EN / SW speed | `1` / `1` | healthz |
 | Gain | `1.38` | healthz |
 | Live transfer | off | healthz `liveTransfer.executor` |
-| DID | `+254709221536` | Done and Dusted, agent Shy |
+| DID | `+254709221537` | Done and Dusted, agent Shy |
 | Caller | `+254790381872` | existing test line |
 
 SHA cutovers while the three calls ran (Railway auto-deploys `main`):

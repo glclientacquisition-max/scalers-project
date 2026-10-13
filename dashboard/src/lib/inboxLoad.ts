@@ -1,5 +1,6 @@
 import { type CallRow } from "@/lib/supabase";
 import { toLead } from "@/lib/callsTriage";
+import type { OwnerFacts } from "@/lib/ownerCallFacts";
 import { storedPhoneCandidates } from "@/lib/handoffMode";
 import {
   assembleInboxItems,
@@ -155,6 +156,20 @@ async function fetchCallsTape(
   return { data, error };
 }
 
+/** Owner-corrected Wanted/Result for these calls. Missing table or error: none (old fields stand). */
+async function loadOwnerFacts(client: SupabaseClient, callIds: string[]): Promise<Map<string, OwnerFacts>> {
+  const out = new Map<string, OwnerFacts>();
+  if (!callIds.length) return out;
+  const { data, error } = await client
+    .from("call_facts")
+    .select("call_id, intent, outcome, source")
+    .in("call_id", callIds)
+    .eq("source", "owner");
+  if (error) return out;
+  for (const row of (data || []) as Array<OwnerFacts & { call_id: string }>) out.set(row.call_id, row);
+  return out;
+}
+
 export async function loadInboxItems(
   client: SupabaseClient,
   tenantId: string,
@@ -165,17 +180,8 @@ export async function loadInboxItems(
   error: string | null;
   partialError: string | null;
 }> {
-  const callsRes = await fetchCallsTape(client, tenantId);
-  if (callsRes.error) {
-    return {
-      items: [],
-      callsTruncated: false,
-      error: callsRes.error.message,
-      partialError: null,
-    };
-  }
-
-  const [openHoldsRes, tapeHoldsRes, openJobsFirst, tapeJobsFirst] = await Promise.all([
+  // Calls tape, holds and jobs only need the tenant id: one round trip, not two.
+  const workPromise = Promise.all([
     fetchPagedOpenWork<InboxHold>((from, to) =>
       client
         .from("service_requests")
@@ -209,6 +215,18 @@ export async function loadInboxItems(
       .order("created_at", { ascending: false })
       .limit(INBOX_WINDOW),
   ]);
+  const [callsRes, work] = await Promise.all([fetchCallsTape(client, tenantId), workPromise]);
+  if (callsRes.error) {
+    return {
+      items: [],
+      callsTruncated: false,
+      error: callsRes.error.message,
+      partialError: null,
+    };
+  }
+
+  const [openHoldsRes, tapeHoldsRes, openJobsFirst, tapeJobsFirst] = work;
+
 
   let openHolds = openHoldsRes;
   let tapeHolds = tapeHoldsRes;
@@ -268,7 +286,9 @@ export async function loadInboxItems(
         openJobs.rows,
         tapeJobs.error ? [] : ((tapeJobs.data || []) as InboxJob[])
       );
-  const leads = (callsRes.data || []).map(toLead);
+  const calls = (callsRes.data || []) as CallRow[];
+  const ownerFacts = await loadOwnerFacts(client, calls.map((c) => c.id));
+  const leads = calls.map((call) => toLead(call, ownerFacts.get(call.id)));
   const items = assembleInboxItems({
     leads,
     holds,

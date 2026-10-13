@@ -1,8 +1,8 @@
 // src/notifications/whatsapp.js
 // Owner / platform WhatsApp via SautiKit Messaging API.
-// Phase 0 dual-use: sender is always the Scalers platform number
+// Sender is always the Scalers platform number
 // (SautiKit 81424fbd-8f4c-459a-858d-98ced4393df6 / +254709221536).
-// Voice on that DID still belongs to Done and Dusted until Phase 2.
+// Staging voice is +254709221537 (Done and Dusted). Prod voice on +254709221536 is Aris Kenya.
 // Do not send shop-caller chat from this number. Do not enable Calling.
 // Staff originate: Meta utility templates (docs/product/WHATSAPP_TEMPLATES.md).
 // Session text only inside an open 24h window (inbound ack, or a follow-up ping).

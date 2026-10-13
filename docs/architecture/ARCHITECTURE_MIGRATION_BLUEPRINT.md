@@ -34,7 +34,7 @@ An automated, sub-second latency AI receptionist platform built specifically for
 
 | Layer | Choice | Rationale |
 | --- | --- | --- |
-| **Telephony** | SautiKit API (+254 DIDs, KES billing, free inbound, bidirectional WebSockets) | Replaces Twilio; local pricing, Kenya DIDs, prepaid KES wallet |
+| **Telephony** | SautiKit API (+254 DIDs, KES billing, KES 0 inbound call leg but about KES 0.50/min for WebSocket streaming, bidirectional WebSockets) | Replaces Twilio; local pricing, Kenya DIDs, prepaid KES wallet |
 | **Orchestration** | Custom Node.js/Express (`server.js` → modular `src/`) | Replaces Vapi/Retell; cost control + full turn-taking ownership |
 | **Speech (STT & TTS)** | Soniox realtime WebSockets | Existing investment + custom voices; must use interim STT for latency |
 | **Intelligence (LLM)** | Google Gemini / OpenAI GPT-4o-mini | Conversational logic, instant fillers, RAG via prompt injection |

@@ -119,7 +119,7 @@ describe("endless list slices", () => {
     assert.doesNotMatch(list, /ContactTableRow/);
     assert.doesNotMatch(list, /DeskDataTable/);
     assert.doesNotMatch(list, /md:hidden|lg:hidden/);
-    assert.match(list, /list-none overflow-hidden rounded-2xl border border-line bg-surface/);
+    assert.match(list, /list-none overflow-hidden rounded-2xl border border-hairline bg-surface/);
     assert.match(list, /appendUniqueById/);
     assert.match(list, /listWindowClass/);
     assert.match(sentinel, /Loading/);

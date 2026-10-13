@@ -165,3 +165,15 @@ export function formatScheduleSummary(schedule: HoursSchedule | null): string {
 export function formatHoursForCompiler(schedule: HoursSchedule | null): string {
   return formatScheduleSummary(schedule);
 }
+
+/** Business hours for owners: "Mon-Fri 08:00-17:00 · Sat 09:00-13:00 · Sun closed". No location, no zone. */
+export function formatHoursForOwner(schedule: HoursSchedule | null): string {
+  const parsed = parseHoursSchedule(schedule);
+  if (!parsed) return "";
+  return formatScheduleSummary({ ...parsed, location: "" })
+    .replace(/\.$/, "")
+    .replace(/ EAT/g, "")
+    .split("; ")
+    .map((s) => s.replace(": ", " "))
+    .join(" · ");
+}

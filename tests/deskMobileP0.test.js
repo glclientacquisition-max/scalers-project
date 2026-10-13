@@ -17,7 +17,7 @@ describe("mobile P0", () => {
 
   it("keeps the caller name visible and the time off the Call button", () => {
     assert.match(phone, /flex min-w-0 flex-col gap-0\.5 sm:flex-row/);
-    assert.match(phone, /min-w-0 sm:flex-1 text-sm tracking-tight/);
+    assert.match(phone, /min-w-0 sm:flex-1 text-body tracking-tight/);
     assert.match(phone, /overflow-hidden/);
     assert.doesNotMatch(phone, /min-w-\[5\.5rem\] shrink-0/);
     assert.match(phone, /<InboxTrailingAction item=\{item\} message=\{message\} \/>/);

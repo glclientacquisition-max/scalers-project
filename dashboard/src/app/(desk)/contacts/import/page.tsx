@@ -4,6 +4,8 @@ import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
+import { memberCan } from "@/lib/requireMember";
 
 export default function ContactImportPage() {
   return (
@@ -14,6 +16,7 @@ export default function ContactImportPage() {
 }
 
 async function ContactImportBody() {
+  if (!(await memberCan("contacts.import"))) return <DeskNoAccess what="Contact import" />;
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return <DeskNoWorkspace />;

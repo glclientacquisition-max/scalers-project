@@ -40,7 +40,7 @@ function ContactsGroupedList({
       {sections.map((section) => (
         <section key={section.key} aria-label={section.label || "Contacts"}>
           {section.label ? (
-            <h2 className="mb-2 px-4 text-meta font-medium uppercase tracking-wide text-ink-3 lg:px-0">
+            <h2 className="mb-2 px-4 text-meta font-medium text-ink-3 lg:px-0">
               {section.label}
             </h2>
           ) : null}

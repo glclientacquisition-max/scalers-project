@@ -134,8 +134,8 @@ describe("desk navigation smoothness", () => {
     assert.match(layout, /DeskNavHost/);
     assert.match(layout, /data-desk-main/);
     assert.match(layout, /DeskScrollRestore/);
-    assert.match(layout, /<DeskRail \/>/);
-    assert.match(layout, /<DeskTabBar \/>/);
+    assert.match(layout, /<DeskRail(?: hideHrefs=\{hideHrefs\})? \/>/);
+    assert.match(layout, /<DeskTabBar(?: hideHrefs=\{hideHrefs\})? \/>/);
     assert.doesNotMatch(layout, /fallback=\{<DeskRail/);
     assert.doesNotMatch(layout, /fallback=\{<DeskTabBar/);
     assert.equal(

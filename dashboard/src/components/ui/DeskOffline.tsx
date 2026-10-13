@@ -21,7 +21,7 @@ export function DeskOffline() {
   return (
     <div className="border-b border-warn/40 bg-warn-soft">
       <p
-        className="mx-auto max-w-desk px-4 py-3 text-sm text-warn sm:px-6"
+        className="mx-auto max-w-desk px-4 py-3 text-body text-warn sm:px-6"
         role="status"
       >
         No connection.

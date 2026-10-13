@@ -1,9 +1,12 @@
-// Platform-wide ops alerts (speech | reasoning | telephony). Not per-tenant owner SMS.
+// Platform-wide ops alerts (speech | reasoning | telephony | audio). Not per-tenant owner SMS.
 // Separate cooldown and recipient list from speechOutageNotify.js.
 
 const { dispatchToStaff } = require('./recipients');
 const { platformOpsDegradeBody } = require('./templates');
-const { platformOpsRecipients } = require('./platformOpsRecipients');
+const {
+  platformOpsRecipients,
+  resetPlatformOpsRecipientsCache,
+} = require('./platformOpsRecipients');
 
 /** @type {Map<string, boolean>} */
 const degraded = new Map();
@@ -11,7 +14,8 @@ const degraded = new Map();
 const alertedAt = new Map();
 let dispatchOverride = null;
 
-const KINDS = new Set(['speech', 'reasoning', 'telephony']);
+// audio: SautiKit-hosted line-unavailable clips failed to refresh (calls use <Say>).
+const KINDS = new Set(['speech', 'reasoning', 'telephony', 'audio']);
 
 function normalizeKind(kind) {
   const k = String(kind || '').trim().toLowerCase();
@@ -44,7 +48,7 @@ function buildPlatformOpsBody(kind, detail = {}) {
 /**
  * Fire when a platform lane newly degrades. One ping per kind until recovery.
  *
- * @param {'speech'|'reasoning'|'telephony'|'llm'} kind
+ * @param {'speech'|'reasoning'|'telephony'|'audio'|'llm'} kind
  * @param {{ channel?: string, message?: string, balanceMinor?: number, currency?: string }} [detail]
  */
 async function notePlatformOpsDegrade(kind, detail = {}) {
@@ -58,11 +62,11 @@ async function notePlatformOpsDegrade(kind, detail = {}) {
     return { ok: false, reason: 'cooldown' };
   }
 
-  const { recipients, source } = platformOpsRecipients();
+  const { recipients, source } = await platformOpsRecipients();
   if (!recipients.length) {
     alertedAt.delete(key);
     console.error(
-      `[platform-ops] ${key} degraded but no ops list (set SCALERS_OPS_ALERT_PHONES or SCALERS_OPS_ALERT_EMAILS)`
+      `[platform-ops] ${key} degraded but no ops list (add an email in Super Admin > Escalate, or set SCALERS_OPS_ALERT_EMAILS)`
     );
     return { ok: false, reason: 'no_ops_recipients', source };
   }
@@ -73,7 +77,9 @@ async function notePlatformOpsDegrade(kind, detail = {}) {
       ? 'Scalers platform speech down'
       : key === 'reasoning'
         ? 'Scalers platform reasoning down'
-        : 'Scalers platform phone line down';
+        : key === 'audio'
+          ? 'Scalers platform phone audio refresh failed'
+          : 'Scalers platform phone line down';
 
   if (String(process.env.VOICE_PLATFORM_OPS_DRY_RUN || '').toLowerCase() === 'true') {
     degraded.set(key, true);
@@ -90,7 +96,8 @@ async function notePlatformOpsDegrade(kind, detail = {}) {
       body,
       subject,
       lead: { reason: `Platform ${key} degraded`, businessName: null },
-      channels: { sms: true, whatsapp: true, email: true },
+      // Email only for now. No SMS or WhatsApp for platform ops alerts.
+      channels: { sms: false, whatsapp: false, email: true },
       ledger: { kind: ledgerKind(key) },
     });
     const hit = sent.find((row) => row.channel);
@@ -128,6 +135,7 @@ function resetPlatformOpsAlert() {
   degraded.clear();
   alertedAt.clear();
   dispatchOverride = null;
+  resetPlatformOpsRecipientsCache();
 }
 
 /** Tests only. */

@@ -39,7 +39,7 @@ const POOL: DidPoolRow[] = [
     tenant_id: "biz-live",
     assigned_at: "2026-09-02T08:00:00.000Z",
     notes: null,
-    tenants: { business_name: "Sample Shop" },
+    tenants: { business_name: "Sample Shop", is_active: true },
   },
 ];
 
@@ -53,6 +53,7 @@ const BUSINESSES: AdminBusiness[] = [
     sautikit_virtual_number: "pending:biz-waiting",
     whatsapp_notification_number: "+254722000222",
     is_active: true,
+    archived_at: null,
     package_name: null,
     package_period: null,
     billing_enforcement: "off",
@@ -65,6 +66,7 @@ const BUSINESSES: AdminBusiness[] = [
     sautikit_virtual_number: "+254711000111",
     whatsapp_notification_number: "+254733000333",
     is_active: true,
+    archived_at: null,
     package_name: "Starter",
     package_period: "month",
     billing_enforcement: "soft",
@@ -77,8 +79,22 @@ const BUSINESSES: AdminBusiness[] = [
     sautikit_virtual_number: "pending:biz-archived",
     whatsapp_notification_number: "pending",
     is_active: false,
+    archived_at: "2026-08-20T08:00:00.000Z",
     package_name: null,
     package_period: null,
+    billing_enforcement: "off",
+    status: "archived",
+  },
+  {
+    id: "biz-archived-recent",
+    created_at: "2026-08-14T08:00:00.000Z",
+    business_name: "Paused Salon",
+    sautikit_virtual_number: "+254711000444",
+    whatsapp_notification_number: "pending",
+    is_active: false,
+    archived_at: "2026-10-05T08:00:00.000Z",
+    package_name: "Starter",
+    package_period: "month",
     billing_enforcement: "off",
     status: "archived",
   },
@@ -89,6 +105,7 @@ const BUSINESSES: AdminBusiness[] = [
     sautikit_virtual_number: `+25471100${String(200 + index).padStart(4, "0")}`,
     whatsapp_notification_number: "+254733000333",
     is_active: true,
+    archived_at: null,
     package_name: index % 2 === 0 ? "Starter" : null,
     package_period: index % 2 === 0 ? ("month" as const) : null,
     billing_enforcement: "off" as const,
@@ -114,6 +131,13 @@ export default function DevAdminOpsPage() {
             businesses={BUSINESSES}
             pendingBusinesses={PENDING}
             availableDids={AVAILABLE_DIDS}
+            badges={{
+              "biz-live": {
+                score: 38,
+                dropping: true,
+                droppingReason: "Score fell 22 points in 7 days",
+              },
+            }}
           />
         </section>
       </div>

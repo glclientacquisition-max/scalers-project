@@ -26,16 +26,16 @@ function SlotRow({
   ret?: InboxReturn;
 }) {
   return (
-    <li className="relative border-t border-line/70 pt-2 first:border-t-0 first:pt-0">
+    <li className="relative border-t border-hairline/70 pt-2 first:border-t-0 first:pt-0">
       <DeskRowHit
         href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: "job" }) : null}
         label="Conversation"
       />
-      <p className={`${deskRowMutedClass} text-sm font-semibold text-ink ${deskPreviewClass}`}>
+      <p className={`${deskRowMutedClass} text-body font-semibold text-ink ${deskPreviewClass}`}>
         {visit.when_text || item.headline}
       </p>
       {visit.when_text ? (
-        <p className={`${deskRowMutedClass} mt-0.5 text-xs text-ink ${deskPreviewClass}`}>
+        <p className={`${deskRowMutedClass} mt-0.5 text-meta text-ink ${deskPreviewClass}`}>
           {item.headline}
         </p>
       ) : null}
@@ -67,12 +67,12 @@ function DaySection({
         day.isToday ? "bg-accent/[0.06]" : "",
       ].join(" ")}
     >
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+      <h2 className="text-meta font-semibold text-ink-2">
         {day.weekdayShort} {day.dayNum}
       </h2>
       <ul className="mt-2 space-y-2">
         {rows.length === 0 ? (
-          <li className="text-xs text-ink-soft">None</li>
+          <li className="text-meta text-ink-2">None</li>
         ) : (
           rows.map((visit) => {
             const item = byId.get(visit.id);
@@ -116,18 +116,18 @@ export function VisitWeekCalendar({
 
   return (
     <div className="mt-8">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-        <p className="text-sm font-semibold text-ink">{heading}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-3">
+        <p className="text-body font-semibold text-ink">{heading}</p>
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={prevHref}
-            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
+            className="inline-flex min-h-11 items-center rounded-xl border border-hairline px-3 text-body font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
           >
             Prev
           </Link>
           <Link
             href={nextHref}
-            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
+            className="inline-flex min-h-11 items-center rounded-xl border border-hairline px-3 text-body font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
           >
             Next
           </Link>
@@ -135,8 +135,8 @@ export function VisitWeekCalendar({
       </div>
 
       {empty ? (
-        <div className="border-y border-line py-12 text-center">
-          <p className="font-display text-2xl tracking-tight text-ink">{copy.jobEmpty}</p>
+        <div className="border-y border-hairline py-12 text-center">
+          <p className="font-display text-page tracking-tight text-ink">{copy.jobEmpty}</p>
           <Link href={listHref} className={`${btnGhost} mt-6`}>
             List
           </Link>
@@ -155,7 +155,7 @@ export function VisitWeekCalendar({
               />
             ))}
           </div>
-          <div className="mt-4 hidden overflow-hidden rounded-2xl border border-line bg-line md:grid md:grid-cols-7 md:gap-px">
+          <div className="mt-4 hidden overflow-hidden rounded-2xl border border-hairline bg-hairline md:grid md:grid-cols-7 md:gap-px">
             {days.map((day) => (
               <DaySection
                 key={day.key}
@@ -171,10 +171,10 @@ export function VisitWeekCalendar({
 
       {unscheduled.length ? (
         <div className="mt-6">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+          <h2 className="text-meta font-semibold text-ink-2">
             Time TBD
           </h2>
-          <ul className="mt-2 divide-y divide-line border-y border-line">
+          <ul className="mt-2 divide-y divide-hairline border-y border-hairline">
             {unscheduled.map((visit) => {
               const item = byId.get(visit.id);
               if (!item) return null;
@@ -185,8 +185,8 @@ export function VisitWeekCalendar({
                     label="Conversation"
                   />
                   <div className={deskRowMutedClass}>
-                    <p className={`text-sm font-semibold text-ink ${deskPreviewClass}`}>{item.headline}</p>
-                    <p className={`text-xs text-ink-soft ${deskPreviewClass}`}>{item.callerName || "Caller"}</p>
+                    <p className={`text-body font-semibold text-ink ${deskPreviewClass}`}>{item.headline}</p>
+                    <p className={`text-meta text-ink-2 ${deskPreviewClass}`}>{item.callerName || "Caller"}</p>
                   </div>
                   <div className={deskRowActionClass}>
                     <RowAction item={item} />

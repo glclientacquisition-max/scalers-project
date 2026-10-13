@@ -48,7 +48,7 @@ describe('platformOpsAlert', () => {
 
   it('dry-run logs without dispatch', async () => {
     process.env.VOICE_PLATFORM_OPS_DRY_RUN = 'true';
-    process.env.SCALERS_OPS_ALERT_PHONES = '+254700000099';
+    process.env.SCALERS_OPS_ALERT_EMAILS = 'ops@scalers.co.ke';
     let called = false;
     setPlatformOpsDispatch(async () => {
       called = true;
@@ -60,12 +60,41 @@ describe('platformOpsAlert', () => {
     assert.equal(called, false);
   });
 
+  it('dispatches email only and ignores ops phones', async () => {
+    const sent = [];
+    setPlatformOpsDispatch(async (opts) => {
+      sent.push(opts);
+      return { sent: [{ channel: 'email', to: 'ops@scalers.co.ke' }], errors: [] };
+    });
+    process.env.SCALERS_OPS_ALERT_PHONES = '+254700000099';
+    process.env.SCALERS_OPS_ALERT_EMAILS = 'ops@scalers.co.ke';
+    await notePlatformOpsDegrade('telephony');
+    assert.equal(sent.length, 1);
+    assert.deepEqual(sent[0].channels, { sms: false, whatsapp: false, email: true });
+    assert.deepEqual(
+      sent[0].recipients.map((r) => [r.phone, r.email]),
+      [['', 'ops@scalers.co.ke']]
+    );
+  });
+
+  it('phones alone are not an ops list', async () => {
+    let called = false;
+    setPlatformOpsDispatch(async () => {
+      called = true;
+      return { sent: [], errors: [] };
+    });
+    process.env.SCALERS_OPS_ALERT_PHONES = '+254700000099';
+    const result = await notePlatformOpsDegrade('speech');
+    assert.equal(result.reason, 'no_ops_recipients');
+    assert.equal(called, false);
+  });
+
   it('recovery allows a later alert', async () => {
     setPlatformOpsDispatch(async () => ({
-      sent: [{ channel: 'sms', to: '+254700000099' }],
+      sent: [{ channel: 'email', to: 'ops@scalers.co.ke' }],
       errors: [],
     }));
-    process.env.SCALERS_OPS_ALERT_PHONES = '+254700000099';
+    process.env.SCALERS_OPS_ALERT_EMAILS = 'ops@scalers.co.ke';
     await notePlatformOpsDegrade('telephony');
     notePlatformOpsRecovered('telephony');
     const again = await notePlatformOpsDegrade('telephony');
