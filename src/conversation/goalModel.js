@@ -187,6 +187,9 @@ function formatVisitSopForPrompt(state) {
   } else if (decision?.blocked === 'refused') {
     nextLine =
       'They refused a location twice. Escalate or log an enquiry. Do not create_appointment. Never say landmark.';
+  } else if (decision?.coverageUnconfirmed) {
+    nextLine =
+      'Area is not owner-confirmed. Never say covered or outside. Say once: I\'ll have the team confirm the area. Continue; create_appointment notes area not confirmed. Never say landmark.';
   } else if (decision?.confirmAccess) {
     nextLine =
       'Area is in coverage. Append create_appointment and note confirm access. Speak nothing. Never say landmark.';

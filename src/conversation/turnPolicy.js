@@ -38,6 +38,18 @@ const { unfinishedTurnHold } = require('./unfinishedTurn');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
+function offerYesNoLine(language) {
+  const lang = String(language || 'en').toLowerCase();
+  if (lang === 'sheng') return 'Niandike hii kwa team? Sema ndio ama hapana.';
+  if (lang === 'sw' || lang.startsWith('swahili')) return 'Niandike hii kwa timu? Tafadhali sema ndio au hapana.';
+  return 'Should I note it for the team? Please say yes or no.';
+}
+
+function slotText(raw) {
+  const value = raw && typeof raw === 'object' ? raw.value : raw;
+  return String(value || '').trim();
+}
+
 function nothingSavedLine(language) {
   const lang = String(language || 'en').toLowerCase();
   if (lang === 'sw') return 'Sawa. Sijahifadhi chochote.';
@@ -172,6 +184,17 @@ function resolveLocalReply({
     };
   }
 
+  // BRAIN_CONFIRMED_COVERAGE: a bare Okay / Sawa to the note-for-the-team
+  // offer is not a yes. Ask once for a clear yes or no; nothing is saved.
+  if (
+    state?.conversation?.pendingAsk?.kind === 'offer' &&
+    state?.conversation?.nonConsentAck === true &&
+    state?.conversation?.leaveIt !== true &&
+    require('./confirmedCoverage').confirmedCoverageEnabled()
+  ) {
+    return { outcome: 'offer_yes_no', line: offerYesNoLine(language) };
+  }
+
   // Visit, hold, and order words are on conversation.fileReadSentence for Voice.
   // Do not speak them here. A local reply would end the turn before Gemini.
 
@@ -216,7 +239,11 @@ function resolveLocalReply({
   const coverageLine = coverageAskSpeech(clean, profile, language, state);
   if (coverageLine) return publish({ outcome: 'coverage', line: coverageLine });
 
-  const placeBlockLine = visitBlockSpeech(state?.visitPlace?.blocked, language);
+  const placeBlockLine = visitBlockSpeech(
+    state?.visitPlace?.blocked,
+    language,
+    slotText(state?.entities?.location) || slotText(state?.entities?.landmark)
+  );
   if (placeBlockLine && looksLikeLeaveIt(clean)) {
     return { outcome: 'leave_it', line: nothingSavedLine(language) };
   }

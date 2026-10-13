@@ -20,6 +20,7 @@ const {
   readVisitPlace,
   classifyVisitLocation,
   assessCoverage,
+  coverageStatus,
   appendVisitNotes,
   hasCoverageText,
   mentionsPin,
@@ -409,19 +410,24 @@ function visitCoverageProfile(opts = {}) {
   return {
     businessPolicies: opts.businessPolicies || null,
     businessLocations: opts.businessLocations || null,
+    // BRAIN_CONFIRMED_COVERAGE reads owner confirmation from tenant_field_meta.
+    fieldMeta: opts.fieldMeta || null,
   };
 }
 
 function applyVisitPlaceNotes(value, profile) {
   const quality = classifyVisitLocation(value.landmark);
-  const coverage = assessCoverage(value.landmark, profile);
+  const status = coverageStatus(value.landmark, profile);
+  const coverage = status === 'unconfirmed' ? 'unknown' : status;
   return {
     ...value,
     notes: appendVisitNotes(value.notes, {
       confirmAccess: quality === 'area_only' && coverage === 'inside',
       pinNote: mentionsPin(value.landmark),
+      // Flag on: any unconfirmed area is noted for the owner.
       areaUnconfirmed:
-        quality === 'findable' && coverage === 'unknown' && hasCoverageText(profile),
+        status === 'unconfirmed' ||
+        (quality === 'findable' && coverage === 'unknown' && hasCoverageText(profile)),
     }),
   };
 }
@@ -442,6 +448,7 @@ function validateCreateAppointment(
     knownNames = [],
     businessPolicies = null,
     businessLocations = null,
+    fieldMeta = null,
   } = {}
 ) {
   if (!raw || typeof raw !== 'object') {
@@ -491,6 +498,7 @@ function validateCreateAppointment(
   const coverageProfile = visitCoverageProfile({
     businessPolicies,
     businessLocations,
+    fieldMeta,
   });
   if (outsideVisitPlace(place, coverageProfile)) {
     return {
@@ -873,6 +881,7 @@ async function executeBrainTools({
       knownNames,
       businessPolicies,
       businessLocations,
+      fieldMeta,
     });
     const fingerprint = validation.valid
       ? stableFingerprint('create_appointment', validation.value)

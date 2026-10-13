@@ -328,6 +328,11 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     '- Out of Train scope: use UNKNOWN REQUEST LINE and note/callback. Do not bluff expertise.',
     '- After a clear completion, confirm briefly and goodbye.'
   );
+  if (require('../confirmedCoverage').confirmedCoverageEnabled()) {
+    lines.push(
+      '- CONFIRMED COVERAGE ONLY: say a place is covered or outside only from an owner-confirmed Coverage line in POLICIES. Otherwise say "I\'ll have the team confirm {place}." and continue the job. Never use Delivery text or location notes as coverage. No callback time.'
+    );
+  }
 
   return lines.join('\n');
 }

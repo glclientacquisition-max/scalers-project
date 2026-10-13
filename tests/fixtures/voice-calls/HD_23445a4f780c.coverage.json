@@ -1,0 +1,43 @@
+{
+  "note": "Staging D&D call HD_23445a4f780c (2026-10-09 ~11:00 EAT). Caller and spoken lines from voice_turn_traces. coverage_areas are source seed with no owner confirmation.",
+  "callId": "HD_23445a4f780c",
+  "businessName": "Done and Dusted",
+  "vertical": "home_services",
+  "businessPolicies": {
+    "coverage_areas": ["county:nairobi", "place:kitengela", "county:kiambu", "place:juja", "place:ongata rongai", "place:syokimau"]
+  },
+  "turns": [
+    {
+      "turn": 8,
+      "caller": "What? Where are you located?",
+      "language": "en",
+      "spoken": "We are located in Nairobi and offer door-to-door cleaning services across Nairobi and surrounding areas like Kiambu, Kitengela, Juja, Rongai, and Syokimau. Where are you located so we can plan a visit?"
+    },
+    {
+      "turn": 9,
+      "caller": "Mmh, na kama niko outside Nairobi, how is it done?",
+      "language": "sw",
+      "spoken": "Ndiyo, tunafika Syokimau.",
+      "model": "Tunafanya usafi kote Nairobi na maeneo ya karibu kama Kiambu, Kitengela, Juja, Ongata Rongai, na Syokimau. Eneo lako likiwa nje ya hapo, iko nje ya huduma zetu na naweza kuwachukulia ujumbe timu yetu. Uko eneo gani mkuu?"
+    },
+    {
+      "turn": 11,
+      "caller": "Maybe Nakuru, Kisumu, how is it done?",
+      "language": "en",
+      "spoken": "Places like Nakuru and Kisumu are outside our coverage area, as we only serve Nairobi, Kiambu, Kitengela, Juja, Ongata Rongai, and Syokimau.",
+      "appended": "Should I note it for the team?"
+    },
+    {
+      "turn": 12,
+      "caller": "Okay.",
+      "language": "en",
+      "spoken": "Is there anything else I can help you with today?"
+    },
+    {
+      "turn": 13,
+      "caller": "So with you, I can make a booking, right?",
+      "language": "en",
+      "spoken": "Okay, I've saved your request."
+    }
+  ]
+}

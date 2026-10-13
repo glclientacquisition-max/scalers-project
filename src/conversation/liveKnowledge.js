@@ -167,7 +167,11 @@ function buildLiveGroundTruth(profile = {}) {
     answer: row.answer,
   }));
   const team = normalizeTeam(profile.teamDirectory);
-  const locations = normalizeLocations(profile.businessLocations);
+  // BRAIN_CONFIRMED_COVERAGE: location coverage notes are not coverage; only
+  // the owner-confirmed Coverage list in POLICIES is.
+  const locations = normalizeLocations(profile.businessLocations).map((loc) =>
+    require('./confirmedCoverage').confirmedCoverageEnabled() ? { ...loc, coverage_notes: '' } : loc
+  );
   const policySplit = factPolicyMap(profile.businessPolicies, fieldMeta);
   const policies = normalizePolicies(policySplit.policies);
   const unknownTopics = [...policySplit.unknown, ...unknownFaqTopics(profile.faqs, fieldMeta)];

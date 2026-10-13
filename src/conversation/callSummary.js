@@ -88,6 +88,12 @@ function deriveCallSummary(opts = {}) {
     }
   }
 
+  // BRAIN_CONFIRMED_COVERAGE: places the owner still has to confirm.
+  // state.needs exists only when the flag is on.
+  for (const line of require('./confirmedCoverage').openCoverageNeedLines(state)) {
+    if (!instructions.includes(line)) instructions.push(line);
+  }
+
   const name = safeCallerName(state);
   const goal = safeGoalDescription(state.goal?.description || '');
   const reason = buildOwnerReason({
