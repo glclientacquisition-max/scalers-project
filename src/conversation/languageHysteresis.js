@@ -98,7 +98,11 @@ function scoreTurnLanguage(text, tokenLanguages = []) {
   }
   const top = share.en >= share.sw ? 'en' : 'sw';
   const topShare = Math.max(share.en, share.sw);
-  if (topShare < 0.65) {
+  // v2 (bug 5, 13 Oct): a turn is only "clear" when one language carries it
+  // (≥ 0.85 share, ≥ 3 content words) AND the other language has no keyword
+  // evidence at all. Any code-switched turn is "mixed" and never counts.
+  const minorityHits = top === 'en' ? Number(evidence.scores?.sw || 0) : Number(evidence.scores?.en || 0);
+  if (topShare < 0.85 || contentWords < 3 || minorityHits > 0) {
     return { turnLang: 'mixed', share, contentWords, shengHits };
   }
   return { turnLang: top, share, contentWords, shengHits };
@@ -157,6 +161,7 @@ function observeTurn(lock, { text = '', tokenLanguages = [] } = {}) {
   const scored = scoreTurnLanguage(text, tokenLanguages);
   let { turnLang } = scored;
   if (turnLang === 'mixed' || turnLang === 'unknown' || scored.loanwordOnly) {
+    if (turnLang === 'mixed') state.votes = []; // a mixed turn breaks a switch streak
     return {
       lock: state,
       decision: {
@@ -168,17 +173,11 @@ function observeTurn(lock, { text = '', tokenLanguages = [] } = {}) {
     };
   }
 
-  // Clear deliberate switch: share ≥ 0.85 and ≥ 6 content words.
-  const topShare = Math.max(scored.share.en, scored.share.sw);
-  const clearSwitch =
-    turnLang !== state.lang &&
-    LOCKABLE.has(turnLang) &&
-    topShare >= 0.85 &&
-    scored.contentWords >= 6;
-
-  const votes = Array.isArray(state.votes) ? state.votes.slice(-2) : [];
+  // v2 (bug 5): no single-turn switch. Switch only on an explicit request
+  // (above) or two clear turns in a row in the other language.
+  const votes = Array.isArray(state.votes) ? state.votes.slice(-1) : [];
   votes.push(turnLang);
-  state.votes = votes.slice(-3);
+  state.votes = votes;
 
   let switched = false;
   if (state.lang === 'unknown' || state.lang === 'mixed') {
@@ -186,19 +185,14 @@ function observeTurn(lock, { text = '', tokenLanguages = [] } = {}) {
     state.source = 'first';
     state.lockedAt = Date.now();
     switched = true;
-  } else if (clearSwitch) {
-    state.lang = turnLang;
-    state.source = 'clear_switch';
-    state.lockedAt = Date.now();
-    switched = true;
-    state.votes = [turnLang];
   } else if (turnLang !== state.lang) {
-    const agree = state.votes.filter((v) => v === turnLang).length;
-    if (agree >= 2) {
+    if (state.votes.length === 2 && state.votes.every((v) => v === turnLang)) {
       state.lang = turnLang;
-      state.source = 'hysteresis_2of3';
+      state.source = 'two_clear_turns';
       state.lockedAt = Date.now();
       switched = true;
+    } else {
+      state.source = 'sticky';
     }
   } else {
     state.source = 'confirm';

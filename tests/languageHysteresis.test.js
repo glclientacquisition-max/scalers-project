@@ -95,7 +95,39 @@ describe('server wiring flag-gated', () => {
     assert.ok(SERVER.includes('langHysteresisEnabled'));
     assert.ok(SERVER.includes('VOICE_LANG_HYSTERESIS') || SERVER.includes('langHysteresisEnabled'));
     assert.ok(SERVER.includes('resolveLanguageState(callLanguageState, languageEvidence)'));
-    assert.ok(SERVER.includes('greeting sentence tts lang='));
+    // v2: the greeting is one synthesis call — no per-sentence split.
+    assert.ok(!SERVER.includes('greeting sentence tts lang='));
+    assert.ok(!SERVER.includes('splitGreetingSentences('));
     assert.equal(lockToCallLanguage({ lang: 'sw' }), 'sw');
+  });
+});
+
+describe('v2 bug 5: mixed turns never count, two clear turns to switch', () => {
+  const on = () => { process.env.VOICE_LANG_HYSTERESIS = 'on'; };
+  it('code-switched turns stay mixed and never flip the lock', () => {
+    on();
+    let lock = createLanguageLock({ lang: 'en' });
+    for (const t of [
+      'Nataka cleaning ya carpet tomorrow morning kama inawezekana',
+      'I want the mattress cleaning lakini kesho asubuhi',
+      'Yes please, ningependa kujua bei ya sofa cleaning',
+    ]) {
+      const r = observeTurn(lock, { text: t });
+      lock = r.lock;
+      assert.equal(r.decision.switched, false, t);
+      assert.equal(lock.lang, 'en', t);
+    }
+  });
+  it('one clear Swahili turn does not switch; two in a row do; a mixed turn resets', () => {
+    on();
+    let lock = createLanguageLock({ lang: 'en' });
+    const sw = 'Habari yako, ningependa kuuliza kuhusu huduma zenu za usafi wa nyumba';
+    lock = observeTurn(lock, { text: sw }).lock;
+    assert.equal(lock.lang, 'en');
+    lock = observeTurn(lock, { text: 'I want the mattress cleaning lakini kesho asubuhi' }).lock;
+    lock = observeTurn(lock, { text: sw }).lock;
+    assert.equal(lock.lang, 'en');
+    lock = observeTurn(lock, { text: 'Naomba mtu aje kesho asubuhi kusafisha nyumba yangu' }).lock;
+    assert.equal(lock.lang, 'sw');
   });
 });

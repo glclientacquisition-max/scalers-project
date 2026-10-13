@@ -382,8 +382,6 @@ const {
   createLanguageLock,
   observeTurn,
   lockToCallLanguage,
-  sentenceTtsLanguage,
-  splitGreetingSentences,
 } = require('./src/conversation/languageHysteresis');
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
@@ -2402,37 +2400,8 @@ mediaWss.on('connection', (ws, req) => {
   async function speakGreetingSentences(text, opts = {}) {
     if (!text) return { ok: false };
     if (speechOutageStarted) return { ok: false, outage: true };
-    // VOICE_LANG_HYSTERESIS: per-sentence TTS language on the greeting
-    // ("Good morning…" en, "Nikusaidie vipi." sw).
-    if (langHysteresisEnabled() && opts.perSentenceLang !== false) {
-      const sentences = splitGreetingSentences(text);
-      if (sentences.length > 1) {
-        bargeInActive = false;
-        suppressReplyRemainder = false;
-        lastAgentText = String(text);
-        agentReplay.beginSpeech(text);
-        let anyOk = false;
-        let cancelled = false;
-        for (const sentence of sentences) {
-          if (bargeInActive) {
-            cancelled = true;
-            break;
-          }
-          const lang = sentenceTtsLanguage(sentence);
-          console.log(
-            `[ws/media][${sidLabel()}] greeting sentence tts lang=${lang}: ${sentence}`
-          );
-          const spoken = await speakText(sentence, {
-            language: lang,
-            skipFileGate: true,
-            tracePath: 'greeting_sentence',
-          });
-          if (spoken?.ok) anyOk = true;
-          if (spoken?.cancelled) cancelled = true;
-        }
-        return { ok: anyOk, cancelled };
-      }
-    }
+    // v2 (13 Oct): the opening is ONE string, ONE voice, ONE synthesis call.
+    // No per-sentence language split (it sounded like several speakers).
     if (!tts && ttsReadyPromise) {
       try {
         await Promise.race([
