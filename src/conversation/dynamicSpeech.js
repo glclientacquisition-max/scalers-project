@@ -478,6 +478,16 @@ function polishSpokenDetail(text, opts = {}) {
   const after = String(out || '').trim();
   let reason = '';
   if (dropReasons.length) reason = dropReasons[0];
+  // BRAIN_TRUST_P1: any guard (not only the trust mouth) that empties model
+  // text marks the turn, so the empty-turn repair is not a false
+  // "say that again" (HD_35b75499d483: name_ask_repeat dropped the reply).
+  if (dropReasons.length && !String(out || '').trim() && String(text || '').trim() && opts.state) {
+    const trustP1 = require('./trustP1');
+    if (trustP1.trustP1Enabled()) {
+      opts.state.trust = opts.state.trust || {};
+      opts.state.trust.guardDroppedTurn = Number(opts.state?.conversation?.turnCount || 0);
+    }
+  }
   else if (!after) reason = 'dropped';
   else if (after !== before) reason = 'rewritten';
   return { text: out, reason, dropReasons };

@@ -727,7 +727,9 @@ function observeCallerTurn(state, input = {}) {
     'home_services';
   const homeVisit = homeVertical && next.intent === 'booking';
   if (homeVertical) {
-    const askedPlace = coverageAskPlace(text);
+    // BRAIN_TRUST_P1: the generic parser (lead-ins, SW verbs, greetings) — see placeAsk.js.
+    const placeAskMod = require('./placeAsk');
+    const askedPlace = placeAskMod.trustOn() ? placeAskMod.coverageAskPlaceGeneric(text) : coverageAskPlace(text);
     if (askedPlace) {
       const foldedAsk = foldCanonicalPlace(askedPlace, input.profile) || askedPlace;
       // BRAIN_CONFIRMED_COVERAGE: a place we cannot answer from the confirmed
@@ -839,6 +841,10 @@ function observeCallerTurn(state, input = {}) {
     next.goal.missingSlots = next.goal.missingSlots.filter(
       (slot) => !['location', 'area', 'landmark'].includes(slot)
     );
+  }
+  // BRAIN_TRUST_P1: a greeting phrase is never the caller's place (echo of our greeting).
+  if (require('./placeAsk').trustOn() && next.entities?.location && require('./placeAsk').isGreetingPhrase(next.entities.location.value || next.entities.location)) {
+    delete next.entities.location;
   }
   return next;
 }

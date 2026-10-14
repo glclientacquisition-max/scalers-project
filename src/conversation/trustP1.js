@@ -605,6 +605,7 @@ function pendingNameAsk(state) {
   return trustP1Enabled() && a?.pending && state?.caller?.nameConfirmed !== true ? a : null;
 }
 
+const EXPLICIT_NAME_LEAD = /(?:^|\s)(?:my name is|my name's|i am|i'm|this is|jina langu ni|naitwa|mimi ni|ni mimi)\s+\S/i;
 const NAME_LEAD = /^(?:(?:uh+|um+|er+|ah+|eh+|yes|yeah|ndio|ndiyo|eeh|ok(?:ay)?|sawa)[, ]+)*(?:(?:my name is|my name's|i am|i'm|it'?s|this is|it is|ni|mimi ni|jina langu ni|naitwa)\s+)?/i;
 const NOT_A_NAME = /^(?:yes|no|yeah|okay|ok|sawa|ndio|hapana|hello|hi|sorry|what|why|who|because|i|me|the|a)$/i;
 
@@ -615,12 +616,16 @@ const NOT_A_NAME = /^(?:yes|no|yeah|okay|ok|sawa|ndio|hapana|hello|hi|sorry|what
 function nameFromAnswer(text) {
   let raw = String(text || '').trim().replace(/[.!?,]+$/g, '').trim();
   raw = raw.replace(/\s+(?:is (?:the|my) name|ndio jina(?: langu)?|here|speaking)$/i, '').trim();
+  const beforeLead = raw;
   raw = raw.replace(NAME_LEAD, '').trim().replace(/[.!?,]+$/g, '');
+  // "my name is …" / "naitwa …" / "jina langu ni …" / "is the name": trust the name.
+  const explicit = EXPLICIT_NAME_LEAD.test(beforeLead) || /\b(?:is (?:the|my) name|ndio jina)/i.test(String(text || ''));
   const words = raw.split(/\s+/).filter(Boolean);
   if (!words.length || words.length > 3) return '';
-  if (words.some((w) => !/^\p{L}[\p{L}'’-]*$/u.test(w) || NOT_A_NAME.test(w))) return '';
+  if (words.some((w) => !/^\p{L}[\p{L}'’-]*$/u.test(w))) return '';
+  if (!explicit && words.some((w) => NOT_A_NAME.test(w))) return '';
   // eslint-disable-next-line global-require
-  if (require('./callerNameQuality').isNonNameUtterance(raw)) return '';
+  if (require('./callerNameQuality').isNonNameUtterance(raw, { explicit, bare: !explicit })) return '';
   return words.map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
 
