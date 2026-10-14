@@ -98,6 +98,70 @@ const HEAR_AGAIN_ONLY_RE =
 const NAMED_EARLY_CUES =
   /^(wait|stop|hold(?:\s+on)?|no|nope|actually|sorry|pardon|subiri|simama|acha|hapana|i said)\b/i;
 
+// Words that carry no request on their own: backchannels, fillers, greetings,
+// politeness, and bare conjunctions. Anything else is content.
+const NON_CONTENT_WORDS = new Set([
+  'mm', 'mmm', 'hm', 'hmm', 'mhm', 'mmhm', 'mmhmm', 'uh', 'um', 'er', 'erm', 'ah', 'aha',
+  'oh', 'eh', 'eeh', 'huh', 'ok', 'okay', 'oke', 'alright', 'right', 'sure', 'fine', 'great',
+  'true', 'yes', 'yeah', 'yep', 'yup', 'no', 'nope', 'sawa', 'ndiyo', 'ndio', 'poa', 'haya',
+  'basi', 'asante', 'thanks', 'thank', 'you', 'please', 'hello', 'hi', 'hey', 'so', 'and',
+  'but', 'or', 'well', 'like', 'just', 'na', 'then', 'i', 'see', 'got', 'it', 'gemini',
+]);
+
+/**
+ * A caller final that carries a question or content words. "Mm-hm.", "Okay.",
+ * "Hello?" and "Do." do not; "Unawashangaa apartment?" and "Kuru?" do.
+ * Such a final must never be dropped silently (HD_054e4f7ff253 t3).
+ * @param {string} text
+ */
+function finalCarriesContent(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return false;
+  const words = normalizeSpeech(raw)
+    .replace(/\?/g, ' ')
+    .split(/[\s-]+/)
+    .map((word) => word.replace(/^'+|'+$/g, ''))
+    .filter(Boolean);
+  const content = words.filter((word) => word.length >= 2 && !NON_CONTENT_WORDS.has(word));
+  if (!content.length) return false;
+  if (content.some((word) => word.length >= 3)) return true;
+  return raw.includes('?');
+}
+
+/**
+ * An ignored or skipped final that must be kept anyway: it carries content and
+ * is not an echo of the agent. Server and replay share this rule.
+ * @param {{ action?: string, reason?: string, queue?: boolean }} decision
+ * @param {string} text
+ */
+function keepDroppedFinal(decision, text) {
+  if (!decision || decision.queue) return false;
+  if (decision.action !== 'ignore' && decision.action !== 'skip') return false;
+  if (decision.reason === 'echo' || decision.reason === 'empty') return false;
+  return finalCarriesContent(text);
+}
+
+/**
+ * Trace row for a caller final after the turn-taking decision.
+ * @param {object} decision decideCallerEvent outcome
+ * @param {string} text
+ * @returns {{ decision: string, reason: string }}
+ */
+function finalDisposition(decision, text) {
+  const d = decision || {};
+  if (d.replay) return { decision: 'replay', reason: d.reason || 'replay' };
+  if (d.action === 'ignore' || d.action === 'skip') {
+    if (keepDroppedFinal(d, text)) {
+      return { decision: 'queue', reason: `kept_${d.reason || d.action}` };
+    }
+    return { decision: d.queue ? 'queue' : d.action, reason: d.reason || '' };
+  }
+  if (d.action === 'queue') return { decision: 'queue', reason: d.reason || 'queue' };
+  if (d.action === 'barge_listen') return { decision: 'hold', reason: 'barge_listen' };
+  if (d.interrupt) return { decision: 'barge', reason: d.reason || '' };
+  return { decision: 'flush', reason: d.reason || '' };
+}
+
 function clamp(n, min, max) {
   return Math.min(max, Math.max(min, n));
 }
@@ -718,6 +782,18 @@ function decideCallerEvent(opts = {}) {
 
   if (phase === 'thinking') {
     if (!INTERRUPT_CUES.test(text) && !isNamedEarlyCue(text)) {
+      // A final with a question or content words is a new caller turn. It is
+      // queued and answered right after the in-flight reply, not dropped as a
+      // continuation (HD_054e4f7ff253 t3 lost "Unawashangaa apartment?").
+      if (opts.isFinal === true && finalCarriesContent(text)) {
+        return outcome({
+          ...base,
+          action: 'queue',
+          reason: 'thinking_queued',
+          queue: true,
+          runGemini: true,
+        });
+      }
       return outcome({ ...base, action: 'ignore', reason: 'thinking_continuation' });
     }
     if (!isNamedEarlyCue(text) && text.length < minChars) {
@@ -905,6 +981,9 @@ function bargePhaseInputs({
 
 module.exports = {
   bargePhaseInputs,
+  finalCarriesContent,
+  keepDroppedFinal,
+  finalDisposition,
   normalizeSpeech,
   looksLikeEcho,
   utteranceLooksIncomplete,
