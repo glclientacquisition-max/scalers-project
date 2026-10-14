@@ -14,6 +14,31 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 
 **Copy-paste chat starters:** [`docs/reference/lanes/PROMPTS.md`](docs/reference/lanes/PROMPTS.md)
 
+## Commands (Node 22)
+
+| What | Command |
+| --- | --- |
+| Install | `npm ci` (root) and `cd dashboard && npm ci` |
+| Voice gate | `npm run test:voice` |
+| Brain gate | `npm run test:brain` |
+| MVP gate | `npm run test:mvp` |
+| Stage-PR changes | `npm run test:stage-pr` |
+| Desk gate | `cd dashboard && npm run lint && npm run build` |
+| Docs | `npm run docs:check` (frontmatter, stale > 90 days warns) · `npm run docs:reference` (regenerate `docs/reference/schema.md` + `env.md`) |
+
+Nested rules: [`src/AGENTS.md`](src/AGENTS.md) (Voice runtime + Brain), [`dashboard/AGENTS.md`](dashboard/AGENTS.md) (Desk + Super Admin). The nearest `AGENTS.md` wins. `CLAUDE.md` files only import these (`@AGENTS.md`).
+
+## Docs layout
+
+`docs/STATUS.md` is the only place for current state; update it in the same PR as any merge to `main`. Everything else follows Diataxis: `tutorials/`, `how-to/`, `reference/` (lane contracts in `reference/lanes/`; `schema.md` and `env.md` are generated, do not hand-edit), `explanation/`, `decisions/` (MADR ADRs, start `proposed`, Alvin accepts), `rfcs/`, `runbooks/` (one per ops alert kind), `archive/`. Every doc has `owner` + `last_reviewed` frontmatter.
+
+## Do not
+
+- Merge to `main`, write to prod (SQL, env, Railway/Vercel settings), release a DID, or rotate secrets without Alvin's explicit yes.
+- Print, paste, or commit secrets. Docs list variable names only.
+- Force-push. Never touch prod DID `+254709221536` (Aris).
+- Set `VOICE_GEMINI_CATALOGUE` or `BRAIN_GEMINI_CATALOGUE`.
+
 ## Rules of engagement
 
 1. Stay inside your lane’s **owns** paths. Ask Platform before changing `src/db.js` API or Supabase SQL.
