@@ -102,7 +102,7 @@ function createBrainV2Shadow(opts = {}) {
     return model;
   }
 
-  async function runOne({ text, profile, langLock, turnIndex }) {
+  async function runOne({ text, profile, langLock, turnIndex, acked, ackRule, stripAck }) {
     const started = now();
     const dry = v2.createDryRunHandlers({ log: [] });
     const handlers = {};
@@ -115,6 +115,7 @@ function createBrainV2Shadow(opts = {}) {
         text, profile: { ...(profile || {}) }, now: new Date(), handlers, model: resolveModel(),
         langLock: langLock === 'en' || langLock === 'sw' ? langLock : null,
         shouldAbort: () => abortFlag,
+        ...(ackRule ? { acked: !!acked } : {}),
       });
       for await (const ev of it) {
         if (abortFlag) break;
@@ -124,7 +125,9 @@ function createBrainV2Shadow(opts = {}) {
           toolIntents.push({ name: ev.name, v1Name: V2_TO_V1_TOOL[ev.name] || ev.name, args: ev.args ?? null, write: !!ev.write, dryRun: true });
         } else if (ev.type === 'sentence') {
           if (firstAt == null) firstAt = now();
-          sentences.push({ text: ev.text, lang: ev.lang, source: ev.source });
+          // VOICE_ACK_RULE backstop on v2 lines: Voice owns the tool-turn ack, so strip any lead.
+          const heard = ackRule && acked ? (typeof stripAck === 'function' ? stripAck(ev.text) : ev.text) : ev.text;
+          sentences.push({ text: heard, lang: ev.lang, source: ev.source, ...(heard !== ev.text ? { rawText: ev.text } : {}) });
         } else if (ev.type === 'done') {
           done = ev;
         }
@@ -148,6 +151,7 @@ function createBrainV2Shadow(opts = {}) {
       sentences,
       toolIntents,
       writeIntents: toolIntents.filter((t) => t.write).length,
+      ...(ackRule ? { acked: !!acked, voiceAck: acked && toolIntents.length ? 'tool_start' : null } : {}),
       model: model ? String(env.BRAIN_V2_SHADOW_MODEL) : null,
       ttftMs: firstAt == null ? null : firstAt - started,
       totalMs: total,
@@ -159,7 +163,7 @@ function createBrainV2Shadow(opts = {}) {
   }
 
   // Fire-and-forget entry point. Returns a promise for tests only; callers must `void` it.
-  function fire({ text, profile, langLock, turnIndex, onResult }) {
+  function fire({ text, profile, langLock, turnIndex, onResult, acked, ackRule, stripAck }) {
     if (disabled) return Promise.resolve(null);
     if (inFlight >= 6) { // turns run in order (v2 state needs every turn); runaway backlog is dropped
       return Promise.resolve(null);
@@ -173,7 +177,7 @@ function createBrainV2Shadow(opts = {}) {
           v2 = loader();
           state = v2.createState({ profile: profile || {}, callerPhone: opts.callerPhone || null });
         }
-        const stage = await runOne({ text, profile, langLock, turnIndex });
+        const stage = await runOne({ text, profile, langLock, turnIndex, acked, ackRule, stripAck });
         if (typeof onResult === 'function') {
           try { onResult(stage); } catch (err) { log(`[brain_v2_shadow][${label()}] trace failed: ${err?.message || err}`); }
         }
