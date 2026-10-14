@@ -1,0 +1,11 @@
+{
+  "callId": "HD_db0e864043c1",
+  "source": "staging Railway logs 2026-10-14 (77ce8123), C1 T9; ms from caller endpoint 46.492",
+  "turn": 9, "lang": "sw", "tool": "create_service_request",
+  "ack": { "text": "Mm.", "atMs": 345, "bytes": 19116, "cached": true },
+  "holdLogged": null,
+  "warmLogged": null,
+  "toolDoneAtMs": 2125,
+  "receipt": { "text": "Sawa, nimehifadhi ombi lako. Asante. Kwaheri.", "trimmed": "Nimehifadhi ombi lako. Asante. Kwaheri.", "ttsBeginMs": 2125 },
+  "assume": { "liveTtfaMs": 250, "msPerChar": 75, "note": "stream done at 1287 ms; receipt TTS begin 2125 ms; no hold line logged; no tool-smooth warm logged on this call" }
+}
