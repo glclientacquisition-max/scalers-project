@@ -60,7 +60,7 @@ function createFakeDb(seed = {}, callerPhone) {
       return row || { id: req.id };
     },
     createAppointment: async (a) => {
-      const row = { id: id('apt'), status: 'requested', service_name: a.serviceName, when_text: a.whenText, window_start: a.windowStart || null, address_landmark: a.landmark, caller_name: a.name, caller_phone: callerPhone };
+      const row = { id: id('apt'), status: 'requested', service_name: a.serviceName, when_text: a.whenText, window_start: a.windowStart || null, address_landmark: a.landmark, notes: a.notes || null, caller_name: a.name, caller_phone: callerPhone };
       db.appointments.push(row);
       db.writes.push(['create_appointment', row.id]);
       return row;

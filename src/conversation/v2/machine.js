@@ -61,7 +61,8 @@ function mergeSlots(state, u, profile) {
     if (u.when.date) s.when.date = u.when.date;
     if (u.when.time) s.when.time = u.when.time;
   }
-  if (u.place && state.intent !== 'cancel') { if (state.intent === 'address_change') s.new_place = u.place; else s.place = u.place; }
+  if (u.place && state.intent !== 'cancel') { if (state.intent === 'address_change') s.new_place = u.place; else if (s.place && !u.landmark && isArea(s.place, profile) && !isArea(u.place, profile)) { s.landmark = u.place; } // HD_513: "Simba Drive" after "Rongai" is an address note, not a new area
+    else { s.landmark = u.landmark || (u.place === s.place ? s.landmark : null); s.place = u.place; } }
   if (u.service && (!s.service || !state.intent || state.phase !== 'readback')) s.service = u.service.name;
   if (u.products.length) {
     for (const p of u.products) {
@@ -105,7 +106,7 @@ function stepIntent(state, u, profile) {
     if (!s.when.time) return slotOr(state, 'time', { day: L.sayDate(s.when.date, state.lang).split(' ')[0] });
     if (!s.place) return slotOr(state, 'place');
     if (!s.name && (state.asked.name || 0) < 2) return slotOr(state, 'name');
-    return { line: propose(state, { tool: 'create_booking', service: s.service, when: { ...s.when }, place: s.place, name: nameSpeakable(state) }) };
+    return { line: propose(state, { tool: 'create_booking', service: s.service, when: { ...s.when }, place: s.place, landmark: s.landmark || null, name: nameSpeakable(state) }) };
   }
   if (it === 'order') {
     if (!s.items.length) return slotOr(state, 'items');
@@ -159,7 +160,7 @@ async function commit(state, p, handlers) {
   try {
     if (p.tool === 'create_booking') {
       action = 'create_appointment';
-      result = await handlers.createAppointment({ serviceName: p.service, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when), landmark: p.place, name });
+      result = await handlers.createAppointment({ serviceName: p.service, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when), landmark: p.place, notes: p.landmark || undefined, name });
       ok = Boolean(result && (result.id || result.dryRun === true)); state.outcomes.push('booked');
     } else if (p.tool === 'create_order') {
       action = 'create_service_request';
@@ -192,6 +193,7 @@ async function commit(state, p, handlers) {
   return { rec, toolResult: { action, status: ok ? 'succeeded' : 'failed', code: ok ? null : 'write_failed', v2: true } };
 }
 
+function isArea(place, profile) { return !!(N.matchArea(place, profile)?.listed || /^(Kitengela|Ruiru|Kasarani|Kilimani|Karen|Westlands|Lavington|Kileleshwa|Rongai|Syokimau|Thika|Juja|Embakasi|Langata|Ngong|Kahawa|Roysambu|Donholm|Umoja|Kikuyu|Parklands|South B|South C|Athi River|Kiambu|Nairobi)$/i.test(String(place || '').trim())); }
 function resetIntent(state) {
   const keep = { name: state.slots.name, nameConfirmed: state.slots.nameConfirmed, nameCorrectionOf: state.slots.nameCorrectionOf };
   state.slots = { service: null, when: { date: null, time: null }, place: null, items: [], row: null, new_when: { date: null, time: null }, new_place: null, kind: null, topic: null, complaint: [], ...keep };
@@ -205,7 +207,7 @@ function echoAffirms(p, u) {
 }
 function pendingChanged(p, state) {
   const s = state.slots;
-  if (p.tool === 'create_booking') return p.service !== s.service || p.when.date !== s.when.date || p.when.time !== s.when.time || p.place !== s.place;
+  if (p.tool === 'create_booking') return p.service !== s.service || p.when.date !== s.when.date || p.when.time !== s.when.time || p.place !== s.place || (p.landmark || null) !== (s.landmark || null);
   if (p.tool === 'update_booking') return (s.new_when.date && s.new_when.date !== p.when.date) || (s.new_when.time && s.new_when.time !== p.when.time);
   return false;
 }
@@ -292,7 +294,27 @@ async function consultModel(state, u, profile, model, catalogue) {
 }
 const INTENT_OF_TOOL = { create_booking: 'book', create_order: 'order', cancel_booking: 'cancel', update_booking: 'change', log_complaint: 'complaint', create_handoff: 'handoff' };
 
-async function runTurn(state, { text, profile = {}, now = new Date(), handlers, model = null, langLock = null }) {
+// Ack rule (v2-ack-overuse.md, approved 14:53 EAT 14 Oct): Brain lines carry no
+// leading ack ("Sawa,", "Okay.", "Haya.", "Alright.", "Sure,", "Asante,") except a
+// write receipt, and only when Voice has not acked this turn (opts.acked), it is
+// not the first turn, the caller did not just say "sawa", the previous turn was
+// not ack-led and no ack was spoken in the last 3 turns. Goodbye is exempt but
+// never paired with an ack-led turn.
+const ACK_LEAD = /^\s*(?:sawa sawa|sawa kabisa|ni sawa|sawa|okay|ok|haya|alright|sure|poa|asante)\s*[,.!]\s*(?=\S)/i;
+const BYE = /^(Asante kwa kupiga simu\.|Thank you for calling\.)/;
+function isAckLed(line) { return ACK_LEAD.test(String(line || '')) && !BYE.test(String(line || '')); }
+function stripAck(line) { const r = String(line).replace(ACK_LEAD, ''); return r.charAt(0).toUpperCase() + r.slice(1); }
+function applyAckRule(state, line, { ackOk, acked, callerAck, lang }) {
+  if (!line) return line;
+  if (BYE.test(line)) return state.lastAckLed && /^Asante/.test(line) ? 'Karibu tena. Kwaheri.' : line;
+  if (!ACK_LEAD.test(line)) return line;
+  const recent = state.lastAckTurn != null && state.turn - state.lastAckTurn < 3;
+  const keep = ackOk && !acked && state.turn > 1 && !state.lastAckLed && !recent;
+  return keep ? line : stripAck(line);
+}
+function noteAck(state, line) { state.lastAckLed = isAckLed(line); if (state.lastAckLed) state.lastAckTurn = state.turn; }
+
+async function runTurn(state, { text, profile = {}, now = new Date(), handlers, model = null, langLock = null, acked = false }) {
   state.turn += 1; state.now = now;
   const prevLang = state.lang;
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
@@ -302,7 +324,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   const catalogue = buildCatalogue({ profile, openRows: state.file.openRows });
   const mc = await consultModel(state, u, profile, model, catalogue);
   const lang = state.lang || 'en';
-  const out = (line, extra = {}) => { const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
+  const out = (line0, extra = {}) => { const line = applyAckRule(state, line0, { ackOk: !!extra.ackOk, acked: !!acked, callerAck: !!u.ack, lang }); const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; noteAck(state, l); return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
 
   // 1) read-back pending: commit only on the caller's yes
   // a new question while a callback offer is open drops the offer and answers the question
@@ -316,7 +338,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
       results.push(toolResult);
       const line = R.receipt(rec, lang);
       resetIntent(state);
-      return out(line);
+      return out(line, { ackOk: true });
     }
     if (pendingChanged(p, state)) { state.phase = 'collect'; state.pending = null; const st = stepIntent(state, u, profile); if (st?.line) return out(st.line); }
     if (u.no || u.done) { resetIntent(state); state.outcomes.push('declined'); return out(u.done ? R.info({ kind: 'bye' }, lang) : R.info({ kind: 'decline' }, lang), { end: u.done }); }
@@ -330,6 +352,9 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   // 2) open offers from an info answer ("would you like ...?")
   if (state.offer && !state.intent) {
     const offer = state.offer; state.offer = null;
+    // HD_513dfb2fa73f: "Would you like to book?" answered with a day / place / service is a yes.
+    const gaveDetail = !!(u.when?.date || u.when?.time || u.place || u.service);
+    if (offer === 'book' && !u.no && !u.done && gaveDetail && !u.intents.filter((i) => i !== 'book').length) { state.intent = 'book'; state.slots.service = state.slots.service || state.offerService; mergeSlots(state, u, profile); const st = stepIntent(state, u, profile); return out(st.line); }
     if (u.yes && !u.intents.length) {
       if (offer === 'book') { state.intent = 'book'; state.slots.service = state.offerService; mergeSlots(state, u, profile); const st = stepIntent(state, u, profile); return out(st.line); }
       return out(propose(state, { tool: 'create_handoff', kind: offer === 'quote' ? 'quote' : 'callback', reason: 'callback' }));
@@ -358,9 +383,9 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   if (!state.intent) {
     mergeSlots(state, u, profile);
     // a service named with no question word is an enquiry about that service
-    if (u.service && !u.intents.length && vertical(profile) === 'home') { state.lastInfo = 'services'; mergeSlots(state, u, profile); return out(R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, lang)); }
+    if (u.service && !u.intents.length && vertical(profile) === 'home') { state.lastInfo = 'services'; mergeSlots(state, u, profile); state.offer = 'book'; state.offerService = u.service.name; return out(R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, lang)); }
     // a time or a place with no intent on a home-services line means a visit
-    if (!u.intents.length && u.when?.time && (u.place || state.slots.service) && vertical(profile) === 'home' && !u.ack && !u.done) { state.intent = 'book'; mergeSlots(state, u, profile); const st0 = stepIntent(state, u, profile); if (st0?.line) return out(st0.line); }
+    if (!u.intents.length && (u.when?.time || ((u.when?.date || u.place) && state.slots.service)) && (u.place || state.slots.service) && vertical(profile) === 'home' && !u.ack && !u.done) { state.intent = 'book'; mergeSlots(state, u, profile); const st0 = stepIntent(state, u, profile); if (st0?.line) return out(st0.line); }
     if (u.name && !u.intents.length) return out(nameSpeakable(state) ? R.info({ kind: 'greet_name', name: nameSpeakable(state) }, lang) : R.ask('intent', 0, lang));
     if (state.lastInfo === 'recall' && !u.ack) { const line = infoAnswer(state, u, profile, 'recall'); return out(line); }
     // off-catalogue item question: say plainly it isn't on our list (never guess stock or price)
@@ -386,7 +411,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     const { rec, toolResult } = await commit(state, st.commitNow, handlers);
     results.push(toolResult);
     resetIntent(state);
-    return out(R.receipt(rec, lang));
+    return out(R.receipt(rec, lang), { ackOk: true });
   }
   return out(st?.line || R.ask('intent', 1, lang));
 }

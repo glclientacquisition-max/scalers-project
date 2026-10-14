@@ -35,7 +35,7 @@ function readback(p, lang) {
   const S = sw(lang);
   const nm = p.name ? (S ? `, kwa ${p.name}` : `, for ${p.name}`) : '';
   switch (p.tool) {
-    case 'create_booking': return S ? `${svcName(p.service)}, ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? `, ${p.place}` : ''}${nm}. Nithibitishe?` : `${svcName(p.service)} on ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? ` in ${p.place}` : ''}${nm}. Shall I book it?`;
+    case 'create_booking': return S ? `${svcName(p.service)}, ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? `, ${p.place}` : ''}${p.landmark ? ` ${swMark(p.landmark)}` : ''}${nm}. Nithibitishe?` : `${svcName(p.service)} on ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? ` in ${p.place}` : ''}${p.landmark ? `, ${enMark(p.landmark)}` : ''}${nm}. Shall I book it?`;
     case 'create_order': return S ? `${items(p.items, lang)}, kuchukua ${L.sayDate(p.pickup.date, lang)}${nm}. Nithibitishe?` : `${items(p.items, lang)}, pickup ${L.sayDate(p.pickup.date, lang)}${nm}. Shall I place the order?`;
     case 'cancel_booking': return S ? `Nifute ${rowLabel(p.row, lang)}${at(p.row.when, lang)}. Niendelee?` : `Cancel your ${rowLabel(p.row, lang)}${at(p.row.when, lang)}. Shall I go ahead?`;
     case 'update_booking': return S ? `Nihamishe ${svcName(p.row.service)} hadi ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}. Niendelee?` : `Move your ${svcName(p.row.service).toLowerCase()} to ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}. Shall I go ahead?`;
@@ -96,7 +96,7 @@ function info(r, lang, n = 0) {
     case 'which_price': return S ? 'Bei ya huduma gani ungependa kujua?' : 'Which service would you like the price for?';
     case 'ack': return r.service ? (S ? `Sawa. Ungependa kubook ${svcName(r.service)}?` : `Okay. Would you like to book ${svcName(r.service).toLowerCase()}?`) : (S ? 'Sawa. Kuna kingine ninaweza kukusaidia nacho?' : 'Okay. Is there anything else I can help with?');
     case 'who': return S ? `Unaongea na ${r.agent}, wa ${r.biz}. Tukusaidie na usafi gani?` : `You're speaking with ${r.agent} from ${r.biz}. What can we clean for you?`;
-    case 'greet_name': return S ? `Asante, ${r.name}. Unahitaji huduma gani leo?` : `Thanks, ${r.name}. Which service do you need today?`;
+    case 'greet_name': return S ? `${r.name}, unahitaji huduma gani leo?` : `Thanks, ${r.name}. Which service do you need today?`;
     case 'off_catalogue': return S ? `Sina ${r.item} kwenye orodha yetu. ${r.hint ? `Tunafanya ${r.hint}.` : ''}`.trim() : `${r.item} isn't on our list. ${r.hint ? `We do ${r.hint}.` : ''}`.trim();
     case 'payment_how': return r.methods ? (S ? `Tunapokea ${r.methods}.` : `We accept ${r.methods}.`) : (S ? 'Sina maelezo ya malipo kwenye orodha yetu.' : "I don't have payment details on our list.");
     case 'greeting': return S ? 'Nzuri, asante. Ungependa huduma gani?' : "I'm well, thank you. Which service do you need?";
@@ -108,14 +108,20 @@ function info(r, lang, n = 0) {
     default: return '';
   }
 }
+const SW2EN = { 'karibu na': 'near', 'karibu ya': 'near', pale: 'at', 'mkabala na': 'opposite', 'mkabala ya': 'opposite', 'nyuma ya': 'behind', 'mbele ya': 'in front of' };
+const EN2SW = { near: 'karibu na', 'next to': 'karibu na', opposite: 'mkabala na', 'across from': 'mkabala na', behind: 'nyuma ya' };
+function remark(l, map) { for (const [k, v] of Object.entries(map)) if (l.toLowerCase().startsWith(k + ' ')) return `${v} ${l.slice(k.length + 1)}`; return l; }
+const enMark = (l) => remark(l, SW2EN); const swMark = (l) => remark(l, EN2SW);
 // Never-repeat rule: the same line twice in a row is re-worded (same facts, no new claims).
 function vary(line, lang, n = 1, plain = false) {
   const S = sw(lang);
   const m = plain ? null : String(line).match(/^Tunahudumia (.+?)(?: na maeneo mengine)?\. Uko wapi\?$/) || String(line).match(/^We serve (.+?)(?: and other listed areas)?\. Which place are you in\?$/);
   if (m) return S ? `Maeneo yetu ni ${m[1]}. Uko mtaa gani hasa?` : `Our areas are ${m[1]}. Which estate are you in exactly?`;
-  const ack = String(line).match(/^(Okay|Sawa)\. (.+)$/);
-  if (ack) return `${ack[1] === 'Sawa' ? 'Haya' : 'Alright'}. ${ack[2]}`;
-  const lead = S ? ['Kama nilivyosema,', 'Narudia,'][n % 2] : ['As I said,', 'Just to repeat,'][n % 2];
-  return `${lead} ${line.charAt(0).toLowerCase()}${line.slice(1)}`;
+  // An ack-led repeat drops the ack instead of swapping it (Okay -> Alright was still an ack).
+  // An ack-led repeat drops the ack instead of swapping it (Okay -> Alright was still an ack).
+  const ack = String(line).match(/^(?:Okay|Sawa|Haya|Alright|Sure)[.,] (.+)$/);
+  if (ack && n < 2) return ack[1].charAt(0).toUpperCase() + ack[1].slice(1);
+  // No "As I said" / "Just to repeat" filler (Alvin, 14 Oct): a repeat is said plainly.
+  return line;
 }
 module.exports = { vary, ask, readback, receipt, info, svcName, rowLabel };

@@ -155,10 +155,10 @@ test('"Sawa, ni hayo tu" at a read-back is not a yes (live regression HD_1677)',
 
 test('acknowledgements, identity, earlier-call and off-catalogue turns get state/catalogue answers', async () => {
   let r = await talk(['Wewe ni nani?']); assert.match(r.out[0].line, /^Unaongea na Shy, wa Done and Dusted/);
-  r = await talk(['Eeh, unaongea na Alvin?']); assert.match(r.out[0].line, /^Asante, Alvin/);
+  r = await talk(['Eeh, unaongea na Alvin?']); assert.match(r.out[0].line, /^Alvin, unahitaji/);
   r = await talk(['Ah, tulifika wapi na ile mambo yetu ya jana?']); assert.match(r.out[0].line, /^Sioni booking/);
   r = await talk(['Mko na JK copier?']); assert.match(r.out[0].line, /^Sina JK copier kwenye orodha yetu/);
-  r = await talk(['Mnafanya carpet?', 'Ni sawa.']); assert.match(r.out[1].line, /^Sawa\. Ungependa kubook Carpet Cleaning\?/);
+  r = await talk(['Mnafanya carpet?', 'Ni sawa.']); assert.match(r.out[1].line, /^Ungependa kubook Carpet Cleaning\?/);
   r = await talk(['Nilikuwa nauliza, ni vipi naweza lipa?']); assert.match(r.out[0].line, /^Tunapokea M-Pesa Paybill/); assert.doesNotMatch(r.out[0].line, /\d{5}/);
 });
 
@@ -173,5 +173,53 @@ test('never-repeat: the coverage line is not said twice in a row (live HD_6a7597
   assert.notEqual(r.out[0].line, r.out[1].line); assert.notEqual(r.out[1].line, r.out[2].line);
   assert.match(r.out[1].line, /^Maeneo yetu ni Nairobi/);
   const p = await talk(['How much is gutter cleaning?', 'How much is gutter cleaning?']);
-  assert.notEqual(p.out[0].line, p.out[1].line);
+  assert.doesNotMatch(p.out[1].line, /^(As I said|Just to repeat)/, 'a repeat is said plainly, no filler prefix');
+});
+
+test('place: area is the place, landmark is a note (EN/SW near, karibu na, pale, opposite)', async () => {
+  const N = V2.nlu;
+  const cases = [
+    ['Kitengela, near Naivas', 'Kitengela', 'near Naivas'], ['Kitengela karibu na Naivas', 'Kitengela', 'karibu na Naivas'],
+    ['Ruiru pale Total', 'Ruiru', 'pale Total'], ['Juja opposite the mall', 'Juja', 'opposite the mall'],
+    ['Mimi niko Kasarani, opposite Mwiki stage.', 'Kasarani', 'opposite Mwiki stage'], ['Westlands', 'Westlands', null],
+  ];
+  for (const [t, place, lm] of cases) { assert.equal(N.extractPlace(t, { prompted: true }), place, t); assert.equal(N.extractLandmark(t), lm, t); }
+  const en = await talk(["Hi, I'd like to book interior window cleaning for Friday at 10am.", 'My name is Alvin', 'Kitengela, near Naivas', 'Yes']);
+  assert.match(en.out[2].line, /in Kitengela, near Naivas, for Alvin/); assert.doesNotMatch(en.out[2].line, /in Naivas/);
+  const a = en.log.find((l) => l[0] === 'appt')[1]; assert.equal(a.landmark, 'Kitengela'); assert.equal(a.notes, 'near Naivas');
+  const sw = await talk(['Nataka kusafisha madirisha Ijumaa saa nne asubuhi', 'Naitwa Alvin', 'Ruiru pale Total', 'Ndio']);
+  assert.match(sw.out[2].line, /, Ruiru pale Total, kwa Alvin/);
+  const b = sw.log.find((l) => l[0] === 'appt')[1]; assert.equal(b.landmark, 'Ruiru'); assert.equal(b.notes, 'pale Total');
+});
+
+const ACKRX = /^\s*(sawa sawa|sawa kabisa|ni sawa|sawa|okay|ok|haya|alright|sure|poa|asante)\s*[,.!]/i;
+test('ack rule: only a write receipt may open with an ack; never after an ack; acked drops it', async () => {
+  const a = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Wanjiru', 'Ruiru', 'Ndio.', 'Sawa.', 'Hapana, ni hayo tu.']);
+  assert.match(a.out[3].line, /^Sawa, nimeweka/);
+  assert.doesNotMatch(a.out[4].line, ACKRX, 'reply to caller sawa goes straight on');
+  assert.match(a.out[5].line, /Kwaheri/);
+  const b = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Wanjiru', 'Ruiru', 'Ndio.', 'Hapana, ni hayo tu.']);
+  assert.equal(b.out[4].line, 'Karibu tena. Kwaheri.', 'goodbye is not paired with an ack-led receipt');
+  for (let i = 1; i < a.out.length; i++) assert.ok(!(ACKRX.test(a.out[i].line) && ACKRX.test(a.out[i - 1].line)));
+  const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] }); const h = V2.createDryRunHandlers(); let r;
+  for (const text of ['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Wanjiru', 'Ruiru']) await V2.runTurn(st, { text, profile: DD, now: NOW, handlers: h });
+  r = await V2.runTurn(st, { text: 'Ndio.', profile: DD, now: NOW, handlers: h, acked: true });
+  assert.match(r.line, /^Nimeweka Carpet Cleaning/);
+  const q = await talk(['Mnafanya carpet?', 'Sawa.', 'Sawa.', 'Ok.']);
+  for (const o of q.out) assert.doesNotMatch(o.line, ACKRX);
+  const f = await talk(['Okay']); assert.doesNotMatch(f.out[0].line, ACKRX, 'no ack on first turn');
+});
+
+test('HD_513dfb2fa73f: "make a booking" + detail answers keep the booking going; no "As I said" filler', async () => {
+  const st = V2.createState({ profile: DD, callerPhone: '+254700000001' }); const h = V2.createDryRunHandlers(); const out = [];
+  const lines = ["I'd like to meet— I'd like to make a booking for", 'My apartment to be washed.', '2-Bedroom— My name is Alvin Yegon.', 'Uh, 2-Bedroom, tomorrow.', "It's in— it's in Rongai.", '8, 8, 8 AM.', "It's in— it's in Simba Drive, and it's— the name is the Grace Apartments.", 'Yes'];
+  for (const text of lines) out.push(await V2.runTurn(st, { text, profile: DD, now: new Date('2026-10-14T11:00:00Z'), handlers: h, langLock: 'en' }));
+  for (const o of out) assert.doesNotMatch(o.line, /As I said|Just to repeat|Kama nilivyosema|Narudia|call you back to finish|calling to book/);
+  assert.match(out[5].line, /2-Bedroom Apartment on Thursday 15 October at 08:00 in Rongai, for Alvin Yegon/);
+  assert.match(out[6].line, /in Rongai, Simba Drive/);
+  const a = h.log.find((l) => l.name === 'createAppointment').args;
+  assert.equal(a.landmark, 'Rongai'); assert.equal(a.notes, 'Simba Drive'); assert.equal(a.whenText, '2026-10-15 08:00');
+  // an offered service answered with a day is a yes to "Would you like to book?"
+  const r = await talk(['Do you clean sofas?', 'Tomorrow at 10am please']);
+  assert.match(r.out[1].line, /Where should we come|name|Shall I book/i);
 });
