@@ -208,7 +208,7 @@ See: [`../governance/TESTING_BASELINE.md`](../governance/TESTING_BASELINE.md).
 | CI in repo | **Updated 2026-10-05:** present in `.github/workflows/` (`ci.yml`, staging workflows) |
 | Staging environment | **Updated 2026-10-05:** documented in [`../operations/ENVIRONMENTS.md`](../operations/ENVIRONMENTS.md) |
 | Production SQL migration tier | UNKNOWN |
-| Live Dial | Spec only. Not shipped. |
+| Live Dial | Not shipped. Callbacks only since #658 (capability `callbacks`). |
 | Owner package checkout | Not shipped. Super Admin assigns packages. |
 | JS/TS duplication (intro, lexicon) | ACTIVE risk |
 

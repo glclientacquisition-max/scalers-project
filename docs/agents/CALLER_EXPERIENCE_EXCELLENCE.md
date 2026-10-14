@@ -195,7 +195,7 @@ Ranked by how much they break trust on a live Kenyan call. Each is a **conversat
 
 **Bar:** Settings that say live connect only speak connect when Dial runs. Otherwise notify and say so.
 
-**Not yet:** Owner can set live transfer. Runtime cannot Dial after Stream. Dead air is worse than SMS. Escalation still asks name even when the card already has one (if F1/F5 fail).
+**Not yet:** (#658 removed the owner live-transfer option; callbacks only.) Owner could set live transfer. Runtime cannot Dial after Stream. Dead air is worse than SMS. Escalation still asks name even when the card already has one (if F1/F5 fail).
 
 **Lane:** Voice for Dial. Brain must not claim transfer until the flag is true.
 

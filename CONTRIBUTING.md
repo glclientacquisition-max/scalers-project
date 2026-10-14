@@ -102,6 +102,23 @@ Do not weaken tests or delete failing tests to make CI green.
 - **SQL changes:** update [`docs/supabase/README.md`](docs/supabase/README.md) apply order.
 - **Docs-only PRs:** must not change runtime behavior.
 
+### STATUS rule
+
+Every PR that merges to `main` updates [`docs/STATUS.md`](docs/STATUS.md) in the same PR: the "Last updated" line, section 2 (shipped) and any row in sections 3 to 5 it changes. A PR that changes nothing live still bumps nothing; say so in the PR body ("STATUS: no change").
+
+### Doc frontmatter
+
+Every Markdown file under `docs/` starts with YAML frontmatter:
+
+```yaml
+---
+owner: platform        # one of: platform, voice, brain, desk, ops-billing
+last_reviewed: 2026-10-14
+---
+```
+
+Bump `last_reviewed` when you check a doc is still true. Docs older than 90 days are flagged by CI. Superseded docs move to `docs/archive/` with a pointer to what replaced them.
+
 Governance index: [`docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md`](docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md).
 
 ---

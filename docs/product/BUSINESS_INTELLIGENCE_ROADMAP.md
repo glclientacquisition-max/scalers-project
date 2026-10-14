@@ -199,7 +199,7 @@ Add additive migrations (do not break existing `tenants` columns):
 | New / extended | Why |
 | --- | --- |
 | `tenants.vertical` | `retail` \| `home_services` \| `hospitality` \| `general` |
-| `tenants.handoff_mode` | `callback` \| `live_transfer` |
+| `tenants.handoff_mode` | `callback` \| `live_transfer` (Desk offers only `callback` since #658) |
 | `business_locations` | address, landmark, geo notes, branches |
 | `business_policies` | keyed policy text (returns, delivery, deposit, warranty…) |
 | `contacts` | `tenant_id`, phone E.164, name, last_reason, meta |

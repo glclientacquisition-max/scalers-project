@@ -15,7 +15,7 @@ Canonical code: `src/conversation/escalationFeature.js`, `requiredEscalate.js`, 
 | Routes via `tenants.team_directory` permissions | Sharing random phone numbers as “done”; falling back to `team[0]`; extra owner SMS |
 | Honest confirm after backend outcome | “I’ve transferred you” / “I’ve texted them” before send OK |
 
-**Live transfer** (`handoff_mode = live_transfer`) is specified, not shipped. Runtime still sets `liveTransfer: false`. Until Voice Dial exists, Brain must keep using this async escalate path even if the tenant preference says live transfer.
+**Callbacks only since #658 (11 Oct 2026).** Desk offers only "Take a message for a callback"; the capability gate is `callbacks`, not `live_transfer`. **Live transfer** (`handoff_mode = live_transfer`) was specified, never shipped (history: [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md)). Runtime still sets `liveTransfer: false`. Until Voice Dial exists, Brain must keep using this async escalate path even if the tenant preference says live transfer.
 
 ---
 

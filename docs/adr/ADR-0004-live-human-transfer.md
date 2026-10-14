@@ -2,7 +2,7 @@
 
 ## Status
 
-**Superseded for the executor** (desk preference still Proposed)
+**Superseded** by #658 (11 Oct 2026): product is callbacks only. Desk no longer offers `live_transfer`; the capability gate is `callbacks`. Executor history below.
 
 Cold Dial after Stream **failed** on staging (2026-09-06): `HD_ae71b5349f5e`, `HD_4f14d4d55244`. StreamStopped does not re-POST the voice URL. Redirect after Stream never ran. Dial XML returned on Completed after hangup.
 

@@ -35,7 +35,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | --- | --- | --- | --- | --- | --- |
 | Agent runtime | Gemini turn loop | `server.js` `runGeminiTurn*` | `@google/genai` import; called from media handler | `/ws/relay` path | CORE |
 | Human handoff (async) | Escalate notify + desk note | `src/conversation/escalationFeature.js`, `server.js` `maybeSendEscalationNotification` | [`../ESCALATION.md`](../product/ESCALATION.md) | Live Dial | CORE |
-| Human handoff (live) | Conference + outbound REST (cold Dial after Stream blocked) | Gated off (`VOICE_LIVE_TRANSFER`) | [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED |
+| Human handoff (live) | **Not offered: callbacks only since #658.** Was: conference + outbound REST (cold Dial after Stream blocked) | Gated off (`VOICE_LIVE_TRANSFER`) | [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED |
 | Runtime prompt assembly | Context + rules + profile | `src/prompts.js` | `buildSystemPrompt`, `buildContextHeader` | Env `BUSINESS_*` | CORE |
 | Brain state | Per-call semantic memory, seeded from returning-caller card | `src/conversation/brainState.js` | `callBrainStates` Map in `server.js` | None | CORE |
 | Returning-caller card | Compact phone file at call setup | `src/conversation/callerMemory.js` + `getCallerMemory` | CONTEXT HEADER; ADR-0005 | Transcript dump, RAG | CORE |

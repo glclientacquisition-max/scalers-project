@@ -146,7 +146,7 @@ OSS setups that already sound human, and which pieces transfer onto Soniox: [`..
 
 ## Good first tickets
 
-- Staging spike: Stream-stop → `<Dial>` (see [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) Spike 0). Do not enable `liveTransfer` until that spike is green.
+- Staging spike: Stream-stop → `<Dial>` (see [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) Spike 0). Do not enable `liveTransfer` until that spike is green. Product is callbacks only since #658; reviving live transfer needs a new ADR.
 - Phase 2 from `VOICE_SPEED_CONSISTENCY.md` (media clear, interim barge, cached ack PCM)
 - Kenya TTS pronunciation edge cases (money, names, Sheng)
 - Extract media session from `server.js` toward `src/telephony/mediaStreamHandler.js` without behavior change

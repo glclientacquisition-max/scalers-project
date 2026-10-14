@@ -18,7 +18,7 @@ Index for the repo. Product behavior is in `product/`. Runbooks are in `operatio
 
 | Folder | Contents |
 | --- | --- |
-| `product/` | Call messages, escalation (shipped), live transfer (spec), WhatsApp templates, home-services bar, MVP gate, business-intelligence roadmap |
+| `product/` | Call messages, escalation (shipped), live transfer (archived; callbacks only since #658), WhatsApp templates, home-services bar, MVP gate, business-intelligence roadmap |
 | `operations/` | Deploy, environments, local tunnel, packages, wallet, DID pool, Super Admin requirements, production cutover |
 | `architecture/` | Entry picture (`SYSTEM_ARCHITECTURE.md`), fact inventory, data flow, historical blueprint, target module layout |
 | `agents/` | Lane contracts (Voice, Brain, Desk, Ops & Billing, Platform) |

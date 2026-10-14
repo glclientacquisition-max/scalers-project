@@ -34,7 +34,7 @@ on conflict (e164) do nothing;
 **Numbers** and **Businesses** both ask before Release number. The number returns to Available.
 
 - If a business still holds it, that business goes back to Waiting for a number.
-- If the business row is already gone and the pool row is still Assigned, release from **Numbers** frees the row anyway. That is the path for `+254709221536` after Jirani Home Services was removed.
+- If the business row is already gone and the pool row is still Assigned, release from **Numbers** frees the row anyway. (History: `+254709221536` was freed this way after Jirani Home Services was removed. It is now **Aris Kenya's live prod DID**: see [`STATUS.md`](../STATUS.md) section 1. **Never release, reassign, or re-point it.**)
 
 ## Runtime behaviour
 
@@ -44,7 +44,8 @@ on conflict (e164) do nothing;
 
 ## Do not
 
-- Seed Jirani’s live DID as `available` while that business still holds it (backfill marks it `assigned`). After the business is gone, release it from Numbers.
+- Seed a live DID as `available` while a business still holds it (backfill marks it `assigned`). After the business is gone, release it from Numbers.
+- Release `+254709221536` (Aris, live paying customer). Releasing any prod DID needs Alvin's explicit yes.
 - Expose `SUPABASE_SERVICE_ROLE_KEY` to the browser.
 - Treat a new DID as the answer to a SautiKit outage. Restore or forward the existing number. See `docs/agents/VOICE_DOWNTIME_AT_SCALE.md#telephony-down-bridge-playbook`.
 - Release a suspended-for-nonpayment DID straight to `available`. `suspend_line_for_nonpayment` marks it `disabled` so ops can decide.
