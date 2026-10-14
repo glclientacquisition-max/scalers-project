@@ -25,6 +25,11 @@ const swA = swMatch(replayF.cases, (c) => fx(c.id)?.lang, true);
 const A = require('./lib/ack');
 const ackRuns = [...suiteF.scenarios.flatMap((s) => s.runs), ...replayF.cases.filter((c) => c.env !== 'prod').flatMap((c) => c.runs)].map(A.lines);
 const ack = A.ackMetrics(ackRuns); const bank = A.fillerBank(path.resolve(__dirname, '../..'));
+const H = require('./lib/heard');
+const sCalls = suiteF.scenarios.flatMap((s) => s.runs.map((r) => ({ lang: s.lang, t: r.transcript })));
+const hS = H.scoreHeard(sCalls.map((x) => x.t), { langOfCall: (i) => sCalls[i].lang });
+const hR = H.scoreHeard(replayF.cases.filter((c) => c.env !== 'prod').flatMap((c) => c.runs.map((r) => r.transcript)));
+const heardOn = hS.turns > 0;
 const bar = [
   ['Booking pass^4 >= 90% (commitment scenarios, all rules)', +(booking.filter((s) => s.passK).length / booking.length).toFixed(3), (v) => v >= 0.9],
   ['Booking end-state pass^4 (DB rows only)', S.bookingCorrectnessPassK, (v) => v >= 0.9],
@@ -39,9 +44,23 @@ const bar = [
   ['Consecutive ack-led turns = 0', ack.consecutive, (v) => v === 0],
   ['Ack stacks = 0', ack.stacks, (v) => v === 0],
   ['Voice filler/hold bank <= 3 words', bank.over.length ? bank.over.join(' | ') : `${bank.n} lines ok`, () => bank.n > 0 && bank.over.length === 0],
+  // Heard audio (lib/heard.js): scored from runTurnStream sentence/readback/tool events.
+  ['Heard: stream events present (suite)', `${hS.heardTurns}/${hS.turns} turns, ${hS.sentences} sentences`, () => heardOn],
+  ['Heard: repeated turns = 0 (suite)', hS.repeatedTurns, (v) => v === 0],
+  ['Heard: fragments = 0 (suite + staging replays)', hS.fragments + hR.fragments, (v) => v === 0],
+  ['Heard: filler-only turns = 0 (suite + staging replays)', hS.fillerOnlyTurns + hR.fillerOnlyTurns, (v) => v === 0],
+  ['Heard: consecutive ack-led turns = 0 (suite + staging replays)', hS.consecutiveAck + hR.consecutiveAck, (v) => v === 0],
+  ['Heard: language match per turn >= 98% (suite, call label)', hS.langMatch, (v) => v >= 0.98],
+  ['Heard: p95 ms to first sentence on tool turns <= 300', hS.toolTurnFirstSentenceMsP95, (v) => v != null && v <= 300],
+  ['Heard: p95 gap tool end -> first sentence <= 300 ms', hS.postToolGapMsP95, (v) => v != null && v <= 300],
+  ['Heard: repeated turns (staging replays; caller often repeats)', hR.repeatedTurns, () => null],
+  ['Heard: repeated sentence rate (suite / staging replays)', `${hS.repeatedSentenceRate} / ${hR.repeatedSentenceRate}`, () => null],
+  ['Heard: ack-led rate (suite / staging replays)', `${hS.ackLedRate} / ${hR.ackLedRate}`, () => null],
+  ['Heard: language match per caller turn (staging replays, code-switch)', hR.langMatch, () => null],
   ['SW/Sheng language match, per turn (SW-labelled replays)', swR.rate, () => null],
   ['Language match per turn, all 87 replays (code-switch included)', swA.rate, () => null],
 ];
 for (const [k, v, f] of bar) { const p = f(v); console.log(`${p === null ? 'INFO' : p ? 'PASS' : 'FAIL'}  ${k}: ${v}`); }
 console.log(JSON.stringify({ ack }));
+console.log(JSON.stringify({ heard: { suite: hS, stagingReplays: hR } }));
 console.log(JSON.stringify({ swSuiteTurns: swS.turns, swReplayTurns: swR.turns, replay: replayF.summary }));

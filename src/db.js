@@ -7,6 +7,9 @@
 //
 // Preserves the orchestration-facing API used by server.js (async).
 
+const { queueOwnerNotify, cancelOwnerNotify } = require('./notifications/ownerNotifyQueue');
+const { writeReceiptsEnabled, writeKey, callbackSupersededBy } = require('./conversation/writeReceipts');
+const { finalizeOnceEnabled, TERMINAL } = require('./callFinalizeOnce');
 const { supabase } = require('./lib/supabaseClient');
 const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
 const { mergeContactIdentity } = require('./conversation/contactIdentity');
@@ -653,7 +656,7 @@ async function uploadRecordingBuffer({
  * Matches on sautikit_call_sid. Idempotent — safe to call from multiple webhooks.
  * Does not reopen a call that is already terminal unless upgrading duration.
  */
-async function updateCallStatus({ callSid, status, durationSeconds, force = false }) {
+async function updateCallStatus({ callSid, status, durationSeconds, force = false, finalizeOnce = finalizeOnceEnabled() }) {
   if (!callSid) {
     throw new Error('[db] updateCallStatus: callSid required');
   }
@@ -737,15 +740,46 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
     return existing;
   }
 
-  const { data, error } = await supabase
-    .from('calls')
-    .update(patch)
-    .eq('sautikit_call_sid', callSid)
-    .select('*')
-    .maybeSingle();
+  // Run-once: flipping to terminal only from a non-terminal status, so the
+  // first webhook wins and later ones learn they lost (finalizeWinner=false).
+  const claimTerminal =
+    finalizeOnce && !alreadyTerminal && !force && TERMINAL.includes(String(patch.status || ''));
+  let query = supabase.from('calls').update(patch).eq('sautikit_call_sid', callSid);
+  if (claimTerminal) query = query.not('status', 'in', `(${TERMINAL.join(',')})`);
+  const { data, error } = await query.select('*').maybeSingle();
 
   throwIfError('updateCallStatus', error);
-  const shaped = shapeCall(data);
+  let lost = false;
+  let row = data;
+  if (claimTerminal && !data) {
+    // Lost the race: keep any duration fill, never the status flip.
+    lost = true;
+    const { status: _ignored, ...rest } = patch;
+    if (Object.keys(rest).length) {
+      const again = await supabase
+        .from('calls')
+        .update(rest)
+        .eq('sautikit_call_sid', callSid)
+        .select('*')
+        .maybeSingle();
+      throwIfError('updateCallStatus', again.error);
+      row = again.data;
+    } else {
+      const fresh = await supabase
+        .from('calls')
+        .select('*')
+        .eq('sautikit_call_sid', callSid)
+        .maybeSingle();
+      row = fresh.data || null;
+    }
+  }
+  const shaped = shapeCall(row);
+  if (shaped && lost) {
+    Object.defineProperty(shaped, 'finalizeWinner', { value: false, enumerable: false });
+  }
+  if (shaped && claimTerminal && !lost) {
+    Object.defineProperty(shaped, 'finalizeWinner', { value: true, enumerable: false });
+  }
 
   await settleCallUsage({
     callId: shaped?.id,
@@ -1621,6 +1655,109 @@ const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other'])
  * Create a service request (hold / enquiry / order) for retail completion.
  * Also upserts contact and mirrors a short note into call summary when callSid given.
  */
+/**
+ * Insert a row, or with a write-receipt key upsert on (tenant_id,
+ * idempotency_key) and ignore the duplicate: a retried or doubled write
+ * returns the row already on file instead of adding a second one.
+ */
+async function insertWithReceipt(table, row, key) {
+  if (!key) {
+    return supabase.from(table).insert(row).select('*').maybeSingle();
+  }
+  const keyed = { ...row, idempotency_key: key };
+  const res = await supabase
+    .from(table)
+    .upsert(keyed, { onConflict: 'tenant_id,idempotency_key', ignoreDuplicates: true })
+    .select('*')
+    .maybeSingle();
+  if (res.error || res.data) return res;
+  // Duplicate ignored: hand back the existing row.
+  return supabase
+    .from(table)
+    .select('*')
+    .eq('tenant_id', row.tenant_id)
+    .eq('idempotency_key', key)
+    .maybeSingle();
+}
+
+/**
+ * A booked visit supersedes the open rescue callback for the same service on
+ * the same call (status fulfilled, metadata.superseded_by = appointment id).
+ */
+async function supersedeRescueCallbacks({ tenantId, appointment } = {}) {
+  if (!tenantId || !appointment?.id || !appointment.call_id) return [];
+  try {
+    const { data: open, error } = await supabase
+      .from('service_requests')
+      .select('id, call_id, request_type, status, item, metadata')
+      .eq('tenant_id', tenantId)
+      .eq('call_id', appointment.call_id)
+      .eq('request_type', 'callback')
+      .eq('status', 'open');
+    if (error || !Array.isArray(open)) return [];
+    const done = [];
+    for (const row of open) {
+      if (!callbackSupersededBy(row, appointment)) continue;
+      const { error: upErr } = await supabase
+        .from('service_requests')
+        .update({
+          status: 'fulfilled',
+          closed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          metadata: { ...(row.metadata || {}), superseded_by: appointment.id, superseded_kind: 'appointment' },
+        })
+        .eq('id', row.id)
+        .eq('tenant_id', tenantId)
+        .eq('status', 'open');
+      if (!upErr) done.push(row.id);
+    }
+    if (done.length) {
+      console.log(`[db] rescue callback superseded ids=${done.join(',')} by appointment=${appointment.id}`);
+    }
+    return done;
+  } catch (err) {
+    console.warn('[db] supersedeRescueCallbacks failed:', err?.message || err);
+    return [];
+  }
+}
+
+/**
+ * Escalate (Brain v2 contract): resolve as soon as the task row exists.
+ * Returns { ok:true, id, notify:'queued' }. The owner notify (notifyOwner)
+ * runs in the background, never awaited; a failure is logged, ok stays true.
+ * Dry run: { ok:true, dryRun:true, id:null, notify:'queued', intended }.
+ * A later booking with supersedes:[id] cancels the queued notify.
+ */
+async function escalateTask({
+  callSid,
+  tenantId,
+  reason,
+  name,
+  phone,
+  notes,
+  item,
+  dryRun = false,
+  notifyOwner,
+} = {}) {
+  const intended = { callSid, tenantId, reason, name, phone, notes, item };
+  if (dryRun) return { ok: true, dryRun: true, id: null, notify: 'queued', intended };
+  const row = await createServiceRequest({
+    callSid,
+    tenantId,
+    type: 'callback',
+    name,
+    phone,
+    item: item || 'callback',
+    notes: [reason, notes].filter(Boolean).join('. ') || null,
+  });
+  if (!row?.id) return { ok: false, id: null, notify: null, reason: 'task_not_saved' };
+  const notify =
+    typeof notifyOwner === 'function'
+      ? queueOwnerNotify(row.id, () => notifyOwner({ task: row, callSid }), { callSid })
+      : 'none';
+  return { ok: true, id: row.id, notify };
+}
+
 async function createServiceRequest({
   callSid,
   tenantId,
@@ -1660,9 +1797,11 @@ async function createServiceRequest({
       [requestType, itemText, when].filter(Boolean).join(' — ') || noteText,
   });
 
-  const { data, error } = await supabase
-    .from('service_requests')
-    .insert({
+  const receipts = writeReceiptsEnabled({ tenantId: resolvedTenantId });
+  const srKey = receipts
+    ? writeKey({ callId: callRow?.id, kind: `request:${requestType}`, item: itemText })
+    : null;
+  const srRow = {
       tenant_id: resolvedTenantId,
       contact_id: contact?.id || null,
       call_id: callRow?.id || null,
@@ -1675,9 +1814,8 @@ async function createServiceRequest({
       caller_name: callerName,
       caller_phone: callerPhone,
       updated_at: new Date().toISOString(),
-    })
-    .select('*')
-    .maybeSingle();
+    };
+  const { data, error } = await insertWithReceipt('service_requests', srRow, srKey);
 
   if (error && /service_requests|relation/i.test(error.message)) {
     console.warn(
@@ -1786,6 +1924,7 @@ async function createAppointment({
   notes,
   windowStart,
   windowEnd,
+  supersedes,
 } = {}) {
   let resolvedTenantId = tenantId || null;
   let callRow = null;
@@ -1794,6 +1933,9 @@ async function createAppointment({
     if (callRow?.tenant_id) resolvedTenantId = callRow.tenant_id;
   }
   if (!resolvedTenantId) return null;
+  const supersedeIds = Array.isArray(supersedes)
+    ? [...new Set(supersedes.map((x) => String(x || '').trim()).filter(Boolean))]
+    : [];
 
   const service = String(serviceName || '').trim();
   if (!service) return null;
@@ -1818,9 +1960,11 @@ async function createAppointment({
       noteText,
   });
 
-  const { data, error } = await supabase
-    .from('appointments')
-    .insert({
+  const receipts = writeReceiptsEnabled({ tenantId: resolvedTenantId });
+  const apKey = receipts
+    ? writeKey({ callId: callRow?.id, kind: 'appointment', item: service })
+    : null;
+  const apRow = {
       tenant_id: resolvedTenantId,
       contact_id: contact?.id || null,
       call_id: callRow?.id || null,
@@ -1835,9 +1979,29 @@ async function createAppointment({
       caller_name: callerName,
       caller_phone: callerPhone,
       updated_at: new Date().toISOString(),
-    })
-    .select('*')
-    .maybeSingle();
+    };
+  let superseded = [];
+  let notifyCancelled = [];
+  let data = null;
+  let error = null;
+  if (supersedeIds.length) {
+    // Brain v2 contract: insert + close the listed escalate tasks in ONE
+    // transaction (create_appointment_superseding), matched on tenant + phone.
+    const rpc = await supabase.rpc('create_appointment_superseding', {
+      p_row: { ...apRow, idempotency_key: apKey },
+      p_supersedes: supersedeIds,
+    });
+    error = rpc.error || null;
+    data = rpc.data?.appointment || null;
+    superseded = Array.isArray(rpc.data?.superseded) ? rpc.data.superseded : [];
+    if (error && /create_appointment_superseding|does not exist|schema cache/i.test(error.message || '')) {
+      throw new Error('[db] createAppointment supersedes needs supabase/migrations/20261014210000_write_receipts.sql');
+    }
+    // One owner message per call: drop still-queued notifies for closed tasks.
+    notifyCancelled = cancelOwnerNotify(superseded);
+  } else {
+    ({ data, error } = await insertWithReceipt('appointments', apRow, apKey));
+  }
 
   if (error && /appointments|relation/i.test(error.message)) {
     console.warn(
@@ -1847,6 +2011,11 @@ async function createAppointment({
     return null;
   }
   throwIfError('createAppointment', error);
+
+  if (!supersedeIds.length && receipts && data?.id && callRow?.id) {
+    superseded = await supersedeRescueCallbacks({ tenantId: resolvedTenantId, appointment: data });
+    notifyCancelled = cancelOwnerNotify(superseded);
+  }
 
   if (callSid && data) {
     const existing = await getCall(callSid);
@@ -1868,6 +2037,9 @@ async function createAppointment({
     }
   }
 
+  if (data && (supersedeIds.length || superseded.length)) {
+    return { ...data, supersedes: supersedeIds, superseded, notifyCancelled };
+  }
   return data || null;
 }
 
@@ -2461,6 +2633,9 @@ async function getTenantCatalogue(tenantId) {
 }
 
 module.exports = {
+  escalateTask,
+  insertWithReceipt,
+  supersedeRescueCallbacks,
   upsertCallFacts,
   getTenantCatalogue,
   resolveTenantId,

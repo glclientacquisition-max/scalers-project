@@ -21,7 +21,7 @@ function createState({ profile = {}, callerPhone, contactName = null, openRows =
     asked: {}, pending: null, tokenSeq: 0, lastLine: '', lastInfo: null, infoRepeat: {}, unknownCount: 0,
     callerPhone, file: { contactName, openRows: openRows.map(normRow), pendingTasks },
     staffNames: (profile.staffNames || []).map((s) => String(s).toLowerCase()),
-    outcomes: [], receipts: [], trace: [], ended: false,
+    outcomes: [], receipts: [], callbacks: [], trace: [], ended: false,
   };
 }
 function normRow(r) {
@@ -45,6 +45,7 @@ function pickIntent(u, state, profile) {
 }
 
 function mergeSlots(state, u, profile) {
+  if (u.name || u.place || u.service || u.when?.date || u.when?.time || u.products?.length) state.progressTurn = state.turn;
   const s = state.slots;
   if (u.name) {
     s.name = u.name; s.nameConfirmed = true;
@@ -131,7 +132,7 @@ function stepIntent(state, u, profile) {
     return { line: propose(state, { tool: 'update_booking', row: s.row, when: nw }) };
   }
   if (it === 'payment_change') return { line: propose(state, { tool: 'create_handoff', kind: 'payment', reason: 'owner_only_change' }) };
-  if (it === 'handoff') return { line: propose(state, { tool: 'create_handoff', kind: 'manager', reason: 'callback', topic: s.service }) };
+  if (it === 'handoff') return { line: propose(state, { tool: 'create_handoff', kind: /manager|owner|mwenye biashara|meneja|human|person/i.test(u.text || '') ? 'manager' : 'callback', reason: 'callback', topic: s.service }) };
   if (it === 'complaint') {
     s.complaint.push(u.text.slice(0, 200));
     if (s.complaint.length < 2 && !u.done) { state.expecting = 'complaint_more'; return { line: R.ask('complaint_more', 0, state.lang) }; }
@@ -147,8 +148,17 @@ function addressHandoff(state) {
 function slotOr(state, slot, ctx) {
   const line = askSlot(state, slot, ctx);
   if (line) return { line };
+  // HD_4ec204aafa93: a day without a time keeps collecting; no callback rescue.
+  if ((slot === 'time' || slot === 'when') && state.slots.when?.date && state.stuck !== 2) { state.stuck = (state.stuck || 0) + 1; state.asked[slot] = 1; return { line: R.ask(slot, 1, state.lang, ctx) }; }
+  // the caller gave something new this turn: keep collecting, no ladder yet
+  if (state.progressTurn === state.turn && !state.ladderOffered) { state.asked[slot] = 1; return { line: R.ask(slot, 1, state.lang, ctx) }; }
   // ladder step 3: offer a callback with what we captured (once per call)
-  if (state.ladderOffered) { state.asked[slot] = 1; return { line: R.ask(slot, 1, state.lang, ctx) }; }
+  if (state.ladderOffered) {
+    // HD_db0e864043c1: never loop the same ask; after it is exhausted again, stop the booking attempt.
+    state.stuck = (state.stuck || 0) + 1;
+    if (state.stuck >= 2) { state.stuck = 0; resetIntent(state); return { line: R.info({ kind: 'drop_intent' }, state.lang) }; }
+    state.asked[slot] = 1; return { line: R.ask(slot, 1, state.lang, ctx) };
+  }
   state.ladderOffered = true;
   return { line: propose(state, { tool: 'create_handoff', kind: 'ladder', reason: 'callback', missing: slot }) };
 }
@@ -160,7 +170,7 @@ async function commit(state, p, handlers) {
   try {
     if (p.tool === 'create_booking') {
       action = 'create_appointment';
-      result = await handlers.createAppointment({ serviceName: p.service, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when), landmark: p.place, notes: p.landmark || undefined, name });
+      result = await handlers.createAppointment({ serviceName: p.service, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when), landmark: p.place, notes: p.landmark || undefined, name, ...(openCallbacks(state).length ? { supersedes: openCallbacks(state) } : {}) });
       ok = Boolean(result && (result.id || result.dryRun === true)); state.outcomes.push('booked');
     } else if (p.tool === 'create_order') {
       action = 'create_service_request';
@@ -177,12 +187,16 @@ async function commit(state, p, handlers) {
     } else if (p.tool === 'create_handoff') {
       result = await handlers.escalate({ reason: p.reason === 'owner_only_change' ? `owner_only_change:${p.kind}` : `callback:${p.kind}`, name, captured: { place: p.place || null, booking: p.row?.id || null, missing: p.missing || null } });
       ok = Boolean(result && result.ok !== false); state.outcomes.push(p.reason === 'owner_only_change' ? 'owner_only_change' : 'handoff_callback');
+      // HD_4ec204aafa93: remember this call's open callback so a later booking supersedes it.
+      if (ok && p.reason !== 'owner_only_change') state.callbacks.push({ id: result.id || result.taskId || null, kind: p.kind || 'callback', open: true });
     } else if (p.tool === 'log_complaint') {
       result = await handlers.escalate({ reason: `complaint:${p.category}`, name, summary: p.summary, kind: 'complaint' });
       ok = Boolean(result && result.ok !== false); state.outcomes.push('complaint');
     }
   } catch (e) { ok = false; }
-  const rec = { tool: p.tool, action, ok, id: result?.id || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null };
+  const sup = ok && p.tool === 'create_booking' ? openCallbacks(state) : [];
+  if (sup.length || (ok && p.tool === 'create_booking')) for (const c of state.callbacks) if (c.open) { c.open = false; c.supersededBy = result?.id || null; }
+  const rec = { tool: p.tool, action, ok, id: result?.id || null, ...(sup.length ? { supersedes: sup } : {}), notify: result?.notify || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null };
   state.receipts.push(rec);
   if (ok && (p.tool === 'create_booking' || p.tool === 'create_order') && s.name && handlers.saveCallerInfo) {
     const prior = state.file.contactName;
@@ -190,9 +204,11 @@ async function commit(state, p, handlers) {
     try { await handlers.saveCallerInfo({ name: s.name, replace }); } catch {}
   }
   if (ok && p.tool === 'cancel_booking') { const r = state.file.openRows.find((x) => x.id === p.row.id); if (r) r.status = 'cancelled'; }
-  return { rec, toolResult: { action, status: ok ? 'succeeded' : 'failed', code: ok ? null : 'write_failed', v2: true } };
+  return { rec, toolResult: { action, status: ok ? 'succeeded' : 'failed', code: ok ? null : 'write_failed', v2: true, ...(sup.length ? { supersedes: sup } : {}) } };
 }
 
+// Open callbacks created earlier in this call (ids may be null in dry-run).
+function openCallbacks(state) { return (state.callbacks || []).filter((c) => c.open).map((c) => c.id).filter(Boolean); }
 function isArea(place, profile) { return !!(N.matchArea(place, profile)?.listed || /^(Kitengela|Ruiru|Kasarani|Kilimani|Karen|Westlands|Lavington|Kileleshwa|Rongai|Syokimau|Thika|Juja|Embakasi|Langata|Ngong|Kahawa|Roysambu|Donholm|Umoja|Kikuyu|Parklands|South B|South C|Athi River|Kiambu|Nairobi)$/i.test(String(place || '').trim())); }
 function resetIntent(state) {
   const keep = { name: state.slots.name, nameConfirmed: state.slots.nameConfirmed, nameCorrectionOf: state.slots.nameCorrectionOf };
@@ -238,6 +254,14 @@ function infoAnswer(state, u, profile, kind) {
     const loc = (profile.businessLocations || [])[0];
     const listed = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').split(':')[1]).filter(Boolean).map((a) => a.replace(/\b\w/g, (c) => c.toUpperCase()));
     const general = listed.length ? listed.slice(0, 4).join(', ') : (loc?.address || profile.hoursSchedule?.location?.split('·').pop()?.trim() || null);
+    // "outside Nairobi" / "nje ya Nairobi": the named place is the base, not the asked area;
+    // answer with the listed areas beyond it (from the tenant list only, never invented).
+    const om = String(u.text || '').match(/\b(?:outside|out of|beyond|nje ya)\s+(?:the\s+)?([A-Za-z]+)/i);
+    if (om && listed.length && !(u.area && u.area.name.toLowerCase() !== om[1].toLowerCase()) && !(u.place && u.place.toLowerCase() !== om[1].toLowerCase())) {
+      const base = om[1].toLowerCase(); const others = listed.filter((a) => a.toLowerCase() !== base);
+      if (others.length && others.length < listed.length) { state.coverageAsk = state.turn; return R.info({ kind: 'coverage_outside', base: L.cap(base), names: others.slice(0, 4).join(', '), more: others.length > 4 }, state.lang); }
+    }
+    if (!u.area && !u.place) state.coverageAsk = state.turn;
     return R.info({ kind: 'coverage', area: u.area, general, fromList: listed.length > 0, more: listed.length > 4 }, state.lang);
   }
   if (kind === 'payment_how') {
@@ -326,6 +350,41 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   const lang = state.lang || 'en';
   const out = (line0, extra = {}) => { const line = applyAckRule(state, line0, { ackOk: !!extra.ackOk, acked: !!acked, callerAck: !!u.ack, lang }); const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; noteAck(state, l); return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
 
+  // HD_db0e864043c1 fixes -------------------------------------------------
+  // "pardon?" / "say again" repeats our last line plainly (not a new question).
+  if (/^\W*(uh,?\s*)?(pardon( me)?|sorry\??|say (that|it) again|come again|repeat( that)?|rudia|sijakusikia|sijaskia|nini\?)\W*$/i.test(text) && state.lastLine) return out(state.lastLine);
+  // "what's my name?" answers from the caller file / this call only; never claims memory.
+  if (/\b(naitwa nani|jina langu ni nani|what'?s my name|do you know my name|unajua jina langu)\b/i.test(text)) {
+    const known = state.slots.name || state.file.contactName;
+    if (known) return out(lang === 'sw' ? `Nina jina lako kama ${known}. Ni sahihi?` : `I have your name as ${known}. Is that right?`);
+    state.asked.name = (state.asked.name || 0) + 1; state.expecting = 'name';
+    return out(lang === 'sw' ? 'Sina jina lako bado. Naomba jina lako?' : "I don't have your name yet. May I have your name?");
+  }
+  // "who did you escalate to?" answers from this call's own receipts only
+  if (/\b(escalat\w*|umemtumia nani|who did you (send|tell|pass)|umepeleka kwa nani)\b/i.test(text) && (state.callbacks || []).length) return out(lang === 'sw' ? 'Nimeomba timu ya biashara ikupigie simu kwa namba hii.' : 'I asked the business team to call you back on this number.');
+  // a bare place right after our "which place are you in?" coverage answer is the coverage follow-up
+  if (state.coverageAsk === state.turn - 1 && !u.intents.length && !state.intent && text.split(/\s+/).length <= 5) {
+    const pl = u.place || N.extractPlace(text, { prompted: true });
+    if (u.area || pl) { u.place = u.place || pl; if (!u.area) u.area = { listed: false, name: L.cap(String(pl).split(/[ ,]/)[0]) }; u.intents.push('coverage'); }
+  }
+  // a place asked as a question ("Of Naivasha?") is a coverage question
+  if ((u.place || /^\W*(of|in|kama|like|what about|na je|je)\s+[A-Z][a-z]{3,}\W*$/i.test(text)) && /\?\s*$/.test(text) && !u.intents.includes('coverage') && !u.intents.includes('book')) u.intents.push('coverage');
+  // after "anything else?": a no, thanks or a compliment closes the call
+  const askedElse = /(anything else|Kuna kingine)[^?]*\?\s*$/i.test(state.lastLine || '');
+  // a cut-off turn ("Hapana, n") is never a no / decline / slot answer: ask again, keep everything
+  if (N.cutOff(text) && state.turn > 1 && (state.repairs || 0) < 2) {
+    state.repairs = (state.repairs || 0) + 1;
+    // re-ask the open question so the caller knows what to answer ("Sorry, I didn't catch that. Where should we come?")
+    const q = (String(state.lastBase || state.lastLine || '').match(/[^.!?]+\?\s*$/) || [])[0];
+    const sorry = R.info({ kind: 'repair' }, lang).split(/(?<=[.!?])\s/)[0];
+    return out(q && state.expecting ? `${sorry} ${q.trim()}` : R.info({ kind: 'repair' }, lang));
+  }
+  if (!state.intent && state.phase === 'collect' && !u.intents.filter((i) => i !== 'greeting').length && !u.service && (askedElse && (u.no || /^\W*hapana\b/i.test(text)) || /\b(thank you|thanks|asante( sana)?|excited|salama kabisa|keep (it )?up|continue serving)\b/i.test(text) && state.turn > 2)) { state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
+  // a name given while a callback offer is open: keep the name, drop the stale offer
+  if (state.phase === 'readback' && state.pending?.tool === 'create_handoff' && u.name && !u.yes && !u.no) { mergeSlots(state, u, profile); state.pending = null; state.phase = 'collect'; if (!state.intent) return out(R.info({ kind: 'greet_name', name: nameSpeakable(state) || u.name }, lang)); const st = stepIntent(state, u, profile); if (st?.line) return out(st.line); }
+  // "no" while collecting (nothing new given) ends the booking attempt honestly
+  if (state.phase === 'collect' && state.intent && u.no && !u.yes && !u.service && !u.when?.date && !u.when?.time && !u.place && !u.name) { resetIntent(state); state.outcomes.push('declined'); return out(R.info({ kind: 'decline' }, lang)); }
+
   // 1) read-back pending: commit only on the caller's yes
   // a new question while a callback offer is open drops the offer and answers the question
   if (state.phase === 'readback' && state.pending?.tool === 'create_handoff' && !u.yes && u.intents.some((i) => INFO.includes(i))) resetIntent(state);
@@ -370,12 +429,14 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   if (!state.intent && mc && !u.intents.length) { const ok = mc.calls.find((c, i) => mc.checks[i].ok && /^(create_booking|create_order)$/.test(c.name)); if (ok && (u.service || u.products.length)) state.intent = INTENT_OF_TOOL[ok.name]; }
   // info questions answered without dropping a transaction in progress
   const infoKind = (u.intents.includes('recall') ? 'recall' : null) || u.intents.find((i) => INFO.includes(i) && i !== 'want_know') || u.intents.find((i) => i === 'want_know') || (!ni && state.lastInfo === 'price' && (u.service || u.products.length) ? 'price' : null);
-  if (infoKind && (!ni || ni === 'book' && infoKind === 'availability' && !/\bbook\b/i.test(u.text))) {
+  if (infoKind && (!ni || ni === 'book' && infoKind === 'availability' && !/\bbook\b/i.test(u.text) || ni === 'book' && ['coverage', 'price', 'hours', 'payment_how'].includes(infoKind) && /\?|\b(where|how much|when|wapi|ngapi|saa ngapi)\b/i.test(u.text))) {
     if (state.intent === 'book' && infoKind === 'availability' && !/\bbook|kubook\b/i.test(u.text) && state.stateIntentTurn === state.turn) state.intent = null;
-    if (!state.intent || state.stateIntentTurn !== state.turn) {
+    if (!state.intent || state.stateIntentTurn !== state.turn || ['coverage', 'price', 'hours', 'payment_how'].includes(infoKind)) {
       state.lastInfo = infoKind;
       if (!state.intent) mergeSlots(state, u, profile);
       const line = infoAnswer(state, u, profile, infoKind);
+      // an unlisted area mid-booking: say so and offer one callback instead of pushing on (HD_db0e t18)
+      if (infoKind === 'coverage' && /isn't on our list of service areas|haiko kwenye orodha ya maeneo yetu/.test(line)) { const first = line.split(/(?<=\.)\s/)[0]; return out(`${first} ${propose(state, { tool: 'create_handoff', kind: 'callback', reason: 'callback', place: u.place || null })}`); }
       if (state.intent) { mergeSlots(state, u, profile); if (/\?\s*$/.test(line.replace(/\s*(Anything else\?|Kuna kingine\?)$/, ''))) return out(line); const st = stepIntent(state, u, profile); return out(st?.line ? `${line.replace(/\s*(Anything else\?|Kuna kingine\?)$/, '')} ${st.line}` : line); }
       return out(line);
     }
@@ -401,7 +462,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     }
     if (u.fragment && state.turn > 1) { state.repairs = (state.repairs || 0) + 1; if (state.repairs <= 2) return out(R.info({ kind: 'repair' }, lang)); }
     const n = state.unknownCount++;
-    if (n === 2 && !state.ladderOffered) { state.ladderOffered = true; return out(propose(state, { tool: 'create_handoff', kind: 'ladder', reason: 'callback' })); }
+    if (n === 2 && !state.ladderOffered && !(state.callbacks || []).length) { state.ladderOffered = true; return out(propose(state, { tool: 'create_handoff', kind: 'ladder', reason: 'callback' })); }
     return out(R.ask('intent', n % 2, lang));
   }
   if (u.done && state.phase === 'collect' && state.intent !== 'complaint' && !u.intents.length) { resetIntent(state); state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
@@ -424,6 +485,8 @@ function finishCall(state, { businessName, callerPhone }) {
   const last = state.receipts[state.receipts.length - 1];
   const captured = { service: s.service || last?.service, when: (s.when.date || last?.when?.date) ? `${s.when.date || last.when.date} ${s.when.time || last?.when?.time || ''}` : null, place: s.place, items: (s.items.length ? s.items : last?.items || []).map((x) => `${x.qty || '?'} x ${x.name}`).join(', ') || null, booking: last?.row ? `${last.row.service} ${last.row.when.date}` : null };
   const intent = { booked: 'book', order_saved: 'order', moved: 'change', cancelled: 'cancel', owner_only_change: last?.kind === 'payment' ? 'payment_change' : 'address_change', complaint: 'complaint', handoff_callback: 'handoff' }[outcome] || state.intent || state.lastInfo || 'none';
-  return { outcome, ownerText: renderOwnerMessage({ businessName, callerPhone, name: s.name, intent, outcome, captured }) };
+  const superseded = (state.callbacks || []).some((c) => c.supersededBy !== undefined && !c.open);
+  if (superseded && outcome === 'booked') captured.note = 'earlier callback request closed: booked instead';
+  return { outcome, superseded: (state.callbacks || []).filter((c) => !c.open).map((c) => c.id).filter(Boolean), ownerText: renderOwnerMessage({ businessName, callerPhone, name: s.name, intent, outcome, captured }) };
 }
 module.exports = { createState, runTurn, finishCall };

@@ -5,14 +5,23 @@
 // other turns are a non-word "Mm." so the caller never hears ack+ack.
 
 const ACK_LEAD_WIDE =
-  /^\s*(?:sawa(?:\s+sawa|\s+kabisa)?|ni\s+sawa|okay|ok|alright|haya|asante|sure|poa)\s*[.,!]\s*(?=\S)/i;
+  /^\s*(?:sawa(?:\s+sawa|\s+kabisa)?|ni\s+sawa|okay|ok|alright|haya|asante(?:\s+sana)?|sure|poa)\s*[.,!]\s*(?=\S)/i;
+// A whole line that is only an ack ("Sawa kabisa." / "Asante sana!").
+const BARE_ACK = /^\s*(?:sawa(?:\s+sawa|\s+kabisa)?|ni\s+sawa|okay|ok|alright|haya|asante(?:\s+sana)?|sure|poa|great)\s*[.,!]*\s*$/i;
+const ACK_NAME_LEAD = /^\s*(?:[Ss]awa|[Oo]kay|[Oo]k|[Aa]lright|[Hh]aya|[Pp]oa|[Nn]diyo)\s+([A-Z][a-z]+[,!]\s*)(?=\S)/;
+const MM = /^\s*mm(?:-?hmm)?\b/i;
+const QUESTION = /\?\s*$|\b(nani|gani|ngapi|wapi|lini|vipi|je|how|what|when|where|which|who|why|can you|unaweza|mnaweza|itaweza)\b/i;
 const ACK_WORD =
   /^\s*(?:sawa(?:\s+sawa|\s+kabisa)?|ni\s+sawa|okay|ok|alright|haya|asante|sure|poa|great|got it)\b/i;
 const CALLER_ACK = /^\s*(?:sawa(?:\s+sawa)?|ni\s+sawa|okay|ok|alright|haya|poa|sure|fine)[.!,\s]*$/i;
 const CLOSING = /\b(kwaheri|goodbye|good bye|bye|karibu tena|thanks for calling|asante kwa kupiga)\b/i;
 const NON_WORD = { sw: 'Mm.', sheng: 'Mm.', en: 'Mm-hmm.' };
-const TOOL_ACK = { sw: 'Sawa.', sheng: 'Poa.', en: 'Got it.' };
+// Tool turns: a status line, not an ack word (brief §6.3: a hold line is not an ack).
+const TOOL_ACK = { sw: 'Naangalia.', sheng: 'Naangalia.', en: 'Let me check.' };
 const SPACING = 3;
+const MM_SPACING = 6;
+const MM_MIN_WORDS = 8;
+function wordCount(t) { return String(t || '').trim().split(/\s+/).filter(Boolean).length; }
 
 function ackRuleEnabled(env = process.env) {
   const v = String(env.VOICE_ACK_RULE || '').trim().toLowerCase();
@@ -23,6 +32,10 @@ function isAckLed(text) {
   const t = String(text || '');
   return ACK_WORD.test(t) && !/^\s*mm/i.test(t);
 }
+/** What the caller heard as an ack: ack words AND a bare "Mm." (rule counts both). */
+function isHeardAck(text) { return isAckLed(text) || MM.test(String(text || '')); }
+function isBareAck(text) { return BARE_ACK.test(String(text || '')); }
+function shortTurn(text) { return String(text || '').trim().split(/\s+/).filter(Boolean).length <= 3; }
 function isClosing(text) { return CLOSING.test(String(text || '')); }
 function isCallerAck(text) { return CALLER_ACK.test(String(text || '')); }
 function langKey(lang) { const l = String(lang || '').toLowerCase(); return l === 'sw' || l === 'sheng' ? l : 'en'; }
@@ -50,17 +63,17 @@ function createAckTracker() {
       callerAck = isCallerAck(callerText);
     },
     /** May an ack be heard on this turn at all? */
-    allowed() {
+    allowed({ spacing = SPACING } = {}) {
       if (ackThisTurn) return false; // already one this turn
       if (turn <= 1) return false; // first turn
       if (lastTurnAckLed) return false; // never two in a row
       if (callerAck) return false; // caller's own sawa: answer with content
-      return turn - lastAckTurn >= SPACING; // max one per 3 turns
+      return turn - lastAckTurn >= spacing; // max one per 3 turns (Mm: per MM_SPACING)
     },
     /** Record a line the caller heard first on this turn. */
     noteHeard(text) {
       if (ackThisTurn) return;
-      if (isAckLed(text) && !isClosing(text)) { ackThisTurn = true; lastAckTurn = turn; }
+      if (isHeardAck(text) && !isClosing(text)) { ackThisTurn = true; lastAckTurn = turn; }
     },
     get ackThisTurn() { return ackThisTurn; },
     get turn() { return turn; },
@@ -71,17 +84,35 @@ function createAckTracker() {
  * Filler under the rule. Word ack only at tool start when allowed; else non-word.
  * @returns {{ text: string, word: boolean }}
  */
-function pickRuleFiller({ lang, toolTurn = false, tracker } = {}) {
+function pickRuleFiller({ lang, toolTurn = false, tracker, callerText = '' } = {}) {
   const k = langKey(lang);
-  if (toolTurn && tracker && tracker.allowed()) return { text: TOOL_ACK[k], word: true };
+  // Mm counts as an ack: same spacing (no first turn, never twice in a row, 1 per 3).
+  if (toolTurn) return { text: TOOL_ACK[k], word: true, status: true };
+  if (!tracker || !tracker.allowed()) return null;
+  // No filler before a question answer or on a short turn ("Yeah.", "Si unaona?").
+  if (shortTurn(callerText) || QUESTION.test(String(callerText || ''))) return null;
+  // Mm only masks a long think: long caller turn, and rarer than word acks.
+  if (wordCount(callerText) < MM_MIN_WORDS || !tracker.allowed({ spacing: MM_SPACING })) return null;
   return { text: NON_WORD[k], word: false };
 }
 
 /** Backstop on a spoken line: strip the lead if an ack already played or the rule forbids one. */
-function applyAckBackstop(line, { tracker, acked = false } = {}) {
+function applyAckBackstop(line, { tracker, acked = false, dropBare = false } = {}) {
   const text = String(line || '');
-  if (!isAckLed(text) || isClosing(text)) return text;
-  if (acked || (tracker && !tracker.allowed())) return stripAckLead(text);
+  if (!isAckLed(text)) return text;
+  // A line that IS the goodbye ("Asante kwa kupiga simu") keeps its words.
+  if (/^\s*(?:asante kwa|thanks for calling|thank you for calling|kwaheri|goodbye)/i.test(text)) return text;
+  // After any filler, a reply sentence that is only an ack would stack ("Mm. Sawa kabisa.").
+  if (dropBare && acked && isBareAck(text)) return '';
+  // Voice owns the one ack per turn (filler/tool-start ack), so a reply never needs
+  // its own lead: strip it on every turn; only a bare-ack reply with no filler stays.
+  if (acked || tracker) {
+    const out = stripAckLead(text);
+    if (out !== text) return out;
+    // "Sawa Chris, ..." -> "Chris, ..." (the name stays, the ack goes).
+    const m = text.match(ACK_NAME_LEAD);
+    return m ? text.slice(m[0].length - m[1].length) : text;
+  }
   return text;
 }
 
@@ -99,15 +130,38 @@ function scoreAckRule(turns = []) {
     if (filler && filler.split(/\s+/).length > 3) fillerOver3 += 1;
     if (isClosing(line) && !filler) { run = 0; continue; }
     counted += 1;
-    const led = isAckLed(heard);
-    if (filler && isAckLed(filler) && isAckLed(line)) stacks += 1;
+    // Heard ack includes "Mm."; a stack is any filler followed by an ack-led line.
+    const led = isHeardAck(heard);
+    if (filler && isHeardAck(filler) && isAckLed(line)) stacks += 1;
     if (led) { ackLed += 1; run += 1; longestRun = Math.max(longestRun, run); } else run = 0;
   }
   const ackLedPct = counted ? Math.round((ackLed / counted) * 1000) / 10 : 0;
   return { counted, ackLed, ackLedPct, stacks, longestRun, fillerOver3, pass: ackLedPct <= 10 && stacks === 0 };
 }
 
+/**
+ * Replay logged heard turns ({caller, filler, reply}) through the rule as live does:
+ * tracker per call, filler from pickRuleFiller, reply backstop (bare ack dropped).
+ */
+function replayHeard(turns = [], { lang = 'sw' } = {}) {
+  const tr = createAckTracker();
+  return turns.map((t) => {
+    tr.beginTurn({ callerText: t.caller || '' });
+    const tool = /^(sawa, )?nime(hifadhi|hamisha|weka|futa|badilisha|ghairi)|nimemtumia|watakupigia|i've saved|they'll call/i.test(String(t.reply || ''));
+    let filler = '';
+    if (t.filler) {
+      const p = pickRuleFiller({ lang, toolTurn: tool, tracker: tr, callerText: t.caller || '' });
+      filler = p ? p.text : '';
+      if (filler) tr.noteHeard(filler);
+    }
+    const text = applyAckBackstop(String(t.reply || ''), { tracker: tr, acked: Boolean(filler), dropBare: true });
+    tr.noteHeard(text);
+    return { filler, text };
+  });
+}
+
 module.exports = {
+  replayHeard,
   ACK_LEAD_WIDE, ackRuleEnabled, isAckLed, isClosing, isCallerAck, stripAckLead,
-  createAckTracker, pickRuleFiller, applyAckBackstop, scoreAckRule,
+  isHeardAck, isBareAck, shortTurn, createAckTracker, pickRuleFiller, applyAckBackstop, scoreAckRule,
 };

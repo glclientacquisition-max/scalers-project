@@ -21,12 +21,19 @@ async function runCallV2({ root, profile, seed, callerPhone = '+254700000001', c
     const t0 = process.hrtime.bigint();
     let modelNs = 0n; let error = null; let r = { line: '', toolResults: [], lang: 'en' };
     const timedModel = async (a) => { const m0 = process.hrtime.bigint(); try { return await model(a); } finally { modelNs += process.hrtime.bigint() - m0; } };
-    try { r = await V2.runTurn(state, { text: clean, profile, now, handlers, model: timedModel }); }
+    // Driven through runTurnStream so the run carries what the caller hears (sentence /
+    // readback / tool events with atMs) for lib/heard.js; done mirrors runTurn's result.
+    let events = [];
+    try {
+      for await (const ev of V2.runTurnStream(state, { text: clean, profile, now, handlers, model: timedModel })) events.push(ev);
+      const d = events.at(-1) || {}; const sl = events.find((e) => e.type === 'sentence');
+      r = { line: d.line || '', toolResults: d.toolResults || [], lang: sl?.lang || state.lang || 'en', end: !!d.end };
+    }
     catch (e) { error = String(e && e.stack || e).split('\n').slice(0, 3).join(' | '); }
     const brainMs = Number(process.hrtime.bigint() - t0 - modelNs) / 1e6;
     all.push(...r.toolResults);
     lastAgentText = r.line;
-    turns.push({ i, callerText: clean, agentLine: r.line, outcome: 'v2', toolResults: r.toolResults.map((x) => ({ action: x.action, status: x.status, code: x.code })), language: r.lang, brainMs, toolTurn: r.toolResults.length > 0, error });
+    turns.push({ i, callerText: clean, agentLine: r.line, outcome: 'v2', toolResults: r.toolResults.map((x) => ({ action: x.action, status: x.status, code: x.code })), language: r.lang, brainMs, toolTurn: r.toolResults.length > 0, error, events: events.map(({ type, phase, name, write, text, lang, atMs, toolMs }) => ({ type, phase, name, write, text, lang, atMs, toolMs })) });
     if (error || r.end) break;
   }
   const fin = V2.finishCall(state, { businessName, callerPhone });

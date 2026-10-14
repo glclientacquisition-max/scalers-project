@@ -43,6 +43,7 @@ function readback(p, lang) {
       const k = p.kind;
       if (k === 'address') return S ? 'Siwezi kubadilisha mahali kwenye simu hii. Nimwombe mwenye biashara akupigie simu, ni sawa?' : `I can't change the address on this call. Shall I ask the owner to call you back about ${p.place ? `moving it to ${p.place}` : 'it'}?`;
       if (k === 'payment') return S ? 'Siwezi kubadilisha malipo kwenye simu hii. Nimwombe mwenye biashara akupigie simu, ni sawa?' : "I can't change payment details on this call. Shall I ask the owner to call you back about it?";
+      if (k === 'callback') return S ? 'Nimwombe mwenye biashara akupigie simu kwa namba hii, ni sawa?' : 'Shall I ask the team to call you back on this number?';
       if (k === 'manager') return S ? 'Mwenye biashara hayupo kwenye simu sasa. Nimwombe akupigie simu, ni sawa?' : `The manager isn't on the line now. Shall I ask them to call you back${p.topic ? ` about the ${svcName(p.topic).toLowerCase()}` : ''}?`;
       return S ? 'Nimwombe mwenye biashara akupigie simu kumaliza hili, ni sawa?' : "Shall I ask the team to call you back to finish this?";
     }
@@ -88,6 +89,7 @@ function info(r, lang, n = 0) {
     case 'pending': return S ? `Ombi lako la kubadilisha ${r.what === 'payment' ? 'malipo' : 'mahali'} bado linasubiri. Mwenye biashara atakupigia simu.` : `Your ${r.what} change request is still pending. The owner will call you back.`;
     case 'services': return S ? `Tunafanya ${r.names.map(svcName).join(', ')}${r.more ? ' na zaidi' : ''}. Ungependa ipi?` : `We do ${r.names.map(svcName).join(', ')}${r.more ? ', and more' : ''}. Which one would you like?`;
     case 'offered': return S ? `Ndio, tunafanya ${svcName(r.label)}${r.price ? `, bei ni ${priceTxt(r.price, true)}` : ''}. Ungependa kubook?` : `Yes, we do ${svcName(r.label).toLowerCase()}${r.price ? `, ${/^From/i.test(r.price) ? priceTxt(r.price) : `at ${r.price}`}` : ''}. Would you like to book?`;
+    case 'coverage_outside': return S ? `Ndio, nje ya ${r.base} tunahudumia ${r.names}${r.more ? ' na maeneo mengine' : ''}. Uko wapi?` : `Yes, outside ${r.base} we serve ${r.names}${r.more ? ' and other listed areas' : ''}. Which place are you in?`;
     case 'coverage':
       if (r.area?.listed) return S ? `${r.area.name} iko kwenye orodha ya maeneo yetu. Timu itathibitisha ukibook.` : `${r.area.name} is on our list of service areas. The team confirms when you book.`;
       if (r.area) return S ? `${r.area.name} haiko kwenye orodha ya maeneo yetu. Timu inaweza kuangalia na kukupigia simu.` : `${r.area.name} isn't on our list of service areas. The team can check and call you back.`;
@@ -104,6 +106,7 @@ function info(r, lang, n = 0) {
     case 'no_rows': return S ? 'Sioni booking iliyo wazi kwa namba hii.' : "I don't see an open booking on this number.";
     case 'not_offered': return S ? 'Hiyo haipo kwenye huduma zetu.' : "That isn't on our list of services.";
     case 'bye': return S ? 'Asante kwa kupiga simu. Kwaheri.' : 'Thank you for calling. Goodbye.';
+    case 'drop_intent': return S ? 'Tuache booking kwa sasa. Kuna kingine ninaweza kukusaidia nacho?' : "Let's leave the booking for now. Is there anything else I can help with?";
     case 'decline': return S ? 'Sawa, sijahifadhi chochote. Kuna kingine?' : "Okay, I haven't saved anything. Anything else?";
     default: return '';
   }

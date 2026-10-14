@@ -47,7 +47,7 @@ const origLog = console.log, origWarn = console.warn;
         try { run = await runCall({ root: ROOT, scenarioId: scn.id, modelSeed: seed, profile, seed: scn.seed || {}, model, caller, now: NOW, businessName: profile.businessName, agentName: profile.agentName || 'Shy' }); }
         finally { console.log = origLog; console.warn = origWarn; }
         const s = scoreRun(scn, run);
-        runs.push({ seed, ...s, faults: run.modelFaults || model.injected, transcript: run.turns.map((t) => ({ c: t.callerText, a: t.agentLine, o: t.outcome, tools: t.toolResults, ms: +t.brainMs.toFixed(2) })), ownerText: run.ownerText });
+        runs.push({ seed, ...s, faults: run.modelFaults || model.injected, transcript: run.turns.map((t) => ({ c: t.callerText, a: t.agentLine, o: t.outcome, tools: t.toolResults, ms: +t.brainMs.toFixed(2), ev: t.events })), ownerText: run.ownerText });
       }
       out.scenarios.push({ id: scn.id, area: scn.area, lang: scn.lang, commitment: !!scn.commitment, passK: runs.every((r) => r.pass), pass1: runs.filter((r) => r.pass).length / K, endStatePassK: runs.every((r) => r.endStatePass), runs });
     }

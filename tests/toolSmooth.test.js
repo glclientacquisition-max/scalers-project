@@ -76,3 +76,49 @@ test('v2Shadow: prefetchContext once + readback/timing logged only with the sub-
   for (const s of b) { assert.equal('prefetch' in s, false); assert.equal('readback' in s, false); assert.equal('timing' in s, false); }
   assert.deepEqual(a.map((s) => s.v2Text), b.map((s) => s.v2Text));
 });
+
+test('77ce8123 traces (HD_db0e864043c1 C1 T9, HD_4ec204aafa93 C2 T9): why no hold played, and the fix', () => {
+  const F = require('../src/speech/fillerPcmCache');
+  const dir = path.join(__dirname, 'fixtures', 'tool-turns-77ce8123');
+  const fx = fs.readdirSync(dir).filter((n) => n.endsWith('.json')).map((n) => JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8')));
+  assert.equal(fx.length, 2);
+  // Root cause: the old warm keyed sw hold lines without a call language (prepared as en),
+  // the runtime looked them up as sw -> miss -> startHoldFill stopped silently.
+  for (const line of T.holdFillLines('sw')) {
+    const oldWarm = F.lookupFillerPcm({ voiceId: 'v', text: line });
+    const runtime = F.lookupFillerPcm({ voiceId: 'v', text: line, callLanguage: T.holdLanguage('sw') });
+    assert.notEqual(oldWarm.key, runtime.key, `old warm missed ${line}`);
+  }
+  // Fix: every warm phrase carries the language the runtime lookup uses; hold lines first.
+  const warm = T.warmPhrases('sw');
+  assert.deepEqual(warm.slice(0, 3).map((p) => p.text), T.holdFillLines('sw'));
+  for (const p of warm) {
+    const w = F.lookupFillerPcm({ voiceId: 'v', text: p.text, callLanguage: p.callLanguage });
+    const r = F.lookupFillerPcm({ voiceId: 'v', text: p.text, callLanguage: T.holdLanguage(p.callLanguage === 'sw' ? 'sheng' : 'en') });
+    assert.equal(w.key, r.key, p.text);
+  }
+  // Staging behaviour (hold never played) vs fixed (hold fills the tool wait).
+  const before = T.scoreToolTurns(fx.map((f) => T.simulateToolTurn(f, {})));
+  const after = T.scoreToolTurns(fx.map((f) => T.simulateToolTurn(f, { hold: true, receipt: false })));
+  assert.ok(before.gapP95Ms >= 1000, `before p95 ${before.gapP95Ms}`); assert.ok(before.deadAir >= 1);
+  assert.ok(after.gapP95Ms <= T.GAP_BAR_MS, `after p95 ${after.gapP95Ms}`); assert.equal(after.deadAir, 0);
+});
+
+test('server.js: hold cache miss is logged and falls back to the live hold; warm pauses on turnBusy', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(src, /if \(startHoldFill\(\)\) return;/);
+  assert.match(src, /tool-smooth hold miss/);
+  assert.match(src, /phrases: toolSmooth\.warmPhrases\(callLanguage\),\s*\/\/[^\n]*\n\s*waitWhile: \(\) => turnBusy,\s*shouldAbort: \(\) => speechOutageStarted \|\| !tts,/);
+});
+
+test('warmFillerAckPcm: waitWhile pauses instead of dropping the pack', async () => {
+  const F = require('../src/speech/fillerPcmCache');
+  F.resetFillerPcmCache();
+  let busy = true; setTimeout(() => { busy = false; }, 60);
+  const tts = { beginSpeak: async () => ({ pushText: () => ({ pushed: true }), end: async () => ({ pcm: Buffer.alloc(320) }), cancel() {} }) };
+  const prev = process.env.VOICE_FILLER_PCM_CACHE; process.env.VOICE_FILLER_PCM_CACHE = '1';
+  try {
+    const r = await F.warmFillerAckPcm({ tts, voiceId: 'v', phrases: T.warmPhrases('sw').slice(0, 3), waitWhile: () => busy, waitPollMs: 10 });
+    if (F.isFillerCacheEnabled()) assert.equal(r.warmed, 3);
+  } finally { if (prev === undefined) delete process.env.VOICE_FILLER_PCM_CACHE; else process.env.VOICE_FILLER_PCM_CACHE = prev; }
+});

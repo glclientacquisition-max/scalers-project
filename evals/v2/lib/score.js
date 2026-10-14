@@ -62,6 +62,15 @@ function scoreRun(scn, run) {
   if (claims.length) fails.push(...claims.map((c) => `false_claim:${c.cls} t${c.turn} "${c.s.slice(0, 70)}"`));
   // ---- must/mustn't say (fact answers for coverage scenarios)
   const said = turns.map((t) => t.agentLine || '').join(' \n ');
+  // receipt-first (escalate contract): on the write turn nothing promising the callback is heard
+  // before the tool ends, and the first sentence after it is the receipt.
+  if (scn.receiptFirst) for (const t of turns) {
+    const ev = t.events || []; const end = ev.findIndex((e) => e.type === 'tool' && e.phase === 'end' && e.name === 'escalate');
+    if (end < 0) continue;
+    if (ev.slice(0, end).some((e) => e.type === 'sentence')) fails.push('receipt_first: spoke before escalate ended');
+    const after = ev.slice(end).filter((e) => e.type === 'sentence' && !/^\W*(okay|sawa|haya)\W*$/i.test(e.text));
+    if (!after.length || !new RegExp(scn.receiptFirst, 'i').test(after[0].text)) fails.push(`receipt_first: first sentence after escalate "${after[0]?.text}"`);
+  }
   for (const re of scn.mustSay || []) if (!new RegExp(re, 'i').test(said)) fails.push(`must_say "${re}"`);
   for (const re of scn.mustNotSay || []) if (new RegExp(re, 'i').test(said)) fails.push(`must_not_say "${re}"`);
   // ---- owner email
@@ -74,6 +83,8 @@ function scoreRun(scn, run) {
   cnt(ex.service_requests, newSr.length, 'service_requests');
   if (ex.handoffsMin != null && db.handoffs.length < ex.handoffsMin) fails.push(`db:handoff expected >=${ex.handoffsMin} got ${db.handoffs.length}`);
   if (ex.handoffs != null && db.handoffs.length !== ex.handoffs) fails.push(`db:handoff expected ${ex.handoffs} got ${db.handoffs.length}`);
+  if (ex.superseded != null) { const n = db.handoffs.filter((h) => h.status === 'superseded').length; if (n !== ex.superseded) fails.push(`db:superseded expected ${ex.superseded} got ${n}`); }
+  if (ex.openHandoffs != null) { const n = db.handoffs.filter((h) => h.status !== 'superseded').length; if (n !== ex.openHandoffs) fails.push(`db:open_handoffs expected ${ex.openHandoffs} got ${n}`); }
   if (ex.complaintsMin != null && db.complaints.length < ex.complaintsMin) fails.push(`db:complaint expected >=${ex.complaintsMin} got ${db.complaints.length}`);
   if (ex.noWrites && db.writes.some((w) => /create|update/.test(w[0]))) fails.push(`db:unexpected_writes ${db.writes.map((w) => w[0]).join(',')}`);
   if (ex.appointment) {

@@ -440,6 +440,7 @@ const {
   isRecordingEvent,
 } = require('./src/sautikit/recordingEvents');
 const { fetchCallRecording } = require('./src/sautikit/recordingFetch');
+const { finalizeOnceEnabled, finalizeDecision } = require('./src/callFinalizeOnce');
 const {
   summarizeHeaders,
   summarizeBody,
@@ -1177,6 +1178,20 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
     });
     const summary = deriveCallSummary({ brainState });
     const primaryIntent = summary.primaryIntent || null;
+    if (opts.writeResolution === false) {
+      // Run-once loser: only hand its live turns to the debounced review.
+      const profile = callTenantProfiles.get(callSid) || {};
+      schedulePostCallTranscriptReview({
+        callSid,
+        vertical: profile.vertical || '',
+        derived,
+        summary,
+        toolFlags: toolFlagsFromBrain(brainState, call?.id || null),
+        turns: Array.isArray(opts.turns) ? opts.turns : null,
+        callStatus: opts.callStatus || null,
+      });
+      return null;
+    }
     const saved = await db.setCallResolution({
       callSid,
       resolution: derived.resolution,
@@ -1246,6 +1261,18 @@ async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, s
       durationSeconds: durationSeconds ?? null,
       found: Boolean(updated),
     });
+    const decision = finalizeDecision({
+      enabled: finalizeOnceEnabled(),
+      won: updated?.finalizeWinner,
+      hasTurns: Array.isArray(turns) && turns.length > 0,
+    });
+    if (decision !== 'run') {
+      console.log(`[${source}] finalize skipped ${callSid} (another webhook won) decision=${decision}`);
+      if (decision === 'review_only') {
+        await persistCallResolution(callSid, source, { turns, callStatus: status, writeResolution: false });
+      }
+      return updated;
+    }
     // Best-effort outcome while Brain state may still be in memory.
     await persistCallResolution(callSid, source, { turns, callStatus: status });
     await persistFirstForwardAcceptance(callSid, durationSeconds);
@@ -2158,6 +2185,8 @@ mediaWss.on('connection', (ws, req) => {
   if (mediaClock) MEDIA_CLOCKS.set(ws, mediaClock);
   let holdFillTimer = null;
   let holdsQueued = 0;
+  /** Filler text this turn: the hold pack skips it (ack rule plays "Naangalia." on tool turns). */
+  let turnFillerText = '';
   let receiptCachedTurn = false;
   function stopHoldFill() {
     if (holdFillTimer) clearInterval(holdFillTimer);
@@ -2165,8 +2194,20 @@ mediaWss.on('connection', (ws, req) => {
   }
   // Items 1-2: while the tool runs, queue a cached same-voice hold line just before
   // the queued audio (ack/filler) runs out. Cached only: never a live-TTS seam.
+  function holdLinesForTurn() {
+    return toolSmooth.holdFillLines(callLanguage).filter((l) => l !== turnFillerText);
+  }
+  function lookupHoldPcm(line) {
+    return lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
+  }
+  /** Returns false when the first hold line is not cached (caller falls back to live hold). */
   function startHoldFill() {
-    if (!mediaClock || holdFillTimer) return;
+    if (!mediaClock || holdFillTimer) return Boolean(holdFillTimer);
+    const first = holdLinesForTurn()[0];
+    if (!isFillerCacheEnabled() || !lookupHoldPcm(first).pcm) {
+      console.log(`[ws/media][${sidLabel()}] tool-smooth hold miss (not warmed), live hold: ${first}`);
+      return false;
+    }
     const turnAtStart = activeTurnTiming;
     holdFillTimer = setInterval(() => {
       if (!turnBusy || bargeInActive || activeTurnTiming !== turnAtStart || ttsSpeedScale !== 1) return stopHoldFill();
@@ -2174,9 +2215,13 @@ mediaWss.on('connection', (ws, req) => {
         if (holdsQueued >= toolSmooth.HOLD_MAX) stopHoldFill();
         return;
       }
-      const line = toolSmooth.holdFillLines(callLanguage)[holdsQueued];
-      const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage, extraLexicon: ttsLexiconOverrides });
-      if (!found.pcm) return stopHoldFill();
+      const line = holdLinesForTurn()[holdsQueued];
+      if (!line) return stopHoldFill();
+      const found = lookupHoldPcm(line);
+      if (!found.pcm) {
+        console.log(`[ws/media][${sidLabel()}] tool-smooth hold miss n=${holdsQueued}: ${line}`);
+        return stopHoldFill();
+      }
       holdsQueued += 1;
       ackPlayedTurn = activeTurnTiming;
       voiceTrace.noteFiller({ text: line, before: line, language: callLanguage });
@@ -2185,11 +2230,12 @@ mediaWss.on('connection', (ws, req) => {
       sendPcmToMedia(ws, found.pcm);
       mediaClock.tag('tts');
     }, 40);
+    return true;
   }
   // Item 3: a receipt already rendered at call start plays with no TTS start-up seam.
   function playCachedReceipt(line) {
     if (!isFillerCacheEnabled() || ttsSpeedScale !== 1) return null;
-    const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage, extraLexicon: ttsLexiconOverrides });
+    const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
     if (!found.pcm) return null;
     receiptCachedTurn = true;
     voiceTrace.noteTts({ text: found.prepared.text, before: String(line), language: found.prepared.language });
@@ -2602,8 +2648,8 @@ mediaWss.on('connection', (ws, req) => {
   async function speakToolHold(spoken) {
     if (!spoken?.speak || bargeInActive) return;
     if (smooth.hold && spoken.kind === 'hold' && mediaClock) {
-      startHoldFill();
-      return;
+      if (startHoldFill()) return;
+      // Cache miss: fall through to the live hold line below (never silent).
     }
     if (
       spoken.kind === 'hold' &&
@@ -3715,13 +3761,18 @@ mediaWss.on('connection', (ws, req) => {
               lang: fillerLanguage(callLanguage),
               toolTurn: Boolean(needsImmediateProgress),
               tracker: ackTracker,
+              callerText: clean,
             })
-          : null;
-      const fillerText = ruleFiller
+          : undefined;
+      // Rule on: null = rate-limited, no filler this turn.
+      const fillerText = ruleFiller === null
+        ? ''
+        : ruleFiller
         ? ruleFiller.text
         : fillerMode === 'ack' || fillerMode === 'auto'
           ? pickContextualAck(clean, fillerLanguage(callLanguage))
           : process.env.VOICE_FILLER;
+      if (smooth.hold) turnFillerText = fillerText || '';
       let fillerStarted = false;
       let firstSpokenChunk = false;
 
@@ -3733,8 +3784,8 @@ mediaWss.on('connection', (ws, req) => {
             fillerStarted = true;
             thinkingAckTurn = turnTiming;
             thinkingAckAtMs = Date.now();
-            // Rule on: a non-word "Mm." is not an ack, so the Brain line keeps its receipt ack.
-            if (!ruleFiller || ruleFiller.word) ackPlayedTurn = turnTiming;
+            // Any filler (Mm included) makes the reply drop its leading ack.
+            ackPlayedTurn = turnTiming;
             if (ruleFiller && ruleFiller.word) wordAckTurn = turnTiming;
             if (ackTracker) ackTracker.noteHeard(fillerText);
             turnTiming.markFiller();
@@ -3883,6 +3934,7 @@ mediaWss.on('connection', (ws, req) => {
           const backstopped = ackRule.applyAckBackstop(text, {
             tracker: ackTracker,
             acked: ackPlayedTurn === turnTiming,
+            dropBare: true,
           });
           if (backstopped !== text && typeof voiceTrace !== 'undefined' && voiceTrace) {
             voiceTrace.noteTransform({ stage: 'ack_rule', before: text, after: backstopped, reason: 'ack_lead' });
@@ -4985,8 +5037,10 @@ mediaWss.on('connection', (ws, req) => {
               tts,
               voiceId: tenantSonioxVoiceId,
               extraLexicon: ttsLexiconOverrides,
-              phrases: toolSmooth.warmPhrases(),
-              shouldAbort: () => speechOutageStarted || turnBusy || !tts,
+              phrases: toolSmooth.warmPhrases(callLanguage),
+              // Pause while a turn is live instead of aborting (77ce8123: C1 warmed 0, C2 5/16).
+              waitWhile: () => turnBusy,
+              shouldAbort: () => speechOutageStarted || !tts,
             }).then((r) => {
               if (r?.warmed) console.log(`[ws/media][${sidLabel()}] tool-smooth pcm warmed n=${r.warmed}`);
             });

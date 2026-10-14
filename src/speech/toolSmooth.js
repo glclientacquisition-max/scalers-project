@@ -69,8 +69,20 @@ const RECEIPT_PACK = [
   'Nimehifadhi ombi lako.', 'Sawa, nimehifadhi ombi lako.',
   'Watakupigia.', 'Sawa. Watakupigia.',
 ];
+/** Language the hold pack is keyed under: sw for sw/sheng, else en. */
+function holdLanguage(lang) { return /^(sw|sheng)$/i.test(String(lang || '')) ? 'sw' : 'en'; }
 function holdFillLines(lang) { return HOLD_FILL[String(lang || '').toLowerCase() === 'en' ? 'en' : (/^(sw|sheng)$/i.test(String(lang || '')) ? 'sw' : 'en')]; }
-function warmPhrases() { return [...HOLD_FILL.en, ...HOLD_FILL.sw, ...RECEIPT_PACK]; }
+/**
+ * Warm list with an explicit language per phrase (the cache key includes it): hold
+ * lines first, the call's own language first, then receipts.
+ */
+function warmPhrases(callLanguage) {
+  const first = holdLanguage(callLanguage);
+  const other = first === 'sw' ? 'en' : 'sw';
+  const tag = (lang) => (text) => ({ text, callLanguage: lang });
+  const receipts = RECEIPT_PACK.map((text) => ({ text, callLanguage: /[a-z]'|\b(I've|They'll|Okay)\b/.test(text) ? 'en' : 'sw' }));
+  return [...HOLD_FILL[first].map(tag(first)), ...HOLD_FILL[other].map(tag(other)), ...receipts];
+}
 
 /**
  * Gap-fill decision (items 1-2): queue the next cached hold line just before the
@@ -109,7 +121,7 @@ function scoreToolTurns(turns = []) {
 
 module.exports = {
   GAP_BAR_MS, DEAD_AIR_MS, HOLD_MAX, RECEIPT_PACK, HOLD_FILL,
-  toolSmoothFlags, pcmMs, createMediaClock, holdFillLines, warmPhrases, shouldQueueHold, scoreToolTurns, pctl,
+  toolSmoothFlags, pcmMs, createMediaClock, holdLanguage, holdFillLines, warmPhrases, shouldQueueHold, scoreToolTurns, pctl,
 };
 
 /**
