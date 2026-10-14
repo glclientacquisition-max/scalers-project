@@ -84,7 +84,8 @@ function createFakeDb(seed = {}, callerPhone) {
       return { ...row };
     },
     saveCallerInfo: async (info) => {
-      if (info?.name) { db.contacts.name = db.contacts.name || info.name; if (!db.contacts.names.includes(info.name)) db.contacts.names.push(info.name); }
+      // `replace` mirrors v2 save_caller_name: replaces the primary name on a confirmed correction.
+      if (info?.name) { db.contacts.name = info.replace ? info.name : (db.contacts.name || info.name); if (!db.contacts.names.includes(info.name)) db.contacts.names.push(info.name); }
       return { ok: true, ...info };
     },
     escalate: async (p) => {
@@ -109,7 +110,12 @@ function withEnv(flags, fn) {
  * Run one call. `model(ctx)` returns raw model text (stand-in or replayed).
  * `caller(ctx)` returns the next caller line or null to hang up.
  */
-async function runCall({ root, profile, seed, callerPhone = '+254700000001', model, caller, maxTurns = 14, now, agentName = 'Shy', businessName }) {
+const V2_ON = () => /^(1|true|on|yes)$/i.test(String(process.env.BRAIN_V2 || ''));
+async function runCall(opts) {
+  if (V2_ON() && require('fs').existsSync(path.join(opts.root, 'src/conversation/v2/index.js'))) return require('./driverV2').runCallV2(opts, createFakeDb);
+  return runCallV1(opts);
+}
+async function runCallV1({ root, profile, seed, callerPhone = '+254700000001', model, caller, maxTurns = 14, now, agentName = 'Shy', businessName }) {
   const B = loadBrain(root);
   const { db, handlers } = createFakeDb(seed, callerPhone);
   const prof = { ...profile, openAppointments: (seed?.appointments || []).filter((a) => a.caller_phone === callerPhone) };

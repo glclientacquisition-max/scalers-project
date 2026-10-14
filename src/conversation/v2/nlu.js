@@ -1,0 +1,124 @@
+'use strict';
+// Deterministic caller-turn understanding for BA v2. Produces intent hints and
+// normalised slot candidates; the state machine decides what to do with them.
+const L = require('./lexicon');
+
+const YES = /^\W*(yes|yeah|yep|yup|ok|okay|sure|correct|right|exactly|please do|go ahead|do it|ndio|ndiyo|eeh ndio|sawa|poa|fiti|kabisa|haya|yes please)\b/i;
+const NO = /^\W*(no|nope|not really|hapana|la|sitaki)\b|\b(that'?s wrong|si sawa|not correct)\b/i;
+const DONE = /\b(that'?s all|nothing else|no thanks|hapana,? ni hayo tu|ni hayo tu|that is all|bye|goodbye|kwaheri)\b/i;
+const NEG = /\b(not|no|wrong|hapana|si|sio|badala)\b/i;
+
+const INTENT_RULES = [
+  ['payment_change', /\b(m-?pesa number|payment details|pay to a different|different (m-?pesa|number to pay)|change (my )?payment|lipa kwa namba nyingine|badilisha (namba ya )?malipo)\b/i],
+  ['address_change', /\b(come to .+ instead|change (the |my )?(address|location)|different (address|location)|new address|badilisha (anwani|mahali)|mje .+ badala)\b/i],
+  ['cancel', /\b(cancel|cancell?ation|futa (booking|appointment)|sitaki tena|ondoa booking)\b/i],
+  ['change', /\b(move my|reschedule|postpone|change my (booking|appointment|visit)|change (the )?(time|date)|badilisha (booking|siku|saa)|songesha)\b/i],
+  ['complaint', /\b(not happy|unhappy|bad service|complain\w*|disappointed|left .{0,20}dirty|damaged|ruined|sijaridhika|mmeniharibia|mmeharibu|malalamiko|huduma mbaya)\b/i],
+  ['handoff', /\b(manager|the owner|speak to (a |someone|somebody|the)|talk to (a |someone|the)|human|real person|mwenye biashara|meneja)\b/i],
+  ['recall', /\b(remember me|last time|what did i (book|order)|my last (visit|booking|order)|mara ya mwisho|mnanikumbuka)\b/i],
+  ['order', /\b(order|kuagiza|agiza|niwekee|buy|nunua|reserve|hold (one|two|\d))\b/i],
+  ['book', /\b(book|ku-?book|kubook|schedule|appointment|someone to come|mtu aje|mkuje|come (and|to) clean|kusafisha|usafi|tuieke|tuweke|niwekee booking|weka booking)\b/i],
+  ['availability', /\b(in stock|available|do you have|mna\b|iko stock|ipo|mnayo|una\b)/i],
+  ['price', /\b(how much|price|cost|charge|bei|pesa ngapi|ni ngapi)\b/i],
+  ['hours', /\b(open|opening|close|closing|hours|fungua|mnafungua|unafungua|mnafunga|unafunga|funga|mnafanya kazi|mko wazi|working (days|hours))\b/i],
+];
+function detectIntents(text) { return INTENT_RULES.filter(([, re]) => re.test(text)).map(([n]) => n); }
+
+const STOP_NAME = new Set(['calling', 'speaking', 'here', 'fine', 'good', 'using', 'looking', 'trying', 'not', 'just', 'the', 'a', 'an', 'interested', 'okay', 'ok', 'sure', 'yes', 'no', 'in', 'at', 'from', 'with', 'sorry', 'well', 'mimi', 'ni', 'going', 'calling', 'wondering', 'happy', 'unhappy', 'new', 'old']);
+const nameCase = (s) => s.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+function cleanName(raw) {
+  if (!raw) return null;
+  const words = raw.replace(/[^A-Za-z' -]/g, ' ').trim().split(/\s+/).filter(Boolean).slice(0, 3);
+  const keep = [];
+  for (const w of words) { if (STOP_NAME.has(w.toLowerCase())) break; keep.push(w); }
+  if (!keep.length || keep.join('').length < 2) return null;
+  return nameCase(keep.join(' '));
+}
+function extractName(text, { prompted = false } = {}) {
+  const t = String(text || '');
+  const pats = [/\bmy name is\s+([A-Za-z' ]+?)(?:[,.!?]| not | and |$)/i, /\b(?:jina langu ni|naitwa|ni mimi)\s+([A-Za-z' ]+?)(?:[,.!?]|$)/i,
+    /\bi'?m speaking (?:with|to)?\s*([A-Za-z']+)/i, /\b(?:this is|it'?s)\s+([A-Z][a-z']+(?: [A-Z][a-z']+)?)/, /\b[Ii]'?m\s+([A-Z][a-z']+)\b/, /\b[Ii] am\s+([A-Z][a-z']+)\b/, /\b([A-Z][a-z']+)\s+here\b/];
+  for (const p of pats) { const m = t.match(p); if (m) { const n = cleanName(m[1]); if (n) return n; } }
+  if (prompted) {
+    const s = t.replace(/^\W*(it'?s|i'?m|ni|mimi ni|my name is|jina ni|yes|ndio)\W+/i, '').trim();
+    const ws = s.split(/\s+/);
+    if (ws.length <= 3 && /^[A-Za-z]/.test(s)) return cleanName(s);
+  }
+  return null;
+}
+function extractCorrection(text) { const m = String(text || '').match(/\bnot\s+([A-Z][a-z']+)/); return m ? m[1] : null; }
+
+const AREA_HINT = /\b(?:around|near|in|at|karibu na|pale|area ya|kwa)\s+([A-Z][A-Za-z]+(?:[ ,]+(?:near|karibu na)?\s*[A-Z][A-Za-z]+(?: [A-Z][a-z]+)*)?)/;
+const KNOWN_AREAS = /\b(Kitengela|Ruiru|Kasarani|Kilimani|Karen|Westlands|Lavington|Kileleshwa|Rongai|Syokimau|Thika|Juja|Embakasi|Langata|Ngong|Kahawa|Roysambu|Donholm|Umoja|Kikuyu|Parklands|South B|South C|Athi River|Kiambu)\b/;
+function extractPlace(text, { prompted = false } = {}) {
+  const t = String(text || '');
+  const known = t.match(KNOWN_AREAS);
+  const m = t.match(AREA_HINT);
+  if (m && !/^(Friday|Monday|Tuesday|Wednesday|Thursday|Saturday|Sunday|The)$/.test(m[1])) return m[1].replace(/\s+/g, ' ').trim();
+  if (known) return known[1];
+  if (prompted) { const s = t.replace(/^\W*(uh|um|eeh|it'?s|we are|i'?m|in|at|around|ni|tuko)\W+/i, '').replace(/[.!?]+$/, '').trim(); if (s && s.split(/\s+/).length <= 8) return s; }
+  return null;
+}
+
+const GENERIC = new Set(['cleaning', 'clean', 'internal', 'standard', 'package', 'service', 'services', 'per', 'room', 'seat', 'add-on', 'the', 'and', 'up', 'to', 'sq', 'ft', 'interior', 'house', 'apartment']);
+const SYN = { fridge: 'refrigerator', friji: 'refrigerator', godoro: 'mattress', magodoro: 'mattress', zulia: 'carpet', dirisha: 'window', madirisha: 'window', windows: 'window', carpets: 'carpet', sofas: 'sofa', mattresses: 'mattress', ovens: 'oven', office: 'office', contract: 'contract' };
+const WEAK = new Set(['deep', 'office', 'commercial', 'large', 'small', 'medium']);
+function tokens(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9- ]/g, ' ').split(/\s+/).filter(Boolean).map((w) => SYN[w] || w.replace(/s$/, '')); }
+function matchService(text, catalog = []) {
+  const tt = new Set(tokens(text));
+  let best = null;
+  for (const s of catalog) {
+    const nt = tokens(s.name).filter((w) => !GENERIC.has(w) && w.length >= 3);
+    let score = 0;
+    for (const w of nt) if (tt.has(w)) score += WEAK.has(w) ? 0.5 : 1;
+    if (score > 0 && (!best || score > best.score)) best = { score, s };
+  }
+  return best && best.score >= 0.5 ? best.s : null;
+}
+const BRANDS = /\b(canon|hp|epson|samsung|lenovo|dell|brother|kyocera|xerox|ricoh)\b/gi;
+function matchProducts(text, catalog = []) {
+  const t = String(text || '').toLowerCase();
+  const found = [];
+  const brands = (t.match(BRANDS) || []).map((b) => b.toLowerCase());
+  catalog.forEach((p, i) => {
+    const names = [p.name, ...(p.aliases || [])].map((x) => x.toLowerCase());
+    const pname = p.name.toLowerCase();
+    const nameToks = pname.split(/\s+/).filter((w) => w.length >= 3);
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const hit = names.find((n) => new RegExp(`\\b${esc(n)}\\b`).test(t)) || nameToks.map((w) => w.replace(/[^a-z0-9-]/g, '')).filter((w) => w.length >= 3).find((w) => new RegExp(`\\b${esc(w)}s?\\b`).test(t));
+    if (!hit) return;
+    if (brands.some((b) => !pname.includes(b))) return; // asked for another brand: not ours
+    const idx = t.indexOf(hit);
+    const before = t.slice(Math.max(0, idx - 14), idx).match(/(\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an|moja|mbili|tatu|nne|tano)\s+(?:of\s+)?(?:\w+\s+)?$/);
+    const after = t.slice(idx + hit.length, idx + hit.length + 14).match(/^\s+(moja|mbili|tatu|nne|tano|sita|\d+)\b/);
+    const q = before ? L.toNum(before[1]) : after ? L.toNum(after[1]) : null;
+    found.push({ product_id: p.id || `prd_${i}`, name: p.name, qty: q, in_stock: p.in_stock, price: p.price });
+  });
+  return found;
+}
+function extractQuantity(text) { const m = String(text || '').toLowerCase().match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|moja|mbili|tatu|nne|tano|sita)\b/); return m ? L.toNum(m[1]) : null; }
+
+function bareHour(t) { const n = Number(t.match(/(\d{1,2})/)[1]); if (n < 1 || n > 12) return null; const h = n <= 6 ? n + 12 : n; return { date: null, time: `${String(h).padStart(2, '0')}:00`, raw: String(n) }; }
+function understand(text, { profile = {}, now, expecting = null } = {}) {
+  const t = String(text || '').trim();
+  const intents = detectIntents(t);
+  const isYes = YES.test(t) && !NEG.test(t.replace(/^\W*(yes|ndio)\W*/i, '').slice(0, 0));
+  const name = extractName(t, { prompted: expecting === 'name' });
+  return {
+    text: t,
+    intents,
+    yes: YES.test(t),
+    no: NO.test(t) && !YES.test(t),
+    done: DONE.test(t),
+    negation: NEG.test(t),
+    name,
+    correctionOf: extractCorrection(t),
+    place: extractPlace(t, { prompted: expecting === 'place' && !name && !L.parseWhen(t, now) && !intents.length }),
+    when: L.parseWhen(t, now) || (expecting === 'time' && /^\W*(?:uh|um|ah|eh)?\W*(\d{1,2})\b/i.test(t) ? bareHour(t) : null),
+    service: matchService(t, profile.servicesCatalog || []),
+    products: matchProducts(t, profile.productCatalog || []),
+    quantity: extractQuantity(t),
+    _yes: isYes,
+  };
+}
+module.exports = { understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };

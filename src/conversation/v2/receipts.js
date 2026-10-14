@@ -1,0 +1,95 @@
+'use strict';
+// Speech for BA v2. Every fact line is rendered from a typed receipt or a fixed
+// ask/ladder template per language. Model text is never spoken.
+const L = require('./lexicon');
+const sw = (lang) => L.isSw(lang);
+const svcName = (s) => String(s || '').replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+const period = (hhmm) => { const h = Number(String(hhmm).slice(0, 2)); return h < 12 ? 'asubuhi' : h < 16 ? 'mchana' : h < 19 ? 'jioni' : 'usiku'; };
+const at = (when, lang) => (when?.time ? (sw(lang) ? ` ${L.sayTime(when.time, lang)}` : ` at ${when.time}`) : '');
+const items = (xs, lang) => xs.map((x) => (sw(lang) ? `${x.name} ${x.qty}` : `${x.qty} ${x.name}`)).join(sw(lang) ? ' na ' : ' and ');
+
+const ASK = {
+  service: { en: ['Which service do you need?', 'Which service do you need? For example carpet or sofa cleaning.'], sw: ['Ungependa tufanye nini?', 'Ungependa tufanye nini? Kwa mfano usafi wa carpet au sofa.'] },
+  date: { en: ['What day would you like?', 'What day would you like? For example tomorrow or Friday.'], sw: ['Siku gani ingekufaa?', 'Siku gani ingekufaa? Kwa mfano kesho au Ijumaa.'] },
+  time: { en: (c) => [`What time on ${c.day}?`, `What time on ${c.day}? For example 10am or 2pm.`], sw: (c) => [`Saa ngapi ${c.day}?`, `Saa ngapi ${c.day}? Kwa mfano saa nne asubuhi.`] },
+  place: { en: ['Where should we come?', 'Where should we come? The estate or a landmark is enough.'], sw: ['Tuje wapi?', 'Tuje wapi? Jina la mtaa au alama inatosha.'] },
+  name: { en: ['May I have your name?', 'Sorry, may I have your name again?'], sw: ['Naomba jina lako?', 'Samahani, naomba jina lako tena?'] },
+  items: { en: ['Which item would you like?', 'Which item would you like from our list?'], sw: ['Ungependa kitu gani?', 'Ungependa kitu gani kwenye orodha yetu?'] },
+  qty: { en: (c) => [`How many ${c.item} would you like?`, `How many ${c.item}? For example one or two.`], sw: (c) => [`${c.item} ngapi?`, `${c.item} ngapi? Kwa mfano moja au mbili.`] },
+  pickup: { en: ['What day will you pick it up?', 'What day will you pick it up? For example tomorrow.'], sw: ['Utakuja kuchukua siku gani?', 'Utakuja kuchukua siku gani? Kwa mfano kesho.'] },
+  which: { en: (c) => [`Which one: ${c.list}?`, `Which one, ${c.list}?`], sw: (c) => [`Ipi: ${c.list}?`, `Ni ipi, ${c.list}?`] },
+  change_what: { en: (c) => [`What would you like to change on your ${c.row}?`, `Is it the day and time you want to change on your ${c.row}?`], sw: (c) => [`Ungependa kubadilisha nini kwenye ${c.row}?`, `Ni siku na saa unataka kubadilisha kwenye ${c.row}?`] },
+  new_when: { en: ['What new day and time would you like?', 'What new day and time? For example Saturday at 10am.'], sw: ['Siku gani na saa ngapi mpya?', 'Siku gani na saa ngapi mpya? Kwa mfano Jumamosi saa nne.'] },
+  complaint_more: { en: ["I'm sorry to hear that. Is there anything else the owner should know?"], sw: ['Pole sana. Kuna kingine mwenye biashara anapaswa kujua?'] },
+  intent: { en: ['How can I help you today?', 'Sorry, are you calling to book, or about something else?'], sw: ['Karibu, tukusaidie vipi?', 'Samahani, unapiga kubook, ama ni kuhusu kitu kingine?'] },
+};
+function ask(slot, n, lang, ctx = {}) {
+  const set = ASK[slot][sw(lang) ? 'sw' : 'en'];
+  const xs = typeof set === 'function' ? set(ctx) : set;
+  return xs[Math.min(n, xs.length - 1)];
+}
+function rowLabel(r, lang) { const d = r.when?.date; return sw(lang) ? `${svcName(r.service)} ya ${L.sayDate(d, lang)}` : `${svcName(r.service).toLowerCase()} on ${L.sayDate(d, lang)}`; }
+
+function readback(p, lang) {
+  const S = sw(lang);
+  const nm = p.name ? (S ? `, kwa ${p.name}` : `, for ${p.name}`) : '';
+  switch (p.tool) {
+    case 'create_booking': return S ? `${svcName(p.service)}, ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? `, ${p.place}` : ''}${nm}. Nithibitishe?` : `${svcName(p.service)} on ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? ` in ${p.place}` : ''}${nm}. Shall I book it?`;
+    case 'create_order': return S ? `${items(p.items, lang)}, kuchukua ${L.sayDate(p.pickup.date, lang)}${nm}. Nithibitishe?` : `${items(p.items, lang)}, pickup ${L.sayDate(p.pickup.date, lang)}${nm}. Shall I place the order?`;
+    case 'cancel_booking': return S ? `Nifute ${rowLabel(p.row, lang)}${at(p.row.when, lang)}. Niendelee?` : `Cancel your ${rowLabel(p.row, lang)}${at(p.row.when, lang)}. Shall I go ahead?`;
+    case 'update_booking': return S ? `Nihamishe ${svcName(p.row.service)} hadi ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}. Niendelee?` : `Move your ${svcName(p.row.service).toLowerCase()} to ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}. Shall I go ahead?`;
+    case 'create_handoff': {
+      const k = p.kind;
+      if (k === 'address') return S ? 'Siwezi kubadilisha mahali kwenye simu hii. Nimwombe mwenye biashara akupigie simu, ni sawa?' : `I can't change the address on this call. Shall I ask the owner to call you back about ${p.place ? `moving it to ${p.place}` : 'it'}?`;
+      if (k === 'payment') return S ? 'Siwezi kubadilisha malipo kwenye simu hii. Nimwombe mwenye biashara akupigie simu, ni sawa?' : "I can't change payment details on this call. Shall I ask the owner to call you back about it?";
+      if (k === 'manager') return S ? 'Mwenye biashara hayupo kwenye simu sasa. Nimwombe akupigie simu, ni sawa?' : `The manager isn't on the line now. Shall I ask them to call you back${p.topic ? ` about the ${svcName(p.topic).toLowerCase()}` : ''}?`;
+      return S ? 'Nimwombe mwenye biashara akupigie simu kumaliza hili, ni sawa?' : "Shall I ask the team to call you back to finish this?";
+    }
+    default: return '';
+  }
+}
+
+function receipt(r, lang) {
+  const S = sw(lang);
+  if (!r.ok) return S ? 'Samahani, sikuweza kuhifadhi hilo sasa. Timu itakupigia simu.' : "Sorry, I couldn't save that just now. The team will call you back.";
+  const more = S ? ' Kuna kingine?' : ' Anything else?';
+  switch (r.tool) {
+    case 'create_booking': return (S ? `Sawa, nimeweka ${svcName(r.service)} yako, ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.` : `Done, your ${svcName(r.service).toLowerCase()} is booked for ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.`) + more;
+    case 'create_order': return (S ? `Sawa, nimehifadhi oda yako: ${items(r.items, lang)}, kuchukua ${L.sayDate(r.pickup.date, lang)}.` : `Done, I've placed your order: ${items(r.items, lang)}, pickup ${L.sayDate(r.pickup.date, lang)}.`) + more;
+    case 'cancel_booking': return (S ? `Sawa, nimefuta ${rowLabel(r.row, lang)}.` : `Done, your ${rowLabel(r.row, lang)} is cancelled.`) + more;
+    case 'update_booking': return (S ? `Sawa, nimebadilisha ${svcName(r.row.service)} hadi ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.` : `Done, your ${svcName(r.row.service).toLowerCase()} is moved to ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.`) + more;
+    case 'create_handoff':
+      if (r.kind === 'address' || r.kind === 'payment') return S ? 'Sawa. Mwenye biashara atakupigia simu. Kwa sasa, mabadiliko bado yanasubiri.' : 'Okay. The owner will call you back on this number. Until then, the change is still pending.';
+      return (S ? 'Sawa. Mwenye biashara atakupigia simu kwa namba hii.' : (r.kind === 'manager' ? 'Okay. The manager will call you back on this number.' : 'Okay. The team will call you back on this number.')) + more;
+    case 'log_complaint': return S ? 'Asante. Nimepeleka malalamiko yako kwa mwenye biashara, atakupigia simu. Kuna kingine?' : 'Thank you. Your complaint is with the owner, who will call you back. Anything else?';
+    default: return '';
+  }
+}
+
+function info(r, lang, n = 0) {
+  const S = sw(lang);
+  switch (r.kind) {
+    case 'price': return r.found ? (S ? `Bei ya ${svcName(r.label)} ni ${r.price}.` : `${svcName(r.label)} is ${r.price}.`) : (S ? 'Sina bei ya hiyo kwenye orodha yetu. Ungependa mwenye biashara akupigie na bei?' : "I don't have a price for that on our list. Would you like the owner to call you with a quote?");
+    case 'stock':
+      if (r.found && /^(yes|true|in)/i.test(String(r.in_stock || ''))) return S ? `Kwa orodha yetu, ${r.label} inapatikana.` : `Our list shows ${r.label} in stock.`;
+      return [S ? 'Siwezi kuthibitisha hiyo kwenye simu hii. Ungependa timu ikupigie simu?' : "I can't confirm that on this call. Would you like the team to call you back?",
+        S ? 'Sina taarifa hiyo sasa hivi. Timu inaweza kukupigia simu, ungependa?' : "I don't have that information right now. The team can call you back. Would you like that?"][Math.min(n, 1)];
+    case 'service_slot': return S ? `Tunafanya ${svcName(r.label)}, lakini siwezi kuthibitisha nafasi bila timu. Ungependa niweke ombi la booking?` : `We do offer ${svcName(r.label).toLowerCase()}, but I can't confirm a slot without the team. Would you like to make a booking request?`;
+    case 'hours': {
+      const o = (hh) => (S ? `${L.sayTime(hh, lang)} ${period(hh)}` : hh);
+      if (r.closed) return S ? `${r.dayLabel} tumefunga.` : `We're closed on ${r.dayLabel}.`;
+      if (r.dayLabel) return S ? `Ndio, ${r.dayLabel} tuko wazi kuanzia ${o(r.open)} hadi ${o(r.close)}.` : `Yes, on ${r.dayLabel} we're open from ${r.open} to ${r.close}.`;
+      return S ? `Tuko wazi kila siku kuanzia ${o(r.open)} hadi ${o(r.close)}. Kuna kingine?` : `We're open ${r.everyDay ? 'every day' : 'today'} from ${r.open} to ${r.close}. Anything else?`;
+    }
+    case 'file':
+      if (!r.rows.length) return [S ? 'Sioni booking yoyote ya awali kwa namba hii.' : "I don't see any earlier bookings on this number.", S ? 'Samahani, siipati. Ungependa timu iangalie na ikupigie simu?' : "Sorry, I can't find it. Would you like the team to check and call you back?"][Math.min(n, 1)];
+      return S ? `Naona ${rowLabel(r.rows[0], lang)}.` : `I can see your ${rowLabel(r.rows[0], lang)}.`;
+    case 'pending': return S ? `Ombi lako la kubadilisha ${r.what === 'payment' ? 'malipo' : 'mahali'} bado linasubiri. Mwenye biashara atakupigia simu.` : `Your ${r.what} change request is still pending. The owner will call you back.`;
+    case 'no_rows': return S ? 'Sioni booking iliyo wazi kwa namba hii.' : "I don't see an open booking on this number.";
+    case 'not_offered': return S ? 'Hiyo haipo kwenye huduma zetu.' : "That isn't on our list of services.";
+    case 'bye': return S ? 'Asante kwa kupiga simu. Kwaheri.' : 'Thank you for calling. Goodbye.';
+    case 'decline': return S ? 'Sawa, sijahifadhi chochote. Kuna kingine?' : "Okay, I haven't saved anything. Anything else?";
+    default: return '';
+  }
+}
+module.exports = { ask, readback, receipt, info, svcName, rowLabel };

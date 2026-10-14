@@ -18,6 +18,7 @@ const K = Number(args.k || 4);
 const FLAGS = {
   prod: { BRAIN_CALL_FIXES_D199: null, BRAIN_TRUST_P1: null, CALLER_INFO_P1: null, BRAIN_CONFIRMED_COVERAGE: null, CALLER_MEMORY_V2: null, FACT_HASH_MODE: null },
   staging: { BRAIN_CALL_FIXES_D199: 'on', BRAIN_TRUST_P1: 'on', CALLER_INFO_P1: null, BRAIN_CONFIRMED_COVERAGE: null, CALLER_MEMORY_V2: 'on', FACT_HASH_MODE: null },
+  v2: { BRAIN_V2: 'on', BRAIN_CALL_FIXES_D199: 'on', BRAIN_TRUST_P1: 'on', CALLER_INFO_P1: null, CALLER_MEMORY_V2: 'on' },
   'staging+ci': { BRAIN_CALL_FIXES_D199: 'on', BRAIN_TRUST_P1: 'on', CALLER_INFO_P1: 'on', CALLER_MEMORY_V2: 'on' },
 }[args.flags || 'prod'];
 const NOW = new Date('2026-10-14T05:00:00Z'); // Wed 08:00 EAT
@@ -43,10 +44,10 @@ const origLog = console.log, origWarn = console.warn;
         const profile = tenants[scn.tenant];
         console.log = () => {}; console.warn = () => {};
         let run;
-        try { run = await runCall({ root: ROOT, profile, seed: scn.seed || {}, model, caller, now: NOW, businessName: profile.businessName, agentName: profile.agentName || 'Shy' }); }
+        try { run = await runCall({ root: ROOT, scenarioId: scn.id, modelSeed: seed, profile, seed: scn.seed || {}, model, caller, now: NOW, businessName: profile.businessName, agentName: profile.agentName || 'Shy' }); }
         finally { console.log = origLog; console.warn = origWarn; }
         const s = scoreRun(scn, run);
-        runs.push({ seed, ...s, faults: model.injected, transcript: run.turns.map((t) => ({ c: t.callerText, a: t.agentLine, o: t.outcome, tools: t.toolResults, ms: +t.brainMs.toFixed(2) })), ownerText: run.ownerText });
+        runs.push({ seed, ...s, faults: run.modelFaults || model.injected, transcript: run.turns.map((t) => ({ c: t.callerText, a: t.agentLine, o: t.outcome, tools: t.toolResults, ms: +t.brainMs.toFixed(2) })), ownerText: run.ownerText });
       }
       out.scenarios.push({ id: scn.id, area: scn.area, lang: scn.lang, commitment: !!scn.commitment, passK: runs.every((r) => r.pass), pass1: runs.filter((r) => r.pass).length / K, endStatePassK: runs.every((r) => r.endStatePass), runs });
     }
