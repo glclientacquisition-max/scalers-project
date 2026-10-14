@@ -6,9 +6,10 @@ const sw = (lang) => L.isSw(lang);
 const priceTxt = (p, S) => String(p || '').replace(/^From\s+/i, S ? 'kuanzia ' : 'from ');
 const svcName = (s) => String(s || '').replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
 const period = (hhmm) => { const h = Number(String(hhmm).slice(0, 2)); return h < 12 ? 'asubuhi' : h < 16 ? 'mchana' : h < 19 ? 'jioni' : 'usiku'; };
-const at = (when, lang) => (when?.time ? (sw(lang) ? ` ${L.sayTime(when.time, lang)}` : ` at ${when.time}`) : '');
+const at = (when, lang) => (when?.time ? (sw(lang) ? ` ${L.sayTime(when.time, lang)} ${period(when.time)}` : ` at ${when.time}`) : '');
 const items = (xs, lang) => xs.map((x) => (sw(lang) ? `${x.name} ${x.qty}` : `${x.qty} ${x.name}`)).join(sw(lang) ? ' na ' : ' and ');
 
+const ord = (n) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}`;
 const ASK = {
   service: { en: ['Which service do you need?', 'Which service do you need? For example carpet or sofa cleaning.'], sw: ['Ungependa tufanye nini?', 'Ungependa tufanye nini? Kwa mfano usafi wa carpet au sofa.'] },
   date: { en: ['What day would you like?', 'What day would you like? For example tomorrow or Friday.'], sw: ['Siku gani ingekufaa?', 'Siku gani ingekufaa? Kwa mfano kesho au Ijumaa.'] },
@@ -21,7 +22,8 @@ const ASK = {
   which: { en: (c) => [`Which one: ${c.list}?`, `Which one, ${c.list}?`], sw: (c) => [`Ipi: ${c.list}?`, `Ni ipi, ${c.list}?`] },
   change_what: { en: (c) => [`What would you like to change on your ${c.row}?`, `Is it the day and time you want to change on your ${c.row}?`], sw: (c) => [`Ungependa kubadilisha nini kwenye ${c.row}?`, `Ni siku na saa unataka kubadilisha kwenye ${c.row}?`] },
   new_when: { en: ['What new day and time would you like?', 'What new day and time? For example Saturday at 10am.'], sw: ['Siku gani na saa ngapi mpya?', 'Siku gani na saa ngapi mpya? Kwa mfano Jumamosi saa nne.'] },
-  kesho: { en: (c) => [`Do you mean later today, ${c.today}, or ${c.tomorrow}?`], sw: (c) => [`Unamaanisha leo ${c.today} mchana, au ${c.tomorrow}?`] },
+  kesho: { en: (c) => [`Do you mean later today, ${c.today} the ${ord(c.todayD)}, or ${c.tomorrow} the ${ord(c.tomorrowD)}?`], sw: (c) => [`Unamaanisha leo ${c.today} tarehe ${c.todayD}, au ${c.tomorrow} tarehe ${c.tomorrowD}?`] },
+  date_conflict: { en: (c) => [`${c.today} is the ${ord(c.todayD)}, and the ${ord(c.tomorrowD)} is a ${c.tomorrow}. Which do you mean?`], sw: (c) => [`${c.today} ni tarehe ${c.todayD}, na tarehe ${c.tomorrowD} ni ${c.tomorrow}. Unamaanisha ipi?`] },
   complaint_more: { en: ["I'm sorry to hear that. Is there anything else the owner should know?"], sw: ['Pole sana. Kuna kingine mwenye biashara anapaswa kujua?'] },
   intent: { en: ['How can I help you today?', 'Sorry, are you calling to book, or about something else?'], sw: ['Karibu, tukusaidie vipi?', 'Samahani, unapiga kubook, ama ni kuhusu kitu kingine?'] },
 };
@@ -103,6 +105,11 @@ function info(r, lang, n = 0) {
     case 'off_catalogue': return S ? `Sina ${r.item} kwenye orodha yetu. ${r.hint ? `Tunafanya ${r.hint}.` : ''}`.trim() : `${r.item} isn't on our list. ${r.hint ? `We do ${r.hint}.` : ''}`.trim();
     case 'payment_how': return r.methods ? (S ? `Tunapokea ${r.methods}.` : `We accept ${r.methods}.`) : (S ? 'Sina maelezo ya malipo kwenye orodha yetu.' : "I don't have payment details on our list.");
     case 'greeting': return S ? 'Nzuri, asante. Ungependa huduma gani?' : "I'm well, thank you. Which service do you need?";
+    case 'closed_day': return S ? `${L.cap(L.DOW_SW[r.dow])} tumefunga. Siku gani nyingine ingekufaa?` : `We're closed on ${r.dayLabel}. What other day would you like?`;
+    case 'time_outside': { const o = (hh) => (S ? `${L.sayTime(hh, lang)} ${period(hh)}` : hh); return S ? `Tuko wazi kuanzia ${o(r.open)} hadi ${o(r.close)}. Saa ngapi ${r.day}?` : `We're open from ${r.open} to ${r.close}. What time on ${r.day}?`; }
+    case 'time_past': return S ? `Saa hiyo imeshapita. Saa ngapi au siku gani nyingine ingekufaa?` : 'That time has already passed. What later day and time would you like?';
+    case 'bot': return S ? `Mimi ni ${r.agent}, msaidizi wa kidijitali wa ${r.biz}. Timu halisi inapata ujumbe wako.` : `I'm ${r.agent}, a virtual assistant for ${r.biz}. The real team gets your request.`;
+    case 'hold': return S ? 'Sawa, chukua muda wako.' : 'Sure, take your time.';
     case 'repair': return S ? 'Samahani, sijakusikia vizuri. Unaweza kurudia?' : "Sorry, I didn't catch that. Could you say it again?";
     case 'no_rows': return S ? 'Sioni booking iliyo wazi kwa namba hii.' : "I don't see an open booking on this number.";
     case 'not_offered': return S ? 'Hiyo haipo kwenye huduma zetu.' : "That isn't on our list of services.";

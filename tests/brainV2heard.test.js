@@ -59,8 +59,9 @@ test('"outside Nairobi": answered from the tenant list, EN and SW; unlisted plac
   const sw = await call(['Mnafanya kazi nje ya Nairobi?', 'Machakos']);
   assert.match(sw[0].said, /nje ya Nairobi tunahudumia/); assert.doesNotMatch(sw[0].said, /Tuko wazi/);
   assert.match(sw[1].said, /Machakos haiko/);
-  const un = await call(['Do you serve outside Nairobi? I am in Thika']);
-  assert.match(un[0].said, /Thika isn't on our list/);
+  // Thika is inside Kiambu County (a listed county), so the unlisted example is Nakuru
+  const un = await call(['Do you serve outside Nairobi? I am in Nakuru']);
+  assert.match(un[0].said, /Nakuru isn't on our list/);
   const hrs = await call(['Mnafanya kazi saa ngapi?']);
   assert.match(hrs[0].said, /Tuko wazi/);
 });

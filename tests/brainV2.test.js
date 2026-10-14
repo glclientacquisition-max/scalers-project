@@ -280,13 +280,13 @@ async function talkAt(now, lines) {
 const SMALL = new Date('2026-10-14T22:39:00Z');
 test('v2: small-hours kesho (SW) asks once, Ijumaa -> Friday', async () => {
   const { st, out } = await talkAt(SMALL, ['Nataka kubook sofa cleaning kesho saa nane mchana.', 'Ijumaa.', 'Ruiru', 'Otieno']);
-  assert.match(out[0].line, /^Unamaanisha leo Alhamisi mchana, au Ijumaa\?$/);
+  assert.match(out[0].line, /^Unamaanisha leo Alhamisi tarehe 15, au Ijumaa tarehe 16\?$/);
   assert.strictEqual(out.filter((o) => /Unamaanisha/.test(o.line)).length, 1);
   assert.strictEqual(st.pending?.when?.date || st.slots.when.date, '2026-10-16');
 });
 test('v2: small-hours tomorrow (EN) -> later today; second "tomorrow" not re-asked', async () => {
   const { st, out } = await talkAt(SMALL, ['I want to book sofa cleaning tomorrow at 2pm.', 'Later today.', 'Kitengela', 'Alvin']);
-  assert.match(out[0].line, /^Do you mean later today, Thursday, or Friday\?$/);
+  assert.match(out[0].line, /^Do you mean later today, Thursday the 15th, or Friday the 16th\?$/);
   assert.strictEqual(st.pending?.when?.date || st.slots.when.date, '2026-10-15');
   const r2 = await talkAt(SMALL, ['Book carpet cleaning tomorrow at 10am.', 'Tomorrow.', 'Kitengela']);
   assert.strictEqual(r2.out.filter((o) => /Do you mean/.test(o.line)).length, 1);

@@ -1,6 +1,6 @@
 'use strict';
 // Deterministic normalisers for BA v2 slots: language, numbers, Swahili clock, dates.
-const SW_MARK = /\b(habari|nataka|naomba|kesho|keshokutwa|leo|saa|asubuhi|mchana|jioni|usiku|ndio|ndiyo|hapana|sawa|asante|tafadhali|jina|langu|naitwa|niaje|sasa|mna|mnafungua|mnafanya|kazi|iko|ipo|kubook|kuagiza|niwekee|nitaichukua|nitakuja|moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi|usafi|kusafisha|aje|mmeniharibia|sijaridhika|kabisa|mwenye|biashara|ajue|jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili|karibu|na|ya|wa|kwa|ni|tu|hiyo|yangu|wangu|gani|wapi|ngapi|lini|nimekam|toner ya|futa|badilisha|nani|wewe|tunaitwaje|unaitwa|shilingi|mnafika|mnakuja|mko|nilikuwa|kujua|jua|mnaofa\w*|saizi|mnatoa|huduma|unaongea|naongea|mi|mimi|niko|lakini|nitakuja|kidogo|mbali|mnawash\w*|mnasafisha|bei|pesa|uliza|nauliza|unisaidie|msaidia|sijui|hujaniambia|mkuje|hapa|tajiri|wenu|yenu|nipe|ile|hii|hizi|vitu|je|kama|si|ama|hivo|hivyo|wah|eeh|tu|sasa)\b/gi;
+const SW_MARK = /\b(habari|nataka|naomba|kesho|keshokutwa|leo|saa|asubuhi|mchana|jioni|usiku|ndio|ndiyo|hapana|sawa|asante|tafadhali|jina|langu|naitwa|niaje|sasa|mna|mnafungua|mnafanya|kazi|iko|ipo|kubook|kuagiza|niwekee|nitaichukua|nitakuja|moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi|usafi|kusafisha|aje|mmeniharibia|sijaridhika|kabisa|mwenye|biashara|ajue|jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili|karibu|na|ya|wa|kwa|ni|tu|hiyo|yangu|wangu|gani|wapi|ngapi|lini|nimekam|toner ya|futa|badilisha|nani|wewe|tunaitwaje|unaitwa|shilingi|mnafika|mnakuja|mnahudumia|mnaweza|mtakuja|mko|nilikuwa|kujua|jua|mnaofa\w*|saizi|mnatoa|huduma|unaongea|naongea|mi|mimi|niko|lakini|nitakuja|kidogo|mbali|mnawash\w*|mnasafisha|bei|pesa|uliza|nauliza|unisaidie|msaidia|sijui|hujaniambia|mkuje|hapa|tajiri|wenu|yenu|nipe|ile|hii|hizi|vitu|je|kama|si|ama|hivo|hivyo|wah|eeh|tu|sasa)\b/gi;
 const SW_GREET_ONLY = /^\W*(eeh|eh|hi|hello|habari|niaje|sasa|mambo|vipi|hujambo)\W*(habari)?\W*$/i;
 const EN_MARK = /\b(the|you|your|i|i'm|is|are|we|will|what|which|can|would|and|for|please|okay|that|have|want|need|book|order|my|me|hello|hi|yes|no|cancel|move|how|much|do|it|in|at|to)\b/gi;
 
@@ -32,6 +32,8 @@ const NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eigh
 const SW_HOUR_WORDS = 'moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi na moja|kumi na mbili|kumi';
 function toNum(w) {
   const s = String(w || '').toLowerCase().trim();
+  const tens = s.match(/^(kumi|ishirini|thelathini)(?: na (moja|mbili|tatu|nne|tano|sita|saba|nane|tisa))?$/);
+  if (tens && s !== 'kumi') return { kumi: 10, ishirini: 20, thelathini: 30 }[tens[1]] + (tens[2] ? NUM[tens[2]] : 0);
   if (/^\d+$/.test(s)) return Number(s);
   if (s === 'kumi na moja') return 11;
   if (s === 'kumi na mbili') return 12;
@@ -48,8 +50,17 @@ function swClock(n, period) {
 }
 const pad = (n) => String(n).padStart(2, '0');
 
+const CORR = /\b(?:no|sorry|actually|i mean|i meant|hapana|samahani|badala yake|nimekosea|sema|nilimaanisha|la(?=,))\b[,\s]+/gi;
 function parseTime(text) {
-  const t = ` ${String(text || '').toLowerCase()} `;
+  const raw = String(text || '');
+  const parts = raw.split(CORR);
+  if (parts.length > 1) { const tail = parseTime1(parts[parts.length - 1]); if (tail) return tail; }
+  return parseTime1(raw);
+}
+function parseTime1(text) {
+  const t0 = ` ${String(text || '').toLowerCase()} `;
+  // "half past ten" / "quarter past nine" / "noon" / "midday"
+  const t = t0.replace(/\b(?:at\s+)?(noon|midday|mid-day)\b/, ' at 12:00 ').replace(/\b(half|quarter) past (\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/, (m, q, n) => { let h = toNum(n); if (h == null) return m; if (h >= 1 && h <= 6) h += 12; return ` ${h}:${q === 'half' ? '30' : '15'} `; });
   let m = t.match(new RegExp(`\\bsaa\\s+(\\d{1,2}|${SW_HOUR_WORDS})(?:[:.](\\d{2}))?(?:\\s+(?:na\\s+)?(nusu|robo))?(?:\\s+(asubuhi|mchana|jioni|usiku|alfajiri))?`));
   if (m) {
     const n = toNum(m[1]); if (n == null || n < 1 || n > 12) return null;
@@ -86,19 +97,32 @@ function addDays(now, n) { const p = eatParts(now); const x = new Date(Date.UTC(
 function parseDate(text, now) {
   const t = String(text || '').toLowerCase();
   let m;
-  if (/\b(keshokutwa|day after tomorrow)\b/.test(t)) return { date: isoDate(addDays(now, 2)), raw: 'keshokutwa' };
+  if (/\b(keshokutwa|day after (tomorrow|tommorow|tomorow|tmrw))\b/.test(t)) return { date: isoDate(addDays(now, 2)), raw: 'keshokutwa' };
   // HD_cc0481620c50: 00:00-04:59 EAT "kesho"/"tomorrow" may mean later today (the caller hasn't slept yet)
-  if (/\b(kesho|tomorrow|tmrw)\b/.test(t)) return { date: isoDate(addDays(now, 1)), raw: 'tomorrow', ...(eatParts(now).h < 5 ? { smallHours: { today: isoDate(addDays(now, 0)), tomorrow: isoDate(addDays(now, 1)), todayDow: eatParts(now).dow, tomorrowDow: addDays(now, 1).dow } } : {}) };
+  if (/\b(kesho+|tomorrow|tommorow|tomorow|tmrw|tmoro)\b/.test(t)) return { date: isoDate(addDays(now, 1)), raw: 'tomorrow', ...(eatParts(now).h < 6 ? { smallHours: { today: isoDate(addDays(now, 0)), tomorrow: isoDate(addDays(now, 1)), todayDow: eatParts(now).dow, tomorrowDow: addDays(now, 1).dow } } : {}) };
+  if (/\b(tonight|leo usiku)\b/.test(t)) return { date: isoDate(addDays(now, 0)), raw: 'tonight', tonight: true };
   if (/\b(leo|today|this (morning|afternoon|evening))\b/.test(t)) return { date: isoDate(addDays(now, 0)), raw: 'today' };
   const today = eatParts(now).dow;
+  // self-corrections ("Friday, no, Saturday"): the weekday mentioned last wins
+  let best = null;
   for (const [list] of [[DOW_EN], [DOW_SW]]) {
     for (let i = 0; i < 7; i++) {
-      if (new RegExp(`\\b${list[i]}\\b`).test(t)) {
-        let n = (i - today + 7) % 7; if (/\bnext\s+/.test(t) && n < 7) n = n === 0 ? 7 : n;
-        return { date: isoDate(addDays(now, n)), raw: list[i] };
-      }
+      const re = new RegExp(`\\b${list[i]}\\b`, 'g'); let mm;
+      while ((mm = re.exec(t))) if (!best || mm.index > best.at) best = { i, at: mm.index, w: list[i] };
     }
   }
+  // a bare day of the month: "the 16th", "tarehe 16", "tarehe kumi na sita" (this month, else next)
+  const dm = t.match(/\b(?:the|on the|tarehe)\s+(\d{1,2})(?:st|nd|rd|th)?\b(?!\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/) || t.match(/\btarehe\s+((?:kumi|ishirini|thelathini)(?: na (?:moja|mbili|tatu|nne|tano|sita|saba|nane|tisa))?)\b/);
+  let byNum = null;
+  if (dm) { const d = toNum(dm[1]); const p = eatParts(now); if (d >= 1 && d <= 31) { let x = new Date(Date.UTC(p.y, p.mo, d)); if (d < p.d) x = new Date(Date.UTC(p.y, p.mo + 1, d)); byNum = { y: x.getUTCFullYear(), mo: x.getUTCMonth(), d: x.getUTCDate(), dow: x.getUTCDay() }; } }
+  if (best) {
+    let n = (best.i - today + 7) % 7; if (/\bnext\s+/.test(t) && n < 7) n = n === 0 ? 7 : n;
+    const wd = addDays(now, n);
+    // weekday and date disagree ("Friday the 17th" when Friday is the 16th): ask, never pick silently
+    if (byNum && isoDate(byNum) !== isoDate(wd)) return { date: null, raw: best.w, conflict: { a: isoDate(wd), aDow: wd.dow, b: isoDate(byNum), bDow: byNum.dow } };
+    return { date: isoDate(wd), raw: best.w };
+  }
+  if (byNum) return { date: isoDate(byNum), raw: dm[0] };
   m = t.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*/);
   if (m) { const mo = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(m[2]); const p = eatParts(now); return { date: `${p.y}-${pad(mo + 1)}-${pad(Number(m[1]))}`, raw: m[0] }; }
   return null;
@@ -106,7 +130,7 @@ function parseDate(text, now) {
 function parseWhen(text, now) {
   const d = parseDate(text, now); const tm = parseTime(text);
   if (!d && !tm) return null;
-  return { date: d ? d.date : null, time: tm ? tm.hhmm : null, raw: [d && d.raw, tm && tm.raw].filter(Boolean).join(' '), ...(d && d.smallHours ? { smallHours: d.smallHours } : {}) };
+  return { date: d ? d.date : null, time: tm ? tm.hhmm : (d && d.tonight ? '20:00' : null), raw: [d && d.raw, tm && tm.raw].filter(Boolean).join(' '), ...(d && d.smallHours ? { smallHours: d.smallHours } : {}), ...(d && d.conflict ? { conflict: d.conflict } : {}) };
 }
 function whenToIso(when) { if (!when?.date || !when?.time) return null; return new Date(`${when.date}T${when.time}:00+03:00`).toISOString(); }
 function dateParts(iso) { const [y, mo, d] = iso.split('-').map(Number); const x = new Date(Date.UTC(y, mo - 1, d)); return { y, mo: mo - 1, d, dow: x.getUTCDay() }; }
