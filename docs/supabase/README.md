@@ -11,11 +11,11 @@ Apply in the **Supabase SQL Editor** (or `psql`) against the target project. Voi
 
 For product notes on wallet/DID, see also:
 
-- [`docs/operations/ONE_WALLET_BILLING.md`](../operations/ONE_WALLET_BILLING.md)
-- [`docs/operations/BETA_WALLET_PROGRAM.md`](../operations/BETA_WALLET_PROGRAM.md)
-- [`docs/operations/PRODUCTION_DID_POOL.md`](../operations/PRODUCTION_DID_POOL.md)
+- [`docs/explanation/billing/ONE_WALLET_BILLING.md`](../explanation/billing/ONE_WALLET_BILLING.md)
+- [`docs/explanation/billing/BETA_WALLET_PROGRAM.md`](../explanation/billing/BETA_WALLET_PROGRAM.md)
+- [`docs/how-to/PRODUCTION_DID_POOL.md`](../how-to/PRODUCTION_DID_POOL.md)
 
-Production vs staging notify objects: [`docs/platform/NOTIFY_SQL_CATALOG.md`](../platform/NOTIFY_SQL_CATALOG.md). Never apply [`foundation_bootstrap.sql`](./foundation_bootstrap.sql) to ALCR.
+Production vs staging notify objects: [`docs/reference/platform/NOTIFY_SQL_CATALOG.md`](../reference/platform/NOTIFY_SQL_CATALOG.md). Never apply [`foundation_bootstrap.sql`](./foundation_bootstrap.sql) to ALCR.
 
 ---
 
@@ -118,7 +118,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 21b | [`contacts_owner_insert.sql`](./contacts_owner_insert.sql) | `contacts_and_requests.sql` | Owner INSERT policy on `contacts` (desk add/import) |
 | 21c | [`service_request_windows.sql`](./service_request_windows.sql) | `contacts_and_requests.sql` | Hold `window_start` / `window_end` + owner UPDATE grant for `when_text` and windows |
 | 22 | [`product_catalog_and_social.sql`](./product_catalog_and_social.sql) | `business_operating_model.sql` | `product_catalog` + `social_handles` (products separate from services) |
-| 22b | [`tenant_field_provenance.sql`](./tenant_field_provenance.sql) | `product_catalog_and_social.sql` | GIGO P0: `tenant_field_meta`, audit history, completeness + hold gate RPCs, FAQ status/source demotion. See [`docs/platform/TENANT_FIELD_PROVENANCE.md`](../platform/TENANT_FIELD_PROVENANCE.md). |
+| 22b | [`tenant_field_provenance.sql`](./tenant_field_provenance.sql) | `product_catalog_and_social.sql` | GIGO P0: `tenant_field_meta`, audit history, completeness + hold gate RPCs, FAQ status/source demotion. See [`docs/reference/platform/TENANT_FIELD_PROVENANCE.md`](../reference/platform/TENANT_FIELD_PROVENANCE.md). |
 | 22c | [`tenant_field_confirm_v2.sql`](./tenant_field_confirm_v2.sql) | `tenant_field_provenance.sql` | GIGO confirm v2: `tenant_field_meta.value_hash`, `confirm_tenant_fields` (batch, max 500, all or nothing), `reopen_tenant_field`. Read only when `FACT_HASH_MODE=on`. Staging first; prod needs Alvin's OK. |
 | 22d | [`services_catalog_stable_ids.sql`](./services_catalog_stable_ids.sql) | `tenant_field_confirm_v2.sql` | One-time: stable `svc_` ids on `services_catalog` rows and provenance moved from `catalog.service.<n>` to `catalog.service.<id>`. Run before Brain's `scripts/backfillFactHashes.js`. |
 | 23 | [`appointments.sql`](./appointments.sql) | `contacts_and_requests.sql` | Home-services visit bookings (`requested\|confirmed\|cancelled\|done`) + RLS |
@@ -143,7 +143,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 24n | [`voice_turn_traces.sql`](./voice_turn_traces.sql) | `platform_ops_people.sql` | Per-turn voice traces (`voice_turn_traces`) plus call `score`, `checks`, `diagnosis`, and `release`. Service role only. Not applied by deploy. Apply the whole file on staging before `VOICE_TRACE` can persist. Re-running it adds the score columns if an earlier draft of the table is already there. |
 | 24o | [`calls_inbox_assignee.sql`](./calls_inbox_assignee.sql) | `inbox_triage.sql` | Optional. `calls.inbox_assignee_name` / `inbox_assignee_phone` (text, nullable). Already on scalers-staging (manual, 2026-10); file written to match. Not on prod. |
 | 24p | [`voice_turn_traces_cron.sql`](./voice_turn_traces_cron.sql) | `voice_turn_traces.sql`, `voice_turn_traces_created_at_idx.sql` | Enables pg_cron and schedules `call purge_voice_turn_traces_batched(30)` daily at 00:17 UTC (03:17 EAT). Applied on prod 2026-10-09 13:38 EAT with Alvin's GO (job id 1 now runs the CALL). Not on staging (no pg_cron). |
-| 24q | [`voice_turn_traces_created_at_idx.sql`](./voice_turn_traces_created_at_idx.sql) | `voice_turn_traces.sql` | Index on `voice_turn_traces(created_at)` for the purge. Plain CREATE INDEX (table is tiny); file explains when to use CONCURRENTLY. Applied on scalers-staging and prod 2026-10-09. Partitioning plan: [`docs/ops/voice-turn-traces-partitioning.md`](../ops/voice-turn-traces-partitioning.md). |
+| 24q | [`voice_turn_traces_created_at_idx.sql`](./voice_turn_traces_created_at_idx.sql) | `voice_turn_traces.sql` | Index on `voice_turn_traces(created_at)` for the purge. Plain CREATE INDEX (table is tiny); file explains when to use CONCURRENTLY. Applied on scalers-staging and prod 2026-10-09. Partitioning plan: [`docs/rfcs/voice-turn-traces-partitioning.md`](../rfcs/voice-turn-traces-partitioning.md). |
 | 24r | [`admin_business_archive.sql`](./admin_business_archive.sql) | `super_admin_ops.sql` | `tenants.archived_at` / `archived_by` for Super Admin Archive (A0). Permanent delete opens 30 days after `archived_at`. Not applied anywhere yet. Admin works without it (archive sets `is_active = false`; permanent delete stays off). |
 | 24v | [`voice_platform_audio.sql`](./voice_platform_audio.sql) | none | SautiKit-hosted line-unavailable clips for `<Play>` (#639): presigned url + expires_at per clip key. Service role only. Not applied by deploy. Apply on staging before the clip refresh can store URLs; until then closed lines use `<Say>`. |
 | 24f | [`whatsapp_threads.sql`](./whatsapp_threads.sql) | `notify_send_ledger.sql` | Platform two-way WhatsApp persist (`whatsapp_threads` / `whatsapp_messages`). Service role only. Not voice DID routing. |

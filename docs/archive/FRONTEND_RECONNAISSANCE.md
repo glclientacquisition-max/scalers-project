@@ -4,14 +4,14 @@ last_reviewed: 2026-10-12
 status: archived
 ---
 
-> **Archived 2026-10-14.** Recon done; Frontend 2.0 charter shipped. Current source: [`docs/frontend/FRONTEND_2_0_CHARTER.md`](../frontend/FRONTEND_2_0_CHARTER.md). Kept for history; do not treat as current.
+> **Archived 2026-10-14.** Recon done; Frontend 2.0 charter shipped. Current source: [`docs/explanation/frontend/FRONTEND_2_0_CHARTER.md`](../explanation/frontend/FRONTEND_2_0_CHARTER.md). Kept for history; do not treat as current.
 
 # Scalers frontend reconnaissance
 
 **Status:** Phases 0–2 documented. Phases 3–4 implemented 2026-09-06 (Home Command Center + Requests/Appointments tables).  
 **Date:** 2026-08-30 (recon). Implementation follow-up 2026-09-06.  
 **Branch base:** `main` @ `0d7ea1b`  
-**Lane:** Desk UI/UX (`docs/agents/DESK_UX.md`)  
+**Lane:** Desk UI/UX (`docs/reference/lanes/DESK_UX.md`)  
 **Mission:** Scalers Frontend 2.0 brief (Principal Product Design + Frontend Architecture). Product vision: **the operating console for a business's AI receptionist.**
 
 Inspected in this pass: `dashboard/` routes, layouts, tokens, shared primitives, owner pages, admin chrome, auth/onboarding, data libs, tests, Cursor rules, and three advisor skills (UI UX Pro Max, Taste, Ponytail). Skills are advisors. Scalers product rules win.
@@ -358,8 +358,8 @@ Matches the mission phases. Small PRs. No backend/schema/auth/billing/voice/Brai
 | Phase | Output | UI? |
 | --- | --- | --- |
 | **0** | This document | No |
-| **1** | `docs/frontend/FRONTEND_CONSTITUTION.md` | No |
-| **2** | `docs/frontend/design-system/MASTER.md` + page notes only where they differ | No |
+| **1** | `docs/explanation/frontend/FRONTEND_CONSTITUTION.md` | No |
+| **2** | `docs/reference/design-system/MASTER.md` + page notes only where they differ | No |
 | **3** | Home Command Center (flagship) | Yes |
 | **4** | Requests + Appointments → Calls pattern; deep links; fluff; related-call href; Open count | Yes |
 | **5** | Tokens, focus, buttons, empty states, auth/onboarding/admin chrome copy | Yes |
@@ -385,20 +385,20 @@ Super Admin is not a redesign target. Token alignment only if it falls out of Ph
 
 | Path | Action |
 | --- | --- |
-| `docs/frontend/FRONTEND_CONSTITUTION.md` | Create. Authoritative UX + engineering principles. Must incorporate `.cursor/rules/scalers-design-ux.mdc` rather than fork it. |
+| `docs/explanation/frontend/FRONTEND_CONSTITUTION.md` | Create. Authoritative UX + engineering principles. Must incorporate `.cursor/rules/scalers-design-ux.mdc` rather than fork it. |
 
 ### Phase 2 (docs)
 
 | Path | Action |
 | --- | --- |
-| `docs/frontend/design-system/MASTER.md` | Create. Tokens, type, layout, components, states, motion. |
-| `docs/frontend/design-system/pages/home.md` | Create. Command Center spec. |
-| `docs/frontend/design-system/pages/calls.md` | Short. Document as the benchmark, do not redesign. |
-| `docs/frontend/design-system/pages/call-detail.md` | Short. Preserve split pane; CTA color decision. |
-| `docs/frontend/design-system/pages/requests.md` | Create. Table unification. |
-| `docs/frontend/design-system/pages/appointments.md` | Create. Table unification. |
-| `docs/frontend/design-system/pages/receptionist.md` | Create. Existing-data-only. |
-| `docs/frontend/design-system/pages/settings.md` | Short. Preserve IA. |
+| `docs/reference/design-system/MASTER.md` | Create. Tokens, type, layout, components, states, motion. |
+| `docs/reference/design-system/pages/home.md` | Create. Command Center spec. |
+| `docs/reference/design-system/pages/calls.md` | Short. Document as the benchmark, do not redesign. |
+| `docs/reference/design-system/pages/call-detail.md` | Short. Preserve split pane; CTA color decision. |
+| `docs/reference/design-system/pages/requests.md` | Create. Table unification. |
+| `docs/reference/design-system/pages/appointments.md` | Create. Table unification. |
+| `docs/reference/design-system/pages/receptionist.md` | Create. Existing-data-only. |
+| `docs/reference/design-system/pages/settings.md` | Short. Preserve IA. |
 
 Do not duplicate MASTER into every page file.
 

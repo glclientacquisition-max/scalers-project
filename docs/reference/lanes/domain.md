@@ -1,0 +1,52 @@
+---
+owner: brain
+last_reviewed: 2026-10-05
+---
+
+# Domain docs
+
+How engineering skills consume Scalers domain documentation.
+
+## Before exploring, read these
+
+- **`CONTEXT.md`** at the repo root (glossary)
+- **`AGENTS.md`** and the lane contract for the task (`docs/reference/lanes/{LANE}.md`)
+- **`docs/explanation/architecture/SYSTEM_ARCHITECTURE.md`** (how the pieces fit) and **`docs/explanation/architecture/CURRENT_STATE.md`** (file-level facts)
+- **`docs/explanation/governance/SOURCE_OF_TRUTH.md`**
+- **`docs/decisions/`**: ADRs that touch the area
+- **`docs/rfcs/`**: accepted specs for in-flight work
+
+If a glossary file is missing, proceed. `/grill-with-docs` and `/domain-modeling` create terms when they actually resolve.
+
+## File structure
+
+Single-context repo:
+
+```
+/
+├── CONTEXT.md
+├── AGENTS.md
+├── README.md            ← what is live, how to run, short repo map
+├── docs/
+│   ├── README.md        ← folder index
+│   ├── adr/
+│   ├── agents/          ← lane contracts (source of truth for who edits what)
+│   ├── architecture/
+│   ├── operations/
+│   ├── product/
+│   ├── specs/           ← feature specs and wayfinder maps
+│   └── supabase/        ← manual SQL
+├── server.js            ← voice entry (do not relocate)
+├── src/
+└── dashboard/           ← Desk (Vercel root directory)
+```
+
+Lane contracts stay in `docs/reference/lanes/`. Do not move them to `CONTEXT.md`. `CONTEXT.md` is vocabulary only.
+
+## Use the glossary's vocabulary
+
+When output names a domain concept (issue title, test name, prompt block), use the term as defined in `CONTEXT.md`. Do not drift to synonyms the glossary lists under `_Avoid_`.
+
+## Flag ADR conflicts
+
+If output contradicts an existing ADR, say so instead of silently overriding.

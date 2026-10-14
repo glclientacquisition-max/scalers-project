@@ -4,7 +4,7 @@ last_reviewed: 2026-08-15
 status: archived
 ---
 
-> **Archived 2026-10-14.** Phase report. Current source: [`docs/governance/PROJECT_HISTORY.md`](../governance/PROJECT_HISTORY.md). Kept for history; do not treat as current.
+> **Archived 2026-10-14.** Phase report. Current source: [`docs/explanation/governance/PROJECT_HISTORY.md`](../explanation/governance/PROJECT_HISTORY.md). Kept for history; do not treat as current.
 
 # Phase 3F completion report
 
@@ -43,12 +43,12 @@ Transform the repository from "reproducible staging" (Phase 3E) into a **control
 | File | Step |
 | --- | --- |
 | `docs/archive/PHASE_3F_BASELINE.md` | 1 — baseline audit |
-| `docs/database/DATABASE_EVOLUTION.md` | 2 — evolution model |
-| `docs/database/DATABASE_APPLY_ORDER.md` | 3 — executable apply order |
-| `docs/operations/ENVIRONMENT_CONTRACT.md` | 5 — environment contract |
-| `docs/operations/RELEASE_GATE.md` | 6 — release gate |
-| `docs/engineering/FEATURE_DEVELOPMENT_CONTRACT.md` | 7 — feature lifecycle |
-| `docs/database/SCHEMA_DRIFT_POLICY.md` | 8 — drift detection policy |
+| `docs/explanation/database/DATABASE_EVOLUTION.md` | 2 — evolution model |
+| `docs/how-to/DATABASE_APPLY_ORDER.md` | 3 — executable apply order |
+| `docs/reference/operations/ENVIRONMENT_CONTRACT.md` | 5 — environment contract |
+| `docs/reference/operations/RELEASE_GATE.md` | 6 — release gate |
+| `docs/reference/governance/FEATURE_DEVELOPMENT_CONTRACT.md` | 7 — feature lifecycle |
+| `docs/explanation/database/SCHEMA_DRIFT_POLICY.md` | 8 — drift detection policy |
 | `docs/archive/PHASE_3F_SECURITY_REVIEW.md` | 9 — security review |
 | `docs/archive/PHASE_3F_COMPLETION_REPORT.md` | 11 — this report |
 
@@ -57,10 +57,10 @@ Transform the repository from "reproducible staging" (Phase 3E) into a **control
 | File | Change |
 | --- | --- |
 | `docs/supabase/MIGRATION_LEDGER.md` | Entry template, change registry, staging reference |
-| `docs/operations/ENVIRONMENTS.md` | Staging ACTIVE; links to contract |
-| `docs/database/DATABASE_GOVERNANCE.md` | Reproducibility YES on staging; new doc links |
-| `docs/governance/TECHNICAL_DEBT.md` | TD-P0-2 mitigated; TD-P2-5 resolved; TD-P2-4 downgraded |
-| `docs/governance/RELEASE_PROCESS.md` | Staging section updated |
+| `docs/reference/operations/ENVIRONMENTS.md` | Staging ACTIVE; links to contract |
+| `docs/explanation/database/DATABASE_GOVERNANCE.md` | Reproducibility YES on staging; new doc links |
+| `docs/explanation/governance/TECHNICAL_DEBT.md` | TD-P0-2 mitigated; TD-P2-5 resolved; TD-P2-4 downgraded |
+| `docs/how-to/RELEASE_PROCESS.md` | Staging section updated |
 
 ### Files intentionally untouched
 
@@ -172,5 +172,5 @@ No new automated tests added (documentation phase).
 ## Related documents
 
 - [`PHASE_3F_BASELINE.md`](PHASE_3F_BASELINE.md)
-- [`../database/DATABASE_EVOLUTION.md`](../database/DATABASE_EVOLUTION.md)
+- [`../database/DATABASE_EVOLUTION.md`](../explanation/database/DATABASE_EVOLUTION.md)
 - [`STAGING_REBUILD_EXECUTION_REPORT.md`](STAGING_REBUILD_EXECUTION_REPORT.md)

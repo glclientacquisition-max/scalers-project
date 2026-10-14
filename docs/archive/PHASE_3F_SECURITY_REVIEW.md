@@ -4,7 +4,7 @@ last_reviewed: 2026-08-15
 status: archived
 ---
 
-> **Archived 2026-10-14.** Phase review (Aug 2026). Current source: [`docs/storage/STORAGE_SECURITY_MODEL.md`](../storage/STORAGE_SECURITY_MODEL.md). Kept for history; do not treat as current.
+> **Archived 2026-10-14.** Phase review (Aug 2026). Current source: [`docs/explanation/STORAGE_SECURITY_MODEL.md`](../explanation/STORAGE_SECURITY_MODEL.md). Kept for history; do not treat as current.
 
 # Phase 3F security review
 
@@ -281,7 +281,7 @@ No open P0 findings.
 
 ## Related documents
 
-- [`../database/SCHEMA_DRIFT_POLICY.md`](../database/SCHEMA_DRIFT_POLICY.md)
-- [`../operations/ENVIRONMENT_CONTRACT.md`](../operations/ENVIRONMENT_CONTRACT.md)
-- [`../governance/TECHNICAL_DEBT.md`](../governance/TECHNICAL_DEBT.md)
+- [`../database/SCHEMA_DRIFT_POLICY.md`](../explanation/database/SCHEMA_DRIFT_POLICY.md)
+- [`../operations/ENVIRONMENT_CONTRACT.md`](../reference/operations/ENVIRONMENT_CONTRACT.md)
+- [`../governance/TECHNICAL_DEBT.md`](../explanation/governance/TECHNICAL_DEBT.md)
 - [`fix_p0_rls_remove_legacy_allow_all.sql`](../supabase/fix_p0_rls_remove_legacy_allow_all.sql)

@@ -4,7 +4,7 @@ last_reviewed: 2026-10-01
 status: archived
 ---
 
-> **Archived 2026-10-14.** Dated call review (Sep 2026); calls +254709221536 'staging', which is wrong today. Current source: [`docs/STATUS.md (DIDs) and docs/agents/VOICE.md`](../STATUS.md (DIDs) and docs/agents/VOICE.md). Kept for history; do not treat as current.
+> **Archived 2026-10-14.** Dated call review (Sep 2026); calls +254709221536 'staging', which is wrong today. Current source: [`docs/STATUS.md (DIDs) and docs/reference/lanes/VOICE.md`](../STATUS.md (DIDs) and docs/reference/lanes/VOICE.md). Kept for history; do not treat as current.
 
 # Staging DID review — `HD_0ef68f8e7930` (2026-09-25 17:57Z)
 
@@ -85,7 +85,7 @@ Owner ask: evaluate naturalness and eliminate roboticness.
 
 **Method (do not retune first):** freeze staging `/healthz` `gitSha` + `voiceProfile`, run three scripted DID calls (phatic, barge, pace), score Voice IDs V1–V9 as pass/fail from recording + transcript + `spoken=` logs. Isolated TTS WAVs are a different test (`tts:listen-harness`).
 
-Protocol + freeze knobs + historical SIDs: [`VOICE_NATURALNESS.md`](../agents/VOICE_NATURALNESS.md). Scanner: `node scripts/score-voice-naturalness.js`.
+Protocol + freeze knobs + historical SIDs: [`VOICE_NATURALNESS.md`](../explanation/voice/VOICE_NATURALNESS.md). Scanner: `node scripts/score-voice-naturalness.js`.
 
 Staging freeze knobs: `VOICE_PROFILE=balanced`, speed 1.0, gain 1.38, live transfer off, DID `+254709221536`. N1/N2 on SHA `abf6aa9` (`main` `#281`, 05:01Z). N3 on SHA `2c8fb51` (`main` `#282` desk Alerts, 05:18Z). Voice knobs did not move. Cutover from `23debf0`. Do not change speed or gain.
 
