@@ -1,11 +1,15 @@
 ---
 owner: platform
-last_reviewed: 2026-08-14
+last_reviewed: 2026-10-14
 ---
 
 # ADR-0003 — Manual SQL script governance
 
 ## Status
+
+**Superseded by [ADR-0009](ADR-0009-single-sql-apply-path.md)** (2026-10-14): one SQL apply path (`supabase/migrations/`); the move itself is deferred until BA v2 is on staging.
+
+Previous status text:
 
 **Accepted** — Reconstructed historical decision
 

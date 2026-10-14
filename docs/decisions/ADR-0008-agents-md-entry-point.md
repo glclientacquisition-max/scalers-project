@@ -5,7 +5,7 @@ last_reviewed: 2026-10-14
 
 # ADR-0008: AGENTS.md is the single agent entry point
 
-- **Status:** proposed (Alvin approves)
+- **Status:** accepted (Alvin, 2026-10-14)
 - **Date:** 2026-10-14
 - **Deciders:** Alvin Yegon; platform
 
@@ -21,7 +21,7 @@ Rules for agents were spread across `AGENTS.md`, `.cursor/rules/*.mdc`, lane con
 
 ## Decision outcome
 
-Proposed: Option 1. The nearest `AGENTS.md` wins (agents.md spec), one copy of each rule, tool-specific files stay thin.
+Accepted: Option 1. The nearest `AGENTS.md` wins (agents.md spec), one copy of each rule, tool-specific files stay thin.
 
 ### Confirmation
 

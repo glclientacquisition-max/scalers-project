@@ -5,7 +5,8 @@ last_reviewed: 2026-10-14
 
 # ADR-0009: One SQL apply path: supabase/migrations
 
-- **Status:** proposed (Alvin approves)
+- **Status:** accepted (Alvin, 2026-10-14)
+- **Supersedes:** [ADR-0003](ADR-0003-manual-sql-governance.md)
 - **Date:** 2026-10-14
 - **Deciders:** Alvin Yegon; platform
 
@@ -21,7 +22,7 @@ SQL lives in two places: 66 files in `docs/supabase/` (manual apply, ledger) and
 
 ## Decision outcome
 
-Proposed: Option 1, executed after BA v2 is on staging. Would supersede ADR-0003 when accepted.
+Accepted: Option 1. **The SQL move is deferred until BA v2 is on staging** (step 6); until then `docs/supabase/` stays the manual apply path and nothing moves. Supersedes ADR-0003.
 
 ### Confirmation
 
