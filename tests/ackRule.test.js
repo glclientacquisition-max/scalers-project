@@ -54,3 +54,21 @@ test('v2Shadow: acked passed and v2 lead stripped only under rule', async () => 
   const off = await sh.fire({ text: 'x', profile: {}, turnIndex: 2 });
   assert.equal('acked' in seen, false); assert.equal(off.v2Text, 'Sawa, nimeweka.'); assert.equal('voiceAck' in off, false);
 });
+
+test('v2Shadow acked: read after the filler delay; true only if a word filler played', async () => {
+  const { createBrainV2Shadow } = require('../src/conversation/v2Shadow');
+  const seen = [];
+  const fake = { createState: () => ({}), createDryRunHandlers: () => ({}),
+    async *runTurnStream(_s, o) { seen.push(o.acked); yield { type: 'done' }; } };
+  const sh = createBrainV2Shadow({ loadV2: () => fake, env: {}, log: () => {} });
+  let played = false; setTimeout(() => { played = true; }, 20);
+  await sh.fire({ text: 'x', profile: {}, turnIndex: 1, ackRule: true, acked: () => played, ackWaitMs: 60 });
+  await sh.fire({ text: 'y', profile: {}, turnIndex: 2, ackRule: true, acked: () => false, ackWaitMs: 10 });
+  assert.deepEqual(seen, [true, false]);
+});
+test('server: shadow acked is the played word filler, not tracker.allowed()', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'server.js'), 'utf8');
+  assert.doesNotMatch(src, /acked: ackTracker\.allowed\(\)/);
+  assert.match(src, /acked: \(\) => wordAckTurn === turnTiming/);
+  assert.match(src, /if \(ruleFiller && ruleFiller\.word\) wordAckTurn = turnTiming;/);
+});
