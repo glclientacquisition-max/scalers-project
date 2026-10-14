@@ -193,7 +193,11 @@ End with this exact close: ${helpClose} (or the closed/message name-ask from the
 /**
  * Optional tiny ack while Gemini thinks.
  */
-function pickContextualAck(userText, lang) {
+function pickContextualAck(userText, lang, ctx = {}) {
+  // VOICE_ACK_RULE: after an ack-led turn or the caller's own sawa, a non-word "Mm.".
+  if (ctx.ackRule && (ctx.prevAckLed || /^\s*(?:sawa(?:\s+sawa)?|ni\s+sawa|okay|ok|haya|poa)[.!,\s]*$/i.test(String(userText || '')))) {
+    return 'Mm.';
+  }
   const t = String(userText || '').toLowerCase();
   const asked = /\?|nani|gani|how|what|when|where|can you|unaweza|nataka|need|want/.test(t);
   const spoken = confirmationLanguage(lang);

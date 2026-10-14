@@ -75,6 +75,7 @@ const {
 } = require('./src/prompts');
 const { createVoiceTrace } = require('./src/speech/voiceTrace');
 const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
+const ackRule = require('./src/speech/ackRule');
 const voiceTraceBySid = new Map();
 
 function bindVoiceTrace(callSid, trace) {
@@ -2130,6 +2131,10 @@ mediaWss.on('connection', (ws, req) => {
   let thinkingAckAtMs = 0;
   // An ack or a hold played on this turn: a tool outcome drops its "Okay." lead.
   let ackPlayedTurn = null;
+  // VOICE_ACK_RULE (default off): per-call heard-ack tracker. null = rule off.
+  const ackTracker = ackRule.ackRuleEnabled() ? ackRule.createAckTracker() : null;
+  /** VOICE_ACK_RULE: the turn on which a word filler (not Mm.) actually played. */
+  let wordAckTurn = null;
   /** Rolling interim hypothesis while agent is busy (for barge-in). */
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
@@ -3101,6 +3106,7 @@ mediaWss.on('connection', (ws, req) => {
     );
     callTranscript.pushCaller(clean);
     messages.push({ role: 'user', content: clean });
+    if (ackTracker) ackTracker.beginTurn({ callerText: clean });
     // BA v2 shadow (BRAIN_V2_SHADOW, default off): log-only, never awaited,
     // never spoken, dry-run writes only. Flag off = no code below runs.
     if (brainV2ShadowEnabled({ tenantId: brainProfile?.id })) {
@@ -3126,6 +3132,15 @@ mediaWss.on('connection', (ws, req) => {
             profile: brainProfile,
             langLock: callLanguage,
             turnIndex: shadowTurnIndex,
+            ...(ackTracker
+              ? {
+                  // true only when a word filler actually played this turn (read after the filler delay)
+                  acked: () => wordAckTurn === turnTiming,
+                  ackWaitMs: resolveVoiceProfile().fillerDelayMs + 80,
+                  ackRule: true,
+                  stripAck: ackRule.stripAckLead,
+                }
+              : {}),
             onResult: (stage) => {
               console.log(
                 `[brain_v2_shadow][${callKey}] turn=${shadowTurnIndex} ttft=${stage.ttftMs}` +
@@ -3623,8 +3638,17 @@ mediaWss.on('connection', (ws, req) => {
         fillerMode !== 'off' &&
         !bareCloser && shouldSpeakThinkingAck(clean);
       const fillerDelayMs = resolveVoiceProfile().fillerDelayMs;
-      const fillerText =
-        fillerMode === 'ack' || fillerMode === 'auto'
+      const ruleFiller =
+        ackTracker && (fillerMode === 'ack' || fillerMode === 'auto')
+          ? ackRule.pickRuleFiller({
+              lang: fillerLanguage(callLanguage),
+              toolTurn: Boolean(needsImmediateProgress),
+              tracker: ackTracker,
+            })
+          : null;
+      const fillerText = ruleFiller
+        ? ruleFiller.text
+        : fillerMode === 'ack' || fillerMode === 'auto'
           ? pickContextualAck(clean, fillerLanguage(callLanguage))
           : process.env.VOICE_FILLER;
       let fillerStarted = false;
@@ -3638,7 +3662,10 @@ mediaWss.on('connection', (ws, req) => {
             fillerStarted = true;
             thinkingAckTurn = turnTiming;
             thinkingAckAtMs = Date.now();
-            ackPlayedTurn = turnTiming;
+            // Rule on: a non-word "Mm." is not an ack, so the Brain line keeps its receipt ack.
+            if (!ruleFiller || ruleFiller.word) ackPlayedTurn = turnTiming;
+            if (ruleFiller && ruleFiller.word) wordAckTurn = turnTiming;
+            if (ackTracker) ackTracker.noteHeard(fillerText);
             turnTiming.markFiller();
             console.log(
               `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
@@ -3778,7 +3805,19 @@ mediaWss.on('connection', (ws, req) => {
             reason: gated.reason || 'trimmed',
           });
         }
-        const text = cutNoAiSlop(gated.line);
+        let text = cutNoAiSlop(gated.line);
+        if (typeof ackTracker !== 'undefined' && ackTracker && text) {
+          // Thinking-ack/never-two backstop: drop the lead if an ack already played or the rule forbids one.
+          const backstopped = ackRule.applyAckBackstop(text, {
+            tracker: ackTracker,
+            acked: ackPlayedTurn === turnTiming,
+          });
+          if (backstopped !== text && typeof voiceTrace !== 'undefined' && voiceTrace) {
+            voiceTrace.noteTransform({ stage: 'ack_rule', before: text, after: backstopped, reason: 'ack_lead' });
+          }
+          text = backstopped;
+          ackTracker.noteHeard(text);
+        }
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
           voiceTrace.noteTransform({
             stage: 'no_ai_slop',
@@ -4222,11 +4261,15 @@ mediaWss.on('connection', (ws, req) => {
           await actionProgressSpeak;
           // "Alright." already played: say "They'll call you back.", not
           // "Okay. They'll call you back." (HD_4d6ac592aeb3 t4).
-          const outcomeLine = trimAckLead(confirmation, {
+          const outcomeSource = ackTracker
+            ? ackRule.applyAckBackstop(confirmation, { tracker: ackTracker, acked: ackPlayedTurn === turnTiming })
+            : confirmation;
+          const outcomeLine = trimAckLead(outcomeSource, {
             acked: ackPlayedTurn === turnTiming,
           });
           callTranscript.pushAgent(outcomeLine);
           await speakText(outcomeLine);
+          if (ackTracker) ackTracker.noteHeard(outcomeLine);
           spokeThisTurn = true;
         }
       } else if (owedConfirmFoldEnabled() && owedReceiptForFold && !bargeInActive) {
