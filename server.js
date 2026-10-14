@@ -74,6 +74,7 @@ const {
   VOICE_SYSTEM_PROMPT_VERSION,
 } = require('./src/prompts');
 const { createVoiceTrace } = require('./src/speech/voiceTrace');
+const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
 const voiceTraceBySid = new Map();
 
 function bindVoiceTrace(callSid, trace) {
@@ -2051,6 +2052,8 @@ mediaWss.on('connection', (ws, req) => {
   let closureNotice = null;
   let messages = [{ role: 'system', content: systemPrompt }];
   const callTranscript = createCallTranscript();
+  /** BA v2 shadow runner; created on first caller turn only when BRAIN_V2_SHADOW is on. */
+  let brainV2Shadow = null;
   function logTurnTiming(timing, extra) {
     if (!timing) return null;
     const summary = timing.log(extra);
@@ -3098,6 +3101,45 @@ mediaWss.on('connection', (ws, req) => {
     );
     callTranscript.pushCaller(clean);
     messages.push({ role: 'user', content: clean });
+    // BA v2 shadow (BRAIN_V2_SHADOW, default off): log-only, never awaited,
+    // never spoken, dry-run writes only. Flag off = no code below runs.
+    if (brainV2ShadowEnabled({ tenantId: brainProfile?.id })) {
+      try {
+        if (!brainV2Shadow) {
+          brainV2Shadow = createBrainV2Shadow({
+            callLabel: () => callKey,
+            // Read once at the shadow's first turn (after caller memory hydrated).
+            callerFile: () => {
+              const mem = brainProfile?.callerMemory || {};
+              return {
+                callerPhone: brainState?.caller?.phone || mem.phone || null,
+                contactName: mem.fileOwnerName || mem.name || null,
+                openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
+              };
+            },
+          });
+        }
+        const shadowTurnIndex = voiceTrace.currentTurnIndex();
+        void brainV2Shadow
+          .fire({
+            text: clean,
+            profile: brainProfile,
+            langLock: callLanguage,
+            turnIndex: shadowTurnIndex,
+            onResult: (stage) => {
+              console.log(
+                `[brain_v2_shadow][${callKey}] turn=${shadowTurnIndex} ttft=${stage.ttftMs}` +
+                  ` total=${stage.totalMs} tools=${stage.toolIntents.map((t) => t.name).join(',') || '-'}` +
+                  ` timedOut=${stage.timedOut}`
+              );
+              if (shadowTurnIndex != null) voiceTrace.noteBrainV2Shadow(stage);
+            },
+          })
+          .catch(() => null);
+      } catch (err) {
+        console.warn(`[ws/media][${callKey}] brain_v2_shadow failed:`, err?.message || err);
+      }
+    }
 
     const turnMatches = selectProductsForTurn({
       catalog: brainProfile.productCatalog,
