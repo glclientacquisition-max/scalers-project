@@ -7,6 +7,7 @@
 //
 // Preserves the orchestration-facing API used by server.js (async).
 
+const { queueOwnerNotify, cancelOwnerNotify } = require('./notifications/ownerNotifyQueue');
 const { writeReceiptsEnabled, writeKey, callbackSupersededBy } = require('./conversation/writeReceipts');
 const { supabase } = require('./lib/supabaseClient');
 const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
@@ -1688,6 +1689,43 @@ async function supersedeRescueCallbacks({ tenantId, appointment } = {}) {
   }
 }
 
+/**
+ * Escalate (Brain v2 contract): resolve as soon as the task row exists.
+ * Returns { ok:true, id, notify:'queued' }. The owner notify (notifyOwner)
+ * runs in the background, never awaited; a failure is logged, ok stays true.
+ * Dry run: { ok:true, dryRun:true, id:null, notify:'queued', intended }.
+ * A later booking with supersedes:[id] cancels the queued notify.
+ */
+async function escalateTask({
+  callSid,
+  tenantId,
+  reason,
+  name,
+  phone,
+  notes,
+  item,
+  dryRun = false,
+  notifyOwner,
+} = {}) {
+  const intended = { callSid, tenantId, reason, name, phone, notes, item };
+  if (dryRun) return { ok: true, dryRun: true, id: null, notify: 'queued', intended };
+  const row = await createServiceRequest({
+    callSid,
+    tenantId,
+    type: 'callback',
+    name,
+    phone,
+    item: item || 'callback',
+    notes: [reason, notes].filter(Boolean).join('. ') || null,
+  });
+  if (!row?.id) return { ok: false, id: null, notify: null, reason: 'task_not_saved' };
+  const notify =
+    typeof notifyOwner === 'function'
+      ? queueOwnerNotify(row.id, () => notifyOwner({ task: row, callSid }), { callSid })
+      : 'none';
+  return { ok: true, id: row.id, notify };
+}
+
 async function createServiceRequest({
   callSid,
   tenantId,
@@ -1854,6 +1892,7 @@ async function createAppointment({
   notes,
   windowStart,
   windowEnd,
+  supersedes,
 } = {}) {
   let resolvedTenantId = tenantId || null;
   let callRow = null;
@@ -1862,6 +1901,9 @@ async function createAppointment({
     if (callRow?.tenant_id) resolvedTenantId = callRow.tenant_id;
   }
   if (!resolvedTenantId) return null;
+  const supersedeIds = Array.isArray(supersedes)
+    ? [...new Set(supersedes.map((x) => String(x || '').trim()).filter(Boolean))]
+    : [];
 
   const service = String(serviceName || '').trim();
   if (!service) return null;
@@ -1906,7 +1948,28 @@ async function createAppointment({
       caller_phone: callerPhone,
       updated_at: new Date().toISOString(),
     };
-  const { data, error } = await insertWithReceipt('appointments', apRow, apKey);
+  let superseded = [];
+  let notifyCancelled = [];
+  let data = null;
+  let error = null;
+  if (supersedeIds.length) {
+    // Brain v2 contract: insert + close the listed escalate tasks in ONE
+    // transaction (create_appointment_superseding), matched on tenant + phone.
+    const rpc = await supabase.rpc('create_appointment_superseding', {
+      p_row: { ...apRow, idempotency_key: apKey },
+      p_supersedes: supersedeIds,
+    });
+    error = rpc.error || null;
+    data = rpc.data?.appointment || null;
+    superseded = Array.isArray(rpc.data?.superseded) ? rpc.data.superseded : [];
+    if (error && /create_appointment_superseding|does not exist|schema cache/i.test(error.message || '')) {
+      throw new Error('[db] createAppointment supersedes needs supabase/migrations/20261014210000_write_receipts.sql');
+    }
+    // One owner message per call: drop still-queued notifies for closed tasks.
+    notifyCancelled = cancelOwnerNotify(superseded);
+  } else {
+    ({ data, error } = await insertWithReceipt('appointments', apRow, apKey));
+  }
 
   if (error && /appointments|relation/i.test(error.message)) {
     console.warn(
@@ -1917,8 +1980,9 @@ async function createAppointment({
   }
   throwIfError('createAppointment', error);
 
-  if (receipts && data?.id && callRow?.id) {
-    await supersedeRescueCallbacks({ tenantId: resolvedTenantId, appointment: data });
+  if (!supersedeIds.length && receipts && data?.id && callRow?.id) {
+    superseded = await supersedeRescueCallbacks({ tenantId: resolvedTenantId, appointment: data });
+    notifyCancelled = cancelOwnerNotify(superseded);
   }
 
   if (callSid && data) {
@@ -1941,6 +2005,9 @@ async function createAppointment({
     }
   }
 
+  if (data && (supersedeIds.length || superseded.length)) {
+    return { ...data, supersedes: supersedeIds, superseded, notifyCancelled };
+  }
   return data || null;
 }
 
@@ -2534,6 +2601,7 @@ async function getTenantCatalogue(tenantId) {
 }
 
 module.exports = {
+  escalateTask,
   insertWithReceipt,
   supersedeRescueCallbacks,
   upsertCallFacts,
