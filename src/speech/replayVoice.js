@@ -150,6 +150,15 @@ function replayTurn(turn, ctx) {
       ],
     };
   }
+  // A recorded place runs the live coverage check, so a replay sees the
+  // same verdict (state.visitPlace) the call did.
+  if (turn.place) {
+    const { decideVisitPlace } = require('../conversation/visitLocation');
+    ctx.state.visitPlace = decideVisitPlace(String(turn.place), {
+      profile: { businessPolicies: ctx.fixture?.businessPolicies || {} },
+      detailAsked: true,
+    });
+  }
   const evidence = analyzeCallerLanguage(caller);
   const sticky =
     evidence.language === 'unknown' ? ctx.language || 'unknown' : evidence.language;

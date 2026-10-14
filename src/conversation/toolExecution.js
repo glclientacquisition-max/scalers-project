@@ -681,6 +681,7 @@ async function executeBrainTools({
   }
   const completed = new Set(completedFingerprints);
   const results = [];
+  let visitDowngraded = false;
   const identityOpts = { productCatalog, agentName, businessName, knownNames, fieldMeta };
 
   if (Array.isArray(parsed?.errors)) {
@@ -755,6 +756,9 @@ async function executeBrainTools({
         item,
         notes,
       };
+      // VOICE_COVERAGE_SINGLE_SOURCE: the caller hears this was a visit request
+      // the team confirms, not a silent "saved your request".
+      if (require('./coverageSingleSource').coverageSingleSourceEnabled()) visitDowngraded = true;
     }
     parsed = { ...parsed, appointment: undefined };
   }
@@ -871,6 +875,7 @@ async function executeBrainTools({
                 requestStatus: created.status || 'open',
                 value: validation.value,
                 record: created,
+                ...(visitDowngraded ? { visitDowngrade: true } : {}),
               }
             : {
                 action: 'create_service_request',
@@ -1419,6 +1424,9 @@ function formatToolConfirmation(results = [], language = 'en') {
     return "I couldn't find an open visit to update right now.";
   }
   if (meaningful.action === 'create_service_request') {
+    if (meaningful.status === 'succeeded' && meaningful.visitDowngrade === true) {
+      return require('./coverageSingleSource').visitDowngradeLine(lang);
+    }
     if (meaningful.status === 'succeeded' || meaningful.status === 'updated') {
       if (meaningful.status === 'updated') {
         if (sw) return 'Sawa, nimesasisha hold yako.';
