@@ -626,6 +626,8 @@ function expandNumberUnitRanges(text, lang = 'en') {
  */
 function expandPhones(text) {
   let out = String(text || '');
+  // CALLER_INFO_P1: Kenyan numbers read in 07xx xxx xxx chunks.
+  if (require('../conversation/callerInfoTrust').on()) out = require('../conversation/callerInfoTrust').chunkPhonesInText(out);
 
   out = out.replace(/\+(\d[\d\s-]{7,}\d)/g, (_, digits) => {
     const d = String(digits).replace(/\D/g, '');

@@ -574,7 +574,13 @@ function agentAskedFileName(agentText, pendingName) {
  */
 function confirmIdentityFirst(state, language = 'en', { askAllowed = true } = {}) {
   const name = String(state?.caller?.fileNameAsked || state?.returning?.fileOwnerName || '').trim();
-  const ask = askAllowed && state?.caller?.fileNameAskSpoken !== true && Boolean(name);
+  let ask = askAllowed && state?.caller?.fileNameAskSpoken !== true && Boolean(name);
+  // BRAIN_TRUST_P1 v3: the one name controller decides (cap 2, pending, refusal).
+  // eslint-disable-next-line global-require
+  const trustP1 = require('./trustP1');
+  if (ask && trustP1.trustP1Enabled()) {
+    ask = trustP1.requestNameAsk(state, { kind: 'file', fileName: name });
+  }
   const line = factLine(
     'confirm_identity_first',
     { name: name || undefined, ask },

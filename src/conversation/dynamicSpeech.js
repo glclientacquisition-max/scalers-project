@@ -459,10 +459,35 @@ function polishSpokenDetail(text, opts = {}) {
       callerText,
     });
   }
+  // BRAIN_TRUST_P1: last mouth — receipt gate, recall guard, name-ask cap,
+  // staff-name redaction, hours anchor, length trim. Flag off: unchanged.
+  const trustP1 = require('./trustP1');
+  if (trustP1.trustP1Enabled() && out) {
+    const shaped = trustP1.shapeSpeech(out, {
+      state: opts.state,
+      profile: opts.profile,
+      toolResults: opts.toolResults || [],
+      language: opts.language,
+      receiptLine: opts.receiptLine,
+      blockedTerms: require('./callerHistoryPolicy').blockedTerms(opts.profile?.callerMemory, opts.state),
+    });
+    out = shaped.text;
+    dropReasons.push(...shaped.drops);
+  }
   const before = String(text || '').trim();
   const after = String(out || '').trim();
   let reason = '';
   if (dropReasons.length) reason = dropReasons[0];
+  // BRAIN_TRUST_P1: any guard (not only the trust mouth) that empties model
+  // text marks the turn, so the empty-turn repair is not a false
+  // "say that again" (HD_35b75499d483: name_ask_repeat dropped the reply).
+  if (dropReasons.length && !String(out || '').trim() && String(text || '').trim() && opts.state) {
+    const trustP1 = require('./trustP1');
+    if (trustP1.trustP1Enabled()) {
+      opts.state.trust = opts.state.trust || {};
+      opts.state.trust.guardDroppedTurn = Number(opts.state?.conversation?.turnCount || 0);
+    }
+  }
   else if (!after) reason = 'dropped';
   else if (after !== before) reason = 'rewritten';
   return { text: out, reason, dropReasons };
@@ -700,6 +725,12 @@ function planEmptyGeminiSpeech({
     };
   }
   if (alreadyOffered) return { speak: false, kind: 'quiet_continue', line: '' };
+  // eslint-disable-next-line global-require
+  const trustP1 = require('./trustP1');
+  const outcome0 = spokenToolOutcome(toolResults, language, userText);
+  if (!outcome0 && trustP1.guardEmptiedTurn(brainState)) {
+    return { speak: true, kind: 'guard_continue', line: trustP1.guardContinueLine(language) };
+  }
   const outcome = spokenToolOutcome(toolResults, language, userText);
   if (outcome) return { speak: true, kind: 'tool_outcome', line: outcome };
   return { speak: true, kind: 'hear_again', line: emptyTurnRepairLine(language) };

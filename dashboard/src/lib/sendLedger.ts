@@ -178,6 +178,16 @@ export async function sendRecordedDeskCallerSms(opts: {
     delete (rest as { overage?: boolean }).overage;
     ({ error } = await opts.client.from("notify_sends").insert(rest));
   }
+  if (error && process.env.CALLER_INFO_P1 === "on") {
+    // CALLER_INFO_P1 (Ops gap): the SMS already went out and its units are
+    // claimed. Retry the ledger row once, and report the send as done so no
+    // caller of this function resends (and charges) the same SMS again.
+    ({ error } = await opts.client.from("notify_sends").insert(row));
+    if (error) {
+      console.warn("[notify ledger] unrecorded after send (not resent)", error.message);
+      return { ok: true, reason: "ledger_unrecorded_sent", overage: claim.overage };
+    }
+  }
   if (error) {
     console.warn("[notify ledger]", error.message);
     if (

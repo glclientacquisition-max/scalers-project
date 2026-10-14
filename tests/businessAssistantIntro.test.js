@@ -134,7 +134,7 @@ describe('business assistant introduction', () => {
     assertForbiddenOpen(line);
   });
 
-  it('pack #0: home_services intro includes English/Kiswahili invite', () => {
+  it('pack #0: home_services intro no longer includes the language invite', () => {
     const line = composeBusinessAssistantIntro({
       businessName: 'Done and Dusted Cleaning Services',
       agentName: 'Shy',
@@ -144,7 +144,7 @@ describe('business assistant introduction', () => {
       variant: 0,
     });
     assert.match(line, /Done and Dusted Cleaning Services, this is Shy\./);
-    assert.match(line, /You can speak in English or Kiswahili\./);
+    assert.doesNotMatch(line, /You can speak in English or Kiswahili/);
     assert.match(line, /How can I help/);
     assert.ok(
       introLooksValid(line, 'Done and Dusted Cleaning Services', 'Shy', {
@@ -375,7 +375,7 @@ describe('business assistant introduction', () => {
     });
     assert.equal(
       line,
-      "Good evening, Done and Dusted, this is Shy. You can speak in English or Kiswahili. We're closed now. Where are we cleaning?"
+      "Good evening, Done and Dusted, this is Shy. We're closed now. Where are we cleaning?"
     );
     assert.match(line, /Done and Dusted, this is Shy\./);
     assert.doesNotMatch(line, /Shy here\./);

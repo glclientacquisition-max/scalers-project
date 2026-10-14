@@ -220,7 +220,8 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
   if (!raw) return { ok: false };
   // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1a): "saa nane mchana" is 14:00;
   // "leo saa 8:00" with no period is ambiguous, never 08:00.
-  if (require('./callFixesD199').callFixesD199Enabled()) {
+  // BRAIN_TRUST_P1: the Swahili clock is always on under the trust flag.
+  if (require('./callFixesD199').callFixesD199Enabled() || trustDatesOn()) {
     const sw = require('./swahiliClockParse').normalizeSwahiliClock(raw);
     if (sw.changed) {
       if (sw.resolved == null) return { ok: false, swahiliAmbiguous: sw.ambiguous };
@@ -229,6 +230,8 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
   }
   if (AMBIGUOUS_RE.test(raw)) return { ok: false };
   if (/\bnext\s+week\b/i.test(raw) && !parseWeekdayKey(raw)) return { ok: false };
+  // BRAIN_TRUST_P1: "wiki ijayo" with no day is a question, never a date.
+  if (trustDatesOn() && /\bwiki\s+ijayo\b/i.test(raw) && !parseWeekdayKey(raw)) return { ok: false, needsDay: true };
 
   const nowParts = eatParts(now);
   const clock = parseClockMinutes(raw);
@@ -237,6 +240,7 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
   const weekday = parseWeekdayKey(raw);
   const hasToday = /\b(today|leo)\b/i.test(raw) || /\btonight\b/i.test(raw);
   const hasTomorrow = /\b(tomorrow|kesho)\b/i.test(raw);
+  const hasDayAfter = trustDatesOn() && /\b(keshokutwa|kesho\s+kutwa|(?:the\s+)?day\s+after\s+tomorrow)\b/i.test(raw);
   const isNowPhrase = /\b(now|right now|sasa hivi)\b/i.test(raw);
 
   if (hasToday && hasTomorrow) return { ok: false };
@@ -279,11 +283,12 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
   if (minutes == null) return { ok: false };
 
   let offset = null;
-  if (hasTomorrow) offset = 1;
+  if (hasDayAfter) offset = 2;
+  else if (hasTomorrow) offset = 1;
   else if (hasToday) offset = 0;
   else if (weekday) {
     offset = dayOffset(nowParts.weekday, weekday);
-    if (/\bnext\b/i.test(raw) && offset === 0) offset = 7;
+    if ((/\bnext\b/i.test(raw) || (trustDatesOn() && /\bwiki\s+ijayo\b/i.test(raw))) && offset === 0) offset = 7;
   } else {
     offset = 0;
   }
@@ -304,12 +309,18 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
   };
 }
 
+function trustDatesOn() {
+  return String(process.env.BRAIN_TRUST_P1 || '').trim() === 'on';
+}
+
 function periodWord(raw) {
   const text = String(raw || '');
   if (/\b(morning|asubuhi)\b/i.test(text)) return 'morning';
   if (/\b(afternoon|mchana)\b/i.test(text)) return 'afternoon';
+  if (trustDatesOn() && /\balasiri\b/i.test(text)) return 'afternoon';
   if (/\b(evening|jioni)\b/i.test(text)) return 'evening';
   if (/\btonight\b/i.test(text)) return 'tonight';
+  if (trustDatesOn() && /\b(night|usiku)\b/i.test(text)) return 'night';
   return '';
 }
 
@@ -469,7 +480,29 @@ function formatRequestedWhenLabel(hours, language = 'en') {
   }
   const time = minutesToHour12(resolved.minutesSinceMidnight);
   if (!time) return '';
+  // BRAIN_TRUST_P1: confirm the clock in both forms (10 AM = saa nne asubuhi).
+  if (require('./callerInfoTrust').on()) {
+    const swClock = swahiliClockWords(resolved.minutesSinceMidnight);
+    if (swClock) return lang === 'en' ? `${day} at ${time}, that's ${swClock}` : `${day}, ${swClock}, yaani ${time}`;
+  }
   return lang === 'en' ? `${day} at ${time}` : `${day}, ${time}`;
+}
+
+const SW_HOUR_WORDS = ['', 'moja', 'mbili', 'tatu', 'nne', 'tano', 'sita', 'saba', 'nane', 'tisa', 'kumi', 'kumi na moja', 'kumi na mbili'];
+/** 600 → "saa nne asubuhi"; 885 → "saa tisa kasoro robo mchana"... kept simple: na nusu / na robo / kasoro robo. */
+function swahiliClockWords(minutes) {
+  const day = ((Math.round(Number(minutes)) % 1440) + 1440) % 1440;
+  if (!Number.isFinite(day)) return '';
+  let h = Math.floor(day / 60);
+  let m = day % 60;
+  let tail = '';
+  if (m === 30) tail = ' na nusu';
+  else if (m === 15) tail = ' na robo';
+  else if (m === 45) { tail = ' kasoro robo'; h = (h + 1) % 24; }
+  else if (m !== 0) return '';
+  const period = h >= 6 && h < 12 ? 'asubuhi' : h >= 12 && h < 16 ? 'mchana' : h >= 16 && h < 19 ? 'jioni' : 'usiku';
+  const sw = ((h - 6) % 12 + 12) % 12 || 12;
+  return `saa ${SW_HOUR_WORDS[sw]}${tail} ${period}`;
 }
 
 module.exports = {
@@ -482,6 +515,7 @@ module.exports = {
   classifyInstant,
   nextOpenDay,
   formatRequestedWhenLabel,
+  swahiliClockWords,
   formatStoredWhenText,
   formatDayOnlyWhen,
   weekdaySpoken,

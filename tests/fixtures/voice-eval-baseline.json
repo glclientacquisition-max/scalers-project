@@ -1,7 +1,7 @@
 {
   "schema": "scalers.voice.eval-baseline",
   "schemaVersion": 1,
-  "recordedAt": "2026-10-13T11:13:16.181Z",
+  "recordedAt": "2026-10-14T07:50:52.932Z",
   "calls": {
     "HD_015bae4a4af2": {
       "score": 87.9,
@@ -73,6 +73,20 @@
       },
       "nameAsks": 0
     },
+    "HD_212e49ef183f": {
+      "score": 87.1,
+      "checks": {
+        "languageMismatch": 1,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 2,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 1,
+        "slow": 0
+      },
+      "nameAsks": 1
+    },
     "HD_21b92f25640b": {
       "score": 66.4,
       "checks": {
@@ -115,6 +129,20 @@
       },
       "nameAsks": 2
     },
+    "HD_9904b41a8ba9": {
+      "score": 88.3,
+      "checks": {
+        "languageMismatch": 7,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 0,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 0
+      },
+      "nameAsks": 0
+    },
     "HD_b47644d19072": {
       "score": 90,
       "checks": {
@@ -142,6 +170,34 @@
         "slow": 0
       },
       "nameAsks": 0
+    },
+    "HD_bc1d27d6287f": {
+      "score": 73.7,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 1,
+        "repeatedQuestion": 1,
+        "silence": 0,
+        "deletedAnswer": 1,
+        "respelling": 0,
+        "prematureTurn": 1,
+        "slow": 0
+      },
+      "nameAsks": 1
+    },
+    "HD_c19044667595": {
+      "score": 82.9,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 2,
+        "silence": 0,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 1
+      },
+      "nameAsks": 3
     },
     "ae6d7c03-0da3-4573-afec-bb7ca38847ec": {
       "score": 100,
@@ -198,6 +254,20 @@
         "slow": 4
       },
       "nameAsks": 0
+    },
+    "HD_ebef585b989a": {
+      "score": 96.7,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 0,
+        "deletedAnswer": 2,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 1
+      },
+      "nameAsks": 1
     },
     "HD_ee813bcf6248": {
       "score": 86.3,
