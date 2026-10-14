@@ -1,0 +1,13 @@
+[
+ {"sid":"HD_212e49ef183f","by":"brain-lead","lang":"en","commitment":true,"seed":{"contactName":"Alvin"},
+  "why":"Alvin confirmed, asked window cleaning Friday in Kitengela at saa 4. Correct outcome: one appointment Fri 16 Oct 10:00 EAT, no callback/hold row, name not re-asked, owner email free of instructions.",
+  "expect":{"appointments":1,"service_requests":0,"appointment":{"service":"window","startEAT":"2026-10-16 10:00"}}},
+ {"sid":"HD_d199dbbf6b79","by":"brain-lead","lang":"sw","commitment":true,
+  "why":"Carpet cleaning tomorrow (Sat 10 Oct) in Kitengela, Grace Apartments; caller corrected to 'saa 3 asubuhi' = 09:00. Saved row had caller_name 'like' (filler word).",
+  "expect":{"appointments":1,"appointment":{"service":"carpet","startEAT":"2026-10-10 09:00","callerName":"^(?!like$)"}}},
+ {"sid":"HD_1b3a67ea7ee9","by":"brain-lead","lang":"en","why":"Price question and 'about my booking'. Nothing should be written; no false 'no bookings' or booking claims.","expect":{"noWrites":true}},
+ {"sid":"HD_1677e57f73f9","by":"brain-lead","lang":"sw","why":"Swahili enquiry that ends without a request. Nothing written; replies stay in Swahili.","expect":{"noWrites":true}},
+ {"sid":"HD_ceba9d9b3f37","by":"brain-lead","lang":"en","why":"'My booking please' produced a 90-word file dump. Nothing written; each turn under the word cap.","expect":{"noWrites":true}},
+ {"sid":"HD_993e272e398a","by":"brain-lead","lang":"en","why":"Price/services enquiry. 'CATALOGUE MOUTH:' instruction was spoken. Nothing written; no instruction text spoken.","expect":{"noWrites":true}},
+ {"sid":"HD_ad735da7fb01","by":"brain-lead","lang":"sw","why":"Swahili carpet price question. Nothing written; Swahili replies; no name loop.","expect":{"noWrites":true}}
+]

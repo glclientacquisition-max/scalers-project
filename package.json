@@ -68,7 +68,9 @@
     "release:candidate": "bash scripts/release-candidate.sh",
     "tunnel": "node scripts/tunnel.js",
     "tunnel:localtunnel": "node scripts/tunnel.js",
-    "tunnel:cloudflared": "bash scripts/tunnel-cloudflared.sh"
+    "tunnel:cloudflared": "bash scripts/tunnel-cloudflared.sh",
+    "eval:v2": "node evals/v2/run.js --flags prod",
+    "eval:v2:replay": "node evals/v2/replay.js --labelled"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
