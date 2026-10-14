@@ -3614,9 +3614,13 @@ mediaWss.on('connection', (ws, req) => {
               lang: fillerLanguage(callLanguage),
               toolTurn: Boolean(needsImmediateProgress),
               tracker: ackTracker,
+              callerText: clean,
             })
-          : null;
-      const fillerText = ruleFiller
+          : undefined;
+      // Rule on: null = rate-limited, no filler this turn.
+      const fillerText = ruleFiller === null
+        ? ''
+        : ruleFiller
         ? ruleFiller.text
         : fillerMode === 'ack' || fillerMode === 'auto'
           ? pickContextualAck(clean, fillerLanguage(callLanguage))
@@ -3632,8 +3636,8 @@ mediaWss.on('connection', (ws, req) => {
             fillerStarted = true;
             thinkingAckTurn = turnTiming;
             thinkingAckAtMs = Date.now();
-            // Rule on: a non-word "Mm." is not an ack, so the Brain line keeps its receipt ack.
-            if (!ruleFiller || ruleFiller.word) ackPlayedTurn = turnTiming;
+            // Any filler (Mm included) makes the reply drop its leading ack.
+            ackPlayedTurn = turnTiming;
             if (ruleFiller && ruleFiller.word) wordAckTurn = turnTiming;
             if (ackTracker) ackTracker.noteHeard(fillerText);
             turnTiming.markFiller();
@@ -3781,6 +3785,7 @@ mediaWss.on('connection', (ws, req) => {
           const backstopped = ackRule.applyAckBackstop(text, {
             tracker: ackTracker,
             acked: ackPlayedTurn === turnTiming,
+            dropBare: true,
           });
           if (backstopped !== text && typeof voiceTrace !== 'undefined' && voiceTrace) {
             voiceTrace.noteTransform({ stage: 'ack_rule', before: text, after: backstopped, reason: 'ack_lead' });

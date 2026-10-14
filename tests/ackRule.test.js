@@ -26,11 +26,26 @@ test('tracker: no ack first turn, never two in a row, 1 per 3, caller sawa', () 
   t.beginTurn({ callerText: 'sawa' }); assert.equal(t.allowed(), false);
   t.beginTurn({ callerText: 'nifanyie booking' }); assert.equal(t.allowed(), true);
 });
-test('filler: word ack (<=3 words) only on allowed tool turn', () => {
-  const t = A.createAckTracker(); t.beginTurn(); t.beginTurn();
-  assert.deepEqual(A.pickRuleFiller({ lang: 'sw', toolTurn: false, tracker: t }), { text: 'Mm.', word: false });
-  const w = A.pickRuleFiller({ lang: 'en', toolTurn: true, tracker: t });
-  assert.equal(w.word, true); assert.ok(w.text.split(/\s+/).length <= 3);
+test('filler: rate-limited (Mm counts), none on short or question turns, status line on tool turns', () => {
+  const long = 'nilikuwa nataka kusafisha godoro langu kesho asubuhi pale nyumbani';
+  const t = A.createAckTracker(); t.beginTurn({ callerText: 'hello there my friend' });
+  assert.equal(A.pickRuleFiller({ lang: 'sw', tracker: t, callerText: long }), null, 'first turn');
+  for (let i = 0; i < 6; i++) t.beginTurn({ callerText: 'x' });
+  assert.equal(A.pickRuleFiller({ lang: 'sw', tracker: t, callerText: 'Yeah.' }), null, 'short');
+  assert.equal(A.pickRuleFiller({ lang: 'sw', tracker: t, callerText: 'Kisha mtakuja saa ngapi kesho asubuhi?' }), null, 'question');
+  assert.equal(A.pickRuleFiller({ lang: 'sw', tracker: t, callerText: 'nataka kusafisha godoro kesho' }), null, 'Mm needs a long turn');
+  assert.deepEqual(A.pickRuleFiller({ lang: 'sw', tracker: t, callerText: long }), { text: 'Mm.', word: false });
+  const w = A.pickRuleFiller({ lang: 'en', toolTurn: true, tracker: t, callerText: 'Yeah.' });
+  assert.equal(w.text, 'Let me check.'); assert.equal(A.isHeardAck(w.text), false, 'status line is not an ack');
+  t.noteHeard('Mm.'); assert.equal(t.allowed(), false, 'Mm counts');
+  t.beginTurn({ callerText: long });
+  assert.equal(A.pickRuleFiller({ lang: 'sw', tracker: t, callerText: long }), null, 'never two in a row');
+});
+test('backstop: after any filler, drop bare-ack sentence and strip "Asante sana," lead', () => {
+  const t = A.createAckTracker(); t.beginTurn(); t.beginTurn(); t.noteHeard('Mm.');
+  assert.equal(A.applyAckBackstop('Sawa kabisa.', { tracker: t, acked: true, dropBare: true }), '');
+  assert.equal(A.applyAckBackstop('Asante sana, Alvin!', { tracker: t, acked: true }), 'Alvin!');
+  assert.equal(A.applyAckBackstop('Sawa kabisa.', { tracker: t, acked: true }), 'Sawa kabisa.');
 });
 test('backstop: thinking-ack never stacks, closings exempt', () => {
   const t = A.createAckTracker(); t.beginTurn(); t.beginTurn(); t.noteHeard('Sawa.');
@@ -41,7 +56,10 @@ test('backstop: thinking-ack never stacks, closings exempt', () => {
 test('scoreAckRule: pct excl goodbyes, stacks, run', () => {
   const r = A.scoreAckRule([{ text: 'Habari' }, { filler: 'Sawa.', text: 'Sawa, nimeweka.' }, { text: 'Okay. Anything else?' }, { text: 'Asante, kwaheri.' }]);
   assert.equal(r.counted, 3); assert.equal(r.ackLed, 2); assert.equal(r.stacks, 1); assert.equal(r.longestRun, 2); assert.equal(r.pass, false);
-  assert.equal(A.scoreAckRule([{ text: 'Habari' }, { filler: 'Mm.', text: 'Nimeweka.' }]).pass, true);
+  // Mm is heard as an ack and stacks with an ack-led reply
+  const m = A.scoreAckRule([{ text: 'Habari' }, { filler: 'Mm.', text: 'Sawa kabisa.' }, { text: 'Kesho saa tatu.' }, { text: 'Tuje wapi?' }]);
+  assert.equal(m.ackLed, 1); assert.equal(m.stacks, 1);
+  assert.equal(A.scoreAckRule(Array.from({ length: 10 }, (_, i) => (i === 5 ? { filler: 'Mm.', text: 'Nimeweka.' } : { text: 'Habari' }))).pass, true);
 });
 test('v2Shadow: acked passed and v2 lead stripped only under rule', async () => {
   const { createBrainV2Shadow } = require('../src/conversation/v2Shadow');
@@ -71,4 +89,23 @@ test('server: shadow acked is the played word filler, not tracker.allowed()', ()
   assert.doesNotMatch(src, /acked: ackTracker\.allowed\(\)/);
   assert.match(src, /acked: \(\) => wordAckTurn === turnTiming/);
   assert.match(src, /if \(ruleFiller && ruleFiller\.word\) wordAckTurn = turnTiming;/);
+});
+
+test('staging heard fixtures HD_db0e864043c1 + HD_4ec204aafa93: before >10% with stacks; rule replay 0 stacks, <=1 Voice ack; 4ec2 <=10% incl Mm', () => {
+  const fs = require('fs'); const path = require('path');
+  const dir = path.join(__dirname, 'fixtures', 'ack-heard');
+  const calls = fs.readdirSync(dir).filter((n) => n.endsWith('.json')).map((n) => JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8')));
+  assert.equal(calls.length, 2);
+  for (const c of calls) {
+    const before = A.scoreAckRule(c.turns.map((t) => ({ filler: t.filler, text: t.reply })));
+    const after = A.scoreAckRule(A.replayHeard(c.turns));
+    assert.ok(before.ackLedPct > 10, `${c.callId} before ${before.ackLedPct}`);
+    assert.ok(before.stacks >= 2, `${c.callId} stacks ${before.stacks}`);
+    assert.equal(after.stacks, 0, c.callId);
+    const replay = A.replayHeard(c.turns);
+    // Voice-made acks: heard-ack fillers, plus ack leads left on a line that followed a filler.
+    const voiceAcks = replay.filter((x) => A.isHeardAck(x.filler) || (x.filler && A.isAckLed(x.text))).length;
+    assert.ok(voiceAcks <= 1, `${c.callId} voice acks ${voiceAcks}`);
+    if (c.callId === 'HD_4ec204aafa93') assert.ok(after.ackLedPct <= 10, `${c.callId} after ${after.ackLedPct}`);
+  }
 });
