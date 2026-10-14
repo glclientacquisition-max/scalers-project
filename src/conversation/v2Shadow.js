@@ -64,6 +64,28 @@ function diffAgainstLive(shadow, liveRecord) {
   };
 }
 
+// Caller file for v2 createState: phone, file name, open visits as raw
+// appointment rows (v2 normRow reads id/service_name/window_start/address_landmark/status).
+function callerFileForState(opts = {}) {
+  let file = opts.callerFile;
+  if (typeof file === 'function') { try { file = file(); } catch { file = null; } }
+  file = file || {};
+  const openRows = (Array.isArray(file.openRows) ? file.openRows : [])
+    .filter((r) => r && (r.kind ? r.kind === 'visit' : true) && !r.past)
+    .map((r) => ({
+      id: r.id || null,
+      service_name: r.service_name || r.job || null,
+      window_start: r.window_start || r.windowStart || null,
+      address_landmark: r.address_landmark || r.place || null,
+      status: r.status || 'requested',
+    }));
+  return {
+    callerPhone: file.callerPhone || opts.callerPhone || null,
+    contactName: file.contactName || null,
+    openRows,
+  };
+}
+
 function loadV2() {
   return require('./v2'); // lazy: flag-off never loads Brain v2
 }
@@ -81,6 +103,7 @@ function createBrainV2Shadow(opts = {}) {
   let chain = Promise.resolve(); // 1 in flight per call; turns run in order
   let inFlight = 0;
   let disabled = false;
+  let lastConsume = null; // the running turn's own stream; a timed-out turn keeps it alive
 
   function resolveModel() {
     if (model !== undefined) return model;
@@ -102,7 +125,15 @@ function createBrainV2Shadow(opts = {}) {
     return model;
   }
 
-  async function runOne({ text, profile, langLock, turnIndex, acked, ackRule, stripAck }) {
+  async function runOne({ text, profile, langLock, turnIndex, acked: ackedIn, ackRule, stripAck, ackWaitMs }) {
+    // VOICE_ACK_RULE: acked = a word filler actually played on the live turn.
+    // Live decides that after fillerDelayMs, so wait for it, then read.
+    let acked = ackedIn;
+    if (ackRule && typeof ackedIn === 'function') {
+      const waitMs = Math.max(0, Math.min(Number(ackWaitMs) || 0, 1500));
+      if (waitMs) await new Promise((r) => setTimeout(r, waitMs));
+      try { acked = !!ackedIn(); } catch { acked = false; }
+    }
     const started = now();
     const dry = v2.createDryRunHandlers({ log: [] });
     const handlers = {};
@@ -139,6 +170,7 @@ function createBrainV2Shadow(opts = {}) {
     try { await Promise.race([consume, timeout]); } catch (err) { error = err?.message || String(err); }
     finally { clearTimeout(timer); }
     consume.catch(() => {}); // a late rejection after timeout is swallowed
+    lastConsume = consume; // the chain waits on this, not on the timeout race
     const total = now() - started;
     const v2Text = sentences.map((s) => s.text).join(' ').trim() || (done?.line || '');
     return {
@@ -163,34 +195,51 @@ function createBrainV2Shadow(opts = {}) {
   }
 
   // Fire-and-forget entry point. Returns a promise for tests only; callers must `void` it.
-  function fire({ text, profile, langLock, turnIndex, onResult, acked, ackRule, stripAck }) {
+  function fire({ text, profile, langLock, turnIndex, onResult, acked, ackRule, stripAck, ackWaitMs }) {
     if (disabled) return Promise.resolve(null);
     if (inFlight >= 6) { // turns run in order (v2 state needs every turn); runaway backlog is dropped
       return Promise.resolve(null);
     }
     inFlight += 1;
-    const p = chain.then(async () => {
+    let resolveStage;
+    const p = new Promise((r) => { resolveStage = r; });
+    const step = chain.then(async () => {
       // Yield past the live turn's synchronous work (Gemini request kick-off) first.
       await new Promise((resolve) => setImmediate(resolve));
       try {
         if (!v2) {
           v2 = loader();
-          state = v2.createState({ profile: profile || {}, callerPhone: opts.callerPhone || null });
+          state = v2.createState({ profile: profile || {}, ...callerFileForState(opts) });
         }
-        const stage = await runOne({ text, profile, langLock, turnIndex, acked, ackRule, stripAck });
+        lastConsume = null;
+        const stage = await runOne({ text, profile, langLock, turnIndex, acked, ackRule, stripAck, ackWaitMs });
         if (typeof onResult === 'function') {
           try { onResult(stage); } catch (err) { log(`[brain_v2_shadow][${label()}] trace failed: ${err?.message || err}`); }
         }
-        return stage;
+        resolveStage(stage);
       } catch (err) {
         if (!v2) disabled = true; // v2 not loadable: stop trying for this call
         log(`[brain_v2_shadow][${label()}] failed: ${err?.message || err}`);
-        return null;
-      } finally {
-        inFlight -= 1;
+        resolveStage(null);
       }
+      // Never two turns on one state: the next turn starts only after this turn's
+      // own stream has finished, even when the trace was cut at the timeout.
+      if (lastConsume) {
+        const stallMs = Math.max(10000, shadowTimeoutMs(env) * 4);
+        let timer;
+        const stalled = await Promise.race([
+          lastConsume.then(() => false, () => false),
+          new Promise((r) => { timer = setTimeout(() => r(true), stallMs); if (timer.unref) timer.unref(); }),
+        ]);
+        clearTimeout(timer);
+        if (stalled) {
+          disabled = true; // state is still owned by a hung turn: stop shadowing this call
+          log(`[brain_v2_shadow][${label()}] turn stalled > ${stallMs}ms; shadow off for this call`);
+        }
+      }
+      inFlight -= 1;
     });
-    chain = p.catch(() => null);
+    chain = step.catch(() => null);
     return p;
   }
 
@@ -198,6 +247,7 @@ function createBrainV2Shadow(opts = {}) {
 }
 
 module.exports = {
+  callerFileForState,
   brainV2ShadowEnabled,
   createBrainV2Shadow,
   diffAgainstLive,

@@ -2124,6 +2124,8 @@ mediaWss.on('connection', (ws, req) => {
   let ackPlayedTurn = null;
   // VOICE_ACK_RULE (default off): per-call heard-ack tracker. null = rule off.
   const ackTracker = ackRule.ackRuleEnabled() ? ackRule.createAckTracker() : null;
+  /** VOICE_ACK_RULE: the turn on which a word filler (not Mm.) actually played. */
+  let wordAckTurn = null;
   /** Rolling interim hypothesis while agent is busy (for barge-in). */
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
@@ -3101,7 +3103,18 @@ mediaWss.on('connection', (ws, req) => {
     if (brainV2ShadowEnabled({ tenantId: brainProfile?.id })) {
       try {
         if (!brainV2Shadow) {
-          brainV2Shadow = createBrainV2Shadow({ callLabel: () => callKey });
+          brainV2Shadow = createBrainV2Shadow({
+            callLabel: () => callKey,
+            // Read once at the shadow's first turn (after caller memory hydrated).
+            callerFile: () => {
+              const mem = brainProfile?.callerMemory || {};
+              return {
+                callerPhone: brainState?.caller?.phone || mem.phone || null,
+                contactName: mem.fileOwnerName || mem.name || null,
+                openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
+              };
+            },
+          });
         }
         const shadowTurnIndex = voiceTrace.currentTurnIndex();
         void brainV2Shadow
@@ -3110,7 +3123,15 @@ mediaWss.on('connection', (ws, req) => {
             profile: brainProfile,
             langLock: callLanguage,
             turnIndex: shadowTurnIndex,
-            ...(ackTracker ? { acked: ackTracker.allowed(), ackRule: true, stripAck: ackRule.stripAckLead } : {}),
+            ...(ackTracker
+              ? {
+                  // true only when a word filler actually played this turn (read after the filler delay)
+                  acked: () => wordAckTurn === turnTiming,
+                  ackWaitMs: resolveVoiceProfile().fillerDelayMs + 80,
+                  ackRule: true,
+                  stripAck: ackRule.stripAckLead,
+                }
+              : {}),
             onResult: (stage) => {
               console.log(
                 `[brain_v2_shadow][${callKey}] turn=${shadowTurnIndex} ttft=${stage.ttftMs}` +
@@ -3613,6 +3634,7 @@ mediaWss.on('connection', (ws, req) => {
             thinkingAckAtMs = Date.now();
             // Rule on: a non-word "Mm." is not an ack, so the Brain line keeps its receipt ack.
             if (!ruleFiller || ruleFiller.word) ackPlayedTurn = turnTiming;
+            if (ruleFiller && ruleFiller.word) wordAckTurn = turnTiming;
             if (ackTracker) ackTracker.noteHeard(fillerText);
             turnTiming.markFiller();
             console.log(

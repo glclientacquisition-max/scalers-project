@@ -23,7 +23,7 @@ const INTENT_RULES = [
   ['payment_how', /\b(naweza (ku)?lipa|how (do|can) i pay|payment (method|options)|mnapokea (m-?pesa|pesa)|nilipe aje|malipo ni aje|lipa vipi)\b/i],
   ['greeting', /^\W*(oh,?\s*)?(habari( yako| zenu)?|niaje|mambo|sasa|hujambo|how are you|hello|hi)\W*(shy\W*)?(,?\s*(ni namna gani|mnaendelea aje|mko aje|how are you)\W*)?$/i],
   ['order', /\b(order|kuagiza|agiza|niwekee|buy|nunua|reserve|hold (one|two|\d))\b/i],
-  ['book', /\b(book|ku-?book|kubook|schedule|appointment|someone to come|mtu aje|mkuje|utume (hao )?watu|mtume (mtu|watu)|wakuje|waje kufanya|come (today|tomorrow|kesho|leo)|come (and|to) clean|kusafisha|usafi|tuieke|tuweke|niwekee booking|weka booking)\b/i],
+  ['book', /\b(book|booking|make a booking|ku-?book|kubook|schedule|appointment|to be (washed|cleaned)|(wash|clean) my|someone to come|mtu aje|mkuje|utume (hao )?watu|mtume (mtu|watu)|wakuje|waje kufanya|come (today|tomorrow|kesho|leo)|come (and|to) clean|kusafisha|usafi|tuieke|tuweke|niwekee booking|weka booking)\b/i],
   ['availability', /\b(in stock|available|do you have|mna\b|iko stock|ipo|mnayo|una\b)/i],
   ['price', /\b(how much|price|pricing|cost|charge|bei|pesa ngapi|shilingi ngapi|ni ngapi|ndio ngapi|ni bei gani|ngapi pesa)\b/i],
   ['hours', /\b(open|opening|close|closing|hours|fungua|mnafungua|unafungua|mnafunga|unafunga|funga|mnafanya kazi|mko wazi|working (days|hours)|operate until|until what time|mnafunga saa ngapi|saa za kazi)\b/i],
