@@ -96,3 +96,35 @@ describe('live transfer Dial XML', () => {
     );
   });
 });
+
+describe('VOICE_STREAM_RECORD on the inbound AI Stream', () => {
+  const { buildAnswerStreamXml: build, streamRecordEnabled } = require('../src/sautikit/pendingLiveTransfer');
+  const args = { streamUrl: 'wss://x.example/ws/media?callSid=HD_1', continueUrl: 'https://x.example/voice/continue' };
+  it('flag off (default): no record attribute', () => {
+    const prev = process.env.VOICE_STREAM_RECORD;
+    delete process.env.VOICE_STREAM_RECORD;
+    try {
+      assert.equal(streamRecordEnabled(), false);
+      assert.ok(!build(args).includes('record='));
+    } finally { if (prev !== undefined) process.env.VOICE_STREAM_RECORD = prev; }
+  });
+  it('flag on: record="true" on <Stream>, connect stays', () => {
+    const xml = build({ ...args, record: streamRecordEnabled({ VOICE_STREAM_RECORD: '1' }) });
+    assert.match(xml, /<Stream [^>]*connect="true"[^>]*record="true" \/>/);
+    assert.equal((xml.match(/record="true"/g) || []).length, 1);
+  });
+});
+
+describe('call.recording.ready from a recorded Stream', () => {
+  const { isRecordingEvent, extractRecordingFields } = require('../src/sautikit/recordingEvents');
+  it('is a recording event with or without a URL (no URL -> fetch path)', () => {
+    const withUrl = { event: 'call.recording.ready', data: { call_id: 'u-1', session_id: 'HD_1', recording: { id: 'rec_1', url: 'https://cdn.example/r.wav' } } };
+    const noUrl = { event: 'call.recording.ready', data: { call_id: 'u-1', session_id: 'HD_1', recording: { id: 'rec_1' } } };
+    assert.equal(isRecordingEvent('call.recording.ready', withUrl), true);
+    assert.equal(extractRecordingFields(withUrl).recordingUrl, 'https://cdn.example/r.wav');
+    assert.equal(isRecordingEvent('call.recording.ready', noUrl), true);
+    assert.equal(extractRecordingFields(noUrl).recordingUrl, null);
+    assert.equal(extractRecordingFields(noUrl).recordingSid, 'rec_1');
+    assert.ok(extractRecordingFields(noUrl).callSids.length > 0);
+  });
+});
