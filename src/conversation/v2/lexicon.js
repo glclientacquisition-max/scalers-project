@@ -116,8 +116,12 @@ function parseDate(text, now) {
   let byNum = null;
   if (dm) { const d = toNum(dm[1]); const p = eatParts(now); if (d >= 1 && d <= 31) { let x = new Date(Date.UTC(p.y, p.mo, d)); if (d < p.d) x = new Date(Date.UTC(p.y, p.mo + 1, d)); byNum = { y: x.getUTCFullYear(), mo: x.getUTCMonth(), d: x.getUTCDate(), dow: x.getUTCDay() }; } }
   if (best) {
-    let n = (best.i - today + 7) % 7; if (/\bnext\s+/.test(t) && n < 7) n = n === 0 ? 7 : n;
+    let n = (best.i - today + 7) % 7;
+    const isNext = new RegExp(`\\bnext\\s+${best.w}\\b|\\b${best.w}\\s+ijayo\\b`).test(t);
+    if (isNext && n === 0) n = 7;
     const wd = addDays(now, n);
+    // "next Friday" while this week's Friday is still ahead: ask which, naming both dates
+    if (isNext && n > 0 && n < 7 && !byNum) { const nx = addDays(now, n + 7); return { date: null, raw: best.w, conflict: { kind: 'next', a: isoDate(wd), aDow: wd.dow, b: isoDate(nx), bDow: nx.dow } }; }
     // weekday and date disagree ("Friday the 17th" when Friday is the 16th): ask, never pick silently
     if (byNum && isoDate(byNum) !== isoDate(wd)) return { date: null, raw: best.w, conflict: { a: isoDate(wd), aDow: wd.dow, b: isoDate(byNum), bDow: byNum.dow } };
     return { date: isoDate(wd), raw: best.w };
@@ -129,7 +133,9 @@ function parseDate(text, now) {
 }
 function parseWhen(text, now) {
   const d = parseDate(text, now); const tm = parseTime(text);
-  if (!d && !tm) return null;
+  if (!d && !tm && !/\b(right now|like now|immediately|asap|sasa hivi|mara moja|saa hii hii)\b/i.test(String(text || ''))) return null;
+  // "right now" / "sasa hivi": today, at the next half hour
+  if (!tm && /\b(right now|like now|immediately|asap|sasa hivi|mara moja|saa hii hii)\b/i.test(String(text || ''))) { const p = eatParts(now); const mins = Math.ceil((p.h * 60 + p.mi + 1) / 30) * 30; return { date: isoDate(addDays(now, 0)), time: `${pad(Math.floor(mins / 60) % 24)}:${pad(mins % 60)}`, raw: 'now', asap: true }; }
   return { date: d ? d.date : null, time: tm ? tm.hhmm : (d && d.tonight ? '20:00' : null), raw: [d && d.raw, tm && tm.raw].filter(Boolean).join(' '), ...(d && d.smallHours ? { smallHours: d.smallHours } : {}), ...(d && d.conflict ? { conflict: d.conflict } : {}) };
 }
 function whenToIso(when) { if (!when?.date || !when?.time) return null; return new Date(`${when.date}T${when.time}:00+03:00`).toISOString(); }

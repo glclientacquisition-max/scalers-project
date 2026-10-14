@@ -24,6 +24,8 @@ const ASK = {
   new_when: { en: ['What new day and time would you like?', 'What new day and time? For example Saturday at 10am.'], sw: ['Siku gani na saa ngapi mpya?', 'Siku gani na saa ngapi mpya? Kwa mfano Jumamosi saa nne.'] },
   kesho: { en: (c) => [`Do you mean later today, ${c.today} the ${ord(c.todayD)}, or ${c.tomorrow} the ${ord(c.tomorrowD)}?`], sw: (c) => [`Unamaanisha leo ${c.today} tarehe ${c.todayD}, au ${c.tomorrow} tarehe ${c.tomorrowD}?`] },
   date_conflict: { en: (c) => [`${c.today} is the ${ord(c.todayD)}, and the ${ord(c.tomorrowD)} is a ${c.tomorrow}. Which do you mean?`], sw: (c) => [`${c.today} ni tarehe ${c.todayD}, na tarehe ${c.tomorrowD} ni ${c.tomorrow}. Unamaanisha ipi?`] },
+  next_dow: { en: (c) => [`Do you mean this ${c.today} the ${ord(c.todayD)}, or ${c.tomorrow} the ${ord(c.tomorrowD)}?`], sw: (c) => [`Unamaanisha ${c.today} hii tarehe ${c.todayD}, au ${c.tomorrow} ijayo tarehe ${c.tomorrowD}?`] },
+  yes_no: { en: (c) => [`Please say yes or no: ${c.q ? c.q.charAt(0).toLowerCase() + c.q.slice(1) : 'shall I go ahead?'}`], sw: (c) => [`Tafadhali sema ndio au hapana: ${c.q ? c.q.charAt(0).toLowerCase() + c.q.slice(1) : 'niendelee?'}`] },
   complaint_more: { en: ["I'm sorry to hear that. Is there anything else the owner should know?"], sw: ['Pole sana. Kuna kingine mwenye biashara anapaswa kujua?'] },
   intent: { en: ['How can I help you today?', 'Sorry, are you calling to book, or about something else?'], sw: ['Karibu, tukusaidie vipi?', 'Samahani, unapiga kubook, ama ni kuhusu kitu kingine?'] },
 };
@@ -107,6 +109,7 @@ function info(r, lang, n = 0) {
     case 'greeting': return S ? 'Nzuri, asante. Ungependa huduma gani?' : "I'm well, thank you. Which service do you need?";
     case 'closed_day': return S ? `${L.cap(L.DOW_SW[r.dow])} tumefunga. Siku gani nyingine ingekufaa?` : `We're closed on ${r.dayLabel}. What other day would you like?`;
     case 'time_outside': { const o = (hh) => (S ? `${L.sayTime(hh, lang)} ${period(hh)}` : hh); return S ? `Tuko wazi kuanzia ${o(r.open)} hadi ${o(r.close)}. Saa ngapi ${r.day}?` : `We're open from ${r.open} to ${r.close}. What time on ${r.day}?`; }
+    case 'closing_today': return S ? `Leo tunafunga ${L.sayTime(r.close, lang)} ${period(r.close)}, hatuwezi kuja sasa hivi. Siku gani nyingine ingekufaa?` : `We close at ${r.close} today, so we can't come right now. What other day would you like?`;
     case 'time_past': return S ? `Saa hiyo imeshapita. Saa ngapi au siku gani nyingine ingekufaa?` : 'That time has already passed. What later day and time would you like?';
     case 'bot': return S ? `Mimi ni ${r.agent}, msaidizi wa kidijitali wa ${r.biz}. Timu halisi inapata ujumbe wako.` : `I'm ${r.agent}, a virtual assistant for ${r.biz}. The real team gets your request.`;
     case 'hold': return S ? 'Sawa, chukua muda wako.' : 'Sure, take your time.';

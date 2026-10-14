@@ -60,7 +60,7 @@ function mergeSlots(state, u, profile) {
     s.new_when = { date: u.when.date || s.new_when.date, time: u.when.time || s.new_when.time };
   } else if (u.when && !['cancel', 'change', 'address_change'].includes(state.intent)) {
     if (u.when.date) s.when.date = u.when.date;
-    if (u.when.time) s.when.time = u.when.time;
+    if (u.when.time) { s.when.time = u.when.time; s.when.asap = !!u.when.asap; }
   }
   if (u.place && state.intent !== 'cancel') { if (state.intent === 'address_change') s.new_place = u.place; else if (s.place && !u.landmark && isArea(s.place, profile) && !isArea(u.place, profile)) { s.landmark = u.place; } // HD_513: "Simba Drive" after "Rongai" is an address note, not a new area
     else { s.landmark = u.landmark || (u.place === s.place ? s.landmark : null); s.place = u.place; } }
@@ -91,12 +91,20 @@ function resolveRow(state, u) {
 // HD_cc0481620c50 (01:39 EAT): "kesho" between 00:00 and 04:59 is ambiguous (later today or the next day).
 // Hold the date, confirm once, and take the caller's answer; never ask a second time in the call.
 function resolveSmallHoursKesho(state, u, text) {
-  if (u.when?.conflict && !state.kesho && state.phase === 'collect') { const c = u.when.conflict; state.kesho = { kind: 'conflict', today: c.a, todayDow: c.aDow, tomorrow: c.b, tomorrowDow: c.bDow, asked: false, done: false }; delete u.when.conflict; }
+  if (u.when?.conflict && !state.kesho && state.phase === 'collect') { const c = u.when.conflict; state.kesho = { kind: c.kind || 'conflict', today: c.a, todayDow: c.aDow, tomorrow: c.b, tomorrowDow: c.bDow, asked: false, done: false }; delete u.when.conflict; }
   const k = state.kesho;
   if (k && k.asked && !k.done && state.expecting === 'kesho') {
     k.done = true; state.expecting = null;
     const t = String(text || '').toLowerCase();
     const num = (iso) => Number(String(iso).slice(8, 10));
+    if (k.kind === 'next') {
+      const nA = num(k.today), nB = num(k.tomorrow);
+      const b = new RegExp(`\\b(next|ijayo|following|the one after|wiki ijayo|${nB}(st|nd|rd|th)?)\\b`).test(t);
+      const a = new RegExp(`\\b(this|hii|wiki hii|this week|coming|${nA}(st|nd|rd|th)?)\\b`).test(t);
+      const date = b && !a ? k.tomorrow : a && !b ? k.today : null;
+      if (date) { u.when = { date, time: u.when?.time || null, raw: 'next-confirmed' }; u.yes = false; u.no = false; }
+      return;
+    }
     const tom = new RegExp(`\\b(${L.DOW_EN[k.tomorrowDow]}|${L.DOW_SW[k.tomorrowDow]}|${k.kind === 'conflict' ? `${num(k.tomorrow)}(st|nd|rd|th)?` : 'kesho|tomorrow|next day'})\\b`).test(t);
     const tod = new RegExp(`\\b(${L.DOW_EN[k.todayDow]}|${L.DOW_SW[k.todayDow]}|${k.kind === 'conflict' ? `${num(k.today)}(st|nd|rd|th)?` : 'leo|today|later today|this (morning|afternoon|evening)|mchana|hii'})\\b`).test(t);
     const date = tom && !tod ? k.tomorrow : tod && !tom ? k.today : (u.when?.date && !u.when.smallHours ? u.when.date : null);
@@ -117,7 +125,7 @@ function askSlot(state, slot, ctx) {
     state.kesho.asked = true; state.expecting = 'kesho';
     const S = L.isSw(state.lang); const dn = (i) => L.cap((S ? L.DOW_SW : L.DOW_EN)[i]);
     const dnum = (iso) => Number(String(iso).slice(8, 10));
-    return R.ask(state.kesho.kind === 'conflict' ? 'date_conflict' : 'kesho', 0, state.lang, { today: dn(state.kesho.todayDow), tomorrow: dn(state.kesho.tomorrowDow), todayD: dnum(state.kesho.today), tomorrowD: dnum(state.kesho.tomorrow) });
+    return R.ask({ conflict: 'date_conflict', next: 'next_dow' }[state.kesho.kind] || 'kesho', 0, state.lang, { today: dn(state.kesho.todayDow), tomorrow: dn(state.kesho.tomorrowDow), todayD: dnum(state.kesho.today), tomorrowD: dnum(state.kesho.tomorrow) });
   }
   const n = state.asked[slot] || 0;
   state.asked[slot] = n + 1;
@@ -127,7 +135,7 @@ function askSlot(state, slot, ctx) {
 }
 
 function mint(state) { state.tokenSeq += 1; return `ct_${state.turn}x${state.tokenSeq}`; }
-function propose(state, p) { p.token = mint(state); state.pending = p; state.phase = 'readback'; state.expecting = 'confirm'; return R.readback(p, state.lang); }
+function propose(state, p) { state.echoAsked = false; p.token = mint(state); state.pending = p; state.phase = 'readback'; state.expecting = 'confirm'; return R.readback(p, state.lang); }
 
 // Returns { line } or { ladder:true } when a slot ask is exhausted.
 function stepIntent(state, u, profile) {
@@ -140,8 +148,8 @@ function stepIntent(state, u, profile) {
     const hp = hoursProblem(profile, s.when, state.now);
     if (hp) {
       state.hoursAsk = (state.hoursAsk || 0) + 1;
-      if (hp.kind === 'closed_day') s.when.date = null; else s.when.time = null;
-      state.expecting = hp.kind === 'closed_day' ? 'date' : 'time';
+      if (hp.kind === 'closed_day' || hp.kind === 'closing_today') { s.when.date = null; s.when.time = null; } else s.when.time = null;
+      state.expecting = hp.kind === 'closed_day' || hp.kind === 'closing_today' ? 'date' : 'time';
       if (state.hoursAsk <= 2) return { line: R.info({ ...hp, day: L.sayDate(s.when.date || hp.date, state.lang).split(' ')[0] }, state.lang) };
       return slotOr(state, hp.kind === 'closed_day' ? 'date' : 'time', { day: L.sayDate(s.when.date || hp.date, state.lang).split(' ')[0] });
     }
@@ -190,6 +198,7 @@ function hoursProblem(profile, when, now) {
   if (h && (h.closed || !h.open)) return { kind: 'closed_day', dayLabel: L.cap(L.DOW_EN[dow]), dow, date: when.date };
   const iso = L.whenToIso(when);
   if (now && iso && new Date(iso).getTime() <= now.getTime()) return { kind: 'time_past', date: when.date };
+  if (when.asap && h && h.close && when.time >= h.close) return { kind: 'closing_today', close: h.close, date: null };
   if (h && h.open && h.close && (when.time < h.open || when.time >= h.close)) return { kind: 'time_outside', open: h.open, close: h.close, date: when.date };
   return null;
 }
@@ -455,7 +464,9 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   if (state.phase === 'readback' && state.pending) {
     const p = state.pending;
     mergeSlots(state, u, profile);
-    if (u.done && !/^\W*(yes|ndio|ndiyo)\b/i.test(u.text) ? false : (u.yes || echoAffirms(p, u)) && !pendingChanged(p, state)) {
+    // a read-back commits only on an explicit yes; a caller repeating the time back is asked yes/no once
+    if (!u.yes && echoAffirms(p, u) && !pendingChanged(p, state) && !state.echoAsked) { state.echoAsked = true; return out(R.ask('yes_no', 0, lang, { q: (String(state.lastBase || '').match(/[^.!?]+\?\s*$/) || [''])[0].trim() })); }
+    if (u.done && !/^\W*(yes|ndio|ndiyo)\b/i.test(u.text) ? false : u.yes && !pendingChanged(p, state)) {
       if (p.tool === 'create_handoff' && p.kind === 'quote') {}
       const { rec, toolResult } = await commit(state, p, handlers);
       results.push(toolResult);

@@ -3,7 +3,7 @@
 // normalised slot candidates; the state machine decides what to do with them.
 const L = require('./lexicon');
 
-const YES = /^\W*(yes|yeah|yep|yup|ok|okay|sure|correct|right|exactly|please do|go ahead|do it|ndio|ndiyo|eeh ndio|sawa|poa|fiti|kabisa|haya|yes please)\b/i;
+const YES = /^\W*(yes|yeah|yep|yup|ok|okay|sure|correct|right|exactly|please do|go ahead|do it|ndio|ndiyo|eeh ndio|sawa|poa|fiti|kabisa|haya|yes please|iko sawa|iko poa|bila shaka|weka|book it|yap|sure thing)\b/i;
 const NO = /^\W*(no|nope|not really|hapana|la|sitaki)\b|\b(that'?s wrong|si sawa|not correct)\b/i;
 const DONE = /\b(kwa sasa hakuna|hakuna kitu|not now|nitawapigia|nitawaita|let me get back to you|i'?ll call (you )?back|that'?s all|nothing else|no thanks|hapana,? ni hayo tu|ni hayo tu|that is all|bye|goodbye|kwaheri)\b/i;
 const NEG = /\b(not|no|wrong|hapana|si|sio|badala)\b/i;

@@ -178,4 +178,25 @@ module.exports = [
   { id: 'S55_sw_kesho_daytime_no_confirm', area: 'dates', lang: 'sw', tenant: 'done_and_dusted', commitment: true, mustNotSay: ['Unamaanisha'],
     turns: ['Nataka kubook sofa cleaning kesho saa nne asubuhi.'], facts: { name: 'Otieno', place: 'Ruiru', when: 'kesho saa nne asubuhi' },
     expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-15 10:00', place: 'Ruiru', callerName: 'Otieno' } } },
+  // Read-back confirms only on an explicit yes: a caller who repeats the time back is asked yes/no once
+  { id: 'S56_en_readback_echo_needs_yes', area: 'readback', lang: 'en', tenant: 'done_and_dusted', commitment: true, mustSay: ['yes or no'],
+    turns: ['Book sofa cleaning Friday at 10am.'], facts: { name: 'Alvin', place: 'Kitengela', onReadback: ['Friday at 10am.', '10am, Friday.'] },
+    expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-16 10:00' } } },
+  { id: 'S57_sw_readback_echo_needs_yes', area: 'readback', lang: 'sw', tenant: 'done_and_dusted', commitment: true, mustSay: ['ndio au hapana'],
+    turns: ['Nataka kubook sofa cleaning Ijumaa saa nne asubuhi.'], facts: { name: 'Otieno', place: 'Ruiru', onReadback: ['Ijumaa saa nne asubuhi.', 'Saa nne, Ijumaa.'] },
+    expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-16 10:00' } } },
+  { id: 'S58_sheng_readback_echo_needs_yes', area: 'readback', lang: 'sheng', tenant: 'done_and_dusted', commitment: true, mustSay: ['ndio au hapana'],
+    turns: ['Niaje, nataka ku-book carpet cleaning Ijumaa saa nane mchana.'], facts: { name: 'Kevo', place: 'Kasarani', onReadback: ['Saa nane mchana, Ijumaa.', 'Ijumaa saa nane.'] },
+    expect: { appointments: 1, appointment: { service: 'carpet', startEAT: '2026-10-16 14:00' } } },
+  // "next Friday" while this week's Friday is still ahead: asked once, naming both dates
+  { id: 'S59_en_next_friday_asked', area: 'dates', lang: 'en', tenant: 'done_and_dusted', commitment: true, mustSay: ['16th.*23rd'],
+    turns: ['Book carpet cleaning next Friday at 10am.'], facts: { name: 'Alvin', place: 'Kitengela', kesho: ['The 23rd.', 'Next week, the 23rd.'] },
+    expect: { appointments: 1, appointment: { service: 'carpet', startEAT: '2026-10-23 10:00' } } },
+  { id: 'S60_sw_next_friday_asked', area: 'dates', lang: 'sw', tenant: 'done_and_dusted', commitment: true, mustSay: ['tarehe 16.*tarehe 23'],
+    turns: ['Nataka kubook carpet cleaning Ijumaa ijayo saa nne asubuhi.'], facts: { name: 'Wanjiru', place: 'Ruiru', kesho: ['Hii ya wiki hii.', 'Tarehe 16.'] },
+    expect: { appointments: 1, appointment: { service: 'carpet', startEAT: '2026-10-16 10:00' } } },
+  // an immediate request near closing time hears the closing time, then picks another day
+  { id: 'S61_en_now_near_close', area: 'hours', lang: 'en', tenant: 'done_and_dusted', commitment: true, now: '2026-10-17T14:30:00Z', mustSay: ['close at 18:00'],
+    turns: ['Can someone come right now for sofa cleaning?'], facts: { name: 'Alvin', place: 'Kitengela', when: 'Monday at 10am' },
+    expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-19 10:00' } } },
 ];

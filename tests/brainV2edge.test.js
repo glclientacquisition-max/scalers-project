@@ -94,3 +94,32 @@ test('read-back: "No wait, actually yes" books; a barge-in correction re-reads',
   const b = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'Wait, wait, no, Saturday.']);
   assert.match(b.lines[3], /Saturday 17 October.*Shall I book it\?$/);
 });
+
+test('read-back: repeating the time back is not a yes; asked yes/no once, commits only on the yes', async () => {
+  const a = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'Friday at 10am.', 'Yes.']);
+  assert.match(a.lines[3], /^Please say yes or no: shall I book it\?$/);
+  assert.match(a.lines[4], /^Done, your sofa cleaning is booked/);
+  const b = await talk(['Nataka sofa cleaning Ijumaa saa nne asubuhi.', 'Ruiru', 'Otieno', 'Ijumaa saa nne.', 'Poa.']);
+  assert.match(b.lines[3], /^Tafadhali sema ndio au hapana: nithibitishe\?$/);
+  assert.match(b.lines[4], /nimeweka Sofa Cleaning/);
+  const c = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', '10am.', '10am.']);
+  assert.ok(!c.out.some((o) => o.toolResults.length), 'echo never writes');
+});
+
+test('"next Friday" while this Friday is ahead: asked once naming both dates; on a Friday it is not asked', async () => {
+  const a = await talk(['Book carpet cleaning next Friday at 10am.', 'The 23rd.', 'Kitengela', 'Alvin']);
+  assert.match(a.lines[0], /^Do you mean this Friday the 16th, or Friday the 23rd\?$/);
+  assert.match(a.lines[3], /Friday 23 October at 10:00/);
+  const b = await talk(['Nataka carpet cleaning Ijumaa ijayo saa nne asubuhi.', 'Tarehe 16.', 'Ruiru', 'Otieno']);
+  assert.match(b.lines[0], /^Unamaanisha Ijumaa hii tarehe 16, au Ijumaa ijayo tarehe 23\?$/);
+  assert.match(b.lines[3], /Ijumaa 16 Oktoba/);
+  const c = await talk(['Book carpet cleaning next Friday at 10am.'], { now: new Date('2026-10-16T05:00:00Z') });
+  assert.doesNotMatch(c.lines[0], /Do you mean/);
+});
+
+test('"right now" near closing gets the closing time and another day', async () => {
+  const sat1730 = new Date('2026-10-17T14:30:00Z');
+  assert.match((await talk(['Can someone come right now for sofa cleaning?'], { now: sat1730 })).lines[0], /^We close at 18:00 today, so we can't come right now\. What other day would you like\?$/);
+  assert.match((await talk(['Mtu anaweza kuja sasa hivi kwa sofa cleaning?'], { now: sat1730 })).lines[0], /^Leo tunafunga saa kumi na mbili jioni/);
+  assert.match((await talk(['Can someone come right now for sofa cleaning?'])).lines[0], /^Where should we come\?$/, 'at 08:00 now is within hours');
+});
