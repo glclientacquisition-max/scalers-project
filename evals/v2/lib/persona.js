@@ -20,6 +20,7 @@ function createPersona(scn, seed) {
     const a = String(lastAgentText || '');
     const ask = (key, re) => re.test(a) && f[key] != null ? key : null;
     const key =
+      ask('kesho', /\b(do you mean|unamaanisha)\b/i) ||
       ask('name', /\b(name|jina|nani)\b/i) ||
       ask('when', /\b(time|day|when|saa ngapi|siku gani|lini|morning|afternoon|asubuhi|mchana)\b/i) ||
       ask('place', /\b(where|wapi|area|eneo|location|address)\b/i) ||

@@ -5,13 +5,13 @@ PASS  Suite pass^4 >= 85%: 1
 PASS  Read-back + yes on 100% of commitments: 1
 PASS  False claims = 0 (suite + replay): 0
 PASS  Owner-email leaks = 0 (suite + replay): 0
-PASS  p95 Brain ms on tool turns <= 300: 0.46
+PASS  p95 Brain ms on tool turns <= 300: 0.45
 PASS  SW/Sheng language match per turn >= 98% (suite): 1
-PASS  Ack-led turns <= 10% excluding goodbyes (suite + staging replays): 0.0372
+PASS  Ack-led turns <= 10% excluding goodbyes (suite + staging replays): 0.0398
 PASS  Consecutive ack-led turns = 0: 0
 PASS  Ack stacks = 0: 0
 PASS  Voice filler/hold bank <= 3 words: 14 lines ok
-PASS  Heard: stream events present (suite): 704/704 turns, 1288 sentences
+PASS  Heard: stream events present (suite): 820/820 turns, 1464 sentences
 PASS  Heard: repeated turns = 0 (suite): 0
 PASS  Heard: fragments = 0 (suite + staging replays): 0
 PASS  Heard: filler-only turns = 0 (suite + staging replays): 0
@@ -21,10 +21,10 @@ PASS  Heard: p95 ms to first sentence on tool turns <= 300: 1
 PASS  Heard: p95 gap tool end -> first sentence <= 300 ms: 0
 INFO  Heard: repeated turns (staging replays; caller often repeats): 116
 INFO  Heard: repeated sentence rate (suite / staging replays): 0 / 0.0204
-INFO  Heard: ack-led rate (suite / staging replays): 0.1136 / 0.0128
+INFO  Heard: ack-led rate (suite / staging replays): 0.1122 / 0.0128
 INFO  Heard: language match per caller turn (staging replays, code-switch): 0.9605
 INFO  SW/Sheng language match, per turn (SW-labelled replays): 0.9231
 INFO  Language match per turn, all 87 replays (code-switch included): 0.9575
-{"ack":{"turns":2900,"ackLed":108,"ackRate":0.0372,"consecutive":0,"longestRun":1,"stacks":0}}
-{"heard":{"suite":{"calls":200,"turns":704,"heardTurns":704,"silentTurns":0,"sentences":1288,"repeatedTurns":0,"repeatedSentenceRate":0,"ackLedRate":0.1136,"consecutiveAck":0,"fillerOnlyTurns":0,"fragments":0,"fragmentSamples":[],"langTurns":532,"langMatch":1,"langSamples":[],"toolTurns":136,"firstSentenceMsP95":1,"toolTurnFirstSentenceMsP95":1,"postToolGapMsP95":0,"interSentenceGapMsP95":0},"stagingReplays":{"calls":248,"turns":2196,"heardTurns":2196,"silentTurns":0,"sentences":3132,"repeatedTurns":116,"repeatedSentenceRate":0.0204,"ackLedRate":0.0128,"consecutiveAck":0,"fillerOnlyTurns":0,"fragments":0,"fragmentSamples":[],"langTurns":608,"langMatch":0.9605,"langSamples":["Yes, outside Nairobi we serve Kitengela, Kiambu, Juja, Ongata Rongai and other l","Yes, outside Nairobi we serve Kitengela, Kiambu, Juja, Ongata Rongai and other l","Yes, outside Nairobi we serve Kitengela, Kiambu, Juja, Ongata Rongai and other l","Yes, outside Nairobi we serve Kitengela, Kiambu, Juja, Ongata Rongai and other l","Bei ya huduma gani ungependa kujua?"],"toolTurns":36,"firstSentenceMsP95":1,"toolTurnFirstSentenceMsP95":1,"postToolGapMsP95":0,"interSentenceGapMsP95":0}}}
-{"swSuiteTurns":207,"swReplayTurns":104,"replay":{"cases":87,"labelled":7,"passK":0.713,"labelledPassK":0.571,"endStatePassK":0.805,"falseClaimTurnRate":0,"agentTurns":3108,"ownerLeak":0,"claimsByClass":{}}}
+{"ack":{"turns":3016,"ackLed":120,"ackRate":0.0398,"consecutive":0,"longestRun":1,"stacks":0}}
+{"heard":{"suite":{"calls":220,"turns":820,"heardTurns":820,"silentTurns":0,"sentences":1464,"repeatedTurns":0,"repeatedSentenceRate":0,"ackLedRate":0.1122,"consecutiveAck":0,"fillerOnlyTurns":0,"fragments":0,"fragmentSamples":[],"langTurns":604,"langMatch":1,"langSamples":[],"toolTurns":156,"firstSentenceMsP95":1,"toolTurnFirstSentenceMsP95":1,"postToolGapMsP95":0,"interSentenceGapMsP95":0},"stagingReplays":{"calls":248,"turns":2196,"heardTurns":2196,"silentTurns":0,"sentences":3132,"repeatedTurns":116,"repeatedSentenceRate":0.0204,"ackLedRate":0.0128,"consecutiveAck":0,"fillerOnlyTurns":0,"fragments":0,"fragmentSamples":[],"langTurns":608,"langMatch":0.9605,"langSamples":["Yes, outside Nairobi we serve Kitengela, Kiambu, Juja, Ongata Rongai and other l","Yes, outside Nairobi we serve Kitengela, Kiambu, Juja, Ongata Rongai and other l","Yes, outside Nairobi we serve Kitengela, Kiambu, Juja, Ongata Rongai and other l","Yes, outside Nairobi we serve Kitengela, Kiambu, Juja, Ongata Rongai and other l","Bei ya huduma gani ungependa kujua?"],"toolTurns":36,"firstSentenceMsP95":1,"toolTurnFirstSentenceMsP95":1,"postToolGapMsP95":1,"interSentenceGapMsP95":0}}}
+{"swSuiteTurns":235,"swReplayTurns":104,"replay":{"cases":87,"labelled":7,"passK":0.713,"labelledPassK":0.571,"endStatePassK":0.805,"falseClaimTurnRate":0,"agentTurns":3108,"ownerLeak":0,"claimsByClass":{}}}

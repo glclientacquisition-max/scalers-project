@@ -161,4 +161,21 @@ module.exports = [
   { id: 'S50_en_place_given_as_name', area: 'names', lang: 'en', tenant: 'done_and_dusted', commitment: true, mustNotSay: ['for Kitengela'],
     turns: ['I want to book carpet cleaning on Friday at 10am.', 'Kitengela.', 'Kitengela.'], facts: { name: 'Alvin', place: 'Kitengela', when: 'Friday at 10am' },
     expect: { appointments: 1, appointment: { service: 'carpet', callerName: 'Alvin' } } },
+  // HD_cc0481620c50: 01:39 EAT Thursday, "kesho" is confirmed once (later today or Friday), never assumed
+  { id: 'S51_sw_kesho_small_hours_friday', area: 'dates', lang: 'sw', tenant: 'done_and_dusted', commitment: true, now: '2026-10-14T22:39:00Z', mustNotSay: ['Siku gani'],
+    turns: ['Nataka kubook sofa cleaning kesho saa nane mchana.'], facts: { kesho: ['Ijumaa.', 'Ijumaa, kesho.'], name: 'Otieno', place: 'Ruiru', when: 'Ijumaa saa nane mchana' },
+    expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-16 14:00', place: 'Ruiru', callerName: 'Otieno' } } },
+  { id: 'S52_sw_kesho_small_hours_today', area: 'dates', lang: 'sw', tenant: 'done_and_dusted', commitment: true, now: '2026-10-14T22:39:00Z', mustNotSay: ['Siku gani'],
+    turns: ['Nataka kubook carpet cleaning kesho saa nane mchana.'], facts: { kesho: ['Leo mchana.', 'Leo Alhamisi.'], name: 'Wanjiku', place: 'Kitengela', when: 'leo saa nane mchana' },
+    expect: { appointments: 1, appointment: { service: 'carpet', startEAT: '2026-10-15 14:00', place: 'Kitengela', callerName: 'Wanjiku' } } },
+  { id: 'S53_en_tomorrow_small_hours_today', area: 'dates', lang: 'en', tenant: 'done_and_dusted', commitment: true, now: '2026-10-14T22:39:00Z', mustNotSay: ['What day would you like'],
+    turns: ['Hi, I want to book sofa cleaning tomorrow at 2pm.'], facts: { kesho: ['Later today.', 'Today, Thursday.'], name: 'Alvin', place: 'Kitengela', when: 'today at 2pm' },
+    expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-15 14:00', place: 'Kitengela', callerName: 'Alvin' } } },
+  { id: 'S54_en_tomorrow_small_hours_friday', area: 'dates', lang: 'en', tenant: 'done_and_dusted', commitment: true, now: '2026-10-14T22:39:00Z', mustNotSay: ['What day would you like'],
+    turns: ['Can I book carpet cleaning for tomorrow at 10am?'], facts: { kesho: ['Friday.', 'Friday please.'], name: 'Alvin', place: 'Kitengela', when: 'Friday at 10am' },
+    expect: { appointments: 1, appointment: { service: 'carpet', startEAT: '2026-10-16 10:00', place: 'Kitengela', callerName: 'Alvin' } } },
+  // daytime "kesho" is unchanged: no confirm question
+  { id: 'S55_sw_kesho_daytime_no_confirm', area: 'dates', lang: 'sw', tenant: 'done_and_dusted', commitment: true, mustNotSay: ['Unamaanisha'],
+    turns: ['Nataka kubook sofa cleaning kesho saa nne asubuhi.'], facts: { name: 'Otieno', place: 'Ruiru', when: 'kesho saa nne asubuhi' },
+    expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-15 10:00', place: 'Ruiru', callerName: 'Otieno' } } },
 ];

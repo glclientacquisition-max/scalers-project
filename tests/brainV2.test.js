@@ -270,3 +270,29 @@ test('HD_db0e864043c1: no memory claim without file evidence; never "wewe ni nan
   const d = await run(['Uh, and where do you serve, like, so that I know if I can place a booking?'], handlers);
   assert.match(d.out[0].line, /We serve/);
 });
+
+// HD_cc0481620c50: 01:39 EAT Thursday, "kesho" is confirmed once, never assumed and never asked twice
+async function talkAt(now, lines) {
+  const h = V2.createDryRunHandlers(); const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] }); const out = [];
+  for (const text of lines) out.push(await V2.runTurn(st, { text, profile: DD, now, handlers: h }));
+  return { st, out };
+}
+const SMALL = new Date('2026-10-14T22:39:00Z');
+test('v2: small-hours kesho (SW) asks once, Ijumaa -> Friday', async () => {
+  const { st, out } = await talkAt(SMALL, ['Nataka kubook sofa cleaning kesho saa nane mchana.', 'Ijumaa.', 'Ruiru', 'Otieno']);
+  assert.match(out[0].line, /^Unamaanisha leo Alhamisi mchana, au Ijumaa\?$/);
+  assert.strictEqual(out.filter((o) => /Unamaanisha/.test(o.line)).length, 1);
+  assert.strictEqual(st.pending?.when?.date || st.slots.when.date, '2026-10-16');
+});
+test('v2: small-hours tomorrow (EN) -> later today; second "tomorrow" not re-asked', async () => {
+  const { st, out } = await talkAt(SMALL, ['I want to book sofa cleaning tomorrow at 2pm.', 'Later today.', 'Kitengela', 'Alvin']);
+  assert.match(out[0].line, /^Do you mean later today, Thursday, or Friday\?$/);
+  assert.strictEqual(st.pending?.when?.date || st.slots.when.date, '2026-10-15');
+  const r2 = await talkAt(SMALL, ['Book carpet cleaning tomorrow at 10am.', 'Tomorrow.', 'Kitengela']);
+  assert.strictEqual(r2.out.filter((o) => /Do you mean/.test(o.line)).length, 1);
+  assert.strictEqual(r2.st.slots.when.date, '2026-10-16');
+});
+test('v2: daytime kesho is not confirmed', async () => {
+  const { out } = await talkAt(NOW, ['Nataka kubook sofa cleaning kesho saa nne asubuhi.']);
+  assert.doesNotMatch(out[0].line, /Unamaanisha/);
+});

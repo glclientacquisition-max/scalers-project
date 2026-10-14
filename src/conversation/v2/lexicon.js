@@ -87,7 +87,8 @@ function parseDate(text, now) {
   const t = String(text || '').toLowerCase();
   let m;
   if (/\b(keshokutwa|day after tomorrow)\b/.test(t)) return { date: isoDate(addDays(now, 2)), raw: 'keshokutwa' };
-  if (/\b(kesho|tomorrow|tmrw)\b/.test(t)) return { date: isoDate(addDays(now, 1)), raw: 'tomorrow' };
+  // HD_cc0481620c50: 00:00-04:59 EAT "kesho"/"tomorrow" may mean later today (the caller hasn't slept yet)
+  if (/\b(kesho|tomorrow|tmrw)\b/.test(t)) return { date: isoDate(addDays(now, 1)), raw: 'tomorrow', ...(eatParts(now).h < 5 ? { smallHours: { today: isoDate(addDays(now, 0)), tomorrow: isoDate(addDays(now, 1)), todayDow: eatParts(now).dow, tomorrowDow: addDays(now, 1).dow } } : {}) };
   if (/\b(leo|today|this (morning|afternoon|evening))\b/.test(t)) return { date: isoDate(addDays(now, 0)), raw: 'today' };
   const today = eatParts(now).dow;
   for (const [list] of [[DOW_EN], [DOW_SW]]) {
@@ -105,7 +106,7 @@ function parseDate(text, now) {
 function parseWhen(text, now) {
   const d = parseDate(text, now); const tm = parseTime(text);
   if (!d && !tm) return null;
-  return { date: d ? d.date : null, time: tm ? tm.hhmm : null, raw: [d && d.raw, tm && tm.raw].filter(Boolean).join(' ') };
+  return { date: d ? d.date : null, time: tm ? tm.hhmm : null, raw: [d && d.raw, tm && tm.raw].filter(Boolean).join(' '), ...(d && d.smallHours ? { smallHours: d.smallHours } : {}) };
 }
 function whenToIso(when) { if (!when?.date || !when?.time) return null; return new Date(`${when.date}T${when.time}:00+03:00`).toISOString(); }
 function dateParts(iso) { const [y, mo, d] = iso.split('-').map(Number); const x = new Date(Date.UTC(y, mo - 1, d)); return { y, mo: mo - 1, d, dow: x.getUTCDay() }; }

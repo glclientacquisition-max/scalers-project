@@ -86,7 +86,34 @@ function resolveRow(state, u) {
   return { ambiguous: (c.length ? c : rows) };
 }
 
+// HD_cc0481620c50 (01:39 EAT): "kesho" between 00:00 and 04:59 is ambiguous (later today or the next day).
+// Hold the date, confirm once, and take the caller's answer; never ask a second time in the call.
+function resolveSmallHoursKesho(state, u, text) {
+  const k = state.kesho;
+  if (k && k.asked && !k.done && state.expecting === 'kesho') {
+    k.done = true; state.expecting = null;
+    const t = String(text || '').toLowerCase();
+    const tom = new RegExp(`\\b(${L.DOW_EN[k.tomorrowDow]}|${L.DOW_SW[k.tomorrowDow]}|kesho|tomorrow|next day)\\b`).test(t);
+    const tod = new RegExp(`\\b(${L.DOW_EN[k.todayDow]}|${L.DOW_SW[k.todayDow]}|leo|today|later today|this (morning|afternoon|evening)|mchana|hii)\\b`).test(t);
+    const date = tom && !tod ? k.tomorrow : tod && !tom ? k.today : (u.when?.date && !u.when.smallHours ? u.when.date : null);
+    if (date) { u.when = { date, time: u.when?.time || null, raw: u.when?.raw || 'kesho-confirmed' }; u.yes = false; u.no = false; }
+    else if (u.when) delete u.when.smallHours;
+    return;
+  }
+  if (u.when?.smallHours) {
+    if (!k && state.phase === 'collect') { state.kesho = { ...u.when.smallHours, asked: false, done: false }; u.when.date = null; }
+    else if (k && k.done) u.when.date = k.tomorrow; // already confirmed once: never ask again
+    delete u.when.smallHours;
+  }
+}
+
 function askSlot(state, slot, ctx) {
+  // HD_cc0481620c50: a small-hours "kesho" is confirmed once, in the caller's language, instead of asking the day from scratch
+  if ((slot === 'date' || slot === 'pickup') && state.kesho && !state.kesho.asked) {
+    state.kesho.asked = true; state.expecting = 'kesho';
+    const S = L.isSw(state.lang); const dn = (i) => L.cap((S ? L.DOW_SW : L.DOW_EN)[i]);
+    return R.ask('kesho', 0, state.lang, { today: dn(state.kesho.todayDow), tomorrow: dn(state.kesho.tomorrowDow) });
+  }
   const n = state.asked[slot] || 0;
   state.asked[slot] = n + 1;
   state.expecting = slot;
@@ -344,6 +371,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
   state.lang = (langLock === 'en' || langLock === 'sw') ? langLock : (L.nextLanguage(state.lang, text) || state.lang);
   const u = N.understand(text, { profile, now, expecting: state.expecting });
+  resolveSmallHoursKesho(state, u, text);
   const results = [];
   const catalogue = buildCatalogue({ profile, openRows: state.file.openRows });
   const mc = await consultModel(state, u, profile, model, catalogue);

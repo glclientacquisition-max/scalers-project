@@ -21,6 +21,7 @@ const ASK = {
   which: { en: (c) => [`Which one: ${c.list}?`, `Which one, ${c.list}?`], sw: (c) => [`Ipi: ${c.list}?`, `Ni ipi, ${c.list}?`] },
   change_what: { en: (c) => [`What would you like to change on your ${c.row}?`, `Is it the day and time you want to change on your ${c.row}?`], sw: (c) => [`Ungependa kubadilisha nini kwenye ${c.row}?`, `Ni siku na saa unataka kubadilisha kwenye ${c.row}?`] },
   new_when: { en: ['What new day and time would you like?', 'What new day and time? For example Saturday at 10am.'], sw: ['Siku gani na saa ngapi mpya?', 'Siku gani na saa ngapi mpya? Kwa mfano Jumamosi saa nne.'] },
+  kesho: { en: (c) => [`Do you mean later today, ${c.today}, or ${c.tomorrow}?`], sw: (c) => [`Unamaanisha leo ${c.today} mchana, au ${c.tomorrow}?`] },
   complaint_more: { en: ["I'm sorry to hear that. Is there anything else the owner should know?"], sw: ['Pole sana. Kuna kingine mwenye biashara anapaswa kujua?'] },
   intent: { en: ['How can I help you today?', 'Sorry, are you calling to book, or about something else?'], sw: ['Karibu, tukusaidie vipi?', 'Samahani, unapiga kubook, ama ni kuhusu kitu kingine?'] },
 };
