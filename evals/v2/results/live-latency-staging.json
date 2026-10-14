@@ -1,0 +1,24 @@
+{
+ "calls": 16,
+ "all": {
+  "n": 231,
+  "firstTokenP50": 1111,
+  "firstTokenP95": 2074,
+  "firstAudioP50": 406,
+  "firstAudioP95": 545
+ },
+ "toolTurns": {
+  "n": 13,
+  "firstTokenP50": 1079,
+  "firstTokenP95": 4028,
+  "firstAudioP50": 409,
+  "firstAudioP95": 536
+ },
+ "answerTurns": {
+  "n": 218,
+  "firstTokenP50": 1121,
+  "firstTokenP95": 1571,
+  "firstAudioP50": 406,
+  "firstAudioP95": 575
+ }
+}
