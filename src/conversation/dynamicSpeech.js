@@ -436,6 +436,17 @@ function polishSpokenDetail(text, opts = {}) {
       dropReasons,
     });
   }
+  {
+    // VOICE_COVERAGE_SINGLE_SOURCE: coverage is stated from the check only.
+    const guarded = require('./coverageSingleSource').guardCoverageClaim(spoken, {
+      state: opts.state,
+      language: opts.language,
+    });
+    if (guarded.changed) {
+      spoken = guarded.text;
+      dropReasons.push(guarded.reason);
+    }
+  }
   const callerText = String(
     (opts.callerTurns || opts.state?.conversation?.answersReceived || []).slice(-1)[0] || ''
   );
