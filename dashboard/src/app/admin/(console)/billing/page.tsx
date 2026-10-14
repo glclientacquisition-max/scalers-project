@@ -1,5 +1,6 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminBillingListPanel } from "@/components/AdminBillingListPanel";
+import { SmsCreditPanel } from "@/components/SmsCreditPanel";
 import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { logAdminError } from "@/lib/adminErrors";
 import { loadAdminBillingOverview } from "@/lib/adminBilling";
@@ -21,6 +22,7 @@ export default async function AdminBillingPage() {
     <div className="space-y-4">
       <h1 className={deskListTitleClass}>Billing</h1>
       <AdminBillingListPanel overview={overview} />
+      <SmsCreditPanel />
     </div>
   );
 }

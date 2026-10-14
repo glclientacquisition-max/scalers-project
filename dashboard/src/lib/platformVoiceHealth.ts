@@ -29,8 +29,18 @@ export type GeminiHealthSnapshot = {
   denied?: boolean;
 };
 
+export type SmsCreditHealth = {
+  configured?: boolean;
+  verified?: boolean | null;
+  balance?: number | null;
+  checkedAt?: string | null;
+  state?: "ok" | "warn" | "critical" | "exhausted" | "unknown";
+  runwayDays?: number | null;
+};
+
 export type VoiceHealthzPayload = {
   ok?: boolean;
+  sms?: SmsCreditHealth;
   gitSha?: string | null;
   soniox?: {
     stt?: boolean;

@@ -489,6 +489,10 @@ const {
   getSmsStatus,
 } = require('./src/notifications/sms');
 const {
+  getSmsCreditHealth,
+  startSmsCreditProbe,
+} = require('./src/notifications/smsCreditMonitor');
+const {
   liveTransferReady,
   liveTransferDestination,
   normalizeKenyaE164,
@@ -627,6 +631,7 @@ app.get('/healthz', (_req, res) => {
   const sms = getSmsStatus();
   res.status(200).json({
     ok: true,
+    sms: getSmsCreditHealth(),
     gitSha: resolveVoiceGitSha(),
     gitBranch: resolveVoiceGitBranch(),
     startedAt: PROCESS_STARTED_AT,
@@ -6668,6 +6673,10 @@ server.listen(PORT, () => {
     console.log(`✓ Email alert fallback ready (from ${process.env.ALERT_EMAIL_FROM})`);
   } else {
     console.log(`ℹ Email fallback not set (RESEND_API_KEY + ALERT_EMAIL_FROM)`);
+  }
+  if (smsSenderReady()) {
+    startSmsCreditProbe();
+    console.log(`✓ TextSMS credit probe scheduled (SMS_CREDIT_PROBE_MS, balance check only)`);
   }
   if (process.env.SAUTIKIT_API_KEY) {
     startTelephonyWalletProbe();
