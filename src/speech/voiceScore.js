@@ -414,7 +414,15 @@ function scoreTurns(turns = []) {
     : 100;
   const callPenalty = Math.min(30, checks.repeatedQuestion * 8);
   const score = Math.round((Math.max(0, avg - callPenalty) + Number.EPSILON) * 10) / 10;
-  return { score, checks, turns: scored, nameAsks, nameAskTurns };
+  // Ack rule (report-only, does not change score): what the caller heard per turn.
+  const ackRule = require('./ackRule').scoreAckRule(
+    turns.map((turn) => ({
+      filler: stages(turn, 'filler').map((r) => String(r.text || '').trim()).filter(Boolean)[0] ||
+        stages(turn, 'tts').filter((r) => r.filler === true).map((r) => String(r.text || '').trim()).filter(Boolean)[0] || '',
+      text: spokenText(turn),
+    }))
+  );
+  return { score, checks, turns: scored, nameAsks, nameAskTurns, ackRule };
 }
 
 const CHECK_WEIGHT = {

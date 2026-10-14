@@ -95,8 +95,10 @@ const ACK_LEAD = /^\s*(?:okay|ok|alright|sawa)\s*[.,!]\s*(?=\S)/i;
  * @param {string} line
  * @param {{ acked?: boolean }} opts
  */
-function trimAckLead(line, { acked = false } = {}) {
+function trimAckLead(line, { acked = false, env = process.env } = {}) {
   const text = String(line || '');
+  // VOICE_ACK_RULE: widened list (haya, asante, sure, poa, ni sawa, sawa sawa/kabisa).
+  if (acked && require('./ackRule').ackRuleEnabled(env)) return require('./ackRule').stripAckLead(text);
   if (!acked || !ACK_LEAD.test(text)) return text;
   const rest = text.replace(ACK_LEAD, '');
   return rest.charAt(0).toUpperCase() + rest.slice(1);
