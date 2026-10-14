@@ -74,6 +74,9 @@ const {
   VOICE_SYSTEM_PROMPT_VERSION,
 } = require('./src/prompts');
 const { createVoiceTrace } = require('./src/speech/voiceTrace');
+const toolSmooth = require('./src/speech/toolSmooth');
+/** VOICE_TOOL_SMOOTH: per-connection heard-audio clock. Empty when the flags are off. */
+const MEDIA_CLOCKS = new WeakMap();
 const voiceTraceBySid = new Map();
 
 function bindVoiceTrace(callSid, trace) {
@@ -1891,6 +1894,8 @@ const OUTBOUND_PCM_FRAME_BYTES = 640;
 
 function sendPcmToMedia(ws, pcm) {
   if (!ws || ws.readyState !== WebSocket.OPEN || !pcm || !pcm.length) return;
+  const mediaClock = MEDIA_CLOCKS.get(ws);
+  if (mediaClock) mediaClock.onSend(pcm.length);
   // Fixed phone gain on the whole utterance. Do not even-out 20 ms frames (pumping).
   const boosted = applyPcmGain(pcm, resolveVoiceProfile().gain);
   // Prefer small frames for smoother playback on the telephony side.
@@ -1911,6 +1916,8 @@ function sendPcmToMedia(ws, pcm) {
  */
 function clearMediaPlayback(ws) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const mediaClock = MEDIA_CLOCKS.get(ws);
+  if (mediaClock) mediaClock.onClear();
   const payloads = [
     { type: 'killAudio' },
     // Compatibility fallbacks seen across forks / Twilio-style bridges.
@@ -2097,6 +2104,18 @@ mediaWss.on('connection', (ws, req) => {
     if (!timing) return null;
     const summary = timing.log(extra);
     callTranscript.stampFromSummary(summary);
+    if (smooth.any) {
+      stopHoldFill();
+      if (smooth.trace && mediaClock) {
+        voiceTrace.noteAudioSegments({
+          segments: mediaClock.segmentsSince(timing.turnStartedAt),
+          holdsQueued,
+          receiptCached: receiptCachedTurn,
+        });
+      }
+      holdsQueued = 0;
+      receiptCachedTurn = false;
+    }
     voiceTrace.commitTurn({
       outcome: extra?.outcome || 'ok',
       latency: summary,
@@ -2169,6 +2188,50 @@ mediaWss.on('connection', (ws, req) => {
   let thinkingAckAtMs = 0;
   // An ack or a hold played on this turn: a tool outcome drops its "Okay." lead.
   let ackPlayedTurn = null;
+  // VOICE_TOOL_SMOOTH (default off): heard-audio clock, cached hold gap-fill, cached receipts.
+  const smooth = toolSmooth.toolSmoothFlags();
+  const mediaClock = smooth.trace || smooth.hold ? toolSmooth.createMediaClock() : null;
+  if (mediaClock) MEDIA_CLOCKS.set(ws, mediaClock);
+  let holdFillTimer = null;
+  let holdsQueued = 0;
+  let receiptCachedTurn = false;
+  function stopHoldFill() {
+    if (holdFillTimer) clearInterval(holdFillTimer);
+    holdFillTimer = null;
+  }
+  // Items 1-2: while the tool runs, queue a cached same-voice hold line just before
+  // the queued audio (ack/filler) runs out. Cached only: never a live-TTS seam.
+  function startHoldFill() {
+    if (!mediaClock || holdFillTimer) return;
+    const turnAtStart = activeTurnTiming;
+    holdFillTimer = setInterval(() => {
+      if (!turnBusy || bargeInActive || activeTurnTiming !== turnAtStart || ttsSpeedScale !== 1) return stopHoldFill();
+      if (!toolSmooth.shouldQueueHold({ toolPending: true, remainingMs: mediaClock.remainingMs(), played: holdsQueued })) {
+        if (holdsQueued >= toolSmooth.HOLD_MAX) stopHoldFill();
+        return;
+      }
+      const line = toolSmooth.holdFillLines(callLanguage)[holdsQueued];
+      const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage, extraLexicon: ttsLexiconOverrides });
+      if (!found.pcm) return stopHoldFill();
+      holdsQueued += 1;
+      ackPlayedTurn = activeTurnTiming;
+      voiceTrace.noteFiller({ text: line, before: line, language: callLanguage });
+      console.log(`[ws/media][${sidLabel()}] tool-smooth hold queued n=${holdsQueued} remaining=${mediaClock.remainingMs()}ms: ${line}`);
+      mediaClock.tag('hold');
+      sendPcmToMedia(ws, found.pcm);
+      mediaClock.tag('tts');
+    }, 40);
+  }
+  // Item 3: a receipt already rendered at call start plays with no TTS start-up seam.
+  function playCachedReceipt(line) {
+    if (!isFillerCacheEnabled() || ttsSpeedScale !== 1) return null;
+    const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage, extraLexicon: ttsLexiconOverrides });
+    if (!found.pcm) return null;
+    receiptCachedTurn = true;
+    voiceTrace.noteTts({ text: found.prepared.text, before: String(line), language: found.prepared.language });
+    console.log(`[ws/media][${sidLabel()}] tool-smooth receipt cached bytes=${found.pcm.length}: ${line}`);
+    return playCachedFillerPcm(found.pcm, { text: line, trace: false, kind: 'receipt' });
+  }
   /** Rolling interim hypothesis while agent is busy (for barge-in). */
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
@@ -2353,7 +2416,7 @@ mediaWss.on('connection', (ws, req) => {
     return waitMs;
   }
 
-  async function playCachedFillerPcm(pcm, { text, trace = true } = {}) {
+  async function playCachedFillerPcm(pcm, { text, trace = true, kind = 'filler' } = {}) {
     if (!pcm || !pcm.length) return { ok: false, empty: true };
     const streamId = newCachedFillerStreamId();
     bargeInActive = false;
@@ -2368,7 +2431,9 @@ mediaWss.on('connection', (ws, req) => {
     if (trace) {
       voiceTrace.noteFiller({ text: String(text || ''), before: String(text || ''), language: callLanguage });
     }
+    if (mediaClock) mediaClock.tag(kind);
     if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
+    if (mediaClock) mediaClock.tag('tts');
     const waitMs = pcmDurationMs(pcm, 16000);
     await sleep(waitMs);
     if (activePlaybackGeneration === gen) {
@@ -2570,6 +2635,10 @@ mediaWss.on('connection', (ws, req) => {
 
   async function speakToolHold(spoken) {
     if (!spoken?.speak || bargeInActive) return;
+    if (smooth.hold && spoken.kind === 'hold' && mediaClock) {
+      startHoldFill();
+      return;
+    }
     if (
       spoken.kind === 'hold' &&
       thinkingAckTurn &&
@@ -2753,6 +2822,7 @@ mediaWss.on('connection', (ws, req) => {
 
   function cancelSpeech(reason) {
     voiceTrace.noteBarge({ reason: String(reason || '') });
+    if (smooth.any) stopHoldFill();
     const endingGen = activePlaybackGeneration;
     clearFillerTimer();
     idleNudge.clear();
@@ -3685,6 +3755,7 @@ mediaWss.on('connection', (ws, req) => {
 
       function stopFillerForReply() {
         clearFillerTimer();
+        if (smooth.any) stopHoldFill();
         if (!fillerStarted) return;
         fillerStarted = false;
         // Drop filler PCM via generation bump + cancel ONLY the filler stream.
@@ -4226,7 +4297,8 @@ mediaWss.on('connection', (ws, req) => {
             acked: ackPlayedTurn === turnTiming,
           });
           callTranscript.pushAgent(outcomeLine);
-          await speakText(outcomeLine);
+          if (smooth.any) stopHoldFill();
+          await ((smooth.receipt && playCachedReceipt(outcomeLine)) || speakText(outcomeLine));
           spokeThisTurn = true;
         }
       } else if (owedConfirmFoldEnabled() && owedReceiptForFold && !bargeInActive) {
@@ -4863,6 +4935,17 @@ mediaWss.on('connection', (ws, req) => {
                 `[ws/media][${sidLabel()}] filler pcm warmed n=${result.warmed}`
               );
             }
+            // Item 4: hold + common receipt packs, same voice x lang x speed key.
+            if (!smooth.prefetch) return null;
+            return warmFillerAckPcm({
+              tts,
+              voiceId: tenantSonioxVoiceId,
+              extraLexicon: ttsLexiconOverrides,
+              phrases: toolSmooth.warmPhrases(),
+              shouldAbort: () => speechOutageStarted || turnBusy || !tts,
+            }).then((r) => {
+              if (r?.warmed) console.log(`[ws/media][${sidLabel()}] tool-smooth pcm warmed n=${r.warmed}`);
+            });
           })
           .catch(() => {});
       }
