@@ -20,11 +20,11 @@ const textOf = (t) => rows(t, 'tts').filter((r) => !r.filler).map((r) => String(
     turns.forEach((t, i) => {
       const filler = String(fillerOf(t)).trim(); const text = textOf(t);
       b.push({ filler, text });
-      tr.beginTurn({ callerText: fx.turns?.[i]?.caller || '' });
+      const callerText = fx.turns?.[i]?.caller || fx.turns?.[i]?.text || ''; tr.beginTurn({ callerText });
       const tool = rows(t, 'tool').length > 0;
       let f2 = '';
-      if (filler) { const p = A.pickRuleFiller({ lang: /^(mm|sawa|haya|poa)/i.test(filler) ? 'sw' : 'en', toolTurn: tool, tracker: tr }); f2 = p.text; tr.noteHeard(f2); }
-      const t2 = A.applyAckBackstop(text, { tracker: tr, acked: A.isAckLed(f2) }); tr.noteHeard(t2);
+      if (filler) { const p = A.pickRuleFiller({ lang: /^(mm|sawa|haya|poa)/i.test(filler) ? 'sw' : 'en', toolTurn: tool, tracker: tr, callerText }); f2 = p ? p.text : ''; if (f2) tr.noteHeard(f2); }
+      const t2 = A.applyAckBackstop(text, { tracker: tr, acked: !!f2 }); tr.noteHeard(t2);
       a.push({ filler: f2, text: t2 });
     });
     const sb = A.scoreAckRule(b); const sa = A.scoreAckRule(a);
