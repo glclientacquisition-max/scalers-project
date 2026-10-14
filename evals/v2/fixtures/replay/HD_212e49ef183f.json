@@ -1,0 +1,117 @@
+{
+ "id": "R_HD_212e49ef183f",
+ "sid": "HD_212e49ef183f",
+ "env": "staging",
+ "tenant": "done_and_dusted",
+ "createdAt": "2026-10-14T07:36:09.495399+00:00",
+ "callerPhone": "+254700000009",
+ "replayMode": "recorded-model",
+ "lang": "en",
+ "commitment": true,
+ "turns": [
+  {
+   "caller": "Eeh, habari.",
+   "model": "",
+   "agent": "Am I speaking with Alvin?",
+   "lang": "unknown",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 341,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Yes, I'm speaking with Alvin.",
+   "model": "",
+   "agent": "Is this about the carpet Cleaning, per room, or something new?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 274,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "I think it's something new",
+   "model": "",
+   "agent": "Which request do you mean?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 363,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "I need to book window cleaning for Friday, and.",
+   "model": "Karibu, Alvin. Where should we come for the window cleaning on Friday?",
+   "agent": "Karibu, Alvin. Where should we come for the window cleaning on Friday?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Uh, around Kitengela.",
+   "model": "What time on Friday would you like us to come for the window cleaning in Kitengela?",
+   "agent": "What time on Friday would you like us to come for the window cleaning in Kitengela?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 410,
+    "callerStopToModelFirstTokenMs": 1478
+   }
+  },
+  {
+   "caller": "Saa 4",
+   "model": "###TOOL###\n{\"create_appointment\":{\"location\":\"Kitengela\",\"name\":\"Alvin\",\"notes\":\"Confirm access/gate details upon arrival\",\"service_name\":\"Interior Window Cleaning\",\"when_text\":\"Friday at 10:00 AM (Saa 4)\"}}\n###ENDTOOL###",
+   "agent": "Tell me your name and when you will pick up so I can save the hold.",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 414,
+    "callerStopToModelFirstTokenMs": 1346
+   }
+  },
+  {
+   "caller": "Uh, saa 4. I thought you have my name.",
+   "model": "###TOOL### {\"create_appointment\":{\"location\":\"Kitengela\",\"name\":\"Alvin\",\"notes\":\"Confirm access upon arrival\",\"service_name\":\"Interior Window Cleaning\",\"when_text\":\"Friday at 10:00 AM (saa 4)\"}} ###ENDTOOL###",
+   "agent": "Tell me your name and when you will pick up so I can save the hold.",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 407,
+    "callerStopToModelFirstTokenMs": 1546
+   }
+  }
+ ],
+ "observed": {
+  "service_requests": [
+   {
+    "type": "callback",
+    "status": "open",
+    "item": "Interior Window Cleaning",
+    "quantity": null,
+    "when_text": "saa 4",
+    "caller_name": "Alvin",
+    "window_start": null,
+    "notes": "Call ended before saving. Captured: service Interior Window Cleaning; when saa 4; place around Kitengela. Owner to call back."
+   }
+  ],
+  "appointments": [],
+  "resolution": "needs_human",
+  "resolution_note": "Alvin wanted Interior Window Cleaning around Kitengela for Friday at saa 4.",
+  "primary_intent": "human",
+  "ownerBody": "New missed-call lead. Done and Dusted Cleaning Services\nName: Alvin\nPhone: +2547XXXXXXXX\nReason: Alvin asked about saa 4. I thought you have my name.\nIntent: book_visit\nOutcome: Slots are complete. Append create_appointment and speak nothing. Do not tell the caller it is booked; the backend speaks the outcome.\nOpen call: https://scalers-staging.vercel.app/calls/199a59d8-0cb2-44e7-9eec-9e5fb8a15f2d\n---\nNew missed-call lead. Done and Dusted Cleaning Services\nName: Alvin\nPhone: +2547XXXXXXXX\nReason: Alvin asked about saa 4. I thought you have my name.\nIntent: book_visit\nOutcome: Slots are complete. Append create_appointment and speak nothing. Do not tell the caller it is booked; the backend speaks the outcome.\nOpen call: https://scalers-staging.vercel.app/calls/199a59d8-0cb2-44e7-9eec-9e5fb8a15f2d"
+ },
+ "expect": {
+  "appointments": 1,
+  "service_requests": 0,
+  "appointment": {
+   "service": "window",
+   "startEAT": "2026-10-16 10:00"
+  }
+ },
+ "label": {
+  "by": "brain-lead",
+  "why": "Alvin confirmed, asked window cleaning Friday in Kitengela at saa 4. Correct outcome: one appointment Fri 16 Oct 10:00 EAT, no callback/hold row, name not re-asked, owner email free of instructions."
+ },
+ "seed": {
+  "contactName": "Alvin"
+ }
+}

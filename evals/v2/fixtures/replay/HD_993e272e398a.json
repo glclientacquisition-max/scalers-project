@@ -1,0 +1,59 @@
+{
+ "id": "R_HD_993e272e398a",
+ "sid": "HD_993e272e398a",
+ "env": "staging",
+ "tenant": "done_and_dusted",
+ "createdAt": "2026-10-07T16:29:20.866385+00:00",
+ "callerPhone": "+254700000009",
+ "replayMode": "transcript-only",
+ "lang": "en",
+ "commitment": false,
+ "turns": [
+  {
+   "caller": "How much is it?",
+   "model": "",
+   "agent": "I am here to help, Alvin. Would you like to set up a carpet cleaning visit, or is there another service you need? I don't have that on file. I can note it for the team. Would you like to schedule a visit? CATALOGUE MOUTH: We offer couch cleaning, mattress cleaning, carpet cleaning, general cleaning for houses and Airbnbs, and pet stain removal. Which service would you like? Would you like to book a cleaning visit for your carpet?"
+  },
+  {
+   "caller": "Fuck.",
+   "model": "",
+   "agent": ""
+  },
+  {
+   "caller": "Yes.",
+   "model": "",
+   "agent": ""
+  },
+  {
+   "caller": "Ni pesa ngapi?",
+   "model": "",
+   "agent": ""
+  },
+  {
+   "caller": "Uh, tell me more about carpet.",
+   "model": "",
+   "agent": ""
+  },
+  {
+   "caller": "Uh, how are you doing? I wanted to know which service is you offer.",
+   "model": "",
+   "agent": "Am I speaking with Alvin? Ungetaka tukupangie siku ya kuja kusafisha?"
+  }
+ ],
+ "observed": {
+  "service_requests": [],
+  "appointments": [],
+  "resolution": "needs_human",
+  "resolution_note": "Alvin asked about Ni pesa ngapi.",
+  "primary_intent": "human",
+  "ownerBody": null
+ },
+ "expect": {
+  "noWrites": true
+ },
+ "label": {
+  "by": "brain-lead",
+  "why": "Price/services enquiry. 'CATALOGUE MOUTH:' instruction was spoken. Nothing written; no instruction text spoken."
+ },
+ "seed": {}
+}
