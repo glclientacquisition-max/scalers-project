@@ -138,3 +138,12 @@ test('a services question that says "usafi" is an enquiry, not a booking', async
   const { st, log } = await talk(['Saizi gani mnatoa za usafi?']);
   assert.equal(st.intent, null); assert.equal(log.length, 0);
 });
+
+test('live-run regressions: no double question, recall beats services, a question drops an open callback offer', async () => {
+  const a = await talk(['tulikuwa tumeongea na wewe jana kuhusu usafi fulani.', 'Eeh, mnawashangaa nini?']);
+  assert.ok((a.out[1].line.match(/\?/g) || []).length <= 1, a.out[1].line);
+  const b = await talk(['Ni huduma gani nilikuwa nimeitisha, mara ya mwisho?']);
+  assert.match(b.out[0].line, /Sioni booking/);
+  const c = await talk(['Uh, I don\'t know.', 'Maybe you tell me.', 'For sure.', 'Nilikuwa nataka kujua ni services gani mna-offer,na.']);
+  assert.match(c.out[3].line, /^Tunafanya/);
+});

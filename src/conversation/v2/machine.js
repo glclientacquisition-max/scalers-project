@@ -297,6 +297,8 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   const out = (line, extra = {}) => { const l = line === state.lastLine && line ? `${line}` : line; state.lastLine = l; return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
 
   // 1) read-back pending: commit only on the caller's yes
+  // a new question while a callback offer is open drops the offer and answers the question
+  if (state.phase === 'readback' && state.pending?.tool === 'create_handoff' && !u.yes && u.intents.some((i) => INFO.includes(i))) resetIntent(state);
   if (state.phase === 'readback' && state.pending) {
     const p = state.pending;
     mergeSlots(state, u, profile);
@@ -334,14 +336,14 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   // model may only propose book/order when our own reading found no intent at all
   if (!state.intent && mc && !u.intents.length) { const ok = mc.calls.find((c, i) => mc.checks[i].ok && /^(create_booking|create_order)$/.test(c.name)); if (ok && (u.service || u.products.length)) state.intent = INTENT_OF_TOOL[ok.name]; }
   // info questions answered without dropping a transaction in progress
-  const infoKind = u.intents.find((i) => INFO.includes(i) && i !== 'want_know') || u.intents.find((i) => i === 'want_know') || (!ni && state.lastInfo === 'price' && (u.service || u.products.length) ? 'price' : null);
+  const infoKind = (u.intents.includes('recall') ? 'recall' : null) || u.intents.find((i) => INFO.includes(i) && i !== 'want_know') || u.intents.find((i) => i === 'want_know') || (!ni && state.lastInfo === 'price' && (u.service || u.products.length) ? 'price' : null);
   if (infoKind && (!ni || ni === 'book' && infoKind === 'availability' && !/\bbook\b/i.test(u.text))) {
     if (state.intent === 'book' && infoKind === 'availability' && !/\bbook|kubook\b/i.test(u.text) && state.stateIntentTurn === state.turn) state.intent = null;
     if (!state.intent || state.stateIntentTurn !== state.turn) {
       state.lastInfo = infoKind;
       if (!state.intent) mergeSlots(state, u, profile);
       const line = infoAnswer(state, u, profile, infoKind);
-      if (state.intent) { mergeSlots(state, u, profile); const st = stepIntent(state, u, profile); return out(st?.line ? `${line.replace(/\s*(Anything else\?|Kuna kingine\?)$/, '')} ${st.line}` : line); }
+      if (state.intent) { mergeSlots(state, u, profile); if (/\?\s*$/.test(line.replace(/\s*(Anything else\?|Kuna kingine\?)$/, ''))) return out(line); const st = stepIntent(state, u, profile); return out(st?.line ? `${line.replace(/\s*(Anything else\?|Kuna kingine\?)$/, '')} ${st.line}` : line); }
       return out(line);
     }
   }
