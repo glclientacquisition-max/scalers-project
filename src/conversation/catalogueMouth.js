@@ -420,11 +420,6 @@ function shapeCatalogueMouth(text, opts = {}) {
   const items = itemsFrom(profile, state);
   const raw = stripControlLabel(text);
 
-  // BRAIN_TRUST_P1: an empty model reply (tool-only turn, e.g. a handover)
-  // is not a catalogue turn. Inventing "Which service do you need?" here
-  // spoke over a successful escalation (HD_9904b41a8ba9). Let the tool
-  // outcome line speak instead.
-  if (!raw.trim() && String(process.env.BRAIN_TRUST_P1 || '').trim() === 'on') return '';
   if (state?.caller?.nameJustConfirmed) {
     const fileLine = unsaidPublicCatalogue(callerText, state, profile, language);
     if (fileLine && stripControlLabel(raw).trim() === fileLine) return fileLine;

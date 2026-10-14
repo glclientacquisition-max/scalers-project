@@ -1,4 +1,3 @@
-delete process.env.VOICE_REPAIR_WHO;
 // Turn-taking unit tests.
 // Run: node tests/turnTaking.test.js
 

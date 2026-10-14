@@ -693,53 +693,9 @@ function coverageNextStepQuestion(language = 'en', state = null) {
  * (HD_72ab69cbab2b T5: "Yes, we cover Kitengela." then five seconds of
  * silence); an uncovered town ends on the note offer.
  */
-/**
- * BRAIN_TRUST_P1 coverage parsing (generic; see placeAsk.js):
- * area-list question → the tenant's own list; a pending "Did you mean X?"
- * answered yes → X; a one-edit mishearing → confirm once; foreign place →
- * the outside-Kenya line; possessive / question-word lead-ins stripped.
- */
-function trustCoverageTurn(text, profile, language, state, placeAsk) {
-  const t = state ? (state.trust = state.trust || {}) : {};
-  const sw = /^(?:sw|sheng|swahili)/i.test(String(language || ''));
-  const { looksLikeShortAffirmation } = require('./callCorrectives');
-  if (t.placeConfirm && t.placeConfirm.pending) {
-    const pending = t.placeConfirm.place;
-    t.placeConfirm = { place: pending, pending: false };
-    if (looksLikeShortAffirmation(text)) return { place: pending, line: '' };
-  }
-  if (placeAsk.asksAreaList(text)) {
-    const names = require('./coverageAreas').coverageAreaNames(profile?.businessPolicies || profile?.policies || {});
-    if (names.length) {
-      const list = names.length > 1 ? `${names.slice(0, -1).join(', ')}${sw ? ' na ' : ' and '}${names[names.length - 1]}` : names[0];
-      const next = coverageNextStepQuestion(language, state);
-      return { place: '', line: sw ? `Tunafika ${list}. ${next}` : `We cover ${list}. ${next}` };
-    }
-  }
-  let place = placeAsk.coverageAskPlaceGeneric(text);
-  if (!place) return { place: '', line: '' };
-  const { isForeignPlace, outsideKenyaLine } = require('./outsideAreas');
-  if (isForeignPlace(place)) return { place: '', line: outsideKenyaLine(language) };
-  const near = placeAsk.nearMissPlace(place);
-  if (near && !(t.placeConfirm && t.placeConfirm.place === near)) {
-    t.placeConfirm = { place: near, pending: true };
-    return { place: '', line: placeAsk.placeConfirmLine(near, language) };
-  }
-  if (near) place = near;
-  const fixes = require('./callFixesD199');
-  if (fixes.callFixesD199Enabled() && !fixes.coverageRealPlace(place)) return { place: '', line: '' };
-  return { place, line: '' };
-}
-
 function coverageAskSpeech(text, profile = {}, language = 'en', state = null) {
   if (String(profile?.vertical || '').toLowerCase() !== 'home_services') return '';
-  let rawPlace = coverageAskPlace(text);
-  const placeAsk = require('./placeAsk');
-  if (placeAsk.trustOn()) {
-    const trusted = trustCoverageTurn(text, profile, language, state, placeAsk);
-    if (trusted.line) return trusted.line;
-    rawPlace = trusted.place;
-  }
+  const rawPlace = coverageAskPlace(text);
   if (!rawPlace) return '';
   const place = foldCanonicalPlace(rawPlace, profile) || rawPlace;
   const coverage = coverageStatus(place, profile);

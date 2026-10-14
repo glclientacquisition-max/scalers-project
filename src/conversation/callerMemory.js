@@ -811,15 +811,13 @@ function applyLiveCallerFile(profile, state) {
   return { changed: liveCallerFileStamp(next) !== before };
 }
 
-function returningFileFromCard(rawCard) {
-  if (!rawCard || typeof rawCard !== 'object') return null;
-  // BRAIN_TRUST_P1: every D199 file line / call-state reader sees the policy view only.
-  const card = require('./callerHistoryPolicy').filterCard(rawCard);
+function returningFileFromCard(card) {
+  if (!card || typeof card !== 'object') return null;
   const identityBound = Boolean(card.identityBound);
   const fileRole = card.fileRole || null;
   const usable = returningFileUsable({ ...card, fileRole, identityBound });
   const fileOwnerName = fileOwnerNameOf(card);
-  const hasOpenRows = card.historyPolicy ? Boolean(card.hasOpenRows) : Boolean(
+  const hasOpenRows = Boolean(
     (Array.isArray(card.openVisits) && card.openVisits.length) ||
       (Array.isArray(card.openRequests) && card.openRequests.length) ||
       // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 3): only set with the flag on.
@@ -877,10 +875,8 @@ function stillOpenUseLine() {
   return '- Use: do not read open visits, holds, callbacks, or orders unless the caller asks about them. If they ask, say each still-open line (job, when, place; only fields present), one sentence each, then one question. Treat CALL STATE as fact. Do not read them on the turn the name is confirmed. If they want one moved or cancelled, update that one. History only if they mention that job. New ask wins. Do not invent extra visits. Do not re-ask the name. If they ask and no Open line remains, you may say nothing is still open.';
 }
 
-function formatReturningCallerForPrompt(rawCard) {
-  if (!rawCard || typeof rawCard !== 'object') return '';
-  // BRAIN_TRUST_P1: the prompt card is the policy view only.
-  const card = require('./callerHistoryPolicy').filterCard(rawCard);
+function formatReturningCallerForPrompt(card) {
+  if (!card || typeof card !== 'object') return '';
   const usable = returningFileUsable(card);
   const known = speakerKnownOnFile(card);
   const fileWho = card.fileOwnerName || card.name;
@@ -940,8 +936,7 @@ function formatReturningCallerForPrompt(rawCard) {
       card.nextVisit ||
       card.lastReason ||
       (Array.isArray(card.openRequests) && card.openRequests.length) ||
-      (Array.isArray(card.recentBookings) && card.recentBookings.length) ||
-      (card.historyPolicy && card.hasOpenRows) // masked by the history policy
+      (Array.isArray(card.recentBookings) && card.recentBookings.length)
     );
     lines.push(
       mayHaveVisit
@@ -1102,88 +1097,12 @@ async function attachCallerMemory(profile, deps = {}) {
   return profile;
 }
 
-
-/**
- * Tier-gated caller card for CALLER_MEMORY_V2.
- * T0: nothing. T1: known + open_task_count only (shared_line caps here).
- * T2: primary_name, last_topic, task one-liners. Never leaks string fields at T1.
- */
-function buildTieredCallerMemoryCard({ tier = 0, file = null, openTasks = [], sharedLine = false } = {}) {
-  const t = Number(tier) || 0;
-  if (t <= 0) return null;
-
-  const tasks = Array.isArray(openTasks) ? openTasks : [];
-  const openCount = tasks.filter((row) => {
-    const status = String(row?.status || '').toLowerCase();
-    if (row?.closed_at) return false;
-    if (status === 'fulfilled' || status === 'cancelled' || status === 'done') return false;
-    return true;
-  }).length;
-
-  const lineShared = Boolean(sharedLine || file?.shared_line || file?.sharedLine);
-  const effective = lineShared && t >= 2 ? 1 : t;
-
-  if (effective === 1) {
-    return {
-      known: true,
-      open_task_count: openCount,
-      openTaskCount: openCount,
-      sharedLine: lineShared,
-      tier: 1,
-    };
-  }
-
-  const primary =
-    (file && (file.primary_name || file.primaryName || file.name)) || null;
-  const topic = (file && (file.last_topic || file.lastTopic)) || null;
-  const preferredLang =
-    (file && (file.preferred_lang || file.preferredLang)) || null;
-
-  const taskLines = tasks
-    .filter((row) => {
-      const status = String(row?.status || '').toLowerCase();
-      if (row?.closed_at) return false;
-      if (status === 'fulfilled' || status === 'cancelled' || status === 'done') return false;
-      return true;
-    })
-    .slice(0, 8)
-    .map((row) => {
-      const type = String(row?.type || '').trim();
-      const item = String(row?.summary_item || row?.summaryItem || row?.item || '').trim();
-      const when = String(row?.when_text || row?.whenText || '').trim();
-      const next = String(row?.next_step || row?.nextStep || '').trim();
-      const bits = [type, item, when, next].filter(Boolean);
-      const line = bits.join(' | ');
-      return line ? line.slice(0, 120) : null;
-    })
-    .filter(Boolean);
-
-  return {
-    known: true,
-    open_task_count: openCount,
-    openTaskCount: openCount,
-    sharedLine: lineShared,
-    tier: 2,
-    primary_name: primary ? String(primary).slice(0, 60) : null,
-    primaryName: primary ? String(primary).slice(0, 60) : null,
-    last_topic: topic ? String(topic).slice(0, 60) : null,
-    lastTopic: topic ? String(topic).slice(0, 60) : null,
-    preferred_lang: preferredLang || null,
-    preferredLang: preferredLang || null,
-    open_tasks: taskLines,
-    openTasks: taskLines,
-    memory_notice_shown_at:
-      file?.memory_notice_shown_at || file?.memoryNoticeShownAt || null,
-  };
-}
-
 module.exports = {
   CLIP,
   applyLiveCallerFile,
   attachCallerMemory,
   bindCallerMemoryCard,
   buildCallerMemoryCard,
-  buildTieredCallerMemoryCard,
   clip,
   formatReturningCallerForPrompt,
   formatReturningFileForCallState,

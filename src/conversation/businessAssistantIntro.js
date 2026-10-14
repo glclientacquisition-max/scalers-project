@@ -237,10 +237,9 @@ function composeOpenerIdentity(opts = {}) {
  * @returns {string}
  */
 function wantsLanguageInvite(opts = {}) {
-  // Alvin 13 Oct: the language invite is dropped everywhere; the tenant
-  // greeting is spoken as is. Kept as a function so callers stay unchanged.
-  void opts;
-  return false;
+  if (opts.requireLanguageInvite === true) return true;
+  const vertical = String(opts.vertical || '').trim().toLowerCase();
+  return vertical === 'home_services' || vertical === 'homeservices' || vertical === 'home_service';
 }
 
 function languageInviteClause(opts = {}) {

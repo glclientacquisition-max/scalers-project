@@ -82,7 +82,6 @@ function tokensFromSonioxMessage(msg) {
           language,
           startMs,
           endMs,
-          confidence: typeof token.confidence === 'number' ? token.confidence : null,
         });
         if (token.is_final) finals += cleaned;
         else interim += cleaned;
@@ -95,7 +94,6 @@ function tokensFromSonioxMessage(msg) {
       language,
       startMs,
       endMs,
-      confidence: typeof token.confidence === 'number' ? token.confidence : null,
     });
     if (token.is_final) finals += token.text;
     else interim += token.text;

@@ -477,7 +477,6 @@ function observeCallerTurn(state, input = {}) {
 
   next.conversation.turnCount += 1;
   next.conversation.stage = next.goal.status === 'unknown' ? 'discovery' : 'understanding';
-  next.conversation.lastCallerText = String(text || '').slice(0, 400);
   next.conversation.hearAgain = isHearAgainSignal(text);
   next.conversation.phatic = looksLikePhaticCallerTurn(text);
   // Okay after "Should I continue?" is a yes. Okay anywhere else is a filler.
@@ -583,23 +582,6 @@ function observeCallerTurn(state, input = {}) {
       lastAgentText: input.lastAgentText,
     }
   );
-  // BRAIN_TRUST_P1 v3: the ONE name controller. An answer to the pending
-  // name ask (any path asked it) binds here, so "Alvin." after "May I have
-  // your name?" is never left unbound (HD_c19044667595).
-  {
-    const trustP1 = require('./trustP1');
-    const pending = trustP1.pendingNameAsk(state);
-    if (pending && !nameResolution.nameConfirmed && !state?.messageOnly) {
-      const answered = trustP1.nameFromAnswer(text);
-      if (answered) {
-        const { entity } = require('./entityExtraction');
-        nameResolution.name = answered;
-        nameResolution.nameConfirmed = true;
-        nameResolution.nameCollision = null;
-        nameResolution.entities = { ...(nameResolution.entities || {}), name: entity(answered, 'caller_name_answer', 0.95, true) };
-      }
-    }
-  }
   next.entities = { ...next.entities, ...nameResolution.entities };
   const wasNameConfirmed = Boolean(state?.caller?.nameConfirmed);
   next.caller.name = nameResolution.name || null;
@@ -623,30 +605,7 @@ function observeCallerTurn(state, input = {}) {
   } else if (!next.caller.name) {
     delete next.entities.name;
   }
-  // BRAIN_TRUST_P1: confidence / spelling / common-word / staff rules (callerNameControl.js).
-  {
-    const nameControl = require('./callerNameControl');
-    nameControl.noteCallerTurn(next, text);
-    nameControl.afterNameResolution(state, next, input);
-    // BRAIN_TRUST_P1 (HD_212e49ef183f): "Saa 4" after "Friday" keeps the day.
-    if (require('./trustP1').trustP1Enabled()) {
-      const val = (w) => String((w && typeof w === 'object' ? w.value : w) || '').trim();
-      const DAY = /\b(?:today|tomorrow|tonight|leo|kesho|keshokutwa|day after tomorrow|(?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili|wiki ijayo|\d{1,2}[/-]\d{1,2})\b/i;
-      const before = val(state?.entities?.when);
-      const now = val(next.entities?.when);
-      if (before && now && now !== before && /\bsaa\b/i.test(now) && !DAY.test(now) && DAY.test(before)) {
-        const day = before.match(DAY)[0];
-        next.entities.when = { ...(typeof next.entities.when === 'object' ? next.entities.when : {}), value: `${day} ${now}` };
-      }
-    }
-    const ci = require('./callerInfoTrust');
-    if (ci.on()) {
-      next.trust = next.trust || {};
-      next.trust.requiredHint = ci.requiredFieldHint(input.profile || {}, next, next.language?.current || 'en');
-    }
-  }
   next.caller.nameJustConfirmed = !wasNameConfirmed && next.caller.nameConfirmed === true;
-  if (next.caller.nameConfirmed && next.trust) require('./trustP1').settleNameAsk(next, { bound: true });
   applyLiveCallerFile(input.profile, next);
   next.caller.boundRole = next.caller.nameConfirmed
     ? next.returning?.fileRole || null
@@ -750,9 +709,7 @@ function observeCallerTurn(state, input = {}) {
     'home_services';
   const homeVisit = homeVertical && next.intent === 'booking';
   if (homeVertical) {
-    // BRAIN_TRUST_P1: the generic parser (lead-ins, SW verbs, greetings) — see placeAsk.js.
-    const placeAskMod = require('./placeAsk');
-    const askedPlace = placeAskMod.trustOn() ? placeAskMod.coverageAskPlaceGeneric(text) : coverageAskPlace(text);
+    const askedPlace = coverageAskPlace(text);
     if (askedPlace) {
       const foldedAsk = foldCanonicalPlace(askedPlace, input.profile) || askedPlace;
       // BRAIN_CONFIRMED_COVERAGE: a place we cannot answer from the confirmed
@@ -864,10 +821,6 @@ function observeCallerTurn(state, input = {}) {
     next.goal.missingSlots = next.goal.missingSlots.filter(
       (slot) => !['location', 'area', 'landmark'].includes(slot)
     );
-  }
-  // BRAIN_TRUST_P1: a greeting phrase is never the caller's place (echo of our greeting).
-  if (require('./placeAsk').trustOn() && next.entities?.location && require('./placeAsk').isGreetingPhrase(next.entities.location.value || next.entities.location)) {
-    delete next.entities.location;
   }
   return next;
 }
@@ -1257,18 +1210,6 @@ function ownedFileAsk(returning, caller) {
 }
 
 function formatNameConfirmForPrompt(state) {
-  // BRAIN_TRUST_P1: the name controller speaks first when it has a specific
-  // instruction (refusal, candidate, re-ask, cap, readback); otherwise the
-  // existing lines run, and its generic "ask only when needed" fills a gap.
-  const nameControl = require('./callerNameControl');
-  const specific = nameControl.nameAskHint(state, { specificOnly: true });
-  if (specific) return specific;
-  const legacy = formatNameConfirmLegacy(state);
-  if (legacy) return legacy;
-  return nameControl.nameAskHint(state) || '';
-}
-
-function formatNameConfirmLegacy(state) {
   if (state?.messageOnly) {
     const locked = String(state?.caller?.name || '').trim();
     if (state?.caller?.nameConfirmed && locked) {
@@ -1366,7 +1307,6 @@ function formatBrainStateForPrompt(state) {
     `- Repair failures: ${value.repair.failureCount}`,
     `- ${formatRepairForPrompt(value)}`,
     formatNameConfirmForPrompt(value),
-    require('./callerInfoTrust').on() ? String(value?.trust?.requiredHint || '') : '',
     formatHearAgainForPrompt(value),
     formatReturningFileForCallState(
       value.messageOnly
@@ -1403,9 +1343,7 @@ function formatBrainStateForPrompt(state) {
         : value.caller?.fileNameAsked
         ? value.caller?.fileNameAskSpoken === true
           ? `- Phatic turn: one short well, then offer help. File name ${value.caller.fileNameAsked} already asked. Do not ask for a name. Do not talk about visits yet. Do not say nothing is open.`
-          : require('./callerNameControl').nameAskHint(value) !== null
-            ? '- Phatic turn: one short well, then offer help. Do not ask who is speaking yet. Do not talk about visits yet. Do not say nothing is open.'
-            : `- Phatic turn: one short well, then ask once: Am I speaking with ${value.caller.fileNameAsked}? Do not talk about visits yet. Do not say nothing is open.`
+          : `- Phatic turn: one short well, then ask once: Am I speaking with ${value.caller.fileNameAsked}? Do not talk about visits yet. Do not say nothing is open.`
         : speakerPendingOnFile(value.returning)
         ? '- Phatic turn: one short well, then offer help. Do not ask who is speaking. Do not use the file name. Do not list services.'
         : value.returning?.nextVisit && returningFileUsable(value.returning)

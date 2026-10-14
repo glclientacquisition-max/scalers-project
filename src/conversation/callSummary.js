@@ -22,11 +22,6 @@ function clean(value, max = 280) {
 }
 
 function safeCallerName(state) {
-  // CALLER_INFO_P1: the owner summary carries a confirmed name only.
-  if (require('./callerInfoTrust').on()) {
-    const held = state.caller?.nameConfirmed ? clean(state.caller?.name, 80) : '';
-    return held && isPlausibleCallerName(held) ? held : null;
-  }
   const raw = clean(state.caller?.name || entityValue(state.entities?.name), 80);
   return isPlausibleCallerName(raw) ? raw : null;
 }
@@ -133,14 +128,8 @@ function deriveCallSummary(opts = {}) {
     ) ||
     'Call completed.';
 
-  // CALLER_INFO_P1: receipts beat the summary (trustP1.validateSummary).
-  let checkedText = clean(text, 400);
-  if (require('./callerInfoTrust').on()) {
-    const ok = require('./trustP1').validateSummary(checkedText, results);
-    if (!ok) checkedText = clean(bits.filter((b) => !/^Actions:|^Products:/.test(b)).join('. ') || 'Call completed.', 400);
-  }
   return {
-    text: checkedText,
+    text: clean(text, 400),
     reason,
     primaryIntent,
     products,
@@ -169,17 +158,6 @@ function buildOwnerReason({ callerName, primaryIntent, goal, products, results }
   if (hold) {
     const item = hold.value?.item || products?.[0] || '';
     const when = hold.value?.whenText || hold.value?.when_text || '';
-    // CALLER_INFO_P1: the reason follows the saved request type.
-    if (require('./callerInfoTrust').on()) {
-      const type = String(hold.requestType || hold.value?.type || '').toLowerCase();
-      const verb = type === 'hold' || type === 'hold_or_pickup' ? 'left a hold'
-        : type === 'order' ? 'placed an order'
-        : /complaint/.test(String(item).toLowerCase()) || /complaint/i.test(String(hold.value?.notes || '')) ? 'made a complaint'
-        : /change/.test(type) || /change/.test(String(item)) ? 'asked for a change (needs you)'
-        : type === 'callback' ? 'asked for a call back'
-        : 'made an enquiry';
-      return clean([`${who} ${verb}`, item && !/complaint|change/.test(verb) ? item : '', when].filter(Boolean).join('. '), 220);
-    }
     return clean([`${who} left a hold`, item, when].filter(Boolean).join('. '), 220);
   }
   if (visit) {
