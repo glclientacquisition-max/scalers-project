@@ -623,6 +623,21 @@ function trustGreetingLine(greetingLine, profile) {
 const trustNoticeSpoken = new Map();
 const trustReadbackKeys = new Map();
 function finalizeSaveReadback(callSid, line, results, language) {
+  const out = finalizeSaveReadbackCore(callSid, line, results, language);
+  // CALLER_INFO_P1: offer the caller SMS once, after a real save, when the tenant turned it on.
+  const ci = require('./src/conversation/callerInfoTrust');
+  if (!out || !ci.on() || !callSid) return out;
+  const state = callBrainStates.get(callSid);
+  const channels = callTenantProfiles.get(callSid)?.notifyChannels;
+  const created = (results || []).some((r) => ['create_appointment', 'create_service_request'].includes(r.action) && r.status === 'succeeded');
+  if (!state || !created || !require('./src/notifications/callerSms').callerSmsEnabled(channels)) return out;
+  state.trust = state.trust || {};
+  if (state.trust.smsOffered) return out;
+  state.trust.smsOffered = true;
+  return `${out} ${ci.smsOfferLine(language)}`;
+}
+
+function finalizeSaveReadbackCore(callSid, line, results, language) {
   if (!line || !trustP1.trustP1Enabled() || !callSid) return line;
   const receipts = trustP1.receiptsOf(results || []);
   if (!receipts.length) return line;
@@ -652,6 +667,21 @@ function finalizeSaveReadback(callSid, line, results, language) {
   const parts = String(line).trim().split(/(?<=[.!?])\s+/);
   const q = parts.length > 1 && /\?$/.test(parts[parts.length - 1]) ? parts.pop() : '';
   return [...parts, notice, q].filter(Boolean).join(' ');
+}
+
+// CALLER_INFO_P1: caller SMS held until an in-call yes; sent once.
+const pendingCallerSms = new Map();
+async function flushPendingCallerSms(callSid, state) {
+  const args = pendingCallerSms.get(callSid);
+  if (!args || state?.trust?.smsConsent == null) return;
+  pendingCallerSms.delete(callSid);
+  if (state.trust.smsConsent !== true) return;
+  try {
+    const sent = await dispatchCallerSms({ ...args, consent: true, language: state.language?.current || args.language });
+    console.log(`[${callSid}] caller sms after in-call yes: ${sent.channel || sent.reason}`);
+  } catch (err) {
+    console.warn(`[${callSid}] caller sms after yes failed:`, err?.message || err);
+  }
 }
 
 // BRAIN_TRUST_P1: a confirmed name that differs from the file owner is a correction; store once per call.
@@ -1282,6 +1312,24 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
       brainState,
       callId: call?.id || null,
     });
+    // CALLER_INFO_P1: the call ended mid-capture; keep what the caller gave.
+    try {
+      const partial = require('./src/conversation/callerInfoTrust').partialHangupRequest(brainState);
+      if (partial) {
+        await db.createServiceRequest({
+          callSid,
+          type: partial.type,
+          name: partial.name,
+          phone: call?.from_number,
+          item: partial.item,
+          whenText: partial.whenText,
+          notes: partial.notes,
+        });
+        console.log(`[${callSid}] partial slots saved on hangup`);
+      }
+    } catch (err) {
+      console.warn(`[${callSid}] partial hangup save failed:`, err?.message || err);
+    }
     const summary = deriveCallSummary({ brainState });
     const primaryIntent = summary.primaryIntent || null;
     const saved = await db.setCallResolution({
@@ -3525,7 +3573,8 @@ mediaWss.on('connection', (ws, req) => {
       }
       // BRAIN_TRUST_P1: correction, address/payment change → owner callback,
       // "do you remember me", resume offer after bind. Code-authored lines.
-      const trustPlan = trustP1.planTrustTurn({
+      let trustPlan = null;
+      trustPlan = trustP1.planTrustTurn({
         text: clean,
         state: brainState,
         card: brainProfile?.callerMemory || null,
@@ -3534,9 +3583,21 @@ mediaWss.on('connection', (ws, req) => {
         language: callLanguage,
         nameJustConfirmed,
       });
-      if (trustPlan?.line) {
+      flushPendingCallerSms(callKey, brainState).catch(() => {});
+      if (trustPlan?.line || (trustPlan?.kind === 'apply' && trustPlan.parsed)) {
         let trustLine = trustPlan.line;
-        if (trustPlan.kind === 'callback' && trustPlan.parsed) {
+        if (trustPlan.kind === 'apply' && trustPlan.parsed) {
+          // CALLER_INFO_P1: confirmed cancel / confirmed save / complaint record.
+          callBrainStates.set(callKey, brainState);
+          const saved = await applyGeminiTools(callKey, trustPlan.parsed);
+          const results = saved?.results || [];
+          const ok = trustP1.receiptsOf(results).length > 0;
+          const toolLine = finalizeSaveReadback(callKey, formatToolConfirmation(results, callLanguage), results, callLanguage);
+          trustLine = trustPlan.parsed.trustComplaint
+            ? (ok ? trustPlan.line : trustPlan.failLine)
+            : toolLine || (/^(?:sw|sheng)/.test(String(callLanguage)) ? 'Samahani, sikuweza kukamilisha hilo sasa hivi.' : "Sorry, I couldn't complete that just now.");
+          brainState = callBrainStates.get(callKey) || brainState;
+        } else if (trustPlan.kind === 'callback' && trustPlan.parsed) {
           callBrainStates.set(callKey, brainState);
           const saved = await applyGeminiTools(callKey, trustPlan.parsed);
           const ok = trustP1.receiptsOf(saved?.results || []).length > 0;
@@ -5223,6 +5284,7 @@ mediaWss.on('connection', (ws, req) => {
     if (sessionCallSid) {
       trustNoticeSpoken.delete(sessionCallSid);
       trustNameCorrectionSaved.delete(sessionCallSid);
+      pendingCallerSms.delete(sessionCallSid);
       trustReadbackKeys.delete(sessionCallSid);
     }
     console.log(
@@ -5470,15 +5532,27 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       callerNumber: call.from_number,
       recordingUrl: call.recording_url,
     };
-    const body = buildEscalationText({
+    let body = buildEscalationText({
       ...lead,
       callerName: lead.name,
       teammate,
       requested: resolved.requested,
       match: resolved.match,
     });
+    const callerInfoP1 = require('./src/conversation/callerInfoTrust');
+    if (callerInfoP1.on()) {
+      // CALLER_INFO_P1: structured handover note (who, wants, urgency, details, flags, promise).
+      const heldState = callBrainStates.get(callSid) || {};
+      const note = callerInfoP1.handoverNote({
+        state: heldState,
+        phone: call.from_number,
+        reason: reason || call.reason || '',
+        returning: Boolean(callTenantProfiles.get(callSid)?.callerMemory?.contactId),
+      });
+      body = `${body}\n\n${note}`.slice(0, 1500);
+    }
 
-    const sent = await dispatchEscalationAlert({
+    const dispatchOnce = () => dispatchEscalationAlert({
       teammatePhone: teammate?.phone || null,
       teammateEmail: teammate?.email || null,
       ownerPhone: ownerNumber,
@@ -5495,6 +5569,31 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         force,
       },
     });
+    let escalationFallbackSaved = false;
+    let sent = await dispatchOnce();
+    if (callerInfoP1.on() && !sent.length) {
+      // CALLER_INFO_P1: one retry, then a callback row the Desk always shows.
+      await new Promise((r) => setTimeout(r, 1500));
+      sent = await dispatchOnce();
+      if (!sent.length) {
+        try {
+          await db.createServiceRequest({
+            callSid,
+            type: 'callback',
+            name: callerName || undefined,
+            phone: call.from_number,
+            item: 'handover',
+            whenText: 'today',
+            notes: `Handover alert failed on all channels. ${String(body).slice(0, 600)}`,
+          });
+          escalationFallbackSaved = true;
+          console.warn(`[${callSid}] ops: escalation alert failed after retry; fallback callback row saved`);
+          await db.mergeCallSummaryMeta({ callSid, patch: { escalation_fallback_callback: true } });
+        } catch (err) {
+          console.warn(`[${callSid}] ops: escalation fallback callback failed:`, err?.message || err);
+        }
+      }
+    }
 
     const transferQueued = await maybeQueueLiveTransfer({
       callSid,
@@ -5536,6 +5635,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         channel: null,
         reason: failed.reason,
         escalation_notify: failed,
+        fallbackCallback: escalationFallbackSaved,
       };
     }
 
@@ -5823,12 +5923,20 @@ async function maybeSendServiceRequestNotification(callSid, request) {
 
   const callerEvent = requestCallerEvent({ ...request, businessName });
   try {
-    const caller = await dispatchCallerSms({
+    const smsState = callBrainStates.get(callSid) || {};
+    const smsArgs = {
       to: request.caller_phone,
       event: callerEvent,
       channels: notifyChannels,
       ledger,
-    });
+      consent: smsState.trust?.smsConsent,
+      language: smsState.language?.current || 'en',
+    };
+    if (require('./src/conversation/callerInfoTrust').on() && smsState.trust?.smsConsent == null && callerEvent) {
+      // CALLER_INFO_P1: hold the SMS until the caller says yes in the call.
+      pendingCallerSms.set(callSid, smsArgs);
+    }
+    const caller = await dispatchCallerSms(smsArgs);
     if (caller.channel) {
       await db.mergeCallSummaryMeta({
         callSid,
@@ -5929,12 +6037,20 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     kind
   );
   try {
-    const caller = await dispatchCallerSms({
+    const smsState = callBrainStates.get(callSid) || {};
+    const smsArgs = {
       to: appointment.caller_phone,
       event: callerEvent,
       channels: notifyChannels,
       ledger,
-    });
+      consent: smsState.trust?.smsConsent,
+      language: smsState.language?.current || 'en',
+    };
+    if (require('./src/conversation/callerInfoTrust').on() && smsState.trust?.smsConsent == null && callerEvent) {
+      // CALLER_INFO_P1: hold the SMS until the caller says yes in the call.
+      pendingCallerSms.set(callSid, smsArgs);
+    }
+    const caller = await dispatchCallerSms(smsArgs);
     if (caller.channel) {
       await db.mergeCallSummaryMeta({
         callSid,
@@ -6311,6 +6427,37 @@ async function applyGeminiTools(callSid, parsed) {
       `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : enforcedParsed.fragmentBlocked ? 'fragment_turn' : 'needs_visit_time'}`
     );
   }
+  // CALLER_INFO_P1: tenant-required fields first, then one summary + yes
+  // before a costed save. Nothing is written until then.
+  {
+    const ci = require('./src/conversation/callerInfoTrust');
+    const creates = enforcedParsed && (enforcedParsed.appointment || enforcedParsed.serviceRequest);
+    if (ci.on() && creates && !enforcedParsed.brainRescue && !enforcedParsed.trustSaveConfirmed) {
+      const lang = state.language?.current || 'en';
+      const action = enforcedParsed.appointment ? 'create_appointment' : 'create_service_request';
+      const missing = ci.missingRequiredFields(groundedProfile, state);
+      let held = null;
+      if (missing.length) {
+        const hint = ci.requiredFieldHint(groundedProfile, state, lang);
+        const ask = (hint.match(/"([^"]+)"/) || [])[1] || '';
+        held = { action, status: 'held', code: 'required_field', askLine: ask, missingSlots: missing };
+      } else {
+        let whenLabel = '';
+        try {
+          const when = enforcedParsed.appointment?.whenText || enforcedParsed.serviceRequest?.whenText || '';
+          const resolved = when ? require('./src/conversation/appointmentHours').resolveAppointmentWhen(when) : null;
+          if (resolved?.ok) whenLabel = require('./src/conversation/appointmentHours').formatRequestedWhenLabel({ resolved }, lang);
+        } catch (_) { /* label is optional */ }
+        const gate = ci.gateCostedSave(enforcedParsed, { state, profile: groundedProfile, language: lang, whenLabel });
+        if (gate) held = { action, status: 'held', code: 'confirm_save', askLine: gate.line };
+      }
+      if (held) {
+        callBrainStates.set(callSid, state);
+        console.log(`[${callSid}] brain action=${held.action} status=held code=${held.code}`);
+        return { results: [held], state };
+      }
+    }
+  }
   const execution = await executeBrainTools({
     parsed: enforcedParsed,
     capabilities,
@@ -6334,6 +6481,10 @@ async function applyGeminiTools(callSid, parsed) {
     businessPolicies: groundedProfile.businessPolicies || null,
     businessLocations: groundedProfile.businessLocations || null,
     fieldMeta: groundedProfile.fieldMeta || null,
+    trustState: state,
+    callerText: String(state.conversation?.lastCallerText || ''),
+    language: state.language?.current || 'en',
+    callerOpenRequests: groundedProfile.callerMemory?.openRequests || [],
     handlers: {
       createServiceRequest: async (request) => {
         if (owedConfirmFoldEnabled()) {

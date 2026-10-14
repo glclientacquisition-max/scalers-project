@@ -24,7 +24,7 @@ const PERIOD_RANGES = {
 };
 
 const HOUR_TOKEN = '(\\d{1,2}|kumi na moja|kumi na mbili|moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi)';
-const MIN_TAIL = '(?:[:.](\\d{2})|\\s+na\\s+(nusu|robo))?';
+const MIN_TAIL = '(?:[:.](\\d{2})|\\s+na\\s+(nusu|robo)|\\s+kasoro\\s+(robo|dakika\\s+\\d{1,2}))?';
 const PERIOD = '(asubuhi|mchana|alasiri|jioni|usiku|alfajiri)';
 // "saa 8", "saa 8:00", "saa nane na nusu", "saa nane (za|ya) mchana";
 // a period may also lead: "kesho asubuhi saa tatu".
@@ -79,10 +79,19 @@ function swahiliClockSpans(text) {
   SAA_CLOCK.lastIndex = 0;
   let match;
   while ((match = SAA_CLOCK.exec(source))) {
-    const [full, leadPeriod, hourToken, mm, frac, trailPeriod] = match;
-    const hour = hourNumber(hourToken);
+    const [full, leadPeriod, hourTokenRaw, mm, frac, kasoro, trailPeriod] = match;
+    let hourToken = hourTokenRaw;
+    let hour = hourNumber(hourToken);
     if (!(hour >= 1 && hour <= 12)) continue;
-    const minute = mm != null ? Number(mm) : frac ? (frac.toLowerCase() === 'nusu' ? 30 : 15) : 0;
+    let minute = mm != null ? Number(mm) : frac ? (frac.toLowerCase() === 'nusu' ? 30 : 15) : 0;
+    if (kasoro) {
+      // "saa tatu kasoro robo" = a quarter to saa tatu = saa mbili, 45 min.
+      const less = /robo/i.test(kasoro) ? 15 : Number(String(kasoro).replace(/\D/g, '')) || 0;
+      if (!(less > 0 && less < 60)) continue;
+      hour = hour === 1 ? 12 : hour - 1;
+      hourToken = String(hour);
+      minute = 60 - less;
+    }
     if (minute > 59) continue;
     const period = String(trailPeriod || leadPeriod || '').toLowerCase();
     out.push({

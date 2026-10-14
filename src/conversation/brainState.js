@@ -477,6 +477,7 @@ function observeCallerTurn(state, input = {}) {
 
   next.conversation.turnCount += 1;
   next.conversation.stage = next.goal.status === 'unknown' ? 'discovery' : 'understanding';
+  next.conversation.lastCallerText = String(text || '').slice(0, 400);
   next.conversation.hearAgain = isHearAgainSignal(text);
   next.conversation.phatic = looksLikePhaticCallerTurn(text);
   // Okay after "Should I continue?" is a yes. Okay anywhere else is a filler.
@@ -627,6 +628,11 @@ function observeCallerTurn(state, input = {}) {
     const nameControl = require('./callerNameControl');
     nameControl.noteCallerTurn(next, text);
     nameControl.afterNameResolution(state, next, input);
+    const ci = require('./callerInfoTrust');
+    if (ci.on()) {
+      next.trust = next.trust || {};
+      next.trust.requiredHint = ci.requiredFieldHint(input.profile || {}, next, next.language?.current || 'en');
+    }
   }
   next.caller.nameJustConfirmed = !wasNameConfirmed && next.caller.nameConfirmed === true;
   if (next.caller.nameConfirmed && next.trust) require('./trustP1').settleNameAsk(next, { bound: true });
@@ -1349,6 +1355,7 @@ function formatBrainStateForPrompt(state) {
     `- Repair failures: ${value.repair.failureCount}`,
     `- ${formatRepairForPrompt(value)}`,
     formatNameConfirmForPrompt(value),
+    require('./callerInfoTrust').on() ? String(value?.trust?.requiredHint || '') : '',
     formatHearAgainForPrompt(value),
     formatReturningFileForCallState(
       value.messageOnly
