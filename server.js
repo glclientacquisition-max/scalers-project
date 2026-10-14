@@ -1331,6 +1331,13 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
       console.warn(`[${callSid}] partial hangup save failed:`, err?.message || err);
     }
     const summary = deriveCallSummary({ brainState });
+    {
+      // BRAIN_TRUST_P1: no model instructions in the owner summary or note.
+      const { stripInternal } = require('./src/conversation/internalText');
+      summary.text = stripInternal(summary.text) || summary.text && 'Call completed.';
+      summary.reason = stripInternal(summary.reason) || null;
+      if (derived && derived.resolutionNote) derived.resolutionNote = stripInternal(derived.resolutionNote) || null;
+    }
     const primaryIntent = summary.primaryIntent || null;
     const saved = await db.setCallResolution({
       callSid,
@@ -6417,6 +6424,20 @@ async function applyGeminiTools(callSid, parsed) {
     state,
     capabilities
   );
+  // BRAIN_TRUST_P1 (HD_212e49ef183f): a visit sent as create_service_request
+  // is booked as create_appointment with the Brain's held slots.
+  {
+    const routed = trustP1.routeVisitRequest(enforcedParsed, state, capabilities);
+    if (routed) {
+      console.log(`[${callSid}] trust routed visit request → create_appointment`);
+      Object.keys(enforcedParsed).forEach((k) => delete enforcedParsed[k]);
+      Object.assign(enforcedParsed, routed);
+    }
+    if (trustP1.trustP1Enabled() && enforcedParsed?.appointment && !String(enforcedParsed.appointment.whenText || enforcedParsed.appointment.when_text || '').trim()) {
+      const held = trustP1.heldWhen(state);
+      if (held) enforcedParsed.appointment = { ...enforcedParsed.appointment, whenText: held };
+    }
+  }
   // BRAIN_TRUST_P1 v3 save gate: a booking-intent request waits for its time.
   if (trustP1.trustP1Enabled() && enforcedParsed?.serviceRequest) {
     const missing = trustP1.saveMissingSlot(enforcedParsed.serviceRequest, state);
