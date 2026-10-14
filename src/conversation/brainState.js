@@ -622,6 +622,12 @@ function observeCallerTurn(state, input = {}) {
   } else if (!next.caller.name) {
     delete next.entities.name;
   }
+  // BRAIN_TRUST_P1: confidence / spelling / common-word / staff rules (callerNameControl.js).
+  {
+    const nameControl = require('./callerNameControl');
+    nameControl.noteCallerTurn(next, text);
+    nameControl.afterNameResolution(state, next, input);
+  }
   next.caller.nameJustConfirmed = !wasNameConfirmed && next.caller.nameConfirmed === true;
   if (next.caller.nameConfirmed && next.trust) require('./trustP1').settleNameAsk(next, { bound: true });
   applyLiveCallerFile(input.profile, next);
@@ -1234,6 +1240,18 @@ function ownedFileAsk(returning, caller) {
 }
 
 function formatNameConfirmForPrompt(state) {
+  // BRAIN_TRUST_P1: the name controller speaks first when it has a specific
+  // instruction (refusal, candidate, re-ask, cap, readback); otherwise the
+  // existing lines run, and its generic "ask only when needed" fills a gap.
+  const nameControl = require('./callerNameControl');
+  const specific = nameControl.nameAskHint(state, { specificOnly: true });
+  if (specific) return specific;
+  const legacy = formatNameConfirmLegacy(state);
+  if (legacy) return legacy;
+  return nameControl.nameAskHint(state) || '';
+}
+
+function formatNameConfirmLegacy(state) {
   if (state?.messageOnly) {
     const locked = String(state?.caller?.name || '').trim();
     if (state?.caller?.nameConfirmed && locked) {
@@ -1367,7 +1385,9 @@ function formatBrainStateForPrompt(state) {
         : value.caller?.fileNameAsked
         ? value.caller?.fileNameAskSpoken === true
           ? `- Phatic turn: one short well, then offer help. File name ${value.caller.fileNameAsked} already asked. Do not ask for a name. Do not talk about visits yet. Do not say nothing is open.`
-          : `- Phatic turn: one short well, then ask once: Am I speaking with ${value.caller.fileNameAsked}? Do not talk about visits yet. Do not say nothing is open.`
+          : require('./callerNameControl').nameAskHint(value) !== null
+            ? '- Phatic turn: one short well, then offer help. Do not ask who is speaking yet. Do not talk about visits yet. Do not say nothing is open.'
+            : `- Phatic turn: one short well, then ask once: Am I speaking with ${value.caller.fileNameAsked}? Do not talk about visits yet. Do not say nothing is open.`
         : speakerPendingOnFile(value.returning)
         ? '- Phatic turn: one short well, then offer help. Do not ask who is speaking. Do not use the file name. Do not list services.'
         : value.returning?.nextVisit && returningFileUsable(value.returning)

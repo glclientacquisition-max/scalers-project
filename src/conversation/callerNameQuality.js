@@ -37,7 +37,7 @@ const NON_NAME_WORDS = new Set([
   'what', 'who', 'why', 'how', 'when', 'where', 'huh', 'eh', 'mm', 'um', 'uh', 'er', 'ah', 'oh', 'aa',
   'sawa', 'ndio', 'ndiyo', 'eeh', 'ee', 'ehe', 'aha', 'hapana', 'la', 'basi', 'poa', 'fiti', 'sasa', 'niaje', 'mambo',
   'habari', 'jambo', 'hujambo', 'asante', 'karibu', 'samahani', 'nini', 'ati', 'eti', 'kwani', 'wewe', 'mimi', 'yeye',
-  'name', 'jina', 'speaking', 'here', 'me', 'i', 'the', 'a', 'and', 'so', 'just', 'like', 'well',
+  'name', 'jina', 'speaking', 'mteja', 'disappointed', 'here', 'me', 'i', 'the', 'a', 'and', 'so', 'just', 'like', 'well',
 ]);
 
 // Courtesy words that are also given names in Kenya. Rejected only when they

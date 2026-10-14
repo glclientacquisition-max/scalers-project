@@ -1692,6 +1692,34 @@ async function loadTrustContext({ tenantId, phone } = {}) {
   return out;
 }
 
+/**
+ * BRAIN_TRUST_P1: the caller corrected the name on file ("no, it's Mary").
+ * Replaces primary_name with correction provenance in names_seen. On a shared
+ * line the corrected name is added as a separate person; the primary stays.
+ */
+async function recordCallerNameCorrection({ tenantId, phone, name, previous, callSid } = {}) {
+  const clean = String(name || '').trim().slice(0, 60);
+  if (!tenantId || !phone || !clean) return null;
+  const ctx = await loadTrustContext({ tenantId, phone });
+  if (!ctx.contactId) return null;
+  const file = ctx.file || {};
+  const seen = Array.isArray(file.names_seen) ? file.names_seen.slice(-19) : [];
+  const shared = file.shared_line === true;
+  seen.push({
+    name: clean,
+    source: shared ? 'shared_line_person' : 'correction',
+    replaced: shared ? null : (previous || file.primary_name || null),
+    call_sid: callSid || null,
+    at: new Date().toISOString(),
+  });
+  return upsertCallerFile({
+    tenantId,
+    contactId: ctx.contactId,
+    namesSeen: seen,
+    ...(shared ? {} : { primaryName: clean }),
+  });
+}
+
 /** BRAIN_TRUST_P1 (T4): store that the notes notice was spoken to this caller. */
 async function markMemoryNoticeShown({ tenantId, phone } = {}) {
   const ctx = await loadTrustContext({ tenantId, phone });
@@ -2690,6 +2718,7 @@ module.exports = {
   markMemoryNoticeShown,
   listOpenTasksForCaller,
   upsertCallerFile,
+  recordCallerNameCorrection,
   getCallerFile,
   listCallerAppointmentsForReview,
   createServiceRequest,
