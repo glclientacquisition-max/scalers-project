@@ -125,9 +125,11 @@ function ownerIntent(call) {
 function ownerReason(call) {
   const review = reviewOf(call);
   return (
-    String(review.reason || call.reason || '')
-      .replace(/\s+/g, ' ')
-      .trim() || null
+    require('../conversation/internalText').stripInternal(
+      String(review.reason || call.reason || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+    ) || null
   );
 }
 
@@ -140,7 +142,7 @@ function isInternalResolutionNote(text) {
 }
 
 function ownerOutcome(call) {
-  const note = String(call.resolution_note || '').trim();
+  const note = require('../conversation/internalText').stripInternal(String(call.resolution_note || '').trim());
   if (!note || isInternalResolutionNote(note)) return null;
   return note;
 }

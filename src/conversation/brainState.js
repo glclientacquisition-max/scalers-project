@@ -628,6 +628,17 @@ function observeCallerTurn(state, input = {}) {
     const nameControl = require('./callerNameControl');
     nameControl.noteCallerTurn(next, text);
     nameControl.afterNameResolution(state, next, input);
+    // BRAIN_TRUST_P1 (HD_212e49ef183f): "Saa 4" after "Friday" keeps the day.
+    if (require('./trustP1').trustP1Enabled()) {
+      const val = (w) => String((w && typeof w === 'object' ? w.value : w) || '').trim();
+      const DAY = /\b(?:today|tomorrow|tonight|leo|kesho|keshokutwa|day after tomorrow|(?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili|wiki ijayo|\d{1,2}[/-]\d{1,2})\b/i;
+      const before = val(state?.entities?.when);
+      const now = val(next.entities?.when);
+      if (before && now && now !== before && /\bsaa\b/i.test(now) && !DAY.test(now) && DAY.test(before)) {
+        const day = before.match(DAY)[0];
+        next.entities.when = { ...(typeof next.entities.when === 'object' ? next.entities.when : {}), value: `${day} ${now}` };
+      }
+    }
     const ci = require('./callerInfoTrust');
     if (ci.on()) {
       next.trust = next.trust || {};

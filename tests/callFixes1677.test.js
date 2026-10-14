@@ -228,7 +228,7 @@ describe('HD_1677e57f73f9 replay, BRAIN_CALL_FIXES_D199=on', () => {
       const retry = fixes.planRejectedCreate(answered, { language: 'sw' });
       assert.equal(retry.kind, 'retry');
       const kept = guardToolPlan(JSON.parse(JSON.stringify(retry.parsed)), answered, {});
-      assert.equal(kept.appointment.whenText, 'today 2 pm');
+      assert.match(kept.appointment.whenText, /^(today|leo) 2 pm$/); // trust keeps the held day word
       assert.equal(resolveAppointmentWhen(kept.appointment.whenText, NOW).minutesSinceMidnight, 14 * 60);
       // An unanswered re-ask (no closing) also ends in a callback, not a loop.
       const silent = observe(JSON.parse(JSON.stringify(state)), profile, 'Riverside.', t31.line);

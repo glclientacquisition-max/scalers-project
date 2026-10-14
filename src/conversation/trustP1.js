@@ -103,8 +103,68 @@ function saveMissingSlot(request = {}, state = {}) {
   const goal = String(state?.goal?.primary || '');
   const booking = goal === 'make_booking_request' || /\b(?:book|booking|schedule|come)\b/i.test(String(request.notes || ''));
   if (!booking) return '';
-  const when = String(request.whenText || '').trim();
+  // HD_212e49ef183f: the Brain's held day/time counts; the model often omits when_text.
+  const when = String(request.whenText || heldWhen(state) || '').trim();
   return when ? '' : 'when_text';
+}
+
+/** Day/time the Brain already holds for this call ('' when none). */
+function heldWhen(state) {
+  const w = state?.entities?.when;
+  return String((w && typeof w === 'object' ? w.value : w) || '').trim();
+}
+
+/** Place the Brain already holds ('' when none). */
+function heldPlace(state) {
+  const e = state?.entities || {};
+  for (const k of ['location', 'landmark', 'area']) {
+    const v = e[k] && typeof e[k] === 'object' ? e[k].value : e[k];
+    if (String(v || '').trim()) return String(v).trim();
+  }
+  return '';
+}
+
+const NOT_VISIT_TYPES = new Set(['callback', 'hold', 'hold_or_pickup', 'order', 'address_change', 'payment_change', 'complaint']);
+
+/**
+ * HD_212e49ef183f: a visit booked through create_service_request becomes
+ * create_appointment (the tenant books visits and the goal is a booking),
+ * with the Brain's held slots filled in. Returns the new parsed plan or null.
+ */
+function routeVisitRequest(parsed, state, capabilities = {}) {
+  if (!trustP1Enabled() || !parsed?.serviceRequest || parsed.appointment || !capabilities.createAppointment) return null;
+  const sr = parsed.serviceRequest;
+  const type = String(sr.type || 'enquiry').toLowerCase();
+  if (NOT_VISIT_TYPES.has(type)) return null;
+  const goal = String(state?.goal?.primary || '');
+  const bookingIntent = goal === 'make_booking_request' || /book|visit|appointment/.test(type) || String(state?.intent || '') === 'booking';
+  if (!bookingIntent) return null;
+  const next = { ...parsed };
+  delete next.serviceRequest;
+  next.appointment = {
+    serviceName: String(sr.item || '').trim(),
+    name: sr.name,
+    whenText: String(sr.whenText || heldWhen(state) || '').trim(),
+    landmark: String(sr.location || sr.landmark || heldPlace(state) || '').trim(),
+    notes: sr.notes || '',
+  };
+  next.trustRoutedVisit = true;
+  return next;
+}
+
+/** Non-repeating ask for a missing day/time; never asks for a confirmed name. */
+function missingSlotLine(state, language = 'en', slot = 'when_text') {
+  const t = trustState(state || {});
+  t.missingSlotAsks = (t.missingSlotAsks || 0) + 1;
+  const n = t.missingSlotAsks;
+  const l = lang2(language);
+  const place = slot === 'location';
+  if (l === 'sw') {
+    if (place) return n > 1 ? 'Nipe jina la estate au eneo tu, tafadhali.' : 'Tukuje wapi, eneo au estate gani?';
+    return n > 1 ? 'Nipe siku na saa, kwa mfano kesho saa nne asubuhi.' : 'Siku gani na saa ngapi inakufaa?';
+  }
+  if (place) return n > 1 ? 'Just the estate or area name, please.' : 'Where should we come, which area or estate?';
+  return n > 1 ? 'Just the day and a time, for example Friday at 10 in the morning.' : 'What day and time suits you?';
 }
 
 const PLACE_ASK = /\b(?:where (?:should|shall|do|can) we come|which (?:estate|building|area|place|apartment)|what(?:'s| is) the (?:address|location|building|estate)|tukuje wapi|mahali gani|uko wapi)\b/i;
@@ -956,6 +1016,8 @@ function validateSummary(summary, results = []) {
  * Code answers before the model, in order: correction, address/payment
  * change, "do you remember me", resume offer after bind. null = model runs.
  */
+const NEW_TOPIC = /\b(?:something (?:new|else|different)|a new (?:one|request|booking|thing)|new (?:one|request|booking)|another (?:thing|one|request)|not (?:that|the old) one|kitu (?:kipya|kingine)|jambo (?:jipya|lingine)|ombi jipya|ingine mpya|kipya)\b/i;
+
 function planTrustTurn({ text = '', state = {}, card = null, tasks = [], language = 'en', byWhen = '', now = Date.now(), nameJustConfirmed = false, lastAgentText = '' } = {}) {
   if (!trustP1Enabled()) return null;
   noteCallerTurnForName(state, text);
@@ -992,6 +1054,14 @@ function planTrustTurn({ text = '', state = {}, card = null, tasks = [], languag
     const offer = planResumeOffer({ card, tasks, state, topic: text, language, now });
     if (offer) return { kind: 'resume', ...offer };
   }
+  // HD_212e49ef183f: "something new" / "kitu kipya" answers "which request?":
+  // a new topic, never a question back.
+  if (NEW_TOPIC.test(text)) {
+    const t = trustState(state);
+    t.resume = null;
+    t.newTopic = true;
+    return null;
+  }
   if (ttl && /\b(?:that one|that order|it|hiyo|hilo)\b/i.test(text) && !resumedTaskId(state)) {
     return { kind: 'which', line: whichOneLine(language) };
   }
@@ -1013,6 +1083,10 @@ function trustPromptFacts({ card = null, language = 'en' } = {}) {
 }
 
 module.exports = {
+  heldWhen,
+  heldPlace,
+  routeVisitRequest,
+  missingSlotLine,
   SUCCESS_WORDS,
   noteAgentLine,
   guardEmptiedTurn,

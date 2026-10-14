@@ -1,0 +1,248 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "tenantId": "df4ad9d8-28ff-4810-b1e6-94f5495472b0",
+  "businessName": "Done and Dusted",
+  "vertical": "home_services",
+  "servicesCatalog": [
+    {
+      "name": "Mattress cleaning",
+      "notes": "Vary by size",
+      "category": "Cleaning",
+      "price_range": "Ksh 800-1200"
+    },
+    {
+      "name": "1-Bedroom Apartment (Standard)",
+      "notes": "Dusting, vacuuming, mopping, bathroom sanitation, kitchen surfaces",
+      "price_range": "KSh 3,000 flat"
+    },
+    {
+      "name": "2-Bedroom Apartment (Standard)",
+      "notes": "Dusting, vacuuming, mopping, up to 2 bathrooms, kitchen surfaces",
+      "price_range": "KSh 4,500 flat"
+    },
+    {
+      "name": "3-Bedroom House (Standard)",
+      "notes": "Full house vacuum/mop, dust all rooms, up to 2.5 bathrooms, kitchen counters",
+      "price_range": "KSh 6,000 flat"
+    },
+    {
+      "name": "Hourly Housekeeping",
+      "notes": "Custom chores: laundry, dishwashing, organizing",
+      "price_range": "KSh 500 per hour (min 3 hours)"
+    },
+    {
+      "name": "Deep Cleaning Package (add-on)",
+      "notes": "Inside oven, fridge, baseboards, interior windows, light fixtures",
+      "price_range": "Base + KSh 3,000 to 6,000"
+    },
+    {
+      "name": "Move-In / Move-Out Clean",
+      "notes": "Empty premises, cabinets/drawers, doors and windows",
+      "price_range": "KSh 5,000 flat (2-bed unit)"
+    },
+    {
+      "name": "Post-Construction Clean",
+      "notes": "Dust mitigation, paint/sticker removal, high-pile vacuum, site sanitation",
+      "price_range": "KSh 40 per sq ft"
+    },
+    {
+      "name": "Small Office (up to 1,500 sq ft)",
+      "notes": "Trash, desk dusting, restrooms, breakroom, floors",
+      "price_range": "KSh 15,000 per visit"
+    },
+    {
+      "name": "Medium Office (1,501-3,500 sq ft)",
+      "notes": "Workspace sanitation, common areas, conference rooms, floors",
+      "price_range": "KSh 25,000 per visit"
+    },
+    {
+      "name": "Large Commercial Contract",
+      "notes": "Daily or weekly custodians, windows, floor buffing",
+      "price_range": "Custom quote (KSh 35-150 per sq m per month)"
+    },
+    {
+      "name": "Sofa Cleaning (per seat)",
+      "price_range": "KSh 800 per seat"
+    },
+    {
+      "name": "Carpet Cleaning (per room)",
+      "price_range": "KSh 2,000 per room"
+    },
+    {
+      "name": "Interior Window Cleaning",
+      "price_range": "KSh 200 per window"
+    },
+    {
+      "name": "Refrigerator Internal Deep Clean",
+      "price_range": "KSh 1,000 per unit"
+    },
+    {
+      "name": "Oven Internal Deep Clean",
+      "price_range": "KSh 1,200 per unit"
+    }
+  ],
+  "businessPolicies": {
+    "coverage_areas": [
+      "county:nairobi",
+      "place:kitengela",
+      "county:kiambu",
+      "place:juja",
+      "place:ongata rongai",
+      "place:syokimau"
+    ]
+  },
+  "socialHandles": {
+    "main": "0790381872"
+  },
+  "callerName": "Alvin",
+  "nameOnFile": true,
+  "callId": "HD_212e49ef183f",
+  "source": "staging 14 Oct 10:36 EAT (b98f186e); turns from transcripts + Railway log",
+  "ttsWire": [],
+  "turns": [
+    {
+      "caller": "Eeh, habari.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "canned",
+        "model": "trust_plan",
+        "promptId": "voice.system",
+        "outputText": "Am I speaking with Alvin?",
+        "chars": 25,
+        "spokenEmitted": null
+      },
+      "outcome": "early_return",
+      "liveTts": [
+        "Am I speaking with Alvin?"
+      ],
+      "observed": {
+        "firstPcmMs": 400,
+        "firstReplyPcmMs": 400
+      }
+    },
+    {
+      "caller": "Yes, I'm speaking with Alvin.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "canned",
+        "model": "trust_plan",
+        "promptId": "voice.system",
+        "outputText": "Is this about the carpet Cleaning (per room), or something new?",
+        "chars": 63,
+        "spokenEmitted": null
+      },
+      "outcome": "early_return",
+      "liveTts": [
+        "Is this about the carpet Cleaning (per room), or something new?"
+      ],
+      "observed": {
+        "firstPcmMs": 400,
+        "firstReplyPcmMs": 400
+      }
+    },
+    {
+      "caller": "I think it's something new",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "What would you like us to help with?",
+        "chars": 36,
+        "spokenEmitted": null
+      },
+      "outcome": "ok",
+      "liveTts": [
+        "What would you like us to help with?"
+      ],
+      "observed": {
+        "firstPcmMs": 400,
+        "firstReplyPcmMs": 400
+      }
+    },
+    {
+      "caller": "I need to book window cleaning for Friday, and.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Karibu, Alvin. Where should we come for the window cleaning on Friday?",
+        "chars": 70,
+        "spokenEmitted": null
+      },
+      "outcome": "ok",
+      "liveTts": [
+        "Karibu, Alvin. Where should we come for the window cleaning on Friday?"
+      ],
+      "observed": {
+        "firstPcmMs": 400,
+        "firstReplyPcmMs": 400
+      }
+    },
+    {
+      "caller": "Uh, around Kitengela.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "What time on Friday would you like us to come for the window cleaning in Kitengela?",
+        "chars": 83,
+        "spokenEmitted": null
+      },
+      "outcome": "ok",
+      "liveTts": [
+        "What time on Friday would you like us to come for the window cleaning in Kitengela?"
+      ],
+      "observed": {
+        "firstPcmMs": 400,
+        "firstReplyPcmMs": 400
+      }
+    },
+    {
+      "caller": "Saa 4",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "",
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "outcome": "ok",
+      "liveTts": [],
+      "observed": {
+        "firstPcmMs": 400,
+        "firstReplyPcmMs": 400
+      }
+    },
+    {
+      "caller": "Uh, saa 4. I thought you have my name.",
+      "soniox": "en",
+      "flushed": true,
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "",
+        "chars": 0,
+        "spokenEmitted": null
+      },
+      "outcome": "ok",
+      "liveTts": [],
+      "observed": {
+        "firstPcmMs": 400,
+        "firstReplyPcmMs": 400
+      }
+    }
+  ]
+}

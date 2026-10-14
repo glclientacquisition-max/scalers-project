@@ -795,6 +795,7 @@ async function executeBrainTools({
     if (trustP1.trustP1Enabled() && validation.valid && trustMissing) {
       validation = {
         valid: false,
+        askLine: trustP1.missingSlotLine(trustState, language, trustMissing),
         reason: 'Ask the day and time before saving this booking request.',
         missingSlots: [trustMissing],
         code: 'trust_missing_slot',
@@ -824,6 +825,7 @@ async function executeBrainTools({
         reason: validation.reason,
         missingSlots: validation.missingSlots || [],
         code: validation.code || null,
+        askLine: validation.askLine || '',
       });
     } else if (completed.has(fingerprint)) {
       results.push({
@@ -1419,6 +1421,7 @@ function formatToolConfirmation(results = [], language = 'en') {
   }
   if (trustP1.trustP1Enabled()) {
     if (meaningful.code === 'trust_garbled') return trustP1.repairAskLine(lang);
+    if (meaningful.code === 'trust_missing_slot' && meaningful.askLine) return meaningful.askLine;
     if (
       // Visits keep their receipt line (spoken when/place in the call
       // language); the generic request line becomes the readback.
