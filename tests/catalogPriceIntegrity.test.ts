@@ -184,5 +184,25 @@ test("confirmPriceAction re-stamps the .price hash after it writes the row", () 
   const write = body.indexOf('.from("tenants").update(');
   const stamp = body.indexOf("restampPriceHash(");
   assert.ok(write > 0 && stamp > write, "re-stamp runs after the tenants update");
-  assert.match(src, /explicitPaths: \[path\]/);
+  assert.match(src, /explicitPaths: \[path, namePath\]/);
+});
+
+test("confirm with no real change: re-stamped .price and .name both match the stored row", async () => {
+  const { planFactConfirm } = await import("../dashboard/src/lib/factConfirm.ts");
+  const { factValueForPath, hashFactValue } = await import("../dashboard/src/lib/factHash.ts");
+  for (const text of ["KSh 3,000 flat", "Ksh 800-1200"]) {
+    const row = parsedRow(text, 1);
+    const before = { services_catalog: [row] };
+    const saved = { services_catalog: [{ ...confirm(row), source: "owner" }] };
+    const pricePath = cp.catalogPricePath("service", saved.services_catalog, 0)!;
+    const namePath = pricePath.replace(/\.price$/, ".name");
+    // priceLabel rewrites the text, so the .name value moves even though the owner said "yes".
+    assert.notEqual(saved.services_catalog[0].price_range, text);
+    assert.notEqual(hashFactValue(factValueForPath(namePath, saved)), hashFactValue(factValueForPath(namePath, before)));
+    const plan = planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: [pricePath, namePath] });
+    const got = Object.fromEntries(plan.confirm.map((c: { path: string; hash: string }) => [c.path, c.hash]));
+    assert.equal(got[pricePath], hashFactValue(factValueForPath(pricePath, saved)));
+    assert.equal(got[namePath], hashFactValue(factValueForPath(namePath, saved)));
+    assert.deepEqual(plan.reopen, []);
+  }
 });

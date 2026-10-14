@@ -40,10 +40,13 @@ async function restampPriceHash(
 ): Promise<void> {
   const path = catalogPricePath(kind, rows, findCatalogItem(rows, target));
   if (!path) return;
+  // The save rewrites price_range/price to priceLabel(), which is part of the
+  // row's .name value, so re-stamp .name too or a "yes, unchanged" goes stale.
+  const namePath = path.replace(/\.price$/, ".name");
   const column = kind === "product" ? "product_catalog" : "services_catalog";
   const saved = (await readSavedFactRow(client, tenantId)) ?? { [column]: rows };
-  // before = after: nothing reads as changed, so only the explicit .price path is stamped.
-  await ownerConfirmPlan(tenantId, planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: [path] }));
+  // before = after: nothing reads as changed, so only the explicit .price and .name paths are stamped.
+  await ownerConfirmPlan(tenantId, planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: [path, namePath] }));
 }
 
 /** Owner answers "Is this right?" for one item's typed price (yes, or a corrected price). */
