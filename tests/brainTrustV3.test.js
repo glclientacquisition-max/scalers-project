@@ -207,3 +207,89 @@ test('HD_9904b41a8ba9: "Mnafika wapi Juja?" is answered as Juja, not "wapi Juja"
   assert.match(line, /cover Juja\./);
   assert.doesNotMatch(line, /wapi/i);
 });
+
+// ---- Round 3b (HD_35b75499d483 + scalability audit) ----
+const placeAsk = require('../src/conversation/placeAsk');
+const fxDD = require('./fixtures/voice-calls/HD_9904b41a8ba9.json');
+const ddProfile = { vertical: 'home_services', servicesCatalog: fxDD.servicesCatalog, businessPolicies: fxDD.businessPolicies };
+const otherProfile = { vertical: 'home_services', servicesCatalog: fxDD.servicesCatalog, businessPolicies: { coverage_areas: ['county:mombasa', 'place:nyali', 'place:bamburi'] } };
+const { coverageAskSpeech } = require('../src/conversation/visitLocation');
+
+test('place: possessive lead-ins are stripped (any place)', () => {
+  assert.equal(placeAsk.coverageAskPlaceGeneric('Can you come to my place in Ruaka?'), 'Ruaka');
+  assert.equal(placeAsk.coverageAskPlaceGeneric('Do you serve my office at Westlands?'), 'Westlands');
+  assert.equal(placeAsk.coverageAskPlaceGeneric('Mnaweza kuja nyumbani kwangu Syokimau?'), 'Syokimau');
+  assert.match(coverageAskSpeech('Can you come to my place in Ruaka?', ddProfile, 'en', {}), /cover Ruaka\./);
+});
+
+test('place: Swahili verb forms, leading "Je," and multi-word places', () => {
+  assert.equal(placeAsk.coverageAskPlaceGeneric('Je, mnafika Juja?'), 'Juja');
+  assert.equal(placeAsk.coverageAskPlaceGeneric('Mtafika Kitengela?'), 'Kitengela');
+  assert.equal(placeAsk.coverageAskPlaceGeneric('Mnaja hadi Ongata Rongai?'), 'Ongata Rongai');
+  assert.equal(placeAsk.coverageAskPlaceGeneric('Do you guys come to South B?'), 'South B');
+});
+
+test('place: "where do you work" gives the tenant\'s own area list', () => {
+  assert.match(coverageAskSpeech('Mnafanyia kazi wapi?', ddProfile, 'en', {}), /^We cover Nairobi, .*Syokimau\./);
+  assert.match(coverageAskSpeech('Where do you work?', otherProfile, 'en', {}), /^We cover Mombasa, Nyali and Bamburi\./);
+  assert.equal(placeAsk.asksAreaList('Mko wapi?'), false, 'where are you located is the business location, not coverage');
+});
+
+test('place: coverage follows each tenant (no hardcoded areas)', () => {
+  assert.match(coverageAskSpeech('Mnafika Syokimau?', ddProfile, 'en', {}), /cover Syokimau/);
+  assert.match(coverageAskSpeech('Mnafika Syokimau?', otherProfile, 'en', {}), /outside/);
+  assert.match(coverageAskSpeech('Do you serve Nyali?', otherProfile, 'en', {}), /cover Nyali/);
+});
+
+test('place: a misheard place is confirmed once, then answered on yes', () => {
+  const st = {};
+  assert.equal(coverageAskSpeech('Do you come to Syokimao?', ddProfile, 'en', st), 'Did you mean Syokimau?');
+  assert.match(coverageAskSpeech('Yes.', ddProfile, 'en', st), /cover Syokimau/);
+  assert.equal(coverageAskSpeech('Mnafika Syokimao?', ddProfile, 'sw', {}), 'Ulisema Syokimau?');
+  assert.match(coverageAskSpeech('What about Kampala?', ddProfile, 'en', {}), /only cover Kenya/);
+});
+
+test('name: trusted after "my name is"/"naitwa"; courtesy word rejected only as a bare answer', () => {
+  assert.equal(trust.nameFromAnswer('My name is Welcome'), 'Welcome');
+  assert.equal(trust.nameFromAnswer('Naitwa Mimi'), 'Mimi');
+  assert.equal(trust.nameFromAnswer('Welcome.'), '');
+  assert.equal(trust.nameFromAnswer('Sure.'), '');
+  assert.equal(trust.nameFromAnswer('My name is Mmh'), '');
+  assert.equal(trust.nameFromAnswer('Neema.'), 'Neema');
+});
+
+test('echo: greeting echo is not caller speech; greeting phrase is never a location', () => {
+  const { createEchoGate } = require('../src/speech/echoGate');
+  const g = createEchoGate();
+  g.remember("Good morning, Done and Dusted, this is Shy. We're closed now. Karibu tena. Tukusaidie vipi.", 1000);
+  g.remember('Hello, can you hear me?', 5000);
+  assert.equal(g.isEcho('Karibu tena.', 6000), true);
+  g.remember('Would you like tomorrow or Friday morning?', 6500);
+  assert.equal(g.isEcho('Friday morning.', 7000), false, 'an answer to the latest line is real speech');
+  assert.equal(g.isEcho('Tomorrow.', 7000), false);
+  assert.equal(g.isEcho('Karibu tena.', 20000), false, 'outside the window');
+  assert.equal(g.isEcho('I need a carpet clean in Juja tomorrow', 6000), false);
+  assert.equal(placeAsk.isGreetingPhrase('Karibu tena'), true);
+  assert.equal(placeAsk.coverageAskPlaceGeneric('Do you cover Karibu tena?'), '');
+  let s = createBrainState({});
+  s.entities.location = { value: 'Karibu tena', source: 'caller_explicit' };
+  s = observeCallerTurn(s, { text: 'Yeah.', lastAgentText: 'Hello, can you hear me?' });
+  assert.equal(s.entities.location, undefined);
+});
+
+test('HD_35b75499d483: "Yeah, yeah." confirms the file name; a guard-emptied reply is not "say that again"', () => {
+  const { buildCallerMemoryCard } = require('../src/conversation/callerMemory');
+  const card = buildCallerMemoryCard({ contact: { phone: '+254700000009', name: 'Chris', metadata: {} }, openRequests: [{ request_type: 'request', item: 'carpet cleaning', when_text: 'tomorrow' }] });
+  let s = createBrainState({ callerMemory: card });
+  s.caller.fileNameAsked = 'Chris';
+  s = observeCallerTurn(s, { text: 'Yeah, yeah.', lastAgentText: 'Am I speaking with Chris?' });
+  assert.equal(s.caller.nameConfirmed, true);
+  const { polishSpokenDetail, planEmptyGeminiSpeech } = require('../src/conversation/dynamicSpeech');
+  const st = createBrainState({});
+  st.conversation.turnCount = 2;
+  st.caller.fileNameAsked = 'Chris';
+  st.caller.fileNameAskSpoken = true;
+  const out = polishSpokenDetail('Am I speaking with Chris?', { state: st, profile: {}, callerText: 'Yeah, yeah.' });
+  assert.equal(out.text, '');
+  assert.equal(planEmptyGeminiSpeech({ brainState: st, language: 'en', userText: 'Yeah, yeah.' }).kind, 'guard_continue');
+});

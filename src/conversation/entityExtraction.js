@@ -232,7 +232,14 @@ function isNameAffirmation(text) {
     .toLowerCase()
     .replace(/[?.!,]+$/g, '')
     .trim();
-  return Boolean(lower) && NAME_AFFIRMATION.test(lower);
+  if (Boolean(lower) && NAME_AFFIRMATION.test(lower)) return true;
+  // BRAIN_TRUST_P1: a doubled yes ("Yeah, yeah.", "Ndio ndio", "Yes yes") is
+  // one yes (HD_35b75499d483 heard "Yeah, yeah." as not-a-yes).
+  if (String(process.env.BRAIN_TRUST_P1 || '').trim() === 'on') {
+    const parts = lower.split(/[\s,]+/).filter(Boolean);
+    if (parts.length >= 2 && parts.length <= 3 && parts.every((w) => NAME_AFFIRMATION.test(w))) return true;
+  }
+  return false;
 }
 
 function isNameNegation(text) {
@@ -1133,7 +1140,12 @@ function extractConversationEntities(
   const branch = extractBranch(text, profile);
   if (branch) entities.branch = entity(branch, 'tenant_location_match', 1, true);
   const visitPlace = extractLandmark(text);
-  if (visitPlace) entities.location = entity(visitPlace, 'caller_explicit', 0.9, false);
+  // BRAIN_TRUST_P1: a greeting phrase ("Karibu tena", often our own echo) is never a place.
+  const greetingPlace = (v) => {
+    const pa = require('./placeAsk');
+    return pa.trustOn() && pa.isGreetingPhrase(v);
+  };
+  if (visitPlace && !greetingPlace(visitPlace)) entities.location = entity(visitPlace, 'caller_explicit', 0.9, false);
 
   const firstMissing = state?.goal?.missingSlots?.[0];
   const shortAnswer = shortSlotAnswer(text);
@@ -1186,7 +1198,7 @@ function extractConversationEntities(
         fixesD199.looksLikeClauseNotPlace(text))
     )
   ) {
-    entities.location = entity(shortAnswer, 'contextual_slot_answer', 0.75, false);
+    if (!greetingPlace(shortAnswer)) entities.location = entity(shortAnswer, 'contextual_slot_answer', 0.75, false);
   }
 
   // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 1): a sentence is never the time

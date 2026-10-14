@@ -1987,6 +1987,8 @@ mediaWss.on('connection', (ws, req) => {
   let playbackBytes = 0;
   let playbackStartedAt = 0;
   let lastAgentText = '';
+  // BRAIN_TRUST_P1: recent agent lines for the echo gate (src/speech/echoGate.js).
+  const agentEchoGate = require('./src/speech/echoGate').createEchoGate();
   let llmRecoveryOffered = false;
   let emptyRepairOffered = false;
   let turnBusy = false;
@@ -2384,6 +2386,7 @@ mediaWss.on('connection', (ws, req) => {
     speaking = true;
     speakStartedAt = Date.now();
     lastAgentText = String(text || '');
+    agentEchoGate.remember(lastAgentText);
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
     fillerStreamId = streamId;
@@ -2500,6 +2503,7 @@ mediaWss.on('connection', (ws, req) => {
     suppressReplyRemainder = false;
     if (/[.!?]$/.test(String(text).trim())) bargeCancelledText = '';
     lastAgentText = String(text);
+    agentEchoGate.remember(lastAgentText);
     agentReplay.beginSpeech(text);
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
@@ -2651,6 +2655,7 @@ mediaWss.on('connection', (ws, req) => {
     suppressReplyRemainder = false;
     if (/[.!?]$/.test(String(text).trim())) bargeCancelledText = '';
     lastAgentText = String(text);
+    agentEchoGate.remember(lastAgentText);
     if (!opts.isFiller && !opts.isReplay) {
       agentReplay.beginSpeech(text);
     }
@@ -3874,6 +3879,7 @@ mediaWss.on('connection', (ws, req) => {
         session.pushText(text);
         spokenChunks.push(text);
         lastAgentText = spokenChunks.join(' ');
+        agentEchoGate.remember(lastAgentText);
       }
 
       async function speakLookupSentence() {
@@ -3920,6 +3926,7 @@ mediaWss.on('connection', (ws, req) => {
         session.pushText(sentence);
         spokenChunks.push(sentence);
         lastAgentText = spokenChunks.join(' ');
+        agentEchoGate.remember(lastAgentText);
         agentReplay.beginSpeech(sentence);
         try {
           await session.end();
@@ -4565,6 +4572,11 @@ mediaWss.on('connection', (ws, req) => {
 
       // Finals: one turn-taking decision, then act.
       interimBargeText = '';
+      if (trustP1.trustP1Enabled() && agentEchoGate.isEcho(text)) {
+        voiceTrace.noteTurnEnd({ decision: 'drop', reason: 'echo_recent_agent' });
+        console.log(`[ws/media][${sidLabel()}] drop echo final (recent agent line): ${text.slice(0, 80)}`);
+        return;
+      }
       const decision = maybeBargeIn(text, 'final speech');
 
       if (decision.reason === 'echo') {
@@ -4807,6 +4819,7 @@ mediaWss.on('connection', (ws, req) => {
       console.log(
         `[ws/media][${sidLabel()}] greeting mode=instant agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)}: ${greetingLine}`
       );
+      agentEchoGate.remember(greetingLine);
 
       const found = lookupGreetingPcm({
         voiceId: tenantSonioxVoiceId,
@@ -4826,6 +4839,7 @@ mediaWss.on('connection', (ws, req) => {
         });
         await playCachedFillerPcm(found.pcm, { text: greetingLine, trace: false });
         callTranscript.pushAgent(greetingLine);
+        agentEchoGate.remember(greetingLine);
         messages.push({ role: 'assistant', content: greetingLine, local: true });
         if (!greetingInterrupted) markGreetingFileNameAsk(greetingLine);
       } else {
@@ -4869,6 +4883,7 @@ mediaWss.on('connection', (ws, req) => {
         if (spoken?.outage || speechOutageStarted) return;
         if (spoken?.ok) {
           callTranscript.pushAgent(greetingLine);
+        agentEchoGate.remember(greetingLine);
           messages.push({ role: 'assistant', content: greetingLine, local: true });
           if (!greetingInterrupted && !spoken.cancelled) markGreetingFileNameAsk(greetingLine);
         }
@@ -6393,6 +6408,12 @@ async function runGeminiTurnStreaming(
             const delta = extractGeminiText(chunk);
             if (!delta) continue;
             if (!firstTokenAt) firstTokenAt = Date.now();
+            // BRAIN_TRUST_P1 diagnostic: a letter|letter delta boundary is glued
+            // (by design, for mid-word slices). Log it so word joins like
+            // "isoutside" can be attributed to the model stream vs our join.
+            if (trustP1.trustP1Enabled() && /\p{L}$/u.test(fullText) && /^\p{L}/u.test(delta)) {
+              console.log(`[${callSid}] stream-join glued left="${fullText.slice(-12)}" right="${delta.slice(0, 12)}"`);
+            }
             fullText = joinSpokenPieces(fullText, delta);
             const pieces = buffer.push(delta);
             for (const piece of pieces) {
