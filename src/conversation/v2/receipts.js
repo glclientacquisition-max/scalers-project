@@ -94,6 +94,13 @@ function info(r, lang, n = 0) {
       return r.general ? (S ? `Tunahudumia ${r.general}${r.more ? ' na maeneo mengine' : ''}. Uko wapi?` : `We serve ${r.general}${r.more ? ' and other listed areas' : ''}. Which place are you in?`) : (S ? 'Uko wapi? Nitaangalia orodha ya maeneo yetu.' : "Which place are you in? I'll check our service areas.");
     case 'want_know': return [S ? 'Sawa, ungependa kujua kuhusu bei, huduma au saa za kazi?' : 'Sure, would you like to know about prices, services or our hours?', S ? 'Uliza tu, mfano bei ya carpet au saa tunafungua.' : 'Go ahead, for example a price or our opening hours.'][Math.min(n, 1)];
     case 'which_price': return S ? 'Bei ya huduma gani ungependa kujua?' : 'Which service would you like the price for?';
+    case 'ack': return r.service ? (S ? `Sawa. Ungependa kubook ${svcName(r.service)}?` : `Okay. Would you like to book ${svcName(r.service).toLowerCase()}?`) : (S ? 'Sawa. Kuna kingine ninaweza kukusaidia nacho?' : 'Okay. Is there anything else I can help with?');
+    case 'who': return S ? `Unaongea na ${r.agent}, wa ${r.biz}. Tukusaidie na usafi gani?` : `You're speaking with ${r.agent} from ${r.biz}. What can we clean for you?`;
+    case 'greet_name': return S ? `Asante, ${r.name}. Unahitaji huduma gani leo?` : `Thanks, ${r.name}. Which service do you need today?`;
+    case 'off_catalogue': return S ? `Sina ${r.item} kwenye orodha yetu. ${r.hint ? `Tunafanya ${r.hint}.` : ''}`.trim() : `${r.item} isn't on our list. ${r.hint ? `We do ${r.hint}.` : ''}`.trim();
+    case 'payment_how': return r.methods ? (S ? `Tunapokea ${r.methods}.` : `We accept ${r.methods}.`) : (S ? 'Sina maelezo ya malipo kwenye orodha yetu.' : "I don't have payment details on our list.");
+    case 'greeting': return S ? 'Nzuri, asante. Ungependa huduma gani?' : "I'm well, thank you. Which service do you need?";
+    case 'repair': return S ? 'Samahani, sijakusikia vizuri. Unaweza kurudia?' : "Sorry, I didn't catch that. Could you say it again?";
     case 'no_rows': return S ? 'Sioni booking iliyo wazi kwa namba hii.' : "I don't see an open booking on this number.";
     case 'not_offered': return S ? 'Hiyo haipo kwenye huduma zetu.' : "That isn't on our list of services.";
     case 'bye': return S ? 'Asante kwa kupiga simu. Kwaheri.' : 'Thank you for calling. Goodbye.';

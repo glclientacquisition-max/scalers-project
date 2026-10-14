@@ -12,7 +12,7 @@ const { renderOwnerMessage } = require('./owner');
 const { buildRequest } = require('./gemini');
 
 const TRANSACTIONAL = ['payment_change', 'address_change', 'cancel', 'change', 'complaint', 'handoff', 'order', 'book'];
-const INFO = ['services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
+const INFO = ['payment_how', 'greeting', 'who_are_you', 'services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
 
 function createState({ profile = {}, callerPhone, contactName = null, openRows = [], pendingTasks = [] } = {}) {
   return {
@@ -217,8 +217,8 @@ function infoAnswer(state, u, profile, kind) {
     const keys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const d = L.parseDate(u.text, state.now);
     const all = Object.values(days);
-    if (d) { const k = keys[new Date(`${d.date}T12:00:00Z`).getUTCDay()]; const h = days[k]; const lbl = L.cap(L.isSw(state.lang) ? L.DOW_SW[keys.indexOf(k)] : L.DOW_EN[keys.indexOf(k)]); return R.info(h ? { kind: 'hours', dayLabel: lbl, open: h.open, close: h.close } : { kind: 'hours', dayLabel: lbl, closed: true }, state.lang); }
-    const same = all.length === 7 && all.every((h) => h.open === all[0].open && h.close === all[0].close);
+    if (d) { const k = keys[new Date(`${d.date}T12:00:00Z`).getUTCDay()]; const h = days[k] && days[k].open ? days[k] : null; const lbl = L.cap(L.isSw(state.lang) ? L.DOW_SW[keys.indexOf(k)] : L.DOW_EN[keys.indexOf(k)]); return R.info(h ? { kind: 'hours', dayLabel: lbl, open: h.open, close: h.close } : { kind: 'hours', dayLabel: lbl, closed: true }, state.lang); }
+    const same = all.length === 7 && all.every((h) => h && all[0] && h.open === all[0].open && h.close === all[0].close);
     const today = days[keys[L.eatParts(state.now).dow]];
     const h = same ? all[0] : today;
     if (!h) return R.info({ kind: 'hours', dayLabel: L.isSw(state.lang) ? 'Leo' : 'today', closed: true }, state.lang);
@@ -238,6 +238,13 @@ function infoAnswer(state, u, profile, kind) {
     const general = listed.length ? listed.slice(0, 4).join(', ') : (loc?.address || profile.hoursSchedule?.location?.split('·').pop()?.trim() || null);
     return R.info({ kind: 'coverage', area: u.area, general, fromList: listed.length > 0, more: listed.length > 4 }, state.lang);
   }
+  if (kind === 'payment_how') {
+    const M = { mpesa_paybill: ['M-Pesa Paybill', 'M-Pesa Paybill'], mpesa_till: ['M-Pesa Till', 'M-Pesa Till'], bank: ['bank transfer', 'benki'], cash: ['cash', 'pesa taslimu'], card: ['card', 'kadi'], pochi: ['Pochi la Biashara', 'Pochi la Biashara'], airtel: ['Airtel Money', 'Airtel Money'] };
+    const ms = (profile.businessPolicies?.payments?.methods || []).map((m) => M[m]?.[L.isSw(state.lang) ? 1 : 0]).filter(Boolean);
+    return R.info({ kind: 'payment_how', methods: ms.length ? ms.join(L.isSw(state.lang) ? ', ' : ', ').replace(/, ([^,]+)$/, L.isSw(state.lang) ? ' au $1' : ' or $1') : null }, state.lang);
+  }
+  if (kind === 'greeting') return R.info({ kind: 'greeting' }, state.lang);
+  if (kind === 'who_are_you') return R.info({ kind: 'who', agent: profile.agentName || 'Shy', biz: profile.businessName || '' }, state.lang);
   if (kind === 'want_know') return R.info({ kind: 'want_know' }, state.lang, n);
   if (kind === 'price') {
     const named = /\b(cleaning|clean|for (an?|the)? ?\w+|ya \w+)\b/i.test(u.text);
@@ -302,7 +309,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   if (state.phase === 'readback' && state.pending) {
     const p = state.pending;
     mergeSlots(state, u, profile);
-    if ((u.yes || echoAffirms(p, u)) && !pendingChanged(p, state)) {
+    if (u.done && !/^\W*(yes|ndio|ndiyo)\b/i.test(u.text) ? false : (u.yes || echoAffirms(p, u)) && !pendingChanged(p, state)) {
       if (p.tool === 'create_handoff' && p.kind === 'quote') {}
       const { rec, toolResult } = await commit(state, p, handlers);
       results.push(toolResult);
@@ -349,8 +356,24 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   }
   if (!state.intent) {
     mergeSlots(state, u, profile);
-    if (u.name && !u.intents.length) return out(R.ask('intent', 0, lang));
-    if (state.lastInfo === 'recall') { const line = infoAnswer(state, u, profile, 'recall'); return out(line); }
+    // a service named with no question word is an enquiry about that service
+    if (u.service && !u.intents.length && vertical(profile) === 'home') { state.lastInfo = 'services'; mergeSlots(state, u, profile); return out(R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, lang)); }
+    // a time or a place with no intent on a home-services line means a visit
+    if (!u.intents.length && u.when?.time && (u.place || state.slots.service) && vertical(profile) === 'home' && !u.ack && !u.done) { state.intent = 'book'; mergeSlots(state, u, profile); const st0 = stepIntent(state, u, profile); if (st0?.line) return out(st0.line); }
+    if (u.name && !u.intents.length) return out(nameSpeakable(state) ? R.info({ kind: 'greet_name', name: nameSpeakable(state) }, lang) : R.ask('intent', 0, lang));
+    if (state.lastInfo === 'recall' && !u.ack) { const line = infoAnswer(state, u, profile, 'recall'); return out(line); }
+    // off-catalogue item question: say plainly it isn't on our list (never guess stock or price)
+    if (u.askedItem && !u.service && !u.products.length) {
+      const cat = vertical(profile) === 'retail' ? (profile.productCatalog || []).map((p) => p.name) : (profile.servicesCatalog || []).map((x) => R.svcName(x.name));
+      return out(R.info({ kind: 'off_catalogue', item: u.askedItem, hint: cat.slice(0, 3).join(', ') }, lang));
+    }
+    // acknowledgements continue from the call's own state instead of restarting
+    if (u.ack) {
+      state.acks = (state.acks || 0) + 1;
+      if (state.acks >= 3) { state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
+      return out(R.info({ kind: 'ack', service: state.slots.service }, lang));
+    }
+    if (u.fragment && state.turn > 1) { state.repairs = (state.repairs || 0) + 1; if (state.repairs <= 2) return out(R.info({ kind: 'repair' }, lang)); }
     const n = state.unknownCount++;
     if (n === 2 && !state.ladderOffered) { state.ladderOffered = true; return out(propose(state, { tool: 'create_handoff', kind: 'ladder', reason: 'callback' })); }
     return out(R.ask('intent', n % 2, lang));

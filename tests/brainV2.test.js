@@ -147,3 +147,17 @@ test('live-run regressions: no double question, recall beats services, a questio
   const c = await talk(['Uh, I don\'t know.', 'Maybe you tell me.', 'For sure.', 'Nilikuwa nataka kujua ni services gani mna-offer,na.']);
   assert.match(c.out[3].line, /^Tunafanya/);
 });
+
+test('"Sawa, ni hayo tu" at a read-back is not a yes (live regression HD_1677)', async () => {
+  const { log, out } = await talk(['Book sofa cleaning Friday at 10am in Kitengela, I am Alvin.', 'Sawa, ni hayo tu. Baadaye basi.']);
+  assert.equal(log.length, 0); assert.doesNotMatch(out[1].line, /nimeweka|booked/i);
+});
+
+test('acknowledgements, identity, earlier-call and off-catalogue turns get state/catalogue answers', async () => {
+  let r = await talk(['Wewe ni nani?']); assert.match(r.out[0].line, /^Unaongea na Shy, wa Done and Dusted/);
+  r = await talk(['Eeh, unaongea na Alvin?']); assert.match(r.out[0].line, /^Asante, Alvin/);
+  r = await talk(['Ah, tulifika wapi na ile mambo yetu ya jana?']); assert.match(r.out[0].line, /^Sioni booking/);
+  r = await talk(['Mko na JK copier?']); assert.match(r.out[0].line, /^Sina JK copier kwenye orodha yetu/);
+  r = await talk(['Mnafanya carpet?', 'Ni sawa.']); assert.match(r.out[1].line, /^Sawa\. Ungependa kubook Carpet Cleaning\?/);
+  r = await talk(['Nilikuwa nauliza, ni vipi naweza lipa?']); assert.match(r.out[0].line, /^Tunapokea M-Pesa Paybill/); assert.doesNotMatch(r.out[0].line, /\d{5}/);
+});

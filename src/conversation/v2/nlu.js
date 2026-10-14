@@ -5,7 +5,7 @@ const L = require('./lexicon');
 
 const YES = /^\W*(yes|yeah|yep|yup|ok|okay|sure|correct|right|exactly|please do|go ahead|do it|ndio|ndiyo|eeh ndio|sawa|poa|fiti|kabisa|haya|yes please)\b/i;
 const NO = /^\W*(no|nope|not really|hapana|la|sitaki)\b|\b(that'?s wrong|si sawa|not correct)\b/i;
-const DONE = /\b(that'?s all|nothing else|no thanks|hapana,? ni hayo tu|ni hayo tu|that is all|bye|goodbye|kwaheri)\b/i;
+const DONE = /\b(kwa sasa hakuna|hakuna kitu|not now|nitawapigia|nitawaita|let me get back to you|i'?ll call (you )?back|that'?s all|nothing else|no thanks|hapana,? ni hayo tu|ni hayo tu|that is all|bye|goodbye|kwaheri)\b/i;
 const NEG = /\b(not|no|wrong|hapana|si|sio|badala)\b/i;
 
 const INTENT_RULES = [
@@ -15,14 +15,17 @@ const INTENT_RULES = [
   ['change', /\b(move my|reschedule|postpone|change my (booking|appointment|visit)|change (the )?(time|date)|badilisha (booking|siku|saa)|songesha)\b/i],
   ['complaint', /\b(not happy|unhappy|bad service|complain\w*|disappointed|left .{0,20}dirty|damaged|ruined|sijaridhika|mmeniharibia|mmeharibu|malalamiko|huduma mbaya)\b/i],
   ['handoff', /\b(manager|the owner|speak to (a |someone|somebody|the)|talk to (a |someone|the)|human|real person|mwenye biashara|meneja)\b/i],
-  ['services', /\b(services? gani|huduma gani|mnaofa\w*|mna-?offer\w*|mnauza\w* nini|which (exact )?services|what services|services (do )?you (do )?offer|mnafanya nini|mnatoa nini|saizi gani|sizes? (do you|gani)|mnawash\w*|mnasafisha|do you (clean|wash|do)\b)/i],
-  ['coverage', /\b(do you cover|you( guys)? cover|uko wapi|mnafika|mnakuja|mnafikana|mtafika|mko wapi|where are you( located)?|your location|location yenu|mnapatikana wapi|kama mnakuja)\b/i],
-  ['recall', /\b(remember me|last time|what did i (book|order)|my last (visit|booking|order)|mara ya mwisho|mnanikumbuka)\b/i],
+  ['services', /\b(services? gani|huduma gani|mnaofa\w*|mna-?offer\w*|mnauza\w* nini|which (exact )?services|what services|services (do )?you (do )?offer|mnafanya nini|mnatoa nini|gani (uko|mko) nayo|(uko|mko) nayo|saizi gani|sizes? (do you|gani)|mnawash\w*|mnasafisha|do you (clean|wash|do)\b)/i],
+  ['coverage', /\b(do you cover|you( guys)? cover|uko wapi|outside (nairobi|the county)|niko outside|mnafika|mnakuja|mnafikana|mtafika|mko wapi|where are you( located)?|your location|location yenu|mnapatikana wapi|kama mnakuja)\b/i],
+  ['recall', /\b(remember me|last time|what did i (book|order)|my last (visit|booking|order)|mara ya mwisho|mnanikumbuka|unanikumbuka|unakumbuka|do you remember|previous(ly)? (thing|dealing|call|order|booking)|in another call|before this call|i (had )?(spoke|spoken|talked) to you|tulifika wapi|tumeachia wapi|tulikuwa tumeachia|tumeongea|tulikuwa tumeongea|nilikuwa nimeitisha|nimekuongelesha|ile (mambo|kitu) (yetu )?ya jana|a while back)\b/i],
   ['want_know', /\b(nataka kujua|nilikuwa nataka kujua|nataka jua|nilitaka kujua|i wanted to (know|ask)|just inquiring|nataka kuuliza)\b/i],
+  ['who_are_you', /^\W*(nani|ni nani|who is this|who am i (speaking|talking) (to|with)|tunaitwaje( tena)?|unaitwa nani|wewe ni nani|unaitwaje|what'?s your name)\W*\??\W*$/i],
+  ['payment_how', /\b(naweza (ku)?lipa|how (do|can) i pay|payment (method|options)|mnapokea (m-?pesa|pesa)|nilipe aje|malipo ni aje|lipa vipi)\b/i],
+  ['greeting', /^\W*(oh,?\s*)?(habari( yako| zenu)?|niaje|mambo|sasa|hujambo|how are you|hello|hi)\W*(shy\W*)?(,?\s*(ni namna gani|mnaendelea aje|mko aje|how are you)\W*)?$/i],
   ['order', /\b(order|kuagiza|agiza|niwekee|buy|nunua|reserve|hold (one|two|\d))\b/i],
-  ['book', /\b(book|ku-?book|kubook|schedule|appointment|someone to come|mtu aje|mkuje|come (and|to) clean|kusafisha|usafi|tuieke|tuweke|niwekee booking|weka booking)\b/i],
+  ['book', /\b(book|ku-?book|kubook|schedule|appointment|someone to come|mtu aje|mkuje|utume (hao )?watu|mtume (mtu|watu)|wakuje|waje kufanya|come (today|tomorrow|kesho|leo)|come (and|to) clean|kusafisha|usafi|tuieke|tuweke|niwekee booking|weka booking)\b/i],
   ['availability', /\b(in stock|available|do you have|mna\b|iko stock|ipo|mnayo|una\b)/i],
-  ['price', /\b(how much|price|pricing|cost|charge|bei|pesa ngapi|shilingi ngapi|ni ngapi|ngapi pesa)\b/i],
+  ['price', /\b(how much|price|pricing|cost|charge|bei|pesa ngapi|shilingi ngapi|ni ngapi|ndio ngapi|ni bei gani|ngapi pesa)\b/i],
   ['hours', /\b(open|opening|close|closing|hours|fungua|mnafungua|unafungua|mnafunga|unafunga|funga|mnafanya kazi|mko wazi|working (days|hours)|operate until|until what time|mnafunga saa ngapi|saa za kazi)\b/i],
 ];
 function detectIntents(text) { return INTENT_RULES.filter(([, re]) => re.test(text)).map(([n]) => n); }
@@ -102,6 +105,7 @@ function matchProducts(text, catalog = []) {
 function lev(a, b) { const m = a.length, n = b.length; const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; }
 // Tenant service areas only (serviceAreas.areas ids like place:kitengela, county:nairobi).
 function matchArea(text, profile = {}) {
+  if (/\boutside\b/i.test(String(text || ''))) return null;
   const areas = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').split(':')[1]).filter(Boolean);
   const toks = String(text || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((w) => w.length >= 4);
   for (const a of areas) { const parts = a.split(' '); const key = parts[parts.length - 1]; if (toks.some((w) => w === key || (key.length >= 6 && lev(w, key) <= 2))) return { listed: true, name: a.replace(/\b\w/g, (c) => c.toUpperCase()) }; }
@@ -112,6 +116,9 @@ function matchArea(text, profile = {}) {
 function extractQuantity(text) { const m = String(text || '').toLowerCase().match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|moja|mbili|tatu|nne|tano|sita)\b/); return m ? L.toNum(m[1]) : null; }
 
 function bareHour(t) { const n = Number(t.match(/(\d{1,2})/)[1]); if (n < 1 || n > 12) return null; const h = n <= 6 ? n + 12 : n; return { date: null, time: `${String(h).padStart(2, '0')}:00`, raw: String(n) }; }
+const ACK = /^\W*(okay|ok|sawa|ni sawa|iko sawa|ndiyo|ndio|eeh|eh|yeah|yes|naam|mm-?hm|mmh|alright|fine|poa|haya|sure|for sure|i see|ah|oh|uh|a|aa)([\s,.!]+(okay|ok|sawa|ni sawa|tu|ndiyo|ndio|yeah|yes|shy|basi|kabisa|iko sawa|sawa sawa|nijulishe|asante|thanks|thank you|great|nice|that's nice))*\W*$/i;
+const ASK_ITEM = /\b(?:mko na|mna|mnauza\w*|mnauzanga|do you (?:have|sell)|una(?:yo)?|na)\s+([a-z][a-z0-9 -]{2,30}?)(?:\s+(?:ni ngapi|ndio ngapi|zinakuja|inakuja|kwa|ya|in)\b.*)?\s*\??\s*$/i;
+function askedItem(t) { const m = String(t || '').match(ASK_ITEM); if (!m) return null; const w = m[1].trim().replace(/\s+(like|tu|pia|also)$/i, ''); if (/^(wewe|mimi|issue|shida|nini|hiyo|hii|ile|kitu|vitu|any)\b/i.test(w) || w.split(/\s+/).length > 4) return null; return w; }
 function understand(text, { profile = {}, now, expecting = null } = {}) {
   const t = String(text || '').trim();
   const intents = detectIntents(t);
@@ -132,6 +139,9 @@ function understand(text, { profile = {}, now, expecting = null } = {}) {
     products: matchProducts(t, profile.productCatalog || []),
     quantity: extractQuantity(t),
     area: matchArea(t, profile),
+    ack: ACK.test(t),
+    askedItem: askedItem(t),
+    fragment: t.replace(/[^A-Za-z ]/g, ' ').trim().split(/\s+/).filter(Boolean).length <= 2 && !ACK.test(t),
     _yes: isYes,
   };
 }
