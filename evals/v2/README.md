@@ -14,8 +14,9 @@ DB writes: tools write into a fake tenant DB seeded from the scenario.
 | `lib/driver.js` | Brain turn loop (mirrors `tests/helpers/brainSimulator.js` + the BRAIN_TRUST_P1 hooks in `server.js`), fake DB, Brain-only timing |
 | `lib/model.js` | Seeded model stand-in (marker protocol) with a per-turn fault rate (`EVAL_FAULT_RATE`, default 0.3) |
 | `lib/persona.js` | Scripted caller personas (EN / SW / Sheng variants, reactive slot answers, says yes to read-backs) |
+| `lib/heard.js` | Heard-audio metrics from `runTurnStream` events (what the caller hears): repeated turns, ack-led, filler-only turns, fragments ("Hapana, n"), language match, tool-turn gaps. Gated in `bar.js` |
 | `lib/score.js` | Build-independent scorer (own EN/SW lexicons) |
-| `scenarios/suite.js` | 25 scenarios from the caller-info audit eval list |
+| `scenarios/suite.js` | 50 scenarios (S36-S50: EN/SW pairs for outside-Nairobi, callback→booking supersedes, escalate receipt-first, what's-my-name, cut-off fragments, place-given-as-name); originally 25 from the caller-info audit eval list |
 | `fixtures/tenants/` | Done and Dusted (staging config), a synthetic retail shop, two prod retail tenants |
 | `fixtures/raw/` | Read-only SELECT exports (staging calls, traces, prod calls) |
 | `fixtures/replay-labels.json` | Human labels (expected end state) for the named regression calls |

@@ -94,7 +94,7 @@ test('availability is never claimed without a receipt; prices only from the cata
 });
 
 test('Swahili caller gets Swahili receipts', async () => {
-  const { out } = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Wanjiru', 'Ruiru', 'Ndio.']);
+  const { out } = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Ruiru', 'Wanjiru', 'Ndio.']);
   assert.match(out[3].line, /^Sawa, nimeweka/);
   assert.ok(out.every((o) => o.lang === 'sw'));
 });
@@ -194,15 +194,15 @@ test('place: area is the place, landmark is a note (EN/SW near, karibu na, pale,
 
 const ACKRX = /^\s*(sawa sawa|sawa kabisa|ni sawa|sawa|okay|ok|haya|alright|sure|poa|asante)\s*[,.!]/i;
 test('ack rule: only a write receipt may open with an ack; never after an ack; acked drops it', async () => {
-  const a = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Wanjiru', 'Ruiru', 'Ndio.', 'Sawa.', 'Hapana, ni hayo tu.']);
+  const a = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Ruiru', 'Wanjiru', 'Ndio.', 'Sawa.', 'Hapana, ni hayo tu.']);
   assert.match(a.out[3].line, /^Sawa, nimeweka/);
   assert.doesNotMatch(a.out[4].line, ACKRX, 'reply to caller sawa goes straight on');
   assert.match(a.out[5].line, /Kwaheri/);
-  const b = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Wanjiru', 'Ruiru', 'Ndio.', 'Hapana, ni hayo tu.']);
+  const b = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Ruiru', 'Wanjiru', 'Ndio.', 'Hapana, ni hayo tu.']);
   assert.equal(b.out[4].line, 'Karibu tena. Kwaheri.', 'goodbye is not paired with an ack-led receipt');
   for (let i = 1; i < a.out.length; i++) assert.ok(!(ACKRX.test(a.out[i].line) && ACKRX.test(a.out[i - 1].line)));
   const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] }); const h = V2.createDryRunHandlers(); let r;
-  for (const text of ['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Wanjiru', 'Ruiru']) await V2.runTurn(st, { text, profile: DD, now: NOW, handlers: h });
+  for (const text of ['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Ruiru', 'Wanjiru']) await V2.runTurn(st, { text, profile: DD, now: NOW, handlers: h });
   r = await V2.runTurn(st, { text: 'Ndio.', profile: DD, now: NOW, handlers: h, acked: true });
   assert.match(r.line, /^Nimeweka Carpet Cleaning/);
   const q = await talk(['Mnafanya carpet?', 'Sawa.', 'Sawa.', 'Ok.']);

@@ -16,7 +16,7 @@ const INTENT_RULES = [
   ['complaint', /\b(not happy|unhappy|bad service|complain\w*|disappointed|left .{0,20}dirty|damaged|ruined|sijaridhika|mmeniharibia|mmeharibu|malalamiko|huduma mbaya)\b/i],
   ['handoff', /\b(manager|the owner|speak to (a |someone|somebody|the)|talk to (a |someone|the)|human|real person|mwenye biashara|meneja|call me back|call me later|callback|someone (to )?call me|nipigie( simu)?|mnipigie|anipigie|wanipigie)\b/i],
   ['services', /\b(services? gani|huduma gani|mnaofa\w*|mna-?offer\w*|mnauza\w* nini|which (exact )?services|what services|services (do )?you (do )?offer|mnafanya nini|mnatoa nini|gani (uko|mko) nayo|(uko|mko) nayo|saizi gani|sizes? (do you|gani)|mnawash\w*|mnasafisha|do you (clean|wash|do)\b)/i],
-  ['coverage', /\b(where do you serve|which areas|do you serve|you (even )?serve outside|mnahudumia wapi|mnafika wapi|maeneo gani|do you cover|you( guys)? cover|uko wapi|outside (nairobi|the county)|niko outside|siishi \w+|sikai \w+|mfike huko|mtafika huko|mnafika huko|mnafika|mnakuja|mnafikana|mtafika|mko wapi|where are you( located)?|your location|location yenu|mnapatikana wapi|kama mnakuja)\b/i],
+  ['coverage', /\b(where do you serve|which areas|do you serve|you (even )?serve outside|mnahudumia wapi|mnafika wapi|maeneo gani|do you cover|you( guys)? cover|uko wapi|outside (nairobi|the county|town|the city)|out of (nairobi|town)|beyond nairobi|nje ya (nairobi|kaunti|mji|town)|do you (come|go|travel|reach) (to|up to|as far as)|can you come to|mnaenda|mnafanya kazi nje|mnafanya (kazi )?(huko|maeneo)|niko outside|siishi \w+|sikai \w+|mfike huko|mtafika huko|mnafika huko|mnafika|mnakuja|mnafikana|mtafika|mko wapi|where are you( located)?|your location|location yenu|mnapatikana wapi|kama mnakuja)\b/i],
   ['recall', /\b(remember me|last time|what did i (book|order)|my last (visit|booking|order)|mara ya mwisho|mnanikumbuka|unanikumbuka|unakumbuka|do you remember|previous(ly)? (thing|dealing|call|order|booking)|in another call|before this call|i (had )?(spoke|spoken|talked) to you|tulifika wapi|tumeachia wapi|tulikuwa tumeachia|tumeongea|tulikuwa tumeongea|nilikuwa nimeitisha|nimekuongelesha|ile (mambo|kitu) (yetu )?ya jana|a while back)\b/i],
   ['want_know', /\b(nataka kujua|nilikuwa nataka kujua|nataka jua|nilitaka kujua|i wanted to (know|ask)|just inquiring|nataka kuuliza|nataka unisaidie|unisaidie|msaidia|hamwezi (ku)?nisaidia|nisaidie|maybe you tell me|you tell me|i don'?t know)\b/i],
   ['who_are_you', /^\W*(nani|ni nani|who is this|who am i (speaking|talking) (to|with)|tunaitwaje( tena)?|unaitwa nani|wewe ni nani|unaitwaje|what'?s your name)\W*\??\W*$/i],
@@ -26,7 +26,7 @@ const INTENT_RULES = [
   ['book', /\b(book|booking|make a booking|ku-?book|kubook|schedule|appointment|to be (washed|cleaned)|(wash|clean) my|someone to come|mtu aje|mkuje|utume (hao )?watu|mtume (mtu|watu)|wakuje|waje kufanya|come (today|tomorrow|kesho|leo)|come (and|to) clean|kusafisha|usafi|tuieke|tuweke|niwekee booking|weka booking)\b/i],
   ['availability', /\b(in stock|available|do you have|mna\b|iko stock|ipo|mnayo|una\b)/i],
   ['price', /\b(how much|price|pricing|cost|charge|bei|pesa ngapi|shilingi ngapi|ni ngapi|ndio ngapi|ni bei gani|ngapi pesa)\b/i],
-  ['hours', /\b(open|opening|close|closing|hours|fungua|mnafungua|unafungua|mnafunga|unafunga|funga|mnafanya kazi|mko wazi|working (days|hours)|operate until|until what time|mnafunga saa ngapi|saa za kazi)\b/i],
+  ['hours', /\b(open|opening|close|closing|hours|fungua|mnafungua|unafungua|mnafunga|unafunga|funga|mnafanya kazi(?! nje| huko| maeneo)|mko wazi|working (days|hours)|operate until|until what time|mnafunga saa ngapi|saa za kazi)\b/i],
 ];
 function detectIntents(text) { return INTENT_RULES.filter(([, re]) => re.test(text)).map(([n]) => n); }
 
@@ -40,12 +40,23 @@ function cleanName(raw) {
   if (!keep.length || keep.join('').length < 2) return null;
   return nameCase(keep.join(' '));
 }
+// A cut-off caller turn ("Hapana, n", "Uh, n") is never a slot answer: after the filler words
+// nothing of 2+ letters is left, or it ends on a dangling single letter.
+const FRAG_FILL = /^(uh|um|eh|eeh|ah|aa|hmm|mm|hapana|no|yes|ndio|sawa|okay|ok|so|na|ni|and|the)$/i;
+function cutOff(text) {
+  const ws = String(text || '').replace(/[^A-Za-z' ]/g, ' ').split(/\s+/).filter(Boolean);
+  const content = ws.filter((w) => !FRAG_FILL.test(w));
+  if (!content.length) return ws.length > 0 && /\b[a-z]$/i.test(String(text).trim()) ? true : false;
+  return content.every((w) => w.length < 2) || (/\b[b-hj-z]$/i.test(String(text).trim()) && content[content.length - 1].length === 1);
+}
+// A bare known area ("Kitengela") given to a name question is not a name. Karen is also a first name.
+function isBareArea(t) { const s = String(t || '').replace(/^\W*(uh|um|eeh|ni|in|at)\W+/i, '').replace(/[.!?,]+$/, '').trim(); const m = s.match(KNOWN_AREAS); return !!m && m[0] === s && s !== 'Karen'; }
 function extractName(text, { prompted = false } = {}) {
   const t = String(text || '');
   const pats = [/\bmy name is\s+([A-Za-z' ]+?)(?:[,.!?]| not | and |$)/i, /\b(?:jina langu ni|naitwa|ni mimi)\s+([A-Za-z' ]+?)(?:[,.!?]|$)/i,
     /\bi'?m speaking (?:with|to)?\s*([A-Za-z']+)/i, /\b(?:you'?re speaking (?:with|to)|unaongea na|naongea na|unazungumza na)\s+([A-Z][a-z']+)/i, /\b[Nn]i\s+([A-Z][a-z']+)\s*,?\s*(?:anapiga|napiga|hapa)/, /\b(?:this is|it'?s)\s+([A-Z][a-z']+(?: [A-Z][a-z']+)?)/, /\b[Ii]'?m\s+([A-Z][a-z']+)\b/, /\b[Ii] am\s+([A-Z][a-z']+)\b/, /\b([A-Z][a-z']+)\s+here\b/];
   for (const p of pats) { const m = t.match(p); if (m) { const n = cleanName(m[1]); if (n) return n; } }
-  if (prompted) {
+  if (prompted && !cutOff(t) && !isBareArea(t)) {
     const s = t.replace(/^\W*(it'?s|i'?m|ni|mimi ni|my name is|jina ni|yes|ndio)\W+/i, '').trim();
     const ws = s.split(/\s+/);
     if (ws.length <= 3 && /^[A-Za-z]/.test(s)) return cleanName(s);
@@ -80,7 +91,7 @@ function extractPlaceCore(text, { prompted = false } = {}) {
   const m = t.match(AREA_HINT);
   if (m && !/^(Friday|Monday|Tuesday|Wednesday|Thursday|Saturday|Sunday|The)$/.test(m[1])) return m[1].replace(/\s+/g, ' ').trim();
   if (known) return known[1];
-  if (prompted) { const s = t.replace(/^\W*(uh|um|eeh|it'?s|we are|i'?m|in|at|around|ni|tuko)\W+/i, '').replace(/[.!?]+$/, '').trim(); if (s && s.split(/\s+/).length <= 8) return s; }
+  if (prompted && !cutOff(t)) { const s = t.replace(/^\W*(uh|um|eeh|it'?s|we are|i'?m|in|at|around|ni|tuko)\W+/i, '').replace(/[.!?]+$/, '').trim(); if (s && s.split(/\s+/).length <= 8) return s; }
   return null;
 }
 
@@ -123,7 +134,9 @@ function matchProducts(text, catalog = []) {
 function lev(a, b) { const m = a.length, n = b.length; const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; }
 // Tenant service areas only (serviceAreas.areas ids like place:kitengela, county:nairobi).
 function matchArea(text, profile = {}) {
-  if (/\b(outside|siishi|sikai|not in|si wa)\b/i.test(String(text || ''))) return null;
+  // "outside Nairobi" names the base, not the caller's area: drop that phrase, keep the rest ("... I'm in Thika")
+  text = String(text || '').replace(/\b(?:outside|out of|beyond|nje ya)\s+(?:the\s+)?[A-Za-z]+/gi, ' ');
+  if (/\b(outside|siishi|sikai|not in|si wa)\b/i.test(text)) return null;
   const areas = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').split(':')[1]).filter(Boolean);
   const toks = String(text || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((w) => w.length >= 4);
   for (const a of areas) { const parts = a.split(' '); const key = parts[parts.length - 1]; if (toks.some((w) => w === key || (key.length >= 6 && lev(w, key) <= 2))) return { listed: true, name: a.replace(/\b\w/g, (c) => c.toUpperCase()) }; }
@@ -164,4 +177,4 @@ function understand(text, { profile = {}, now, expecting = null } = {}) {
     _yes: isYes,
   };
 }
-module.exports = { splitLandmark, extractLandmark, matchArea, understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };
+module.exports = { cutOff, splitLandmark, extractLandmark, matchArea, understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };

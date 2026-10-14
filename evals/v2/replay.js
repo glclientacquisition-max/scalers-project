@@ -35,7 +35,7 @@ const ol = console.log, ow = console.warn;
         try { run = await runCall({ root: ROOT, scenarioId: fx.id, modelSeed: seed, profile, seed: fx.seed || {}, callerPhone: fx.callerPhone, model, caller, now: new Date(fx.createdAt.replace(' ', 'T').replace(/\+00(:00)?$/, 'Z')), businessName: profile.businessName, agentName: profile.agentName || 'Shy', maxTurns: 60 }); }
         finally { console.log = ol; console.warn = ow; }
         const s = scoreRun({ id: fx.id, lang: fx.lang, commitment: false, expect: fx.expect }, run);
-        runs.push({ seed, ...s, transcript: run.turns.map((t) => ({ c: t.callerText, a: t.agentLine, o: t.outcome, tools: t.toolResults })), ownerText: run.ownerText });
+        runs.push({ seed, ...s, transcript: run.turns.map((t) => ({ c: t.callerText, a: t.agentLine, o: t.outcome, tools: t.toolResults, ev: t.events })), ownerText: run.ownerText });
       }
       out.cases.push({ id: fx.id, env: fx.env, mode: fx.replayMode, labelled: fx.label.by !== 'auto-observed', passK: runs.every((r) => r.pass), endStatePassK: runs.every((r) => r.endStatePass), runs });
     }

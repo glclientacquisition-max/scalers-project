@@ -254,6 +254,14 @@ function infoAnswer(state, u, profile, kind) {
     const loc = (profile.businessLocations || [])[0];
     const listed = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').split(':')[1]).filter(Boolean).map((a) => a.replace(/\b\w/g, (c) => c.toUpperCase()));
     const general = listed.length ? listed.slice(0, 4).join(', ') : (loc?.address || profile.hoursSchedule?.location?.split('·').pop()?.trim() || null);
+    // "outside Nairobi" / "nje ya Nairobi": the named place is the base, not the asked area;
+    // answer with the listed areas beyond it (from the tenant list only, never invented).
+    const om = String(u.text || '').match(/\b(?:outside|out of|beyond|nje ya)\s+(?:the\s+)?([A-Za-z]+)/i);
+    if (om && listed.length && !(u.area && u.area.name.toLowerCase() !== om[1].toLowerCase()) && !(u.place && u.place.toLowerCase() !== om[1].toLowerCase())) {
+      const base = om[1].toLowerCase(); const others = listed.filter((a) => a.toLowerCase() !== base);
+      if (others.length && others.length < listed.length) { state.coverageAsk = state.turn; return R.info({ kind: 'coverage_outside', base: L.cap(base), names: others.slice(0, 4).join(', '), more: others.length > 4 }, state.lang); }
+    }
+    if (!u.area && !u.place) state.coverageAsk = state.turn;
     return R.info({ kind: 'coverage', area: u.area, general, fromList: listed.length > 0, more: listed.length > 4 }, state.lang);
   }
   if (kind === 'payment_how') {
@@ -348,16 +356,29 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   // "what's my name?" answers from the caller file / this call only; never claims memory.
   if (/\b(naitwa nani|jina langu ni nani|what'?s my name|do you know my name|unajua jina langu)\b/i.test(text)) {
     const known = state.slots.name || state.file.contactName;
-    if (known) return out(lang === 'sw' ? `Nimeandika jina ${known}. Ni sahihi?` : `I have your name as ${known}. Is that right?`);
+    if (known) return out(lang === 'sw' ? `Nina jina lako kama ${known}. Ni sahihi?` : `I have your name as ${known}. Is that right?`);
     state.asked.name = (state.asked.name || 0) + 1; state.expecting = 'name';
     return out(lang === 'sw' ? 'Sina jina lako bado. Naomba jina lako?' : "I don't have your name yet. May I have your name?");
   }
   // "who did you escalate to?" answers from this call's own receipts only
   if (/\b(escalat\w*|umemtumia nani|who did you (send|tell|pass)|umepeleka kwa nani)\b/i.test(text) && (state.callbacks || []).length) return out(lang === 'sw' ? 'Nimeomba timu ya biashara ikupigie simu kwa namba hii.' : 'I asked the business team to call you back on this number.');
+  // a bare place right after our "which place are you in?" coverage answer is the coverage follow-up
+  if (state.coverageAsk === state.turn - 1 && !u.intents.length && !state.intent && text.split(/\s+/).length <= 5) {
+    const pl = u.place || N.extractPlace(text, { prompted: true });
+    if (u.area || pl) { u.place = u.place || pl; if (!u.area) u.area = { listed: false, name: L.cap(String(pl).split(/[ ,]/)[0]) }; u.intents.push('coverage'); }
+  }
   // a place asked as a question ("Of Naivasha?") is a coverage question
   if ((u.place || /^\W*(of|in|kama|like|what about|na je|je)\s+[A-Z][a-z]{3,}\W*$/i.test(text)) && /\?\s*$/.test(text) && !u.intents.includes('coverage') && !u.intents.includes('book')) u.intents.push('coverage');
   // after "anything else?": a no, thanks or a compliment closes the call
   const askedElse = /(anything else|Kuna kingine)[^?]*\?\s*$/i.test(state.lastLine || '');
+  // a cut-off turn ("Hapana, n") is never a no / decline / slot answer: ask again, keep everything
+  if (N.cutOff(text) && state.turn > 1 && (state.repairs || 0) < 2) {
+    state.repairs = (state.repairs || 0) + 1;
+    // re-ask the open question so the caller knows what to answer ("Sorry, I didn't catch that. Where should we come?")
+    const q = (String(state.lastBase || state.lastLine || '').match(/[^.!?]+\?\s*$/) || [])[0];
+    const sorry = R.info({ kind: 'repair' }, lang).split(/(?<=[.!?])\s/)[0];
+    return out(q && state.expecting ? `${sorry} ${q.trim()}` : R.info({ kind: 'repair' }, lang));
+  }
   if (!state.intent && state.phase === 'collect' && !u.intents.filter((i) => i !== 'greeting').length && !u.service && (askedElse && (u.no || /^\W*hapana\b/i.test(text)) || /\b(thank you|thanks|asante( sana)?|excited|salama kabisa|keep (it )?up|continue serving)\b/i.test(text) && state.turn > 2)) { state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
   // a name given while a callback offer is open: keep the name, drop the stale offer
   if (state.phase === 'readback' && state.pending?.tool === 'create_handoff' && u.name && !u.yes && !u.no) { mergeSlots(state, u, profile); state.pending = null; state.phase = 'collect'; if (!state.intent) return out(R.info({ kind: 'greet_name', name: nameSpeakable(state) || u.name }, lang)); const st = stepIntent(state, u, profile); if (st?.line) return out(st.line); }
