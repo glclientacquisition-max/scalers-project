@@ -353,7 +353,9 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
         ? require('./callFixesD199').ackPromptText(
             'Out of coverage. Callback note only. Okay, Sawa, or leave it is not a booking. Do not create_appointment. Do not say you will serve them tomorrow.'
           )
-        : 'The area is outside POLICIES/LOCATIONS. Do not create_appointment. Say the area is outside our coverage. Do not offer a callback. Never say landmark.',
+        : require('./coverageSingleSource').coverageSingleSourceEnabled()
+          ? require('./coverageSingleSource').outsideReason()
+          : 'The area is outside POLICIES/LOCATIONS. Do not create_appointment. Say the area is outside our coverage. Do not offer a callback. Never say landmark.',
     };
   }
   if (placeGate === 'unknown_coverage') {

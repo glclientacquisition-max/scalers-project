@@ -105,6 +105,10 @@ function formatPoliciesBlock(policies) {
       'COVERAGE RULE: The Coverage line is the only service area. A county on it covers every town in that county. Delivery text is timing and other instructions.'
     );
     if (gate) lines.push(confirmedCoveragePromptRule(true));
+    {
+      const single = require('./coverageSingleSource');
+      if (single.coverageSingleSourceEnabled()) lines.push(single.coverageSourcePromptRule());
+    }
     if (p.coverage_outside) {
       const fee = p.coverage_outside.feeKsh;
       lines.push(
