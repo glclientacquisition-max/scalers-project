@@ -1,12 +1,15 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { bustTenantCache } from "@/lib/tenantCache";
 import { revalidatePath } from "next/cache";
 import { memberDenied } from "@/lib/requireMember";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { recompileAfterCatalogImport } from "@/lib/catalogImportRecompile";
 import { readCatalogFresh } from "@/lib/catalogFresh";
-import { patchCatalogItem } from "@/lib/catalogPricing";
+import { catalogPricePath, findCatalogItem, patchCatalogItem } from "@/lib/catalogPricing";
+import { planFactConfirm } from "@/lib/factConfirm";
+import { ownerConfirmPlan, readSavedFactRow } from "@/lib/ownerAttestFields";
 import {
   categoriesFor,
   isIntent,
@@ -26,6 +29,21 @@ async function workspace() {
   const workspace = await createWorkspaceDataClient();
   if (!tenant || !workspace) return { error: "Not signed in." } as const;
   return { tenant, client: workspace.client } as const;
+}
+
+async function restampPriceHash(
+  client: SupabaseClient,
+  tenantId: string,
+  kind: "product" | "service",
+  rows: Array<Record<string, unknown>>,
+  target: { id?: string | null; name: string }
+): Promise<void> {
+  const path = catalogPricePath(kind, rows, findCatalogItem(rows, target));
+  if (!path) return;
+  const column = kind === "product" ? "product_catalog" : "services_catalog";
+  const saved = (await readSavedFactRow(client, tenantId)) ?? { [column]: rows };
+  // before = after: nothing reads as changed, so only the explicit .price path is stamped.
+  await ownerConfirmPlan(tenantId, planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: [path] }));
 }
 
 /** Owner answers "Is this right?" for one item's typed price (yes, or a corrected price). */
@@ -60,6 +78,11 @@ export async function confirmPriceAction(input: { kind: "product" | "service"; i
   const { error } = await ws.client.from("tenants").update({ [column]: next }).eq("id", ws.tenant.id);
   bustTenantCache(ws.tenant.id);
   if (error) return { ok: false, error: SAVE_FAILED };
+  // The owner just confirmed this price: re-stamp its .price hash against the
+  // row as saved, so the rewrite above does not leave a stale value_hash.
+  await restampPriceHash(ws.client, ws.tenant.id, input.kind, next, { id: input.id, name: input.name }).catch((err) =>
+    console.warn("[confirmPriceAction] price hash", err instanceof Error ? err.message : err)
+  );
   // Same as payments: the prompt quotes prices, so rebuild it with the confirmed one.
   await recompileAfterCatalogImport({
     client: ws.client,
