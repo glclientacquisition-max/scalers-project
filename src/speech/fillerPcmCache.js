@@ -92,7 +92,9 @@ async function warmFillerAckPcm(opts = {}) {
   const tts = opts.tts;
   if (!isFillerCacheEnabled() || !tts) return { warmed: 0 };
   let warmed = 0;
-  for (const text of commonAckPhrases()) {
+  // opts.phrases (VOICE_TOOL_SMOOTH_PREFETCH): hold + receipt packs, same key schema.
+  const phrases = Array.isArray(opts.phrases) ? opts.phrases : commonAckPhrases();
+  for (const text of phrases) {
     if (opts.shouldAbort?.()) break;
     const found = lookupFillerPcm({
       voiceId: opts.voiceId,
