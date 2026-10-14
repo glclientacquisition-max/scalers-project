@@ -1,6 +1,6 @@
 'use strict';
 // Deterministic normalisers for BA v2 slots: language, numbers, Swahili clock, dates.
-const SW_MARK = /\b(habari|nataka|naomba|kesho|keshokutwa|leo|saa|asubuhi|mchana|jioni|usiku|ndio|ndiyo|hapana|sawa|asante|tafadhali|jina|langu|naitwa|niaje|sasa|mna|mnafungua|mnafanya|kazi|iko|ipo|kubook|kuagiza|niwekee|nitaichukua|nitakuja|moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi|usafi|kusafisha|aje|mmeniharibia|sijaridhika|kabisa|mwenye|biashara|ajue|jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili|karibu|na|ya|wa|kwa|ni|tu|hiyo|yangu|wangu|gani|wapi|ngapi|lini|nimekam|toner ya|futa|badilisha)\b/gi;
+const SW_MARK = /\b(habari|nataka|naomba|kesho|keshokutwa|leo|saa|asubuhi|mchana|jioni|usiku|ndio|ndiyo|hapana|sawa|asante|tafadhali|jina|langu|naitwa|niaje|sasa|mna|mnafungua|mnafanya|kazi|iko|ipo|kubook|kuagiza|niwekee|nitaichukua|nitakuja|moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi|usafi|kusafisha|aje|mmeniharibia|sijaridhika|kabisa|mwenye|biashara|ajue|jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili|karibu|na|ya|wa|kwa|ni|tu|hiyo|yangu|wangu|gani|wapi|ngapi|lini|nimekam|toner ya|futa|badilisha|shilingi|mnafika|mnakuja|mko|nilikuwa|kujua|jua|mnaofa\w*|saizi|mnatoa|huduma|unaongea|naongea|mi|mimi|niko|lakini|nitakuja|kidogo|mbali|mnawash\w*|mnasafisha|bei|pesa|uliza|nauliza|unisaidie|msaidia|sijui|hujaniambia|mkuje|hapa|tajiri|wenu|yenu|nipe|ile|hii|hizi|vitu|je|kama|si|ama|hivo|hivyo|wah|eeh|tu|sasa)\b/gi;
 const SW_GREET_ONLY = /^\W*(eeh|eh|hi|hello|habari|niaje|sasa|mambo|vipi|hujambo)\W*(habari)?\W*$/i;
 const EN_MARK = /\b(the|you|your|i|i'm|is|are|we|will|what|which|can|would|and|for|please|okay|that|have|want|need|book|order|my|me|hello|hi|yes|no|cancel|move|how|much|do|it|in|at|to)\b/gi;
 
@@ -18,11 +18,11 @@ function nextLanguage(prev, text) {
   if (d.greetingOnly) return prev || null;
   const vote = d.sw > d.en ? 'sw' : d.en > d.sw ? 'en' : null;
   const tag = (v) => (v === 'sw' && d.sheng ? 'sheng' : v);
-  if (!prev) return vote && d.words >= 2 && Math.max(d.sw, d.en) >= 2 ? tag(vote) : null;
+  if (!prev) return vote && d.words >= 2 && (Math.max(d.sw, d.en) >= 2 || Math.min(d.sw, d.en) === 0) ? tag(vote) : null;
   const base = prev === 'en' ? 'en' : 'sw';
   // follow the caller's latest clear content turn; short/ambiguous turns keep the call language
   const win = vote === 'sw' ? d.sw : d.en; const lose = vote === 'sw' ? d.en : d.sw;
-  if (vote && vote !== base && d.words >= 3 && win >= 2 && win >= 2 * lose + 1) return tag(vote);
+  if (vote && vote !== base && d.words >= 2 && win >= 2 && win >= lose + 2) return tag(vote);
   return prev;
 }
 const isSw = (lang) => /^(sw|sheng|mixed)/.test(String(lang || ''));

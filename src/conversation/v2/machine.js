@@ -12,7 +12,7 @@ const { renderOwnerMessage } = require('./owner');
 const { buildRequest } = require('./gemini');
 
 const TRANSACTIONAL = ['payment_change', 'address_change', 'cancel', 'change', 'complaint', 'handoff', 'order', 'book'];
-const INFO = ['recall', 'availability', 'price', 'hours'];
+const INFO = ['services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
 
 function createState({ profile = {}, callerPhone, contactName = null, openRows = [], pendingTasks = [] } = {}) {
   return {
@@ -39,6 +39,8 @@ function pickIntent(u, state, profile) {
   if (t === 'book' && vertical(profile) === 'retail') t = 'order';
   if (t === 'order' && vertical(profile) === 'home') t = 'book';
   if (t === 'handoff' && state.intent === 'complaint') t = null;
+  // a question about services/prices/hours/areas that only mentions "usafi" is an enquiry, not a booking
+  if (t === 'book' && u.intents.some((i) => ['services', 'coverage', 'price', 'hours'].includes(i)) && !/\b(book|ku-?book|kubook|appointment|schedule|tuweke|tuieke)\b/i.test(u.text)) t = null;
   return t || null;
 }
 
@@ -222,8 +224,25 @@ function infoAnswer(state, u, profile, kind) {
     if (!h) return R.info({ kind: 'hours', dayLabel: L.isSw(state.lang) ? 'Leo' : 'today', closed: true }, state.lang);
     return R.info({ kind: 'hours', everyDay: same, open: h.open, close: h.close }, state.lang);
   }
+  if (kind === 'services') {
+    const cat = vertical(profile) === 'retail' ? (profile.productCatalog || []).map((p) => p.name) : (profile.servicesCatalog || []).map((x) => x.name);
+    if (u.service) return R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, state.lang);
+    if (u.products[0]) return R.info({ kind: 'offered', label: u.products[0].name, price: u.products[0].price ? `KSh ${u.products[0].price}` : null }, state.lang);
+    if (!cat.length) return R.info({ kind: 'want_know' }, state.lang);
+    const start = (n * 4) % cat.length;
+    return R.info({ kind: 'services', names: [...cat, ...cat].slice(start, start + 4), more: cat.length > 4 }, state.lang);
+  }
+  if (kind === 'coverage') {
+    const loc = (profile.businessLocations || [])[0];
+    const listed = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').split(':')[1]).filter(Boolean).map((a) => a.replace(/\b\w/g, (c) => c.toUpperCase()));
+    const general = listed.length ? listed.slice(0, 4).join(', ') : (loc?.address || profile.hoursSchedule?.location?.split('·').pop()?.trim() || null);
+    return R.info({ kind: 'coverage', area: u.area, general, fromList: listed.length > 0, more: listed.length > 4 }, state.lang);
+  }
+  if (kind === 'want_know') return R.info({ kind: 'want_know' }, state.lang, n);
   if (kind === 'price') {
-    const svc = u.service; const prod = u.products[0];
+    const named = /\b(cleaning|clean|for (an?|the)? ?\w+|ya \w+)\b/i.test(u.text);
+    const svc = u.service || (!named && u.text.split(/\s+/).length <= 5 && state.slots.service && (profile.servicesCatalog || []).find((x) => x.name === state.slots.service)); const prod = u.products[0];
+    if (!svc && !prod && !/\b(oven|fridge|gutter|\w+ cleaning)\b/i.test(u.text)) return R.info({ kind: 'which_price' }, state.lang);
     if (svc && svc.price_range && svc.pricing?.confirmed !== false) return R.info({ kind: 'price', found: true, label: svc.name, price: svc.price_range }, state.lang);
     if (prod && prod.price) return R.info({ kind: 'price', found: true, label: prod.name, price: `KSh ${prod.price}` }, state.lang);
     state.offer = 'quote';
@@ -315,7 +334,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   // model may only propose book/order when our own reading found no intent at all
   if (!state.intent && mc && !u.intents.length) { const ok = mc.calls.find((c, i) => mc.checks[i].ok && /^(create_booking|create_order)$/.test(c.name)); if (ok && (u.service || u.products.length)) state.intent = INTENT_OF_TOOL[ok.name]; }
   // info questions answered without dropping a transaction in progress
-  const infoKind = u.intents.find((i) => INFO.includes(i)) || (!ni && state.lastInfo === 'price' && (u.service || u.products.length) ? 'price' : null);
+  const infoKind = u.intents.find((i) => INFO.includes(i) && i !== 'want_know') || u.intents.find((i) => i === 'want_know') || (!ni && state.lastInfo === 'price' && (u.service || u.products.length) ? 'price' : null);
   if (infoKind && (!ni || ni === 'book' && infoKind === 'availability' && !/\bbook\b/i.test(u.text))) {
     if (state.intent === 'book' && infoKind === 'availability' && !/\bbook|kubook\b/i.test(u.text) && state.stateIntentTurn === state.turn) state.intent = null;
     if (!state.intent || state.stateIntentTurn !== state.turn) {
@@ -334,6 +353,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     if (n === 2 && !state.ladderOffered) { state.ladderOffered = true; return out(propose(state, { tool: 'create_handoff', kind: 'ladder', reason: 'callback' })); }
     return out(R.ask('intent', n % 2, lang));
   }
+  if (u.done && state.phase === 'collect' && state.intent !== 'complaint' && !u.intents.length) { resetIntent(state); state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
   mergeSlots(state, u, profile);
   const st = stepIntent(state, u, profile);
   if (st?.commitNow) {

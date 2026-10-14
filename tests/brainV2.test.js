@@ -118,3 +118,23 @@ test('catalogue: schemas reject extra properties and foreign row ids; Gemini req
   const parsed = V2.gemini.parseResponse({ candidates: [{ content: { parts: [{ text: 'hi' }, { functionCall: { name: 'get_hours', args: {} } }] } }] });
   assert.deepEqual(parsed.calls.map((c) => c.name), ['get_hours']);
 });
+
+test('Swahili/Sheng questions get fact answers from tenant data, not a generic reply', async () => {
+  const one = async (t) => (await talk([t])).out[0];
+  let r = await one('Nilikuwa nataka kujua ni services gani mnaofa.');
+  assert.equal(r.lang, 'sw'); assert.match(r.line, /^Tunafanya .*Mattress cleaning/);
+  r = await one('Nilikuwa nataka kujua ni saizi gani mnatoa.'); assert.match(r.line, /Bedroom/);
+  r = await one('Mnawashanga carpet?'); assert.match(r.line, /^Ndio, tunafanya Carpet Cleaning, bei ni kuanzia KSh 2,200/);
+  r = await one('Niaje, mnafika Syokimau?'); assert.match(r.line, /^Syokimau iko kwenye orodha/);
+  r = await one('Mnafika Kisumu?'); assert.match(r.line, /^Kisumu haiko kwenye orodha/);
+  r = await one('Habari, nilikuwa nataka kujua.'); assert.match(r.line, /bei, huduma au saa za kazi/);
+  r = await one('You guys operate until what time?'); assert.match(r.line, /08:00 to 18:00/);
+  const p = await talk(['Shilingi ngapi?', 'Ya sofa.']);
+  assert.match(p.out[0].line, /huduma gani/); assert.match(p.out[1].line, /KSh 800/);
+  for (const o of [r, ...p.out]) assert.doesNotMatch(o.line, /Samahani, unapiga kubook|Nimwombe mwenye biashara/);
+});
+
+test('a services question that says "usafi" is an enquiry, not a booking', async () => {
+  const { st, log } = await talk(['Saizi gani mnatoa za usafi?']);
+  assert.equal(st.intent, null); assert.equal(log.length, 0);
+});

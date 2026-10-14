@@ -15,12 +15,15 @@ const INTENT_RULES = [
   ['change', /\b(move my|reschedule|postpone|change my (booking|appointment|visit)|change (the )?(time|date)|badilisha (booking|siku|saa)|songesha)\b/i],
   ['complaint', /\b(not happy|unhappy|bad service|complain\w*|disappointed|left .{0,20}dirty|damaged|ruined|sijaridhika|mmeniharibia|mmeharibu|malalamiko|huduma mbaya)\b/i],
   ['handoff', /\b(manager|the owner|speak to (a |someone|somebody|the)|talk to (a |someone|the)|human|real person|mwenye biashara|meneja)\b/i],
+  ['services', /\b(services? gani|huduma gani|mnaofa\w*|mna-?offer\w*|mnauza\w* nini|which (exact )?services|what services|services (do )?you (do )?offer|mnafanya nini|mnatoa nini|saizi gani|sizes? (do you|gani)|mnawash\w*|mnasafisha|do you (clean|wash|do)\b)/i],
+  ['coverage', /\b(do you cover|you( guys)? cover|uko wapi|mnafika|mnakuja|mnafikana|mtafika|mko wapi|where are you( located)?|your location|location yenu|mnapatikana wapi|kama mnakuja)\b/i],
   ['recall', /\b(remember me|last time|what did i (book|order)|my last (visit|booking|order)|mara ya mwisho|mnanikumbuka)\b/i],
+  ['want_know', /\b(nataka kujua|nilikuwa nataka kujua|nataka jua|nilitaka kujua|i wanted to (know|ask)|just inquiring|nataka kuuliza)\b/i],
   ['order', /\b(order|kuagiza|agiza|niwekee|buy|nunua|reserve|hold (one|two|\d))\b/i],
   ['book', /\b(book|ku-?book|kubook|schedule|appointment|someone to come|mtu aje|mkuje|come (and|to) clean|kusafisha|usafi|tuieke|tuweke|niwekee booking|weka booking)\b/i],
   ['availability', /\b(in stock|available|do you have|mna\b|iko stock|ipo|mnayo|una\b)/i],
-  ['price', /\b(how much|price|cost|charge|bei|pesa ngapi|ni ngapi)\b/i],
-  ['hours', /\b(open|opening|close|closing|hours|fungua|mnafungua|unafungua|mnafunga|unafunga|funga|mnafanya kazi|mko wazi|working (days|hours))\b/i],
+  ['price', /\b(how much|price|pricing|cost|charge|bei|pesa ngapi|shilingi ngapi|ni ngapi|ngapi pesa)\b/i],
+  ['hours', /\b(open|opening|close|closing|hours|fungua|mnafungua|unafungua|mnafunga|unafunga|funga|mnafanya kazi|mko wazi|working (days|hours)|operate until|until what time|mnafunga saa ngapi|saa za kazi)\b/i],
 ];
 function detectIntents(text) { return INTENT_RULES.filter(([, re]) => re.test(text)).map(([n]) => n); }
 
@@ -37,7 +40,7 @@ function cleanName(raw) {
 function extractName(text, { prompted = false } = {}) {
   const t = String(text || '');
   const pats = [/\bmy name is\s+([A-Za-z' ]+?)(?:[,.!?]| not | and |$)/i, /\b(?:jina langu ni|naitwa|ni mimi)\s+([A-Za-z' ]+?)(?:[,.!?]|$)/i,
-    /\bi'?m speaking (?:with|to)?\s*([A-Za-z']+)/i, /\b(?:this is|it'?s)\s+([A-Z][a-z']+(?: [A-Z][a-z']+)?)/, /\b[Ii]'?m\s+([A-Z][a-z']+)\b/, /\b[Ii] am\s+([A-Z][a-z']+)\b/, /\b([A-Z][a-z']+)\s+here\b/];
+    /\bi'?m speaking (?:with|to)?\s*([A-Za-z']+)/i, /\b(?:you'?re speaking (?:with|to)|unaongea na|naongea na|unazungumza na)\s+([A-Z][a-z']+)/i, /\bni\s+([A-Z][a-z']+)\s*,?\s*(?:anapiga|napiga)/, /\b(?:this is|it'?s)\s+([A-Z][a-z']+(?: [A-Z][a-z']+)?)/, /\b[Ii]'?m\s+([A-Z][a-z']+)\b/, /\b[Ii] am\s+([A-Z][a-z']+)\b/, /\b([A-Z][a-z']+)\s+here\b/];
   for (const p of pats) { const m = t.match(p); if (m) { const n = cleanName(m[1]); if (n) return n; } }
   if (prompted) {
     const s = t.replace(/^\W*(it'?s|i'?m|ni|mimi ni|my name is|jina ni|yes|ndio)\W+/i, '').trim();
@@ -96,6 +99,16 @@ function matchProducts(text, catalog = []) {
   });
   return found;
 }
+function lev(a, b) { const m = a.length, n = b.length; const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; }
+// Tenant service areas only (serviceAreas.areas ids like place:kitengela, county:nairobi).
+function matchArea(text, profile = {}) {
+  const areas = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').split(':')[1]).filter(Boolean);
+  const toks = String(text || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((w) => w.length >= 4);
+  for (const a of areas) { const parts = a.split(' '); const key = parts[parts.length - 1]; if (toks.some((w) => w === key || (key.length >= 6 && lev(w, key) <= 2))) return { listed: true, name: a.replace(/\b\w/g, (c) => c.toUpperCase()) }; }
+  const tx = String(text || '').replace(/\b(Mnafika|Mnakuja|Mtafika|Hadi|Cover|Niko|Nipo|Kwa|Na)\b/g, (m) => m.toLowerCase());
+  const asked = tx.match(/\b(?:cover|niko|nipo|in|na|kwa|si|fika|kuja|mnafika|mnakuja|mtafika|hadi|to)\s+([A-Z][a-z]{3,})/) || tx.match(KNOWN_AREAS);
+  return asked ? { listed: false, name: asked[1] } : null;
+}
 function extractQuantity(text) { const m = String(text || '').toLowerCase().match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|moja|mbili|tatu|nne|tano|sita)\b/); return m ? L.toNum(m[1]) : null; }
 
 function bareHour(t) { const n = Number(t.match(/(\d{1,2})/)[1]); if (n < 1 || n > 12) return null; const h = n <= 6 ? n + 12 : n; return { date: null, time: `${String(h).padStart(2, '0')}:00`, raw: String(n) }; }
@@ -118,7 +131,8 @@ function understand(text, { profile = {}, now, expecting = null } = {}) {
     service: matchService(t, profile.servicesCatalog || []),
     products: matchProducts(t, profile.productCatalog || []),
     quantity: extractQuantity(t),
+    area: matchArea(t, profile),
     _yes: isYes,
   };
 }
-module.exports = { understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };
+module.exports = { matchArea, understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };

@@ -29,6 +29,8 @@ function scoreRun(scn, run) {
   if (turns.some((t) => t.error)) fails.push(`harness_error: ${turns.find((t) => t.error).error}`);
   // ---- speech assertions per turn
   let langMismatch = 0;
+  let turnLangN = 0;
+  let expectL = scn.lang === 'en' ? 'en' : 'sw';
   turns.forEach((t, idx) => {
     const line = t.agentLine || '';
     const succ = t.toolResults.filter(ok).map((r) => r.action);
@@ -42,13 +44,26 @@ function scoreRun(scn, run) {
       for (const nm of scn.forbiddenNames || []) if (new RegExp(`\\b${nm}\\b`, 'i').test(s)) claims.push({ turn: idx, cls: 'other_person_name', s });
     }
     if (INSTR.test(line)) claims.push({ turn: idx, cls: 'instruction_spoken', s: line });
-    if (scn.lang !== 'en' && langOf(line) === 'en') langMismatch++;
-    if (scn.lang === 'en' && langOf(line) === 'sw' && !/karibu/i.test(line)) langMismatch++;
+    // Language is scored per turn: the expected language is the caller's latest clear turn
+    // (call-level fixture labels are unreliable for code-switching callers). EVAL_LANG=call restores the old rule.
+    const callerL = langOf(t.callerText || '');
+    const callMode = process.env.EVAL_LANG === 'call';
+    if (callerL !== 'unknown') expectL = callerL;
+    const want = callMode ? (scn.lang === 'en' ? 'en' : 'sw') : expectL;
+    // per-turn mode scores only turns where the caller's own language is clear (or the scripted call language for turn 0)
+    const scored = callMode || callerL !== 'unknown' || idx === 0;
+    if (scored) turnLangN++;
+    if (!scored) {} else if (want !== 'en' && langOf(line) === 'en') langMismatch++;
+    else if (want === 'en' && langOf(line) === 'sw' && !/karibu/i.test(line)) langMismatch++;
     if (words(line).length > (scn.maxWords || 35)) fails.push(`too_long t${idx} (${words(line).length}w)`);
     if ((line.match(/\?/g) || []).length > 1) fails.push(`two_questions t${idx}`);
   });
   if (langMismatch) fails.push(`language_mismatch x${langMismatch}`);
   if (claims.length) fails.push(...claims.map((c) => `false_claim:${c.cls} t${c.turn} "${c.s.slice(0, 70)}"`));
+  // ---- must/mustn't say (fact answers for coverage scenarios)
+  const said = turns.map((t) => t.agentLine || '').join(' \n ');
+  for (const re of scn.mustSay || []) if (!new RegExp(re, 'i').test(said)) fails.push(`must_say "${re}"`);
+  for (const re of scn.mustNotSay || []) if (new RegExp(re, 'i').test(said)) fails.push(`must_not_say "${re}"`);
   // ---- owner email
   if (INSTR.test(run.ownerText)) fails.push('owner_email_instruction_leak');
   // ---- final DB state
@@ -106,6 +121,8 @@ function scoreRun(scn, run) {
     fails,
     claims,
     agentTurns: turns.length,
+    langTurns: turnLangN,
+    langMismatch,
     brainMs: turns.map((t) => ({ ms: t.brainMs, tool: t.toolTurn })),
   };
 }
