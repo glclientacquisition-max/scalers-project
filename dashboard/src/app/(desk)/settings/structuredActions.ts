@@ -19,6 +19,7 @@ import {
   sanitizePricing,
   type StructuredPrice,
 } from "@/lib/structuredData";
+import { reportFactHashRestampFailure } from "@/lib/factHashRestampReport";
 
 export type StructuredResult = { ok: true; message: string } | { ok: false; error: string; fields?: Record<string, string> };
 
@@ -44,9 +45,15 @@ async function restampPriceHash(
   // row's .name value, so re-stamp .name too or a "yes, unchanged" goes stale.
   const namePath = path.replace(/\.price$/, ".name");
   const column = kind === "product" ? "product_catalog" : "services_catalog";
-  const saved = (await readSavedFactRow(client, tenantId)) ?? { [column]: rows };
-  // before = after: nothing reads as changed, so only the explicit .price and .name paths are stamped.
-  await ownerConfirmPlan(tenantId, planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: [path, namePath] }));
+  try {
+    const saved = (await readSavedFactRow(client, tenantId)) ?? { [column]: rows };
+    // before = after: nothing reads as changed, so only the explicit .price and .name paths are stamped.
+    await ownerConfirmPlan(tenantId, planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: [path, namePath] }));
+  } catch (err) {
+    // Price save already committed; do not fail the owner action. Under
+    // FACT_HASH_MODE=on a missed re-stamp drops the row from the grounded catalogue.
+    reportFactHashRestampFailure({ tenantId, itemPath: path, error: err });
+  }
 }
 
 /** Owner answers "Is this right?" for one item's typed price (yes, or a corrected price). */
@@ -83,9 +90,8 @@ export async function confirmPriceAction(input: { kind: "product" | "service"; i
   if (error) return { ok: false, error: SAVE_FAILED };
   // The owner just confirmed this price: re-stamp its .price hash against the
   // row as saved, so the rewrite above does not leave a stale value_hash.
-  await restampPriceHash(ws.client, ws.tenant.id, input.kind, next, { id: input.id, name: input.name }).catch((err) =>
-    console.warn("[confirmPriceAction] price hash", err instanceof Error ? err.message : err)
-  );
+  // Failures are reported inside restampPriceHash (structured log); never block the save.
+  await restampPriceHash(ws.client, ws.tenant.id, input.kind, next, { id: input.id, name: input.name });
   // Same as payments: the prompt quotes prices, so rebuild it with the confirmed one.
   await recompileAfterCatalogImport({
     client: ws.client,

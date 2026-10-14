@@ -206,3 +206,53 @@ test("confirm with no real change: re-stamped .price and .name both match the st
     assert.deepEqual(plan.reopen, []);
   }
 });
+
+// --- fact hash re-stamp failure visibility -----------------------------------
+
+test("factHashRestampFailurePayload is structured: tenant id, item path, error; no PII fields", async () => {
+  const { factHashRestampFailurePayload } = await import("../dashboard/src/lib/factHashRestampReport.ts");
+  const payload = factHashRestampFailurePayload({
+    tenantId: "df4ad9d8-aaaa-bbbb-cccc-ddddeeeeffff",
+    itemPath: "catalog.service.svc_a.price",
+    error: new Error("rpc confirm_tenant_fields_batch failed"),
+  });
+  assert.deepEqual(payload, {
+    tenantId: "df4ad9d8-aaaa-bbbb-cccc-ddddeeeeffff",
+    itemPath: "catalog.service.svc_a.price",
+    error: "rpc confirm_tenant_fields_batch failed",
+  });
+  assert.equal("name" in payload, false);
+  assert.equal("price" in payload, false);
+  assert.equal("price_range" in payload, false);
+});
+
+test("reportFactHashRestampFailure logs a structured fact_hash_restamp_failed error", async () => {
+  const { reportFactHashRestampFailure } = await import("../dashboard/src/lib/factHashRestampReport.ts");
+  const errors: unknown[] = [];
+  const orig = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args[0]); };
+  try {
+    reportFactHashRestampFailure({
+      tenantId: "t1",
+      itemPath: "catalog.service.svc_a.price",
+      error: "stamp failed",
+    });
+  } finally {
+    console.error = orig;
+  }
+  assert.equal(errors.length, 1);
+  const parsed = JSON.parse(String(errors[0]));
+  assert.equal(parsed.event, "fact_hash_restamp_failed");
+  assert.equal(parsed.tenantId, "t1");
+  assert.equal(parsed.itemPath, "catalog.service.svc_a.price");
+  assert.equal(parsed.error, "stamp failed");
+});
+
+test("confirmPriceAction reports re-stamp failures instead of a silent console.warn", () => {
+  const src = read("dashboard/src/app/(desk)/settings/structuredActions.ts");
+  const body = src.slice(src.indexOf("async function restampPriceHash"));
+  assert.ok(src.includes('reportFactHashRestampFailure'), "imports/uses the reporter");
+  assert.ok(body.includes("reportFactHashRestampFailure({"), "failure path calls the reporter");
+  assert.ok(body.includes("itemPath: path"), "logs the item path, not the item name");
+  assert.ok(!/console\.warn\(\s*"\[confirmPriceAction\] price hash"/.test(src), "old silent warn removed");
+});
