@@ -82,6 +82,8 @@ function scoreRun(scn, run) {
     else {
       if (ex.appointment.service && !new RegExp(ex.appointment.service, 'i').test(a.service_name || '')) fails.push(`db:appointment.service "${a.service_name}"`);
       if (ex.appointment.startEAT) { const got = EAT(a.window_start); if (got !== ex.appointment.startEAT) fails.push(`db:appointment.window_start expected ${ex.appointment.startEAT} got ${got} (when_text "${a.when_text}")`); }
+      if (ex.appointment.place && a.address_landmark !== ex.appointment.place) fails.push(`db:appointment.place expected "${ex.appointment.place}" got "${a.address_landmark}"`);
+      if (ex.appointment.note && !new RegExp(ex.appointment.note, 'i').test(a.notes || '')) fails.push(`db:appointment.note expected /${ex.appointment.note}/ got "${a.notes}"`);
       if (ex.appointment.callerName && !new RegExp(ex.appointment.callerName, 'i').test(a.caller_name || '')) fails.push(`db:appointment.caller_name "${a.caller_name}"`);
     }
   }

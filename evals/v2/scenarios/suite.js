@@ -112,4 +112,17 @@ module.exports = [
     turns: ['Habari, nilikuwa nataka kujua.', ['Saa ngapi mnafungua?', 'Mnafungua saa ngapi?']], facts: {}, expect: { noWrites: true } },
   { id: 'S32_sw_do_you_clean_carpet', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['tunafanya Carpet'],
     turns: [['Mnasafisha carpet?', 'Mnawashanga carpet?']], facts: {}, expect: { noWrites: true } },
+  // Area + landmark: the area is the place, the landmark is a note (v2 read-back fix).
+  { id: 'S33_book_en_area_landmark', area: 'booking', lang: 'en', tenant: 'done_and_dusted',
+    turns: [["Hi, I'd like to book interior window cleaning for Friday at 10am.", 'Can I book window cleaning on Friday at 10 in the morning?']],
+    facts: { name: 'Alvin', place: 'Kitengela, near Naivas', when: 'Friday at 10am' }, mustSay: ['in Kitengela, near Naivas'],
+    expect: { appointments: 1, service_requests: 0, appointment: { service: 'window', startEAT: '2026-10-16 10:00', place: 'Kitengela', note: 'near Naivas', callerName: 'Alvin' } } },
+  { id: 'S34_book_sw_area_karibu_na', area: 'booking', lang: 'sw', tenant: 'done_and_dusted',
+    turns: [['Nataka kusafisha madirisha Ijumaa saa nne asubuhi.', 'Naomba kubook usafi wa madirisha Ijumaa saa nne asubuhi.']],
+    facts: { name: 'Wanjiru', place: 'Ruiru karibu na Spur Mall', when: 'Ijumaa saa nne asubuhi' },
+    expect: { appointments: 1, service_requests: 0, appointment: { service: 'window', place: 'Ruiru', note: 'karibu na Spur Mall', callerName: 'Wanjiru' } } },
+  { id: 'S35_book_sw_area_pale_opposite', area: 'booking', lang: 'sw', tenant: 'done_and_dusted',
+    turns: [['Nataka kusafisha madirisha Ijumaa saa nne asubuhi.', 'Naomba kubook usafi wa madirisha Ijumaa saa nne asubuhi.']],
+    facts: { name: 'Otieno', place: 'Juja pale Total, opposite the stage', when: 'Ijumaa saa nne asubuhi' },
+    expect: { appointments: 1, service_requests: 0, appointment: { service: 'window', place: 'Juja', note: 'pale Total', callerName: 'Otieno' } } },
 ];

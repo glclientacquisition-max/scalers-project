@@ -56,7 +56,25 @@ function extractCorrection(text) { const m = String(text || '').match(/\bnot\s+(
 
 const AREA_HINT = /\b(?:around|near|in|at|karibu na|pale|area ya|kwa)\s+([A-Z][A-Za-z]+(?:[ ,]+(?:near|karibu na)?\s*[A-Z][A-Za-z]+(?: [A-Z][a-z]+)*)?)/;
 const KNOWN_AREAS = /\b(Kitengela|Ruiru|Kasarani|Kilimani|Karen|Westlands|Lavington|Kileleshwa|Rongai|Syokimau|Thika|Juja|Embakasi|Langata|Ngong|Kahawa|Roysambu|Donholm|Umoja|Kikuyu|Parklands|South B|South C|Athi River|Kiambu)\b/;
+// "Kitengela, near Naivas" / "Kitengela karibu na Naivas" / "Ruiru pale Total" / "Juja opposite the mall":
+// the area before the marker is the place; the landmark after it is a note.
+const LANDMARK = /(?:^|,\s*|\s+)(near|next to|opposite|opp\.?|across from|behind|karibu na|karibu ya|pale|mkabala na|mkabala ya|nyuma ya|mbele ya)\s+(.+?)\s*[.!?]*$/i;
+function splitLandmark(text) {
+  const t = String(text || ''); const m = t.match(LANDMARK);
+  if (!m) return { before: t, landmark: null };
+  const before = t.slice(0, m.index).replace(/[,\s]+$/, '');
+  const rest = m[2].trim();
+  if (!rest || rest.split(/\s+/).length > 6) return { before: t, landmark: null };
+  const word = m[1].toLowerCase();
+  return { before, landmark: `${word === 'opp' || word === 'opp.' ? 'opposite' : word} ${rest}` };
+}
+function extractLandmark(text) { const { before, landmark } = splitLandmark(text); return landmark && extractPlace(before, { prompted: true }) ? landmark : null; }
 function extractPlace(text, { prompted = false } = {}) {
+  const sp = splitLandmark(text);
+  if (sp.landmark) { const area = extractPlaceCore(sp.before, { prompted: true }); if (area) return area; }
+  return extractPlaceCore(text, { prompted });
+}
+function extractPlaceCore(text, { prompted = false } = {}) {
   const t = String(text || '');
   const known = t.match(KNOWN_AREAS);
   const m = t.match(AREA_HINT);
@@ -134,6 +152,7 @@ function understand(text, { profile = {}, now, expecting = null } = {}) {
     name,
     correctionOf: extractCorrection(t),
     place: extractPlace(t, { prompted: expecting === 'place' && !name && !L.parseWhen(t, now) && !intents.length }),
+    landmark: extractLandmark(t),
     when: L.parseWhen(t, now) || (expecting === 'time' && /^\W*(?:uh|um|ah|eh)?\W*(\d{1,2})\b/i.test(t) ? bareHour(t) : null),
     service: matchService(t, profile.servicesCatalog || []),
     products: matchProducts(t, profile.productCatalog || []),
@@ -145,4 +164,4 @@ function understand(text, { profile = {}, now, expecting = null } = {}) {
     _yes: isYes,
   };
 }
-module.exports = { matchArea, understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };
+module.exports = { splitLandmark, extractLandmark, matchArea, understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };

@@ -78,3 +78,21 @@ test('transport: timeout aborts and the machine continues deterministically', as
   const { turns } = await streamCall(['Hi, what services do you offer?'], { model: m });
   assert.ok(turns[0].some((e) => e.type === 'sentence'));
 });
+
+test('timing + confirm-then-write hooks: atMs on events, readback event, done.timing, acked receipt', async () => {
+  const { turns } = await streamCall(BOOK);
+  for (const e of turns.flat()) assert.equal(typeof e.atMs, 'number');
+  const rb = turns[2].find((e) => e.type === 'readback'); assert.ok(rb, 'read-back turn announces confirm'); assert.equal(rb.tool, 'create_booking');
+  assert.equal(turns[2].at(-1).awaitingConfirm, true);
+  assert.ok(!turns[2].some((e) => e.type === 'tool' && e.write && e.name !== 'saveCallerInfo'), 'no write on read-back turn');
+  const end = turns[3].find((e) => e.type === 'tool' && e.phase === 'end' && e.name === 'createAppointment'); assert.equal(typeof end.toolMs, 'number');
+  const d = turns[3].at(-1); assert.equal(d.awaitingConfirm, false); assert.ok(d.timing.turnMs >= 0); assert.ok(d.timing.firstSentenceMs != null);
+  const st = mk(); const h = V2.createDryRunHandlers();
+  for (const text of BOOK.slice(0, 3)) await collect(V2.runTurnStream(st, { text, profile: DD, now: NOW, handlers: h }));
+  const ev = await collect(V2.runTurnStream(st, { text: 'Yes', profile: DD, now: NOW, handlers: h, acked: true }));
+  assert.doesNotMatch(ev.find((e) => e.type === 'sentence').text, /^(Okay|Sawa|Alright|Haya)\b/);
+});
+test('prefetchContext is a pure read (no handler calls)', () => {
+  const st = mk(); const pc = V2.prefetchContext(st, DD);
+  assert.ok(pc.catalogue); assert.ok(Array.isArray(pc.callerFile.openRows));
+});
