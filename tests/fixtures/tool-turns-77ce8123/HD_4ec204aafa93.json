@@ -1,0 +1,11 @@
+{
+  "callId": "HD_4ec204aafa93",
+  "source": "staging Railway logs 2026-10-14 17:54 UTC (20:54 EAT, 77ce8123), C2 T9 'Westlands hapo hivi.'; ms from caller endpoint 15.420",
+  "turn": 9, "lang": "sw", "tool": "create_appointment",
+  "ack": { "text": "Mm.", "atMs": 406, "bytes": 19116, "cached": true },
+  "holdLogged": null,
+  "warmLogged": "tool-smooth pcm warmed n=5 (of 16)",
+  "toolDoneAtMs": 1968,
+  "receipt": { "text": "Sawa, nimehifadhi ombi la ziara Alhamisi, 9 AM.", "trimmed": "Nimehifadhi ombi la ziara Alhamisi, 9 AM.", "ttsBeginMs": 1968 },
+  "assume": { "liveTtfaMs": 250, "msPerChar": 75, "note": "stream done 1585 ms; ack bytes assumed equal to the cached sw Mm. on C1" }
+}

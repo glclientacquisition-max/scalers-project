@@ -2156,8 +2156,17 @@ mediaWss.on('connection', (ws, req) => {
   }
   // Items 1-2: while the tool runs, queue a cached same-voice hold line just before
   // the queued audio (ack/filler) runs out. Cached only: never a live-TTS seam.
+  function lookupHoldPcm(line) {
+    return lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
+  }
+  /** Returns false when the first hold line is not cached (caller falls back to live hold). */
   function startHoldFill() {
-    if (!mediaClock || holdFillTimer) return;
+    if (!mediaClock || holdFillTimer) return Boolean(holdFillTimer);
+    const first = toolSmooth.holdFillLines(callLanguage)[0];
+    if (!isFillerCacheEnabled() || !lookupHoldPcm(first).pcm) {
+      console.log(`[ws/media][${sidLabel()}] tool-smooth hold miss (not warmed), live hold: ${first}`);
+      return false;
+    }
     const turnAtStart = activeTurnTiming;
     holdFillTimer = setInterval(() => {
       if (!turnBusy || bargeInActive || activeTurnTiming !== turnAtStart || ttsSpeedScale !== 1) return stopHoldFill();
@@ -2166,8 +2175,11 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
       const line = toolSmooth.holdFillLines(callLanguage)[holdsQueued];
-      const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage, extraLexicon: ttsLexiconOverrides });
-      if (!found.pcm) return stopHoldFill();
+      const found = lookupHoldPcm(line);
+      if (!found.pcm) {
+        console.log(`[ws/media][${sidLabel()}] tool-smooth hold miss n=${holdsQueued}: ${line}`);
+        return stopHoldFill();
+      }
       holdsQueued += 1;
       ackPlayedTurn = activeTurnTiming;
       voiceTrace.noteFiller({ text: line, before: line, language: callLanguage });
@@ -2176,11 +2188,12 @@ mediaWss.on('connection', (ws, req) => {
       sendPcmToMedia(ws, found.pcm);
       mediaClock.tag('tts');
     }, 40);
+    return true;
   }
   // Item 3: a receipt already rendered at call start plays with no TTS start-up seam.
   function playCachedReceipt(line) {
     if (!isFillerCacheEnabled() || ttsSpeedScale !== 1) return null;
-    const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage, extraLexicon: ttsLexiconOverrides });
+    const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
     if (!found.pcm) return null;
     receiptCachedTurn = true;
     voiceTrace.noteTts({ text: found.prepared.text, before: String(line), language: found.prepared.language });
@@ -2593,8 +2606,8 @@ mediaWss.on('connection', (ws, req) => {
   async function speakToolHold(spoken) {
     if (!spoken?.speak || bargeInActive) return;
     if (smooth.hold && spoken.kind === 'hold' && mediaClock) {
-      startHoldFill();
-      return;
+      if (startHoldFill()) return;
+      // Cache miss: fall through to the live hold line below (never silent).
     }
     if (
       spoken.kind === 'hold' &&
@@ -4944,8 +4957,10 @@ mediaWss.on('connection', (ws, req) => {
               tts,
               voiceId: tenantSonioxVoiceId,
               extraLexicon: ttsLexiconOverrides,
-              phrases: toolSmooth.warmPhrases(),
-              shouldAbort: () => speechOutageStarted || turnBusy || !tts,
+              phrases: toolSmooth.warmPhrases(callLanguage),
+              // Pause while a turn is live instead of aborting (77ce8123: C1 warmed 0, C2 5/16).
+              waitWhile: () => turnBusy,
+              shouldAbort: () => speechOutageStarted || !tts,
             }).then((r) => {
               if (r?.warmed) console.log(`[ws/media][${sidLabel()}] tool-smooth pcm warmed n=${r.warmed}`);
             });
