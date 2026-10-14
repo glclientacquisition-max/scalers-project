@@ -1,0 +1,10 @@
+{
+  "callId": "HD_cc0481620c50",
+  "source": "staging 02f5889b, 2026-10-14 22:39:25 UTC (01:39 EAT Thu), turn 4 (log) / T5: caller said 'Alvin.' (detected en)",
+  "callerText": "Alvin.",
+  "language": "en",
+  "model": "Sawa Alvin, tuna usafi wa carpet kesho saa 8:00. Tuje wapi, au iko eneo gani?",
+  "heard": ["Which service do you need?", "Tuje wapi, au iko eneo gani?"],
+  "entities": { "when": { "value": "kesho saa 8" }, "service": { "value": "Carpet Cleaning (per room)", "confirmed": true } },
+  "services": ["Carpet Cleaning (per room)", "Sofa Cleaning", "Mattress Cleaning", "House Cleaning", "Window Cleaning"]
+}
