@@ -372,7 +372,16 @@ const {
   turnRequestsTool,
 } = require('./src/speech/toolHold');
 const { appendFinalPart, joinUtteranceParts } = require('./src/speech/utteranceJoin');
-const { queueToolOutcome, takeToolOutcome } = require('./src/conversation/toolOutcomeQueue');
+const { queueToolOutcome, takeToolOutcome, peekToolOutcome } = require('./src/conversation/toolOutcomeQueue');
+const {
+  owedConfirmFoldEnabled,
+  foldOwedIntoReply,
+  stripSavedClaimAfterReceipt,
+} = require('./src/speech/owedConfirmFold');
+const {
+  findDuplicateServiceRequest,
+  noteServiceRequestCreated,
+} = require('./src/conversation/requestDedupe');
 const { lineUnavailableResponse } = require('./src/sautikit/inactiveTenantGate');
 const { createClosedLineCalls } = require('./src/sautikit/closedLineCalls');
 const closedLineCalls = createClosedLineCalls();
@@ -3163,18 +3172,38 @@ mediaWss.on('connection', (ws, req) => {
       }
       // A booking or callback confirmed after a barge-in is still owed.
       // Speak it first, before a local fact or the model reply.
-      const owedOutcome = takeToolOutcome(brainState);
-      if (owedOutcome) {
-        callBrainStates.set(callKey, brainState);
-        console.log(`[ws/media][${callKey}] speaking queued tool outcome`);
-        callTranscript.pushAgent(owedOutcome);
-        const owedSpoken = await speakText(owedOutcome);
-        if (owedSpoken?.ok) {
-          messages.push({ role: 'assistant', content: owedOutcome, local: true });
-        } else {
-          queueToolOutcome(brainState, owedOutcome);
+      // VOICE_OWED_CONFIRM_FOLD=on folds it into the next reply as one line
+      // (HD_0daf1d0fd631 / HD_9c1864aacd5f doubled acknowledgements).
+      let owedReceiptForFold = '';
+      if (owedConfirmFoldEnabled()) {
+        owedReceiptForFold = peekToolOutcome(brainState);
+      } else {
+        const owedOutcome = takeToolOutcome(brainState);
+        if (owedOutcome) {
           callBrainStates.set(callKey, brainState);
+          console.log(`[ws/media][${callKey}] speaking queued tool outcome`);
+          callTranscript.pushAgent(owedOutcome);
+          const owedSpoken = await speakText(owedOutcome);
+          if (owedSpoken?.ok) {
+            messages.push({ role: 'assistant', content: owedOutcome, local: true });
+          } else {
+            queueToolOutcome(brainState, owedOutcome);
+            callBrainStates.set(callKey, brainState);
+          }
         }
+      }
+      function consumeOwedFold(replyLines) {
+        if (!owedConfirmFoldEnabled() || !owedReceiptForFold) {
+          return { lines: replyLines, folded: false };
+        }
+        const folded = foldOwedIntoReply(owedReceiptForFold, replyLines);
+        takeToolOutcome(brainState);
+        callBrainStates.set(callKey, brainState);
+        owedReceiptForFold = '';
+        if (folded.folded) {
+          console.log(`[ws/media][${callKey}] folded queued tool outcome into reply`);
+        }
+        return folded;
       }
       const slotsBeforeReply = slotRows(brainState);
       const localReply = resolveLocalReply({
@@ -3400,7 +3429,8 @@ mediaWss.on('connection', (ws, req) => {
         }
         bargeInActive = false;
         suppressReplyRemainder = false;
-        for (const line of planned.lines) {
+        const plannedFold = consumeOwedFold(planned.lines);
+        for (const line of plannedFold.lines) {
           callTranscript.pushAgent(line);
           turnTiming.markFirstSpokenChunk();
           const nameAsk = askingName && line === fileNameAsk;
@@ -4133,22 +4163,38 @@ mediaWss.on('connection', (ws, req) => {
         voiceTrace.noteBrainLines(result.brainLines);
       }
       if (result?.actionConfirmation && !bargeInActive) {
-        const confirmation = String(result.actionConfirmation).trim();
+        let confirmation = String(result.actionConfirmation).trim();
+        if (owedConfirmFoldEnabled() && owedReceiptForFold) {
+          const folded = consumeOwedFold([confirmation]);
+          confirmation = folded.lines.join(' ').trim();
+        } else if (owedConfirmFoldEnabled() && !owedReceiptForFold) {
+          // Receipt already folded into an earlier line this turn: drop a second claim.
+          confirmation = stripSavedClaimAfterReceipt(confirmation);
+        }
         const lookupSpoken = spokenChunks.join(' ').trim();
         // The lookup sentence is already on the stream. Do not speakText it.
         const alreadySaid =
           /take a message|nitachukua ujumbe/i.test(lookupSpoken) &&
           /take a message|nitachukua ujumbe/i.test(confirmation);
-        if (!(spokeLookupSentence && confirmation === lookupSpoken) && !alreadySaid) {
+        if (confirmation && !(spokeLookupSentence && confirmation === lookupSpoken) && !alreadySaid) {
           await actionProgressSpeak;
           // "Alright." already played: say "They'll call you back.", not
           // "Okay. They'll call you back." (HD_4d6ac592aeb3 t4).
-          const outcomeLine = trimAckLead(result.actionConfirmation, {
+          const outcomeLine = trimAckLead(confirmation, {
             acked: ackPlayedTurn === turnTiming,
           });
           callTranscript.pushAgent(outcomeLine);
           await speakText(outcomeLine);
           spokeThisTurn = true;
+        }
+      } else if (owedConfirmFoldEnabled() && owedReceiptForFold && !bargeInActive) {
+        // No model confirmation this turn: still deliver the owed receipt once.
+        const folded = consumeOwedFold([]);
+        for (const line of folded.lines) {
+          callTranscript.pushAgent(line);
+          await speakText(line);
+          spokeThisTurn = true;
+          messages.push({ role: 'assistant', content: line, local: true });
         }
       }
 
@@ -5911,6 +5957,15 @@ async function applyGeminiTools(callSid, parsed) {
     fieldMeta: groundedProfile.fieldMeta || null,
     handlers: {
       createServiceRequest: async (request) => {
+        if (owedConfirmFoldEnabled()) {
+          const dup = findDuplicateServiceRequest(state, request);
+          if (dup) {
+            console.log(
+              `[${callSid}] service_request deduped id=${dup.id || 'unknown'} type=${request.type || ''}`
+            );
+            return { ...dup, deduped: true };
+          }
+        }
         const created = await db.createServiceRequest({
           callSid,
           type: request.type,
@@ -5922,6 +5977,9 @@ async function applyGeminiTools(callSid, parsed) {
           notes: request.notes || parsed.reason,
         });
         if (created) {
+          if (owedConfirmFoldEnabled()) {
+            noteServiceRequestCreated(state, request, created);
+          }
           console.log(
             `[${callSid}] service_request created id=${created.id} type=${created.request_type}`
           );
