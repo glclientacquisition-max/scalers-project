@@ -167,3 +167,11 @@ test('"siishi Nairobi" is not answered as "Nairobi is covered"; help requests ge
   assert.doesNotMatch(r.out[0].line, /Nairobi iko kwenye orodha/); assert.match(r.out[0].line, /^Tunahudumia/);
   assert.match(r.out[1].line, /bei, huduma au saa za kazi/);
 });
+
+test('never-repeat: the coverage line is not said twice in a row (live HD_6a7597)', async () => {
+  const r = await talk(['Hapana, mimi siishi Nairobi.', 'Oh, eh, sawa, mfike huko.', 'Mfike huko.']);
+  assert.notEqual(r.out[0].line, r.out[1].line); assert.notEqual(r.out[1].line, r.out[2].line);
+  assert.match(r.out[1].line, /^Maeneo yetu ni Nairobi/);
+  const p = await talk(['How much is gutter cleaning?', 'How much is gutter cleaning?']);
+  assert.notEqual(p.out[0].line, p.out[1].line);
+});

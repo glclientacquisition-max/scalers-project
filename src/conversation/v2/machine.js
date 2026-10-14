@@ -301,7 +301,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   const catalogue = buildCatalogue({ profile, openRows: state.file.openRows });
   const mc = await consultModel(state, u, profile, model, catalogue);
   const lang = state.lang || 'en';
-  const out = (line, extra = {}) => { const l = line === state.lastLine && line ? `${line}` : line; state.lastLine = l; return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
+  const out = (line, extra = {}) => { const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
 
   // 1) read-back pending: commit only on the caller's yes
   // a new question while a callback offer is open drops the offer and answers the question

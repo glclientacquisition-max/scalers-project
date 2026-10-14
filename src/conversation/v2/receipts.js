@@ -108,4 +108,12 @@ function info(r, lang, n = 0) {
     default: return '';
   }
 }
-module.exports = { ask, readback, receipt, info, svcName, rowLabel };
+// Never-repeat rule: the same line twice in a row is re-worded (same facts, no new claims).
+function vary(line, lang, n = 1, plain = false) {
+  const S = sw(lang);
+  const m = plain ? null : String(line).match(/^Tunahudumia (.+?)(?: na maeneo mengine)?\. Uko wapi\?$/) || String(line).match(/^We serve (.+?)(?: and other listed areas)?\. Which place are you in\?$/);
+  if (m) return S ? `Maeneo yetu ni ${m[1]}. Uko mtaa gani hasa?` : `Our areas are ${m[1]}. Which estate are you in exactly?`;
+  const lead = S ? ['Kama nilivyosema,', 'Narudia,'][n % 2] : ['As I said,', 'Just to repeat,'][n % 2];
+  return `${lead} ${line.charAt(0).toLowerCase()}${line.slice(1)}`;
+}
+module.exports = { vary, ask, readback, receipt, info, svcName, rowLabel };
