@@ -22,6 +22,9 @@ const leaks = allRuns.filter((r) => r.fails.includes('owner_email_instruction_le
 const swS = swMatch(suiteF.scenarios, (s) => langOfId[s.id]);
 const swR = swMatch(replayF.cases, (c) => fx(c.id)?.lang);
 const swA = swMatch(replayF.cases, (c) => fx(c.id)?.lang, true);
+const A = require('./lib/ack');
+const ackRuns = [...suiteF.scenarios.flatMap((s) => s.runs), ...replayF.cases.filter((c) => c.env !== 'prod').flatMap((c) => c.runs)].map(A.lines);
+const ack = A.ackMetrics(ackRuns); const bank = A.fillerBank(path.resolve(__dirname, '../..'));
 const bar = [
   ['Booking pass^4 >= 90% (commitment scenarios, all rules)', +(booking.filter((s) => s.passK).length / booking.length).toFixed(3), (v) => v >= 0.9],
   ['Booking end-state pass^4 (DB rows only)', S.bookingCorrectnessPassK, (v) => v >= 0.9],
@@ -32,8 +35,13 @@ const bar = [
   ['Owner-email leaks = 0 (suite + replay)', leaks, (v) => v === 0],
   ['p95 Brain ms on tool turns <= 300', S.brainMsP95ToolTurns, (v) => v != null && v <= 300],
   ['SW/Sheng language match per turn >= 98% (suite)', swS.rate, (v) => v >= 0.98],
+  ['Ack-led turns <= 10% excluding goodbyes (suite + staging replays)', ack.ackRate, (v) => v <= 0.10],
+  ['Consecutive ack-led turns = 0', ack.consecutive, (v) => v === 0],
+  ['Ack stacks = 0', ack.stacks, (v) => v === 0],
+  ['Voice filler/hold bank <= 3 words', bank.over.length ? bank.over.join(' | ') : `${bank.n} lines ok`, () => bank.n > 0 && bank.over.length === 0],
   ['SW/Sheng language match, per turn (SW-labelled replays)', swR.rate, () => null],
   ['Language match per turn, all 87 replays (code-switch included)', swA.rate, () => null],
 ];
 for (const [k, v, f] of bar) { const p = f(v); console.log(`${p === null ? 'INFO' : p ? 'PASS' : 'FAIL'}  ${k}: ${v}`); }
+console.log(JSON.stringify({ ack }));
 console.log(JSON.stringify({ swSuiteTurns: swS.turns, swReplayTurns: swR.turns, replay: replayF.summary }));
