@@ -30,6 +30,7 @@ function appointmentCallerEvent(appointment, kind = 'created') {
     kind: eventKind,
     businessName: appointment?.businessName,
     when: appointment?.when_text,
+    windowStart: appointment?.window_start || null,
     item: appointment?.service_name,
     caller: {
       name: displayOwnerCallerName(appointment?.caller_name),
@@ -100,17 +101,21 @@ function holdStatusCallerSms({ channels, status, requestType } = {}) {
 /**
  * @param {{ to?: string, event?: object, channels?: object }} opts
  */
-async function dispatchCallerSms({ to, event, channels, ledger } = {}) {
+async function dispatchCallerSms({ to, event, channels, ledger, consent, language } = {}) {
   if (!callerSmsEnabled(channels)) {
     return { channel: null, reason: 'caller_sms_off' };
   }
   if (!event) return { channel: null, reason: 'no_event' };
+  // CALLER_INFO_P1: only after an in-call yes; body from the saved row, in
+  // the caller's language, GSM-7, at most 160 characters.
+  const callerInfo = require('../conversation/callerInfoTrust');
+  if (callerInfo.on() && consent !== true) return { channel: null, reason: 'no_in_call_yes' };
   if (!isSmsConfigured()) {
     return { channel: null, reason: 'sms_not_configured' };
   }
   const dest = normalizeSmsTo(to || event.caller?.phone);
   if (!dest) return { channel: null, reason: 'no_caller_phone' };
-  const body = renderCallerText(event);
+  const body = callerInfo.on() ? callerInfo.callerSmsBody(event, language) : renderCallerText(event);
   const gate = await beginInstanceSend({ ...ledger, kind: event.kind }, dest);
   if (!gate.ok) {
     return { channel: null, reason: gate.reason };
@@ -135,6 +140,9 @@ async function dispatchCallerSms({ to, event, channels, ledger } = {}) {
     });
     const claimSent = durableSendClaim(recorded);
     if (!claimSent.ok) {
+      // CALLER_INFO_P1 (Ops gap): the SMS went out and was charged; report it
+      // as sent so nothing resends (and charges) it again.
+      if (callerInfo.on()) return { ...sent, ledgerUnrecorded: true };
       return { channel: null, reason: claimSent.reason };
     }
     return sent;

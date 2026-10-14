@@ -998,8 +998,32 @@ function buildingAnswer(raw) {
   return value.slice(0, 120);
 }
 
+// BRAIN_TRUST_P1: keshokutwa / day after tomorrow, wiki ijayo, Swahili
+// weekdays, "kasoro robo", alasiri/usiku. undefined = fall back to the old reader.
+const TRUST_DAY = /\b(keshokutwa|kesho\s+kutwa|(?:the\s+)?day\s+after\s+tomorrow|today|tomorrow|tonight|leo|kesho|(?:next\s+|this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|(?:jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili)(?:\s+(?:hii|ijayo|wiki\s+ijayo))?|next\s+week|wiki\s+ijayo)\b/i;
+const TRUST_CLOCK = /\b(?:at\s*)?\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)|\bsaa\s+(?:kumi\s+na\s+(?:moja|mbili)|moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi|\d{1,2}(?::\d{2})?)(?:\s+(?:na\s+(?:nusu|robo)|kasoro\s+robo))?(?:\s+(?:za\s+|ya\s+)?(?:asubuhi|mchana|alasiri|jioni|usiku|alfajiri))?/i;
+const TRUST_PERIOD = /\b(morning|afternoon|evening|night|asubuhi|mchana|alasiri|jioni|usiku)\b/i;
+function extractWhenTrust(raw) {
+  const day = TRUST_DAY.exec(raw);
+  const clock = TRUST_CLOCK.exec(raw);
+  if (!day && !clock) return undefined;
+  const parts = [];
+  if (day) parts.push(day[0]);
+  if (/\bwiki\s+ijayo\b/i.test(raw) && day && !/wiki\s+ijayo/i.test(day[0])) parts.push('wiki ijayo');
+  if (clock) parts.push(clock[0].trim().replace(/(?<=[ap]\.?m)\.$/i, ''));
+  else {
+    const period = TRUST_PERIOD.exec(raw);
+    if (period && !parts.join(' ').toLowerCase().includes(period[1].toLowerCase())) parts.push(period[1]);
+  }
+  return parts.join(' ').replace(/\s+/g, ' ').trim() || null;
+}
+
 function extractWhen(text) {
   const raw = String(text || '');
+  if (String(process.env.BRAIN_TRUST_P1 || '').trim() === 'on') {
+    const trusted = extractWhenTrust(raw);
+    if (trusted !== undefined) return trusted;
+  }
   const relative =
     /\b(today|tomorrow|tonight|this (?:morning|afternoon|evening)|next (?:week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|leo|kesho|jioni|asubuhi)\b/i.exec(
       raw

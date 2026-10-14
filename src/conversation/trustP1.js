@@ -149,8 +149,23 @@ function receiptReadback(results = [], language = 'en', { byWhen = '' } = {}) {
   if (!rows.length) return '';
   const r = rows[0];
   const v = r.value || r.record || {};
-  const item = String(v.item || v.summary_item || v.serviceName || v.service_name || '').trim();
-  const qty = v.quantity != null && String(v.quantity).trim() ? String(v.quantity).trim() : '';
+  let item = String(v.item || v.summary_item || v.serviceName || v.service_name || '').trim();
+  let qty = v.quantity != null && String(v.quantity).trim() ? String(v.quantity).trim() : '';
+  // CALLER_INFO_P1: read back every saved item, not rows[0] only.
+  if (require('./callerInfoTrust').on()) {
+    const lines = [];
+    for (const row of rows) {
+      const rv = row.value || row.record || {};
+      const list = Array.isArray(rv.items) && rv.items.length ? rv.items : [rv];
+      for (const it of list) {
+        const name = String(it.item || it.summary_item || it.serviceName || it.service_name || '').trim();
+        const q = it.quantity != null && String(it.quantity).trim() ? String(it.quantity).trim() : '';
+        const one = [q, name].filter(Boolean).join(' ');
+        if (one && !lines.includes(one)) lines.push(one);
+      }
+    }
+    if (lines.length > 1) { item = lines.join(', '); qty = ''; }
+  }
   const when = String(v.whenText || v.when_text || '').trim();
   const type = String(v.type || r.requestType || (r.action === 'create_appointment' ? 'visit' : '')).toLowerCase();
   const what = [qty, item].filter(Boolean).join(' ') || (l === 'sw' ? 'ombi lako' : 'your request');
@@ -799,9 +814,18 @@ function shapeSpeech(text, ctx = {}) {
   const lastItem = String(state?.entities?.item?.value || state?.entities?.item || state?.entities?.service?.value || '');
   const kept = [];
   let swappedPast = false;
+  const callerInfo = require('./callerInfoTrust');
+  const turnReceipts = receiptsOf(ctx.toolResults);
   for (let s of splitSentences(raw)) {
     if (READBACK.test(s) && ctx.receiptLine) {
       kept.push(s);
+      continue;
+    }
+    // CALLER_INFO_P1: availability / refund promises / receipt-type match.
+    const ci = callerInfo.guardSentence(s, { receipts: turnReceipts, state, language, ctx });
+    if (ci) {
+      drops.push(ci.reason);
+      if (ci.replace && !kept.includes(ci.replace)) kept.push(ci.replace);
       continue;
     }
     if (!hasReceipt && SUCCESS_WORDS.test(s) && !isHonestChangeLine(s)) {
@@ -859,6 +883,10 @@ function shapeSpeech(text, ctx = {}) {
   // said once per turn across streamed chunks. Model text is only deduped
   // inside one shaping pass: shapeSpeech can run more than once on the same
   // text, so remembering model sentences would delete real answers.
+  {
+    const one = callerInfo.oneQuestion(kept);
+    if (one.dropped) { drops.push('trust_second_question'); kept.length = 0; kept.push(...one.sentences); }
+  }
   let deduped = [...new Set(kept)];
   if (state) {
     const t = trustState(state);
@@ -931,6 +959,15 @@ function validateSummary(summary, results = []) {
 function planTrustTurn({ text = '', state = {}, card = null, tasks = [], language = 'en', byWhen = '', now = Date.now(), nameJustConfirmed = false, lastAgentText = '' } = {}) {
   if (!trustP1Enabled()) return null;
   noteCallerTurnForName(state, text);
+  // CALLER_INFO_P1: a yes/no to a pending cancel or save; SMS consent; complaints.
+  {
+    const ci = require('./callerInfoTrust');
+    if (ci.on()) {
+      ci.noteSmsConsent(state, { lastAgentText, text });
+      const plan = ci.planPendingCancel(state, text, language) || ci.planPendingSave(state, text, language) || ci.planComplaint(state, text, language);
+      if (plan) return { ...plan, line: plan.line || '' , callerInfo: true };
+    }
+  }
   // v3 save pipeline: a broken address answer is repaired once, never saved.
   if (unclearPlaceAnswer(text, lastAgentText) && !trustState(state).placeRepairAsked) {
     trustState(state).placeRepairAsked = true;
@@ -976,6 +1013,7 @@ function trustPromptFacts({ card = null, language = 'en' } = {}) {
 }
 
 module.exports = {
+  SUCCESS_WORDS,
   noteAgentLine,
   guardEmptiedTurn,
   guardContinueLine,

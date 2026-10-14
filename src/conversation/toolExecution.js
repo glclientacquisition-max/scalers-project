@@ -147,6 +147,8 @@ function stableFingerprint(action, payload) {
       .filter(([, value]) => value)
       .sort(([a], [b]) => a.localeCompare(b))
   );
+  // CALLER_INFO_P1: a reworded note is not a new save.
+  if (require('./callerInfoTrust').on()) delete normalized.notes;
   return `${action}:${JSON.stringify(normalized)}`;
 }
 
@@ -184,6 +186,9 @@ function whenTextIsRefinement(previous, next) {
   const b = clean(next).toLowerCase();
   if (!a || !b) return Boolean(b && b !== a);
   if (a === b) return false;
+  // CALLER_INFO_P1: only a real refinement ("Friday" → "Friday 10 am") rewrites
+  // the hold; a different when in passing does not.
+  if (require('./callerInfoTrust').on()) return b.includes(a) || a.includes(b);
   return b.includes(a) || a.includes(b) || true;
 }
 
@@ -668,7 +673,12 @@ async function executeBrainTools({
   businessPolicies = null,
   businessLocations = null,
   fieldMeta = null,
+  trustState = null,
+  callerText = '',
+  language = 'en',
+  callerOpenRequests = [],
 } = {}) {
+  const ciTrust = require('./callerInfoTrust');
   const held = clean(heldCallerName, 120);
   if (held) {
     parsed = applyHeldCallerName(parsed, held);
@@ -822,6 +832,18 @@ async function executeBrainTools({
         fingerprint,
         identity,
       });
+    } else if (ciTrust.on() && validation.value.type !== 'callback' && ciTrust.duplicateRequest(validation.value, { openRequests: callerOpenRequests })) {
+      // CALLER_INFO_P1: same caller + item already open from an earlier call.
+      const prior = ciTrust.duplicateRequest(validation.value, { openRequests: callerOpenRequests });
+      results.push({
+        action: 'create_service_request',
+        status: 'duplicate',
+        fingerprint,
+        identity,
+        id: prior.id || null,
+        value: { ...validation.value, item: prior.item || validation.value.item },
+        reason: 'Already open for this caller from an earlier call.',
+      });
     } else if (
       priorHold &&
       validation.value.type === 'hold' &&
@@ -956,8 +978,27 @@ async function executeBrainTools({
         status: 'duplicate',
         fingerprint,
       });
+    } else if (ciTrust.on() && ciTrust.duplicateVisit(validation.value, { openAppointments, callerPhone })) {
+      // CALLER_INFO_P1: same caller + service + day is already open.
+      const prior = ciTrust.duplicateVisit(validation.value, { openAppointments, callerPhone });
+      results.push({
+        action: 'create_appointment',
+        status: 'duplicate',
+        fingerprint,
+        id: prior.id || null,
+        visit: prior,
+        value: { ...validation.value, item: prior.service_name || validation.value.serviceName },
+        reason: 'Same visit already open for this caller.',
+      });
     } else {
       try {
+        if (ciTrust.on()) {
+          validation.value.idempotencyKey = ciTrust.idempotencyKey({
+            phone: callerPhone,
+            item: validation.value.serviceName,
+            day: ciTrust.eatDateKey(validation.value.windowStart),
+          });
+        }
         const created = await handlers.createAppointment?.(validation.value);
         results.push(
           created
@@ -997,12 +1038,48 @@ async function executeBrainTools({
       reason: 'Message only. Cancel and reschedule are not available.',
     });
   } else if (parsed?.appointmentUpdate) {
-    const validation = validateUpdateAppointment(parsed.appointmentUpdate, {
+    let validation = validateUpdateAppointment(parsed.appointmentUpdate, {
       hoursSchedule,
       now,
       openAppointments,
       callerPhone,
     });
+    let changeVisit = null;
+    // CALLER_INFO_P1: only this caller's open visits; named; yes before cancel.
+    if (ciTrust.on() && (validation.valid || validation.missingSlots?.includes('status'))) {
+      const raw = validation.value || {};
+      const resolved = ciTrust.resolveVisitChange(raw, {
+        openAppointments,
+        callerPhone,
+        callerText,
+        state: trustState,
+        language,
+        confirmedCancel: parsed.trustCancelConfirmed === true,
+      });
+      if (!resolved.ok) {
+        if (resolved.code === 'address_change_owner' && handlers.createServiceRequest) {
+          try {
+            const created = await handlers.createServiceRequest({
+              type: 'callback',
+              name: held || clean(parsed.name, 120) || 'Caller',
+              item: 'address_change',
+              whenText: '',
+              notes: clean(`Caller asked to change the visit address (${ciTrust.visitLabel(resolved.visit)}) to: ${raw.landmark}. Not changed on the call; owner to confirm.`, 300),
+            });
+            if (created) {
+              results.push({ action: 'create_service_request', status: 'succeeded', id: created.id || null, requestType: 'callback', value: { type: 'address_change', item: 'address change' }, record: created });
+              if (trustState) require('./trustP1').noteChangeTask(trustState, 'address');
+            }
+          } catch (error) {
+            results.push({ action: 'create_service_request', status: 'failed', reason: clean(error?.message || error, 300) });
+          }
+        }
+        validation = { valid: false, reason: resolved.line || resolved.code, code: resolved.code, askLine: resolved.line || '', missingSlots: resolved.missingSlots || [] };
+      } else {
+        validation = { ...validation, valid: true, value: resolved.value };
+        changeVisit = resolved.visit;
+      }
+    }
     const fingerprint = validation.valid
       ? stableFingerprint('update_appointment', validation.value)
       : null;
@@ -1018,6 +1095,7 @@ async function executeBrainTools({
           status: 'invalid',
           reason: validation.reason,
           code: validation.code || null,
+          askLine: validation.askLine || '',
           missingSlots: validation.missingSlots || [],
           hours: validation.hours || null,
         });
@@ -1045,6 +1123,7 @@ async function executeBrainTools({
                   ? { movedFiledVisit: true }
                   : {}),
                 appointmentStatus: updated.status || validation.value.status,
+                visit: changeVisit,
                 value: validation.value,
                 hours: validation.hours || null,
                 record: updated,
@@ -1149,6 +1228,7 @@ async function executeBrainTools({
                 status: 'failed',
                 fingerprint,
                 reason: clean(outcome?.reason || 'No working handoff channel.', 300),
+                fallbackCallback: Boolean(outcome?.fallbackCallback),
               }
         );
       } catch (error) {
@@ -1321,6 +1401,22 @@ function formatToolConfirmation(results = [], language = 'en') {
   // BRAIN_TRUST_P1 (T1): success speech only as a receipt readback; a
   // garbled save is a repair ask.
   const trustP1 = require('./trustP1');
+  const callerInfo = require('./callerInfoTrust');
+  if (callerInfo.on()) {
+    const ask = results.find((r) => r && r.askLine && ['invalid', 'held'].includes(r.status));
+    const changeSaved = results.find((r) => r.action === 'create_service_request' && r.status === 'succeeded' && /change/.test(String(r.value?.type || '')));
+    if (changeSaved && results.some((r) => r.code === 'address_change_owner')) {
+      return sw ? "Siwezi kubadilisha anwani kwa simu. Nimeandika anwani mpya, na mwenye duka atakupigia kuthibitisha." : "I can't change the address on a call. I've noted the new address, and the owner will call you back to confirm.";
+    }
+    if (ask) return ask.askLine;
+    if (meaningful.action === 'update_appointment' && meaningful.status === 'succeeded' && meaningful.visit) {
+      if (String(meaningful.appointmentStatus || '').toLowerCase() === 'cancelled') return callerInfo.cancelledLine(meaningful.visit, lang);
+      return callerInfo.movedLine(meaningful.visit, formatRequestedWhenLabel(meaningful.hours, lang), lang);
+    }
+    if (meaningful.action === 'create_appointment' && meaningful.status === 'duplicate' && meaningful.visit) {
+      return sw ? `Tayari iko kwenye rekodi: ${callerInfo.visitLabel(meaningful.visit, lang)}.` : `That's already on file: ${callerInfo.visitLabel(meaningful.visit, lang)}.`;
+    }
+  }
   if (trustP1.trustP1Enabled()) {
     if (meaningful.code === 'trust_garbled') return trustP1.repairAskLine(lang);
     if (
@@ -1517,6 +1613,14 @@ function formatToolConfirmation(results = [], language = 'en') {
     return "I couldn't save that request right now.";
   }
 
+  if (require('./callerInfoTrust').on() && (meaningful.status === 'succeeded' || meaningful.status === 'failed')) {
+    // CALLER_INFO_P1: honest handover line (alerted / callback saved / neither).
+    return require('./callerInfoTrust').handoverCallerLine({
+      alerted: meaningful.status === 'succeeded' && !meaningful.soft,
+      callbackSaved: meaningful.status === 'failed' ? Boolean(meaningful.fallbackCallback) : Boolean(meaningful.soft),
+      language: lang,
+    });
+  }
   if (meaningful.status === 'succeeded') {
     if (sw || sheng) return 'Sawa. Watakupigia.';
     return "Okay. They'll call you back.";
@@ -1538,6 +1642,7 @@ function formatToolConfirmation(results = [], language = 'en') {
 }
 
 module.exports = {
+  whenTextIsRefinement,
   REQUEST_TYPES,
   RESERVED_CALLER_NAMES,
   stableFingerprint,
