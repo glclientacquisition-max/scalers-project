@@ -16,9 +16,9 @@ const INTENT_RULES = [
   ['complaint', /\b(not happy|unhappy|bad service|complain\w*|disappointed|left .{0,20}dirty|damaged|ruined|sijaridhika|mmeniharibia|mmeharibu|malalamiko|huduma mbaya)\b/i],
   ['handoff', /\b(manager|the owner|speak to (a |someone|somebody|the)|talk to (a |someone|the)|human|real person|mwenye biashara|meneja)\b/i],
   ['services', /\b(services? gani|huduma gani|mnaofa\w*|mna-?offer\w*|mnauza\w* nini|which (exact )?services|what services|services (do )?you (do )?offer|mnafanya nini|mnatoa nini|gani (uko|mko) nayo|(uko|mko) nayo|saizi gani|sizes? (do you|gani)|mnawash\w*|mnasafisha|do you (clean|wash|do)\b)/i],
-  ['coverage', /\b(do you cover|you( guys)? cover|uko wapi|outside (nairobi|the county)|niko outside|mnafika|mnakuja|mnafikana|mtafika|mko wapi|where are you( located)?|your location|location yenu|mnapatikana wapi|kama mnakuja)\b/i],
+  ['coverage', /\b(do you cover|you( guys)? cover|uko wapi|outside (nairobi|the county)|niko outside|siishi \w+|sikai \w+|mfike huko|mtafika huko|mnafika huko|mnafika|mnakuja|mnafikana|mtafika|mko wapi|where are you( located)?|your location|location yenu|mnapatikana wapi|kama mnakuja)\b/i],
   ['recall', /\b(remember me|last time|what did i (book|order)|my last (visit|booking|order)|mara ya mwisho|mnanikumbuka|unanikumbuka|unakumbuka|do you remember|previous(ly)? (thing|dealing|call|order|booking)|in another call|before this call|i (had )?(spoke|spoken|talked) to you|tulifika wapi|tumeachia wapi|tulikuwa tumeachia|tumeongea|tulikuwa tumeongea|nilikuwa nimeitisha|nimekuongelesha|ile (mambo|kitu) (yetu )?ya jana|a while back)\b/i],
-  ['want_know', /\b(nataka kujua|nilikuwa nataka kujua|nataka jua|nilitaka kujua|i wanted to (know|ask)|just inquiring|nataka kuuliza)\b/i],
+  ['want_know', /\b(nataka kujua|nilikuwa nataka kujua|nataka jua|nilitaka kujua|i wanted to (know|ask)|just inquiring|nataka kuuliza|nataka unisaidie|unisaidie|msaidia|hamwezi (ku)?nisaidia|nisaidie|maybe you tell me|you tell me|i don'?t know)\b/i],
   ['who_are_you', /^\W*(nani|ni nani|who is this|who am i (speaking|talking) (to|with)|tunaitwaje( tena)?|unaitwa nani|wewe ni nani|unaitwaje|what'?s your name)\W*\??\W*$/i],
   ['payment_how', /\b(naweza (ku)?lipa|how (do|can) i pay|payment (method|options)|mnapokea (m-?pesa|pesa)|nilipe aje|malipo ni aje|lipa vipi)\b/i],
   ['greeting', /^\W*(oh,?\s*)?(habari( yako| zenu)?|niaje|mambo|sasa|hujambo|how are you|hello|hi)\W*(shy\W*)?(,?\s*(ni namna gani|mnaendelea aje|mko aje|how are you)\W*)?$/i],
@@ -43,7 +43,7 @@ function cleanName(raw) {
 function extractName(text, { prompted = false } = {}) {
   const t = String(text || '');
   const pats = [/\bmy name is\s+([A-Za-z' ]+?)(?:[,.!?]| not | and |$)/i, /\b(?:jina langu ni|naitwa|ni mimi)\s+([A-Za-z' ]+?)(?:[,.!?]|$)/i,
-    /\bi'?m speaking (?:with|to)?\s*([A-Za-z']+)/i, /\b(?:you'?re speaking (?:with|to)|unaongea na|naongea na|unazungumza na)\s+([A-Z][a-z']+)/i, /\bni\s+([A-Z][a-z']+)\s*,?\s*(?:anapiga|napiga)/, /\b(?:this is|it'?s)\s+([A-Z][a-z']+(?: [A-Z][a-z']+)?)/, /\b[Ii]'?m\s+([A-Z][a-z']+)\b/, /\b[Ii] am\s+([A-Z][a-z']+)\b/, /\b([A-Z][a-z']+)\s+here\b/];
+    /\bi'?m speaking (?:with|to)?\s*([A-Za-z']+)/i, /\b(?:you'?re speaking (?:with|to)|unaongea na|naongea na|unazungumza na)\s+([A-Z][a-z']+)/i, /\b[Nn]i\s+([A-Z][a-z']+)\s*,?\s*(?:anapiga|napiga|hapa)/, /\b(?:this is|it'?s)\s+([A-Z][a-z']+(?: [A-Z][a-z']+)?)/, /\b[Ii]'?m\s+([A-Z][a-z']+)\b/, /\b[Ii] am\s+([A-Z][a-z']+)\b/, /\b([A-Z][a-z']+)\s+here\b/];
   for (const p of pats) { const m = t.match(p); if (m) { const n = cleanName(m[1]); if (n) return n; } }
   if (prompted) {
     const s = t.replace(/^\W*(it'?s|i'?m|ni|mimi ni|my name is|jina ni|yes|ndio)\W+/i, '').trim();
@@ -105,7 +105,7 @@ function matchProducts(text, catalog = []) {
 function lev(a, b) { const m = a.length, n = b.length; const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; }
 // Tenant service areas only (serviceAreas.areas ids like place:kitengela, county:nairobi).
 function matchArea(text, profile = {}) {
-  if (/\boutside\b/i.test(String(text || ''))) return null;
+  if (/\b(outside|siishi|sikai|not in|si wa)\b/i.test(String(text || ''))) return null;
   const areas = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').split(':')[1]).filter(Boolean);
   const toks = String(text || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((w) => w.length >= 4);
   for (const a of areas) { const parts = a.split(' '); const key = parts[parts.length - 1]; if (toks.some((w) => w === key || (key.length >= 6 && lev(w, key) <= 2))) return { listed: true, name: a.replace(/\b\w/g, (c) => c.toUpperCase()) }; }

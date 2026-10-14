@@ -161,3 +161,9 @@ test('acknowledgements, identity, earlier-call and off-catalogue turns get state
   r = await talk(['Mnafanya carpet?', 'Ni sawa.']); assert.match(r.out[1].line, /^Sawa\. Ungependa kubook Carpet Cleaning\?/);
   r = await talk(['Nilikuwa nauliza, ni vipi naweza lipa?']); assert.match(r.out[0].line, /^Tunapokea M-Pesa Paybill/); assert.doesNotMatch(r.out[0].line, /\d{5}/);
 });
+
+test('"siishi Nairobi" is not answered as "Nairobi is covered"; help requests get the enquiry menu', async () => {
+  const r = await talk(['Hapana, mimi siishi Nairobi.', 'Wah, sawa, hamwezi msaidia hivo sasa?']);
+  assert.doesNotMatch(r.out[0].line, /Nairobi iko kwenye orodha/); assert.match(r.out[0].line, /^Tunahudumia/);
+  assert.match(r.out[1].line, /bei, huduma au saa za kazi/);
+});
