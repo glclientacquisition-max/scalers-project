@@ -104,6 +104,8 @@ function createBrainV2Shadow(opts = {}) {
   let inFlight = 0;
   let disabled = false;
   let lastConsume = null; // the running turn's own stream; a timed-out turn keeps it alive
+  const smooth = opts.smooth || {}; // VOICE_TOOL_SMOOTH sub-flags from server.js (off = {})
+  let prefetched = null; // logged once, on the first shadow turn
 
   function resolveModel() {
     if (model !== undefined) return model;
@@ -139,7 +141,7 @@ function createBrainV2Shadow(opts = {}) {
     const handlers = {};
     for (const [k, fn] of Object.entries(dry)) if (typeof fn === 'function') handlers[k] = fn;
     const toolIntents = []; const sentences = [];
-    let firstAt = null; let done = null; let timedOut = false; let abortFlag = false;
+    let firstAt = null; let done = null; let readback = null; let timedOut = false; let abortFlag = false;
     const timeoutMs = shadowTimeoutMs(env);
     const consume = (async () => {
       const it = v2.runTurnStream(state, {
@@ -159,6 +161,9 @@ function createBrainV2Shadow(opts = {}) {
           // VOICE_ACK_RULE backstop on v2 lines: Voice owns the tool-turn ack, so strip any lead.
           const heard = ackRule && acked ? (typeof stripAck === 'function' ? stripAck(ev.text) : ev.text) : ev.text;
           sentences.push({ text: heard, lang: ev.lang, source: ev.source, ...(heard !== ev.text ? { rawText: ev.text } : {}) });
+        } else if (ev.type === 'readback' && smooth.readback) {
+          // Item 5: read-back is playing; reads may run now, writes only after yes.
+          readback = { tool: ev.tool || null, write: !!ev.write, readsAllowed: Array.isArray(ev.readsAllowed) ? ev.readsAllowed : [], atMs: ev.atMs ?? null };
         } else if (ev.type === 'done') {
           done = ev;
         }
@@ -183,6 +188,8 @@ function createBrainV2Shadow(opts = {}) {
       sentences,
       toolIntents,
       writeIntents: toolIntents.filter((t) => t.write).length,
+      ...(smooth.readback ? { readback, timing: done?.timing || null } : {}),
+      ...(smooth.prefetch && prefetched ? (() => { const p = prefetched; prefetched = null; return { prefetch: p }; })() : {}),
       ...(ackRule ? { acked: !!acked, voiceAck: acked && toolIntents.length ? 'tool_start' : null } : {}),
       model: model ? String(env.BRAIN_V2_SHADOW_MODEL) : null,
       ttftMs: firstAt == null ? null : firstAt - started,
@@ -210,6 +217,13 @@ function createBrainV2Shadow(opts = {}) {
         if (!v2) {
           v2 = loader();
           state = v2.createState({ profile: profile || {}, ...callerFileForState(opts) });
+          // Item 4: pure read of state+profile (no handlers, no writes).
+          if (smooth.prefetch && typeof v2.prefetchContext === 'function') {
+            try {
+              const ctx = v2.prefetchContext(state, profile || {});
+              prefetched = { catalogue: Array.isArray(ctx?.catalogue) ? ctx.catalogue.length : (ctx?.catalogue ? Object.keys(ctx.catalogue).length : 0), openRows: ctx?.callerFile?.openRows?.length || 0, hasHours: !!ctx?.hours, hasAreas: !!ctx?.areas };
+            } catch (err) { log(`[brain_v2_shadow][${label()}] prefetch failed: ${err?.message || err}`); }
+          }
         }
         lastConsume = null;
         const stage = await runOne({ text, profile, langLock, turnIndex, acked, ackRule, stripAck, ackWaitMs });

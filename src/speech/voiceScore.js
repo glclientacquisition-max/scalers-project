@@ -422,7 +422,20 @@ function scoreTurns(turns = []) {
       text: spokenText(turn),
     }))
   );
-  return { score, checks, turns: scored, nameAsks, nameAskTurns, ackRule };
+  // Tool-turn smoothness (report-only, VOICE_TOOL_SMOOTH_TRACE): heard gap p50/p95, dead air, ack stacks.
+  const toolSmooth = require('./toolSmooth').scoreToolTurns(
+    turns.map((turn) => {
+      const seg = stage(turn, 'audio_segments');
+      const filler = stages(turn, 'filler').map((r) => String(r.text || '').trim()).filter(Boolean)[0] || '';
+      const A = require('./ackRule');
+      return {
+        tool: stages(turn, 'tool').length > 0,
+        segments: seg ? seg.segments || [] : [],
+        stack: Boolean(filler && A.isAckLed(filler) && A.isAckLed(spokenText(turn))),
+      };
+    })
+  );
+  return { score, checks, turns: scored, nameAsks, nameAskTurns, ackRule, toolSmooth };
 }
 
 const CHECK_WEIGHT = {

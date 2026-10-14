@@ -1,0 +1,12 @@
+{
+  "callId": "HD_513dfb2fa73f",
+  "source": "staging Railway deploy logs 2026-10-14 12:41 UTC (15:41 EAT); ms from caller endpoint 12:41:22.780Z",
+  "turn": 10,
+  "lang": "en",
+  "tool": "create_service_request",
+  "ack": { "text": "Mm-hmm.", "atMs": 418, "bytes": 40960, "cached": true },
+  "holdLogged": "tool hold skipped after thinking-ack 1004ms: Just a second.",
+  "toolDoneAtMs": 1972,
+  "receipt": { "text": "Okay, I've saved your request.", "trimmed": "I've saved your request.", "ttsBeginMs": 1972 },
+  "assume": { "liveTtfaMs": 250, "msPerChar": 75, "note": "Logs carry no PCM timestamps for live TTS; live first-PCM = begin + 250 ms (brief §1.2 range 200-400), live/hold length = 75 ms/char (matches cached ack sizes)." }
+}
