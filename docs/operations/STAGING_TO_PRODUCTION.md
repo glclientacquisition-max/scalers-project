@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # Staging → production promotion
 
 **Status:** Canonical (2026-08-15)  

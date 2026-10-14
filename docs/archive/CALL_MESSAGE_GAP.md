@@ -1,7 +1,15 @@
+---
+owner: voice
+last_reviewed: 2026-10-05
+status: archived
+---
+
+> **Archived 2026-10-14.** Dated staging corpus gap list (Sep 2026). Current source: [`docs/product/CALL_MESSAGE_CONTRACT.md`](../product/CALL_MESSAGE_CONTRACT.md). Kept for history; do not treat as current.
+
 # Call message gap: live SMS vs excellence
 
 **Status:** Staging corpus, 2026-09-01 to 2026-09-10 (Done and Dusted / Shy, DID `+254709221536`)  
-**Contract:** [`CALL_MESSAGE_CONTRACT.md`](./CALL_MESSAGE_CONTRACT.md)  
+**Contract:** [`CALL_MESSAGE_CONTRACT.md`](../product/CALL_MESSAGE_CONTRACT.md)  
 **Lane:** Voice send path; Brain for names and intent; Desk for `DESK_PUBLIC_URL`
 
 Bodies below are reconstructed from `calls.summary` plus `ownerLeadEvent`. The send path does not yet persist `owner_notify_body`.

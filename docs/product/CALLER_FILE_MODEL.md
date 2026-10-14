@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-07
+---
+
 # Caller file model (A+B)
 
 **Status:** Locked (Alvin GO · 7 Oct 2026)  

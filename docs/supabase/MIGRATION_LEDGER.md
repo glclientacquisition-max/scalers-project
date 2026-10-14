@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-11
+---
+
 # Migration ledger
 
 **Status:** Authoritative index (hardened Phase 3F, 2026-08-15)  
@@ -282,7 +287,7 @@ CLI version timestamps are **INFERRED** from version string `YYYYMMDDHHMMSS` (UT
 
 - [`DATABASE_EVOLUTION.md`](../database/DATABASE_EVOLUTION.md)
 - [`DATABASE_APPLY_ORDER.md`](../database/DATABASE_APPLY_ORDER.md)
-- [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../operations/STAGING_REBUILD_EXECUTION_REPORT.md)
+- [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../archive/STAGING_REBUILD_EXECUTION_REPORT.md)
 
 ## Pending (not applied): team invites
 

@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-10-11
+---
+
 # Desk state — Scalers Product
 **As of:** 2026-09-20 ~12:00 EAT  
 **North star:** Kenyan SME owners on phone — triage faster, know the real next action, never be lied to by the desk.  

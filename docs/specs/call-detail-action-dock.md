@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-10-11
+---
+
 # Call-detail action dock (P0)
 
 **Status:** Ready for Desk UX — PR #358 staging smoke GO 2026-09-20 11:10 EAT  

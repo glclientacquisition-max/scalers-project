@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-04
+---
+
 # Database apply order
 
 **Status:** Canonical sequence (Phase 3F, 2026-08-15)  
@@ -241,7 +246,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | Issue | `foundation_bootstrap.sql` §6 previously omitted `UPDATE (notify_channels)` |
 | Production | **APPLIED** 2026-08-16 (`LEDGER-PROD-NOTIFY-GRANT`, CLI `20260816180900`) |
 | Staging | Present since Phase 3E; Git path is now `notify_channels.sql` |
-| Report | [`PHASE_3H_A3_APPLY_REPORT.md`](../operations/PHASE_3H_A3_APPLY_REPORT.md) |
+| Report | [`PHASE_3H_A3_APPLY_REPORT.md`](../archive/PHASE_3H_A3_APPLY_REPORT.md) |
 
 ```sql
 grant update (notify_channels) on public.tenants to authenticated;
@@ -277,4 +282,4 @@ grant update (notify_channels) on public.tenants to authenticated;
 
 - [`DATABASE_EVOLUTION.md`](./DATABASE_EVOLUTION.md)
 - [`../supabase/README.md`](../supabase/README.md)
-- [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../operations/STAGING_REBUILD_EXECUTION_REPORT.md)
+- [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../archive/STAGING_REBUILD_EXECUTION_REPORT.md)

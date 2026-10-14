@@ -1,3 +1,11 @@
+---
+owner: platform
+last_reviewed: 2026-08-15
+status: archived
+---
+
+> **Archived 2026-10-14.** Phase report. Current source: [`docs/governance/PROJECT_HISTORY.md`](../governance/PROJECT_HISTORY.md). Kept for history; do not treat as current.
+
 # Phase 3F baseline audit
 
 **Date:** 2026-08-15  
@@ -54,7 +62,7 @@
 | Bootstrap provenance | `docs/supabase/foundation_bootstrap.provenance.md` | Methodology + gaps |
 | Schema reference | `docs/supabase/schema.sql` | Reference only; superseded for bootstrap |
 | Governance | `docs/database/DATABASE_GOVERNANCE.md` | Pre-3F; partially stale on reproducibility |
-| Staging evidence | `docs/operations/STAGING_REBUILD_EXECUTION_REPORT.md` | Phase 3E execution log |
+| Staging evidence | `docs/archive/STAGING_REBUILD_EXECUTION_REPORT.md` | Phase 3E execution log |
 
 ### Foundation bootstrap
 
@@ -183,7 +191,7 @@ From `docs/governance/TECHNICAL_DEBT.md` plus Phase 3E outcomes:
 | Legacy Super Admin cookie auth | P2 | OPEN (TD-P2-1) |
 | Verbose request logging (PII) | P1 | OPEN (TD-P1-4) |
 
-Full classification: `docs/security/PHASE_3F_SECURITY_REVIEW.md`.
+Full classification: `docs/archive/PHASE_3F_SECURITY_REVIEW.md`.
 
 ---
 
@@ -202,13 +210,13 @@ Full classification: `docs/security/PHASE_3F_SECURITY_REVIEW.md`.
 
 This phase produces governance and release documentation only. No product features. No production SQL execution.
 
-**Deliverables:** See `docs/operations/PHASE_3F_COMPLETION_REPORT.md`.
+**Deliverables:** See `docs/archive/PHASE_3F_COMPLETION_REPORT.md`.
 
 ---
 
 ## Related documents
 
-- [`STAGING_REBUILD_EXECUTION_REPORT.md`](./STAGING_REBUILD_EXECUTION_REPORT.md)
+- [`STAGING_REBUILD_EXECUTION_REPORT.md`](STAGING_REBUILD_EXECUTION_REPORT.md)
 - [`../supabase/MIGRATION_LEDGER.md`](../supabase/MIGRATION_LEDGER.md)
 - [`../database/DATABASE_EVOLUTION.md`](../database/DATABASE_EVOLUTION.md)
 - [`../database/DATABASE_APPLY_ORDER.md`](../database/DATABASE_APPLY_ORDER.md)

@@ -1,3 +1,11 @@
+---
+owner: platform
+last_reviewed: 2026-08-16
+status: archived
+---
+
+> **Archived 2026-10-14.** Phase report. Current source: [`docs/supabase/MIGRATION_LEDGER.md`](../supabase/MIGRATION_LEDGER.md). Kept for history; do not treat as current.
+
 # Phase 3H A3 apply report: notify_channels grant
 
 **Date:** 2026-08-16  

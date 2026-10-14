@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # How Scalers fits together
 
 **Status:** Entry map. Read this first.  
@@ -39,7 +44,7 @@ Caller → SautiKit → server.js /voice/incoming
 
 ## Not shipped
 
-- Live Dial to a person during the call. Not built; product is callbacks only since #658. History: [`../product/LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md). The shipped handoff is the async notify above.
+- Live Dial to a person during the call. Not built; product is callbacks only since #658. History: [`../product/LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md). The shipped handoff is the async notify above.
 - Owner M-Pesa checkout for a package. Super Admin assigns the package. See [`../operations/PACKAGES.md`](../operations/PACKAGES.md).
 
 ## Desk

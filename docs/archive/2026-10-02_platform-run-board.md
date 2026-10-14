@@ -1,3 +1,11 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+status: archived
+---
+
+> **Archived 2026-10-14.** Dated run board. Current source: [`docs/STATUS.md`](../STATUS.md). Kept for history; do not treat as current.
+
 # Platform run board — staging acceptance
 
 **Slice:** Desk A (Platform board on `/admin`)  

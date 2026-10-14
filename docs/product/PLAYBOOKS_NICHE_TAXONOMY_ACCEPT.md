@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-11
+---
+
 # Playbooks niches & subcategories — Product ACCEPT
 
 **Date:** 2026-09-21  

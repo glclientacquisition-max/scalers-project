@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-16
+---
+
 # Technical debt register
 
 **Status:** Governance baseline (updated Phase 3F, 2026-08-15)  

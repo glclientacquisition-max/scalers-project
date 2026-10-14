@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # Platform system map
 
 **Status:** Investigation snapshot plus P2 notify catalog  
@@ -221,7 +226,7 @@ Delivery statuses already parse and persist (`persistWhatsAppStatus`). Desk does
 
 Ladder: TextSMS.co.ke → SautiKit WhatsApp → Resend → desk note. One success per dest + kind + call. Escalate: one teammate, no extra owner SMS. Contract: [`../CALL_MESSAGE_CONTRACT.md`](../product/CALL_MESSAGE_CONTRACT.md).
 
-Known payload gap (Voice, not a new channel): mid-call lead SMS fires on `save_caller_info` before hangup `owner_review`. Visit/hold marks `whatsapp_sent` so hangup does not double the lead. [`../CALL_MESSAGE_GAP.md`](../product/CALL_MESSAGE_GAP.md).
+Known payload gap (Voice, not a new channel): mid-call lead SMS fires on `save_caller_info` before hangup `owner_review`. Visit/hold marks `whatsapp_sent` so hangup does not double the lead. [`../CALL_MESSAGE_GAP.md`](../archive/CALL_MESSAGE_GAP.md).
 
 Desk Ping (`pingTeammateAction` → `POST /internal/desk/escalate`) reuses the same notify path and the same `formatEscalationDelivery` honesty.
 
@@ -303,9 +308,9 @@ Company Brain §7. Do not reorder without Product + founder.
 | --- | --- |
 | [`../company/COMPANY_BRAIN.md`](../company/COMPANY_BRAIN.md) | North star, wedge, ladder, roster |
 | [`../BUSINESS_INTELLIGENCE_ROADMAP.md`](../product/BUSINESS_INTELLIGENCE_ROADMAP.md) | Voice Brain destination (stale “no CRM” in §2; trust §11 + this map) |
-| [`../CALL_MESSAGE_CONTRACT.md`](../product/CALL_MESSAGE_CONTRACT.md) / [`../CALL_MESSAGE_GAP.md`](../product/CALL_MESSAGE_GAP.md) | Who gets what after a call |
+| [`../CALL_MESSAGE_CONTRACT.md`](../product/CALL_MESSAGE_CONTRACT.md) / [`../CALL_MESSAGE_GAP.md`](../archive/CALL_MESSAGE_GAP.md) | Who gets what after a call |
 | [`../ESCALATION.md`](../product/ESCALATION.md) | Async handoff (the shipped product) |
-| [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) / ADR-0004 | Blocked Dial; conference next |
+| [`../LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md) / ADR-0004 | Blocked Dial; conference next |
 | [`../WHATSAPP_TEMPLATES.md`](../product/WHATSAPP_TEMPLATES.md) / [`../specs/whatsapp-two-way.md`](../specs/whatsapp-two-way.md) | Staff templates + dual-use DID |
 | [`../ONE_WALLET_BILLING.md`](../operations/ONE_WALLET_BILLING.md) / [`../BETA_WALLET_PROGRAM.md`](../operations/BETA_WALLET_PROGRAM.md) | Prepaid truth |
 | [`NOTIFY_SQL_CATALOG.md`](./NOTIFY_SQL_CATALOG.md) | ALCR vs staging notify SQL + apply checklist |

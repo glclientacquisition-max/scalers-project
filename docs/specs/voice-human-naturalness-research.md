@@ -1,3 +1,8 @@
+---
+owner: voice
+last_reviewed: 2026-10-01
+---
+
 # Research: human voice, not robotic
 
 **Status:** Research plus Voice runtime for cache path and remaining leak prose.  

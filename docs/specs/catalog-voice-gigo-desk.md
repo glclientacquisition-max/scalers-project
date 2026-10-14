@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-09
+---
+
 # Catalog, voice facts, and Settings portrayal
 
 **Status:** Shipped v1 on `main` (2026-10-07, squash **#598** `33af1303`)  

@@ -1,3 +1,8 @@
+---
+owner: voice
+last_reviewed: 2026-10-09
+---
+
 # Voice naturalness eval
 
 **Lane:** Voice.  
@@ -112,7 +117,7 @@ If N1 fails, still run N2 and N3 on the same SHA. The set is the measurement.
 | N2 barge | `HD_b4cb560bae33` | `abf6aa9` | fail | Speech guarantee on ANSWER: `I can't finish that just now`. V9 barge pass; wait not in STT. |
 | N3 pace | `HD_391a57aae9e9` | `2c8fb51` | fail | **V8 pass** (scale `0.85` → `0.7` → `1`, wire matched). **V5** ×3 (`Okay.` → `I'm well. Who is calling?` at 210 / 207 / 301 ms). |
 
-Detail: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md).
+Detail: [`LIVE_CALL_FINDINGS.md`](../archive/LIVE_CALL_FINDINGS.md).
 
 **V5 matcher is in code.** `looksLikeBareCloser` rejects bare `Okay` / `ok` / `fine` / `great` and punctuated variants. Those turns are not how-are-you and do not get a thinking-ack or a who-is-calling local line. Named how-are-you (`How are you doing, Shy?`) still does. Wellbeing answers still need `I'm` / `I am`. Do not crank speed or gain.
 
@@ -146,6 +151,6 @@ Shipped Voice work that already targets this (do not redo before the freeze): se
 
 - A5 sheet: [`docs/operations/beta_voice_eval_checklist.md`](../operations/beta_voice_eval_checklist.md)
 - Speed program (do not crank): [`VOICE_SPEED_CONSISTENCY.md`](./VOICE_SPEED_CONSISTENCY.md)
-- Live SID log: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md)
+- Live SID log: [`LIVE_CALL_FINDINGS.md`](../archive/LIVE_CALL_FINDINGS.md)
 - Brain CX map (lists, phatic): [`CALLER_EXPERIENCE_EXCELLENCE.md`](./CALLER_EXPERIENCE_EXCELLENCE.md) F7
 - OSS research (turn-taking steals, what not to swap, five live follow-ups): [`../specs/voice-human-naturalness-research.md`](../specs/voice-human-naturalness-research.md)

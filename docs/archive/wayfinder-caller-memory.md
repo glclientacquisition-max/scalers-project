@@ -1,3 +1,11 @@
+---
+owner: brain
+last_reviewed: 2026-09-25
+status: archived
+---
+
+> **Archived 2026-10-14.** Short duplicate. Current source: [`docs/specs/caller-memory.md`](../specs/caller-memory.md). Kept for history; do not treat as current.
+
 # Wayfinder: returning-caller card
 
 ## Destination

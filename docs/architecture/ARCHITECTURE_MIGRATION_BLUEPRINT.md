@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # B2B AI Voice SaaS — Architecture & Migration Blueprint
 
 > **Status:** HISTORICAL + TARGET. Not the live picture.  

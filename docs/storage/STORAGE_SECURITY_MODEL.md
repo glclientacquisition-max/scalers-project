@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-15
+---
+
 # Storage security model — call-recordings
 
 **Status:** Phase 3G (2026-08-15)  

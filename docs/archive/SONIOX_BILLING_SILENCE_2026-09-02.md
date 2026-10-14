@@ -1,3 +1,11 @@
+---
+owner: voice
+last_reviewed: 2026-09-03
+status: archived
+---
+
+> **Archived 2026-10-14.** Dated incident note. Current source: [`docs/agents/VOICE_DOWNTIME_AT_SCALE.md`](../agents/VOICE_DOWNTIME_AT_SCALE.md). Kept for history; do not treat as current.
+
 # Live incident — business assistant silent (Soniox 402)
 
 **Date:** 2026-09-02  

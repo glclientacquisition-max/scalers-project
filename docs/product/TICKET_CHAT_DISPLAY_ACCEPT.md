@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-21
+---
+
 # Ticket in-chat display polish — Product ACCEPT
 
 **Date:** 2026-09-21  

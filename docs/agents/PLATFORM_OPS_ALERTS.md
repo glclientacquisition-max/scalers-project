@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # Platform ops alerts (speech | reasoning | telephony)
 
 **Lane:** Voice  

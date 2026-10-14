@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-14
+---
+
 # History gaps
 
 **Status:** Governance baseline (2026-08-14)  

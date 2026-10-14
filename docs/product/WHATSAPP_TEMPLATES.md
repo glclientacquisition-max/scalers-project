@@ -1,3 +1,8 @@
+---
+owner: voice
+last_reviewed: 2026-10-09
+---
+
 # Staff WhatsApp templates (Meta approval)
 
 **Status:** First template Active (`scalers_staff_alert` / `en`). Submit the rest. Staff WhatsApp is template-only.  

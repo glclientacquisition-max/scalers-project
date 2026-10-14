@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # Target module skeleton (future, not the current layout)
 
 > **Status:** TARGET. Do not read this tree as the repo you clone.  

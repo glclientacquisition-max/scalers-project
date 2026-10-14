@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-10-05
+---
+
 # Settings `/settings`
 
 **Job:** Teach and configure the business and the assistant.  

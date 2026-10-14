@@ -1,6 +1,14 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+status: archived
+---
+
+> **Archived 2026-10-14.** Phase 3G audit (Aug 2026). Current source: [`docs/STATUS.md`](../STATUS.md). Kept for history; do not treat as current.
+
 # Beta readiness audit
 
-**Update 2026-08-16:** Production `notify_channels` UPDATE grant applied (`LEDGER-PROD-NOTIFY-GRANT`). See [`PHASE_3H_A3_APPLY_REPORT.md`](./PHASE_3H_A3_APPLY_REPORT.md).
+**Update 2026-08-16:** Production `notify_channels` UPDATE grant applied (`LEDGER-PROD-NOTIFY-GRANT`). See [`PHASE_3H_A3_APPLY_REPORT.md`](PHASE_3H_A3_APPLY_REPORT.md).
 
 **Date:** 2026-08-15 (Phase 3G)  
 **Method:** Codebase + documentation review — no new features implemented  
@@ -126,6 +134,6 @@ Scalers MVP core loops exist and are test-covered at unit/smoke level. Staging d
 
 ## Related documents
 
-- [`PHASE_3G_COMPLETION_REPORT.md`](./PHASE_3G_COMPLETION_REPORT.md)
-- [`../security/PHASE_3F_SECURITY_REVIEW.md`](../security/PHASE_3F_SECURITY_REVIEW.md)
-- [`BETA_WALLET_PROGRAM.md`](BETA_WALLET_PROGRAM.md) (if exists)
+- [`PHASE_3G_COMPLETION_REPORT.md`](PHASE_3G_COMPLETION_REPORT.md)
+- [`../security/PHASE_3F_SECURITY_REVIEW.md`](PHASE_3F_SECURITY_REVIEW.md)
+- [`BETA_WALLET_PROGRAM.md`](../operations/BETA_WALLET_PROGRAM.md) (if exists)

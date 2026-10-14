@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-12
+---
+
 # Desk as a daily product (research)
 
 **Status:** Shell shipping. Constitution amended 2026-09-10. Inbox phone rows and cmdk stay later.  

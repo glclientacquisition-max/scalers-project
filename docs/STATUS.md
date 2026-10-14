@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-14
+---
+
 # Scalers status and handoff (start here)
 
 **Last updated Wed 14 Oct 2026, 20:30 EAT.** Checked against `main` (`7d870a75`), `gh pr list`, main's first-parent log, and prod/staging `/healthz` at 20:15 EAT. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).

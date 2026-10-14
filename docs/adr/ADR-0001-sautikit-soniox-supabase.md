@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # ADR-0001 — SautiKit + Soniox + Supabase voice stack
 
 ## Status

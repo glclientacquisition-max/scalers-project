@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-13
+---
+
 # Handoff record (one per call)
 
 Status: DRAFT; decisions locked 2026-10-09 (Chief under Alvin's delegation,

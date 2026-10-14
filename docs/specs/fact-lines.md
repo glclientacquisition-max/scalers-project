@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-13
+---
+
 # Fact lines: Brain templates, Voice wording
 
 Status: contract, 2026-10-09. Owner of this file: Brain. Wording: Voice.

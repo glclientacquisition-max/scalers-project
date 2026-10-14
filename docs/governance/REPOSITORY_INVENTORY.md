@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # Repository inventory
 
 **Status:** Governance baseline (2026-08-14)  

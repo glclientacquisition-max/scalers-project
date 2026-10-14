@@ -1,3 +1,8 @@
+---
+owner: voice
+last_reviewed: 2026-10-09
+---
+
 # WhatsApp two-way and Scalers-as-tenant
 
 **Status:** Phase 1 implementing. First Utility template is Active.  

@@ -1,3 +1,8 @@
+---
+owner: ops-billing
+last_reviewed: 2026-10-10
+---
+
 # Scalers — Super Admin Requirements
 
 ## Goal

@@ -1,3 +1,11 @@
+---
+owner: brain
+last_reviewed: 2026-08-11
+status: archived
+---
+
+> **Archived 2026-10-14.** Dated tenant review (Aug 2026, old DID holder). Current source: [`docs/STATUS.md`](../STATUS.md). Kept for history; do not treat as current.
+
 # ChapterOne Bookstore — setup review (2026-08-11)
 
 Tenant: `9f3ff5d6-f189-46c9-8c2d-4bb15f07aecf`  

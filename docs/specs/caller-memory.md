@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-09-25
+---
+
 # Spec: returning-caller card
 
 **Status:** Accepted for this PR  

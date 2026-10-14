@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-02
+---
+
 # Platform ops alerts — Voice slice acceptance
 
 **Date:** 2026-10-02  

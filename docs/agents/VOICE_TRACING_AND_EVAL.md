@@ -1,3 +1,8 @@
+---
+owner: voice
+last_reviewed: 2026-10-08
+---
+
 # Voice tracing and eval
 
 Phase 1 of the voice rebuild. This measures what a call did. It does not change what the caller hears.

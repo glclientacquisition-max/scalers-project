@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-10-12
+---
+
 # Super Admin
 
 **Route:** `/admin`  

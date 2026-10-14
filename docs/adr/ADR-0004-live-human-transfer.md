@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # ADR-0004 — Live human transfer via cold Dial after Stream stop
 
 ## Status
@@ -25,7 +30,7 @@ Warm transfer via Conference plus an outbound agent leg is documented by SautiKi
 5. On Dial failure, `<Say>` + hangup. Do not re-open Stream in v1.
 6. Defer warm conference / whisper / DTMF 0 to v2.
 
-Canonical spec: [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md).
+Canonical spec: [`../LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md).
 
 ## Alternatives considered
 

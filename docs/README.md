@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # Docs
 
 Index for the repo. Product behavior is in `product/`. Runbooks are in `operations/`. SQL stays in `supabase/`.

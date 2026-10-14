@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-15
+---
+
 # Feature development contract
 
 **Status:** Canonical lifecycle (Phase 3F, 2026-08-15)  

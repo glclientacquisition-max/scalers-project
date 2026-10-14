@@ -1,3 +1,8 @@
+---
+owner: ops-billing
+last_reviewed: 2026-10-05
+---
+
 # Wayfinder: package billing
 
 **Destination:** Owners buy a monthly or annual package with included buckets. Exhausted buckets continue only if on-demand is on, or the owner upgrades. Super Admin owns the catalog at `/admin/packages` after the existing username + access code login.  

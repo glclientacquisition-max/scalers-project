@@ -1,3 +1,8 @@
+---
+owner: voice
+last_reviewed: 2026-10-14
+---
+
 # Escalation feature (definition)
 
 **Job:** When a caller needs a human, Scalers captures who they are and why, notifies the right teammate over the best available channel, confirms honestly on the phone, and leaves a desk trail the owner can act on.
@@ -10,12 +15,12 @@ Canonical code: `src/conversation/escalationFeature.js`, `requiredEscalate.js`, 
 
 | Is | Is not |
 | --- | --- |
-| Async handoff: notify teammate/owner + desk note | Live cold transfer (that is a separate product: [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md)) |
+| Async handoff: notify teammate/owner + desk note | Live cold transfer (that is a separate product: [`LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md)) |
 | Requires **caller name + reason** before notify | Guessing a name or inventing staff |
 | Routes via `tenants.team_directory` permissions | Sharing random phone numbers as “done”; falling back to `team[0]`; extra owner SMS |
 | Honest confirm after backend outcome | “I’ve transferred you” / “I’ve texted them” before send OK |
 
-**Callbacks only since #658 (11 Oct 2026).** Desk offers only "Take a message for a callback"; the capability gate is `callbacks`, not `live_transfer`. **Live transfer** (`handoff_mode = live_transfer`) was specified, never shipped (history: [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md)). Runtime still sets `liveTransfer: false`. Until Voice Dial exists, Brain must keep using this async escalate path even if the tenant preference says live transfer.
+**Callbacks only since #658 (11 Oct 2026).** Desk offers only "Take a message for a callback"; the capability gate is `callbacks`, not `live_transfer`. **Live transfer** (`handoff_mode = live_transfer`) was specified, never shipped (history: [`LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md)). Runtime still sets `liveTransfer: false`. Until Voice Dial exists, Brain must keep using this async escalate path even if the tenant preference says live transfer.
 
 ---
 
@@ -93,7 +98,7 @@ Resolution: `needs_human` when escalate succeeded or handoff requested without a
 2. **Desk UI** — show `escalation_notify.channels` on call detail, or “Needs human. Notify failed.”
 3. **Per-tenant sender ID** (optional) when businesses register their own shortcodes
 4. **Delivery receipts** — TextSMS DLR webhook → update `escalation_notify`
-5. **Live transfer** — spec: [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) + [`adr/ADR-0004-live-human-transfer.md`](../adr/ADR-0004-live-human-transfer.md). Do not implement until the Stream-stop → Dial staging spike passes. Keep this async escalate path as default and as Dial fallback.
+5. **Live transfer** — spec: [`LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md) + [`adr/ADR-0004-live-human-transfer.md`](../adr/ADR-0004-live-human-transfer.md). Do not implement until the Stream-stop → Dial staging spike passes. Keep this async escalate path as default and as Dial fallback.
 6. **Owner preference** — SMS vs WA vs email priority per tenant
 7. **Quiet hours** — delay SMS, still desk-note immediately
 

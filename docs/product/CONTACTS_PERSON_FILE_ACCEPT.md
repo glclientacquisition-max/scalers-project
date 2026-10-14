@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-25
+---
+
 # Contacts person file. Product ACCEPT
 
 **Date:** 2026-09-21  

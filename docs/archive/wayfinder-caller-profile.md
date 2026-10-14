@@ -1,3 +1,11 @@
+---
+owner: brain
+last_reviewed: 2026-09-17
+status: archived
+---
+
+> **Archived 2026-10-14.** Short duplicate. Current source: [`docs/specs/caller-profile.md`](../specs/caller-profile.md). Kept for history; do not treat as current.
+
 # Wayfinder: summarized caller profile
 
 ## Destination

@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # Source of truth
 
 **Status:** Governance baseline (2026-08-14)  
@@ -35,7 +40,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | --- | --- | --- | --- | --- | --- |
 | Agent runtime | Gemini turn loop | `server.js` `runGeminiTurn*` | `@google/genai` import; called from media handler | `/ws/relay` path | CORE |
 | Human handoff (async) | Escalate notify + desk note | `src/conversation/escalationFeature.js`, `server.js` `maybeSendEscalationNotification` | [`../ESCALATION.md`](../product/ESCALATION.md) | Live Dial | CORE |
-| Human handoff (live) | **Not offered: callbacks only since #658.** Was: conference + outbound REST (cold Dial after Stream blocked) | Gated off (`VOICE_LIVE_TRANSFER`) | [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED |
+| Human handoff (live) | **Not offered: callbacks only since #658.** Was: conference + outbound REST (cold Dial after Stream blocked) | Gated off (`VOICE_LIVE_TRANSFER`) | [`../LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED |
 | Runtime prompt assembly | Context + rules + profile | `src/prompts.js` | `buildSystemPrompt`, `buildContextHeader` | Env `BUSINESS_*` | CORE |
 | Brain state | Per-call semantic memory, seeded from returning-caller card | `src/conversation/brainState.js` | `callBrainStates` Map in `server.js` | None | CORE |
 | Returning-caller card | Compact phone file at call setup | `src/conversation/callerMemory.js` + `getCallerMemory` | CONTEXT HEADER; ADR-0005 | Transcript dump, RAG | CORE |
@@ -124,7 +129,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | Call wallet debit | RPC `charge_call_to_wallet` | `src/db.js` | Idempotent per `call_id` | None | CORE |
 | Inbound on-demand | `billing_rate_card.inbound_kes_per_second` | 0.10 (KES 6/min) | Package overage. Env `WALLET_RATE_KES_PER_MINUTE` default 0 is fallback only if `consume_call_seconds` is missing | SautiKit already costs us about KES 0.50/min on inbound (streaming to Voice, on top of a KES 0 call leg). Re-check margin if SautiKit changes the stream rate | CORE |
 | Outbound live transfer | `billing_rate_card.outbound_kes_per_second` | 0.15 (KES 9/min) | Stored. Hidden until live transfer. SautiKit outbound cost **KES 3/min** answered; unanswered 0. Env default 4 is fallback only | Conference executor not live | PROPOSED (executor) / CORE (rates) |
-| Transfer billing helpers | `src/billing/liveTransferLegs.js` | Ops | [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) §8 | Fold outbound into inbound | CORE (do not fold) |
+| Transfer billing helpers | `src/billing/liveTransferLegs.js` | Ops | [`../LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md) §8 | Fold outbound into inbound | CORE (do not fold) |
 
 ---
 
@@ -178,4 +183,4 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 - [`REPOSITORY_INVENTORY.md`](./REPOSITORY_INVENTORY.md)
 - [`../architecture/CURRENT_STATE.md`](../architecture/CURRENT_STATE.md)
 - [`../agents/AGENT_ARCHITECTURE.md`](../agents/AGENT_ARCHITECTURE.md)
-- [`../frontend/FRONTEND_RECONNAISSANCE.md`](../frontend/FRONTEND_RECONNAISSANCE.md)
+- [`../frontend/FRONTEND_RECONNAISSANCE.md`](../archive/FRONTEND_RECONNAISSANCE.md)

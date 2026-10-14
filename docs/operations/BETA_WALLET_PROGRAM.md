@@ -1,3 +1,8 @@
+---
+owner: ops-billing
+last_reviewed: 2026-10-06
+---
+
 # Beta billing enforcement (packages + on-demand)
 
 Billing modes are **product controls** for metering and on-demand debits. They are not a wallet top-up product or a graduation into float top-up.

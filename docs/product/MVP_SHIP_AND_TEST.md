@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-05
+---
+
 # MVP: onboard → answer unanswered calls
 
 **Product job (MVP):** When a business signs up and finishes onboarding, callers who would otherwise hit an unanswered line get a **live AI receptionist** that greets them, answers common questions from the business facts on file, takes a useful message / request when needed, and notifies the owner.

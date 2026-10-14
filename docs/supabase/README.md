@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # Supabase SQL apply order
 
 Canonical index for every file in `docs/supabase/`. Prefer **additive** scripts; re-runs should be safe (`if not exists`, `drop … if exists`, idempotent backfills).

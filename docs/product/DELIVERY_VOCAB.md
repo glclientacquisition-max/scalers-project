@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-20
+---
+
 # Delivery honesty vocabulary (Product cite)
 
 **Authority:** Scalers Critic PASS 2026-09-20 — Product adopts as law.  

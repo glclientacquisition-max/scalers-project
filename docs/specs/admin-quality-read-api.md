@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # Super Admin Quality read API
 
 Contract for the Super Admin Quality reads. `dashboard/src/lib/quality/readQuality.ts` is the only code that reads `voice_turn_traces` for Super Admin. The `/api/admin/quality*` routes call it directly. The `/admin/quality*` screens, Overview, and Businesses call it through `dashboard/src/lib/adminQuality.ts`, which only reshapes the bodies for the desk view model. `dashboard/src/lib/quality/rollup.js` owns the Dropping and release math. Nothing else computes them.

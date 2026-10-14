@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-20
+---
+
 # Inbox verb cut Phase 1 (P0)
 
 **Status:** Shipping in this PR.  

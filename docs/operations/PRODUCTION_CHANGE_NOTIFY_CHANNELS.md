@@ -1,3 +1,8 @@
+---
+owner: ops-billing
+last_reviewed: 2026-08-16
+---
+
 # Production change: notify_channels UPDATE grant
 
 **Status:** APPLIED 2026-08-16  
@@ -5,7 +10,7 @@
 **Prepared:** 2026-08-15 (Phase 3G)  
 **Applied:** 2026-08-16 (Phase 3H A3, human-approved)  
 **SQL artifact:** [`../supabase/production_pending/grant_notify_channels_update.sql`](../supabase/production_pending/grant_notify_channels_update.sql)  
-**Apply report:** [`PHASE_3H_A3_APPLY_REPORT.md`](./PHASE_3H_A3_APPLY_REPORT.md)
+**Apply report:** [`PHASE_3H_A3_APPLY_REPORT.md`](../archive/PHASE_3H_A3_APPLY_REPORT.md)
 
 ---
 
@@ -110,6 +115,6 @@ revoke update (notify_channels) on public.tenants from authenticated;
 
 ## Related documents
 
-- [`PHASE_3H_A3_APPLY_REPORT.md`](./PHASE_3H_A3_APPLY_REPORT.md)
-- [`../security/PHASE_3F_SECURITY_REVIEW.md`](../security/PHASE_3F_SECURITY_REVIEW.md) (SEC-P1-1)
+- [`PHASE_3H_A3_APPLY_REPORT.md`](../archive/PHASE_3H_A3_APPLY_REPORT.md)
+- [`../security/PHASE_3F_SECURITY_REVIEW.md`](../archive/PHASE_3F_SECURITY_REVIEW.md) (SEC-P1-1)
 - [`../storage/STORAGE_SECURITY_MODEL.md`](../storage/STORAGE_SECURITY_MODEL.md)

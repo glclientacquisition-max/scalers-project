@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-05
+---
+
 # Caller experience excellence (Brain)
 
 **Status:** Research, not a ship claim. 2026-09-15.  

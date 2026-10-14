@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-09-20
+---
+
 # Notify SQL catalog (P2)
 
 **Status:** Live probe 2026-09-20 EAT (Platform via Supabase MCP).  

@@ -1,3 +1,8 @@
+---
+owner: ops-billing
+last_reviewed: 2026-10-05
+---
+
 # Platform escalate mail
 
 Staff notices from Admin → Platform → Escalate. Not owner leads and not caller alerts.

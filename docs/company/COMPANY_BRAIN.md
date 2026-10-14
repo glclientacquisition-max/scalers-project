@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-09-20
+---
+
 # Scalers Company Brain
 
 **Status:** Approved v0.2.1 — founder + Chief (2026-09-20 EAT)  

@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-09-10
+---
+
 # Issue tracker: GitHub (read) + specs on disk (write)
 
 Humans track work as GitHub issues and pull requests on `glclientacquisition-max/scalers-project`.

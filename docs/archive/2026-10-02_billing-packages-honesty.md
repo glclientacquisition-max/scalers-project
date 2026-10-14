@@ -1,3 +1,11 @@
+---
+owner: ops-billing
+last_reviewed: 2026-10-06
+status: archived
+---
+
+> **Archived 2026-10-14.** Dated acceptance run. Current source: [`docs/operations/PACKAGES.md`](../operations/PACKAGES.md). Kept for history; do not treat as current.
+
 # Acceptance — billing packages + on-demand honesty (Slice C)
 
 **As-of:** 2026-10-02  

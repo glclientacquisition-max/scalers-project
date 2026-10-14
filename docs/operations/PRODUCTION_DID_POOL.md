@@ -1,3 +1,8 @@
+---
+owner: ops-billing
+last_reviewed: 2026-10-14
+---
+
 # Phase C — SautiKit DID number pool
 
 ## Goal

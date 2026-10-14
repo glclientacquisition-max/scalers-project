@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-05
+---
+
 # Business Intelligence Roadmap — From Generalist Receptionist to Full-Assist Employee
 
 > **Status:** In progress — Phase 0 foundations landing (vertical, handoff, locations, policies, full-assist prompt job)  
@@ -416,7 +421,7 @@ Live proceed bar (cleaning beachhead, shared spine for other home niches): [`HOM
 
 1. **Gap mining** — weekly top unresolved intents per tenant/vertical  
 2. **Raise FAQ/catalog ceilings** carefully; add `knowledge_documents` + chunk retrieve **at call setup only** if prompt size breaks (architecture blueprint RAG phase — not mid-turn for latency)  
-3. **Live transfer** — specified in [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) (cold Dial after Stream stop). Implement only after the Voice staging spike; keep async escalate as default and fallback.  
+3. **Live transfer** — specified in [`LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md) (cold Dial after Stream stop). Implement only after the Voice staging spike; keep async escalate as default and fallback.  
 4. **Caller memory** — returning-caller card from `contacts` at call setup (ADR-0005). Instant greeting stays brand-first.  
 5. **Scenario smokes** — extend `scripts/smoke-escalation-scenarios.js` pattern to retail/home playbook scripts  
 6. **Vertical template library** — starter catalogs/FAQs/policies per vertical  

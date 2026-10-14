@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-07
+---
+
 # Caller identity and summary (runtime contract)
 
 **Status:** Locked with [`CALLER_FILE_MODEL.md`](../product/CALLER_FILE_MODEL.md) (Alvin GO · 7 Oct 2026)  

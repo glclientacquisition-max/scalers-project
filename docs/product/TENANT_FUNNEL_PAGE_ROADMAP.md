@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-10-11
+---
+
 # Tenant Funnel Page — Product verdict + roadmap
 
 **Date:** 2026-09-20 (rev 2 — founder refinement)  
