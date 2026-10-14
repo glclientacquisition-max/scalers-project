@@ -276,6 +276,8 @@ function prepareForTts(text, opts = {}) {
   const extras = mergeExtraLexicon(opts.extraLexicon);
 
   let spoken = stripMarkup(original);
+  // BRAIN_TRUST_P1: "Achieng'" → "Achieng" for TTS only (storage keeps the spelling).
+  spoken = require('../conversation/callerNameControl').stripNameApostrophes(spoken);
   if (shouldRewriteSheng(spoken, opts.callLanguage)) {
     spoken = rewriteShengForTts(spoken);
   }

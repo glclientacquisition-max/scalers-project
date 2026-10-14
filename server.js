@@ -621,6 +621,24 @@ function finalizeSaveReadback(callSid, line, results, language) {
   return [...parts, notice, q].filter(Boolean).join(' ');
 }
 
+// BRAIN_TRUST_P1: a confirmed name that differs from the file owner is a correction; store once per call.
+const trustNameCorrectionSaved = new Map();
+function maybeRecordNameCorrection(callSid, state) {
+  if (!trustP1.trustP1Enabled() || !state?.caller?.nameConfirmed) return;
+  const owner = String(state.returning?.fileOwnerName || '').trim();
+  const name = String(state.caller.name || '').trim();
+  if (!owner || !name || owner.toLowerCase() === name.toLowerCase()) return;
+  if (trustNameCorrectionSaved.get(callSid) === name.toLowerCase()) return;
+  trustNameCorrectionSaved.set(callSid, name.toLowerCase());
+  const profile = callTenantProfiles.get(callSid) || {};
+  const ctx = profile.trustP1Context || {};
+  const tenantId = ctx.tenantId || profile.id;
+  if (!tenantId || !ctx.phone) return;
+  db.recordCallerNameCorrection({ tenantId, phone: ctx.phone, name, previous: owner, callSid })
+    .then(() => console.log(`[${callSid}] caller name correction stored`))
+    .catch((err) => console.warn(`[${callSid}] name correction save failed:`, err?.message || err));
+}
+
 async function loadVisitReviewAppointments(callSid, profile) {
   try {
     const call = await db.getCall(callSid);
@@ -1994,6 +2012,9 @@ mediaWss.on('connection', (ws, req) => {
   let turnBusy = false;
   let utteranceParts = [];
   let utteranceLanguages = [];
+  // BRAIN_TRUST_P1: final STT tokens (with Soniox confidence) for the current utterance / last flushed turn.
+  let utteranceSttTokens = [];
+  let turnSttTokens = [];
   let utteranceTimer = null;
   let utteranceStartedAt = 0;
   /** Idle check-in only after the caller has actually spoken. */
@@ -2387,6 +2408,7 @@ mediaWss.on('connection', (ws, req) => {
     speakStartedAt = Date.now();
     lastAgentText = String(text || '');
     agentEchoGate.remember(lastAgentText);
+    trustP1.noteAgentLine(callBrainStates.get(sidLabel()), lastAgentText);
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
     fillerStreamId = streamId;
@@ -2504,6 +2526,7 @@ mediaWss.on('connection', (ws, req) => {
     if (/[.!?]$/.test(String(text).trim())) bargeCancelledText = '';
     lastAgentText = String(text);
     agentEchoGate.remember(lastAgentText);
+    trustP1.noteAgentLine(callBrainStates.get(sidLabel()), lastAgentText);
     agentReplay.beginSpeech(text);
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
@@ -2656,6 +2679,7 @@ mediaWss.on('connection', (ws, req) => {
     if (/[.!?]$/.test(String(text).trim())) bargeCancelledText = '';
     lastAgentText = String(text);
     agentEchoGate.remember(lastAgentText);
+    trustP1.noteAgentLine(callBrainStates.get(sidLabel()), lastAgentText);
     if (!opts.isFiller && !opts.isReplay) {
       agentReplay.beginSpeech(text);
     }
@@ -3124,6 +3148,7 @@ mediaWss.on('connection', (ws, req) => {
           entities,
           profile: brainProfile,
           lastAgentText,
+          sttTokens: turnSttTokens,
         },
         {
           turnEnd: {
@@ -3134,6 +3159,7 @@ mediaWss.on('connection', (ws, req) => {
         }
       )
     );
+    maybeRecordNameCorrection(callKey, brainState);
     if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
       systemPrompt = buildSystemPrompt(brainProfile);
     }
@@ -3880,6 +3906,7 @@ mediaWss.on('connection', (ws, req) => {
         spokenChunks.push(text);
         lastAgentText = spokenChunks.join(' ');
         agentEchoGate.remember(lastAgentText);
+    trustP1.noteAgentLine(callBrainStates.get(sidLabel()), lastAgentText);
       }
 
       async function speakLookupSentence() {
@@ -3927,6 +3954,7 @@ mediaWss.on('connection', (ws, req) => {
         spokenChunks.push(sentence);
         lastAgentText = spokenChunks.join(' ');
         agentEchoGate.remember(lastAgentText);
+    trustP1.noteAgentLine(callBrainStates.get(sidLabel()), lastAgentText);
         agentReplay.beginSpeech(sentence);
         try {
           await session.end();
@@ -4394,6 +4422,7 @@ mediaWss.on('connection', (ws, req) => {
     if (callEnding) {
       utteranceParts = [];
       utteranceLanguages = [];
+      utteranceSttTokens = [];
       return;
     }
     if (!utteranceParts.length) return;
@@ -4401,6 +4430,8 @@ mediaWss.on('connection', (ws, req) => {
     const tokenLanguages = utteranceLanguages.slice();
     utteranceParts = [];
     utteranceLanguages = [];
+    turnSttTokens = utteranceSttTokens.slice();
+    utteranceSttTokens = [];
     if (!rawText) return;
     // #584 decideTurnEnd passes { unfinished: true } into this flush.
     // Do not drop that flag on the way to Brain observe.
@@ -4530,6 +4561,7 @@ mediaWss.on('connection', (ws, req) => {
               .map((token) => token && token.language)
               .filter(Boolean);
         if (tags.length) utteranceLanguages.push(...tags);
+        if (Array.isArray(evt.tokens)) utteranceSttTokens.push(...evt.tokens.filter((tk) => tk && tk.final !== false));
       }
 
       const isInterim = !evt.isFinal;
@@ -4572,7 +4604,12 @@ mediaWss.on('connection', (ws, req) => {
 
       // Finals: one turn-taking decision, then act.
       interimBargeText = '';
-      if (trustP1.trustP1Enabled() && agentEchoGate.isEcho(text)) {
+      const echoBrain = callBrainStates.get(sidLabel());
+      const echoExempt =
+        Boolean(trustP1.pendingNameAsk(echoBrain)) ||
+        trustP1.sentenceAsksName(lastAgentText) ||
+        /\b(?:am i speaking with|is this|naongea na|ni wewe)\b/i.test(String(lastAgentText || ''));
+      if (trustP1.trustP1Enabled() && agentEchoGate.isEcho(text, { speaking, exempt: echoExempt })) {
         voiceTrace.noteTurnEnd({ decision: 'drop', reason: 'echo_recent_agent' });
         console.log(`[ws/media][${sidLabel()}] drop echo final (recent agent line): ${text.slice(0, 80)}`);
         return;
@@ -5015,6 +5052,7 @@ mediaWss.on('connection', (ws, req) => {
     const ms = Date.now() - connectedAt;
     if (sessionCallSid) {
       trustNoticeSpoken.delete(sessionCallSid);
+      trustNameCorrectionSaved.delete(sessionCallSid);
       trustReadbackKeys.delete(sessionCallSid);
     }
     console.log(
@@ -5166,8 +5204,20 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       ownerPhone: ownerNumber,
     });
     const teammate = resolved.teammate;
-    const callerName =
+    let callerName =
       displayOwnerCallerName(escalate.name || call.name) || null;
+    // BRAIN_TRUST_P1: a handover carries only a confirmed name; otherwise "caller on 07xx".
+    let trustCallerLabel = '';
+    if (trustP1.trustP1Enabled()) {
+      const heldState = callBrainStates.get(callSid);
+      const confirmedName = heldState?.caller?.nameConfirmed ? String(heldState.caller.name || '').trim() : '';
+      callerName = confirmedName || null;
+      trustCallerLabel = require('./src/conversation/callerNameControl').handoverCallerLabel({
+        name: confirmedName,
+        nameConfirmed: Boolean(confirmedName),
+        phone: call.from_number,
+      });
+    }
     let reason =
       String(escalate.reason || call.reason || call.escalate_reason || '').trim() || null;
     if (resolved.match === 'fallback' && resolved.requested) {
@@ -5187,7 +5237,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 
     const lead = {
       businessName,
-      name: callerName || 'Caller',
+      name: callerName || trustCallerLabel || 'Caller',
       reason: reason || call.reason,
       callerNumber: call.from_number,
       recordingUrl: call.recording_url,
@@ -6167,12 +6217,19 @@ async function applyGeminiTools(callSid, parsed) {
         }
         return updated;
       },
-      saveCallerInfo: (info) =>
-        db.saveCallerInfo({
+      saveCallerInfo: (info) => {
+        // BRAIN_TRUST_P1: only the code-held confirmed name is stored (never a model-supplied variant).
+        let savedName = info.name || undefined;
+        if (trustP1.trustP1Enabled()) {
+          const held = callBrainStates.get(callSid);
+          savedName = held?.caller?.nameConfirmed ? String(held.caller.name || '').trim() || undefined : undefined;
+        }
+        return db.saveCallerInfo({
           callSid,
-          name: info.name || undefined,
+          name: savedName,
           reason: info.reason || undefined,
-        }),
+        });
+      },
       escalate: (escalation) =>
         maybeSendEscalationNotification(callSid, escalation),
     },

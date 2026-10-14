@@ -1117,6 +1117,10 @@ function extractConversationEntities(
     const fromIm = Boolean(imRaw) && namesLikelySame(imRaw, name);
     entities.name = entity(name, fromIm ? 'caller_im' : 'caller_explicit', 0.95, false);
   }
+  // BRAIN_TRUST_P1: "calling for Peter" / "nataka kuongea na Peter" names staff, never the caller.
+  if (entities.name && require('./callerNameControl').isStaffMention(text, entityValue(entities.name), profile || {})) {
+    delete entities.name;
+  }
   const phone = extractPhone(text);
   if (phone) entities.phone = entity(phone, 'caller_explicit', 0.98, true);
   const when = extractWhen(text);

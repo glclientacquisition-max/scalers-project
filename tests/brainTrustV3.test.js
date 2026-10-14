@@ -263,12 +263,12 @@ test('echo: greeting echo is not caller speech; greeting phrase is never a locat
   const g = createEchoGate();
   g.remember("Good morning, Done and Dusted, this is Shy. We're closed now. Karibu tena. Tukusaidie vipi.", 1000);
   g.remember('Hello, can you hear me?', 5000);
-  assert.equal(g.isEcho('Karibu tena.', 6000), true);
+  assert.equal(g.isEcho('Karibu tena.', { at: 6000, speaking: true }), true);
   g.remember('Would you like tomorrow or Friday morning?', 6500);
-  assert.equal(g.isEcho('Friday morning.', 7000), false, 'an answer to the latest line is real speech');
-  assert.equal(g.isEcho('Tomorrow.', 7000), false);
-  assert.equal(g.isEcho('Karibu tena.', 20000), false, 'outside the window');
-  assert.equal(g.isEcho('I need a carpet clean in Juja tomorrow', 6000), false);
+  assert.equal(g.isEcho('Friday morning.', { at: 7000, speaking: true }), false, 'an answer to the latest line is real speech');
+  assert.equal(g.isEcho('Tomorrow.', { at: 7000, speaking: true }), false);
+  assert.equal(g.isEcho('Karibu tena.', { at: 20000 }), false, 'outside the window');
+  assert.equal(g.isEcho('I need a carpet clean in Juja tomorrow', { at: 6000, speaking: true }), false);
   assert.equal(placeAsk.isGreetingPhrase('Karibu tena'), true);
   assert.equal(placeAsk.coverageAskPlaceGeneric('Do you cover Karibu tena?'), '');
   let s = createBrainState({});

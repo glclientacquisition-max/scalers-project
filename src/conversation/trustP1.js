@@ -613,6 +613,14 @@ const NOT_A_NAME = /^(?:yes|no|yeah|okay|ok|sawa|ndio|hapana|hello|hi|sorry|what
  * The caller's answer to the pending ask → a name, or ''. Bare "Alvin.",
  * "It's Alvin", "Alvin is the name", "Jina langu ni Wanjiru".
  */
+/** Count name asks in lines spoken without the model (local / early-return lines). */
+function noteAgentLine(state, text) {
+  if (!trustP1Enabled() || !state) return;
+  for (const s of splitSentences(String(text || ''))) {
+    if (sentenceAsksName(s)) { noteNameAsk(state, { kind: /speaking with|naongea na|ni wewe/i.test(s) ? 'file' : 'open' }); break; }
+  }
+}
+
 function nameFromAnswer(text) {
   let raw = String(text || '').trim().replace(/[.!?,]+$/g, '').trim();
   raw = raw.replace(/\s+(?:is (?:the|my) name|ndio jina(?: langu)?|here|speaking)$/i, '').trim();
@@ -873,6 +881,11 @@ function shapeSpeech(text, ctx = {}) {
   let out = [...new Set(deduped)].join(' ');
   out = redactStaffNames(out, ctx.profile || {}, language);
   out = trimLength(out);
+  if (state) {
+    const named = require('./callerNameControl').guardNameInSpeech(out, state);
+    out = named.text;
+    drops.push(...named.drops);
+  }
   // Remember that the guard removed model text this turn, so an empty
   // reply is not repaired as if the caller went unheard (false hear_again).
   if (state && drops.length) trustState(state).guardDroppedTurn = Number(state?.conversation?.turnCount || 0);
@@ -963,6 +976,7 @@ function trustPromptFacts({ card = null, language = 'en' } = {}) {
 }
 
 module.exports = {
+  noteAgentLine,
   guardEmptiedTurn,
   guardContinueLine,
   requestNameAsk,

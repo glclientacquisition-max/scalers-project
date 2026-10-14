@@ -199,7 +199,17 @@ function oneEditPlaceName(key) {
  * Two substitutions (rongae → rongai and ronge) stay unknown.
  * @returns {string}
  */
+
+// BRAIN_TRUST_P1: a place outside Kenya ("Kampala") is checked before any
+// fuzzy match, so it never snaps to a near Kenya name ("Kamara").
+function foreignBeforeFuzzy(token) {
+  if (String(process.env.BRAIN_TRUST_P1 || '').trim() !== 'on') return false;
+  // eslint-disable-next-line global-require
+  return require('./outsideAreas').isForeignPlace(String(token || ''));
+}
+
 function canonicalPlaceName(token) {
+  if (foreignBeforeFuzzy(token)) return '';
   const key = normalizePlaceKey(token);
   if (!key || key.includes(' ') || key.length < 5) return '';
   if (KISWAHILI_NUMBER_TIME_WORDS.has(key)) return '';
@@ -256,6 +266,7 @@ function placesInCounties(counties) {
  * @param {Set<string> | string[] | null} allowedNames
  */
 function nearestAllowedPlace(token, allowedNames) {
+  if (foreignBeforeFuzzy(token)) return '';
   const key = normalizePlaceKey(token);
   if (!key || key.includes(' ') || key.length < 5) return '';
   if (SPOKEN_EVERYDAY.has(key) && !INDEX.places[key]) return '';
