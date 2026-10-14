@@ -93,6 +93,11 @@ function coveredByAreas(text, areas) {
     if (places.has(tokens[i])) return true;
     if (i + 1 < tokens.length && places.has(`${tokens[i]} ${tokens[i + 1]}`)) return true;
   }
+  // VOICE_COVERAGE_SINGLE_SOURCE: "Rongai" is the listed "Ongata Rongai".
+  {
+    const single = require('./coverageSingleSource');
+    if (single.coverageSingleSourceEnabled() && single.aliasPlaceMatch(phrase, places)) return true;
+  }
   if (!counties.size) return false;
   return countiesForPlace(text).some((county) => counties.has(county));
 }

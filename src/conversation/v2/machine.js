@@ -292,7 +292,27 @@ async function consultModel(state, u, profile, model, catalogue) {
 }
 const INTENT_OF_TOOL = { create_booking: 'book', create_order: 'order', cancel_booking: 'cancel', update_booking: 'change', log_complaint: 'complaint', create_handoff: 'handoff' };
 
-async function runTurn(state, { text, profile = {}, now = new Date(), handlers, model = null, langLock = null }) {
+// Ack rule (v2-ack-overuse.md, approved 14:53 EAT 14 Oct): Brain lines carry no
+// leading ack ("Sawa,", "Okay.", "Haya.", "Alright.", "Sure,", "Asante,") except a
+// write receipt, and only when Voice has not acked this turn (opts.acked), it is
+// not the first turn, the caller did not just say "sawa", the previous turn was
+// not ack-led and no ack was spoken in the last 3 turns. Goodbye is exempt but
+// never paired with an ack-led turn.
+const ACK_LEAD = /^\s*(?:sawa sawa|sawa kabisa|ni sawa|sawa|okay|ok|haya|alright|sure|poa|asante)\s*[,.!]\s*(?=\S)/i;
+const BYE = /^(Asante kwa kupiga simu\.|Thank you for calling\.)/;
+function isAckLed(line) { return ACK_LEAD.test(String(line || '')) && !BYE.test(String(line || '')); }
+function stripAck(line) { const r = String(line).replace(ACK_LEAD, ''); return r.charAt(0).toUpperCase() + r.slice(1); }
+function applyAckRule(state, line, { ackOk, acked, callerAck, lang }) {
+  if (!line) return line;
+  if (BYE.test(line)) return state.lastAckLed && /^Asante/.test(line) ? 'Karibu tena. Kwaheri.' : line;
+  if (!ACK_LEAD.test(line)) return line;
+  const recent = state.lastAckTurn != null && state.turn - state.lastAckTurn < 3;
+  const keep = ackOk && !acked && state.turn > 1 && !state.lastAckLed && !recent;
+  return keep ? line : stripAck(line);
+}
+function noteAck(state, line) { state.lastAckLed = isAckLed(line); if (state.lastAckLed) state.lastAckTurn = state.turn; }
+
+async function runTurn(state, { text, profile = {}, now = new Date(), handlers, model = null, langLock = null, acked = false }) {
   state.turn += 1; state.now = now;
   const prevLang = state.lang;
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
@@ -302,7 +322,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   const catalogue = buildCatalogue({ profile, openRows: state.file.openRows });
   const mc = await consultModel(state, u, profile, model, catalogue);
   const lang = state.lang || 'en';
-  const out = (line, extra = {}) => { const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
+  const out = (line0, extra = {}) => { const line = applyAckRule(state, line0, { ackOk: !!extra.ackOk, acked: !!acked, callerAck: !!u.ack, lang }); const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; noteAck(state, l); return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
 
   // 1) read-back pending: commit only on the caller's yes
   // a new question while a callback offer is open drops the offer and answers the question
@@ -316,7 +336,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
       results.push(toolResult);
       const line = R.receipt(rec, lang);
       resetIntent(state);
-      return out(line);
+      return out(line, { ackOk: true });
     }
     if (pendingChanged(p, state)) { state.phase = 'collect'; state.pending = null; const st = stepIntent(state, u, profile); if (st?.line) return out(st.line); }
     if (u.no || u.done) { resetIntent(state); state.outcomes.push('declined'); return out(u.done ? R.info({ kind: 'bye' }, lang) : R.info({ kind: 'decline' }, lang), { end: u.done }); }
@@ -386,7 +406,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     const { rec, toolResult } = await commit(state, st.commitNow, handlers);
     results.push(toolResult);
     resetIntent(state);
-    return out(R.receipt(rec, lang));
+    return out(R.receipt(rec, lang), { ackOk: true });
   }
   return out(st?.line || R.ask('intent', 1, lang));
 }

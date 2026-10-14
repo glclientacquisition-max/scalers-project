@@ -193,7 +193,11 @@ End with this exact close: ${helpClose} (or the closed/message name-ask from the
 /**
  * Optional tiny ack while Gemini thinks.
  */
-function pickContextualAck(userText, lang) {
+function pickContextualAck(userText, lang, ctx = {}) {
+  // VOICE_ACK_RULE: after an ack-led turn or the caller's own sawa, a non-word "Mm.".
+  if (ctx.ackRule && (ctx.prevAckLed || /^\s*(?:sawa(?:\s+sawa)?|ni\s+sawa|okay|ok|haya|poa)[.!,\s]*$/i.test(String(userText || '')))) {
+    return 'Mm.';
+  }
   const t = String(userText || '').toLowerCase();
   const asked = /\?|nani|gani|how|what|when|where|can you|unaweza|nataka|need|want/.test(t);
   const spoken = confirmationLanguage(lang);
@@ -435,6 +439,17 @@ function polishSpokenDetail(text, opts = {}) {
       allowEmpty: true,
       dropReasons,
     });
+  }
+  {
+    // VOICE_COVERAGE_SINGLE_SOURCE: coverage is stated from the check only.
+    const guarded = require('./coverageSingleSource').guardCoverageClaim(spoken, {
+      state: opts.state,
+      language: opts.language,
+    });
+    if (guarded.changed) {
+      spoken = guarded.text;
+      dropReasons.push(guarded.reason);
+    }
   }
   const callerText = String(
     (opts.callerTurns || opts.state?.conversation?.answersReceived || []).slice(-1)[0] || ''
