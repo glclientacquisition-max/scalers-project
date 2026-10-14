@@ -439,7 +439,7 @@ const {
   extractRecordingFields,
   isRecordingEvent,
 } = require('./src/sautikit/recordingEvents');
-const { fetchCallRecording } = require('./src/sautikit/recordingFetch');
+const { fetchCallRecording, recordingScopeDenied } = require('./src/sautikit/recordingFetch');
 const { finalizeOnceEnabled, finalizeDecision } = require('./src/callFinalizeOnce');
 const {
   summarizeHeaders,
@@ -1018,6 +1018,20 @@ async function attachProviderRecording({
         );
         break;
       }
+      if (fetched.scopeDenied) {
+        // Key cannot read recordings: mark unavailable once, no retry, no noise.
+        for (const sid of ids) {
+          try {
+            await db.mergeCallSummaryMeta({
+              callSid: sid,
+              patch: { recording_status: 'unavailable', recording_unavailable_reason: 'provider_scope' },
+            });
+          } catch {
+            /* best-effort */
+          }
+        }
+        return null;
+      }
       if (fetched.status === 404 || fetched.status === 410) {
         console.warn(
           `[${source}] no provider recording callSid=${id} status=${fetched.status}`
@@ -1063,6 +1077,7 @@ function scheduleRecordingFetch(callSids, source) {
   if (!ids.length) return;
   const key = ids.join('|');
   if (recordingFetchScheduled.has(key)) return;
+  if (recordingScopeDenied()) return;
   recordingFetchScheduled.add(key);
   setTimeout(() => {
     attachProviderRecording({
