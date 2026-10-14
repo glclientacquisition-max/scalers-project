@@ -175,3 +175,19 @@ test('never-repeat: the coverage line is not said twice in a row (live HD_6a7597
   const p = await talk(['How much is gutter cleaning?', 'How much is gutter cleaning?']);
   assert.notEqual(p.out[0].line, p.out[1].line);
 });
+
+test('place: area is the place, landmark is a note (EN/SW near, karibu na, pale, opposite)', async () => {
+  const N = V2.nlu;
+  const cases = [
+    ['Kitengela, near Naivas', 'Kitengela', 'near Naivas'], ['Kitengela karibu na Naivas', 'Kitengela', 'karibu na Naivas'],
+    ['Ruiru pale Total', 'Ruiru', 'pale Total'], ['Juja opposite the mall', 'Juja', 'opposite the mall'],
+    ['Mimi niko Kasarani, opposite Mwiki stage.', 'Kasarani', 'opposite Mwiki stage'], ['Westlands', 'Westlands', null],
+  ];
+  for (const [t, place, lm] of cases) { assert.equal(N.extractPlace(t, { prompted: true }), place, t); assert.equal(N.extractLandmark(t), lm, t); }
+  const en = await talk(["Hi, I'd like to book interior window cleaning for Friday at 10am.", 'My name is Alvin', 'Kitengela, near Naivas', 'Yes']);
+  assert.match(en.out[2].line, /in Kitengela, near Naivas, for Alvin/); assert.doesNotMatch(en.out[2].line, /in Naivas/);
+  const a = en.log.find((l) => l[0] === 'appt')[1]; assert.equal(a.landmark, 'Kitengela'); assert.equal(a.notes, 'near Naivas');
+  const sw = await talk(['Nataka kusafisha madirisha Ijumaa saa nne asubuhi', 'Naitwa Alvin', 'Ruiru pale Total', 'Ndio']);
+  assert.match(sw.out[2].line, /, Ruiru pale Total, kwa Alvin/);
+  const b = sw.log.find((l) => l[0] === 'appt')[1]; assert.equal(b.landmark, 'Ruiru'); assert.equal(b.notes, 'pale Total');
+});

@@ -35,7 +35,7 @@ function readback(p, lang) {
   const S = sw(lang);
   const nm = p.name ? (S ? `, kwa ${p.name}` : `, for ${p.name}`) : '';
   switch (p.tool) {
-    case 'create_booking': return S ? `${svcName(p.service)}, ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? `, ${p.place}` : ''}${nm}. Nithibitishe?` : `${svcName(p.service)} on ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? ` in ${p.place}` : ''}${nm}. Shall I book it?`;
+    case 'create_booking': return S ? `${svcName(p.service)}, ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? `, ${p.place}` : ''}${p.landmark ? ` ${swMark(p.landmark)}` : ''}${nm}. Nithibitishe?` : `${svcName(p.service)} on ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? ` in ${p.place}` : ''}${p.landmark ? `, ${enMark(p.landmark)}` : ''}${nm}. Shall I book it?`;
     case 'create_order': return S ? `${items(p.items, lang)}, kuchukua ${L.sayDate(p.pickup.date, lang)}${nm}. Nithibitishe?` : `${items(p.items, lang)}, pickup ${L.sayDate(p.pickup.date, lang)}${nm}. Shall I place the order?`;
     case 'cancel_booking': return S ? `Nifute ${rowLabel(p.row, lang)}${at(p.row.when, lang)}. Niendelee?` : `Cancel your ${rowLabel(p.row, lang)}${at(p.row.when, lang)}. Shall I go ahead?`;
     case 'update_booking': return S ? `Nihamishe ${svcName(p.row.service)} hadi ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}. Niendelee?` : `Move your ${svcName(p.row.service).toLowerCase()} to ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}. Shall I go ahead?`;
@@ -108,6 +108,10 @@ function info(r, lang, n = 0) {
     default: return '';
   }
 }
+const SW2EN = { 'karibu na': 'near', 'karibu ya': 'near', pale: 'at', 'mkabala na': 'opposite', 'mkabala ya': 'opposite', 'nyuma ya': 'behind', 'mbele ya': 'in front of' };
+const EN2SW = { near: 'karibu na', 'next to': 'karibu na', opposite: 'mkabala na', 'across from': 'mkabala na', behind: 'nyuma ya' };
+function remark(l, map) { for (const [k, v] of Object.entries(map)) if (l.toLowerCase().startsWith(k + ' ')) return `${v} ${l.slice(k.length + 1)}`; return l; }
+const enMark = (l) => remark(l, SW2EN); const swMark = (l) => remark(l, EN2SW);
 // Never-repeat rule: the same line twice in a row is re-worded (same facts, no new claims).
 function vary(line, lang, n = 1, plain = false) {
   const S = sw(lang);

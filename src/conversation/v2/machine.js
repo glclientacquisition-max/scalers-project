@@ -61,7 +61,7 @@ function mergeSlots(state, u, profile) {
     if (u.when.date) s.when.date = u.when.date;
     if (u.when.time) s.when.time = u.when.time;
   }
-  if (u.place && state.intent !== 'cancel') { if (state.intent === 'address_change') s.new_place = u.place; else s.place = u.place; }
+  if (u.place && state.intent !== 'cancel') { if (state.intent === 'address_change') s.new_place = u.place; else { s.landmark = u.landmark || (u.place === s.place ? s.landmark : null); s.place = u.place; } }
   if (u.service && (!s.service || !state.intent || state.phase !== 'readback')) s.service = u.service.name;
   if (u.products.length) {
     for (const p of u.products) {
@@ -105,7 +105,7 @@ function stepIntent(state, u, profile) {
     if (!s.when.time) return slotOr(state, 'time', { day: L.sayDate(s.when.date, state.lang).split(' ')[0] });
     if (!s.place) return slotOr(state, 'place');
     if (!s.name && (state.asked.name || 0) < 2) return slotOr(state, 'name');
-    return { line: propose(state, { tool: 'create_booking', service: s.service, when: { ...s.when }, place: s.place, name: nameSpeakable(state) }) };
+    return { line: propose(state, { tool: 'create_booking', service: s.service, when: { ...s.when }, place: s.place, landmark: s.landmark || null, name: nameSpeakable(state) }) };
   }
   if (it === 'order') {
     if (!s.items.length) return slotOr(state, 'items');
@@ -159,7 +159,7 @@ async function commit(state, p, handlers) {
   try {
     if (p.tool === 'create_booking') {
       action = 'create_appointment';
-      result = await handlers.createAppointment({ serviceName: p.service, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when), landmark: p.place, name });
+      result = await handlers.createAppointment({ serviceName: p.service, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when), landmark: p.place, notes: p.landmark || undefined, name });
       ok = Boolean(result && (result.id || result.dryRun === true)); state.outcomes.push('booked');
     } else if (p.tool === 'create_order') {
       action = 'create_service_request';
