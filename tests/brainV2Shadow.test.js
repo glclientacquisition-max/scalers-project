@@ -164,3 +164,37 @@ test('diff: similarity + tool agreement helpers', () => {
   const d = S.diffAgainstLive({ v2Text: 'x', toolIntents: [{ v1Name: 'escalate' }] }, { stages: [{ stage: 'tool', name: 'create_appointment' }] });
   assert.equal(d.toolIntentMatch, false); assert.deepEqual(d.v2Tools, ['escalate']); assert.deepEqual(d.v1Tools, ['create_appointment']);
 });
+
+test('caller file: phone, contact name and open visit rows reach createState', async () => {
+  let got = null;
+  const loadV2 = () => ({ createState: (o) => { got = o; return {}; }, createDryRunHandlers: () => ({}), async *runTurnStream() { yield { type: 'done', line: '' }; } });
+  const sh = S.createBrainV2Shadow({ env: {}, log: () => {}, loadV2, callerFile: () => ({ callerPhone: '+254790000001', contactName: 'Alvin', openRows: [
+    { id: 'a1', kind: 'visit', job: 'Carpet cleaning', windowStart: '2026-10-16T07:00:00Z', place: 'Kitengela', status: 'confirmed' },
+    { id: 'r1', kind: 'request', job: 'Callback' },
+    { id: 'a0', kind: 'visit', job: 'Sofa', past: true },
+  ] }) });
+  await sh.fire({ text: 'hi', profile: {}, turnIndex: 1 });
+  assert.equal(got.callerPhone, '+254790000001'); assert.equal(got.contactName, 'Alvin');
+  assert.deepEqual(got.openRows, [{ id: 'a1', service_name: 'Carpet cleaning', window_start: '2026-10-16T07:00:00Z', address_landmark: 'Kitengela', status: 'confirmed' }]);
+  // and the real v2 normalises it
+  const st = require('../src/conversation/v2').createState({ profile: DD, ...S.callerFileForState({ callerFile: { openRows: [{ id: 'a1', kind: 'visit', job: 'Carpet', windowStart: '2026-10-16T07:00:00Z', place: 'Kitengela', status: 'confirmed' }] } }) });
+  assert.equal(st.file.openRows[0].service, 'Carpet'); assert.equal(st.file.openRows[0].when.time, '10:00');
+});
+
+test('chain: a timed-out turn finishes before the next turn touches the state (never two at once)', async () => {
+  let running = 0; let maxRunning = 0; const order = [];
+  const loadV2 = () => ({ createState: () => ({}), createDryRunHandlers: () => ({}),
+    async *runTurnStream(_s, o) {
+      running += 1; maxRunning = Math.max(maxRunning, running); order.push(`start:${o.text}`);
+      await new Promise((r) => setTimeout(r, o.text === 'slow' ? 120 : 5));
+      running -= 1; order.push(`end:${o.text}`);
+      yield { type: 'done', line: '' };
+    } });
+  const sh = S.createBrainV2Shadow({ env: { BRAIN_V2_SHADOW_TIMEOUT_MS: '30' }, log: () => {}, loadV2 });
+  const a = sh.fire({ text: 'slow', profile: {}, turnIndex: 1 });
+  const b = sh.fire({ text: 'next', profile: {}, turnIndex: 2 });
+  const sa = await a; assert.equal(sa.timedOut, true);
+  await b;
+  assert.equal(maxRunning, 1);
+  assert.deepEqual(order, ['start:slow', 'end:slow', 'start:next', 'end:next']);
+});

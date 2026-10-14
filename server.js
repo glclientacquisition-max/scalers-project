@@ -3097,7 +3097,18 @@ mediaWss.on('connection', (ws, req) => {
     if (brainV2ShadowEnabled({ tenantId: brainProfile?.id })) {
       try {
         if (!brainV2Shadow) {
-          brainV2Shadow = createBrainV2Shadow({ callLabel: () => callKey });
+          brainV2Shadow = createBrainV2Shadow({
+            callLabel: () => callKey,
+            // Read once at the shadow's first turn (after caller memory hydrated).
+            callerFile: () => {
+              const mem = brainProfile?.callerMemory || {};
+              return {
+                callerPhone: brainState?.caller?.phone || mem.phone || null,
+                contactName: mem.fileOwnerName || mem.name || null,
+                openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
+              };
+            },
+          });
         }
         const shadowTurnIndex = voiceTrace.currentTurnIndex();
         void brainV2Shadow
