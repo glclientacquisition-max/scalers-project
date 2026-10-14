@@ -1,0 +1,339 @@
+{
+ "id": "R_HD_1677e57f73f9",
+ "sid": "HD_1677e57f73f9",
+ "env": "staging",
+ "tenant": "done_and_dusted",
+ "createdAt": "2026-10-09T10:04:11.879002+00:00",
+ "callerPhone": "+254700000009",
+ "replayMode": "recorded-model",
+ "lang": "sw",
+ "commitment": false,
+ "turns": [
+  {
+   "caller": "the question.",
+   "model": "{\"lang\":\"en\",\"intent\":\"smalltalk\",\"facts_used\":[],\"say\":[\"I am Shy from Done and Dusted Cleaning Services. How can I help you today?\"]}",
+   "agent": "I am Shy from Done and Dusted Cleaning Services. How can I help you today?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 408,
+    "callerStopToModelFirstTokenMs": 1414
+   }
+  },
+  {
+   "caller": "Hizi vitu zenye",
+   "model": "{\n  \"lang\": \"sw\",\n  \"intent\": \"services\",\n  \"facts_used\": [\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:sofa-cleaning\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:carpet-cleaning\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:mattress-cleaning\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:1-bedroom-apartment\"\n    }\n  ],\n  \"say\": [\n    \"Tunafanya usafishaji wa sofa, carpet, mattress, na usafishaji wa nyumba na maofisi.\",\n    \"Ungetaka tusaidie na huduma gani?\"\n  ]\n}",
+   "agent": "Tunafanya usafishaji wa sofa, carpet, mattress, na usafishaji wa nyumba na maofisi. Ungetaka tusaidie na huduma gani?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 630,
+    "callerStopToModelFirstTokenMs": 1242
+   }
+  },
+  {
+   "caller": "Hizi vitu zenye—hizi vitu zenye zenye kuonekanga ngozi ni tangu waje?",
+   "model": "{\"lang\":\"sw\",\"intent\":\"services\",\"facts_used\":[{\"kind\":\"service\",\"id\":\"svc:sofa-cleaning\"}],\"say\":[\"Usafishaji wa sofa ni shilingi mia nane kwa kila kiti. Ungetaka tukusafishie viti ngapi?\"]}",
+   "agent": "Usafishaji wa sofa ni shilingi mia nane kwa kila kiti. Ungetaka tukusafishie viti ngapi?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 463,
+    "callerStopToModelFirstTokenMs": 2211
+   }
+  },
+  {
+   "caller": "A-a,",
+   "model": "",
+   "agent": "",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "A-a, uliza je,",
+   "model": "{\"lang\":\"sw\",\"intent\":\"services\",\"facts_used\":[],\"say\":[\"Samahani, ungalipenda kuuliza nini kuhusu huduma zetu?\"]}",
+   "agent": "Samahani, ungalipenda kuuliza nini kuhusu huduma zetu?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Nauliza pale, mtu anaonekanga manguo zake ni tangu waje?",
+   "model": "{\"lang\":\"sw\",\"intent\":\"services\",\"facts_used\":[{\"kind\":\"service\",\"id\":\"svc:hourly-housekeeping\"}],\"say\":[\"Kufua au kupiga pasi nguo hufanywa chini ya usafishaji wa masaa kwa shilingi mia tano kwa kila saa, kuanzia masaa matatu. Ungependa kusaidiwa na hii huduma?\"]}",
+   "agent": "Kufua au kupiga pasi nguo hufanywa chini ya usafishaji wa masaa kwa shilingi mia tano kwa kila saa, kuanzia masaa matatu. Ungependa kusaidiwa na hii huduma?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 406,
+    "callerStopToModelFirstTokenMs": 1363
+   }
+  },
+  {
+   "caller": "M-m,",
+   "model": "",
+   "agent": "",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "M-m, nauliza hivo.",
+   "model": "{\"lang\":\"sw\",\"intent\":\"services\",\"facts_used\":[],\"say\":[\"Mimi Sina hiyo taarifa kamili, naweza kuichukua ili niwaambie timu yetu wakuarifu. Ungependa nikuwekee hii kama ujumbe?\"]}",
+   "agent": "Mimi Sina hiyo taarifa kamili, naweza kuichukua ili niwaambie timu yetu wakuarifu. Ungependa nikuwekee hii kama ujumbe?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 404,
+    "callerStopToModelFirstTokenMs": 1402
+   }
+  },
+  {
+   "caller": "Nakuuliza pale watu huonekanga nguo ni tangu waje, pale watu wanaonekanga nguo zao?",
+   "model": "{\"lang\":\"sw\",\"intent\":\"services\",\"facts_used\":[],\"say\":[\"Mimi Sina hiyo taarifa kamili, naweza kuichukua ili niwaambie timu yetu wakuarifu. Naweza kupata jina lakina maelezo zaidi?\"]}",
+   "agent": "Mimi Sina hiyo taarifa kamili, naweza kuichukua ili niwaambie timu yetu wakuarifu. Naweza kupata jina lakina maelezo zaidi?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": 1222
+   }
+  },
+  {
+   "caller": "Natafakari.",
+   "model": "{\"lang\":\"sw\",\"intent\":\"smalltalk\",\"facts_used\":[],\"say\":[\"Chukua muda wako. Ukiko tayari uniambie jinsi naweza kukusaidia.\"]}",
+   "agent": "Chukua muda wako. Ukiko tayari uniambie jinsi naweza kukusaidia.",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": 1518
+   }
+  },
+  {
+   "caller": "Ah, nataka unionyeshe wardrobe.",
+   "model": "",
+   "agent": "",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Na unionyeshe direction ya carpet.",
+   "model": "{\n  \"lang\": \"sw\",\n  \"intent\": \"services\",\n  \"facts_used\": [\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:carpet-cleaning\"\n    },\n    {\n      \"kind\": \"location\",\n      \"id\": \"loc:main\"\n    }\n  ],\n  \"say\": [\n    \"Sisi hatuuzi au kuonyesha wardrobe kwani tunatoa huduma za usafishaji pekee.\",\n    \"Kuhusu carpet, tunatoa huduma ya usafishaji wa carpet kwa shilingi elfu mbili kwa kila chumba na tunakufuata ulipo Nairobi na mazingira yake.\"\n  ]\n}",
+   "agent": "Sisi hatuuzi au kuonyesha wardrobe kwani tunatoa huduma za usafishaji pekee. Kuhusu carpet, tunatoa huduma ya usafishaji wa carpet kwa shilingi elfu mbili kwa kila chumba na tunakufuata ulipo Nairobi na mazingira yake.",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 404,
+    "callerStopToModelFirstTokenMs": 1063
+   }
+  },
+  {
+   "caller": "Ukisema muoshe, mnionyeshe, mnionyeshe wardrobe.",
+   "model": "{\"lang\":\"sw\",\"intent\":\"services\",\"facts_used\":[],\"say\":[\"Hatuuzi wala hatuonyeshi wardrobe, sisi hufanya usafishaji wa nyumba na vitu vya ndani pekee. Je, ungependa tukusaidie na usafishaji gani leo?\"]}",
+   "agent": "Hatuuzi wala hatuonyeshi wardrobe, sisi hufanya usafishaji wa nyumba na vitu vya ndani pekee. Je, ungependa tukusaidie na usafishaji gani leo?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 404,
+    "callerStopToModelFirstTokenMs": 1071
+   }
+  },
+  {
+   "caller": "Kuosha? Ujui kuosha?",
+   "model": "",
+   "agent": "",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Natafakari.",
+   "model": "{\n  \"lang\": \"sw\",\n  \"intent\": \"services\",\n  \"facts_used\": [\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:carpet-cleaning\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:sofa-cleaning\"\n    }\n  ],\n  \"say\": [\n    \"Tunaosha vizuri kabisa! Tunatoa huduma za kuosha carpet, sofa, matress na usafishaji wa nyumba pia.\",\n    \"Chukua muda wako kutafakari, kisha uniambie ungetaka tukuoshee nini.\"\n  ]\n}",
+   "agent": "Tunaosha vizuri kabisa. Tunatoa huduma za kuosha carpet, sofa, matress na usafishaji wa nyumba pia. Chukua muda wako kutafakari, kisha uniambie ungetaka tukuoshee nini.",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": 2074
+   }
+  },
+  {
+   "caller": "Wardrobe.",
+   "model": "{\"lang\":\"sw\",\"intent\":\"services\",\"facts_used\":[],\"say\":[\"Mimi Sina hiyo taarifa kamili, naweza kuichukua ili niwaambie timu yetu. Ungependa tukufanyie usafishaji wa wardrobe ama unahitaji usaidizi gani zaidi?\"]}",
+   "agent": "Mimi Sina hiyo taarifa kamili, naweza kuichukua ili niwaambie timu yetu. Ungependa tukufanyie usafishaji wa wardrobe ama unahitaji usaidizi gani zaidi?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": 1129
+   }
+  },
+  {
+   "caller": "Unataka kuambia nini?",
+   "model": "{\"lang\":\"sw\",\"intent\":\"services\",\"facts_used\":[],\"say\":[\"Nataka kukuambia kuwa sisi ni Done and Dusted na tunatoa huduma za usafishaji wa nyumba, carpet, na sofa. Je, ungependa kukata miadi au kupata maelezo zaidi kuhusu usafishaji?\"]}",
+   "agent": "Nataka kukuambia kuwa sisi ni Done and Dusted na tunatoa huduma za usafishaji wa nyumba, carpet, na sofa. Je, ungependa kukata miadi au kupata maelezo zaidi kuhusu usafishaji?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "A-a, anasema. Mazi.",
+   "model": "",
+   "agent": "",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 404,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Kitu—",
+   "model": "",
+   "agent": "",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Kitu— Nakuuliza, nakuuliza, nakuuliza, nakuuliza, unataka.",
+   "model": "",
+   "agent": "",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 464,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Kuambia timu yako nini?",
+   "model": "{\n  \"lang\": \"sw\",\n  \"intent\": \"other\",\n  \"facts_used\": [],\n  \"say\": [\n    \"Naweza kuwaambia timu yetu kwamba unahitaji usaidizi wa kuosha au kufanya usafishaji wa wardrobe.\"\n  ]\n}",
+   "agent": "Naweza kuwaambia timu yetu kwamba unahitaji usaidizi wa kuosha au kufanya usafishaji wa wardrobe.",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 404,
+    "callerStopToModelFirstTokenMs": 1436
+   }
+  },
+  {
+   "caller": "Yeah, yeah, na pia kuosha kitchen.",
+   "model": "{\n  \"lang\": \"sw\",\n  \"intent\": \"services\",\n  \"facts_used\": [\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:1-bedroom-apartment\"\n    }\n  ],\n  \"say\": [\n    \"Sawa kabisa, tunaweza kuandika ombi hilo kwa timu yetu au tukupangie miadi ya usafishaji wa jikoni na nyumba.\"\n  ]\n}",
+   "agent": "Sawa kabisa, tunaweza kuandika ombi hilo kwa timu yetu au tukupangie miadi ya usafishaji wa jikoni na nyumba.",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": 1360
+   }
+  },
+  {
+   "caller": "Hey, Chris, sawa kabisa, iko saw",
+   "model": "",
+   "agent": "",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "a, iko sawa, iko sawa. Sasa ki unafanya ni, um, utume hao watu leo saa 8:00 wakuje, wafanyie kazi, halafu tu—",
+   "model": "",
+   "agent": "",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "a, iko sawa, iko sawa. Sasa ki unafanya ni, um, utume hao watu leo saa 8:00 wakuje, wafanyie kazi, halafu tu— Niwalipe.",
+   "model": "",
+   "agent": "",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 404,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Si ndiyo?",
+   "model": "{\n  \"lang\": \"sw\",\n  \"intent\": \"booking\",\n  \"facts_used\": [],\n  \"say\": [\n    \"Je, ninaongea na Chris?\",\n    \"Naomba pia unieleze, tuje wapi kufanya huo usafishaji wa jikoni na wardrobe leo saa nane?\"\n  ]\n}",
+   "agent": "Naomba pia unieleze, tuje wapi kufanya huo usafishaji wa jikoni na wardrobe leo saa nane?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": 1108
+   }
+  },
+  {
+   "caller": "Saa 8:00, saa 8:00, eh, hapa Kijani",
+   "model": "{\n  \"lang\": \"sw\",\n  \"intent\": \"booking\",\n  \"facts_used\": [\n    {\n      \"kind\": \"coverage\",\n      \"id\": \"cov:nairobi\"\n    }\n  ],\n  \"say\": [\n    \"Hapo Kijani ni lango gani au jengo gani ndio tuweze kupata eneo kamili?\"\n  ]\n}",
+   "agent": "Hapo Kijani ni lango gani au jengo gani ndio tuweze kupata eneo kamili?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 406,
+    "callerStopToModelFirstTokenMs": 1036
+   }
+  },
+  {
+   "caller": "Bado tuko hapa tu, Riverside, Westlands.",
+   "model": "{\n  \"lang\": \"sw\",\n  \"intent\": \"booking\",\n  \"facts_used\": [\n    {\n      \"kind\": \"coverage\",\n      \"id\": \"cov:nairobi\"\n    }\n  ],\n  \"say\": [\n    \"Sawa kabisa.\"\n  ],\n  \"tool\": {\n    \"name\": \"create_appointment\",\n    \"args_json\": \"{\\\"service_name\\\":\\\"Kitchen and Wardrobe Cleaning\\\",\\\"name\\\":\\\"Chris\\\",\\\"when_text\\\":\\\"today at 2:00 PM\\\",\\\"location\\\":\\\"Kijani, Riverside, Westlands\\\",\\\"notes\\\":\\\"confirm access\\\"}\"\n  }\n}",
+   "agent": "Sawa kabisa.",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": 1001
+   }
+  },
+  {
+   "caller": "Riverside, Westlands.",
+   "model": "{\"lang\":\"sw\",\"intent\":\"booking\",\"facts_used\":[{\"kind\":\"coverage\",\"id\":\"cov:nairobi\"}],\"say\":[\"Nimeelewa ni Riverside, Westlands.\"]}",
+   "agent": "Nimeelewa ni Riverside, Westlands.",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 404,
+    "callerStopToModelFirstTokenMs": 1122
+   }
+  },
+  {
+   "caller": "Sawa, ni hayo tu. Baadaye basi.",
+   "model": "{\n  \"lang\": \"sw\",\n  \"intent\": \"smalltalk\",\n  \"facts_used\": [],\n  \"say\": [\n    \"Asante sana, siku njema.\"\n  ]\n}",
+   "agent": "Asante sana, siku njema.",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": 1250
+   }
+  },
+  {
+   "caller": "Baadaye.",
+   "model": "{\n  \"lang\": \"sw\",\n  \"intent\": \"smalltalk\",\n  \"facts_used\": [],\n  \"say\": [\n    \"Kwa heri ya kuonana baadaye.\"\n  ]\n}",
+   "agent": "Kwa heri ya kuonana baadaye.",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": 1015
+   }
+  }
+ ],
+ "observed": {
+  "service_requests": [],
+  "appointments": [],
+  "resolution": "needs_human",
+  "resolution_note": "Caller asked about Na unionyeshe direction ya carpet.",
+  "primary_intent": "human",
+  "ownerBody": null
+ },
+ "expect": {
+  "noWrites": true
+ },
+ "label": {
+  "by": "brain-lead",
+  "why": "Swahili enquiry that ends without a request. Nothing written; replies stay in Swahili."
+ },
+ "seed": {}
+}
