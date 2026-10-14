@@ -1,0 +1,14 @@
+{
+  "callId": "HD_4ec204aafa93",
+  "source": "staging Railway logs 2026-10-14 17:54 UTC (20:54 EAT), 77ce8123",
+  "tts": [
+    { "original": "Sawa, nimehifadhi ombi la ziara Alhamisi, 9 AM.", "heard": "Sawa, nimehifadhi ombi la ziara Alhamisi, saa 9 asubuhi.", "expect": "Sawa, nimehifadhi ombi la ziara Alhamisi, saa tatu asubuhi." },
+    { "original": "Sawa, nimehamisha ziara Alhamisi, 9 AM.", "heard": "Sawa, nimehamisha ziara Alhamisi, saa 9 asubuhi.", "expect": "Sawa, nimehamisha ziara Alhamisi, saa tatu asubuhi." }
+  ],
+  "dispute": {
+    "caller": "Si saa 9 asubuhi?",
+    "heardReply": "Sawa, nimehamisha ziara Alhamisi, 9 AM.",
+    "open": { "id": "appt-1", "window_start": "2026-10-15T06:00:00.000Z", "when_text": "Alhamisi, 9 AM" },
+    "update": { "appointmentId": "appt-1", "status": "", "whenText": "Alhamisi, 9 AM", "landmark": "", "notes": "", "windowStart": "2026-10-15T06:00:00.000Z" }
+  }
+}
