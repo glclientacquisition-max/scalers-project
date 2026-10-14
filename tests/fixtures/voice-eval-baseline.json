@@ -268,6 +268,20 @@
         "slow": 8
       },
       "nameAsks": 1
+    },
+    "HD_513dfb2fa73f": {
+      "score": 96,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 1,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 1,
+        "slow": 0
+      },
+      "nameAsks": 1
     }
   }
 }
