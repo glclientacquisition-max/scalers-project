@@ -61,7 +61,8 @@ function mergeSlots(state, u, profile) {
     if (u.when.date) s.when.date = u.when.date;
     if (u.when.time) s.when.time = u.when.time;
   }
-  if (u.place && state.intent !== 'cancel') { if (state.intent === 'address_change') s.new_place = u.place; else { s.landmark = u.landmark || (u.place === s.place ? s.landmark : null); s.place = u.place; } }
+  if (u.place && state.intent !== 'cancel') { if (state.intent === 'address_change') s.new_place = u.place; else if (s.place && !u.landmark && isArea(s.place, profile) && !isArea(u.place, profile)) { s.landmark = u.place; } // HD_513: "Simba Drive" after "Rongai" is an address note, not a new area
+    else { s.landmark = u.landmark || (u.place === s.place ? s.landmark : null); s.place = u.place; } }
   if (u.service && (!s.service || !state.intent || state.phase !== 'readback')) s.service = u.service.name;
   if (u.products.length) {
     for (const p of u.products) {
@@ -192,6 +193,7 @@ async function commit(state, p, handlers) {
   return { rec, toolResult: { action, status: ok ? 'succeeded' : 'failed', code: ok ? null : 'write_failed', v2: true } };
 }
 
+function isArea(place, profile) { return !!(N.matchArea(place, profile)?.listed || /^(Kitengela|Ruiru|Kasarani|Kilimani|Karen|Westlands|Lavington|Kileleshwa|Rongai|Syokimau|Thika|Juja|Embakasi|Langata|Ngong|Kahawa|Roysambu|Donholm|Umoja|Kikuyu|Parklands|South B|South C|Athi River|Kiambu|Nairobi)$/i.test(String(place || '').trim())); }
 function resetIntent(state) {
   const keep = { name: state.slots.name, nameConfirmed: state.slots.nameConfirmed, nameCorrectionOf: state.slots.nameCorrectionOf };
   state.slots = { service: null, when: { date: null, time: null }, place: null, items: [], row: null, new_when: { date: null, time: null }, new_place: null, kind: null, topic: null, complaint: [], ...keep };
@@ -205,7 +207,7 @@ function echoAffirms(p, u) {
 }
 function pendingChanged(p, state) {
   const s = state.slots;
-  if (p.tool === 'create_booking') return p.service !== s.service || p.when.date !== s.when.date || p.when.time !== s.when.time || p.place !== s.place;
+  if (p.tool === 'create_booking') return p.service !== s.service || p.when.date !== s.when.date || p.when.time !== s.when.time || p.place !== s.place || (p.landmark || null) !== (s.landmark || null);
   if (p.tool === 'update_booking') return (s.new_when.date && s.new_when.date !== p.when.date) || (s.new_when.time && s.new_when.time !== p.when.time);
   return false;
 }
@@ -350,6 +352,9 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   // 2) open offers from an info answer ("would you like ...?")
   if (state.offer && !state.intent) {
     const offer = state.offer; state.offer = null;
+    // HD_513dfb2fa73f: "Would you like to book?" answered with a day / place / service is a yes.
+    const gaveDetail = !!(u.when?.date || u.when?.time || u.place || u.service);
+    if (offer === 'book' && !u.no && !u.done && gaveDetail && !u.intents.filter((i) => i !== 'book').length) { state.intent = 'book'; state.slots.service = state.slots.service || state.offerService; mergeSlots(state, u, profile); const st = stepIntent(state, u, profile); return out(st.line); }
     if (u.yes && !u.intents.length) {
       if (offer === 'book') { state.intent = 'book'; state.slots.service = state.offerService; mergeSlots(state, u, profile); const st = stepIntent(state, u, profile); return out(st.line); }
       return out(propose(state, { tool: 'create_handoff', kind: offer === 'quote' ? 'quote' : 'callback', reason: 'callback' }));
@@ -378,9 +383,9 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   if (!state.intent) {
     mergeSlots(state, u, profile);
     // a service named with no question word is an enquiry about that service
-    if (u.service && !u.intents.length && vertical(profile) === 'home') { state.lastInfo = 'services'; mergeSlots(state, u, profile); return out(R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, lang)); }
+    if (u.service && !u.intents.length && vertical(profile) === 'home') { state.lastInfo = 'services'; mergeSlots(state, u, profile); state.offer = 'book'; state.offerService = u.service.name; return out(R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, lang)); }
     // a time or a place with no intent on a home-services line means a visit
-    if (!u.intents.length && u.when?.time && (u.place || state.slots.service) && vertical(profile) === 'home' && !u.ack && !u.done) { state.intent = 'book'; mergeSlots(state, u, profile); const st0 = stepIntent(state, u, profile); if (st0?.line) return out(st0.line); }
+    if (!u.intents.length && (u.when?.time || ((u.when?.date || u.place) && state.slots.service)) && (u.place || state.slots.service) && vertical(profile) === 'home' && !u.ack && !u.done) { state.intent = 'book'; mergeSlots(state, u, profile); const st0 = stepIntent(state, u, profile); if (st0?.line) return out(st0.line); }
     if (u.name && !u.intents.length) return out(nameSpeakable(state) ? R.info({ kind: 'greet_name', name: nameSpeakable(state) }, lang) : R.ask('intent', 0, lang));
     if (state.lastInfo === 'recall' && !u.ack) { const line = infoAnswer(state, u, profile, 'recall'); return out(line); }
     // off-catalogue item question: say plainly it isn't on our list (never guess stock or price)

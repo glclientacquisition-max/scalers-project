@@ -118,9 +118,10 @@ function vary(line, lang, n = 1, plain = false) {
   const m = plain ? null : String(line).match(/^Tunahudumia (.+?)(?: na maeneo mengine)?\. Uko wapi\?$/) || String(line).match(/^We serve (.+?)(?: and other listed areas)?\. Which place are you in\?$/);
   if (m) return S ? `Maeneo yetu ni ${m[1]}. Uko mtaa gani hasa?` : `Our areas are ${m[1]}. Which estate are you in exactly?`;
   // An ack-led repeat drops the ack instead of swapping it (Okay -> Alright was still an ack).
+  // An ack-led repeat drops the ack instead of swapping it (Okay -> Alright was still an ack).
   const ack = String(line).match(/^(?:Okay|Sawa|Haya|Alright|Sure)[.,] (.+)$/);
   if (ack && n < 2) return ack[1].charAt(0).toUpperCase() + ack[1].slice(1);
-  const lead = S ? ['Kama nilivyosema,', 'Narudia,'][n % 2] : ['As I said,', 'Just to repeat,'][n % 2];
-  return `${lead} ${line.charAt(0).toLowerCase()}${line.slice(1)}`;
+  // No "As I said" / "Just to repeat" filler (Alvin, 14 Oct): a repeat is said plainly.
+  return line;
 }
 module.exports = { vary, ask, readback, receipt, info, svcName, rowLabel };

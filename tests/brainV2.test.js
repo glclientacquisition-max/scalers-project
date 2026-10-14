@@ -173,7 +173,7 @@ test('never-repeat: the coverage line is not said twice in a row (live HD_6a7597
   assert.notEqual(r.out[0].line, r.out[1].line); assert.notEqual(r.out[1].line, r.out[2].line);
   assert.match(r.out[1].line, /^Maeneo yetu ni Nairobi/);
   const p = await talk(['How much is gutter cleaning?', 'How much is gutter cleaning?']);
-  assert.notEqual(p.out[0].line, p.out[1].line);
+  assert.doesNotMatch(p.out[1].line, /^(As I said|Just to repeat)/, 'a repeat is said plainly, no filler prefix');
 });
 
 test('place: area is the place, landmark is a note (EN/SW near, karibu na, pale, opposite)', async () => {
@@ -208,4 +208,18 @@ test('ack rule: only a write receipt may open with an ack; never after an ack; a
   const q = await talk(['Mnafanya carpet?', 'Sawa.', 'Sawa.', 'Ok.']);
   for (const o of q.out) assert.doesNotMatch(o.line, ACKRX);
   const f = await talk(['Okay']); assert.doesNotMatch(f.out[0].line, ACKRX, 'no ack on first turn');
+});
+
+test('HD_513dfb2fa73f: "make a booking" + detail answers keep the booking going; no "As I said" filler', async () => {
+  const st = V2.createState({ profile: DD, callerPhone: '+254700000001' }); const h = V2.createDryRunHandlers(); const out = [];
+  const lines = ["I'd like to meet— I'd like to make a booking for", 'My apartment to be washed.', '2-Bedroom— My name is Alvin Yegon.', 'Uh, 2-Bedroom, tomorrow.', "It's in— it's in Rongai.", '8, 8, 8 AM.', "It's in— it's in Simba Drive, and it's— the name is the Grace Apartments.", 'Yes'];
+  for (const text of lines) out.push(await V2.runTurn(st, { text, profile: DD, now: new Date('2026-10-14T11:00:00Z'), handlers: h, langLock: 'en' }));
+  for (const o of out) assert.doesNotMatch(o.line, /As I said|Just to repeat|Kama nilivyosema|Narudia|call you back to finish|calling to book/);
+  assert.match(out[5].line, /2-Bedroom Apartment on Thursday 15 October at 08:00 in Rongai, for Alvin Yegon/);
+  assert.match(out[6].line, /in Rongai, Simba Drive/);
+  const a = h.log.find((l) => l.name === 'createAppointment').args;
+  assert.equal(a.landmark, 'Rongai'); assert.equal(a.notes, 'Simba Drive'); assert.equal(a.whenText, '2026-10-15 08:00');
+  // an offered service answered with a day is a yes to "Would you like to book?"
+  const r = await talk(['Do you clean sofas?', 'Tomorrow at 10am please']);
+  assert.match(r.out[1].line, /Where should we come|name|Shall I book/i);
 });
