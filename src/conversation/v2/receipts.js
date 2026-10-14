@@ -96,7 +96,7 @@ function info(r, lang, n = 0) {
     case 'which_price': return S ? 'Bei ya huduma gani ungependa kujua?' : 'Which service would you like the price for?';
     case 'ack': return r.service ? (S ? `Sawa. Ungependa kubook ${svcName(r.service)}?` : `Okay. Would you like to book ${svcName(r.service).toLowerCase()}?`) : (S ? 'Sawa. Kuna kingine ninaweza kukusaidia nacho?' : 'Okay. Is there anything else I can help with?');
     case 'who': return S ? `Unaongea na ${r.agent}, wa ${r.biz}. Tukusaidie na usafi gani?` : `You're speaking with ${r.agent} from ${r.biz}. What can we clean for you?`;
-    case 'greet_name': return S ? `Asante, ${r.name}. Unahitaji huduma gani leo?` : `Thanks, ${r.name}. Which service do you need today?`;
+    case 'greet_name': return S ? `${r.name}, unahitaji huduma gani leo?` : `Thanks, ${r.name}. Which service do you need today?`;
     case 'off_catalogue': return S ? `Sina ${r.item} kwenye orodha yetu. ${r.hint ? `Tunafanya ${r.hint}.` : ''}`.trim() : `${r.item} isn't on our list. ${r.hint ? `We do ${r.hint}.` : ''}`.trim();
     case 'payment_how': return r.methods ? (S ? `Tunapokea ${r.methods}.` : `We accept ${r.methods}.`) : (S ? 'Sina maelezo ya malipo kwenye orodha yetu.' : "I don't have payment details on our list.");
     case 'greeting': return S ? 'Nzuri, asante. Ungependa huduma gani?' : "I'm well, thank you. Which service do you need?";
@@ -117,8 +117,9 @@ function vary(line, lang, n = 1, plain = false) {
   const S = sw(lang);
   const m = plain ? null : String(line).match(/^Tunahudumia (.+?)(?: na maeneo mengine)?\. Uko wapi\?$/) || String(line).match(/^We serve (.+?)(?: and other listed areas)?\. Which place are you in\?$/);
   if (m) return S ? `Maeneo yetu ni ${m[1]}. Uko mtaa gani hasa?` : `Our areas are ${m[1]}. Which estate are you in exactly?`;
-  const ack = String(line).match(/^(Okay|Sawa)\. (.+)$/);
-  if (ack) return `${ack[1] === 'Sawa' ? 'Haya' : 'Alright'}. ${ack[2]}`;
+  // An ack-led repeat drops the ack instead of swapping it (Okay -> Alright was still an ack).
+  const ack = String(line).match(/^(?:Okay|Sawa|Haya|Alright|Sure)[.,] (.+)$/);
+  if (ack && n < 2) return ack[1].charAt(0).toUpperCase() + ack[1].slice(1);
   const lead = S ? ['Kama nilivyosema,', 'Narudia,'][n % 2] : ['As I said,', 'Just to repeat,'][n % 2];
   return `${lead} ${line.charAt(0).toLowerCase()}${line.slice(1)}`;
 }

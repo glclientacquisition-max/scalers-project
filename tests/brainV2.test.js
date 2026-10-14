@@ -155,10 +155,10 @@ test('"Sawa, ni hayo tu" at a read-back is not a yes (live regression HD_1677)',
 
 test('acknowledgements, identity, earlier-call and off-catalogue turns get state/catalogue answers', async () => {
   let r = await talk(['Wewe ni nani?']); assert.match(r.out[0].line, /^Unaongea na Shy, wa Done and Dusted/);
-  r = await talk(['Eeh, unaongea na Alvin?']); assert.match(r.out[0].line, /^Asante, Alvin/);
+  r = await talk(['Eeh, unaongea na Alvin?']); assert.match(r.out[0].line, /^Alvin, unahitaji/);
   r = await talk(['Ah, tulifika wapi na ile mambo yetu ya jana?']); assert.match(r.out[0].line, /^Sioni booking/);
   r = await talk(['Mko na JK copier?']); assert.match(r.out[0].line, /^Sina JK copier kwenye orodha yetu/);
-  r = await talk(['Mnafanya carpet?', 'Ni sawa.']); assert.match(r.out[1].line, /^Sawa\. Ungependa kubook Carpet Cleaning\?/);
+  r = await talk(['Mnafanya carpet?', 'Ni sawa.']); assert.match(r.out[1].line, /^Ungependa kubook Carpet Cleaning\?/);
   r = await talk(['Nilikuwa nauliza, ni vipi naweza lipa?']); assert.match(r.out[0].line, /^Tunapokea M-Pesa Paybill/); assert.doesNotMatch(r.out[0].line, /\d{5}/);
 });
 
@@ -190,4 +190,22 @@ test('place: area is the place, landmark is a note (EN/SW near, karibu na, pale,
   const sw = await talk(['Nataka kusafisha madirisha Ijumaa saa nne asubuhi', 'Naitwa Alvin', 'Ruiru pale Total', 'Ndio']);
   assert.match(sw.out[2].line, /, Ruiru pale Total, kwa Alvin/);
   const b = sw.log.find((l) => l[0] === 'appt')[1]; assert.equal(b.landmark, 'Ruiru'); assert.equal(b.notes, 'pale Total');
+});
+
+const ACKRX = /^\s*(sawa sawa|sawa kabisa|ni sawa|sawa|okay|ok|haya|alright|sure|poa|asante)\s*[,.!]/i;
+test('ack rule: only a write receipt may open with an ack; never after an ack; acked drops it', async () => {
+  const a = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Wanjiru', 'Ruiru', 'Ndio.', 'Sawa.', 'Hapana, ni hayo tu.']);
+  assert.match(a.out[3].line, /^Sawa, nimeweka/);
+  assert.doesNotMatch(a.out[4].line, ACKRX, 'reply to caller sawa goes straight on');
+  assert.match(a.out[5].line, /Kwaheri/);
+  const b = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Wanjiru', 'Ruiru', 'Ndio.', 'Hapana, ni hayo tu.']);
+  assert.equal(b.out[4].line, 'Karibu tena. Kwaheri.', 'goodbye is not paired with an ack-led receipt');
+  for (let i = 1; i < a.out.length; i++) assert.ok(!(ACKRX.test(a.out[i].line) && ACKRX.test(a.out[i - 1].line)));
+  const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] }); const h = V2.createDryRunHandlers(); let r;
+  for (const text of ['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Wanjiru', 'Ruiru']) await V2.runTurn(st, { text, profile: DD, now: NOW, handlers: h });
+  r = await V2.runTurn(st, { text: 'Ndio.', profile: DD, now: NOW, handlers: h, acked: true });
+  assert.match(r.line, /^Nimeweka Carpet Cleaning/);
+  const q = await talk(['Mnafanya carpet?', 'Sawa.', 'Sawa.', 'Ok.']);
+  for (const o of q.out) assert.doesNotMatch(o.line, ACKRX);
+  const f = await talk(['Okay']); assert.doesNotMatch(f.out[0].line, ACKRX, 'no ack on first turn');
 });
