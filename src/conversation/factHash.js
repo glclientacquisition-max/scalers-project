@@ -125,12 +125,32 @@ function isEmptyLeaf(v) {
   return false;
 }
 
-/** Catalogue row minus envelope keys and empty leaves ("" / null / []). */
+/**
+ * Envelope keys inside a row's typed `pricing` object. They record who set the
+ * price and from what text, not the price: confirmPriceAction rewrites them on
+ * every confirm, so they must not move the row's .name hash.
+ */
+const PRICING_ENVELOPE_KEYS = new Set(['source', 'confirmed', 'parsed_from']);
+
+/** `pricing` minus its envelope keys and empty leaves; undefined when nothing is left. */
+function pricingFactValue(pricing) {
+  if (!pricing || typeof pricing !== 'object' || Array.isArray(pricing)) return pricing;
+  const out = {};
+  for (const [key, v] of Object.entries(pricing)) {
+    if (PRICING_ENVELOPE_KEYS.has(key) || isEmptyLeaf(v)) continue;
+    out[key] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Catalogue row minus envelope keys (row and pricing) and empty leaves ("" / null / []). */
 function catalogRowFactValue(row) {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
   const out = {};
-  for (const [key, v] of Object.entries(row)) {
-    if (ROW_META_KEYS.has(key) || isEmptyLeaf(v)) continue;
+  for (const [key, raw] of Object.entries(row)) {
+    if (ROW_META_KEYS.has(key)) continue;
+    const v = key === 'pricing' ? pricingFactValue(raw) : raw;
+    if (v === undefined || isEmptyLeaf(v)) continue;
     out[key] = v;
   }
   return out;
@@ -315,6 +335,7 @@ function tenantRowFromProfile(profile = {}) {
 }
 
 module.exports = {
+  PRICING_ENVELOPE_KEYS,
   canonicalFactJson,
   hashFactValue,
   numberToDecimal,

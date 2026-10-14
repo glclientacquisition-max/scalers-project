@@ -141,3 +141,48 @@ test("wiring: Add prices list freezes while typing and uses the shared rule", ()
   assert.ok(src.includes("unpricedFrozen"));
   assert.ok(!/products\.length \/ PRODUCT_PAGE_SIZE/.test(src), "Add product uses the visible list");
 });
+
+// --- fact hash contract: confirmPriceAction re-stamps the .price hash -------
+
+test("catalogPricePath keys a service by stable id and a product by sku, else position", () => {
+  const services = [{ id: "svc_a", name: "A" }, { id: "7", name: "B" }, { name: "C" }];
+  assert.equal(cp.catalogPricePath("service", services, 0), "catalog.service.svc_a.price");
+  assert.equal(cp.catalogPricePath("service", services, 1), "catalog.service.2.price");
+  assert.equal(cp.catalogPricePath("service", services, 2), "catalog.service.3.price");
+  const products = [{ sku: " P1 ", name: "Ream" }, { name: "Pens" }];
+  assert.equal(cp.catalogPricePath("product", products, 0), "catalog.product.P1.price");
+  assert.equal(cp.catalogPricePath("product", products, 1), "catalog.product.2.price");
+  assert.equal(cp.catalogPricePath("service", services, -1), null);
+  assert.equal(cp.catalogPricePath("service", services, 9), null);
+});
+
+test("confirm rewrite: the re-stamped .price hash matches the saved row, and the envelope does not move .name", async () => {
+  const { planFactConfirm } = await import("../dashboard/src/lib/factConfirm.ts");
+  const { factValueForPath, hashFactValue } = await import("../dashboard/src/lib/factHash.ts");
+  const before = {
+    services_catalog: [
+      { id: "svc_a", name: "Carpet", price_range: "KES 900", pricing: { mode: "fixed", amount_ksh: 900, source: "parsed", confirmed: false, parsed_from: "900" } },
+    ],
+  };
+  const saved = {
+    services_catalog: [
+      { id: "svc_a", name: "Carpet", price_range: "KES 900", source: "owner", pricing: { mode: "fixed", amount_ksh: 900, source: "owner", confirmed: true, parsed_from: "KES 900" } },
+    ],
+  };
+  const path = cp.catalogPricePath("service", saved.services_catalog, 0)!;
+  const plan = planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: [path] });
+  assert.deepEqual(plan.confirm, [{ path, hash: hashFactValue(factValueForPath(path, saved)) }]);
+  assert.deepEqual(plan.reopen, []);
+  // Only the envelope changed, so the row's .name hash is the same as before the confirm.
+  const name = "catalog.service.svc_a.name";
+  assert.equal(hashFactValue(factValueForPath(name, saved)), hashFactValue(factValueForPath(name, before)));
+});
+
+test("confirmPriceAction re-stamps the .price hash after it writes the row", () => {
+  const src = fs.readFileSync(path.join(process.cwd(), "dashboard/src/app/(desk)/settings/structuredActions.ts"), "utf8");
+  const body = src.slice(src.indexOf("export async function confirmPriceAction"));
+  const write = body.indexOf('.from("tenants").update(');
+  const stamp = body.indexOf("restampPriceHash(");
+  assert.ok(write > 0 && stamp > write, "re-stamp runs after the tenants update");
+  assert.match(src, /explicitPaths: \[path\]/);
+});

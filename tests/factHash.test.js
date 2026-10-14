@@ -17,6 +17,7 @@ const {
   factValueForPath,
   catalogRowFactValue,
   stableRowId,
+  PRICING_ENVELOPE_KEYS,
 } = require('../src/conversation/factHash');
 const {
   indexFieldMeta,
@@ -201,6 +202,47 @@ describe('shared path vectors (factValueForPath)', () => {
     const moved = JSON.parse(JSON.stringify(t));
     moved.services_catalog.reverse();
     assert.equal(leaf('catalog.service.svc_carpet.price', moved), leaf('catalog.service.svc_carpet.price', t));
+  });
+
+  it('pricing envelope (source, confirmed, parsed_from) does not move the row .name hash', () => {
+    const t = FIXTURE.pathTenant;
+    const name = (tenant) => hashFactValue(factValueForPath('catalog.service.svc_priced.name', tenant));
+    const edited = JSON.parse(JSON.stringify(t));
+    const row = edited.services_catalog.find((r) => r.id === 'svc_priced');
+    // What confirmPriceAction rewrites on every confirm.
+    row.pricing = { ...row.pricing, source: 'parsed', confirmed: false, parsed_from: 'something else' };
+    assert.equal(name(edited), name(t));
+    delete row.pricing.source;
+    delete row.pricing.confirmed;
+    delete row.pricing.parsed_from;
+    assert.equal(name(edited), name(t));
+    // The price itself still moves it.
+    row.pricing.amount_ksh = 2600;
+    assert.notEqual(name(edited), name(t));
+    // A pricing object that is only envelope drops out entirely.
+    const bare = JSON.parse(JSON.stringify(t));
+    const b = bare.services_catalog.find((r) => r.id === 'svc_priced');
+    b.pricing = { source: 'owner', confirmed: true, parsed_from: 'x' };
+    assert.equal(factValueForPath('catalog.service.svc_priced.name', bare).pricing, undefined);
+  });
+
+  it('JS/TS parity: catalogRowFactValue strips the same pricing envelope', { skip: tsSkip }, () => {
+    const rows = [
+      { id: 'svc_a', name: 'A', pricing: { mode: 'fixed', amount_ksh: 100, source: 'owner', confirmed: true, parsed_from: 'KES 100' } },
+      { id: 'svc_b', name: 'B', pricing: { source: 'parsed', confirmed: false, parsed_from: 'ask' } },
+      { id: 'svc_c', name: 'C', pricing: { mode: 'ask', amount_ksh: null, unit: '' }, source: 'owner', confirmed: true },
+      { id: 'svc_d', name: 'D', pricing: null, price_range: 'KES 5' },
+    ];
+    const out = runTs(`
+      import { catalogRowFactValue, hashFactValue, PRICING_ENVELOPE_KEYS } from './dashboard/src/lib/factHash.ts';
+      const rows = ${JSON.stringify(rows)};
+      process.stdout.write(JSON.stringify({ keys: [...PRICING_ENVELOPE_KEYS].sort(), rows: rows.map((r) => [catalogRowFactValue(r), hashFactValue(catalogRowFactValue(r))]) }));
+    `);
+    assert.deepEqual(out.keys, [...PRICING_ENVELOPE_KEYS].sort());
+    rows.forEach((r, i) => {
+      assert.deepEqual(out.rows[i][0], catalogRowFactValue(r), r.id);
+      assert.equal(out.rows[i][1], hashFactValue(catalogRowFactValue(r)), r.id);
+    });
   });
 
   it('TS twin matches all path vectors', { skip: tsSkip }, () => {
