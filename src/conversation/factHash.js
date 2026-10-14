@@ -156,6 +156,21 @@ function catalogRowFactValue(row) {
   return out;
 }
 
+/**
+ * The row value under the OLD rules (before the pricing envelope was dropped):
+ * row envelope keys stripped, `pricing` kept whole. Only the re-stamp backfill
+ * reads it, to tell "stale only because the rule changed" from a real edit.
+ */
+function legacyCatalogRowFactValue(row) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+  const out = {};
+  for (const [key, v] of Object.entries(row)) {
+    if (ROW_META_KEYS.has(key) || isEmptyLeaf(v)) continue;
+    out[key] = v;
+  }
+  return out;
+}
+
 function faqFactValue(faq) {
   return {
     question: String(faq?.question ?? ''),
@@ -309,6 +324,15 @@ function factValueForPath(fieldPath, tenant = {}) {
   return undefined;
 }
 
+/** catalog.<kind>.<key>.name under the OLD rules; undefined for any other path, null for a missing row. */
+function legacyNameFactValueForPath(fieldPath, tenant = {}) {
+  const m = String(fieldPath || '').trim().match(/^catalog\.(service|product)\.(.+)\.name$/);
+  if (!m) return undefined;
+  const t = tenant && typeof tenant === 'object' ? tenant : {};
+  const row = findCatalogRow(asList(m[1] === 'service' ? t.services_catalog : t.product_catalog), m[2], m[1]);
+  return row ? legacyCatalogRowFactValue(row) : null;
+}
+
 /** Voice profile (tenantProfileFromRow) back to the tenants columns the hash reads. */
 function tenantRowFromProfile(profile = {}) {
   const p = profile && typeof profile === 'object' ? profile : {};
@@ -341,6 +365,8 @@ module.exports = {
   numberToDecimal,
   factValueForPath,
   catalogRowFactValue,
+  legacyCatalogRowFactValue,
+  legacyNameFactValueForPath,
   faqFactValue,
   holdsFactValue,
   priceFactValue,
