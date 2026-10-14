@@ -113,6 +113,8 @@ function vary(line, lang, n = 1, plain = false) {
   const S = sw(lang);
   const m = plain ? null : String(line).match(/^Tunahudumia (.+?)(?: na maeneo mengine)?\. Uko wapi\?$/) || String(line).match(/^We serve (.+?)(?: and other listed areas)?\. Which place are you in\?$/);
   if (m) return S ? `Maeneo yetu ni ${m[1]}. Uko mtaa gani hasa?` : `Our areas are ${m[1]}. Which estate are you in exactly?`;
+  const ack = String(line).match(/^(Okay|Sawa)\. (.+)$/);
+  if (ack) return `${ack[1] === 'Sawa' ? 'Haya' : 'Alright'}. ${ack[2]}`;
   const lead = S ? ['Kama nilivyosema,', 'Narudia,'][n % 2] : ['As I said,', 'Just to repeat,'][n % 2];
   return `${lead} ${line.charAt(0).toLowerCase()}${line.slice(1)}`;
 }

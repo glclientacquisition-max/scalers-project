@@ -160,19 +160,19 @@ async function commit(state, p, handlers) {
     if (p.tool === 'create_booking') {
       action = 'create_appointment';
       result = await handlers.createAppointment({ serviceName: p.service, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when), landmark: p.place, name });
-      ok = Boolean(result && result.id); state.outcomes.push('booked');
+      ok = Boolean(result && (result.id || result.dryRun === true)); state.outcomes.push('booked');
     } else if (p.tool === 'create_order') {
       action = 'create_service_request';
       result = await handlers.createServiceRequest({ type: 'order', item: p.items.map((x) => `${x.qty} x ${x.name}`).join(', '), quantity: String(p.items.reduce((a, x) => a + x.qty, 0)), whenText: p.pickup.date, name, notes: p.items.map((x) => x.name).join(', ') });
-      ok = Boolean(result && result.id); state.outcomes.push('order_saved');
+      ok = Boolean(result && (result.id || result.dryRun === true)); state.outcomes.push('order_saved');
     } else if (p.tool === 'cancel_booking') {
       action = 'update_appointment';
       result = await handlers.updateAppointment({ appointmentId: p.row.id, status: 'cancelled' });
-      ok = Boolean(result && result.id === p.row.id); state.outcomes.push('cancelled');
+      ok = Boolean(result && (result.id === p.row.id || result.dryRun === true)); state.outcomes.push('cancelled');
     } else if (p.tool === 'update_booking') {
       action = 'update_appointment';
       result = await handlers.updateAppointment({ appointmentId: p.row.id, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when) });
-      ok = Boolean(result && result.id === p.row.id); state.outcomes.push('moved');
+      ok = Boolean(result && (result.id === p.row.id || result.dryRun === true)); state.outcomes.push('moved');
     } else if (p.tool === 'create_handoff') {
       result = await handlers.escalate({ reason: p.reason === 'owner_only_change' ? `owner_only_change:${p.kind}` : `callback:${p.kind}`, name, captured: { place: p.place || null, booking: p.row?.id || null, missing: p.missing || null } });
       ok = Boolean(result && result.ok !== false); state.outcomes.push(p.reason === 'owner_only_change' ? 'owner_only_change' : 'handoff_callback');
@@ -292,10 +292,11 @@ async function consultModel(state, u, profile, model, catalogue) {
 }
 const INTENT_OF_TOOL = { create_booking: 'book', create_order: 'order', cancel_booking: 'cancel', update_booking: 'change', log_complaint: 'complaint', create_handoff: 'handoff' };
 
-async function runTurn(state, { text, profile = {}, now = new Date(), handlers, model = null }) {
+async function runTurn(state, { text, profile = {}, now = new Date(), handlers, model = null, langLock = null }) {
   state.turn += 1; state.now = now;
   const prevLang = state.lang;
-  state.lang = L.nextLanguage(state.lang, text) || state.lang;
+  // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
+  state.lang = (langLock === 'en' || langLock === 'sw') ? langLock : (L.nextLanguage(state.lang, text) || state.lang);
   const u = N.understand(text, { profile, now, expecting: state.expecting });
   const results = [];
   const catalogue = buildCatalogue({ profile, openRows: state.file.openRows });
