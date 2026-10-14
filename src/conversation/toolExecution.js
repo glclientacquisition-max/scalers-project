@@ -637,6 +637,19 @@ function validateUpdateAppointment(
   return { valid: true, value };
 }
 
+/** VOICE_SW_TIME: a time-only update to the instant the open visit already has. */
+function updateIsNoChange(value, openAppointments) {
+  if (!require('../speech/swahiliTime').swTimeEnabled()) return false;
+  if (!value || value.status || value.landmark || value.notes || !value.whenText) return false;
+  const prior = (openAppointments || []).find((a) => String(a?.id || '') === String(value.appointmentId || ''));
+  if (!prior) return false;
+  const was = Date.parse(prior.window_start || prior.windowStart || '');
+  const now = Date.parse(value.windowStart || '');
+  if (Number.isFinite(was) && Number.isFinite(now)) return was === now;
+  const norm = (t) => String(t || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return !value.windowStart && norm(prior.when_text || prior.whenText) === norm(value.whenText);
+}
+
 function applyHeldCallerName(parsed, held) {
   if (!held || !parsed || typeof parsed !== 'object') return parsed;
   const stamp = (row) => (row && typeof row === 'object' ? { ...row, name: held } : row);
@@ -1004,6 +1017,18 @@ async function executeBrainTools({
         action: 'update_appointment',
         status: 'duplicate',
         fingerprint,
+      });
+    } else if (updateIsNoChange(validation.value, openAppointments)) {
+      // VOICE_SW_TIME: the caller disputed the time but it is the time already on
+      // the visit (HD_4ec204aafa93 "Si saa 9 asubuhi?"). Re-read it; do not say "moved".
+      const prior = (openAppointments || []).find((a) => String(a?.id || '') === validation.value.appointmentId) || null;
+      results.push({
+        action: 'update_appointment',
+        status: 'unchanged',
+        fingerprint,
+        value: validation.value,
+        hours: validation.hours || null,
+        record: prior,
       });
     } else {
       try {
@@ -1398,6 +1423,12 @@ function formatToolConfirmation(results = [], language = 'en') {
         ? `Okay, I've moved that visit to ${whenLabel}.`
         : "Okay, I've updated that visit.";
     }
+    if (meaningful.status === 'unchanged') {
+      const whenLabel = formatRequestedWhenLabel(meaningful.hours, lang);
+      if (sw) return whenLabel ? `Ziara yako iko ${whenLabel}, haijabadilika.` : 'Ziara yako haijabadilika.';
+      if (sheng) return whenLabel ? `Visit yako iko ${whenLabel}, haija-change.` : 'Visit yako haija-change.';
+      return whenLabel ? `Your visit is still ${whenLabel}. Nothing changed.` : 'Your visit is unchanged.';
+    }
     if (meaningful.status === 'duplicate') {
       if (sw) return 'Badiliko hilo tayari limetumwa.';
       if (sheng) return 'Hiyo update tayari ilitumwa.';
@@ -1519,4 +1550,5 @@ module.exports = {
   brainLinesForResults,
   toolOutcomeLine,
   formatVisitTimeProblem,
+  updateIsNoChange,
 };
