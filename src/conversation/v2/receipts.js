@@ -43,6 +43,7 @@ function readback(p, lang) {
       const k = p.kind;
       if (k === 'address') return S ? 'Siwezi kubadilisha mahali kwenye simu hii. Nimwombe mwenye biashara akupigie simu, ni sawa?' : `I can't change the address on this call. Shall I ask the owner to call you back about ${p.place ? `moving it to ${p.place}` : 'it'}?`;
       if (k === 'payment') return S ? 'Siwezi kubadilisha malipo kwenye simu hii. Nimwombe mwenye biashara akupigie simu, ni sawa?' : "I can't change payment details on this call. Shall I ask the owner to call you back about it?";
+      if (k === 'callback') return S ? 'Nimwombe mwenye biashara akupigie simu kwa namba hii, ni sawa?' : 'Shall I ask the team to call you back on this number?';
       if (k === 'manager') return S ? 'Mwenye biashara hayupo kwenye simu sasa. Nimwombe akupigie simu, ni sawa?' : `The manager isn't on the line now. Shall I ask them to call you back${p.topic ? ` about the ${svcName(p.topic).toLowerCase()}` : ''}?`;
       return S ? 'Nimwombe mwenye biashara akupigie simu kumaliza hili, ni sawa?' : "Shall I ask the team to call you back to finish this?";
     }
@@ -104,6 +105,7 @@ function info(r, lang, n = 0) {
     case 'no_rows': return S ? 'Sioni booking iliyo wazi kwa namba hii.' : "I don't see an open booking on this number.";
     case 'not_offered': return S ? 'Hiyo haipo kwenye huduma zetu.' : "That isn't on our list of services.";
     case 'bye': return S ? 'Asante kwa kupiga simu. Kwaheri.' : 'Thank you for calling. Goodbye.';
+    case 'drop_intent': return S ? 'Tuache booking kwa sasa. Kuna kingine ninaweza kukusaidia nacho?' : "Let's leave the booking for now. Is there anything else I can help with?";
     case 'decline': return S ? 'Sawa, sijahifadhi chochote. Kuna kingine?' : "Okay, I haven't saved anything. Anything else?";
     default: return '';
   }

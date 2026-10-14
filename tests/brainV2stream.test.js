@@ -53,7 +53,7 @@ test('langLock: Swahili caller stays English when Voice locked en, and vice vers
 test('dry-run handlers: shapes per voice scope', async () => {
   const h = V2.createDryRunHandlers();
   assert.deepEqual(await h.createAppointment({ a: 1 }), { id: null, dryRun: true, intended: { a: 1 } });
-  assert.deepEqual(await h.escalate({ r: 1 }), { ok: true, dryRun: true, intended: { r: 1 } });
+  assert.deepEqual(await h.escalate({ r: 1 }), { ok: true, dryRun: true, id: null, notify: 'queued', intended: { r: 1 } });
   assert.deepEqual(await h.saveCallerInfo({ name: 'x' }), { dryRun: true, intended: { name: 'x' } });
   assert.equal(h.log.length, 3);
 });

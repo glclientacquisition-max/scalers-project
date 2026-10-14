@@ -17,7 +17,7 @@ const INTENT = { book: 'Book a visit', order: 'Order', cancel: 'Cancel a booking
 const safe = (v) => String(v == null ? '' : v).replace(/[^\p{L}\p{N} ,.:/+'-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 function renderOwnerMessage({ businessName, callerPhone, name, intent, outcome, captured = {} }) {
   const lines = [`New call for ${safe(businessName)}`, `Caller: ${name ? safe(name) : 'Name not given'} (${safe(callerPhone)})`, `Intent: ${INTENT[intent] || INTENT.none}`, `Outcome: ${OUTCOME[outcome] || OUTCOME.no_action}`];
-  const keys = ['service', 'when', 'place', 'items', 'booking', 'new_place', 'category'];
+  const keys = ['service', 'when', 'place', 'items', 'booking', 'new_place', 'category', 'note'];
   for (const k of keys) if (captured[k]) lines.push(`${k.replace('_', ' ')}: ${safe(captured[k])}`);
   return lines.join('\n');
 }

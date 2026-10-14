@@ -223,3 +223,50 @@ test('HD_513dfb2fa73f: "make a booking" + detail answers keep the booking going;
   const r = await talk(['Do you clean sofas?', 'Tomorrow at 10am please']);
   assert.match(r.out[1].line, /Where should we come|name|Shall I book/i);
 });
+
+function idHandlers() {
+  const log = [];
+  return { log, handlers: {
+    createAppointment: async (a) => (log.push(['appt', a]), { id: 'apt_9' }),
+    escalate: async (a) => (log.push(['esc', a]), { ok: true, id: 'esc_1', notify: 'queued' }),
+    saveCallerInfo: async () => ({ ok: true }), updateAppointment: async (u) => ({ id: u.appointmentId }), createServiceRequest: async () => ({ id: 'sr_1' }),
+  } };
+}
+async function run(lines, handlers, opts = {}) { const st = V2.createState({ profile: DD, callerPhone: '+254700000001', ...opts }); const out = []; for (const text of lines) out.push(await V2.runTurn(st, { text, profile: DD, now: NOW, handlers })); return { st, out }; }
+
+test('HD_4ec204aafa93: a booking supersedes this call\'s open callback; one owner message with the final outcome', async () => {
+  const { log, handlers } = idHandlers();
+  const { st, out } = await run(['Can someone call me back please?', 'Yes', 'Actually, book sofa cleaning Friday at 10am in Kitengela, I am Alvin.', 'Yes', 'No thanks'], handlers);
+  const appt = log.find((l) => l[0] === 'appt')[1];
+  assert.deepEqual(appt.supersedes, ['esc_1']);
+  assert.deepEqual(out[3].toolResults[0].supersedes, ['esc_1']);
+  const fin = V2.finishCall(st, { businessName: 'DD', callerPhone: '+254700000001' });
+  assert.equal(fin.outcome, 'booked'); assert.deepEqual(fin.superseded, ['esc_1']);
+  assert.match(fin.ownerText, /Visit booked/); assert.match(fin.ownerText, /earlier callback request closed/);
+  assert.doesNotMatch(fin.ownerText, /asked for a callback/);
+});
+test('HD_4ec204aafa93: a day without a time keeps collecting and never rescues to a callback', async () => {
+  const { log, handlers } = idHandlers();
+  const { out } = await run(['I want sofa cleaning on Friday in Kitengela, I am Alvin.', 'Friday', 'Yes Friday', 'Friday please', 'Friday'], handlers);
+  assert.ok(!log.some((l) => l[0] === 'esc'), 'no callback written');
+  for (const o of out) assert.doesNotMatch(o.line, /call you back/);
+});
+test('HD_db0e864043c1: no memory claim without file evidence; never "wewe ni nani"; pardon repeats; unlisted area offers one callback', async () => {
+  const { handlers } = idHandlers();
+  const a = await run(['Hi', 'Do you remember me? I have been talking to you for a while.', 'Kwa nikumbuka, naitwa nani?', 'Naitwa Alvin Yegon.'], handlers);
+  assert.doesNotMatch(a.out[1].line, /remember you|nakukumbuka|ninakukumbuka/i);
+  assert.match(a.out[2].line, /Sina jina lako bado\. Naomba jina lako\?/);
+  assert.match(a.out[3].line, /^Alvin Yegon, unahitaji huduma gani leo\?/);
+  const withFile = await run(['Kwa nikumbuka, naitwa nani?'], handlers, { contactName: 'Wanjiru' });
+  assert.match(withFile.out[0].line, /Wanjiru/);
+  const R = V2.receipts; const all = JSON.stringify([R.ask, R.info, R.readback, R.receipt].map((f) => f.toString()));
+  assert.doesNotMatch(all, /wewe ni nani/i);
+  const b = await run(['How much is sofa cleaning?', 'Uh, pardon me?'], handlers);
+  assert.equal(b.out[1].line, b.out[0].line);
+  const c = await run(['I want to book sofa cleaning.', 'Of Naivasha?', 'Yeah.', 'Oh, ume-escalatea nani specifically?'], handlers);
+  assert.match(c.out[1].line, /Naivasha isn't on our list.*call you back/);
+  assert.match(c.out[2].line, /call you back on this number/);
+  assert.match(c.out[3].line, /asked the business team to call you back/);
+  const d = await run(['Uh, and where do you serve, like, so that I know if I can place a booking?'], handlers);
+  assert.match(d.out[0].line, /We serve/);
+});

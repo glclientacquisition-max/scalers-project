@@ -8,7 +8,8 @@ function createDryRunHandlers({ log = [] } = {}) {
     createAppointment: async (args) => rec('createAppointment', args, { id: null, dryRun: true, intended: args }),
     createServiceRequest: async (args) => rec('createServiceRequest', args, { id: null, dryRun: true, intended: args }),
     updateAppointment: async (args) => rec('updateAppointment', args, { id: null, dryRun: true, intended: args }),
-    escalate: async (args) => rec('escalate', args, { ok: true, dryRun: true, intended: args }),
+    // Contract: escalate resolves when the task row exists; owner notify is queued, never awaited.
+    escalate: async (args) => rec('escalate', args, { ok: true, dryRun: true, id: null, notify: 'queued', intended: args }),
     saveCallerInfo: async (args) => rec('saveCallerInfo', args, { dryRun: true, intended: args }),
   };
 }
