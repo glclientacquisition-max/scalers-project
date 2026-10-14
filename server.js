@@ -2149,6 +2149,8 @@ mediaWss.on('connection', (ws, req) => {
   if (mediaClock) MEDIA_CLOCKS.set(ws, mediaClock);
   let holdFillTimer = null;
   let holdsQueued = 0;
+  /** Filler text this turn: the hold pack skips it (ack rule plays "Naangalia." on tool turns). */
+  let turnFillerText = '';
   let receiptCachedTurn = false;
   function stopHoldFill() {
     if (holdFillTimer) clearInterval(holdFillTimer);
@@ -2156,13 +2158,16 @@ mediaWss.on('connection', (ws, req) => {
   }
   // Items 1-2: while the tool runs, queue a cached same-voice hold line just before
   // the queued audio (ack/filler) runs out. Cached only: never a live-TTS seam.
+  function holdLinesForTurn() {
+    return toolSmooth.holdFillLines(callLanguage).filter((l) => l !== turnFillerText);
+  }
   function lookupHoldPcm(line) {
     return lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
   }
   /** Returns false when the first hold line is not cached (caller falls back to live hold). */
   function startHoldFill() {
     if (!mediaClock || holdFillTimer) return Boolean(holdFillTimer);
-    const first = toolSmooth.holdFillLines(callLanguage)[0];
+    const first = holdLinesForTurn()[0];
     if (!isFillerCacheEnabled() || !lookupHoldPcm(first).pcm) {
       console.log(`[ws/media][${sidLabel()}] tool-smooth hold miss (not warmed), live hold: ${first}`);
       return false;
@@ -2174,7 +2179,8 @@ mediaWss.on('connection', (ws, req) => {
         if (holdsQueued >= toolSmooth.HOLD_MAX) stopHoldFill();
         return;
       }
-      const line = toolSmooth.holdFillLines(callLanguage)[holdsQueued];
+      const line = holdLinesForTurn()[holdsQueued];
+      if (!line) return stopHoldFill();
       const found = lookupHoldPcm(line);
       if (!found.pcm) {
         console.log(`[ws/media][${sidLabel()}] tool-smooth hold miss n=${holdsQueued}: ${line}`);
@@ -3709,6 +3715,7 @@ mediaWss.on('connection', (ws, req) => {
         : fillerMode === 'ack' || fillerMode === 'auto'
           ? pickContextualAck(clean, fillerLanguage(callLanguage))
           : process.env.VOICE_FILLER;
+      if (smooth.hold) turnFillerText = fillerText || '';
       let fillerStarted = false;
       let firstSpokenChunk = false;
 
