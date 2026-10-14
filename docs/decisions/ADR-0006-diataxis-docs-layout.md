@@ -5,7 +5,7 @@ last_reviewed: 2026-10-14
 
 # ADR-0006: Docs follow Diataxis with ADRs, RFCs and runbooks
 
-- **Status:** proposed (Alvin approves)
+- **Status:** accepted (Alvin, 2026-10-14)
 - **Date:** 2026-10-14
 - **Deciders:** Alvin Yegon; platform
 
@@ -21,7 +21,7 @@ Docs grew to ~150 files across 18 folders (`agents/`, `ops/` vs `operations/`, `
 
 ## Decision outcome
 
-Proposed: Option 1. It separates "why" from "steps", gives generated reference a home, and archive keeps history without polluting search.
+Accepted: Option 1. It separates "why" from "steps", gives generated reference a home, and archive keeps history without polluting search.
 
 ### Confirmation
 

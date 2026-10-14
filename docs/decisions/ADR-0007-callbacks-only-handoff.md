@@ -5,7 +5,8 @@ last_reviewed: 2026-10-14
 
 # ADR-0007: Human handoff is callbacks only
 
-- **Status:** proposed (Alvin approves)
+- **Status:** accepted (Alvin, 2026-10-14)
+- **Supersedes:** [ADR-0004](ADR-0004-live-human-transfer.md)
 - **Date:** 2026-10-14
 - **Deciders:** Alvin Yegon; voice
 
@@ -21,7 +22,7 @@ last_reviewed: 2026-10-14
 
 ## Decision outcome
 
-Proposed: Option 1. Never promise what the runtime cannot do; dead air after "connecting you" is worse than a callback. Supersedes ADR-0004.
+Accepted: Option 1. Never promise what the runtime cannot do; dead air after "connecting you" is worse than a callback. Supersedes ADR-0004.
 
 ### Confirmation
 

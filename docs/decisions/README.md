@@ -48,13 +48,13 @@ ADRs marked **Reconstructed historical decision** were written after the fact fr
 | --- | --- | --- |
 | [ADR-0001](ADR-0001-sautikit-soniox-supabase.md) | SautiKit + Soniox + Supabase voice stack | Accepted (historical) |
 | [ADR-0002](ADR-0002-five-lane-agent-governance.md) | Five-lane agent governance model | Accepted |
-| [ADR-0003](ADR-0003-manual-sql-governance.md) | Manual SQL script governance | Accepted (historical) |
-| [ADR-0004](ADR-0004-live-human-transfer.md) | Live human transfer via cold Dial after Stream stop | Superseded (#658; see ADR-0007) |
+| [ADR-0003](ADR-0003-manual-sql-governance.md) | Manual SQL script governance | Superseded by ADR-0009 |
+| [ADR-0004](ADR-0004-live-human-transfer.md) | Live human transfer via cold Dial after Stream stop | Superseded by ADR-0007 |
 | [ADR-0005](ADR-0005-returning-caller-card.md) | Returning-caller card at call setup | Accepted |
-| [ADR-0006](ADR-0006-diataxis-docs-layout.md) | Docs follow Diataxis with ADRs, RFCs and runbooks | Proposed |
-| [ADR-0007](ADR-0007-callbacks-only-handoff.md) | Human handoff is callbacks only | Proposed |
-| [ADR-0008](ADR-0008-agents-md-entry-point.md) | AGENTS.md is the single agent entry point | Proposed |
-| [ADR-0009](ADR-0009-single-sql-apply-path.md) | One SQL apply path: supabase/migrations (deferred, step 6) | Proposed |
+| [ADR-0006](ADR-0006-diataxis-docs-layout.md) | Docs follow Diataxis with ADRs, RFCs and runbooks | Accepted (2026-10-14) |
+| [ADR-0007](ADR-0007-callbacks-only-handoff.md) | Human handoff is callbacks only | Accepted (2026-10-14) |
+| [ADR-0008](ADR-0008-agents-md-entry-point.md) | AGENTS.md is the single agent entry point | Accepted (2026-10-14) |
+| [ADR-0009](ADR-0009-single-sql-apply-path.md) | One SQL apply path: supabase/migrations (move deferred until v2 is on staging) | Accepted (2026-10-14) |
 
 ---
 

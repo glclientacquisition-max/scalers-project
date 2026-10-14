@@ -1,11 +1,15 @@
 ---
 owner: platform
-last_reviewed: 2026-10-05
+last_reviewed: 2026-10-14
 ---
 
 # ADR-0004 — Live human transfer via cold Dial after Stream stop
 
 ## Status
+
+**Superseded by [ADR-0007](ADR-0007-callbacks-only-handoff.md)** (2026-10-14): #658 (11 Oct 2026): product is callbacks only.
+
+Previous status text:
 
 **Superseded** by #658 (11 Oct 2026): product is callbacks only. Desk no longer offers `live_transfer`; the capability gate is `callbacks`. Executor history below.
 
