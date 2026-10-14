@@ -1,7 +1,7 @@
 {
   "schema": "scalers.voice.eval-baseline",
   "schemaVersion": 1,
-  "recordedAt": "2026-10-13T21:22:14.905Z",
+  "recordedAt": "2026-10-14T04:21:00.816Z",
   "calls": {
     "HD_015bae4a4af2": {
       "score": 87.9,
