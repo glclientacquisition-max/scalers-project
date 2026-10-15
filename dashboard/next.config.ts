@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
     // Client router cache: a tab you visited in the last 30s opens instantly from memory.
     // Server actions (revalidatePath / router.refresh) and LiveInbox refreshes still purge it.
     staleTimes: { dynamic: 30, static: 180 },
+    // Smart import uploads PDFs up to 10 MB (photos are shrunk in the browser first).
+    // Next only offers a global limit; every action still checks its own input.
+    // Flag off: the Next default (1 MB), so nothing changes until DESK_SMART_IMPORT is on.
+    serverActions: {
+      bodySizeLimit: /^(1|true|on|yes)$/i.test(String(process.env.DESK_SMART_IMPORT || "").trim()) ? "12mb" : "1mb",
+    },
   },
   // Keep Next rooted on the dashboard package (monorepo-safe).
   outputFileTracingRoot: path.join(__dirname),

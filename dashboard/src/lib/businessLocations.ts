@@ -165,3 +165,11 @@ export function validatePlace(loc: BusinessLocation): Record<string, string> {
   if (!loc.label.trim() && !loc.area_id && !loc.address.trim()) return { label: "Add a name or pick the area." };
   return {};
 }
+
+/** The hours "location" line a Locations save posts: first place's label, address and landmark. */
+export function placeLocationLine(loc: Pick<BusinessLocation, "label" | "address" | "landmark">): string {
+  return [loc.label, loc.address, loc.landmark]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" · ");
+}

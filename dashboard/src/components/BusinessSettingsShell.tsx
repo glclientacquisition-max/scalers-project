@@ -29,6 +29,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 const panelLoading = () => <Skeleton className="h-64 w-full rounded-2xl" />;
 const KnowledgeIngestPanel = dynamic(() => import("@/components/KnowledgeIngestPanel").then((m) => m.KnowledgeIngestPanel), { loading: panelLoading });
 const CatalogImportPanel = dynamic(() => import("@/components/CatalogImportPanel").then((m) => m.CatalogImportPanel), { loading: panelLoading });
+const SmartImportPanel = dynamic(() => import("@/components/settings/SmartImportPanel").then((m) => m.SmartImportPanel), { loading: panelLoading });
 const TestLinePanel = dynamic(() => import("@/components/TestLinePanel").then((m) => m.TestLinePanel), { loading: panelLoading });
 import { SettingsLeaveGuard } from "@/components/SettingsLeaveGuard";
 import { TenantForm } from "@/components/TenantForm";
@@ -193,12 +194,16 @@ function SettingsPanelBody({
   tab,
   tenant,
   curatedVoices,
+  smartImport = false,
 }: {
   tab: "import" | "test";
   tenant: TenantRow;
   curatedVoices: CuratedSonioxVoice[];
+  smartImport?: boolean;
 }) {
   if (tab === "import") {
+    // DESK_SMART_IMPORT: one Import for every tab. Off: the importers below, unchanged.
+    if (smartImport) return <SmartImportPanel tenant={tenant} />;
     return parseVertical(tenant.vertical) === "retail" ? (
       <CatalogImportPanel tenant={tenant} />
     ) : (
@@ -220,6 +225,7 @@ export function BusinessSettingsShell({
   liveTransferExecutor = false,
   membersSlot = null,
   structuredSlot = null,
+  smartImport = false,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -229,6 +235,8 @@ export function BusinessSettingsShell({
   liveTransferExecutor?: boolean;
   membersSlot?: ReactNode;
   structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
+  /** DESK_SMART_IMPORT (server flag). */
+  smartImport?: boolean;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
@@ -329,6 +337,7 @@ export function BusinessSettingsShell({
                 />
                 {tab === "import" || tab === "test" ? (
                   <SettingsPanelBody
+                    smartImport={smartImport}
                     tab={tab}
                     tenant={tenant}
                     curatedVoices={curatedVoices}

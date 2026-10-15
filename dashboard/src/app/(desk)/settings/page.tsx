@@ -23,6 +23,7 @@ import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { smartImportEnabled } from "@/lib/smartImport/flag";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
@@ -109,6 +110,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
       liveTransferExecutor={deskLiveTransferExecutorEnabled()}
       membersSlot={membersSlot}
       structuredSlot={structuredSlot}
+      smartImport={smartImportEnabled()}
     />
   );
 }

@@ -1,5 +1,5 @@
 import { sanitizePricing, type StructuredPrice } from "./structuredData";
-import { stableRowId } from "@/lib/factHash";
+import { stableRowId } from "./factHash";
 
 export type ServiceItem = {
   /** Stable, non-numeric id (svc_…). Assigned on save; field paths key on it. */
