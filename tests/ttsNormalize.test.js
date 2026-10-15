@@ -2,6 +2,7 @@
 // Run: node tests/ttsNormalize.test.js
 
 const assert = require('assert');
+const SW_TIME = require('../src/speech/swahiliTime').swTimeEnabled();
 const fs = require('fs');
 const path = require('path');
 const {
@@ -207,7 +208,7 @@ test('expandBarePriceInContext only after Price:', () => {
 test('expandTimes + day ranges', () => {
   assert.match(expandTimes('Open 8am close 6:30pm', 'en'), /8 A M/);
   assert.match(expandTimes('Open 8am close 6:30pm', 'en'), /6 30 P M/);
-  assert.match(expandTimes('Fungua 8am', 'sw'), /saa 8 asubuhi/);
+  assert.match(expandTimes('Fungua 8am', 'sw'), SW_TIME ? /saa mbili asubuhi/ : /saa 8 asubuhi/);
   assert.match(expandDayRanges('Mon-Sat', 'en'), /Monday to Saturday/);
   assert.match(expandDayRanges('Mon-Sat', 'sw'), /Jumatatu hadi Jumamosi/);
 });
@@ -231,11 +232,11 @@ test('expand24HourTime is a safety net and skips AM/PM forms', () => {
   assert.strictEqual(expand24HourTime('08:00–18:00', 'en'), '8 AM to 6 PM');
   assert.strictEqual(
     expand24HourTime('08:00-18:00', 'sw'),
-    'saa 8 asubuhi hadi saa 6 jioni'
+    SW_TIME ? 'saa mbili asubuhi hadi saa kumi na mbili jioni' : 'saa 8 asubuhi hadi saa 6 jioni'
   );
   assert.strictEqual(
     expand24HourTime('14:30', 'sw'),
-    'saa 2 na dakika 30 jioni'
+    SW_TIME ? 'saa nane na nusu mchana' : 'saa 2 na dakika 30 jioni'
   );
   assert.strictEqual(expand24HourTime('8 A M', 'en'), '8 A M');
   assert.strictEqual(expand24HourTime('9:00 AM', 'en'), '9:00 AM');
@@ -477,7 +478,7 @@ test('12h time ranges expand both sides and drop the dash', () => {
 
 test('SW 12h range keeps a single saa head', () => {
   const prepared = prepareForTts('Tunafungua saa 8am - 4pm. Sawa.', { callLanguage: 'sw' });
-  assert.match(prepared.text, /saa 8 asubuhi hadi saa 4 jioni/);
+  assert.match(prepared.text, SW_TIME ? /saa mbili asubuhi hadi saa kumi jioni/ : /saa 8 asubuhi hadi saa 4 jioni/);
   assert.ok(!/saa saa/.test(prepared.text));
 });
 
@@ -659,15 +660,15 @@ test('millions speak in words', () => {
 test('swahili numeric clock keeps its stated period, no doubled saa', () => {
   assert.strictEqual(
     prepareForTts('Anwani na muda ni kesho saa 3:00 usiku hapo Panda.', { callLanguage: 'sw' }).text,
-    'Anwani na muda ni kesho saa 3 usiku hapo Panda.'
+    SW_TIME ? 'Anwani na muda ni kesho saa tatu usiku hapo Panda.' : 'Anwani na muda ni kesho saa 3 usiku hapo Panda.'
   );
   assert.strictEqual(
     prepareForTts('Tufike saa 3:30 usiku.', { callLanguage: 'sw' }).text,
-    'Tufike saa 3 na dakika 30 usiku.'
+    SW_TIME ? 'Tufike saa tatu na nusu usiku.' : 'Tufike saa 3 na dakika 30 usiku.'
   );
   assert.strictEqual(
     prepareForTts('Kuanzia 6:00 asubuhi.', { callLanguage: 'sw' }).text,
-    'Kuanzia saa 6 asubuhi.'
+    SW_TIME ? 'Kuanzia saa kumi na mbili asubuhi.' : 'Kuanzia saa 6 asubuhi.'
   );
 });
 
@@ -760,7 +761,7 @@ for (const c of golden.cases) {
       c.expectLanguage,
       `lang for ${c.id}: got ${prepared.language}, spoken=${prepared.text}`
     );
-    for (const needle of c.expectIncludes || []) {
+    for (const needle of (SW_TIME && c.expectIncludesSwTime) || c.expectIncludes || []) {
       assert.ok(
         prepared.text.toLowerCase().includes(String(needle).toLowerCase()),
         `${c.id} missing "${needle}" in "${prepared.text}"`
