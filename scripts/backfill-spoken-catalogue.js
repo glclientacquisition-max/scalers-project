@@ -5,7 +5,7 @@
 // first, and staging credentials in env). --ai uses Gemini for the AI pass.
 //   node scripts/backfill-spoken-catalogue.js [--tenant <id>] [--ai] [--apply] [--from-file profiles.json]
 const fs = require('fs');
-const { compileSpokenCatalogue, needsRegeneration } = require('../src/knowledge/spokenCatalogue');
+const { CATALOGUE_COLS, catalogueProfileFromRow, compileSpokenCatalogue, needsRegeneration } = require('../src/knowledge/spokenCatalogue');
 const args = process.argv.slice(2);
 const flag = (n) => args.includes(n);
 const val = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : null; };
@@ -24,7 +24,7 @@ async function loadTenants() {
   if (val('--from-file')) return JSON.parse(fs.readFileSync(val('--from-file'), 'utf8'));
   const { createClient } = require('@supabase/supabase-js');
   const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-  let q = db.from('tenants').select('id,services_catalog,product_catalog,service_areas,business_locations,spoken_catalogue');
+  let q = db.from('tenants').select(CATALOGUE_COLS.join(','));
   if (val('--tenant')) q = q.eq('id', val('--tenant'));
   const { data, error } = await q; if (error) throw new Error(error.message);
   return { db, rows: data };
@@ -38,7 +38,7 @@ const { rpcArgs, aiCode } = require('../src/knowledge/spokenCatalogueOnSave');
 async function backfill({ rows, db = null, generate = null, apply = false, force = false, report = false, log = console.log }) {
   const out = { compiled: 0, written: 0, upToDate: 0 };
   for (const r of rows) {
-    const profile = { tenantId: r.id, servicesCatalog: r.services_catalog || [], productCatalog: r.product_catalog || [], serviceAreas: r.service_areas || null, businessLocations: r.business_locations || [] };
+    const profile = catalogueProfileFromRow(r);
     if (!needsRegeneration(r.spoken_catalogue, profile) && !force) { log(`${r.id} up to date (v${r.spoken_catalogue.version})`); out.upToDate++; continue; }
     const doc = await compileSpokenCatalogue(profile, { generate, previous: r.spoken_catalogue || null });
     doc.status = 'draft'; // a compile is never an approval
