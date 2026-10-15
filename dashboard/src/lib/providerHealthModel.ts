@@ -26,6 +26,9 @@ export type ProviderCard = {
   state: HealthState;
   /** "Balance unknown" when the provider has no balance API we read. */
   balance: string;
+  /** Large figure + its unit, split for display (null when unknown). */
+  balanceAmount: string | null;
+  balanceUnit: string | null;
   runway: string | null;
   checkedAt: string | null;
   /** Plain-language problem, one line in the card, full text in the panel. */
@@ -71,7 +74,7 @@ export function isStale(checkedAt: string | null | undefined, maxAgeMs: number |
 }
 
 function card(
-  base: Omit<ProviderCard, "link" | "shared" | "balance" | "runway" | "scopes"> &
+  base: Omit<ProviderCard, "link" | "shared" | "balance" | "runway" | "scopes" | "balanceAmount" | "balanceUnit"> &
     Partial<Pick<ProviderCard, "balance" | "runway" | "scopes">>,
   now: number,
 ): ProviderCard {
@@ -80,6 +83,7 @@ function card(
     runway: null,
     scopes: null,
     ...base,
+    ...splitBalance(base.balance),
     link: LINKS[base.id],
     shared: SHARED_ACCOUNTS.has(base.id),
   };
@@ -88,6 +92,16 @@ function card(
     out.error = out.checkedAt ? "Last check is stale." : "Not checked yet.";
   }
   return out;
+}
+
+/** "KES 2,500" -> { KES, 2,500 }; "900 units" -> { 900, units }; "USD 80 · autopay off" keeps the note in unit. */
+export function splitBalance(balance: string | undefined): { balanceAmount: string | null; balanceUnit: string | null } {
+  if (!balance || balance === "Balance unknown") return { balanceAmount: null, balanceUnit: null };
+  const pre = balance.match(/^([A-Z]{3})\s+([\d.,]+)(.*)$/);
+  if (pre) return { balanceAmount: pre[2], balanceUnit: `${pre[1]}${pre[3]}`.trim() };
+  const post = balance.match(/^([\d.,]+)\s+(.+)$/);
+  if (post) return { balanceAmount: post[1], balanceUnit: post[2] };
+  return { balanceAmount: balance, balanceUnit: null };
 }
 
 function formatKes(minor: number, currency = "KES"): string {

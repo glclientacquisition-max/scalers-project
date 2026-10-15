@@ -125,3 +125,10 @@ test("page wiring: sections in order, links only, business not tenant, SMS panel
   assert.doesNotMatch(read("dashboard/src/app/admin/(console)/billing/page.tsx"), /SmsCreditPanel/);
   assert.match(read("dashboard/src/lib/platformVoiceHealth.ts"), /\/admin\/health/);
 });
+
+test("balance splits into a large figure and a clear unit", () => {
+  assert.deepEqual(m.splitBalance("KES 2,500"), { balanceAmount: "2,500", balanceUnit: "KES" });
+  assert.deepEqual(m.splitBalance("900 units"), { balanceAmount: "900", balanceUnit: "units" });
+  assert.deepEqual(m.splitBalance("USD 80 · autopay off"), { balanceAmount: "80", balanceUnit: "USD · autopay off" });
+  assert.deepEqual(m.splitBalance("Balance unknown"), { balanceAmount: null, balanceUnit: null });
+});

@@ -40,19 +40,19 @@ export function PlatformHeader({ checkedAt }: { checkedAt: string }) {
 
 export function CallsBanner({ banner }: { banner: Banner }) {
   return (
-    <section aria-label="Can calls go through" className="rounded-2xl border border-hairline bg-surface px-4 py-4">
+    <section aria-label="Can calls go through" className="rounded-2xl border border-hairline bg-surface px-5 py-5">
       <div className="flex items-center gap-3">
-        <p className="min-w-0 flex-1 text-title font-medium text-ink">{banner.headline}</p>
+        <p className="min-w-0 flex-1 font-display text-display text-ink">{banner.headline}</p>
         <HealthStamp state={banner.state} />
       </div>
       {banner.reason ? (
-        <p className="mt-1 text-meta text-ink-2">
+        <p className="mt-2 text-body text-ink">
           {banner.reason}
           {banner.owner ? <span className="text-ink-3"> · Owner: {banner.owner}</span> : null}
         </p>
       ) : null}
       {banner.pinned ? (
-        <p className="mt-2 text-meta text-ink-2">
+        <p className="mt-3 border-t border-hairline pt-3 text-meta text-ink-2">
           Aris line {banner.pinned.e164}:{" "}
           {banner.pinned.business ? `${banner.pinned.business} · ${banner.pinned.status}` : banner.pinned.status || "not in the pool"}
         </p>
@@ -72,9 +72,9 @@ export function CallStatsStrip({ stats }: { stats: CallStats | null }) {
   return (
     <section aria-label="Calls" className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-hairline bg-hairline sm:grid-cols-3">
       {cells.map(([label, value]) => (
-        <div key={label} className="bg-surface px-4 py-3">
+        <div key={label} className="bg-surface px-5 py-4">
           <p className="text-meta text-ink-2">{label}</p>
-          <p className="text-title font-medium tabular-nums text-ink">{value}</p>
+          <p className="mt-1 font-display text-display tabular-nums text-ink">{value}</p>
         </div>
       ))}
     </section>
@@ -86,9 +86,9 @@ export function FixList({ items }: { items: FixItem[] }) {
     <section aria-label="To fix">
       <SectionHead title="To fix" />
       {items.length ? (
-        <ol className="divide-y divide-hairline">
+        <ol className="mt-1.5 divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
           {items.map((item, i) => (
-            <li key={item.key} className="flex items-baseline gap-3 py-3 ps-4 pe-4">
+            <li key={item.key} className="flex items-baseline gap-3 px-4 py-3.5">
               <span className="w-5 shrink-0 text-meta tabular-nums text-ink-3">{i + 1}</span>
               <span className="min-w-0 flex-1 text-body text-ink">{item.text}</span>
               <span className="shrink-0 text-meta text-ink-2">{item.owner}</span>
@@ -106,15 +106,29 @@ export function FixList({ items }: { items: FixItem[] }) {
 }
 
 export function ProviderColumn({ label, cards, sha }: { label: string; cards: ProviderCard[]; sha: string | null }) {
-  const sorted = [...cards].sort((a, b) => Number(a.state === "ok") - Number(b.state === "ok") || Number(b.carriesCalls) - Number(a.carriesCalls));
+  const byCalls = (a: ProviderCard, b: ProviderCard) => Number(b.carriesCalls) - Number(a.carriesCalls);
+  const attention = cards.filter((c) => c.state !== "ok").sort(byCalls);
+  const good = cards.filter((c) => c.state === "ok").sort(byCalls);
   return (
-    <section aria-label={`${label} providers`} className="min-w-0 space-y-2">
+    <section aria-label={`${label} providers`} className="min-w-0 space-y-3">
       <SectionHead title={label}>{sha ? <span className="text-caption tabular-nums text-ink-3">Voice {sha.slice(0, 7)}</span> : null}</SectionHead>
-      <ul className="space-y-2">
-        {sorted.map((c) => (
-          <ProviderCardView key={`${c.env}:${c.id}`} card={c} />
-        ))}
-      </ul>
+      {attention.length ? (
+        <ul className="space-y-3" aria-label="Needs attention">
+          {attention.map((c) => (
+            <ProviderCardView key={`${c.env}:${c.id}`} card={c} />
+          ))}
+        </ul>
+      ) : null}
+      {good.length ? (
+        <div className="space-y-1.5">
+          <p className="px-4 text-caption text-ink-3">All good</p>
+          <ul className="divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
+            {good.map((c) => (
+              <ProviderCardView key={`${c.env}:${c.id}`} card={c} />
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -130,7 +144,7 @@ export function LinesList({ lines }: { lines: LineRow[] | null }) {
       {!lines ? (
         <p className="px-4 py-3 text-meta text-ink-2">Could not read the number pool.</p>
       ) : lines.length ? (
-        <ul className="divide-y divide-hairline">
+        <ul className="mt-1.5 divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline">
           {lines.map((l) => (
             <ListRow
               key={l.e164}
@@ -153,9 +167,9 @@ export function HostingList({ rows }: { rows: HostingRow[] }) {
   return (
     <section aria-label="Hosting">
       <SectionHead title="Hosting" />
-      <ul className="divide-y divide-hairline">
+      <ul className="mt-1.5 divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
         {rows.map((r) => (
-          <li key={r.name} className="flex items-baseline gap-3 py-3 ps-4 pe-4">
+          <li key={r.name} className="flex items-baseline gap-3 px-4 py-3.5">
             <span className="w-24 shrink-0 text-body font-medium text-ink">{r.name}</span>
             <span className="min-w-0 flex-1 truncate text-meta text-ink-2">{r.detail}</span>
             <a href={r.href} target="_blank" rel="noreferrer" className={linkClass}>

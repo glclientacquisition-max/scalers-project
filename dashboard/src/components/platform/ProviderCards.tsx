@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ListRow } from "@/components/ui/ListRow";
-import { CheckedTime, HealthStamp } from "@/components/platform/HealthStamp";
+import { BalanceFigure, CheckedTime, HealthStamp } from "@/components/platform/HealthStamp";
 import { DetailPanel } from "@/components/platform/ProviderDetail";
 import { STATE_WORD, type ProviderCard } from "@/lib/providerHealthModel";
 
@@ -10,21 +10,26 @@ const linkClass = "text-meta font-medium text-accent-deep underline-offset-2 hov
 
 function CardDetail({ card }: { card: ProviderCard }) {
   const rows: Array<[string, string]> = [
-    ["Status", STATE_WORD[card.state]],
-    ["Balance", card.balance],
-    ["Runway", card.runway || "n/a"],
     ["Owner", card.owner],
+    ["Environment", card.env === "prod" ? "Production" : "Staging"],
   ];
   return (
-    <div className="space-y-4">
-      <dl>
+    <div className="space-y-5">
+      <div className="flex items-center gap-3">
+        <span className="min-w-0 flex-1">
+          <BalanceFigure amount={card.balanceAmount} unit={card.balanceUnit} />
+          {card.runway ? <span className="mt-0.5 block text-meta tabular-nums text-ink-2">Runway {card.runway}</span> : null}
+        </span>
+        <HealthStamp state={card.state} />
+      </div>
+      <dl className="overflow-hidden rounded-2xl border border-hairline bg-surface px-4">
         {rows.map(([k, v]) => (
-          <div key={k} className="flex gap-3 border-t border-hairline py-2 first:border-t-0">
+          <div key={k} className="flex gap-3 border-t border-hairline py-3 first:border-t-0">
             <dt className="w-24 shrink-0 text-meta text-ink-2">{k}</dt>
             <dd className="min-w-0 text-body text-ink">{v}</dd>
           </div>
         ))}
-        <div className="flex gap-3 border-t border-hairline py-2">
+        <div className="flex gap-3 border-t border-hairline py-3">
           <dt className="w-24 shrink-0 text-meta text-ink-2">Checked</dt>
           <dd className="min-w-0 text-body text-ink">
             <CheckedTime iso={card.checkedAt} />
@@ -34,10 +39,10 @@ function CardDetail({ card }: { card: ProviderCard }) {
       {card.error ? <p className="whitespace-pre-wrap text-body text-ink">{card.error}</p> : null}
       {card.scopes ? (
         <div>
-          <p className="text-meta text-ink-2">Key scopes</p>
-          <ul className="mt-1">
+          <p className="px-1 text-caption text-ink-3">Key scopes</p>
+          <ul className="mt-1 divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface px-4">
             {card.scopes.map((s) => (
-              <li key={s.scope} className="flex gap-3 py-1 text-body">
+              <li key={s.scope} className="flex gap-3 py-3 text-body">
                 <span className="min-w-0 flex-1 text-ink">{s.scope}</span>
                 <span className={s.ok ? "text-ok" : "font-semibold text-attention"}>{s.ok ? "OK" : "Missing"}</span>
               </li>
@@ -56,10 +61,10 @@ function CardDetail({ card }: { card: ProviderCard }) {
 export function ProviderCardView({ card }: { card: ProviderCard }) {
   const [open, setOpen] = useState(false);
   const missingScopes = (card.scopes || []).filter((s) => !s.ok).length;
-  const title = (
-    <span className="flex items-baseline gap-2">
+  const name = (
+    <span className="flex min-w-0 items-baseline gap-2">
       <span className="truncate">{card.name}</span>
-      {card.shared ? <span className="shrink-0 text-caption text-ink-3">shared</span> : null}
+      {card.shared ? <span className="shrink-0 text-caption text-ink-3">Shared</span> : null}
     </span>
   );
   const panel = (
@@ -68,13 +73,13 @@ export function ProviderCardView({ card }: { card: ProviderCard }) {
     </DetailPanel>
   );
   if (card.state === "ok") {
-    // Green cards collapse to one line.
+    // Green: one row inside the grouped "All good" list.
     return (
       <>
         <ListRow
-          className="overflow-hidden rounded-2xl border border-hairline"
           onOpen={() => setOpen(true)}
-          title={title}
+          title={name}
+          preview={<BalanceFigure amount={card.balanceAmount} unit={card.balanceUnit} size="sm" />}
           stamp={<HealthStamp state="ok" />}
           when={<CheckedTime iso={card.checkedAt} />}
         />
@@ -83,27 +88,31 @@ export function ProviderCardView({ card }: { card: ProviderCard }) {
     );
   }
   return (
-    <li className="rounded-2xl border border-hairline bg-surface">
+    <li className="overflow-hidden rounded-2xl border border-hairline bg-surface">
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="block w-full min-w-0 px-4 py-3 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+        className="block min-h-11 w-full min-w-0 px-5 pb-3 pt-4 text-start outline-none transition-colors duration-fast ease-out hover:bg-surface-2/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
       >
-        <span className="flex items-baseline gap-3">
-          <span className="min-w-0 flex-1 text-body font-medium text-ink">{title}</span>
+        <span className="flex items-center gap-3">
+          <span className="min-w-0 flex-1 text-body font-medium text-ink">{name}</span>
           <HealthStamp state={card.state} />
         </span>
-        <span className="mt-1 block truncate text-meta text-ink-2">{card.error || STATE_WORD[card.state]}</span>
-        <span className="mt-1 flex flex-wrap gap-x-4 text-meta text-ink-2">
-          <span>{card.balance}</span>
-          {card.runway ? <span>Runway {card.runway}</span> : null}
-          {missingScopes ? <span className="text-attention">{missingScopes} scope(s) missing</span> : null}
-          <span>
-            Checked <CheckedTime iso={card.checkedAt} />
-          </span>
+        <span className="mt-3 block">
+          <BalanceFigure amount={card.balanceAmount} unit={card.balanceUnit} />
         </span>
+        {card.runway ? <span className="mt-0.5 block text-meta tabular-nums text-ink-2">Runway {card.runway}</span> : null}
+        <span className="mt-3 block truncate text-meta text-ink">{card.error || STATE_WORD[card.state]}</span>
+        {missingScopes ? (
+          <span className="mt-1 block text-meta font-medium text-attention">
+            {missingScopes} key {missingScopes === 1 ? "scope" : "scopes"} missing
+          </span>
+        ) : null}
       </button>
-      <div className="px-4 pb-3">
+      <div className="flex items-baseline gap-3 border-t border-hairline px-5 py-3">
+        <span className="min-w-0 flex-1 text-caption text-ink-3">
+          Checked <CheckedTime iso={card.checkedAt} />
+        </span>
         <a href={card.link.href} target="_blank" rel="noreferrer" className={linkClass}>
           {card.link.label}
         </a>
