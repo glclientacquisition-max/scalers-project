@@ -17,12 +17,10 @@ const { compileSpokenCatalogue, needsRegeneration } = require('./spokenCatalogue
 
 const ON = /^(1|true|on|yes)$/i;
 const enabled = (env = process.env) => ON.test(String(env.SPOKEN_CATALOGUE_ON_SAVE || '').trim());
-const TENANT_COLS = 'id,services_catalog,product_catalog,service_areas,business_locations,spoken_catalogue';
+const TENANT_COLS = require('./spokenCatalogue').CATALOGUE_COLS.join(',');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function profileFromRow(r) {
-  return { tenantId: r.id, servicesCatalog: r.services_catalog || [], productCatalog: r.product_catalog || [], serviceAreas: r.service_areas || null, businessLocations: r.business_locations || [] };
-}
+const profileFromRow = (r) => require('./spokenCatalogue').catalogueProfileFromRow(r);
 
 // generate wrapped with a hard timeout; the error is a code, never model text
 function withTimeout(generate, ms) {
@@ -44,6 +42,10 @@ async function hasColumn(db, table, col) {
   return ok;
 }
 
+// Arguments for public.save_spoken_catalogue_version (migration 20261015113748).
+function rpcArgs(tenantId, doc) {
+  return { p_tenant_id: tenantId, p_version: doc.version, p_schema_version: doc.schemaVersion, p_source_hash: doc.sourceHash, p_status: doc.status, p_generator: doc.generator, p_doc: doc, p_issues: doc.issues || [], p_compile_error: doc.aiError ? String(doc.aiError).slice(0, 200) : null };
+}
 async function writeVersion(db, tenantId, doc, { log }) {
   const compileError = doc.aiError ? String(doc.aiError).slice(0, 200) : null;
   const row = { tenant_id: tenantId, version: doc.version, schema_version: doc.schemaVersion, source_hash: doc.sourceHash, status: doc.status, generator: doc.generator, doc, issues: doc.issues || [] };
@@ -108,4 +110,4 @@ function scheduleSpokenCatalogueCompile(tenantId, deps = {}) {
   return { scheduled: true, done: s.done };
 }
 
-module.exports = { enabled, runSpokenCatalogueCompile, scheduleSpokenCatalogueCompile, profileFromRow, withTimeout, _resetColumnMemo: () => optionalCols.clear() };
+module.exports = { rpcArgs, aiCode, enabled, runSpokenCatalogueCompile, scheduleSpokenCatalogueCompile, profileFromRow, withTimeout, _resetColumnMemo: () => optionalCols.clear() };

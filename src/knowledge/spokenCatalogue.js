@@ -335,15 +335,34 @@ function findEntry(text, sc) {
   return best;
 }
 const MEMO = new Map();
-function resolveSpokenCatalogue(profile = {}) {
-  const stored = profile.spokenCatalogue;
-  if (stored && !needsRegeneration(stored, profile)) return stored;
-  const h = sourceHash(profile);
+// SPOKEN_CATALOGUE_STORED_FIRST (default off). On: the call path speaks the
+// stored live doc whenever one exists (freshness is a write-time concern);
+// a hash mismatch is only traced as stale. compileSync runs only with no doc.
+const storedFirst = (env = process.env) => /^(1|true|on|yes)$/i.test(String(env.SPOKEN_CATALOGUE_STORED_FIRST || '').trim());
+function compileMemo(profile, h = sourceHash(profile)) {
   if (MEMO.has(h)) return MEMO.get(h);
   const out = compileSync(profile);
   if (MEMO.size > 200) MEMO.clear();
   MEMO.set(h, out);
   return out;
 }
+/** { doc, stale, degraded } for the call path. */
+function resolveSpokenCatalogueMeta(profile = {}, { env = process.env } = {}) {
+  const stored = profile.spokenCatalogue;
+  if (storedFirst(env)) {
+    if (stored && Array.isArray(stored.entries)) return { doc: stored, stale: needsRegeneration(stored, profile), degraded: false };
+    return { doc: compileMemo(profile), stale: false, degraded: true };
+  }
+  if (stored && !needsRegeneration(stored, profile)) return { doc: stored, stale: false, degraded: false };
+  return { doc: compileMemo(profile), stale: false, degraded: false };
+}
+function resolveSpokenCatalogue(profile = {}, opts = {}) { return resolveSpokenCatalogueMeta(profile, opts).doc; }
 
-module.exports = { SCHEMA_VERSION, AI_SCHEMA, sourceHash, compileSpokenCatalogue, compileSync, needsRegeneration, applyOwnerEdit, approve, approvePrices, spokenName, sayName, entryForRaw, findEntry, resolveSpokenCatalogue, priceRules, swNameRules, explainRules, coverageRules, checkField, categoryLabel, slug };
+// One row -> catalogue profile mapping and column list for every writer and
+// reader (backfill, on-save compile, Voice call path), so sourceHash agrees.
+const CATALOGUE_COLS = ['id', 'services_catalog', 'product_catalog', 'service_areas', 'business_locations', 'spoken_catalogue'];
+function catalogueProfileFromRow(r = {}) {
+  return { tenantId: r.id, servicesCatalog: r.services_catalog || [], productCatalog: r.product_catalog || [], serviceAreas: r.service_areas || null, businessLocations: r.business_locations || [] };
+}
+
+module.exports = { CATALOGUE_COLS, catalogueProfileFromRow, storedFirst, resolveSpokenCatalogueMeta, SCHEMA_VERSION, AI_SCHEMA, sourceHash, compileSpokenCatalogue, compileSync, needsRegeneration, applyOwnerEdit, approve, approvePrices, spokenName, sayName, entryForRaw, findEntry, resolveSpokenCatalogue, priceRules, swNameRules, explainRules, coverageRules, checkField, categoryLabel, slug };
