@@ -25,11 +25,17 @@ function callsOf(j) {
       for (const [i, t] of c.turns.entries()) {
         lang = lang || c.lang || t.lang || t.soniox || 'en';
         const m = await planV2CatalogueMouth(null, { text: t.caller, profile: c.profile, language: lang, state, model: null });
-        if (!m?.line) continue;
-        spoken += 1;
-        const r = senseCheck({ line: m.line, lang: m.v2.lang, caller: t.caller, intent: m.v2.intent, sc: resolveSpokenCatalogue(c.profile) });
-        if (!r.ok) fails += 1;
-        out.push(`${r.ok ? 'ok  ' : 'FAIL'} ${c.callId} T${t.turn || i + 1} [${m.v2.lang}] "${t.caller}" -> "${m.line}"${r.ok ? '' : `  (${r.problems.join(', ')})`}`);
+        // BRAIN_V2_TOPIC_PROPOSALS: v2 returns proposals for the TurnArbiter instead of a line; check every claimed one.
+        const INTENT = { catalogue: 'services', fallback: 'services', explain: 'explain', price: 'price' };
+        const replies = Array.isArray(m?.v2Raw)
+          ? m.v2Raw.filter((p) => p.claim && p.text).map((p) => ({ line: p.text, lang: p.lang, intent: INTENT[p.kind] || null, kind: p.kind }))
+          : m?.line ? [{ line: m.line, lang: m.v2.lang, intent: m.v2.intent }] : [];
+        for (const x of replies) {
+          spoken += 1;
+          const r = senseCheck({ line: x.line, lang: x.lang, caller: t.caller, intent: x.intent, sc: resolveSpokenCatalogue(c.profile) });
+          if (!r.ok) fails += 1;
+          out.push(`${r.ok ? 'ok  ' : 'FAIL'} ${c.callId} T${t.turn || i + 1} [${x.lang}]${x.kind ? ` ${x.kind}` : ''} "${t.caller}" -> "${x.line}"${r.ok ? '' : `  (${r.problems.join(', ')})`}`);
+        }
       }
     }
   }
