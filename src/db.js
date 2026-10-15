@@ -2280,6 +2280,10 @@ async function insertNotifySend(row = {}) {
     idempotency_key: row.idempotency_key,
     overage: Boolean(row.overage),
   };
+  if (row.status === 'failed') {
+    payload.status = 'failed';
+    payload.error = row.error || null;
+  }
   let { data, error } = await supabase
     .from('notify_sends')
     .insert(payload)
@@ -2288,6 +2292,19 @@ async function insertNotifySend(row = {}) {
   if (error && /overage/i.test(error.message || '')) {
     const rest = { ...payload };
     delete rest.overage;
+    ({ data, error } = await supabase
+      .from('notify_sends')
+      .insert(rest)
+      .select('id')
+      .maybeSingle());
+  }
+  if (error && payload.status && /'?(status|error)'? column|column .*(status|error)/i.test(error.message || '')) {
+    // notify_sends_status.sql not applied yet: keep the failed row, note it in body.
+    const rest = { ...payload };
+    delete rest.status;
+    delete rest.error;
+    delete rest.overage;
+    rest.body = `[FAILED: ${String(row.error || 'send_failed').slice(0, 120)}] ${rest.body || ''}`.slice(0, 2000);
     ({ data, error } = await supabase
       .from('notify_sends')
       .insert(rest)

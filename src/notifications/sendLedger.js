@@ -94,8 +94,11 @@ function buildLedgerRow({
   providerMessageId,
   at,
   overage,
+  status,
+  error,
 } = {}) {
   const cls = classify(kind);
+  const failed = String(status || '') === 'failed';
   const ch = String(channel || '').trim();
   return {
     tenant_id: tenantId || null,
@@ -110,15 +113,20 @@ function buildLedgerRow({
     body: String(body || '').slice(0, 2000),
     provider_message_id: providerMessageId || null,
     overage: Boolean(overage),
-    idempotency_key: idempotencyKey({
-      tenantId,
-      callSid,
-      callId,
-      kind: cls.kind,
-      channel: ch,
-      to,
-      at,
-    }),
+    status: failed ? 'failed' : 'sent',
+    error: failed ? String(error || 'send_failed').slice(0, 300) : null,
+    // A failed row must never block a later real send (instanceAlreadyDelivered
+    // looks up the plain key), so it gets its own key, one per hour.
+    idempotency_key:
+      idempotencyKey({
+        tenantId,
+        callSid,
+        callId,
+        kind: cls.kind,
+        channel: ch,
+        to,
+        at,
+      }) + (failed ? `:failed:${(at instanceof Date ? at : new Date()).toISOString().slice(0, 13)}` : ''),
   };
 }
 
@@ -334,6 +342,11 @@ async function recordNotifySend(entry = {}) {
   }
 }
 
+/** Persist one failed send (status failed, error text). Never throws. */
+async function recordFailedSend(entry = {}) {
+  return recordNotifySend({ ...entry, status: 'failed', error: entry.error });
+}
+
 async function recordDispatchResult(ledger, result, body) {
   if (!ledger?.tenantId || !result?.channel) return { ok: false, reason: 'skipped' };
   return recordNotifySend({
@@ -363,6 +376,7 @@ module.exports = {
   releaseInstanceFlight,
   resetInstanceFlights,
   recordDispatchResult,
+  recordFailedSend,
   recordNotifySend,
   allowanceDecision,
   smsAllowanceDecision,
