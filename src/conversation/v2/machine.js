@@ -310,6 +310,8 @@ function infoAnswer(state, u, profile, kind) {
     if (u.service) return R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, state.lang);
     if (u.products[0]) return R.info({ kind: 'offered', label: u.products[0].name, price: u.products[0].price ? `KSh ${u.products[0].price}` : null }, state.lang);
     if (!cat.length) return R.info({ kind: 'want_know' }, state.lang);
+    // HD_89aa48bf657f: home services are listed as plain categories in the caller's language, never raw catalogue names
+    if (vertical(profile) === 'home') { const cats = R.serviceCategories(cat); const house = cats.find((c) => c.k === 'house'); if (house && /\b(saizi|sizes?|ukubwa|vyumba|bedrooms?)\b/i.test(u.text || '')) return R.info({ kind: 'house_sizes', sizes: house.names.map((x) => (x.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean) }, state.lang); if (cats.length) return R.info({ kind: 'service_categories', cats }, state.lang); }
     const start = (n * 4) % cat.length;
     return R.info({ kind: 'services', names: [...cat, ...cat].slice(start, start + 4), more: cat.length > 4 }, state.lang);
   }
@@ -443,6 +445,10 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     const q = (String(state.lastBase || state.lastLine || '').match(/[^.!?]+\?\s*$/) || [])[0];
     if (q) return out(u.intents.includes('hold') ? `${R.info({ kind: 'hold' }, lang)} ${q.trim()}` : `${R.info({ kind: 'repair' }, lang).split(/(?<=[.!?])\s/)[0]} ${q.trim()}`);
   }
+  // HD_89aa48bf657f T5: "what do you mean by 1-Bedroom?" gets a short plain explanation, no price, no booking push
+  if (u.intents.includes('explain') && u.service) { const svc = u.service; if (state.intent === 'book' && state.slots.service === svc.name && state.phase === 'collect' && !state.slots.when.date) state.slots.service = state.slotsServiceBefore || null; return out(R.info({ kind: 'explain', name: svc.name, notes: svc.notes || '' }, lang)); }
+  // thanks-only while collecting and nothing new: the caller is closing
+  if (state.phase === 'collect' && state.turn > 2 && /^\W*((okay|ok|sawa|alright)\W+)?(thank you|thanks|asante( sana)?)\W*$/i.test(text)) { resetIntent(state); state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
   // after "anything else?": a no, thanks or a compliment closes the call
   const askedElse = /(anything else|Kuna kingine)[^?]*\?\s*$/i.test(state.lastLine || '');
   // a cut-off turn ("Hapana, n") is never a no / decline / slot answer: ask again, keep everything

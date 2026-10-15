@@ -125,3 +125,17 @@ test('"right now" near closing gets the closing time and another day', async () 
   assert.match((await talk(['Mtu anaweza kuja sasa hivi kwa sofa cleaning?'], { now: sat1730 })).lines[0], /^Leo tunafunga saa kumi na mbili jioni/);
   assert.match((await talk(['Can someone come right now for sofa cleaning?'])).lines[0], /^Where should we come\?$/, 'at 08:00 now is within hours');
 });
+
+test('HD_89aa48bf657f: plain service categories, explain without push, no early name ask, close on thanks', async () => {
+  const r = await talk(['Nilikuwa nataka ku- make something like a booking.', 'Uniambie usasi gani mnafanya.']);
+  assert.match(r.lines[1], /^Tunafanya usafi wa magodoro, sofa, mazulia.*usafi wa nyumba kulingana na ukubwa.*usafi wa kina.*maofisi\. Ungependa ipi\?$/);
+  assert.doesNotMatch(r.lines.join(' '), /jina|1-Bedroom|move-in move-out/i);
+  const e = await talk(['What services do you offer?']);
+  assert.match(e.lines[0], /^We do mattresses, sofas, carpets, windows, house cleaning by size, deep cleaning.*offices\. Which would you like\?$/);
+  const x = await talk(["I don't understand what you're saying by 1-Bedroom."]);
+  assert.equal(x.lines[0], 'It means cleaning a one-bedroom home: dusting, mopping, the bathroom and the kitchen.');
+  const s = await talk(['Maana ya post-construction ni nini?']);
+  assert.match(s.lines[0], /^Ni usafi baada ya ujenzi/);
+  const c = await talk(['Nataka booking.', 'Sofa', 'Okay, thank you.']);
+  assert.match(c.lines[2], /Goodbye|Kwaheri/i);
+});
