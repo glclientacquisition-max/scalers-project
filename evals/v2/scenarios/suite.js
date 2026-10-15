@@ -100,7 +100,7 @@ module.exports = [
   // Phase 1b: Swahili/Sheng questions that used to get a generic reply. Answers must come from tenant facts only.
   { id: 'S26_sw_services_list', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['Mattress|Apartment|Carpet|Sofa'],
     turns: [['Nilikuwa nataka kujua ni services gani mnaofa.', 'Mnafanya huduma gani?']], facts: {}, expect: { noWrites: true } },
-  { id: 'S27_sw_saizi_gani', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['Bedroom|Apartment|Mattress'],
+  { id: 'S27_sw_saizi_gani', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['kulingana na ukubwa', 'kimoja'],
     turns: [['Nilikuwa nataka kujua ni saizi gani mnatoa.', 'Saizi gani mnatoa za usafi?']], facts: {}, expect: { noWrites: true } },
   { id: 'S28_sw_price_followup', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['huduma gani', 'KSh 800'],
     turns: ['Shilingi ngapi?', ['Sofa cleaning.', 'Ya sofa.']], facts: {}, expect: { noWrites: true } },
@@ -199,6 +199,10 @@ module.exports = [
   { id: 'S64_en_readback_day_only_reasks', area: 'readback', lang: 'en', tenant: 'done_and_dusted', commitment: true, mustSay: ['yes or no'],
     turns: ['Book sofa cleaning Friday at 10am.'], facts: { name: 'Alvin', place: 'Kitengela', onReadback: ['Friday.', 'Uh, Friday.'] },
     expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-16 10:00' } } },
+  { id: 'S65_sw_services_plain_categories', area: 'services', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['magodoro', 'nyumba kulingana na ukubwa', 'maofisi'], mustNotSay: ['1-Bedroom', 'move-in move-out', 'jina lako'],
+    turns: ['Uniambie usasi gani mnafanya.'], facts: {}, expect: { appointments: 0, service_requests: 0 } },
+  { id: 'S66_en_explain_no_push', area: 'services', lang: 'en', tenant: 'done_and_dusted', mustSay: ['one-bedroom home'], mustNotSay: ['Would you like to book', 'shillings', 'What day'],
+    turns: ["I don't understand what you're saying by 1-Bedroom.", 'Okay, thank you.'], facts: {}, expect: { appointments: 0, service_requests: 0 } },
   // "next Friday" while this week's Friday is still ahead: asked once, naming both dates
   { id: 'S59_en_next_friday_asked', area: 'dates', lang: 'en', tenant: 'done_and_dusted', commitment: true, mustSay: ['16th.*23rd'],
     turns: ['Book carpet cleaning next Friday at 10am.'], facts: { name: 'Alvin', place: 'Kitengela', kesho: ['The 23rd.', 'Next week, the 23rd.'] },

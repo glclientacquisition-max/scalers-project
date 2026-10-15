@@ -36,6 +36,37 @@ function ask(slot, n, lang, ctx = {}) {
 }
 function rowLabel(r, lang) { const d = r.when?.date; return sw(lang) ? `${svcName(r.service)} ya ${L.sayDate(d, lang)}` : `${svcName(r.service).toLowerCase()} on ${L.sayDate(d, lang)}`; }
 
+// HD_89aa48bf657f: plain service categories from the tenant catalogue (names never read raw)
+const CATS = [
+  ['items', /mattress|sofa|carpet|window|refrigerator|fridge|oven|couch/i],
+  ['house', /bedroom|house|apartment|housekeeping|studio/i],
+  ['deep', /deep|move-?in|move-?out|post-?construction|fumigat/i],
+  ['office', /office|commercial|contract/i],
+];
+function serviceCategories(names) {
+  const got = new Map(); const other = [];
+  for (const n of names) { const c = CATS.find(([, re]) => re.test(n)); if (c) got.set(c[0], [...(got.get(c[0]) || []), n]); else other.push(n); }
+  return [...CATS.map(([k]) => k).filter((k) => got.has(k)).map((k) => ({ k, names: got.get(k) })), ...other.slice(0, 2).map((n) => ({ k: 'raw', names: [n] }))];
+}
+const ITEM_WORDS = { mattress: ['mattresses', 'magodoro'], sofa: ['sofas', 'sofa'], carpet: ['carpets', 'mazulia'], window: ['windows', 'madirisha'], refrigerator: ['fridges', 'friji'], oven: ['ovens', 'oveni'] };
+function catPhrase(c, S) {
+  if (c.k === 'items') { const ws = Object.entries(ITEM_WORDS).filter(([k]) => c.names.some((n) => n.toLowerCase().includes(k))).map(([, v]) => v[S ? 1 : 0]).slice(0, 4); return S ? `usafi wa ${ws.join(', ')}` : ws.join(', '); }
+  if (c.k === 'house') return S ? 'usafi wa nyumba kulingana na ukubwa' : 'house cleaning by size';
+  if (c.k === 'deep') return S ? 'usafi wa kina, kama wa kuhamia au baada ya ujenzi' : 'deep cleaning, like move-in or after building work';
+  if (c.k === 'office') return S ? 'usafi wa maofisi' : 'offices';
+  return svcName(c.names[0]).toLowerCase();
+}
+function explain(name, notes, S) {
+  const n = String(name || '');
+  const bed = n.match(/(\d)-Bedroom/i);
+  if (bed) return S ? `Ni usafi wa nyumba yenye vyumba ${['', 'kimoja', 'viwili', 'vitatu'][bed[1]] ? `${bed[1] === '1' ? 'cha kulala kimoja' : `vya kulala ${['', '', 'viwili', 'vitatu'][bed[1]]}`}` : bed[1]}: kufagia, kupiga deki, bafu na jikoni.` : `It means cleaning a ${['', 'one', 'two', 'three'][bed[1]] || bed[1]}-bedroom home: dusting, mopping, the bathroom and the kitchen.`;
+  if (/move-?in|move-?out/i.test(n)) return S ? 'Ni usafi kamili wa nyumba unapohamia au kuhama.' : 'It means a full clean of a home when you move in or move out.';
+  if (/post-?construction/i.test(n)) return S ? 'Ni usafi baada ya ujenzi au ukarabati, kuondoa vumbi na uchafu.' : 'It means cleaning up after building or renovation work: dust and debris.';
+  if (/deep/i.test(n)) return S ? 'Ni usafi wa kina zaidi ya usafi wa kawaida.' : 'It means a more thorough clean than a standard one.';
+  if (/hourly/i.test(n)) return S ? 'Ni msaidizi wa usafi anayelipwa kwa saa.' : 'It means a cleaner you book by the hour.';
+  const first = String(notes || '').split(/[,.;]/).slice(0, 3).join(',').trim();
+  return S ? `${svcName(n)}${first ? `: ${first}` : ''}.` : `${svcName(n)}${first ? ` covers ${first.toLowerCase()}` : ''}.`;
+}
 function readback(p, lang) {
   const S = sw(lang);
   const nm = p.name ? (S ? `, kwa ${p.name}` : `, for ${p.name}`) : '';
@@ -92,6 +123,9 @@ function info(r, lang, n = 0) {
       if (!r.rows.length) return [S ? 'Sioni booking yoyote ya awali kwa namba hii.' : "I don't see any earlier bookings on this number.", S ? 'Samahani, siipati. Ungependa timu iangalie na ikupigie simu?' : "Sorry, I can't find it. Would you like the team to check and call you back?"][Math.min(n, 1)];
       return S ? `Naona ${rowLabel(r.rows[0], lang)}.` : `I can see your ${rowLabel(r.rows[0], lang)}.`;
     case 'pending': return S ? `Ombi lako la kubadilisha ${r.what === 'payment' ? 'malipo' : 'mahali'} bado linasubiri. Mwenye biashara atakupigia simu.` : `Your ${r.what} change request is still pending. The owner will call you back.`;
+    case 'service_categories': { const ps = r.cats.map((c) => catPhrase(c, S)); const list = ps.length > 1 ? `${ps.slice(0, -1).join(S ? ', ' : ', ')}${S ? ' na ' : ', and '}${ps[ps.length - 1]}` : ps[0]; return S ? `Tunafanya ${list}. Ungependa ipi?` : `We do ${list}. Which would you like?`; }
+    case 'house_sizes': { const w = S ? { 1: 'kimoja', 2: 'viwili', 3: 'vitatu', 4: 'vinne' } : { 1: 'one', 2: 'two', 3: 'three', 4: 'four' }; const ws = [...new Set(r.sizes)].sort().map((d) => w[d] || d); const l = ws.length > 1 ? `${ws.slice(0, -1).join(', ')} ${S ? 'au' : 'or'} ${ws[ws.length - 1]}` : ws[0] || ''; return S ? `Usafi wa nyumba ni kulingana na ukubwa, vyumba vya kulala ${l}. Nyumba yako ina vyumba vingapi?` : `House cleaning goes by size: ${l} bedrooms. How many bedrooms is your home?`; }
+    case 'explain': return explain(r.name, r.notes, S);
     case 'services': return S ? `Tunafanya ${r.names.map(svcName).join(', ')}${r.more ? ' na zaidi' : ''}. Ungependa ipi?` : `We do ${r.names.map(svcName).join(', ')}${r.more ? ', and more' : ''}. Which one would you like?`;
     case 'offered': return S ? `Ndio, tunafanya ${svcName(r.label)}${r.price ? `, bei ni ${priceTxt(r.price, true)}` : ''}. Ungependa kubook?` : `Yes, we do ${svcName(r.label).toLowerCase()}${r.price ? `, ${/^From/i.test(r.price) ? priceTxt(r.price) : `at ${r.price}`}` : ''}. Would you like to book?`;
     case 'coverage_outside': return S ? `Ndio, nje ya ${r.base} tunahudumia ${r.names}${r.more ? ' na maeneo mengine' : ''}. Uko wapi?` : `Yes, outside ${r.base} we serve ${r.names}${r.more ? ' and other listed areas' : ''}. Which place are you in?`;
@@ -138,4 +172,4 @@ function vary(line, lang, n = 1, plain = false) {
   // No "As I said" / "Just to repeat" filler (Alvin, 14 Oct): a repeat is said plainly.
   return line;
 }
-module.exports = { vary, ask, readback, receipt, info, svcName, rowLabel };
+module.exports = { serviceCategories, vary, ask, readback, receipt, info, svcName, rowLabel };

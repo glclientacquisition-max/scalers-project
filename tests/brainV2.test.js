@@ -122,8 +122,8 @@ test('catalogue: schemas reject extra properties and foreign row ids; Gemini req
 test('Swahili/Sheng questions get fact answers from tenant data, not a generic reply', async () => {
   const one = async (t) => (await talk([t])).out[0];
   let r = await one('Nilikuwa nataka kujua ni services gani mnaofa.');
-  assert.equal(r.lang, 'sw'); assert.match(r.line, /^Tunafanya .*Mattress cleaning/);
-  r = await one('Nilikuwa nataka kujua ni saizi gani mnatoa.'); assert.match(r.line, /Bedroom/);
+  assert.equal(r.lang, 'sw'); assert.match(r.line, /^Tunafanya usafi wa magodoro/);
+  r = await one('Nilikuwa nataka kujua ni saizi gani mnatoa.'); assert.match(r.line, /^Usafi wa nyumba ni kulingana na ukubwa, vyumba vya kulala kimoja, viwili au vitatu\./);
   r = await one('Mnawashanga carpet?'); assert.match(r.line, /^Ndio, tunafanya Carpet Cleaning, bei ni kuanzia KSh 2,200/);
   r = await one('Niaje, mnafika Syokimau?'); assert.match(r.line, /^Syokimau iko kwenye orodha/);
   r = await one('Mnafika Kisumu?'); assert.match(r.line, /^Kisumu haiko kwenye orodha/);
