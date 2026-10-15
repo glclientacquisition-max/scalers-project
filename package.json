@@ -68,7 +68,10 @@
     "release:candidate": "bash scripts/release-candidate.sh",
     "tunnel": "node scripts/tunnel.js",
     "tunnel:localtunnel": "node scripts/tunnel.js",
-    "tunnel:cloudflared": "bash scripts/tunnel-cloudflared.sh"
+    "tunnel:cloudflared": "bash scripts/tunnel-cloudflared.sh",
+    "docs:reference": "node scripts/docs/gen-reference.js",
+    "docs:reference:check": "node scripts/docs/gen-reference.js --check",
+    "docs:check": "node scripts/docs/check-docs.js"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
