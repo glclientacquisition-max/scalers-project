@@ -34,6 +34,18 @@ function shadowLegacy(line, { legacy, profile, language, state, callerText }) {
 }
 
 async function planV2CatalogueMouth(legacy, { text, profile, language, state, env = process.env, log = () => {}, model, topicLocked = false } = {}) {
+  // BRAIN_V2_TOPIC_PROPOSALS: proposals only (Voice's TurnArbiter decides); the legacy plan is returned untouched.
+  if (require('./v2/topic').enabled(env)) {
+    try {
+      const r = await require('./v2/proposals').proposeTurn({ text, profile, language, state: state || {}, model: model === undefined ? defaultModel(env) : model, legacyLine: legacy?.line || null, nameJustConfirmed: state?.caller?.nameJustConfirmed ?? null });
+      log(`v2_topic ${JSON.stringify({ ...r.trace, kinds: r.proposals.map((p) => p.kind), legacyOk: r.legacyCheck ? r.legacyCheck.ok : null })}`);
+      const T = require('./v2/topic'); const docVersion = profile?.spokenCataloguePin?.version ?? null;
+      return { ...(legacy || {}), v2Proposals: r.proposals.map((p) => T.toArbiter(p, { docVersion })).filter(Boolean), v2Raw: r.proposals, v2LegacyCheck: r.legacyCheck };
+    } catch (e) {
+      log(`v2_topic error, legacy kept: ${String(e?.message || e).slice(0, 80)}`);
+      return legacy;
+    }
+  }
   if (!step.catalogueStepEnabled(env)) return legacy;
   try {
     const heard = step.looksCatalogue(text, profile, state || {});

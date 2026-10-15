@@ -3521,7 +3521,7 @@ mediaWss.on('connection', (ws, req) => {
             callerName: brainState?.caller?.name || '',
             catalogueListed: brainState?.conversation?.catalogueListed === true,
             lock: turnArbiter.lock(),
-          })
+          }).concat(catalogueMouth.v2Proposals || []) // BRAIN_V2_TOPIC_PROPOSALS: v2 submits to the arbiter
         : [];
       const arbiterClaims = arbiterProposals.length > 0;
       const packetsBeforeFacts = packetRows();
