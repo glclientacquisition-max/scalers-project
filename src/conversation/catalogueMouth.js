@@ -84,16 +84,6 @@ function formatCatalogueMouthForPrompt(state) {
   if (!freshCatalogueAsk(latest)) return '';
   const items = itemsFrom({}, state);
   if (!items.length) return '';
-  if (/^(1|true|on|yes)$/i.test(String(process.env.BRAIN_PLAIN_SERVICE_CATEGORIES || ''))) {
-    const sw = /^(sw|sheng)$/i.test(String(state?.language?.current || ''));
-    return [
-      'Services asked this turn. Do not speak a heading.',
-      `catalogue: ${JSON.stringify(items)}`,
-      `Name them as plain categories in ${sw ? 'Kiswahili' : 'English'}, one short sentence, then ask which one. Do not read these raw names.`,
-      sw ? 'Example: Tunafanya usafi wa magodoro, sofa na mazulia, usafi wa nyumba kulingana na ukubwa, usafi wa kina, na maofisi. Ungependa ipi?' : 'Example: We do mattresses, sofas and carpets, house cleaning by size, deep cleaning, and offices. Which would you like?',
-      'Do not ask for their name in this turn.',
-    ].join('\n');
-  }
   const wrap = wrapperFor(state?.language?.current);
   const cap =
     items.length > 4
@@ -370,31 +360,7 @@ function unsaidPublicCatalogue(callerText, state, profile, language) {
   return line;
 }
 
-/** VOICE_MOUTH_LOCK (default off): language-locked, slot-aware name-yes rewrite. */
-function mouthLockEnabled(env = process.env) {
-  return /^(1|true|on|yes)$/i.test(String(env.VOICE_MOUTH_LOCK || '').trim());
-}
-const SW_MOUTH =
-  /\b(sawa|tuna|tuje|wapi|kesho|leo|saa|ni|na|kwa|ya|wa|unahitaji|ungependa|huduma|usafi|eneo|gani|asante|karibu|nime\w+|tuta\w+)\b/gi;
-/** The model's own language wins over a one-word turn ("Alvin." detected en). */
-function lockedLanguage(text, language) {
-  const words = String(text || '').split(/\s+/).filter(Boolean).length;
-  const sw = (String(text || '').match(SW_MOUTH) || []).length;
-  if (words && sw >= 2 && sw / words >= 0.25) return 'sw';
-  return language;
-}
-function serviceSlotFilled(state) {
-  const e = state?.entities?.service;
-  return Boolean(e && (typeof e === 'object' ? String(e.value || '').trim() : String(e).trim()));
-}
-/** A "Sawa Alvin, tuna X kesho saa 8" readback names one service: not a list. */
-function readbackNotList(part, items) {
-  return countItems(part, items) <= 1 && (String(part).match(/,/g) || []).length <= 1 && !/\bCATALOGUE\s+MOUTH\b/i.test(part);
-}
-
 function speechAfterNameYes(text, items, language, opts = {}) {
-  const lock = mouthLockEnabled();
-  if (lock) language = lockedLanguage(text, language);
   const fileLine = unsaidPublicCatalogue(
     opts.callerText,
     opts.state,
@@ -409,12 +375,9 @@ function speechAfterNameYes(text, items, language, opts = {}) {
   ) {
     return fileLine;
   }
-  const shaped = (part) => catalogueShaped(part, items) && !(lock && readbackNotList(part, items));
-  const kept = splitSentences(text).filter((part) => !shaped(part) && !isRelistSentence(part, items));
+  const kept = splitSentences(text).filter((part) => !catalogueShaped(part, items) && !isRelistSentence(part, items));
   const joined = groundCatalogueSpeech(stripControlLabel(kept.join(' ')), items, { listTurn: false });
-  if (!joined || countItems(joined, items) >= 3 || shaped(joined)) {
-    // Never re-ask a slot the caller already gave (HD_cc0481620c50 T5).
-    if (lock && !fileLine && serviceSlotFilled(opts.state)) return joined && countItems(joined, items) < 3 ? joined : '';
+  if (!joined || countItems(joined, items) >= 3 || catalogueShaped(joined, items)) {
     return fileLine || whichServiceLine(language);
   }
   return joined;
@@ -449,12 +412,6 @@ function failedCatalogueAttempt(original) {
  * Final mouth for a catalogue, detail, or name-yes turn.
  * Gemini text that already uses exact names is kept. Invented names are removed.
  */
-function plainCategories() {
-  return /^(1|true|on|yes)$/i.test(String(process.env.BRAIN_PLAIN_SERVICE_CATEGORIES || '').trim());
-}
-const EXPLAIN_ASK_RE = /\b(what do you mean by|what('?s| is| does) .{1,30} mean|don'?t understand what you('?re| are) saying|maana ya|inamaanisha nini|sielewi|sijaelewa)\b/i;
-const BOOKING_PUSH_RE = /\b(would you like to book|do you want to book|shall i book|ungependa (ku-?)?book|tukuwekee|nikuwekee)\b/i;
-const PRICE_TAIL_RE = /,?\s*(for|at|kwa)\s+(ksh\.?\s*)?[\d,]+(\s*(shillings|bob))?\.?$|,?\s*(for|kwa)\s+[a-z ]+ (thousand|elfu)[a-z ]*shillings\.?$/i;
 function shapeCatalogueMouth(text, opts = {}) {
   const state = opts.state;
   const callerText = String(opts.callerText || '');
@@ -471,15 +428,6 @@ function shapeCatalogueMouth(text, opts = {}) {
       state,
       profile,
     });
-  }
-  if (plainCategories()) {
-    // BRAIN_PLAIN_SERVICE_CATEGORIES: a "what does X mean" turn keeps a plain explanation and loses any price or booking push
-    if (EXPLAIN_ASK_RE.test(callerText)) {
-      const kept = splitSentences(raw).filter((x) => !BOOKING_PUSH_RE.test(x)).map((x) => x.replace(PRICE_TAIL_RE, '.'));
-      if (kept.length) return kept.join(' ');
-    }
-    // a plain-category list names no raw catalogue item, so the exact-name guard must not swap it for the file list
-    if (freshCatalogueAsk(callerText) && raw) { markCatalogueSpoken(state); return raw; }
   }
   if (looksLikeServiceDetailAsk(callerText) || detailAboutNamedService(callerText, profile)) {
     return speechForServiceDetails(raw, callerText, profile, language, items);
@@ -505,7 +453,6 @@ function shapeCatalogueMouth(text, opts = {}) {
 
 module.exports = {
   geminiCatalogueEnabled,
-  plainCategories,
   catalogueItemNames,
   formatCatalogueMouthForPrompt,
   groundCatalogueSpeech,
@@ -513,9 +460,6 @@ module.exports = {
   fileServicePriceLine,
   shapeCatalogueMouth,
   whichServiceLine,
-  mouthLockEnabled,
-  lockedLanguage,
-  speechAfterNameYes,
   freshCatalogueAsk,
   stripControlLabel,
 };

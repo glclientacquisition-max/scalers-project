@@ -274,11 +274,13 @@
   caret-color: var(--ink);
 }
 
-/* Shell is position:fixed. Do not scroll the light canvas out from under it. */
-html:has(.desk-theme),
-html:has(.desk-theme) body,
-html:has([data-admin-shell]),
-html:has([data-admin-shell]) body {
+/* Shell is position:fixed. Do not scroll the light canvas out from under it.
+   cacheComponents keeps the previous route mounted under `display: none !important`,
+   so a hidden shell must not lock pages like /onboarding after a client navigation. */
+html:has(.desk-theme:not([style*="display: none"], [style*="display: none"] *)),
+html:has(.desk-theme:not([style*="display: none"], [style*="display: none"] *)) body,
+html:has([data-admin-shell]:not([style*="display: none"], [style*="display: none"] *)),
+html:has([data-admin-shell]:not([style*="display: none"], [style*="display: none"] *)) body {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;

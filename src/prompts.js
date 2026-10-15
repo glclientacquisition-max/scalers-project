@@ -33,21 +33,6 @@ const DEFAULT_KNOWLEDGE = `No tenant-specific business knowledge is configured.
 Do not answer business-specific questions from model memory.
 Say the information is unavailable and offer only actions explicitly allowed by AUTHORITY / ACTION POLICY.`;
 
-// BRAIN_PLAIN_SERVICE_CATEGORIES (default off), HD_89aa48bf657f: list services as plain
-// categories in the caller's language, explain a term without a booking push, and do not
-// ask for the name before a service is chosen.
-function plainServiceCategoriesEnabled() {
-  return /^(1|true|on|yes)$/i.test(String(process.env.BRAIN_PLAIN_SERVICE_CATEGORIES || ''));
-}
-const PLAIN_CATEGORY_RULES = `- If they ask what you offer, which services, or what you do, name the plain categories from the catalogue in the caller's language, in one short sentence, then ask which one. Example English: mattresses, sofas and carpets, house cleaning by size, deep cleaning, and offices. Example Kiswahili: usafi wa magodoro, sofa na mazulia, usafi wa nyumba kulingana na ukubwa, usafi wa kina, na maofisi. Do not read raw catalogue names like 1-Bedroom, move-in move-out, or post-construction.
-- If they ask what a term means (what is 1-Bedroom, sielewi, maana ya), give one short plain explanation in their language. No price, no "would you like to book", no question that pushes a booking.
-- Do not ask for their name until they have chosen a service. One question per turn.
-- Reply in the language of the caller's latest clear turn. If they switch to English, answer in English.`;
-const CATALOGUE_RULES_RE = /- If they ask what you offer[^\n]*\n- If this turn gives exact service names[^\n]*\n/;
-function conversationRules() {
-  return plainServiceCategoriesEnabled() ? CONVERSATION_RULES.replace(CATALOGUE_RULES_RE, `${PLAIN_CATEGORY_RULES}\n`) : CONVERSATION_RULES;
-}
-
 const CONVERSATION_RULES = `Conversation rules (live phone — be conclusive and intelligent):
 - Your job is FULL ASSISTANCE: identify what they need, resolve it from live ground truth when you can, confirm the outcome, then goodbye. Do not default to "someone will call you back" when you already have the answer.
 - Answer the caller's actual question first with a clear, complete reply — do not stall with holding lines like "let me check" / "one moment" / "sawa nakucheckia".
@@ -276,7 +261,7 @@ ${liveBlock}
 ${playbookBlock}
 ${String(profile.llmSystemPrompt).trim()}
 
-${conversationRules()}
+${CONVERSATION_RULES}
 
 ${languagePolicy}
 
@@ -320,7 +305,7 @@ Your job on this call:
 4. Collect name/reason only when required for that action. Confirm unclear names once.
 5. Never claim an action succeeded until the backend confirmation is spoken.
 
-${conversationRules()}
+${CONVERSATION_RULES}
 
 ${languagePolicy}
 
@@ -355,8 +340,6 @@ module.exports = {
   buildContextHeader,
   DEFAULT_KNOWLEDGE,
   CONVERSATION_RULES,
-  conversationRules,
-  plainServiceCategoriesEnabled,
   VOICE_SYSTEM_PROMPT_ID,
   VOICE_SYSTEM_PROMPT_VERSION,
 };

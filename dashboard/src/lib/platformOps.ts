@@ -25,7 +25,7 @@ import {
   deriveSpeechHealth,
   type PhoneLineTelecomInput,
 } from "@/lib/platformRunBoardModel";
-import { fetchVoiceAdminHealth } from "@/lib/platformVoiceHealth";
+import { fetchVoiceHealthz } from "@/lib/platformVoiceHealth";
 import { getSautikitWallet, isSautikitConfigured, listSautikitNumbers } from "@/lib/sautikit";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/adminGuard";
@@ -257,7 +257,7 @@ async function gatherPlatformSignals() {
     listDidPool().catch(() => []),
     listPendingTenants().catch(() => []),
     countExpiredBeta().catch(() => 0),
-    fetchVoiceAdminHealth("prod"),
+    fetchVoiceHealthz(),
     loadPhoneLine(),
   ]);
 
@@ -277,7 +277,7 @@ async function gatherPlatformSignals() {
   return { settings, persisted, signals, strip: deriveStatusStrip(signals), voice };
 }
 
-function snapshotInfra(voice: Awaited<ReturnType<typeof fetchVoiceAdminHealth>>) {
+function snapshotInfra(voice: Awaited<ReturnType<typeof fetchVoiceHealthz>>) {
   return infraFromEnv({
     voiceReachable: voice.status === "ok" ? true : voice.status === "unreachable" ? false : null,
     supabaseUrl: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",

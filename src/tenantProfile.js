@@ -59,6 +59,8 @@ function tenantProfileFromRow(row, extras = {}) {
     openAppointments: Array.isArray(extras.openAppointments) ? extras.openAppointments : [],
     fieldMeta: extras.fieldMeta || null,
     holdGate: extras.holdGate || null,
+    // VOICE_V2_CATALOGUE only: stored speech-ready KB (null until Platform's column exists / backfill runs).
+    ...(/^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || '')) ? { spokenCatalogue: row.spoken_catalogue || null } : {}),
   };
 }
 

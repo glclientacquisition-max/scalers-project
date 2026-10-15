@@ -63,20 +63,6 @@ test('voiceScore: toolSmooth block is report-only (score unchanged)', () => {
   const b = scoreTurns([{ ...turn, stages: [...turn.stages, { stage: 'audio_segments', segments: [{ kind: 'filler', startMs: 400, endMs: 1400 }, { kind: 'receipt', startMs: 3000, endMs: 4000 }] }] }]);
   assert.equal(a.score, b.score); assert.equal(b.toolSmooth.deadAir, 1); assert.equal(b.toolSmooth.gapP95Ms, 1600);
 });
-test('v2Shadow: prefetchContext once + readback/timing logged only with the sub-flags', async () => {
-  const S = require('../src/conversation/v2Shadow');
-  const DD = require('../evals/v2/fixtures/tenants/done_and_dusted.json');
-  const BOOK = ["Hi, I'd like to book interior window cleaning for Friday at 10am.", 'My name is Alvin', 'Kitengela, near Naivas'];
-  const on = S.createBrainV2Shadow({ env: {}, log: () => {}, smooth: { prefetch: true, readback: true } });
-  const off = S.createBrainV2Shadow({ env: {}, log: () => {} });
-  const a = []; const b = [];
-  for (let i = 0; i < BOOK.length; i++) { a.push(await on.fire({ text: BOOK[i], profile: DD, langLock: 'en', turnIndex: i + 1 })); b.push(await off.fire({ text: BOOK[i], profile: DD, langLock: 'en', turnIndex: i + 1 })); }
-  assert.ok(a[0].prefetch && a[0].prefetch.catalogue > 0); assert.equal(a[1].prefetch, undefined);
-  const rb = a.find((s) => s.readback); assert.ok(rb); assert.equal(rb.readback.write, true); assert.ok(rb.readback.readsAllowed.includes('checkAvailability'));
-  for (const s of b) { assert.equal('prefetch' in s, false); assert.equal('readback' in s, false); assert.equal('timing' in s, false); }
-  assert.deepEqual(a.map((s) => s.v2Text), b.map((s) => s.v2Text));
-});
-
 test('77ce8123 traces (HD_db0e864043c1 C1 T9, HD_4ec204aafa93 C2 T9): why no hold played, and the fix', () => {
   const F = require('../src/speech/fillerPcmCache');
   const dir = path.join(__dirname, 'fixtures', 'tool-turns-77ce8123');

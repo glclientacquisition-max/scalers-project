@@ -48,12 +48,20 @@ YES / NO
 
 <!-- YES / NO — link docs if yes -->
 
+## STATUS updated?
+
+YES / NO (no live change)
+
+<!-- Every merge to main updates docs/STATUS.md in the same PR (CONTRIBUTING.md#status-rule). -->
+
 ## Checklist
 
 - [ ] Tests pass
 - [ ] No secrets introduced
 - [ ] No unrelated changes
 - [ ] Documentation updated where appropriate
+- [ ] `docs/STATUS.md` updated (section 2 on every merge to `main`)
+- [ ] Touched docs have `owner` + `last_reviewed` frontmatter
 - [ ] Database changes are traceable
 - [ ] AI/voice changes identified
 - [ ] Git diff reviewed
