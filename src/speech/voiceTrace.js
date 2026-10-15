@@ -226,6 +226,7 @@ function noopTrace() {
     noteBrainLines: noop,
     noteCall: noop,
     noteBrainV2Shadow: noop,
+    noteAudioSegments: noop,
     currentTurnIndex: noop,
     commitTurn: noop,
     finishCall: async () => null,
@@ -426,6 +427,16 @@ function createVoiceTrace(opts = {}) {
       name: String(info.name || ''),
       status: info.status || null,
       args: redactText(info.args || ''),
+    });
+  }
+
+  // VOICE_TOOL_SMOOTH_TRACE: heard audio spans for this turn (ms from turn start).
+  function noteAudioSegments(info = {}) {
+    pushStage({
+      stage: 'audio_segments',
+      segments: (info.segments || []).slice(0, 40).map((s) => ({ kind: String(s.kind || ''), startMs: Math.round(s.startMs), endMs: Math.round(s.endMs) })),
+      holdsQueued: Number(info.holdsQueued) || 0,
+      receiptCached: !!info.receiptCached,
     });
   }
 
@@ -659,6 +670,7 @@ function createVoiceTrace(opts = {}) {
     noteBrainLines: guard(noteBrainLines),
     noteCall: guard(noteCall),
     noteBrainV2Shadow: guard(noteBrainV2Shadow),
+    noteAudioSegments: guard(noteAudioSegments),
     currentTurnIndex: guard(currentTurnIndex),
     commitTurn: guard(commitTurn),
     finishCall: async () => {
