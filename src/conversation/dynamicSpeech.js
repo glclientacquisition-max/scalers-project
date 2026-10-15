@@ -193,7 +193,11 @@ End with this exact close: ${helpClose} (or the closed/message name-ask from the
 /**
  * Optional tiny ack while Gemini thinks.
  */
-function pickContextualAck(userText, lang) {
+function pickContextualAck(userText, lang, ctx = {}) {
+  // VOICE_ACK_RULE: after an ack-led turn or the caller's own sawa, a non-word "Mm.".
+  if (ctx.ackRule && (ctx.prevAckLed || /^\s*(?:sawa(?:\s+sawa)?|ni\s+sawa|okay|ok|haya|poa)[.!,\s]*$/i.test(String(userText || '')))) {
+    return 'Mm.';
+  }
   const t = String(userText || '').toLowerCase();
   const asked = /\?|nani|gani|how|what|when|where|can you|unaweza|nataka|need|want/.test(t);
   const spoken = confirmationLanguage(lang);
@@ -373,12 +377,25 @@ function trimSpokenServiceDump(text, opts = {}) {
     return raw;
   }
   if (!looksLikeSpokenServiceDump(raw)) return raw;
-  const lang = confirmationLanguage(opts.language);
+  const G = require('./answerGrounding');
+  const structural = G.noAnswerDeleteEnabled();
+  if (structural) {
+    // A grounded list answers any phrasing of the question: never delete it.
+    const g = G.serviceListGrounding(raw, { profile: opts.profile, state: opts.state });
+    if (g.grounded) return raw;
+  }
+  const lang = structural
+    ? confirmationLanguage(G.replyLanguage(raw, opts.language))
+    : confirmationLanguage(opts.language);
   const line =
     lang === 'sw' || lang === 'sheng'
       ? 'Tunaweza kusaidia. Unahitaji huduma gani?'
       : 'We can help with that. What do you need done?';
   logSpokenFilterDrop('service_dump', raw);
+  if (structural) {
+    const mem = G.turnMemory(opts.state, opts.callerTurns);
+    if (mem) mem.listDeleted = true;
+  }
   return line;
 }
 
@@ -387,9 +404,44 @@ const HEDGE_OPENER =
 const HEDGE_PHRASE =
   /\b(let me check|one moment please|take your time|sawa nakucheckia|nakucheckia)\b/gi;
 
+const LEAD_CONJ = /^(?:or|and|but|so|then|na|au|ama|lakini|halafu)\b[,]?\s*/i;
+
+/**
+ * VOICE_NO_ANSWER_DELETE: hedges go per sentence. A hedge clause is removed with
+ * its comma, a conjunction left at the head is dropped, and the remainder is
+ * re-capitalised. Never a fragment like "or let me know..." (HD_89aa48bf657f T7).
+ */
+function stripHedgesBySentence(text, opts = {}) {
+  const out = [];
+  for (const sentence of String(text || '').split(/(?<=[.!?])\s+/)) {
+    let t = sentence.trim();
+    if (!t) continue;
+    // The hedge takes its object ("that for you"), its commas, and a conjunction
+    // right after it; whatever was before it keeps a comma join.
+    const hedge = new RegExp(
+      `([,;]?\\s*)\\b(?:${HEDGE_PHRASE.source.replace(/^\\b\(|\)\\b$/g, '')}|one moment|just a (?:sec|second|minute)|hold on)\\b(?:\\s+(?:that|this|it))?(?:\\s+for you)?(?:\\s+please)?\\s*[,;]?\\s*(?:(?:and|or|but|so|na|au|ama)\\b\\s*)?`,
+      'gi'
+    );
+    t = t.replace(hedge, (m, lead, off) => (off > 0 ? ', ' : ''));
+    t = t.replace(HEDGE_OPENER, '');
+    t = t.replace(/\s+/g, ' ').replace(/\s+([,.!?;])/g, '$1').replace(/,\s*([.!?])/g, '$1').replace(/,\s*,/g, ',');
+    t = t.replace(/^[,.;:\s]+/, '').trim();
+    let prev;
+    do { prev = t; t = t.replace(LEAD_CONJ, '').trim(); } while (t !== prev);
+    if (!t || /^[.!?]+$/.test(t)) continue;
+    // "Okay, one moment." loses the hedge: the bare "Okay" left behind goes too.
+    if (t !== sentence.trim() && /^(?:okay|ok|alright|sawa|poa)[,.!]?$/i.test(t)) continue;
+    out.push(t.charAt(0).toUpperCase() + t.slice(1));
+  }
+  const joined = out.join(' ').trim();
+  if (!joined) return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
+  return joined;
+}
+
 function stripSpokenHedges(text, opts = {}) {
   let raw = String(text || '').trim();
   if (!raw) return raw;
+  if (require('./answerGrounding').noAnswerDeleteEnabled()) return stripHedgesBySentence(raw, opts);
   raw = raw.replace(HEDGE_OPENER, '');
   raw = raw.replace(HEDGE_PHRASE, '');
   raw = raw.replace(/\s+/g, ' ').replace(/^[,.]+\s*/, '').trim();
@@ -418,6 +470,10 @@ function stripPrematureOutcomeClaims(text, opts = {}) {
  * speech guard runs too: no new numbers, no saved claim without a tool result,
  * no coverage flip, no transfer claim. See speechGuard.js.
  */
+function splitSpokenSentences(text) {
+  return String(text || '').split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+}
+
 function polishSpokenDetail(text, opts = {}) {
   const dropReasons = [];
   let spoken = stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true });
@@ -458,6 +514,11 @@ function polishSpokenDetail(text, opts = {}) {
       ...opts,
       callerText,
     });
+  }
+  if (opts.streamChunk && require('./answerGrounding').noAnswerDeleteEnabled()) {
+    // Streamed chunks of one turn share memory; a whole-reply re-polish does not.
+    const G = require('./answerGrounding');
+    out = G.applyTurnContext(out, G.turnMemory(opts.state, opts.callerTurns), splitSpokenSentences);
   }
   const before = String(text || '').trim();
   const after = String(out || '').trim();

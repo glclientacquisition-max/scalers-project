@@ -1,6 +1,7 @@
 "use server";
 
 import { bustTenantCache } from "@/lib/tenantCache";
+import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
 import { PRODUCT_ID_PREFIX, parseBaseline, settleCatalogPrices } from "@/lib/catalogPricing";
 import { readCatalogFresh } from "@/lib/catalogFresh";
 import { normalizePhone } from "@/lib/setupFlow";
@@ -524,6 +525,7 @@ export async function saveAndCompileSettings(
   if (error) {
     return ownerSaveFailed("settings.save", error.message);
   }
+  requestSpokenCatalogueCompile(tenant.id, patch);
 
   const socialChannels = socialHandles?.channels;
   const hasSocialHandles =
