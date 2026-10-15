@@ -68,6 +68,10 @@ Coordinate other lanes; prefer additive migrations.
 Task: <one concrete platform / schema / auth / deploy change>
 ```
 
+## Related
+
+Internal critic (eval, not product PRs): [`PLATFORM_TESTER.md`](./PLATFORM_TESTER.md). Grok Bot paste: [`GROK_BOT.md`](./GROK_BOT.md).
+
 ## Good first tickets
 
 - ~~Documented apply-order index for all `docs/supabase/*.sql`~~ → [`docs/supabase/README.md`](../supabase/README.md)

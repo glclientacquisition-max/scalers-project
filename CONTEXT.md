@@ -62,3 +62,7 @@ _Avoid_: full-repo rewrite, mega-thread
 **Eval**:
 A scored Brain fixture (Evalite / `npm run eval:brain`). Complements deterministic `npm run test:brain`. Does not train Gemini.
 _Avoid_: fine-tune, RLHF
+
+**Platform tester**:
+Internal critic that scores a named surface against WhatsApp / Telegram / Instagram as tools. Chosen runtime is Grok Bot (`docs/agents/GROK_BOT.md`). Scorecard in `docs/agents/PLATFORM_TESTER_SCORECARD.md`. Hands ranked fixes to the owning lane. Not a customer-facing bot. Not a second inbox.
+_Avoid_: grok.com chat, xAI API bot, Discord bot, Telegram bot, pentest kit, design-system rewrite
