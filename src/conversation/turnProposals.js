@@ -4,7 +4,7 @@
 // turns are claimed; every other turn returns [] and the existing path runs.
 // Legacy and Brain catalogue lines may propose but never emit their own
 // words while a pinned spoken catalogue exists: they are re-rendered from it.
-const { isBackchannel } = require('../speech/turnArbiter');
+const { isBackchannel, isHello } = require('../speech/turnArbiter');
 
 const lang2 = (l) => (/^(sw|sheng)/i.test(String(l || '')) ? 'sw' : 'en');
 const openQuestionOf = (line, lang) => {
@@ -21,15 +21,15 @@ function categoryLine(doc, lang) {
   return require('./v2/receipts').info({ kind: 'service_categories', labels }, L);
 }
 
-function closerAfterNameYes({ name, lock, lang }) {
-  const L = lang2(lock?.lang || lang);
-  const who = String(name || '').trim().split(/\s+/)[0];
-  const oq = lock?.openQuestion || openQuestionOf('', L);
-  if (L === 'sw') return `Asante${who ? `, ${who}` : ''}. ${oq}`;
-  return `Thank you${who ? `, ${who}` : ''}. ${oq}`;
+// Brain review: current turn's language; a confirmed name only (never the first ASR token).
+function closerAfterNameYes({ name, nameConfirmed = false, lang }) {
+  const L = lang2(lang);
+  const who = nameConfirmed ? String(name || '').trim() : '';
+  if (L === 'sw') return `Asante${who ? `, ${who}` : ''}. Kati ya huduma nilizotaja, ungependa ipi?`;
+  return `Thanks${who ? `, ${who}` : ''}. Which of those would you like?`;
 }
 
-function buildTurnProposals({ text, lang, doc, docVersion = null, localReply = null, legacyMouth = null, v2Mouth = null, groundedPrice = '', nameJustConfirmed = false, callerName = '', catalogueListed = false, lock = null } = {}) {
+function buildTurnProposals({ text, lang, doc, docVersion = null, localReply = null, legacyMouth = null, v2Mouth = null, groundedPrice = '', nameJustConfirmed = false, callerName = '', callerNameConfirmed = false, catalogueListed = false, lock = null } = {}) {
   const L = lang2(lang);
   const out = [];
   const locked = lock && lock.topic === 'catalogue';
@@ -49,28 +49,20 @@ function buildTurnProposals({ text, lang, doc, docVersion = null, localReply = n
   if (localReply?.outcome === 'catalogue') asCatalogue('local_catalogue', localReply.line);
   if (groundedPrice) out.push({ source: 'grounded_price', topic: 'price', line: groundedPrice });
   if (localReply && ['price', 'service_facts', 'service_fact'].includes(localReply.outcome) && localReply.line) out.push({ source: 'service_facts', topic: 'price', line: localReply.line });
-  // Inside the catalogue lock, a follow-up v2 did not read but that names a
-  // pinned-doc service is answered from the doc (never left to live Gemini).
-  if (locked && !out.length && doc && !isBackchannel(text) && !nameJustConfirmed) {
-    const SC = require('../knowledge/spokenCatalogue');
-    const R = require('./v2/receipts');
-    const e = SC.findEntry(text, doc);
-    if (e) {
-      const cat = doc.categories.find((c) => c.id === e.category?.id);
-      const sizes = cat && cat.id === 'house' ? cat.entryIds.map((id) => (doc.entries.find((x) => x.id === id)?.raw?.name.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean) : [];
-      const line = sizes.length > 1 ? R.info({ kind: 'house_sizes', sizes }, L) : e.explain?.[L] ? `${e.explain[L]} ${lock.openQuestion || openQuestionOf('', L)}` : '';
-      if (line) out.push({ source: 'v2_catalogue', topic: 'catalogue', line, facts: { docVersion, entry: e.id, renderedFrom: 'locked_followup' } });
-    }
-  }
   // Name-yes hands back to the open question: one closer, list kept as is
   // (a fact the caller is still owed wins instead).
   if (nameJustConfirmed && locked && catalogueListed && !out.some((p) => p.topic === 'price')) {
     out.length = 0;
-    out.push({ source: 'name_yes_closer', topic: 'catalogue', line: closerAfterNameYes({ name: callerName, lock, lang: L }) });
+    out.push({ source: 'name_yes_closer', topic: 'catalogue', line: closerAfterNameYes({ name: callerName, nameConfirmed: callerNameConfirmed, lang: L }) });
   }
   // A backchannel / barge fragment inside a locked catalogue topic keeps the
   // topic: re-ask the open question instead of letting Gemini re-list.
-  if (locked && !nameJustConfirmed && isBackchannel(text) && !out.length) out.push({ source: 'topic_hold', topic: 'catalogue', line: lock.openQuestion || openQuestionOf('', L) });
+  if (locked && !nameJustConfirmed && !out.length) {
+    // "Hello?" inside the topic replays the last line; a backchannel re-asks the open question.
+    const last = Array.isArray(lock.lines) && lock.lines.length ? lock.lines[lock.lines.length - 1] : '';
+    if (isHello(text) && last) out.push({ source: 'topic_hold', topic: 'catalogue', line: last, facts: { replay: true } });
+    else if (isBackchannel(text, lock)) out.push({ source: 'topic_hold', topic: 'catalogue', line: lock.lang === L && lock.openQuestion ? lock.openQuestion : openQuestionOf('', L) });
+  }
   return out;
 }
 

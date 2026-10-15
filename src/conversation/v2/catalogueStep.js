@@ -29,11 +29,10 @@ function validateCommand(cmd, sc) {
 }
 function buildCommandRequest({ text, sc, lang }) {
   const menu = sc.entries.map((e) => ({ service_id: e.id, name: e.raw.name }));
-  const strip = (o) => JSON.parse(JSON.stringify(o, (k, v) => (k === 'additionalProperties' ? undefined : v)));
   return {
     systemInstruction: { parts: [{ text: `Classify the caller's latest turn about this business's services. Output only the JSON command, never a reply. list_services = asks what services exist; explain_service = asks what one service means/includes; price_service = asks the price of one service; other = anything else (booking, hours, areas, greetings). Call language: ${lang}.\nServices: ${JSON.stringify(menu)}` }] },
     contents: [{ role: 'user', parts: [{ text: String(text || '') }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 64, responseMimeType: 'application/json', responseSchema: strip(commandSchema(sc)) },
+    generationConfig: { temperature: 0, maxOutputTokens: 64, responseMimeType: 'application/json', responseJsonSchema: commandSchema(sc) }, // JSON Schema (lowercase types) goes in responseJsonSchema, as #702
   };
 }
 function parseCommandResponse(resp) {

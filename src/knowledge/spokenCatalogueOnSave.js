@@ -14,6 +14,7 @@
 // Go-live (Alvin): every successful compile goes live (tenants.spoken_catalogue +
 // live_version); the version row stays 'draft' until an owner approves it.
 const { compileSpokenCatalogue, needsRegeneration } = require('./spokenCatalogue');
+const { errorCode } = require('./spokenCatalogueGenerate');
 
 const ON = /^(1|true|on|yes)$/i;
 const enabled = (env = process.env) => ON.test(String(env.SPOKEN_CATALOGUE_ON_SAVE || '').trim());
@@ -27,10 +28,11 @@ function withTimeout(generate, ms) {
   if (typeof generate !== 'function') return null;
   return (args) => new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('timeout')), ms);
-    Promise.resolve().then(() => generate(args)).then((v) => { clearTimeout(t); resolve(v); }, () => { clearTimeout(t); reject(new Error('generate_failed')); });
+    Promise.resolve().then(() => generate(args)).then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(new Error(errorCode(e) || 'generate_failed')); });
   });
 }
-const aiCode = (e) => (e == null ? null : /^timeout$/.test(String(e)) ? 'timeout' : 'generate_failed');
+// compile_error is a short class code only (<=200 chars): http_<status> | timeout | bad_json | schema_invalid | no_key | network | generate_failed
+const aiCode = (e) => (e == null ? null : String(errorCode(typeof e === 'string' ? new Error(e) : e)).slice(0, 40));
 
 const optionalCols = new Map(); // memo per process: column -> exists
 async function hasColumn(db, table, col) {

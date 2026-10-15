@@ -25,7 +25,14 @@ const PRIORITY = {
   gemini: 10,
 };
 const LOCK_TTL = 3;
-const BACKCHANNEL = /^(karibu|yeah|yes|yeah yeah|ok(ay)?|sawa( sawa)?|ndio|ndiyo|eeh?|mm+|hmm+|aha|uh+|um+|right|sure|asante|thanks?( you)?|poa|fine|hello|halo|niulize|go on|endelea)[.!?, ]*$/i;
+// Backchannels / barge fragments that keep the topic. Not thank-you: a thank-you closes the call (HD_89 rule).
+const BC_TOKENS = 'karibu|yeah|ok(?:ay)?|sawa basi|sawa|eeh?|ehe|mm+|hmm+|mhm|m-hm|aha|uh+|um+|oh|ah|i see|poa|fine|naam|haya|nakusikia|nimekusikia|nisikize|niulize|go on|endelea';
+const BACKCHANNEL = new RegExp(`^\\W*(?:(?:${BC_TOKENS})[\\s.,!?]*){1,3}$`, 'i');
+// Yes-words are a backchannel only when the open question is not a yes/no question.
+const YES_TOKENS = 'yes|yeah yes|ndio|ndiyo|sure|right';
+const YES_ONLY = new RegExp(`^\\W*(?:(?:${YES_TOKENS}|${BC_TOKENS})[\\s.,!?]*){1,3}$`, 'i');
+const HELLO = /^\W*(?:(?:hello|halo|hallo|haloo)[\s.,!?]*){1,3}$/i;
+const YES_NO_Q = /^(je,?\s+)?(is|are|do|does|did|can|could|would|will|shall|should|am|have|has|unataka|ungependa\s+ni|naongea|uko|una|ni\s+wewe)\b|\b(or not|au la|sivyo)\b/i;
 
 function turnArbiterEnabled(env = process.env) {
   return /^(1|true|on|yes)$/i.test(String(env.VOICE_TURN_ARBITER || ''));
@@ -34,10 +41,14 @@ const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
 const words = (s) => norm(s).toLowerCase().replace(/[^\p{L}\p{N} ]/gu, ' ').split(/\s+/).filter(Boolean);
 function deepFreeze(o) { if (o && typeof o === 'object' && !Object.isFrozen(o)) { Object.freeze(o); for (const v of Object.values(o)) deepFreeze(v); } return o; }
 
-function isBackchannel(text) {
+function isYesNoQuestion(q) { return YES_NO_Q.test(norm(q)); }
+function isBackchannel(text, { openQuestion = '' } = {}) {
   const t = norm(text);
-  return !t || BACKCHANNEL.test(t);
+  if (!t) return true;
+  if (BACKCHANNEL.test(t)) return true;
+  return YES_ONLY.test(t) && Boolean(openQuestion) && !isYesNoQuestion(openQuestion);
 }
+const isHello = (text) => HELLO.test(norm(text));
 
 function createTurnArbiter({ enabled = turnArbiterEnabled(), trace = () => {}, state = null } = {}) {
   const holder = state || {};
@@ -54,7 +65,7 @@ function createTurnArbiter({ enabled = turnArbiterEnabled(), trace = () => {}, s
     const l = lock();
     if (l) {
       // Barge-in fragments and backchannels keep the topic; other turns age it.
-      if (!isBackchannel(text)) l.ttl -= 1;
+      if (!isBackchannel(text, l) && !isHello(text)) l.ttl -= 1;
       if (l.ttl <= 0) { trace({ kind: 'topic_unlock', topic: l.topic, reason: 'ttl' }); setLock(null); }
     }
     return turn;
@@ -114,8 +125,19 @@ function createTurnArbiter({ enabled = turnArbiterEnabled(), trace = () => {}, s
     trace({ kind: 'packet_extended', turn, source: sealed.source, reason, line: norm(line) });
     return sealed;
   }
+  // Gemini on an unclaimed turn: item names checked against the pinned doc.
+  // Uses Brain's itemNamePostCheck (src/conversation/v2/topic.js, #707); absent -> no check.
+  function geminiLineOk(line, doc) {
+    if (!enabled || !doc || !norm(line)) return true;
+    let check = null;
+    try { check = require('../conversation/v2/topic').itemNamePostCheck; } catch { return true; }
+    if (typeof check !== 'function') return true;
+    const r = check(line, doc) || { ok: true };
+    if (!r.ok) trace({ kind: 'proposal_rejected', turn, source: 'gemini', reason: 'item_name_post_check', offending: r.offending || [], line: norm(line) });
+    return r.ok !== false;
+  }
   return {
-    enabled, release, extend,
+    enabled, release, extend, geminiLineOk,
     beginTurn, speak, admit, geminiAllowed,
     claimed: () => Boolean(sealed),
     packet: () => sealed,
@@ -131,4 +153,4 @@ function polishPacketLine(line, polish) {
   return same && norm(out) ? out : line;
 }
 
-module.exports = { turnArbiterEnabled, createTurnArbiter, polishPacketLine, isBackchannel, PRIORITY, LOCK_TTL };
+module.exports = { turnArbiterEnabled, createTurnArbiter, polishPacketLine, isBackchannel, isHello, isYesNoQuestion, PRIORITY, LOCK_TTL };

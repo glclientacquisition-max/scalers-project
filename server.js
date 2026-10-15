@@ -772,14 +772,10 @@ app.post('/internal/desk/spoken-catalogue', (req, res) => {
 let spokenCatalogueGen;
 function spokenCatalogueGenerate() {
   if (spokenCatalogueGen !== undefined) return spokenCatalogueGen;
-  const key = String(process.env.GEMINI_API_KEY || '').trim();
-  if (!key || /^(0|off|false|no)$/i.test(String(process.env.SPOKEN_CATALOGUE_MODEL || ''))) return (spokenCatalogueGen = null);
-  const { createGeminiSend } = require('./src/conversation/v2/transport');
-  const send = createGeminiSend({ apiKey: key, model: process.env.SPOKEN_CATALOGUE_MODEL || 'gemini-3.5-flash', timeoutMs: 10000, thinkingMinimal: false });
-  spokenCatalogueGen = async ({ prompt, schema }) => {
-    const resp = await send({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, responseMimeType: 'application/json', responseSchema: schema } });
-    return JSON.parse((resp?.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join(''));
-  };
+  // SPOKEN_CATALOGUE_MODEL=off disables the AI pass; a missing key is recorded as compile_error=no_key.
+  if (/^(0|off|false|no)$/i.test(String(process.env.SPOKEN_CATALOGUE_MODEL || ''))) return (spokenCatalogueGen = null);
+  const { createSpokenCatalogueGenerate } = require('./src/knowledge/spokenCatalogueGenerate');
+  spokenCatalogueGen = createSpokenCatalogueGenerate({ apiKey: process.env.GEMINI_API_KEY, model: process.env.SPOKEN_CATALOGUE_MODEL || 'gemini-3.5-flash', timeoutMs: 10000 });
   return spokenCatalogueGen;
 }
 
@@ -3519,6 +3515,7 @@ mediaWss.on('connection', (ws, req) => {
             groundedPrice: groundedPriceLine,
             nameJustConfirmed: brainState?.caller?.nameJustConfirmed === true,
             callerName: brainState?.caller?.name || '',
+            callerNameConfirmed: brainState?.caller?.nameConfirmed === true,
             catalogueListed: brainState?.conversation?.catalogueListed === true,
             lock: turnArbiter.lock(),
           }).concat(catalogueMouth.v2Proposals || []) // BRAIN_V2_TOPIC_PROPOSALS: v2 submits to the arbiter
@@ -4019,6 +4016,8 @@ mediaWss.on('connection', (ws, req) => {
         if (suppressModelSpeech) return;
         // VOICE_TURN_ARBITER: live Gemini is a proposer; never races a sealed packet.
         if (typeof turnArbiter !== 'undefined' && turnArbiter.enabled && !turnArbiter.geminiAllowed()) return;
+        // Unclaimed turn: a Gemini line may only name services that are in the pinned doc (Brain #707 itemNamePostCheck).
+        if (typeof turnArbiter !== 'undefined' && turnArbiter.enabled && !turnArbiter.geminiLineOk(String(chunk || ''), brainProfile?.spokenCataloguePin?.doc)) return;
         // Streamed chunks are spoken before tools run, so a saved claim or a
         // number the caller never said must not reach TTS. Confirmation of a
         // save comes from formatToolConfirmation after the tool result.
