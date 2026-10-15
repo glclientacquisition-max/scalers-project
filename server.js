@@ -3515,6 +3515,7 @@ mediaWss.on('connection', (ws, req) => {
             groundedPrice: groundedPriceLine,
             nameJustConfirmed: brainState?.caller?.nameJustConfirmed === true,
             callerName: brainState?.caller?.name || '',
+            callerNameConfirmed: brainState?.caller?.nameConfirmed === true,
             catalogueListed: brainState?.conversation?.catalogueListed === true,
             lock: turnArbiter.lock(),
           })
@@ -4015,6 +4016,8 @@ mediaWss.on('connection', (ws, req) => {
         if (suppressModelSpeech) return;
         // VOICE_TURN_ARBITER: live Gemini is a proposer; never races a sealed packet.
         if (typeof turnArbiter !== 'undefined' && turnArbiter.enabled && !turnArbiter.geminiAllowed()) return;
+        // Unclaimed turn: a Gemini line may only name services that are in the pinned doc (Brain #707 itemNamePostCheck).
+        if (typeof turnArbiter !== 'undefined' && turnArbiter.enabled && !turnArbiter.geminiLineOk(String(chunk || ''), brainProfile?.spokenCataloguePin?.doc)) return;
         // Streamed chunks are spoken before tools run, so a saved claim or a
         // number the caller never said must not reach TTS. Confirmation of a
         // save comes from formatToolConfirmation after the tool result.
