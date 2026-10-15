@@ -215,10 +215,12 @@ test('HD_513dfb2fa73f: "make a booking" + detail answers keep the booking going;
   const lines = ["I'd like to meet— I'd like to make a booking for", 'My apartment to be washed.', '2-Bedroom— My name is Alvin Yegon.', 'Uh, 2-Bedroom, tomorrow.', "It's in— it's in Rongai.", '8, 8, 8 AM.', "It's in— it's in Simba Drive, and it's— the name is the Grace Apartments.", 'Yes'];
   for (const text of lines) out.push(await V2.runTurn(st, { text, profile: DD, now: new Date('2026-10-14T11:00:00Z'), handlers: h, langLock: 'en' }));
   for (const o of out) assert.doesNotMatch(o.line, /As I said|Just to repeat|Kama nilivyosema|Narudia|call you back to finish|calling to book/);
-  assert.match(out[5].line, /2-Bedroom Apartment on Thursday 15 October at 08:00 in Rongai, for Alvin Yegon/);
-  assert.match(out[6].line, /in Rongai, Simba Drive/);
+  // area clarify: Rongai touches our Ongata Rongai (Kajiado) and Rongai (Nakuru); the caller moved on, so the place we serve is kept and read back
+  assert.equal(out[4].line, 'Is that Ongata Rongai in Kajiado or Rongai in Nakuru?');
+  assert.match(out[5].line, /2-Bedroom Apartment on Thursday 15 October at 08:00 in Ongata Rongai, for Alvin Yegon/);
+  assert.match(out[6].line, /in Ongata Rongai, Simba Drive/);
   const a = h.log.find((l) => l.name === 'createAppointment').args;
-  assert.equal(a.landmark, 'Rongai'); assert.equal(a.notes, 'Simba Drive'); assert.equal(a.whenText, '2026-10-15 08:00');
+  assert.equal(a.landmark, 'Ongata Rongai'); assert.equal(a.notes, 'Simba Drive'); assert.equal(a.whenText, '2026-10-15 08:00');
   // an offered service answered with a day is a yes to "Would you like to book?"
   const r = await talk(['Do you clean sofas?', 'Tomorrow at 10am please']);
   assert.match(r.out[1].line, /Where should we come|name|Shall I book/i);
