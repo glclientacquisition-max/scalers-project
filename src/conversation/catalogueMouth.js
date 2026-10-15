@@ -360,7 +360,31 @@ function unsaidPublicCatalogue(callerText, state, profile, language) {
   return line;
 }
 
+/** VOICE_MOUTH_LOCK (default off): language-locked, slot-aware name-yes rewrite. */
+function mouthLockEnabled(env = process.env) {
+  return /^(1|true|on|yes)$/i.test(String(env.VOICE_MOUTH_LOCK || '').trim());
+}
+const SW_MOUTH =
+  /\b(sawa|tuna|tuje|wapi|kesho|leo|saa|ni|na|kwa|ya|wa|unahitaji|ungependa|huduma|usafi|eneo|gani|asante|karibu|nime\w+|tuta\w+)\b/gi;
+/** The model's own language wins over a one-word turn ("Alvin." detected en). */
+function lockedLanguage(text, language) {
+  const words = String(text || '').split(/\s+/).filter(Boolean).length;
+  const sw = (String(text || '').match(SW_MOUTH) || []).length;
+  if (words && sw >= 2 && sw / words >= 0.25) return 'sw';
+  return language;
+}
+function serviceSlotFilled(state) {
+  const e = state?.entities?.service;
+  return Boolean(e && (typeof e === 'object' ? String(e.value || '').trim() : String(e).trim()));
+}
+/** A "Sawa Alvin, tuna X kesho saa 8" readback names one service: not a list. */
+function readbackNotList(part, items) {
+  return countItems(part, items) <= 1 && (String(part).match(/,/g) || []).length <= 1 && !/\bCATALOGUE\s+MOUTH\b/i.test(part);
+}
+
 function speechAfterNameYes(text, items, language, opts = {}) {
+  const lock = mouthLockEnabled();
+  if (lock) language = lockedLanguage(text, language);
   const fileLine = unsaidPublicCatalogue(
     opts.callerText,
     opts.state,
@@ -375,9 +399,12 @@ function speechAfterNameYes(text, items, language, opts = {}) {
   ) {
     return fileLine;
   }
-  const kept = splitSentences(text).filter((part) => !catalogueShaped(part, items) && !isRelistSentence(part, items));
+  const shaped = (part) => catalogueShaped(part, items) && !(lock && readbackNotList(part, items));
+  const kept = splitSentences(text).filter((part) => !shaped(part) && !isRelistSentence(part, items));
   const joined = groundCatalogueSpeech(stripControlLabel(kept.join(' ')), items, { listTurn: false });
-  if (!joined || countItems(joined, items) >= 3 || catalogueShaped(joined, items)) {
+  if (!joined || countItems(joined, items) >= 3 || shaped(joined)) {
+    // Never re-ask a slot the caller already gave (HD_cc0481620c50 T5).
+    if (lock && !fileLine && serviceSlotFilled(opts.state)) return joined && countItems(joined, items) < 3 ? joined : '';
     return fileLine || whichServiceLine(language);
   }
   return joined;
@@ -460,6 +487,9 @@ module.exports = {
   fileServicePriceLine,
   shapeCatalogueMouth,
   whichServiceLine,
+  mouthLockEnabled,
+  lockedLanguage,
+  speechAfterNameYes,
   freshCatalogueAsk,
   stripControlLabel,
 };

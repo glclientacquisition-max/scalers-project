@@ -20,6 +20,19 @@ function langOf(line) {
 
 const EAT = (iso) => { if (!iso) return null; const d = new Date(iso); if (isNaN(d)) return null; const e = new Date(d.getTime() + 3 * 3600e3); return e.toISOString().slice(0, 16).replace('T', ' '); };
 
+// Alvin (15 Oct): the caller repeating the read-back time exactly is a yes. Own tiny parser: EN "10am"/"10:00",
+// SW "saa 4"/"saa nne" (Swahili clock, +6h); compared with the time in the read-back line.
+const SWN = { moja: 1, mbili: 2, tatu: 3, nne: 4, tano: 5, sita: 6, saba: 7, nane: 8, tisa: 9, kumi: 10 };
+function hourOf(s) {
+  const t = String(s || '').toLowerCase();
+  let m = t.match(/\bsaa\s+(kumi na (?:moja|mbili)|\d{1,2}|moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi)\b/);
+  if (m) { const n = /kumi na moja/.test(m[1]) ? 11 : /kumi na mbili/.test(m[1]) ? 12 : SWN[m[1]] || Number(m[1]); return ((n % 12) + 6) % 24; }
+  m = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/); if (m) return (Number(m[1]) % 12) + (m[3] === 'pm' ? 12 : 0);
+  m = t.match(/\b(\d{1,2}):(\d{2})\b/); if (m) return Number(m[1]);
+  return null;
+}
+function timeEcho(caller, prev) { if (/\b(no|not|hapana|si|sio)\b/i.test(caller)) return false; const a = hourOf(caller), b = hourOf(prev); return a != null && a === b; }
+
 function scoreRun(scn, run) {
   const fails = [];
   const claims = [];
@@ -93,6 +106,7 @@ function scoreRun(scn, run) {
     else {
       if (ex.appointment.service && !new RegExp(ex.appointment.service, 'i').test(a.service_name || '')) fails.push(`db:appointment.service "${a.service_name}"`);
       if (ex.appointment.startEAT) { const got = EAT(a.window_start); if (got !== ex.appointment.startEAT) fails.push(`db:appointment.window_start expected ${ex.appointment.startEAT} got ${got} (when_text "${a.when_text}")`); }
+      if (ex.appointment.startEATAny) { const got = EAT(a.window_start); if (!ex.appointment.startEATAny.includes(got)) fails.push(`db:appointment.window_start expected one of ${ex.appointment.startEATAny.join('|')} got ${got}`); }
       if (ex.appointment.place && a.address_landmark !== ex.appointment.place) fails.push(`db:appointment.place expected "${ex.appointment.place}" got "${a.address_landmark}"`);
       if (ex.appointment.note && !new RegExp(ex.appointment.note, 'i').test(a.notes || '')) fails.push(`db:appointment.note expected /${ex.appointment.note}/ got "${a.notes}"`);
       if (ex.appointment.callerName && !new RegExp(ex.appointment.callerName, 'i').test(a.caller_name || '')) fails.push(`db:appointment.caller_name "${a.caller_name}"`);
@@ -110,6 +124,7 @@ function scoreRun(scn, run) {
     const row = db.appointments.find((a) => a.id === id);
     if (!row || row.status !== st) fails.push(`db:${id}.status expected ${st} got ${row && row.status}`);
   }
+  for (const [id, at] of Object.entries(ex.movedTo || {})) { const row = db.appointments.find((a) => a.id === id); const got = row && EAT(row.window_start); if (got !== at) fails.push(`db:${id}.moved expected ${at} got ${got}`); }
   for (const id of ex.untouched || []) { const row = db.appointments.find((a) => a.id === id); if (row && row._touched) fails.push(`db:${id} touched (must not be)`); }
   if (db.foreignTouches.length) fails.push(`db:foreign_row_touched ${db.foreignTouches.join(',')}`);
   if (ex.landmarkUnchanged) { const row = db.appointments.find((a) => a.id === ex.landmarkUnchanged.id); if (row && row.address_landmark !== ex.landmarkUnchanged.value) fails.push(`db:address changed by phone to "${row.address_landmark}"`); }
@@ -121,9 +136,9 @@ function scoreRun(scn, run) {
       const commits = t.toolResults.filter((r) => ok(r) && /create_appointment|create_service_request|update_appointment/.test(r.action));
       if (!commits.length) return;
       const prev = turns[idx - 1]?.agentLine || '';
-      const yes = /^(yes|yeah|yep|ok|okay|sure|correct|ndio|ndiyo|sawa|poa|fiti|go ahead)\b/i.test(t.callerText.trim());
+      const yes = /^(yes|yeah|yep|ok|okay|sure|correct|ndio|ndiyo|sawa|poa|fiti|go ahead)\b/i.test(t.callerText.trim()) || /\b(actually|wait|ngoja)\b.{0,10}\b(yes|ndio)\b/i.test(t.callerText);
       const readBack = /\?\s*$/.test(prev) && /\b(shall|should|go ahead|confirm|correct|right|is that|niendelee|nithibitishe|ni sawa|sawa\?)\b/i.test(prev);
-      if (!(yes && readBack)) readbackViol++;
+      if (!((yes || timeEcho(t.callerText, prev)) && readBack)) readbackViol++;
     });
     if (readbackViol) fails.push(`readback_yes_missing x${readbackViol}`);
   }

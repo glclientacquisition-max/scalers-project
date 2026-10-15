@@ -31,3 +31,14 @@ commit write (Alvin's decision for v2).
 
 No LLM key is configured on the box, so callers are scripted personas and the model side
 is a seeded stand-in, not Gemini. `EVAL_PERSONA=llm` is reserved for an LLM persona.
+
+## Edge-case sweep (`edge/`)
+
+| Path | What |
+| --- | --- |
+| `edge/gen.js` | Combinatorial + seeded generator: ~240 base cases over dates/times (kesho 00:00-05:59, keshokutwa, weekdays, this/next Friday, next week, Swahili vs English clock, saa mbili 08:00/20:00, AM/PM, closed day, holiday, past time), names vs places, nicknames, spelled names, landmarks, phone numbers, ASR noise/silence/hold, barge-in, self-corrections, change after read-back, multi-intent, cancel/update, in-county estates (Ruaka in Kiambu), out-of-area towns, off-catalogue services, "are you a bot", rude callers. Each case has a fixed clock, persona language, the exact STT line plus 3-5 CheckList-style variants (ASR casing, disfluency, typo, code-switch greeting) and an expected booking row or clarifying question. |
+| `edge/paraphrase.js` | Optional Gemini paraphrases of the synthetic openings (no call data), cached in `edge/paraphrases.json` |
+| `edge/run.js` | `node evals/v2/edge/run.js [--expand] [--k 4] [--show 1]`: pass^k on BRAIN_V2, failures clustered by root-cause family x failure signature. `--expand` runs every variant as its own case. |
+
+Templates borrow test themes from Duckling (BSD) / SUTime and CheckList (MIT); no code or data copied.
+Audio variants (TTS + 8 kHz telephone noise, DTMF, real barge-in timing) are not covered here.
