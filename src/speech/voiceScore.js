@@ -414,7 +414,18 @@ function scoreTurns(turns = []) {
     : 100;
   const callPenalty = Math.min(30, checks.repeatedQuestion * 8);
   const score = Math.round((Math.max(0, avg - callPenalty) + Number.EPSILON) * 10) / 10;
-  return { score, checks, turns: scored, nameAsks, nameAskTurns };
+  // Tool-turn smoothness (report-only, VOICE_TOOL_SMOOTH_TRACE): heard gap p50/p95, dead air.
+  const toolSmooth = require('./toolSmooth').scoreToolTurns(
+    turns.map((turn) => {
+      const seg = stage(turn, 'audio_segments');
+      return {
+        tool: stages(turn, 'tool').length > 0,
+        segments: seg ? seg.segments || [] : [],
+        stack: false,
+      };
+    })
+  );
+  return { score, checks, turns: scored, nameAsks, nameAskTurns, toolSmooth };
 }
 
 const CHECK_WEIGHT = {

@@ -92,11 +92,25 @@ async function warmFillerAckPcm(opts = {}) {
   const tts = opts.tts;
   if (!isFillerCacheEnabled() || !tts) return { warmed: 0 };
   let warmed = 0;
-  for (const text of commonAckPhrases()) {
+  // opts.phrases (VOICE_TOOL_SMOOTH_PREFETCH): hold + receipt packs, same key schema.
+  const phrases = Array.isArray(opts.phrases) ? opts.phrases : commonAckPhrases();
+  for (const phrase of phrases) {
+    // A phrase may carry its own callLanguage so the warm key matches the runtime lookup.
+    const text = typeof phrase === 'string' ? phrase : phrase?.text;
+    const callLanguage = typeof phrase === 'string' ? undefined : phrase?.callLanguage;
+    // opts.waitWhile: pause (not abort) while a turn is live, so the warm is not lost.
+    if (opts.waitWhile) {
+      const until = Date.now() + (opts.waitMaxMs || 60000);
+      while (opts.waitWhile() && Date.now() < until && !opts.shouldAbort?.()) {
+        await new Promise((r) => setTimeout(r, opts.waitPollMs || 100));
+      }
+      if (opts.waitWhile()) break;
+    }
     if (opts.shouldAbort?.()) break;
     const found = lookupFillerPcm({
       voiceId: opts.voiceId,
       text,
+      ...(callLanguage ? { callLanguage } : {}),
       extraLexicon: opts.extraLexicon,
     });
     if (found.pcm) continue;

@@ -225,6 +225,7 @@ function noopTrace() {
     noteSpeakSlots: noop,
     noteBrainLines: noop,
     noteCall: noop,
+    noteAudioSegments: noop,
     commitTurn: noop,
     finishCall: async () => null,
   };
@@ -427,6 +428,16 @@ function createVoiceTrace(opts = {}) {
     });
   }
 
+  // VOICE_TOOL_SMOOTH_TRACE: heard audio spans for this turn (ms from turn start).
+  function noteAudioSegments(info = {}) {
+    pushStage({
+      stage: 'audio_segments',
+      segments: (info.segments || []).slice(0, 40).map((s) => ({ kind: String(s.kind || ''), startMs: Math.round(s.startMs), endMs: Math.round(s.endMs) })),
+      holdsQueued: Number(info.holdsQueued) || 0,
+      receiptCached: !!info.receiptCached,
+    });
+  }
+
   function noteBarge(info = {}) {
     pushStage({
       stage: 'barge_in',
@@ -599,6 +610,7 @@ function createVoiceTrace(opts = {}) {
     noteSpeakSlots: guard(noteSpeakSlots),
     noteBrainLines: guard(noteBrainLines),
     noteCall: guard(noteCall),
+    noteAudioSegments: guard(noteAudioSegments),
     commitTurn: guard(commitTurn),
     finishCall: async () => {
       try {
