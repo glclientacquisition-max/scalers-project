@@ -1887,6 +1887,8 @@ async function updateAppointment({
   serviceName,
   windowStart,
   windowEnd,
+  callerName,
+  replaceCallerName,
 } = {}) {
   let resolvedTenantId = tenantId || null;
   let callRow = null;
@@ -1922,6 +1924,10 @@ async function updateAppointment({
     const endIso = new Date(windowEnd).toISOString();
     if (!Number.isNaN(Date.parse(endIso))) patch.window_end = endIso;
   }
+  // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 1): only the code-held confirmed
+  // name is passed here; it replaces a junk name an older call saved, never
+  // a real one (replaceCallerName decides).
+  const heldName = String(callerName || '').trim();
 
   if (Object.keys(patch).length <= 1) {
     return null;
@@ -1976,6 +1982,26 @@ async function updateAppointment({
     return null;
   }
   throwIfError('updateAppointment', error);
+  if (
+    data &&
+    heldName &&
+    data.caller_name !== heldName &&
+    typeof replaceCallerName === 'function' &&
+    replaceCallerName(data.caller_name)
+  ) {
+    const { data: named, error: nameErr } = await supabase
+      .from('appointments')
+      .update({ caller_name: heldName.slice(0, 120) })
+      .eq('id', data.id)
+      .eq('tenant_id', resolvedTenantId)
+      .select('*')
+      .maybeSingle();
+    if (nameErr) {
+      console.warn('[db] updateAppointment caller_name skipped:', nameErr.message);
+      return data;
+    }
+    return named || data;
+  }
   return data || null;
 }
 
@@ -2374,7 +2400,69 @@ async function confirmTenantField({ tenantId, fieldPath, userId = null } = {}) {
   return data || null;
 }
 
+/**
+ * Ended calls with speech that have no reviewed (or owner) call_facts row yet.
+ * Feeds the review sweep. Newest first; calls under 3 minutes old are left to the live timer.
+ */
+async function listUnreviewedCalls({ sinceDays = 14, limit = 20, minSeconds = 10 } = {}) {
+  const since = new Date(Date.now() - sinceDays * 86400000).toISOString();
+  const settled = new Date(Date.now() - 3 * 60000).toISOString();
+  const { data: calls, error } = await supabase
+    .from('calls')
+    .select('id, tenant_id, created_at, sautikit_call_sid, resolution, primary_intent, summary, duration_seconds')
+    .gte('created_at', since)
+    .lte('created_at', settled)
+    .gte('duration_seconds', minSeconds)
+    .order('created_at', { ascending: false })
+    .limit(Math.max(limit * 5, 50));
+  throwIfError('listUnreviewedCalls', error);
+  const list = calls || [];
+  if (!list.length) return [];
+  const { data: facts, error: factErr } = await supabase
+    .from('call_facts')
+    .select('call_id')
+    .in('call_id', list.map((c) => c.id))
+    .in('source', ['review', 'owner']);
+  throwIfError('listUnreviewedCalls.facts', factErr);
+  const done = new Set((facts || []).map((f) => f.call_id));
+  return list
+    .filter((c) => !done.has(c.id))
+    .map((c) => ({ ...c, summary: parseSummary(c.summary) }))
+    .slice(0, limit);
+}
+
+/** Per-call structured record. Owner-corrected rows keep their intent/outcome (trusted). */
+async function upsertCallFacts(row) {
+  if (!row?.call_id || !row?.tenant_id) return null;
+  const { mergeWithExisting } = require('./conversation/callFacts');
+  const { data: existing, error: readErr } = await supabase
+    .from('call_facts')
+    .select('source, intent, outcome, lost_reason, owner_corrected_by, owner_corrected_at')
+    .eq('call_id', row.call_id)
+    .maybeSingle();
+  throwIfError('upsertCallFacts.read', readErr);
+  const next = mergeWithExisting(row, existing);
+  const { error } = await supabase.from('call_facts').upsert(next, { onConflict: 'call_id' });
+  throwIfError('upsertCallFacts', error);
+  return next;
+}
+
+async function getTenantCatalogue(tenantId) {
+  if (!tenantId) return [];
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('product_catalog, services_catalog')
+    .eq('id', tenantId)
+    .maybeSingle();
+  throwIfError('getTenantCatalogue', error);
+  const a = Array.isArray(data?.product_catalog) ? data.product_catalog : [];
+  const b = Array.isArray(data?.services_catalog) ? data.services_catalog : [];
+  return [...a, ...b];
+}
+
 module.exports = {
+  upsertCallFacts,
+  getTenantCatalogue,
   resolveTenantId,
   inboundTenantLine,
   getPlatformAudio,
@@ -2409,6 +2497,7 @@ module.exports = {
   updateAppointment,
   listOpenAppointments,
   mergeCallSummaryMeta,
+  listUnreviewedCalls,
   insertNotifySend,
   findNotifySend,
   findNotifySendByProviderMessageId,

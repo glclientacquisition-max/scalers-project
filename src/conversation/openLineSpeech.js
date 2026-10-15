@@ -179,12 +179,60 @@ function planVisitReadTurn({
   cursor = null,
   now = new Date(),
   pageSize = VISIT_REVIEW_PAGE,
+  openRequests = [],
+  fileState = null,
 } = {}) {
   const more = looksLikeVisitReviewMore(callerText);
   const history = looksLikeHistoryReview(callerText);
   const lookup = looksLikeOpenVisitLookup(callerText);
   const current =
     cursor && typeof cursor === 'object' ? cursor : { phase: 'open', page: 0 };
+  const fixesD199 = require('./callFixesD199');
+  const fixesOn = fixesD199.callFixesD199Enabled();
+  if (
+    fixesOn &&
+    fileState &&
+    nameConfirmed === true &&
+    nameJustConfirmed !== true &&
+    !messageOnly
+  ) {
+    // BRAIN_CALL_FIXES_D199 (b)(e): code answers "when did I request that?",
+    // "what have you saved?", and "the mansion one" from the file.
+    const answer = fixesD199.planFileAnswer({
+      text: callerText,
+      state: fileState,
+      language: languageOf(language),
+      now,
+    });
+    if (answer?.line) {
+      if (answer.rowId && fileState.conversation && typeof fileState.conversation === 'object') {
+        fileState.conversation.lastFileRowId = answer.rowId;
+      }
+      return { runModel: false, line: answer.line, lines: answer.lines, cursor: current, kind: answer.kind };
+    }
+    // (b) the first open read: every open visit, then requests and holds, as fact lines.
+    if (lookup && !more && !history) {
+      const read = fixesD199.openFileRead(fileState, languageOf(language), { now });
+      if (read) {
+        return { runModel: false, line: read.line, lines: read.lines, cursor: { phase: 'done', page: 0 }, kind: 'open_read' };
+      }
+    }
+  }
+  if (fixesOn && fileState && !messageOnly) {
+    // HD_1b3a67ea7ee9 (8): the confirm turn answers the file ask made before it.
+    const confirmRead = fixesD199.planConfirmFileRead(fileState, { language: languageOf(language), now });
+    if (confirmRead) {
+      return { runModel: false, line: confirmRead.line, lines: confirmRead.lines, cursor: { phase: 'done', page: 0 }, kind: 'confirm_read' };
+    }
+    // (6) Unconfirmed: the read result is masked, never empty.
+    if (
+      nameConfirmed !== true &&
+      fixesD199.fileMasked(fileState) &&
+      (lookup || more || history || fixesD199.looksLikeFileAsk(callerText))
+    ) {
+      return { runModel: true, line: '', cursor: current, masked: true, fileStatus: 'masked' };
+    }
+  }
   if (!lookup && !more && !history) return { runModel: true, line: '', cursor: current };
   if (nameJustConfirmed === true || nameConfirmed !== true) {
     return { runModel: true, line: '', cursor: current };
@@ -197,6 +245,15 @@ function planVisitReadTurn({
   const rows = Array.isArray(appointments) ? appointments : [];
   const hasRows = rows.length > 0;
 
+  // BRAIN_CALL_FIXES_D199 (b): the first open read also says open requests and
+  // holds ("Mansion Cleaning Custom Quote" was missed on HD_d199).
+  const requestLines =
+    fixesOn && Array.isArray(openRequests) ? openRequests.filter(Boolean) : [];
+  const speakOpen = (lines) =>
+    requestLines.length
+      ? formatNameConfirmSpeech({ openVisits: lines, openRequests: requestLines, language: lang })
+      : speakVisitLines(lines, lang);
+
   if (lookup && !more && !history) {
     if (hasRows) {
       const page = pageCallerVisitReview(rows, { page: 0, pageSize: size, now, scope: 'open' });
@@ -204,7 +261,7 @@ function planVisitReadTurn({
       const next = page.hasMore ? { phase: 'open', page: 1 } : { phase: 'done', page: 0 };
       return {
         runModel: false,
-        line: speakVisitLines(page.lines, lang),
+        line: speakOpen(page.lines),
         cursor: next,
         hasMore: page.hasMore || done.total > 0,
       };
@@ -212,7 +269,7 @@ function planVisitReadTurn({
     const page = pageSpokenLines(openVisits, 0, size);
     return {
       runModel: false,
-      line: speakVisitLines(page.lines, lang),
+      line: speakOpen(page.lines),
       cursor: page.hasMore ? { phase: 'open', page: 1 } : { phase: 'done', page: 0 },
       hasMore: page.hasMore,
     };

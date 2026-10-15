@@ -41,12 +41,14 @@ function priceAskHasService(words, ctx = {}) {
 }
 
 function coverageAskIsResolved(words, ctx = {}) {
-  const { coverageAskPlace, assessCoverage, foldCanonicalPlace } = require('./visitLocation');
+  const { coverageAskPlace, coverageStatus, foldCanonicalPlace } = require('./visitLocation');
   const profile = ctx.profile || {};
   const place = coverageAskPlace(words);
   if (!place) return false;
   const folded = foldCanonicalPlace(place, profile) || place;
-  return assessCoverage(folded, profile) !== 'unknown';
+  // Flag off: same as assessCoverage. Flag on: 'unconfirmed' is answered too
+  // ("I'll have the team confirm {place}"), so the turn is whole.
+  return coverageStatus(folded, profile) !== 'unknown';
 }
 
 /**

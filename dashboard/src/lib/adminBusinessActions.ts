@@ -1,3 +1,4 @@
+import { bustTenantCache } from "@/lib/tenantCache";
 import { recordAdminAction } from "@/lib/adminAudit";
 import {
   AdminActionBlocked,
@@ -119,9 +120,11 @@ async function updateTenant(
 ): Promise<boolean> {
   const admin = getSupabaseAdmin();
   const first = await admin.from("tenants").update({ ...base, ...withColumns }).eq("id", businessId);
+  bustTenantCache(businessId);
   if (!first.error) return true;
   if (!isMissingArchiveColumn(first.error)) throw first.error;
   const second = await admin.from("tenants").update(base).eq("id", businessId);
+  bustTenantCache(businessId);
   if (second.error) throw second.error;
   return false;
 }

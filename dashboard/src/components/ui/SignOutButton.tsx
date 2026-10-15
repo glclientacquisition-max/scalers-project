@@ -1,22 +1,22 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
 import { useEffect, useState } from "react";
 import {
-  btnPrimary,
   deskShiftClass,
   focusRingVisible,
 } from "@/components/ui/deskChrome";
 import { MenuItem } from "@/components/ui/Menu";
 
 const stayClass = [
-  "inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft",
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-body font-medium text-ink-2",
   deskShiftClass,
-  "hover:bg-surface hover:text-ink active:bg-line",
+  "hover:bg-surface hover:text-ink active:bg-hairline",
   focusRingVisible,
 ].join(" ");
 
 /** Confirm, then POST `/api/logout`. The account menu uses `layout="menu"`. */
-export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu" }) {
+export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu" | "sheet" }) {
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
@@ -39,12 +39,27 @@ export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu
         </MenuItem>
       );
     }
+    if (layout === "sheet") {
+      return (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className={[
+            "flex min-h-12 w-full items-center px-4 text-start text-body font-medium text-attention",
+            deskShiftClass,
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
+          ].join(" ")}
+        >
+          Sign out
+        </button>
+      );
+    }
     return (
       <button
         type="button"
         onClick={() => setConfirming(true)}
         className={[
-          "inline-flex min-h-11 items-center rounded-md px-2 text-sm font-medium text-ink-soft hover:text-warn",
+          "inline-flex min-h-11 items-center rounded-md px-2 text-body font-medium text-ink-2 hover:text-warn",
           deskShiftClass,
           focusRingVisible,
         ].join(" ")}
@@ -56,11 +71,11 @@ export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu
 
   const confirm = (
     <>
-      <p className="text-sm font-medium text-ink">Sign out?</p>
+      <p className="text-body font-medium text-ink">Sign out?</p>
       <form action="/api/logout" method="post">
-        <button type="submit" className={btnPrimary}>
+        <Button type="submit">
           Sign out
-        </button>
+        </Button>
       </form>
       <button type="button" onClick={() => setConfirming(false)} className={stayClass}>
         Stay
@@ -68,9 +83,9 @@ export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu
     </>
   );
 
-  if (layout === "menu") {
+  if (layout === "menu" || layout === "sheet") {
     return (
-      <div role="group" aria-label="Sign out?" className="flex flex-wrap items-center gap-2 px-2 py-2">
+      <div role="group" aria-label="Sign out?" className={layout === "sheet" ? "flex flex-wrap items-center gap-2 px-4 py-3" : "flex flex-wrap items-center gap-2 px-2 py-2"}>
         {confirm}
       </div>
     );

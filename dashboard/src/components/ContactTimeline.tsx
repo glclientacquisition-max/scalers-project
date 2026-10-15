@@ -11,23 +11,23 @@ function TimelineRowHit({ entry }: { entry: ContactTimelineEntry }) {
 
 export function ContactTimeline({ entries }: { entries: ContactTimelineEntry[] }) {
   if (!entries.length) {
-    return <p className="mt-4 text-sm text-ink-soft">No calls or jobs yet.</p>;
+    return <p className="mt-4 text-body text-ink-2">No calls or jobs yet.</p>;
   }
 
   return (
     <>
-      <ul className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+      <ul className="mt-4 overflow-hidden rounded-2xl border border-hairline bg-surface md:hidden">
         {entries.map((entry) => (
           <li
             key={entry.id}
             className={[
-              "relative min-w-0 border-t border-line/70 px-3 py-3 first:border-t-0",
+              "relative min-w-0 border-t border-hairline/70 px-3 py-3 first:border-t-0",
               entry.href ? "cursor-pointer" : "",
             ].join(" ")}
           >
             <TimelineRowHit entry={entry} />
             <div className={`${deskRowMutedClass} flex min-w-0 items-baseline justify-between gap-2`}>
-              <p className="truncate text-xs tabular-nums text-ink-soft">
+              <p className="truncate text-meta tabular-nums text-ink-2">
                 {formatCallWhen(entry.createdAt)}
               </p>
               <InboxPurposeChip purpose={entry.purpose} label={entry.stamp} />
@@ -38,25 +38,25 @@ export function ContactTimeline({ entries }: { entries: ContactTimelineEntry[] }
           </li>
         ))}
       </ul>
-      <div className="mt-4 hidden min-w-0 overflow-x-auto rounded-2xl border border-line bg-surface md:block">
-        <table className="w-full min-w-0 text-left text-sm">
-          <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
+      <div className="mt-4 hidden min-w-0 overflow-x-auto rounded-2xl border border-hairline bg-surface md:block">
+        <table className="w-full min-w-0 text-left text-body">
+          <thead className="border-b border-hairline bg-surface-muted/60 text-ink-2">
             <tr>
               <th
                 scope="col"
-                className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
+                className="px-3 py-2 text-meta font-semibold"
               >
                 When
               </th>
               <th
                 scope="col"
-                className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
+                className="px-3 py-2 text-meta font-semibold"
               >
                 Type
               </th>
               <th
                 scope="col"
-                className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
+                className="px-3 py-2 text-meta font-semibold"
               >
                 What
               </th>
@@ -67,11 +67,11 @@ export function ContactTimeline({ entries }: { entries: ContactTimelineEntry[] }
               <tr
                 key={entry.id}
                 className={[
-                  "relative border-t border-line/70",
+                  "relative border-t border-hairline/70",
                   entry.href ? "cursor-pointer hover:bg-accent/[0.04]" : "",
                 ].join(" ")}
               >
-                <td className={`${deskRowMutedClass} whitespace-nowrap px-3 py-2 text-ink-soft`}>
+                <td className={`${deskRowMutedClass} whitespace-nowrap px-3 py-2 text-ink-2`}>
                   <TimelineRowHit entry={entry} />
                   {formatCallWhen(entry.createdAt)}
                 </td>

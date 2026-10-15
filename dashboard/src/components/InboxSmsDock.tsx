@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { PaperAirplaneIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import {
@@ -16,7 +17,7 @@ import { emptyInboxSmsFacts } from "@/lib/polishInboxSms";
 const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
 
-export function InboxSmsDock({
+function InboxSmsDockInner({
   callId,
   callerPhone,
   facts = emptyInboxSmsFacts(),
@@ -79,7 +80,7 @@ export function InboxSmsDock({
   }
 
   return (
-    <div className="shrink-0 border-t border-line bg-surface px-4 py-3">
+    <div className="shrink-0 border-t border-hairline bg-surface px-4 py-3">
       <form action={sendAction} className="flex items-end gap-2">
         <input type="hidden" name="call_id" value={callId} />
         <input type="hidden" name="caller_phone" value={callerPhone || ""} />
@@ -150,3 +151,5 @@ export function InboxSmsDock({
     </div>
   );
 }
+
+export const InboxSmsDock = withRoleGate("inbox.act", InboxSmsDockInner);

@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useState, useTransition } from "react";
 import { updateContactNotes } from "@/app/(desk)/contacts/actions";
 import {
@@ -9,7 +10,7 @@ import {
 } from "@/components/settingsUi";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 
-export function ContactNotesForm({
+function ContactNotesFormInner({
   contactId,
   initial,
 }: {
@@ -35,7 +36,7 @@ export function ContactNotesForm({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className={`flex min-h-11 w-full items-center justify-between text-left text-xs font-medium uppercase tracking-wide text-ink-soft ${deskShiftClass} ${focusRingVisible} rounded-xl`}
+        className={`flex min-h-11 w-full items-center justify-between text-left text-meta font-medium text-ink-2 ${deskShiftClass} ${focusRingVisible} rounded-xl`}
       >
         <span>Notes</span>
         <span aria-hidden="true">{open ? "▾" : "▸"}</span>
@@ -64,9 +65,10 @@ export function ContactNotesForm({
           <button type="submit" disabled={pending} className={settingsPrimaryButtonClass}>
             Save
           </button>
-          {error ? <p className="text-sm text-warn">{error}</p> : null}
+          {error ? <p className="text-body text-warn">{error}</p> : null}
         </form>
       ) : null}
     </section>
   );
 }
+export const ContactNotesForm = withRoleGate("contacts.edit", ContactNotesFormInner);

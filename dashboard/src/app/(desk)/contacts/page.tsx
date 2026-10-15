@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { RoleGate } from "@/components/DeskRole";
 import { AddContactPanel } from "@/components/AddContactPanel";
 import { ContactsPullHost } from "@/components/ContactsEndlessList";
 import { ContactsSearch } from "@/components/ContactsSearch";
@@ -139,9 +140,11 @@ async function ContactsBody({ searchParams }: ContactsPageProps) {
                   Show all
                 </ButtonLink>
               ) : (
-                <ButtonLink href="/contacts/import" variant="primary">
-                  Import
-                </ButtonLink>
+                <RoleGate action="contacts.import" mode="hide">
+                  <ButtonLink href="/contacts/import" variant="primary">
+                    Import
+                  </ButtonLink>
+                </RoleGate>
               )
             }
           />

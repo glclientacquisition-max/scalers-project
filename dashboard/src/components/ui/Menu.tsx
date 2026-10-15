@@ -3,6 +3,7 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { cx } from "@/lib/cx";
+import { CheckIcon } from "@heroicons/react/20/solid";
 
 const popupClass =
   "glass-chrome z-menu min-w-48 origin-[var(--transform-origin)] rounded-xl border border-hairline py-1.5 text-body text-ink shadow-menu outline-none transition-[opacity,transform] duration-fast ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 motion-reduce:transition-none";
@@ -41,7 +42,7 @@ export function Menu({
         {triggerChildren}
       </BaseMenu.Trigger>
       <BaseMenu.Portal>
-        <BaseMenu.Positioner side={side} align={align} sideOffset={6} collisionPadding={12} className="z-menu">
+        <BaseMenu.Positioner side={side} align={align} sideOffset={6} collisionPadding={{ top: 12, bottom: 12, left: 12, right: 24 }} className="z-menu">
           <BaseMenu.Popup className={cx(popupClass, popupClassName)}>{children}</BaseMenu.Popup>
         </BaseMenu.Positioner>
       </BaseMenu.Portal>
@@ -72,10 +73,26 @@ export function MenuSeparator() {
 
 export function MenuLabel({ children }: { children: ReactNode }) {
   return (
-    <BaseMenu.GroupLabel className="px-3 pb-1 pt-2 text-caption font-medium uppercase tracking-wide text-ink-3">
+    <BaseMenu.GroupLabel className="px-3 pb-1 pt-2 text-caption font-medium text-ink-3">
       {children}
     </BaseMenu.GroupLabel>
   );
 }
 
 export const MenuGroup = BaseMenu.Group;
+
+/** Single choice inside a menu (e.g. theme). Proper menuitemradio semantics, check on the chosen row. */
+export function MenuRadioGroup(props: ComponentProps<typeof BaseMenu.RadioGroup>) {
+  return <BaseMenu.RadioGroup {...props} />;
+}
+
+export function MenuRadioItem({ className, children, ...rest }: ComponentProps<typeof BaseMenu.RadioItem>) {
+  return (
+    <BaseMenu.RadioItem className={cx(itemClass, "justify-between", className as string)} {...rest}>
+      <span className="min-w-0 truncate">{children as ReactNode}</span>
+      <BaseMenu.RadioItemIndicator className="text-accent">
+        <CheckIcon className="h-5 w-5" aria-hidden="true" />
+      </BaseMenu.RadioItemIndicator>
+    </BaseMenu.RadioItem>
+  );
+}

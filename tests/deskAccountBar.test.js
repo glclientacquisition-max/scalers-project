@@ -21,7 +21,7 @@ describe("desk account bar", () => {
     assert.match(menu, /from "@\/components\/ui\/Menu"/);
     assert.match(menu, /<button type="button" aria-label=\{name\} className=\{iconButtonClass\(\)\}>/);
     assert.match(menu, /h-7 w-7/);
-    assert.match(menu, /bg-accent text-xs font-semibold text-accent-on/);
+    assert.match(menu, /bg-accent text-meta font-semibold text-accent-on/);
     assert.match(menu, /ring-2 ring-accent ring-offset-2 ring-offset-surface/);
     assert.match(read("dashboard/src/components/ui/Menu.tsx"), /shadow-menu/);
     assert.match(menu, /md:hidden/);
@@ -42,21 +42,21 @@ describe("desk account bar", () => {
     assert.match(menu, /name="tenant_id"/);
     assert.match(menu, />\s*Workspace\s*</);
     assert.match(menu, /MenuLabel/);
-    assert.match(menu, /text-ink-3/);
+    assert.match(menu, /text-ink-[23]/);
     assert.doesNotMatch(menu, /text-gray-500/);
     assert.match(menu, /pointer-events-none/);
   });
 
   it("shows a theme cluster on Appearance and keeps Line live off that control", () => {
     assert.match(picker, /<SegmentedControl/);
-    assert.match(picker, /label="This device"/);
+    assert.match(picker, /label="On this device"/);
     assert.match(picker, /data-theme-cluster=""/);
     for (const label of ["System", "Light", "Dark"]) {
       assert.match(picker, new RegExp(`label: "${label}"`));
     }
     assert.doesNotMatch(picker, /Line live|SettingsSegmented|bg-white|#[0-9a-fA-F]{6}/);
     assert.match(menu, /<ThemePicker \/>/);
-    assert.match(menu, />\s*This device\s*</);
+    assert.match(menu, /appearanceLabel\(/);
     assert.match(menu, /data-account-appearance=""/);
     assert.doesNotMatch(menu, /\/settings/);
     assert.doesNotMatch(shell, /<ThemePicker \/>/);

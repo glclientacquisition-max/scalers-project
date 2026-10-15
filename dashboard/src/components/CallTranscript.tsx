@@ -21,7 +21,7 @@ function SpeechBubble({
   lead: boolean;
 }) {
   const isCaller = item.speaker === "caller";
-  const who = isCaller ? "Caller" : "Receptionist";
+  const who = isCaller ? "Caller" : "Business Assistant";
   return (
     <div
       className={[
@@ -45,11 +45,11 @@ function SpeechBubble({
               : "rounded-2xl",
         ].join(" ")}
       >
-        <p className="whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">
+        <p className="whitespace-pre-wrap text-body leading-relaxed [overflow-wrap:anywhere]">
           {plainOwnerCopy(item.text)}
         </p>
         {item.stamp ? (
-          <p className="mt-1 text-[11px] text-ink-soft">{item.stamp}</p>
+          <p className="mt-1 text-caption text-ink-2">{item.stamp}</p>
         ) : null}
       </div>
     </div>
@@ -61,7 +61,7 @@ function FactLine({ item, lead }: { item: TranscriptFactItem; lead: boolean }) {
     <p
       data-transcript-fact=""
       className={[
-        "px-2 text-center text-xs text-ink-soft [overflow-wrap:anywhere]",
+        "px-2 text-center text-meta text-ink-2 [overflow-wrap:anywhere]",
         lead ? "" : "mt-3",
       ].join(" ")}
     >
@@ -99,7 +99,7 @@ export function CallTranscript({
   return (
     <section>
       {thread ? null : (
-        <h2 className="font-display text-2xl tracking-tight text-ink">
+        <h2 className="font-display text-page tracking-tight text-ink">
           Conversation
         </h2>
       )}
@@ -107,11 +107,11 @@ export function CallTranscript({
         className={
           thread
             ? ""
-            : "relative mt-4 rounded-2xl border border-line bg-surface px-2 py-4 sm:px-4"
+            : "relative mt-4 rounded-2xl border border-hairline bg-surface px-2 py-4 sm:px-4"
         }
       >
         {stream.length === 0 ? (
-          <p className="px-3 py-6 text-center text-sm text-ink-soft">
+          <p className="px-3 py-6 text-center text-body text-ink-2">
             No conversation.
           </p>
         ) : (

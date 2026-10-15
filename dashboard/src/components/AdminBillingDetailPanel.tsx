@@ -216,51 +216,51 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
       </div>
 
       {error ? (
-        <p className="text-sm text-warn" role="alert">
+        <p className="text-body text-warn" role="alert">
           {error}
         </p>
       ) : null}
       {status ? (
-        <p className="text-sm text-ok" role="status">
+        <p className="text-body text-ok" role="status">
           {status}
         </p>
       ) : null}
 
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Package</h2>
-        <p className="mt-1 text-sm text-ink-2">{nowPackage}</p>
+        <p className="mt-1 text-body text-ink-2">{nowPackage}</p>
         <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("package")}>
           {sub?.packageId ? "Change package" : "Assign package"}
         </Button>
       </section>
 
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Usage</h2>
-        <p className="mt-2 text-sm tabular-nums text-ink">
+        <p className="mt-2 text-body tabular-nums text-ink">
           Minutes {minutesLine}
           {sub
             ? ` · SMS ${usedOfIncluded(sub.usage.smsUsed, sub.usage.smsIncluded)} · Email ${usedOfIncluded(sub.usage.emailUsed, sub.usage.emailIncluded)}`
             : null}
         </p>
-        <p className="mt-2 text-sm text-ink-2">
+        <p className="mt-2 text-body text-ink-2">
           On-demand rates (read-only): inbound KES {inboundKesPerMinute(rates.inboundKesPerSecond)}/min,
           outbound KES {outboundKesPerMinute(rates.outboundKesPerSecond)}/min. Owner opted in:{" "}
           {row.on_demand_usage_enabled ? "Yes" : "No"}.
         </p>
-        {sub?.gap ? <p className="mt-2 text-sm text-attention">{sub.gap}</p> : null}
+        {sub?.gap ? <p className="mt-2 text-body text-attention">{sub.gap}</p> : null}
       </section>
 
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Charging</h2>
-        <p className="mt-1 text-sm text-ink-2">{planConsequence(row.billing_enforcement)}</p>
+        <p className="mt-1 text-body text-ink-2">{planConsequence(row.billing_enforcement)}</p>
         <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("charging")}>
           Change charging
         </Button>
       </section>
 
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Grant minutes</h2>
-        <p className="mt-1 text-sm text-ink-2">
+        <p className="mt-1 text-body text-ink-2">
           Adds to included minutes for this period.
         </p>
         <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("grant")}>
@@ -271,13 +271,13 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
       <section>
         <h2 className="text-title font-medium text-ink">History</h2>
         {!historyLoaded ? (
-          <p className="mt-2 text-sm text-ink-2">Loading…</p>
+          <p className="mt-2 text-body text-ink-2">Loading…</p>
         ) : history.length === 0 ? (
           <Empty title="No history yet." />
         ) : (
-          <ul className="mt-4 divide-y divide-line/70">
+          <ul className="mt-4 divide-y divide-hairline/70">
             {history.map((entry) => (
-              <li key={entry.id} className={`flex justify-between gap-3 py-2 text-sm ${adminTdClass}`}>
+              <li key={entry.id} className={`flex justify-between gap-3 py-2 text-body ${adminTdClass}`}>
                 <div className="min-w-0">
                   <p className="font-medium text-ink">{entry.title}</p>
                   {entry.detail ? <p className="break-words text-ink">{entry.detail}</p> : null}

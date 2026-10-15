@@ -90,7 +90,7 @@ function inboxCopy(
 
 function InboxNextStep({ line }: { line: string | null }) {
   if (!line) return null;
-  return <p className={`mt-0.5 text-xs text-ink-soft ${deskPreviewClass}`}>{line}</p>;
+  return <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>{line}</p>;
 }
 
 /** Name line. Unread and Live are for assistive tech. The dot slot stays silent. */
@@ -247,7 +247,7 @@ export function InboxTableRow({
       item={item}
       as="tr"
       className={[
-        "relative border-t border-line/70",
+        "relative border-t border-hairline/70",
         deskShiftClass,
         openHref ? "cursor-pointer" : "",
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
@@ -262,7 +262,7 @@ export function InboxTableRow({
               <InboxRowLabel
                 unread={item.unread}
                 live={item.purpose === "live"}
-                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
+                className={`text-body tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-2" : ""}`}
               >
                 {item.headline}
               </InboxRowLabel>
@@ -272,7 +272,7 @@ export function InboxTableRow({
           <td className={`${deskRowMutedClass} max-w-[10rem] px-3 py-2 align-top font-medium text-ink`}>
             <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
-          <td className={`${deskRowMutedClass} px-3 py-2 align-top text-sm text-ink-soft`}>
+          <td className={`${deskRowMutedClass} px-3 py-2 align-top text-body text-ink-2`}>
             <InboxWhenMeta item={item} text={showHold ? needed : when} />
           </td>
         </>
@@ -286,7 +286,7 @@ export function InboxTableRow({
               <InboxRowLabel
                 unread={item.unread}
                 live={item.purpose === "live"}
-                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
+                className={`text-body tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-2" : ""}`}
               >
                 {hasJob ? visit : stamp}
               </InboxRowLabel>
@@ -296,7 +296,7 @@ export function InboxTableRow({
           <td className={`${deskRowMutedClass} max-w-[10rem] px-3 py-2 align-top font-medium text-ink`}>
             <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
-          <td className={`${deskRowMutedClass} px-3 py-2 align-top text-sm text-ink-soft`}>
+          <td className={`${deskRowMutedClass} px-3 py-2 align-top text-body text-ink-2`}>
             <InboxWhenMeta item={item} text={hasJob ? place : ""} />
           </td>
         </>
@@ -310,18 +310,18 @@ export function InboxTableRow({
               <InboxRowLabel
                 unread={item.unread}
                 live={item.purpose === "live"}
-                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
+                className={`text-body tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-2" : ""}`}
               >
                 {who}
               </InboxRowLabel>
-              <p className={`mt-0.5 text-sm text-ink ${deskPreviewClass}`}>{item.headline}</p>
+              <p className={`mt-0.5 text-body text-ink ${deskPreviewClass}`}>{item.headline}</p>
               <InboxNextStep line={nextStep} />
             </InboxRowWho>
           </td>
           <td className={`${deskRowMutedClass} whitespace-nowrap px-3 py-2 align-top`}>
             <InboxPurposeChip purpose={item.purpose} label={stamp} />
           </td>
-          <td className={`${deskRowMutedClass} whitespace-nowrap px-3 py-2 align-top text-sm text-ink-soft`}>
+          <td className={`${deskRowMutedClass} whitespace-nowrap px-3 py-2 align-top text-body text-ink-2`}>
             <InboxWhenMeta item={item} text={when} />
           </td>
         </>
@@ -361,7 +361,7 @@ export function InboxPhoneRow({
         <InboxRowLabel
           unread={item.unread}
           live={item.purpose === "live"}
-          className={`min-w-0 sm:flex-1 text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)}`}
+          className={`min-w-0 sm:flex-1 text-body tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)}`}
         >
           {who}
         </InboxRowLabel>
@@ -370,12 +370,12 @@ export function InboxPhoneRow({
           <InboxWhenMeta
             item={item}
             text={meta}
-            className="flex min-w-0 items-center gap-1.5 text-xs text-ink-soft"
+            className="flex min-w-0 items-center gap-1.5 text-meta text-ink-2"
             textClassName="min-w-0 truncate"
           />
         </span>
       </div>
-      <p className={`mt-0.5 text-sm ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
+      <p className={`mt-0.5 text-body ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-2"}`}>
         {work}
       </p>
       <InboxNextStep line={nextStep} />
@@ -387,7 +387,7 @@ export function InboxPhoneRow({
       item={item}
       as="li"
       className={[
-        "relative flex min-w-0 items-center gap-3 overflow-hidden border-t border-line/70 px-4 py-3 first:border-t-0",
+        "relative flex min-w-0 items-center gap-3 overflow-hidden border-t border-hairline/70 px-4 py-3 first:border-t-0",
         item.urgent ? "bg-warn-soft/50" : "",
       ].join(" ")}
     >

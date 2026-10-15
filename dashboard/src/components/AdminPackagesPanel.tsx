@@ -183,7 +183,7 @@ export function AdminPackagesPanel({
 
         {tab === "packages" || catalogOnly ? (
           packs.length === 0 ? (
-            <Empty title="No packages." line="Add a SKU in the catalog." />
+            <Empty title="No packages." line="Add a SKU in the catalogue." />
           ) : (
             <ul className="divide-y divide-hairline">
               {packs.map((pack) => (

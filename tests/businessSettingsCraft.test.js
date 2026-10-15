@@ -13,7 +13,6 @@ function loadSettingsNav() {
   const script = `
     import {
       SETTINGS_NAV,
-      settingsWideDefaultHref,
       businessSettingsHref,
       parseBusinessSettingsPanel,
     } from ${JSON.stringify(nav)};
@@ -25,11 +24,6 @@ function loadSettingsNav() {
     console.log(JSON.stringify({
       sections,
       labels: sections.flatMap((section) => section.labels),
-      hoursWide: settingsWideDefaultHref(undefined, "1"),
-      phoneIndex: settingsWideDefaultHref(undefined, "0"),
-      missingCookie: settingsWideDefaultHref(undefined, undefined),
-      trainStays: settingsWideDefaultHref("train", "1"),
-      testStays: settingsWideDefaultHref("test", "1"),
       trainHref: businessSettingsHref("train"),
       testHref: businessSettingsHref("test"),
       trainPanel: parseBusinessSettingsPanel(undefined, "train"),
@@ -105,7 +99,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(nav, /label: "Updates"/);
     assert.match(nav, /label: "Test"/);
     assert.match(nav, /label: "FAQs"/);
-    assert.match(nav, /label: "Catalog"/);
+    assert.match(nav, /label: "Catalogue"/);
     assert.match(nav, /label: "Import"/);
     assert.match(nav, /label: "How we notify"/);
     assert.match(nav, /label: "Team"/);
@@ -156,16 +150,16 @@ describe("business settings craft", () => {
 
   it("uses non-clickable group headers and a phone index of destination rows", () => {
     assert.match(shell, /text-meta font-medium text-ink-2/);
-    assert.match(ui, /uppercase tracking-wide text-gray-500/);
+    assert.match(ui, /settingsBlockTitleClass =\s*"text-meta font-medium text-ink-2"/);
     assert.match(ui, /pointer-events-none/);
     assert.match(shell, /data-settings-menu=\{variant\}/);
-    assert.match(shell, /md:hidden/);
+    assert.match(shell, /data-settings-home=""/);
     assert.match(shell, /SettingsChevron/);
     assert.match(shell, /min-h-11/);
     assert.match(shell, /variant: "index" \| "rail"/);
     assert.match(shell, /settingsRailWrapClass/);
     assert.match(ui, /hidden min-w-0 shrink-0 md:block md:w-64/);
-    assert.match(ui, /md:sticky md:top-4/);
+    assert.match(ui, /md:sticky md:top-0 md:pt-4/);
   });
 
   it("parks Sign out in the account menu and Appearance off the settings index", () => {
@@ -180,7 +174,7 @@ describe("business settings craft", () => {
     assert.match(account, /<SignOutButton layout="menu"/);
     assert.match(account, /<ThemePicker \/>/);
     assert.match(account, /data-account-appearance=""/);
-    assert.match(account, />\s*This device\s*</);
+    assert.match(account, /appearanceLabel\(/);
     assert.doesNotMatch(account, /businessSettingsHref\("appearance"\)/);
     assert.doesNotMatch(account, /href=.*\/settings/);
     assert.doesNotMatch(account, />\s*Profile\s*</);
@@ -205,7 +199,7 @@ describe("business settings craft", () => {
     assert.match(signOut, /action="\/api\/logout"/);
     assert.match(signOut, /method="post"/);
     assert.match(signOut, /type="submit"/);
-    assert.match(signOut, /btnPrimary/);
+    assert.match(signOut, /btnPrimary|<Button\b/); // kit Button replaced the one-off class
     assert.match(signOut, /type="button"/);
     assert.doesNotMatch(
       signOut.slice(0, signOut.indexOf("if (!confirming)")),
@@ -216,7 +210,7 @@ describe("business settings craft", () => {
   it("labels Appearance as This device and persists with scalers-desk-theme", () => {
     const themeLib = read("dashboard/src/lib/deskTheme.ts");
     const layout = read("dashboard/src/app/layout.tsx");
-    assert.match(theme, /label="This device"/);
+    assert.match(theme, /label="On this device"/);
     assert.match(theme, /readDeskTheme/);
     assert.match(theme, /writeDeskTheme/);
     assert.match(themeLib, /export const DESK_THEME_STORAGE_KEY = "scalers-desk-theme"/);
@@ -238,14 +232,14 @@ describe("business settings craft", () => {
   });
 
   it("shows dense catalog rows below lg and the table from lg", () => {
-    assert.doesNotMatch(form, /rounded-xl border border-line bg-surface p-3/);
+    assert.doesNotMatch(form, /rounded-xl border border-hairline bg-surface p-3/);
     assert.match(form, /lg:hidden/);
     assert.match(form, /svc-name-m-/);
     assert.match(form, /svc-notes-m-/);
     assert.match(form, /svc-oos-m-/);
     assert.match(form, /prod-name-m-/);
     assert.match(form, /prod-cat-m-/);
-    assert.match(form, /className="hidden overflow-hidden rounded-xl border border-line lg:block"/);
+    assert.match(form, /className="hidden overflow-hidden rounded-xl border border-hairline lg:block"/);
     assert.match(form, /table-fixed/);
     assert.doesNotMatch(form, /min-w-\[720px\]/);
     assert.doesNotMatch(form, /min-w-\[640px\]/);
@@ -287,12 +281,15 @@ describe("business settings craft", () => {
     assert.match(ui, /md:flex-row/);
     assert.match(ui, /grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2/);
     assert.match(ui, /min-w-0 flex-1/);
-    assert.match(ui, /text-xl font-semibold/);
+    assert.match(ui, /text-title font-semibold/);
     assert.match(form, /SettingsGroup/);
     assert.match(form, /lg:grid-cols-\[minmax\(5\.5rem,7rem\)_3\.5rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);
     assert.match(form, /grid-cols-\[minmax\(0,7rem\)_minmax\(0,1fr\)_2\.75rem_2\.75rem\]/);
-    assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_auto_2\.5rem\]/);
-    assert.match(form, /grid-cols-\[minmax\(0,1fr\)_minmax\(0,1\.2fr\)_2\.75rem\]/);
+    // Alert contacts are a grouped list (no table columns), so nothing truncates.
+    assert.match(form, /<AlertContactsList/);
+    assert.doesNotMatch(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /grid-cols-\[/);
+    // FAQs are grouped cards (kit FieldCard + TextField + TextAreaField), not a two-column table.
+    assert.match(form, /data-faq-list=""[\s\S]*<FieldCard[\s\S]*<TextAreaField/);
     assert.match(shell, /rounded-2xl border border-hairline bg-surface/);
     assert.match(shell, /bg-accent-tonal/);
     assert.doesNotMatch(shell, /border-l-2/);
@@ -318,7 +315,7 @@ describe("business settings craft", () => {
     assert.match(alerts, /ALERTS_SETTINGS_FORM_ID/);
     assert.match(alerts, /form=\{ALERTS_SETTINGS_FORM_ID\}/);
     assert.match(theme, /<SegmentedControl/);
-    assert.match(theme, /label="This device"/);
+    assert.match(theme, /label="On this device"/);
     assert.match(theme, /data-theme-cluster=""/);
     assert.doesNotMatch(theme, /SettingsSegmented/);
     assert.match(ui, /deskRateCardClass/);
@@ -370,7 +367,7 @@ describe("business settings craft", () => {
       "Hours",
       "Locations",
       "Policies",
-      "Catalog",
+      "Catalogue",
       "Import",
       "FAQs",
       "Voice",
@@ -384,46 +381,45 @@ describe("business settings craft", () => {
       ["Business", "Knowledge", "Assistant", "People"]
     );
     assert.equal(new Set(got.sections.map((section) => section.id)).size, got.sections.length);
-    assert.equal(got.labels[got.labels.indexOf("Catalog") + 1], "Import");
+    assert.equal(got.labels[got.labels.indexOf("Catalogue") + 1], "Import");
     assert.equal(got.labels.indexOf("Identity") + 1, got.labels.indexOf("Hours"));
     const people = got.sections.find((section) => section.title === "People");
     assert.deepEqual(people.labels, ["Team", "How we notify"]);
     assert.equal(people.id, "people");
     assert.notEqual(people.id, "alerts");
     assert.equal(got.sections.some((section) => section.title === "How we notify" || section.title === "Alerts" || section.id === "alerts"), false);
-    assert.equal(got.hoursWide, "/settings?tab=train&panel=hours");
-    assert.equal(got.phoneIndex, null);
-    assert.equal(got.missingCookie, null);
-    assert.equal(got.trainStays, null);
-    assert.equal(got.testStays, null);
     assert.equal(got.trainHref, "/settings?tab=train");
     assert.equal(got.testHref, "/settings?tab=test");
     assert.equal(got.trainPanel, "identity");
   });
 
-  it("opens wide /settings on Hours and does not mount Identity on the index", () => {
-    const boot = read("dashboard/src/lib/deskMdBoot.ts");
+  it("shows the Settings home on every width with no auto-open, and deep links still land", () => {
     const layout = read("dashboard/src/app/layout.tsx");
+    assert.equal(fs.existsSync(path.join(__dirname, "../dashboard/src/lib/deskMdBoot.ts")), false);
+    assert.equal(fs.existsSync(path.join(__dirname, "../dashboard/src/components/SettingsWideOpen.tsx")), false);
+    assert.doesNotMatch(layout, /DESK_MD_BOOT_SCRIPT/);
+    assert.doesNotMatch(page, /settingsWideDefaultHref|desk-md|DESK_MD_COOKIE/);
+    assert.doesNotMatch(nav, /SETTINGS_HOURS_HREF|settingsWideDefaultHref/);
+    assert.match(page, /parseBusinessSettingsPanel\(panelRaw, tabRaw\)/);
+    for (const item of nav.match(/\{ label: "[^"]+", description: "[^"]+"/g) || []) assert.ok(item.length < 120, item);
+    assert.equal((nav.match(/description: "/g) || []).length, 12);
     const activeFn = nav.slice(
       nav.indexOf("export function settingsNavItemActive"),
       nav.indexOf("export function settingsNavItems")
     );
-    const menu = shell.slice(shell.indexOf("if (isMenu)"), shell.indexOf("const rail ="));
-    assert.match(page, /settingsWideDefaultHref/);
-    assert.ok(page.indexOf("settingsWideDefaultHref") < page.indexOf("getCurrentTenant()"));
-    assert.match(page, /if \(!tabRaw\)/);
-    assert.match(nav, /export const SETTINGS_HOURS_HREF = businessSettingsHref\("train", "hours"\)/);
-    assert.match(nav, /if \(deskMd !== "1"\) return null/);
-    assert.match(boot, /min-width: 768px/);
-    assert.match(boot, /location\.search/);
-    assert.match(boot, /SETTINGS_HOURS_HREF/);
-    assert.match(layout, /DESK_MD_BOOT_SCRIPT/);
+    const menu = shell.slice(shell.indexOf("if (isMenu)"), shell.indexOf("data-desk-nested"));
     assert.doesNotMatch(shell, /SettingsIdentityRedirect/);
     assert.doesNotMatch(shell, /panel=identity/);
     assert.doesNotMatch(shell, /panel="identity"/);
     assert.doesNotMatch(shell, /selectHubIdentity/);
     assert.doesNotMatch(menu, /TenantForm/);
-    assert.match(menu, /md:hidden/);
+    assert.match(menu, /<SettingsMenu[\s\S]*variant="index"/);
+    // Settings home has the full content width: no rail beside it, two columns of groups on wide desktop.
+    assert.doesNotMatch(menu, /\{rail\}/);
+    assert.match(shell, /xl:grid-cols-2/);
+    // Inside a section: rail with a "Settings" title link, and the back link shows on every width.
+    assert.match(shell, /href="\/settings"[\s\S]{0,240}>\s*Settings\s*<\/Link>/);
+    assert.match(ui, /<DeskBack href="\/settings">/);
     assert.match(activeFn, /tab === "train" && trainPanel === target\.panel/);
     assert.doesNotMatch(activeFn, /selectHubIdentity/);
     assert.doesNotMatch(shell, /selectHubAppearance/);
@@ -444,11 +440,10 @@ describe("business settings craft", () => {
     assert.doesNotMatch(catalogScan, /settingsPrimaryButtonClass/);
     assert.match(form, /Saves live - no sticky Save/);
     assert.doesNotMatch(form, /panel === "pronunciation" \? undefined/);
-    assert.match(coach, /btnPrimary/);
+    assert.match(coach, /btnPrimary|<Button\b/); // kit Button replaced the one-off class
     assert.match(coach, /fixHasUsePrimary/);
     assert.match(form, /settingsGhostButtonClass/);
     assert.match(form, /Add service/);
-    assert.match(form, /Add 3 blank rows/);
     assert.match(save, /min-h-11/);
     assert.doesNotMatch(save, /min-h-14/);
     assert.doesNotMatch(save, /w-full/);
@@ -470,7 +465,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(form, /min-w-\[720px\]/);
     assert.doesNotMatch(form, /min-w-\[640px\]/);
     assert.doesNotMatch(form, /minmax\(10rem,auto\)/);
-    assert.match(form, /\{flag\.label\}/);
+    assert.match(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /\{flag\.label\}/);
     assert.match(form, /label: "Urgent"/);
     assert.match(form, /label: "Follow-up"/);
     assert.match(form, /label: "Ops"/);
@@ -484,13 +479,13 @@ describe("business settings craft", () => {
       form.indexOf('panel === "team"'),
       form.indexOf('panel === "faqs"')
     );
-    assert.match(team, /<span>Role<\/span>/);
-    assert.match(team, />\s*Role\s*</);
+    const contacts = require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8");
+    // "Job" (not "Role") so it isn't confused with member roles.
+    assert.match(contacts, /\["role", "Job",/);
     assert.doesNotMatch(team, /Handles/);
-    // Batch B: email/name carry title + wrap — no silent truncate data loss.
-    assert.match(team, /title=\{member\.email \|\| undefined\}/);
-    assert.match(team, /title=\{member\.name \|\| undefined\}/);
-    assert.match(team, /break-words \[overflow-wrap:anywhere\]/);
+    // Name/email wrap in the list row: no silent truncation.
+    assert.match(contacts, /\[overflow-wrap:anywhere\]/);
+    assert.doesNotMatch(contacts, /\btruncate\b/);
     assert.doesNotMatch(team, /min-w-0 truncate/);
   });
 
@@ -499,8 +494,8 @@ describe("business settings craft", () => {
       form.indexOf('panel === "policies"'),
       form.indexOf('panel === "tools"')
     );
-    assert.match(policies, /No rules yet\. Add payment or cancellation/);
-    assert.match(policies, /openPolicyIds\.length === 0/);
+    assert.match(policies, /<PaymentsEditor/);
+    assert.match(policies, /<PolicyRulesEditor/);
     assert.doesNotMatch(policies, /M-Pesa Paybill|30% deposit required/);
 
     assert.match(test, /Add a business name in/);
@@ -509,9 +504,8 @@ describe("business settings craft", () => {
 
     assert.match(form, /id="business_name"[\s\S]{0,240}title=\{businessName/);
     assert.match(ui, /title=\{businessName\}/);
-    assert.match(ui, /break-words text-sm font-medium text-ink/);
-    assert.match(shell, /title=\{status\}/);
-    assert.match(form, /title="Add 3 blank rows"/);
+    assert.match(ui, /break-words text-body font-medium text-ink/);
+    assert.match(shell, /title=\{status\?\.title \|\| statusText\}/); // truncated status keeps its full text on hover
   });
 
   it("packs Profile sub-strips instead of stretching them across the pane", () => {

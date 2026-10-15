@@ -1,13 +1,14 @@
+import { AppearanceFooter } from "@/components/ThemePicker";
+import { Button } from "@/components/ui/Button";
 import { redirect } from "next/navigation";
 import { BrandWordmark } from "@/components/brand/BrandMark";
-import { ThemeDock } from "@/components/ThemePicker";
-import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
+import { deskFieldClass } from "@/components/ui/deskChrome";
 import { isLegacyAuthenticated } from "@/lib/auth";
 
 export const instant = false;
 
 /** Same field box as the owner sign-in, at 16px so the phone does not zoom. */
-const adminLoginFieldClass = deskFieldClass.replace("text-sm", "text-base");
+const adminLoginFieldClass = deskFieldClass.replace("text-body", "text-body");
 
 export default async function AdminLoginPage({
   searchParams,
@@ -25,13 +26,12 @@ export default async function AdminLoginPage({
       <div className="w-full max-w-md">
         <div className="flex items-start justify-between gap-3">
           <BrandWordmark href="/admin/login" context="Super Admin" variant="lockup" priority />
-          <ThemeDock />
         </div>
         <h1 className="sr-only">Super Admin</h1>
 
-        <form action="/api/admin/session" method="post" className="glass-chrome mt-8 space-y-4 rounded-panel border border-line p-6">
+        <form action="/api/admin/session" method="post" className="glass-chrome mt-8 space-y-4 rounded-panel border border-hairline p-6">
           <div>
-            <label className="block text-sm font-medium text-ink" htmlFor="username">
+            <label className="block text-body font-medium text-ink" htmlFor="username">
               Username
             </label>
             <input
@@ -49,7 +49,7 @@ export default async function AdminLoginPage({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-ink" htmlFor="accessCode">
+            <label className="block text-body font-medium text-ink" htmlFor="accessCode">
               Access code
             </label>
             <input
@@ -64,14 +64,17 @@ export default async function AdminLoginPage({
             />
           </div>
           {invalid ? (
-            <p id="admin-login-error" className="text-sm text-warn" role="alert">
+            <p id="admin-login-error" className="text-body text-warn" role="alert">
               Invalid username or access code.
             </p>
           ) : null}
-          <button type="submit" className={`${btnPrimary} w-full`}>
+          <Button type="submit" className="w-full">
             Sign in
-          </button>
+          </Button>
         </form>
+        <footer className="mt-10 flex justify-center">
+          <AppearanceFooter />
+        </footer>
       </div>
     </main>
   );

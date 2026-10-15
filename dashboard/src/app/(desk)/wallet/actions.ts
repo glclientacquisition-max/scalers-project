@@ -1,5 +1,8 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -19,6 +22,8 @@ export async function saveOnDemandUsage(
   _prev: OnDemandUsageState,
   formData: FormData
 ): Promise<OnDemandUsageState> {
+  const denied = await memberDenied("billing.manage");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to change on-demand usage." };
   }
@@ -43,6 +48,7 @@ export async function saveOnDemandUsage(
     p_tenant_id: tenant.id,
     p_enabled: enabled,
   });
+  bustTenantCache(tenant.id);
 
   if (error) {
     return ownerSaveFailed(

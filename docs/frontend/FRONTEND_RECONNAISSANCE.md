@@ -127,7 +127,7 @@ Tokens already exist. The job is to **canonize usage**, not invent a second syst
 | Canvas | `#F4F7FB` | `surface-canvas` |
 | Card | `#FFFFFF` | `surface` |
 | Line | `#D5DEE9` | `line` |
-| Warn | `#C2410C` | `warn` |
+| Warn | `#B13A0A` | `warn` |
 | Ok | `#15803D` | `ok` |
 | Lead | `#B98A1F` | `lead` |
 | WhatsApp | `#25D366` | `whatsapp` |

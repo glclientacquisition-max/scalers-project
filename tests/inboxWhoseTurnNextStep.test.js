@@ -179,7 +179,7 @@ describe("Needs you whose-turn next-step", () => {
     const row = read("dashboard/src/components/InboxItemRow.tsx");
     assert.match(row, /inboxNeedsYouNextStep\(item, vertical\)/);
     assert.match(row, /function InboxNextStep/);
-    assert.match(row, /text-xs text-ink-soft/);
+    assert.match(row, /text-meta text-ink-2/);
     const trailing = row.slice(
       row.indexOf("function InboxTrailingAction"),
       row.indexOf("export function InboxTableRow")

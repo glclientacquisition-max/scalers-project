@@ -1,12 +1,13 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
+import { withRoleGate } from "@/components/DeskRole";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateContactName } from "@/app/(desk)/contacts/actions";
 import { isJunkCallerName } from "@/lib/callerNameQuality";
 import { contactStripTitle } from "@/lib/contactStrip";
 import {
-  btnPrimary,
   deskFieldClass,
   deskHitClass,
   deskShiftClass,
@@ -14,7 +15,7 @@ import {
   pendingSpinnerClass,
 } from "@/components/ui/deskChrome";
 
-export function ContactNameForm({
+function ContactNameFormInner({
   contactId,
   initialName = "",
   title,
@@ -67,11 +68,11 @@ export function ContactNameForm({
         autoCapitalize="words"
         className={`${deskFieldClass} min-w-0 flex-1`}
       />
-      <button type="submit" disabled={pending} className={`${btnPrimary} shrink-0 gap-2`}>
+      <Button type="submit" disabled={pending} className="shrink-0 gap-2">
         {pending ? <span aria-hidden="true" className={pendingSpinnerClass} /> : null}
         <span>Save</span>
-      </button>
-      {error ? <p className="w-full text-sm text-warn">{error}</p> : null}
+      </Button>
+      {error ? <p className="w-full text-body text-warn">{error}</p> : null}
     </form>
   );
 
@@ -83,7 +84,7 @@ export function ContactNameForm({
           type="button"
           data-contact-add-name=""
           onClick={() => setOpen(true)}
-          className={`inline-flex min-h-11 items-center rounded-md px-1 text-sm font-medium text-accent focus:outline-none focus:ring-2 focus:ring-brand ${deskShiftClass}`}
+          className={`inline-flex min-h-11 items-center rounded-md px-1 text-body font-medium text-accent focus:outline-none focus:ring-2 focus:ring-brand ${deskShiftClass}`}
         >
           + Add name
         </button>
@@ -95,7 +96,7 @@ export function ContactNameForm({
   return (
     <div data-contact-name-form="" className="min-w-0">
       {junk ? (
-        <h1 className="min-w-0 text-lg font-semibold leading-tight tracking-tight text-ink">
+        <h1 className="min-w-0 text-title font-semibold leading-tight tracking-tight text-ink">
           {heading}
         </h1>
       ) : (
@@ -108,7 +109,7 @@ export function ContactNameForm({
             aria-label="Edit name"
             aria-expanded={open}
             onClick={() => setOpen((value) => !value)}
-            className={`${deskHitClass} text-ink-soft ${deskShiftClass} ${focusRingVisible}`}
+            className={`${deskHitClass} text-ink-2 ${deskShiftClass} ${focusRingVisible}`}
           >
             <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
               <path
@@ -125,3 +126,5 @@ export function ContactNameForm({
     </div>
   );
 }
+
+export const ContactNameForm = withRoleGate("contacts.edit", ContactNameFormInner);

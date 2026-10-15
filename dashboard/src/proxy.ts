@@ -8,6 +8,7 @@ import {
   isAdminHostName,
   isLoopbackHost,
 } from "@/lib/adminHost";
+import { rootAuthForward } from "@/lib/authRedirect";
 import { ADMIN_CACHE_CONTROL, adminGateRedirect, isNoStoreAdminPath } from "@/lib/adminGate";
 
 /**
@@ -30,6 +31,9 @@ export function proxy(request: NextRequest) {
   const hostname = hostnameOf(request.headers.get("host"));
   const adminHost = configuredAdminHost();
   const path = request.nextUrl.pathname;
+
+  const authForward = rootAuthForward(path, request.nextUrl.searchParams);
+  if (authForward) return NextResponse.redirect(new URL(authForward, request.url), 303);
 
   if (adminHost && isAdminHostName(hostname)) {
     if (path === "/" || path === "/login") {

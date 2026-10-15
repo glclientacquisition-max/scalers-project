@@ -59,7 +59,7 @@ describe("desk preview truncate", () => {
     assert.match(phone, /contactListSubline/);
     assert.match(phone, /function lastCallStamp/);
     assert.match(phone, /formatCallWhenRelative/);
-    assert.doesNotMatch(phone, /font-mono text-sm text-ink/);
+    assert.doesNotMatch(phone, /font-mono text-body text-ink/);
     assert.doesNotMatch(phone, /line-clamp-2|break-words|overflow-wrap|whitespace-normal/);
     assert.match(phone, /<ContactListDock phone=\{row\.phone\} \/>/);
     assert.match(phone, /<CallLink number=\{number\} \/>/);

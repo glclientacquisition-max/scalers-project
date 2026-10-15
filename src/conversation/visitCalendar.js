@@ -146,6 +146,15 @@ function textAlreadySaysDay(whenText, dayKey) {
   return Boolean(dayKey && text.includes(dayKey));
 }
 
+/** BRAIN_CALL_FIXES_D199: "today, 9 AM" for a visit earlier today. */
+function todayWhenLabel(whenText) {
+  const clock = /\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)/i.exec(String(whenText || ''));
+  const period = /\b(morning|afternoon|evening)\b/i.exec(String(whenText || ''));
+  if (clock) return `today, ${clock[0].replace(/\s+/g, ' ').trim()}`;
+  if (period) return `today ${period[1].toLowerCase()}`;
+  return 'today';
+}
+
 function livedWhenLabel(whenText, { past, dayKey, spokenDay, relative }) {
   const original = String(whenText || '').replace(/\s+/g, ' ').trim();
   if (past) {
@@ -232,14 +241,26 @@ function classifyLivedVisit(row, now = new Date()) {
   } else if (pastMode === 'date' && dayKey) {
     past = dayKey < eatYmd(now);
   }
+  // BRAIN_CALL_FIXES_D199 (e): a confirmed visit earlier today (EAT) is still
+  // today's visit. HD_1677e57f73f9 (3): one still 'requested' whose time has
+  // passed is past (today's 9 AM at 1 PM), never open or upcoming.
+  const todayStill =
+    past &&
+    dayKey &&
+    dayKey === eatYmd(now) &&
+    String(row?.status || '').toLowerCase() === 'confirmed' &&
+    require('./callFixesD199').callFixesD199Enabled();
+  if (todayStill) past = false;
 
   const spokenDay = past ? 'past' : spokenDayWord(dayKey, now) || null;
-  const whenLabel = livedWhenLabel(whenText, {
-    past,
-    dayKey,
-    spokenDay,
-    relative,
-  });
+  const whenLabel = todayStill
+    ? todayWhenLabel(whenText)
+    : livedWhenLabel(whenText, {
+        past,
+        dayKey,
+        spokenDay,
+        relative,
+      });
   return {
     past,
     relative,

@@ -80,9 +80,9 @@ describe("Residual owner DeskSelect swaps", () => {
     assert.match(form, /social-kind-/);
     assert.match(form, /prod-stock-m-/);
     assert.match(form, /prod-stock-/);
-    assert.match(form, /add-policy-rule/);
+    // Policies "Add a rule" is a bottom-drawer picker now (PolicyRulesEditor), not a DeskSelect.
+    assert.match(form, /<PolicyRulesEditor/);
     assert.match(form, /placeholder="Not set"/);
-    assert.match(form, /placeholder="Add rule"/);
     assert.doesNotMatch(form, /<select[\s>]/);
   });
 

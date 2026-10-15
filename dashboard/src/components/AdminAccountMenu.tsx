@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { BrandLockup } from "@/components/brand/BrandMark";
-import { ThemePicker } from "@/components/ThemePicker";
+import { ThemePicker, appearanceLabel, useThemeChoice } from "@/components/ThemePicker";
 import { iconButtonClass } from "@/components/ui/IconButton";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { SignOutButton } from "@/components/ui/SignOutButton";
@@ -17,6 +17,7 @@ function accountInitials(name: string): string {
 export function AdminAccountMenu({ name }: { name: string }) {
   const [open, setOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
+  const theme = useThemeChoice();
   const initials = accountInitials(name);
 
   return (
@@ -44,7 +45,7 @@ export function AdminAccountMenu({ name }: { name: string }) {
           <button type="button" aria-label={name} className={iconButtonClass()}>
             <span
               className={cx(
-                "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-on",
+                "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-meta font-semibold text-accent-on",
                 open ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : "",
               )}
             >
@@ -61,13 +62,10 @@ export function AdminAccountMenu({ name }: { name: string }) {
             aria-expanded={themeOpen}
             onClick={() => setThemeOpen((current) => !current)}
           >
-            Appearance
+            {appearanceLabel(theme.choice)}
           </MenuItem>
           {themeOpen ? (
             <div data-account-appearance="" className="px-2 pb-2">
-              <p className="pointer-events-none px-1 pb-2 pt-1 text-caption font-medium uppercase tracking-wide text-ink-3">
-                This device
-              </p>
               <ThemePicker />
             </div>
           ) : null}

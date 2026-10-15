@@ -1,0 +1,396 @@
+{
+ "note": "Staging D&D call HD_1677e57f73f9 (2026-10-09 13:04 EAT, staging ccdab29b, sw). Caller text, spoken lines (structured say), model lines dropped by structured_verify, and tool calls from voice_turn_traces (turn_index 1-33); caller file rows (contact, open service_requests, requested appointments) as on file at call start, read-only. Caller phone omitted; contact last_reason was overwritten by this call so it is null here. held marks a fragment held as unfinished; holdTimedOut marks one the model answered after the hold timer. Outcome: nothing saved (create_appointment invalid 'Visit has a day but no time.' with when_text 'today at 2:00 PM' from caller 'leo saa 8:00'), summary goal 'Na unionyeshe direction ya carpet'.",
+ "callId": "HD_1677e57f73f9",
+ "startedAt": "2026-10-09T10:04:13.063Z",
+ "tenantFixture": "done-and-dusted-staging.json",
+ "businessName": "Done and Dusted",
+ "vertical": "home_services",
+ "callerFile": {
+  "contact": {
+   "id": "85bf2fec-c63f-403d-9a0f-7af64c1830b9",
+   "name": "Chris",
+   "notes": null,
+   "last_reason": null,
+   "metadata": {
+    "alternate_names": [
+     {
+      "name": "so disappointed",
+      "seen_at": "2026-10-01T21:23:41.062Z"
+     },
+     {
+      "name": "Mteja",
+      "seen_at": "2026-09-25T11:39:54.425Z"
+     },
+     {
+      "name": "Chr",
+      "seen_at": "2026-09-21T13:38:39.749Z"
+     }
+    ]
+   }
+  },
+  "requests": [
+   {
+    "id": "e625455a-02cf-4416-8b6a-218f36efc641",
+    "item": "Carpet cleaning",
+    "notes": "Um, hapa Nairobi. Hapa Riverside tu, hapa Riverside Drive. Mni-cleanie carpet zangu, I have like 20 carpets, nataka mkuje mni-cleanie saa hizi",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-10-07T09:11:33.49956+00:00",
+    "request_type": "enquiry",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "f5da6c06-fdb7-4e86-a7b1-63a936cc005d",
+    "item": "Mattress cleaning coverage in Naivasha",
+    "notes": "callback — Mattress cleaning coverage in Naivasha — kesho saa 8 mchana",
+    "status": "open",
+    "quantity": null,
+    "when_text": "kesho saa 8 mchana",
+    "created_at": "2026-09-14T17:19:12.490928+00:00",
+    "request_type": "callback",
+    "window_start": null,
+    "window_end": null
+   },
+   {
+    "id": "a32fa58d-bfdd-4755-9487-8827568b4afa",
+    "item": "General cleaning issue",
+    "notes": "Caller complaining that team went ahead improperly during general cleaning service",
+    "status": "open",
+    "quantity": null,
+    "when_text": null,
+    "created_at": "2026-09-12T09:30:52.476197+00:00",
+    "request_type": "enquiry",
+    "window_start": null,
+    "window_end": null
+   }
+  ],
+  "openAppointments": [
+   {
+    "id": "a5f01a05-0c5c-46b2-86ab-62d9e0db6944",
+    "service_name": "Mattress cleaning",
+    "status": "requested",
+    "when_text": "kesho saa 8 mchana",
+    "window_start": "2026-09-15T11:00:06.427+00:00",
+    "window_end": null,
+    "address_landmark": "Naivasha",
+    "notes": "Mattress cleaning in Naivasha",
+    "created_at": "2026-09-14T17:12:06.9996+00:00"
+   },
+   {
+    "id": "1060e526-55ce-4cf1-ba5e-87977e57c46a",
+    "service_name": "Mattress cleaning",
+    "status": "requested",
+    "when_text": "kesho saa 8 mchana",
+    "window_start": "2026-09-15T11:00:52.99+00:00",
+    "window_end": null,
+    "address_landmark": "Iwasha",
+    "notes": "Emergency mattress cleaning from previous call",
+    "created_at": "2026-09-14T17:10:53.30119+00:00"
+   },
+   {
+    "id": "a8c93aa2-8573-4496-bd94-cd21b448b42a",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "kesho saa 8 am",
+    "window_start": null,
+    "window_end": null,
+    "address_landmark": "Barnabas",
+    "notes": "Carpet cleaning booking",
+    "created_at": "2026-08-16T14:31:25.713368+00:00"
+   },
+   {
+    "id": "e32ecf22-5b96-4e39-9bed-490fa1aee36d",
+    "service_name": "Carpet cleaning",
+    "status": "requested",
+    "when_text": "tomorrow",
+    "window_start": null,
+    "window_end": null,
+    "address_landmark": "Green State",
+    "notes": "Caller wants size measured on site for exact carpet quote",
+    "created_at": "2026-08-16T14:26:11.923173+00:00"
+   }
+  ]
+ },
+ "turns": [
+  {
+   "turn": 1,
+   "caller": "the question.",
+   "language": "en",
+   "spoken": "I am Shy from Done and Dusted Cleaning Services. How can I help you today?",
+   "outcome": "barge_in",
+   "intent": "smalltalk"
+  },
+  {
+   "turn": 2,
+   "caller": "Hizi vitu zenye",
+   "language": "sw",
+   "spoken": "Tunafanya usafishaji wa sofa, carpet, mattress, na usafishaji wa nyumba na maofisi. Ungetaka tusaidie na huduma gani?",
+   "outcome": "barge_in",
+   "intent": "services"
+  },
+  {
+   "turn": 3,
+   "caller": "Hizi vitu zenye—hizi vitu zenye zenye kuonekanga ngozi ni tangu waje?",
+   "language": "sw",
+   "spoken": "Usafishaji wa sofa ni shilingi mia nane kwa kila kiti. Ungetaka tukusafishie viti ngapi?",
+   "intent": "services"
+  },
+  {
+   "turn": 4,
+   "caller": "A-a,",
+   "language": "sw",
+   "spoken": "",
+   "held": true
+  },
+  {
+   "turn": 5,
+   "caller": "A-a, uliza je,",
+   "language": "sw",
+   "spoken": "",
+   "held": true
+  },
+  {
+   "turn": 6,
+   "caller": "A-a, uliza je,",
+   "language": "sw",
+   "spoken": "Samahani, ungalipenda kuuliza nini kuhusu huduma zetu?",
+   "holdTimedOut": true,
+   "intent": "services"
+  },
+  {
+   "turn": 7,
+   "caller": "Nauliza pale, mtu anaonekanga manguo zake ni tangu waje?",
+   "language": "sw",
+   "spoken": "Kufua au kupiga pasi nguo hufanywa chini ya usafishaji wa masaa kwa shilingi mia tano kwa kila saa, kuanzia masaa matatu. Ungependa kusaidiwa na hii huduma?",
+   "outcome": "barge_in",
+   "intent": "services"
+  },
+  {
+   "turn": 8,
+   "caller": "M-m,",
+   "language": "sw",
+   "spoken": "",
+   "held": true
+  },
+  {
+   "turn": 9,
+   "caller": "M-m, nauliza hivo.",
+   "language": "sw",
+   "spoken": "Mimi Sina hiyo taarifa kamili, naweza kuichukua ili niwaambie timu yetu wakuarifu. Ungependa nikuwekee hii kama ujumbe?",
+   "outcome": "barge_in",
+   "intent": "services"
+  },
+  {
+   "turn": 10,
+   "caller": "Nakuuliza pale watu huonekanga nguo ni tangu waje, pale watu wanaonekanga nguo zao?",
+   "language": "sw",
+   "spoken": "Mimi Sina hiyo taarifa kamili, naweza kuichukua ili niwaambie timu yetu wakuarifu. Naweza kupata jina lakina maelezo zaidi?",
+   "outcome": "barge_in",
+   "intent": "services"
+  },
+  {
+   "turn": 11,
+   "caller": "Natafakari.",
+   "language": "sw",
+   "spoken": "Chukua muda wako. Ukiko tayari uniambie jinsi naweza kukusaidia.",
+   "intent": "smalltalk"
+  },
+  {
+   "turn": 12,
+   "caller": "Ah, nataka unionyeshe wardrobe.",
+   "language": "sw",
+   "spoken": "",
+   "outcome": "barge_in"
+  },
+  {
+   "turn": 13,
+   "caller": "Na unionyeshe direction ya carpet.",
+   "language": "sw",
+   "spoken": "Sisi hatuuzi au kuonyesha wardrobe kwani tunatoa huduma za usafishaji pekee. Kuhusu carpet, tunatoa huduma ya usafishaji wa carpet kwa shilingi elfu mbili kwa kila chumba na tunakufuata ulipo Nairobi na mazingira yake.",
+   "outcome": "barge_in",
+   "intent": "services"
+  },
+  {
+   "turn": 14,
+   "caller": "Ukisema muoshe, mnionyeshe, mnionyeshe wardrobe.",
+   "language": "sw",
+   "spoken": "Hatuuzi wala hatuonyeshi wardrobe, sisi hufanya usafishaji wa nyumba na vitu vya ndani pekee. Je, ungependa tukusaidie na usafishaji gani leo?",
+   "outcome": "barge_in",
+   "intent": "services"
+  },
+  {
+   "turn": 15,
+   "caller": "Kuosha? Ujui kuosha?",
+   "language": "sw",
+   "spoken": "",
+   "outcome": "barge_in"
+  },
+  {
+   "turn": 16,
+   "caller": "Natafakari.",
+   "language": "sw",
+   "spoken": "Tunaosha vizuri kabisa! Tunatoa huduma za kuosha carpet, sofa, matress na usafishaji wa nyumba pia. Chukua muda wako kutafakari, kisha uniambie ungetaka tukuoshee nini.",
+   "outcome": "barge_in",
+   "intent": "services"
+  },
+  {
+   "turn": 17,
+   "caller": "Wardrobe.",
+   "language": "sw",
+   "spoken": "Mimi Sina hiyo taarifa kamili, naweza kuichukua ili niwaambie timu yetu. Ungependa tukufanyie usafishaji wa wardrobe ama unahitaji usaidizi gani zaidi?",
+   "outcome": "barge_in",
+   "intent": "services"
+  },
+  {
+   "turn": 18,
+   "caller": "Unataka kuambia nini?",
+   "language": "sw",
+   "spoken": "",
+   "outcome": "barge_in"
+  },
+  {
+   "turn": 19,
+   "caller": "Unataka kuambia nini?",
+   "language": "sw",
+   "spoken": "Nataka kukuambia kuwa sisi ni Done and Dusted na tunatoa huduma za usafishaji wa nyumba, carpet, na sofa. Je, ungependa kukata miadi au kupata maelezo zaidi kuhusu usafishaji?",
+   "outcome": "barge_in",
+   "intent": "services"
+  },
+  {
+   "turn": 20,
+   "caller": "A-a, anasema. Mazi.",
+   "language": "sw",
+   "spoken": "",
+   "outcome": "barge_in"
+  },
+  {
+   "turn": 21,
+   "caller": "Kitu—",
+   "language": "sw",
+   "spoken": "",
+   "held": true
+  },
+  {
+   "turn": 22,
+   "caller": "Kitu— Nakuuliza, nakuuliza, nakuuliza, nakuuliza, unataka.",
+   "language": "sw",
+   "spoken": "",
+   "outcome": "barge_in"
+  },
+  {
+   "turn": 23,
+   "caller": "Kuambia timu yako nini?",
+   "language": "sw",
+   "spoken": "Naweza kuwaambia timu yetu kwamba unahitaji usaidizi wa kuosha au kufanya usafishaji wa wardrobe.",
+   "intent": "other"
+  },
+  {
+   "turn": 24,
+   "caller": "Yeah, yeah, na pia kuosha kitchen.",
+   "language": "sw",
+   "spoken": "Sawa kabisa, tunaweza kuandika ombi hilo kwa timu yetu au tukupangie miadi ya usafishaji wa jikoni na nyumba.",
+   "intent": "services"
+  },
+  {
+   "turn": 25,
+   "caller": "Hey, Chris, sawa kabisa, iko saw",
+   "language": "sw",
+   "spoken": "",
+   "outcome": "barge_in"
+  },
+  {
+   "turn": 26,
+   "caller": "a, iko sawa, iko sawa. Sasa ki unafanya ni, um, utume hao watu leo saa 8:00 wakuje, wafanyie kazi, halafu tu—",
+   "language": "sw",
+   "spoken": "",
+   "held": true
+  },
+  {
+   "turn": 27,
+   "caller": "a, iko sawa, iko sawa. Sasa ki unafanya ni, um, utume hao watu leo saa 8:00 wakuje, wafanyie kazi, halafu tu— Niwalipe.",
+   "language": "sw",
+   "spoken": "",
+   "outcome": "barge_in"
+  },
+  {
+   "turn": 28,
+   "caller": "Si ndiyo?",
+   "language": "sw",
+   "spoken": "Naomba pia unieleze, tuje wapi kufanya huo usafishaji wa jikoni na wardrobe leo saa nane?",
+   "intent": "booking",
+   "modelSay": [
+    "Je, ninaongea na Chris?",
+    "Naomba pia unieleze, tuje wapi kufanya huo usafishaji wa jikoni na wardrobe leo saa nane?"
+   ],
+   "dropped": [
+    {
+     "line": "Je, ninaongea na Chris?",
+     "by": "structured_verify",
+     "reason": "privacy_unbound",
+     "detail": "names the caller file before the speaker is confirmed"
+    }
+   ]
+  },
+  {
+   "turn": 29,
+   "caller": "Saa 8:00, saa 8:00, eh, hapa Kijani",
+   "language": "sw",
+   "spoken": "Hapo Kijani ni lango gani au jengo gani ndio tuweze kupata eneo kamili?",
+   "outcome": "barge_in",
+   "intent": "booking"
+  },
+  {
+   "turn": 30,
+   "caller": "Bado tuko hapa tu, Riverside, Westlands.",
+   "language": "sw",
+   "spoken": "Sawa kabisa.",
+   "intent": "booking",
+   "tools": [
+    {
+     "name": "save_caller_info",
+     "args": {
+      "name": "Chris",
+      "reason": "Caller name is not confirmed yet."
+     },
+     "status": "deferred"
+    },
+    {
+     "name": "create_appointment",
+     "args": {
+      "service_name": "Kitchen and Wardrobe Cleaning",
+      "name": "Chris",
+      "when_text": "today at 2:00 PM",
+      "location": "Kijani, Riverside, Westlands",
+      "notes": "confirm access"
+     },
+     "status": "invalid",
+     "reason": "Visit has a day but no time."
+    }
+   ]
+  },
+  {
+   "turn": 31,
+   "caller": "Riverside, Westlands.",
+   "language": "sw",
+   "spoken": "Nimeelewa ni Riverside, Westlands.",
+   "intent": "booking"
+  },
+  {
+   "turn": 32,
+   "caller": "Sawa, ni hayo tu. Baadaye basi.",
+   "language": "sw",
+   "spoken": "Asante sana, siku njema.",
+   "intent": "smalltalk"
+  },
+  {
+   "turn": 33,
+   "caller": "Baadaye.",
+   "language": "sw",
+   "spoken": "Kwa heri ya kuonana baadaye.",
+   "outcome": "barge_in",
+   "intent": "smalltalk"
+  }
+ ]
+}

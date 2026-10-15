@@ -20,9 +20,9 @@ function randomHex(bytes: number): string {
   return Array.from(out, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export function newServiceId(taken: Set<string> = new Set()): string {
+export function newServiceId(taken: Set<string> = new Set(), prefix: string = SERVICE_ID_PREFIX): string {
   for (;;) {
-    const id = `${SERVICE_ID_PREFIX}${randomHex(8)}`;
+    const id = `${prefix}${randomHex(8)}`;
     if (!taken.has(id)) return id;
   }
 }
@@ -33,7 +33,8 @@ export function newServiceId(taken: Set<string> = new Set()): string {
  */
 export function assignServiceIds<T extends Record<string, unknown>>(
   rows: T[],
-  stored: Array<Record<string, unknown>> = []
+  stored: Array<Record<string, unknown>> = [],
+  prefix: string = SERVICE_ID_PREFIX
 ): Array<T & { id: string }> {
   const storedIds = new Set<string>();
   for (const row of stored) {
@@ -52,7 +53,7 @@ export function assignServiceIds<T extends Record<string, unknown>>(
       used.add(id);
       return { ...row, id };
     }
-    const fresh = newServiceId(taken);
+    const fresh = newServiceId(taken, prefix);
     taken.add(fresh);
     used.add(fresh);
     return { ...row, id: fresh };

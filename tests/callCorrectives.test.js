@@ -1,5 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+// Delivery-text coverage is the flag-off path; BRAIN_CONFIRMED_COVERAGE=on twins: confirmedCoverage.test.js.
+const { flagOff } = require('./helpers/ownerCoverage');
 const fs = require('node:fs');
 const {
   createBrainState,
@@ -129,7 +131,7 @@ describe('post-V5 call correctives', () => {
     assert.notEqual(decision.action, 'ESCALATE');
   });
 
-  it('treats out-of-coverage leave-it as outside coverage, not a callback offer', () => {
+  it('treats out-of-coverage leave-it as outside coverage, not a callback offer', flagOff(() => {
     let state = say(
       createBrainState(home),
       'Carpet cleaning tomorrow in Rongai, this is Alvin',
@@ -154,7 +156,7 @@ describe('post-V5 call correctives', () => {
       { createAppointment: true }
     );
     assert.equal(injected.appointment, undefined);
-  });
+  }));
 
   it('does not lock an in-coverage visit on leave-it', () => {
     let state = say(

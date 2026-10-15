@@ -52,7 +52,11 @@ export const isAdminAuthenticated = cache(async (): Promise<boolean> => {
 /** Shared-password cookie session (ops / demo). */
 export const isLegacyAuthenticated = isAdminAuthenticated;
 
-export const getAuthUser = cache(async (): Promise<User | null> => {
+/**
+ * Full user from the Auth server (one network round trip). Use where fields that are not in
+ * the JWT matter: email_confirmed_at, identities. Onboarding and sign-up use this.
+ */
+export const getVerifiedAuthUser = cache(async (): Promise<User | null> => {
   try {
     const supabase = await createSupabaseServerClient();
     const {
@@ -62,6 +66,41 @@ export const getAuthUser = cache(async (): Promise<User | null> => {
   } catch {
     return null;
   }
+});
+
+/**
+ * Signed-in user for desk reads. The session JWT is verified locally against the project's
+ * ES256 signing keys (JWKS is cached), so no Auth round trip per request. Falls back to
+ * getUser when the claims cannot be verified (HS256 project, missing session, old SDK).
+ * Database access still goes through RLS with the same JWT.
+ */
+export const getAuthUser = cache(async (): Promise<User | null> => {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const auth = supabase.auth as unknown as {
+      getClaims?: () => Promise<{ data: { claims: Record<string, unknown> } | null; error: unknown }>;
+    };
+    if (typeof auth.getClaims === "function") {
+      const { data, error } = await auth.getClaims();
+      const c = data?.claims;
+      if (!error && c && typeof c.sub === "string" && c.sub && c.role === "authenticated") {
+        return {
+          id: c.sub,
+          email: typeof c.email === "string" ? c.email : undefined,
+          phone: typeof c.phone === "string" ? c.phone : undefined,
+          aud: typeof c.aud === "string" ? c.aud : "authenticated",
+          role: "authenticated",
+          app_metadata: (c.app_metadata as User["app_metadata"]) || {},
+          user_metadata: (c.user_metadata as User["user_metadata"]) || {},
+          created_at: "",
+        } as User;
+      }
+      if (!error && !c) return null;
+    }
+  } catch {
+    /* fall through to the network check */
+  }
+  return getVerifiedAuthUser();
 });
 
 /** True if Supabase Auth session OR legacy shared-password cookie is valid. */

@@ -115,7 +115,7 @@ describe("admin desk standard shell", () => {
     assert.doesNotMatch(adminNav, /BackChevron/);
   });
 
-  it("gives Super Admin the same account header as the desk, with This device", () => {
+  it("gives Super Admin the same account header as the desk, with the Appearance control", () => {
     const menu = read("dashboard/src/components/AdminAccountMenu.tsx");
     const account = read("dashboard/src/components/DeskAccountMenu.tsx");
     assert.match(adminNav, /<AdminAccountMenu/);
@@ -124,13 +124,12 @@ describe("admin desk standard shell", () => {
     assert.match(menu, /data-account-bar=""/);
     assert.match(menu, /href="\/admin"/);
     assert.match(menu, /<ThemePicker \/>/);
-    assert.match(menu, />\s*This device\s*</);
-    assert.match(menu, />\s*Appearance\s*</);
+    assert.match(menu, /appearanceLabel\(theme\.choice\)/);
     assert.match(menu, /SignOutButton/);
     assert.doesNotMatch(menu, /DeskAccountMenu|switchDeskTenant|\/home/);
     assert.match(account, /data-account-bar=""/);
     const adminDoc = read("docs/frontend/design-system/pages/admin.md");
     assert.match(adminDoc, /account header/);
-    assert.match(adminDoc, /This device/);
+    assert.match(adminDoc, /On this device/);
   });
 });

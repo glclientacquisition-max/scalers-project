@@ -23,7 +23,7 @@ export function ContactKpiStrip({
             <p className="text-caption font-medium text-ink-2">
               {card.label}
             </p>
-            <p className="mt-1 font-display text-xl tabular-nums leading-none text-ink">
+            <p className="mt-1 font-display text-title tabular-nums leading-none text-ink">
               {card.value}
             </p>
           </>
@@ -33,7 +33,7 @@ export function ContactKpiStrip({
             key={card.id}
             href={href}
             data-contact-kpi={card.id}
-            className="min-w-0 min-h-11 flex-1 rounded-2xl border border-line bg-surface px-3 py-3 focus:outline-none focus:ring-2 focus:ring-brand"
+            className="min-w-0 min-h-11 flex-1 rounded-2xl border border-hairline bg-surface px-3 py-3 focus:outline-none focus:ring-2 focus:ring-brand"
           >
             {body}
           </Link>
@@ -41,7 +41,7 @@ export function ContactKpiStrip({
           <article
             key={card.id}
             data-contact-kpi={card.id}
-            className="min-w-0 flex-1 rounded-2xl border border-line bg-surface px-3 py-3"
+            className="min-w-0 flex-1 rounded-2xl border border-hairline bg-surface px-3 py-3"
           >
             {body}
           </article>
