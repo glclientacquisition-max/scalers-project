@@ -103,17 +103,15 @@ describe("package usage meter", () => {
     assert.deepEqual(assignmentFromBusiness(null), { packageId: null, period: null });
   });
 
-  it("previews landing prices and follows the selected business on Admin", () => {
+  it("previews landing prices and sends package changes to the business's Billing page", () => {
     const panel = read("dashboard/src/components/AdminPackagesPanel.tsx");
     const page = read("dashboard/src/app/admin/(console)/packages/page.tsx");
     assert.match(panel, /packagePriceLabel/);
     assert.match(panel, /Per year/);
     assert.match(panel, /live on landing/);
-    assert.match(panel, /Now \$\{selected\.packageName/);
-    assert.match(panel, /Now none/);
-    assert.match(panel, /assignmentFromBusiness/);
     assert.match(panel, /action: "save_package"/);
-    assert.match(panel, /action: "assign"/);
+    assert.doesNotMatch(panel, /action: "assign"/);
+    assert.match(panel, /\/admin\/billing\/\$\{tenantId\}/);
     assert.match(panel, /usedOfIncluded\(minutesUsedFromSeconds/);
     assert.match(panel, /row\.gap/);
     assert.match(panel, /Matches package/);
