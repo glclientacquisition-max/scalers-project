@@ -25,4 +25,9 @@ function takeToolOutcome(state) {
   return text;
 }
 
-module.exports = { queueToolOutcome, takeToolOutcome };
+/** Peek without clearing. Used by VOICE_OWED_CONFIRM_FOLD to fold into the reply. */
+function peekToolOutcome(state) {
+  return outcomeLine(state?.conversation?.pendingToolOutcome);
+}
+
+module.exports = { queueToolOutcome, takeToolOutcome, peekToolOutcome };
