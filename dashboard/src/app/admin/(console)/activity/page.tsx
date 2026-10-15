@@ -1,3 +1,4 @@
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminActivityPanel } from "@/components/AdminActivityPanel";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { ACTIVITY_LIMIT, loadAdminActivity } from "@/lib/adminActivity";
@@ -18,7 +19,9 @@ export default async function AdminActivityPage({
     const { rows, businesses, actors } = await loadAdminActivity(filters);
     const names = new Map(businesses.map((b) => [b.id, b.name]));
     return (
-      <AdminActivityPanel
+      <div className="space-y-4">
+        <AdminPageHeader title="Activity" subtitle="Every admin change: who, what, and when." />
+        <AdminActivityPanel
         items={rows.map((row) => activityItem(row, names))}
         businesses={businesses}
         actors={actors}
@@ -26,6 +29,7 @@ export default async function AdminActivityPage({
         actor={filters.actor}
         limit={ACTIVITY_LIMIT}
       />
+      </div>
     );
   } catch (err) {
     logAdminError("activity", err);

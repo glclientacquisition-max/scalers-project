@@ -63,7 +63,7 @@ function compareLine(count: { today: number; lastWeek: number }, weekday: string
 }
 
 /**
- * Today in numbers. Couldn't answer has no platform-wide count yet; the row opens Calls, where each business lists its own.
+ * Today in numbers. Couldn't answer has no platform-wide count yet; the row opens Quality, where each business lists its own.
  */
 export function todayNumberRows(counts: CallCounts, now: Date): TodayNumberRow[] {
   const weekday = WEEKDAYS[new Date(now.getTime() + EAT_OFFSET_MS).getUTCDay()];
@@ -79,7 +79,7 @@ export function todayNumberRows(counts: CallCounts, now: Date): TodayNumberRow[]
       key: "couldnt-answer",
       title: "Couldn't answer",
       value: "",
-      detail: "Per business on Calls. Traced calls only.",
+      detail: "Per business on Quality. Traced calls only.",
       available: false,
       href: "/admin/quality",
     },

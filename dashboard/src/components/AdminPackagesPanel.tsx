@@ -132,7 +132,7 @@ export function AdminPackagesPanel({
     <>
       {!catalogOnly && needsYou.length > 0 ? (
         <section>
-          <p className="px-4 text-caption text-ink-3">Needs you</p>
+          <p className="px-4 text-caption font-medium text-ink-2">Needs you</p>
           <ul className="divide-y divide-hairline">
             {needsYou.map((row) => (
               <ListRow
@@ -148,7 +148,7 @@ export function AdminPackagesPanel({
       ) : null}
 
       <section>
-        <p className="px-4 text-caption text-ink-3">Rates</p>
+        <p className="px-4 text-caption font-medium text-ink-2">Rates</p>
         <ul className="divide-y divide-hairline">
           <ListRow
             title="On-demand"
@@ -159,13 +159,25 @@ export function AdminPackagesPanel({
       </section>
 
       <section>
-        <p className="px-4 text-caption text-ink-3">{tab === "packages" ? "Packages" : "Shops"}</p>
+        <p className="px-4 text-caption font-medium text-ink-2">
+          {tab === "packages" ? "Packages" : "Businesses"}
+        </p>
         {catalogOnly ? null : (
           <Segmented
             label="Packages filter"
             items={[
-              { key: "packages", label: "Packages", count: packs.length, active: tab === "packages" },
-              { key: "shops", label: "Shops", count: businesses.length, active: tab === "shops" },
+              {
+                key: "packages",
+                label: "Packages",
+                count: packs.length,
+                active: tab === "packages",
+              },
+              {
+                key: "shops",
+                label: "Businesses",
+                count: businesses.length,
+                active: tab === "shops",
+              },
             ]}
             onSelect={(key) => setTab(key as Tab)}
           />
@@ -183,7 +195,10 @@ export function AdminPackagesPanel({
 
         {tab === "packages" || catalogOnly ? (
           packs.length === 0 ? (
-            <Empty title="No packages." line="Add a SKU in the catalogue." />
+            <Empty
+              title="No packages."
+              line="Add a package in the catalogue."
+            />
           ) : (
             <ul className="divide-y divide-hairline">
               {packs.map((pack) => (

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { useMemo, useState } from "react";
 import { QualityEmpty } from "@/components/admin/QualityEmpty";
 import { DeltaMark, DroppingMark, QualitySpark, Unlogged, formatCallWhen } from "@/components/admin/QualityBits";
@@ -33,8 +34,15 @@ function failureText(row: BusinessQualityRow): string {
 function phonePreview(row: BusinessQualityRow): string {
   const failure = failureText(row);
   const calls = callCountLabel(row.callsTraced);
-  if (row.dropping) return `${calls}. ${failure}. ${row.droppingReason}`;
   return `${calls}. ${failure}`;
+}
+
+/** Time and short version, so two releases on one day never read the same. */
+function releaseStamp(row: ReleaseDelta): string {
+  const sha = String(row.release.gitSha || "").slice(0, 7);
+  return [row.at ? formatCallWhen(row.at) : "", sha]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function checkRows(delta: ReleaseDelta) {
@@ -72,11 +80,11 @@ export function QualityIndex({
   return (
     <div className="space-y-8">
       <section>
-        <header className="px-4 pb-3">
-          <h1 className="text-page text-ink">Quality</h1>
-          <p className="mt-0.5 text-meta text-ink-2">Traced calls, worst first.</p>
-        </header>
-        <div className="px-4 pb-2">
+        <AdminPageHeader
+          title="Quality"
+          subtitle="Traced calls, worst first."
+        />
+        <div className="pb-2">
           <Input
             id="quality-search"
             type="search"
@@ -198,10 +206,12 @@ export function QualityIndex({
                     return (
                       <tr key={row.release.gitSha}>
                         <Td>
-                          <span className="block font-medium text-ink">{releaseName(row)}</span>
-                          {row.release.label && row.at ? (
-                            <span className="text-caption tabular-nums text-ink-3">{formatCallWhen(row.at)}</span>
-                          ) : null}
+                          <span className="block font-medium text-ink">
+                            {releaseName(row)}
+                          </span>
+                          <span className="text-caption tabular-nums text-ink-2">
+                            {releaseStamp(row)}
+                          </span>
                         </Td>
                         <Td num>
                           <ScoreText score={row.before.avgScore} />
@@ -237,10 +247,12 @@ export function QualityIndex({
                 return (
                   <li key={row.release.gitSha} className="space-y-1 px-4 py-3">
                     <p className="flex items-baseline gap-3">
-                      <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">{releaseName(row)}</span>
-                      {row.release.label && row.at ? (
-                        <span className="shrink-0 text-caption tabular-nums text-ink-3">{formatCallWhen(row.at)}</span>
-                      ) : null}
+                      <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
+                        {releaseName(row)}
+                      </span>
+                      <span className="shrink-0 text-caption tabular-nums text-ink-2">
+                        {releaseStamp(row)}
+                      </span>
                     </p>
                     <p className="text-meta tabular-nums text-ink-2">
                       Score <ScoreText score={row.before.avgScore} /> to <ScoreText score={row.after.avgScore} /> (

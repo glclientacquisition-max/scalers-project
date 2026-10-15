@@ -1,3 +1,4 @@
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminOpsNotices, AdminPlatformOpsForm } from "@/components/AdminPlatformOpsForm";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { PlatformRunBoard } from "@/components/PlatformRunBoard";
@@ -19,6 +20,7 @@ export default async function AdminPlatformPage() {
 
   return (
     <div className="space-y-4">
+      <AdminPageHeader title="Platform" subtitle="Providers, health checks, and alerts." />
       <AdminOpsNotices notices={snapshot.notices.filter((notice) => notice.status === "open")} />
       <PlatformRunBoard />
       <AdminPlatformOpsForm settings={snapshot.settings} persisted={snapshot.persisted} />

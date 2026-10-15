@@ -298,7 +298,13 @@ describe("Quality view model", () => {
     );
     assert.equal(rows.length, 1);
     assert.equal(rows[0].title, "Done and Dusted");
-    assert.equal(rows[0].detail, "Score fell 22 points versus the prior 7 days.");
+    // One line on Today: the first clause, capped. The full reason stays on the quality screen.
+    assert.equal(rows[0].detail, "Score fell 22 points versus the prior 7 days");
+    assert.equal(
+      model.shortReason("Deleted answer on 4 calls, none in the prior week. Check the knowledge base."),
+      "Deleted answer on 4 calls",
+    );
+    assert.ok(model.shortReason("x".repeat(80)).length <= 48);
     assert.equal(rows[0].stamp, "Dropping");
     assert.equal(rows[0].href, "/admin/quality/a");
   });

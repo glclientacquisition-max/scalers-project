@@ -45,7 +45,7 @@ export function AdminOpsNotices({ notices }: { notices: OpsNotice[] }) {
 
   return (
     <section>
-      <p className="px-4 text-caption text-ink-3">Needs you</p>
+      <p className="px-4 text-caption font-medium text-ink-2">Needs you</p>
       {error ? (
         <p className="px-4 text-body text-attention" role="alert">
           {error}
@@ -165,7 +165,7 @@ export function AdminPlatformOpsForm({
   if (!persisted) {
     return (
       <section id="escalate">
-        <p className="px-4 text-caption text-ink-3">People</p>
+        <p className="px-4 text-caption font-medium text-ink-2">People</p>
         <Empty title="No one to notify." />
       </section>
     );
@@ -174,7 +174,7 @@ export function AdminPlatformOpsForm({
   return (
     <>
       <section id="escalate">
-        <p className="px-4 text-caption text-ink-3">People</p>
+        <p className="px-4 text-caption font-medium text-ink-2">People</p>
         {error ? (
           <p className="px-4 text-body text-attention" role="alert">
             {error}
@@ -218,7 +218,7 @@ export function AdminPlatformOpsForm({
       </section>
 
       <section>
-        <p className="px-4 text-caption text-ink-3">Alerts</p>
+        <p className="px-4 text-caption font-medium text-ink-2">Alerts</p>
         <ul className="divide-y divide-hairline">
           <ListRow
             title="Low money"

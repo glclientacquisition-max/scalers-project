@@ -138,6 +138,24 @@ function AdminIcon({ name }: { name: string }) {
       </svg>
     );
   }
+  if (name === "Packages") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <path
+          d="M3.5 6.5 10 3.5l6.5 3v7L10 16.5l-6.5-3v-7Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M3.5 6.5 10 9.5l6.5-3M10 9.5v7"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
   if (name === "Numbers") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
@@ -308,7 +326,7 @@ const phoneTabClass =
 const phoneLabelClass = "max-w-full truncate text-center text-caption leading-none";
 
 /**
- * Numbers, Platform, Activity, and Settings. The bar itself stays five items wide.
+ * Packages, Quality, Platform, Activity, and Settings. The bar itself stays five items wide.
  * The chooser is the same bottom drawer as every other overlay.
  */
 function AdminPhoneMore() {

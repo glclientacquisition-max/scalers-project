@@ -167,7 +167,11 @@ describe("A0: a live number can't be released", () => {
     for (const rel of [`${DASH}/components/AdminBusinessesPanel.tsx`, `${DASH}/components/DidPoolManager.tsx`]) {
       const src = read(rel);
       assert.match(src, /releaseBlockReason/, rel);
-      assert.match(src, /disabled\s*\n\s*(title=[^\n]*\n\s*)?aria-describedby=\{`release-why-/, rel);
+      assert.match(
+        src,
+        /(disabled\s*\n\s*(title=[^\n]*\n\s*)?aria-describedby=\{`release-why-)|(<DisabledAction[^>]*describedBy=\{`release-why-)/,
+        rel,
+      );
     }
   });
 });

@@ -74,8 +74,8 @@ describe("admin desk standard shell", () => {
     assert.match(adminNav, />More</);
     assert.doesNotMatch(adminNav, /overflow-x-auto/);
     assert.doesNotMatch(adminNav, /w-\[4\.5rem\]/);
-    assert.deepEqual(loadParents().phoneTabs, ["Today", "Businesses", "Calls", "Billing"]);
-    assert.deepEqual(loadParents().phoneMore, ["Numbers", "Platform", "Activity", "Settings"]);
+    assert.deepEqual(loadParents().phoneTabs, ["Today", "Businesses", "Numbers", "Billing"]);
+    assert.deepEqual(loadParents().phoneMore, ["Packages", "Quality", "Platform", "Activity", "Settings"]);
     assert.match(links, /safe-area-inset-top/);
     assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/(desk)/loading.tsx")), false);
     assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/admin/loading.tsx")), false);
@@ -88,7 +88,8 @@ describe("admin desk standard shell", () => {
     assert.deepEqual(got.billingClient, { href: "/admin/billing", label: "Billing" });
     assert.deepEqual(got.wallets, { href: "/admin/billing", label: "Billing" });
     assert.deepEqual(got.ledgerNested, { href: "/admin/billing", label: "Billing" });
-    assert.deepEqual(got.packages, { href: "/admin/billing", label: "Billing" });
+    // Packages is its own destination now (cleanup fix 2).
+    assert.equal(got.packages, null);
     assert.equal(got.billing, null);
     assert.equal(got.businesses, null);
     assert.deepEqual(got.nested, { href: "/admin/businesses", label: "Businesses" });
@@ -97,9 +98,10 @@ describe("admin desk standard shell", () => {
     assert.deepEqual(got.labels, [
       "Today",
       "Businesses",
-      "Calls",
-      "Billing",
       "Numbers",
+      "Billing",
+      "Packages",
+      "Quality",
       "Platform",
       "Activity",
       "Settings",

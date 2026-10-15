@@ -73,7 +73,7 @@ describe("Super Admin Today: numbers from calls only", () => {
     assert.equal(rows[1].value, "");
     assert.equal(rows[2].value, "2");
     assert.equal(rows[3].available, false);
-    assert.equal(rows[3].detail, "Per business on Calls. Traced calls only.");
+    assert.equal(rows[3].detail, "Per business on Quality. Traced calls only.");
     assert.equal(rows[3].href, "/admin/quality");
   });
 
@@ -144,10 +144,10 @@ describe("Super Admin nav: eight destinations, phone 4 + More", () => {
   it("lists the eight in order and puts four on the phone bar", () => {
     assert.deepEqual(
       links.ADMIN_LINKS.map((l) => l.label),
-      ["Today", "Businesses", "Calls", "Billing", "Numbers", "Platform", "Activity", "Settings"],
+      ["Today", "Businesses", "Numbers", "Billing", "Packages", "Quality", "Platform", "Activity", "Settings"],
     );
-    assert.deepEqual(links.ADMIN_PHONE_TABS.map((l) => l.label), ["Today", "Businesses", "Calls", "Billing"]);
-    assert.deepEqual(links.ADMIN_MORE_LINKS.map((l) => l.label), ["Numbers", "Platform", "Activity", "Settings"]);
+    assert.deepEqual(links.ADMIN_PHONE_TABS.map((l) => l.label), ["Today", "Businesses", "Numbers", "Billing"]);
+    assert.deepEqual(links.ADMIN_MORE_LINKS.map((l) => l.label), ["Packages", "Quality", "Platform", "Activity", "Settings"]);
   });
 
   it("links only to screens that exist; nothing is pending now Activity ships", () => {
@@ -175,8 +175,11 @@ describe("Super Admin nav: eight destinations, phone 4 + More", () => {
     assert.doesNotMatch(nav, /framer-motion|motion\/react/);
   });
 
-  it("lights Billing on Packages and More on its rows", () => {
-    assert.equal(links.adminRouteActive("/admin/packages", "/admin/billing", false), true);
+  it("lights Packages on its own route and More on its rows", () => {
+    assert.equal(links.adminRouteActive("/admin/packages", "/admin/packages", false), true);
+    assert.equal(links.adminRouteActive("/admin/packages", "/admin/billing", false), false);
+    assert.equal(links.adminMoreActive("/admin/packages"), true);
+    assert.equal(links.adminMoreActive("/admin/quality"), true);
     assert.equal(links.adminRouteActive("/admin", "/admin#calls", true), false);
     assert.equal(links.adminMoreActive("/admin/platform"), true);
     assert.equal(links.adminMoreActive("/admin/voices"), true);

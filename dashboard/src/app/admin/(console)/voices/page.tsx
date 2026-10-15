@@ -1,3 +1,4 @@
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminVoicesManager } from "@/components/AdminVoicesManager";
 import { logAdminError } from "@/lib/adminErrors";
@@ -18,6 +19,7 @@ export default async function AdminVoicesPage() {
 
   return (
     <div className="space-y-4">
+      <AdminPageHeader title="Settings" subtitle="Voices businesses can pick." />
       <AdminVoicesManager initialVoices={voices} />
     </div>
   );

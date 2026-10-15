@@ -1,3 +1,4 @@
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminPackagesPanel } from "@/components/AdminPackagesPanel";
 import { logAdminError } from "@/lib/adminErrors";
@@ -18,6 +19,7 @@ export default async function AdminPackagesPage() {
 
   return (
     <div className="space-y-4">
+      <AdminPageHeader title="Packages" subtitle="Prices, minutes, and on-demand rates." />
       <AdminPackagesPanel {...catalog} />
     </div>
   );

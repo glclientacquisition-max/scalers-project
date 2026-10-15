@@ -47,6 +47,8 @@ export async function listPendingTenants(): Promise<PendingTenant[]> {
     .from("tenants")
     .select("id, business_name, sautikit_virtual_number, created_at")
     .like("sautikit_virtual_number", "pending:%")
+    // Archived businesses never wait for a number. Same rule as lib/adminWaitingModel.
+    .or("is_active.is.null,is_active.eq.true")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data || []) as PendingTenant[];

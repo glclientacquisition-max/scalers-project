@@ -95,11 +95,15 @@ function TurnTimeline({ turn, turns }: { turn: VoiceTurnTrace; turns: readonly V
                     {row.reason ? `. ${row.reason}` : ""}
                   </p>
                   <p className="mt-1">
-                    <span className="text-caption text-ink-3">Before </span>
+                    <span className="text-caption font-medium text-ink-2">
+                      Before{" "}
+                    </span>
                     <StruckDrop before={row.before} dropped={row.dropped} />
                   </p>
                   <p className="mt-1">
-                    <span className="text-caption text-ink-3">After </span>
+                    <span className="text-caption font-medium text-ink-2">
+                      After{" "}
+                    </span>
                     {row.after || <Unlogged />}
                   </p>
                 </li>

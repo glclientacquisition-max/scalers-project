@@ -22,6 +22,7 @@ export function Sheet({
   size = "md",
   dismissible = true,
   theme = "desk",
+  placement = "bottom",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,7 +36,10 @@ export function Sheet({
   dismissible?: boolean;
   /** Portal sits on document.body, so the shell theme has to travel with it. */
   theme?: "desk" | "admin";
+  /** "side": a full-height panel on the right from md up; still a bottom drawer on phone. */
+  placement?: "bottom" | "side";
 }) {
+  const side = placement === "side";
   const themeClass = theme === "admin" ? "admin-theme" : "desk-theme";
   return (
     <Drawer.Root
@@ -53,15 +57,28 @@ export function Sheet({
       <Drawer.VirtualKeyboardProvider>
         <Drawer.Portal>
           <Drawer.Backdrop className="desk-drawer-backdrop fixed inset-0 z-sheet motion-reduce:transition-none" />
-          <Drawer.Viewport className="desk-drawer-viewport pointer-events-none fixed inset-0 z-sheet flex items-end justify-center">
+          <Drawer.Viewport
+            className={cx(
+              "desk-drawer-viewport pointer-events-none fixed inset-0 z-sheet flex items-end justify-center",
+              side && "md:items-stretch md:justify-end",
+            )}
+          >
             <Drawer.Popup
               className={cx(
                 "desk-drawer glass-chrome pointer-events-auto flex max-h-[85dvh] w-full flex-col rounded-t-2xl text-ink shadow-sheet outline-none motion-reduce:transition-none",
                 themeClass,
                 size === "lg" ? "sm:max-w-2xl" : "sm:max-w-md",
+                side &&
+                  "md:h-dvh md:max-h-none md:rounded-none md:rounded-l-2xl md:border-l md:border-hairline",
               )}
             >
-              <div className="flex h-7 items-center justify-center pt-1" aria-hidden="true">
+              <div
+                className={cx(
+                  "flex h-7 items-center justify-center pt-1",
+                  side && "md:hidden",
+                )}
+                aria-hidden="true"
+              >
                 <span className="h-1 w-9 rounded-full bg-ink-3" />
               </div>
               <div className="flex items-start gap-3 px-5 pt-3 sm:px-6">

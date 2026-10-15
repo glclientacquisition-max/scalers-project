@@ -64,5 +64,8 @@ export function packageUsageGap(input: {
 export function usedOfIncluded(used: number, included: number): string {
   const usedCount = Math.max(0, Math.floor(Number(used) || 0));
   const cap = Math.max(0, Math.floor(Number(included) || 0));
+  // No allowance: "2 of 0" reads like a bug, so say what it is.
+  if (cap === 0)
+    return `${usedCount.toLocaleString("en-KE")} used, no allowance`;
   return `${usedCount.toLocaleString("en-KE")} of ${cap.toLocaleString("en-KE")}`;
 }
