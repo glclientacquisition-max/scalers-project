@@ -331,6 +331,7 @@ const { narratesInternalAction, groundFilePriceLine } = require('./src/conversat
 const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
+const { planV2CatalogueMouth } = require('./src/conversation/v2CatalogueTurn');
 const {
   catalogueGeminiDirective,
   geminiCatalogueEnabled,
@@ -3259,7 +3260,7 @@ mediaWss.on('connection', (ws, req) => {
       }
       // Local Phase-0 breath owns a services ask, including one the name gate
       // would otherwise take, and a Yes while that list is still pending.
-      const catalogueMouth = planCatalogueMouth({
+      const legacyCatalogueMouth = planCatalogueMouth({
         localReply,
         text: clean,
         profile: brainProfile,
@@ -3271,6 +3272,14 @@ mediaWss.on('connection', (ws, req) => {
           geminiReasoningDown(getGeminiProviderHealth()) ||
           !String(process.env.GEMINI_API_KEY || '').trim(),
         geminiCatalogue: geminiCatalogueEnabled(),
+      });
+      // VOICE_V2_CATALOGUE off: same object back, nothing logged.
+      const catalogueMouth = await planV2CatalogueMouth(legacyCatalogueMouth, {
+        text: clean,
+        profile: brainProfile,
+        language: callLanguage,
+        state: brainState,
+        log: (m) => console.log(`[ws/media][${callKey}] ${m}`),
       });
       const packetsBeforeFacts = packetRows();
       const localPacket = commitTurnFacts(speakCommit, {
