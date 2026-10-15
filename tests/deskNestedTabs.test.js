@@ -57,10 +57,10 @@ describe("desk nested tab hide", () => {
   const contactImport = read("dashboard/src/app/(desk)/contacts/import/page.tsx");
   const ticket = read("dashboard/src/components/InboxTicketView.tsx");
   const settings = read("dashboard/src/components/BusinessSettingsShell.tsx");
-  const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
-  const master = read("docs/frontend/design-system/MASTER.md");
-  const contactsNote = read("docs/frontend/design-system/pages/contacts.md");
-  const settingsNote = read("docs/frontend/design-system/pages/settings.md");
+  const constitution = read("docs/explanation/frontend/FRONTEND_CONSTITUTION.md");
+  const master = read("docs/reference/design-system/MASTER.md");
+  const contactsNote = read("docs/reference/design-system/pages/contacts.md");
+  const settingsNote = read("docs/reference/design-system/pages/settings.md");
 
   it("hides tabs on nested insides and keeps them on list roots", () => {
     const got = loadHelper();

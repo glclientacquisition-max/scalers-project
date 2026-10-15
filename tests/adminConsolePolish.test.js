@@ -293,12 +293,12 @@ describe("admin console polish", () => {
   });
 
   it("documents the admin shell as the desk geometry with its own links", () => {
-    const master = read("docs/frontend/design-system/MASTER.md");
+    const master = read("docs/reference/design-system/MASTER.md");
     assert.match(master, /## Super Admin/);
     assert.match(master, /ADMIN_LINKS/);
     assert.match(master, /Do not copy the ops shell onto `\(desk\)`/);
     assert.doesNotMatch(master, /labeled navy sidebar/);
-    const page = read("docs/frontend/design-system/pages/admin.md");
+    const page = read("docs/reference/design-system/pages/admin.md");
     assert.match(page, /Icon rail on `md\+`/);
     assert.match(page, /Bottom tabs below `md`/);
     assert.doesNotMatch(page, /navy/);

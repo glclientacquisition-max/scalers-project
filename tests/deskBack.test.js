@@ -74,7 +74,7 @@ describe("DeskBack icon", () => {
     const lead = read("dashboard/src/components/ui/DeskBack.tsx");
     const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
     const imported = read("dashboard/src/app/(desk)/contacts/import/page.tsx");
-    const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
+    const constitution = read("docs/explanation/frontend/FRONTEND_CONSTITUTION.md");
     assert.match(lead, /export function DeskRecordLead/);
     assert.match(lead, /data-desk-record-lead/);
     assert.match(contact, /<DeskRecordLead/);

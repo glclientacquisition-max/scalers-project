@@ -7,7 +7,7 @@ description: Constitution-safe desk motion. Use when adding animation, motion gr
 
 Motion on Scalers is five named verbs. It is not motion graphics, Lottie, Framer Motion (`motion` / `motion/react`), GSAP, orbs, blobs, or page-wide loops.
 
-Canon: `docs/frontend/design-system/MASTER.md` (Motion). Law: `docs/frontend/FRONTEND_CONSTITUTION.md` §1 reduced-motion, §8. Tokens and keyframes: `dashboard/src/app/globals.css`. Primitives: `dashboard/src/lib/deskMotion.ts`, `dashboard/src/components/ui/DeskLand.tsx`, `DeskNotice.tsx`, `LivePing` in `deskRow.tsx`, `pendingSpinnerClass` and `deskShiftClass` in `deskChrome.ts`. Catalog: `dashboard/src/app/dev/motion/page.tsx`.
+Canon: `docs/reference/design-system/MASTER.md` (Motion). Law: `docs/explanation/frontend/FRONTEND_CONSTITUTION.md` §1 reduced-motion, §8. Tokens and keyframes: `dashboard/src/app/globals.css`. Primitives: `dashboard/src/lib/deskMotion.ts`, `dashboard/src/components/ui/DeskLand.tsx`, `DeskNotice.tsx`, `LivePing` in `deskRow.tsx`, `pendingSpinnerClass` and `deskShiftClass` in `deskChrome.ts`. Catalog: `dashboard/src/app/dev/motion/page.tsx`.
 
 ## Classify
 

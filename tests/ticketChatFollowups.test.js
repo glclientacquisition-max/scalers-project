@@ -50,8 +50,8 @@ describe("ticket chat follow-ups", () => {
   const delivery = read("dashboard/src/lib/escalationDelivery.ts");
   const live = read("dashboard/src/lib/deskLiveTransfer.ts");
   const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
-  const accept = read("docs/product/TICKET_CHAT_FOLLOWUPS_ACCEPT.md");
-  const callDetail = read("docs/frontend/design-system/pages/call-detail.md");
+  const accept = read("docs/reference/acceptance/TICKET_CHAT_FOLLOWUPS_ACCEPT.md");
+  const callDetail = read("docs/reference/design-system/pages/call-detail.md");
 
   it("lands the ACCEPT spec", () => {
     assert.match(accept, /\*\*Status:\*\* ACCEPT/);

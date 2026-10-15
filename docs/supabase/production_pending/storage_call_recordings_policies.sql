@@ -1,6 +1,6 @@
 -- PRODUCTION PENDING — DO NOT APPLY WITHOUT EXPLICIT HUMAN APPROVAL
 -- Project: ALCR (fjxcdccgyhnvnnlnovcl)
--- See: docs/storage/STORAGE_SECURITY_MODEL.md
+-- See: docs/explanation/STORAGE_SECURITY_MODEL.md
 --
 -- PROPOSED policies derived from current application behavior (Phase 3G).
 -- Historical production policy state: UNKNOWN.
