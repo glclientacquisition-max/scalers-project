@@ -735,6 +735,38 @@ app.post('/internal/desk/escalate', async (req, res) => {
   }
 });
 
+/**
+ * SPOKEN_CATALOGUE_ON_SAVE (default off): Desk pings after an owner Save on
+ * services / products / areas / locations. Answers at once; the compile runs in
+ * the background and only when the catalogue hash changed. Secret required.
+ */
+app.post('/internal/desk/spoken-catalogue', (req, res) => {
+  const secret = String(process.env.VOICE_INTERNAL_SECRET || '').trim();
+  if (!secret || String(req.headers['x-voice-internal-secret'] || '').trim() !== secret) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const onSave = require('./src/knowledge/spokenCatalogueOnSave');
+  if (!onSave.enabled()) return res.status(200).json({ ok: true, skipped: 'flag_off' });
+  const tenantId = String(req.body?.tenantId || '').trim();
+  const { supabase } = require('./src/lib/supabaseClient');
+  const r = onSave.scheduleSpokenCatalogueCompile(tenantId, { db: supabase, generate: spokenCatalogueGenerate() });
+  return res.status(202).json({ ok: true, scheduled: r.scheduled, coalesced: Boolean(r.coalesced) });
+});
+
+let spokenCatalogueGen;
+function spokenCatalogueGenerate() {
+  if (spokenCatalogueGen !== undefined) return spokenCatalogueGen;
+  const key = String(process.env.GEMINI_API_KEY || '').trim();
+  if (!key || /^(0|off|false|no)$/i.test(String(process.env.SPOKEN_CATALOGUE_MODEL || ''))) return (spokenCatalogueGen = null);
+  const { createGeminiSend } = require('./src/conversation/v2/transport');
+  const send = createGeminiSend({ apiKey: key, model: process.env.SPOKEN_CATALOGUE_MODEL || 'gemini-3.5-flash', timeoutMs: 10000, thinkingMinimal: false });
+  spokenCatalogueGen = async ({ prompt, schema }) => {
+    const resp = await send({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, responseMimeType: 'application/json', responseSchema: schema } });
+    return JSON.parse((resp?.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join(''));
+  };
+  return spokenCatalogueGen;
+}
+
 app.get('/api/voices', async (_req, res) => {
   try {
     const voices = await refreshCuratedVoicesFromDb({ force: true });

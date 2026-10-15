@@ -1,6 +1,7 @@
 "use server";
 
 import { bustTenantCache } from "@/lib/tenantCache";
+import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
 import { revalidatePath } from "next/cache";
 import { memberDenied } from "@/lib/requireMember";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -60,6 +61,7 @@ export async function confirmPriceAction(input: { kind: "product" | "service"; i
   const { error } = await ws.client.from("tenants").update({ [column]: next }).eq("id", ws.tenant.id);
   bustTenantCache(ws.tenant.id);
   if (error) return { ok: false, error: SAVE_FAILED };
+  requestSpokenCatalogueCompile(ws.tenant.id, { [column]: next });
   // Same as payments: the prompt quotes prices, so rebuild it with the confirmed one.
   await recompileAfterCatalogImport({
     client: ws.client,
