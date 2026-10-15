@@ -489,6 +489,14 @@ const {
   getSmsStatus,
 } = require('./src/notifications/sms');
 const {
+  checkAdminHealthAuth,
+  sautikitScopeChecks,
+} = require('./src/ops/adminHealth');
+const {
+  getSonioxBalanceHealth,
+  startSonioxBalanceProbe,
+} = require('./src/speech/sonioxBalanceProbe');
+const {
   getSmsCreditHealth,
   startSmsCreditProbe,
 } = require('./src/notifications/smsCreditMonitor');
@@ -627,11 +635,39 @@ function resolveVoiceGitBranch() {
   return branch || null;
 }
 
+/**
+ * Public /healthz: liveness only (ok, sha, branch, started). Balances, wallet
+ * detail and provider errors moved to GET /admin/health (ADMIN_HEALTH_TOKEN).
+ */
 app.get('/healthz', (_req, res) => {
-  const sms = getSmsStatus();
   res.status(200).json({
     ok: true,
+    gitSha: resolveVoiceGitSha(),
+    gitBranch: resolveVoiceGitBranch(),
+    startedAt: PROCESS_STARTED_AT,
+  });
+});
+
+/** Admin-only health for the Super Admin Platform page. Read-only, no secrets. */
+app.get('/admin/health', (req, res) => {
+  const auth = checkAdminHealthAuth(req.headers);
+  if (auth === 'not_configured') {
+    return res.status(503).json({ error: 'ADMIN_HEALTH_TOKEN not set' });
+  }
+  if (auth !== 'ok') return res.status(401).json({ error: 'Unauthorized' });
+  res.set('Cache-Control', 'no-store');
+  return res.status(200).json(buildAdminHealthBody());
+});
+
+function buildAdminHealthBody() {
+  const sms = getSmsStatus();
+  return {
+    ok: true,
+    checkedAt: new Date().toISOString(),
+    environment: String(process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || '').trim() || null,
     sms: getSmsCreditHealth(),
+    sonioxBalance: getSonioxBalanceHealth(),
+    keyScopes: { sautikit: sautikitScopeChecks() },
     gitSha: resolveVoiceGitSha(),
     gitBranch: resolveVoiceGitBranch(),
     startedAt: PROCESS_STARTED_AT,
@@ -678,8 +714,8 @@ app.get('/healthz', (_req, res) => {
       ignoreHours: envLiveTransferIgnoreHours(),
     },
     voiceProfile: publicVoiceProfile(),
-  });
-});
+  };
+}
 
 /** Ops: force a TextSMS balance probe (no SMS charged). */
 app.get('/internal/sms/status', async (req, res) => {
@@ -6673,6 +6709,9 @@ server.listen(PORT, () => {
     console.log(`✓ Email alert fallback ready (from ${process.env.ALERT_EMAIL_FROM})`);
   } else {
     console.log(`ℹ Email fallback not set (RESEND_API_KEY + ALERT_EMAIL_FROM)`);
+  }
+  if (startSonioxBalanceProbe()) {
+    console.log(`✓ Soniox balance probe scheduled (SONIOX_BALANCE_PROBE_MS)`);
   }
   if (smsSenderReady()) {
     startSmsCreditProbe();

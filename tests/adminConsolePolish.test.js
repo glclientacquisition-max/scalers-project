@@ -288,7 +288,7 @@ describe("admin console polish", () => {
     assert.doesNotMatch(board, /SAUTIKIT_API_KEY/);
     const platform = read("dashboard/src/app/admin/(console)/platform/page.tsx");
     assert.match(platform, /AdminOpsNotices/);
-    assert.match(platform, /PlatformRunBoard/);
+    assert.match(platform, /ProviderColumn/); // provider-health page replaced the run board
     assert.doesNotMatch(platform, /Infrastructure/);
   });
 
