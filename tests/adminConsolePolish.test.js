@@ -230,7 +230,11 @@ describe("admin console polish", () => {
   it("uses the desk list title on admin list roots", () => {
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/voices/page.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/voices/page.tsx"), /<h1/);
-    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /PageHeader/);
+    // One shared header on every Admin destination (cleanup fix 3).
+    for (const page of ["page.tsx", "businesses/page.tsx", "numbers/page.tsx", "billing/page.tsx", "packages/page.tsx", "platform/page.tsx", "activity/page.tsx", "voices/page.tsx"]) {
+      assert.match(read(`dashboard/src/app/admin/(console)/${page}`), /<AdminPageHeader title="/, page);
+    }
+    assert.match(read("dashboard/src/components/admin/QualityIndex.tsx"), /<AdminPageHeader\s+title="Quality"/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/businesses/page.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/packages/page.tsx"), /deskListTitleClass/);

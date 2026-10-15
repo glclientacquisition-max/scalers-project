@@ -1,7 +1,16 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { listDidPool, listPendingTenants, type DidPoolRow, type PendingTenant } from "@/lib/didPool";
+import {
+  listDidPool,
+  type DidPoolRow,
+  type PendingTenant,
+} from "@/lib/didPool";
 import { loadBusinessPackageNames } from "@/lib/packageCatalog";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import {
+  isArchivedBusiness,
+  isWaitingBusiness,
+  waitingBusinesses,
+} from "@/lib/adminWaitingModel";
 
 export type AdminBusiness = {
   id: string;
@@ -35,10 +44,23 @@ export type AdminOverview = {
 function businessStatus(row: {
   is_active: boolean | null;
   sautikit_virtual_number: string;
+  archived_at?: string | null;
 }): AdminBusiness["status"] {
-  if (row.is_active === false) return "archived";
-  if (String(row.sautikit_virtual_number || "").startsWith("pending:")) return "waiting";
+  if (isArchivedBusiness(row)) return "archived";
+  if (isWaitingBusiness(row)) return "waiting";
   return "active";
+}
+
+/** Businesses waiting for a number, oldest first, from the one shared rule. */
+export function pendingFromBusinesses(
+  businesses: AdminBusiness[],
+): PendingTenant[] {
+  return waitingBusinesses(businesses).map((b) => ({
+    id: b.id,
+    business_name: b.business_name,
+    sautikit_virtual_number: b.sautikit_virtual_number,
+    created_at: b.created_at,
+  }));
 }
 
 export async function listBusinesses(): Promise<AdminBusiness[]> {
@@ -98,10 +120,9 @@ export async function getAdminOverview(): Promise<AdminOverview> {
   const since = new Date();
   since.setDate(since.getDate() - 7);
 
-  const [businesses, pool, pendingBusinesses, callsRes] = await Promise.all([
+  const [businesses, pool, callsRes] = await Promise.all([
     listBusinesses(),
     listDidPool(),
-    listPendingTenants(),
     admin
       .from("calls")
       .select("id", { count: "exact", head: true })
@@ -109,6 +130,7 @@ export async function getAdminOverview(): Promise<AdminOverview> {
   ]);
 
   if (callsRes.error) throw callsRes.error;
+  const pendingBusinesses = pendingFromBusinesses(businesses);
 
   return {
     totalBusinesses: businesses.length,

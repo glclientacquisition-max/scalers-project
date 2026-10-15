@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminBusiness } from "@/lib/admin";
 import type { QualityBadge } from "@/lib/adminQualityModel";
-import { formatScore } from "@/lib/adminQualityModel";
+import { formatScore, shortReason } from "@/lib/adminQualityModel";
 import type { PendingTenant } from "@/lib/didPool";
 import type { WalletLedgerRow } from "@/lib/wallet";
 import { archiveState, releaseBlockReason } from "@/lib/adminBusinessModel";
@@ -58,13 +58,15 @@ function formatCreated(iso: string) {
 
 function notifyLabel(raw: string) {
   const value = raw.trim();
-  if (!value || value === "pending") return "None";
+  if (!value || value === "pending") return "Not set";
   return value;
 }
 
 function packLabel(b: AdminBusiness) {
-  if (!b.package_name) return "None";
-  return b.package_period === "year" ? `${b.package_name} / year` : b.package_name;
+  if (!b.package_name) return "No package";
+  return b.package_period === "year"
+    ? `${b.package_name} / year`
+    : b.package_name;
 }
 
 function planLabel(b: AdminBusiness) {
@@ -84,13 +86,13 @@ function chargeKind(kind: string) {
 
 function chargeAmount(amount: number) {
   const abs = Math.abs(amount).toLocaleString("en-KE");
-  return amount < 0 ? `-KES ${abs}` : `KES ${abs}`;
+  return amount < 0 ? `\u2212KES ${abs}` : `KES ${abs}`;
 }
 
 function phoneLine(b: AdminBusiness) {
-  if (b.status === "waiting") return "Waiting";
+  if (b.status === "waiting") return "Waiting for a number";
   const number = b.sautikit_virtual_number.trim();
-  if (number.startsWith("pending:")) return "None";
+  if (!number || number.startsWith("pending:")) return "";
   return number;
 }
 
@@ -110,10 +112,45 @@ function deleteOpensLabel(iso: string | null) {
   return Number.isNaN(date.getTime()) ? "" : `Opens ${createdLabel.format(date)},`;
 }
 
+/** Number and package, whichever exist. Nothing at all rather than "None". */
 function previewLine(b: AdminBusiness) {
-  const pack = packLabel(b);
-  if (b.status === "waiting") return pack === "None" ? "Waiting" : pack;
-  return pack === "None" ? phoneLine(b) : `${phoneLine(b)} · ${pack}`;
+  const pack = b.package_name ? packLabel(b) : "";
+  const number = b.status === "waiting" ? "" : phoneLine(b);
+  return [number, pack].filter(Boolean).join(" · ");
+}
+
+/** One status per row. Dropping outranks Active, since it is the thing to act on. */
+function rowStamp(b: AdminBusiness, dropping: boolean) {
+  if (dropping && b.status === "active")
+    return <Stamp tone="attention">Dropping</Stamp>;
+  return <Stamp tone={statusTone(b.status)}>{statusLabel(b.status)}</Stamp>;
+}
+
+/**
+ * A refused action. Reads as a button at full contrast, says why on hover and focus,
+ * and does nothing when pressed.
+ */
+function DisabledAction({
+  label,
+  describedBy,
+  reason,
+}: {
+  label: string;
+  describedBy: string;
+  reason?: string;
+}) {
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-disabled="true"
+      aria-describedby={describedBy}
+      title={reason}
+      className="inline-flex min-h-9 cursor-not-allowed items-center rounded-xl border border-hairline px-3 text-meta font-semibold text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+    >
+      {label}
+    </span>
+  );
 }
 
 function SheetNote({ error }: { error: string }) {
@@ -260,7 +297,7 @@ export function AdminBusinessesPanel({
     <>
       {pendingBusinesses.length > 0 ? (
         <section>
-          <p className="px-4 text-caption text-ink-3">Needs you</p>
+          <p className="px-4 text-caption font-medium text-ink-2">Needs you</p>
           {freeCount === 0 ? (
             <div className="px-4 py-3">
               <Empty
@@ -298,8 +335,8 @@ export function AdminBusinessesPanel({
       ) : null}
 
       <section>
-        <p className="px-4 text-caption text-ink-3">Businesses</p>
-        <div className="px-4 py-2">
+        <p className="px-4 text-caption font-medium text-ink-2">Businesses</p>
+        <div className="py-2">
           <Input
             id="biz-search"
             type="search"
@@ -358,14 +395,15 @@ export function AdminBusinessesPanel({
                   key={b.id}
                   id={`biz-${b.id}`}
                   title={b.business_name}
-                  preview={badge?.dropping ? `${previewLine(b)} · ${badge.droppingReason}` : previewLine(b)}
-                  when={badge && badge.score != null ? formatScore(badge.score) : undefined}
-                  stamp={
-                    <span className="inline-flex items-center gap-2">
-                      {badge?.dropping ? <Stamp tone="attention">Dropping</Stamp> : null}
-                      <Stamp tone={statusTone(b.status)}>{statusLabel(b.status)}</Stamp>
-                    </span>
+                  preview={previewLine(b) || undefined}
+                  when={
+                    badge && badge.score != null ? (
+                      <span className="tabular-nums text-ink-2">
+                        Score {formatScore(badge.score)}
+                      </span>
+                    ) : undefined
                   }
+                  stamp={rowStamp(b, Boolean(badge?.dropping))}
                   onOpen={() => openShop(b.id)}
                 />
               );
@@ -406,18 +444,19 @@ export function AdminBusinessesPanel({
         }}
         title={open?.business_name || "Business"}
         theme="admin"
+        placement="side"
       >
         <SheetNote error={error} />
         {open ? (
           <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
-            <ListRow title="Number" preview={phoneLine(open)} />
+            <ListRow title="Number" preview={phoneLine(open) || "No number"} />
             {badges[open.id] ? (
               <ListRow
                 title="Quality"
                 href={`/admin/quality/${open.id}`}
                 preview={
                   badges[open.id]?.dropping
-                    ? badges[open.id]?.droppingReason
+                    ? shortReason(badges[open.id]?.droppingReason || "")
                     : formatScore(badges[open.id]?.score ?? null)
                 }
                 stamp={
@@ -479,15 +518,11 @@ export function AdminBusinessesPanel({
                     </span>
                   }
                   actions={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled
-                      aria-describedby={`release-why-${open.id}`}
-                    >
-                      Release
-                    </Button>
+                    <DisabledAction
+                      label="Release"
+                      describedBy={`release-why-${open.id}`}
+                      reason={releaseReason(open) || undefined}
+                    />
                   }
                 />
               ) : (
@@ -524,15 +559,11 @@ export function AdminBusinessesPanel({
                       title="Delete permanently"
                       preview={<span id={`delete-why-${open.id}`}>{why}</span>}
                       actions={
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled
-                          aria-describedby={`delete-why-${open.id}`}
-                        >
-                          Delete
-                        </Button>
+                        <DisabledAction
+                          label="Delete"
+                          describedBy={`delete-why-${open.id}`}
+                          reason={undefined}
+                        />
                       }
                     />
                   );
@@ -723,7 +754,7 @@ export function AdminBusinessesPanel({
           <Empty
             className="px-0 py-8"
             title="No packages."
-            line="Set SKUs on Packages."
+            line="Set package prices on Packages."
             action={<ButtonLink href="/admin/packages">Packages</ButtonLink>}
           />
         ) : (

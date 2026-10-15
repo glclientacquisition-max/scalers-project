@@ -60,11 +60,39 @@ export function eatStamp(iso: string): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${hh}:${mm}`;
 }
 
+/** System values that leak from logs, in plain words. Keys are matched case-insensitively. */
+const VALUE_LABELS: Record<string, string> = {
+  "shared-login": "Shared ops login",
+  shared_login: "Shared ops login",
+  migration: "System update",
+  system: "System",
+  "not setup": "Not set up",
+  not_setup: "Not set up",
+  "not-setup": "Not set up",
+  payment: "Payment",
+  call_charge: "Call charge",
+  line_rental: "Line rental",
+  admin_adjustment: "Manual adjustment",
+  off: "Beta (free)",
+  soft: "On-demand soft",
+  hard: "On-demand hard",
+  month: "Monthly",
+  year: "Yearly",
+};
+
+/** Human label for an enum-like value. Anything unknown passes through unchanged. */
+export function valueLabel(value: string): string {
+  const key = String(value || "").trim();
+  return VALUE_LABELS[key.toLowerCase()] || key;
+}
+
 function text(value: unknown): string {
   if (value === null || value === undefined || value === "") return "None";
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (typeof value === "number" || typeof value === "string") return String(value);
-  if (Array.isArray(value)) return value.length ? value.map(text).join(", ") : "None";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") return valueLabel(value);
+  if (Array.isArray(value))
+    return value.length ? value.map(text).join(", ") : "None";
   return JSON.stringify(value);
 }
 
@@ -119,8 +147,13 @@ export function activityItem(row: ActivityRow, names: Map<string, string>): Acti
   const note = typeof detail.note === "string" && detail.note.trim() ? detail.note.trim() : null;
   const hasDiff = "before" in detail || "after" in detail;
   const changes = hasDiff ? changeLines(detail.before, detail.after) : [];
-  if (!hasDiff && row.amount_kes != null) changes.push({ field: "Amount", before: "", after: `KES ${row.amount_kes}` });
-  const actor = String(row.actor || "").trim() || "Unknown";
+  if (!hasDiff && row.amount_kes != null)
+    changes.push({
+      field: "Amount",
+      before: "",
+      after: `KES ${row.amount_kes}`,
+    });
+  const actor = valueLabel(String(row.actor || "").trim()) || "Unknown";
   return {
     id: row.id,
     when: eatStamp(row.created_at),

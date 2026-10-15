@@ -6,7 +6,11 @@ import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
 import { Empty } from "@/components/ui/Empty";
 import { ListRow } from "@/components/ui/ListRow";
 import { Sheet } from "@/components/ui/Sheet";
-import { activityHref, type ActivityItem } from "@/lib/adminActivityModel";
+import {
+  activityHref,
+  type ActivityItem,
+  valueLabel,
+} from "@/lib/adminActivityModel";
 
 const ALL = "all";
 
@@ -39,15 +43,21 @@ export function AdminActivityPanel({
     { value: ALL, label: "All businesses" },
     ...businesses.map((b) => ({ value: b.id, label: b.name })),
   ];
-  const actorOptions = [{ value: ALL, label: "Everyone" }, ...actors.map((a) => ({ value: a, label: a }))];
+  const actorOptions = [
+    { value: ALL, label: "Everyone" },
+    ...actors.map((a) => ({ value: a, label: valueLabel(a) })),
+  ];
   const filtered = Boolean(business || actor);
 
   return (
     <div className="space-y-6">
       <section aria-labelledby="activity-filters">
-        <h1 id="activity-filters" className="px-4 text-caption text-ink-3">
-          Activity
-        </h1>
+        <h2
+          id="activity-filters"
+          className="px-4 text-caption font-medium text-ink-2"
+        >
+          Filter
+        </h2>
         <ul className="divide-y divide-hairline bg-surface">
           <li>
             <ChoiceSheet
@@ -124,7 +134,10 @@ export function AdminActivityPanel({
             </ul>
             {open.changes.length ? (
               <section aria-labelledby="activity-changes">
-                <h2 id="activity-changes" className="text-caption text-ink-3">
+                <h2
+                  id="activity-changes"
+                  className="text-caption font-medium text-ink-2"
+                >
                   Before and after
                 </h2>
                 <dl className="mt-2 space-y-3">

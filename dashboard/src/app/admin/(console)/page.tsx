@@ -1,3 +1,4 @@
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminTodayPanel } from "@/components/AdminTodayPanel";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { getAdminOverview } from "@/lib/admin";
@@ -56,6 +57,8 @@ export default async function AdminTodayPage() {
   });
 
   return (
+    <div className="space-y-4">
+    <AdminPageHeader title="Today" subtitle={eatDayLabel(now)} />
     <AdminTodayPanel
       dayLabel={eatDayLabel(now)}
       status={statusSentence(ops.signals)}
@@ -69,5 +72,6 @@ export default async function AdminTodayPage() {
       needsNumber={overview.waitingForNumber > 0 || overview.availableDids === 0}
       numbers={todayNumberRows(counts, now)}
     />
+    </div>
   );
 }

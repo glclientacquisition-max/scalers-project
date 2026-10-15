@@ -1,3 +1,4 @@
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminBusinessesPanel } from "@/components/AdminBusinessesPanel";
 import { getAdminOverview } from "@/lib/admin";
@@ -20,6 +21,7 @@ export default async function AdminBusinessesPage() {
 
   return (
     <div className="space-y-4">
+      <AdminPageHeader title="Businesses" subtitle="Every business, its number, and its package." />
       <AdminBusinessesPanel
         businesses={overview.businesses}
         badges={badges}

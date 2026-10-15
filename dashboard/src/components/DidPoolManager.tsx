@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import { BuyNumberPanel } from "@/components/BuyNumberPanel";
 import { Button } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
@@ -170,7 +169,7 @@ export function DidPoolManager({
     <>
       {pendingBusinesses.length > 0 ? (
         <section>
-          <p className="px-4 text-caption text-ink-3">Needs you</p>
+          <p className="px-4 text-caption font-medium text-ink-2">Needs you</p>
           <ul className="divide-y divide-hairline">
             {pendingBusinesses.map((business) => (
               <ListRow
@@ -190,7 +189,7 @@ export function DidPoolManager({
       ) : null}
 
       <section>
-        <p className="px-4 text-caption text-ink-3">Pool</p>
+        <p className="px-4 text-caption font-medium text-ink-2">Pool</p>
         <Segmented
           label="Pool filter"
           items={[
@@ -269,23 +268,22 @@ export function DidPoolManager({
             ))}
           </ul>
         )}
-        <ul className="divide-y divide-hairline">
-          <ListRow
-            title="Add number"
-            onOpen={() => setSheet("add")}
-            when={<ChevronRightIcon className="h-5 w-5 text-ink-3" aria-hidden="true" />}
-          />
-          <ListRow
-            title="Buy"
-            onOpen={() => setSheet("buy")}
-            when={<ChevronRightIcon className="h-5 w-5 text-ink-3" aria-hidden="true" />}
-          />
-          <ListRow
-            title="Sync"
-            preview={syncBusy ? "Working" : undefined}
-            onOpen={() => void syncPool()}
-          />
-        </ul>
+        <div className="flex flex-wrap gap-2 px-4 pt-4">
+          <Button type="button" onClick={() => setSheet("add")}>
+            Add number
+          </Button>
+          <Button type="button" variant="tonal" onClick={() => setSheet("buy")}>
+            Buy
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            pending={syncBusy}
+            onClick={() => void syncPool()}
+          >
+            {syncBusy ? "Syncing" : "Sync"}
+          </Button>
+        </div>
       </section>
 
       <Sheet

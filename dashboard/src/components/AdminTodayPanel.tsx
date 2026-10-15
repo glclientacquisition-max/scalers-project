@@ -34,16 +34,19 @@ export function AdminTodayPanel({
   return (
     <div className="space-y-8">
       <section aria-labelledby="today-status">
-        <h1 id="today-status" className="px-4 text-caption text-ink-3">
-          Today · {dayLabel}
-        </h1>
+        <h2 id="today-status" className="sr-only">
+          Status, {dayLabel}
+        </h2>
         <ul className="divide-y divide-hairline">
           <ListRow href="/admin/platform" title={status.text} preview="Platform" stamp={statusStamp} />
         </ul>
       </section>
 
       <section aria-labelledby="today-needs">
-        <h2 id="today-needs" className="px-4 text-caption text-ink-3">
+        <h2
+          id="today-needs"
+          className="px-4 text-caption font-medium text-ink-2"
+        >
           Needs you
         </h2>
         {queue.length === 0 ? (
@@ -74,7 +77,10 @@ export function AdminTodayPanel({
       </section>
 
       <section id="calls" aria-labelledby="today-calls" className="scroll-mt-4">
-        <h2 id="today-calls" className="px-4 text-caption text-ink-3">
+        <h2
+          id="today-calls"
+          className="px-4 text-caption font-medium text-ink-2"
+        >
           Calls today
         </h2>
         <ul className="divide-y divide-hairline">
@@ -89,7 +95,9 @@ export function AdminTodayPanel({
             />
           ))}
         </ul>
-        <p className="px-4 pt-2 text-meta text-ink-3">Counted from midnight, East Africa time.</p>
+        <p className="px-4 pt-2 text-meta text-ink-2">
+          Counted from midnight, East Africa time.
+        </p>
       </section>
     </div>
   );

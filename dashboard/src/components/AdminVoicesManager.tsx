@@ -131,7 +131,7 @@ export function AdminVoicesManager({
     <>
       {!hasDefault ? (
         <section>
-          <p className="px-4 text-caption text-ink-3">Needs you</p>
+          <p className="px-4 text-caption font-medium text-ink-2">Needs you</p>
           {initialVoices.length === 0 ? (
             <Empty
               title="No voices."
@@ -158,7 +158,7 @@ export function AdminVoicesManager({
 
       {initialVoices.length > 0 ? (
         <section>
-          <p className="px-4 text-caption text-ink-3">Voices</p>
+          <p className="px-4 text-caption font-medium text-ink-2">Voices</p>
           <ul className="divide-y divide-hairline">
             {initialVoices.map((voice) => {
               const stamp = voiceStamp(voice);

@@ -334,7 +334,7 @@ export function formatDelta(delta: number | null): string {
   const rounded = Math.round(delta * 10) / 10;
   const body = Number.isInteger(rounded) ? String(Math.abs(rounded)) : Math.abs(rounded).toFixed(1);
   if (rounded > 0) return `+${body}`;
-  if (rounded < 0) return `-${body}`;
+  if (rounded < 0) return `\u2212${body}`; // true minus sign
   return "0";
 }
 
@@ -362,7 +362,23 @@ export function releaseName(delta: { release: VoiceRelease; at: string | null })
   return "Release";
 }
 
-export function sortWorstFirst<T extends { score: number | null }>(rows: readonly T[]): T[] {
+/**
+ * One line for lists: the first clause of the dropping reason, capped. Full text stays on the
+ * business quality screen and in the hover title.
+ */
+export function shortReason(reason: string, max = 48): string {
+  const text = String(reason || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!text) return "";
+  const first = text.split(/(?<=[.;])\s|,\s/)[0].replace(/[.;,]$/, "");
+  if (first.length <= max) return first;
+  return `${first.slice(0, max - 1).trimEnd()}\u2026`;
+}
+
+export function sortWorstFirst<T extends { score: number | null }>(
+  rows: readonly T[],
+): T[] {
   return rows.toSorted((a, b) => {
     if (a.score == null && b.score == null) return 0;
     if (a.score == null) return 1;
@@ -453,7 +469,7 @@ export function droppingAttentionRows(
     rows.push({
       key: `quality-${id}`,
       title: nameById.get(id) || "Business",
-      detail: badge.droppingReason,
+      detail: shortReason(badge.droppingReason),
       href: qualityBusinessHref("/admin/quality", id, "7d"),
       stamp: "Dropping",
     });

@@ -14,26 +14,32 @@ export type AdminLink = {
 };
 
 /**
- * Desktop rail: all eight, in this order. Phone: the four `tab` items plus More.
- * Calls opens the call quality screens (#603) until the Calls list (A6) absorbs them.
- * Settings opens Voices, the one settings screen today.
+ * Desktop rail: all nine, in this order. Phone: the four `tab` items plus More.
+ * Every label is the page title it opens. Settings opens Voices, the one settings screen today.
  */
 export const ADMIN_LINKS: readonly AdminLink[] = [
   { href: "/admin", label: "Today", exact: true, phone: "tab" },
-  { href: "/admin/businesses", label: "Businesses", exact: false, phone: "tab" },
-  { href: "/admin/quality", label: "Calls", exact: false, phone: "tab" },
+  {
+    href: "/admin/businesses",
+    label: "Businesses",
+    exact: false,
+    phone: "tab",
+  },
+  { href: "/admin/numbers", label: "Numbers", exact: false, phone: "tab" },
   { href: "/admin/billing", label: "Billing", exact: false, phone: "tab" },
-  { href: "/admin/numbers", label: "Numbers", exact: false, phone: "more" },
+  { href: "/admin/packages", label: "Packages", exact: false, phone: "more" },
+  { href: "/admin/quality", label: "Quality", exact: false, phone: "more" },
   { href: "/admin/platform", label: "Platform", exact: false, phone: "more" },
   { href: "/admin/activity", label: "Activity", exact: false, phone: "more" },
   { href: "/admin/voices", label: "Settings", exact: false, phone: "more" },
 ];
 
 /** Older screens still in use, filed under the destination that will absorb them. */
-export const ADMIN_SECTIONS: readonly { href: string; label: string; parent: string }[] = [
-  { href: "/admin/packages", label: "Packages", parent: "/admin/billing" },
-  { href: "/admin/wallets", label: "Ledger", parent: "/admin/billing" },
-];
+export const ADMIN_SECTIONS: readonly {
+  href: string;
+  label: string;
+  parent: string;
+}[] = [{ href: "/admin/wallets", label: "Ledger", parent: "/admin/billing" }];
 
 export const ADMIN_PHONE_TABS = ADMIN_LINKS.filter((item) => item.phone === "tab");
 export const ADMIN_MORE_LINKS = ADMIN_LINKS.filter((item) => item.phone === "more");
@@ -52,7 +58,7 @@ export const adminShellClass =
   "admin-theme fixed inset-0 flex min-w-0 overflow-hidden bg-canvas text-ink pt-[env(safe-area-inset-top,0px)]";
 
 export const adminMainClass =
-  "mx-auto w-full min-h-0 min-w-0 max-w-desk flex-1 overflow-y-auto px-4 pt-4 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-6 md:p-6";
+  "mx-auto w-full min-h-0 min-w-0 max-w-desk flex-1 overflow-y-auto px-4 pt-4 pb-[calc(var(--desk-tabbar-clearance)+1rem)] sm:px-6 sm:pt-6 md:p-6";
 
 function pathOnly(pathname: string) {
   const bare = (pathname.split("?")[0] || "/").replace(/\/+$/, "") || "/";

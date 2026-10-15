@@ -7,6 +7,7 @@ import {
   failingChecks,
   formatDelta,
   formatScore,
+  shortReason,
   LATENCY_BUDGET_MS,
   type VoiceCheckCounts,
 } from "@/lib/adminQualityModel";
@@ -137,9 +138,16 @@ export function FailChips({ checks }: { checks: VoiceCheckCounts | null }) {
 export function DroppingMark({ dropping, reason }: { dropping: boolean; reason: string }) {
   if (!dropping) return <span className="text-meta text-ink-3">Steady</span>;
   return (
-    <span className="inline-flex min-w-0 flex-col items-start gap-0.5">
+    <span
+      className="inline-flex min-w-0 max-w-[14rem] items-center gap-2"
+      title={reason || undefined}
+    >
       <Stamp tone="attention">Dropping</Stamp>
-      {reason ? <span className="max-w-[14rem] text-caption text-attention">{reason}</span> : null}
+      {reason ? (
+        <span className="min-w-0 truncate text-caption text-ink-2">
+          {shortReason(reason)}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -213,8 +221,10 @@ export function StruckDrop({ before, dropped }: { before: string; dropped: strin
 export function TurnFact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid gap-1 md:grid-cols-[8.5rem_minmax(0,1fr)] md:items-baseline md:gap-3">
-      <dt className="text-caption text-ink-3">{label}</dt>
-      <dd className="min-w-0 text-body text-ink [overflow-wrap:anywhere]">{children}</dd>
+      <dt className="text-caption font-medium text-ink-2">{label}</dt>
+      <dd className="min-w-0 text-body text-ink [overflow-wrap:anywhere]">
+        {children}
+      </dd>
     </div>
   );
 }

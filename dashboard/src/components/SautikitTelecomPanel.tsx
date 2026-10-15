@@ -137,8 +137,19 @@ export async function SautikitTelecomPanel() {
                     <td className={`${adminTdClass} whitespace-nowrap tabular-nums`}>
                       {formatMinor(n.monthly_retail_minor, n.currency)}
                     </td>
-                    <td className={`${adminTdClass} whitespace-nowrap tabular-nums`}>
-                      {n.inbound_per_min_minor === 0 ? "Free" : formatMinor(n.inbound_per_min_minor, n.currency)}
+                    <td
+                      className={`${adminTdClass} whitespace-nowrap tabular-nums`}
+                    >
+                      {n.inbound_per_min_minor === 0 ? (
+                        <span title="The call leg is KES 0. The audio stream is billed separately.">
+                          {`${n.currency || "KES"} 0 inbound leg`}
+                        </span>
+                      ) : (
+                        formatMinor(n.inbound_per_min_minor, n.currency)
+                      )}
+                    </td>
+                    <td className={adminTdClass}>
+                      {(n.capabilities || []).join(", ") || "n/a"}
                     </td>
                     <td className={adminTdClass}>{(n.capabilities || []).join(", ") || "n/a"}</td>
                     <td className={adminTdClass}>
@@ -158,7 +169,12 @@ export async function SautikitTelecomPanel() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-hairline/70 py-3 text-meta text-ink-2">
-        {freeInbound ? <span>Inbound minutes are free on this account.</span> : null}
+        {freeInbound ? (
+          <span>
+            Inbound call leg is KES 0. The audio stream still costs about KES
+            0.50 a minute.
+          </span>
+        ) : null}
         {wallet ? (
           <span>
             SautiKit wallet:{" "}
