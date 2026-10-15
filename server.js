@@ -3647,6 +3647,22 @@ mediaWss.on('connection', (ws, req) => {
             speakThinkingAck(fillerText).catch(() => {});
           }
         }, fillerDelayMs);
+      } else if (ackTracker && ruleFiller === null && tts && ackRule.gapGuardEnabled()) {
+        // VOICE_NO_ANSWER_DELETE gap guard (HD_b401138c8ffd: ~1.6 s silence, no
+        // filler on any turn). Neutral Mm., not an ack-led reply; the reply's ack
+        // lead is stripped so it cannot stack.
+        fillerTimer = setTimeout(() => {
+          fillerTimer = null;
+          if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk) {
+            fillerStarted = true;
+            thinkingAckTurn = turnTiming;
+            thinkingAckAtMs = Date.now();
+            ackPlayedTurn = turnTiming;
+            turnTiming.markFiller();
+            console.log(`[ws/media][${sidLabel()}] gap-guard lang=${callLanguage}: ${ackRule.GAP_FILL}`);
+            speakThinkingAck(ackRule.GAP_FILL).catch(() => {});
+          }
+        }, ackRule.gapGuardMs());
       }
 
       const streamOn =
@@ -3739,6 +3755,7 @@ mediaWss.on('connection', (ws, req) => {
           capabilities,
           state: brainState,
           language: callLanguage,
+          streamChunk: true,
         });
         const polished = polishedDetail.text;
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {

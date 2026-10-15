@@ -120,6 +120,20 @@ function applyAckBackstop(line, { tracker, acked = false, dropBare = false } = {
  * Score heard turns: [{ text, filler? }] per bot turn (filler first if any).
  * ack-led % excludes closings; stack = word filler + ack-led line in one turn.
  */
+/**
+ * VOICE_NO_ANSWER_DELETE gap guard: with the ack rule on, a turn with no filler
+ * and no audio by ~900 ms after end of turn gets a neutral "Mm." It is not an
+ * ack-led reply; it counts toward stacks only when an ack word follows it.
+ */
+const GAP_FILL = 'Mm.';
+function gapGuardEnabled(env = process.env) {
+  return /^(1|true|on|yes)$/i.test(String(env.VOICE_NO_ANSWER_DELETE || '').trim());
+}
+function gapGuardMs(env = process.env) {
+  const n = Number(env.VOICE_GAP_GUARD_MS);
+  return Number.isFinite(n) && n >= 400 && n <= 2000 ? n : 900;
+}
+
 function scoreAckRule(turns = []) {
   let counted = 0; let ackLed = 0; let stacks = 0; let run = 0; let longestRun = 0; let fillerOver3 = 0;
   for (const t of turns) {
@@ -131,8 +145,9 @@ function scoreAckRule(turns = []) {
     if (isClosing(line) && !filler) { run = 0; continue; }
     counted += 1;
     // Heard ack includes "Mm."; a stack is any filler followed by an ack-led line.
-    const led = isHeardAck(heard);
-    if (filler && isHeardAck(filler) && isAckLed(line)) stacks += 1;
+    // A gap-guard Mm is not an ack-led reply; it stacks only with a following ack word.
+    const led = t?.gap ? isHeardAck(line) : isHeardAck(heard);
+    if (filler && (t?.gap ? true : isHeardAck(filler)) && isAckLed(line)) stacks += 1;
     if (led) { ackLed += 1; run += 1; longestRun = Math.max(longestRun, run); } else run = 0;
   }
   const ackLedPct = counted ? Math.round((ackLed / counted) * 1000) / 10 : 0;
@@ -143,7 +158,7 @@ function scoreAckRule(turns = []) {
  * Replay logged heard turns ({caller, filler, reply}) through the rule as live does:
  * tracker per call, filler from pickRuleFiller, reply backstop (bare ack dropped).
  */
-function replayHeard(turns = [], { lang = 'sw' } = {}) {
+function replayHeard(turns = [], { lang = 'sw', gapGuard = false, gapMs = 900 } = {}) {
   const tr = createAckTracker();
   return turns.map((t) => {
     tr.beginTurn({ callerText: t.caller || '' });
@@ -154,14 +169,16 @@ function replayHeard(turns = [], { lang = 'sw' } = {}) {
       filler = p ? p.text : '';
       if (filler) tr.noteHeard(filler);
     }
+    let gap = false;
+    if (gapGuard && !filler && Number(t.firstPcmMs) > gapMs) { filler = GAP_FILL; gap = true; }
     const text = applyAckBackstop(String(t.reply || ''), { tracker: tr, acked: Boolean(filler), dropBare: true });
     tr.noteHeard(text);
-    return { filler, text };
+    return gap ? { filler, text, gap } : { filler, text };
   });
 }
 
 module.exports = {
-  replayHeard,
+  replayHeard, GAP_FILL, gapGuardEnabled, gapGuardMs,
   ACK_LEAD_WIDE, ackRuleEnabled, isAckLed, isClosing, isCallerAck, stripAckLead,
   isHeardAck, isBareAck, shortTurn, createAckTracker, pickRuleFiller, applyAckBackstop, scoreAckRule,
 };
