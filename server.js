@@ -769,14 +769,10 @@ app.post('/internal/desk/spoken-catalogue', (req, res) => {
 let spokenCatalogueGen;
 function spokenCatalogueGenerate() {
   if (spokenCatalogueGen !== undefined) return spokenCatalogueGen;
-  const key = String(process.env.GEMINI_API_KEY || '').trim();
-  if (!key || /^(0|off|false|no)$/i.test(String(process.env.SPOKEN_CATALOGUE_MODEL || ''))) return (spokenCatalogueGen = null);
-  const { createGeminiSend } = require('./src/conversation/v2/transport');
-  const send = createGeminiSend({ apiKey: key, model: process.env.SPOKEN_CATALOGUE_MODEL || 'gemini-3.5-flash', timeoutMs: 10000, thinkingMinimal: false });
-  spokenCatalogueGen = async ({ prompt, schema }) => {
-    const resp = await send({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, responseMimeType: 'application/json', responseSchema: schema } });
-    return JSON.parse((resp?.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join(''));
-  };
+  // SPOKEN_CATALOGUE_MODEL=off disables the AI pass; a missing key is recorded as compile_error=no_key.
+  if (/^(0|off|false|no)$/i.test(String(process.env.SPOKEN_CATALOGUE_MODEL || ''))) return (spokenCatalogueGen = null);
+  const { createSpokenCatalogueGenerate } = require('./src/knowledge/spokenCatalogueGenerate');
+  spokenCatalogueGen = createSpokenCatalogueGenerate({ apiKey: process.env.GEMINI_API_KEY, model: process.env.SPOKEN_CATALOGUE_MODEL || 'gemini-3.5-flash', timeoutMs: 10000 });
   return spokenCatalogueGen;
 }
 

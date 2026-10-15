@@ -14,6 +14,7 @@
 // Go-live (Alvin): every successful compile goes live (tenants.spoken_catalogue +
 // live_version); the version row stays 'draft' until an owner approves it.
 const { compileSpokenCatalogue, needsRegeneration } = require('./spokenCatalogue');
+const { errorCode } = require('./spokenCatalogueGenerate');
 
 const ON = /^(1|true|on|yes)$/i;
 const enabled = (env = process.env) => ON.test(String(env.SPOKEN_CATALOGUE_ON_SAVE || '').trim());
@@ -29,10 +30,11 @@ function withTimeout(generate, ms) {
   if (typeof generate !== 'function') return null;
   return (args) => new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('timeout')), ms);
-    Promise.resolve().then(() => generate(args)).then((v) => { clearTimeout(t); resolve(v); }, () => { clearTimeout(t); reject(new Error('generate_failed')); });
+    Promise.resolve().then(() => generate(args)).then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(new Error(errorCode(e) || 'generate_failed')); });
   });
 }
-const aiCode = (e) => (e == null ? null : /^timeout$/.test(String(e)) ? 'timeout' : 'generate_failed');
+// compile_error is a short class code only (<=200 chars): http_<status> | timeout | bad_json | schema_invalid | no_key | network | generate_failed
+const aiCode = (e) => (e == null ? null : String(errorCode(typeof e === 'string' ? new Error(e) : e)).slice(0, 40));
 
 const optionalCols = new Map(); // memo per process: column -> exists
 async function hasColumn(db, table, col) {
@@ -44,6 +46,10 @@ async function hasColumn(db, table, col) {
   return ok;
 }
 
+// Arguments for public.save_spoken_catalogue_version (migration 20261015113748).
+function rpcArgs(tenantId, doc) {
+  return { p_tenant_id: tenantId, p_version: doc.version, p_schema_version: doc.schemaVersion, p_source_hash: doc.sourceHash, p_status: doc.status, p_generator: doc.generator, p_doc: doc, p_issues: doc.issues || [], p_compile_error: doc.aiError ? String(doc.aiError).slice(0, 200) : null };
+}
 async function writeVersion(db, tenantId, doc, { log }) {
   const compileError = doc.aiError ? String(doc.aiError).slice(0, 200) : null;
   const row = { tenant_id: tenantId, version: doc.version, schema_version: doc.schemaVersion, source_hash: doc.sourceHash, status: doc.status, generator: doc.generator, doc, issues: doc.issues || [] };
@@ -108,4 +114,4 @@ function scheduleSpokenCatalogueCompile(tenantId, deps = {}) {
   return { scheduled: true, done: s.done };
 }
 
-module.exports = { enabled, runSpokenCatalogueCompile, scheduleSpokenCatalogueCompile, profileFromRow, withTimeout, _resetColumnMemo: () => optionalCols.clear() };
+module.exports = { rpcArgs, aiCode, enabled, runSpokenCatalogueCompile, scheduleSpokenCatalogueCompile, profileFromRow, withTimeout, _resetColumnMemo: () => optionalCols.clear() };
