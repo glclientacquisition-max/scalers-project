@@ -1,7 +1,7 @@
 {
   "name": "missed-call-agent",
   "version": "1.0.0",
-  "description": "AI missed-call answering agent — Kenyan Swahili voice agent for home services businesses",
+  "description": "AI missed-call answering agent \u2014 Kenyan Swahili voice agent for home services businesses",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -74,7 +74,10 @@
     "eval:v2:edge": "node evals/v2/edge/run.js --expand",
     "docs:reference": "node scripts/docs/gen-reference.js",
     "docs:reference:check": "node scripts/docs/gen-reference.js --check",
-    "docs:check": "node scripts/docs/check-docs.js"
+    "docs:check": "node scripts/docs/check-docs.js",
+    "test:tts-cancel": "node tests/sonioxTtsCancel.test.js",
+    "test:soniox-errors": "node --test tests/sonioxErrors.test.js tests/sonioxLanguage.test.js tests/sonioxTtsBilling.test.js tests/sonioxTtsStaleStream.test.js tests/sonioxTtsSilentStream.test.js tests/pcmUtil.test.js tests/voiceProfile.test.js tests/emergencyTts.test.js tests/outageClips.test.js tests/speechOutageNotify.test.js tests/platformOpsAlert.test.js tests/platformOpsRecipients.test.js tests/walletProbe.test.js tests/inboundBillingGate.test.js",
+    "test:soniox-voice": "node --test tests/sonioxVoice.test.js tests/wavPack.test.js"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
