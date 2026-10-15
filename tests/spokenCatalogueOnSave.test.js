@@ -146,3 +146,22 @@ test('draft SQL: lock_timeout, one approved per tenant, empty search_path, tenan
   assert.ok(sql.indexOf("status = 'superseded'\n     where tenant_id = p_tenant_id and status = 'approved'") < sql.indexOf('insert into public.tenant_spoken_catalogue_versions'));
   assert.match(sql, /live_version = p_version/);
 });
+
+test('backfill --apply writes through save_spoken_catalogue_version only; dry run writes nothing', async () => {
+  const { backfill } = require('../scripts/backfill-spoken-catalogue');
+  const calls = [];
+  const db = { rpc: async (name, args) => { calls.push({ name, args }); return { error: null }; }, from: () => { throw new Error('no direct table writes'); } };
+  const dry = await backfill({ rows: [base()], db, log: () => {} });
+  assert.deepEqual(dry, { compiled: 1, written: 0, upToDate: 0 }); assert.equal(calls.length, 0);
+  const r = await backfill({ rows: [base()], db, apply: true, generate: async () => { throw new Error('x'); }, log: () => {} });
+  assert.equal(r.written, 1); assert.equal(calls[0].name, 'save_spoken_catalogue_version');
+  const a = calls[0].args;
+  assert.equal(a.p_tenant_id, TID); assert.equal(a.p_status, 'draft'); assert.equal(a.p_version, 1);
+  assert.match(a.p_source_hash, /^[0-9a-f]{64}$/); assert.equal(a.p_compile_error, 'generate_failed');
+  const row = base(); row.spoken_catalogue = a.p_doc;
+  assert.equal((await backfill({ rows: [row], db, apply: true, log: () => {} })).upToDate, 1);
+  await backfill({ rows: [row], db, apply: true, force: true, log: () => {} });
+  assert.equal(calls[1].args.p_version, 2, '--force bumps the version');
+  const bad = { rpc: async () => ({ error: { code: 'P0002', message: 'tenant not found' } }) };
+  await assert.rejects(backfill({ rows: [base()], db: bad, apply: true, log: () => {} }), /save_spoken_catalogue_version P0002/);
+});

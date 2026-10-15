@@ -44,6 +44,10 @@ async function hasColumn(db, table, col) {
   return ok;
 }
 
+// Arguments for public.save_spoken_catalogue_version (migration 20261015113748).
+function rpcArgs(tenantId, doc) {
+  return { p_tenant_id: tenantId, p_version: doc.version, p_schema_version: doc.schemaVersion, p_source_hash: doc.sourceHash, p_status: doc.status, p_generator: doc.generator, p_doc: doc, p_issues: doc.issues || [], p_compile_error: doc.aiError ? String(doc.aiError).slice(0, 200) : null };
+}
 async function writeVersion(db, tenantId, doc, { log }) {
   const compileError = doc.aiError ? String(doc.aiError).slice(0, 200) : null;
   const row = { tenant_id: tenantId, version: doc.version, schema_version: doc.schemaVersion, source_hash: doc.sourceHash, status: doc.status, generator: doc.generator, doc, issues: doc.issues || [] };
@@ -108,4 +112,4 @@ function scheduleSpokenCatalogueCompile(tenantId, deps = {}) {
   return { scheduled: true, done: s.done };
 }
 
-module.exports = { enabled, runSpokenCatalogueCompile, scheduleSpokenCatalogueCompile, profileFromRow, withTimeout, _resetColumnMemo: () => optionalCols.clear() };
+module.exports = { rpcArgs, aiCode, enabled, runSpokenCatalogueCompile, scheduleSpokenCatalogueCompile, profileFromRow, withTimeout, _resetColumnMemo: () => optionalCols.clear() };

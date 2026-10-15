@@ -29,27 +29,43 @@ async function loadTenants() {
   const { data, error } = await q; if (error) throw new Error(error.message);
   return { db, rows: data };
 }
-(async () => {
-  const loaded = await loadTenants();
-  const rows = Array.isArray(loaded) ? loaded : loaded.rows;
-  const generate = flag('--ai') ? geminiGenerate() : null;
+// --apply writes each compiled doc through public.save_spoken_catalogue_version
+// (migration 20261015113748): one transaction that inserts the version row
+// (status 'draft' until an owner approves), supersedes older drafts and goes
+// live (tenants.spoken_catalogue + live_version). No direct table writes.
+// Without --apply it is a dry run: compiles and prints, writes nothing.
+const { rpcArgs, aiCode } = require('../src/knowledge/spokenCatalogueOnSave');
+async function backfill({ rows, db = null, generate = null, apply = false, force = false, report = false, log = console.log }) {
+  const out = { compiled: 0, written: 0, upToDate: 0 };
   for (const r of rows) {
     const profile = { tenantId: r.id, servicesCatalog: r.services_catalog || [], productCatalog: r.product_catalog || [], serviceAreas: r.service_areas || null, businessLocations: r.business_locations || [] };
-    if (!needsRegeneration(r.spoken_catalogue, profile) && !flag('--force')) { console.log(`${r.id} up to date (v${r.spoken_catalogue.version})`); continue; }
+    if (!needsRegeneration(r.spoken_catalogue, profile) && !force) { log(`${r.id} up to date (v${r.spoken_catalogue.version})`); out.upToDate++; continue; }
     const doc = await compileSpokenCatalogue(profile, { generate, previous: r.spoken_catalogue || null });
-    console.log(`${r.id} -> v${doc.version} ${doc.generator} entries=${doc.entries.length} categories=${doc.categories.length} ambiguity=${doc.coverage.ambiguityGroups.length} issues=${doc.issues.length}`);
-    if (flag('--report')) {
-      for (const e of doc.entries) console.log(`   ${e.raw.name} | sw: ${e.spoken.sw} | en: ${e.spoken.en} | cat: ${e.category.id} | price sw: ${e.price.sw} | explain sw: ${e.explain.sw}`);
-      console.log(`   categories: ${doc.categories.map((c) => `${c.id}=${c.sw} / ${c.en}`).join(' ; ')}`);
-      console.log(`   ambiguity: ${doc.coverage.ambiguityGroups.map((g) => `${g.heard}:${g.options.join('/')}`).join('; ') || 'none'}`);
-      for (const i of doc.issues) console.log(`   review: ${i.id} ${i.field} ${i.code}${i.raw ? ` (${i.raw})` : ''}`);
+    doc.status = 'draft'; // a compile is never an approval
+    doc.aiError = aiCode(doc.aiError);
+    if (r.spoken_catalogue && doc.version <= (r.spoken_catalogue.version || 0)) doc.version = (r.spoken_catalogue.version || 0) + 1; // --force on an unchanged hash
+    out.compiled++;
+    log(`${r.id} -> v${doc.version} ${doc.generator} entries=${doc.entries.length} categories=${doc.categories.length} ambiguity=${doc.coverage.ambiguityGroups.length} issues=${doc.issues.length}`);
+    if (report) {
+      for (const e of doc.entries) log(`   ${e.raw.name} | sw: ${e.spoken.sw} | en: ${e.spoken.en} | cat: ${e.category.id} | price sw: ${e.price.sw} | explain sw: ${e.explain.sw}`);
+      log(`   categories: ${doc.categories.map((c) => `${c.id}=${c.sw} / ${c.en}`).join(' ; ')}`);
+      log(`   ambiguity: ${doc.coverage.ambiguityGroups.map((g) => `${g.heard}:${g.options.join('/')}`).join('; ') || 'none'}`);
+      for (const i of doc.issues) log(`   review: ${i.id} ${i.field} ${i.code}${i.raw ? ` (${i.raw})` : ''}`);
     }
-    if (!flag('--apply')) continue;
-    const { db } = loaded;
-    const ins = await db.from('tenant_spoken_catalogue_versions').insert({ tenant_id: r.id, version: doc.version, schema_version: doc.schemaVersion, source_hash: doc.sourceHash, status: doc.status, generator: doc.generator, doc, issues: doc.issues });
-    if (ins.error) throw new Error(ins.error.message);
-    const up = await db.from('tenants').update({ spoken_catalogue: doc }).eq('id', r.id);
-    if (up.error) throw new Error(up.error.message);
+    if (!apply) continue;
+    const { error } = await db.rpc('save_spoken_catalogue_version', rpcArgs(r.id, doc));
+    if (error) throw new Error(`${r.id}: save_spoken_catalogue_version ${error.code || ''} ${error.message || ''}`.trim());
+    out.written++;
   }
-  if (!flag('--apply')) console.log('dry run: nothing written');
-})().catch((e) => { console.error(e.message); process.exit(1); });
+  if (!apply) log('dry run: nothing written');
+  return out;
+}
+if (require.main === module) {
+  (async () => {
+    const loaded = await loadTenants();
+    const rows = Array.isArray(loaded) ? loaded : loaded.rows;
+    if (flag('--apply') && !loaded.db) throw new Error('--apply needs the database (not --from-file)');
+    await backfill({ rows, db: loaded.db || null, generate: flag('--ai') ? geminiGenerate() : null, apply: flag('--apply'), force: flag('--force'), report: flag('--report') });
+  })().catch((e) => { console.error(e.message); process.exit(1); });
+}
+module.exports = { backfill };
