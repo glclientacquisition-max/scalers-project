@@ -1,0 +1,74 @@
+{
+ "vertical": "retail",
+ "businessName": "Njeri Stationers",
+ "agentName": "Amani",
+ "productCatalog": [
+  {
+   "name": "Diary",
+   "aliases": [
+    "diaries"
+   ],
+   "price": "350",
+   "in_stock": "yes"
+  },
+  {
+   "name": "HP Printer",
+   "aliases": [
+    "printer"
+   ],
+   "price": "15,000",
+   "in_stock": "yes"
+  },
+  {
+   "name": "A4 Paper Ream",
+   "aliases": [
+    "rim",
+    "ream"
+   ],
+   "price": "650",
+   "in_stock": "yes"
+  }
+ ],
+ "businessPolicies": {
+  "deposit": "Hold until 6pm with the caller name.",
+  "payment": "M-Pesa or cash on collection."
+ },
+ "hoursSchedule": {
+  "days": {
+   "fri": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "mon": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "sat": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "sun": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "thu": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "tue": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "wed": {
+    "open": "08:00",
+    "close": "18:00"
+   }
+  },
+  "location": "Main · Nairobi and the close surroundings",
+  "timezone": "Africa/Nairobi"
+ },
+ "agentTools": {
+  "escalate": true,
+  "end_call": true
+ }
+}

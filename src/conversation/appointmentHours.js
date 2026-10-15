@@ -118,7 +118,8 @@ function dayOffset(fromKey, toKey) {
 
 function eatInstant(now, dayOffsetDays, minutesSinceMidnight) {
   const p = eatParts(now);
-  const eatNow = now.getTime() + EAT_OFFSET_MS();
+  // HD_cc0481620c50: round down to the minute so seconds never leak into the window (14:00:46)
+  const eatNow = Math.floor((now.getTime() + EAT_OFFSET_MS()) / 60000) * 60000;
   const eatMidnight = eatNow - p.minutesSinceMidnight * 60 * 1000;
   const targetEat =
     eatMidnight + dayOffsetDays * 86400000 + minutesSinceMidnight * 60 * 1000;

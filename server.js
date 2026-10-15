@@ -74,6 +74,8 @@ const {
   VOICE_SYSTEM_PROMPT_VERSION,
 } = require('./src/prompts');
 const { createVoiceTrace } = require('./src/speech/voiceTrace');
+const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
+const ackRule = require('./src/speech/ackRule');
 const toolSmooth = require('./src/speech/toolSmooth');
 /** VOICE_TOOL_SMOOTH: per-connection heard-audio clock. Empty when the flags are off. */
 const MEDIA_CLOCKS = new WeakMap();
@@ -332,6 +334,7 @@ const { narratesInternalAction, groundFilePriceLine } = require('./src/conversat
 const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
+const { planV2CatalogueMouth } = require('./src/conversation/v2CatalogueTurn');
 const {
   catalogueGeminiDirective,
   geminiCatalogueEnabled,
@@ -2100,6 +2103,8 @@ mediaWss.on('connection', (ws, req) => {
   let closureNotice = null;
   let messages = [{ role: 'system', content: systemPrompt }];
   const callTranscript = createCallTranscript();
+  /** BA v2 shadow runner; created on first caller turn only when BRAIN_V2_SHADOW is on. */
+  let brainV2Shadow = null;
   function logTurnTiming(timing, extra) {
     if (!timing) return null;
     const summary = timing.log(extra);
@@ -2251,6 +2256,10 @@ mediaWss.on('connection', (ws, req) => {
     console.log(`[ws/media][${sidLabel()}] tool-smooth receipt cached bytes=${found.pcm.length}: ${line}`);
     return playCachedFillerPcm(found.pcm, { text: line, trace: false, kind: 'receipt' });
   }
+  // VOICE_ACK_RULE (default off): per-call heard-ack tracker. null = rule off.
+  const ackTracker = ackRule.ackRuleEnabled() ? ackRule.createAckTracker() : null;
+  /** VOICE_ACK_RULE: the turn on which a word filler (not Mm.) actually played. */
+  let wordAckTurn = null;
   /** Rolling interim hypothesis while agent is busy (for barge-in). */
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
@@ -3229,6 +3238,55 @@ mediaWss.on('connection', (ws, req) => {
     );
     callTranscript.pushCaller(clean);
     messages.push({ role: 'user', content: clean });
+    if (ackTracker) ackTracker.beginTurn({ callerText: clean });
+    // BA v2 shadow (BRAIN_V2_SHADOW, default off): log-only, never awaited,
+    // never spoken, dry-run writes only. Flag off = no code below runs.
+    if (brainV2ShadowEnabled({ tenantId: brainProfile?.id })) {
+      try {
+        if (!brainV2Shadow) {
+          brainV2Shadow = createBrainV2Shadow({
+            callLabel: () => callKey,
+            // Read once at the shadow's first turn (after caller memory hydrated).
+            callerFile: () => {
+              const mem = brainProfile?.callerMemory || {};
+              return {
+                callerPhone: brainState?.caller?.phone || mem.phone || null,
+                contactName: mem.fileOwnerName || mem.name || null,
+                openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
+              };
+            },
+          });
+        }
+        const shadowTurnIndex = voiceTrace.currentTurnIndex();
+        void brainV2Shadow
+          .fire({
+            text: clean,
+            profile: brainProfile,
+            langLock: callLanguage,
+            turnIndex: shadowTurnIndex,
+            ...(ackTracker
+              ? {
+                  // true only when a word filler actually played this turn (read after the filler delay)
+                  acked: () => wordAckTurn === turnTiming,
+                  ackWaitMs: resolveVoiceProfile().fillerDelayMs + 80,
+                  ackRule: true,
+                  stripAck: ackRule.stripAckLead,
+                }
+              : {}),
+            onResult: (stage) => {
+              console.log(
+                `[brain_v2_shadow][${callKey}] turn=${shadowTurnIndex} ttft=${stage.ttftMs}` +
+                  ` total=${stage.totalMs} tools=${stage.toolIntents.map((t) => t.name).join(',') || '-'}` +
+                  ` timedOut=${stage.timedOut}`
+              );
+              if (shadowTurnIndex != null) voiceTrace.noteBrainV2Shadow(stage);
+            },
+          })
+          .catch(() => null);
+      } catch (err) {
+        console.warn(`[ws/media][${callKey}] brain_v2_shadow failed:`, err?.message || err);
+      }
+    }
 
     const turnMatches = selectProductsForTurn({
       catalog: brainProfile.productCatalog,
@@ -3362,7 +3420,7 @@ mediaWss.on('connection', (ws, req) => {
       }
       // Local Phase-0 breath owns a services ask, including one the name gate
       // would otherwise take, and a Yes while that list is still pending.
-      const catalogueMouth = planCatalogueMouth({
+      const legacyCatalogueMouth = planCatalogueMouth({
         localReply,
         text: clean,
         profile: brainProfile,
@@ -3374,6 +3432,14 @@ mediaWss.on('connection', (ws, req) => {
           geminiReasoningDown(getGeminiProviderHealth()) ||
           !String(process.env.GEMINI_API_KEY || '').trim(),
         geminiCatalogue: geminiCatalogueEnabled(),
+      });
+      // VOICE_V2_CATALOGUE off: same object back, nothing logged.
+      const catalogueMouth = await planV2CatalogueMouth(legacyCatalogueMouth, {
+        text: clean,
+        profile: brainProfile,
+        language: callLanguage,
+        state: brainState,
+        log: (m) => console.log(`[ws/media][${callKey}] ${m}`),
       });
       const packetsBeforeFacts = packetRows();
       const localPacket = commitTurnFacts(speakCommit, {
@@ -3712,8 +3778,21 @@ mediaWss.on('connection', (ws, req) => {
         fillerMode !== 'off' &&
         !bareCloser && shouldSpeakThinkingAck(clean);
       const fillerDelayMs = resolveVoiceProfile().fillerDelayMs;
-      const fillerText =
-        fillerMode === 'ack' || fillerMode === 'auto'
+      const ruleFiller =
+        ackTracker && (fillerMode === 'ack' || fillerMode === 'auto')
+          ? ackRule.pickRuleFiller({
+              lang: fillerLanguage(callLanguage),
+              toolTurn: Boolean(needsImmediateProgress),
+              tracker: ackTracker,
+              callerText: clean,
+            })
+          : undefined;
+      // Rule on: null = rate-limited, no filler this turn.
+      const fillerText = ruleFiller === null
+        ? ''
+        : ruleFiller
+        ? ruleFiller.text
+        : fillerMode === 'ack' || fillerMode === 'auto'
           ? pickContextualAck(clean, fillerLanguage(callLanguage))
           : process.env.VOICE_FILLER;
       if (smooth.hold) turnFillerText = fillerText || '';
@@ -3728,7 +3807,10 @@ mediaWss.on('connection', (ws, req) => {
             fillerStarted = true;
             thinkingAckTurn = turnTiming;
             thinkingAckAtMs = Date.now();
+            // Any filler (Mm included) makes the reply drop its leading ack.
             ackPlayedTurn = turnTiming;
+            if (ruleFiller && ruleFiller.word) wordAckTurn = turnTiming;
+            if (ackTracker) ackTracker.noteHeard(fillerText);
             turnTiming.markFiller();
             console.log(
               `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
@@ -3736,6 +3818,31 @@ mediaWss.on('connection', (ws, req) => {
             speakThinkingAck(fillerText).catch(() => {});
           }
         }, fillerDelayMs);
+      } else if (ackTracker && ruleFiller === null && tts && ackRule.gapGuardEnabled()) {
+        // VOICE_NO_ANSWER_DELETE gap guard (HD_b401138c8ffd: ~1.6 s silence, no
+        // filler on any turn). Neutral Mm., not an ack-led reply; the reply's ack
+        // lead is stripped so it cannot stack.
+        // Measured from end of turn (not from here), so the clip reaches the caller
+        // under 900 ms; cached clip only (no live TTS start-up), one per turn.
+        const gapDelay = ackRule.gapGuardDelay(turnTiming.turnStartedAt, Date.now());
+        fillerTimer = setTimeout(() => {
+          fillerTimer = null;
+          if (!turnBusy || speaking || bargeInActive || firstSpokenChunk || fillerStarted) return;
+          const found = isFillerCacheEnabled() && ttsSpeedScale === 1
+            ? lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: ackRule.GAP_FILL, callLanguage, extraLexicon: ttsLexiconOverrides })
+            : { pcm: null };
+          if (!found.pcm) {
+            console.log(`[ws/media][${sidLabel()}] gap-guard miss (not cached) lang=${callLanguage}`);
+            return;
+          }
+          fillerStarted = true;
+          thinkingAckTurn = turnTiming;
+          thinkingAckAtMs = Date.now();
+          ackPlayedTurn = turnTiming;
+          turnTiming.markFiller();
+          console.log(`[ws/media][${sidLabel()}] gap-guard lang=${callLanguage} at=${Date.now() - turnTiming.turnStartedAt}ms: ${ackRule.GAP_FILL}`);
+          playCachedFillerPcm(found.pcm, { text: ackRule.GAP_FILL }).catch(() => {});
+        }, gapDelay);
       }
 
       const streamOn =
@@ -3829,6 +3936,7 @@ mediaWss.on('connection', (ws, req) => {
           capabilities,
           state: brainState,
           language: callLanguage,
+          streamChunk: true,
         });
         const polished = polishedDetail.text;
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
@@ -3869,7 +3977,20 @@ mediaWss.on('connection', (ws, req) => {
             reason: gated.reason || 'trimmed',
           });
         }
-        const text = cutNoAiSlop(gated.line);
+        let text = cutNoAiSlop(gated.line);
+        if (typeof ackTracker !== 'undefined' && ackTracker && text) {
+          // Thinking-ack/never-two backstop: drop the lead if an ack already played or the rule forbids one.
+          const backstopped = ackRule.applyAckBackstop(text, {
+            tracker: ackTracker,
+            acked: ackPlayedTurn === turnTiming,
+            dropBare: true,
+          });
+          if (backstopped !== text && typeof voiceTrace !== 'undefined' && voiceTrace) {
+            voiceTrace.noteTransform({ stage: 'ack_rule', before: text, after: backstopped, reason: 'ack_lead' });
+          }
+          text = backstopped;
+          ackTracker.noteHeard(text);
+        }
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
           voiceTrace.noteTransform({
             stage: 'no_ai_slop',
@@ -4313,12 +4434,16 @@ mediaWss.on('connection', (ws, req) => {
           await actionProgressSpeak;
           // "Alright." already played: say "They'll call you back.", not
           // "Okay. They'll call you back." (HD_4d6ac592aeb3 t4).
-          const outcomeLine = trimAckLead(confirmation, {
+          const outcomeSource = ackTracker
+            ? ackRule.applyAckBackstop(confirmation, { tracker: ackTracker, acked: ackPlayedTurn === turnTiming })
+            : confirmation;
+          const outcomeLine = trimAckLead(outcomeSource, {
             acked: ackPlayedTurn === turnTiming,
           });
           callTranscript.pushAgent(outcomeLine);
           if (smooth.any) stopHoldFill();
           await ((smooth.receipt && playCachedReceipt(outcomeLine)) || speakText(outcomeLine));
+          if (ackTracker) ackTracker.noteHeard(outcomeLine);
           spokeThisTurn = true;
         }
       } else if (owedConfirmFoldEnabled() && owedReceiptForFold && !bargeInActive) {
@@ -4943,12 +5068,23 @@ mediaWss.on('connection', (ws, req) => {
         }
       }
       if (tts && isFillerCacheEnabled()) {
-        void warmFillerAckPcm({
+        // VOICE_NO_ANSWER_DELETE: the gap-guard clip is warmed first, keyed per call
+        // language (HD_89aa48bf657f T1 missed: the ack warm keyed "Mm." as en only).
+        const gapWarm = ackRule.gapGuardEnabled()
+          ? warmFillerAckPcm({
+              tts,
+              voiceId: tenantSonioxVoiceId,
+              extraLexicon: ttsLexiconOverrides,
+              phrases: ackRule.gapWarmPhrases(callLanguage),
+              shouldAbort: () => speechOutageStarted || !tts,
+            }).catch(() => null)
+          : Promise.resolve(null);
+        void gapWarm.then(() => warmFillerAckPcm({
           tts,
           voiceId: tenantSonioxVoiceId,
           extraLexicon: ttsLexiconOverrides,
           shouldAbort: () => speechOutageStarted || turnBusy || !tts,
-        })
+        }))
           .then((result) => {
             if (result?.warmed) {
               console.log(
