@@ -3647,6 +3647,31 @@ mediaWss.on('connection', (ws, req) => {
             speakThinkingAck(fillerText).catch(() => {});
           }
         }, fillerDelayMs);
+      } else if (ackTracker && ruleFiller === null && tts && ackRule.gapGuardEnabled()) {
+        // VOICE_NO_ANSWER_DELETE gap guard (HD_b401138c8ffd: ~1.6 s silence, no
+        // filler on any turn). Neutral Mm., not an ack-led reply; the reply's ack
+        // lead is stripped so it cannot stack.
+        // Measured from end of turn (not from here), so the clip reaches the caller
+        // under 900 ms; cached clip only (no live TTS start-up), one per turn.
+        const gapDelay = ackRule.gapGuardDelay(turnTiming.turnStartedAt, Date.now());
+        fillerTimer = setTimeout(() => {
+          fillerTimer = null;
+          if (!turnBusy || speaking || bargeInActive || firstSpokenChunk || fillerStarted) return;
+          const found = isFillerCacheEnabled() && ttsSpeedScale === 1
+            ? lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: ackRule.GAP_FILL, callLanguage, extraLexicon: ttsLexiconOverrides })
+            : { pcm: null };
+          if (!found.pcm) {
+            console.log(`[ws/media][${sidLabel()}] gap-guard miss (not cached) lang=${callLanguage}`);
+            return;
+          }
+          fillerStarted = true;
+          thinkingAckTurn = turnTiming;
+          thinkingAckAtMs = Date.now();
+          ackPlayedTurn = turnTiming;
+          turnTiming.markFiller();
+          console.log(`[ws/media][${sidLabel()}] gap-guard lang=${callLanguage} at=${Date.now() - turnTiming.turnStartedAt}ms: ${ackRule.GAP_FILL}`);
+          playCachedFillerPcm(found.pcm, { text: ackRule.GAP_FILL }).catch(() => {});
+        }, gapDelay);
       }
 
       const streamOn =
@@ -3739,6 +3764,7 @@ mediaWss.on('connection', (ws, req) => {
           capabilities,
           state: brainState,
           language: callLanguage,
+          streamChunk: true,
         });
         const polished = polishedDetail.text;
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
@@ -4853,12 +4879,23 @@ mediaWss.on('connection', (ws, req) => {
         }
       }
       if (tts && isFillerCacheEnabled()) {
-        void warmFillerAckPcm({
+        // VOICE_NO_ANSWER_DELETE: the gap-guard clip is warmed first, keyed per call
+        // language (HD_89aa48bf657f T1 missed: the ack warm keyed "Mm." as en only).
+        const gapWarm = ackRule.gapGuardEnabled()
+          ? warmFillerAckPcm({
+              tts,
+              voiceId: tenantSonioxVoiceId,
+              extraLexicon: ttsLexiconOverrides,
+              phrases: ackRule.gapWarmPhrases(callLanguage),
+              shouldAbort: () => speechOutageStarted || !tts,
+            }).catch(() => null)
+          : Promise.resolve(null);
+        void gapWarm.then(() => warmFillerAckPcm({
           tts,
           voiceId: tenantSonioxVoiceId,
           extraLexicon: ttsLexiconOverrides,
           shouldAbort: () => speechOutageStarted || turnBusy || !tts,
-        })
+        }))
           .then((result) => {
             if (result?.warmed) {
               console.log(
