@@ -377,12 +377,25 @@ function trimSpokenServiceDump(text, opts = {}) {
     return raw;
   }
   if (!looksLikeSpokenServiceDump(raw)) return raw;
-  const lang = confirmationLanguage(opts.language);
+  const G = require('./answerGrounding');
+  const structural = G.noAnswerDeleteEnabled();
+  if (structural) {
+    // A grounded list answers any phrasing of the question: never delete it.
+    const g = G.serviceListGrounding(raw, { profile: opts.profile, state: opts.state });
+    if (g.grounded) return raw;
+  }
+  const lang = structural
+    ? confirmationLanguage(G.replyLanguage(raw, opts.language))
+    : confirmationLanguage(opts.language);
   const line =
     lang === 'sw' || lang === 'sheng'
       ? 'Tunaweza kusaidia. Unahitaji huduma gani?'
       : 'We can help with that. What do you need done?';
   logSpokenFilterDrop('service_dump', raw);
+  if (structural) {
+    const mem = G.turnMemory(opts.state, opts.callerTurns);
+    if (mem) mem.listDeleted = true;
+  }
   return line;
 }
 
@@ -422,6 +435,10 @@ function stripPrematureOutcomeClaims(text, opts = {}) {
  * speech guard runs too: no new numbers, no saved claim without a tool result,
  * no coverage flip, no transfer claim. See speechGuard.js.
  */
+function splitSpokenSentences(text) {
+  return String(text || '').split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+}
+
 function polishSpokenDetail(text, opts = {}) {
   const dropReasons = [];
   let spoken = stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true });
@@ -473,6 +490,11 @@ function polishSpokenDetail(text, opts = {}) {
       ...opts,
       callerText,
     });
+  }
+  if (opts.streamChunk && require('./answerGrounding').noAnswerDeleteEnabled()) {
+    // Streamed chunks of one turn share memory; a whole-reply re-polish does not.
+    const G = require('./answerGrounding');
+    out = G.applyTurnContext(out, G.turnMemory(opts.state, opts.callerTurns), splitSpokenSentences);
   }
   const before = String(text || '').trim();
   const after = String(out || '').trim();

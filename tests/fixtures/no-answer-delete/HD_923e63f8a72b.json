@@ -1,0 +1,103 @@
+{
+ "callId": "HD_923e63f8a72b",
+ "source": "staging 2026-10-15 05:10-05:11 UTC (08:10 EAT), score 37.1. caller/heard verbatim; deleted chunk = the catalogue sentence the call spoke on T1/T7 (logged char counts fit). The deleted T2/T4/T5/T6 chunk is reconstructed: it must name >=3 of the dump detector's job nouns to have been cut, so the reconstruction uses the tenant's sofa/carpet/mattress rows.",
+ "lang": "sw",
+ "catalogue": [
+  "Apartment na House Cleaning",
+  "Deep Cleaning",
+  "Office Cleaning",
+  "Mattress cleaning",
+  "Sofa Cleaning",
+  "Carpet Cleaning"
+ ],
+ "list": "Tuna Apartment na House Cleaning, Deep Cleaning, Office Cleaning, na Mattress cleaning, na zingine.",
+ "turns": [
+  {
+   "turn": 1,
+   "caller": "Au kwa ajili ya nini? Nilikuwa nataka kujua ni huduma gani mnapea nanga,",
+   "chunks": [
+    "Tuna Apartment na House Cleaning, Deep Cleaning, Office Cleaning, na Mattress cleaning, na zingine. Unahitaji gani?"
+   ],
+   "heard": [
+    "Tuna Apartment na House Cleaning, Deep Cleaning, Office Cleaning, na Mattress cleaning, na zingine. Unahitaji gani?"
+   ]
+  },
+  {
+   "turn": 2,
+   "caller": "Wewe niambie.",
+   "chunks": [
+    "LIST",
+    "Ungependa huduma gani?"
+   ],
+   "heard": [
+    "Tunaweza kusaidia. Unahitaji huduma gani?",
+    "Ungependa huduma gani?"
+   ],
+   "deleted": true
+  },
+  {
+   "turn": 3,
+   "caller": "Mmh.",
+   "chunks": [
+    "Je, ungependa tukufanyie huduma gani kati ya hizo?"
+   ],
+   "heard": [
+    "Je, ungependa tukufanyie huduma gani kati ya hizo?"
+   ]
+  },
+  {
+   "turn": 4,
+   "caller": "Umesema mnafanya nini tena?",
+   "chunks": [
+    "LIST",
+    "Ungependa ipi?"
+   ],
+   "heard": [
+    "Tunaweza kusaidia. Unahitaji huduma gani?",
+    "Ungependa ipi?"
+   ],
+   "deleted": true
+  },
+  {
+   "turn": 5,
+   "caller": "Umesema mnafanya nini tena?",
+   "chunks": [
+    "LIST",
+    "Ungependa huduma gani?"
+   ],
+   "heard": [
+    "Tunaweza kusaidia. Unahitaji huduma gani?",
+    "Ungependa huduma gani?"
+   ],
+   "deleted": true
+  },
+  {
+   "turn": 6,
+   "caller": "Like.",
+   "chunks": [
+    "LIST",
+    "Unahitaji ipi kati ya hizo?"
+   ],
+   "heard": [
+    "Tunaweza kusaidia. Unahitaji huduma gani?",
+    "Unahitaji ipi kati ya hizo?"
+   ],
+   "deleted": true,
+   "danglingRef": true
+  },
+  {
+   "turn": 7,
+   "caller": "Umesema mnafanya— Mnawapa which services tena?",
+   "chunks": [
+    "Tuna Apartment na House Cleaning, Deep Cleaning, Office Cleaning, na Mattress cleaning, na zingine. Unahitaji gani?",
+    "Unahitaji gani?"
+   ],
+   "heard": [
+    "Tuna Apartment na House Cleaning, Deep Cleaning, Office Cleaning, na Mattress cleaning, na zingine. Unahitaji gani?",
+    "Unahitaji gani?"
+   ],
+   "doubledCloser": true
+  }
+ ],
+ "deletedList": "Tunasafisha sofa, carpet, mattress, nyumba na ofisi, pia deep cleaning."
+}
