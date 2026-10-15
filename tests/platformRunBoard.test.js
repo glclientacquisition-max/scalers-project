@@ -34,7 +34,8 @@ describe("platform run board", () => {
   it("admin Platform page uses the run board without a vendor telecom headline", () => {
     const page = read("dashboard/src/app/admin/(console)/platform/page.tsx");
     const board = read("dashboard/src/components/PlatformRunBoard.tsx");
-    assert.match(page, /PlatformRunBoard/);
+    // Rebuilt as a provider-health page: provider cards replace the run board rows.
+    assert.match(page, /ProviderColumn/);
     assert.doesNotMatch(page, /SautikitTelecomPanel/);
     const model = read("dashboard/src/lib/platformRunBoardModel.ts");
     assert.match(model, /title: "Speech"/);

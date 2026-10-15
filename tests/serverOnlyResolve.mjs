@@ -9,6 +9,17 @@ export async function resolve(specifier, context, nextResolve) {
       url: new URL("./server-only-empty.mjs", import.meta.url).href,
     };
   }
+  if (specifier.startsWith("@/")) {
+    // Dashboard path alias (tsconfig "@/*" -> dashboard/src/*).
+    const base = new URL(`../dashboard/src/${specifier.slice(2)}`, import.meta.url).href;
+    for (const ext of ["", ".ts", ".tsx", ".js"]) {
+      try {
+        return await nextResolve(`${base}${ext}`, context);
+      } catch {
+        // try the next extension
+      }
+    }
+  }
   if (
     (specifier.startsWith("./") || specifier.startsWith("../")) &&
     !specifier.endsWith(".ts") &&
