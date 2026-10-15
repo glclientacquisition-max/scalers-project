@@ -36,7 +36,10 @@ function shadowLegacy(line, { legacy, profile, language, state, callerText }) {
 async function planV2CatalogueMouth(legacy, { text, profile, language, state, env = process.env, log = () => {}, model } = {}) {
   if (!step.catalogueStepEnabled(env)) return legacy;
   try {
-    if (!step.looksCatalogue(text, profile)) return legacy;
+    if (!step.looksCatalogue(text, profile, state || {})) {
+      if (state?.v2CatalogueState) state.v2CatalogueState.lastInfo = null; // topic closes on a non-catalogue turn
+      return legacy;
+    }
     // lang slot: the call language, moved only by v2's sticky language rule on a clear caller turn.
     const L = require('./v2/lexicon');
     const call = /^(sw|sheng)/i.test(String(language || '')) ? 'sw' : /^en/i.test(String(language || '')) ? 'en' : null;

@@ -24,7 +24,10 @@ function senseCheck({ line, lang, intent, sc, caller }) {
     if (EN_WORDS.test(t)) problems.push('english_word_in_sw');
   } else if (/\b(tunafanya|ungependa|shilingi|usafi|na)\b/i.test(t)) problems.push('swahili_in_en');
   const answers = { services: /\b(we do|tunafanya|for example|kwa mfano|house cleaning goes|usafi wa nyumba ni)\b/i, price: /\b(shillings|shilingi|quote|bei maalum|price for|bei ya hiyo)\b/i, explain: /\b(means|ni|covers)\b/i, list_services: /\b(we do|tunafanya|huduma zetu|all our services)\b/i, list_category: /\b(we do|tunafanya)\b/i, price_service: /\b(shillings|shilingi|quote|bei maalum)\b/i, explain_service: /\b(covers|we do|tunafanya|ni|is)\b/i };
-  if (answers[intent] && !answers[intent].test(t)) problems.push('does_not_answer');
+  // A services answer either says "we do / tunafanya" or names at least two of the tenant's services/categories.
+  const named = (sc?.entries || []).flatMap((e) => [e.spoken?.[lang], e.category?.[lang]]).concat(['magodoro', 'sofa', 'mazulia', 'mattresses', 'sofas', 'carpets', 'nyumba', 'house', 'maofisi', 'offices', 'usafi wa kina', 'deep clean'])
+    .filter(Boolean).map((x) => String(x).toLowerCase()).filter((x, i, a) => a.indexOf(x) === i && t.toLowerCase().includes(x)).length;
+  if (answers[intent] && !answers[intent].test(t) && !(intent === 'services' && named >= 2)) problems.push('does_not_answer');
   if (t.split(/\s+/).length > 40) problems.push('too_long');
   return { ok: !problems.length, problems };
 }

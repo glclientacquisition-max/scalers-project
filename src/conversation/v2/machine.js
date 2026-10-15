@@ -619,7 +619,7 @@ function finishCall(state, { businessName, callerPhone }) {
 // Returns null when the turn is not a catalogue turn; the caller keeps its own path.
 function catalogueTurn(state, { text, profile = {}, lang, command = null, now = new Date() }) {
   state.now = now; state.lang = lang; state.turn += 1;
-  const u = N.understand(text, { profile, now, expecting: null });
+  const u = N.understand(text, { profile, now, expecting: null, topic: state.lastInfo });
   if (command) {
     const svc = command.service_id ? (profile.servicesCatalog || []).find((s, i) => (s.id || null) === command.service_id || SC.slug(s.name) === String(command.service_id).replace(/^svc_/, '')) || null : null;
     u.service = svc || u.service;
@@ -629,7 +629,7 @@ function catalogueTurn(state, { text, profile = {}, lang, command = null, now = 
   if (u.intents.includes('explain') && u.service) { kind = 'explain'; const sp = spoken(profile, u.service, lang); line = sp && sp.explain ? R.info({ kind: 'explain_text', text: sp.explain }, lang) : R.info({ kind: 'explain', name: u.service.name, notes: u.service.notes || '' }, lang); }
   else if (u.intents.includes('price') && u.service) { kind = 'price'; line = infoAnswer(state, u, profile, 'price'); }
   else if (u.intents.includes('services')) { kind = 'services'; line = infoAnswer(state, u, profile, 'services'); }
-  if (line) state.lastLine = line;
+  if (line) { state.lastLine = line; state.lastInfo = kind; } else state.lastInfo = null;
   return line ? { line, kind, service: u.service?.name || null } : null;
 }
 module.exports = { createState, runTurn, finishCall, catalogueTurn };

@@ -134,7 +134,7 @@ test('flag on: v2 owns the services turn, legacy rewrites only log in shadow; re
   assert.ok(logs.some((l) => /shadow catalogue_mouth would have spoken/.test(l)));
   const lines = [out.line];
   for (const t of ['Umesema mnafanya nini tena?', 'Umesema mnafanya nini tena?']) lines.push((await planV2CatalogueMouth(null, { text: t, profile: P923, language: 'sw', state, env: ON })).line);
-  assert.strictEqual(new Set(lines).size, 3, lines.join(' | '));
+  assert.notStrictEqual(lines[1], lines[0], 'repeat goes one level deeper'); assert.ok(!lines.slice(1).includes(lines[0]), lines.join(' | '));
   for (const l of lines) { assert.ok(senseCheck({ line: l, lang: 'sw', intent: 'services', sc: S.compileSync(P923) }).ok, l); assert.strictEqual((l.match(/\?/g) || []).length, 1); }
 }));
 

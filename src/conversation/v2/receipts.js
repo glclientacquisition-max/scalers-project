@@ -129,9 +129,13 @@ function info(r, lang, n = 0) {
     case 'service_detail': { // follow-up on the category list: one level deeper, still plain words, no raw catalogue names
       const parts = r.cats.map((c) => {
         if (c.k === 'items') return catPhrase(c, S);
-        if (c.k === 'house') { const ds = [...new Set(c.names.map((x) => (x.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean))].sort(); const w = S ? { 1: 'kimoja', 2: 'viwili', 3: 'vitatu' } : { 1: 'one', 2: 'two', 3: 'three' }; const l = ds.map((d) => w[d] || d); const hourly = c.names.some((x) => /hourly/i.test(x)); return S ? `nyumba ya vyumba ${l.join(', ')}${hourly ? ', au msaidizi kwa saa' : ''}` : `homes with ${l.slice(0, -1).join(', ')}${l.length > 1 ? ' or ' : ''}${l[l.length - 1]} bedrooms${hourly ? ', or a cleaner by the hour' : ''}`; }
+        if (c.k === 'house') { const ds = [...new Set(c.names.map((x) => (x.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean))].sort(); const w = S ? { 1: 'kimoja', 2: 'viwili', 3: 'vitatu' } : { 1: 'one', 2: 'two', 3: 'three' }; const l = ds.map((d) => w[d] || d); if (!l.length) return S ? 'usafi wa nyumba' : 'house cleaning'; const hourly = c.names.some((x) => /hourly/i.test(x)); return S ? `nyumba ya vyumba ${l.join(', ')}${hourly ? ', au msaidizi kwa saa' : ''}` : `homes with ${l.slice(0, -1).join(', ')}${l.length > 1 ? ' or ' : ''}${l[l.length - 1]} bedrooms${hourly ? ', or a cleaner by the hour' : ''}`; }
         if (c.k === 'deep') { const ws = [[/move/i, S ? 'kuhamia' : 'moving'], [/construction/i, S ? 'baada ya ujenzi' : 'after building work'], [/fridge|refrigerator/i, S ? 'friji' : 'fridges'], [/oven/i, S ? 'oveni' : 'ovens']].filter(([re]) => c.names.some((x) => re.test(x))).map(([, w]) => w); return S ? `usafi wa kina${ws.length ? ` kama ${ws.join(', ')}` : ''}` : `deep cleans${ws.length ? ` like ${ws.join(', ')}` : ''}`; }
-        if (c.k === 'office') return S ? 'ofisi ndogo, za kati au kubwa' : 'small, medium or large offices';
+        if (c.k === 'office') { // sizes only when the catalogue lists them (HD_923e: one 'Office Cleaning' row)
+          const sz = [[/small/i, S ? 'ndogo' : 'small'], [/medium/i, S ? 'za kati' : 'medium'], [/large|commercial/i, S ? 'kubwa' : 'large']].filter(([re]) => c.names.some((x) => re.test(x))).map(([, w]) => w);
+          if (sz.length < 2) return S ? 'usafi wa maofisi' : 'offices';
+          return S ? `ofisi ${sz.slice(0, -1).join(', ')} au ${sz[sz.length - 1]}` : `${sz.slice(0, -1).join(', ')} or ${sz[sz.length - 1]} offices`;
+        }
         return catPhrase(c, S);
       });
       { const j = parts.join("; "); return `${j.charAt(0).toUpperCase()}${j.slice(1)}. ${S ? "Ungependa ipi?" : "Which would you like?"}`; }

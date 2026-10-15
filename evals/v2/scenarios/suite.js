@@ -4,6 +4,10 @@
 // reactive answers), tenant fixture, seed rows, expected final DB state, speech rules.
 // `commitment: true` => v2 policy: read-back + caller yes before every commit write.
 const ME = '+254700000001';
+// VOICE_V2_CATALOGUE on: prices/units come from the spoken catalogue, pinned to the line's language
+// (no KSh in Swahili, no shilingi in English). Off: Brain's original raw-catalogue expectations.
+const SC = /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
+const BOOK_ASK = 'Ungependa kubook|Would you like to book';
 const OTHER = '+254711111111';
 const apt = (id, phone, service, when, start, landmark, name) => ({ id, caller_phone: phone, service_name: service, status: 'requested', when_text: when, window_start: start, address_landmark: landmark, caller_name: name });
 
@@ -102,7 +106,7 @@ module.exports = [
     turns: [['Nilikuwa nataka kujua ni services gani mnaofa.', 'Mnafanya huduma gani?']], facts: {}, expect: { noWrites: true } },
   { id: 'S27_sw_saizi_gani', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['kulingana na ukubwa', 'kimoja'],
     turns: [['Nilikuwa nataka kujua ni saizi gani mnatoa.', 'Saizi gani mnatoa za usafi?']], facts: {}, expect: { noWrites: true } },
-  { id: 'S28_sw_price_followup', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['huduma gani', 'KSh 800|shilingi 800'],
+  { id: 'S28_sw_price_followup', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: SC ? ['huduma gani', '\\bshilingi 800 kwa kiti\\b'] : ['huduma gani', '\\bKSh 800\\b'], mustNotSay: SC ? ['\\bKSh\\b', '\\bshillings?\\b', BOOK_ASK] : [BOOK_ASK],
     turns: ['Shilingi ngapi?', ['Sofa cleaning.', 'Ya sofa.']], facts: {}, expect: { noWrites: true } },
   { id: 'S29_sheng_coverage_listed', area: 'sw_coverage', lang: 'sheng', tenant: 'done_and_dusted', mustSay: ['Syokimau.*orodha'],
     turns: [['Niaje, mnafika Syokimau?', 'Sasa, mnakuja Syokimau?']], facts: {}, expect: { noWrites: true } },
@@ -110,8 +114,12 @@ module.exports = [
     turns: [['Mnafika Kisumu?', 'Je, mnakuja hadi Kisumu?']], facts: {}, expect: { noWrites: true } },
   { id: 'S31_sw_nataka_kujua_hours', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['bei, huduma', 'saa mbili'],
     turns: ['Habari, nilikuwa nataka kujua.', ['Saa ngapi mnafungua?', 'Mnafungua saa ngapi?']], facts: {}, expect: { noWrites: true } },
-  { id: 'S32_sw_do_you_clean_carpet', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['tunafanya (Carpet|usafi wa zulia)'],
+  { id: 'S32_sw_do_you_clean_carpet', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: SC ? ['tunafanya usafi wa zulia, bei ni kuanzia shilingi 2,200 kwa mita mraba\\b'] : ['tunafanya Carpet'], mustNotSay: SC ? ['\\bKSh\\b', '\\bshillings?\\b', 'per m²'] : [],
     turns: [['Mnasafisha carpet?', 'Mnawashanga carpet?']], facts: {}, expect: { noWrites: true } },
+  { id: 'S28e_en_sofa_price', area: 'services', lang: 'en', tenant: 'done_and_dusted', mustSay: SC ? ['\\b800 shillings per seat\\b'] : ['\\bKSh 800\\b'], mustNotSay: SC ? ['\\bKSh\\b', '\\bshilingi\\b', BOOK_ASK] : [BOOK_ASK],
+    turns: ['How much is sofa cleaning?'], facts: {}, expect: { noWrites: true } },
+  { id: 'S32e_en_carpet_price', area: 'services', lang: 'en', tenant: 'done_and_dusted', mustSay: SC ? ['\\bfrom 2,200 shillings per (m²|square metre)'] : ['\\bKSh 2,200 per m²'], mustNotSay: SC ? ['\\bKSh\\b', '\\bshilingi\\b', BOOK_ASK] : [BOOK_ASK],
+    turns: ['How much for carpet cleaning?'], facts: {}, expect: { noWrites: true } },
   // Area + landmark: the area is the place, the landmark is a note (v2 read-back fix).
   { id: 'S33_book_en_area_landmark', area: 'booking', lang: 'en', tenant: 'done_and_dusted',
     turns: [["Hi, I'd like to book interior window cleaning for Friday at 10am.", 'Can I book window cleaning on Friday at 10 in the morning?']],
@@ -201,7 +209,7 @@ module.exports = [
     expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-16 10:00' } } },
   { id: 'S65_sw_services_plain_categories', area: 'services', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['magodoro', 'nyumba kulingana na ukubwa', 'maofisi'], mustNotSay: ['1-Bedroom', 'move-in move-out', 'jina lako'],
     turns: ['Uniambie usasi gani mnafanya.'], facts: {}, expect: { appointments: 0, service_requests: 0 } },
-  { id: 'S66_en_explain_no_push', area: 'services', lang: 'en', tenant: 'done_and_dusted', mustSay: ['one-bedroom home'], mustNotSay: ['Would you like to book', 'shillings', 'What day'],
+  { id: 'S66_en_explain_no_push', area: 'services', lang: 'en', tenant: 'done_and_dusted', mustSay: ['one-bedroom home'], mustNotSay: [BOOK_ASK, 'shillings', 'shilingi', 'KSh', 'What day'],
     turns: ["I don't understand what you're saying by 1-Bedroom.", 'Okay, thank you.'], facts: {}, expect: { appointments: 0, service_requests: 0 } },
   // "next Friday" while this week's Friday is still ahead: asked once, naming both dates
   { id: 'S59_en_next_friday_asked', area: 'dates', lang: 'en', tenant: 'done_and_dusted', commitment: true, mustSay: ['16th.*23rd'],
