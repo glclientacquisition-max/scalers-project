@@ -36,7 +36,7 @@ function shadowLegacy(line, { legacy, profile, language, state, callerText }) {
 async function planV2CatalogueMouth(legacy, { text, profile, language, state, env = process.env, log = () => {}, model } = {}) {
   if (!step.catalogueStepEnabled(env)) return legacy;
   try {
-    if (!step.looksCatalogue(text, profile, state || {})) return legacy;
+    if (!step.looksCatalogue(text, profile)) return legacy;
     // lang slot: the call language, moved only by v2's sticky language rule on a clear caller turn.
     const L = require('./v2/lexicon');
     const call = /^(sw|sheng)/i.test(String(language || '')) ? 'sw' : /^en/i.test(String(language || '')) ? 'en' : null;
@@ -46,6 +46,7 @@ async function planV2CatalogueMouth(legacy, { text, profile, language, state, en
     const lang = /^(sw|sheng)/.test(holder.v2CatalogueLang) ? 'sw' : 'en';
     const r = await step.runCatalogueStep({ text, profile, lang, state: holder, model: model === undefined ? defaultModel(env) : model });
     log(`v2_catalogue ${JSON.stringify(r.trace)}`);
+    r.trace.intent = r.trace.kind;
     if (!r.line) return legacy;
     for (const s of shadowLegacy(r.line, { legacy, profile, language, state, callerText: text })) log(`v2_catalogue shadow ${s}`);
     return { ...(legacy || {}), speakLocal: true, line: r.line, reason: 'v2_catalogue', v2: r.trace };

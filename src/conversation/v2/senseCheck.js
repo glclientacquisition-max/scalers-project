@@ -23,7 +23,7 @@ function senseCheck({ line, lang, intent, sc, caller }) {
     if (raw.some((n) => t.toLowerCase().includes(n.toLowerCase()))) problems.push('raw_catalogue_name');
     if (EN_WORDS.test(t)) problems.push('english_word_in_sw');
   } else if (/\b(tunafanya|ungependa|shilingi|usafi|na)\b/i.test(t)) problems.push('swahili_in_en');
-  const answers = { list_services: /\b(we do|tunafanya|huduma zetu|all our services)\b/i, list_category: /\b(we do|tunafanya)\b/i, price_service: /\b(shillings|shilingi|quote|bei maalum)\b/i, explain_service: /\b(covers|we do|tunafanya|ni|is)\b/i };
+  const answers = { services: /\b(we do|tunafanya|for example|kwa mfano|house cleaning goes|usafi wa nyumba ni)\b/i, price: /\b(shillings|shilingi|quote|bei maalum|price for|bei ya hiyo)\b/i, explain: /\b(means|ni|covers)\b/i, list_services: /\b(we do|tunafanya|huduma zetu|all our services)\b/i, list_category: /\b(we do|tunafanya)\b/i, price_service: /\b(shillings|shilingi|quote|bei maalum)\b/i, explain_service: /\b(covers|we do|tunafanya|ni|is)\b/i };
   if (answers[intent] && !answers[intent].test(t)) problems.push('does_not_answer');
   if (t.split(/\s+/).length > 40) problems.push('too_long');
   return { ok: !problems.length, problems };

@@ -38,6 +38,12 @@ async function loadTenants() {
     if (!needsRegeneration(r.spoken_catalogue, profile) && !flag('--force')) { console.log(`${r.id} up to date (v${r.spoken_catalogue.version})`); continue; }
     const doc = await compileSpokenCatalogue(profile, { generate, previous: r.spoken_catalogue || null });
     console.log(`${r.id} -> v${doc.version} ${doc.generator} entries=${doc.entries.length} categories=${doc.categories.length} ambiguity=${doc.coverage.ambiguityGroups.length} issues=${doc.issues.length}`);
+    if (flag('--report')) {
+      for (const e of doc.entries) console.log(`   ${e.raw.name} | sw: ${e.spoken.sw} | en: ${e.spoken.en} | cat: ${e.category.id} | price sw: ${e.price.sw} | explain sw: ${e.explain.sw}`);
+      console.log(`   categories: ${doc.categories.map((c) => `${c.id}=${c.sw} / ${c.en}`).join(' ; ')}`);
+      console.log(`   ambiguity: ${doc.coverage.ambiguityGroups.map((g) => `${g.heard}:${g.options.join('/')}`).join('; ') || 'none'}`);
+      for (const i of doc.issues) console.log(`   review: ${i.id} ${i.field} ${i.code}${i.raw ? ` (${i.raw})` : ''}`);
+    }
     if (!flag('--apply')) continue;
     const { db } = loaded;
     const ins = await db.from('tenant_spoken_catalogue_versions').insert({ tenant_id: r.id, version: doc.version, schema_version: doc.schemaVersion, source_hash: doc.sourceHash, status: doc.status, generator: doc.generator, doc, issues: doc.issues });

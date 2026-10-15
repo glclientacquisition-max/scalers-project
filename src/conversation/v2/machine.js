@@ -10,6 +10,15 @@ const R = require('./receipts');
 const { buildCatalogue, validateCall } = require('./catalogue');
 const { renderOwnerMessage } = require('./owner');
 const { buildRequest } = require('./gemini');
+// VOICE_V2_CATALOGUE: catalogue words, categories, explanations and prices come from the
+// tenant's spoken catalogue (src/knowledge/spokenCatalogue.js). Off: unchanged behaviour.
+const SC = require('../../knowledge/spokenCatalogue');
+const scOn = () => /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
+function spoken(profile, svc, lang) {
+  if (!scOn() || !svc) return null;
+  const sc = SC.resolveSpokenCatalogue(profile); const e = SC.entryForRaw(sc, svc.name); const Lg = L.isSw(lang) ? 'sw' : 'en';
+  return { label: SC.sayName(sc, svc.name, Lg) || svc.name, price: e ? e.price[Lg] : null, explain: e?.explain?.[Lg] || null, sc };
+}
 
 const TRANSACTIONAL = ['payment_change', 'address_change', 'cancel', 'change', 'complaint', 'handoff', 'order', 'book'];
 const INFO = ['payment_how', 'greeting', 'who_are_you', 'services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
@@ -307,10 +316,11 @@ function infoAnswer(state, u, profile, kind) {
   }
   if (kind === 'services') {
     const cat = vertical(profile) === 'retail' ? (profile.productCatalog || []).map((p) => p.name) : (profile.servicesCatalog || []).map((x) => x.name);
-    if (u.service) return R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, state.lang);
+    if (u.service) { const sp = spoken(profile, u.service, state.lang); return R.info({ kind: 'offered', label: sp ? sp.label : u.service.name, price: sp ? sp.price : u.service.price_range || null }, state.lang); }
     if (u.products[0]) return R.info({ kind: 'offered', label: u.products[0].name, price: u.products[0].price ? `KSh ${u.products[0].price}` : null }, state.lang);
     if (!cat.length) return R.info({ kind: 'want_know' }, state.lang);
     // HD_89aa48bf657f: home services are listed as plain categories in the caller's language, never raw catalogue names
+    if (vertical(profile) === 'home' && scOn()) { const sc = SC.resolveSpokenCatalogue(profile); const lg = L.isSw(state.lang) ? 'sw' : 'en'; const house = sc.categories.find((c) => c.id === 'house'); if (house && /\b(saizi|sizes?|ukubwa|vyumba|bedrooms?)\b/i.test(u.text || '')) return R.info({ kind: 'house_sizes', sizes: house.entryIds.map((id) => (sc.entries.find((e) => e.id === id).raw.name.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean) }, state.lang); const labels = sc.categories.map((c) => c[lg]).filter(Boolean).slice(0, 4); if (labels.length) { if (n >= 2) { const examples = sc.categories.slice(0, 4).map((c) => sc.entries.find((e) => e.id === c.entryIds[Math.min(n - 2, c.entryIds.length - 1)])?.spoken?.[lg]).filter(Boolean); if (examples.length) return R.info({ kind: 'service_categories', labels, examples }, state.lang); } return R.info({ kind: 'service_categories', labels, again: n === 1 }, state.lang); } }
     if (vertical(profile) === 'home') { const cats = R.serviceCategories(cat); const house = cats.find((c) => c.k === 'house'); if (house && /\b(saizi|sizes?|ukubwa|vyumba|bedrooms?)\b/i.test(u.text || '')) return R.info({ kind: 'house_sizes', sizes: house.names.map((x) => (x.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean) }, state.lang); if (cats.length) return R.info({ kind: 'service_categories', cats }, state.lang); }
     const start = (n * 4) % cat.length;
     return R.info({ kind: 'services', names: [...cat, ...cat].slice(start, start + 4), more: cat.length > 4 }, state.lang);
@@ -341,6 +351,7 @@ function infoAnswer(state, u, profile, kind) {
     const named = /\b(cleaning|clean|for (an?|the)? ?\w+|ya \w+)\b/i.test(u.text);
     const svc = u.service || (!named && u.text.split(/\s+/).length <= 5 && state.slots.service && (profile.servicesCatalog || []).find((x) => x.name === state.slots.service)); const prod = u.products[0];
     if (!svc && !prod && !/\b(oven|fridge|gutter|\w+ cleaning)\b/i.test(u.text)) return R.info({ kind: 'which_price' }, state.lang);
+    if (svc && scOn()) { const sp = spoken(profile, svc, state.lang); if (sp.price && svc.pricing?.confirmed !== false) return R.info({ kind: 'price', found: true, label: sp.label, price: sp.price }, state.lang); if (svc.price_range) return R.info({ kind: 'price', found: false }, state.lang); }
     if (svc && svc.price_range && svc.pricing?.confirmed !== false) return R.info({ kind: 'price', found: true, label: svc.name, price: svc.price_range }, state.lang);
     if (prod && prod.price) return R.info({ kind: 'price', found: true, label: prod.name, price: `KSh ${prod.price}` }, state.lang);
     state.offer = 'quote';
@@ -349,7 +360,7 @@ function infoAnswer(state, u, profile, kind) {
   if (kind === 'availability') {
     const prod = u.products[0];
     if (prod) return R.info({ kind: 'stock', found: true, label: prod.name, in_stock: prod.in_stock }, state.lang, n);
-    if (u.service && vertical(profile) === 'home') { state.offer = 'book'; state.offerService = u.service.name; return R.info({ kind: 'service_slot', label: u.service.name }, state.lang); }
+    if (u.service && vertical(profile) === 'home') { state.offer = 'book'; state.offerService = u.service.name; return R.info({ kind: 'service_slot', label: spoken(profile, u.service, state.lang)?.label || u.service.name }, state.lang); }
     state.offer = 'callback';
     return R.info({ kind: 'stock', found: false }, state.lang, n);
   }
@@ -446,7 +457,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     if (q) return out(u.intents.includes('hold') ? `${R.info({ kind: 'hold' }, lang)} ${q.trim()}` : `${R.info({ kind: 'repair' }, lang).split(/(?<=[.!?])\s/)[0]} ${q.trim()}`);
   }
   // HD_89aa48bf657f T5: "what do you mean by 1-Bedroom?" gets a short plain explanation, no price, no booking push
-  if (u.intents.includes('explain') && u.service) { const svc = u.service; if (state.intent === 'book' && state.slots.service === svc.name && state.phase === 'collect' && !state.slots.when.date) state.slots.service = state.slotsServiceBefore || null; return out(R.info({ kind: 'explain', name: svc.name, notes: svc.notes || '' }, lang)); }
+  if (u.intents.includes('explain') && u.service) { const svc = u.service; if (state.intent === 'book' && state.slots.service === svc.name && state.phase === 'collect' && !state.slots.when.date) state.slots.service = state.slotsServiceBefore || null; const sp = spoken(profile, svc, lang); return out(sp && sp.explain ? R.info({ kind: 'explain_text', text: sp.explain }, lang) : R.info({ kind: 'explain', name: svc.name, notes: svc.notes || '' }, lang)); }
   // thanks-only while collecting and nothing new: the caller is closing
   if (state.phase === 'collect' && state.turn > 2 && /^\W*((okay|ok|sawa|alright)\W+)?(thank you|thanks|asante( sana)?)\W*$/i.test(text)) { resetIntent(state); state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
   // after "anything else?": a no, thanks or a compliment closes the call
@@ -536,7 +547,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     mergeSlots(state, u, profile);
     // a service named with no question word is an enquiry about that service
     if (u.service && (!u.intents.length || u.intents.every((i) => i === 'want_know')) && vertical(profile) === 'home' && (u.when?.date || u.when?.time || /\b(next week|wiki ijayo|wiki (yenye |inayo)?(inakuja|kuja)|mashujaa|this week|wiki hii|sasa hivi|right now|leo|today|tonight)\b/i.test(u.text)) && (!/\?\s*$/.test(u.text) || (u.when?.date && u.when?.time) || /\b(can (you|someone) come|mnaweza (kuja|kufika)|(mtu|mtu wenu) anaweza kuja|kuna anayeweza kuja|kuna mtu wa kuja|mtakuja|nae?za pata|naweza kupata|can i (get|have))\b/i.test(u.text))) { state.intent = 'book'; mergeSlots(state, u, profile); const stb = stepIntent(state, u, profile); if (stb?.line) return out(stb.line); }
-    if (u.service && !u.intents.length && vertical(profile) === 'home') { state.lastInfo = 'services'; mergeSlots(state, u, profile); state.offer = 'book'; state.offerService = u.service.name; return out(R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, lang)); }
+    if (u.service && !u.intents.length && vertical(profile) === 'home') { state.lastInfo = 'services'; mergeSlots(state, u, profile); state.offer = 'book'; state.offerService = u.service.name; const sp = spoken(profile, u.service, lang); return out(R.info({ kind: 'offered', label: sp ? sp.label : u.service.name, price: sp ? sp.price : u.service.price_range || null }, lang)); }
     // a time or a place with no intent on a home-services line means a visit
     if (!u.intents.length && (u.when?.time || ((u.when?.date || u.place) && state.slots.service)) && (u.place || state.slots.service) && vertical(profile) === 'home' && !u.ack && !u.done) { state.intent = 'book'; mergeSlots(state, u, profile); const st0 = stepIntent(state, u, profile); if (st0?.line) return out(st0.line); }
     if (u.name && !u.intents.length) return out(nameSpeakable(state) ? R.info({ kind: 'greet_name', name: nameSpeakable(state) }, lang) : R.ask('intent', 0, lang));
@@ -581,4 +592,22 @@ function finishCall(state, { businessName, callerPhone }) {
   if (superseded && outcome === 'booked') captured.note = 'earlier callback request closed: booked instead';
   return { outcome, superseded: (state.callbacks || []).filter((c) => !c.open).map((c) => c.id).filter(Boolean), ownerText: renderOwnerMessage({ businessName, callerPhone, name: s.name, intent, outcome, captured }) };
 }
-module.exports = { createState, runTurn, finishCall };
+// Catalogue/discovery step only (VOICE_V2_CATALOGUE live wiring): intent from nlu.js
+// (or a checked model command), reply from receipts.js via the spoken catalogue.
+// Returns null when the turn is not a catalogue turn; the caller keeps its own path.
+function catalogueTurn(state, { text, profile = {}, lang, command = null, now = new Date() }) {
+  state.now = now; state.lang = lang; state.turn += 1;
+  const u = N.understand(text, { profile, now, expecting: null });
+  if (command) {
+    const svc = command.service_id ? (profile.servicesCatalog || []).find((s, i) => (s.id || null) === command.service_id || SC.slug(s.name) === String(command.service_id).replace(/^svc_/, '')) || null : null;
+    u.service = svc || u.service;
+    u.intents = command.intent === 'explain_service' ? ['explain'] : command.intent === 'price_service' ? ['price'] : command.intent === 'list_services' ? ['services'] : command.intent === 'other' ? [] : u.intents;
+  }
+  let kind = null; let line = null;
+  if (u.intents.includes('explain') && u.service) { kind = 'explain'; const sp = spoken(profile, u.service, lang); line = sp && sp.explain ? R.info({ kind: 'explain_text', text: sp.explain }, lang) : R.info({ kind: 'explain', name: u.service.name, notes: u.service.notes || '' }, lang); }
+  else if (u.intents.includes('price') && u.service) { kind = 'price'; line = infoAnswer(state, u, profile, 'price'); }
+  else if (u.intents.includes('services')) { kind = 'services'; line = infoAnswer(state, u, profile, 'services'); }
+  if (line) state.lastLine = line;
+  return line ? { line, kind, service: u.service?.name || null } : null;
+}
+module.exports = { createState, runTurn, finishCall, catalogueTurn };

@@ -102,7 +102,7 @@ module.exports = [
     turns: [['Nilikuwa nataka kujua ni services gani mnaofa.', 'Mnafanya huduma gani?']], facts: {}, expect: { noWrites: true } },
   { id: 'S27_sw_saizi_gani', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['kulingana na ukubwa', 'kimoja'],
     turns: [['Nilikuwa nataka kujua ni saizi gani mnatoa.', 'Saizi gani mnatoa za usafi?']], facts: {}, expect: { noWrites: true } },
-  { id: 'S28_sw_price_followup', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['huduma gani', 'KSh 800'],
+  { id: 'S28_sw_price_followup', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['huduma gani', 'KSh 800|shilingi 800'],
     turns: ['Shilingi ngapi?', ['Sofa cleaning.', 'Ya sofa.']], facts: {}, expect: { noWrites: true } },
   { id: 'S29_sheng_coverage_listed', area: 'sw_coverage', lang: 'sheng', tenant: 'done_and_dusted', mustSay: ['Syokimau.*orodha'],
     turns: [['Niaje, mnafika Syokimau?', 'Sasa, mnakuja Syokimau?']], facts: {}, expect: { noWrites: true } },
@@ -110,7 +110,7 @@ module.exports = [
     turns: [['Mnafika Kisumu?', 'Je, mnakuja hadi Kisumu?']], facts: {}, expect: { noWrites: true } },
   { id: 'S31_sw_nataka_kujua_hours', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['bei, huduma', 'saa mbili'],
     turns: ['Habari, nilikuwa nataka kujua.', ['Saa ngapi mnafungua?', 'Mnafungua saa ngapi?']], facts: {}, expect: { noWrites: true } },
-  { id: 'S32_sw_do_you_clean_carpet', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['tunafanya Carpet'],
+  { id: 'S32_sw_do_you_clean_carpet', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: ['tunafanya (Carpet|usafi wa zulia)'],
     turns: [['Mnasafisha carpet?', 'Mnawashanga carpet?']], facts: {}, expect: { noWrites: true } },
   // Area + landmark: the area is the place, the landmark is a note (v2 read-back fix).
   { id: 'S33_book_en_area_landmark', area: 'booking', lang: 'en', tenant: 'done_and_dusted',

@@ -90,7 +90,7 @@ test('staff names are never spoken; file name is never spoken unless the caller 
 
 test('availability is never claimed without a receipt; prices only from the catalogue', async () => {
   const { out } = await talk(['How much is an oven deep clean?', 'And for the fridge?', 'How much is gutter cleaning?']);
-  assert.match(out[0].line, /KSh 1,200/); assert.match(out[1].line, /KSh 1,000/); assert.match(out[2].line, /don't have a price/);
+  assert.match(out[0].line, /KSh 1,200|1,200 shillings/); assert.match(out[1].line, /KSh 1,000|1,000 shillings/); assert.match(out[2].line, /don't have a price/);
 });
 
 test('Swahili caller gets Swahili receipts', async () => {
@@ -124,13 +124,13 @@ test('Swahili/Sheng questions get fact answers from tenant data, not a generic r
   let r = await one('Nilikuwa nataka kujua ni services gani mnaofa.');
   assert.equal(r.lang, 'sw'); assert.match(r.line, /^Tunafanya usafi wa magodoro/);
   r = await one('Nilikuwa nataka kujua ni saizi gani mnatoa.'); assert.match(r.line, /^Usafi wa nyumba ni kulingana na ukubwa, vyumba vya kulala kimoja, viwili au vitatu\./);
-  r = await one('Mnawashanga carpet?'); assert.match(r.line, /^Ndio, tunafanya Carpet Cleaning, bei ni kuanzia KSh 2,200/);
+  r = await one('Mnawashanga carpet?'); assert.match(r.line, /^Ndio, tunafanya (Carpet Cleaning, bei ni kuanzia KSh 2,200|usafi wa zulia, bei ni kuanzia shilingi 2,200)/); // VOICE_V2_CATALOGUE: spoken catalogue
   r = await one('Niaje, mnafika Syokimau?'); assert.match(r.line, /^Syokimau iko kwenye orodha/);
   r = await one('Mnafika Kisumu?'); assert.match(r.line, /^Kisumu haiko kwenye orodha/);
   r = await one('Habari, nilikuwa nataka kujua.'); assert.match(r.line, /bei, huduma au saa za kazi/);
   r = await one('You guys operate until what time?'); assert.match(r.line, /08:00 to 18:00/);
   const p = await talk(['Shilingi ngapi?', 'Ya sofa.']);
-  assert.match(p.out[0].line, /huduma gani/); assert.match(p.out[1].line, /KSh 800/);
+  assert.match(p.out[0].line, /huduma gani/); assert.match(p.out[1].line, /KSh 800|shilingi 800/);
   for (const o of [r, ...p.out]) assert.doesNotMatch(o.line, /Samahani, unapiga kubook|Nimwombe mwenye biashara/);
 });
 
