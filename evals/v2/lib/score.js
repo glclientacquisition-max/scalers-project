@@ -84,6 +84,22 @@ function scoreRun(scn, run) {
     const after = ev.slice(end).filter((e) => e.type === 'sentence' && !/^\W*(okay|sawa|haya)\W*$/i.test(e.text));
     if (!after.length || !new RegExp(scn.receiptFirst, 'i').test(after[0].text)) fails.push(`receipt_first: first sentence after escalate "${after[0]?.text}"`);
   }
+  // per-turn catalogue/which-service caps (replay fixtures with perTurn: {maxCatalogue, maxWhichService, noConsecutiveWhichService})
+  if (scn.perTurn) {
+    const pt = scn.perTurn;
+    const CAT = /\b(tunafanya|tuna|we do|we offer|we have)\b[^.?!]*,[^.?!]*,/gi;
+    const WHICH = /\b(which service|huduma (gani|ipi)|ungependa huduma)/gi;
+    let prevWhich = false;
+    turns.forEach((t, idx) => {
+      const line = t.agentLine || '';
+      const nCat = (line.match(CAT) || []).length;
+      const nWhich = (line.match(WHICH) || []).length;
+      if (pt.maxCatalogue != null && nCat > pt.maxCatalogue) fails.push(`per_turn_catalogue t${idx} x${nCat}`);
+      if (pt.maxWhichService != null && nWhich > pt.maxWhichService) fails.push(`per_turn_which_service t${idx} x${nWhich}`);
+      if (pt.noConsecutiveWhichService && nWhich && prevWhich) fails.push(`consecutive_which_service t${idx}`);
+      prevWhich = nWhich > 0;
+    });
+  }
   for (const re of scn.mustSay || []) if (!new RegExp(re, 'i').test(said)) fails.push(`must_say "${re}"`);
   for (const re of scn.mustNotSay || []) if (new RegExp(re, 'i').test(said)) fails.push(`must_not_say "${re}"`);
   // ---- owner email
