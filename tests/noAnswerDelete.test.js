@@ -98,3 +98,47 @@ test('ON: after an ungrounded list is cut, a "kati ya hizo" chunk pointing at it
   assert.match(first, /Tunaweza kusaidia/);
   assert.equal(D.polishSpokenDetail('Unahitaji ipi kati ya hizo?', o).text, '');
 }));
+
+const fx89 = require('./fixtures/hedge-gap/HD_89aa48bf657f.json');
+test('HD_89aa48bf657f T7 hedge: OFF leaves "or let me know" fragment; ON strips the clause and re-capitalises', () => {
+  const run = () => {
+    const answers = [fx89.t7.caller];
+    const st = { language: { current: 'en' }, conversation: { answersReceived: answers }, caller: {}, entities: {} };
+    return fx89.t7.chunks.map((c) => D.polishSpokenDetail(c, { callerTurns: answers, profile, state: st, language: 'en', toolResults: [], capabilities: {}, streamChunk: true }).text);
+  };
+  withFlag(null, () => assert.deepEqual(run(), fx89.t7.heard));
+  withFlag('1', () => {
+    const out = run();
+    assert.equal(out[1], 'Let me know if you want to ask about another cleaning service like carpets or sofas.');
+    for (const line of out) assert.doesNotMatch(line, /^(or|and|but|so|na|au)\b/i);
+    assert.equal(D.stripSpokenHedges('Okay, let me check that for you.', { language: 'en' }), 'Okay.');
+    assert.equal(D.stripSpokenHedges('Sure, take your time and tell me the day.', { language: 'en' }), 'Sure, tell me the day.');
+    assert.equal(D.stripSpokenHedges('Sawa nakucheckia, na nitakujulisha.', { language: 'sw' }), 'Nitakujulisha.');
+  });
+});
+
+test('HD_89aa48bf657f gap guard: sent at 700 ms after end of turn (was 871-1060), cached clip keyed per call language', () => {
+  const F = require('../src/speech/fillerPcmCache');
+  const before = fx89.gapGuard.map((g) => g.endpointToGapLogMs);
+  assert.ok(Math.min(...before) > 850);
+  const after = fx89.gapGuard.map(() => {
+    const ended = 1000; const handlerAt = ended + fx89.handlerStartAfterEndpointMs;
+    return handlerAt - ended + A.gapGuardDelay(ended, handlerAt, {});
+  });
+  for (const ms of after) assert.equal(ms, 700);
+  assert.equal(A.gapGuardDelay(0, 950, {}), 0, 'a late handler sends at once, never negative');
+  // T1 miss: the ack warm keyed "Mm." without a call language; the gap warm uses the runtime key.
+  const sw = A.gapWarmPhrases('sw');
+  assert.deepEqual(sw[0], { text: 'Mm.', callLanguage: 'sw' });
+  for (const p of sw) {
+    assert.equal(F.lookupFillerPcm({ voiceId: 'v', text: p.text, callLanguage: p.callLanguage }).key,
+      F.lookupFillerPcm({ voiceId: 'v', text: 'Mm.', callLanguage: p.callLanguage }).key);
+  }
+});
+
+test('server.js: gap guard is cached-only, once per turn, never over reply audio', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(src, /if \(!turnBusy \|\| speaking \|\| bargeInActive \|\| firstSpokenChunk \|\| fillerStarted\) return;/);
+  assert.match(src, /gap-guard miss \(not cached\)/);
+  assert.match(src, /ackRule\.gapGuardDelay\(turnTiming\.turnStartedAt, Date\.now\(\)\)/);
+});
