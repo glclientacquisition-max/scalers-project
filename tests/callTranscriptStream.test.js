@@ -132,7 +132,7 @@ describe("call transcript stream", () => {
 
 describe("ticket chat display chrome", () => {
   it("lands the ACCEPT spec and leaves dock plus contact strip shipped", () => {
-    const spec = read("docs/product/TICKET_CHAT_DISPLAY_ACCEPT.md");
+    const spec = read("docs/reference/acceptance/TICKET_CHAT_DISPLAY_ACCEPT.md");
     assert.match(spec, /\*\*Status:\*\* ACCEPT/);
     assert.match(spec, /Contact strip/);
     assert.match(spec, /#383/);
@@ -156,7 +156,7 @@ describe("ticket chat display chrome", () => {
     const src = read("dashboard/src/components/CallTranscript.tsx");
     const faq = read("dashboard/src/components/CallFaqSuggestions.tsx");
     const ticket = read("dashboard/src/components/InboxTicketView.tsx");
-    const detail = read("docs/frontend/design-system/pages/call-detail.md");
+    const detail = read("docs/reference/design-system/pages/call-detail.md");
     assert.match(src, /buildCallTranscriptStream/);
     assert.match(src, /data-transcript-stream/);
     assert.match(src, /aria-label=\{who\}/);

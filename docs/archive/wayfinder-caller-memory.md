@@ -4,7 +4,7 @@ last_reviewed: 2026-09-25
 status: archived
 ---
 
-> **Archived 2026-10-14.** Short duplicate. Current source: [`docs/specs/caller-memory.md`](../specs/caller-memory.md). Kept for history; do not treat as current.
+> **Archived 2026-10-14.** Short duplicate. Current source: [`docs/rfcs/caller-memory.md`](../rfcs/caller-memory.md). Kept for history; do not treat as current.
 
 # Wayfinder: returning-caller card
 
@@ -14,7 +14,7 @@ Live calls load a compact phone file as a candidate. This call binds the speaker
 
 ## Notes
 
-Lanes: Brain + Platform read helper. Spec: `docs/specs/caller-memory.md`. ADR-0005. Skills: tdd, code-review. Do not dump transcripts. Do not migrate the live Gemini loop to the Vercel AI SDK.
+Lanes: Brain + Platform read helper. Spec: `docs/rfcs/caller-memory.md`. ADR-0005. Skills: tdd, code-review. Do not dump transcripts. Do not migrate the live Gemini loop to the Vercel AI SDK.
 
 ## Decisions so far
 

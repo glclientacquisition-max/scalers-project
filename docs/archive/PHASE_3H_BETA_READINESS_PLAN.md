@@ -275,7 +275,7 @@ Optional: `STAGING_DATABASE_URL` for full catalog mode in CI.
 
 | Criterion | What to observe |
 | --- | --- |
-| Naturalness | Pass/fail on Voice IDs V1–V9 (fragment TTS, tiny lead-in, hyphen names, punctuation spoken, thinking-ack, idle poke, filler-every-turn, fake volume, barge-then-talk). Not a 1–5 MOS. See `docs/agents/VOICE_NATURALNESS.md`. |
+| Naturalness | Pass/fail on Voice IDs V1–V9 (fragment TTS, tiny lead-in, hyphen names, punctuation spoken, thinking-ack, idle poke, filler-every-turn, fake volume, barge-then-talk). Not a 1–5 MOS. See `docs/explanation/voice/VOICE_NATURALNESS.md`. |
 | Kenyan English clarity | Understandable on mobile |
 | Swahili clarity | Correct language choice and pronunciation |
 | Sheng (if enabled) | Appropriate code-switch, not garbled |
@@ -293,8 +293,8 @@ Optional: `STAGING_DATABASE_URL` for full catalog mode in CI.
 | --- | --- |
 | Unit tests | `npm run test:voice` (TTS, turns, timing markers, STT context) |
 | TTS listen harness | `npm run tts:listen-harness` (operator listening) |
-| Live DID script | **PROPOSED:** `docs/operations/beta_voice_eval_checklist.md` (Phase 3H implementation) |
-| Targets | `docs/agents/VOICE_SPEED_CONSISTENCY.md` — p50 first PCM 800–1200 ms |
+| Live DID script | **PROPOSED:** `docs/how-to/beta_voice_eval_checklist.md` (Phase 3H implementation) |
+| Targets | `docs/explanation/voice/VOICE_SPEED_CONSISTENCY.md` — p50 first PCM 800–1200 ms |
 
 **Do not** change provider or model until baseline scores recorded for ≥ 3 calls.
 
@@ -522,7 +522,7 @@ Scalers is **technically reproducible** and **governance-complete** after Phases
 
 - [`BETA_READINESS_AUDIT.md`](BETA_READINESS_AUDIT.md)
 - [`PHASE_3G_COMPLETION_REPORT.md`](PHASE_3G_COMPLETION_REPORT.md)
-- [`PRODUCTION_CHANGE_NOTIFY_CHANNELS.md`](../operations/PRODUCTION_CHANGE_NOTIFY_CHANNELS.md)
-- [`../storage/STORAGE_SECURITY_MODEL.md`](../storage/STORAGE_SECURITY_MODEL.md)
-- [`../engineering/FEATURE_DEVELOPMENT_CONTRACT.md`](../engineering/FEATURE_DEVELOPMENT_CONTRACT.md)
-- [`../agents/VOICE_SPEED_CONSISTENCY.md`](../agents/VOICE_SPEED_CONSISTENCY.md)
+- [`PRODUCTION_CHANGE_NOTIFY_CHANNELS.md`](../reference/operations/PRODUCTION_CHANGE_NOTIFY_CHANNELS.md)
+- [`../storage/STORAGE_SECURITY_MODEL.md`](../explanation/STORAGE_SECURITY_MODEL.md)
+- [`../engineering/FEATURE_DEVELOPMENT_CONTRACT.md`](../reference/governance/FEATURE_DEVELOPMENT_CONTRACT.md)
+- [`../agents/VOICE_SPEED_CONSISTENCY.md`](../explanation/voice/VOICE_SPEED_CONSISTENCY.md)

@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Start here
 
-New to this repo or this task? Read `docs/STATUS.md` first. It covers current status, environments, what is done, on staging, in flight, next, and the rules. Then read `AGENTS.md` and your lane contract in `docs/agents/`.
+New to this repo or this task? Read `docs/STATUS.md` first. It covers current status, environments, what is done, on staging, in flight, next, and the rules. Then read `AGENTS.md` and your lane contract in `docs/reference/lanes/`.
 
 - One task, one lane, one PR into `main`.
 - Never release or re-point the live DID +254709221536.

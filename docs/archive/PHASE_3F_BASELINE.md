@@ -4,7 +4,7 @@ last_reviewed: 2026-08-15
 status: archived
 ---
 
-> **Archived 2026-10-14.** Phase report. Current source: [`docs/governance/PROJECT_HISTORY.md`](../governance/PROJECT_HISTORY.md). Kept for history; do not treat as current.
+> **Archived 2026-10-14.** Phase report. Current source: [`docs/explanation/governance/PROJECT_HISTORY.md`](../explanation/governance/PROJECT_HISTORY.md). Kept for history; do not treat as current.
 
 # Phase 3F baseline audit
 
@@ -61,7 +61,7 @@ status: archived
 | Foundation bootstrap | `docs/supabase/foundation_bootstrap.sql` | Production-introspected; do not apply to ALCR |
 | Bootstrap provenance | `docs/supabase/foundation_bootstrap.provenance.md` | Methodology + gaps |
 | Schema reference | `docs/supabase/schema.sql` | Reference only; superseded for bootstrap |
-| Governance | `docs/database/DATABASE_GOVERNANCE.md` | Pre-3F; partially stale on reproducibility |
+| Governance | `docs/explanation/database/DATABASE_GOVERNANCE.md` | Pre-3F; partially stale on reproducibility |
 | Staging evidence | `docs/archive/STAGING_REBUILD_EXECUTION_REPORT.md` | Phase 3E execution log |
 
 ### Foundation bootstrap
@@ -168,7 +168,7 @@ Stable DB contract: `src/db.js` (Platform lane owns changes).
 
 ## Known technical debt (selected)
 
-From `docs/governance/TECHNICAL_DEBT.md` plus Phase 3E outcomes:
+From `docs/explanation/governance/TECHNICAL_DEBT.md` plus Phase 3E outcomes:
 
 | ID | Summary | Phase 3F note |
 | --- | --- | --- |
@@ -218,5 +218,5 @@ This phase produces governance and release documentation only. No product featur
 
 - [`STAGING_REBUILD_EXECUTION_REPORT.md`](STAGING_REBUILD_EXECUTION_REPORT.md)
 - [`../supabase/MIGRATION_LEDGER.md`](../supabase/MIGRATION_LEDGER.md)
-- [`../database/DATABASE_EVOLUTION.md`](../database/DATABASE_EVOLUTION.md)
-- [`../database/DATABASE_APPLY_ORDER.md`](../database/DATABASE_APPLY_ORDER.md)
+- [`../database/DATABASE_EVOLUTION.md`](../explanation/database/DATABASE_EVOLUTION.md)
+- [`../database/DATABASE_APPLY_ORDER.md`](../how-to/DATABASE_APPLY_ORDER.md)

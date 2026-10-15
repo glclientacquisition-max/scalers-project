@@ -4,7 +4,7 @@ last_reviewed: 2026-09-17
 status: archived
 ---
 
-> **Archived 2026-10-14.** Short duplicate. Current source: [`docs/specs/caller-profile.md`](../specs/caller-profile.md). Kept for history; do not treat as current.
+> **Archived 2026-10-14.** Short duplicate. Current source: [`docs/rfcs/caller-profile.md`](../rfcs/caller-profile.md). Kept for history; do not treat as current.
 
 # Wayfinder: summarized caller profile
 
@@ -14,7 +14,7 @@ A rolling summarized profile from finished calls. Feeds the compact live card an
 
 ## Notes
 
-Lanes: Brain first (hangup merge + card clip). Platform blesses `contacts.metadata.caller_profile`. Desk shows it on `/contacts/[id]` later. Spec: `docs/specs/caller-profile.md`. Depends on ADR-0005 and `docs/specs/caller-memory.md`.
+Lanes: Brain first (hangup merge + card clip). Platform blesses `contacts.metadata.caller_profile`. Desk shows it on `/contacts/[id]` later. Spec: `docs/rfcs/caller-profile.md`. Depends on ADR-0005 and `docs/rfcs/caller-memory.md`.
 
 ## Decisions so far
 

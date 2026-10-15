@@ -4,7 +4,7 @@ last_reviewed: 2026-08-11
 status: archived
 ---
 
-> **Archived 2026-10-14.** Dated finding. Current source: [`docs/agents/PRONUNCIATION.md`](../agents/PRONUNCIATION.md). Kept for history; do not treat as current.
+> **Archived 2026-10-14.** Dated finding. Current source: [`docs/explanation/voice/PRONUNCIATION.md`](../explanation/voice/PRONUNCIATION.md). Kept for history; do not treat as current.
 
 # Live call finding — ChapterOne pronunciation (2026-08-11 evening)
 

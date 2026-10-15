@@ -4,7 +4,7 @@ last_reviewed: 2026-08-15
 status: archived
 ---
 
-> **Archived 2026-10-14.** Phase report. Current source: [`docs/governance/PROJECT_HISTORY.md`](../governance/PROJECT_HISTORY.md). Kept for history; do not treat as current.
+> **Archived 2026-10-14.** Phase report. Current source: [`docs/explanation/governance/PROJECT_HISTORY.md`](../explanation/governance/PROJECT_HISTORY.md). Kept for history; do not treat as current.
 
 # Phase 3G completion report
 
@@ -61,7 +61,7 @@ Convert Phase 3F governance into practical automation, close highest-value gaps 
 
 | Item | Status |
 | --- | --- |
-| Model doc | **DONE** — `docs/storage/STORAGE_SECURITY_MODEL.md` |
+| Model doc | **DONE** — `docs/explanation/STORAGE_SECURITY_MODEL.md` |
 | PROPOSED policy SQL | **DONE** — `production_pending/storage_call_recordings_policies.sql` |
 | Applied to production | **NO** |
 
@@ -109,12 +109,12 @@ Convert Phase 3F governance into practical automation, close highest-value gaps 
 - `scripts/verify-staging-schema.js`
 - `scripts/release-candidate.sh`
 - `docs/database/staging_schema_manifest.json`
-- `docs/database/SCHEMA_DRIFT_AUTOMATION.md`
-- `docs/operations/STAGING_VALIDATION.md`
-- `docs/operations/PRODUCTION_CHANGE_NOTIFY_CHANNELS.md`
+- `docs/explanation/database/SCHEMA_DRIFT_AUTOMATION.md`
+- `docs/how-to/STAGING_VALIDATION.md`
+- `docs/reference/operations/PRODUCTION_CHANGE_NOTIFY_CHANNELS.md`
 - `docs/archive/BETA_READINESS_AUDIT.md`
 - `docs/archive/PHASE_3G_COMPLETION_REPORT.md`
-- `docs/storage/STORAGE_SECURITY_MODEL.md`
+- `docs/explanation/STORAGE_SECURITY_MODEL.md`
 - `docs/supabase/production_pending/*`
 
 ## Files modified
@@ -122,8 +122,8 @@ Convert Phase 3F governance into practical automation, close highest-value gaps 
 - `.github/workflows/ci.yml`
 - `package.json` (+ `pg` devDependency, npm scripts)
 - `docs/supabase/MIGRATION_LEDGER.md`
-- `docs/operations/ENVIRONMENT_CONTRACT.md`
-- `docs/operations/RELEASE_GATE.md`
+- `docs/reference/operations/ENVIRONMENT_CONTRACT.md`
+- `docs/reference/operations/RELEASE_GATE.md`
 
 ---
 
@@ -197,5 +197,5 @@ Convert Phase 3F governance into practical automation, close highest-value gaps 
 ## Related documents
 
 - [`BETA_READINESS_AUDIT.md`](BETA_READINESS_AUDIT.md)
-- [`STAGING_VALIDATION.md`](../operations/STAGING_VALIDATION.md)
-- [`../database/SCHEMA_DRIFT_AUTOMATION.md`](../database/SCHEMA_DRIFT_AUTOMATION.md)
+- [`STAGING_VALIDATION.md`](../how-to/STAGING_VALIDATION.md)
+- [`../database/SCHEMA_DRIFT_AUTOMATION.md`](../explanation/database/SCHEMA_DRIFT_AUTOMATION.md)

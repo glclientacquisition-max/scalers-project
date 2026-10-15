@@ -11,9 +11,9 @@ Repo map: [`README.md`](README.md). Doc index: [`docs/README.md`](docs/README.md
 ## Before you code
 
 1. Read [`AGENTS.md`](AGENTS.md) — pick **one lane** per PR (Voice, Brain, Desk UI/UX, Ops & Billing, Platform).
-2. Read [`docs/architecture/CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md) and [`docs/governance/SOURCE_OF_TRUTH.md`](docs/governance/SOURCE_OF_TRUTH.md).
+2. Read [`docs/explanation/architecture/CURRENT_STATE.md`](docs/explanation/architecture/CURRENT_STATE.md) and [`docs/explanation/governance/SOURCE_OF_TRUTH.md`](docs/explanation/governance/SOURCE_OF_TRUTH.md).
 3. Check `git status` and branch from up-to-date `main`.
-4. Plan non-trivial changes before implementing (see [`docs/governance/DEVELOPMENT_WORKFLOW.md`](docs/governance/DEVELOPMENT_WORKFLOW.md)).
+4. Plan non-trivial changes before implementing (see [`docs/how-to/DEVELOPMENT_WORKFLOW.md`](docs/how-to/DEVELOPMENT_WORKFLOW.md)).
 
 ---
 
@@ -29,7 +29,7 @@ Use these prefixes for **new** work:
 | `experiment/*` | Non-production spikes |
 | `hotfix/*` | Urgent production fixes |
 
-**Cursor cloud agents** may use `cursor/<descriptive-name>-d058` (see [`docs/governance/BRANCH_LIFECYCLE.md`](docs/governance/BRANCH_LIFECYCLE.md)).
+**Cursor cloud agents** may use `cursor/<descriptive-name>-d058` (see [`docs/how-to/BRANCH_LIFECYCLE.md`](docs/how-to/BRANCH_LIFECYCLE.md)).
 
 Do not rename existing historical `cursor/*` branches.
 
@@ -43,7 +43,7 @@ Do not rename existing historical `cursor/*` branches.
 IDEA → PLAN → BRANCH → IMPLEMENT → TEST → PR → REVIEW → MERGE
 ```
 
-Full lifecycle (including beta/production): [`docs/governance/DEVELOPMENT_WORKFLOW.md`](docs/governance/DEVELOPMENT_WORKFLOW.md).
+Full lifecycle (including beta/production): [`docs/how-to/DEVELOPMENT_WORKFLOW.md`](docs/how-to/DEVELOPMENT_WORKFLOW.md).
 
 **Rules:**
 
@@ -89,7 +89,7 @@ cd dashboard && npm ci && npm run build
 | Desk UI/UX | `npm run build` (lint: known pre-existing failure — see below) |
 | Platform | SQL review; `npm run smoke:db` when Supabase env available |
 
-**Known baseline issue (does not block CI):** `cd dashboard && npm run lint` fails on a pre-existing unused variable in `retailOnboardingPack.ts`. Fix in a dedicated `fix/*` PR. See [`docs/governance/TESTING_BASELINE.md`](docs/governance/TESTING_BASELINE.md).
+**Known baseline issue (does not block CI):** `cd dashboard && npm run lint` fails on a pre-existing unused variable in `retailOnboardingPack.ts`. Fix in a dedicated `fix/*` PR. See [`docs/reference/governance/TESTING_BASELINE.md`](docs/reference/governance/TESTING_BASELINE.md).
 
 Do not weaken tests or delete failing tests to make CI green.
 
@@ -98,7 +98,7 @@ Do not weaken tests or delete failing tests to make CI green.
 ## Documentation expectations
 
 - **Behavior or contract changes:** update relevant docs in the same PR.
-- **Architecture decisions:** add an ADR under `docs/adr/` (see [`docs/adr/README.md`](docs/adr/README.md)).
+- **Architecture decisions:** add an ADR under `docs/decisions/` (see [`docs/decisions/README.md`](docs/decisions/README.md)).
 - **SQL changes:** update [`docs/supabase/README.md`](docs/supabase/README.md) apply order.
 - **Docs-only PRs:** must not change runtime behavior.
 
@@ -119,7 +119,7 @@ last_reviewed: 2026-10-14
 
 Bump `last_reviewed` when you check a doc is still true. Docs older than 90 days are flagged by CI. Superseded docs move to `docs/archive/` with a pointer to what replaced them.
 
-Governance index: [`docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md`](docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md).
+Governance index: [`docs/explanation/governance/SCALERS_ENGINEERING_PRINCIPLES.md`](docs/explanation/governance/SCALERS_ENGINEERING_PRINCIPLES.md).
 
 ---
 
@@ -131,7 +131,7 @@ Scalers uses **manual SQL scripts** in `docs/supabase/` — not Supabase CLI mig
 2. Add additive SQL with header noting predecessor scripts.
 3. Insert into apply order in `docs/supabase/README.md`.
 4. Never edit scripts that may already be applied in production — add a new script instead.
-5. See [`docs/database/DATABASE_GOVERNANCE.md`](docs/database/DATABASE_GOVERNANCE.md).
+5. See [`docs/explanation/database/DATABASE_GOVERNANCE.md`](docs/explanation/database/DATABASE_GOVERNANCE.md).
 
 ---
 
@@ -143,7 +143,7 @@ Cursor and other AI agents must follow [`AGENTS.md`](AGENTS.md) safety protocol:
 - No destructive operations without explicit human approval.
 - No secrets in commits. Never put service role keys in `NEXT_PUBLIC_*`.
 - Distinguish documentation PRs from behavioral changes.
-- Paste the lane prompt from [`docs/agents/PROMPTS.md`](docs/agents/PROMPTS.md) at the start of agent sessions.
+- Paste the lane prompt from [`docs/reference/lanes/PROMPTS.md`](docs/reference/lanes/PROMPTS.md) at the start of agent sessions.
 
 ---
 
@@ -158,6 +158,6 @@ Cursor and other AI agents must follow [`AGENTS.md`](AGENTS.md) safety protocol:
 
 ## Questions
 
-- Architecture: [`docs/architecture/CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md)
-- Deploy: [`docs/operations/DEPLOYMENT.md`](docs/operations/DEPLOYMENT.md)
-- Release: [`docs/governance/RELEASE_PROCESS.md`](docs/governance/RELEASE_PROCESS.md)
+- Architecture: [`docs/explanation/architecture/CURRENT_STATE.md`](docs/explanation/architecture/CURRENT_STATE.md)
+- Deploy: [`docs/how-to/DEPLOYMENT.md`](docs/how-to/DEPLOYMENT.md)
+- Release: [`docs/how-to/RELEASE_PROCESS.md`](docs/how-to/RELEASE_PROCESS.md)

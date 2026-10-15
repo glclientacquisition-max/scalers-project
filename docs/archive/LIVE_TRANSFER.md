@@ -4,14 +4,14 @@ last_reviewed: 2026-10-09
 status: archived
 ---
 
-> **Archived 2026-10-14.** Superseded by #658: product is callbacks only. Current source: [`docs/product/ESCALATION.md`](../product/ESCALATION.md). Kept for history; do not treat as current.
+> **Archived 2026-10-14.** Superseded by #658: product is callbacks only. Current source: [`docs/explanation/product/ESCALATION.md`](../explanation/product/ESCALATION.md). Kept for history; do not treat as current.
 
 # Live human transfer (caller escalation to a real person)
 
 **Status:** Desk option exists. Cold Dial after Stream is **blocked** on current SautiKit (staging 2026-09-06). Default `VOICE_LIVE_TRANSFER=off`. Keep callback escalate until a conference REST spike rings a human. Tenant option is Business → Train → Escalation Team (`handoff_mode`). Brain sets `liveTransfer` only when that option, open hours, a directory phone, and the env flag all pass.  
 **Job:** When a caller needs a human *and* the business opted in, Scalers leaves the AI media stream and bridges the live call to a real teammate. If the bridge cannot run or the human does not answer, the existing async escalate path still notifies and the caller hears an honest fallback.
 
-**Related:** async notify is already shipped in [`ESCALATION.md`](../product/ESCALATION.md). Decision record: [`adr/ADR-0004-live-human-transfer.md`](../adr/ADR-0004-live-human-transfer.md).
+**Related:** async notify is already shipped in [`ESCALATION.md`](../explanation/product/ESCALATION.md). Decision record: [`adr/ADR-0004-live-human-transfer.md`](../decisions/ADR-0004-live-human-transfer.md).
 
 ---
 

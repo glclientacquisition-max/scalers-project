@@ -4,12 +4,12 @@ last_reviewed: 2026-09-12
 status: archived
 ---
 
-> **Archived 2026-10-14.** Short duplicate. Current source: [`docs/specs/desk-daily-product.md`](../specs/desk-daily-product.md). Kept for history; do not treat as current.
+> **Archived 2026-10-14.** Short duplicate. Current source: [`docs/rfcs/desk-daily-product.md`](../rfcs/desk-daily-product.md). Kept for history; do not treat as current.
 
 # Wayfinder: desk as a daily product
 
 **Destination:** Owners use Scalers on phone and laptop every morning without being taught.  
-**Notes:** Full research in [`docs/specs/desk-daily-product.md`](../specs/desk-daily-product.md). Constitution still outranks this map.  
+**Notes:** Full research in [`docs/rfcs/desk-daily-product.md`](../rfcs/desk-daily-product.md). Constitution still outranks this map.  
 **Claimed by:** desk research 2026-09-10
 
 ## Decisions so far

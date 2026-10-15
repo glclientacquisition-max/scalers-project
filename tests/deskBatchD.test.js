@@ -37,8 +37,8 @@ describe("desk batch D screen fit and recovery", () => {
     assert.match(sheet, /h-11 w-11/);
     assert.doesNotMatch(sheet, /framer-motion|motion\/react/);
     assert.doesNotMatch(dialog, /shadow-xl|landing-rise|animate-|transition-opacity|scale-/);
-    const master = read("docs/frontend/design-system/MASTER.md");
-    const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
+    const master = read("docs/reference/design-system/MASTER.md");
+    const constitution = read("docs/explanation/frontend/FRONTEND_CONSTITUTION.md");
     const mandate = read(".cursor/rules/scalers-design-ux.mdc");
     assert.match(master, /`Sheet` bottom drawer via `DeskDialog`/);
     assert.doesNotMatch(master, /stops above the tab bar/);
@@ -90,7 +90,7 @@ describe("desk batch D screen fit and recovery", () => {
     assert.match(home, /returnSidebar/);
     assert.match(home, /DeskLoadError/);
     assert.match(home, /Could not load Overview/);
-    const note = read("docs/frontend/design-system/pages/home.md");
+    const note = read("docs/reference/design-system/pages/home.md");
     assert.match(note, /Work, then aside, then Updates/);
   });
 

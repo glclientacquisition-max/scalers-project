@@ -168,7 +168,7 @@ Every database change merged to `main` must add a row to the **Change registry**
 ### Process
 
 1. Author SQL in `docs/supabase/<name>.sql` with `-- Run after:` header.
-2. Update [`README.md`](./README.md) and [`DATABASE_APPLY_ORDER.md`](../database/DATABASE_APPLY_ORDER.md) if order changes.
+2. Update [`README.md`](./README.md) and [`DATABASE_APPLY_ORDER.md`](../how-to/DATABASE_APPLY_ORDER.md) if order changes.
 3. Add ledger row before or with merge PR.
 4. After staging apply: set `staging_applied = YES`, date, verification notes.
 5. After production apply (human-approved): set `production_applied = YES`, date, executor.
@@ -285,8 +285,8 @@ CLI version timestamps are **INFERRED** from version string `YYYYMMDDHHMMSS` (UT
 
 ## Related documents
 
-- [`DATABASE_EVOLUTION.md`](../database/DATABASE_EVOLUTION.md)
-- [`DATABASE_APPLY_ORDER.md`](../database/DATABASE_APPLY_ORDER.md)
+- [`DATABASE_EVOLUTION.md`](../explanation/database/DATABASE_EVOLUTION.md)
+- [`DATABASE_APPLY_ORDER.md`](../how-to/DATABASE_APPLY_ORDER.md)
 - [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../archive/STAGING_REBUILD_EXECUTION_REPORT.md)
 
 ## Pending (not applied): team invites

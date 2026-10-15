@@ -9,7 +9,7 @@ last_reviewed: 2026-10-14
 
 New agent or new human: read this whole page before you touch code.
 
-**Read order:** [`AGENTS.md`](../AGENTS.md) → your lane contract in [`docs/agents/`](agents/) ([`VOICE.md`](agents/VOICE.md), [`BRAIN.md`](agents/BRAIN.md), [`DESK_UX.md`](agents/DESK_UX.md), [`OPS_BILLING.md`](agents/OPS_BILLING.md), [`PLATFORM.md`](agents/PLATFORM.md)) → [`SYSTEM_ARCHITECTURE.md`](architecture/SYSTEM_ARCHITECTURE.md), [`CURRENT_STATE.md`](architecture/CURRENT_STATE.md), [`SOURCE_OF_TRUTH.md`](governance/SOURCE_OF_TRUTH.md) → this file. Glossary: [`CONTEXT.md`](../CONTEXT.md). **One task, one lane, one PR.**
+**Read order:** [`AGENTS.md`](../AGENTS.md) → your lane contract in [`docs/reference/lanes/`](reference/lanes/) ([`VOICE.md`](reference/lanes/VOICE.md), [`BRAIN.md`](reference/lanes/BRAIN.md), [`DESK_UX.md`](reference/lanes/DESK_UX.md), [`OPS_BILLING.md`](reference/lanes/OPS_BILLING.md), [`PLATFORM.md`](reference/lanes/PLATFORM.md)) → [`SYSTEM_ARCHITECTURE.md`](explanation/architecture/SYSTEM_ARCHITECTURE.md), [`CURRENT_STATE.md`](explanation/architecture/CURRENT_STATE.md), [`SOURCE_OF_TRUTH.md`](explanation/governance/SOURCE_OF_TRUTH.md) → this file. Glossary: [`CONTEXT.md`](../CONTEXT.md). **One task, one lane, one PR.**
 
 ---
 
@@ -29,7 +29,7 @@ Billing is **packages + on-demand only**; beta charging is off; no prepaid walle
 | SautiKit workspace | `e0e57aa5` | `1f85601c` |
 | Supabase | `fjxcdccgyhnvnnlnovcl` | `sgcdncjxauhsbunobmob` |
 
-Design: all UI follows Frontend 2.0 ([`FRONTEND_2_0_CHARTER.md`](frontend/FRONTEND_2_0_CHARTER.md) wins, then [`design-system/MASTER.md`](frontend/design-system/MASTER.md)). Staging mechanics: [`ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
+Design: all UI follows Frontend 2.0 ([`FRONTEND_2_0_CHARTER.md`](explanation/frontend/FRONTEND_2_0_CHARTER.md) wins, then [`design-system/MASTER.md`](reference/design-system/MASTER.md)). Staging mechanics: [`ENVIRONMENTS.md`](reference/operations/ENVIRONMENTS.md).
 
 ---
 
@@ -40,7 +40,7 @@ Times EAT. SHAs are the squash commits on `main` (first-parent log). Older histo
 | PR | SHA | Merged | What |
 | --- | --- | --- | --- |
 | #634 | `7d870a75` | 13 Oct 14:29 | Brain `BRAIN_CALL_FIXES_D199`: junk slots cleaned, cut-off turns write nothing, reschedule bypasses coverage gate, Swahili "saa nane". |
-| #632 | `01d02ae9` | 13 Oct 14:25 | Brain `BRAIN_CONFIRMED_COVERAGE` Phase 0 + [handoff-record spec](specs/handoff-record.md). |
+| #632 | `01d02ae9` | 13 Oct 14:25 | Brain `BRAIN_CONFIRMED_COVERAGE` Phase 0 + [handoff-record spec](rfcs/handoff-record.md). |
 | #672 | `7cd263de` | 13 Oct 09:23 | Locations: "Do you go outside these areas?" (anywhere in Kenya). |
 | #671 | `38ae42d8` | 13 Oct 07:11 | Honest insights, callbacks-only outcomes, durable reviews, Updates. |
 | #670 | `3bc2f76d` | 12 Oct 20:53 | Appearance: one worded control everywhere. |
