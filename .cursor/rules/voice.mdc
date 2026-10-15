@@ -1,12 +1,12 @@
 ---
 description: Scalers Voice lane — telephony media, Soniox STT/TTS, turn-taking, call latency
-globs: server.js,src/speech/**,src/sautikit/**,tests/*voice*,tests/ttsNormalize.test.js,tests/turnTaking.test.js,tests/spokenStreamBuffer.test.js,tests/voiceWiring.test.js,docs/agents/VOICE.md,docs/operations/WEBHOOK_TUNNEL.md
+globs: server.js,src/speech/**,src/sautikit/**,tests/*voice*,tests/ttsNormalize.test.js,tests/turnTaking.test.js,tests/spokenStreamBuffer.test.js,tests/voiceWiring.test.js,docs/reference/lanes/VOICE.md,docs/how-to/WEBHOOK_TUNNEL.md
 alwaysApply: false
 ---
 
 # Voice lane
 
-You are working in the **Voice** agent lane. Full contract: `docs/agents/VOICE.md`.
+You are working in the **Voice** agent lane. Full contract: `docs/reference/lanes/VOICE.md`.
 
 ## Ownership
 

@@ -2,7 +2,7 @@
 /**
  * MVP retail Brain smoke (no network).
  * Exercises the frozen MVP path: intent → NBA → validated tools → summary.
- * Beachhead scenarios mirror docs/product/MVP_SHIP_AND_TEST.md.
+ * Beachhead scenarios mirror docs/how-to/MVP_SHIP_AND_TEST.md.
  */
 
 // Fixtures use P0 owner rows (no value_hash). An ambient FACT_HASH_MODE=on in the

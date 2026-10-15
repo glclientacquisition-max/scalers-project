@@ -13,7 +13,7 @@ describe("universal row anatomy", () => {
   const row = read("dashboard/src/components/ui/deskRow.tsx");
   const inbox = read("dashboard/src/components/InboxItemRow.tsx");
   const avatar = read("dashboard/src/components/InboxRowAvatar.tsx");
-  const master = read("docs/frontend/design-system/MASTER.md");
+  const master = read("docs/reference/design-system/MASTER.md");
 
   it("ships the shared primitives", () => {
     assert.match(row, /export function RowIdentity/);
@@ -82,7 +82,7 @@ describe("universal row anatomy", () => {
 describe("inbox call action", () => {
   const call = read("dashboard/src/components/CallLink.tsx");
   const inbox = read("dashboard/src/components/InboxItemRow.tsx");
-  const master = read("docs/frontend/design-system/MASTER.md");
+  const master = read("docs/reference/design-system/MASTER.md");
 
   it("is a tel: deep link with E.164 plus prefix", () => {
     assert.match(call, /export function telHref/);

@@ -124,3 +124,51 @@ describe('fetchCallRecording', () => {
     assert.equal(out.status, 'not_configured');
   });
 });
+
+describe('fetchCallRecording scope denial (403)', () => {
+  const { resetRecordingScopeLatch, recordingScopeDenied } = require('../src/sautikit/recordingFetch');
+  it('latches on 403, logs once, and skips the network afterwards', async () => {
+    resetRecordingScopeLatch();
+    let hits = 0;
+    const warns = [];
+    const origWarn = console.warn;
+    console.warn = (...a) => warns.push(a.join(' '));
+    try {
+      const fetchImpl = async () => {
+        hits += 1;
+        return { status: 403, ok: false, headers: { get: () => null }, json: async () => ({}) };
+      };
+      const first = await fetchCallRecording('call-uuid', { apiKey: 'k', fetchImpl });
+      assert.equal(first.status, 403);
+      assert.equal(first.scopeDenied, true);
+      assert.equal(recordingScopeDenied(), true);
+      const second = await fetchCallRecording('call-2', { apiKey: 'k', fetchImpl });
+      assert.equal(second.status, 'scope_denied');
+      assert.equal(second.scopeDenied, true);
+      assert.equal(hits, 1);
+      assert.equal(warns.filter((w) => w.includes('recording fetch denied')).length, 1);
+      assert.ok(!warns.join('\n').includes('Bearer'));
+    } finally {
+      console.warn = origWarn;
+      resetRecordingScopeLatch();
+    }
+  });
+
+  it('expires the latch after the TTL', async () => {
+    resetRecordingScopeLatch();
+    const { SCOPE_DENIED_TTL_MS } = require('../src/sautikit/recordingFetch');
+    const origWarn = console.warn;
+    console.warn = () => {};
+    try {
+      await fetchCallRecording('c', {
+        apiKey: 'k',
+        now: 1000,
+        fetchImpl: async () => ({ status: 401, ok: false, headers: { get: () => null }, json: async () => ({}) }),
+      });
+      assert.equal(recordingScopeDenied(1000 + SCOPE_DENIED_TTL_MS + 1), false);
+    } finally {
+      console.warn = origWarn;
+      resetRecordingScopeLatch();
+    }
+  });
+});

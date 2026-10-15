@@ -425,7 +425,7 @@ const {
   extractRecordingFields,
   isRecordingEvent,
 } = require('./src/sautikit/recordingEvents');
-const { fetchCallRecording } = require('./src/sautikit/recordingFetch');
+const { fetchCallRecording, recordingScopeDenied } = require('./src/sautikit/recordingFetch');
 const { finalizeOnceEnabled, finalizeDecision } = require('./src/callFinalizeOnce');
 const {
   summarizeHeaders,
@@ -1004,6 +1004,20 @@ async function attachProviderRecording({
         );
         break;
       }
+      if (fetched.scopeDenied) {
+        // Key cannot read recordings: mark unavailable once, no retry, no noise.
+        for (const sid of ids) {
+          try {
+            await db.mergeCallSummaryMeta({
+              callSid: sid,
+              patch: { recording_status: 'unavailable', recording_unavailable_reason: 'provider_scope' },
+            });
+          } catch {
+            /* best-effort */
+          }
+        }
+        return null;
+      }
       if (fetched.status === 404 || fetched.status === 410) {
         console.warn(
           `[${source}] no provider recording callSid=${id} status=${fetched.status}`
@@ -1049,6 +1063,7 @@ function scheduleRecordingFetch(callSids, source) {
   if (!ids.length) return;
   const key = ids.join('|');
   if (recordingFetchScheduled.has(key)) return;
+  if (recordingScopeDenied()) return;
   recordingFetchScheduled.add(key);
   setTimeout(() => {
     attachProviderRecording({
@@ -6589,6 +6604,29 @@ async function runGeminiTurn(
 }
 
 /**
+ * Retry recording copies marked pending_copy: ask SautiKit for a fresh presigned
+ * URL (the stored one may have expired) and copy once more, no long backoff.
+ */
+async function sweepPendingRecordingCopies({ limit = 10 } = {}) {
+  const rows = await db.listPendingRecordingCopies({ limit });
+  let copied = 0;
+  for (const row of rows) {
+    const callSid = row.sautikit_call_sid;
+    if (!callSid) continue;
+    try {
+      const fetched = await fetchCallRecording(callSid);
+      const url = fetched.downloadUrl || row.recording_url;
+      if (!url) continue;
+      const result = await db.copyRecordingToStorage({ callSid, url, delays: [], fromSweep: true });
+      if (result?.ok) copied += 1;
+    } catch (err) {
+      console.warn(`[recording-sweep] ${callSid} failed:`, err?.message || err);
+    }
+  }
+  if (rows.length) console.log(`[recording-sweep] pending ${rows.length}, copied ${copied}`);
+}
+
+/**
  * Catch up post-call reviews lost to a restart, deploy or model timeout, from the
  * stored transcript. Off with POST_CALL_REVIEW_SWEEP=off; never in tests.
  */
@@ -6601,6 +6639,8 @@ function startReviewSweep() {
     running = true;
     sweepUnreviewedCalls()
       .catch((err) => console.warn('[review-sweep] failed:', err?.message || err))
+      .then(() => sweepPendingRecordingCopies())
+      .catch((err) => console.warn('[recording-sweep] failed:', err?.message || err))
       .finally(() => {
         running = false;
       });

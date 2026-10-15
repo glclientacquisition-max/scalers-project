@@ -62,8 +62,8 @@ describe("desk motion canon", () => {
   const land = read("dashboard/src/components/ui/DeskLand.tsx");
   const row = read("dashboard/src/components/ui/deskRow.tsx");
   const chrome = read("dashboard/src/components/ui/deskChrome.ts");
-  const master = read("docs/frontend/design-system/MASTER.md");
-  const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
+  const master = read("docs/reference/design-system/MASTER.md");
+  const constitution = read("docs/explanation/frontend/FRONTEND_CONSTITUTION.md");
   const skill = read(".cursor/skills/desk-motion/SKILL.md");
 
   it("keeps the land helper in lockstep with deskMotion.ts", () => {

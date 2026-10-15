@@ -13,7 +13,7 @@ describe("desk rows open the record", () => {
   const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
   const inbox = read("dashboard/src/components/InboxItemRow.tsx");
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
-  const master = read("docs/frontend/design-system/MASTER.md");
+  const master = read("docs/reference/design-system/MASTER.md");
 
   it("ships DeskRowHit as the shared list pattern", () => {
     assert.match(hit, /export function DeskRowHit/);

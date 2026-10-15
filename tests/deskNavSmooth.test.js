@@ -93,7 +93,7 @@ describe("desk navigation smoothness", () => {
   const admin = read("dashboard/src/components/AdminNav.tsx");
   const state = read("dashboard/src/components/DeskNavState.tsx");
   const memory = read("dashboard/src/lib/deskScrollMemory.ts");
-  const master = read("docs/frontend/design-system/MASTER.md");
+  const master = read("docs/reference/design-system/MASTER.md");
 
   it("remembers list scroll and zeros nested records without dropping the list", () => {
     const got = loadMemory();
