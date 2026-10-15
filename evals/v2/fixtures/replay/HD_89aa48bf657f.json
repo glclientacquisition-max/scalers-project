@@ -1,0 +1,25 @@
+{
+ "id": "R_HD_89aa48bf657f",
+ "sid": "HD_89aa48bf657f",
+ "env": "staging",
+ "tenant": "done_and_dusted",
+ "createdAt": "2026-10-15T05:26:29+00:00",
+ "callerPhone": "+254700000089",
+ "replayMode": "transcript-only",
+ "lang": "sw",
+ "commitment": false,
+ "turns": [
+  { "caller": "Uh, can— Nilikuwa nataka ku- make something like a booking.", "model": "", "agent": "Ungependa tukufanyie usafi gani?", "lang": "sw" },
+  { "caller": "Uniambie usasi gani mnafanya.", "model": "", "agent": "Tunaosha mattresses, sofas, carpets, nyumba za 1-bedroom, 2-bedroom, na 3-bedroom. Pia tunafanya deep cleaning, move-in move-out, post-construction, na kusafisha maofisi. Ungependa huduma gani?", "lang": "sw" },
+  { "caller": "I.", "model": "", "agent": "Je, ungependa huduma gani ya usafi, na jina lako ni nani?", "lang": "en" },
+  { "caller": "I don't— I don't understand what you're saying by 1-Bedroom.", "model": "", "agent": "Standard 1-Bedroom Apartment cleaning includes dusting, vacuuming, mopping, bathroom sanitation, and kitchen surfaces for three thousand shillings. Would you like to book that?", "lang": "en" },
+  { "caller": "Mmh, okay, I don't know.", "model": "", "agent": "No problem. ... or let me know if you want to ask about another cleaning service like carpets or sofas.", "lang": "en" },
+  { "caller": "Okay, thank you.", "model": "", "agent": "Thank you. Goodbye.", "lang": "en" }
+ ],
+ "observed": { "service_requests": [], "appointments": [], "path": "old (Gemini voice.system 2026-10-06, gemini-3.6-flash); v2 shadow only", "release": "483c4838" },
+ "expect": { "appointments": 0, "service_requests": 0 },
+ "mustSay": ["magodoro", "nyumba kulingana na ukubwa", "one-bedroom home", "Goodbye"],
+ "mustNotSay": ["move-in move-out", "1-bedroom, 2-bedroom", "Would you like to book", "jina lako", "What day would you like", "shillings"],
+ "label": { "by": "brain-lead", "why": "Caller asked in Swahili what services exist, then (in English) what 1-Bedroom means, then closed. Correct: plain service categories in Swahili, no name ask before a service, a short plain explanation with no price/booking push, close on 'Okay, thank you'. No rows." },
+ "seed": {}
+}

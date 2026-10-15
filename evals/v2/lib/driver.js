@@ -63,6 +63,8 @@ function createFakeDb(seed = {}, callerPhone) {
       const row = { id: id('apt'), status: 'requested', service_name: a.serviceName, when_text: a.whenText, window_start: a.windowStart || null, address_landmark: a.landmark, notes: a.notes || null, caller_name: a.name, caller_phone: callerPhone };
       db.appointments.push(row);
       db.writes.push(['create_appointment', row.id]);
+      // Platform contract (#680): supersedes[] closes this call's open callback rows in the same write.
+      for (const sid of a.supersedes || []) { const h = db.handoffs.find((x) => x.id === sid); if (h) h.status = 'superseded'; }
       return row;
     },
     updateAppointment: async (u) => {
@@ -93,7 +95,7 @@ function createFakeDb(seed = {}, callerPhone) {
       db.handoffs.push({ via: 'escalate', ...row });
       if (/complain|malalamiko|sijaridhika/i.test(String(p.reason || ''))) db.complaints.push(row);
       db.writes.push(['escalate', row.id]);
-      return { ok: true, channel: 'whatsapp', id: row.id };
+      return { ok: true, channel: 'whatsapp', id: row.id, notify: 'queued' };
     },
   };
   return { db, handlers };

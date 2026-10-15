@@ -18,8 +18,11 @@ function createPersona(scn, seed) {
   return function caller({ lastAgentText }) {
     if (k < script.length) return script[k++];
     const a = String(lastAgentText || '');
-    const ask = (key, re) => re.test(a) && f[key] != null ? key : null;
+    // a read-back question ("..., Nithibitishe?") is answered as a read-back even when it names a time
+    const isReadback = /\?\s*$/.test(a) && /\b(shall i|nithibitishe|niendelee|go ahead)\b/i.test(a);
+    const ask = (key, re) => !isReadback && re.test(a) && f[key] != null ? key : null;
     const key =
+      ask('kesho', /\b(do you mean|unamaanisha)\b/i) ||
       ask('name', /\b(name|jina|nani)\b/i) ||
       ask('when', /\b(time|day|when|saa ngapi|siku gani|lini|morning|afternoon|asubuhi|mchana)\b/i) ||
       ask('place', /\b(where|wapi|area|eneo|location|address)\b/i) ||
@@ -27,8 +30,10 @@ function createPersona(scn, seed) {
       ask('item', /\b(which item|which one|kitu gani|gani)\b/i) ||
       ask('service', /\b(what do you need|tufanye nini|which service)\b/i) ||
       ask('which', /\b(which (one|visit|booking)|ipi)\b/i);
-    if (key) { answered[key] = (answered[key] || 0) + 1; if (answered[key] > 3) return null; return pick(f[key], r); }
+    if (key) { answered[key] = (answered[key] || 0) + 1; if (answered[key] > 3) return null; const v = f[key]; return v && v.seq ? v.seq[Math.min(answered[key] - 1, v.seq.length - 1)] : pick(v, r); }
     if (/\?\s*$/.test(a) && /\b(shall|should|go ahead|confirm|correct|right|sawa\?|niendelee|nithibitishe|is that|ni sawa|book it|save)\b/i.test(a)) {
+      // edge cases: the first read-back gets a scripted reply (barge-in / change of mind), then yes
+      if (f.onReadback && !answered.rb) { answered.rb = 1; return pick(f.onReadback, r); }
       answered.yes = (answered.yes || 0) + 1; if (answered.yes > 3) return null; return sw ? pick(['Ndio.', 'Ndio, sawa.'], r) : pick(['Yes.', 'Yes please.'], r);
     }
     if (/\?\s*$/.test(a) && idle < 1) { idle++; return sw ? 'Hapana, ni hayo tu.' : "No, that's all."; }

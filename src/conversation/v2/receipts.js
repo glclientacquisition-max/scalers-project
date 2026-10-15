@@ -6,9 +6,10 @@ const sw = (lang) => L.isSw(lang);
 const priceTxt = (p, S) => String(p || '').replace(/^From\s+/i, S ? 'kuanzia ' : 'from ');
 const svcName = (s) => String(s || '').replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
 const period = (hhmm) => { const h = Number(String(hhmm).slice(0, 2)); return h < 12 ? 'asubuhi' : h < 16 ? 'mchana' : h < 19 ? 'jioni' : 'usiku'; };
-const at = (when, lang) => (when?.time ? (sw(lang) ? ` ${L.sayTime(when.time, lang)}` : ` at ${when.time}`) : '');
+const at = (when, lang) => (when?.time ? (sw(lang) ? ` ${L.sayTime(when.time, lang)} ${period(when.time)}` : ` at ${when.time}`) : '');
 const items = (xs, lang) => xs.map((x) => (sw(lang) ? `${x.name} ${x.qty}` : `${x.qty} ${x.name}`)).join(sw(lang) ? ' na ' : ' and ');
 
+const ord = (n) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}`;
 const ASK = {
   service: { en: ['Which service do you need?', 'Which service do you need? For example carpet or sofa cleaning.'], sw: ['Ungependa tufanye nini?', 'Ungependa tufanye nini? Kwa mfano usafi wa carpet au sofa.'] },
   date: { en: ['What day would you like?', 'What day would you like? For example tomorrow or Friday.'], sw: ['Siku gani ingekufaa?', 'Siku gani ingekufaa? Kwa mfano kesho au Ijumaa.'] },
@@ -21,6 +22,10 @@ const ASK = {
   which: { en: (c) => [`Which one: ${c.list}?`, `Which one, ${c.list}?`], sw: (c) => [`Ipi: ${c.list}?`, `Ni ipi, ${c.list}?`] },
   change_what: { en: (c) => [`What would you like to change on your ${c.row}?`, `Is it the day and time you want to change on your ${c.row}?`], sw: (c) => [`Ungependa kubadilisha nini kwenye ${c.row}?`, `Ni siku na saa unataka kubadilisha kwenye ${c.row}?`] },
   new_when: { en: ['What new day and time would you like?', 'What new day and time? For example Saturday at 10am.'], sw: ['Siku gani na saa ngapi mpya?', 'Siku gani na saa ngapi mpya? Kwa mfano Jumamosi saa nne.'] },
+  kesho: { en: (c) => [`Do you mean later today, ${c.today} the ${ord(c.todayD)}, or ${c.tomorrow} the ${ord(c.tomorrowD)}?`], sw: (c) => [`Unamaanisha leo ${c.today} tarehe ${c.todayD}, au ${c.tomorrow} tarehe ${c.tomorrowD}?`] },
+  date_conflict: { en: (c) => [`${c.today} is the ${ord(c.todayD)}, and the ${ord(c.tomorrowD)} is a ${c.tomorrow}. Which do you mean?`], sw: (c) => [`${c.today} ni tarehe ${c.todayD}, na tarehe ${c.tomorrowD} ni ${c.tomorrow}. Unamaanisha ipi?`] },
+  next_dow: { en: (c) => [`Do you mean this ${c.today} the ${ord(c.todayD)}, or ${c.tomorrow} the ${ord(c.tomorrowD)}?`], sw: (c) => [`Unamaanisha ${c.today} hii tarehe ${c.todayD}, au ${c.tomorrow} ijayo tarehe ${c.tomorrowD}?`] },
+  yes_no: { en: (c) => [`Please say yes or no: ${c.q ? c.q.charAt(0).toLowerCase() + c.q.slice(1) : 'shall I go ahead?'}`], sw: (c) => [`Tafadhali sema ndio au hapana: ${c.q ? c.q.charAt(0).toLowerCase() + c.q.slice(1) : 'niendelee?'}`] },
   complaint_more: { en: ["I'm sorry to hear that. Is there anything else the owner should know?"], sw: ['Pole sana. Kuna kingine mwenye biashara anapaswa kujua?'] },
   intent: { en: ['How can I help you today?', 'Sorry, are you calling to book, or about something else?'], sw: ['Karibu, tukusaidie vipi?', 'Samahani, unapiga kubook, ama ni kuhusu kitu kingine?'] },
 };
@@ -31,6 +36,37 @@ function ask(slot, n, lang, ctx = {}) {
 }
 function rowLabel(r, lang) { const d = r.when?.date; return sw(lang) ? `${svcName(r.service)} ya ${L.sayDate(d, lang)}` : `${svcName(r.service).toLowerCase()} on ${L.sayDate(d, lang)}`; }
 
+// HD_89aa48bf657f: plain service categories from the tenant catalogue (names never read raw)
+const CATS = [
+  ['items', /mattress|sofa|carpet|window|refrigerator|fridge|oven|couch/i],
+  ['house', /bedroom|house|apartment|housekeeping|studio/i],
+  ['deep', /deep|move-?in|move-?out|post-?construction|fumigat/i],
+  ['office', /office|commercial|contract/i],
+];
+function serviceCategories(names) {
+  const got = new Map(); const other = [];
+  for (const n of names) { const c = CATS.find(([, re]) => re.test(n)); if (c) got.set(c[0], [...(got.get(c[0]) || []), n]); else other.push(n); }
+  return [...CATS.map(([k]) => k).filter((k) => got.has(k)).map((k) => ({ k, names: got.get(k) })), ...other.slice(0, 2).map((n) => ({ k: 'raw', names: [n] }))];
+}
+const ITEM_WORDS = { mattress: ['mattresses', 'magodoro'], sofa: ['sofas', 'sofa'], carpet: ['carpets', 'mazulia'], window: ['windows', 'madirisha'], refrigerator: ['fridges', 'friji'], oven: ['ovens', 'oveni'] };
+function catPhrase(c, S) {
+  if (c.k === 'items') { const ws = Object.entries(ITEM_WORDS).filter(([k]) => c.names.some((n) => n.toLowerCase().includes(k))).map(([, v]) => v[S ? 1 : 0]).slice(0, 4); return S ? `usafi wa ${ws.join(', ')}` : ws.join(', '); }
+  if (c.k === 'house') return S ? 'usafi wa nyumba kulingana na ukubwa' : 'house cleaning by size';
+  if (c.k === 'deep') return S ? 'usafi wa kina, kama wa kuhamia au baada ya ujenzi' : 'deep cleaning, like move-in or after building work';
+  if (c.k === 'office') return S ? 'usafi wa maofisi' : 'offices';
+  return svcName(c.names[0]).toLowerCase();
+}
+function explain(name, notes, S) {
+  const n = String(name || '');
+  const bed = n.match(/(\d)-Bedroom/i);
+  if (bed) return S ? `Ni usafi wa nyumba yenye vyumba ${['', 'kimoja', 'viwili', 'vitatu'][bed[1]] ? `${bed[1] === '1' ? 'cha kulala kimoja' : `vya kulala ${['', '', 'viwili', 'vitatu'][bed[1]]}`}` : bed[1]}: kufagia, kupiga deki, bafu na jikoni.` : `It means cleaning a ${['', 'one', 'two', 'three'][bed[1]] || bed[1]}-bedroom home: dusting, mopping, the bathroom and the kitchen.`;
+  if (/move-?in|move-?out/i.test(n)) return S ? 'Ni usafi kamili wa nyumba unapohamia au kuhama.' : 'It means a full clean of a home when you move in or move out.';
+  if (/post-?construction/i.test(n)) return S ? 'Ni usafi baada ya ujenzi au ukarabati, kuondoa vumbi na uchafu.' : 'It means cleaning up after building or renovation work: dust and debris.';
+  if (/deep/i.test(n)) return S ? 'Ni usafi wa kina zaidi ya usafi wa kawaida.' : 'It means a more thorough clean than a standard one.';
+  if (/hourly/i.test(n)) return S ? 'Ni msaidizi wa usafi anayelipwa kwa saa.' : 'It means a cleaner you book by the hour.';
+  const first = String(notes || '').split(/[,.;]/).slice(0, 3).join(',').trim();
+  return S ? `${svcName(n)}${first ? `: ${first}` : ''}.` : `${svcName(n)}${first ? ` covers ${first.toLowerCase()}` : ''}.`;
+}
 function readback(p, lang) {
   const S = sw(lang);
   const nm = p.name ? (S ? `, kwa ${p.name}` : `, for ${p.name}`) : '';
@@ -43,6 +79,7 @@ function readback(p, lang) {
       const k = p.kind;
       if (k === 'address') return S ? 'Siwezi kubadilisha mahali kwenye simu hii. Nimwombe mwenye biashara akupigie simu, ni sawa?' : `I can't change the address on this call. Shall I ask the owner to call you back about ${p.place ? `moving it to ${p.place}` : 'it'}?`;
       if (k === 'payment') return S ? 'Siwezi kubadilisha malipo kwenye simu hii. Nimwombe mwenye biashara akupigie simu, ni sawa?' : "I can't change payment details on this call. Shall I ask the owner to call you back about it?";
+      if (k === 'callback') return S ? 'Nimwombe mwenye biashara akupigie simu kwa namba hii, ni sawa?' : 'Shall I ask the team to call you back on this number?';
       if (k === 'manager') return S ? 'Mwenye biashara hayupo kwenye simu sasa. Nimwombe akupigie simu, ni sawa?' : `The manager isn't on the line now. Shall I ask them to call you back${p.topic ? ` about the ${svcName(p.topic).toLowerCase()}` : ''}?`;
       return S ? 'Nimwombe mwenye biashara akupigie simu kumaliza hili, ni sawa?' : "Shall I ask the team to call you back to finish this?";
     }
@@ -70,7 +107,7 @@ function receipt(r, lang) {
 function info(r, lang, n = 0) {
   const S = sw(lang);
   switch (r.kind) {
-    case 'price': return r.found ? (S ? `Bei ya ${svcName(r.label)} ni ${priceTxt(r.price, true)}.` : `${svcName(r.label)} is ${priceTxt(r.price)}.`) : (S ? 'Sina bei ya hiyo kwenye orodha yetu. Ungependa mwenye biashara akupigie na bei?' : "I don't have a price for that on our list. Would you like the owner to call you with a quote?");
+    case 'price': return r.found ? (S ? `Bei ya ${svcName(r.label)} ni ${priceTxt(r.price, true)}.` : `${L.cap(svcName(r.label))} is ${priceTxt(r.price)}.`) : (S ? 'Sina bei ya hiyo kwenye orodha yetu. Ungependa mwenye biashara akupigie na bei?' : "I don't have a price for that on our list. Would you like the owner to call you with a quote?");
     case 'stock':
       if (r.found && /^(yes|true|in)/i.test(String(r.in_stock || ''))) return S ? `Kwa orodha yetu, ${r.label} inapatikana.` : `Our list shows ${r.label} in stock.`;
       return [S ? 'Siwezi kuthibitisha hiyo kwenye simu hii. Ungependa timu ikupigie simu?' : "I can't confirm that on this call. Would you like the team to call you back?",
@@ -86,8 +123,27 @@ function info(r, lang, n = 0) {
       if (!r.rows.length) return [S ? 'Sioni booking yoyote ya awali kwa namba hii.' : "I don't see any earlier bookings on this number.", S ? 'Samahani, siipati. Ungependa timu iangalie na ikupigie simu?' : "Sorry, I can't find it. Would you like the team to check and call you back?"][Math.min(n, 1)];
       return S ? `Naona ${rowLabel(r.rows[0], lang)}.` : `I can see your ${rowLabel(r.rows[0], lang)}.`;
     case 'pending': return S ? `Ombi lako la kubadilisha ${r.what === 'payment' ? 'malipo' : 'mahali'} bado linasubiri. Mwenye biashara atakupigia simu.` : `Your ${r.what} change request is still pending. The owner will call you back.`;
+    case 'explain_text': return r.text;
+    case 'service_categories': { const ps = r.labels || r.cats.map((c) => catPhrase(c, S)); const list = ps.length > 1 ? `${ps.slice(0, -1).join(S ? ', ' : ', ')}${S ? ' na ' : ', and '}${ps[ps.length - 1]}` : ps[0]; if (r.examples) { const ex = r.examples.length > 1 ? `${r.examples.slice(0, -1).join(', ')}${S ? ' na ' : ', and '}${r.examples[r.examples.length - 1]}` : r.examples[0]; return S ? `Kwa mfano, ${ex}. Ungependa ipi?` : `For example, ${ex}. Which would you like?`; } if (r.again) return S ? `Ndio, tunafanya ${list}. Ungependa ipi kati ya hizo?` : `Yes, we do ${list}. Which of those would you like?`; return S ? `Tunafanya ${list}. Ungependa ipi?` : `We do ${list}. Which would you like?`; }
+    case 'house_sizes': { const w = S ? { 1: 'kimoja', 2: 'viwili', 3: 'vitatu', 4: 'vinne' } : { 1: 'one', 2: 'two', 3: 'three', 4: 'four' }; const ws = [...new Set(r.sizes)].sort().map((d) => w[d] || d); const l = ws.length > 1 ? `${ws.slice(0, -1).join(', ')} ${S ? 'au' : 'or'} ${ws[ws.length - 1]}` : ws[0] || ''; return S ? `Usafi wa nyumba ni kulingana na ukubwa, vyumba vya kulala ${l}. Nyumba yako ina vyumba vingapi?` : `House cleaning goes by size: ${l} bedrooms. How many bedrooms is your home?`; }
+    case 'service_detail': { // follow-up on the category list: one level deeper, still plain words, no raw catalogue names
+      const parts = r.cats.map((c) => {
+        if (c.k === 'items') return catPhrase(c, S);
+        if (c.k === 'house') { const ds = [...new Set(c.names.map((x) => (x.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean))].sort(); const w = S ? { 1: 'kimoja', 2: 'viwili', 3: 'vitatu' } : { 1: 'one', 2: 'two', 3: 'three' }; const l = ds.map((d) => w[d] || d); if (!l.length) return S ? 'usafi wa nyumba' : 'house cleaning'; const hourly = c.names.some((x) => /hourly/i.test(x)); return S ? `nyumba ya vyumba ${l.join(', ')}${hourly ? ', au msaidizi kwa saa' : ''}` : `homes with ${l.slice(0, -1).join(', ')}${l.length > 1 ? ' or ' : ''}${l[l.length - 1]} bedrooms${hourly ? ', or a cleaner by the hour' : ''}`; }
+        if (c.k === 'deep') { const ws = [[/move/i, S ? 'kuhamia' : 'moving'], [/construction/i, S ? 'baada ya ujenzi' : 'after building work'], [/fridge|refrigerator/i, S ? 'friji' : 'fridges'], [/oven/i, S ? 'oveni' : 'ovens']].filter(([re]) => c.names.some((x) => re.test(x))).map(([, w]) => w); return S ? `usafi wa kina${ws.length ? ` kama ${ws.join(', ')}` : ''}` : `deep cleans${ws.length ? ` like ${ws.join(', ')}` : ''}`; }
+        if (c.k === 'office') { // sizes only when the catalogue lists them (HD_923e: one 'Office Cleaning' row)
+          const sz = [[/small/i, S ? 'ndogo' : 'small'], [/medium/i, S ? 'za kati' : 'medium'], [/large|commercial/i, S ? 'kubwa' : 'large']].filter(([re]) => c.names.some((x) => re.test(x))).map(([, w]) => w);
+          if (sz.length < 2) return S ? 'usafi wa maofisi' : 'offices';
+          return S ? `ofisi ${sz.slice(0, -1).join(', ')} au ${sz[sz.length - 1]}` : `${sz.slice(0, -1).join(', ')} or ${sz[sz.length - 1]} offices`;
+        }
+        return catPhrase(c, S);
+      });
+      { const j = parts.join("; "); return `${j.charAt(0).toUpperCase()}${j.slice(1)}. ${S ? "Ungependa ipi?" : "Which would you like?"}`; }
+    }
+    case 'explain': return explain(r.name, r.notes, S);
     case 'services': return S ? `Tunafanya ${r.names.map(svcName).join(', ')}${r.more ? ' na zaidi' : ''}. Ungependa ipi?` : `We do ${r.names.map(svcName).join(', ')}${r.more ? ', and more' : ''}. Which one would you like?`;
     case 'offered': return S ? `Ndio, tunafanya ${svcName(r.label)}${r.price ? `, bei ni ${priceTxt(r.price, true)}` : ''}. Ungependa kubook?` : `Yes, we do ${svcName(r.label).toLowerCase()}${r.price ? `, ${/^From/i.test(r.price) ? priceTxt(r.price) : `at ${r.price}`}` : ''}. Would you like to book?`;
+    case 'coverage_outside': return S ? `Ndio, nje ya ${r.base} tunahudumia ${r.names}${r.more ? ' na maeneo mengine' : ''}. Uko wapi?` : `Yes, outside ${r.base} we serve ${r.names}${r.more ? ' and other listed areas' : ''}. Which place are you in?`;
     case 'coverage':
       if (r.area?.listed) return S ? `${r.area.name} iko kwenye orodha ya maeneo yetu. Timu itathibitisha ukibook.` : `${r.area.name} is on our list of service areas. The team confirms when you book.`;
       if (r.area) return S ? `${r.area.name} haiko kwenye orodha ya maeneo yetu. Timu inaweza kuangalia na kukupigia simu.` : `${r.area.name} isn't on our list of service areas. The team can check and call you back.`;
@@ -100,10 +156,17 @@ function info(r, lang, n = 0) {
     case 'off_catalogue': return S ? `Sina ${r.item} kwenye orodha yetu. ${r.hint ? `Tunafanya ${r.hint}.` : ''}`.trim() : `${r.item} isn't on our list. ${r.hint ? `We do ${r.hint}.` : ''}`.trim();
     case 'payment_how': return r.methods ? (S ? `Tunapokea ${r.methods}.` : `We accept ${r.methods}.`) : (S ? 'Sina maelezo ya malipo kwenye orodha yetu.' : "I don't have payment details on our list.");
     case 'greeting': return S ? 'Nzuri, asante. Ungependa huduma gani?' : "I'm well, thank you. Which service do you need?";
+    case 'closed_day': return S ? `${L.cap(L.DOW_SW[r.dow])} tumefunga. Siku gani nyingine ingekufaa?` : `We're closed on ${r.dayLabel}. What other day would you like?`;
+    case 'time_outside': { const o = (hh) => (S ? `${L.sayTime(hh, lang)} ${period(hh)}` : hh); return S ? `Tuko wazi kuanzia ${o(r.open)} hadi ${o(r.close)}. Saa ngapi ${r.day}?` : `We're open from ${r.open} to ${r.close}. What time on ${r.day}?`; }
+    case 'closing_today': return S ? `Leo tunafunga ${L.sayTime(r.close, lang)} ${period(r.close)}, hatuwezi kuja sasa hivi. Siku gani nyingine ingekufaa?` : `We close at ${r.close} today, so we can't come right now. What other day would you like?`;
+    case 'time_past': return S ? `Saa hiyo imeshapita. Saa ngapi au siku gani nyingine ingekufaa?` : 'That time has already passed. What later day and time would you like?';
+    case 'bot': return S ? `Mimi ni ${r.agent}, msaidizi wa kidijitali wa ${r.biz}. Timu halisi inapata ujumbe wako.` : `I'm ${r.agent}, a virtual assistant for ${r.biz}. The real team gets your request.`;
+    case 'hold': return S ? 'Sawa, chukua muda wako.' : 'Sure, take your time.';
     case 'repair': return S ? 'Samahani, sijakusikia vizuri. Unaweza kurudia?' : "Sorry, I didn't catch that. Could you say it again?";
     case 'no_rows': return S ? 'Sioni booking iliyo wazi kwa namba hii.' : "I don't see an open booking on this number.";
     case 'not_offered': return S ? 'Hiyo haipo kwenye huduma zetu.' : "That isn't on our list of services.";
     case 'bye': return S ? 'Asante kwa kupiga simu. Kwaheri.' : 'Thank you for calling. Goodbye.';
+    case 'drop_intent': return S ? 'Tuache booking kwa sasa. Kuna kingine ninaweza kukusaidia nacho?' : "Let's leave the booking for now. Is there anything else I can help with?";
     case 'decline': return S ? 'Sawa, sijahifadhi chochote. Kuna kingine?' : "Okay, I haven't saved anything. Anything else?";
     default: return '';
   }
@@ -124,4 +187,4 @@ function vary(line, lang, n = 1, plain = false) {
   // No "As I said" / "Just to repeat" filler (Alvin, 14 Oct): a repeat is said plainly.
   return line;
 }
-module.exports = { vary, ask, readback, receipt, info, svcName, rowLabel };
+module.exports = { serviceCategories, vary, ask, readback, receipt, info, svcName, rowLabel };
