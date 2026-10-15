@@ -7,6 +7,7 @@
 //
 // Preserves the orchestration-facing API used by server.js (async).
 
+const { finalizeOnceEnabled, TERMINAL } = require('./callFinalizeOnce');
 const { supabase } = require('./lib/supabaseClient');
 const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
 const { mergeContactIdentity } = require('./conversation/contactIdentity');
@@ -654,7 +655,7 @@ async function uploadRecordingBuffer({
  * Matches on sautikit_call_sid. Idempotent — safe to call from multiple webhooks.
  * Does not reopen a call that is already terminal unless upgrading duration.
  */
-async function updateCallStatus({ callSid, status, durationSeconds, force = false }) {
+async function updateCallStatus({ callSid, status, durationSeconds, force = false, finalizeOnce = finalizeOnceEnabled() }) {
   if (!callSid) {
     throw new Error('[db] updateCallStatus: callSid required');
   }
@@ -738,15 +739,46 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
     return existing;
   }
 
-  const { data, error } = await supabase
-    .from('calls')
-    .update(patch)
-    .eq('sautikit_call_sid', callSid)
-    .select('*')
-    .maybeSingle();
+  // Run-once: flipping to terminal only from a non-terminal status, so the
+  // first webhook wins and later ones learn they lost (finalizeWinner=false).
+  const claimTerminal =
+    finalizeOnce && !alreadyTerminal && !force && TERMINAL.includes(String(patch.status || ''));
+  let query = supabase.from('calls').update(patch).eq('sautikit_call_sid', callSid);
+  if (claimTerminal) query = query.not('status', 'in', `(${TERMINAL.join(',')})`);
+  const { data, error } = await query.select('*').maybeSingle();
 
   throwIfError('updateCallStatus', error);
-  const shaped = shapeCall(data);
+  let lost = false;
+  let row = data;
+  if (claimTerminal && !data) {
+    // Lost the race: keep any duration fill, never the status flip.
+    lost = true;
+    const { status: _ignored, ...rest } = patch;
+    if (Object.keys(rest).length) {
+      const again = await supabase
+        .from('calls')
+        .update(rest)
+        .eq('sautikit_call_sid', callSid)
+        .select('*')
+        .maybeSingle();
+      throwIfError('updateCallStatus', again.error);
+      row = again.data;
+    } else {
+      const fresh = await supabase
+        .from('calls')
+        .select('*')
+        .eq('sautikit_call_sid', callSid)
+        .maybeSingle();
+      row = fresh.data || null;
+    }
+  }
+  const shaped = shapeCall(row);
+  if (shaped && lost) {
+    Object.defineProperty(shaped, 'finalizeWinner', { value: false, enumerable: false });
+  }
+  if (shaped && claimTerminal && !lost) {
+    Object.defineProperty(shaped, 'finalizeWinner', { value: true, enumerable: false });
+  }
 
   await settleCallUsage({
     callId: shaped?.id,

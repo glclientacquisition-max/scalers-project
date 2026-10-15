@@ -426,6 +426,7 @@ const {
   isRecordingEvent,
 } = require('./src/sautikit/recordingEvents');
 const { fetchCallRecording, recordingScopeDenied } = require('./src/sautikit/recordingFetch');
+const { finalizeOnceEnabled, finalizeDecision } = require('./src/callFinalizeOnce');
 const {
   summarizeHeaders,
   summarizeBody,
@@ -1178,6 +1179,20 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
     });
     const summary = deriveCallSummary({ brainState });
     const primaryIntent = summary.primaryIntent || null;
+    if (opts.writeResolution === false) {
+      // Run-once loser: only hand its live turns to the debounced review.
+      const profile = callTenantProfiles.get(callSid) || {};
+      schedulePostCallTranscriptReview({
+        callSid,
+        vertical: profile.vertical || '',
+        derived,
+        summary,
+        toolFlags: toolFlagsFromBrain(brainState, call?.id || null),
+        turns: Array.isArray(opts.turns) ? opts.turns : null,
+        callStatus: opts.callStatus || null,
+      });
+      return null;
+    }
     const saved = await db.setCallResolution({
       callSid,
       resolution: derived.resolution,
@@ -1247,6 +1262,18 @@ async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, s
       durationSeconds: durationSeconds ?? null,
       found: Boolean(updated),
     });
+    const decision = finalizeDecision({
+      enabled: finalizeOnceEnabled(),
+      won: updated?.finalizeWinner,
+      hasTurns: Array.isArray(turns) && turns.length > 0,
+    });
+    if (decision !== 'run') {
+      console.log(`[${source}] finalize skipped ${callSid} (another webhook won) decision=${decision}`);
+      if (decision === 'review_only') {
+        await persistCallResolution(callSid, source, { turns, callStatus: status, writeResolution: false });
+      }
+      return updated;
+    }
     // Best-effort outcome while Brain state may still be in memory.
     await persistCallResolution(callSid, source, { turns, callStatus: status });
     await persistFirstForwardAcceptance(callSid, durationSeconds);
