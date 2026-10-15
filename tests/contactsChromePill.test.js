@@ -8,9 +8,9 @@ function read(rel) {
 }
 
 describe("contacts chrome pill ACCEPT", () => {
-  const accept = read("docs/product/CONTACTS_CHROME_PILL_ACCEPT.md");
-  const note = read("docs/frontend/design-system/pages/contacts.md");
-  const master = read("docs/frontend/design-system/MASTER.md");
+  const accept = read("docs/reference/acceptance/CONTACTS_CHROME_PILL_ACCEPT.md");
+  const note = read("docs/reference/design-system/pages/contacts.md");
+  const master = read("docs/reference/design-system/MASTER.md");
   const page = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const profile = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
   const dock = read("dashboard/src/components/ContactActionDock.tsx");

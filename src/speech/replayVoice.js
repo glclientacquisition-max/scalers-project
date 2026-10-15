@@ -150,15 +150,6 @@ function replayTurn(turn, ctx) {
       ],
     };
   }
-  // A recorded place runs the live coverage check, so a replay sees the
-  // same verdict (state.visitPlace) the call did.
-  if (turn.place) {
-    const { decideVisitPlace } = require('../conversation/visitLocation');
-    ctx.state.visitPlace = decideVisitPlace(String(turn.place), {
-      profile: { businessPolicies: ctx.fixture?.businessPolicies || {} },
-      detailAsked: true,
-    });
-  }
   const evidence = analyzeCallerLanguage(caller);
   const sticky =
     evidence.language === 'unknown' ? ctx.language || 'unknown' : evidence.language;
@@ -394,6 +385,14 @@ async function replayCall(fixture, opts = {}) {
         },
         canned: null,
       };
+    }
+    if (require('../conversation/v2/catalogueStep').catalogueStepEnabled()) {
+      // VOICE_V2_CATALOGUE: the v2 catalogue step owns catalogue turns (rules command source, no network).
+      const lang = ctx.language && ctx.language !== 'unknown' ? ctx.language : turn.soniox || turn.lang || 'en';
+      const mouth = await require('../conversation/v2CatalogueTurn').planV2CatalogueMouth(null, {
+        text: turn.caller, profile: fixture.profile || fixture, language: lang, state: (ctx.v2State ||= {}), model: null,
+      });
+      if (mouth?.line) next = { ...next, model: { ...(next.model || {}), outputText: null }, canned: { path: 'v2_catalogue', text: mouth.line }, v2Catalogue: mouth.v2 };
     }
     turns.push(replayTurn(next, ctx));
   }

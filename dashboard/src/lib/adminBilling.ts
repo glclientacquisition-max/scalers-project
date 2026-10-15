@@ -13,6 +13,8 @@ import {
   type TenantSubscriptionRow,
 } from "@/lib/packageCatalog";
 import type { WalletLedgerRow } from "@/lib/wallet";
+import { actionLabel, eatStamp } from "@/lib/adminActivityModel";
+import { billingAuditDetail, ledgerKindLabel } from "@/lib/adminBillingCopy";
 
 export type AdminBillingStatus = "archived" | "ok" | "low_minutes" | "exhausted" | "charging";
 
@@ -52,8 +54,14 @@ export type OpsAuditRow = {
 export type BillingHistoryEntry = {
   id: string;
   created_at: string;
-  kind: string;
-  summary: string;
+  /** Plain label, e.g. "Changed package" or "Call charge". */
+  title: string;
+  /** What changed and why, e.g. "Starter / month → Growth / month · upgrade". */
+  detail: string | null;
+  /** Signed-in Super Admin for admin actions; null for charge lines. */
+  actor: string | null;
+  /** "9 Oct 13:05" in Nairobi time. */
+  when: string;
   amount_kes: number | null;
 };
 
@@ -263,22 +271,6 @@ export async function listOpsAuditLog(tenantId: string, limit = 40): Promise<Ops
   }));
 }
 
-function auditSummary(row: OpsAuditRow): string {
-  const note = row.detail?.note;
-  if (typeof note === "string" && note.trim()) return note.trim();
-  if (row.action === "grant_package_minutes") {
-    const m = row.detail?.minutes_granted;
-    return typeof m === "number" ? `Granted ${m} minutes` : "Granted minutes";
-  }
-  if (row.action === "waive_overage") return "Waived on-demand overage";
-  if (row.action === "set_billing_mode") {
-    const mode = row.detail?.mode;
-    return typeof mode === "string" ? `Charging mode → ${mode}` : "Charging mode change";
-  }
-  if (row.action === "adjust_wallet") return "Balance adjustment";
-  return row.action.replace(/_/g, " ");
-}
-
 export async function loadBillingHistory(tenantId: string): Promise<BillingHistoryEntry[]> {
   const [ledger, audit] = await Promise.all([
     listTenantLedger(tenantId, 40),
@@ -288,16 +280,20 @@ export async function loadBillingHistory(tenantId: string): Promise<BillingHisto
   const fromLedger: BillingHistoryEntry[] = ledger.map((row: WalletLedgerRow) => ({
     id: `ledger:${row.id}`,
     created_at: row.created_at,
-    kind: row.kind,
-    summary: row.note?.trim() || row.kind.replace(/_/g, " "),
+    title: ledgerKindLabel(row.kind),
+    detail: row.note?.trim() || null,
+    actor: null,
+    when: eatStamp(row.created_at),
     amount_kes: row.amount_kes,
   }));
 
   const fromAudit: BillingHistoryEntry[] = audit.map((row) => ({
     id: `audit:${row.id}`,
     created_at: row.created_at,
-    kind: row.action,
-    summary: auditSummary(row),
+    title: actionLabel(row.action),
+    detail: billingAuditDetail(row),
+    actor: row.actor.trim() || null,
+    when: eatStamp(row.created_at),
     amount_kes: row.amount_kes,
   }));
 

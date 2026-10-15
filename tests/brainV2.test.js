@@ -1,4 +1,9 @@
 'use strict';
+// VOICE_V2_CATALOGUE on: spoken-catalogue prices, pinned to the line's language; off: raw catalogue (Brain's original).
+const SC_ON = () => /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
+const priceRe = (n, lang, unit = '') => (SC_ON() ? new RegExp(lang === 'sw' ? `\\bshilingi ${n}${unit ? ` ${unit.sw}` : ''}\\b` : `\\b${n} shillings${unit ? ` ${unit.en}` : ''}\\b`) : new RegExp(`\\bKSh ${n}\\b`));
+const otherCurrency = (lang) => (SC_ON() ? (lang === 'sw' ? /\bKSh\b|\bshillings?\b/ : /\bKSh\b|\bshilingi\b/) : /$^/);
+const BOOK_ASK = /Ungependa kubook|Would you like to book/;
 // BA v2 Phase 1 unit tests (BRAIN_V2, off by default). Model is mocked; no network.
 const test = require('node:test');
 const assert = require('node:assert');
@@ -90,7 +95,8 @@ test('staff names are never spoken; file name is never spoken unless the caller 
 
 test('availability is never claimed without a receipt; prices only from the catalogue', async () => {
   const { out } = await talk(['How much is an oven deep clean?', 'And for the fridge?', 'How much is gutter cleaning?']);
-  assert.match(out[0].line, /KSh 1,200/); assert.match(out[1].line, /KSh 1,000/); assert.match(out[2].line, /don't have a price/);
+  assert.match(out[0].line, priceRe('1,200', 'en')); assert.match(out[1].line, priceRe('1,000', 'en'));
+  for (const o of out.slice(0, 2)) { assert.doesNotMatch(o.line, otherCurrency('en')); assert.doesNotMatch(o.line, BOOK_ASK); assert.doesNotMatch(o.line, /\b11,200\b/); } assert.match(out[2].line, /don't have a price/);
 });
 
 test('Swahili caller gets Swahili receipts', async () => {
@@ -124,13 +130,13 @@ test('Swahili/Sheng questions get fact answers from tenant data, not a generic r
   let r = await one('Nilikuwa nataka kujua ni services gani mnaofa.');
   assert.equal(r.lang, 'sw'); assert.match(r.line, /^Tunafanya usafi wa magodoro/);
   r = await one('Nilikuwa nataka kujua ni saizi gani mnatoa.'); assert.match(r.line, /^Usafi wa nyumba ni kulingana na ukubwa, vyumba vya kulala kimoja, viwili au vitatu\./);
-  r = await one('Mnawashanga carpet?'); assert.match(r.line, /^Ndio, tunafanya Carpet Cleaning, bei ni kuanzia KSh 2,200/);
+  r = await one('Mnawashanga carpet?'); assert.match(r.line, SC_ON() ? /^Ndio, tunafanya usafi wa zulia, bei ni kuanzia shilingi 2,200 kwa mita mraba\./ : /^Ndio, tunafanya Carpet Cleaning, bei ni kuanzia KSh 2,200\b/); assert.doesNotMatch(r.line, otherCurrency('sw'));
   r = await one('Niaje, mnafika Syokimau?'); assert.match(r.line, /^Syokimau iko kwenye orodha/);
   r = await one('Mnafika Kisumu?'); assert.match(r.line, /^Kisumu haiko kwenye orodha/);
   r = await one('Habari, nilikuwa nataka kujua.'); assert.match(r.line, /bei, huduma au saa za kazi/);
   r = await one('You guys operate until what time?'); assert.match(r.line, /08:00 to 18:00/);
   const p = await talk(['Shilingi ngapi?', 'Ya sofa.']);
-  assert.match(p.out[0].line, /huduma gani/); assert.match(p.out[1].line, /KSh 800/);
+  assert.match(p.out[0].line, /huduma gani/); assert.match(p.out[1].line, SC_ON() ? priceRe('800', 'sw', { sw: 'kwa kiti' }) : priceRe('800', 'sw')); assert.doesNotMatch(p.out[1].line, otherCurrency('sw')); assert.doesNotMatch(p.out[1].line, BOOK_ASK);
   for (const o of [r, ...p.out]) assert.doesNotMatch(o.line, /Samahani, unapiga kubook|Nimwombe mwenye biashara/);
 });
 
@@ -215,10 +221,12 @@ test('HD_513dfb2fa73f: "make a booking" + detail answers keep the booking going;
   const lines = ["I'd like to meet— I'd like to make a booking for", 'My apartment to be washed.', '2-Bedroom— My name is Alvin Yegon.', 'Uh, 2-Bedroom, tomorrow.', "It's in— it's in Rongai.", '8, 8, 8 AM.', "It's in— it's in Simba Drive, and it's— the name is the Grace Apartments.", 'Yes'];
   for (const text of lines) out.push(await V2.runTurn(st, { text, profile: DD, now: new Date('2026-10-14T11:00:00Z'), handlers: h, langLock: 'en' }));
   for (const o of out) assert.doesNotMatch(o.line, /As I said|Just to repeat|Kama nilivyosema|Narudia|call you back to finish|calling to book/);
-  assert.match(out[5].line, /2-Bedroom Apartment on Thursday 15 October at 08:00 in Rongai, for Alvin Yegon/);
-  assert.match(out[6].line, /in Rongai, Simba Drive/);
+  // area clarify: Rongai touches our Ongata Rongai (Kajiado) and Rongai (Nakuru); the caller moved on, so the place we serve is kept and read back
+  assert.equal(out[4].line, 'Is that Ongata Rongai in Kajiado or Rongai in Nakuru?');
+  assert.match(out[5].line, /2-Bedroom Apartment on Thursday 15 October at 08:00 in Ongata Rongai, for Alvin Yegon/);
+  assert.match(out[6].line, /in Ongata Rongai, Simba Drive/);
   const a = h.log.find((l) => l.name === 'createAppointment').args;
-  assert.equal(a.landmark, 'Rongai'); assert.equal(a.notes, 'Simba Drive'); assert.equal(a.whenText, '2026-10-15 08:00');
+  assert.equal(a.landmark, 'Ongata Rongai'); assert.equal(a.notes, 'Simba Drive'); assert.equal(a.whenText, '2026-10-15 08:00');
   // an offered service answered with a day is a yes to "Would you like to book?"
   const r = await talk(['Do you clean sofas?', 'Tomorrow at 10am please']);
   assert.match(r.out[1].line, /Where should we come|name|Shall I book/i);

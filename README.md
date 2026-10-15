@@ -18,8 +18,8 @@ The owner works in the Desk: setup, the call inbox, contacts, approve-first SMS 
 
 ## Not shipped
 
-- Live Dial to a person during the call. The shipped handoff is an async notify plus a Desk note. Spec: [`docs/product/LIVE_TRANSFER.md`](docs/product/LIVE_TRANSFER.md).
-- Owner self-serve package checkout. See [`docs/operations/PACKAGES.md`](docs/operations/PACKAGES.md).
+- Live Dial to a person during the call. The shipped handoff is an async notify plus a Desk note. Spec: [`docs/archive/LIVE_TRANSFER.md`](docs/archive/LIVE_TRANSFER.md).
+- Owner self-serve package checkout. See [`docs/reference/operations/PACKAGES.md`](docs/reference/operations/PACKAGES.md).
 
 ## Repo map
 
@@ -42,11 +42,11 @@ Two apps, one git repo. They deploy separately. There is no npm workspace.
 | `evals/` | Brain eval fixture. Run `npm run eval:brain`. |
 | `Dockerfile`, `railway.toml`, `render.yaml` | Voice deploy. Render is the alternate host. |
 
-How the pieces fit, in one page: [`docs/architecture/SYSTEM_ARCHITECTURE.md`](docs/architecture/SYSTEM_ARCHITECTURE.md).
+How the pieces fit, in one page: [`docs/explanation/architecture/SYSTEM_ARCHITECTURE.md`](docs/explanation/architecture/SYSTEM_ARCHITECTURE.md).
 
 Lanes (Voice, Brain, Desk, Ops & Billing, Platform): [`AGENTS.md`](AGENTS.md).
 
-`server.js` is still one process. The target split is [`docs/architecture/TARGET_MODULE_LAYOUT.md`](docs/architecture/TARGET_MODULE_LAYOUT.md). Do that extract in its own pull request, with no behavior change.
+`server.js` is still one process. The target split is [`docs/explanation/architecture/TARGET_MODULE_LAYOUT.md`](docs/explanation/architecture/TARGET_MODULE_LAYOUT.md). Do that extract in its own pull request, with no behavior change.
 
 ## Run locally
 
@@ -70,7 +70,7 @@ To take a SautiKit test call against your laptop:
 npm run tunnel:cloudflared
 ```
 
-Steps: [`docs/operations/WEBHOOK_TUNNEL.md`](docs/operations/WEBHOOK_TUNNEL.md).
+Steps: [`docs/how-to/WEBHOOK_TUNNEL.md`](docs/how-to/WEBHOOK_TUNNEL.md).
 
 Optional DB check, when Supabase env is set: `npm run smoke:db`.
 
@@ -105,8 +105,8 @@ Pull requests to `main` run the same commands in [`.github/workflows/ci.yml`](.g
 | [`docs/README.md`](docs/README.md) | Where each doc folder lives |
 | [`CONTEXT.md`](CONTEXT.md) | Words we use |
 | [`AGENTS.md`](AGENTS.md) | Which lane may edit which paths |
-| [`docs/architecture/CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md) | What the system is today |
-| [`docs/governance/SOURCE_OF_TRUTH.md`](docs/governance/SOURCE_OF_TRUTH.md) | Which file is canonical |
+| [`docs/explanation/architecture/CURRENT_STATE.md`](docs/explanation/architecture/CURRENT_STATE.md) | What the system is today |
+| [`docs/explanation/governance/SOURCE_OF_TRUTH.md`](docs/explanation/governance/SOURCE_OF_TRUTH.md) | Which file is canonical |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Branch, PR, and test rules |
 | [`CHANGELOG.md`](CHANGELOG.md) | Notable changes. Older work is in git, not in version tags. |
 
