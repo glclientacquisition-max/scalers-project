@@ -101,7 +101,7 @@ describe("desk control craft", () => {
   });
 
   it("corrects the Desk CTA color in lane prompts", () => {
-    const prompts = read("docs/agents/PROMPTS.md");
+    const prompts = read("docs/reference/lanes/PROMPTS.md");
     assert.doesNotMatch(prompts, /primary CTA #0096FF/);
     assert.match(prompts, /one filled `#005CCC`/);
     assert.match(prompts, /ribbon\/focus `#0096FF`/);

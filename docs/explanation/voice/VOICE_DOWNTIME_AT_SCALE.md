@@ -1,0 +1,123 @@
+---
+owner: voice
+last_reviewed: 2026-10-09
+---
+
+# Voice downtime at scale
+
+**Lane:** Voice  
+**Status:** Contract for platform outages when Scalers hosts many businesses  
+**Companion:** [`SONIOX_BILLING_SILENCE_2026-09-02.md`](../../archive/SONIOX_BILLING_SILENCE_2026-09-02.md)
+
+Three platform failures share one rule: the caller dialed one business, and the owner should not get one text per call.
+
+| Failure | What still works | Caller hears | Owner line |
+| --- | --- | --- | --- |
+| **Speech down** (Soniox 402 / fatal STT or TTS) | Nothing. Cannot hear or speak. | Catalog-voice clip: short downtime, call back. Hang up. | `{Business} line downtime. Callers heard a short message and were asked to call back.` |
+| **Reasoning down** (Gemini credits 403/429, denied, timeout) | STT and TTS still work. | Live voice: "Okay, I can't finish that just now. May I have your name so I can reach them?" Save name. Confirm. | `{Business} line is taking names only. Callers are asked for a name so the team can call back.` |
+| **Telephony down** (SautiKit balance, DID suspended, webhook gone) | Nothing reaches Voice. No webhook, no `/ws/media`. | Carrier network message. We cannot speak. | `{Business} number is offline. We are restoring it.` |
+
+Do not say Soniox, Gemini, SautiKit, billing, or "technical issue" to the caller. Do not invent a booking.
+
+## Three audiences
+
+| Who | Channel | Cadence | Job |
+| --- | --- | --- | --- |
+| Caller | Phone, that tenant's catalog voice | Every affected call | Speech down: hear the same person, call back, leave. Reasoning down: give a name, know the team will call back. |
+| Owner | SMS, then WhatsApp, then email | Once per business per kind per cooldown (default 30 min), and only if a caller actually hit that DID | Know their line is degraded. Not one text per abandoned call. |
+| Ops | SMS/email to `SCALERS_OPS_ALERT_*` + `/healthz` | Once per kind per cooldown while degraded | `notePlatformOpsDegrade` in `src/notifications/platformOpsAlert.js`. Owner `speechOutageNotify` unchanged. |
+
+## Speech down: caller line
+
+Shared catalog voices serve many tenants. Agent names differ. Pre-rendered audio cannot say "this is Lynn" or name a shop.
+
+Keep one voice-generic sentence:
+
+- EN: `Hello. This line is on a short downtime. Please call back in a few minutes.`
+- SW: `Habari. Simu hii ina downtime fupi. Tafadhali piga tena baada ya dakika chache.`
+
+The caller already dialed that DID. Voice continuity is the identity. A wrong name is worse than no name.
+
+English until the caller has spoken. Then match EN or SW. Hang up after the clip. STT is also dead, so do not ask for a name or take a callback.
+
+## Reasoning down: caller line
+
+STT and TTS are alive. Keep the line open. The same receptionist asks for a name and saves it.
+
+- EN: `Okay, I can't finish that just now. May I have your name so I can reach them?`
+- SW: `Sawa, siwezi kumaliza hiyo sasa hivi. Niambie jina lako ndio niwasiliane nao.`
+
+After a name, including on the same turn that reasoning failed: `Okay, I have your name. I'll have the team reach you.` Do not promise a booking. Do not ask for the name again if they already said it.
+
+## Telephony down: bridge playbook
+
+SautiKit is the SIP/webhook edge. When it stops, `POST /voice/incoming` never fires. Voice cannot answer with a clip because the call never reaches the process. The carrier message the caller hears is outside our control.
+
+**Goal of the bridge:** keep the business reachable while the number is dead, and restore the number without a new DID for the owner to publish.
+
+1. **Detect.** A missing `voice/incoming` on a live DID, a SautiKit 402 on admin actions, or a DID that stops routing is a telephony outage. `/healthz` cannot see it because no call arrives. Ops watches SautiKit balance and DID state.
+2. **Tell the owner once.** Same cooldown as speech/llm (`speechOutageNotify`, kind `speech`). Line: `{Business} number is offline. We are restoring it.`
+3. **Bridge the caller.** Point the affected DID's voice callback at a reachable fallback, or forward the number at the carrier. Options in order:
+   - SautiKit account restored / balance topped up. Preferred. No caller-facing change.
+   - Re-point the same DID to a backup voice URL on a second host that serves the same Stream XML. Caller keeps the same number.
+   - Carrier-level forward from the dead DID to a working DID or the owner's mobile. Caller hears a ring, not downtime.
+4. **Owner phone as last resort.** If no backup voice path exists, the owner alert includes a temporary contact line so the business can post it on WhatsApp status / door.
+5. **Restore and verify.** One test call to the DID. Confirm `/ws/media` opens and the greeting plays before telling the owner it is back.
+
+Do not keep a silent failed DID. Do not assign a new DID as the "fix" unless the old one is surrendered. `TELEPHONY_PROVIDER` failover is planned, not built.
+
+## Prepaid balance empty
+
+This is not "SautiKit is down". The webhook still arrives. The wallet probe (`GET /v1/wallet`, interval `VOICE_TELEPHONY_WALLET_PROBE_MS`, default 15 minutes) sets `telephony.lastError.billingExhausted` on an empty balance or HTTP 402. The next new `POST /` or `POST /voice/incoming` returns `<Reject/>` and does not open `/ws/media`. The caller hears the carrier reject, not a Scalers clip. A later healthy probe clears the flag so calls resume without a restart.
+
+Probe HTTP errors, including 403, do not set the flag. If the probe key cannot read the wallet, calls keep streaming onto the DIDs while the balance is empty. Fix the key before expecting the gate to fire. `/healthz` `telephony.lastError.message` shows `wallet probe HTTP 403` in that case and `billingExhausted: false`.
+
+## Clip model (voice × language, not tenant × language)
+
+Key clips by curated `soniox_voice_id` and language.
+
+1. Boot warms the platform default voice only.
+2. First live PCM for another catalog voice warms that voice (60s debounce).
+3. Playback order: that voice's clip → default clone clip → espeak → Gemini TTS.
+4. Packaged `src/speech/pcm/downtime-{en,sw}.wav` is the default clone only.
+
+Do not render N tenants × 2 languages at boot. Do not bake `agent_name` into a clip.
+
+## Owner line
+
+`src/speech/speechOutageNotify.js` sends at most one alert per `tenant.id` per kind (`speech` or `llm`) per `VOICE_OUTAGE_OWNER_COOLDOWN_MS` (default 1800000). Claim the slot before send so two overlapping calls do not double-text.
+
+No vendor names. No "add funds" (that is wallet, a different incident). Uses the tenant notify stack (SMS → WhatsApp → email).
+
+## Ops
+
+`GET /healthz`:
+
+- `soniox.lastError.billingExhausted`
+- `soniox.outageClips` (default voice ready flags plus per-voice map)
+- `gemini.lastError` (`billingExhausted`, `denied`, last error kind)
+- `telephony.lastError` (SautiKit wallet probe: empty balance or 402)
+
+**Platform ops alerts (Scalers team, not owners):** set `SCALERS_OPS_ALERT_PHONES` and/or `SCALERS_OPS_ALERT_EMAILS` on Voice. When speech, reasoning, or telephony newly degrades, Voice sends one alert per kind until recovery (`VOICE_PLATFORM_OPS_COOLDOWN_MS`, default 30 min backstop). Hooks: Soniox billing in `sonioxProviderHealth.js`, Gemini billing/denied in `geminiProviderHealth.js`, telephony wallet in `src/sautikit/walletProbe.js` (interval `VOICE_TELEPHONY_WALLET_PROBE_MS`). Staging dry-run: `VOICE_PLATFORM_OPS_DRY_RUN=true` or `POST /internal/platform/ops-alert` with `VOICE_INTERNAL_SECRET`. Full path: [`PLATFORM_OPS_ALERTS.md`](../../reference/lanes/PLATFORM_OPS_ALERTS.md).
+
+Desk Super Admin Platform board reads `/healthz`. No public status page. Voice does not add Admin UI.
+
+## What not to do
+
+- Per-call owner SMS
+- A unique downtime script per business
+- Holding the caller for a human while speech is down
+- Inventing a booking or a callback when STT cannot hear
+- Retrying depleted Gemini credits on the next turn
+- Answering a telephony outage with a spoken clip (no call reaches us)
+- Opening `/ws/media` when the wallet probe says the prepaid balance is empty or returned 402
+- Handing the owner a new DID instead of restoring or forwarding the old one
+
+## Archived or suspended business (not an outage)
+
+A call to a DID whose tenant rows are all archived or `is_active = false` never takes the call (`src/sautikit/inactiveTenantGate.js`, #639): `/voice/incoming` returns the line-unavailable message and `<Hangup/>` before Stream and the call row. No minutes, no model, no owner or ops outage alert. Lookup errors fail open.
+
+- Clips: `src/speech/pcm/line-unavailable-en.v1.wav` ("Hello. This line is not available right now. Thank you for calling.", 5.03 s) and `line-unavailable-sw.v1.wav` ("Habari. Nambari hii haipatikani kwa sasa. Asante kwa kupiga.", 5.29 s), platform clone voice 7b197f3c, 16 kHz mono. The `downtime-*` files are the outage clips; never used for closed lines.
+- Hosting: SautiKit only (`POST /v1/uploads/audio`, the one supported way to give it audio). `src/sautikit/lineUnavailableAudio.js` uploads each clip and stores the presigned `storage.sautikit.com` URL and its expiry in `voice_platform_audio` ([`voice_platform_audio.sql`](../../supabase/voice_platform_audio.sql)). Signed URLs are never logged or committed; logs show host and expiry.
+- Refresh: at boot (+30 s) and every 6 h (`VOICE_LINE_UNAVAILABLE_REFRESH_MS`). A clip is re-uploaded when it has no row, its file sha changed, or under 48 h remain (day 5 of the 7-day link). An upload failure keeps the old row, writes `last_error`, and sends one platform ops alert (kind `audio`, "Phone audio"; respects `VOICE_PLATFORM_OPS_DRY_RUN`). No key, a key without `numbers.claim` (403 `api_key.scope_denied`), or no table: one warn log, no alert. `VOICE_LINE_UNAVAILABLE_REFRESH=off` disables it.
+- Call time: the stored URLs (cached 1 min, ignored with under 10 min left), host must be `storage.sautikit.com`, then a ranged GET (1.5 s, cached 10 min ok / 1 min failed) must return audio. SautiKit reports no `<Play>` failure, so anything else uses `<Say>` with the same words, per language.

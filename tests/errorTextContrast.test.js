@@ -38,7 +38,7 @@ describe("attention (error) text contrast", () => {
   }
 
   it("MASTER documents the same light value", () => {
-    const master = fs.readFileSync(path.join(root, "docs/frontend/design-system/MASTER.md"), "utf8");
+    const master = fs.readFileSync(path.join(root, "docs/reference/design-system/MASTER.md"), "utf8");
     assert.ok(master.toLowerCase().includes(`#${token(light, "attention").toLowerCase()}`));
   });
 

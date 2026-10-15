@@ -1,0 +1,49 @@
+---
+owner: desk
+last_reviewed: 2026-09-12
+status: archived
+---
+
+> **Archived 2026-10-14.** Short duplicate. Current source: [`docs/rfcs/desk-daily-product.md`](../rfcs/desk-daily-product.md). Kept for history; do not treat as current.
+
+# Wayfinder: desk as a daily product
+
+**Destination:** Owners use Scalers on phone and laptop every morning without being taught.  
+**Notes:** Full research in [`docs/rfcs/desk-daily-product.md`](../rfcs/desk-daily-product.md). Constitution still outranks this map.  
+**Claimed by:** desk research 2026-09-10
+
+## Decisions so far
+
+- Do not greenfield a second design system or install shadcn to “look like Linear.”
+- Copy Linear/Stripe **discipline** (density, one accent, honest data, fast taps), not their pixels.
+- Highest leverage is an adaptive **shell**: one nav list, bottom tabs on phone, top links on `md+`.
+- Constitution §8: phone bottom tabs; `md+` top links; no left desk rail. Sign out in the header. Header lockup is Scalers only.
+- Inbox stays the collection benchmark; phone uses a dense stacked row, not cards.
+- Contacts stays a primary thumb tab in the shell pass (no More overflow yet).
+
+## Not yet specified
+
+- Exact container-query breakpoint for Inbox stacked rows.
+- Whether cmdk is Phase 5 or later.
+
+## Out of scope
+
+- Voice, Brain, wallet RPCs, DID, Super Admin, React Native, dark mode as a prerequisite.
+
+## Frontier
+
+### research / Shell vs constitution
+
+**Answer:** Tab bar is a presentation of `DESK_LINKS`. Constitution amended. Shell code in `DeskNav` + `(desk)/layout.tsx`.
+
+### task / Shell implementation
+
+Shipped on `main` (#246). Header is Scalers only. Workspace name lives on Overview.
+
+### task / Inbox phone rows
+
+Shipping: dense stacked rows below `md`. Same chrome as the table. Not cards.
+
+### task / Optimistic lead status
+
+Blocked by: nothing technically; do not mix into the shell PR.

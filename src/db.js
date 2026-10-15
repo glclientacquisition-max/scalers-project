@@ -7,6 +7,7 @@
 //
 // Preserves the orchestration-facing API used by server.js (async).
 
+const { finalizeOnceEnabled, TERMINAL } = require('./callFinalizeOnce');
 const { supabase } = require('./lib/supabaseClient');
 const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
 const { mergeContactIdentity } = require('./conversation/contactIdentity');
@@ -19,6 +20,7 @@ const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 't
 const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 0);
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
 const { billableTalkSeconds, inboundOpen } = require('./billing/packageOverage');
+const recordingCopy = require('./sautikit/recordingCopy');
 
 function throwIfError(context, error) {
   if (error) {
@@ -653,7 +655,7 @@ async function uploadRecordingBuffer({
  * Matches on sautikit_call_sid. Idempotent — safe to call from multiple webhooks.
  * Does not reopen a call that is already terminal unless upgrading duration.
  */
-async function updateCallStatus({ callSid, status, durationSeconds, force = false }) {
+async function updateCallStatus({ callSid, status, durationSeconds, force = false, finalizeOnce = finalizeOnceEnabled() }) {
   if (!callSid) {
     throw new Error('[db] updateCallStatus: callSid required');
   }
@@ -737,15 +739,46 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
     return existing;
   }
 
-  const { data, error } = await supabase
-    .from('calls')
-    .update(patch)
-    .eq('sautikit_call_sid', callSid)
-    .select('*')
-    .maybeSingle();
+  // Run-once: flipping to terminal only from a non-terminal status, so the
+  // first webhook wins and later ones learn they lost (finalizeWinner=false).
+  const claimTerminal =
+    finalizeOnce && !alreadyTerminal && !force && TERMINAL.includes(String(patch.status || ''));
+  let query = supabase.from('calls').update(patch).eq('sautikit_call_sid', callSid);
+  if (claimTerminal) query = query.not('status', 'in', `(${TERMINAL.join(',')})`);
+  const { data, error } = await query.select('*').maybeSingle();
 
   throwIfError('updateCallStatus', error);
-  const shaped = shapeCall(data);
+  let lost = false;
+  let row = data;
+  if (claimTerminal && !data) {
+    // Lost the race: keep any duration fill, never the status flip.
+    lost = true;
+    const { status: _ignored, ...rest } = patch;
+    if (Object.keys(rest).length) {
+      const again = await supabase
+        .from('calls')
+        .update(rest)
+        .eq('sautikit_call_sid', callSid)
+        .select('*')
+        .maybeSingle();
+      throwIfError('updateCallStatus', again.error);
+      row = again.data;
+    } else {
+      const fresh = await supabase
+        .from('calls')
+        .select('*')
+        .eq('sautikit_call_sid', callSid)
+        .maybeSingle();
+      row = fresh.data || null;
+    }
+  }
+  const shaped = shapeCall(row);
+  if (shaped && lost) {
+    Object.defineProperty(shaped, 'finalizeWinner', { value: false, enumerable: false });
+  }
+  if (shaped && claimTerminal && !lost) {
+    Object.defineProperty(shaped, 'finalizeWinner', { value: true, enumerable: false });
+  }
 
   await settleCallUsage({
     callId: shaped?.id,
@@ -950,52 +983,32 @@ async function chargeCallToWallet({ callId, minutes, rateKesPerMin } = {}) {
   return row || null;
 }
 
+/**
+ * Save the provider recording URL right away, then copy the file into Storage in
+ * the background (SautiKit often 404s for a few seconds after Completed). If the
+ * copy never lands, the call is marked recording_status='pending_copy' and the
+ * sweep (sweepPendingRecordingCopies) retries with a fresh provider URL.
+ * Pass copy: 'await' to wait for the copy (tests), or copy: false to skip it.
+ */
 async function attachRecording({
   callSid,
   recordingUrl,
   recordingSid,
   sourceUrl,
   authHeader,
+  copy = 'background',
+  copyOptions = {},
 }) {
   const existing = await getCall(callSid);
   if (!existing) {
     throw new Error(`[db] attachRecording: no call for ${callSid}`);
   }
 
-  let finalUrl = recordingUrl || sourceUrl || null;
-  let recordingPath = null;
-
+  const finalUrl = recordingUrl || sourceUrl || null;
   const downloadUrl = sourceUrl || recordingUrl;
-  if (downloadUrl) {
-    try {
-      const headers = {};
-      if (authHeader) headers.Authorization = authHeader;
-
-      const response = await fetch(downloadUrl, { headers });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} downloading recording`);
-      }
-
-      const buffer = Buffer.from(await response.arrayBuffer());
-      const uploaded = await uploadRecordingBuffer({
-        callSid,
-        recordingSid,
-        buffer,
-        contentType: response.headers.get('content-type') || 'audio/mpeg',
-      });
-      finalUrl = uploaded.recordingUrl || finalUrl;
-      recordingPath = uploaded.recordingPath;
-    } catch (err) {
-      console.warn(
-        `[db] attachRecording: Storage upload failed for ${callSid}, keeping provider URL:`,
-        err?.message || err
-      );
-    }
-  }
 
   const meta = parseSummary(existing.summary);
   if (recordingSid) meta.recording_sid = recordingSid;
-  if (recordingPath) meta.recording_path = recordingPath;
 
   const { data, error } = await supabase
     .from('calls')
@@ -1009,7 +1022,98 @@ async function attachRecording({
     .maybeSingle();
 
   throwIfError('attachRecording', error);
+
+  if (downloadUrl && copy) {
+    const job = copyRecordingToStorage({
+      callSid,
+      url: downloadUrl,
+      recordingSid,
+      authHeader,
+      ...copyOptions,
+    }).catch((err) => {
+      console.warn(`[db] attachRecording: copy job failed for ${callSid}:`, err?.message || err);
+      return { ok: false };
+    });
+    if (copy === 'await') await job;
+  }
+
   return shapeCall(data);
+}
+
+/**
+ * Download + upload with retry. On success store the Storage URL/path and clear
+ * any pending_copy marker; on failure mark pending_copy (or copy_failed once the
+ * sweep has tried MAX_SWEEP_ATTEMPTS times).
+ */
+async function copyRecordingToStorage({
+  callSid,
+  url,
+  recordingSid,
+  authHeader,
+  fetchImpl,
+  delays,
+  sleep,
+  fromSweep = false,
+} = {}) {
+  const result = await recordingCopy.copyRecordingWithRetry({
+    callSid,
+    url,
+    recordingSid,
+    authHeader,
+    upload: uploadRecordingBuffer,
+    ...(fetchImpl ? { fetchImpl } : {}),
+    ...(delays ? { delays } : {}),
+    ...(sleep ? { sleep } : {}),
+  });
+
+  const current = await getCall(callSid);
+  if (!current) return result;
+  const meta = parseSummary(current.summary);
+
+  if (result.ok) {
+    if (result.recordingPath) meta.recording_path = result.recordingPath;
+    if (recordingSid) meta.recording_sid = recordingSid;
+    delete meta.recording_status;
+    delete meta.recording_copy_attempts;
+    delete meta.recording_copy_last_error;
+    const update = { summary: serializeSummary(meta) };
+    if (result.recordingUrl) update.recording_url = result.recordingUrl;
+    const { error } = await supabase
+      .from('calls')
+      .update(update)
+      .eq('sautikit_call_sid', callSid);
+    throwIfError('copyRecordingToStorage', error);
+    return result;
+  }
+
+  const sweepAttempts = Number(meta.recording_copy_attempts || 0) + (fromSweep ? 1 : 0);
+  meta.recording_copy_attempts = sweepAttempts;
+  meta.recording_copy_last_error = String(result.lastError?.message || result.lastError || 'unknown').slice(0, 200);
+  meta.recording_status =
+    sweepAttempts >= recordingCopy.MAX_SWEEP_ATTEMPTS
+      ? recordingCopy.COPY_FAILED
+      : recordingCopy.PENDING_COPY;
+  const { error } = await supabase
+    .from('calls')
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid);
+  throwIfError('copyRecordingToStorage', error);
+  console.warn(
+    `[db] recording copy ${meta.recording_status} callSid=${callSid}, keeping provider URL: ${meta.recording_copy_last_error}`
+  );
+  return result;
+}
+
+/** Calls whose recording copy is still owed (summary.recording_status = pending_copy). */
+async function listPendingRecordingCopies({ limit = 20 } = {}) {
+  const { data, error } = await supabase
+    .from('calls')
+    .select('sautikit_call_sid, summary, recording_url, created_at')
+    .like('summary', `%"recording_status":"${recordingCopy.PENDING_COPY}"%`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  throwIfError('listPendingRecordingCopies', error);
+  return data || [];
 }
 
 async function getTenantById(tenantId) {
@@ -2478,6 +2582,8 @@ async function getTenantCatalogue(tenantId) {
 }
 
 module.exports = {
+  copyRecordingToStorage,
+  listPendingRecordingCopies,
   upsertCallFacts,
   getTenantCatalogue,
   resolveTenantId,

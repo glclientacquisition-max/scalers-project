@@ -7,6 +7,37 @@ function apiBase(value) {
   return String(value || process.env.SAUTIKIT_API_BASE || DEFAULT_API_BASE).replace(/\/$/, '');
 }
 
+// A key without the recordings scope (e.g. the wallet.read-only key) answers
+// 401/403 on every call. Latch it: log once, stop hitting the API for a while,
+// and let callers mark the recording unavailable instead of retrying.
+const SCOPE_DENIED_TTL_MS = 60 * 60 * 1000;
+let scopeDeniedUntil = 0;
+let scopeDeniedLogged = false;
+
+function isScopeDeniedStatus(status) {
+  return status === 401 || status === 403;
+}
+
+function recordingScopeDenied(now = Date.now()) {
+  return scopeDeniedUntil > now;
+}
+
+function noteScopeDenied(status, now = Date.now()) {
+  scopeDeniedUntil = now + SCOPE_DENIED_TTL_MS;
+  if (!scopeDeniedLogged) {
+    scopeDeniedLogged = true;
+    console.warn(
+      `[sautikit] recording fetch denied status=${status}: SAUTIKIT_API_KEY lacks the recordings scope. ` +
+        'Recordings marked unavailable; remint the key (see docs/runbooks/sautikit-recording-scope.md).'
+    );
+  }
+}
+
+function resetRecordingScopeLatch() {
+  scopeDeniedUntil = 0;
+  scopeDeniedLogged = false;
+}
+
 function readHeader(headers, name) {
   if (!headers) return '';
   if (typeof headers.get === 'function') return String(headers.get(name) || '').trim();
@@ -50,6 +81,10 @@ async function fetchCallRecording(callId, opts = {}) {
   if (!id) return { downloadUrl: null, sessionId: null, status: 'missing_id' };
   if (!apiKey) return { downloadUrl: null, sessionId: null, status: 'not_configured' };
 
+  if (recordingScopeDenied(opts.now)) {
+    return { downloadUrl: null, sessionId: null, status: 'scope_denied', scopeDenied: true };
+  }
+
   const base = apiBase(opts.apiBase);
   const fetchImpl = opts.fetchImpl || fetch;
   const headers = {
@@ -81,6 +116,9 @@ async function fetchCallRecording(callId, opts = {}) {
       const fromBody = downloadUrlFromJson(json);
       if (fromBody) downloadUrl = fromBody;
       sessionId = sessionIdFromCallJson(json) || null;
+    } else if (isScopeDeniedStatus(status)) {
+      noteScopeDenied(status, opts.now);
+      return { downloadUrl: null, sessionId: null, status, scopeDenied: true };
     } else if (status === 404 || status === 410 || status === 202) {
       return { downloadUrl: null, sessionId: null, status };
     }
@@ -116,4 +154,7 @@ async function fetchCallRecording(callId, opts = {}) {
 
 module.exports = {
   fetchCallRecording,
+  recordingScopeDenied,
+  resetRecordingScopeLatch,
+  SCOPE_DENIED_TTL_MS,
 };

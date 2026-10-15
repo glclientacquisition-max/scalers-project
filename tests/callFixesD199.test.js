@@ -358,7 +358,7 @@ describe('HD_d199dbbf6b79 replay, flag off keeps the live behaviour', () => {
     }));
 });
 
-describe('fact lines (docs/specs/fact-lines.md)', () => {
+describe('fact lines (docs/rfcs/fact-lines.md)', () => {
   const { factLine, renderLine } = require('../src/conversation/factLine');
   const { createVoiceTrace } = require('../src/speech/voiceTrace');
 

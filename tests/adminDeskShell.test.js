@@ -128,7 +128,7 @@ describe("admin desk standard shell", () => {
     assert.match(menu, /SignOutButton/);
     assert.doesNotMatch(menu, /DeskAccountMenu|switchDeskTenant|\/home/);
     assert.match(account, /data-account-bar=""/);
-    const adminDoc = read("docs/frontend/design-system/pages/admin.md");
+    const adminDoc = read("docs/reference/design-system/pages/admin.md");
     assert.match(adminDoc, /account header/);
     assert.match(adminDoc, /On this device/);
   });
