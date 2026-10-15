@@ -37,7 +37,7 @@ field keeps the baseline and lands in `issues[]` for the owner. Same code for ev
 1. Owner saves catalogue / areas (onboarding or Train) → Brain's knowledge compile calls
    `compileSpokenCatalogue(profile, { generate, previous })` (Brain lane; hook requested).
 2. Result is written as a new row in `tenant_spoken_catalogue_versions` (status draft) and to
-   `tenants.spoken_catalogue` (Platform draft: `docs/drafts/20261015100000_spoken_catalogue.sql`).
+   `tenants.spoken_catalogue` (migration `supabase/migrations/20261015063255_spoken_catalogue.sql`, applied on staging).
 3. Live call: `resolveSpokenCatalogue(profile)` uses the stored doc when its `sourceHash` matches the
    current catalogue, else compiles the rules baseline in-process (memoised by hash). So a tenant is
    never without a spoken catalogue, including before backfill.

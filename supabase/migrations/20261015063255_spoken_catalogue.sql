@@ -1,4 +1,3 @@
--- DRAFT for Platform review. NOT in supabase/migrations/ and NOT applied anywhere.
 -- Speech-ready knowledge base ("spoken catalogue"), one current doc per tenant
 -- plus an append-only version history for owner review (draft -> approved).
 -- ADDITIVE: new nullable column + new table; no existing data changes. Safe to re-run.

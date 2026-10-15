@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Compile the spoken catalogue for tenants. DRY RUN by default: reads tenants,
 // prints what would be written, writes nothing. --apply writes (needs the
-// Platform migration docs/drafts/20261015100000_spoken_catalogue.sql applied
+// migration supabase/migrations/20261015063255_spoken_catalogue.sql applied
 // first, and staging credentials in env). --ai uses Gemini for the AI pass.
 //   node scripts/backfill-spoken-catalogue.js [--tenant <id>] [--ai] [--apply] [--from-file profiles.json]
 const fs = require('fs');
