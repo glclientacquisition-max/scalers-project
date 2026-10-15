@@ -5,7 +5,7 @@ import {
   type PhoneLineTelecomInput,
   type PlatformHealthTone,
 } from "@/lib/platformRunBoardModel";
-import { fetchVoiceHealthz } from "@/lib/platformVoiceHealth";
+import { fetchVoiceAdminHealth } from "@/lib/platformVoiceHealth";
 import { getSautikitWallet, isSautikitConfigured, listSautikitNumbers } from "@/lib/sautikit";
 
 function healthStampTone(tone: PlatformHealthTone): "ok" | "attention" | "neutral" {
@@ -36,7 +36,7 @@ async function loadPhoneLineTelecom(): Promise<PhoneLineTelecomInput> {
 
 /** Server component: line, speech, reasoning. Numbers live on /admin/numbers. */
 export async function PlatformRunBoard() {
-  const [telecom, voice] = await Promise.all([loadPhoneLineTelecom(), fetchVoiceHealthz()]);
+  const [telecom, voice] = await Promise.all([loadPhoneLineTelecom(), fetchVoiceAdminHealth("prod")]);
   const rows = buildPlatformRunRows({ telecom, voice });
   const numberCount = telecom.status === "ok" ? telecom.numbers.length : 0;
 
