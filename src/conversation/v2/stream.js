@@ -7,8 +7,19 @@ const READS = new Set(['lookupFile', 'checkAvailability', 'getPrice', 'getHours'
 const clock = () => Number(process.hrtime.bigint() / 1000000n);
 const WRITES = new Set(['createAppointment', 'createServiceRequest', 'updateAppointment', 'escalate', 'saveCallerInfo']);
 
+// Never split inside a number ("4.30", "KSh 1.5k") or after an abbreviation ("St.", "a.m.", "No."):
+// a split there makes Voice speak a fragment ("Hapana, n" class) and then the rest as a new line.
+const ABBR = /(?:\b(?:st|mt|dr|mr|mrs|ms|no|rd|ave|approx|etc)|\b[ap]\.m|\b[a-z])\.$/i;
 function splitSentences(line) {
-  return String(line || '').match(/[^.!?]+(?:[.!?]+|$)/g)?.map((s) => s.trim()).filter(Boolean) || [];
+  const raw = String(line || '').match(/[^.!?]+(?:[.!?]+|$)/g)?.map((s) => s.trim()).filter(Boolean) || [];
+  const out = [];
+  for (const s of raw) {
+    const prev = out[out.length - 1];
+    const tight = prev && (/\d\.$/.test(prev) && /^\d/.test(s) || /\b[a-z]\.$/i.test(prev) && /^[a-z]\./i.test(s));
+    if (prev && (tight || ABBR.test(prev) || /^[a-z]/.test(s))) out[out.length - 1] = `${prev}${tight ? '' : ' '}${s}`;
+    else out.push(s);
+  }
+  return out;
 }
 function wrapHandlers(handlers = {}, push, now = () => 0) {
   const out = {};
