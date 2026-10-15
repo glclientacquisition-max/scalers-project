@@ -13,12 +13,8 @@ const val = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : nu
 function geminiGenerate() {
   const key = String(process.env.GEMINI_API_KEY || '').trim();
   if (!key) throw new Error('--ai needs GEMINI_API_KEY');
-  const { createGeminiSend } = require('../src/conversation/v2/transport');
-  const send = createGeminiSend({ apiKey: key, model: process.env.SPOKEN_CATALOGUE_MODEL || 'gemini-3.5-flash', timeoutMs: 30000, thinkingMinimal: false });
-  return async ({ prompt, schema }) => {
-    const resp = await send({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, responseMimeType: 'application/json', responseSchema: schema } });
-    return JSON.parse((resp?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join(''));
-  };
+  const { createSpokenCatalogueGenerate } = require('../src/knowledge/spokenCatalogueGenerate');
+  return createSpokenCatalogueGenerate({ apiKey: key, model: process.env.SPOKEN_CATALOGUE_MODEL || 'gemini-3.5-flash', timeoutMs: 30000 });
 }
 async function loadTenants() {
   if (val('--from-file')) return JSON.parse(fs.readFileSync(val('--from-file'), 'utf8'));
