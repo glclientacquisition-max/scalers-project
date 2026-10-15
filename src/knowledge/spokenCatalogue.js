@@ -106,7 +106,7 @@ function categoryLabel(key, rawNames) {
 }
 const money = (s) => s.replace(/,/g, '').match(/\d+(?:\.\d+)?/g)?.map(Number) || [];
 const fmt = (n) => n.toLocaleString('en-US');
-function priceRules(raw, { name = '', unit: unitHint = '' } = {}) {
+function priceRules(raw, { name = '', unit: unitHint = '', ownerApproved = false } = {}) {
   let s = String(raw || '').trim();
   // Unit kept: from the price text, else the structured unit, else the name '(per seat)'.
   if (s && !/per\s|\/\s*hr|hourly|m²/i.test(s)) { const u = unitHint === 'sqm' ? 'per m²' : unitHint ? `per ${unitHint}` : (String(name).match(/\((per\s+[a-z ]+?)\)/i) || [])[1] || (/\bhourly\b/i.test(name) ? 'per hour' : null); if (u) s = `${s} ${u}`; }
@@ -120,7 +120,8 @@ function priceRules(raw, { name = '', unit: unitHint = '' } = {}) {
   const amt = nums.filter((n) => !(min && n === Number(min[1])) && !(/\(\s*\d-?bed/i.test(s) && n < 10));
   if (!amt.length) return { en: null, sw: null, numbers: [] };
   // An amount under KSh 100 is not spoken (e.g. 'KSh 40' for a whole job): owner confirms first.
-  if (amt.some((n) => n < 100)) return { en: null, sw: null, numbers: amt, review: 'odd_price' };
+  // An owner-approved price (priceStatus 'approved', same price hash) is spoken as written.
+  if (!ownerApproved && amt.some((n) => n < 100)) return { en: null, sw: null, numbers: amt, review: 'odd_price' };
   const [a, b] = amt;
   let en; let sw;
   if (base) { en = `the base price plus ${fmt(a)}${b ? ` to ${fmt(b)}` : ''} shillings`; sw = `bei ya msingi ukiongeza shilingi ${fmt(a)}${b ? ` hadi ${fmt(b)}` : ''}`; }
@@ -219,10 +220,12 @@ function buildDoc(profile, rows, { ai = null, aiError = null, previous = null, n
   const prevById = new Map((previous?.entries || []).map((e) => [e.id, e]));
   let changed = !previous;
   const entries = rows.map((r) => {
-    const price = priceRules(r.price, { name: r.name, unit: r.unit });
-    if (r.price && r.priceConfirmed === false) issues.push({ id: r.id, field: 'price', code: 'price_unconfirmed', raw: r.price });
-    if (price.review) issues.push({ id: r.id, field: 'price', code: price.review, raw: r.price });
     const prev = prevById.get(r.id);
+    // Price approval survives regeneration only while the price itself is unchanged.
+    const priceStatus = prev && prev.hash?.price === r.hash.price && (prev.priceStatus === 'approved' || prev.status === 'approved') ? 'approved' : 'draft';
+    const price = priceRules(r.price, { name: r.name, unit: r.unit, ownerApproved: priceStatus === 'approved' });
+    if (r.price && r.priceConfirmed === false && priceStatus !== 'approved') issues.push({ id: r.id, field: 'price', code: 'price_unconfirmed', raw: r.price });
+    if (price.review) issues.push({ id: r.id, field: 'price', code: price.review, raw: r.price });
     const keepText = prev && prev.hash?.text === r.hash.text && (prev.edited || prev.status === 'approved');
     const priceSame = prev && prev.hash?.price === r.hash.price;
     if (!prev || !keepText || !priceSame) changed = true;
@@ -240,7 +243,7 @@ function buildDoc(profile, rows, { ai = null, aiError = null, previous = null, n
       }
       text = { spoken: { en: out.name_en, sw: out.name_sw }, explain: { en: out.explain_en, sw: out.explain_sw }, source: src, edited: false, status: 'draft' };
     }
-    return { id: r.id, kind: r.kind, hash: r.hash, raw: { name: r.name, price: r.price }, category: { id: ck }, ...text, price: { en: price.en, sw: price.sw, numbers: price.numbers, review: price.review || null } };
+    return { id: r.id, kind: r.kind, hash: r.hash, raw: { name: r.name, price: r.price, unit: r.unit || null }, category: { id: ck }, ...text, priceStatus, price: { en: price.en, sw: price.sw, numbers: price.numbers, review: price.review || null } };
   });
   const categories = [];
   for (const e of entries) {
@@ -284,7 +287,21 @@ function applyOwnerEdit(sc, { id, field, lang, value }) {
   e[field][lang] = String(value || '').trim() || null; e.edited = true; e.status = 'draft'; sc.status = 'draft';
   return sc;
 }
+// Owner approves prices as written (all entries, or ids). A flagged price (odd_price) becomes speakable.
+function approvePrices(sc, { ids = null, by = null, at = new Date() } = {}) {
+  const done = [];
+  for (const e of sc.entries) {
+    if (ids && !ids.includes(e.id)) continue;
+    e.priceStatus = 'approved';
+    const p = priceRules(e.raw.price, { name: e.raw.name, unit: e.raw.unit, ownerApproved: true });
+    e.price = { en: p.en, sw: p.sw, numbers: p.numbers, review: p.review || null };
+    done.push(e.id);
+  }
+  sc.issues = (sc.issues || []).filter((i) => !(done.includes(i.id) && i.field === 'price' && ['odd_price', 'price_unconfirmed'].includes(i.code)));
+  return Object.assign(sc, { pricesApprovedBy: by, pricesApprovedAt: at.toISOString() });
+}
 function approve(sc, { by = null, at = new Date() } = {}) {
+  approvePrices(sc, { by, at });
   for (const e of sc.entries) e.status = 'approved';
   return Object.assign(sc, { status: 'approved', approvedBy: by, approvedAt: at.toISOString() });
 }
@@ -329,4 +346,4 @@ function resolveSpokenCatalogue(profile = {}) {
   return out;
 }
 
-module.exports = { SCHEMA_VERSION, AI_SCHEMA, sourceHash, compileSpokenCatalogue, compileSync, needsRegeneration, applyOwnerEdit, approve, spokenName, sayName, entryForRaw, findEntry, resolveSpokenCatalogue, priceRules, swNameRules, explainRules, coverageRules, checkField, categoryLabel, slug };
+module.exports = { SCHEMA_VERSION, AI_SCHEMA, sourceHash, compileSpokenCatalogue, compileSync, needsRegeneration, applyOwnerEdit, approve, approvePrices, spokenName, sayName, entryForRaw, findEntry, resolveSpokenCatalogue, priceRules, swNameRules, explainRules, coverageRules, checkField, categoryLabel, slug };

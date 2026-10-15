@@ -142,3 +142,27 @@ test('sense-check replay over every HD fixture passes', () => {
   const out = execFileSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'v2-catalogue-sense.js')], { encoding: 'utf8' });
   assert.match(out, /sense-check fails: 0/); assert.match(out, /HD_923e63f8a72b/); assert.match(out, /HD_b401138c8ffd/);
 });
+
+test('owner approval lets a flagged price be spoken; unapproved odd prices stay flagged', async () => {
+  const SC = require('../src/knowledge/spokenCatalogue');
+  const profile = { tenantId: 't', servicesCatalog: [{ id: 'svc_pc', name: 'Post-Construction Clean', price_range: 'KSh 40', pricing: { confirmed: true } }, { id: 'svc_lc', name: 'Large Commercial Contract', price_range: 'KSh 35-150', pricing: { confirmed: true } }, { id: 'svc_ov', name: 'Oven Internal Deep Clean', price_range: 'KSh 1,200', pricing: { confirmed: true } }] };
+  const draft = await SC.compileSpokenCatalogue(profile);
+  const pc = (d) => d.entries.find((e) => e.id === 'svc_pc');
+  assert.strictEqual(pc(draft).price.sw, null); assert.strictEqual(pc(draft).priceStatus, 'draft');
+  assert.ok(draft.issues.some((i) => i.id === 'svc_pc' && i.code === 'odd_price'));
+  const ok = SC.approvePrices(JSON.parse(JSON.stringify(draft)), { by: 'owner' });
+  assert.match(pc(ok).price.sw, /^shilingi 40$/); assert.match(pc(ok).price.en, /^40 shillings$/);
+  assert.match(ok.entries.find((e) => e.id === 'svc_lc').price.sw, /^shilingi 35 hadi 150$/);
+  assert.ok(!ok.issues.some((i) => i.code === 'odd_price'));
+  // Regeneration keeps the approval while the price is unchanged ...
+  const again = await SC.compileSpokenCatalogue(profile, { previous: ok });
+  assert.strictEqual(pc(again).priceStatus, 'approved'); assert.match(pc(again).price.sw, /shilingi 40/);
+  // ... and drops it when the price changes.
+  const changed = { ...profile, servicesCatalog: profile.servicesCatalog.map((r) => (r.id === 'svc_pc' ? { ...r, price_range: 'KSh 45' } : r)) };
+  const re = await SC.compileSpokenCatalogue(changed, { previous: ok });
+  assert.strictEqual(pc(re).priceStatus, 'draft'); assert.strictEqual(pc(re).price.sw, null);
+  // The approved price is spoken on the live path.
+  const M = require('../src/conversation/v2/machine'); const st = M.createState(); const r = M.catalogueTurn(st, { text: 'Post-construction ni bei gani?', profile: { ...profile, spokenCatalogue: ok }, lang: 'sw' });
+  if (/^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''))) { assert.match(r.line, /\bshilingi 40\b/, r.line); assert.doesNotMatch(r.line, /\bKSh\b|Ungependa kubook/); }
+  else assert.strictEqual(r.line, 'Bei ya Post-Construction Clean ni KSh 40.'); // flag off: legacy line unchanged
+});

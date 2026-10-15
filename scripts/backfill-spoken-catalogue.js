@@ -4,8 +4,9 @@
 // migration supabase/migrations/20261015063255_spoken_catalogue.sql applied
 // first, and staging credentials in env). --ai uses Gemini for the AI pass.
 //   node scripts/backfill-spoken-catalogue.js [--tenant <id>] [--ai] [--apply] [--from-file profiles.json]
+//     [--approve-prices <tenantId,...>]  owner said these tenants' prices are right as written (priceStatus approved)
 const fs = require('fs');
-const { compileSpokenCatalogue, needsRegeneration } = require('../src/knowledge/spokenCatalogue');
+const { compileSpokenCatalogue, needsRegeneration, approvePrices } = require('../src/knowledge/spokenCatalogue');
 const args = process.argv.slice(2);
 const flag = (n) => args.includes(n);
 const val = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : null; };
@@ -37,9 +38,10 @@ async function loadTenants() {
     const profile = { tenantId: r.id, servicesCatalog: r.services_catalog || [], productCatalog: r.product_catalog || [], serviceAreas: r.service_areas || null, businessLocations: r.business_locations || [] };
     if (!needsRegeneration(r.spoken_catalogue, profile) && !flag('--force')) { console.log(`${r.id} up to date (v${r.spoken_catalogue.version})`); continue; }
     const doc = await compileSpokenCatalogue(profile, { generate, previous: r.spoken_catalogue || null });
+    if (String(val('--approve-prices') || '').split(',').includes(r.id)) { approvePrices(doc, { by: 'owner' }); console.log(`${r.id} prices owner-approved`); }
     console.log(`${r.id} -> v${doc.version} ${doc.generator} entries=${doc.entries.length} categories=${doc.categories.length} ambiguity=${doc.coverage.ambiguityGroups.length} issues=${doc.issues.length}`);
     if (flag('--report')) {
-      for (const e of doc.entries) console.log(`   ${e.raw.name} | sw: ${e.spoken.sw} | en: ${e.spoken.en} | cat: ${e.category.id} | price sw: ${e.price.sw} | explain sw: ${e.explain.sw}`);
+      for (const e of doc.entries) console.log(`   ${e.raw.name} | sw: ${e.spoken.sw} | en: ${e.spoken.en} | cat: ${e.category.id} | price ${e.priceStatus}: sw ${e.price.sw} / en ${e.price.en} | explain sw: ${e.explain.sw}`);
       console.log(`   categories: ${doc.categories.map((c) => `${c.id}=${c.sw} / ${c.en}`).join(' ; ')}`);
       console.log(`   ambiguity: ${doc.coverage.ambiguityGroups.map((g) => `${g.heard}:${g.options.join('/')}`).join('; ') || 'none'}`);
       for (const i of doc.issues) console.log(`   review: ${i.id} ${i.field} ${i.code}${i.raw ? ` (${i.raw})` : ''}`);
