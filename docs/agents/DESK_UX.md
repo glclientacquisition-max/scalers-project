@@ -1,8 +1,13 @@
+---
+owner: desk
+last_reviewed: 2026-10-05
+---
+
 # Desk UI/UX lane contract
 
 **Mission:** Make every Scalers screen, owner desk and Super Admin alike, feel as obvious and fast as WhatsApp or Instagram, without breaking Auth / RLS or admin isolation.
 
-**Frontend 2.0 program (2026-09-30):** [`docs/frontend/FRONTEND_2_0_CHARTER.md`](../frontend/FRONTEND_2_0_CHARTER.md) is the law. It supersedes the phase table in `FRONTEND_CONSTITUTION.md` and the recon gate. Older docs stay for history: [`FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md), [`design-system/MASTER.md`](../frontend/design-system/MASTER.md), [`FRONTEND_RECONNAISSANCE.md`](../frontend/FRONTEND_RECONNAISSANCE.md). Where they conflict with the charter, the charter wins.
+**Frontend 2.0 program (2026-09-30):** [`docs/frontend/FRONTEND_2_0_CHARTER.md`](../frontend/FRONTEND_2_0_CHARTER.md) is the law. It supersedes the phase table in `FRONTEND_CONSTITUTION.md` and the recon gate. Older docs stay for history: [`FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md), [`design-system/MASTER.md`](../frontend/design-system/MASTER.md), [`FRONTEND_RECONNAISSANCE.md`](../archive/FRONTEND_RECONNAISSANCE.md). Where they conflict with the charter, the charter wins.
 
 Use for landing, signup/onboarding UX, calls inbox, settings presentation, navigation, admin presentation, and visual design. Not for wallet ledger rules, RPC behavior, or voice audio.
 

@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # Platform lane contract
 
 **Mission:** Keep shared contracts stable — Supabase schema/RLS, `src/db.js` API, auth, deploy, and cross-lane glue — so Voice / Brain / Desk / Ops can ship in parallel.

@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-15
+---
+
 # Database evolution model
 
 **Status:** Canonical governance (Phase 3F, 2026-08-15)  

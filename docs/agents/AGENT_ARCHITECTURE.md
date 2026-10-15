@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # Agent architecture
 
 **Status:** Fact inventory for the live-call agent (2026-08-14).  

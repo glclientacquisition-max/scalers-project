@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-20
+---
+
 # Bookings + holds — honesty target (ACCEPT)
 
 **Status:** Founder LOCKED 2026-09-20 · Product ACCEPT path  

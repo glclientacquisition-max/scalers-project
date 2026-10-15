@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-10-12
+---
+
 # Scalers Frontend 2.0 Charter
 
 **Status:** Authoritative. Supersedes the phase table in `FRONTEND_CONSTITUTION.md` §10 and the "no UI until constitution" gate in `FRONTEND_RECONNAISSANCE.md`.

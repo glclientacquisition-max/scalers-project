@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # Phase 5 — Production cutover
 
 Move the voice engine off Cloudflare quick tunnels onto a persistent host, point SautiKit at it, and enable owner WhatsApp lead notify.

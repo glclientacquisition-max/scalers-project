@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # Scalers current state
 
 **Status:** Fact inventory. Not the 5-minute picture.  
@@ -144,7 +149,7 @@ See: [`../database/DATABASE_GOVERNANCE.md`](../database/DATABASE_GOVERNANCE.md).
 
 **FACT:** Hangup meters included minutes via `consume_call_seconds` once that SQL is applied. On-demand past the cap is KES 0.10/sec (KES 6/min) on the rate card.  
 **FACT:** `charge_call_to_wallet` stays idempotent per `call_id`. Env `WALLET_RATE_KES_PER_MINUTE` (default 0) is a fallback when the consume RPC is missing.  
-**FACT:** Outbound live-transfer rate is stored at KES 0.15/sec (KES 9/min) and is not offered until Live Dial ships. SautiKit outbound cost is KES 3/min answered. A transfer would be a second `calls` row. See [`../product/LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) §8 and [`../operations/PACKAGES.md`](../operations/PACKAGES.md).  
+**FACT:** Outbound live-transfer rate is stored at KES 0.15/sec (KES 9/min) and is not offered until Live Dial ships. SautiKit outbound cost is KES 3/min answered. A transfer would be a second `calls` row. See [`../product/LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md) §8 and [`../operations/PACKAGES.md`](../operations/PACKAGES.md).  
 **FACT:** Beta (`billing_enforcement=off`) meters and does not charge. It does not originate outbound transfer unless `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on`.
 
 ---
@@ -208,7 +213,7 @@ See: [`../governance/TESTING_BASELINE.md`](../governance/TESTING_BASELINE.md).
 | CI in repo | **Updated 2026-10-05:** present in `.github/workflows/` (`ci.yml`, staging workflows) |
 | Staging environment | **Updated 2026-10-05:** documented in [`../operations/ENVIRONMENTS.md`](../operations/ENVIRONMENTS.md) |
 | Production SQL migration tier | UNKNOWN |
-| Live Dial | Spec only. Not shipped. |
+| Live Dial | Not shipped. Callbacks only since #658 (capability `callbacks`). |
 | Owner package checkout | Not shipped. Super Admin assigns packages. |
 | JS/TS duplication (intro, lexicon) | ACTIVE risk |
 

@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # Platform system map
 
 **Status:** Investigation snapshot plus P2 notify catalog  
@@ -91,7 +96,7 @@ Desk APIs (Vercel): login/logout/tenant, admin businesses/wallets/voices/DID/Sau
 | `notify_sends` | dest + kind + call, channel | Send ledger + instance cap. **MISSING on ALCR** until 24c apply. Staging has it. |
 | `whatsapp_messages.status` | Meta/SautiKit receipt | Platform WABA only. |
 | `billing_enforcement` | `off` \| `soft` \| `hard` | Wallet mode. |
-| `handoff_mode` | `callback` \| `live_transfer` | Preference. **Not** proof Dial works. |
+| `handoff_mode` | `callback` (only option offered since #658) \| legacy `live_transfer` | Stored preference. **Not** proof Dial works. Desk no longer offers `live_transfer` (#658). |
 
 Inbox triage columns (`inbox_read_at`, snooze, mute, pin) exist. Product is cutting snooze/unread from the UI. Do not rebuild them as a second attention channel.
 
@@ -134,7 +139,7 @@ Tools that write the business: `save_caller_info`, `create_service_request`, `cr
 
 Code for cold Dial is real: `queuePendingLiveTransfer`, `/voice/transfer`, `saveTransferAttempt`, billing helpers. ADR-0004 executor is **superseded**: StreamStopped rides `events_url` (cannot return Dial); Redirect after `<Stream connect="true"/>` did not run on staging (`HD_ae71b5349f5e`, `HD_4f14d4d55244`). Next lab is **conference + REST outbound**, not another WS-close.
 
-Desk Train copy today (`TenantForm.tsx`): if the executor env is **off**, live_transfer shows “Messages {name}.” If someone turns `VOICE_LIVE_TRANSFER=on` on the **desk** host without a working conference, the same panel will say **“Rings {name} during open hours.”** That is the remaining lie. Voice host and Vercel env must stay **off** until a human actually rings.
+**Callbacks only since #658 (11 Oct 2026).** Desk Team panel (`TenantForm.tsx`) shows the Live connect switch only when `liveTransferExecutor` is on; a stored `live_transfer` alone no longer shows it, and `handoffMode.ts` lists only `callback`. Earlier copy: if the executor env was **off**, live_transfer showed “Messages {name}.” If someone turns `VOICE_LIVE_TRANSFER=on` on the **desk** host without a working conference, the same panel will say **“Rings {name} during open hours.”** That is the remaining lie. Voice host and Vercel env must stay **off** until a human actually rings.
 
 Call detail already stamps `live_connect` when escalate runs and transfer did not (`Notify only (live connect unavailable)`). Keep that.
 
@@ -221,7 +226,7 @@ Delivery statuses already parse and persist (`persistWhatsAppStatus`). Desk does
 
 Ladder: TextSMS.co.ke → SautiKit WhatsApp → Resend → desk note. One success per dest + kind + call. Escalate: one teammate, no extra owner SMS. Contract: [`../CALL_MESSAGE_CONTRACT.md`](../product/CALL_MESSAGE_CONTRACT.md).
 
-Known payload gap (Voice, not a new channel): mid-call lead SMS fires on `save_caller_info` before hangup `owner_review`. Visit/hold marks `whatsapp_sent` so hangup does not double the lead. [`../CALL_MESSAGE_GAP.md`](../product/CALL_MESSAGE_GAP.md).
+Known payload gap (Voice, not a new channel): mid-call lead SMS fires on `save_caller_info` before hangup `owner_review`. Visit/hold marks `whatsapp_sent` so hangup does not double the lead. [`../CALL_MESSAGE_GAP.md`](../archive/CALL_MESSAGE_GAP.md).
 
 Desk Ping (`pingTeammateAction` → `POST /internal/desk/escalate`) reuses the same notify path and the same `formatEscalationDelivery` honesty.
 
@@ -303,9 +308,9 @@ Company Brain §7. Do not reorder without Product + founder.
 | --- | --- |
 | [`../company/COMPANY_BRAIN.md`](../company/COMPANY_BRAIN.md) | North star, wedge, ladder, roster |
 | [`../BUSINESS_INTELLIGENCE_ROADMAP.md`](../product/BUSINESS_INTELLIGENCE_ROADMAP.md) | Voice Brain destination (stale “no CRM” in §2; trust §11 + this map) |
-| [`../CALL_MESSAGE_CONTRACT.md`](../product/CALL_MESSAGE_CONTRACT.md) / [`../CALL_MESSAGE_GAP.md`](../product/CALL_MESSAGE_GAP.md) | Who gets what after a call |
+| [`../CALL_MESSAGE_CONTRACT.md`](../product/CALL_MESSAGE_CONTRACT.md) / [`../CALL_MESSAGE_GAP.md`](../archive/CALL_MESSAGE_GAP.md) | Who gets what after a call |
 | [`../ESCALATION.md`](../product/ESCALATION.md) | Async handoff (the shipped product) |
-| [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) / ADR-0004 | Blocked Dial; conference next |
+| [`../LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md) / ADR-0004 | Blocked Dial; conference next |
 | [`../WHATSAPP_TEMPLATES.md`](../product/WHATSAPP_TEMPLATES.md) / [`../specs/whatsapp-two-way.md`](../specs/whatsapp-two-way.md) | Staff templates + dual-use DID |
 | [`../ONE_WALLET_BILLING.md`](../operations/ONE_WALLET_BILLING.md) / [`../BETA_WALLET_PROGRAM.md`](../operations/BETA_WALLET_PROGRAM.md) | Prepaid truth |
 | [`NOTIFY_SQL_CATALOG.md`](./NOTIFY_SQL_CATALOG.md) | ALCR vs staging notify SQL + apply checklist |

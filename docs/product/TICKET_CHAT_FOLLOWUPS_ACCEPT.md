@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-22
+---
+
 # Ticket chat follow-ups — Product ACCEPT
 
 **Date:** 2026-09-21  

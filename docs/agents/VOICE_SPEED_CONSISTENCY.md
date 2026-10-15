@@ -1,3 +1,8 @@
+---
+owner: voice
+last_reviewed: 2026-10-01
+---
+
 # Voice speed & consistency — way forward
 
 **Goal:** Calls should feel **consistently snappy** — first agent audio usually within **~800–1200 ms** after the caller stops, without sounding rushed, cut-off, or randomly slow.
@@ -80,7 +85,7 @@ Ship the levers that raise *average* speed and reduce variance without live A/B 
 | Same PCM path for cached greeting/filler and live replies | Stop quality drift after hello (even-out + gain vs gain only) | Done. Raw cache + greeting speed key. |
 | Extract media session from `server.js` | Safer iteration on turn loop | Next |
 
-Live evidence + next Brain hand-offs: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md). Silent-answer 402 incident: [`SONIOX_BILLING_SILENCE_2026-09-02.md`](./SONIOX_BILLING_SILENCE_2026-09-02.md).
+Live evidence + next Brain hand-offs: [`LIVE_CALL_FINDINGS.md`](../archive/LIVE_CALL_FINDINGS.md). Silent-answer 402 incident: [`SONIOX_BILLING_SILENCE_2026-09-02.md`](../archive/SONIOX_BILLING_SILENCE_2026-09-02.md).
 
 ### Phase 3 — Operate like a product
 

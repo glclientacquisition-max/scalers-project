@@ -1,3 +1,8 @@
+---
+owner: ops-billing
+last_reviewed: 2026-10-09
+---
+
 # Ops & Billing lane contract
 
 **Mission:** Keep package + on-demand billing honest in product copy, DID inventory, charge-line history, and Super Admin ops correct, auditable, and hard to abuse.
@@ -33,7 +38,7 @@ Use for packages catalog, on-demand rate card, DID pool assign/release, phone-li
 1. **No dual wallets** — AI bundled into per-minute rate; do not resurrect USD/KES client wallets or a prepaid float.
 2. Charge lines are append-only; credits/debits via security-definer RPCs / service role only. Desk and Admin do not expose waive, repair, or adjust.
 3. `charge_call_to_wallet` (and JS wrapper) must stay **idempotent** per call.
-4. Live transfer outbound is a **second** call id. Never fold those minutes into the inbound row. Beta does not originate outbound PSTN unless ops sets the lab flag. See [`docs/product/LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md) §8.
+4. Live transfer outbound is a **second** call id. Never fold those minutes into the inbound row. Beta does not originate outbound PSTN unless ops sets the lab flag. See [`docs/archive/LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md) §8.
 5. Beta default: `billing_enforcement = off` → meter only, no charges (`docs/operations/BETA_WALLET_PROGRAM.md`).
 6. Soft/hard enforcement behavior must match docs; do not silently bill beta tenants.
 7. DID pool statuses (`available` / `assigned` / `reserved` / `disabled`) stay consistent with tenant `sautikit_virtual_number`.

@@ -1,3 +1,11 @@
+---
+owner: platform
+last_reviewed: 2026-08-15
+status: archived
+---
+
+> **Archived 2026-10-14.** Phase review (Aug 2026). Current source: [`docs/storage/STORAGE_SECURITY_MODEL.md`](../storage/STORAGE_SECURITY_MODEL.md). Kept for history; do not treat as current.
+
 # Phase 3F security review
 
 **Date:** 2026-08-15  

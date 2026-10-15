@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-25
+---
+
 # Contacts ops workflow — Product ACCEPT
 
 **Date:** 2026-09-21  

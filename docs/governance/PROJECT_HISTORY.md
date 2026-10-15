@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # Project history
 
 **Status:** Reconstructed from Git evidence (2026-08-14)  

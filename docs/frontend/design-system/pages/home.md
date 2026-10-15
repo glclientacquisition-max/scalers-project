@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-30
+---
+
 # Home (Command Center)
 
 **Route:** `/home`  

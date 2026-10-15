@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-09-10
+---
+
 # Architecture Decision Records (ADR)
 
 **Status:** Governance baseline (2026-08-14)

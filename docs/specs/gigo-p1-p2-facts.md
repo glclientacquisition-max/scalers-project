@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-09
+---
+
 # GIGO P1/P2 business facts: schemas, readers, read tools (Brain)
 
 **Status:** Brain code on branch `brain/gigo-fact-schemas`. Not wired into the live prompt or Voice yet. No SQL.

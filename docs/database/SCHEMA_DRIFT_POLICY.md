@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-15
+---
+
 # Schema drift policy
 
 **Status:** Canonical policy (Phase 3F, 2026-08-15)  
@@ -145,4 +150,4 @@ Validates reproducibility without production access. Aligns with Phase 3E proof.
 - [`MIGRATION_LEDGER.md`](../supabase/MIGRATION_LEDGER.md)
 - [`DATABASE_APPLY_ORDER.md`](./DATABASE_APPLY_ORDER.md)
 - [`ENVIRONMENT_CONTRACT.md`](../operations/ENVIRONMENT_CONTRACT.md)
-- [`../security/PHASE_3F_SECURITY_REVIEW.md`](../security/PHASE_3F_SECURITY_REVIEW.md)
+- [`../security/PHASE_3F_SECURITY_REVIEW.md`](../archive/PHASE_3F_SECURITY_REVIEW.md)

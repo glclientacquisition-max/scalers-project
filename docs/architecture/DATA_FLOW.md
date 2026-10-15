@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # Scalers data flow
 
 **Status:** Fact inventory for one call. Not the system picture.  

@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-05
+---
+
 # Home services MVP bar of excellence
 
 **Lane:** Brain (playbooks, seeds, live pack). Desk copy only where the vertical blurb or Train seeds show.  

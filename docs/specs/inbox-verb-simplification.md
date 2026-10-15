@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-20
+---
+
 # Inbox verbs: snooze, unread, and the rest
 
 **Status:** Shipped #331. Phase 1 re-verified after #364 / #369 in [`inbox-verb-cut-p0.md`](./inbox-verb-cut-p0.md).  

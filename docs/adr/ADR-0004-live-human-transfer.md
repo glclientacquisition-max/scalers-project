@@ -1,8 +1,13 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # ADR-0004 — Live human transfer via cold Dial after Stream stop
 
 ## Status
 
-**Superseded for the executor** (desk preference still Proposed)
+**Superseded** by #658 (11 Oct 2026): product is callbacks only. Desk no longer offers `live_transfer`; the capability gate is `callbacks`. Executor history below.
 
 Cold Dial after Stream **failed** on staging (2026-09-06): `HD_ae71b5349f5e`, `HD_4f14d4d55244`. StreamStopped does not re-POST the voice URL. Redirect after Stream never ran. Dial XML returned on Completed after hangup.
 
@@ -25,7 +30,7 @@ Warm transfer via Conference plus an outbound agent leg is documented by SautiKi
 5. On Dial failure, `<Say>` + hangup. Do not re-open Stream in v1.
 6. Defer warm conference / whisper / DTMF 0 to v2.
 
-Canonical spec: [`../LIVE_TRANSFER.md`](../product/LIVE_TRANSFER.md).
+Canonical spec: [`../LIVE_TRANSFER.md`](../archive/LIVE_TRANSFER.md).
 
 ## Alternatives considered
 

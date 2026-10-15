@@ -1,3 +1,8 @@
+---
+owner: voice
+last_reviewed: 2026-09-16
+---
+
 # Beta evaluation checklists
 
 **Status:** Operator fill-in (Phase 3H A2, A4, A5)  
@@ -133,7 +138,7 @@ Use before a real business goes live.
 
 ## Related
 
-- [`PHASE_3H_BETA_READINESS_PLAN.md`](./PHASE_3H_BETA_READINESS_PLAN.md)
+- [`PHASE_3H_BETA_READINESS_PLAN.md`](../archive/PHASE_3H_BETA_READINESS_PLAN.md)
 - [`PRODUCTION_CHANGE_NOTIFY_CHANNELS.md`](./PRODUCTION_CHANGE_NOTIFY_CHANNELS.md)
 - [`../agents/VOICE_SPEED_CONSISTENCY.md`](../agents/VOICE_SPEED_CONSISTENCY.md)
 - [`../agents/VOICE_NATURALNESS.md`](../agents/VOICE_NATURALNESS.md)

@@ -1,6 +1,11 @@
+---
+owner: platform
+last_reviewed: 2026-10-14
+---
+
 # Scalers status and handoff (start here)
 
-**Last updated Sat 10 Oct 2026, 10:45 EAT.** Checked against `main`, `gh pr list`, `gh pr view`, and main's log at 10:45 EAT. Items marked *per team notes* come from lane agents and Alvin, not from the repo. Update this file when you finish a piece of work, not only at the end of a week.
+**Last updated Wed 14 Oct 2026, 20:30 EAT.** Checked against `main` (`7d870a75`), `gh pr list`, main's first-parent log, and prod/staging `/healthz` at 20:15 EAT. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
 
 New agent or new human: read this whole page before you touch code.
 
@@ -10,12 +15,16 @@ New agent or new human: read this whole page before you touch code.
 
 ## 1. Where we are
 
-Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) both run **`main` @ `aef7bb62`** (#641, Admin Activity log; healthz `ok`). Staging Voice runs a hand-pinned build **`ffd9e5aa`** (commits ahead of `main`, 11 behind; `hold-staging` label on #618 keeps it pinned). Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Staging DID is **+254709221537** (Done and Dusted test tenant). Build order set by Alvin: **Admin → Settings/onboarding (GIGO) → UI/UX sweep → Packages → Landing → Voice/Brain on real calls.** Live-call Voice fixes ship any time a real call shows a bug. Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage (removed 6 Oct).
+Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) both run **`main` @ `7d870a75`** (#634, merged 13 Oct 14:29 EAT; prod `/healthz` reports this SHA, started 13 Oct 15:35 EAT). Staging Voice runs a curated "kitchen" build **`1374b25d`** = `main` + #674 + #680 + #681 + #682 + #683 (*per team notes*; staging `/healthz` reports `1374b25d`). The `hold-staging` label is on **#674, #681, #682, #683**, so Stage-PR keeps that pin. Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Staging DID is **+254709221537** (Done and Dusted test tenant).
+
+**Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate on WhatsApp or email. `handoff_mode = live_transfer` is no longer offered in Desk. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.
+
+Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage.
 
 | | Production | Staging |
 | --- | --- | --- |
-| Voice (Railway) | `scalers-project-production.up.railway.app`, deploys `main` on merge. `aef7bb62` | `scalers-staging-staging.up.railway.app`, pinned `ffd9e5aa` |
-| Desk (Vercel) | `scalers-project`, builds `main`. `aef7bb62` | `scalers-staging` (builds the staging branch only) |
+| Voice (Railway) | `scalers-project-production.up.railway.app`, deploys `main` on merge. `7d870a75` | `scalers-staging-staging.up.railway.app`, pinned `1374b25d` |
+| Desk (Vercel) | `scalers-project`, builds `main`. `7d870a75` | `scalers-staging` (one debounced API deploy, #665) |
 | DID | **+254709221536** Aris | **+254709221537** Done and Dusted |
 | SautiKit workspace | `e0e57aa5` | `1f85601c` |
 | Supabase | `fjxcdccgyhnvnnlnovcl` | `sgcdncjxauhsbunobmob` |
@@ -24,73 +33,80 @@ Design: all UI follows Frontend 2.0 ([`FRONTEND_2_0_CHARTER.md`](frontend/FRONTE
 
 ---
 
-## 2. Shipped to prod (6 to 10 Oct)
+## 2. Shipped to prod (since 10 Oct)
 
-Times EAT. SHAs are the squash commits on `main`.
+Times EAT. SHAs are the squash commits on `main` (first-parent log). Older history: `git log --first-parent origin/main` and the previous STATUS in git (`bb68df70`).
 
 | PR | SHA | Merged | What |
 | --- | --- | --- | --- |
-| #641 | `aef7bb62` | 10 Oct | Admin A1: Activity log for every admin write. |
-| #637 | `8dbd682c` | 10 Oct | Admin A2: Today screen + new nav (phone: 4 tabs + More sheet). |
-| #636 | `2afe0df6` | 10 Oct | Admin A0: safety fixes, live-number guard, ConfirmSheet, session actor, Archive. |
-| #603 | `614d9247` | 10 Oct | Super Admin **Quality** tab reads live voice traces. |
-| #651 | `eda862e7` | 9 Oct 21:41 | Archived/suspended tenant plays line-unavailable and hangs up; no charge. Replaces #639. |
-| #648 | `1e1581a1` | 9 Oct 21:31 | Ops-Billing hotfix: Admin **grant minutes** always failed (42702 ambiguous column) and showed `[object Object]`. Prod SQL applied (migration `20261009183115`, *per Ops*). |
-| #627 | `96ac39eb` | 9 Oct 15:24 | Desk fact-confirm 1: changed-only owner confirm (`FACT_HASH_MODE`, on for staging only, unset on prod), confirm v2 SQL, stable service ids. |
-| #635 | `2f5ce569` | 9 Oct 13:41 | Batched `voice_turn_traces` purge + `created_at` index + partitioning plan. Daily cron 03:17 EAT, 30-day retention. |
-| #630 | `b3f72f76` | 9 Oct 11:22 | pg_cron daily 30-day purge of `voice_turn_traces` (applied on prod). Superseded in mechanism by #635. |
-| #626 | `892ec9f5` | 9 Oct 11:17 | Platform ops alerts read Super Admin emails, email only, env fallback. |
-| #623 | `cc85f8dc` | 9 Oct 11:05 | Admin checks sign-in and Super Admin before any data loads (signed-out leak fix). |
-| #613 | `db84f5ca` | 9 Oct 10:40 | Admin degrades on missing ops tables, logs real DB errors, traces wallet scope denial. |
-| #619, #620, #607, #601, #624 | various | 9 Oct 11:15–11:19 | Docs: this handoff, stream cost (KES 0.50/min), staging/prod DID fix, catalogue/GIGO as-built, prod Admin schema gap list. |
-| #612, #617 | `9b2b7426`, `87cd6f94` | 9 Oct 00:04, 00:07 | Voice M0 / M0b: coverage grounding, TTS word gaps, price/what-else/barge-in, Kiswahili hours, handoff close after escalate, filler on tool turns. |
-| #616 | `9706426c` | 8 Oct 17:43 | Voice rejects inbound calls when the SautiKit wallet is empty (fails open on probe errors). |
-| #561–#600 range | various | 6–8 Oct | GIGO P0, caller file A+B, Speak-DNA, voice pipeline/traces, Admin kit, Desk kit, wallet-ledger surfaces removed. `gh pr list --state merged --limit 60`. |
-
-Ops changes on prod (not PRs, *per team notes*):
-
-- **Prod call traces on** (`VOICE_TRACE=on`). First rows written on the 9 Oct 20:18 EAT Aris call.
-- **Prod SautiKit key swapped** to `scalers-prod-voice-v2` on Railway prod Voice, 9 Oct 19:31 EAT. Wallet probe, `calls.read`, and WhatsApp session messages verified OK.
-- **Line-unavailable clips** (en/sw) uploaded to prod SautiKit via `POST /v1/uploads/audio`.
-- **Prod Aris number (alcr) WhatsApp events webhook** repointed from staging to `https://scalers-project-production.up.railway.app/whatsapp/events`, 10 Oct ~10:40 EAT (Alvin).
-- **`CRON_SECRET` set on Vercel prod** (Alvin). Unblocks #640.
-- **Aris test call** 9 Oct 22:37 EAT, `HD_6480a5e68777`: greeting 1.36 s, score 92.9 (*per team notes*).
+| #634 | `7d870a75` | 13 Oct 14:29 | Brain `BRAIN_CALL_FIXES_D199`: junk slots cleaned, cut-off turns write nothing, reschedule bypasses coverage gate, Swahili "saa nane". |
+| #632 | `01d02ae9` | 13 Oct 14:25 | Brain `BRAIN_CONFIRMED_COVERAGE` Phase 0 + [handoff-record spec](specs/handoff-record.md). |
+| #672 | `7cd263de` | 13 Oct 09:23 | Locations: "Do you go outside these areas?" (anywhere in Kenya). |
+| #671 | `38ae42d8` | 13 Oct 07:11 | Honest insights, callbacks-only outcomes, durable reviews, Updates. |
+| #670 | `3bc2f76d` | 12 Oct 20:53 | Appearance: one worded control everywhere. |
+| #669 | `8a37abbc` | 12 Oct 20:20 | Contrast: attention/error text meets 4.5:1 in light mode. |
+| #668 | `916444d2` | 12 Oct 19:54 | Calls: SSR guard test for `document` on /calls. |
+| #667 | `5a9ced74` | 12 Oct 18:51 | Locations: areas you serve, with delivery fees. |
+| #663 | `e7f30281` | 12 Oct 14:30 | Payments and Policies: typed payments v2, policy rules. |
+| #666 | `465a5773` | 12 Oct 14:25 | Catalogue: a Save never undoes a confirmed price. |
+| #661 | `47fad32a` | 12 Oct 12:35 | Design leftovers: type tokens, kit Button, sentence-case labels. |
+| #664 | `330a22f4` | 12 Oct 12:33 | Speed: London region, router cache, local session check, cached tenant row, skeletons. |
+| #662 | `987589b1` | 12 Oct 12:26 | Overview call insights from `call_facts`. |
+| #660 | `70c03cab` | 12 Oct 12:21 | UI polish: kit text fields, phone account Sheet, mobile and a11y sweep. |
+| #665 | `db5b7f17` | 11 Oct 23:56 | Vercel: only `main` auto-deploys; one debounced API deploy for staging. |
+| #659 | `d6c56df6` | 11 Oct 20:07 | Structured data foundation. |
+| #658 | `871fea0a` | 11 Oct 19:45 | **Callbacks only**: live transfer promises replaced by a Callbacks capability. |
+| #657 | `3d16cc8b` | 11 Oct 16:23 | Unified capability gates. |
+| #656 | `e51b2d6e` | 11 Oct 15:03 | Onboarding rebuild. |
+| #655 | `e4b30a88` | 11 Oct 12:20 | Team invites with roles (behind `TEAM_INVITES`). |
+| #654 | `d9823cd6` | 11 Oct 12:15 | QA fixes: onboarding, validation, wrong-number SMS, import, checklist, marketing. |
+| #652 | `bb68df70` | 10 Oct 10:50 | Docs: previous STATUS refresh. |
+| #641 and earlier | | ≤ 10 Oct | Admin A0–A2 + Activity log (#636, #637, #641), Quality tab (#603), line-unavailable (#651), grant-minutes hotfix (#648), fact-confirm (#627), traces purge (#630, #635), ops alerts (#626), Voice M0/M0b (#612, #617), wallet-empty reject (#616). |
 
 ---
 
-## 3. Shipping now
+## 3. On staging now (not on prod)
 
-Admin chain (#603, #636, #637, #641) is **done on prod**. #651 is live.
+Curated kitchen `1374b25d` (*per team notes*), all flags default off on prod:
 
-| Step | PR / item | What | State at 10:45 |
-| --- | --- | --- | --- |
-| 1 | **#649** | Admin billing cleanup: readable errors, one assign path, Change package confirm. | Open, mergeable, base `main` (stacked chain already merged) |
+| PR | Lane | What |
+| --- | --- | --- |
+| #674 | Voice | Fold owed booking confirm into the next reply (`VOICE_OWED_CONFIRM_FOLD`). |
+| #680 | Brain | BA v2 Phase 1 behind `BRAIN_V2` (off). |
+| #681 | Voice | BA v2 shadow hook on `/ws/media` (`BRAIN_V2_SHADOW`). |
+| #682 | Voice | Joint ack rule (`VOICE_ACK_RULE`, off). |
+| #683 | Voice | Coverage single source (`VOICE_COVERAGE_SINGLE_SOURCE`, off). |
 
-Close #639 if still open (#651 superseded it).
+Caller files memory v2 SQL (#673) is applied on **staging only**.
 
 ---
 
-## 4. Ready, waiting on Alvin's GO
+## 4. Open PRs waiting on Alvin's GO
 
-| PR | Lane | What | Notes |
-| --- | --- | --- | --- |
-| #645 | Voice | **Prod dead-air fix** (HD_d3900): greeting pre-rendered per tenant, webhook answers from an in-memory tenant directory (~2 ms vs 2.05 s), drains buffered caller audio so it can't barge the greeting, shorter end-of-turn wait (360 ms), hold line past 700 ms, true per-channel notify outcome (`owner_notified`), URLs spoken properly, **recording fetch fixed (prod fetched 0 recordings in 21 days)**. Each fix has its own off switch. | Draft, base `main`, CI green. Staging test call first. |
-| #644, #646 | Voice | Bundle: one owner message per call after the call, goodbye ends the call, carrier duration, greeting as spoken, language invite retired for all businesses. | #646 is based on `voice/call-ceba-fixes` (#638), not `main`; needs a main-based cut before prod. |
-| #634 | Brain | `BRAIN_CALL_FIXES_D199`: junk slots cleaned, cut-off turns write nothing, reschedule bypasses the coverage gate, Swahili "saa nane" time handling. | Draft |
-| #632 | Brain | `BRAIN_CONFIRMED_COVERAGE` Phase 0 + handoff-record spec. | Draft |
-| #643 | Voice | Phone wallet low-balance alert (webhook + poll, restart-safe). | Draft |
-| #628 | Voice | Junk caller names never make a shared line; no saved request without caller content. | Draft |
-| #631 | Voice / Ops | Beta never rejects at the package cap; ops email at 80%/100%; draft period rollover cron. | Draft |
-| #647 | Ops-Billing | SMS reserve → send → settle + reconcile (e.g. Aris 42 → 18). | Draft, base `main` |
-| #650 | Ops-Billing | Package rules: explicit no-package/unassign, upgrades now with prorated minutes, downgrades next period, `tenant_billing_state` view. | Draft, **stacked on #631**. Alvin's decisions made: granted minutes expire at period end; a first package mid-month gets full minutes; annual packages billed yearly with the monthly allowance reset. |
-| #640 | Platform | Ops alerts on a Vercel cron instead of page load. | Draft. `CRON_SECRET` is on Vercel prod; needs GO and deploy. |
-| #587 | Voice | Speak a clip before a billing hangup (Swahili fallback recordings). | Needs a named reviewer. |
+Source: `gh pr list --state open` at 20:15 EAT, 14 Oct. All drafts unless noted.
 
-Other open drafts (staging or parked): #633 spoken facts, #625 wait-barge re-prompt, #622/#629 scorer, #621 score honesty, #618 (holds staging pin), #615 skip-staging label, #614 Voice Phase 2, #611 catalogue import preview, #602 Quality read APIs, #597, #584, #583, #560, **#537**, #492 landing, #440, #434, #356. #642 is superseded (clips now uploaded to SautiKit).
+| PR | Lane | What |
+| --- | --- | --- |
+| #649 (ready) | Ops-Billing | Admin billing cleanup: readable errors, one assign path, Change package confirm. |
+| #684 | Brain/Platform | Fact hash contract: drop pricing envelope; `confirmPriceAction` re-stamps `.price`. |
+| #673, #678 | Platform / Brain | Caller files memory v2 (schema + retention); trust P1 + returning caller (stacked on #673). |
+| #675, #676, #677 | Voice | Silent-caller prompt + stall watchdog; repair-who + carrier-drop callback; language hysteresis. |
+| #679, #680 | Brain | BA v2 Phase 0 eval harness; Phase 1 (both `skip-staging`). |
+| #645, #644, #646, #638 | Voice | Prod dead-air fix; one owner message per call; goodbye ends call; HD_ceba fixes. |
+| #643, #631, #628, #625, #633, #621, #618 | Voice | Wallet low alert; beta never rejects at cap; junk names; wait-barge; spoken facts; score honesty; dropped question. |
+| #647, #650 | Ops-Billing | SMS reserve→send→settle; package change rules (stacked on #631). |
+| #640, #602, #615 | Platform | Ops alerts on Vercel cron; Quality read APIs; Stage-PR skip-staging filter. |
+| #622, #629 | Voice | Scorer fixes. |
+| #611 | Desk | Catalogue import preview. |
+| #587, #597, #614, #584, #583, #537 | Voice | Parked (`skip-staging`). #597 on hold. |
+| #653, #492, #560, #440, #434, #356 | Various | Legal pack, landing, docs, ops, tester lane: parked. |
+| #639, #642 | — | Superseded (#651; clips on SautiKit). Close. |
 
 ---
 
 ## 5. Known broken / open issues
+
+*Carried from 10 Oct; not re-verified on 14 Oct unless noted. Lane owners: confirm or delete your rows.*
 
 - **SautiKit wallet low on prod:** ~KES 5.5 (*healthz* 9 Oct 22:51). #616 rejects inbound at zero. Top-up urgent.
 - **TextSMS zero credit** (HTTP 402) on prod and staging.
@@ -113,11 +129,11 @@ Other open drafts (staging or parked): #633 spoken facts, #625 wait-barge re-pro
 
 - **Legal pack draft #653** (Terms, Privacy, DPA, call notice, beta terms). Parked until after launch.
 - **Admin:** suspend business, business edit / members / owner reset, package catalogue and create package, billing period card, invoices (after #631).
-- **Settings / onboarding** (GIGO P1/P2, coverage moves to Settings › Locations as "Areas you serve").
+- **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
 - **Landing page** (#492 parked until its turn).
 - **WhatsApp as the assistant doing work** (not just alerts).
-- Live Dial to a person during a call: spec only ([`LIVE_TRANSFER.md`](product/LIVE_TRANSFER.md)).
+- Live call transfer: **not built** (callbacks only since #658; reviving it needs a new ADR and Alvin's yes). History: [`archive/LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md).
 
 Billing model is fixed: packages + on-demand only, beta charging off, no prepaid wallet, no waive overage. Public copy never mentions unbuilt features.
 
@@ -130,7 +146,7 @@ Billing model is fixed: packages + on-demand only, beta charging off, no prepaid
 3. **Paste the staging SautiKit key** (full scope, workspace `1f85601c`) to Ops for Railway staging Voice.
 4. **Meta WhatsApp currency** (fixes 131042).
 5. **Webhook signing after launch** (`SAUTIKIT_VALIDATE_WEBHOOKS` + secrets); Voice watches first calls.
-6. **GOs** for section 4 (#645, Voice bundle #644/#646, #634, #632, #643, #628, #631, #647, #650, #640, #587 reviewer).
+6. **GOs** for section 4.
 
 ---
 
@@ -143,4 +159,4 @@ Billing model is fixed: packages + on-demand only, beta charging off, no prepaid
 - **Git identity.** Never set git config. Commit with `git -c user.name='Alvin Yegon' -c user.email='alvin@scalers.co.ke'`.
 - **Test gates** (Node 22): `npm run test:voice`, `npm run test:brain`, `npm run test:mvp`, and `cd dashboard && npm run lint && npm run build`. Stage-PR changes: `npm run test:stage-pr`.
 - **Docs-only PRs** must not change runtime code. Say "docs-only" in the PR body.
-- **Before you finish:** update sections 2 to 5 of this file if your PR changed what's live, in flight, or broken.
+- **Before you finish:** update sections 1 to 5 of this file in the same PR when it changes what's live, in flight, or broken. Every merge to `main` updates section 2.

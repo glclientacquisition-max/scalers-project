@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-16
+---
+
 # Production-pending SQL
 
 **DO NOT apply without explicit human approval on ALCR (`fjxcdccgyhnvnnlnovcl`).**

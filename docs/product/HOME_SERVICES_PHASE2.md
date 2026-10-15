@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-05
+---
+
 # Phase 2 — Home services pack (execution plan)
 
 **Outcome:** A trained home-services tenant can book a visit on-call (service + time window + landmark + name), answer area/price bands from catalog/policies, reschedule/cancel, and escalate true emergencies, with appointments visible in the desk.

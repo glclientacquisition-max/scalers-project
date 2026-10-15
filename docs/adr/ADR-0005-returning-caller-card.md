@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-09-25
+---
+
 # ADR-0005 — Returning-caller card at call setup
 
 ## Status

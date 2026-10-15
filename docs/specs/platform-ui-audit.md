@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-09-23
+---
+
 # Platform UI/UX audit
 
 **Date:** 2026-09-19  

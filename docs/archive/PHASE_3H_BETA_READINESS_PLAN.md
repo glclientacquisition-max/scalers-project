@@ -1,9 +1,17 @@
+---
+owner: platform
+last_reviewed: 2026-09-16
+status: archived
+---
+
+> **Archived 2026-10-14.** Phase plan. Current source: [`docs/STATUS.md`](../STATUS.md). Kept for history; do not treat as current.
+
 # Phase 3H beta readiness plan
 
 **Date:** 2026-08-15  
 **Status:** IN PROGRESS (execution started 2026-08-16)  
 **Production ALCR:** Grant A3 applied 2026-08-16. No other production SQL in this phase.  
-**Apply report:** [`PHASE_3H_A3_APPLY_REPORT.md`](./PHASE_3H_A3_APPLY_REPORT.md)
+**Apply report:** [`PHASE_3H_A3_APPLY_REPORT.md`](PHASE_3H_A3_APPLY_REPORT.md)
 
 ---
 
@@ -512,9 +520,9 @@ Scalers is **technically reproducible** and **governance-complete** after Phases
 
 ## Related documents
 
-- [`BETA_READINESS_AUDIT.md`](./BETA_READINESS_AUDIT.md)
-- [`PHASE_3G_COMPLETION_REPORT.md`](./PHASE_3G_COMPLETION_REPORT.md)
-- [`PRODUCTION_CHANGE_NOTIFY_CHANNELS.md`](./PRODUCTION_CHANGE_NOTIFY_CHANNELS.md)
+- [`BETA_READINESS_AUDIT.md`](BETA_READINESS_AUDIT.md)
+- [`PHASE_3G_COMPLETION_REPORT.md`](PHASE_3G_COMPLETION_REPORT.md)
+- [`PRODUCTION_CHANGE_NOTIFY_CHANNELS.md`](../operations/PRODUCTION_CHANGE_NOTIFY_CHANNELS.md)
 - [`../storage/STORAGE_SECURITY_MODEL.md`](../storage/STORAGE_SECURITY_MODEL.md)
 - [`../engineering/FEATURE_DEVELOPMENT_CONTRACT.md`](../engineering/FEATURE_DEVELOPMENT_CONTRACT.md)
 - [`../agents/VOICE_SPEED_CONSISTENCY.md`](../agents/VOICE_SPEED_CONSISTENCY.md)

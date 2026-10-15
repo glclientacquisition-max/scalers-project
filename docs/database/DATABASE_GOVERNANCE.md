@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-05
+---
+
 # Database governance
 
 **Status:** Current-state documentation (updated Phase 3F, 2026-08-15)  
@@ -116,7 +121,7 @@ Stable voice API surface documented in `docs/agents/PLATFORM.md` and [`../govern
 | Are migrations authoritative? | **Scripts in Git are authoritative for intent**; live DB is authoritative for reality |
 | Automated bootstrap | **NO** — manual SQL Editor sequence required |
 
-See [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../operations/STAGING_REBUILD_EXECUTION_REPORT.md).
+See [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../archive/STAGING_REBUILD_EXECUTION_REPORT.md).
 
 ---
 

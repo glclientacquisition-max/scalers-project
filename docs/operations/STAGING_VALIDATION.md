@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-08
+---
+
 # Staging validation workflow
 
 **Status:** Phase 3G (2026-08-15)  

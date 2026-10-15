@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-16
+---
+
 # Foundation bootstrap provenance
 
 **Status:** Production-authoritative / historically-unverified  

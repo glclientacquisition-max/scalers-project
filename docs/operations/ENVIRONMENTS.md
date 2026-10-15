@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # Environments
 
 **Status:** Governance baseline (2026-08-14)  
@@ -75,7 +80,7 @@ Staging is defined. See [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md) f
 | URL | `https://sgcdncjxauhsbunobmob.supabase.co` |
 | Region | `eu-west-2` |
 | Rebuilt from Git | YES (Phase 3E, manual SQL path) |
-| Evidence | [`STAGING_REBUILD_EXECUTION_REPORT.md`](./STAGING_REBUILD_EXECUTION_REPORT.md) |
+| Evidence | [`STAGING_REBUILD_EXECUTION_REPORT.md`](../archive/STAGING_REBUILD_EXECUTION_REPORT.md) |
 
 | Component | Staging target |
 | --- | --- |

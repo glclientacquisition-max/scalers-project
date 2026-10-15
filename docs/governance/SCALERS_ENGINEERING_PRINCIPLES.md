@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-14
+---
+
 # Scalers engineering principles
 
 **Status:** Permanent governance (2026-08-14)  

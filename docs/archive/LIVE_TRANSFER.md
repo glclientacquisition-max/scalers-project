@@ -1,9 +1,17 @@
+---
+owner: voice
+last_reviewed: 2026-10-09
+status: archived
+---
+
+> **Archived 2026-10-14.** Superseded by #658: product is callbacks only. Current source: [`docs/product/ESCALATION.md`](../product/ESCALATION.md). Kept for history; do not treat as current.
+
 # Live human transfer (caller escalation to a real person)
 
 **Status:** Desk option exists. Cold Dial after Stream is **blocked** on current SautiKit (staging 2026-09-06). Default `VOICE_LIVE_TRANSFER=off`. Keep callback escalate until a conference REST spike rings a human. Tenant option is Business → Train → Escalation Team (`handoff_mode`). Brain sets `liveTransfer` only when that option, open hours, a directory phone, and the env flag all pass.  
 **Job:** When a caller needs a human *and* the business opted in, Scalers leaves the AI media stream and bridges the live call to a real teammate. If the bridge cannot run or the human does not answer, the existing async escalate path still notifies and the caller hears an honest fallback.
 
-**Related:** async notify is already shipped in [`ESCALATION.md`](./ESCALATION.md). Decision record: [`adr/ADR-0004-live-human-transfer.md`](../adr/ADR-0004-live-human-transfer.md).
+**Related:** async notify is already shipped in [`ESCALATION.md`](../product/ESCALATION.md). Decision record: [`adr/ADR-0004-live-human-transfer.md`](../adr/ADR-0004-live-human-transfer.md).
 
 ---
 
@@ -248,7 +256,7 @@ Lab on staging DID, no product toggle:
 2. Confirm `/voice/transfer` (post-Stream Redirect) or `/voice/incoming` receives a continue webhook.
 3. Return `<Dial>` to a known mobile; confirm ring and two-way audio.
 4. Confirm timeout path can return `<Say>` + `<Hangup>`.
-5. Write findings in `docs/agents/LIVE_CALL_FINDINGS.md`.
+5. Write findings in `docs/archive/LIVE_CALL_FINDINGS.md`.
 
 If closing the WS hangs up the caller, stop and evaluate SautiKit `Redirect` / conference instead. Do not enable `liveTransfer` on production.
 

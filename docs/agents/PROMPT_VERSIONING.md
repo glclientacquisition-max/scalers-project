@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-08-14
+---
+
 # Prompt and agent versioning
 
 **Status:** Current problem documented (2026-08-14)  

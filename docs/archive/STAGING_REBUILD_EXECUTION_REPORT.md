@@ -1,3 +1,11 @@
+---
+owner: platform
+last_reviewed: 2026-08-15
+status: archived
+---
+
+> **Archived 2026-10-14.** One-off execution report. Current source: [`docs/operations/ENVIRONMENTS.md`](../operations/ENVIRONMENTS.md). Kept for history; do not treat as current.
+
 # Staging rebuild execution report — Phase 3E Step 2
 
 **Date:** 2026-08-15  

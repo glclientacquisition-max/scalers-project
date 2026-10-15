@@ -1,3 +1,8 @@
+---
+owner: voice
+last_reviewed: 2026-10-09
+---
+
 # Pronunciation system (Scalers)
 
 **Mission:** Make Kenyan receptionist names, places, and brands sound right on Soniox phone TTS — without letting owners accidentally poison common English.

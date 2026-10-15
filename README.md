@@ -18,7 +18,7 @@ The owner works in the Desk: setup, the call inbox, contacts, approve-first SMS 
 
 ## Not shipped
 
-- Live Dial to a person during the call. The shipped handoff is an async notify plus a Desk note. Spec: [`docs/product/LIVE_TRANSFER.md`](docs/product/LIVE_TRANSFER.md).
+- Live Dial to a person during the call. The shipped handoff is an async notify plus a Desk note. Spec: [`docs/archive/LIVE_TRANSFER.md`](docs/archive/LIVE_TRANSFER.md).
 - Owner self-serve package checkout. See [`docs/operations/PACKAGES.md`](docs/operations/PACKAGES.md).
 
 ## Repo map

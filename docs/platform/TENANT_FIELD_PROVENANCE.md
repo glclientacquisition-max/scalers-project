@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # Tenant field provenance (GIGO BI P0)
 
 Platform-owned sidecar for **who said a tenant fact is true**. Values stay on existing `tenants` columns; provenance lives in `tenant_field_meta` keyed by `field_path`.

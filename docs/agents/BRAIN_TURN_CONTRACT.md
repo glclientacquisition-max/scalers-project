@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-08
+---
+
 # Brain turn contract
 
 One caller turn, one path. Every playbook (retail, home services, hospitality,

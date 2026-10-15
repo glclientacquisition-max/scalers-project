@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-14
+---
+
 # Branch lifecycle policy
 
 **Status:** Phase 3A governance (2026-08-14)  

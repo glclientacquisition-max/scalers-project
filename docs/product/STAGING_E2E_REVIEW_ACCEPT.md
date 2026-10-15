@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-10-11
+---
+
 # Staging E2E review (Done and Dusted Cleaning, 390px) — Product ACCEPT
 
 **Date:** 2026-09-27  

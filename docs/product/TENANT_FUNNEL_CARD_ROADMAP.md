@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-10-11
+---
+
 # Superseded
 
 **Moved to:** [`TENANT_FUNNEL_PAGE_ROADMAP.md`](./TENANT_FUNNEL_PAGE_ROADMAP.md)

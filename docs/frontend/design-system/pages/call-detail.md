@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-30
+---
+
 # Call detail
 
 **Route:** `/calls/[id]`  

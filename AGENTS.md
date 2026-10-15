@@ -6,7 +6,7 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 
 | Lane | Scope | Contract |
 | --- | --- | --- |
-| **Voice** | Telephony media, STT/TTS, turn-taking, call latency | [`docs/agents/VOICE.md`](docs/agents/VOICE.md) · speed plan: [`VOICE_SPEED_CONSISTENCY.md`](docs/agents/VOICE_SPEED_CONSISTENCY.md) · live findings: [`LIVE_CALL_FINDINGS.md`](docs/agents/LIVE_CALL_FINDINGS.md) · pronunciation: [`PRONUNCIATION.md`](docs/agents/PRONUNCIATION.md) · ChapterOne setup: [`CHAPTERONE_SETUP_REVIEW.md`](docs/agents/CHAPTERONE_SETUP_REVIEW.md) |
+| **Voice** | Telephony media, STT/TTS, turn-taking, call latency | [`docs/agents/VOICE.md`](docs/agents/VOICE.md) · speed plan: [`VOICE_SPEED_CONSISTENCY.md`](docs/agents/VOICE_SPEED_CONSISTENCY.md) · live findings: [`LIVE_CALL_FINDINGS.md`](docs/archive/LIVE_CALL_FINDINGS.md) · pronunciation: [`PRONUNCIATION.md`](docs/agents/PRONUNCIATION.md) · ChapterOne setup: [`CHAPTERONE_SETUP_REVIEW.md`](docs/archive/CHAPTERONE_SETUP_REVIEW.md) |
 | **Brain** | Prompts, conversation logic, tools, knowledge compile | [`docs/agents/BRAIN.md`](docs/agents/BRAIN.md) · caller CX gaps: [`docs/agents/CALLER_EXPERIENCE_EXCELLENCE.md`](docs/agents/CALLER_EXPERIENCE_EXCELLENCE.md) |
 | **Desk UI/UX** | Owner desk + marketing UI | [`docs/agents/DESK_UX.md`](docs/agents/DESK_UX.md) |
 | **Ops & Billing** | Wallet, DID pool, Super Admin | [`docs/agents/OPS_BILLING.md`](docs/agents/OPS_BILLING.md) |
@@ -38,10 +38,10 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 | [`docs/governance/DEVELOPMENT_WORKFLOW.md`](docs/governance/DEVELOPMENT_WORKFLOW.md) | Branching, lifecycle, PR checklist |
 | [`docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md`](docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md) | Permanent engineering rules |
 | [`docs/agents/AGENT_ARCHITECTURE.md`](docs/agents/AGENT_ARCHITECTURE.md) | AI agent stack on live calls |
-| [`docs/product/LIVE_TRANSFER.md`](docs/product/LIVE_TRANSFER.md) | Live human Dial (spec; not shipped) |
+| [`docs/archive/LIVE_TRANSFER.md`](docs/archive/LIVE_TRANSFER.md) | Live human Dial (archived: callbacks only since #658) |
 | [`docs/product/ESCALATION.md`](docs/product/ESCALATION.md) | Async human notify (shipped) |
 | [`docs/database/DATABASE_GOVERNANCE.md`](docs/database/DATABASE_GOVERNANCE.md) | Manual SQL model |
-| [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](docs/frontend/FRONTEND_RECONNAISSANCE.md) | Desk Frontend 2.0 recon (no UI until constitution) |
+| [`docs/archive/FRONTEND_RECONNAISSANCE.md`](docs/archive/FRONTEND_RECONNAISSANCE.md) | Desk Frontend 2.0 recon (no UI until constitution) |
 
 ---
 

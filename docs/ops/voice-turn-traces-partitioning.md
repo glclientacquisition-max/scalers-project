@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-09
+---
+
 # voice_turn_traces: when and how to switch on monthly partitioning
 
 Status: plan only. Nothing here is built. Today the 30-day retention is a

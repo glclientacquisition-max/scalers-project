@@ -1,8 +1,13 @@
+---
+owner: voice
+last_reviewed: 2026-10-09
+---
+
 # Voice downtime at scale
 
 **Lane:** Voice  
 **Status:** Contract for platform outages when Scalers hosts many businesses  
-**Companion:** [`SONIOX_BILLING_SILENCE_2026-09-02.md`](./SONIOX_BILLING_SILENCE_2026-09-02.md)
+**Companion:** [`SONIOX_BILLING_SILENCE_2026-09-02.md`](../archive/SONIOX_BILLING_SILENCE_2026-09-02.md)
 
 Three platform failures share one rule: the caller dialed one business, and the owner should not get one text per call.
 

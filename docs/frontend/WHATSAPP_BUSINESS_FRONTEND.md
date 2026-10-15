@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-09-19
+---
+
 # WhatsApp Business frontend architecture
 
 **Status:** Research spec for a Scalers chat client. Not shipped UI.  

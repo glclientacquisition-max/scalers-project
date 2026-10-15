@@ -1,3 +1,8 @@
+---
+owner: ops-billing
+last_reviewed: 2026-10-06
+---
+
 # Package entitlements
 
 **Status:** Super Admin catalog at `/admin/packages` (username + access code). Owner Usage and Home read remaining buckets. Hangup meters minutes via `consume_call_seconds` once `package_minute_consume.sql` is applied. Owner checkout later.  

@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-14
+---
+
 # ADR-0002 — Five-lane agent governance model
 
 ## Status

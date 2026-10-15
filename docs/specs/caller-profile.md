@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-09-17
+---
+
 # Spec: summarized caller profile
 
 **Status:** Proposed (idea, not shipped)  

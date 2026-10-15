@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-10-05
+---
+
 # Settings `/settings`
 
 **Job:** Teach and configure the business and the assistant.  
@@ -185,7 +190,7 @@ Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
-| Live connect | switch, when transfer can run or is already on (Team only; handoff UI off Voice, #514) | `handoff_mode` | Assistant on calls |
+| Live connect | Hidden unless the live-transfer executor env is on (#658: callbacks only; a stored `live_transfer` no longer shows the switch). Team only; handoff UI off Voice, #514 | `handoff_mode` | Assistant on calls |
 | Team phone | text | none | Rings {name} during open hours. or Add a team phone. |
 | Name / **Role** / Phone / Email | table + inputs | `team_directory` | Whole business + assistant on calls |
 | Urgent / Follow-up / Ops | switch | teammate notify flags (`receives_escalation` / `inbox` / `ops`) | Whole business |

@@ -1,3 +1,11 @@
+---
+owner: voice
+last_reviewed: 2026-10-01
+status: archived
+---
+
+> **Archived 2026-10-14.** Dated call review (Sep 2026); calls +254709221536 'staging', which is wrong today. Current source: [`docs/STATUS.md (DIDs) and docs/agents/VOICE.md`](../STATUS.md (DIDs) and docs/agents/VOICE.md). Kept for history; do not treat as current.
+
 # Staging DID review — `HD_0ef68f8e7930` (2026-09-25 17:57Z)
 
 SHA `df462cb` (`#426` on Railway staging Voice). 144s. Caller `+254790381872` → `+254709221536`. Recording URL empty. Score from desk transcript + `spoken=` + `[voice-timing]`.
@@ -77,7 +85,7 @@ Owner ask: evaluate naturalness and eliminate roboticness.
 
 **Method (do not retune first):** freeze staging `/healthz` `gitSha` + `voiceProfile`, run three scripted DID calls (phatic, barge, pace), score Voice IDs V1–V9 as pass/fail from recording + transcript + `spoken=` logs. Isolated TTS WAVs are a different test (`tts:listen-harness`).
 
-Protocol + freeze knobs + historical SIDs: [`VOICE_NATURALNESS.md`](./VOICE_NATURALNESS.md). Scanner: `node scripts/score-voice-naturalness.js`.
+Protocol + freeze knobs + historical SIDs: [`VOICE_NATURALNESS.md`](../agents/VOICE_NATURALNESS.md). Scanner: `node scripts/score-voice-naturalness.js`.
 
 Staging freeze knobs: `VOICE_PROFILE=balanced`, speed 1.0, gain 1.38, live transfer off, DID `+254709221536`. N1/N2 on SHA `abf6aa9` (`main` `#281`, 05:01Z). N3 on SHA `2c8fb51` (`main` `#282` desk Alerts, 05:18Z). Voice knobs did not move. Cutover from `23debf0`. Do not change speed or gain.
 
@@ -370,7 +378,7 @@ Next build: conference hold + `POST /v1/calls` into the same room ([SautiKit cal
 
 # Live call findings — Ngong Hills Hotel (2026-08-11)
 
-Later incident (assistant silent, Soniox 402 billing): [`SONIOX_BILLING_SILENCE_2026-09-02.md`](./SONIOX_BILLING_SILENCE_2026-09-02.md).
+Later incident (assistant silent, Soniox 402 billing): [`SONIOX_BILLING_SILENCE_2026-09-02.md`](SONIOX_BILLING_SILENCE_2026-09-02.md).
 
 Later incident (mid-call mute after barge-in): staging `HD_5de59f6babc7` (2026-09-04). Caller overlapped the next question. Barge-in cancelled TTS. Soniox `400 Stream … not found` then marked the whole TTS session dead. Gemini still wrote the reply; the caller heard silence. Desk transcript stored the unheard line. Fix: treat that 400 as a stale stream, not a provider outage.
 

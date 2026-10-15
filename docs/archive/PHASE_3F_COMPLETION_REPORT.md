@@ -1,3 +1,11 @@
+---
+owner: platform
+last_reviewed: 2026-08-15
+status: archived
+---
+
+> **Archived 2026-10-14.** Phase report. Current source: [`docs/governance/PROJECT_HISTORY.md`](../governance/PROJECT_HISTORY.md). Kept for history; do not treat as current.
+
 # Phase 3F completion report
 
 **Date:** 2026-08-15  
@@ -34,15 +42,15 @@ Transform the repository from "reproducible staging" (Phase 3E) into a **control
 
 | File | Step |
 | --- | --- |
-| `docs/operations/PHASE_3F_BASELINE.md` | 1 — baseline audit |
+| `docs/archive/PHASE_3F_BASELINE.md` | 1 — baseline audit |
 | `docs/database/DATABASE_EVOLUTION.md` | 2 — evolution model |
 | `docs/database/DATABASE_APPLY_ORDER.md` | 3 — executable apply order |
 | `docs/operations/ENVIRONMENT_CONTRACT.md` | 5 — environment contract |
 | `docs/operations/RELEASE_GATE.md` | 6 — release gate |
 | `docs/engineering/FEATURE_DEVELOPMENT_CONTRACT.md` | 7 — feature lifecycle |
 | `docs/database/SCHEMA_DRIFT_POLICY.md` | 8 — drift detection policy |
-| `docs/security/PHASE_3F_SECURITY_REVIEW.md` | 9 — security review |
-| `docs/operations/PHASE_3F_COMPLETION_REPORT.md` | 11 — this report |
+| `docs/archive/PHASE_3F_SECURITY_REVIEW.md` | 9 — security review |
+| `docs/archive/PHASE_3F_COMPLETION_REPORT.md` | 11 — this report |
 
 ### Files modified
 
@@ -163,6 +171,6 @@ No new automated tests added (documentation phase).
 
 ## Related documents
 
-- [`PHASE_3F_BASELINE.md`](./PHASE_3F_BASELINE.md)
+- [`PHASE_3F_BASELINE.md`](PHASE_3F_BASELINE.md)
 - [`../database/DATABASE_EVOLUTION.md`](../database/DATABASE_EVOLUTION.md)
-- [`STAGING_REBUILD_EXECUTION_REPORT.md`](./STAGING_REBUILD_EXECUTION_REPORT.md)
+- [`STAGING_REBUILD_EXECUTION_REPORT.md`](STAGING_REBUILD_EXECUTION_REPORT.md)

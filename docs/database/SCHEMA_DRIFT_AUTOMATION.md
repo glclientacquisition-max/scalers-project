@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-15
+---
+
 # Schema drift automation
 
 **Status:** Implemented Phase 3G (2026-08-15)  

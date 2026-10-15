@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-10-07
+---
+
 # Contacts segment + click-through — Product ACCEPT
 
 **Date:** 2026-09-21  

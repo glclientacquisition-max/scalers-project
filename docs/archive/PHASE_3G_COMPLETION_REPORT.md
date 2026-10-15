@@ -1,3 +1,11 @@
+---
+owner: platform
+last_reviewed: 2026-08-15
+status: archived
+---
+
+> **Archived 2026-10-14.** Phase report. Current source: [`docs/governance/PROJECT_HISTORY.md`](../governance/PROJECT_HISTORY.md). Kept for history; do not treat as current.
+
 # Phase 3G completion report
 
 **Date:** 2026-08-15  
@@ -104,8 +112,8 @@ Convert Phase 3F governance into practical automation, close highest-value gaps 
 - `docs/database/SCHEMA_DRIFT_AUTOMATION.md`
 - `docs/operations/STAGING_VALIDATION.md`
 - `docs/operations/PRODUCTION_CHANGE_NOTIFY_CHANNELS.md`
-- `docs/operations/BETA_READINESS_AUDIT.md`
-- `docs/operations/PHASE_3G_COMPLETION_REPORT.md`
+- `docs/archive/BETA_READINESS_AUDIT.md`
+- `docs/archive/PHASE_3G_COMPLETION_REPORT.md`
 - `docs/storage/STORAGE_SECURITY_MODEL.md`
 - `docs/supabase/production_pending/*`
 
@@ -188,6 +196,6 @@ Convert Phase 3F governance into practical automation, close highest-value gaps 
 
 ## Related documents
 
-- [`BETA_READINESS_AUDIT.md`](./BETA_READINESS_AUDIT.md)
-- [`STAGING_VALIDATION.md`](./STAGING_VALIDATION.md)
+- [`BETA_READINESS_AUDIT.md`](BETA_READINESS_AUDIT.md)
+- [`STAGING_VALIDATION.md`](../operations/STAGING_VALIDATION.md)
 - [`../database/SCHEMA_DRIFT_AUTOMATION.md`](../database/SCHEMA_DRIFT_AUTOMATION.md)

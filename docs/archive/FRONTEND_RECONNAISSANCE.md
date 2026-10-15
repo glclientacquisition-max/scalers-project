@@ -1,3 +1,11 @@
+---
+owner: desk
+last_reviewed: 2026-10-12
+status: archived
+---
+
+> **Archived 2026-10-14.** Recon done; Frontend 2.0 charter shipped. Current source: [`docs/frontend/FRONTEND_2_0_CHARTER.md`](../frontend/FRONTEND_2_0_CHARTER.md). Kept for history; do not treat as current.
+
 # Scalers frontend reconnaissance
 
 **Status:** Phases 0–2 documented. Phases 3–4 implemented 2026-09-06 (Home Command Center + Requests/Appointments tables).  
@@ -371,7 +379,7 @@ Super Admin is not a redesign target. Token alignment only if it falls out of Ph
 
 | Path | Action |
 | --- | --- |
-| `docs/frontend/FRONTEND_RECONNAISSANCE.md` | Create |
+| `docs/archive/FRONTEND_RECONNAISSANCE.md` | Create |
 
 ### Phase 1 (next, docs)
 

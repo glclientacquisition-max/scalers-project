@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-05
+---
+
 # Lane chat starters (copy-paste)
 
 Open a **new** Cursor chat/agent per ticket. Paste the block for that lane, then replace the task line.
