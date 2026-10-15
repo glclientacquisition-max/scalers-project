@@ -14,6 +14,9 @@ import {
   type BillingMode,
 } from "@/lib/adminWallets";
 
+/** Shown when a write fails for a reason the operator can't act on. The raw cause goes to the log. */
+const SAVE_FAILED = "That didn't save. Nothing changed. Try again, or check Activity.";
+
 export async function GET(request: Request) {
   if (!(await isLegacyAuthenticated())) {
     return NextResponse.json({ error: "ops_only" }, { status: 403 });
@@ -49,7 +52,7 @@ export async function POST(request: Request) {
   const action = String(body.action || "");
   const businessId = String(body.business_id || "");
   if (!businessId) {
-    return NextResponse.json({ error: "business_id required" }, { status: 400 });
+    return NextResponse.json({ error: "Pick a business first." }, { status: 400 });
   }
 
   // The signed-in Super Admin, never a typed name or a value from the request body.
@@ -60,10 +63,10 @@ export async function POST(request: Request) {
     if (action === "grant_minutes") {
       const minutes = Number(body.minutes || 0);
       if (!Number.isFinite(minutes) || minutes <= 0) {
-        return NextResponse.json({ error: "Enter a positive minute amount" }, { status: 400 });
+        return NextResponse.json({ error: "Enter how many minutes to grant." }, { status: 400 });
       }
       if (note.length < 3) {
-        return NextResponse.json({ error: "Reason required (min 3 chars)" }, { status: 400 });
+        return NextResponse.json({ error: "Add a reason (3 letters or more)." }, { status: 400 });
       }
       const result = await grantTenantPackageMinutes({
         businessId,
@@ -79,10 +82,10 @@ export async function POST(request: Request) {
       const packageId = String(body.package_id || "");
       const period = String(body.period || "month");
       if (!packageId) {
-        return NextResponse.json({ error: "Package required" }, { status: 400 });
+        return NextResponse.json({ error: "Pick a package." }, { status: 400 });
       }
       if (period !== "month" && period !== "year") {
-        return NextResponse.json({ error: "Period must be month or year" }, { status: 400 });
+        return NextResponse.json({ error: "Pick monthly or yearly." }, { status: 400 });
       }
       const before = (await loadBusinessPackageNames().catch(() => null))?.get(businessId) ?? null;
       await assignBusinessPackage({ tenantId: businessId, packageId, period });
@@ -94,10 +97,10 @@ export async function POST(request: Request) {
     if (action === "set_billing_mode") {
       const mode = String(body.mode || "") as BillingMode;
       if (mode !== "off" && mode !== "soft" && mode !== "hard") {
-        return NextResponse.json({ error: "mode must be off|soft|hard" }, { status: 400 });
+        return NextResponse.json({ error: "Pick a charging mode." }, { status: 400 });
       }
       if (note.length < 3) {
-        return NextResponse.json({ error: "Reason required (min 3 chars)" }, { status: 400 });
+        return NextResponse.json({ error: "Add a reason (3 letters or more)." }, { status: 400 });
       }
       const result = await setTenantBillingMode({
         businessId,
@@ -109,9 +112,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, ...result });
     }
 
-    return NextResponse.json({ error: "unknown action" }, { status: 400 });
+    return NextResponse.json({ error: "That action isn't available." }, { status: 400 });
   } catch (err) {
     logAdminError("billing", err);
-    return NextResponse.json({ error: adminFacingError(err) }, { status: 500 });
+    return NextResponse.json({ error: adminFacingError(err, SAVE_FAILED) }, { status: 500 });
   }
 }
