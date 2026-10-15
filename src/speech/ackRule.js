@@ -129,9 +129,21 @@ const GAP_FILL = 'Mm.';
 function gapGuardEnabled(env = process.env) {
   return /^(1|true|on|yes)$/i.test(String(env.VOICE_NO_ANSWER_DELETE || '').trim());
 }
+/** Target send time after end of turn (default 700 ms: heard < 900 ms with send latency). */
 function gapGuardMs(env = process.env) {
   const n = Number(env.VOICE_GAP_GUARD_MS);
-  return Number.isFinite(n) && n >= 400 && n <= 2000 ? n : 900;
+  return Number.isFinite(n) && n >= 400 && n <= 2000 ? n : 700;
+}
+/** Timer delay from now so the clip is sent gapGuardMs after the turn ended. */
+function gapGuardDelay(turnEndedAt, now = Date.now(), env = process.env) {
+  const elapsed = Math.max(0, Number(now) - Number(turnEndedAt == null ? now : turnEndedAt));
+  return Math.max(0, gapGuardMs(env) - elapsed);
+}
+/** Gap clip warm list: the call language first, keyed the way the runtime looks it up. */
+function gapWarmPhrases(callLanguage) {
+  const first = String(callLanguage || 'en').toLowerCase();
+  const langs = [first, ...['sw', 'en', 'sheng'].filter((l) => l !== first)];
+  return langs.map((l) => ({ text: GAP_FILL, callLanguage: l }));
 }
 
 function scoreAckRule(turns = []) {
@@ -178,7 +190,7 @@ function replayHeard(turns = [], { lang = 'sw', gapGuard = false, gapMs = 900 } 
 }
 
 module.exports = {
-  replayHeard, GAP_FILL, gapGuardEnabled, gapGuardMs,
+  replayHeard, GAP_FILL, gapGuardEnabled, gapGuardMs, gapGuardDelay, gapWarmPhrases,
   ACK_LEAD_WIDE, ackRuleEnabled, isAckLed, isClosing, isCallerAck, stripAckLead,
   isHeardAck, isBareAck, shortTurn, createAckTracker, pickRuleFiller, applyAckBackstop, scoreAckRule,
 };
