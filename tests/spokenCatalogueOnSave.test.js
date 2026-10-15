@@ -13,7 +13,7 @@ function fakeDb(row, { rpc = 'missing', cols = [] } = {}) {
   const calls = { inserts: [], updates: [], rpc: [], selects: 0 };
   const db = {
     calls,
-    rpc: async (name, args) => { calls.rpc.push({ name, args }); if (rpc === 'missing') return { error: { code: 'PGRST202', message: 'Could not find the function' } }; row.spoken_catalogue = args.p_doc; return { error: null }; },
+    rpc: async (name, args) => { calls.rpc.push({ name, args }); if (rpc === 'no_tenant') return { error: { code: 'P0002', message: `tenant ${args.p_tenant_id} not found` } }; if (rpc === 'missing') return { error: { code: 'PGRST202', message: 'Could not find the function' } }; row.spoken_catalogue = args.p_doc; return { error: null }; },
     from(table) {
       const q = { table, filters: [] };
       const chain = {
@@ -49,7 +49,8 @@ test('save triggers a compile: version row then live doc; no catalogue text in l
   assert.deepEqual(Object.keys(ins).sort(), ['doc', 'generator', 'issues', 'schema_version', 'source_hash', 'status', 'tenant_id', 'version']);
   assert.match(ins.source_hash, /^[0-9a-f]{64}$/); assert.equal(ins.status, 'draft');
   const live = db.calls.updates.find((u) => u.table === 'tenants').p;
-  assert.deepEqual(Object.keys(live), ['spoken_catalogue'], 'live_version / compile_error absent on staging: not written');
+  assert.deepEqual(Object.keys(live), ['spoken_catalogue'], 'live_version absent on staging: not written');
+  assert.equal('compile_error' in ins, false, 'versions.compile_error absent on staging: not written');
   assert.equal(row.spoken_catalogue.sourceHash, sourceHash(S.profileFromRow(row)));
   for (const l of logs) assert.doesNotMatch(l, /sofa|carpet|kitengela|2,200|800/i);
 });
@@ -104,9 +105,44 @@ test('one transaction through the RPC when Platform has created it; optional col
   const db2 = fakeDb(base(), { cols: ['live_version', 'compile_error'] });
   const r2 = await S.runSpokenCatalogueCompile(TID, { db: db2, env: ON, ...quiet });
   assert.deepEqual(r2.write, { mode: 'ordered', liveVersion: true, compileError: true });
+  assert.equal(db2.calls.inserts[0].compile_error, null, 'clean compile: no error');
+  assert.equal(db2.calls.updates.find((u) => u.table === 'tenants').p.live_version, 1, 'goes live with live_version');
   S._resetColumnMemo();
 });
 
 test('bad tenant id is refused', async () => {
   assert.equal((await S.runSpokenCatalogueCompile('x; drop', { db: fakeDb(base()), env: ON, ...quiet })).skipped, 'bad_tenant');
+});
+
+test('go-live: every successful compile is live, the version row stays draft; AI failure lands in versions.compile_error', async () => {
+  S._resetColumnMemo();
+  const row = base(); const db = fakeDb(row, { cols: ['live_version', 'compile_error'] });
+  const r = await S.runSpokenCatalogueCompile(TID, { db, env: ON, generate: async () => { throw new Error('x'); }, ...quiet });
+  const ins = db.calls.inserts[0];
+  assert.equal(ins.status, 'draft'); assert.match(ins.generator, /^(rules|ai\+rules)$/);
+  assert.equal(ins.compile_error, 'generate_failed'); assert.ok(ins.compile_error.length <= 200);
+  assert.equal(row.spoken_catalogue.version, r.version); assert.equal(row.live_version, r.version);
+  const rp = fakeDb(base(), { rpc: 'ok' });
+  await S.runSpokenCatalogueCompile(TID, { db: rp, env: ON, generate: () => new Promise(() => {}), timeoutMs: 20, ...quiet });
+  assert.equal(rp.calls.rpc[0].args.p_compile_error, 'timeout'); assert.equal(rp.calls.rpc[0].args.p_status, 'draft');
+  S._resetColumnMemo();
+});
+
+test('RPC raises tenant not found: reported, no fallback writes', async () => {
+  const db = fakeDb(base(), { rpc: 'no_tenant' });
+  const r = await S.runSpokenCatalogueCompile(TID, { db, env: ON, ...quiet });
+  assert.equal(r.ok, false); assert.equal(r.error, 'no_tenant'); assert.equal(db.calls.inserts.length, 0);
+});
+
+test('draft SQL: lock_timeout, one approved per tenant, empty search_path, tenant check, compile_error on versions', () => {
+  const sql = require('fs').readFileSync(require('path').join(__dirname, '../docs/drafts/20261015140000_save_spoken_catalogue_version.sql'), 'utf8');
+  assert.ok(sql.indexOf("set lock_timeout = '3s'") < sql.indexOf('alter table public.tenants'));
+  assert.match(sql, /create unique index if not exists \S+\s+on public\.tenant_spoken_catalogue_versions \(tenant_id\) where status = 'approved'/);
+  assert.match(sql, /set search_path = ''/);
+  assert.match(sql, /raise exception 'tenant % not found'/);
+  assert.match(sql, /alter table public\.tenant_spoken_catalogue_versions add column if not exists compile_error text/);
+  assert.match(sql, /length\(compile_error\) <= 200/);
+  assert.doesNotMatch(sql, /tenants add column if not exists compile_error/);
+  assert.ok(sql.indexOf("status = 'superseded'\n     where tenant_id = p_tenant_id and status = 'approved'") < sql.indexOf('insert into public.tenant_spoken_catalogue_versions'));
+  assert.match(sql, /live_version = p_version/);
 });

@@ -1,6 +1,6 @@
 import "server-only";
-import { after } from "next/server";
-import { getVoicePublicBase } from "@/lib/sautikit";
+import { after } from "next/server.js";
+import { getVoicePublicBase } from "./voicePublicBase.js";
 
 /**
  * SPOKEN_CATALOGUE_ON_SAVE (default off, staging only). After an owner Save that
@@ -8,7 +8,9 @@ import { getVoicePublicBase } from "@/lib/sautikit";
  * recompile the spoken catalogue. Runs after the response (never blocks Save);
  * Brain checks the catalogue hash and skips unchanged saves.
  */
-export const SPOKEN_CATALOGUE_FIELDS = ["services_catalog", "product_catalog", "service_areas", "business_locations"] as const;
+// service_areas carries the Locations areas and delivery fees (#667, outside-area fee #672);
+// business_policies carries their mirror (coverage_areas / coverage_outside) the voice server reads.
+export const SPOKEN_CATALOGUE_FIELDS = ["services_catalog", "product_catalog", "service_areas", "business_locations", "business_policies"] as const;
 
 export function spokenCatalogueOnSaveEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return /^(1|true|on|yes)$/i.test(String(env.SPOKEN_CATALOGUE_ON_SAVE || "").trim());
@@ -20,7 +22,10 @@ export function touchesSpokenCatalogue(patch: Record<string, unknown> | null | u
 
 export async function pingSpokenCatalogueCompile(tenantId: string, fetchImpl: typeof fetch = fetch): Promise<boolean> {
   const secret = String(process.env.VOICE_INTERNAL_SECRET || "").trim();
-  if (!secret || !tenantId) return false;
+  if (!secret || !tenantId) {
+    console.warn(`[spoken_catalogue] ping skipped tenant=${tenantId || "-"}: ${secret ? "no tenant" : "VOICE_INTERNAL_SECRET unset"}`);
+    return false;
+  }
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 3000);
   try {
@@ -32,8 +37,10 @@ export async function pingSpokenCatalogueCompile(tenantId: string, fetchImpl: ty
       cache: "no-store",
       signal: ctl.signal,
     });
+    if (!res.ok) console.warn(`[spoken_catalogue] ping failed tenant=${tenantId} status=${res.status}`);
     return res.ok;
-  } catch {
+  } catch (err) {
+    console.warn(`[spoken_catalogue] ping failed tenant=${tenantId}: ${err instanceof Error ? err.name : "error"}`);
     return false;
   } finally {
     clearTimeout(t);

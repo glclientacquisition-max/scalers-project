@@ -10,7 +10,9 @@
 // when Platform has created it; until then two ordered writes (version row,
 // then tenants.spoken_catalogue), so a failure in between leaves only an extra
 // draft history row, never a live doc without history. Optional columns
-// (tenants.live_version / compile_error) are written only if they exist.
+// tenants.live_version and versions.compile_error are written only if they exist.
+// Go-live (Alvin): every successful compile goes live (tenants.spoken_catalogue +
+// live_version); the version row stays 'draft' until an owner approves it.
 const { compileSpokenCatalogue, needsRegeneration } = require('./spokenCatalogue');
 
 const ON = /^(1|true|on|yes)$/i;
@@ -43,24 +45,27 @@ async function hasColumn(db, table, col) {
 }
 
 async function writeVersion(db, tenantId, doc, { log }) {
+  const compileError = doc.aiError ? String(doc.aiError).slice(0, 200) : null;
   const row = { tenant_id: tenantId, version: doc.version, schema_version: doc.schemaVersion, source_hash: doc.sourceHash, status: doc.status, generator: doc.generator, doc, issues: doc.issues || [] };
   // 1) one transaction, when Platform's RPC exists
   if (typeof db.rpc === 'function') {
-    const { error } = await db.rpc('save_spoken_catalogue_version', { p_tenant_id: tenantId, p_version: row.version, p_schema_version: row.schema_version, p_source_hash: row.source_hash, p_status: row.status, p_generator: row.generator, p_doc: doc, p_issues: row.issues });
+    const { error } = await db.rpc('save_spoken_catalogue_version', { p_tenant_id: tenantId, p_version: row.version, p_schema_version: row.schema_version, p_source_hash: row.source_hash, p_status: row.status, p_generator: row.generator, p_doc: doc, p_issues: row.issues, p_compile_error: compileError });
     if (!error) return { mode: 'rpc' };
+    if (/P0002|not found/i.test(`${error.code || ''} ${error.message || ''}`) && !/function/i.test(error.message || '')) throw new Error('no_tenant:rpc');
     if (!/function|does not exist|PGRST202|42883/i.test(`${error.code || ''} ${error.message || ''}`)) throw new Error(`rpc:${error.code || 'error'}`);
     log('spoken_catalogue rpc missing, ordered writes');
   }
   // 2) degrade: history row first, then the live doc
+  const withErr = await hasColumn(db, 'tenant_spoken_catalogue_versions', 'compile_error');
+  if (withErr) row.compile_error = compileError;
   const ins = await db.from('tenant_spoken_catalogue_versions').insert(row);
   if (ins.error) throw new Error(`insert:${ins.error.code || 'error'}`);
   const patch = { spoken_catalogue: doc };
   if (await hasColumn(db, 'tenants', 'live_version')) patch.live_version = doc.version;
-  if (await hasColumn(db, 'tenants', 'compile_error')) patch.compile_error = null;
   const up = await db.from('tenants').update(patch).eq('id', tenantId);
   if (up.error) throw new Error(`update:${up.error.code || 'error'}`);
   await db.from('tenant_spoken_catalogue_versions').update({ status: 'superseded' }).eq('tenant_id', tenantId).eq('status', 'draft').lt('version', doc.version);
-  return { mode: 'ordered', liveVersion: 'live_version' in patch, compileError: 'compile_error' in patch };
+  return { mode: 'ordered', liveVersion: 'live_version' in patch, compileError: withErr };
 }
 
 /** Run one compile for a tenant. Returns a small result; throws nothing. */
@@ -76,13 +81,13 @@ async function runSpokenCatalogueCompile(tenantId, { db, generate = null, timeou
     if (!needsRegeneration(previous, profile)) { log(`[spoken_catalogue] tenant=${tenantId} unchanged v${previous.version}`); return { ok: true, skipped: 'unchanged', version: previous.version }; }
     const doc = await compileSpokenCatalogue(profile, { generate: withTimeout(generate, timeoutMs), previous, now });
     doc.aiError = aiCode(doc.aiError); // stored as a code only
+    if (doc.status !== 'draft') doc.status = 'draft'; // a compile is never an approval; it still goes live
     const w = await writeVersion(db, tenantId, doc, { log });
     log(`[spoken_catalogue] tenant=${tenantId} v${doc.version} ${doc.generator}${doc.aiError ? ` ai=${doc.aiError}` : ''} entries=${doc.entries.length} categories=${doc.categories.length} issues=${doc.issues.length} hash=${doc.sourceHash.slice(0, 12)} write=${w.mode} ms=${Date.now() - t0}`);
     return { ok: true, version: doc.version, generator: doc.generator, aiError: doc.aiError, write: w, doc };
   } catch (e) {
     const code = String(e?.message || e).split(':')[0].slice(0, 40);
     log(`[spoken_catalogue] tenant=${tenantId} failed ${code} ms=${Date.now() - t0}`);
-    try { if (await hasColumn(db, 'tenants', 'compile_error')) await db.from('tenants').update({ compile_error: code }).eq('id', tenantId); } catch { /* best effort */ }
     return { ok: false, error: code };
   }
 }
