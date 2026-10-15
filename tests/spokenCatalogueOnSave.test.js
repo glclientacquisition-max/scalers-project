@@ -135,7 +135,7 @@ test('RPC raises tenant not found: reported, no fallback writes', async () => {
 });
 
 test('draft SQL: lock_timeout, one approved per tenant, empty search_path, tenant check, compile_error on versions', () => {
-  const sql = require('fs').readFileSync(require('path').join(__dirname, '../docs/drafts/20261015140000_save_spoken_catalogue_version.sql'), 'utf8');
+  const sql = require('fs').readFileSync(require('path').join(__dirname, '../supabase/migrations/20261015113748_save_spoken_catalogue_version.sql'), 'utf8');
   assert.ok(sql.indexOf("set lock_timeout = '3s'") < sql.indexOf('alter table public.tenants'));
   assert.match(sql, /create unique index if not exists \S+\s+on public\.tenant_spoken_catalogue_versions \(tenant_id\) where status = 'approved'/);
   assert.match(sql, /set search_path = ''/);
