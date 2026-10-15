@@ -1,0 +1,397 @@
+{
+ "docs": [
+  {
+   "id": "menu_photo_text",
+   "kind": "menu photo (OCR text)",
+   "source": "MAMA OLIECH KITCHEN\nChapati 30/=\nChips Mayai 250\nMutura 100\nSmokie pasua 60\nTea (cup) 50\nDelivery Kilimani 150\nCall/WhatsApp 0712 345 678\nLipa na M-Pesa Till 552211",
+   "expected": [
+    [
+     "Chapati",
+     "products"
+    ],
+    [
+     "Chips Mayai",
+     "products"
+    ],
+    [
+     "Mutura",
+     "products"
+    ],
+    [
+     "Smokie pasua",
+     "products"
+    ],
+    [
+     "Tea",
+     "products"
+    ],
+    [
+     "Kilimani",
+     "coverage"
+    ],
+    [
+     "0712 345 678",
+     "profile"
+    ],
+    [
+     "Till 552211",
+     "payments"
+    ],
+    [
+     "MAMA OLIECH KITCHEN",
+     "profile"
+    ]
+   ],
+   "mock": [
+    {
+     "target": "profile",
+     "profile_field": "business_name",
+     "text": "Mama Oliech Kitchen",
+     "confidence": "high",
+     "evidence": "MAMA OLIECH KITCHEN"
+    },
+    {
+     "target": "products",
+     "name": "Chapati",
+     "price": "30/=",
+     "confidence": "high",
+     "evidence": "Chapati 30/="
+    },
+    {
+     "target": "products",
+     "name": "Chips Mayai",
+     "price": "250",
+     "confidence": "high",
+     "evidence": "Chips Mayai 250"
+    },
+    {
+     "target": "products",
+     "name": "Mutura",
+     "price": "100",
+     "confidence": "high",
+     "evidence": "Mutura 100"
+    },
+    {
+     "target": "products",
+     "name": "Smokie pasua",
+     "price": "60",
+     "confidence": "high",
+     "evidence": "Smokie pasua 60"
+    },
+    {
+     "target": "products",
+     "name": "Tea",
+     "unit": "cup",
+     "price": "50",
+     "confidence": "high",
+     "evidence": "Tea (cup) 50"
+    },
+    {
+     "target": "coverage",
+     "area": "Kilimani",
+     "fee_ksh": 150,
+     "confidence": "medium",
+     "alt_target": "",
+     "evidence": "Delivery Kilimani 150"
+    },
+    {
+     "target": "profile",
+     "profile_field": "phone",
+     "text": "0712 345 678",
+     "confidence": "high",
+     "evidence": "Call/WhatsApp 0712 345 678"
+    },
+    {
+     "target": "payments",
+     "text": "Lipa na M-Pesa Till 552211",
+     "confidence": "high",
+     "evidence": "Till 552211"
+    }
+   ]
+  },
+  {
+   "id": "price_list",
+   "kind": "cleaning price list",
+   "source": "SparkleHome Cleaners price list\nDeep cleaning 1 bedroom Ksh 3,500\nSofa cleaning per seat 500-800\nCarpet cleaning from 1,000\nMove-out cleaning: price on request\n50% deposit to book. Cancel 24h before or lose deposit.",
+   "expected": [
+    [
+     "Deep cleaning",
+     "services"
+    ],
+    [
+     "Sofa cleaning",
+     "services"
+    ],
+    [
+     "Carpet cleaning",
+     "services"
+    ],
+    [
+     "Move-out cleaning",
+     "services"
+    ],
+    [
+     "deposit",
+     "policies"
+    ],
+    [
+     "Cancel",
+     "policies"
+    ]
+   ],
+   "mock": [
+    {
+     "target": "services",
+     "name": "Deep cleaning 1 bedroom",
+     "price": "Ksh 3,500",
+     "confidence": "high",
+     "evidence": "Deep cleaning 1 bedroom Ksh 3,500"
+    },
+    {
+     "target": "services",
+     "name": "Sofa cleaning",
+     "unit": "per seat",
+     "price": "500-800",
+     "confidence": "high",
+     "evidence": "Sofa cleaning per seat 500-800"
+    },
+    {
+     "target": "services",
+     "name": "Carpet cleaning",
+     "price": "from 1,000",
+     "confidence": "high",
+     "evidence": "Carpet cleaning from 1,000"
+    },
+    {
+     "target": "services",
+     "name": "Move-out cleaning",
+     "price": "ask",
+     "confidence": "high",
+     "evidence": "Move-out cleaning: price on request"
+    },
+    {
+     "target": "policies",
+     "policy_kind": "deposit",
+     "text": "50% deposit to book.",
+     "confidence": "high",
+     "evidence": "50% deposit to book."
+    },
+    {
+     "target": "policies",
+     "policy_kind": "cancellation",
+     "text": "Cancel 24h before or lose the deposit.",
+     "confidence": "high",
+     "evidence": "Cancel 24h before or lose deposit."
+    }
+   ]
+  },
+  {
+   "id": "flyer",
+   "kind": "business flyer",
+   "source": "GLOW SALON & SPA\nWe do braids, nails and facials for the modern Nairobi woman.\nWestlands, Mpaka Road, opposite Sarit Centre\nOpen Mon-Sat 8am-8pm, Sunday 10am-4pm\nwww.glowsalon.co.ke | IG @glowsalonke | glow@salon.co.ke",
+   "expected": [
+    [
+     "GLOW SALON",
+     "profile"
+    ],
+    [
+     "braids",
+     "profile"
+    ],
+    [
+     "Mpaka Road",
+     "locations"
+    ],
+    [
+     "hours",
+     "hours"
+    ],
+    [
+     "glowsalon.co.ke",
+     "profile"
+    ],
+    [
+     "@glowsalonke",
+     "profile"
+    ],
+    [
+     "glow@salon.co.ke",
+     "profile"
+    ]
+   ],
+   "mock": [
+    {
+     "target": "profile",
+     "profile_field": "business_name",
+     "text": "Glow Salon & Spa",
+     "confidence": "high",
+     "evidence": "GLOW SALON & SPA"
+    },
+    {
+     "target": "profile",
+     "profile_field": "description",
+     "text": "We do braids, nails and facials.",
+     "confidence": "high",
+     "evidence": "We do braids, nails and facials"
+    },
+    {
+     "target": "locations",
+     "name": "Westlands",
+     "address": "Mpaka Road, Westlands",
+     "landmark": "opposite Sarit Centre",
+     "confidence": "high",
+     "evidence": "Westlands, Mpaka Road, opposite Sarit Centre"
+    },
+    {
+     "target": "hours",
+     "days": {
+      "mon": "08:00-20:00",
+      "tue": "08:00-20:00",
+      "wed": "08:00-20:00",
+      "thu": "08:00-20:00",
+      "fri": "08:00-20:00",
+      "sat": "08:00-20:00",
+      "sun": "10:00-16:00"
+     },
+     "confidence": "high",
+     "evidence": "hours: Open Mon-Sat 8am-8pm"
+    },
+    {
+     "target": "profile",
+     "profile_field": "website",
+     "text": "www.glowsalon.co.ke",
+     "confidence": "high",
+     "evidence": "www.glowsalon.co.ke"
+    },
+    {
+     "target": "profile",
+     "profile_field": "social",
+     "text": "@glowsalonke",
+     "confidence": "high",
+     "evidence": "IG @glowsalonke"
+    },
+    {
+     "target": "profile",
+     "profile_field": "email",
+     "text": "glow@salon.co.ke",
+     "confidence": "high",
+     "evidence": "glow@salon.co.ke"
+    }
+   ]
+  },
+  {
+   "id": "faq_page",
+   "kind": "FAQ page",
+   "source": "FAQs\nDo you deliver on Sundays? Yes, until 2pm.\nCan I return a book? Within 7 days with a receipt.\nIs there parking? Yes, free in the basement.\nDo you accept card? Yes, Visa and M-Pesa.",
+   "expected": [
+    [
+     "Sundays",
+     "faqs"
+    ],
+    [
+     "return a book",
+     "policies"
+    ],
+    [
+     "parking",
+     "faqs"
+    ],
+    [
+     "card",
+     "payments"
+    ]
+   ],
+   "mock": [
+    {
+     "target": "faqs",
+     "question": "Do you deliver on Sundays?",
+     "answer": "Yes, until 2pm.",
+     "confidence": "high",
+     "evidence": "Do you deliver on Sundays?"
+    },
+    {
+     "target": "policies",
+     "policy_kind": "returns",
+     "text": "Returns within 7 days with a receipt.",
+     "confidence": "medium",
+     "alt_target": "faqs",
+     "evidence": "Can I return a book?"
+    },
+    {
+     "target": "faqs",
+     "question": "Is there parking?",
+     "answer": "Yes, free in the basement.",
+     "confidence": "high",
+     "evidence": "Is there parking?"
+    },
+    {
+     "target": "payments",
+     "text": "Visa card and M-Pesa.",
+     "confidence": "high",
+     "evidence": "Do you accept card?"
+    }
+   ],
+   "unsure": [
+    "return a book"
+   ]
+  },
+  {
+   "id": "delivery_areas",
+   "kind": "delivery areas list",
+   "source": "Delivery areas and fees\nRuaka 200\nKileleshwa 250\nSyokimau 400 (next day)\nAnywhere else: we quote\nDelivery box 50",
+   "expected": [
+    [
+     "Ruaka",
+     "coverage"
+    ],
+    [
+     "Kileleshwa",
+     "coverage"
+    ],
+    [
+     "Syokimau",
+     "coverage"
+    ],
+    [
+     "Delivery box",
+     "products"
+    ]
+   ],
+   "mock": [
+    {
+     "target": "coverage",
+     "area": "Ruaka",
+     "fee_ksh": 200,
+     "confidence": "high",
+     "evidence": "Ruaka 200"
+    },
+    {
+     "target": "coverage",
+     "area": "Kileleshwa",
+     "fee_ksh": 250,
+     "confidence": "high",
+     "evidence": "Kileleshwa 250"
+    },
+    {
+     "target": "coverage",
+     "area": "Syokimau",
+     "fee_ksh": 400,
+     "eta": "next day",
+     "confidence": "high",
+     "evidence": "Syokimau 400 (next day)"
+    },
+    {
+     "target": "products",
+     "name": "Delivery box",
+     "price": "50",
+     "confidence": "low",
+     "alt_target": "coverage",
+     "evidence": "Delivery box 50"
+    }
+   ],
+   "unsure": [
+    "Delivery box"
+   ]
+  }
+ ]
+}

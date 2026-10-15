@@ -46,6 +46,10 @@ async function generateGeminiContent(opts: {
   maxOutputTokens?: number;
   timeoutMs?: number;
   model?: string;
+  /** Structured output: e.g. "application/json". Omitted = free text (unchanged default). */
+  responseMimeType?: string;
+  /** OpenAPI-subset schema; only sent with responseMimeType. */
+  responseSchema?: Record<string, unknown>;
 }): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -82,6 +86,10 @@ async function generateGeminiContent(opts: {
         generationConfig: {
           temperature: opts.temperature ?? 0.35,
           maxOutputTokens: opts.maxOutputTokens ?? 2048,
+          ...(opts.responseMimeType ? { responseMimeType: opts.responseMimeType } : {}),
+          ...(opts.responseMimeType && opts.responseSchema
+            ? { responseSchema: opts.responseSchema }
+            : {}),
         },
       }),
     });
@@ -174,5 +182,27 @@ export async function generateGeminiMultimodal(opts: {
     maxOutputTokens: opts.maxOutputTokens,
     timeoutMs: opts.timeoutMs,
     model: audioModel,
+  });
+}
+
+/** Structured JSON generation (text and/or inline image/PDF parts). Defaults unchanged elsewhere. */
+export async function generateGeminiJson(opts: {
+  systemInstruction: string;
+  parts: GeminiPart[];
+  responseSchema: Record<string, unknown>;
+  temperature?: number;
+  maxOutputTokens?: number;
+  timeoutMs?: number;
+  model?: string;
+}): Promise<string> {
+  return generateGeminiContent({
+    systemInstruction: opts.systemInstruction,
+    parts: opts.parts,
+    temperature: opts.temperature ?? 0.2,
+    maxOutputTokens: opts.maxOutputTokens ?? 8192,
+    timeoutMs: opts.timeoutMs ?? 45_000,
+    model: opts.model || process.env.GEMINI_IMPORT_MODEL || undefined,
+    responseMimeType: "application/json",
+    responseSchema: opts.responseSchema,
   });
 }

@@ -100,6 +100,7 @@ import {
 import {
   emptyLocation,
   upgradeLegacyPlace,
+  placeLocationLine,
   normalizeBusinessLocations,
   type BusinessLocation,
 } from "@/lib/businessLocations";
@@ -239,12 +240,6 @@ function extractLocationFallback(businessHours: string): string {
   return text;
 }
 
-function placeLocationLine(loc: Pick<BusinessLocation, "label" | "address" | "landmark">): string {
-  return [loc.label, loc.address, loc.landmark]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(" · ");
-}
 
 const initial: SettingsCompileState = {};
 
@@ -830,10 +825,13 @@ function TenantFormInner({
       );
       return;
     }
+    // Computed from the current list so the pager can jump to the last page in the same tick.
+    const nextCount = Math.min(40, services.filter((s) => s.name.trim()).length + parsed.length);
     setServices((prev) => {
       const existing = prev.filter((s) => s.name.trim());
       return [...existing, ...parsed].slice(0, 40);
     });
+    setServicePage(Math.max(0, Math.ceil(nextCount / SERVICE_PAGE_SIZE) - 1));
     saveAfterPasteRef.current = true;
     setBulkServicesText("");
     setBulkServicesError(null);
@@ -1314,7 +1312,12 @@ function TenantFormInner({
         >
         <div className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <p className={settingsBlockTitleClass}>Services</p>
+            <p className={settingsBlockTitleClass}>
+              Services
+              <span className="ml-2 font-normal tabular-nums text-ink-2">
+                ({services.filter((s) => s.name.trim()).length})
+              </span>
+            </p>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
