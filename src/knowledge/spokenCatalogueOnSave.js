@@ -17,12 +17,10 @@ const { compileSpokenCatalogue, needsRegeneration } = require('./spokenCatalogue
 
 const ON = /^(1|true|on|yes)$/i;
 const enabled = (env = process.env) => ON.test(String(env.SPOKEN_CATALOGUE_ON_SAVE || '').trim());
-const TENANT_COLS = 'id,services_catalog,product_catalog,service_areas,business_locations,spoken_catalogue';
+const TENANT_COLS = require('./spokenCatalogue').CATALOGUE_COLS.join(',');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function profileFromRow(r) {
-  return { tenantId: r.id, servicesCatalog: r.services_catalog || [], productCatalog: r.product_catalog || [], serviceAreas: r.service_areas || null, businessLocations: r.business_locations || [] };
-}
+const profileFromRow = (r) => require('./spokenCatalogue').catalogueProfileFromRow(r);
 
 // generate wrapped with a hard timeout; the error is a code, never model text
 function withTimeout(generate, ms) {

@@ -5,7 +5,7 @@
 // tenant's spoken catalogue (src/knowledge/spokenCatalogue.js) is the only data
 // for service words, categories, explanations and prices, in the locked language.
 const { validate } = require('./catalogue');
-const { resolveSpokenCatalogue } = require('../../knowledge/spokenCatalogue');
+const { resolveSpokenCatalogueMeta } = require('../../knowledge/spokenCatalogue');
 const N = require('./nlu');
 
 const ON = /^(1|true|on|yes)$/i;
@@ -56,14 +56,15 @@ async function modelCommand({ model, text, sc, lang, timeoutMs }) {
 }
 async function runCatalogueStep({ text, profile, lang, state, model = null, timeoutMs = 700 }) {
   const M = require('./machine');
-  const sc = resolveSpokenCatalogue(profile || {});
+  const scMeta = resolveSpokenCatalogueMeta(profile || {});
+  const sc = scMeta.doc;
   if (!sc.entries.length) return { line: null, trace: { step: 'catalogue', yield: 'empty_catalogue' } };
   const holder = state || {};
   const v2 = (holder.v2CatalogueState ||= M.createState({ profile }));
   let mc = null;
   if (typeof model === 'function') mc = await modelCommand({ model, text, sc, lang, timeoutMs });
   const r = M.catalogueTurn(v2, { text, profile, lang, command: mc?.command || null });
-  const trace = { step: 'catalogue', lang, kind: r?.kind || null, source: mc?.command ? 'model' : 'nlu', modelMs: mc?.ms ?? null, modelError: mc?.error || null, command: mc?.command || null, scVersion: sc.version, scHash: sc.sourceHash.slice(0, 12) };
+  const trace = { step: 'catalogue', lang, kind: r?.kind || null, source: mc?.command ? 'model' : 'nlu', modelMs: mc?.ms ?? null, modelError: mc?.error || null, command: mc?.command || null, scVersion: sc.version, scHash: sc.sourceHash.slice(0, 12), ...(scMeta.stale ? { scStale: true } : {}), ...(scMeta.degraded ? { scDegraded: true } : {}) };
   return r ? { line: r.line, trace } : { line: null, trace: { ...trace, yield: 'not_catalogue' } };
 }
 module.exports = { looksCatalogue, catalogueStepEnabled, commandSchema, validateCommand, buildCommandRequest, parseCommandResponse, modelCommand, runCatalogueStep };
