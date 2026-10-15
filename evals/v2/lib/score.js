@@ -20,6 +20,19 @@ function langOf(line) {
 
 const EAT = (iso) => { if (!iso) return null; const d = new Date(iso); if (isNaN(d)) return null; const e = new Date(d.getTime() + 3 * 3600e3); return e.toISOString().slice(0, 16).replace('T', ' '); };
 
+// Alvin (15 Oct): the caller repeating the read-back time exactly is a yes. Own tiny parser: EN "10am"/"10:00",
+// SW "saa 4"/"saa nne" (Swahili clock, +6h); compared with the time in the read-back line.
+const SWN = { moja: 1, mbili: 2, tatu: 3, nne: 4, tano: 5, sita: 6, saba: 7, nane: 8, tisa: 9, kumi: 10 };
+function hourOf(s) {
+  const t = String(s || '').toLowerCase();
+  let m = t.match(/\bsaa\s+(kumi na (?:moja|mbili)|\d{1,2}|moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi)\b/);
+  if (m) { const n = /kumi na moja/.test(m[1]) ? 11 : /kumi na mbili/.test(m[1]) ? 12 : SWN[m[1]] || Number(m[1]); return ((n % 12) + 6) % 24; }
+  m = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/); if (m) return (Number(m[1]) % 12) + (m[3] === 'pm' ? 12 : 0);
+  m = t.match(/\b(\d{1,2}):(\d{2})\b/); if (m) return Number(m[1]);
+  return null;
+}
+function timeEcho(caller, prev) { if (/\b(no|not|hapana|si|sio)\b/i.test(caller)) return false; const a = hourOf(caller), b = hourOf(prev); return a != null && a === b; }
+
 function scoreRun(scn, run) {
   const fails = [];
   const claims = [];
@@ -125,7 +138,7 @@ function scoreRun(scn, run) {
       const prev = turns[idx - 1]?.agentLine || '';
       const yes = /^(yes|yeah|yep|ok|okay|sure|correct|ndio|ndiyo|sawa|poa|fiti|go ahead)\b/i.test(t.callerText.trim()) || /\b(actually|wait|ngoja)\b.{0,10}\b(yes|ndio)\b/i.test(t.callerText);
       const readBack = /\?\s*$/.test(prev) && /\b(shall|should|go ahead|confirm|correct|right|is that|niendelee|nithibitishe|ni sawa|sawa\?)\b/i.test(prev);
-      if (!(yes && readBack)) readbackViol++;
+      if (!((yes || timeEcho(t.callerText, prev)) && readBack)) readbackViol++;
     });
     if (readbackViol) fails.push(`readback_yes_missing x${readbackViol}`);
   }

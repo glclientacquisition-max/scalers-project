@@ -280,7 +280,8 @@ function resetIntent(state) {
 
 function echoAffirms(p, u) {
   if (u.negation || u.no) return false;
-  if (p.tool === 'create_booking' && u.when && (u.when.time === p.when.time || u.when.date === p.when.date) && (!u.when.time || u.when.time === p.when.time) && (!u.when.date || u.when.date === p.when.date)) return true;
+  // Alvin (15 Oct): the caller repeating the read-back TIME exactly ("saa 4", "Uh, 10am") is a yes; a day alone is not
+  if ((p.tool === 'create_booking' || p.tool === 'update_booking') && u.when && u.when.time && u.when.time === p.when.time && (!u.when.date || u.when.date === p.when.date)) return true;
   return false;
 }
 function pendingChanged(p, state) {
@@ -465,8 +466,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     const p = state.pending;
     mergeSlots(state, u, profile);
     // a read-back commits only on an explicit yes; a caller repeating the time back is asked yes/no once
-    if (!u.yes && echoAffirms(p, u) && !pendingChanged(p, state) && !state.echoAsked) { state.echoAsked = true; return out(R.ask('yes_no', 0, lang, { q: (String(state.lastBase || '').match(/[^.!?]+\?\s*$/) || [''])[0].trim() })); }
-    if (u.done && !/^\W*(yes|ndio|ndiyo)\b/i.test(u.text) ? false : u.yes && !pendingChanged(p, state)) {
+    if (u.done && !/^\W*(yes|ndio|ndiyo)\b/i.test(u.text) ? false : (u.yes || echoAffirms(p, u)) && !pendingChanged(p, state)) {
       if (p.tool === 'create_handoff' && p.kind === 'quote') {}
       const { rec, toolResult } = await commit(state, p, handlers);
       results.push(toolResult);
@@ -483,6 +483,8 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     if (u.no || u.done) { resetIntent(state); state.outcomes.push('declined'); return out(u.done ? R.info({ kind: 'bye' }, lang) : R.info({ kind: 'decline' }, lang), { end: u.done }); }
     // unrelated answer: re-read once, then hand off
     state.pendingRepeats = (state.pendingRepeats || 0) + 1;
+    // not clearly yes or no and no new question: one yes/no re-ask; otherwise re-read once
+    if (state.pendingRepeats <= 1 && !state.echoAsked && !u.intents.length) { state.echoAsked = true; return out(R.ask('yes_no', 0, lang, { q: (String(R.readback(p, lang) || '').match(/[^.!?]+\?\s*$/) || [''])[0].trim() })); }
     if (state.pendingRepeats <= 1) { const line = propose(state, { ...p }); return out(line); }
     state.pendingRepeats = 0;
     if (p.tool === 'create_handoff') { resetIntent(state); } else { state.phase = 'collect'; state.pending = null; }

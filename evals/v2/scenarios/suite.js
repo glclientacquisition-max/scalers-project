@@ -178,16 +178,27 @@ module.exports = [
   { id: 'S55_sw_kesho_daytime_no_confirm', area: 'dates', lang: 'sw', tenant: 'done_and_dusted', commitment: true, mustNotSay: ['Unamaanisha'],
     turns: ['Nataka kubook sofa cleaning kesho saa nne asubuhi.'], facts: { name: 'Otieno', place: 'Ruiru', when: 'kesho saa nne asubuhi' },
     expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-15 10:00', place: 'Ruiru', callerName: 'Otieno' } } },
-  // Read-back confirms only on an explicit yes: a caller who repeats the time back is asked yes/no once
-  { id: 'S56_en_readback_echo_needs_yes', area: 'readback', lang: 'en', tenant: 'done_and_dusted', commitment: true, mustSay: ['yes or no'],
-    turns: ['Book sofa cleaning Friday at 10am.'], facts: { name: 'Alvin', place: 'Kitengela', onReadback: ['Friday at 10am.', '10am, Friday.'] },
+  // Alvin (15 Oct, option b): repeating the read-back time exactly is a yes and books; a different time is a change
+  { id: 'S56_en_readback_echo_books', area: 'readback', lang: 'en', tenant: 'done_and_dusted', commitment: true, mustNotSay: ['yes or no'],
+    turns: ['Book sofa cleaning Friday at 10am.'], facts: { name: 'Alvin', place: 'Kitengela', onReadback: ['Friday at 10am.', 'Uh, 10am.'] },
     expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-16 10:00' } } },
-  { id: 'S57_sw_readback_echo_needs_yes', area: 'readback', lang: 'sw', tenant: 'done_and_dusted', commitment: true, mustSay: ['ndio au hapana'],
-    turns: ['Nataka kubook sofa cleaning Ijumaa saa nne asubuhi.'], facts: { name: 'Otieno', place: 'Ruiru', onReadback: ['Ijumaa saa nne asubuhi.', 'Saa nne, Ijumaa.'] },
+  { id: 'S57_sw_readback_echo_books', area: 'readback', lang: 'sw', tenant: 'done_and_dusted', commitment: true, mustNotSay: ['ndio au hapana'],
+    turns: ['Nataka kubook sofa cleaning Ijumaa saa nne asubuhi.'], facts: { name: 'Otieno', place: 'Ruiru', onReadback: ['Ijumaa saa nne asubuhi.', 'Eeh, saa 4.'] },
     expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-16 10:00' } } },
-  { id: 'S58_sheng_readback_echo_needs_yes', area: 'readback', lang: 'sheng', tenant: 'done_and_dusted', commitment: true, mustSay: ['ndio au hapana'],
+  { id: 'S58_sheng_readback_echo_books', area: 'readback', lang: 'sheng', tenant: 'done_and_dusted', commitment: true, mustNotSay: ['ndio au hapana'],
     turns: ['Niaje, nataka ku-book carpet cleaning Ijumaa saa nane mchana.'], facts: { name: 'Kevo', place: 'Kasarani', onReadback: ['Saa nane mchana, Ijumaa.', 'Ijumaa saa nane.'] },
     expect: { appointments: 1, appointment: { service: 'carpet', startEAT: '2026-10-16 14:00' } } },
+  // a different time at the read-back is a change (re-read with the new time), never a yes
+  { id: 'S62_en_readback_other_time_is_change', area: 'readback', lang: 'en', tenant: 'done_and_dusted', commitment: true, mustSay: ['Friday 16 October at 11:00 in .*Shall I book it'],
+    turns: ['Book sofa cleaning Friday at 10am.'], facts: { name: 'Alvin', place: 'Kitengela', onReadback: ['11am.', 'Uh, 11am.'] },
+    expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-16 11:00' } } },
+  { id: 'S63_sw_readback_other_time_is_change', area: 'readback', lang: 'sw', tenant: 'done_and_dusted', commitment: true, mustSay: ['saa tano asubuhi.*Nithibitishe\\?'],
+    turns: ['Nataka kubook sofa cleaning Ijumaa saa nne asubuhi.'], facts: { name: 'Otieno', place: 'Ruiru', onReadback: ['Saa tano.', 'Eeh, saa 5.'] },
+    expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-16 11:00' } } },
+  // a day alone (not the time) is not clearly yes: one yes/no re-ask, then the yes books
+  { id: 'S64_en_readback_day_only_reasks', area: 'readback', lang: 'en', tenant: 'done_and_dusted', commitment: true, mustSay: ['yes or no'],
+    turns: ['Book sofa cleaning Friday at 10am.'], facts: { name: 'Alvin', place: 'Kitengela', onReadback: ['Friday.', 'Uh, Friday.'] },
+    expect: { appointments: 1, appointment: { service: 'sofa', startEAT: '2026-10-16 10:00' } } },
   // "next Friday" while this week's Friday is still ahead: asked once, naming both dates
   { id: 'S59_en_next_friday_asked', area: 'dates', lang: 'en', tenant: 'done_and_dusted', commitment: true, mustSay: ['16th.*23rd'],
     turns: ['Book carpet cleaning next Friday at 10am.'], facts: { name: 'Alvin', place: 'Kitengela', kesho: ['The 23rd.', 'Next week, the 23rd.'] },

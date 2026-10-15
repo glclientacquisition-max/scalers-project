@@ -19,3 +19,8 @@ Not covered (needs audio): TTS + 8 kHz telephone noise, matatu/background noise,
 Suite S56-S61 added (echo instead of yes EN/SW/Sheng, next Friday EN/SW, right-now near close); they failed on 51e7be7f and pass now.
 Edge: 246 base cases 245/246 pass^4; 1,406 variants 1,404/1,406. Bar 20/21: HD_212 replay now fails by design
 (the recorded caller repeats "saa 4" at the read-back and the call ends, so v2 asks yes/no and writes nothing; the label expects a booking).
+
+## Option (b) (Alvin, 15 Oct): exact time repeat at the read-back is a yes
+Exact repeat of the read-back time books; a different time is a change (re-read); a day alone or other unclear reply gets one yes/no re-ask.
+Suite 64/64 pass^4 (S56-S58 expect a booking, S62-S63 other time, S64 day only). Bar 21/21. HD_212 label unchanged, passes.
+Edge: 251 base 250/251; 1,441 variants 1,439/1,441 (residue: SW-paraphrased opening then English answers, code-switch follow).

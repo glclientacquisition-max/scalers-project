@@ -95,15 +95,17 @@ test('read-back: "No wait, actually yes" books; a barge-in correction re-reads',
   assert.match(b.lines[3], /Saturday 17 October.*Shall I book it\?$/);
 });
 
-test('read-back: repeating the time back is not a yes; asked yes/no once, commits only on the yes', async () => {
-  const a = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'Friday at 10am.', 'Yes.']);
-  assert.match(a.lines[3], /^Please say yes or no: shall I book it\?$/);
-  assert.match(a.lines[4], /^Done, your sofa cleaning is booked/);
-  const b = await talk(['Nataka sofa cleaning Ijumaa saa nne asubuhi.', 'Ruiru', 'Otieno', 'Ijumaa saa nne.', 'Poa.']);
-  assert.match(b.lines[3], /^Tafadhali sema ndio au hapana: nithibitishe\?$/);
-  assert.match(b.lines[4], /nimeweka Sofa Cleaning/);
-  const c = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', '10am.', '10am.']);
-  assert.ok(!c.out.some((o) => o.toolResults.length), 'echo never writes');
+test('read-back: an exact repeat of the time is a yes (Alvin, option b); another time is a change; a day alone gets one yes/no re-ask', async () => {
+  const a = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'Uh, 10am.']);
+  assert.match(a.lines[3], /^Done, your sofa cleaning is booked for Friday 16 October at 10:00/);
+  const b = await talk(['Nataka sofa cleaning Ijumaa saa nne asubuhi.', 'Ruiru', 'Otieno', 'Eeh, saa 4.']);
+  assert.match(b.lines[3], /nimeweka Sofa Cleaning/);
+  const c = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', '11am.']);
+  assert.match(c.lines[3], /at 11:00 in Kitengela.*Shall I book it\?$/); assert.ok(!c.out[3].toolResults.length, 'a different time never writes');
+  const d = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'Friday.', 'Yes.']);
+  assert.match(d.lines[3], /^Please say yes or no: shall I book it\?$/); assert.match(d.lines[4], /^Done/);
+  const e = await talk(['Nataka sofa cleaning Ijumaa saa nne asubuhi.', 'Ruiru', 'Otieno', 'Hmm, sijui.', 'Poa.']);
+  assert.match(e.lines[3], /^Tafadhali sema ndio au hapana: nithibitishe\?$/); assert.match(e.lines[4], /nimeweka/);
 });
 
 test('"next Friday" while this Friday is ahead: asked once naming both dates; on a Friday it is not asked', async () => {
