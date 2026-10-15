@@ -414,7 +414,7 @@ function applyAckRule(state, line, { ackOk, acked, callerAck, lang }) {
 }
 function noteAck(state, line) { state.lastAckLed = isAckLed(line); if (state.lastAckLed) state.lastAckTurn = state.turn; }
 
-async function runTurn(state, { text, profile = {}, now = new Date(), handlers, model = null, langLock = null, acked = false }) {
+async function runTurnInner(state, { text, profile = {}, now = new Date(), handlers, model = null, langLock = null, acked = false }) {
   state.turn += 1; state.now = now;
   const prevLang = state.lang;
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
@@ -631,5 +631,49 @@ function catalogueTurn(state, { text, profile = {}, lang, command = null, now = 
   else if (u.intents.includes('services')) { kind = 'services'; line = infoAnswer(state, u, profile, 'services'); }
   if (line) { state.lastLine = line; state.lastInfo = kind; } else state.lastInfo = null;
   return line ? { line, kind, service: u.service?.name || null } : null;
+}
+// BRAIN_V2_TOPIC_PROPOSALS (default off): topic inheritance (filler / ack / barge-in keeps the
+// catalogue topic for TOPIC_TTL turns), one "which service?" per turn and never twice in a row,
+// and the turn's output exposed as a proposal for Voice's TurnArbiter. Off: runTurnInner as is.
+const TP = require('./topic');
+const TOPIC_KINDS = { services: 'catalogue', explain: 'explain', price: 'price', coverage: 'area' };
+async function runTurn(state, args) {
+  if (!TP.enabled()) return runTurnInner(state, args);
+  const lastLine = state.lastLine || '';
+  const topic = TP.liveTopic(state, state.turn + 1);
+  if (topic && topic.kind === 'catalogue' && !state.offer && !state.intent && TP.inheritsTopic(args.text) && !/\b(bye|kwaheri|asante|thank)/i.test(String(args.text || ''))) {
+    state.turn += 1;
+    const q = TP.openQuestion(lastLine) || (L.isSw(state.lang) ? 'Ungependa ipi?' : 'Which would you like?');
+    state.lastLine = q;
+    state.lastBase = q;
+    return { line: q, lang: state.lang, source: 'receipt', toolResults: [], end: false, proposals: [TP.proposal({ kind: 'reprompt', text: q, lang: state.lang, topic: { ...topic, now: state.turn }, claim: true })] };
+  }
+  const turn0 = state.turn;
+  if (topic && !state.intent) {
+    const doc = TP.pinDoc(state, args.profile) || SC.resolveSpokenCatalogue(args.profile || {});
+    const f = require('./proposals').followUp({ text: args.text, doc, lang: L.isSw(state.lang) ? 'sw' : 'en', profile: { ...(args.profile || {}), spokenCataloguePin: { doc: doc } }, state: { v2CatalogueState: state }, topicIds: topic.itemIds });
+    if (f) {
+      state.lastLine = f.text; state.lastBase = f.text; state.lastInfo = f.kind === 'price' ? 'price' : 'explain';
+      TP.setTopic(state, { kind: f.kind, itemIds: f.itemIds, turn: state.turn });
+      const svc = f.itemIds.length === 1 ? (args.profile?.servicesCatalog || args.profile?.services || []).find((x) => x.id === f.itemIds[0]) : null;
+      if (state.turn === turn0) state.turn += 1;
+      if (svc) { state.offer = 'book'; state.offerService = svc.name; }
+      return { line: f.text, lang: state.lang, source: 'receipt', toolResults: [], end: false, proposals: [TP.proposal({ kind: f.kind, text: f.text, lang: state.lang, topic: { ...state.topic, now: state.turn }, claim: true })] };
+    }
+  }
+  // booking right after an explained item books that item
+  if (topic && state.offerService && !state.slots.service && /\b(book|kubook|nataka|I want|I'd like)\b/i.test(String(args.text || ''))) state.slots.service = state.offerService;
+  const before = JSON.stringify(state.infoRepeat || {});
+  const r = await runTurnInner(state, args);
+  const infoTurn = JSON.stringify(state.infoRepeat || {}) !== before;
+  if (r && r.line) {
+    const d = TP.dedupeQuestions(r.line, { lastLine });
+    if (d && d !== r.line) { r.line = d; state.lastLine = d; }
+  }
+  const kind = infoTurn ? TOPIC_KINDS[state.lastInfo] || null : null;
+  if (kind && r?.line && state.lastLine === r.line) TP.setTopic(state, { kind, itemIds: [], turn: state.turn });
+  else if (!topic || !TP.inheritsTopic(args.text)) TP.clearTopic(state);
+  if (r) r.proposals = r.line ? [TP.proposal({ kind: kind || 'turn', text: r.line, lang: state.lang, topic: kind ? { ...state.topic, now: state.turn } : null, claim: Boolean(kind) })] : [];
+  return r;
 }
 module.exports = { createState, runTurn, finishCall, catalogueTurn };
