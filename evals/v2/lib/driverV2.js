@@ -5,11 +5,13 @@
 const path = require('path');
 const { createFcModel } = require('./fcModel');
 
-async function runCallV2({ root, profile, seed, callerPhone = '+254700000001', caller, maxTurns = 14, now, businessName, scenarioId = 'x', modelSeed = 1, fcModel }, createFakeDb) {
+async function runCallV2({ root, profile, seed, callerPhone = '+254700000001', caller, maxTurns = 14, now, businessName, scenarioId = 'x', modelSeed = 1, fcModel, callLanguage = null }, createFakeDb) {
   const V2 = require(path.join(root, 'src/conversation/v2'));
   const { db, handlers } = createFakeDb(seed, callerPhone);
   const openRows = (seed?.appointments || []).filter((a) => a.caller_phone === callerPhone);
   const state = V2.createState({ profile, callerPhone, contactName: seed?.contactName || null, openRows, pendingTasks: seed?.pendingTasks || [] });
+  // Live calls start with the STT-detected call language (server.js callLanguage); replays seed it from the fixture.
+  if (callLanguage && /^(sw|en)$/.test(callLanguage)) state.lang = callLanguage;
   const model = fcModel || createFcModel({ scenarioId, seed: modelSeed });
   const turns = [];
   const all = [];
