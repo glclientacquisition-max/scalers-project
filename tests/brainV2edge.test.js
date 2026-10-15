@@ -139,3 +139,30 @@ test('HD_89aa48bf657f: plain service categories, explain without push, no early 
   const c = await talk(['Nataka booking.', 'Sofa', 'Okay, thank you.']);
   assert.match(c.lines[2], /Goodbye|Kwaheri/i);
 });
+
+test('topic context: "what exactly... which" right after a services answer is a services follow-up', async () => {
+  const r = await talk(['What services do you offer?', 'What exactly do you clean, which ones?']);
+  assert.match(r.lines[1], /^Mattresses, sofas, carpets.*homes with one, two or three bedrooms.*offices\. Which would you like\?$/);
+  const s = await talk(['Mnafanya huduma gani?', 'Zipi hasa?']);
+  assert.match(s.lines[1], /^Usafi wa magodoro.*nyumba ya vyumba kimoja, viwili, vitatu.*Ungependa ipi\?$/);
+  const e = await talk(['What services do you offer?', 'Which one is the deep cleaning?']);
+  assert.match(e.lines[1], /^It means a more thorough clean/);
+  const n = await talk(['Which day are you open?']);
+  assert.doesNotMatch(n.lines[0], /Mattresses|Which would you like/, 'no topic, no follow-up');
+});
+
+test('area clarify: only ambiguity groups that touch the tenant places', async () => {
+  const N = require('../src/conversation/v2/nlu');
+  const g = N.areaAmbiguity('in Rongai', DD);
+  assert.deepEqual(g.options.map((o) => `${o.name}/${o.county}/${o.listed}`), ['Ongata Rongai/Kajiado/true', 'Rongai/Nakuru/false']);
+  assert.equal(N.areaAmbiguity('in Ongata Rongai', DD), null, 'full name said');
+  assert.equal(N.areaAmbiguity('Rongai, Nakuru', DD), null, 'county said');
+  assert.equal(N.areaAmbiguity('in Kiambu', DD), null, 'same county, not ambiguous');
+  const far = { ...DD, serviceAreas: { areas: [{ id: 'county:mombasa' }] } };
+  assert.equal(N.areaAmbiguity('in Rongai', far), null, 'group does not touch our places');
+  const r = await talk(['Book sofa cleaning tomorrow at 10am in Rongai.', 'Kajiado', 'Alvin']);
+  assert.equal(r.lines[0], 'Is that Ongata Rongai in Kajiado or Rongai in Nakuru?');
+  assert.match(r.lines[2], /in Ongata Rongai, for Alvin\. Shall I book it\?$/);
+  const s = await talk(['Mnafika Rongai?', 'Nakuru']);
+  assert.match(s.lines[1], /^Nakuru haiko kwenye orodha/);
+});

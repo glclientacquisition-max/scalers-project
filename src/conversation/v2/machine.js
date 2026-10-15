@@ -311,7 +311,7 @@ function infoAnswer(state, u, profile, kind) {
     if (u.products[0]) return R.info({ kind: 'offered', label: u.products[0].name, price: u.products[0].price ? `KSh ${u.products[0].price}` : null }, state.lang);
     if (!cat.length) return R.info({ kind: 'want_know' }, state.lang);
     // HD_89aa48bf657f: home services are listed as plain categories in the caller's language, never raw catalogue names
-    if (vertical(profile) === 'home') { const cats = R.serviceCategories(cat); const house = cats.find((c) => c.k === 'house'); if (house && /\b(saizi|sizes?|ukubwa|vyumba|bedrooms?)\b/i.test(u.text || '')) return R.info({ kind: 'house_sizes', sizes: house.names.map((x) => (x.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean) }, state.lang); if (cats.length) return R.info({ kind: 'service_categories', cats }, state.lang); }
+    if (vertical(profile) === 'home') { const cats = R.serviceCategories(cat); const house = cats.find((c) => c.k === 'house'); if (u.followup || n >= 1) return R.info({ kind: 'service_detail', cats }, state.lang); if (house && /\b(saizi|sizes?|ukubwa|vyumba|bedrooms?)\b/i.test(u.text || '')) return R.info({ kind: 'house_sizes', sizes: house.names.map((x) => (x.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean) }, state.lang); if (cats.length) return R.info({ kind: 'service_categories', cats }, state.lang); }
     const start = (n * 4) % cat.length;
     return R.info({ kind: 'services', names: [...cat, ...cat].slice(start, start + 4), more: cat.length > 4 }, state.lang);
   }
@@ -408,13 +408,35 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   const prevLang = state.lang;
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
   state.lang = (langLock === 'en' || langLock === 'sw') ? langLock : (L.nextLanguage(state.lang, text) || state.lang);
-  const u = N.understand(text, { profile, now, expecting: state.expecting });
+  let areaQ = null;
+  let u = N.understand(text, { profile, now, expecting: state.expecting, topic: state.lastInfo });
+  // area clarify (only groups touching the tenant's own places): ask once, then re-read the held turn with the chosen place
+  if (state.areaPick) {
+    const pk = state.areaPick; state.areaPick = null;
+    const low = String(text || '').toLowerCase();
+    const hit = pk.options.find((o) => low.includes(o.county.toLowerCase())) || pk.options.find((o) => o.name.toLowerCase() !== pk.heard.toLowerCase() && low.includes(o.name.toLowerCase().split(' ')[0])) || (u.no && pk.options.length === 2 ? pk.options[1] : null) || (u.yes && !u.no ? pk.options[0] : null);
+    if (hit) { const say = hit.listed ? hit.name : hit.county; u = N.understand(pk.text.replace(new RegExp(`\\b${pk.heard}\\b`, 'i'), say), { profile, now, expecting: pk.expecting, topic: state.lastInfo }); text = u.text; }
+    else { // no pick: the caller moved on; keep the one option we serve, the read-back still confirms it
+      const own = pk.options.filter((o) => o.listed);
+      if (own.length === 1 && !state.slots.place && !u.place) { const h = N.understand(pk.text.replace(new RegExp(`\\b${pk.heard}\\b`, 'i'), own[0].name), { profile, now, expecting: 'place' }); if (h.place || h.area) { state.slots.place = h.place || h.area.name; if (h.landmark && !state.slots.landmark) state.slots.landmark = h.landmark; } }
+    }
+  } else {
+    const amb = N.areaAmbiguity(text, profile);
+    if (amb && (state.intent || state.expecting === 'place' || u.intents.some((i) => ['book', 'coverage'].includes(i)) || u.area)) {
+      state.areaPick = { ...amb, text, expecting: state.expecting };
+      const o = amb.options; const sw = L.isSw(state.lang);
+      const opt = (x) => (sw ? `${x.name} ya ${x.county}` : `${x.name} in ${x.county}`);
+      const q = sw ? `Ni ${o.slice(0, -1).map(opt).join(', ')} au ${opt(o[o.length - 1])}?` : `Is that ${o.slice(0, -1).map(opt).join(', ')} or ${opt(o[o.length - 1])}?`;
+      areaQ = q;
+    }
+  }
   resolveSmallHoursKesho(state, u, text);
   const results = [];
   const catalogue = buildCatalogue({ profile, openRows: state.file.openRows });
   const mc = await consultModel(state, u, profile, model, catalogue);
   const lang = state.lang || 'en';
   const out = (line0, extra = {}) => { const line = applyAckRule(state, line0, { ackOk: !!extra.ackOk, acked: !!acked, callerAck: !!u.ack, lang }); const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; noteAck(state, l); return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
+  if (areaQ) return out(areaQ);
 
   // HD_db0e864043c1 fixes -------------------------------------------------
   // "pardon?" / "say again" repeats our last line plainly (not a new question).
