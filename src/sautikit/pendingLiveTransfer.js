@@ -46,13 +46,23 @@ function escapeXmlAttr(raw) {
  * media socket closes. Staging showed StreamStopped never hits /voice/incoming
  * (it rides events_url, which cannot return Dial).
  */
-function buildAnswerStreamXml({ streamUrl, continueUrl } = {}) {
+function streamRecordEnabled(env = process.env) {
+  return /^(1|true|on|yes)$/i.test(String(env.VOICE_STREAM_RECORD || ''));
+}
+
+/**
+ * VOICE_STREAM_RECORD=1 (off by default) adds record="true" so SautiKit
+ * records the AI leg and fires call.recording.ready (attached by
+ * /voice/events; fetched via GET /v1/calls/{id}/recording when no URL).
+ */
+function buildAnswerStreamXml({ streamUrl, continueUrl, record = streamRecordEnabled() } = {}) {
   const url = escapeXmlAttr(streamUrl);
   const next = escapeXml(continueUrl);
+  const recordAttr = record ? ' record="true"' : '';
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<Response>\n` +
-    `    <Stream url="${url}" name="ai-receptionist" track="inbound_track" connect="true" outputSamplingRate="16000" bidirectionalSamplingRate="16000" />\n` +
+    `    <Stream url="${url}" name="ai-receptionist" track="inbound_track" connect="true" outputSamplingRate="16000" bidirectionalSamplingRate="16000"${recordAttr} />\n` +
     `    <Redirect method="POST">${next}</Redirect>\n` +
     `</Response>`
   );
@@ -176,6 +186,7 @@ module.exports = {
   buildDialXml,
   buildTransferFallbackXml,
   buildAnswerStreamXml,
+  streamRecordEnabled,
   emptyVoiceXml,
   transferTimeoutSeconds,
   queuePendingLiveTransfer,
