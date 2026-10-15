@@ -22,6 +22,8 @@ function callsOf(j) {
   for (const f of files) {
     for (const c of callsOf(JSON.parse(fs.readFileSync(f, 'utf8')))) {
       const state = {}; let lang = null;
+      // As server.js at call start (VOICE_TURN_ARBITER): pin the doc once through the resolver.
+      require('../src/knowledge/spokenCatalogue').pinSpokenCatalogue(c.profile);
       for (const [i, t] of c.turns.entries()) {
         lang = lang || c.lang || t.lang || t.soniox || 'en';
         const m = await planV2CatalogueMouth(null, { text: t.caller, profile: c.profile, language: lang, state, model: null });
