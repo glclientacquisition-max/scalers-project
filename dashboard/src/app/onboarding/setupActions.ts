@@ -1,6 +1,7 @@
 "use server";
 
 import { bustTenantCache } from "@/lib/tenantCache";
+import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
 import { parsePaymentsText } from "@/lib/structuredData";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
@@ -270,6 +271,7 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
   }
 
   const tWrite = Date.now();
+  requestSpokenCatalogueCompile(row.id, patch);
   // Number assignment stays inline (one DB call) so the next screen can show it.
   let number = updated[0].sautikit_virtual_number as string | null;
   if (numberPending(number)) number = (await assignDidFromPool(row.id)) || number;

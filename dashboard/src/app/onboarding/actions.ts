@@ -1,6 +1,7 @@
 "use server";
 
 import { bustTenantCache } from "@/lib/tenantCache";
+import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
 import { redirect } from "next/navigation";
 import { getVerifiedAuthUser as getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import {
@@ -215,6 +216,7 @@ export async function completeOnboardingAction(
   if (dropped.length) {
     console.warn("[onboarding] saved without missing columns:", dropped.join(", "));
   }
+  requestSpokenCatalogueCompile(tenant.id, patch);
 
   await recordCaptureMeta({
     tenantId: tenant.id,
