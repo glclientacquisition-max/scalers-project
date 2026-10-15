@@ -431,7 +431,7 @@ function scoreTurns(turns = []) {
       return {
         tool: stages(turn, 'tool').length > 0,
         segments: seg ? seg.segments || [] : [],
-        stack: A.isAckStack(filler, spokenText(turn)),
+        stack: Boolean(filler && A.isAckLed(filler) && A.isAckLed(spokenText(turn))),
       };
     })
   );
