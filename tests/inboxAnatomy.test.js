@@ -13,8 +13,8 @@ describe("inbox outside and inside anatomy", () => {
   const detail = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
   const jobActions = read("dashboard/src/components/InboxJobActions.tsx");
   const holdActions = read("dashboard/src/components/RequestStatusToggle.tsx");
-  const calls = read("docs/frontend/design-system/pages/calls.md");
-  const callDetail = read("docs/frontend/design-system/pages/call-detail.md");
+  const calls = read("docs/reference/design-system/pages/calls.md");
+  const callDetail = read("docs/reference/design-system/pages/call-detail.md");
 
   it("defines list as who, one preview, stamp or time, one dock verb", () => {
     assert.match(calls, /Who first\. Work second\. Stamp or time as meta/);
@@ -150,7 +150,7 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(statusFn, /caller_hold_cancelled/);
     assert.match(statusFn, /type === "hold" \|\| type === "order"/);
     assert.match(statusFn, /sendRecordedDeskCallerSms/);
-    const contract = read("docs/product/CALL_MESSAGE_CONTRACT.md");
+    const contract = read("docs/reference/product/CALL_MESSAGE_CONTRACT.md");
     assert.match(contract, /caller_hold_ready/);
     assert.match(contract, /caller_hold_cancelled/);
     assert.match(contract, /Owner taps Done/);

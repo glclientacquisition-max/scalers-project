@@ -70,7 +70,7 @@ describe("home overview craft", () => {
     assert.doesNotMatch(queues, /label: "Needs you"/);
     assert.doesNotMatch(queues, /purpose: "needs"/);
     assert.doesNotMatch(queues, /count: work\.needs/);
-    const note = read("docs/frontend/design-system/pages/home.md");
+    const note = read("docs/reference/design-system/pages/home.md");
     assert.match(note, /Return calls/);
     assert.match(note, /copy\.returnCtaMany/);
     const cta = page.slice(page.indexOf("let ctaHref"), page.indexOf("const showCta"));
@@ -109,7 +109,7 @@ describe("home overview craft", () => {
     assert.doesNotMatch(page, />Manage</);
     const actions = read("dashboard/src/app/(desk)/settings/bulletinActions.ts");
     assert.match(actions, /revalidatePath\("\/home"\)/);
-    const note = read("docs/frontend/design-system/pages/home.md");
+    const note = read("docs/reference/design-system/pages/home.md");
     assert.match(note, /DailyBulletinPanel/);
   });
 
@@ -145,7 +145,7 @@ describe("home overview craft", () => {
     assert.match(nudge, /aria-label="Settings review"/);
     assert.doesNotMatch(nudge, /ScoreRing/);
     assert.doesNotMatch(nudge, /DOMAINS\.map/);
-    const note = read("docs/frontend/design-system/pages/home.md");
+    const note = read("docs/reference/design-system/pages/home.md");
     assert.doesNotMatch(note, /Setup/);
     assert.doesNotMatch(note, /HomeCapture/);
   });

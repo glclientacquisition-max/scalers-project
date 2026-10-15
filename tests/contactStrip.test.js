@@ -85,10 +85,10 @@ describe("contact strip chrome", () => {
   const form = read("dashboard/src/components/ContactNameForm.tsx");
   const profile = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
   const list = read("dashboard/src/components/ContactListRow.tsx");
-  const note = read("docs/frontend/design-system/pages/call-detail.md");
-  const contactsNote = read("docs/frontend/design-system/pages/contacts.md");
-  const accept = read("docs/product/CONTACT_STRIP_ACCEPT.md");
-  const master = read("docs/frontend/design-system/MASTER.md");
+  const note = read("docs/reference/design-system/pages/call-detail.md");
+  const contactsNote = read("docs/reference/design-system/pages/contacts.md");
+  const accept = read("docs/reference/acceptance/CONTACT_STRIP_ACCEPT.md");
+  const master = read("docs/reference/design-system/MASTER.md");
 
   it("lands the ACCEPT spec and one composition family on the ticket", () => {
     assert.match(accept, /\*\*Status:\*\* ACCEPT/);
@@ -185,6 +185,6 @@ describe("contact strip chrome", () => {
     assert.match(master, /Call \+ WhatsApp live on the ticket Action dock/);
     assert.doesNotMatch(master, /data-contact-strip-reach="opened"/);
     assert.match(contactsNote, /Identity only/);
-    assert.match(read("docs/product/DELIVERY_VOCAB.md"), /\*\*opened\*\*/);
+    assert.match(read("docs/reference/product/DELIVERY_VOCAB.md"), /\*\*opened\*\*/);
   });
 });

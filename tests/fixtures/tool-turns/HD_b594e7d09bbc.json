@@ -1,0 +1,13 @@
+{
+  "callId": "HD_b594e7d09bbc",
+  "source": "staging Railway deploy logs 2026-10-14 12:22 UTC (15:22 EAT); ms from caller endpoint 12:22:08.604Z",
+  "turn": 11,
+  "lang": "en",
+  "tool": "escalate",
+  "ack": { "text": "Alright.", "atMs": 457, "bytes": 32768, "cached": true },
+  "holdLogged": "tool hold skipped after thinking-ack 781ms: Checking now.",
+  "toolDoneAtMs": 4276,
+  "toolNote": "escalate waits ~2.7 s on the owner e-mail notify (12:22:09.860 -> 12:22:12.536) before the receipt",
+  "receipt": { "text": "They'll call you back.", "trimmed": "They'll call you back.", "ttsBeginMs": 4276 },
+  "assume": { "liveTtfaMs": 250, "msPerChar": 75, "note": "as HD_513dfb2fa73f" }
+}

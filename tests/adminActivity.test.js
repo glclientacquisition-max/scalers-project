@@ -90,7 +90,12 @@ describe("Activity: every admin write is recorded", () => {
       assert.match(actions.slice(at, at + 400), /before:/, action);
     }
     const packages = read("dashboard/src/app/api/admin/packages/route.ts");
-    for (const action of ["save_rates", "save_package", "assign_package"]) assert.match(packages, new RegExp(`"${action}"`));
+    for (const action of ["save_rates", "save_package"]) assert.match(packages, new RegExp(`"${action}"`));
+    // Package assignment has one path: the business's Billing page.
+    assert.match(
+      read("dashboard/src/app/api/admin/billing/route.ts"),
+      /recordAdminAction\(\{ actor, action: "assign_package", businessId, before, after \}\)/,
+    );
     assert.match(read("dashboard/src/app/api/did-pool/route.ts"), /action: "assign_number"[\s\S]{0,300}after:/);
   });
 

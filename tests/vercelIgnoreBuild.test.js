@@ -48,7 +48,7 @@ before(() => {
   shas.root = commit("dashboard/package.json", "root");
   shas.desk = commit("dashboard/src/app/page.tsx", "desk change");
   shas.voice = commit("src/speech/sonioxStt.js", "voice change");
-  shas.docs = commit("docs/operations/ENVIRONMENTS.md", "docs change");
+  shas.docs = commit("docs/reference/operations/ENVIRONMENTS.md", "docs change");
 });
 
 after(() => {

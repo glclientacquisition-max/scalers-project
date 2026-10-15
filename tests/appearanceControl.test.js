@@ -75,7 +75,7 @@ describe("Appearance control", () => {
   });
 
   it("MASTER documents the pattern", () => {
-    const master = read("docs/frontend/design-system/MASTER.md");
+    const master = read("docs/reference/design-system/MASTER.md");
     assert.match(master, /Appearance · System/);
     assert.match(master, /AppearanceFooter/);
     assert.doesNotMatch(master, /ThemeDock/);

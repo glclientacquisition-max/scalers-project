@@ -1,5 +1,5 @@
 // Offline caller simulator. Runs the same turn contract as server.js
-// (docs/agents/BRAIN_TURN_CONTRACT.md) with an adversarial Gemini stub and
+// (docs/reference/lanes/BRAIN_TURN_CONTRACT.md) with an adversarial Gemini stub and
 // fake tool handlers, then checks the universal invariants after every turn.
 // No network. Used by tests/brainSimulation.test.js and by playbook authors.
 
