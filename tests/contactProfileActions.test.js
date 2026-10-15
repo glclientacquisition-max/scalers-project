@@ -12,7 +12,7 @@ describe("contact profile action dock", () => {
   const page = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
   const dock = read("dashboard/src/components/ContactActionDock.tsx");
   const ticketDock = read("dashboard/src/components/InboxTicketActionDock.tsx");
-  const contactsNote = read("docs/frontend/design-system/pages/contacts.md");
+  const contactsNote = read("docs/reference/design-system/pages/contacts.md");
 
   it("puts Call and WhatsApp on Saved and Unsaved profiles when a phone exists", () => {
     assert.match(page, /<ContactActionDock/);

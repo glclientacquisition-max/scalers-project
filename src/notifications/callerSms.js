@@ -10,7 +10,9 @@ const {
   durableSendClaim,
   recordNotifySend,
   releaseInstanceFlight,
+  recordFailedSend,
 } = require('./sendLedger');
+const { isCreditExhausted, smsBackoffActive, noteCreditExhausted } = require('./smsBackoff');
 
 function callerSmsEnabled(channels) {
   return parseNotifyChannels(channels).caller_sms === true;
@@ -111,6 +113,21 @@ async function dispatchCallerSms({ to, event, channels, ledger } = {}) {
   const dest = normalizeSmsTo(to || event.caller?.phone);
   if (!dest) return { channel: null, reason: 'no_caller_phone' };
   const body = renderCallerText(event);
+  const failRow = (error) =>
+    recordFailedSend({
+      tenantId: ledger?.tenantId,
+      callId: ledger?.callId,
+      callSid: ledger?.callSid,
+      kind: event.kind,
+      channel: 'sms',
+      to: dest,
+      body,
+      error,
+    });
+  if (smsBackoffActive(ledger?.tenantId)) {
+    await failRow('sms_credit_backoff');
+    return { channel: null, reason: 'sms_credit_backoff' };
+  }
   const gate = await beginInstanceSend({ ...ledger, kind: event.kind }, dest);
   if (!gate.ok) {
     return { channel: null, reason: gate.reason };
@@ -120,7 +137,17 @@ async function dispatchCallerSms({ to, event, channels, ledger } = {}) {
     if (!claim.allowed) {
       return { channel: null, reason: claim.reason || 'sms_allowance_exhausted' };
     }
-    const result = await sendSms({ to: dest, body });
+    let result;
+    try {
+      result = await sendSms({ to: dest, body });
+    } catch (err) {
+      await failRow(String(err?.message || err));
+      if (isCreditExhausted(err)) {
+        noteCreditExhausted(ledger?.tenantId);
+        return { channel: null, reason: 'sms_credits_exhausted' };
+      }
+      throw err;
+    }
     const sent = { channel: 'sms', to: dest, result, body };
     const recorded = await recordNotifySend({
       tenantId: ledger?.tenantId,

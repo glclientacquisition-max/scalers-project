@@ -4,8 +4,6 @@ import { adminActorName } from "@/lib/adminActor";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import {
-  assignBusinessPackage,
-  loadBusinessPackageNames,
   loadPackageCatalog,
   parseCount,
   parseDiscountPercent,
@@ -115,22 +113,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    if (action === "assign") {
-      const tenantId = String(body.business_id || "");
-      const packageId = String(body.package_id || "");
-      const period = String(body.period || "month");
-      if (!tenantId || !packageId) {
-        return NextResponse.json({ error: "Business and package required" }, { status: 400 });
-      }
-      if (period !== "month" && period !== "year") {
-        return NextResponse.json({ error: "Period must be month or year" }, { status: 400 });
-      }
-      const before = (await loadBusinessPackageNames().catch(() => null))?.get(tenantId) ?? null;
-      await assignBusinessPackage({ tenantId, packageId, period });
-      const after = (await loadBusinessPackageNames().catch(() => null))?.get(tenantId) ?? { packageId, period };
-      await recordAdminAction({ actor, action: "assign_package", businessId: tenantId, before, after });
-      return NextResponse.json({ ok: true });
-    }
+    // Package assignment lives on the business's Billing page (/api/admin/billing assign_package).
+    // One path, one confirm.
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (err) {

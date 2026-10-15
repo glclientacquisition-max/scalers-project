@@ -334,6 +334,7 @@ const { narratesInternalAction, groundFilePriceLine } = require('./src/conversat
 const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
+const { planV2CatalogueMouth } = require('./src/conversation/v2CatalogueTurn');
 const {
   catalogueGeminiDirective,
   geminiCatalogueEnabled,
@@ -441,8 +442,6 @@ const {
 } = require('./src/sautikit/recordingEvents');
 const { fetchCallRecording, recordingScopeDenied } = require('./src/sautikit/recordingFetch');
 const { finalizeOnceEnabled, finalizeDecision } = require('./src/callFinalizeOnce');
-const { createVoiceDrain, BUSY_XML: DRAIN_BUSY_XML } = require('./src/voiceDrain');
-const voiceDrain = createVoiceDrain();
 const {
   summarizeHeaders,
   summarizeBody,
@@ -505,18 +504,6 @@ const {
   probeSmsCredentials,
   getSmsStatus,
 } = require('./src/notifications/sms');
-const {
-  checkAdminHealthAuth,
-  sautikitScopeChecks,
-} = require('./src/ops/adminHealth');
-const {
-  getSonioxBalanceHealth,
-  startSonioxBalanceProbe,
-} = require('./src/speech/sonioxBalanceProbe');
-const {
-  getSmsCreditHealth,
-  startSmsCreditProbe,
-} = require('./src/notifications/smsCreditMonitor');
 const {
   liveTransferReady,
   liveTransferDestination,
@@ -652,43 +639,10 @@ function resolveVoiceGitBranch() {
   return branch || null;
 }
 
-/**
- * Public /healthz: liveness only (ok, sha, branch, started). Balances, wallet
- * detail and provider errors moved to GET /admin/health (ADMIN_HEALTH_TOKEN).
- */
 app.get('/healthz', (_req, res) => {
-  const drain = voiceDrain.stats();
-  res.status(drain.draining ? 503 : 200).json({
-    ok: !drain.draining,
-    status: drain.draining ? 'draining' : 'ok',
-    activeCalls: drain.activeCalls,
-    drain,
-    gitSha: resolveVoiceGitSha(),
-    gitBranch: resolveVoiceGitBranch(),
-    startedAt: PROCESS_STARTED_AT,
-  });
-});
-
-/** Admin-only health for the Super Admin Platform page. Read-only, no secrets. */
-app.get('/admin/health', (req, res) => {
-  const auth = checkAdminHealthAuth(req.headers);
-  if (auth === 'not_configured') {
-    return res.status(503).json({ error: 'ADMIN_HEALTH_TOKEN not set' });
-  }
-  if (auth !== 'ok') return res.status(401).json({ error: 'Unauthorized' });
-  res.set('Cache-Control', 'no-store');
-  return res.status(200).json(buildAdminHealthBody());
-});
-
-function buildAdminHealthBody() {
   const sms = getSmsStatus();
-  return {
+  res.status(200).json({
     ok: true,
-    checkedAt: new Date().toISOString(),
-    environment: String(process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || '').trim() || null,
-    sms: getSmsCreditHealth(),
-    sonioxBalance: getSonioxBalanceHealth(),
-    keyScopes: { sautikit: sautikitScopeChecks() },
     gitSha: resolveVoiceGitSha(),
     gitBranch: resolveVoiceGitBranch(),
     startedAt: PROCESS_STARTED_AT,
@@ -735,8 +689,8 @@ function buildAdminHealthBody() {
       ignoreHours: envLiveTransferIgnoreHours(),
     },
     voiceProfile: publicVoiceProfile(),
-  };
-}
+  });
+});
 
 /** Ops: force a TextSMS balance probe (no SMS charged). */
 app.get('/internal/sms/status', async (req, res) => {
@@ -793,6 +747,38 @@ app.post('/internal/desk/escalate', async (req, res) => {
     });
   }
 });
+
+/**
+ * SPOKEN_CATALOGUE_ON_SAVE (default off): Desk pings after an owner Save on
+ * services / products / areas / locations. Answers at once; the compile runs in
+ * the background and only when the catalogue hash changed. Secret required.
+ */
+app.post('/internal/desk/spoken-catalogue', (req, res) => {
+  const secret = String(process.env.VOICE_INTERNAL_SECRET || '').trim();
+  if (!secret || String(req.headers['x-voice-internal-secret'] || '').trim() !== secret) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const onSave = require('./src/knowledge/spokenCatalogueOnSave');
+  if (!onSave.enabled()) return res.status(200).json({ ok: true, skipped: 'flag_off' });
+  const tenantId = String(req.body?.tenantId || '').trim();
+  const { supabase } = require('./src/lib/supabaseClient');
+  const r = onSave.scheduleSpokenCatalogueCompile(tenantId, { db: supabase, generate: spokenCatalogueGenerate() });
+  return res.status(202).json({ ok: true, scheduled: r.scheduled, coalesced: Boolean(r.coalesced) });
+});
+
+let spokenCatalogueGen;
+function spokenCatalogueGenerate() {
+  if (spokenCatalogueGen !== undefined) return spokenCatalogueGen;
+  const key = String(process.env.GEMINI_API_KEY || '').trim();
+  if (!key || /^(0|off|false|no)$/i.test(String(process.env.SPOKEN_CATALOGUE_MODEL || ''))) return (spokenCatalogueGen = null);
+  const { createGeminiSend } = require('./src/conversation/v2/transport');
+  const send = createGeminiSend({ apiKey: key, model: process.env.SPOKEN_CATALOGUE_MODEL || 'gemini-3.5-flash', timeoutMs: 10000, thinkingMinimal: false });
+  spokenCatalogueGen = async ({ prompt, schema }) => {
+    const resp = await send({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, responseMimeType: 'application/json', responseSchema: schema } });
+    return JSON.parse((resp?.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join(''));
+  };
+  return spokenCatalogueGen;
+}
 
 app.get('/api/voices', async (_req, res) => {
   try {
@@ -1226,10 +1212,8 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
   if (!callSid) return null;
   const brainState = callBrainStates.get(callSid);
   if (!brainState) return null;
-  return voiceDrain.trackWork(
-    withSummaryWriteLock(callSid, () =>
-      writeHangupSummary(callSid, source, opts, brainState)
-    )
+  return withSummaryWriteLock(callSid, () =>
+    writeHangupSummary(callSid, source, opts, brainState)
   );
 }
 
@@ -1310,11 +1294,7 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
   }
 }
 
-function markCallTerminalFromWebhook(args) {
-  return voiceDrain.trackWork(markCallTerminalFromWebhookInner(args));
-}
-
-async function markCallTerminalFromWebhookInner({ callSid, status, durationSeconds, source, turns }) {
+async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, source, turns }) {
   if (!callSid) {
     console.warn(`[${source}] termination detected but no callSid — skipping DB update`);
     return null;
@@ -1413,8 +1393,6 @@ async function maybeSendMissedTextback({ callSid, call }) {
 //    configs point at the tunnel root (logs showed POST / → 404 before).
 // ---------------------------------------------------------------------------
 async function handleVoiceIncoming(req, res) {
-  // SIGTERM drain: new calls go to the next deployment (POST / and /voice too).
-  if (drainRefusesNewCall(req, res)) return;
   try {
     const extracted = extractInboundCallFields(req.body);
     let fromNumber = extracted.fromNumber;
@@ -1679,19 +1657,6 @@ function handleSautikitRootPost(req, res) {
 }
 
 app.post('/', sautikitWebhookGuard, handleSautikitRootPost);
-/** Draining: refuse NEW calls politely; a call already live here passes. */
-function drainRefusesNewCall(req, res) {
-  if (!voiceDrain.isDraining()) return false;
-  const ids = extractEventCallSids(req.body || {});
-  for (const k of ['CallSid', 'callSid', 'call_sid', 'session_id', 'sessionId']) {
-    if (req.body?.[k]) ids.push(String(req.body[k]));
-    if (req.query?.[k]) ids.push(String(req.query[k]));
-  }
-  if (voiceDrain.isActiveCall(ids)) return false;
-  console.warn(`[drain] refusing new call ids=${ids.join(',') || '-'}`);
-  res.set('Retry-After', '5').type('text/xml').status(200).send(DRAIN_BUSY_XML);
-  return true;
-}
 app.post('/voice/incoming', sautikitWebhookGuard, handleVoiceIncoming);
 app.post('/voice', sautikitWebhookGuard, handleVoiceIncoming);
 // Workspace WhatsApp inbound (whatsapp.event.received). Do not resolveTenantId(DID).
@@ -1933,13 +1898,6 @@ server.on('upgrade', (req, socket, head) => {
     console.log(`[upgrade] pathname=${pathname} proto=${req.headers['sec-websocket-protocol'] || ''}`);
 
     if (pathname === '/ws/media') {
-      const upCallSid = new URL(req.url || '', 'http://localhost').searchParams.get('callSid');
-      if (voiceDrain.isDraining() && !voiceDrain.isActiveCall([upCallSid])) {
-        console.warn(`[drain] refusing /ws/media upgrade callSid=${upCallSid || '-'}`);
-        socket.write('HTTP/1.1 503 Service Unavailable\r\nRetry-After: 5\r\nConnection: close\r\n\r\n');
-        socket.destroy();
-        return;
-      }
       mediaWss.handleUpgrade(req, socket, head, (ws) => {
         mediaWss.emit('connection', ws, req);
       });
@@ -2014,14 +1972,6 @@ function clearMediaPlayback(ws) {
 }
 
 mediaWss.on('connection', (ws, req) => {
-  try {
-    const qsSid = new URL(req?.url || '', 'http://localhost').searchParams.get('callSid');
-    voiceDrain.trackSession(ws, qsSid || null);
-  } catch {
-    voiceDrain.trackSession(ws);
-  }
-  // Release after close handlers ran their call-end work (tracked separately).
-  ws.once('close', () => setImmediate(() => voiceDrain.untrackSession(ws)));
   const connectedAt = Date.now();
   let sessionCallSid = null;
   try {
@@ -2275,8 +2225,6 @@ mediaWss.on('connection', (ws, req) => {
   let thinkingAckAtMs = 0;
   // An ack or a hold played on this turn: a tool outcome drops its "Okay." lead.
   let ackPlayedTurn = null;
-  // VOICE_ACK_RULE (default off): per-call heard-ack tracker. null = rule off.
-  const ackTracker = ackRule.ackRuleEnabled() ? ackRule.createAckTracker() : null;
   // VOICE_TOOL_SMOOTH (default off): heard-audio clock, cached hold gap-fill, cached receipts.
   const smooth = toolSmooth.toolSmoothFlags();
   const mediaClock = smooth.trace || smooth.hold ? toolSmooth.createMediaClock() : null;
@@ -2340,6 +2288,8 @@ mediaWss.on('connection', (ws, req) => {
     console.log(`[ws/media][${sidLabel()}] tool-smooth receipt cached bytes=${found.pcm.length}: ${line}`);
     return playCachedFillerPcm(found.pcm, { text: line, trace: false, kind: 'receipt' });
   }
+  // VOICE_ACK_RULE (default off): per-call heard-ack tracker. null = rule off.
+  const ackTracker = ackRule.ackRuleEnabled() ? ackRule.createAckTracker() : null;
   /** VOICE_ACK_RULE: the turn on which a word filler (not Mm.) actually played. */
   let wordAckTurn = null;
   /** Rolling interim hypothesis while agent is busy (for barge-in). */
@@ -3328,7 +3278,6 @@ mediaWss.on('connection', (ws, req) => {
         if (!brainV2Shadow) {
           brainV2Shadow = createBrainV2Shadow({
             callLabel: () => callKey,
-            ...(smooth.prefetch || smooth.readback ? { smooth: { prefetch: smooth.prefetch, readback: smooth.readback } } : {}),
             // Read once at the shadow's first turn (after caller memory hydrated).
             callerFile: () => {
               const mem = brainProfile?.callerMemory || {};
@@ -3503,7 +3452,7 @@ mediaWss.on('connection', (ws, req) => {
       }
       // Local Phase-0 breath owns a services ask, including one the name gate
       // would otherwise take, and a Yes while that list is still pending.
-      const catalogueMouth = planCatalogueMouth({
+      const legacyCatalogueMouth = planCatalogueMouth({
         localReply,
         text: clean,
         profile: brainProfile,
@@ -3515,6 +3464,14 @@ mediaWss.on('connection', (ws, req) => {
           geminiReasoningDown(getGeminiProviderHealth()) ||
           !String(process.env.GEMINI_API_KEY || '').trim(),
         geminiCatalogue: geminiCatalogueEnabled(),
+      });
+      // VOICE_V2_CATALOGUE off: same object back, nothing logged.
+      const catalogueMouth = await planV2CatalogueMouth(legacyCatalogueMouth, {
+        text: clean,
+        profile: brainProfile,
+        language: callLanguage,
+        state: brainState,
+        log: (m) => console.log(`[ws/media][${callKey}] ${m}`),
       });
       const packetsBeforeFacts = packetRows();
       const localPacket = commitTurnFacts(speakCommit, {
@@ -6978,6 +6935,29 @@ async function runGeminiTurn(
 }
 
 /**
+ * Retry recording copies marked pending_copy: ask SautiKit for a fresh presigned
+ * URL (the stored one may have expired) and copy once more, no long backoff.
+ */
+async function sweepPendingRecordingCopies({ limit = 10 } = {}) {
+  const rows = await db.listPendingRecordingCopies({ limit });
+  let copied = 0;
+  for (const row of rows) {
+    const callSid = row.sautikit_call_sid;
+    if (!callSid) continue;
+    try {
+      const fetched = await fetchCallRecording(callSid);
+      const url = fetched.downloadUrl || row.recording_url;
+      if (!url) continue;
+      const result = await db.copyRecordingToStorage({ callSid, url, delays: [], fromSweep: true });
+      if (result?.ok) copied += 1;
+    } catch (err) {
+      console.warn(`[recording-sweep] ${callSid} failed:`, err?.message || err);
+    }
+  }
+  if (rows.length) console.log(`[recording-sweep] pending ${rows.length}, copied ${copied}`);
+}
+
+/**
  * Catch up post-call reviews lost to a restart, deploy or model timeout, from the
  * stored transcript. Off with POST_CALL_REVIEW_SWEEP=off; never in tests.
  */
@@ -6990,6 +6970,8 @@ function startReviewSweep() {
     running = true;
     sweepUnreviewedCalls()
       .catch((err) => console.warn('[review-sweep] failed:', err?.message || err))
+      .then(() => sweepPendingRecordingCopies())
+      .catch((err) => console.warn('[recording-sweep] failed:', err?.message || err))
       .finally(() => {
         running = false;
       });
@@ -6997,10 +6979,6 @@ function startReviewSweep() {
   setTimeout(tick, 60_000).unref?.();
   setInterval(tick, 10 * 60_000).unref?.();
 }
-
-process.once('SIGTERM', () => {
-  voiceDrain.start('SIGTERM');
-});
 
 server.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);
@@ -7088,13 +7066,6 @@ server.listen(PORT, () => {
     console.log(`✓ Email alert fallback ready (from ${process.env.ALERT_EMAIL_FROM})`);
   } else {
     console.log(`ℹ Email fallback not set (RESEND_API_KEY + ALERT_EMAIL_FROM)`);
-  }
-  if (startSonioxBalanceProbe()) {
-    console.log(`✓ Soniox balance probe scheduled (SONIOX_BALANCE_PROBE_MS)`);
-  }
-  if (smsSenderReady()) {
-    startSmsCreditProbe();
-    console.log(`✓ TextSMS credit probe scheduled (SMS_CREDIT_PROBE_MS, balance check only)`);
   }
   if (process.env.SAUTIKIT_API_KEY) {
     startTelephonyWalletProbe();

@@ -7,8 +7,6 @@
 //
 // Preserves the orchestration-facing API used by server.js (async).
 
-const { queueOwnerNotify, cancelOwnerNotify } = require('./notifications/ownerNotifyQueue');
-const { writeReceiptsEnabled, writeKey, callbackSupersededBy } = require('./conversation/writeReceipts');
 const { finalizeOnceEnabled, TERMINAL } = require('./callFinalizeOnce');
 const { supabase } = require('./lib/supabaseClient');
 const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
@@ -22,6 +20,7 @@ const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 't
 const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 0);
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
 const { billableTalkSeconds, inboundOpen } = require('./billing/packageOverage');
+const recordingCopy = require('./sautikit/recordingCopy');
 
 function throwIfError(context, error) {
   if (error) {
@@ -984,52 +983,32 @@ async function chargeCallToWallet({ callId, minutes, rateKesPerMin } = {}) {
   return row || null;
 }
 
+/**
+ * Save the provider recording URL right away, then copy the file into Storage in
+ * the background (SautiKit often 404s for a few seconds after Completed). If the
+ * copy never lands, the call is marked recording_status='pending_copy' and the
+ * sweep (sweepPendingRecordingCopies) retries with a fresh provider URL.
+ * Pass copy: 'await' to wait for the copy (tests), or copy: false to skip it.
+ */
 async function attachRecording({
   callSid,
   recordingUrl,
   recordingSid,
   sourceUrl,
   authHeader,
+  copy = 'background',
+  copyOptions = {},
 }) {
   const existing = await getCall(callSid);
   if (!existing) {
     throw new Error(`[db] attachRecording: no call for ${callSid}`);
   }
 
-  let finalUrl = recordingUrl || sourceUrl || null;
-  let recordingPath = null;
-
+  const finalUrl = recordingUrl || sourceUrl || null;
   const downloadUrl = sourceUrl || recordingUrl;
-  if (downloadUrl) {
-    try {
-      const headers = {};
-      if (authHeader) headers.Authorization = authHeader;
-
-      const response = await fetch(downloadUrl, { headers });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} downloading recording`);
-      }
-
-      const buffer = Buffer.from(await response.arrayBuffer());
-      const uploaded = await uploadRecordingBuffer({
-        callSid,
-        recordingSid,
-        buffer,
-        contentType: response.headers.get('content-type') || 'audio/mpeg',
-      });
-      finalUrl = uploaded.recordingUrl || finalUrl;
-      recordingPath = uploaded.recordingPath;
-    } catch (err) {
-      console.warn(
-        `[db] attachRecording: Storage upload failed for ${callSid}, keeping provider URL:`,
-        err?.message || err
-      );
-    }
-  }
 
   const meta = parseSummary(existing.summary);
   if (recordingSid) meta.recording_sid = recordingSid;
-  if (recordingPath) meta.recording_path = recordingPath;
 
   const { data, error } = await supabase
     .from('calls')
@@ -1043,18 +1022,116 @@ async function attachRecording({
     .maybeSingle();
 
   throwIfError('attachRecording', error);
+
+  if (downloadUrl && copy) {
+    const job = copyRecordingToStorage({
+      callSid,
+      url: downloadUrl,
+      recordingSid,
+      authHeader,
+      ...copyOptions,
+    }).catch((err) => {
+      console.warn(`[db] attachRecording: copy job failed for ${callSid}:`, err?.message || err);
+      return { ok: false };
+    });
+    if (copy === 'await') await job;
+  }
+
   return shapeCall(data);
+}
+
+/**
+ * Download + upload with retry. On success store the Storage URL/path and clear
+ * any pending_copy marker; on failure mark pending_copy (or copy_failed once the
+ * sweep has tried MAX_SWEEP_ATTEMPTS times).
+ */
+async function copyRecordingToStorage({
+  callSid,
+  url,
+  recordingSid,
+  authHeader,
+  fetchImpl,
+  delays,
+  sleep,
+  fromSweep = false,
+} = {}) {
+  const result = await recordingCopy.copyRecordingWithRetry({
+    callSid,
+    url,
+    recordingSid,
+    authHeader,
+    upload: uploadRecordingBuffer,
+    ...(fetchImpl ? { fetchImpl } : {}),
+    ...(delays ? { delays } : {}),
+    ...(sleep ? { sleep } : {}),
+  });
+
+  const current = await getCall(callSid);
+  if (!current) return result;
+  const meta = parseSummary(current.summary);
+
+  if (result.ok) {
+    if (result.recordingPath) meta.recording_path = result.recordingPath;
+    if (recordingSid) meta.recording_sid = recordingSid;
+    delete meta.recording_status;
+    delete meta.recording_copy_attempts;
+    delete meta.recording_copy_last_error;
+    const update = { summary: serializeSummary(meta) };
+    if (result.recordingUrl) update.recording_url = result.recordingUrl;
+    const { error } = await supabase
+      .from('calls')
+      .update(update)
+      .eq('sautikit_call_sid', callSid);
+    throwIfError('copyRecordingToStorage', error);
+    return result;
+  }
+
+  const sweepAttempts = Number(meta.recording_copy_attempts || 0) + (fromSweep ? 1 : 0);
+  meta.recording_copy_attempts = sweepAttempts;
+  meta.recording_copy_last_error = String(result.lastError?.message || result.lastError || 'unknown').slice(0, 200);
+  meta.recording_status =
+    sweepAttempts >= recordingCopy.MAX_SWEEP_ATTEMPTS
+      ? recordingCopy.COPY_FAILED
+      : recordingCopy.PENDING_COPY;
+  const { error } = await supabase
+    .from('calls')
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid);
+  throwIfError('copyRecordingToStorage', error);
+  console.warn(
+    `[db] recording copy ${meta.recording_status} callSid=${callSid}, keeping provider URL: ${meta.recording_copy_last_error}`
+  );
+  return result;
+}
+
+/** Calls whose recording copy is still owed (summary.recording_status = pending_copy). */
+async function listPendingRecordingCopies({ limit = 20 } = {}) {
+  const { data, error } = await supabase
+    .from('calls')
+    .select('sautikit_call_sid, summary, recording_url, created_at')
+    .like('summary', `%"recording_status":"${recordingCopy.PENDING_COPY}"%`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  throwIfError('listPendingRecordingCopies', error);
+  return data || [];
 }
 
 async function getTenantById(tenantId) {
   if (!tenantId) return null;
+  const fullCols =
+    'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active';
+  // VOICE_V2_CATALOGUE only: also read the stored spoken catalogue (migration
+  // 20261015063255). Flag off: the exact select as before. A DB without the
+  // column falls back to the same select; a null value means the rules baseline.
+  const v2Catalogue = /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
   let { data, error } = await supabase
     .from('tenants')
-    .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'
-    )
+    .select(v2Catalogue ? `${fullCols}, spoken_catalogue` : fullCols)
     .eq('id', tenantId)
     .maybeSingle();
+  if (v2Catalogue && error && /spoken_catalogue/i.test(error.message || '')) {
+    ({ data, error } = await supabase.from('tenants').select(fullCols).eq('id', tenantId).maybeSingle());
+  }
 
   if (error && /spoken_name|greeting_invite/i.test(error.message || '')) {
     ({ data, error } = await supabase
@@ -1655,109 +1732,6 @@ const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other'])
  * Create a service request (hold / enquiry / order) for retail completion.
  * Also upserts contact and mirrors a short note into call summary when callSid given.
  */
-/**
- * Insert a row, or with a write-receipt key upsert on (tenant_id,
- * idempotency_key) and ignore the duplicate: a retried or doubled write
- * returns the row already on file instead of adding a second one.
- */
-async function insertWithReceipt(table, row, key) {
-  if (!key) {
-    return supabase.from(table).insert(row).select('*').maybeSingle();
-  }
-  const keyed = { ...row, idempotency_key: key };
-  const res = await supabase
-    .from(table)
-    .upsert(keyed, { onConflict: 'tenant_id,idempotency_key', ignoreDuplicates: true })
-    .select('*')
-    .maybeSingle();
-  if (res.error || res.data) return res;
-  // Duplicate ignored: hand back the existing row.
-  return supabase
-    .from(table)
-    .select('*')
-    .eq('tenant_id', row.tenant_id)
-    .eq('idempotency_key', key)
-    .maybeSingle();
-}
-
-/**
- * A booked visit supersedes the open rescue callback for the same service on
- * the same call (status fulfilled, metadata.superseded_by = appointment id).
- */
-async function supersedeRescueCallbacks({ tenantId, appointment } = {}) {
-  if (!tenantId || !appointment?.id || !appointment.call_id) return [];
-  try {
-    const { data: open, error } = await supabase
-      .from('service_requests')
-      .select('id, call_id, request_type, status, item, metadata')
-      .eq('tenant_id', tenantId)
-      .eq('call_id', appointment.call_id)
-      .eq('request_type', 'callback')
-      .eq('status', 'open');
-    if (error || !Array.isArray(open)) return [];
-    const done = [];
-    for (const row of open) {
-      if (!callbackSupersededBy(row, appointment)) continue;
-      const { error: upErr } = await supabase
-        .from('service_requests')
-        .update({
-          status: 'fulfilled',
-          closed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          metadata: { ...(row.metadata || {}), superseded_by: appointment.id, superseded_kind: 'appointment' },
-        })
-        .eq('id', row.id)
-        .eq('tenant_id', tenantId)
-        .eq('status', 'open');
-      if (!upErr) done.push(row.id);
-    }
-    if (done.length) {
-      console.log(`[db] rescue callback superseded ids=${done.join(',')} by appointment=${appointment.id}`);
-    }
-    return done;
-  } catch (err) {
-    console.warn('[db] supersedeRescueCallbacks failed:', err?.message || err);
-    return [];
-  }
-}
-
-/**
- * Escalate (Brain v2 contract): resolve as soon as the task row exists.
- * Returns { ok:true, id, notify:'queued' }. The owner notify (notifyOwner)
- * runs in the background, never awaited; a failure is logged, ok stays true.
- * Dry run: { ok:true, dryRun:true, id:null, notify:'queued', intended }.
- * A later booking with supersedes:[id] cancels the queued notify.
- */
-async function escalateTask({
-  callSid,
-  tenantId,
-  reason,
-  name,
-  phone,
-  notes,
-  item,
-  dryRun = false,
-  notifyOwner,
-} = {}) {
-  const intended = { callSid, tenantId, reason, name, phone, notes, item };
-  if (dryRun) return { ok: true, dryRun: true, id: null, notify: 'queued', intended };
-  const row = await createServiceRequest({
-    callSid,
-    tenantId,
-    type: 'callback',
-    name,
-    phone,
-    item: item || 'callback',
-    notes: [reason, notes].filter(Boolean).join('. ') || null,
-  });
-  if (!row?.id) return { ok: false, id: null, notify: null, reason: 'task_not_saved' };
-  const notify =
-    typeof notifyOwner === 'function'
-      ? queueOwnerNotify(row.id, () => notifyOwner({ task: row, callSid }), { callSid })
-      : 'none';
-  return { ok: true, id: row.id, notify };
-}
-
 async function createServiceRequest({
   callSid,
   tenantId,
@@ -1797,11 +1771,9 @@ async function createServiceRequest({
       [requestType, itemText, when].filter(Boolean).join(' — ') || noteText,
   });
 
-  const receipts = writeReceiptsEnabled({ tenantId: resolvedTenantId });
-  const srKey = receipts
-    ? writeKey({ callId: callRow?.id, kind: `request:${requestType}`, item: itemText })
-    : null;
-  const srRow = {
+  const { data, error } = await supabase
+    .from('service_requests')
+    .insert({
       tenant_id: resolvedTenantId,
       contact_id: contact?.id || null,
       call_id: callRow?.id || null,
@@ -1814,8 +1786,9 @@ async function createServiceRequest({
       caller_name: callerName,
       caller_phone: callerPhone,
       updated_at: new Date().toISOString(),
-    };
-  const { data, error } = await insertWithReceipt('service_requests', srRow, srKey);
+    })
+    .select('*')
+    .maybeSingle();
 
   if (error && /service_requests|relation/i.test(error.message)) {
     console.warn(
@@ -1924,7 +1897,6 @@ async function createAppointment({
   notes,
   windowStart,
   windowEnd,
-  supersedes,
 } = {}) {
   let resolvedTenantId = tenantId || null;
   let callRow = null;
@@ -1933,9 +1905,6 @@ async function createAppointment({
     if (callRow?.tenant_id) resolvedTenantId = callRow.tenant_id;
   }
   if (!resolvedTenantId) return null;
-  const supersedeIds = Array.isArray(supersedes)
-    ? [...new Set(supersedes.map((x) => String(x || '').trim()).filter(Boolean))]
-    : [];
 
   const service = String(serviceName || '').trim();
   if (!service) return null;
@@ -1960,11 +1929,9 @@ async function createAppointment({
       noteText,
   });
 
-  const receipts = writeReceiptsEnabled({ tenantId: resolvedTenantId });
-  const apKey = receipts
-    ? writeKey({ callId: callRow?.id, kind: 'appointment', item: service })
-    : null;
-  const apRow = {
+  const { data, error } = await supabase
+    .from('appointments')
+    .insert({
       tenant_id: resolvedTenantId,
       contact_id: contact?.id || null,
       call_id: callRow?.id || null,
@@ -1979,29 +1946,9 @@ async function createAppointment({
       caller_name: callerName,
       caller_phone: callerPhone,
       updated_at: new Date().toISOString(),
-    };
-  let superseded = [];
-  let notifyCancelled = [];
-  let data = null;
-  let error = null;
-  if (supersedeIds.length) {
-    // Brain v2 contract: insert + close the listed escalate tasks in ONE
-    // transaction (create_appointment_superseding), matched on tenant + phone.
-    const rpc = await supabase.rpc('create_appointment_superseding', {
-      p_row: { ...apRow, idempotency_key: apKey },
-      p_supersedes: supersedeIds,
-    });
-    error = rpc.error || null;
-    data = rpc.data?.appointment || null;
-    superseded = Array.isArray(rpc.data?.superseded) ? rpc.data.superseded : [];
-    if (error && /create_appointment_superseding|does not exist|schema cache/i.test(error.message || '')) {
-      throw new Error('[db] createAppointment supersedes needs supabase/migrations/20261014210000_write_receipts.sql');
-    }
-    // One owner message per call: drop still-queued notifies for closed tasks.
-    notifyCancelled = cancelOwnerNotify(superseded);
-  } else {
-    ({ data, error } = await insertWithReceipt('appointments', apRow, apKey));
-  }
+    })
+    .select('*')
+    .maybeSingle();
 
   if (error && /appointments|relation/i.test(error.message)) {
     console.warn(
@@ -2011,11 +1958,6 @@ async function createAppointment({
     return null;
   }
   throwIfError('createAppointment', error);
-
-  if (!supersedeIds.length && receipts && data?.id && callRow?.id) {
-    superseded = await supersedeRescueCallbacks({ tenantId: resolvedTenantId, appointment: data });
-    notifyCancelled = cancelOwnerNotify(superseded);
-  }
 
   if (callSid && data) {
     const existing = await getCall(callSid);
@@ -2037,9 +1979,6 @@ async function createAppointment({
     }
   }
 
-  if (data && (supersedeIds.length || superseded.length)) {
-    return { ...data, supersedes: supersedeIds, superseded, notifyCancelled };
-  }
   return data || null;
 }
 
@@ -2348,6 +2287,10 @@ async function insertNotifySend(row = {}) {
     idempotency_key: row.idempotency_key,
     overage: Boolean(row.overage),
   };
+  if (row.status === 'failed') {
+    payload.status = 'failed';
+    payload.error = row.error || null;
+  }
   let { data, error } = await supabase
     .from('notify_sends')
     .insert(payload)
@@ -2356,6 +2299,19 @@ async function insertNotifySend(row = {}) {
   if (error && /overage/i.test(error.message || '')) {
     const rest = { ...payload };
     delete rest.overage;
+    ({ data, error } = await supabase
+      .from('notify_sends')
+      .insert(rest)
+      .select('id')
+      .maybeSingle());
+  }
+  if (error && payload.status && /'?(status|error)'? column|column .*(status|error)/i.test(error.message || '')) {
+    // notify_sends_status.sql not applied yet: keep the failed row, note it in body.
+    const rest = { ...payload };
+    delete rest.status;
+    delete rest.error;
+    delete rest.overage;
+    rest.body = `[FAILED: ${String(row.error || 'send_failed').slice(0, 120)}] ${rest.body || ''}`.slice(0, 2000);
     ({ data, error } = await supabase
       .from('notify_sends')
       .insert(rest)
@@ -2633,9 +2589,8 @@ async function getTenantCatalogue(tenantId) {
 }
 
 module.exports = {
-  escalateTask,
-  insertWithReceipt,
-  supersedeRescueCallbacks,
+  copyRecordingToStorage,
+  listPendingRecordingCopies,
   upsertCallFacts,
   getTenantCatalogue,
   resolveTenantId,

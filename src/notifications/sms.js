@@ -67,7 +67,7 @@ function parseTextSmsCode(json) {
  * Cheap credential check against TextSMS getbalance (no SMS charged).
  * Caches the latest result for /healthz and boot logs.
  */
-async function probeSmsCredentials({ force = false, fetchImpl } = {}) {
+async function probeSmsCredentials({ force = false } = {}) {
   const configured = isSmsConfigured();
   const shortcode = process.env.TEXTSMS_SHORTCODE || null;
   if (!configured) {
@@ -95,7 +95,7 @@ async function probeSmsCredentials({ force = false, fetchImpl } = {}) {
   const apiKey = process.env.TEXTSMS_API_KEY;
   const partnerID = process.env.TEXTSMS_PARTNER_ID;
   try {
-    const res = await (fetchImpl || fetch)(TEXTSMS_BALANCE_URL, {
+    const res = await fetch(TEXTSMS_BALANCE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -148,29 +148,6 @@ function getSmsStatus() {
   };
 }
 
-function isSmsSendDisabled() {
-  return String(process.env.TEXTSMS_SEND_DISABLED || '').toLowerCase() === 'true';
-}
-
-/** @type {Set<(detail: object) => void>} */
-const creditExhaustedListeners = new Set();
-
-/** Subscribe to 402 / code 1008 send failures (insufficient credits). */
-function onSmsCreditExhausted(fn) {
-  creditExhaustedListeners.add(fn);
-  return () => creditExhaustedListeners.delete(fn);
-}
-
-function notifyCreditExhausted(detail) {
-  for (const fn of creditExhaustedListeners) {
-    try {
-      fn(detail);
-    } catch (err) {
-      console.warn('[sms] credit listener failed:', err?.message || err);
-    }
-  }
-}
-
 /**
  * Send one SMS through TextSMS.
  * @param {object} opts
@@ -192,14 +169,6 @@ async function sendSms({ to, body } = {}) {
 
   const message = String(body || '').trim();
   if (!message) throw new Error('SMS message body is empty');
-
-  // Shared TextSMS account (prod + staging): staging can opt out of real
-  // sends. Throwing lets dispatch fall through to the next channel.
-  if (isSmsSendDisabled()) {
-    const err = new Error('TextSMS send disabled (TEXTSMS_SEND_DISABLED=true)');
-    err.code = 'sms_send_disabled';
-    throw err;
-  }
 
   const payload = {
     apikey: apiKey,
@@ -238,9 +207,6 @@ async function sendSms({ to, body } = {}) {
         checkedAt: new Date().toISOString(),
       };
     }
-    if (res.status === 402 || code === 1008) {
-      notifyCreditExhausted({ status: res.status, code, description });
-    }
     const err = new Error(
       `TextSMS send failed: http=${res.status} code=${Number.isFinite(code) ? code : 'n/a'} ${description || text.slice(0, 200)}`
     );
@@ -274,8 +240,6 @@ module.exports = {
   sendSms,
   probeSmsCredentials,
   getSmsStatus,
-  isSmsSendDisabled,
-  onSmsCreditExhausted,
   TEXTSMS_SEND_URL,
   TEXTSMS_BALANCE_URL,
 };

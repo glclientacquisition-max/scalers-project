@@ -1,15 +1,11 @@
-import { CardSkeleton } from "@/components/platform/PlatformSections";
+import { Skeleton, SkeletonList } from "@/components/ui/Skeleton";
 
 export default function AdminPlatformLoading() {
   return (
-    <div className="space-y-6" aria-busy="true">
-      <CardSkeleton lines={0} />
-      <CardSkeleton lines={2} />
-      <CardSkeleton lines={1} />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <CardSkeleton lines={6} />
-        <CardSkeleton lines={6} />
-      </div>
+    <div className="space-y-4" aria-busy="true">
+      <Skeleton className="h-8 w-28 rounded-xl" />
+      <SkeletonList rows={4} />
+      <SkeletonList rows={2} />
     </div>
   );
 }

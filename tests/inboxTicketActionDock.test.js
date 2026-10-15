@@ -12,7 +12,7 @@ describe("ticket action dock", () => {
   const ticket = read("dashboard/src/components/InboxTicketView.tsx");
   const ping = read("dashboard/src/components/InboxPingTeammate.tsx");
   const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
-  const detail = read("docs/frontend/design-system/pages/call-detail.md");
+  const detail = read("docs/reference/design-system/pages/call-detail.md");
 
   it("surfaces Mark done, Call, WhatsApp, and Ping as one dock", () => {
     assert.match(ticket, /<InboxTicketActionDock/);

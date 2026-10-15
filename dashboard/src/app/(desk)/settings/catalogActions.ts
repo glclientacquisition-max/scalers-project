@@ -1,6 +1,7 @@
 "use server";
 
 import { bustTenantCache } from "@/lib/tenantCache";
+import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
 import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
@@ -273,6 +274,7 @@ export async function applyCatalogImportAction(
   if (error) {
     return ownerSaveFailed("catalog", error.message);
   }
+  requestSpokenCatalogueCompile(tenant.id, patch);
 
   const hashMode = factHashModeFromEnv();
   if (confirm && hashMode) {

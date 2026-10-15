@@ -147,6 +147,30 @@ function matchProducts(text, catalog = []) {
 }
 function lev(a, b) { const m = a.length, n = b.length; const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; }
 // Tenant service areas only (serviceAreas.areas ids like place:kitengela, county:nairobi).
+// Area clarify: a heard place that names two different places (Rongai: Ongata Rongai in Kajiado, or Rongai in Nakuru).
+// Only groups that touch the tenant's own places are used; anything else is not our question to ask.
+let PLACE_IDX = null;
+const placeIdx = () => (PLACE_IDX ||= (() => { try { return require('../data/kenyaPlaceCounties.json').places || {}; } catch { return {}; } })());
+const capW = (s) => String(s).replace(/\b\w/g, (c) => c.toUpperCase());
+function areaAmbiguity(text, profile = {}) {
+  const P = placeIdx(); const low = ` ${String(text || '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ')} `;
+  const own = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').toLowerCase()); const ownPlaces = own.map((a) => a.split(':').pop());
+  const ownCounties = own.filter((a) => a.startsWith('county:')).map((a) => a.slice(7));
+  const counties = new Set(Object.values(P).flat());
+  for (const k of Object.keys(P)) {
+    if (k.length < 4 || counties.has(k) || !low.includes(` ${k} `)) continue;
+    const longer = Object.keys(P).filter((x) => x !== k && x.endsWith(` ${k}`) && !/^(\w+ )?(cbd|town)$/.test(x.slice(0, -k.length - 1)) && x !== `${k} ${k}`);
+    if (longer.some((x) => low.includes(` ${x} `))) continue; // caller already said the full name
+    const opts = longer.map((x) => ({ name: capW(x), county: P[x][0] }));
+    for (const c of P[k]) if (!opts.some((o) => o.county === c)) opts.push({ name: capW(k), county: c });
+    if (opts.some((o) => low.includes(` ${o.county} `))) continue; // the county settles it
+    if (new Set(opts.map((o) => o.county)).size < 2) continue;
+    for (const o of opts) o.listed = ownPlaces.includes(o.name.toLowerCase()) || ownCounties.includes(o.county);
+    if (!opts.some((o) => o.listed)) continue; // the group does not touch our places
+    return { heard: capW(k), options: opts.slice(0, 3).map((o) => ({ ...o, county: capW(o.county) })) };
+  }
+  return null;
+}
 function matchArea(text, profile = {}) {
   // "outside Nairobi" names the base, not the caller's area: drop that phrase, keep the rest ("... I'm in Thika")
   text = String(text || '').replace(/\b(?:outside|out of|beyond|nje ya)\s+(?:the\s+)?[A-Za-z]+/gi, ' ');
@@ -170,9 +194,18 @@ function bareHour(t) { const n = Number(t.match(/(\d{1,2})/)[1]); if (n < 1 || n
 const ACK = /^\W*(okay|ok|sawa|ni sawa|iko sawa|ndiyo|ndio|eeh|eh|yeah|yes|naam|mm-?hm|mmh|alright|fine|poa|haya|sure|for sure|i see|ah|oh|uh|a|aa)([\s,.!]+(okay|ok|sawa|ni sawa|tu|ndiyo|ndio|yeah|yes|shy|basi|kabisa|iko sawa|sawa sawa|nijulishe|asante|thanks|thank you|great|nice|that's nice))*\W*$/i;
 const ASK_ITEM = /\b(?:mko na|mna|mnauza\w*|mnauzanga|do you (?:have|sell)|una(?:yo)?|na)\s+([a-z][a-z0-9 -]{2,30}?)(?:\s+(?:ni ngapi|ndio ngapi|zinakuja|inakuja|kwa|ya|in)\b.*)?\s*\??\s*$/i;
 function askedItem(t) { const m = String(t || '').match(ASK_ITEM); if (!m) return null; const w = m[1].trim().replace(/\s+(like|tu|pia|also)$/i, ''); if (/^(wewe|mimi|issue|shida|nini|hiyo|hii|ile|kitu|vitu|any)\b/i.test(w) || w.split(/\s+/).length > 4) return null; return w; }
-function understand(text, { profile = {}, now, expecting = null } = {}) {
+// Topic context (b401 T5): right after a services answer, "what exactly... which?" is a follow-up on that list
+const TOPIC_FOLLOWUP = /\b(what exactly|which (ones?|services?|kind|type)|which\b|what (kind|type)s?|specifically|like what|such as|zipi|gani hasa|ipi hasa|aina gani|kama nini|nini hasa)\b/i;
+function understand(text, { profile = {}, now, expecting = null, topic = null } = {}) {
   const t = String(text || '').trim();
   const intents = detectIntents(t);
+  let followup = false;
+  if (topic === 'services' && TOPIC_FOLLOWUP.test(t) && !intents.some((i) => ['book', 'cancel', 'change', 'price', 'hours', 'coverage', 'recall'].includes(i))) {
+    const svc = matchService(t, profile.servicesCatalog || []);
+    for (const i of ['want_know', 'bot_q']) { const k = intents.indexOf(i); if (k >= 0) intents.splice(k, 1); }
+    if (svc && !intents.includes('explain')) intents.push('explain'); else if (!svc && !intents.includes('services')) intents.push('services');
+    followup = true;
+  }
   const isYes = YES.test(t) && !NEG.test(t.replace(/^\W*(yes|ndio)\W*/i, '').slice(0, 0));
   const name = extractName(t, { prompted: expecting === 'name' });
   return {
@@ -194,7 +227,8 @@ function understand(text, { profile = {}, now, expecting = null } = {}) {
     ack: ACK.test(t),
     askedItem: askedItem(t),
     fragment: t.replace(/[^A-Za-z ]/g, ' ').trim().split(/\s+/).filter(Boolean).length <= 2 && !ACK.test(t),
+    followup,
     _yes: isYes,
   };
 }
-module.exports = { nonAnswer, cutOff, splitLandmark, extractLandmark, matchArea, understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };
+module.exports = { areaAmbiguity, nonAnswer, cutOff, splitLandmark, extractLandmark, matchArea, understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };

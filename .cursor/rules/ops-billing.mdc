@@ -1,12 +1,12 @@
 ---
 description: Scalers Ops & Billing lane — wallet, DID pool, Super Admin telecom
-globs: docs/supabase/wallet*.sql,docs/supabase/one_wallet_billing.sql,docs/supabase/did_number_pool.sql,docs/supabase/super_admin_ops.sql,docs/operations/ONE_WALLET_BILLING.md,docs/operations/BETA_WALLET_PROGRAM.md,docs/operations/PRODUCTION_DID_POOL.md,docs/operations/SUPER_ADMIN_REQUIREMENTS.md,docs/operations/PACKAGES.md,dashboard/src/app/admin/**,dashboard/src/app/api/admin/**,dashboard/src/app/api/did-pool/**,dashboard/src/app/(desk)/wallet/**,dashboard/src/lib/admin.ts,dashboard/src/lib/adminWallets.ts,dashboard/src/lib/didPool.ts,dashboard/src/lib/wallet.ts,dashboard/src/lib/sautikit.ts,dashboard/src/components/Admin*.tsx,dashboard/src/components/DidPoolManager.tsx,dashboard/src/components/BuyNumberPanel.tsx,dashboard/src/components/Sautikit*.tsx,docs/agents/OPS_BILLING.md
+globs: docs/supabase/wallet*.sql,docs/supabase/one_wallet_billing.sql,docs/supabase/did_number_pool.sql,docs/supabase/super_admin_ops.sql,docs/explanation/billing/ONE_WALLET_BILLING.md,docs/explanation/billing/BETA_WALLET_PROGRAM.md,docs/how-to/PRODUCTION_DID_POOL.md,docs/reference/operations/SUPER_ADMIN_REQUIREMENTS.md,docs/reference/operations/PACKAGES.md,dashboard/src/app/admin/**,dashboard/src/app/api/admin/**,dashboard/src/app/api/did-pool/**,dashboard/src/app/(desk)/wallet/**,dashboard/src/lib/admin.ts,dashboard/src/lib/adminWallets.ts,dashboard/src/lib/didPool.ts,dashboard/src/lib/wallet.ts,dashboard/src/lib/sautikit.ts,dashboard/src/components/Admin*.tsx,dashboard/src/components/DidPoolManager.tsx,dashboard/src/components/BuyNumberPanel.tsx,dashboard/src/components/Sautikit*.tsx,docs/reference/lanes/OPS_BILLING.md
 alwaysApply: false
 ---
 
 # Ops & Billing lane
 
-Full contract: `docs/agents/OPS_BILLING.md`.
+Full contract: `docs/reference/lanes/OPS_BILLING.md`.
 
 - Own one KES ledger, packages/on-demand product copy, DID pool, Super Admin ops.
 - Keep call charges idempotent; beta `billing_enforcement=off` must not charge.

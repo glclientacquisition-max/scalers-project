@@ -1,5 +1,5 @@
 // Offline call simulation against the Brain turn contract
-// (docs/agents/BRAIN_TURN_CONTRACT.md). An adversarial Gemini stub leaks a
+// (docs/reference/lanes/BRAIN_TURN_CONTRACT.md). An adversarial Gemini stub leaks a
 // price, a transfer, a coverage flip, a booking claim, and a stock count on
 // every turn. The gates must strip all of it for every playbook. Any invariant
 // violation fails the build.

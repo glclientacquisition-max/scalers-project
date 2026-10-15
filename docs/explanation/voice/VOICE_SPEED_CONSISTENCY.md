@@ -1,0 +1,158 @@
+---
+owner: voice
+last_reviewed: 2026-10-01
+---
+
+# Voice speed & consistency — way forward
+
+**Goal:** Calls should feel **consistently snappy** — first agent audio usually within **~800–1200 ms** after the caller stops, without sounding rushed, cut-off, or randomly slow.
+
+This is a Voice-lane program. Brain owns reply *content*; Voice owns *when* and *how* audio starts and stops.
+
+---
+
+## What “good” means
+
+| Dimension | Target |
+| --- | --- |
+| **Speed (p50)** | First audible audio ≤ 800–1200 ms after end-of-utterance |
+| **Speed (p90)** | ≤ ~1800 ms (no long silent dead-air) |
+| **Consistency** | Same call shouldn’t swing between “instant” and “awkward pause”; pacing, barge-in, and pronunciation feel stable |
+| **Clarity** | Kenya EN/SW/Sheng still clear on mobile — do **not** win speed by overspeeding TTS |
+
+---
+
+## Where time actually goes today
+
+```
+Caller stops
+  → Soniox endpoint + local adaptive flush     (~300–900 ms)
+  → Gemini first tokens                        (~300–800 ms)
+  → Stream buffer waits for a full sentence    (~0–400 ms)  ← required (V1). Do not cut this.
+  → Soniox TTS beginSpeak + first PCM          (~100–300 ms)
+  → (optional) thinking-ack at ~400–550 ms if LLM is slow
+```
+
+**Consistency killers we see in the path:**
+
+1. ~~First TTS waits for a full sentence before speaking.~~ **Superseded.** Sentence-only flush is required. Word/comma early flush makes Soniox restart the thought (sounding-out). See below.
+2. Opening a TTS stream only after the first chunk (serial setup).
+3. Endpoint/flush defaults that sometimes wait nearly a full second on short answers.
+4. Filler cancel / overlap races (partially fixed in PR #74).
+5. No per-turn timing logs → hard to know if a “slow call” was STT, LLM, or TTS.
+6. Pace/loudness drift: EN vs SW TTS speed, quiet fillers vs loud replies, no phone-level gain. Locked by `VOICE_PROFILE`.
+7. ~~Greeting / filler cache even-out then gain.~~ Cached clips now store raw PCM. `sendPcmToMedia` applies `VOICE_TTS_GAIN` on cache and live. Greeting key includes profile speed.
+
+---
+
+## Principles
+
+1. **Measure before guessing** — every turn logs stage timings.
+2. **Full sentence beats first-audio fragment** — Soniox treats each flush as a finished utterance. Word/comma early flush is how the agent sounds out then restarts. `VOICE_STREAM_EARLY_CHARS` / `WORDS` stay **0**. Prefetch and fillers own snappy first audio, not mid-clause flush.
+3. **Warm the pipe** — prefetch TTS while Gemini starts; don’t pay setup on the critical path.
+4. **Stable defaults > clever one-offs** — tune env defaults so every deploy feels the same. Same profile speed on every call until the caller asks (V8).
+5. **Don’t sacrifice Kenya clarity** — TTS speed stays at **1.0** by default (same EN/SW). Cap at ~1.06 (`snappy`). Never 1.2+.
+6. **Filler is a safety net, not the product** — auto ack only when first audio is late; prefer real reply audio.
+
+---
+
+## Phased plan
+
+### Phase 1 — Foundation (this PR)
+
+Ship the levers that raise *average* speed and reduce variance without live A/B infra:
+
+| Change | Why |
+| --- | --- |
+| Per-turn timing logs (`voice-timing`) | See STT→LLM→TTS splits in Railway logs |
+| Prefetch TTS at turn start | Remove beginSpeak from first-chunk critical path |
+| ~~Earlier stream flush (shorter clause / word flush)~~ | **Do not enable.** Live DID: fragment flush = sounding-out. Sentence-only is the product. [`VOICE_NATURALNESS.md`](VOICE_NATURALNESS.md) V1. |
+| Filler stop without killing prefetch streams | Avoid cancelling the reply TTS we just warmed |
+| Tighter defaults (endpoint, flush, filler delay) | More consistent snappy feel |
+| Slightly tighter Gemini voice config | Shorter, more stable spoken lines |
+
+**Success signal:** logs show `first_pcm_ms` clustering under ~1200 on typical turns; fewer “silent then dump” turns.
+
+### Phase 2 — Consistency hardening
+
+| Change | Why | Status |
+| --- | --- | --- |
+| True SautiKit media clear (`killAudio`) on barge-in | Stop talk-over after interrupt | Done |
+| Accumulate interim STT for barge decisions | Fewer missed “wait/stop” interrupts | Done |
+| Don’t flush mid-thought (`…and.`) / skip interrupt-only Gemini turns | Live DID `HD_0cdf315f02e9` | Done |
+| Cached micro-ack PCM per locale (optional) | Instant ack when LLM is actually slow | Done |
+| Greeting always instant + tenant warm before first PCM | No default-name greeting flash | This PR |
+| Same PCM path for cached greeting/filler and live replies | Stop quality drift after hello (even-out + gain vs gain only) | Done. Raw cache + greeting speed key. |
+| Extract media session from `server.js` | Safer iteration on turn loop | Next |
+
+Live evidence + next Brain hand-offs: [`LIVE_CALL_FINDINGS.md`](../../archive/LIVE_CALL_FINDINGS.md). Silent-answer 402 incident: [`SONIOX_BILLING_SILENCE_2026-09-02.md`](../../archive/SONIOX_BILLING_SILENCE_2026-09-02.md).
+
+### Phase 3 — Operate like a product
+
+| Change | Why | Status |
+| --- | --- | --- |
+| Persist turn timings (or sample to Supabase/log drain) | p50/p90 over real Kenya calls | `latency_ms` on transcript turns; p50 rollup next |
+| Env “voice profile” (`balanced` / `snappy`) | One-knob deploy: locked EN/SW pace + PCM phone gain | This PR |
+| Same-language thinking-acks | English greeting must not be followed by Sawa / Poa | This PR |
+| Regression checklist on staging DID | Manual script: yes/no, name, barge, SW switch | Next |
+
+---
+
+## Recommended production defaults (Phase 1)
+
+```bash
+VOICE_LLM_STREAM=on
+VOICE_GREETING_MODE=instant
+VOICE_FILLER=auto
+VOICE_FILLER_DELAY_MS=400
+SONIOX_MAX_ENDPOINT_DELAY_MS=700
+VOICE_FLUSH_MIN_MS=300
+VOICE_FLUSH_MAX_MS=1200
+SONIOX_TTS_SPEED=1.0
+SONIOX_TTS_SPEED_SW=1.0
+VOICE_PROFILE=balanced
+VOICE_TTS_GAIN=1.38
+GEMINI_THINKING_LEVEL=MINIMAL
+GEMINI_MAX_OUTPUT_TOKENS=120
+# stream buffer: sentence-only (earlyFlushChars=0). Do not flush 5-word fragments.
+SONIOX_TTS_MODEL=tts-rt-v2
+```
+
+---
+
+## What we will *not* do
+
+- Crank TTS to 1.2+ (mushy on Safaricom/Airtel).
+- Force a filler every turn (robotic; hurts consistency).
+- Enable `VOICE_STREAM_EARLY_CHARS` / `WORDS` to chase first audio. Sentence-only is the product.
+- Rewrite Brain prompt policy in Voice PRs (hand off content issues).
+- Optimize for lab Wi-Fi only. Judge on real DID calls.
+- Treat a vague “sounds robotic” MOS as a Voice retune. Score V1–V9 on a frozen SHA first ([`VOICE_NATURALNESS.md`](VOICE_NATURALNESS.md)).
+
+---
+
+## How to read timing logs
+
+Look for:
+
+```
+[voice-timing][callSid] turn_ms=… endpoint_to_llm_ms=… first_chunk_ms=… first_pcm_ms=… filler=0|1
+```
+
+| Pattern | Likely cause |
+| --- | --- |
+| High `endpoint_to_llm_ms` | STT / local flush too patient |
+| High `first_chunk_ms` with low LLM wait | Stream buffer holding too long |
+| High `first_pcm_ms` after chunk | TTS setup / Soniox |
+| `filler=1` often | Reply path still slow — fix LLM/TTS, don’t lower filler forever |
+| Order/escalate silence, then a long confirmation | Action turn with no progress line — expect `action-progress` log before tools |
+| Silent greeting / no talk on answer | TTS not ready — greeting must await `ttsReadyPromise` |
+| Scratchy audio after barge or filler | Orphan PCM — cancel the barged TTS, `killAudio`, and forward a frame only when its stream id is the active utterance. Do not re-speak a cancelled tail. Echo and backchannel do not cancel. |
+
+---
+
+## Ownership
+
+- **Voice lane:** this doc + media/STT/TTS/turn-taking changes
+- **Brain lane:** if replies are long-winded or inconsistent in *wording*
+- **Platform:** only if we persist metrics to Supabase
