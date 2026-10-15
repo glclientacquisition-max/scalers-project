@@ -3,6 +3,7 @@
 -- plus an append-only version history for owner review (draft -> approved).
 -- ADDITIVE: new nullable column + new table; no existing data changes. Safe to re-run.
 
+set lock_timeout = '3s';
 alter table public.tenants add column if not exists spoken_catalogue jsonb;
 
 create table if not exists public.tenant_spoken_catalogue_versions (
@@ -17,13 +18,17 @@ create table if not exists public.tenant_spoken_catalogue_versions (
   issues       jsonb not null default '[]'::jsonb,
   created_at   timestamptz not null default now(),
   approved_at  timestamptz,
-  approved_by  uuid references auth.users(id),
+  approved_by  uuid references auth.users(id) on delete set null,
   unique (tenant_id, version)
 );
-create index if not exists tenant_spoken_catalogue_versions_tenant_idx
-  on public.tenant_spoken_catalogue_versions (tenant_id, version desc);
+-- (tenant_id, version) lookups use the unique constraint's index; no extra index.
+create index if not exists tenant_spoken_catalogue_versions_approved_by_idx
+  on public.tenant_spoken_catalogue_versions (approved_by) where approved_by is not null;
 
 alter table public.tenant_spoken_catalogue_versions enable row level security;
+revoke all on table public.tenant_spoken_catalogue_versions from public, anon, authenticated;
+grant select on table public.tenant_spoken_catalogue_versions to authenticated;
+grant all on table public.tenant_spoken_catalogue_versions to service_role;
 -- Members read their own tenant's versions (Desk review UI). Writes: service role
 -- (compile/backfill) only for now; owner edit/approve goes through a server route later.
 drop policy if exists spoken_catalogue_versions_select_member on public.tenant_spoken_catalogue_versions;
