@@ -348,6 +348,9 @@ function compileMemo(profile, h = sourceHash(profile)) {
 }
 /** { doc, stale, degraded } for the call path. */
 function resolveSpokenCatalogueMeta(profile = {}, { env = process.env } = {}) {
+  // VOICE_TURN_ARBITER: the doc pinned at call start (pinSpokenCatalogue) is the
+  // only doc for the rest of the call. No hash check or compile on the hot path.
+  if (profile.spokenCataloguePin?.doc) return { ...profile.spokenCataloguePin, pinned: true };
   const stored = profile.spokenCatalogue;
   if (storedFirst(env)) {
     if (stored && Array.isArray(stored.entries)) return { doc: stored, stale: needsRegeneration(stored, profile), degraded: false };
@@ -355,6 +358,13 @@ function resolveSpokenCatalogueMeta(profile = {}, { env = process.env } = {}) {
   }
   if (stored && !needsRegeneration(stored, profile)) return { doc: stored, stale: false, degraded: false };
   return { doc: compileMemo(profile), stale: false, degraded: false };
+}
+// Call start only: resolve once with Platform's resolver and pin the result on the profile.
+function pinSpokenCatalogue(profile = {}, opts = {}) {
+  if (!profile || profile.spokenCataloguePin?.doc) return profile?.spokenCataloguePin || null;
+  const m = resolveSpokenCatalogueMeta(profile, opts);
+  profile.spokenCataloguePin = Object.freeze({ doc: m.doc, stale: m.stale, degraded: m.degraded, version: m.doc?.version ?? null, sourceHash: m.doc?.sourceHash || null });
+  return profile.spokenCataloguePin;
 }
 function resolveSpokenCatalogue(profile = {}, opts = {}) { return resolveSpokenCatalogueMeta(profile, opts).doc; }
 
@@ -365,4 +375,4 @@ function catalogueProfileFromRow(r = {}) {
   return { tenantId: r.id, servicesCatalog: r.services_catalog || [], productCatalog: r.product_catalog || [], serviceAreas: r.service_areas || null, businessLocations: r.business_locations || [] };
 }
 
-module.exports = { CATALOGUE_COLS, catalogueProfileFromRow, storedFirst, resolveSpokenCatalogueMeta, SCHEMA_VERSION, AI_SCHEMA, sourceHash, compileSpokenCatalogue, compileSync, needsRegeneration, applyOwnerEdit, approve, approvePrices, spokenName, sayName, entryForRaw, findEntry, resolveSpokenCatalogue, priceRules, swNameRules, explainRules, coverageRules, checkField, categoryLabel, slug };
+module.exports = { CATALOGUE_COLS, catalogueProfileFromRow, storedFirst, resolveSpokenCatalogueMeta, pinSpokenCatalogue, SCHEMA_VERSION, AI_SCHEMA, sourceHash, compileSpokenCatalogue, compileSync, needsRegeneration, applyOwnerEdit, approve, approvePrices, spokenName, sayName, entryForRaw, findEntry, resolveSpokenCatalogue, priceRules, swNameRules, explainRules, coverageRules, checkField, categoryLabel, slug };

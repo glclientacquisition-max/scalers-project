@@ -33,11 +33,13 @@ function shadowLegacy(line, { legacy, profile, language, state, callerText }) {
   return out;
 }
 
-async function planV2CatalogueMouth(legacy, { text, profile, language, state, env = process.env, log = () => {}, model } = {}) {
+async function planV2CatalogueMouth(legacy, { text, profile, language, state, env = process.env, log = () => {}, model, topicLocked = false } = {}) {
   if (!step.catalogueStepEnabled(env)) return legacy;
   try {
-    if (!step.looksCatalogue(text, profile, state || {})) {
-      if (state?.v2CatalogueState) state.v2CatalogueState.lastInfo = null; // topic closes on a non-catalogue turn
+    const heard = step.looksCatalogue(text, profile, state || {});
+    if (!heard && !topicLocked) {
+      // Topic closes on a non-catalogue turn, unless VOICE_TURN_ARBITER's lock holds it (barge-in / backchannel).
+      if (state?.v2CatalogueState && !topicLocked) state.v2CatalogueState.lastInfo = null;
       return legacy;
     }
     // lang slot: the call language, moved only by v2's sticky language rule on a clear caller turn.
@@ -51,6 +53,11 @@ async function planV2CatalogueMouth(legacy, { text, profile, language, state, en
     log(`v2_catalogue ${JSON.stringify(r.trace)}`);
     r.trace.intent = r.trace.kind;
     if (!r.line) return legacy;
+    // Inside VOICE_TURN_ARBITER's catalogue lock, a turn the regex missed is v2's only if v2 read it as a catalogue ask.
+    if (!heard && !['explain', 'explain_text', 'price', 'services', 'service_detail', 'list'].includes(String(r.trace?.kind || ''))) {
+      log(`v2_catalogue locked-topic turn not catalogue (kind=${r.trace?.kind}), legacy kept`);
+      return legacy;
+    }
     for (const s of shadowLegacy(r.line, { legacy, profile, language, state, callerText: text })) log(`v2_catalogue shadow ${s}`);
     return { ...(legacy || {}), speakLocal: true, line: r.line, reason: 'v2_catalogue', v2: r.trace };
   } catch (e) {

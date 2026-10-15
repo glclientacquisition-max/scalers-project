@@ -335,6 +335,9 @@ const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const { planV2CatalogueMouth } = require('./src/conversation/v2CatalogueTurn');
+const { createTurnArbiter, turnArbiterEnabled } = require('./src/speech/turnArbiter');
+const { buildTurnProposals } = require('./src/conversation/turnProposals');
+const { pinSpokenCatalogue } = require('./src/knowledge/spokenCatalogue');
 const {
   catalogueGeminiDirective,
   geminiCatalogueEnabled,
@@ -2206,6 +2209,13 @@ mediaWss.on('connection', (ws, req) => {
   let callLanguage = 'unknown';
   let callLanguageState = createLanguageState();
   let brainProfile = {};
+  // VOICE_TURN_ARBITER (off by default): one speak decision per caller turn.
+  const turnLockState = {};
+  const turnArbiter = createTurnArbiter({
+    enabled: turnArbiterEnabled(),
+    state: turnLockState,
+    trace: (e) => console.log(`[ws/media][${sidLabel()}] turn_arbiter ${JSON.stringify(e)}`),
+  });
   /** Caller-requested TTS speed scale for this call (1 = profile default). */
   let ttsSpeedScale = 1;
   /** Soniox stream id for the in-flight thinking-ack (cancel this only — keep reply prefetch). */
@@ -2280,6 +2290,7 @@ mediaWss.on('connection', (ws, req) => {
   }
   // Item 3: a receipt already rendered at call start plays with no TTS start-up seam.
   function playCachedReceipt(line) {
+    if (turnArbiter.enabled && !turnArbiter.admit(line, { tracePath: 'cached_receipt' }).ok) return null;
     if (!isFillerCacheEnabled() || ttsSpeedScale !== 1) return null;
     const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
     if (!found.pcm) return null;
@@ -2352,6 +2363,13 @@ mediaWss.on('connection', (ws, req) => {
     try {
       const profile = await db.getTenantProfile({ callSid: sessionCallSid });
       await hydrateCallerMemory(profile, sessionCallSid);
+      if (turnArbiter.enabled) {
+        // Pin the spoken catalogue once, via Platform's resolver. Never recompiled mid-call.
+        const pin = pinSpokenCatalogue(profile);
+        console.log(
+          `[ws/media][${sessionCallSid}] spoken catalogue pinned v=${pin?.version ?? 'none'} hash=${String(pin?.sourceHash || '').slice(0, 12)} stale=${pin?.stale === true} degraded=${pin?.degraded === true}`
+        );
+      }
       brainProfile = profile;
       businessName = profile.businessName || businessName;
       agentName = profile.agentName || agentName;
@@ -2718,6 +2736,11 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   async function speakText(text, opts = {}) {
+    // VOICE_TURN_ARBITER: the only TTS entry. A claimed turn speaks its sealed packet only.
+    if (turnArbiter.enabled) {
+      const admitted = turnArbiter.admit(text, opts);
+      if (!admitted.ok) return { ok: false, arbiter: admitted.reason };
+    }
     if (!opts.skipFileGate && !opts.isFiller && !opts.isReplay && !opts.isIdleNudge) {
       const gated = gateCallerFileSpeech(text, callBrainStates.get(sidLabel()));
       if (!gated.speak) {
@@ -3391,6 +3414,7 @@ mediaWss.on('connection', (ws, req) => {
         );
         if (removed.length) voiceTrace.noteSpeakSlots({ action: 'drain', slots: removed });
       }
+      if (turnArbiter.enabled) turnArbiter.beginTurn(clean);
       // A booking or callback confirmed after a barge-in is still owed.
       // Speak it first, before a local fact or the model reply.
       // VOICE_OWED_CONFIRM_FOLD=on folds it into the next reply as one line
@@ -3472,23 +3496,44 @@ mediaWss.on('connection', (ws, req) => {
         language: callLanguage,
         state: brainState,
         log: (m) => console.log(`[ws/media][${callKey}] ${m}`),
+        topicLocked: turnArbiter.enabled && turnArbiter.lock()?.topic === 'catalogue',
       });
+      const groundedPriceLine = groundFilePriceLine({
+        profile: brainProfile,
+        text: clean,
+        callerTurns: brainState?.conversation?.answersReceived,
+        state: brainState,
+        language: callLanguage,
+      });
+      // VOICE_TURN_ARBITER: every mouth proposes; the decision is made after the
+      // visit-read / rejected-create paths below (those own their turns).
+      const arbiterProposals = turnArbiter.enabled
+        ? buildTurnProposals({
+            text: clean,
+            lang: callLanguage,
+            doc: brainProfile?.spokenCataloguePin?.doc || null,
+            docVersion: brainProfile?.spokenCataloguePin?.version ?? null,
+            localReply,
+            legacyMouth: legacyCatalogueMouth,
+            v2Mouth: catalogueMouth,
+            groundedPrice: groundedPriceLine,
+            nameJustConfirmed: brainState?.caller?.nameJustConfirmed === true,
+            callerName: brainState?.caller?.name || '',
+            catalogueListed: brainState?.conversation?.catalogueListed === true,
+            lock: turnArbiter.lock(),
+          })
+        : [];
+      const arbiterClaims = arbiterProposals.length > 0;
       const packetsBeforeFacts = packetRows();
-      const localPacket = commitTurnFacts(speakCommit, {
+      const localPacket = arbiterClaims ? null : commitTurnFacts(speakCommit, {
         localReply,
         catalogueLine:
           catalogueMouth.speakLocal && catalogueMouth.line ? catalogueMouth.line : '',
         catalogueListed: brainState?.conversation?.catalogueListed === true,
-        groundedPrice: groundFilePriceLine({
-          profile: brainProfile,
-          text: clean,
-          callerTurns: brainState?.conversation?.answersReceived,
-          state: brainState,
-          language: callLanguage,
-        }),
+        groundedPrice: groundedPriceLine,
       });
       traceCommittedPackets(packetsBeforeFacts);
-      if (localReply && !localPacket && !authorizeSpeak(localReply)) {
+      if (localReply && !localPacket && !arbiterClaims && !authorizeSpeak(localReply)) {
         voiceTrace.noteSpeakPacket({
           tier: 'private',
           outcome: localReply.outcome,
@@ -3573,7 +3618,17 @@ mediaWss.on('connection', (ws, req) => {
         language: callLanguage,
       });
       const packetsBeforeSlots = packetRows();
-      if (askingName || nameJustConfirmed || endClose.close) {
+      const arbPacket = arbiterClaims && !endClose.close ? turnArbiter.speak(arbiterProposals) : null;
+      if (arbPacket) {
+        // One sealed packet. Brain localReply and live Gemini are no-ops this turn.
+        for (const line of arbPacket.lines) {
+          speakCommit.commit(authorizeSpeak({ outcome: arbPacket.topic === 'price' ? 'price' : 'catalogue', line }));
+        }
+        if (askingName && fileNameAsk) turnArbiter.extend(fileNameAsk, 'file_name_ask');
+      } else if (arbiterClaims && localReply && !authorizeSpeak(localReply)) {
+        voiceTrace.noteSpeakPacket({ tier: 'private', outcome: localReply.outcome, text: localReply.line, committed: false });
+      }
+      if (!arbPacket && (askingName || nameJustConfirmed || endClose.close)) {
         commitReadySpeakSlots(speakCommit, brainState, {
           nameJustConfirmed: nameJustConfirmed || endClose.close,
           catalogueListed: brainState?.conversation?.catalogueListed === true,
@@ -3628,11 +3683,12 @@ mediaWss.on('connection', (ws, req) => {
         drainSpokenSpeakSlots(brainState, planned.lines);
         noteSlotDrain(slotsBeforePlanned);
         callBrainStates.set(callKey, brainState);
-        const spokeCatalogue =
-          catalogueMouth.speakLocal &&
-          Boolean(catalogueMouth.line) &&
-          planned.lines.includes(catalogueMouth.line);
-        if (spokeCatalogue && catalogueMouth.reason === 'outage') {
+        const spokeCatalogue = arbPacket
+          ? arbPacket.topic === 'catalogue'
+          : catalogueMouth.speakLocal &&
+            Boolean(catalogueMouth.line) &&
+            planned.lines.includes(catalogueMouth.line);
+        if (spokeCatalogue && !arbPacket && catalogueMouth.reason === 'outage') {
           await resolveLlmRecoverySpeech(clean, { consumeOffer: false });
         }
         if (spokeCatalogue) {
@@ -3673,6 +3729,12 @@ mediaWss.on('connection', (ws, req) => {
           );
           spokeThisTurn = true;
         }
+        if (arbPacket) turnArbiter.release();
+        return;
+      }
+      if (arbPacket) {
+        // Claimed but nothing planned (already spoken): stay silent rather than let Gemini speak.
+        turnArbiter.release();
         return;
       }
       // Name Yes: a public fact the name gate did not speak is still the answer.
@@ -3955,6 +4017,8 @@ mediaWss.on('connection', (ws, req) => {
       async function onSpokenChunk(chunk) {
         // Visit, hold, and order lookups speak nameConfirmSpeech, not the model.
         if (suppressModelSpeech) return;
+        // VOICE_TURN_ARBITER: live Gemini is a proposer; never races a sealed packet.
+        if (typeof turnArbiter !== 'undefined' && turnArbiter.enabled && !turnArbiter.geminiAllowed()) return;
         // Streamed chunks are spoken before tools run, so a saved claim or a
         // number the caller never said must not reach TTS. Confirmation of a
         // save comes from formatToolConfirmation after the tool result.
