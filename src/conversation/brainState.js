@@ -493,6 +493,8 @@ function observeCallerTurn(state, input = {}) {
   }
   if (text) next.conversation.answersReceived.push(text);
   next.conversation.answersReceived = next.conversation.answersReceived.slice(-8);
+  // OLD_PATH_ORDER_GUARD (default off): remember the agent line this caller turn answers.
+  require('./oldPathOrderGuard').noteCallerTurn(next, { lastAgentText: input.lastAgentText, text });
 
   if (input.languageState && typeof input.languageState === 'object') {
     next.language = {

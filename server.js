@@ -6079,6 +6079,16 @@ async function applyGeminiTools(callSid, parsed) {
       `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : enforcedParsed.fragmentBlocked ? 'fragment_turn' : 'needs_visit_time'}`
     );
   }
+  // OLD_PATH_ORDER_GUARD (default off): no order/hold without catalogue items, a stock
+  // answer and a read-back the caller said yes to; otherwise re-ask the read-back once.
+  const orderGuardBlock = require('./src/conversation/oldPathOrderGuard').applyOrderGuard(
+    enforcedParsed,
+    state,
+    groundedProfile
+  );
+  if (orderGuardBlock) {
+    console.log(`[${callSid}] tool guard order_guard missing=${orderGuardBlock.missing.join(',')}`);
+  }
   const execution = await executeBrainTools({
     parsed: enforcedParsed,
     capabilities,
@@ -6274,6 +6284,7 @@ async function applyGeminiTools(callSid, parsed) {
       askLines: ask.lines,
     });
   }
+  if (orderGuardBlock) execution.results.unshift(orderGuardBlock);
   let updatedState = recordActionResults(state, execution.results);
   // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): hold a rejected create until it
   // is re-asked and saved, or saved as a callback. The invalid result carries
