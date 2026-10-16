@@ -1364,6 +1364,8 @@ function formatToolConfirmation(results = [], language = 'en') {
   if (meaningful.code === 'fragment_turn' && require('./callFixesD199').callFixesD199Enabled()) {
     return String(meaningful.askLine || '');
   }
+  // OLD_PATH_ORDER_GUARD: a blocked order speaks its read-back / item ask; nothing was written.
+  if (meaningful.code === 'order_guard') return String(meaningful.askLine || '');
   if (meaningful.action === 'tool_request') {
     if (sw) return 'Sijaweza kukamilisha hatua hiyo.';
     if (sheng) return 'Sijaweza ku-complete hiyo action.';
