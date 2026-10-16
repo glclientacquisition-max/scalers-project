@@ -110,6 +110,9 @@ test('intent from nlu; reply from receipts via spoken catalogue (S65 / S66 shape
 }));
 
 test('valid model command is used; invalid or slow model falls back to nlu', () => withFlag(async () => {
+  // the classify-always path (VOICE_NLU_FIRST_INTENT off); the NLU-first gate is tests/nluFirstIntent.test.js
+  const nluFirst = process.env.VOICE_NLU_FIRST_INTENT; delete process.env.VOICE_NLU_FIRST_INTENT;
+  try {
   const id = svc(/^Sofa/).id;
   const ok = async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ intent: 'price_service', service_id: id, language: 'sw' }) }] } }] });
   let r = await C.runCatalogueStep({ text: 'na hiyo ya viti je?', profile: FIX, lang: 'sw', state: {}, model: ok });
@@ -119,6 +122,7 @@ test('valid model command is used; invalid or slow model falls back to nlu', () 
   assert.strictEqual(r.trace.source, 'nlu'); assert.ok(r.trace.modelError);
   r = await C.runCatalogueStep({ text: 'Mnafanya services gani?', profile: FIX, lang: 'sw', state: {}, model: () => new Promise((res) => setTimeout(res, 500)), timeoutMs: 30 });
   assert.strictEqual(r.trace.source, 'nlu'); assert.match(r.trace.modelError, /timeout/);
+  } finally { if (nluFirst !== undefined) process.env.VOICE_NLU_FIRST_INTENT = nluFirst; }
 }));
 
 test('flag off: legacy plan returned untouched (same object), nothing logged', async () => {

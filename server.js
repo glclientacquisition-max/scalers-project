@@ -4213,6 +4213,21 @@ mediaWss.on('connection', (ws, req) => {
         return true;
       }
 
+      // VOICE_INTENT_IN_MAIN_TURN (shadow): fold the catalogue command into this Gemini turn.
+      const intentGate = require('./src/conversation/v2/intentGate');
+      const foldDoc = intentGate.intentInMainTurnEnabled() ? brainProfile?.spokenCataloguePin?.doc || null : null;
+      const foldNote = foldDoc ? intentGate.foldInstruction(foldDoc) : '';
+      if (foldNote) catalogueSystemPrompt = `${catalogueSystemPrompt}\n\n${foldNote}`;
+      function logFoldedIntent(result) {
+        if (!foldNote) return;
+        try {
+          const folded = intentGate.foldedFromParsed(parseGeminiResponse(String(result?.rawText || '')), foldDoc);
+          const nlu = intentGate.nluIntent(clean, { profile: brainProfile, doc: foldDoc, topic: brainState?.v2CatalogueState?.lastInfo || null });
+          console.log(`[ws/media][${callKey}] intent_fold ${JSON.stringify({ folded, nlu, agree: Boolean(folded && folded.intent === nlu.intent && (folded.service_id || null) === (nlu.service_id || null)) })}`);
+        } catch (err) {
+          console.log(`[ws/media][${callKey}] intent_fold error ${String(err?.message || err).slice(0, 60)}`);
+        }
+      }
       function traceModelResult(result) {
         voiceTrace.noteModelOutput({
           provider: 'gemini',
@@ -4287,6 +4302,7 @@ mediaWss.on('connection', (ws, req) => {
           catalogueBreath: catalogueMouth.letGemini,
         });
         traceModelResult(result);
+        logFoldedIntent(result);
         stopFillerForReply();
 
         if (suppressModelSpeech) {

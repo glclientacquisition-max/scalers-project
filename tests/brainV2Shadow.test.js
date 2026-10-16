@@ -9,7 +9,10 @@ const S = require('../src/conversation/v2Shadow');
 const { createVoiceTrace } = require('../src/speech/voiceTrace');
 const DD = require('../evals/v2/fixtures/tenants/done_and_dusted.json');
 
-const BOOK = ["Hi, I'd like to book interior window cleaning for Friday at 10am.", 'My name is Alvin', 'Kitengela, near Naivas', 'Yes'];
+// A weekday two days out (Nairobi time), so the slot is never "already passed". A fixed "Friday at 10am"
+// failed every Friday after 10:00 EAT (CI on #712, 16 Oct 2026 23:17 EAT: "That time has already passed").
+const BOOK_DAY = new Date(Date.now() + 2 * 864e5).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Africa/Nairobi' });
+const BOOK = [`Hi, I'd like to book interior window cleaning for ${BOOK_DAY} at 10am.`, 'My name is Alvin', 'Kitengela, near Naivas', 'Yes'];
 const memSink = () => { const writes = []; const updates = []; return { writes, updates, write: async (r) => { writes.push(JSON.parse(JSON.stringify(r))); }, update: async (r) => { updates.push(JSON.parse(JSON.stringify(r))); } }; };
 
 test('flag: off by default and for falsy values; on for on/1/true; tenant allowlist', () => {
