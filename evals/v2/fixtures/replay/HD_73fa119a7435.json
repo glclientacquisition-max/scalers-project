@@ -1,0 +1,65 @@
+{
+ "id": "R_HD_73fa119a7435",
+ "sid": "HD_73fa119a7435",
+ "env": "staging",
+ "tenant": "done_and_dusted",
+ "createdAt": "2026-10-15 20:53:55.763019+00",
+ "callerPhone": "+254700000011",
+ "replayMode": "transcript-only",
+ "lang": "en",
+ "commitment": false,
+ "turns": [
+  {
+   "caller": "Alvin, how are you? I'm calling to contact for joining services. Gani mnapenda?",
+   "model": "",
+   "agent": "(live: legacy \"We offer Apartment and House Cleaning...\")"
+  },
+  {
+   "caller": "Yes, you're speaking with Alvin.",
+   "model": "",
+   "agent": "(live: \"Which service do you need? Which service would you like to request today?\")"
+  },
+  {
+   "caller": "Uh, where did we leave off last time?",
+   "model": "",
+   "agent": ""
+  },
+  {
+   "caller": "Eeh, Carpet Cleaning. Could you remind me, like, like accurately, what Carpet Cleaning details were we— were.",
+   "model": "",
+   "agent": ""
+  },
+  {
+   "caller": "We going through?",
+   "model": "",
+   "agent": ""
+  },
+  {
+   "caller": "We're leaving",
+   "model": "",
+   "agent": ""
+  }
+ ],
+ "observed": {
+  "service_requests": [],
+  "appointments": [],
+  "resolution": "needs_human"
+ },
+ "expect": {
+  "noWrites": true
+ },
+ "mustNotSay": [
+  "Tuna Apartment na House Cleaning",
+  "Apartment and House Cleaning"
+ ],
+ "perTurn": {
+  "maxCatalogue": 1,
+  "maxWhichService": 1,
+  "noConsecutiveWhichService": true
+ },
+ "label": {
+  "by": "brain-lead",
+  "why": "English caller, name confirm then carpet details. No legacy list, never a double which-service, no writes."
+ },
+ "seed": {}
+}

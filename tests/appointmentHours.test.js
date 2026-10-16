@@ -290,3 +290,12 @@ describe('openClosedStatus still means now only', () => {
     assert.equal(openClosedStatus(schedule, SUN_21), 'closed');
   });
 });
+
+// HD_cc0481620c50: eatInstant rounds down to the minute (no 14:00:46 windows)
+describe('eatInstant minute rounding', () => {
+  it('drops seconds from the resolved window', () => {
+    const { resolveAppointmentWhen } = require('../src/conversation/appointmentHours');
+    const r = resolveAppointmentWhen('kesho saa nane mchana', new Date('2026-10-14T22:39:46.512Z'));
+    assert.equal(r.instant instanceof Date ? r.instant.toISOString() : String(r.instant), '2026-10-16T11:00:00.000Z');
+  });
+});
