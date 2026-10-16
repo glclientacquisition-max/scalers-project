@@ -13,6 +13,9 @@ const { buildRequest } = require('./gemini');
 // VOICE_V2_CATALOGUE: catalogue words, categories, explanations and prices come from the
 // tenant's spoken catalogue (src/knowledge/spokenCatalogue.js). Off: unchanged behaviour.
 const SC = require('../../knowledge/spokenCatalogue');
+const AT = require('../areaTerms');
+// Booking-for-me OFF: every offer is a request for the team (callback), never a booking.
+const requestMode = (profile) => !require('../provenance').confirmedSlotEnabled(profile || {});
 const scOn = () => /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
 function spoken(profile, svc, lang) {
   if (!scOn() || !svc) return null;
@@ -144,7 +147,7 @@ function askSlot(state, slot, ctx) {
 }
 
 function mint(state) { state.tokenSeq += 1; return `ct_${state.turn}x${state.tokenSeq}`; }
-function propose(state, p) { state.echoAsked = false; p.token = mint(state); state.pending = p; state.phase = 'readback'; state.expecting = 'confirm'; return R.readback(p, state.lang); }
+function propose(state, p) { if (p.tool === 'create_booking') p.request = state.requestMode; state.echoAsked = false; p.token = mint(state); state.pending = p; state.phase = 'readback'; state.expecting = 'confirm'; return R.readback(p, state.lang); }
 
 // Returns { line } or { ladder:true } when a slot ask is exhausted.
 function stepIntent(state, u, profile) {
@@ -227,7 +230,7 @@ function slotOr(state, slot, ctx) {
   if (state.ladderOffered) {
     // HD_db0e864043c1: never loop the same ask; after it is exhausted again, stop the booking attempt.
     state.stuck = (state.stuck || 0) + 1;
-    if (state.stuck >= 2) { state.stuck = 0; resetIntent(state); return { line: R.info({ kind: 'drop_intent' }, state.lang) }; }
+    if (state.stuck >= 2) { state.stuck = 0; resetIntent(state); return { line: R.info({ kind: 'drop_intent', request: state.requestMode }, state.lang) }; }
     state.asked[slot] = 1; return { line: R.ask(slot, 1, state.lang, ctx) };
   }
   state.ladderOffered = true;
@@ -267,7 +270,7 @@ async function commit(state, p, handlers) {
   } catch (e) { ok = false; }
   const sup = ok && p.tool === 'create_booking' ? openCallbacks(state) : [];
   if (sup.length || (ok && p.tool === 'create_booking')) for (const c of state.callbacks) if (c.open) { c.open = false; c.supersededBy = result?.id || null; }
-  const rec = { tool: p.tool, action, ok, id: result?.id || null, ...(sup.length ? { supersedes: sup } : {}), notify: result?.notify || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null };
+  const rec = { tool: p.tool, action, ok, id: result?.id || null, ...(sup.length ? { supersedes: sup } : {}), notify: result?.notify || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null, request: p.tool === 'create_booking' ? Boolean(state.requestMode) : false };
   state.receipts.push(rec);
   if (ok && (p.tool === 'create_booking' || p.tool === 'create_order') && s.name && handlers.saveCallerInfo) {
     const prior = state.file.contactName;
@@ -316,8 +319,8 @@ function infoAnswer(state, u, profile, kind) {
   }
   if (kind === 'services') {
     const cat = vertical(profile) === 'retail' ? (profile.productCatalog || []).map((p) => p.name) : (profile.servicesCatalog || []).map((x) => x.name);
-    if (u.service) { const sp = spoken(profile, u.service, state.lang); return R.info({ kind: 'offered', label: sp ? sp.label : u.service.name, price: sp ? sp.price : u.service.price_range || null }, state.lang); }
-    if (u.products[0]) return R.info({ kind: 'offered', label: u.products[0].name, price: u.products[0].price ? `KSh ${u.products[0].price}` : null }, state.lang);
+    if (u.service) { const sp = spoken(profile, u.service, state.lang); return R.info({ kind: 'offered', label: sp ? sp.label : u.service.name, price: sp ? sp.price : u.service.price_range || null, request: requestMode(profile) }, state.lang); }
+    if (u.products[0]) return R.info({ kind: 'offered', label: u.products[0].name, price: u.products[0].price ? `KSh ${u.products[0].price}` : null, request: requestMode(profile) }, state.lang);
     if (!cat.length) return R.info({ kind: 'want_know' }, state.lang);
     // HD_89aa48bf657f: home services are listed as plain categories in the caller's language, never raw catalogue names
     if (vertical(profile) === 'home' && scOn() && !(u.followup || n >= 1)) { const sc = SC.resolveSpokenCatalogue(profile); const lg = L.isSw(state.lang) ? 'sw' : 'en'; const house = sc.categories.find((c) => c.id === 'house'); if (house && /\b(saizi|sizes?|ukubwa|vyumba|bedrooms?)\b/i.test(u.text || '')) return R.info({ kind: 'house_sizes', sizes: house.entryIds.map((id) => (sc.entries.find((e) => e.id === id).raw.name.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean) }, state.lang); const labels = sc.categories.map((c) => c[lg]).filter(Boolean).slice(0, 4); if (labels.length) return R.info({ kind: 'service_categories', labels }, state.lang); }
@@ -337,7 +340,10 @@ function infoAnswer(state, u, profile, kind) {
       if (others.length && others.length < listed.length) { state.coverageAsk = state.turn; return R.info({ kind: 'coverage_outside', base: L.cap(base), names: others.slice(0, 4).join(', '), more: others.length > 4 }, state.lang); }
     }
     if (!u.area && !u.place) state.coverageAsk = state.turn;
-    return R.info({ kind: 'coverage', area: u.area, general, fromList: listed.length > 0, more: listed.length > 4 }, state.lang);
+    // Locations per-area terms (owner-confirmed fee, time, mode) for the named area
+    const term = (u.area || u.place) ? AT.matchArea(u.area?.name || u.place, profile.areaTerms) : null;
+    if (term) return AT.coveredAreaLine(term, L.isSw(state.lang) ? 'sw' : 'en');
+    return R.info({ kind: 'coverage', area: u.area, general, fromList: listed.length > 0, more: listed.length > 4, request: requestMode(profile) }, state.lang);
   }
   if (kind === 'payment_how') {
     const M = { mpesa_paybill: ['M-Pesa Paybill', 'M-Pesa Paybill'], mpesa_till: ['M-Pesa Till', 'M-Pesa Till'], bank: ['bank transfer', 'benki'], cash: ['cash', 'pesa taslimu'], card: ['card', 'kadi'], pochi: ['Pochi la Biashara', 'Pochi la Biashara'], airtel: ['Airtel Money', 'Airtel Money'] };
@@ -360,7 +366,7 @@ function infoAnswer(state, u, profile, kind) {
   if (kind === 'availability') {
     const prod = u.products[0];
     if (prod) return R.info({ kind: 'stock', found: true, label: prod.name, in_stock: prod.in_stock }, state.lang, n);
-    if (u.service && vertical(profile) === 'home') { state.offer = 'book'; state.offerService = u.service.name; return R.info({ kind: 'service_slot', label: spoken(profile, u.service, state.lang)?.label || u.service.name }, state.lang); }
+    if (u.service && vertical(profile) === 'home') { state.offer = 'book'; state.offerService = u.service.name; return R.info({ kind: 'service_slot', label: spoken(profile, u.service, state.lang)?.label || u.service.name, request: requestMode(profile) }, state.lang); }
     state.offer = 'callback';
     return R.info({ kind: 'stock', found: false }, state.lang, n);
   }
@@ -415,6 +421,7 @@ function applyAckRule(state, line, { ackOk, acked, callerAck, lang }) {
 function noteAck(state, line) { state.lastAckLed = isAckLed(line); if (state.lastAckLed) state.lastAckTurn = state.turn; }
 
 async function runTurnInner(state, { text, profile = {}, now = new Date(), handlers, model = null, langLock = null, acked = false }) {
+  state.requestMode = requestMode(profile);
   state.turn += 1; state.now = now;
   const prevLang = state.lang;
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
@@ -569,7 +576,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     mergeSlots(state, u, profile);
     // a service named with no question word is an enquiry about that service
     if (u.service && (!u.intents.length || u.intents.every((i) => i === 'want_know')) && vertical(profile) === 'home' && (u.when?.date || u.when?.time || /\b(next week|wiki ijayo|wiki (yenye |inayo)?(inakuja|kuja)|mashujaa|this week|wiki hii|sasa hivi|right now|leo|today|tonight)\b/i.test(u.text)) && (!/\?\s*$/.test(u.text) || (u.when?.date && u.when?.time) || /\b(can (you|someone) come|mnaweza (kuja|kufika)|(mtu|mtu wenu) anaweza kuja|kuna anayeweza kuja|kuna mtu wa kuja|mtakuja|nae?za pata|naweza kupata|can i (get|have))\b/i.test(u.text))) { state.intent = 'book'; mergeSlots(state, u, profile); const stb = stepIntent(state, u, profile); if (stb?.line) return out(stb.line); }
-    if (u.service && !u.intents.length && vertical(profile) === 'home') { state.lastInfo = 'services'; mergeSlots(state, u, profile); state.offer = 'book'; state.offerService = u.service.name; const sp = spoken(profile, u.service, lang); return out(R.info({ kind: 'offered', label: sp ? sp.label : u.service.name, price: sp ? sp.price : u.service.price_range || null }, lang)); }
+    if (u.service && !u.intents.length && vertical(profile) === 'home') { state.lastInfo = 'services'; mergeSlots(state, u, profile); state.offer = 'book'; state.offerService = u.service.name; const sp = spoken(profile, u.service, lang); return out(R.info({ kind: 'offered', label: sp ? sp.label : u.service.name, price: sp ? sp.price : u.service.price_range || null, request: requestMode(profile) }, lang)); }
     // a time or a place with no intent on a home-services line means a visit
     if (!u.intents.length && (u.when?.time || ((u.when?.date || u.place) && state.slots.service)) && (u.place || state.slots.service) && vertical(profile) === 'home' && !u.ack && !u.done) { state.intent = 'book'; mergeSlots(state, u, profile); const st0 = stepIntent(state, u, profile); if (st0?.line) return out(st0.line); }
     if (u.name && !u.intents.length) return out(nameSpeakable(state) ? R.info({ kind: 'greet_name', name: nameSpeakable(state) }, lang) : R.ask('intent', 0, lang));
@@ -583,7 +590,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     if (u.ack) {
       state.acks = (state.acks || 0) + 1;
       if (state.acks >= 3) { state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
-      return out(R.info({ kind: 'ack', service: state.slots.service }, lang));
+      return out(R.info({ kind: 'ack', service: state.slots.service, request: requestMode(profile) }, lang));
     }
     if (u.fragment && state.turn > 1) { state.repairs = (state.repairs || 0) + 1; if (state.repairs <= 2) return out(R.info({ kind: 'repair' }, lang)); }
     const n = state.unknownCount++;

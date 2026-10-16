@@ -346,6 +346,22 @@ function compileMemo(profile, h = sourceHash(profile)) {
   MEMO.set(h, out);
   return out;
 }
+const REFRESH = new Map();
+function refreshStale(stored, profile) {
+  const h = sourceHash(profile);
+  const key = `${h}:${stored.sourceHash || ''}:${stored.version ?? ''}`;
+  if (REFRESH.has(key)) return REFRESH.get(key);
+  const fresh = compileMemo(profile, h);
+  const prev = new Map((stored.entries || []).map((e) => [e.id, e]));
+  const entries = fresh.entries.map((f) => {
+    const e = prev.get(f.id);
+    return e && e.hash?.text === f.hash?.text && e.hash?.price === f.hash?.price ? { ...e, category: f.category } : f;
+  });
+  const out = { ...fresh, version: stored.version ?? fresh.version, entries, refreshedFrom: stored.sourceHash || null };
+  if (REFRESH.size > 200) REFRESH.clear();
+  REFRESH.set(key, out);
+  return out;
+}
 /** { doc, stale, degraded } for the call path. */
 function resolveSpokenCatalogueMeta(profile = {}, { env = process.env } = {}) {
   // VOICE_TURN_ARBITER: the doc pinned at call start (pinSpokenCatalogue) is the
@@ -353,7 +369,13 @@ function resolveSpokenCatalogueMeta(profile = {}, { env = process.env } = {}) {
   if (profile.spokenCataloguePin?.doc) return { ...profile.spokenCataloguePin, pinned: true };
   const stored = profile.spokenCatalogue;
   if (storedFirst(env)) {
-    if (stored && Array.isArray(stored.entries)) return { doc: stored, stale: needsRegeneration(stored, profile), degraded: false };
+    if (stored && Array.isArray(stored.entries)) {
+      const stale = needsRegeneration(stored, profile);
+      // Stale (a Save or import changed rows and the rebuild has not landed or failed):
+      // keep every entry whose row is unchanged, refresh changed / new rows from the
+      // rules compile, drop removed rows. A removed or changed price is never spoken.
+      return stale ? { doc: refreshStale(stored, profile), stale: true, refreshed: true, degraded: false } : { doc: stored, stale: false, degraded: false };
+    }
     return { doc: compileMemo(profile), stale: false, degraded: true };
   }
   if (stored && !needsRegeneration(stored, profile)) return { doc: stored, stale: false, degraded: false };
