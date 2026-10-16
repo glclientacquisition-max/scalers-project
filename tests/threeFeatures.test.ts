@@ -92,6 +92,17 @@ test("callbacks only: no transferred outcome anywhere in the taxonomy; old value
   assert.equal(cf.normalizeCallFacts({ outcome: "transferred" }).outcome, "callback");
 });
 
+test("owner confirms each visit: the booking outcome reads as a request, stored key unchanged", () => {
+  for (const f of ["src/data/taxonomy.json", "dashboard/src/lib/taxonomy.json"]) {
+    const t = JSON.parse(read(f));
+    const booking = t.outcomes.find((o: { id: string }) => o.id === "booking");
+    assert.equal(booking?.label, "Visit requested", f);
+    assert.ok(!t.outcomes.some((o: { label: string }) => /\b(booked|confirmed|scheduled)\b/i.test(o.label)), f);
+  }
+  const cf = require("../src/conversation/callFacts.js");
+  assert.equal(cf.normalizeCallFacts({ outcome: "booking" }).outcome, "booking");
+});
+
 test("migration: transferred rows become callback; owner corrections mirror calls; bulletin compare-and-save", () => {
   const dir = path.join(root, "supabase/migrations");
   const f = fs.readdirSync(dir).find((x) => x.includes("three_features"))!;
