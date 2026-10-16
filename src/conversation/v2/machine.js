@@ -618,8 +618,9 @@ function finishCall(state, { businessName, callerPhone }) {
   const captured = { service: s.service || last?.service, when: (s.when.date || last?.when?.date) ? `${s.when.date || last.when.date} ${s.when.time || last?.when?.time || ''}` : null, place: s.place, items: (s.items.length ? s.items : last?.items || []).map((x) => `${x.qty || '?'} x ${x.name}`).join(', ') || null, booking: last?.row ? `${last.row.service} ${last.row.when.date}` : null };
   const intent = { booked: 'book', order_saved: 'order', moved: 'change', cancelled: 'cancel', owner_only_change: last?.kind === 'payment' ? 'payment_change' : 'address_change', complaint: 'complaint', handoff_callback: 'handoff' }[outcome] || state.intent || state.lastInfo || 'none';
   const superseded = (state.callbacks || []).some((c) => c.supersededBy !== undefined && !c.open);
-  if (superseded && outcome === 'booked') captured.note = 'earlier callback request closed: booked instead';
-  return { outcome, superseded: (state.callbacks || []).filter((c) => !c.open).map((c) => c.id).filter(Boolean), ownerText: renderOwnerMessage({ businessName, callerPhone, name: s.name, intent, outcome, captured }) };
+  const requestMode = state.requestMode !== false;
+  if (superseded && outcome === 'booked') captured.note = requestMode ? 'earlier callback request closed: visit requested instead' : 'earlier callback request closed: booked instead';
+  return { outcome, superseded: (state.callbacks || []).filter((c) => !c.open).map((c) => c.id).filter(Boolean), ownerText: renderOwnerMessage({ businessName, callerPhone, name: s.name, intent, outcome, captured, requestMode }) };
 }
 // Catalogue/discovery step only (VOICE_V2_CATALOGUE live wiring): intent from nlu.js
 // (or a checked model command), reply from receipts.js via the spoken catalogue.
