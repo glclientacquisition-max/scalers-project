@@ -44,6 +44,11 @@ async function noteSpeechOutage(opts = {}) {
     );
   }
 
+  // VOICE_OUTAGE_DEBOUNCE: the owner hears about a confirmed outage only (never a single stale stream
+  // or a call that already hung up). Dedupe stays the per-tenant cooldown below.
+  if (kind === 'speech' && require('./outageDebounce').outageDebounceEnabled() && !opts.confirmed) {
+    return { ok: false, reason: 'unconfirmed' };
+  }
   if (!tenantId) return { ok: false, reason: 'no_tenant' };
   if (!claimOwnerSlot(tenantId, kind, now)) return { ok: false, reason: 'cooldown' };
 
