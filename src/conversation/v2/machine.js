@@ -20,6 +20,11 @@ function spoken(profile, svc, lang) {
   return { label: SC.sayName(sc, svc.name, Lg) || svc.name, price: e ? e.price[Lg] : null, explain: e?.explain?.[Lg] || null, sc };
 }
 
+// §4 service check answer: catalogue label + grounded price (spoken catalogue when on, else items[] price_range).
+function checkServiceLine(profile, svc, lang) {
+  const sp = spoken(profile, svc, lang);
+  return R.info({ kind: 'offered', label: sp ? sp.label : svc.name, price: sp ? sp.price : (svc.pricing?.confirmed === false ? null : svc.price_range || null) }, lang);
+}
 const TRANSACTIONAL = ['payment_change', 'address_change', 'cancel', 'change', 'complaint', 'handoff', 'order', 'book'];
 const INFO = ['payment_how', 'greeting', 'who_are_you', 'services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
 
@@ -168,6 +173,12 @@ function stepIntent(state, u, profile) {
   }
   if (it === 'order') {
     if (!s.items.length) return slotOr(state, 'items');
+    // BRAIN_V2_NLU_GAPS §6b (HD_2847152f6c1e): an order only carries catalogue-resolved items that are in stock;
+    // an out-of-stock item is answered from the catalogue and dropped before any read-back.
+    if (N.gapsOn()) {
+      const out = s.items.find((x) => { const p = (profile.productCatalog || []).find((q, i) => (q.id || `prd_${i}`) === x.product_id); return !p || /^(no|false|0|out)/i.test(String(p.in_stock ?? 'yes')); });
+      if (out) { s.items = s.items.filter((x) => x !== out); state.offer = 'callback'; return { line: R.info({ kind: 'stock', found: true, label: out.name, in_stock: false }, state.lang) }; }
+    }
     const noQty = s.items.find((x) => !x.qty);
     if (noQty) return slotOr(state, 'qty', { item: noQty.name });
     if (!s.when.date) return slotOr(state, 'pickup');
@@ -420,7 +431,18 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
   state.lang = (langLock === 'en' || langLock === 'sw') ? langLock : (L.nextLanguage(state.lang, text) || state.lang);
   let areaQ = null;
-  let u = N.understand(text, { profile, now, expecting: state.expecting, topic: state.lastInfo });
+  let u = N.understand(text, { profile, now, expecting: state.expecting, topic: state.lastInfo, prev: state.nluPrev || null, opening: state.turn === 1 && !state.slots.name });
+  state.nluPrev = { kind: u.kind, service: u.service || null };
+  // §4 "do you do X?" (BRAIN_V2_NLU_GAPS): a resolved catalogue item is answered with its grounded
+  // name + price from the catalogue (checkServiceLine), never a slot/availability claim and never a re-list.
+  if (u.intents.includes('check') && u.service && u.intents.length === 1 && !state.intent && vertical(profile) === 'home') {
+    state.lastInfo = 'price'; mergeSlots(state, u, profile); state.offer = 'book'; state.offerService = u.service.name;
+    const lang0 = state.lang || 'en'; const line = checkServiceLine(profile, u.service, lang0);
+    state.lastBase = line; state.lastLine = line; noteAck(state, line);
+    return { line, lang: lang0, source: 'receipt', toolResults: [], end: false };
+  }
+  // §6c "Chris." early in the call with no name yet: the caller's name, never "help regarding Chris?"
+  if (u.nameCandidate && !u.name && !state.slots.name && !state.intent && state.turn <= 3) { u.name = u.nameCandidate; u.kind = 'give_name'; u.confidence = 0.6; u.clear = false; u.reason = 'bare_name_intro'; }
   // area clarify (only groups touching the tenant's own places): ask once, then re-read the held turn with the chosen place
   if (state.areaPick) {
     const pk = state.areaPick; state.areaPick = null;
@@ -628,6 +650,7 @@ function catalogueTurn(state, { text, profile = {}, lang, command = null, now = 
   let kind = null; let line = null;
   if (u.intents.includes('explain') && u.service) { kind = 'explain'; const sp = spoken(profile, u.service, lang); line = sp && sp.explain ? R.info({ kind: 'explain_text', text: sp.explain }, lang) : R.info({ kind: 'explain', name: u.service.name, notes: u.service.notes || '' }, lang); }
   else if (u.intents.includes('price') && u.service) { kind = 'price'; line = infoAnswer(state, u, profile, 'price'); }
+  else if (u.intents.includes('check') && u.service) { kind = 'price'; line = checkServiceLine(profile, u.service, lang); state.offer = 'book'; state.offerService = u.service.name; }
   else if (u.intents.includes('services')) { kind = 'services'; line = infoAnswer(state, u, profile, 'services'); }
   if (line) { state.lastLine = line; state.lastInfo = kind; } else state.lastInfo = null;
   return line ? { line, kind, service: u.service?.name || null } : null;

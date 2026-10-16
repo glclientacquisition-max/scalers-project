@@ -40,7 +40,7 @@ async function planV2CatalogueMouth(legacy, { text, profile, language, state, en
       const r = await require('./v2/proposals').proposeTurn({ text, profile, language, state: state || {}, model: model === undefined ? defaultModel(env) : model, legacyLine: legacy?.line || null, nameJustConfirmed: state?.caller?.nameJustConfirmed ?? null });
       log(`v2_topic ${JSON.stringify({ ...r.trace, kinds: r.proposals.map((p) => p.kind), legacyOk: r.legacyCheck ? r.legacyCheck.ok : null })}`);
       const T = require('./v2/topic'); const docVersion = profile?.spokenCataloguePin?.version ?? null;
-      return { ...(legacy || {}), v2Proposals: r.proposals.map((p) => T.toArbiter(p, { docVersion })).filter(Boolean), v2Raw: r.proposals, v2LegacyCheck: r.legacyCheck };
+      return { ...(legacy || {}), v2Proposals: r.proposals.map((p) => T.toArbiter(p, { docVersion })).filter(Boolean), v2Raw: r.proposals, v2LegacyCheck: r.legacyCheck, ...(r.nameYes ? { v2NameYes: r.nameYes } : {}) };
     } catch (e) {
       log(`v2_topic error, legacy kept: ${String(e?.message || e).slice(0, 80)}`);
       return legacy;
