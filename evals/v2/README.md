@@ -42,3 +42,11 @@ is a seeded stand-in, not Gemini. `EVAL_PERSONA=llm` is reserved for an LLM pers
 
 Templates borrow test themes from Duckling (BSD) / SUTime and CheckList (MIT); no code or data copied.
 Audio variants (TTS + 8 kHz telephone noise, DTMF, real barge-in timing) are not covered here.
+
+## Regression-9 (`regression/`, `npm run test:bugs`)
+
+The nine known bugs from the Oct 15-16 calls as permanent EN + SW cases (synthetic, fixture
+tenants, no call data). `node evals/v2/regression/run.js --flags v2 --k 4` exits 1 on any FAIL.
+Voice-side bugs (6-9) are probes marked `xfail` with an owner note: XFAIL and XPASS never fail
+the run; an XPASS means the owner can drop the xfail. Offline: no network, DB, model key or
+SAUTIKIT_API_KEY. Platform's CI gate (#718, check `bug-test-pack`) runs `npm run test:bugs`.

@@ -189,3 +189,12 @@ test('§4 a service check with no catalogue hit never invents a yes; flag off is
     assert.equal(require('../src/conversation/v2/machine').catalogueTurn(V2.createState({ profile: DD, callerPhone: '+2547', openRows: [], pendingTasks: [] }), { text: 'Mpaka carpet?', profile: DD, lang: 'sw', now: NOW }), null);
   });
 });
+
+test('regression-9: SW "Ni Wanjiru." is a bare name; "Mko na X?" is a stock question (gaps on only)', () => {
+  for (const t of ['Ni Wanjiru.', 'Mimi ni Wanjiru.']) { const r = u(t, { opening: true }); assert.equal(r.kind, 'give_name', t); assert.equal(r.name, 'Wanjiru'); }
+  for (const t of ['Ni sawa.', 'Ni Kitengela.', 'ni kesho']) assert.notEqual(u(t, { opening: true }).kind, 'give_name', t);
+  const a = N.understand('Mko na engineering set?', { profile: RS, now: NOW, ...on });
+  assert.equal(a.kind, 'check_availability');
+  assert.notEqual(N.understand('Mko na engineering set?', { profile: RS, now: NOW, gaps: false }).kind, 'check_availability');
+  assert.equal(N.understand('Mko na huduma gani?', { profile: DD, now: NOW, ...on }).kind, 'list_services');
+});

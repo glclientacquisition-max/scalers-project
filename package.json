@@ -72,6 +72,7 @@
     "eval:v2": "node evals/v2/run.js --flags prod",
     "eval:v2:replay": "node evals/v2/replay.js --labelled",
     "eval:v2:replay:v2": "node evals/v2/replay.js --labelled --flags v2 --k 4",
+    "test:bugs": "node evals/v2/regression/run.js --flags v2 --k 4",
     "eval:v2:edge": "node evals/v2/edge/run.js --expand",
     "docs:reference": "node scripts/docs/gen-reference.js",
     "docs:reference:check": "node scripts/docs/gen-reference.js --check",
