@@ -153,4 +153,31 @@ function polishPacketLine(line, polish) {
   return same && norm(out) ? out : line;
 }
 
-module.exports = { turnArbiterEnabled, createTurnArbiter, polishPacketLine, isBackchannel, isHello, isYesNoQuestion, PRIORITY, LOCK_TTL };
+function fillerSlotEnabled(env = process.env) {
+  return /^(1|true|on|yes)$/i.test(String(env.VOICE_FILLER_SLOT || '').trim());
+}
+
+/**
+ * VOICE_FILLER_SLOT (off): one filler/hold audio slot per turn (regression-9 R8, HD_2847152f6c1e T4:
+ * "Mm-hmm." + "Let me check." + the receipt stacked). The first filler or hold claims the slot; a
+ * hold line can follow a hold line (the same slot) but never a filler. The real answer (reply,
+ * receipt) pre-empts: the slot closes for the rest of the turn and the caller hears the answer next.
+ */
+function createAudioSlot({ trace = () => {} } = {}) {
+  let holder = null;
+  return {
+    claim(kind) {
+      const k = kind === 'hold' ? 'hold' : 'filler';
+      if (holder && holder !== k) { trace({ kind: 'audio_slot_denied', want: k, holder }); return false; }
+      if (holder === 'filler') return false; // one filler per turn
+      holder = k;
+      return true;
+    },
+    preempt() { const was = holder; holder = 'answer'; if (was && was !== 'answer') trace({ kind: 'audio_slot_preempted', was }); return was; },
+    holder: () => holder,
+    fillerPlayed: () => holder === 'filler',
+    reset() { holder = null; },
+  };
+}
+
+module.exports = { fillerSlotEnabled, createAudioSlot, turnArbiterEnabled, createTurnArbiter, polishPacketLine, isBackchannel, isHello, isYesNoQuestion, PRIORITY, LOCK_TTL };
