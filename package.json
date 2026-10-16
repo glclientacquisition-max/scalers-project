@@ -30,7 +30,7 @@
     "test:timing": "node tests/voiceTiming.test.js",
     "test:filler-pcm": "node tests/fillerPcmCache.test.js",
     "test:greeting-pcm": "node --test tests/greetingPcmCache.test.js",
-    "test:interim": "node tests/interimBarge.test.js",
+    "test:interim": "node tests/interimBarge.test.js && node --test tests/swVerbLock.test.js",
     "test:stt-context": "node tests/sttContext.test.js",
     "test:gemini-voice": "node --test tests/geminiVoice.test.js tests/geminiProviderHealth.test.js tests/spokenChunkPath.test.js",
     "test:live-transfer": "node --test tests/liveTransferXml.test.js tests/liveTransferLegs.test.js",
