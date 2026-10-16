@@ -122,6 +122,9 @@ function formatCoverageWithTerms(coverageIds, terms) {
     .join(', ');
 }
 
+const SW_ETA = [[/^same[ -]?day$/i, 'siku hiyo hiyo'], [/^next[ -]?day$/i, 'siku inayofuata'], [/^within 24 ?h(ou)?rs?$/i, 'ndani ya saa 24'], [/^(1|one)[- ]2 days$/i, 'ndani ya siku 1 hadi 2']];
+function swEta(eta) { const hit = SW_ETA.find(([re]) => re.test(eta)); return hit ? hit[1] : null; }
+
 /** One spoken line for a covered area with its fee and time. */
 function coveredAreaLine(area, language = 'en') {
   const sw = language === 'sw';
@@ -138,7 +141,7 @@ function coveredAreaLine(area, language = 'en') {
       : visit ? `The travel fee there is ${money(area.feeKsh)}.` : `Delivery there is ${money(area.feeKsh)}.`;
   }
   const head = sw ? `Ndiyo, tunafika ${area.name}.` : visit ? `Yes, we come to ${area.name}.` : `Yes, we deliver to ${area.name}.`;
-  const when = eta ? (sw ? ` Muda: ${eta.toLowerCase()}.` : ` Timing: ${eta.toLowerCase()}.`) : '';
+  const when = !eta ? '' : sw ? (swEta(eta) ? ` Tunakuja ${swEta(eta)}.` : ` Muda: ${eta}.`) : ` Timing: ${eta.toLowerCase()}.`;
   return `${head} ${fee}${when}`;
 }
 
