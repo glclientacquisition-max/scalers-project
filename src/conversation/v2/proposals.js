@@ -78,10 +78,12 @@ async function proposeTurn({ text, profile = {}, language, state = {}, model = n
   if (!doc) return out(null, { yield: 'no_pinned_doc' });
   const pinnedProfile = { ...profile, spokenCatalogue: doc, spokenCataloguePin: { doc: doc } };
 
-  // name confirmed while a topic is open: hand back to the open question, nothing re-listed
+  // name confirmed while a topic is open: Voice's name_yes_closer owns the turn (#706). v2 proposes
+  // nothing (no re-list, no second "which service") and hands the closer its facts.
   if (topic && (nameJustConfirmed === true || (nameJustConfirmed == null && NAME_YES.test(text)))) {
-    const q = (h.lastLang === lang && T.openQuestion(h.lastLine)) || (lang === 'sw' ? 'Ungependa ipi?' : 'Which would you like?');
-    return out(T.proposal({ kind: 'name_handback', text: q, lang, topic: h.topic, claim: true }), { reason: 'name_yes' });
+    const caller = state?.caller || {};
+    const nameYes = { confirmedName: caller.nameConfirmed === true ? caller.name || null : null, lang, openQuestion: (h.lastLang === lang && T.openQuestion(h.lastLine)) || null };
+    return { ...out(null, { reason: 'name_yes_yield' }), nameYes };
   }
   // a follow-up about an item while the topic is open ("Hebu niambie kuhusu hiyo usafi wa apartment") is an explain
   if (topic) {

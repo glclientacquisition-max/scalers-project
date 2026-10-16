@@ -13,7 +13,7 @@ const ON = /^(1|true|on|yes)$/i;
 const enabled = (env = process.env) => ON.test(String(env.BRAIN_V2_TOPIC_PROPOSALS || '').trim());
 const TOPIC_TTL = 2;
 
-const PRIORITY = { catalogue: 80, explain: 80, price: 80, area: 75, name_handback: 72, reprompt: 70, fallback: 60, turn: 50 };
+const PRIORITY = { catalogue: 80, explain: 80, price: 80, area: 75, reprompt: 70, fallback: 60, turn: 50 };
 
 // ---------- 1. topic state ----------
 function setTopic(state, { kind, itemIds = [], turn }) {
@@ -85,13 +85,13 @@ function itemNamePostCheck(line, doc, { legacyNames = [] } = {}) {
 const WHICH_SERVICE = /\b(which (service|one)[^.?!]*\?|what service[^.?!]*\?|ungependa (huduma )?(gani|ipi)[^.?!]*\?|unahitaji (huduma )?(gani|ipi)[^.?!]*\?|huduma gani[^.?!]*\?)/gi;
 function countWhichService(line) { return (String(line || '').match(WHICH_SERVICE) || []).length; }
 // One "which service?" per line, and never the same one as the previous turn.
-function dedupeQuestions(line, { lastLine = '' } = {}) {
+// Within one turn only: a question repeated across turns (re-ask after a filler) is kept.
+function dedupeQuestions(line) {
   const parts = String(line || '').split(/(?<=[.!?])\s+/).filter(Boolean);
   const seen = []; const out = [];
-  const lastAsked = countWhichService(lastLine) > 0;
   for (const p of parts) {
     const q = countWhichService(p) > 0;
-    if (q && (seen.length || (lastAsked && out.length))) continue;
+    if (q && seen.length) continue;
     if (q) seen.push(p);
     out.push(p);
   }
@@ -122,7 +122,7 @@ function proposal({ kind, text, lang, topic = null, claim = false, priority }) {
 // Voice's TurnArbiter (#706 src/speech/turnArbiter.js) proposal shape:
 // {source, topic, line, grounded, facts, lock?}. source picks the arbiter PRIORITY;
 // claim:false proposals are not submitted (the existing path keeps the turn).
-const ARBITER_SOURCE = { catalogue: 'v2_catalogue', fallback: 'v2_catalogue', explain: 'v2_catalogue', area: 'v2_catalogue', reprompt: 'topic_hold', name_handback: 'name_yes_closer', price: 'grounded_price' };
+const ARBITER_SOURCE = { catalogue: 'v2_catalogue', fallback: 'v2_catalogue', explain: 'v2_catalogue', area: 'v2_catalogue', reprompt: 'topic_hold', price: 'grounded_price' };
 function toArbiter(p, { docVersion = null } = {}) {
   if (!p || !p.claim || !p.text || !ARBITER_SOURCE[p.kind]) return null;
   const topic = p.kind === 'price' ? 'price' : 'catalogue';

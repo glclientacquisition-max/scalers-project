@@ -9,7 +9,7 @@ const DD = require('../evals/v2/fixtures/tenants/done_and_dusted.json');
 const doc = SC.compileSync(DD);
 const pinned = { ...DD, spokenCatalogue: doc };
 const ON = { BRAIN_V2_TOPIC_PROPOSALS: '1' };
-const withFlag = async (fn) => { const o = process.env.BRAIN_V2_TOPIC_PROPOSALS; process.env.BRAIN_V2_TOPIC_PROPOSALS = '1'; try { return await fn(); } finally { if (o === undefined) delete process.env.BRAIN_V2_TOPIC_PROPOSALS; else process.env.BRAIN_V2_TOPIC_PROPOSALS = o; } };
+const withFlag = async (fn, v = '1') => { const o = process.env.BRAIN_V2_TOPIC_PROPOSALS; if (v == null) delete process.env.BRAIN_V2_TOPIC_PROPOSALS; else process.env.BRAIN_V2_TOPIC_PROPOSALS = v; try { return await fn(); } finally { if (o === undefined) delete process.env.BRAIN_V2_TOPIC_PROPOSALS; else process.env.BRAIN_V2_TOPIC_PROPOSALS = o; } };
 
 test('flag defaults off', () => { assert.equal(T.enabled({}), false); assert.equal(T.enabled(ON), true); });
 
@@ -35,7 +35,9 @@ test('post-check drops legacy and invented item names, keeps grounded lines', ()
 test('dedupe keeps one which-service per turn and none twice in a row', () => {
   const d = T.dedupeQuestions('Which service do you need? Which service would you like to request today?', {});
   assert.equal(T.countWhichService(d), 1);
-  assert.equal(T.countWhichService(T.dedupeQuestions('Thanks, Alvin. Which service do you need?', { lastLine: 'Which service do you need?' })), 0);
+  // across turns a repeat is fine (re-ask after a filler): only within one turn is it deduped
+  assert.equal(T.dedupeQuestions('Ungependa ipi?', { lastLine: 'Tunafanya usafi wa sofa na mazulia. Ungependa ipi?' }), 'Ungependa ipi?');
+  assert.equal(T.dedupeQuestions('Ni usafi wa kina. Ungependa ipi?', { lastLine: 'Ungependa ipi?' }), 'Ni usafi wa kina. Ungependa ipi?');
 });
 
 test('proposal shape', () => {
@@ -60,13 +62,13 @@ test('HD_f9b6 sequence: one catalogue line, Karibu inherits, apartment clarifies
   } finally { SC.compileSync = orig; }
 });
 
-test('name yes hands back to the open question, never a second which-service', async () => {
-  const state = {};
+test('name yes: v2 yields to Voice name_yes_closer and passes name + current language', async () => {
+  const state = { caller: { name: 'Alvin', nameConfirmed: true } };
   await P.proposeTurn({ text: 'What services do you offer?', profile: pinned, language: 'en', state, model: null });
   const r = await P.proposeTurn({ text: "Yes, you're speaking with Alvin.", profile: pinned, language: 'en', state, model: null, nameJustConfirmed: true });
-  assert.equal(r.proposals[0].kind, 'name_handback');
-  assert.ok(T.countWhichService(r.proposals[0].text) <= 1);
-  assert.match(r.proposals[0].text, /\?$/);
+  assert.equal(r.proposals.length, 0);
+  assert.deepStrictEqual({ n: r.nameYes.confirmedName, l: r.nameYes.lang }, { n: 'Alvin', l: 'en' });
+  assert.match(r.nameYes.openQuestion, /\?$/);
 });
 
 test('step failure falls back to the stored doc categories in the caller language', async () => {
@@ -87,12 +89,14 @@ test('no pinned doc: v2 yields', async () => {
 test('flag off: planV2CatalogueMouth unchanged (no proposals), machine has no proposals', async () => {
   const { planV2CatalogueMouth } = require('../src/conversation/v2CatalogueTurn');
   const legacy = { line: 'legacy' };
+  await withFlag(async () => {
   const r = await planV2CatalogueMouth(legacy, { text: 'ni services gani?', profile: pinned, language: 'sw', state: {}, env: {}, model: null });
   assert.equal(r.v2Proposals, undefined);
   const V2 = require('../src/conversation/v2');
   const st = V2.createState({ profile: DD, callerPhone: '+254700000001' });
   const t = await V2.runTurn(st, { text: 'ni services gani mnafanya?', profile: DD, now: new Date('2026-10-15T09:00:00Z'), handlers: V2.createDryRunHandlers() });
   assert.equal(t.proposals, undefined);
+  }, null);
 });
 
 test('flag on: planV2CatalogueMouth keeps legacy and adds proposals; machine inherits topic on Karibu', async () => {
