@@ -1,0 +1,9 @@
+{
+  "callSid": "HD_2847152f6c1e",
+  "turn": 3,
+  "note": "Regression-9 R7. T2 asked 'Am I speaking with <file name>?'. T3 the caller asked about stock instead of answering; the agent repeated the name ask over the question. Expected with VOICE_NAME_GATE_ANSWER: answer the question, no second ask.",
+  "askedTurns": 1,
+  "callerText": { "en": "Do you have the engineering set?", "sw": "Mko na engineering set?" },
+  "observedAgent": "Am I speaking with <name>?",
+  "expected": { "askAgain": false }
+}

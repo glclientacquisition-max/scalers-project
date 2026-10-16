@@ -359,6 +359,8 @@ const {
 const {
   gateCallerFileSpeech,
   lockFileNameAsk,
+  nameGateAnswerEnabled,
+  shouldAskFileName,
   speakerBound,
 } = require('./src/speech/callerFileSpeech');
 const {
@@ -3469,7 +3471,14 @@ mediaWss.on('connection', (ws, req) => {
         }
         brainState = callBrainStates.get(callKey) || brainState;
       }
-      const askingName = !nameGate.runModel && Boolean(fileNameAsk) && !nameJustConfirmed;
+      const nameAskDue = !nameGate.runModel && Boolean(fileNameAsk) && !nameJustConfirmed;
+      // VOICE_NAME_GATE_ANSWER (off): the ask is open and the caller asked something else: answer, no repeat.
+      const askingName =
+        nameAskDue &&
+        (!nameGateAnswerEnabled() || shouldAskFileName({ askedTurns: fileNameAsksCommitted, callerText: clean }));
+      if (nameAskDue && !askingName) {
+        console.log(`[ws/media][${callKey}] name ask open, caller asked something else: answering, no repeat`);
+      }
       const endClose = planBrainEndClose({
         action: nextBestAction.action,
         language: callLanguage,

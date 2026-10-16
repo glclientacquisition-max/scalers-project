@@ -179,7 +179,36 @@ function lockFileNameAsk(line, language) {
   return `Am I speaking with ${who}?`;
 }
 
+function nameGateAnswerEnabled(env = process.env) {
+  return /^(1|true|on|yes)$/i.test(String(env.VOICE_NAME_GATE_ANSWER || '').trim());
+}
+
+// A caller turn that is its own request, not an answer to "Am I speaking with X?" (EN + SW).
+const QUESTION_RE = /\?\s*$|^\s*(?:do|does|did|can|could|is|are|will|would|how|what|when|where|which|who|why)\b|^\s*(?:je|mko|mna|una|kuna|naweza|nawezaje|bei|ni\s+ngapi|lini|wapi|gani|vipi|ngapi)\b|\b(?:ngapi|gani|wapi|lini|vipi)\b/i;
+const IDENTITY_ANSWER_RE = /^\s*(?:yes|yeah|yep|no|nope|speaking|it'?s me|this is|i am|i'm|my name|ndio|ndiyo|eeh|ee|hapana|si mimi|ni mimi|mimi ni|jina langu)\b/i;
+function callerTurnIsOtherRequest(text) {
+  const t = String(text || '').trim();
+  if (!t || IDENTITY_ANSWER_RE.test(t)) return false;
+  return QUESTION_RE.test(t);
+}
+
+/**
+ * Name-gate decision (regression-9 R7, HD_2847152f6c1e T3). The identity question is open once it was
+ * asked. When the caller then asks something else, answer that and do not ask again. The first ask
+ * always goes; one re-ask is allowed only for a turn that is neither an answer nor a request.
+ * @param {{ askedTurns?: number, callerText?: string }} o
+ */
+function shouldAskFileName({ askedTurns = 0, callerText = '' } = {}) {
+  const asked = Number(askedTurns) || 0;
+  if (asked <= 0) return true;
+  if (asked >= 2) return false;
+  return !callerTurnIsOtherRequest(callerText);
+}
+
 module.exports = {
+  nameGateAnswerEnabled,
+  shouldAskFileName,
+  callerTurnIsOtherRequest,
   speakerBound,
   gateCallerFileSpeech,
   lineIsOpenFileRow,
