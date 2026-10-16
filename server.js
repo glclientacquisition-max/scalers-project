@@ -58,6 +58,7 @@ const {
   getOutageClipStatus,
 } = require('./src/speech/outageClips');
 const { noteSpeechOutage } = require('./src/speech/speechOutageNotify');
+const { outageDebounceEnabled, createOutageGate, probeReady } = require('./src/speech/outageDebounce');
 const {
   resolveSonioxVoice,
   ttsVoiceNeedsSwap,
@@ -2199,6 +2200,9 @@ mediaWss.on('connection', (ws, req) => {
 
   /** Soniox 402/fatal: speak a local fallback once, then hang up. */
   let speechOutageStarted = false;
+  // VOICE_OUTAGE_DEBOUNCE: one gate per call decides when a TTS failure is a real outage.
+  const outageDebounce = outageDebounceEnabled();
+  const outageGate = createOutageGate();
   let profileLoaded = false;
   let profileCallSid = null;
   /** Sticky call language: 'en' | 'sw' | 'sheng' | 'mixed' | 'unknown' */
@@ -2544,8 +2548,44 @@ mediaWss.on('connection', (ws, req) => {
    * Soniox STT+TTS are billed out (402) or otherwise dead. Speak the clone-voice
    * downtime recording (same voice as the greeting) and hang up.
    */
-  async function handleSpeechProviderOutage(reason) {
+  /** VOICE_OUTAGE_DEBOUNCE: rebind TTS once and probe it. True when the new session is ready. */
+  async function reconnectTtsOnce() {
+    try {
+      if (tts) tts.close();
+    } catch {
+      /* ignore */
+    }
+    tts = null;
+    try {
+      const next = bindMediaTts(tenantSonioxVoiceId);
+      if (await probeReady(next)) return true;
+    } catch (err) {
+      console.warn(`[ws/media][${sidLabel()}] tts reconnect failed:`, err?.message || err);
+    }
+    tts = null;
+    return false;
+  }
+
+  async function handleSpeechProviderOutage(reason, o = {}) {
     if (speechOutageStarted) return { ok: false, outage: true };
+    if (outageDebounce) {
+      const mediaGone = () => ws.readyState !== WebSocket.OPEN;
+      let d = outageGate.fail(reason, { ...(o.classified || {}), closed: mediaGone() });
+      if (d.action === 'retry') {
+        const ok = await reconnectTtsOnce();
+        if (speechOutageStarted) return { ok: false, outage: true };
+        if (ok) {
+          console.warn(`[ws/media][${sidLabel()}] outage_debounce: single tts failure (${reason}), reconnected; re-speaking`);
+          return { ok: false, recovered: true };
+        }
+        d = outageGate.fail(`${reason} (reconnect failed)`, { probeFailed: true, closed: mediaGone() });
+      }
+      if (d.action === 'ignore_closed') {
+        console.warn(`[ws/media][${sidLabel()}] outage_debounce: tts unavailable after call close (${reason}); not an outage, no clip, no alert`);
+        return { ok: false, closed: true };
+      }
+      console.error(`[ws/media][${sidLabel()}] outage_debounce: confirmed speech outage why=${d.why} fails=${d.fails}`);
+    }
     speechOutageStarted = true;
     unfinishedHold.close();
     greetingStarted = true;
@@ -2555,7 +2595,7 @@ mediaWss.on('connection', (ws, req) => {
     console.error(
       `[ws/media][${sidLabel()}] speech provider outage (${reason}): speaking clone-voice downtime clip`
     );
-    void noteSpeechOutage({ profile: brainProfile }).catch((err) => {
+    if (!outageDebounce || o.notify !== false) void noteSpeechOutage({ profile: brainProfile, confirmed: outageDebounce ? outageGate.confirmed() : undefined }).catch((err) => {
       console.warn(
         `[ws/media][${sidLabel()}] owner outage alert failed:`,
         err?.message || err
@@ -2609,7 +2649,9 @@ mediaWss.on('connection', (ws, req) => {
       console.warn(
         `[ws/media][${sidLabel()}] greeting skipped — TTS unavailable: ${String(text).slice(0, 80)}`
       );
-      return handleSpeechProviderOutage('tts unavailable');
+      const r = await handleSpeechProviderOutage('tts unavailable');
+      if (r?.recovered && !opts.outageRetry) return speakGreetingSentences(text, { ...opts, outageRetry: true });
+      return r;
     }
     bargeInActive = false;
     suppressReplyRemainder = false;
@@ -2686,7 +2728,8 @@ mediaWss.on('connection', (ws, req) => {
       const classified = classifySonioxError(err);
       if (classified.billing || classified.fatal) {
         return handleSpeechProviderOutage(
-          `tts ${classified.code || classified.message}`
+          `tts ${classified.code || classified.message}`,
+          { classified }
         );
       }
       return { ok: false };
@@ -2764,7 +2807,9 @@ mediaWss.on('connection', (ws, req) => {
       console.warn(
         `[ws/media][${sidLabel()}] speakText skipped — TTS unavailable: ${String(text).slice(0, 80)}`
       );
-      return handleSpeechProviderOutage('tts unavailable');
+      const r = await handleSpeechProviderOutage('tts unavailable');
+      if (r?.recovered && !opts.outageRetry) return speakText(text, { ...opts, outageRetry: true });
+      return r;
     }
     if (isOrphanFragment(bargeCancelledText, text)) {
       console.log(`[ws/media][${sidLabel()}] drop fragment restart after barge`);
@@ -2867,6 +2912,7 @@ mediaWss.on('connection', (ws, req) => {
       ) {
         putGreetingPcm(opts.greetingCacheKey, spoken.pcm);
       }
+      if (outageDebounce) outageGate.ok();
       return { ok: true };
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] TTS speak failed:`, err?.message || err);
@@ -2878,7 +2924,8 @@ mediaWss.on('connection', (ws, req) => {
       const classified = classifySonioxError(err);
       if (classified.billing || classified.fatal) {
         return handleSpeechProviderOutage(
-          `tts ${classified.code || classified.message}`
+          `tts ${classified.code || classified.message}`,
+          { classified }
         );
       }
       return { ok: false };
@@ -4808,7 +4855,8 @@ mediaWss.on('connection', (ws, req) => {
       const classified = evt.classified || classifySonioxError(evt.raw);
       if (classified.billing || classified.fatal) {
         void handleSpeechProviderOutage(
-          `stt ${classified.code || classified.message}`
+          `stt ${classified.code || classified.message}`,
+          { classified }
         );
       }
       return;
@@ -5087,7 +5135,8 @@ mediaWss.on('connection', (ws, req) => {
         console.warn(
           `[ws/media][${sidLabel()}] greeting skipped — default shop name`
         );
-        await handleSpeechProviderOutage('default shop name');
+        // Not a provider failure: callers still hear the clip, but no speech-outage SMS (flag on).
+        await handleSpeechProviderOutage('default shop name', { classified: { fatal: true }, notify: false });
         return;
       }
 
@@ -5162,8 +5211,9 @@ mediaWss.on('connection', (ws, req) => {
           console.warn(
             `[ws/media][${sidLabel()}] greeting skipped — TTS not ready`
           );
-          await handleSpeechProviderOutage('tts not ready');
-          return;
+          const r = await handleSpeechProviderOutage('tts not ready');
+          if (!r?.recovered || !tts) return;
+          readyTts = tts;
         }
 
         greetingAwaitingFirstPcm = true;
@@ -5326,6 +5376,7 @@ mediaWss.on('connection', (ws, req) => {
   });
 
   ws.on('close', (code, reason) => {
+    outageGate.markClosed();
     const ms = Date.now() - connectedAt;
     console.log(
       `[ws/media] closed after ${ms}ms code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
