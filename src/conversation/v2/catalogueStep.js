@@ -61,9 +61,15 @@ async function runCatalogueStep({ text, profile, lang, state, model = null, time
   const holder = state || {};
   const v2 = (holder.v2CatalogueState ||= M.createState({ profile }));
   let mc = null;
-  if (typeof model === 'function') mc = await modelCommand({ model, text, sc, lang, timeoutMs });
+  // VOICE_NLU_FIRST_INTENT: skip the separate classify when nlu is confident.
+  const G = require('./intentGate');
+  const nluFirst = G.nluFirstEnabled();
+  const nluDecision = nluFirst ? G.nluIntent(text, { profile, doc: sc, topic: v2.lastInfo || null }) : null;
+  const callModel = typeof model === 'function' && (!nluFirst || nluDecision.confidence !== 'high');
+  if (callModel) mc = await modelCommand({ model, text, sc, lang, timeoutMs });
   const r = M.catalogueTurn(v2, { text, profile, lang, command: mc?.command || null });
-  const trace = { step: 'catalogue', lang, kind: r?.kind || null, source: mc?.command ? 'model' : 'nlu', modelMs: mc?.ms ?? null, modelError: mc?.error || null, command: mc?.command || null, scVersion: sc.version, scHash: sc.sourceHash.slice(0, 12), ...(scMeta.stale ? { scStale: true } : {}), ...(scMeta.degraded ? { scDegraded: true } : {}) };
+  const intentSource = mc?.command ? 'model' : nluFirst && typeof model === 'function' && !callModel ? 'skip' : 'nlu';
+  const trace = { step: 'catalogue', lang, kind: r?.kind || null, source: mc?.command ? 'model' : 'nlu', ...(nluFirst ? { intentSource, nlu: nluDecision } : {}), modelMs: mc?.ms ?? null, modelError: mc?.error || null, command: mc?.command || null, scVersion: sc.version, scHash: sc.sourceHash.slice(0, 12), ...(scMeta.stale ? { scStale: true } : {}), ...(scMeta.degraded ? { scDegraded: true } : {}) };
   return r ? { line: r.line, trace } : { line: null, trace: { ...trace, yield: 'not_catalogue' } };
 }
 module.exports = { looksCatalogue, catalogueStepEnabled, commandSchema, validateCommand, buildCommandRequest, parseCommandResponse, modelCommand, runCatalogueStep };
