@@ -48,13 +48,13 @@ function tenantProfileFromRow(row, extras = {}) {
     ttsLexicon: parseLexiconOverrides(row.tts_lexicon),
     sonioxVoiceId: row.soniox_voice_id || null,
     sonioxVoiceLabel: row.soniox_voice_label || null,
-    vertical: parseVertical(row.vertical),
-    handoffMode: parseHandoffMode(row.handoff_mode),
-    businessLocations: row.business_locations || [],
     // Settings › Locations area terms (fee, time, mode) from tenants.service_areas.
     areaTerms: require('./conversation/areaTerms').readAreaTerms(
       row.service_areas !== undefined ? row.service_areas : extras.serviceAreas
     ),
+    vertical: parseVertical(row.vertical),
+    handoffMode: parseHandoffMode(row.handoff_mode),
+    businessLocations: row.business_locations || [],
     businessPolicies: row.business_policies || {},
     billingEnforcement:
       row.billing_enforcement != null ? String(row.billing_enforcement) : null,
