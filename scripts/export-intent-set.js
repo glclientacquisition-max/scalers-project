@@ -9,12 +9,18 @@ const out = process.argv[2] || '/workspace/eval/intent-set.jsonl';
 const root = path.join(__dirname, '..');
 const fx = path.join(root, 'tests', 'fixtures');
 const files = ['voice-calls', 'no-answer-delete', 'hedge-gap'].flatMap((d) => fs.readdirSync(path.join(fx, d)).filter((f) => f.endsWith('.json')).map((f) => path.join(fx, d, f)));
+// A call fixture that names a tenant with a full fixture uses that tenant's catalogue, so ids are the stored-doc ids, not slugs of the call's name list.
+function tenantFixtureById(id) {
+  if (!id) return null; const dir = path.join(__dirname, '..', 'evals/v2/fixtures/tenants');
+  for (const f of fs.readdirSync(dir)) { if (!f.endsWith('.json')) continue; const t = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); if (t.tenantId === id) return t; }
+  return null;
+}
 function callsOf(j, file) {
   if (Array.isArray(j.turns) && j.turns[0]?.callId && j.catalogue) {
     const by = {}; for (const t of j.turns) (by[t.callId] ||= []).push(t);
     return Object.entries(by).map(([callId, turns]) => ({ callId, profile: { servicesCatalog: j.catalogue.map((name) => ({ name })) }, turns, file }));
   }
-  const profile = j.profile || (j.servicesCatalog ? j : { servicesCatalog: (j.catalogue || []).map((name) => (typeof name === 'string' ? { name } : name)) });
+  const profile = tenantFixtureById(j.tenantId || j.profile?.tenantId) || j.profile || (j.servicesCatalog ? j : { servicesCatalog: (j.catalogue || []).map((name) => (typeof name === 'string' ? { name } : name)) });
   const turns = j.turns || (j.t7 ? [j.t7] : []);
   return [{ callId: j.callId || j.sid || path.basename(file, '.json'), profile, turns, lang: j.lang, file }];
 }

@@ -11,8 +11,15 @@ const file = args.find((a) => !a.startsWith('--')) || '/workspace/eval/intent-se
 const jsonOut = args.includes('--json') ? args[args.indexOf('--json') + 1] : null;
 const rows = fs.readFileSync(file, 'utf8').trim().split('\n').map(JSON.parse);
 const root = path.join(__dirname, '..');
+// A call fixture that names a tenant with a full fixture uses that tenant's catalogue, so ids are the stored-doc ids, not slugs of the call's name list.
+function tenantFixtureById(id) {
+  if (!id) return null; const dir = path.join(__dirname, '..', 'evals/v2/fixtures/tenants');
+  for (const f of fs.readdirSync(dir)) { if (!f.endsWith('.json')) continue; const t = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); if (t.tenantId === id) return t; }
+  return null;
+}
 function profileFor(r) {
   const j = JSON.parse(fs.readFileSync(path.join(root, r.source), 'utf8'));
+  const tf = tenantFixtureById(j.tenantId || j.profile?.tenantId); if (tf) return tf;
   if (j.tenant) { try { return require(path.join(root, 'evals/v2/fixtures/tenants', `${j.tenant}.json`)); } catch { return {}; } }
   if (Array.isArray(j.turns) && j.turns[0]?.callId && j.catalogue) return { servicesCatalog: j.catalogue.map((name) => ({ name })) };
   return j.profile || (j.servicesCatalog ? j : { servicesCatalog: (j.catalogue || []).map((n) => (typeof n === 'string' ? { name: n } : n)) });
