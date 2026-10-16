@@ -108,6 +108,7 @@ function compileEntries(entries) {
         : `\\b(?:${entry.match})\\b`;
     return {
       ...entry,
+      langsExplicit: entry.langsExplicit ?? Array.isArray(entry.langs),
       langs: entry.langs || ['en', 'sw', 'sheng'],
       priority: entry.priority ?? 50,
       index,
@@ -361,6 +362,7 @@ function parseLexiconOverrides(raw) {
       match,
       say,
       langs: Array.isArray(item.langs) ? item.langs : ['en', 'sw', 'sheng'],
+      langsExplicit: Array.isArray(item.langs),
       priority: Number(item.priority) >= 0 ? Number(item.priority) : 200,
     });
   }
@@ -377,6 +379,22 @@ function envLexiconOverrides() {
  * @param {'en'|'sw'|string} [lang]
  * @param {LexiconEntry[]} [extraEntries]
  */
+// "Na-koo-roo": an English-phonetics respelling (hyphenated syllables).
+const RESPELLING_RE = /[A-Za-z]+-[A-Za-z]+-?/;
+function ttsLineLangEnabled(env = process.env) {
+  return /^(1|true|on|yes)$/i.test(String(env.VOICE_TTS_LINE_LANG || '').trim());
+}
+/**
+ * VOICE_TTS_LINE_LANG (off), regression-9 R9: per-language lexicon at the TTS boundary. In Swahili a
+ * respelling applies only when its entry names 'sw' explicitly; a default-all-languages entry keeps the
+ * word as written (Swahili spelling is already phonetic: "Nakuru" is said as written).
+ */
+function entryAllowedForLang(entry, ttsLang, env = process.env) {
+  if (ttsLang !== 'sw' || !ttsLineLangEnabled(env)) return true;
+  if (entry.langsExplicit && entry.langs.includes('sw')) return true;
+  return !RESPELLING_RE.test(String(entry.say || ''));
+}
+
 function applyLexicon(text, lang = 'en', extraEntries = []) {
   let out = String(text || '');
   if (!out) return out;
@@ -394,6 +412,7 @@ function applyLexicon(text, lang = 'en', extraEntries = []) {
       entry.langs.includes(ttsLang) ||
       (allowSheng && entry.langs.includes('sheng'));
     if (!ok) continue;
+    if (!entryAllowedForLang(entry, ttsLang)) continue;
     out = out.replace(entry.re, entry.say);
   }
 
@@ -454,6 +473,8 @@ function mergeIdentityLexicon(extra, identity = {}) {
 }
 
 module.exports = {
+  ttsLineLangEnabled,
+  entryAllowedForLang,
   KENYA_LEXICON,
   PLACE_LEXICON,
   applyLexicon,

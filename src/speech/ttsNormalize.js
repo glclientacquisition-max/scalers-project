@@ -4,6 +4,7 @@ const {
   applyLexicon,
   envLexiconOverrides,
   parseLexiconOverrides,
+  ttsLineLangEnabled,
 } = require('./pronunciationLexicon');
 const { expandPhones, expandSpokenForms } = require('./spokenForms');
 const { shouldRewriteSheng, rewriteShengForTts } = require('./shengRewrite');
@@ -224,12 +225,31 @@ function detectUtteranceTtsLang(text) {
  * @param {string} [forcedLanguage] - optional override (`en` | `sw` only)
  * @returns {'en'|'sw'}
  */
+// VOICE_TTS_LINE_LANG (off), regression-9 R9: a call with no language yet uses the line's own.
+// Swahili function words, counted only when the line carries no English function words.
+const SW_LINE_WORDS = /\b(tuko|tuna|kuna|ni|na|ya|wa|za|la|kwa|katika|hii|hiyo|huu|hapa|pia|sisi|wewe|mimi|yetu|yako|yangu|matawi|tawi|mji|miji|moja|mbili|tatu|matatu|nne|tano|asubuhi|jioni|saa|siku|wiki|karibu|ndio|ndiyo|hapana|tafadhali|asante)\b/gi;
+const EN_LINE_WORDS = /\b(the|and|is|are|we|you|our|your|in|of|to|a|an|it|for|with|have|has|this|that|at|on|be|can|will|i)\b/i;
+function detectLineLanguage(text) {
+  const raw = String(text || '');
+  if (!raw.trim() || EN_LINE_WORDS.test(raw)) return null;
+  return (raw.match(SW_LINE_WORDS) || []).length >= 2 ? 'sw' : null;
+}
+function callHasNoLanguage(callLanguage) {
+  const c = String(callLanguage || '').trim().toLowerCase();
+  return !c || c === 'unknown';
+}
+
 function resolveTtsLanguage(text, callLanguage, forcedLanguage) {
   const forced = String(forcedLanguage || '').toLowerCase();
   if (forced === 'en' || forced === 'sw') return forced;
 
   const utterance = detectUtteranceTtsLang(text);
   if (utterance) return utterance;
+
+  if (callHasNoLanguage(callLanguage) && ttsLineLangEnabled()) {
+    const line = detectLineLanguage(text);
+    if (line) return line;
+  }
 
   if (callLanguage === 'sw') {
     const raw = String(text || '').toLowerCase();
@@ -303,6 +323,7 @@ function pickTtsLanguage(text, callLanguage) {
 }
 
 module.exports = {
+  detectLineLanguage,
   stripMarkup,
   expandPhones,
   polishPunctuation,
