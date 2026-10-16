@@ -59,6 +59,7 @@ const {
 } = require('./src/speech/outageClips');
 const { noteSpeechOutage } = require('./src/speech/speechOutageNotify');
 const { outageDebounceEnabled, createOutageGate, probeReady } = require('./src/speech/outageDebounce');
+const { bookOutranksListTurn } = require('./src/conversation/turnProposals');
 const {
   resolveSonioxVoice,
   ttsVoiceNeedsSwap,
@@ -3541,6 +3542,14 @@ mediaWss.on('connection', (ws, req) => {
         log: (m) => console.log(`[ws/media][${callKey}] ${m}`),
         topicLocked: turnArbiter.enabled && turnArbiter.lock()?.topic === 'catalogue',
       });
+      // BRAIN_V2_NLU_GAPS §6a (HD_69f53a46339b T2): "Which service do you offer? I want Deep cleaning
+      // tomorrow, Kilimani." names a service plus a date/place, so it is a booking. No catalogue list
+      // (local, legacy or v2) speaks this turn; the booking reply owns it. Off: same objects as before.
+      const bookOutranksList = bookOutranksListTurn(clean, brainProfile);
+      if (bookOutranksList) console.log(`[ws/media][${callKey}] catalogue yields: booking outranks list`);
+      const turnLocalReply = bookOutranksList && localReply?.outcome === 'catalogue' ? null : localReply;
+      const turnLegacyMouth = bookOutranksList ? null : legacyCatalogueMouth;
+      const turnCatalogueMouth = bookOutranksList ? { speakLocal: false, line: '', v2Proposals: [] } : catalogueMouth;
       const groundedPriceLine = groundFilePriceLine({
         profile: brainProfile,
         text: clean,
@@ -3556,28 +3565,28 @@ mediaWss.on('connection', (ws, req) => {
             lang: callLanguage,
             doc: brainProfile?.spokenCataloguePin?.doc || null,
             docVersion: brainProfile?.spokenCataloguePin?.version ?? null,
-            localReply,
-            legacyMouth: legacyCatalogueMouth,
-            v2Mouth: catalogueMouth,
+            localReply: turnLocalReply,
+            legacyMouth: turnLegacyMouth,
+            v2Mouth: turnCatalogueMouth,
             groundedPrice: groundedPriceLine,
             nameJustConfirmed: brainState?.caller?.nameJustConfirmed === true,
             callerName: brainState?.caller?.name || '',
             callerNameConfirmed: brainState?.caller?.nameConfirmed === true,
             catalogueListed: brainState?.conversation?.catalogueListed === true,
             lock: turnArbiter.lock(),
-          }).concat(catalogueMouth.v2Proposals || []) // BRAIN_V2_TOPIC_PROPOSALS: v2 submits to the arbiter
+          }).concat(turnCatalogueMouth.v2Proposals || []) // BRAIN_V2_TOPIC_PROPOSALS: v2 submits to the arbiter
         : [];
       const arbiterClaims = arbiterProposals.length > 0;
       const packetsBeforeFacts = packetRows();
       const localPacket = arbiterClaims ? null : commitTurnFacts(speakCommit, {
-        localReply,
+        localReply: turnLocalReply,
         catalogueLine:
-          catalogueMouth.speakLocal && catalogueMouth.line ? catalogueMouth.line : '',
+          turnCatalogueMouth.speakLocal && turnCatalogueMouth.line ? turnCatalogueMouth.line : '',
         catalogueListed: brainState?.conversation?.catalogueListed === true,
         groundedPrice: groundedPriceLine,
       });
       traceCommittedPackets(packetsBeforeFacts);
-      if (localReply && !localPacket && !arbiterClaims && !authorizeSpeak(localReply)) {
+      if (turnLocalReply && !localPacket && !arbiterClaims && !authorizeSpeak(turnLocalReply)) {
         voiceTrace.noteSpeakPacket({
           tier: 'private',
           outcome: localReply.outcome,
@@ -3729,9 +3738,9 @@ mediaWss.on('connection', (ws, req) => {
         callBrainStates.set(callKey, brainState);
         const spokeCatalogue = arbPacket
           ? arbPacket.topic === 'catalogue'
-          : catalogueMouth.speakLocal &&
-            Boolean(catalogueMouth.line) &&
-            planned.lines.includes(catalogueMouth.line);
+          : turnCatalogueMouth.speakLocal &&
+            Boolean(turnCatalogueMouth.line) &&
+            planned.lines.includes(turnCatalogueMouth.line);
         if (spokeCatalogue && !arbPacket && catalogueMouth.reason === 'outage') {
           await resolveLlmRecoverySpeech(clean, { consumeOffer: false });
         }
@@ -3785,7 +3794,7 @@ mediaWss.on('connection', (ws, req) => {
       // SpeakPacket already returned when it spoke the fact. This speaks a
       // public slot that is still unanswered, then Voice drains that line.
       if (
-        localReply &&
+        turnLocalReply &&
         nameJustConfirmed &&
         isSpeakSlotOutcome(localReply.outcome) &&
         !speakCommit.wasSpoken(localReply.line)
