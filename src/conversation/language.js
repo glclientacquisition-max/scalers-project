@@ -240,6 +240,22 @@ function languageTagBucket(tag) {
  * @param {string} text
  * @param {{ tokenLanguages?: string[] }} [opts]
  */
+// VOICE_SW_VERB_LOCK (off): count conjugated Swahili verbs the marker list misses ("mnaosha",
+// "mnadhanioshea", "tunasafisha"). Subject prefix + tense marker + a vowel-final root. Without it,
+// "mnaosha carpet?" scores en=1 (loanword) sw=0 and the call locks to English on turn one.
+const SW_VERB_RE = /^(?:ni|u|a|tu|m|wa|mu)(?:na|me|ta|li|ki|nge|naweza)[a-z]{2,}[aeiu]$/;
+const SW_VERB_NOT = new Set(['anatomia', 'metali', 'manage', 'mentee', 'atlanta', 'anaconda', 'antenna', 'mamba', 'america', 'amerika', 'umbrella', 'tunisia']);
+function swVerbLockEnabled() {
+  return /^(1|true|on|yes)$/i.test(String(process.env.VOICE_SW_VERB_LOCK || '').trim());
+}
+function countSwahiliVerbs(raw) {
+  let n = 0;
+  for (const w of raw.split(/[^a-z']+/)) {
+    if (w.length >= 5 && SW_VERB_RE.test(w) && !SW_VERB_NOT.has(w) && !ENGLISH_CORE_MARKERS.includes(w) && !ENGLISH_JOB_LOANWORDS.includes(w)) n += 1;
+  }
+  return n;
+}
+
 function analyzeCallerLanguage(text, opts = {}) {
   const raw = String(text || '')
     .toLowerCase()
@@ -255,6 +271,8 @@ function analyzeCallerLanguage(text, opts = {}) {
 
   let swHits = countMarkers(raw, SWAHILI_MARKERS);
   let enHits = countMarkers(raw, ENGLISH_CORE_MARKERS);
+  // Only when the turn has no English function words: "mnaosha carpet?" yes, "unaongea na English by the way?" no (HD_48631816b68c #19).
+  if (swVerbLockEnabled() && enHits === 0 && !/\b(i|my|you|we|the|a|an|is|are|can|do|what|how|when|where|by|english)\b/.test(raw)) swHits += countSwahiliVerbs(raw) + (/\bmpaka\b/.test(raw) ? 1 : 0);
   const loanHits = countMarkers(raw, ENGLISH_JOB_LOANWORDS);
   let shengHits = countMarkers(raw, SHENG_MARKERS);
   const tags = Array.isArray(opts.tokenLanguages) ? opts.tokenLanguages : [];
@@ -483,6 +501,8 @@ function languageDirective(lang) {
 
 module.exports = {
   analyzeCallerLanguage,
+  countSwahiliVerbs,
+  swVerbLockEnabled,
   dominantSonioxLanguage,
   ENGLISH_JOB_LOANWORDS,
   detectCallerLanguage,
