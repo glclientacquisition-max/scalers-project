@@ -15,7 +15,9 @@ const ROOT = path.resolve(args.root || path.join(__dirname, '../../..'));
 const K = Number(args.k || 4);
 // v2 = run.js v2 profile + the Brain fixes these cases lock in (BRAIN_V2_NLU_GAPS).
 const FLAGS = {
-  v2: { BRAIN_V2: 'on', BRAIN_V2_NLU_GAPS: 'on', BRAIN_CALL_FIXES_D199: 'on', BRAIN_TRUST_P1: 'on', CALLER_INFO_P1: null, CALLER_MEMORY_V2: 'on' },
+  v2: { BRAIN_V2: 'on', BRAIN_V2_NLU_GAPS: 'on', BRAIN_CALL_FIXES_D199: 'on', BRAIN_TRUST_P1: 'on', CALLER_INFO_P1: null, CALLER_MEMORY_V2: 'on',
+    // Voice R6-R9 flags (all off in prod by default): R9 changes prepareForTts, so the pack runs it on.
+    VOICE_OUTAGE_DEBOUNCE: 'on', VOICE_NAME_GATE_ANSWER: 'on', VOICE_FILLER_SLOT: 'on', VOICE_TTS_LINE_LANG: 'on' },
 }[args.flags || 'v2'];
 if (!FLAGS) { console.error(`unknown --flags ${args.flags} (supported: v2)`); process.exit(2); }
 const NOW = new Date('2026-10-14T05:00:00Z'); // Wed 08:00 EAT
