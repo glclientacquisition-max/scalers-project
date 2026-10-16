@@ -543,18 +543,13 @@ function toolFlagsFromBrain(brainState, callId = null) {
   ).toLowerCase();
   const holdStatus = String(hold?.requestStatus || hold?.record?.status || 'open').toLowerCase();
   const holdType = String(hold?.requestType || hold?.value?.type || '').toLowerCase();
-  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 8): the kind comes from the
-  // row written. Only a hold row is a hold.
-  const fixesOn = require('./callFixesD199').callFixesD199Enabled();
+  // The kind comes from the row written (was behind BRAIN_CALL_FIXES_D199,
+  // Aris HD_d3900cbf2b2d 8; now always): only a hold or order row is a hold.
   const realHold = !holdType || holdType === 'hold' || holdType === 'hold_or_pickup' || holdType === 'order';
   return {
-    ...(fixesOn
-      ? {
-          enquirySaved: Boolean(hold) && !realHold && holdType !== 'callback',
-          enquiryItem: String(hold?.value?.item || hold?.record?.item || '').trim(),
-          holdKind: hold ? holdType || 'hold' : null,
-        }
-      : {}),
+    enquirySaved: Boolean(hold) && !realHold && holdType !== 'callback',
+    enquiryItem: String(hold?.value?.item || hold?.record?.item || '').trim(),
+    holdKind: hold ? holdType || 'hold' : null,
     holdSaved: ok('create_service_request'),
     callbackSaved: ok('create_service_request') && holdType === 'callback',
     visitSaved: ok('create_appointment') || ok('update_appointment'),
@@ -579,8 +574,7 @@ function toolFlagsFromBrain(brainState, callId = null) {
     refusedWhen: Array.isArray(brainState?.actions?.refusedHours)
       ? brainState.actions.refusedHours.filter(Boolean)
       : [],
-    holdOpen:
-      Boolean(hold) && (!holdStatus || holdStatus === 'open') && (!fixesOn || realHold),
+    holdOpen: Boolean(hold) && (!holdStatus || holdStatus === 'open') && realHold,
     escalateSaved: ok('escalate'),
     escalateReason: String(
       escalate?.value?.reason || escalate?.record?.reason || ''
@@ -670,10 +664,10 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical, 
     next: '',
     applied: { reason: false, intent: false, resolution: false, card: false },
   };
-  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 8): the owner-review kind is
-  // what was written: a visit row is book_visit, a hold row hold_or_pickup,
-  // an enquiry or callback row the derived intent. No write: the model's.
-  if (require('./callFixesD199').callFixesD199Enabled() && review) {
+  // The owner-review kind is what was written (was behind BRAIN_CALL_FIXES_D199):
+  // a visit row is book_visit, a hold row hold_or_pickup, an enquiry or
+  // callback row the derived intent. No write: the model's.
+  if (review) {
     let kind = review.primary_intent || null;
     if (flags.visitSaved) kind = 'book_visit';
     else if (flags.holdKind) {
@@ -899,7 +893,9 @@ function formatTrustedSnapshot(ctx) {
     `intent: ${derived.primaryIntent || 'unknown'}`,
     `resolution: ${derived.resolution || 'unknown'}`,
     `reason: ${cleanReason(summary.reason) || 'none'}`,
-    `holdSaved: ${Boolean(flags.holdSaved)}`,
+    // A saved enquiry or callback row is not a hold.
+    `holdSaved: ${Boolean(flags.holdSaved) && !flags.enquirySaved && !flags.callbackSaved}`,
+    `enquirySaved: ${Boolean(flags.enquirySaved)}`,
     `visitSaved: ${Boolean(flags.visitSaved)}`,
     `visitRequested: ${Boolean(flags.visitRequested)}`,
     `callbackSaved: ${Boolean(flags.callbackSaved)}`,
@@ -1196,6 +1192,25 @@ function withSummaryWriteLock(callSid, fn) {
   return run;
 }
 
+/**
+ * Owner-report facts follow the row written, not the model's guess: an enquiry
+ * or callback row is not "Item held", and a saved visit is a visit request.
+ */
+function alignFactsWithSavedWork(facts, flags = {}) {
+  if (!facts || typeof facts !== 'object') return facts;
+  const out = { ...facts };
+  if (flags.visitSaved) {
+    if (out.outcome === 'hold' || out.outcome === 'sale_or_order') out.outcome = 'booking';
+    if (out.intent === 'hold_or_pickup') out.intent = 'book_visit';
+    return out;
+  }
+  if (flags.enquirySaved || flags.callbackSaved) {
+    if (out.outcome === 'hold') out.outcome = 'callback';
+    if (out.intent === 'hold_or_pickup') out.intent = 'general_enquiry';
+  }
+  return out;
+}
+
 async function defaultSaveFacts({ callSid, ctx, review, turns }) {
   const db = require('../db');
   const call = ctx.call || (await db.getCall(callSid));
@@ -1486,7 +1501,8 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
   try {
     // Injected save (tests, replays) means no live db; facts then only via deps.saveFacts.
     const saveFacts = deps.saveFacts || (deps.save ? null : defaultSaveFacts);
-    if (saveFacts) await saveFacts({ callSid, ctx, review, turns });
+    const factsReview = review.facts ? { ...review, facts: alignFactsWithSavedWork(review.facts, ctx.toolFlags || {}) } : review;
+    if (saveFacts) await saveFacts({ callSid, ctx, review: factsReview, turns });
   } catch (err) {
     console.warn(`[transcript-review] ${callSid} call_facts failed:`, err?.message || err);
   }
@@ -1589,4 +1605,6 @@ module.exports = {
   recordReviewStatus,
   schedulePostCallTranscriptReview,
   toolFlagsFromBrain,
+  alignFactsWithSavedWork,
+  formatTrustedSnapshotForTests: formatTrustedSnapshot,
 };

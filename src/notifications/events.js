@@ -8,7 +8,10 @@ const {
   renderStaffSubject,
   renderStaffText,
   serviceRequestTitle,
+  serviceRequestAction,
+  isMissedCall,
   staffAction,
+  staffTitle,
 } = require('./templates');
 
 const EVENTS = Object.freeze({
@@ -162,6 +165,7 @@ function ownerLeadEvent(call = {}, businessName) {
   if (outcome) fields.push(['Outcome', outcome]);
   return {
     kind: EVENTS.LEAD,
+    ...(isMissedCall(call) ? { title: staffTitle('missed_lead') } : {}),
     businessName,
     fields,
     recordingUrl: call.recording_url,
@@ -188,7 +192,7 @@ function serviceRequestEvent(request = {}, businessName) {
       ['Phone', request.caller_phone],
       ['Notes', request.notes],
     ],
-    action: staffAction(EVENTS.SERVICE_REQUEST),
+    action: serviceRequestAction(type),
     caller: {
       name: request.caller_name,
       phone: request.caller_phone,
