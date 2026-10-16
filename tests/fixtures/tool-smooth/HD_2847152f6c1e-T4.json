@@ -1,0 +1,7 @@
+{
+  "callSid": "HD_2847152f6c1e",
+  "turn": 4,
+  "note": "Regression-9 R8. Tool turn: the 'Mm-hmm.' filler played, the tool was still pending when it ended, toolSmooth queued 'Let me check.', then the cached receipt played. Three stacked lines. Expected with VOICE_FILLER_SLOT: the filler owns the turn's one filler/hold slot, no hold line, the receipt pre-empts.",
+  "heard": ["Mm-hmm.", "Let me check.", "Okay, I've saved your request."],
+  "expectedHeard": ["Mm-hmm.", "Okay, I've saved your request."]
+}
