@@ -1,0 +1,7 @@
+{
+  "callSid": "HD_740090e11a2f",
+  "note": "Regression-9 R9. A Swahili line naming Kenyan places was respelled with English phonetics ('Na-koo-roo'). The line came out before the call language was set, so it was read as English, and a lexicon respelling with no language tag applied. Expected with VOICE_TTS_LINE_LANG: the line is detected as sw and Nakuru is said as written.",
+  "line": "Tuko na matawi matatu Nakuru, Nairobi na Mombasa.",
+  "lexicon": [{ "match": "Nakuru", "say": "Na-koo-roo" }],
+  "expected": { "language": "sw", "text": "Tuko na matawi matatu Nakuru, Nairobi na Mombasa." }
+}
