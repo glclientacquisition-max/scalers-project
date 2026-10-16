@@ -7,6 +7,9 @@ const {
   setSpeechOutageDispatch,
 } = require('../src/speech/speechOutageNotify');
 
+// Confirmed outage, so these cases hold with VOICE_OUTAGE_DEBOUNCE on as well.
+const CONF = { why: 'consecutive_2' };
+
 describe('speechOutageNotify', () => {
   beforeEach(() => {
     resetSpeechOutageNotify();
@@ -44,9 +47,9 @@ describe('speechOutageNotify', () => {
       businessName: 'Shop A',
       whatsappNumber: '+254700000001',
     };
-    const speech = await noteSpeechOutage({ profile, kind: 'speech' });
+    const speech = await noteSpeechOutage({ profile, kind: 'speech', confirmed: CONF });
     const llm = await noteSpeechOutage({ profile, kind: 'llm' });
-    const speechAgain = await noteSpeechOutage({ profile, kind: 'speech' });
+    const speechAgain = await noteSpeechOutage({ profile, kind: 'speech', confirmed: CONF });
     assert.equal(speech.ok, true);
     assert.equal(llm.ok, true);
     assert.equal(speechAgain.reason, 'cooldown');
@@ -65,9 +68,9 @@ describe('speechOutageNotify', () => {
       businessName: 'Shop A',
       whatsappNumber: '+254700000001',
     };
-    const first = await noteSpeechOutage({ profile });
-    const second = await noteSpeechOutage({ profile });
-    const other = await noteSpeechOutage({
+    const first = await noteSpeechOutage({ profile, confirmed: CONF });
+    const second = await noteSpeechOutage({ profile, confirmed: CONF });
+    const other = await noteSpeechOutage({ confirmed: CONF,
       profile: {
         id: 'tenant-b',
         businessName: 'Shop B',
@@ -87,7 +90,7 @@ describe('speechOutageNotify', () => {
       sent.push(opts);
       return { channel: 'sms' };
     });
-    const result = await noteSpeechOutage({
+    const result = await noteSpeechOutage({ confirmed: CONF,
       profile: {
         id: 'tenant-c',
         businessName: 'Shop C',
