@@ -65,4 +65,33 @@ async function probeReady(session, timeoutMs = num('VOICE_OUTAGE_PROBE_MS', 2500
   } finally { clearTimeout(timer); }
 }
 
-module.exports = { outageDebounceEnabled, createOutageGate, probeReady };
+/**
+ * Pure outage decision (regression-9 R6 seam). Replays a call's TTS error events through the same gate
+ * server.js runs live under VOICE_OUTAGE_DEBOUNCE, so a test can ask "would this call declare an outage?"
+ * without a socket. Events: { code?, message?, at?, closed?, probeFailed?, billing?, fatal? }.
+ * A Soniox 400 "Stream ... not found" (one dead stream after a barge or a close) is classified by
+ * sonioxErrors and is never fatal on its own; the reconnect after it is what decides.
+ * @returns {{ outage: boolean, action: 'none'|'ignore_closed'|'retry'|'outage', why: string, fails: number }}
+ */
+function decideSpeechOutage(events = [], opts = {}) {
+  const { classifySonioxError } = require('./sonioxErrors');
+  let clock = 0;
+  const gate = createOutageGate({ threshold: opts.threshold, windowMs: opts.windowMs, now: () => clock });
+  let last = { action: 'none', confirmed: false, fails: 0, why: 'no_errors' };
+  for (const [i, e] of (Array.isArray(events) ? events : [events]).entries()) {
+    if (!e) continue;
+    clock = Number.isFinite(Number(e.at)) ? Number(e.at) : i * 1000;
+    if (e.ok) { gate.ok(); continue; }
+    const c = e.code != null || e.message ? classifySonioxError({ error_code: e.code, error_message: e.message }) : {};
+    last = gate.fail(String(e.message || e.reason || 'tts unavailable'), {
+      billing: Boolean(e.billing || c.billing),
+      fatal: Boolean(e.fatal || (c.fatal && !c.staleStream)),
+      probeFailed: Boolean(e.probeFailed),
+      closed: Boolean(e.closed),
+    });
+    if (last.action === 'outage') break;
+  }
+  return { outage: last.action === 'outage', action: last.action, why: last.why, fails: last.fails };
+}
+
+module.exports = { outageDebounceEnabled, createOutageGate, probeReady, decideSpeechOutage };

@@ -108,7 +108,13 @@ function setSpeechOutageDispatch(fn) {
   dispatchOverride = fn;
 }
 
+/** R6 seam: true only when the call's TTS errors add up to a confirmed outage (see outageDebounce). */
+function shouldDeclareSpeechOutage(events, opts) {
+  return require('./outageDebounce').decideSpeechOutage(events, opts).outage;
+}
+
 module.exports = {
+  shouldDeclareSpeechOutage,
   buildOwnerOutageBody,
   noteSpeechOutage,
   resetSpeechOutageNotify,
