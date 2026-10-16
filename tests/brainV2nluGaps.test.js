@@ -150,3 +150,42 @@ test('§6c machine greets a bare name instead of "help regarding Chris" (EN, SW)
     }
   } finally { delete process.env.BRAIN_V2_NLU_GAPS; }
 });
+
+// S32_sw_do_you_clean_carpet: a service check on a catalogue item answers with the grounded price,
+// with VOICE_V2_CATALOGUE on (spoken catalogue) and off (items[] price_range); no slot claim, no re-list.
+const withEnv = async (env, fn) => { const old = {}; for (const k of Object.keys(env)) { old[k] = process.env[k]; if (env[k] == null) delete process.env[k]; else process.env[k] = env[k]; } try { return await fn(); } finally { for (const k of Object.keys(old)) { if (old[k] == null) delete process.env[k]; else process.env[k] = old[k]; } } };
+const CHECKS = [
+  ['en', 'do you clean carpets?'], ['en', 'And do you guys like clean carpets?'], ['en', 'do you also do carpets?'], ['en', 'even carpets?'],
+  ['sw', 'Mnasafisha carpet?'], ['sw', 'mnaosha carpet?'], ['sw', 'Mpaka carpet?'], ['sw', 'Carpet mnadhanioshea?'],
+];
+for (const sc of [null, '1']) {
+  test(`§4 service check answers with the grounded price (VOICE_V2_CATALOGUE=${sc || 'off'}), EN + SW`, async () => {
+    await withEnv({ BRAIN_V2_NLU_GAPS: '1', VOICE_V2_CATALOGUE: sc }, async () => {
+      for (const [lang, t] of CHECKS) {
+        const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] });
+        const r = await V2.runTurn(st, { text: t, profile: DD, now: NOW, handlers: {}, langLock: lang });
+        const price = sc ? (lang === 'sw' ? /bei ni kuanzia shilingi 2,200 kwa mita mraba/ : /from 2,200 shillings per square metre/) : /KSh 2,200/;
+        assert.match(r.line, price, t);
+        assert.match(r.line, lang === 'sw' ? /^Ndio, tunafanya/ : /^Yes, we do carpet cleaning/, t);
+        assert.doesNotMatch(r.line, /slot|nafasi|available|inapatikana|confirm|thibitisha/i, t); // no availability claim
+        assert.doesNotMatch(r.line, /sofa|mattress|godoro|window|dirisha/i, t); // no re-list
+        if (sc) assert.doesNotMatch(r.line, lang === 'sw' ? /\bKSh\b|\bshillings?\b|per m²/ : /\bKSh\b|\bshilingi\b/, t);
+        // catalogue step (Voice path) gives the same grounded answer
+        const cs = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] });
+        const c = require('../src/conversation/v2/machine').catalogueTurn(cs, { text: t, profile: DD, lang, now: NOW });
+        assert.ok(c && c.line === r.line, `${t}: catalogueTurn ${c && c.line}`);
+        assert.ok(require('../src/conversation/v2/catalogueStep').looksCatalogue(t, DD, {}), t);
+      }
+    });
+  });
+}
+test('§4 a service check with no catalogue hit never invents a yes; flag off is unchanged', async () => {
+  await withEnv({ BRAIN_V2_NLU_GAPS: '1' }, async () => {
+    const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] });
+    const r = await V2.runTurn(st, { text: 'do you clean swimming pools?', profile: DD, now: NOW, handlers: {}, langLock: 'en' });
+    assert.doesNotMatch(r.line, /^Yes, we do/);
+  });
+  await withEnv({ BRAIN_V2_NLU_GAPS: null }, async () => {
+    assert.equal(require('../src/conversation/v2/machine').catalogueTurn(V2.createState({ profile: DD, callerPhone: '+2547', openRows: [], pendingTasks: [] }), { text: 'Mpaka carpet?', profile: DD, lang: 'sw', now: NOW }), null);
+  });
+});
