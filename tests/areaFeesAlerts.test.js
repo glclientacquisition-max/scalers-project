@@ -157,3 +157,11 @@ test('a real hold stays a hold; a saved visit is a visit request', () => {
   assert.equal(vf.outcome, 'booking');
   assert.equal(vf.intent, 'book_visit');
 });
+
+test('Swahili area line says the timing in Swahili', () => {
+  const AT = require('../src/conversation/areaTerms');
+  const [a] = AT.readAreaTerms({ areas: [{ id: 'place:kileleshwa', eta: 'Same day', modes: ['visit'], source: 'owner', fee_ksh: 300, fee_mode: 'fixed', confirmed: true }] }).areas;
+  const line = AT.coveredAreaLine(a, 'sw');
+  assert.match(line, /shilingi 300/); assert.match(line, /siku hiyo hiyo/); assert.doesNotMatch(line, /same day/i);
+  assert.match(AT.coveredAreaLine({ ...a, eta: 'Next day' }, 'sw'), /siku inayofuata/);
+});
