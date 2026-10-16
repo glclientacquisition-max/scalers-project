@@ -74,7 +74,11 @@ function policiesHaveContent(policies) {
   return Object.entries(POLICY_LABELS).some(([key]) => Boolean(p[key]));
 }
 
-function formatPoliciesBlock(policies) {
+/**
+ * @param {unknown} policies
+ * @param {{ areaTerms?: object|null }} [opts] Settings › Locations terms (areaTerms.js)
+ */
+function formatPoliciesBlock(policies, opts = {}) {
   const p = normalizePolicies(policies);
   const lines = [];
   let anyContent = false;
@@ -98,11 +102,15 @@ function formatPoliciesBlock(policies) {
   }
   const gate = confirmedCoverageEnabled();
   if (Array.isArray(p.coverage_areas)) {
+    const terms = opts && opts.areaTerms;
+    const list = terms
+      ? require('./areaTerms').formatCoverageWithTerms(p.coverage_areas, terms)
+      : formatCoverageList(p.coverage_areas);
+    lines.push(`- Coverage: ${list || '(none listed)'}`);
     lines.push(
-      `- Coverage: ${formatCoverageList(p.coverage_areas) || '(none listed)'}`
-    );
-    lines.push(
-      'COVERAGE RULE: The Coverage line is the only service area. A county on it covers every town in that county. Delivery text is timing and other instructions.'
+      terms
+        ? 'COVERAGE RULE: The Coverage line is the only service area. A county on it covers every town in that county. When a caller names a place, say whether we cover it and give that area\'s fee and time from the brackets. "fee confirmed on callback" means the team confirms the fee when they call back: never guess an amount. Delivery text adds other details, and any fee it states also counts.'
+        : 'COVERAGE RULE: The Coverage line is the only service area. A county on it covers every town in that county. When a caller asks about an area, say whether we cover it and give any fee the Delivery text states for that area. Never guess a fee.'
     );
     if (gate) lines.push(confirmedCoveragePromptRule(true));
     if (p.coverage_outside) {

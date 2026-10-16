@@ -1333,8 +1333,21 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
 
   return tenantProfileFromRow(row, {
     openAppointments: await listOpenAppointments(row.id),
+    serviceAreas: row.service_areas !== undefined ? undefined : await getTenantServiceAreas(row.id),
     ...(await loadProvenanceForProfile(row.id)),
   });
+}
+
+/** tenants.service_areas (Locations area terms) when the main select did not read it. Null on an old schema. */
+async function getTenantServiceAreas(tenantId) {
+  if (!tenantId) return null;
+  try {
+    const { data, error } = await supabase.from('tenants').select('service_areas').eq('id', tenantId).maybeSingle();
+    if (error) return null;
+    return data?.service_areas ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function loadProvenanceForProfile(tenantId) {
