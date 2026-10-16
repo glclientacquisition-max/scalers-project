@@ -640,6 +640,8 @@ function catalogueTurn(state, { text, profile = {}, lang, command = null, now = 
   if (u.intents.includes('explain') && u.service) { kind = 'explain'; const sp = spoken(profile, u.service, lang); line = sp && sp.explain ? R.info({ kind: 'explain_text', text: sp.explain }, lang) : R.info({ kind: 'explain', name: u.service.name, notes: u.service.notes || '' }, lang); }
   else if (u.intents.includes('price') && u.service) { kind = 'price'; line = infoAnswer(state, u, profile, 'price'); }
   else if (u.intents.includes('services')) { kind = 'services'; line = infoAnswer(state, u, profile, 'services'); }
+  // BRAIN_V2_NLU_GAPS §4 in the Voice catalogue step: "mnasafisha carpet?" (check + service) answers like a one-service ask (S32_sw).
+  else if (u.intents.includes('check') && u.service) { kind = 'services'; line = infoAnswer(state, { ...u, intents: ['services'] }, profile, 'services'); }
   if (line) { state.lastLine = line; state.lastInfo = kind; } else state.lastInfo = null;
   return line ? { line, kind, service: u.service?.name || null } : null;
 }
