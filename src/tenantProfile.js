@@ -51,6 +51,10 @@ function tenantProfileFromRow(row, extras = {}) {
     vertical: parseVertical(row.vertical),
     handoffMode: parseHandoffMode(row.handoff_mode),
     businessLocations: row.business_locations || [],
+    // Settings › Locations area terms (fee, time, mode) from tenants.service_areas.
+    areaTerms: require('./conversation/areaTerms').readAreaTerms(
+      row.service_areas !== undefined ? row.service_areas : extras.serviceAreas
+    ),
     businessPolicies: row.business_policies || {},
     billingEnforcement:
       row.billing_enforcement != null ? String(row.billing_enforcement) : null,

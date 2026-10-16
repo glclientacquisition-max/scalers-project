@@ -374,7 +374,14 @@ function checkCoverage(profile = {}, place, opts = {}) {
   if (reading.status !== 'known') return { status: 'unknown', reason: reading.reason };
   if (!normalizePlaceKey(place)) return { status: 'unknown', reason: 'no_place' };
   const areas = formatCoverageList(reading.value);
-  if (coveredByAreas(place, reading.value)) return { status: 'covered', reason: null, areas };
+  if (coveredByAreas(place, reading.value)) {
+    // Settings › Locations terms (#667): the matched area's fee, time and mode.
+    // A fee is quoted only when the owner set and confirmed that area.
+    const { matchArea, areaTermsValue, coveredAreaLine } = require('../areaTerms');
+    const hit = matchArea(place, profile.areaTerms);
+    if (!hit) return { status: 'covered', reason: null, areas };
+    return { status: 'covered', reason: null, areas, area: areaTermsValue(hit), say: coveredAreaLine(hit, opts.language || 'en') };
+  }
   // "Yes, anywhere in Kenya": listed areas keep their terms; other Kenyan places get these.
   const anywhere = readCoverageOutside(profile.businessPolicies);
   if (anywhere) {

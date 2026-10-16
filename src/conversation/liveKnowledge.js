@@ -252,7 +252,7 @@ function buildLiveGroundTruth(profile = {}) {
     parts.push('', openVisits);
   }
 
-  parts.push('', 'POLICIES:', formatPoliciesBlock(policies));
+  parts.push('', 'POLICIES:', formatPoliciesBlock(policies, { areaTerms: profile.areaTerms || null }));
 
   parts.push('', formatUnknownSection(unknownTopics));
 
