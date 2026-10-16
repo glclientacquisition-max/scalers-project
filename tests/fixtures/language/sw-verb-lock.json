@@ -1,0 +1,44 @@
+{
+  "note": "First caller turns with a conjugated Swahili verb plus an English loanword. Before VOICE_SW_VERB_LOCK the call locked to English (reply in English). Sources: Brain nlu-gap-spec §4 (HD_ee813bcf6248 T11/T12), Alvin's 'mnaosha carpet?' check.",
+  "cases": [
+    {
+      "first": "mnaosha carpet?",
+      "lock": "sw"
+    },
+    {
+      "first": "Carpet mnadhanioshea?",
+      "lock": "sw",
+      "source": "HD_ee813bcf6248#T12"
+    },
+    {
+      "first": "Mpaka carpet?",
+      "lock": "sw",
+      "source": "HD_ee813bcf6248#T11"
+    },
+    {
+      "first": "Tunasafisha sofa?",
+      "lock": "sw"
+    },
+    {
+      "first": "Mnafanya deep cleaning?",
+      "lock": "sw"
+    },
+    {
+      "first": "Do you clean carpets?",
+      "lock": "en"
+    },
+    {
+      "first": "The manager can call me back",
+      "lock": "en"
+    },
+    {
+      "first": "I need my mattress cleaned tomorrow",
+      "lock": "en"
+    },
+    {
+      "first": "Eeh, unaongea na English by the way?",
+      "lock": "en",
+      "source": "HD_48631816b68c #19 (asks for English; verb must not win)"
+    }
+  ]
+}
