@@ -25,7 +25,7 @@
     "score:naturalness": "node scripts/score-voice-naturalness.js",
     "test:action-progress": "node tests/actionProgress.test.js",
     "test:brain-v2-shadow": "node --test tests/brainV2Shadow.test.js tests/ackRule.test.js tests/toolSmooth.test.js",
-    "test:tool-smooth": "node --test tests/toolSmooth.test.js",
+    "test:tool-smooth": "node --test tests/toolSmooth.test.js tests/fillerHoldSlot.test.js",
     "test:spoken-filter": "node --test tests/spokenFilterDrop.test.js tests/hdEe81GuardEscalation.test.js tests/hdC988ToolTurnStack.test.js tests/owedConfirmFold.test.js tests/noAnswerDelete.test.js",
     "test:timing": "node tests/voiceTiming.test.js",
     "test:filler-pcm": "node tests/fillerPcmCache.test.js",

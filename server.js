@@ -336,7 +336,7 @@ const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const { planV2CatalogueMouth } = require('./src/conversation/v2CatalogueTurn');
-const { createTurnArbiter, turnArbiterEnabled } = require('./src/speech/turnArbiter');
+const { createTurnArbiter, turnArbiterEnabled, fillerSlotEnabled, createAudioSlot } = require('./src/speech/turnArbiter');
 const { buildTurnProposals, bookOutranksListTurn } = require('./src/conversation/turnProposals');
 const { pinSpokenCatalogue } = require('./src/knowledge/spokenCatalogue');
 const {
@@ -2155,6 +2155,7 @@ mediaWss.on('connection', (ws, req) => {
       holdsQueued = 0;
       receiptCachedTurn = false;
     }
+    if (audioSlot) audioSlot.reset();
     voiceTrace.commitTurn({
       outcome: extra?.outcome || 'ok',
       latency: summary,
@@ -2243,6 +2244,8 @@ mediaWss.on('connection', (ws, req) => {
   if (mediaClock) MEDIA_CLOCKS.set(ws, mediaClock);
   let holdFillTimer = null;
   let holdsQueued = 0;
+  // VOICE_FILLER_SLOT (off): one filler/hold slot per turn; the real answer pre-empts it.
+  const audioSlot = fillerSlotEnabled() ? createAudioSlot({ trace: (e) => console.log(`[ws/media][${sidLabel()}] ${e.kind}${e.want ? ` want=${e.want}` : ''} holder=${e.holder || e.was}`) }) : null;
   /** Filler text this turn: the hold pack skips it (ack rule plays "Naangalia." on tool turns). */
   let turnFillerText = '';
   let receiptCachedTurn = false;
@@ -2269,7 +2272,8 @@ mediaWss.on('connection', (ws, req) => {
     const turnAtStart = activeTurnTiming;
     holdFillTimer = setInterval(() => {
       if (!turnBusy || bargeInActive || activeTurnTiming !== turnAtStart || ttsSpeedScale !== 1) return stopHoldFill();
-      if (!toolSmooth.shouldQueueHold({ toolPending: true, remainingMs: mediaClock.remainingMs(), played: holdsQueued })) {
+      if (!toolSmooth.shouldQueueHold({ toolPending: true, remainingMs: mediaClock.remainingMs(), played: holdsQueued, ...(audioSlot ? { fillerPlayed: audioSlot.fillerPlayed() } : {}) })) {
+        if (audioSlot && audioSlot.holder() && audioSlot.holder() !== 'hold') return stopHoldFill();
         if (holdsQueued >= toolSmooth.HOLD_MAX) stopHoldFill();
         return;
       }
@@ -2280,6 +2284,7 @@ mediaWss.on('connection', (ws, req) => {
         console.log(`[ws/media][${sidLabel()}] tool-smooth hold miss n=${holdsQueued}: ${line}`);
         return stopHoldFill();
       }
+      if (audioSlot && !audioSlot.claim('hold')) return stopHoldFill();
       holdsQueued += 1;
       ackPlayedTurn = activeTurnTiming;
       voiceTrace.noteFiller({ text: line, before: line, language: callLanguage });
@@ -2296,6 +2301,7 @@ mediaWss.on('connection', (ws, req) => {
     if (!isFillerCacheEnabled() || ttsSpeedScale !== 1) return null;
     const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
     if (!found.pcm) return null;
+    if (audioSlot) { audioSlot.preempt(); stopHoldFill(); }
     receiptCachedTurn = true;
     voiceTrace.noteTts({ text: found.prepared.text, before: String(line), language: found.prepared.language });
     console.log(`[ws/media][${sidLabel()}] tool-smooth receipt cached bytes=${found.pcm.length}: ${line}`);
@@ -2754,6 +2760,10 @@ mediaWss.on('connection', (ws, req) => {
 
   async function speakToolHold(spoken) {
     if (!spoken?.speak || bargeInActive) return;
+    if (audioSlot && spoken.kind === 'hold' && audioSlot.holder() && audioSlot.holder() !== 'hold') {
+      console.log(`[ws/media][${sidLabel()}] tool hold skipped: ${audioSlot.holder()} owns the slot`);
+      return;
+    }
     if (smooth.hold && spoken.kind === 'hold' && mediaClock) {
       if (startHoldFill()) return;
       // Cache miss: fall through to the live hold line below (never silent).
@@ -3958,7 +3968,7 @@ mediaWss.on('connection', (ws, req) => {
         fillerTimer = setTimeout(() => {
           fillerTimer = null;
           // Adaptive: skip if LLM→TTS already started (stream chunk or full reply).
-          if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk) {
+          if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk && (!audioSlot || audioSlot.claim('filler'))) {
             fillerStarted = true;
             thinkingAckTurn = turnTiming;
             thinkingAckAtMs = Date.now();
@@ -3990,6 +4000,7 @@ mediaWss.on('connection', (ws, req) => {
             console.log(`[ws/media][${sidLabel()}] gap-guard miss (not cached) lang=${callLanguage}`);
             return;
           }
+          if (audioSlot && !audioSlot.claim('filler')) return;
           fillerStarted = true;
           thinkingAckTurn = turnTiming;
           thinkingAckAtMs = Date.now();
@@ -4037,6 +4048,7 @@ mediaWss.on('connection', (ws, req) => {
 
       function stopFillerForReply() {
         clearFillerTimer();
+        if (audioSlot) { audioSlot.preempt(); stopHoldFill(); }
         if (smooth.any) stopHoldFill();
         if (!fillerStarted) return;
         fillerStarted = false;

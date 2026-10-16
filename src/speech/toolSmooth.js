@@ -88,7 +88,10 @@ function warmPhrases(callLanguage) {
  * Gap-fill decision (items 1-2): queue the next cached hold line just before the
  * queued audio runs out while the tool is still pending. Max `max` per turn.
  */
-function shouldQueueHold({ toolPending, remainingMs, played = 0, max = HOLD_MAX, leadMs = 150 } = {}) {
+function shouldQueueHold({ toolPending, remainingMs, played = 0, max = HOLD_MAX, leadMs = 150, fillerPlayed = false } = {}) {
+  // Regression-9 R8 (HD_2847152f6c1e T4): a filler already played this turn owns the one
+  // filler/hold slot, so no hold line stacks after it. server.js passes fillerPlayed under VOICE_FILLER_SLOT.
+  if (fillerPlayed) return false;
   return Boolean(toolPending) && played < max && Number(remainingMs) <= leadMs;
 }
 
