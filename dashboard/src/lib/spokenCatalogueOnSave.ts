@@ -20,12 +20,10 @@ export function touchesSpokenCatalogue(patch: Record<string, unknown> | null | u
   return Boolean(patch) && SPOKEN_CATALOGUE_FIELDS.some((k) => k in (patch as Record<string, unknown>));
 }
 
-export async function pingSpokenCatalogueCompile(tenantId: string, fetchImpl: typeof fetch = fetch): Promise<boolean> {
-  const secret = String(process.env.VOICE_INTERNAL_SECRET || "").trim();
-  if (!secret || !tenantId) {
-    console.warn(`[spoken_catalogue] ping skipped tenant=${tenantId || "-"}: ${secret ? "no tenant" : "VOICE_INTERNAL_SECRET unset"}`);
-    return false;
-  }
+// One retry after a short pause on a network error, timeout or 5xx (Brain redeploying);
+// a 4xx is a real refusal and is not retried. If both fail, the call path still never
+// speaks a stale price: Brain refreshes changed rows from the live catalogue at call start.
+async function pingOnce(tenantId: string, secret: string, fetchImpl: typeof fetch): Promise<{ ok: boolean; retry: boolean; why: string }> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 3000);
   try {
@@ -37,14 +35,31 @@ export async function pingSpokenCatalogueCompile(tenantId: string, fetchImpl: ty
       cache: "no-store",
       signal: ctl.signal,
     });
-    if (!res.ok) console.warn(`[spoken_catalogue] ping failed tenant=${tenantId} status=${res.status}`);
-    return res.ok;
+    return { ok: res.ok, retry: !res.ok && res.status >= 500, why: `status=${res.status}` };
   } catch (err) {
-    console.warn(`[spoken_catalogue] ping failed tenant=${tenantId}: ${err instanceof Error ? err.name : "error"}`);
-    return false;
+    return { ok: false, retry: true, why: err instanceof Error ? err.name : "error" };
   } finally {
     clearTimeout(t);
   }
+}
+
+export async function pingSpokenCatalogueCompile(
+  tenantId: string,
+  fetchImpl: typeof fetch = fetch,
+  { retryDelayMs = 1500 }: { retryDelayMs?: number } = {},
+): Promise<boolean> {
+  const secret = String(process.env.VOICE_INTERNAL_SECRET || "").trim();
+  if (!secret || !tenantId) {
+    console.warn(`[spoken_catalogue] ping skipped tenant=${tenantId || "-"}: ${secret ? "no tenant" : "VOICE_INTERNAL_SECRET unset"}`);
+    return false;
+  }
+  let r = await pingOnce(tenantId, secret, fetchImpl);
+  if (!r.ok && r.retry) {
+    if (retryDelayMs > 0) await new Promise((res) => setTimeout(res, retryDelayMs));
+    r = await pingOnce(tenantId, secret, fetchImpl);
+  }
+  if (!r.ok) console.warn(`[spoken_catalogue] ping failed tenant=${tenantId} ${r.why}`);
+  return r.ok;
 }
 
 /** Call right after the tenants update succeeded. No-op when the flag is off or the patch is unrelated. */
