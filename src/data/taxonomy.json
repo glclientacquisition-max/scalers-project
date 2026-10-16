@@ -90,7 +90,7 @@
   "outcomes": [
     { "id": "sale_or_order", "label": "Order taken" },
     { "id": "hold", "label": "Item held" },
-    { "id": "booking", "label": "Visit booked" },
+    { "id": "booking", "label": "Visit requested" },
     { "id": "callback", "label": "Callback needed" },
     { "id": "info_only", "label": "Answered" },
     { "id": "lost", "label": "Lost sale" },
