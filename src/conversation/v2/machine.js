@@ -168,6 +168,12 @@ function stepIntent(state, u, profile) {
   }
   if (it === 'order') {
     if (!s.items.length) return slotOr(state, 'items');
+    // BRAIN_V2_NLU_GAPS §6b (HD_2847152f6c1e): an order only carries catalogue-resolved items that are in stock;
+    // an out-of-stock item is answered from the catalogue and dropped before any read-back.
+    if (N.gapsOn()) {
+      const out = s.items.find((x) => { const p = (profile.productCatalog || []).find((q, i) => (q.id || `prd_${i}`) === x.product_id); return !p || /^(no|false|0|out)/i.test(String(p.in_stock ?? 'yes')); });
+      if (out) { s.items = s.items.filter((x) => x !== out); state.offer = 'callback'; return { line: R.info({ kind: 'stock', found: true, label: out.name, in_stock: false }, state.lang) }; }
+    }
     const noQty = s.items.find((x) => !x.qty);
     if (noQty) return slotOr(state, 'qty', { item: noQty.name });
     if (!s.when.date) return slotOr(state, 'pickup');
@@ -420,7 +426,12 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
   state.lang = (langLock === 'en' || langLock === 'sw') ? langLock : (L.nextLanguage(state.lang, text) || state.lang);
   let areaQ = null;
-  let u = N.understand(text, { profile, now, expecting: state.expecting, topic: state.lastInfo });
+  let u = N.understand(text, { profile, now, expecting: state.expecting, topic: state.lastInfo, prev: state.nluPrev || null, opening: state.turn === 1 && !state.slots.name });
+  state.nluPrev = { kind: u.kind, service: u.service || null };
+  // §4 "do you do X?" (BRAIN_V2_NLU_GAPS): answered from the catalogue like an availability ask
+  if (u.intents.includes('check') && !u.intents.includes('availability')) u.intents.push('availability');
+  // §6c "Chris." early in the call with no name yet: the caller's name, never "help regarding Chris?"
+  if (u.nameCandidate && !u.name && !state.slots.name && !state.intent && state.turn <= 3) { u.name = u.nameCandidate; u.kind = 'give_name'; u.confidence = 0.6; u.clear = false; u.reason = 'bare_name_intro'; }
   // area clarify (only groups touching the tenant's own places): ask once, then re-read the held turn with the chosen place
   if (state.areaPick) {
     const pk = state.areaPick; state.areaPick = null;

@@ -20,7 +20,9 @@ test('flags default off', () => {
 });
 
 test('nluIntent: clear list_services and bound price are high; unbound explain / conflict are low', () => {
-  assert.deepEqual(G.nluIntent('Niulize, ni services gani mna- mna offer?', { profile: DD, doc }), { intent: 'list_services', service_id: null, confidence: 'high', reason: 'services' });
+  const l = G.nluIntent('Niulize, ni services gani mna- mna offer?', { profile: DD, doc });
+  assert.deepEqual({ intent: l.intent, service_id: l.service_id, confidence: l.confidence, reason: l.reason }, { intent: 'list_services', service_id: null, confidence: 'high', reason: 'services' });
+  assert.equal(l.clear, true); assert.ok(l.score >= 0.8 && l.score <= 1); // Brain nlu confidence passed through
   const p = G.nluIntent('Nilikuwa nataka kujua bei ya kuosha carpet', { profile: DD, doc });
   assert.equal(p.intent, 'price_service'); assert.equal(p.confidence, 'high'); assert.equal(p.service_id, doc.entries.find((e) => /carpet/i.test(e.raw.name)).id);
   assert.equal(G.nluIntent('Hebu niambie kuhusu hiyo usafi wa apartment', { profile: DD, doc }).confidence, 'low');
