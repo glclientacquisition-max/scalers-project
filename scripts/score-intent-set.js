@@ -29,13 +29,14 @@ const model = key ? require('../src/conversation/v2/transport').createGeminiSend
 const pct = (a, b) => (b ? `${((100 * a) / b).toFixed(1)}%` : 'n/a');
 const q = (xs, p) => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b); return Math.round(s[Math.min(s.length - 1, Math.floor(p * s.length))]); };
 (async () => {
-  const res = []; let topicByCall = {};
+  const res = []; let topicByCall = {}; const prevByCall = {};
   const docs = {};
   for (const r of rows) {
     const profile = profileFor(r);
     const doc = (docs[r.source] ||= SC.compileSync(profile));
     const t0 = process.hrtime.bigint();
-    const nlu = G.nluIntent(r.text, { profile, doc, topic: topicByCall[r.callId] || null });
+    const nlu = G.nluIntent(r.text, { profile, doc, topic: topicByCall[r.callId] || null, prev: prevByCall[r.callId] || null, opening: !prevByCall[r.callId] });
+    prevByCall[r.callId] = { kind: nlu.nluKind, service: nlu.service };
     const nluMs = Number(process.hrtime.bigint() - t0) / 1e6;
     topicByCall[r.callId] = nlu.intent === 'list_services' ? 'services' : nlu.intent === 'other' ? topicByCall[r.callId] && null : topicByCall[r.callId];
     let hybrid = { intent: nlu.intent, service_id: nlu.service_id, source: nlu.confidence === 'high' ? 'skip' : 'nlu', ms: 0 };
@@ -54,7 +55,7 @@ const q = (xs, p) => { if (!xs.length) return null; const s = [...xs].sort((a, b
   const summary = {
     turns: n, catalogueTurns: cat.length, modelAvailable: Boolean(model),
     nluOnly: { intentAcc: pct(res.filter((x) => ok(x.nlu, x.gold)).length, n), catalogueIntentAcc: pct(cat.filter((x) => ok(x.nlu, x.gold)).length, cat.length), serviceIdAcc: pct(res.filter((x) => x.gold.service_id && okSvc(x.nlu, x.gold)).length, res.filter((x) => x.gold.service_id).length), p50ms: Number(q(res.map((x) => x.nluMs), 0.5)?.toFixed?.(2) ?? 0), p95ms: q(res.map((x) => x.nluMs), 0.95) },
-    gate: { stepTurns: res.filter((x) => x.stepEntered).length, high: res.filter((x) => x.stepEntered && x.nlu.confidence === 'high').length, low: res.filter((x) => x.stepEntered && x.nlu.confidence === 'low').length, highAcc: pct(res.filter((x) => x.stepEntered && x.nlu.confidence === 'high' && ok(x.nlu, x.gold) && okSvc(x.nlu, x.gold)).length, res.filter((x) => x.stepEntered && x.nlu.confidence === 'high').length), lowReasons: res.filter((x) => x.stepEntered && x.nlu.confidence === 'low').reduce((m, x) => ((m[x.nlu.reason] = (m[x.nlu.reason] || 0) + 1), m), {}) },
+    gate: { stepTurns: res.filter((x) => x.stepEntered).length, high: res.filter((x) => x.stepEntered && x.nlu.confidence === 'high').length, low: res.filter((x) => x.stepEntered && x.nlu.confidence === 'low').length, clear: res.filter((x) => x.stepEntered && x.nlu.clear).length, highAcc: pct(res.filter((x) => x.stepEntered && x.nlu.confidence === 'high' && ok(x.nlu, x.gold) && okSvc(x.nlu, x.gold)).length, res.filter((x) => x.stepEntered && x.nlu.confidence === 'high').length), lowReasons: res.filter((x) => x.stepEntered && x.nlu.confidence === 'low').reduce((m, x) => ((m[x.nlu.reason] = (m[x.nlu.reason] || 0) + 1), m), {}) },
     modelCalls: { before: res.filter((x) => x.stepEntered).length, after: res.filter((x) => x.stepEntered && x.nlu.confidence !== 'high').length, note: 'before = every turn entering the catalogue step paid the classify (<=700 ms; live sample timed out at 702 ms); after = VOICE_NLU_FIRST_INTENT' },
     stepTurnsAcc: { nlu: pct(res.filter((x) => x.stepEntered && ok(x.nlu, x.gold)).length, res.filter((x) => x.stepEntered).length) },
     hybrid: model ? { intentAcc: pct(res.filter((x) => ok(x.hybrid, x.gold)).length, n), catalogueIntentAcc: pct(cat.filter((x) => ok(x.hybrid, x.gold)).length, cat.length), modelCalls: res.filter((x) => x.hybrid.ms).length, modelUsed: res.filter((x) => x.hybrid.source === 'model').length, addedMsP50: q(res.filter((x) => x.hybrid.ms).map((x) => x.hybrid.ms), 0.5), addedMsP95: q(res.filter((x) => x.hybrid.ms).map((x) => x.hybrid.ms), 0.95) } : 'not run: GEMINI_API_KEY not set',
