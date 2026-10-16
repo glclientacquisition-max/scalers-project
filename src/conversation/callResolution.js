@@ -208,7 +208,9 @@ function highWaterPrimaryIntent({ liveIntent, results = [] } = {}) {
     if (type === 'order') return 'order_enquiry';
     if (type === 'enquiry') return 'order_enquiry';
     if (type === 'callback') return 'callback';
-    return 'hold_or_pickup';
+    // Only a hold row (or a row with no type, the legacy hold) is a hold.
+    if (!type || type === 'hold' || type === 'hold_or_pickup') return 'hold_or_pickup';
+    return 'order_enquiry';
   }
 
   return normalizePrimaryIntent(liveIntent);
