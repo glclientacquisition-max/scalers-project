@@ -27,7 +27,7 @@ const ASK = {
   next_dow: { en: (c) => [`Do you mean this ${c.today} the ${ord(c.todayD)}, or ${c.tomorrow} the ${ord(c.tomorrowD)}?`], sw: (c) => [`Unamaanisha ${c.today} hii tarehe ${c.todayD}, au ${c.tomorrow} ijayo tarehe ${c.tomorrowD}?`] },
   yes_no: { en: (c) => [`Please say yes or no: ${c.q ? c.q.charAt(0).toLowerCase() + c.q.slice(1) : 'shall I go ahead?'}`], sw: (c) => [`Tafadhali sema ndio au hapana: ${c.q ? c.q.charAt(0).toLowerCase() + c.q.slice(1) : 'niendelee?'}`] },
   complaint_more: { en: ["I'm sorry to hear that. Is there anything else the owner should know?"], sw: ['Pole sana. Kuna kingine mwenye biashara anapaswa kujua?'] },
-  intent: { en: ['How can I help you today?', 'Sorry, are you calling to book, or about something else?'], sw: ['Karibu, tukusaidie vipi?', 'Samahani, unapiga kubook, ama ni kuhusu kitu kingine?'] },
+  intent: { en: ['How can I help you today?', 'Sorry, is this about a service, a price, or something else?'], sw: ['Karibu, tukusaidie vipi?', 'Samahani, ni kuhusu huduma, bei, ama kitu kingine?'] },
 };
 function ask(slot, n, lang, ctx = {}) {
   const set = ASK[slot][sw(lang) ? 'sw' : 'en'];
@@ -67,11 +67,13 @@ function explain(name, notes, S) {
   const first = String(notes || '').split(/[,.;]/).slice(0, 3).join(',').trim();
   return S ? `${svcName(n)}${first ? `: ${first}` : ''}.` : `${svcName(n)}${first ? ` covers ${first.toLowerCase()}` : ''}.`;
 }
+// Booking-for-me OFF (r.request): offer to take a request for the team, never to "book".
+const REQ = { sw: 'Nikuandikie ombi kwa timu?', en: 'Shall I take a request for the team?' };
 function readback(p, lang) {
   const S = sw(lang);
   const nm = p.name ? (S ? `, kwa ${p.name}` : `, for ${p.name}`) : '';
   switch (p.tool) {
-    case 'create_booking': return S ? `${svcName(p.service)}, ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? `, ${p.place}` : ''}${p.landmark ? ` ${swMark(p.landmark)}` : ''}${nm}. Nithibitishe?` : `${svcName(p.service)} on ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? ` in ${p.place}` : ''}${p.landmark ? `, ${enMark(p.landmark)}` : ''}${nm}. Shall I book it?`;
+    case 'create_booking': return S ? `${svcName(p.service)}, ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? `, ${p.place}` : ''}${p.landmark ? ` ${swMark(p.landmark)}` : ''}${nm}. ${p.request ? 'Nipeleke ombi hili kwa timu?' : 'Nithibitishe?'}` : `${svcName(p.service)} on ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}${p.place ? ` in ${p.place}` : ''}${p.landmark ? `, ${enMark(p.landmark)}` : ''}${nm}. ${p.request ? 'Shall I send this request to the team?' : 'Shall I book it?'}`;
     case 'create_order': return S ? `${items(p.items, lang)}, kuchukua ${L.sayDate(p.pickup.date, lang)}${nm}. Nithibitishe?` : `${items(p.items, lang)}, pickup ${L.sayDate(p.pickup.date, lang)}${nm}. Shall I place the order?`;
     case 'cancel_booking': return S ? `Nifute ${rowLabel(p.row, lang)}${at(p.row.when, lang)}. Niendelee?` : `Cancel your ${rowLabel(p.row, lang)}${at(p.row.when, lang)}. Shall I go ahead?`;
     case 'update_booking': return S ? `Nihamishe ${svcName(p.row.service)} hadi ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}. Niendelee?` : `Move your ${svcName(p.row.service).toLowerCase()} to ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}. Shall I go ahead?`;
@@ -92,7 +94,8 @@ function receipt(r, lang) {
   if (!r.ok) return S ? 'Samahani, sikuweza kuhifadhi hilo sasa. Timu itakupigia simu.' : "Sorry, I couldn't save that just now. The team will call you back.";
   const more = S ? ' Kuna kingine?' : ' Anything else?';
   switch (r.tool) {
-    case 'create_booking': return (S ? `Sawa, nimeweka ${svcName(r.service)} yako, ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.` : `Done, your ${svcName(r.service).toLowerCase()} is booked for ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.`) + more;
+    case 'create_booking': if (r.request) return (S ? `Sawa, nimeandika ombi lako la ${svcName(r.service)}, ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}. Timu itakupigia simu kuthibitisha.` : `Done, I've sent your request for ${svcName(r.service).toLowerCase()} on ${L.sayDate(r.when.date, lang)}${at(r.when, lang)} to the team. They will call you back to confirm.`) + more;
+      return (S ? `Sawa, nimeweka ${svcName(r.service)} yako, ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.` : `Done, your ${svcName(r.service).toLowerCase()} is booked for ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.`) + more;
     case 'create_order': return (S ? `Sawa, nimehifadhi oda yako: ${items(r.items, lang)}, kuchukua ${L.sayDate(r.pickup.date, lang)}.` : `Done, I've placed your order: ${items(r.items, lang)}, pickup ${L.sayDate(r.pickup.date, lang)}.`) + more;
     case 'cancel_booking': return (S ? `Sawa, nimefuta ${rowLabel(r.row, lang)}.` : `Done, your ${rowLabel(r.row, lang)} is cancelled.`) + more;
     case 'update_booking': return (S ? `Sawa, nimebadilisha ${svcName(r.row.service)} hadi ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.` : `Done, your ${svcName(r.row.service).toLowerCase()} is moved to ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.`) + more;
@@ -112,7 +115,8 @@ function info(r, lang, n = 0) {
       if (r.found && /^(yes|true|in)/i.test(String(r.in_stock || ''))) return S ? `Kwa orodha yetu, ${r.label} inapatikana.` : `Our list shows ${r.label} in stock.`;
       return [S ? 'Siwezi kuthibitisha hiyo kwenye simu hii. Ungependa timu ikupigie simu?' : "I can't confirm that on this call. Would you like the team to call you back?",
         S ? 'Sina taarifa hiyo sasa hivi. Timu inaweza kukupigia simu, ungependa?' : "I don't have that information right now. The team can call you back. Would you like that?"][Math.min(n, 1)];
-    case 'service_slot': return S ? `Tunafanya ${svcName(r.label)}, lakini siwezi kuthibitisha nafasi bila timu. Ungependa niweke ombi la booking?` : `We do offer ${svcName(r.label).toLowerCase()}, but I can't confirm a slot without the team. Would you like to make a booking request?`;
+    case 'service_slot': if (r.request) return S ? `Tunafanya ${svcName(r.label)}, lakini siwezi kuthibitisha nafasi bila timu. ${REQ.sw}` : `We do offer ${svcName(r.label).toLowerCase()}, but I can't confirm a slot without the team. ${REQ.en}`;
+      return S ? `Tunafanya ${svcName(r.label)}, lakini siwezi kuthibitisha nafasi bila timu. Ungependa niweke ombi la booking?` : `We do offer ${svcName(r.label).toLowerCase()}, but I can't confirm a slot without the team. Would you like to make a booking request?`;
     case 'hours': {
       const o = (hh) => (S ? `${L.sayTime(hh, lang)} ${period(hh)}` : hh);
       if (r.closed) return S ? `${r.dayLabel} tumefunga.` : `We're closed on ${r.dayLabel}.`;
@@ -142,15 +146,15 @@ function info(r, lang, n = 0) {
     }
     case 'explain': return explain(r.name, r.notes, S);
     case 'services': return S ? `Tunafanya ${r.names.map(svcName).join(', ')}${r.more ? ' na zaidi' : ''}. Ungependa ipi?` : `We do ${r.names.map(svcName).join(', ')}${r.more ? ', and more' : ''}. Which one would you like?`;
-    case 'offered': return S ? `Ndio, tunafanya ${svcName(r.label)}${r.price ? `, bei ni ${priceTxt(r.price, true)}` : ''}. Ungependa kubook?` : `Yes, we do ${svcName(r.label).toLowerCase()}${r.price ? `, ${/^From/i.test(r.price) ? priceTxt(r.price) : `at ${r.price}`}` : ''}. Would you like to book?`;
+    case 'offered': return S ? `Ndio, tunafanya ${svcName(r.label)}${r.price ? `, bei ni ${priceTxt(r.price, true)}` : ''}. ${r.request ? REQ.sw : 'Ungependa kubook?'}` : `Yes, we do ${svcName(r.label).toLowerCase()}${r.price ? `, ${/^From/i.test(r.price) ? priceTxt(r.price) : `at ${r.price}`}` : ''}. ${r.request ? REQ.en : 'Would you like to book?'}`;
     case 'coverage_outside': return S ? `Ndio, nje ya ${r.base} tunahudumia ${r.names}${r.more ? ' na maeneo mengine' : ''}. Uko wapi?` : `Yes, outside ${r.base} we serve ${r.names}${r.more ? ' and other listed areas' : ''}. Which place are you in?`;
     case 'coverage':
-      if (r.area?.listed) return S ? `${r.area.name} iko kwenye orodha ya maeneo yetu. Timu itathibitisha ukibook.` : `${r.area.name} is on our list of service areas. The team confirms when you book.`;
+      if (r.area?.listed) return S ? `${r.area.name} iko kwenye orodha ya maeneo yetu. ${r.request ? 'Timu itathibitisha watakapokupigia.' : 'Timu itathibitisha ukibook.'}` : `${r.area.name} is on our list of service areas. ${r.request ? 'The team confirms when they call you back.' : 'The team confirms when you book.'}`;
       if (r.area) return S ? `${r.area.name} haiko kwenye orodha ya maeneo yetu. Timu inaweza kuangalia na kukupigia simu.` : `${r.area.name} isn't on our list of service areas. The team can check and call you back.`;
       return r.general ? (S ? `Tunahudumia ${r.general}${r.more ? ' na maeneo mengine' : ''}. Uko wapi?` : `We serve ${r.general}${r.more ? ' and other listed areas' : ''}. Which place are you in?`) : (S ? 'Uko wapi? Nitaangalia orodha ya maeneo yetu.' : "Which place are you in? I'll check our service areas.");
     case 'want_know': return [S ? 'Sawa, ungependa kujua kuhusu bei, huduma au saa za kazi?' : 'Sure, would you like to know about prices, services or our hours?', S ? 'Uliza tu, mfano bei ya carpet au saa tunafungua.' : 'Go ahead, for example a price or our opening hours.'][Math.min(n, 1)];
     case 'which_price': return S ? 'Bei ya huduma gani ungependa kujua?' : 'Which service would you like the price for?';
-    case 'ack': return r.service ? (S ? `Sawa. Ungependa kubook ${svcName(r.service)}?` : `Okay. Would you like to book ${svcName(r.service).toLowerCase()}?`) : (S ? 'Sawa. Kuna kingine ninaweza kukusaidia nacho?' : 'Okay. Is there anything else I can help with?');
+    case 'ack': return r.service ? (r.request ? (S ? `Sawa. Nikuandikie ombi la ${svcName(r.service)} kwa timu?` : `Okay. Shall I take a ${svcName(r.service).toLowerCase()} request for the team?`) : S ? `Sawa. Ungependa kubook ${svcName(r.service)}?` : `Okay. Would you like to book ${svcName(r.service).toLowerCase()}?`) : (S ? 'Sawa. Kuna kingine ninaweza kukusaidia nacho?' : 'Okay. Is there anything else I can help with?');
     case 'who': return S ? `Unaongea na ${r.agent}, wa ${r.biz}. Tukusaidie na usafi gani?` : `You're speaking with ${r.agent} from ${r.biz}. What can we clean for you?`;
     case 'greet_name': return S ? `${r.name}, unahitaji huduma gani leo?` : `Thanks, ${r.name}. Which service do you need today?`;
     case 'off_catalogue': return S ? `Sina ${r.item} kwenye orodha yetu. ${r.hint ? `Tunafanya ${r.hint}.` : ''}`.trim() : `${r.item} isn't on our list. ${r.hint ? `We do ${r.hint}.` : ''}`.trim();
@@ -166,7 +170,8 @@ function info(r, lang, n = 0) {
     case 'no_rows': return S ? 'Sioni booking iliyo wazi kwa namba hii.' : "I don't see an open booking on this number.";
     case 'not_offered': return S ? 'Hiyo haipo kwenye huduma zetu.' : "That isn't on our list of services.";
     case 'bye': return S ? 'Asante kwa kupiga simu. Kwaheri.' : 'Thank you for calling. Goodbye.';
-    case 'drop_intent': return S ? 'Tuache booking kwa sasa. Kuna kingine ninaweza kukusaidia nacho?' : "Let's leave the booking for now. Is there anything else I can help with?";
+    case 'drop_intent': if (r.request) return S ? 'Tuache ombi kwa sasa. Kuna kingine ninaweza kukusaidia nacho?' : "Let's leave the request for now. Is there anything else I can help with?";
+      return S ? 'Tuache booking kwa sasa. Kuna kingine ninaweza kukusaidia nacho?' : "Let's leave the booking for now. Is there anything else I can help with?";
     case 'decline': return S ? 'Sawa, sijahifadhi chochote. Kuna kingine?' : "Okay, I haven't saved anything. Anything else?";
     default: return '';
   }

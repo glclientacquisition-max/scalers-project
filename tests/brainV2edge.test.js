@@ -90,22 +90,22 @@ test('noise, hold and "are you a bot?" keep every slot and re-ask the open quest
 
 test('read-back: "No wait, actually yes" books; a barge-in correction re-reads', async () => {
   const a = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'No wait, actually yes, book it.']);
-  assert.match(a.lines[3], /^Done, your sofa cleaning is booked/);
+  assert.match(a.lines[3], /^Done, I've sent your request for sofa cleaning/);
   const b = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'Wait, wait, no, Saturday.']);
-  assert.match(b.lines[3], /Saturday 17 October.*Shall I book it\?$/);
+  assert.match(b.lines[3], /Saturday 17 October.*Shall I send this request to the team\?$/);
 });
 
 test('read-back: an exact repeat of the time is a yes (Alvin, option b); another time is a change; a day alone gets one yes/no re-ask', async () => {
   const a = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'Uh, 10am.']);
-  assert.match(a.lines[3], /^Done, your sofa cleaning is booked for Friday 16 October at 10:00/);
+  assert.match(a.lines[3], /^Done, I've sent your request for sofa cleaning on Friday 16 October at 10:00/);
   const b = await talk(['Nataka sofa cleaning Ijumaa saa nne asubuhi.', 'Ruiru', 'Otieno', 'Eeh, saa 4.']);
-  assert.match(b.lines[3], /nimeweka Sofa Cleaning/);
+  assert.match(b.lines[3], /ombi lako la Sofa Cleaning/);
   const c = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', '11am.']);
-  assert.match(c.lines[3], /at 11:00 in Kitengela.*Shall I book it\?$/); assert.ok(!c.out[3].toolResults.length, 'a different time never writes');
+  assert.match(c.lines[3], /at 11:00 in Kitengela.*Shall I send this request to the team\?$/); assert.ok(!c.out[3].toolResults.length, 'a different time never writes');
   const d = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'Friday.', 'Yes.']);
-  assert.match(d.lines[3], /^Please say yes or no: shall I book it\?$/); assert.match(d.lines[4], /^Done/);
+  assert.match(d.lines[3], /^Please say yes or no: shall I send this request to the team\?$/); assert.match(d.lines[4], /^Done/);
   const e = await talk(['Nataka sofa cleaning Ijumaa saa nne asubuhi.', 'Ruiru', 'Otieno', 'Hmm, sijui.', 'Poa.']);
-  assert.match(e.lines[3], /^Tafadhali sema ndio au hapana: nithibitishe\?$/); assert.match(e.lines[4], /nimeweka/);
+  assert.match(e.lines[3], /^Tafadhali sema ndio au hapana: nipeleke ombi hili kwa timu\?$/); assert.match(e.lines[4], /nimeandika ombi/);
 });
 
 test('"next Friday" while this Friday is ahead: asked once naming both dates; on a Friday it is not asked', async () => {
@@ -162,7 +162,7 @@ test('area clarify: only ambiguity groups that touch the tenant places', async (
   assert.equal(N.areaAmbiguity('in Rongai', far), null, 'group does not touch our places');
   const r = await talk(['Book sofa cleaning tomorrow at 10am in Rongai.', 'Kajiado', 'Alvin']);
   assert.equal(r.lines[0], 'Is that Ongata Rongai in Kajiado or Rongai in Nakuru?');
-  assert.match(r.lines[2], /in Ongata Rongai, for Alvin\. Shall I book it\?$/);
+  assert.match(r.lines[2], /in Ongata Rongai, for Alvin\. Shall I send this request to the team\?$/);
   const s = await talk(['Mnafika Rongai?', 'Nakuru']);
   assert.match(s.lines[1], /^Nakuru haiko kwenye orodha/);
 });

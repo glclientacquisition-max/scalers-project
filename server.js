@@ -2365,6 +2365,14 @@ mediaWss.on('connection', (ws, req) => {
         console.log(
           `[ws/media][${sessionCallSid}] spoken catalogue pinned v=${pin?.version ?? 'none'} hash=${String(pin?.sourceHash || '').slice(0, 12)} stale=${pin?.stale === true} degraded=${pin?.degraded === true}`
         );
+        // Stale stored doc (a rebuild ping was lost or failed): this call already speaks the
+        // refreshed rows; ask for a rebuild so the next call has a fresh stored doc. Flag-gated.
+        if (pin?.stale === true && profile.id) {
+          try {
+            const onSave = require('./src/knowledge/spokenCatalogueOnSave');
+            onSave.scheduleSpokenCatalogueCompile(profile.id, { db: require('./src/lib/supabaseClient').supabase, generate: spokenCatalogueGenerate() });
+          } catch (err) { console.warn(`[ws/media][${sessionCallSid}] spoken catalogue rebuild request failed: ${err?.message || err}`); }
+        }
       }
       brainProfile = profile;
       businessName = profile.businessName || businessName;

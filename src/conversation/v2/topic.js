@@ -103,7 +103,8 @@ function openQuestion(line) { const m = String(line || '').match(/[^.!?]*\?\s*$/
 // Pinned once at call start from tenants.spoken_catalogue; never compiled on the hot path.
 function pinDoc(state, profile) {
   if (state.pinnedDoc === undefined && profile?.spokenCataloguePin?.doc) state.pinnedDoc = profile.spokenCataloguePin.doc; // Voice's call-start pin (#705/#706)
-  if (state.pinnedDoc === undefined) state.pinnedDoc = profile?.spokenCatalogue && Array.isArray(profile.spokenCatalogue.categories) ? profile.spokenCatalogue : null;
+  // No call-start pin: the freshness-checked lookup (never a stale stored doc as is)
+  if (state.pinnedDoc === undefined) state.pinnedDoc = profile?.spokenCatalogue && Array.isArray(profile.spokenCatalogue.categories) ? require('../../knowledge/spokenCatalogue').pinSpokenCatalogue(profile)?.doc || null : null;
   return state.pinnedDoc;
 }
 function fallbackLine(doc, lang) {

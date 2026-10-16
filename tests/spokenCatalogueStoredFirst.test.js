@@ -37,11 +37,13 @@ test('flag off: call profile unchanged (no serviceAreas, old divergent hash)', (
   assert.notStrictEqual(SC.sourceHash(call), SC.sourceHash(SC.catalogueProfileFromRow(row)));
 }));
 
-test('stored-first: stored doc returned even on hash mismatch, traced stale', () => withFlag('1', () => {
+test('stored-first: hash mismatch keeps unchanged stored entries (refreshed copy), traced stale', () => withFlag('1', () => {
   const stored = SC.compileSync(SC.catalogueProfileFromRow(row)); stored.version = 1;
   const drifted = { ...SC.catalogueProfileFromRow(row), serviceAreas: null, spokenCatalogue: stored };
   const m = SC.resolveSpokenCatalogueMeta(drifted);
-  assert.strictEqual(m.doc, stored); assert.strictEqual(m.stale, true); assert.strictEqual(m.degraded, false);
+  assert.strictEqual(m.stale, true); assert.strictEqual(m.refreshed, true); assert.strictEqual(m.degraded, false); assert.strictEqual(m.doc.version, 1);
+  // rows unchanged (only areas drifted): every stored entry is kept as stored
+  for (const e of stored.entries) { const k = m.doc.entries.find((x) => x.id === e.id); assert.deepStrictEqual({ spoken: k.spoken, price: k.price, hash: k.hash }, { spoken: e.spoken, price: e.price, hash: e.hash }); }
   const fresh = SC.resolveSpokenCatalogueMeta({ ...SC.catalogueProfileFromRow(row), spokenCatalogue: stored });
   assert.strictEqual(fresh.doc, stored); assert.strictEqual(fresh.stale, false);
 }));

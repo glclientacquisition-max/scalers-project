@@ -91,12 +91,12 @@ test('topic lock survives barge-in fragments and backchannels, ages on other tur
   assert.equal(st.turnLock, null);
 });
 
-test('doc pinned at call start: drifted hash keeps the stored doc, no compile on the hot path', () => {
+test('doc pinned at call start: drifted hash pins the refreshed stored doc, no compile on the hot path', () => {
   const prev = process.env.SPOKEN_CATALOGUE_STORED_FIRST; process.env.SPOKEN_CATALOGUE_STORED_FIRST = '1';
   try {
     const p = ddProfile({ drift: true });
     const pin = SC.pinSpokenCatalogue(p);
-    assert.equal(pin.version, 1); assert.equal(pin.stale, true); assert.equal(pin.doc, p.spokenCatalogue);
+    assert.equal(pin.version, 1); assert.equal(pin.stale, true); for (const e of pin.doc.entries) { const s0 = p.spokenCatalogue.entries.find((x) => x.id === e.id); if (s0 && s0.hash.price === e.hash.price && s0.hash.text === e.hash.text) assert.deepEqual(e.spoken, s0.spoken); }
     const real = SC.compileSync; let compiled = 0;
     // resolve on every turn returns the pin, even with the flag flipped mid-call
     process.env.SPOKEN_CATALOGUE_STORED_FIRST = '';

@@ -69,9 +69,9 @@ test('"outside Nairobi": answered from the tenant list, EN and SW; unlisted plac
 test('cut-off turns ("Hapana, n") never fill a slot, decline, or end the call; the open question is re-asked', async () => {
   const sw = await call(['Nataka kubook sofa cleaning kesho saa nne asubuhi', 'Hapana, n', 'Ruiru', 'Otieno', 'Ndio']);
   assert.match(sw[1].said, /^Samahani.*Tuje wapi\?$/);
-  assert.match(sw[3].said, /Ruiru, kwa Otieno/); assert.match(sw[4].said, /nimeweka Sofa Cleaning/);
+  assert.match(sw[3].said, /Ruiru, kwa Otieno/); assert.match(sw[4].said, /ombi lako la Sofa Cleaning/);
   const en = await call(['Hi, I want to book sofa cleaning tomorrow at 10am', 'Kitengela', 'Alvin', 'No, w', 'Yes']);
-  assert.match(en[3].said, /^Sorry/); assert.match(en[4].said, /booked/);
+  assert.match(en[3].said, /^Sorry/); assert.match(en[4].said, /sent your request/);
   assert.equal(V2.nlu.extractName('Kitengela', { prompted: true }), null, 'a bare area is not a name');
   assert.equal(V2.nlu.extractName('Karen', { prompted: true }), 'Karen');
 });
