@@ -112,7 +112,7 @@ function extractPlaceCore(text, { prompted = false } = {}) {
 const GENERIC = new Set(['cleaning', 'clean', 'internal', 'standard', 'package', 'service', 'services', 'per', 'room', 'seat', 'add-on', 'the', 'and', 'up', 'to', 'sq', 'ft', 'interior', 'house', 'apartment']);
 const SYN = { fridge: 'refrigerator', friji: 'refrigerator', viti: 'sofa', kiti: 'sofa', couch: 'sofa', couches: 'sofa', kochi: 'sofa', godoro: 'mattress', magodoro: 'mattress', zulia: 'carpet', dirisha: 'window', madirisha: 'window', windows: 'window', carpets: 'carpet', sofas: 'sofa', mattresses: 'mattress', ovens: 'oven', office: 'office', contract: 'contract' };
 const WEAK = new Set(['deep', 'office', 'commercial', 'large', 'small', 'medium']);
-function tokens(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9- ]/g, ' ').split(/\s+/).filter(Boolean).map((w) => SYN[w] || w.replace(/s$/, '')); }
+function tokens(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9- ]/g, ' ').split(/\s+/).filter(Boolean).map((w) => (SYN[w] || w).replace(/s$/, '')); }
 function matchService(text, catalog = []) {
   const tt = new Set(tokens(text));
   let best = null;
@@ -196,9 +196,92 @@ const ASK_ITEM = /\b(?:mko na|mna|mnauza\w*|mnauzanga|do you (?:have|sell)|una(?
 function askedItem(t) { const m = String(t || '').match(ASK_ITEM); if (!m) return null; const w = m[1].trim().replace(/\s+(like|tu|pia|also)$/i, ''); if (/^(wewe|mimi|issue|shida|nini|hiyo|hii|ile|kitu|vitu|any)\b/i.test(w) || w.split(/\s+/).length > 4) return null; return w; }
 // Topic context (b401 T5): right after a services answer, "what exactly... which?" is a follow-up on that list
 const TOPIC_FOLLOWUP = /\b(what exactly|which (ones?|services?|kind|type)|which\b|what (kind|type)s?|specifically|like what|such as|zipi|gani hasa|ipi hasa|aina gani|kama nini|nini hasa)\b/i;
-function understand(text, { profile = {}, now, expecting = null, topic = null } = {}) {
+// ---------------------------------------------------------------------------
+// BRAIN_V2_NLU_GAPS (default off): nlu-gap-spec.md sections 0-6. Off: understand() reads
+// exactly as before; only the additive confidence/clear/reason/kind fields are new.
+const gapsOn = (o = {}) => (o.gaps != null ? !!o.gaps : /^(1|true|on|yes)$/i.test(String(process.env.BRAIN_V2_NLU_GAPS || '').trim()));
+// §0 ASR pre-normaliser: intent and service reads only; slots keep the caller's original text.
+const FILLER = /(?:^|\s)(?:(?<!\b(?:i'?d|would|i|we|you'?d|they'?d)\s)like|uh|um|eeh|you know|guys)(?=[\s,.!?]|$)[,]?/gi;
+function normaliseAsr(text) {
+  let s = String(text || '');
+  s = s.replace(/\b(?:(?:one )?back room joining|joining services?)\b/gi, 'cleaning services')
+    .replace(/\bservice is you offer\b/gi, 'services you offer')
+    .replace(/\busasi\b/gi, 'usafi')
+    .replace(/\b(mnawashangaa|mnaoshanga|mnadhanioshea|mnaziosha)\b/gi, 'mnaosha');
+  s = s.replace(FILLER, ' ').replace(/\s+([,.!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+  return s;
+}
+// §1 which-services phrasings
+const SERVICES_X = /\b(what else (can|do) you (do|offer)|what (else )?can you do|anything else you (do|offer)|which \w+ services|what \w+ services|services? (is |are |do )?you (do )?offer|which services?\b|(services|huduma|usafi) gani|gani mnap\w+|mnafanya nini (tena|zingine)|mnafanya (nini )?(ingine|zingine|tena)|nini (ingine|zingine) mnafanya|mko na \w+ gani|mna \w+ gani)\b/i;
+// §3 explain phrasings
+const EXPLAIN_X = /\b(remind me|tell me (more )?about|(more )?details (of|about|on|for)|what('?s| is) included|what does .{1,30} (include|involve)|niambie (zaidi )?kuhusu|nieleze|maelezo ya|inahusisha nini|inajumuisha nini)\b/i;
+// §4 "do you do X?" service check (needs a catalogue hit)
+const CHECK_X = /\b(do you (also )?(clean|wash|do|handle) \w+|mnaosha \w+|mnasafisha \w+|\w+ (mna|m)\w*osh\w*)\b|^\W*(mpaka|even|hata) [\w -]{2,30}\W*$/i;
+// §5 "Wewe niambie" inside a services topic
+const TELL_ME = /^\W*(wewe )?(niambie|tell me|you tell me|just tell me)\W*$/i;
+// §2 Rule A / Rule B
+const ELLIPTIC = /^\W*(for |like |ya |kwa )?(a |an |the )?[\w -]{2,40}?\W*(je|cleaning)?\W*$/i;
+const AMOUNT = /\b\d{2,6}\s*(shillings?|bob|ksh|kes|\/=)?\b|\bpeke yake\b|\b(only|tu)\b\W*\??\W*$|\belfu\b/i;
+// §3 GENERIC binding: "usafi wa apartment" binds when exactly one catalogue item carries the token.
+function bindGeneric(text, catalog = []) {
+  const m = String(text || '').toLowerCase().match(/\b(?:usafi|cleaning|clean)\s+(?:wa|ya|of|for)?\s*(?:the |a |an |hiyo |ile )?([a-z-]+)\b/);
+  if (!m || !GENERIC.has(m[1])) return { service: null, candidates: [] };
+  const c = catalog.filter((s) => tokens(s.name).includes(m[1]));
+  return { service: c.length === 1 ? c[0] : null, candidates: c };
+}
+// §6c bare name: one capitalised token that is no service, place, lexicon or filler word
+const NOT_NAME = /^(okay|ok|sawa|asante|karibu|thanks|hello|halo|hallo|hi|yes|no|ndio|ndiyo|hapana|like|mmh|eeh|haya|poa|fine|good|great|sure|right|yeah|nani|wewe|mimi|leo|kesho|jana|today|tomorrow|bye|kwaheri|pardon|sorry|what|why|when|where|who|how|stop|wait|ngoja|subiri|basi|tena|sasa|niulize|anduna|shy)$/i;
+function bareName(t, profile) {
+  const m = String(t || '').trim().match(/^\W*([A-Z][a-z']{2,15})\W*$/);
+  if (!m || NOT_NAME.test(m[1])) return null;
+  if (matchService(m[1], profile.servicesCatalog || []) || matchProducts(m[1], profile.productCatalog || []).length) return null;
+  if (isBareArea(m[1]) || Object.values(COUNTY_OF).some((ps) => ps.includes(m[1].toLowerCase())) || L.parseWhen(m[1], new Date())) return null;
+  return nameCase(m[1]);
+}
+const CAT_KIND = { explain: 'explain_service', price: 'price_service', services: 'list_services', check: 'check_service', availability: 'check_availability' };
+// Confidence per kind (0-1), clear (safe to act on without the model) and reason.
+function scoreTurn(u, { rule = null, topic = null } = {}) {
+  const has = (k) => u.intents.includes(k);
+  const svc = !!u.service;
+  if (rule) return { kind: rule.kind, confidence: rule.confidence, clear: rule.confidence >= 0.8, reason: rule.reason };
+  if (has('check')) return svc ? { kind: 'check_service', confidence: 0.9, clear: true, reason: 'service_check' } : { kind: 'check_service', confidence: 0.4, clear: false, reason: 'no_service_id' };
+  if (has('explain') || has('price')) {
+    const kind = has('price') ? 'price_service' : 'explain_service';
+    return svc ? { kind, confidence: 0.9, clear: true, reason: 'service_bound' } : { kind, confidence: 0.4, clear: false, reason: u.serviceCandidates?.length > 1 ? 'service_ambiguous' : 'no_service_id' };
+  }
+  if (has('services')) return has('book') ? { kind: 'list_services', confidence: 0.4, clear: false, reason: 'conflict_book' } : { kind: 'list_services', confidence: 0.9, clear: true, reason: u.followup ? 'services_followup' : 'services' };
+  const tx = u.intents.find((i) => ['payment_change', 'address_change', 'cancel', 'change', 'complaint', 'handoff', 'order', 'book'].includes(i));
+  if (tx) { const others = u.intents.filter((i) => i !== tx && i !== 'want_know'); return { kind: tx, confidence: others.length ? 0.6 : 0.8, clear: !others.length, reason: others.length ? 'mixed_intents' : 'rule' }; }
+  if (u.intents.length) { const k = u.intents.find((i) => i !== 'want_know') || u.intents[0]; return { kind: CAT_KIND[k] || k, confidence: u.intents.length === 1 ? 0.8 : 0.6, clear: u.intents.length === 1, reason: u.intents.length === 1 ? 'rule' : 'mixed_intents' }; }
+  if (u.yes && !u.no) return { kind: 'yes', confidence: 0.9, clear: true, reason: 'yes' };
+  if (u.no) return { kind: 'no', confidence: 0.9, clear: true, reason: 'no' };
+  if (u.done) return { kind: 'done', confidence: 0.85, clear: true, reason: 'done' };
+  if (u.name) return { kind: 'give_name', confidence: 0.8, clear: true, reason: 'name' };
+  if (u.when) return { kind: 'give_time', confidence: 0.8, clear: true, reason: 'when' };
+  if (u.place || u.area) return { kind: 'give_place', confidence: 0.75, clear: true, reason: 'place' };
+  if (u.ack) return { kind: 'ack', confidence: 0.85, clear: true, reason: 'ack' };
+  return { kind: 'other', confidence: 0.2, clear: false, reason: topic ? 'empty_in_topic' : 'no_intent' };
+}
+function understand(text, { profile = {}, now, expecting = null, topic = null, prev = null, opening = false, gaps } = {}) {
   const t = String(text || '').trim();
+  const G = gapsOn({ gaps });
+  const norm = G ? normaliseAsr(t) : t;
   const intents = detectIntents(t);
+  if (G && norm !== t) for (const i of detectIntents(norm)) if (!intents.includes(i)) intents.push(i);
+  const catalog = profile.servicesCatalog || [];
+  let service = matchService(G ? norm : t, catalog);
+  let serviceCandidates = [];
+  let rule = null;
+  if (G) {
+    if (SERVICES_X.test(norm) && !intents.includes('services')) intents.push('services');
+    if (EXPLAIN_X.test(norm) && !intents.includes('explain')) intents.push('explain');
+    if (!service && (intents.includes('explain') || intents.includes('price'))) { const b = bindGeneric(norm, catalog); service = b.service; serviceCandidates = b.candidates; }
+    // §4: a named catalogue service in a "do you do X / mnaosha X / mpaka X?" turn is a service check, not a list
+    if (service && CHECK_X.test(norm) && !intents.includes('price') && !intents.includes('book')) {
+      for (const k of ['services', 'availability', 'want_know']) { const j = intents.indexOf(k); if (j >= 0) intents.splice(j, 1); }
+      if (!intents.includes('explain')) intents.push('check');
+    }
+  }
   // "Hebu niambie kuhusu hiyo usafi wa apartment": a describe-me ask, not a booking ("usafi" alone is not book)
   if (intents.includes('explain') && intents.includes('book') && !/\b(book|booking|ku-?book|kubook|schedule|appointment|niwekee|weka booking|tuweke|tuieke)\b/i.test(t)) intents.splice(intents.indexOf('book'), 1);
   let followup = false;
@@ -209,8 +292,29 @@ function understand(text, { profile = {}, now, expecting = null, topic = null } 
     followup = true;
   }
   const isYes = YES.test(t) && !NEG.test(t.replace(/^\W*(yes|ndio)\W*/i, '').slice(0, 0));
-  const name = extractName(t, { prompted: expecting === 'name' });
-  return {
+  let name = extractName(t, { prompted: expecting === 'name' });
+  const when0 = L.parseWhen(t, now);
+  if (G) {
+    const area0 = matchArea(t, profile); const place0 = extractPlace(t, { prompted: false });
+    const words = norm.replace(/[^A-Za-z0-9 -]/g, ' ').split(/\s+/).filter(Boolean).length;
+    const quiet = !intents.some((i) => !['want_know'].includes(i));
+    const pk = prev && (prev.kind || (prev.intents || []).find((i) => ['price', 'explain', 'services'].includes(i)));
+    const prevSvc = prev && (prev.service || null);
+    // §2 Rule A: right after a price ask, a short "for (a) <service>?" is the price of that service
+    if (!rule && /price/.test(pk || '') && service && quiet && words <= 8 && ELLIPTIC.test(norm.replace(/[—–]/g, ' '))) { intents.push('price'); rule = { kind: 'price_service', confidence: 0.85, reason: 'rule_a_pending_price' }; }
+    // §2 Rule B: price topic on S and the caller echoes an amount ("ni 200 peke yake?") with no other service
+    else if (!rule && /price/.test(pk || '') && prevSvc && (!service || service.name === prevSvc.name) && quiet && AMOUNT.test(t)) { intents.push('price'); service = prevSvc; rule = { kind: 'price_service', confidence: 0.85, reason: 'rule_b_price_echo' }; }
+    // §5 "Wewe niambie" inside a services topic
+    if (!rule && topic === 'services' && TELL_ME.test(t)) { for (const k of ['want_know']) { const j = intents.indexOf(k); if (j >= 0) intents.splice(j, 1); } if (!intents.includes('services')) intents.push('services'); rule = { kind: 'list_services', confidence: 0.85, reason: 'tell_me_in_topic' }; }
+    // §6a a named service plus a date or a place is a booking; it outranks "which services do you offer?"
+    if (!rule && service && (when0?.date || when0?.time || area0 || place0) && intents.includes('services') && !intents.includes('price') && !intents.includes('explain')) {
+      intents.splice(intents.indexOf('services'), 1); if (!intents.includes('book')) intents.push('book');
+      rule = { kind: 'book_service', confidence: 0.9, reason: 'book_outranks_list' };
+    }
+    // §6c a bare capitalised name at the opening or when a name is pending is the caller's name
+    if (!rule && !name && !intents.length && (opening || expecting === 'name')) { const bn = bareName(t, profile); if (bn) { name = bn; rule = { kind: 'give_name', confidence: 0.6, reason: opening ? 'bare_name_opening' : 'bare_name_pending' }; } }
+  }
+  const base = {
     text: t,
     intents,
     yes: YES.test(t) || REVERSE_YES.test(t),
@@ -221,8 +325,8 @@ function understand(text, { profile = {}, now, expecting = null, topic = null } 
     correctionOf: extractCorrection(t),
     place: extractPlace(t, { prompted: expecting === 'place' && !name && !L.parseWhen(t, now) && !intents.length }),
     landmark: extractLandmark(t),
-    when: L.parseWhen(t, now) || (expecting === 'time' && /^\W*(?:uh|um|ah|eh)?\W*(\d{1,2})\b/i.test(t) ? bareHour(t) : null),
-    service: matchService(t, profile.servicesCatalog || []),
+    when: when0 || (expecting === 'time' && /^\W*(?:uh|um|ah|eh)?\W*(\d{1,2})\b/i.test(t) ? bareHour(t) : null),
+    service,
     products: matchProducts(t, profile.productCatalog || []),
     quantity: extractQuantity(t),
     area: matchArea(t, profile),
@@ -232,5 +336,9 @@ function understand(text, { profile = {}, now, expecting = null, topic = null } 
     followup,
     _yes: isYes,
   };
+  if (G) { base.serviceCandidates = serviceCandidates; base.normText = norm; if (!base.name && !rule && !intents.length) { const bn = bareName(t, profile); if (bn) base.nameCandidate = bn; } }
+  const sc = scoreTurn(base, { rule, topic });
+  base.kind = sc.kind; base.confidence = sc.confidence; base.clear = sc.clear; base.reason = sc.reason;
+  return base;
 }
-module.exports = { areaAmbiguity, nonAnswer, cutOff, splitLandmark, extractLandmark, matchArea, understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };
+module.exports = { normaliseAsr, scoreTurn, gapsOn, areaAmbiguity, nonAnswer, cutOff, splitLandmark, extractLandmark, matchArea, understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };

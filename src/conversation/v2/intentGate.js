@@ -11,11 +11,24 @@ const nluFirstEnabled = (env = process.env) => on(env.VOICE_NLU_FIRST_INTENT);
 const intentInMainTurnEnabled = (env = process.env) => nluFirstEnabled(env) && on(env.VOICE_INTENT_IN_MAIN_TURN);
 
 /** -> { intent, service_id, confidence: 'high'|'low', reason } */
-function nluIntent(text, { profile = {}, doc = null, topic = null, now = new Date() } = {}) {
-  const u = N.understand(text, { profile, now, topic });
+// Brain nlu also returns { kind, confidence: 0-1, clear, reason } on every turn; it is passed
+// through as score/clear. Under BRAIN_V2_NLU_GAPS the gap rules (book outranks list, service
+// check, price rules A/B, "wewe niambie") set the kind; off, the reads below are unchanged.
+function nluIntent(text, { profile = {}, doc = null, topic = null, prev = null, opening = false, now = new Date(), gaps } = {}) {
+  const u = N.understand(text, { profile, now, topic, prev, opening, gaps });
+  const res = gate(u, doc, topic);
+  return { ...res, score: u.confidence, clear: res.confidence === 'high', nluKind: u.kind, nluReason: u.reason, service: u.service || null };
+}
+function gate(u, doc, topic) {
   const has = (k) => u.intents.includes(k);
   const entry = doc && u.service ? SC.entryForRaw(doc, typeof u.service === 'string' ? u.service : u.service.name) : null;
   const sid = entry ? entry.id : null;
+  if (u.kind === 'book_service') return { intent: 'other', service_id: sid, confidence: 'high', reason: 'book_outranks_list' };
+  if (u.kind === 'check_service') return sid ? { intent: 'explain_service', service_id: sid, confidence: 'high', reason: 'service_check' } : { intent: 'explain_service', service_id: null, confidence: 'low', reason: 'no_service_id' };
+  if (/^rule_|^tell_me/.test(u.reason || '')) {
+    const intent = u.kind === 'list_services' ? 'list_services' : 'price_service';
+    if (intent === 'list_services' || sid) return { intent, service_id: intent === 'list_services' ? null : sid, confidence: 'high', reason: u.reason };
+  }
   if (has('explain') || has('price')) {
     const intent = has('price') ? 'price_service' : 'explain_service';
     if (sid) return { intent, service_id: sid, confidence: 'high', reason: 'service_bound' };

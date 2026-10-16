@@ -42,7 +42,8 @@ function parseCommandResponse(resp) {
 // Cheap gate (nlu intents) so the step and its model call only run on catalogue turns.
 function looksCatalogue(text, profile, state = {}) {
   const u = N.understand(text, { profile: profile || {}, now: new Date(), topic: state?.v2CatalogueState?.lastInfo || null });
-  return u.intents.includes('services') || ((u.intents.includes('explain') || u.intents.includes('price')) && Boolean(u.service));
+  // BRAIN_V2_NLU_GAPS §4: a service check on a catalogue item is a catalogue turn (answered with its grounded price)
+  return u.intents.includes('services') || (u.intents.includes('check') && Boolean(u.service)) || ((u.intents.includes('explain') || u.intents.includes('price')) && Boolean(u.service));
 }
 async function modelCommand({ model, text, sc, lang, timeoutMs }) {
   const t0 = Date.now();

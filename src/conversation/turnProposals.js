@@ -66,4 +66,15 @@ function buildTurnProposals({ text, lang, doc, docVersion = null, localReply = n
   return out;
 }
 
-module.exports = { buildTurnProposals, categoryLine, closerAfterNameYes, openQuestionOf };
+// BRAIN_V2_NLU_GAPS §6a: a turn naming a service plus a date or place is a booking, so no catalogue
+// list speaks (HD_69f53a46339b T2). Off, or any other turn: false. Never throws on the live path.
+function bookOutranksListTurn(text, profile, { now = new Date() } = {}) {
+  if (!/^(1|true|on|yes)$/i.test(String(process.env.BRAIN_V2_NLU_GAPS || '').trim())) return false;
+  try {
+    return require('./v2/nlu').understand(String(text || ''), { profile: profile || {}, now }).kind === 'book_service';
+  } catch {
+    return false;
+  }
+}
+
+module.exports = { bookOutranksListTurn, buildTurnProposals, categoryLine, closerAfterNameYes, openQuestionOf };
