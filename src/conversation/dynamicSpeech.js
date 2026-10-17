@@ -422,6 +422,7 @@ function stripPrematureOutcomeClaims(text, opts = {}) {
  */
 function polishSpokenDetail(text, opts = {}) {
   const dropReasons = [];
+  const trustedPlaces = [];
   let spoken = stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true });
   // Guard whole sentences first. Stripping a verb phrase after the fact would
   // leave a fragment ("that for you.") that the guard can no longer see.
@@ -436,6 +437,7 @@ function polishSpokenDetail(text, opts = {}) {
       language: opts.language,
       allowEmpty: true,
       dropReasons,
+      trustedPlaces,
       ...(opts.now != null ? { now: opts.now } : {}),
     });
   }
@@ -468,7 +470,10 @@ function polishSpokenDetail(text, opts = {}) {
   if (dropReasons.length) reason = dropReasons[0];
   else if (!after) reason = 'dropped';
   else if (after !== before) reason = 'rewritten';
-  return { text: out, reason, dropReasons };
+  const result = { text: out, reason, dropReasons };
+  // VOICE_BUSINESS_PLACES: which business place kept this text (trace only).
+  if (trustedPlaces.length) result.trustedPlace = trustedPlaces[0];
+  return result;
 }
 
 function polishSpokenReply(text, opts = {}) {

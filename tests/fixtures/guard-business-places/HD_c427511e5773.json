@@ -1,0 +1,40 @@
+{
+  "_doc": "Aris prod HD_c427511e5773, 17 Oct 2026 20:34 EAT (release 41a63296; replayed on 8ee9b161). The model gave the file's address with 'University of Nairobi' for the file's 'UON'; the guard dropped it as unbound_place on t3 and t4.",
+  "tenantId": "24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0",
+  "profile": {
+    "businessName": "Aris Kenya",
+    "vertical": "retail",
+    "businessLocations": [
+      {
+        "label": "Main",
+        "address": "We have a hybrid system where we operate through our e-commrce website online where you order and have it delivered country wide or pickup in our outlets in person.",
+        "landmark": "Inside UON premises",
+        "directions": "Along State house road-ground floor Hall 7",
+        "coverage_notes": "Country wide delivery via parcel grid delivery system"
+      }
+    ]
+  },
+  "turns": [
+    {
+      "turn": 3,
+      "caller": "Where are you located?",
+      "model": "We are located along State House Road, on the ground floor of Hall 7, inside the University of Nairobi premises. We also deliver countrywide through our online store.",
+      "spokenBefore": "We also deliver countrywide through our online store.",
+      "dropBefore": ["unbound_place"]
+    },
+    {
+      "turn": 4,
+      "caller": "Uh, where can I find you locally?",
+      "model": "You can find us inside the University of Nairobi premises, along State House Road on the ground floor of Hall 7.",
+      "spokenBefore": "",
+      "dropBefore": ["unbound_place"]
+    },
+    {
+      "turn": 5,
+      "caller": "Where can I find you?",
+      "model": "Our physical shop is on State House Road, ground floor of Hall 7, inside the UON premises. Is there a specific item you are looking for?",
+      "spokenBefore": "Our physical shop is on State House Road, ground floor of Hall 7, inside the UON premises. Is there a specific item you are looking for?",
+      "dropBefore": []
+    }
+  ]
+}

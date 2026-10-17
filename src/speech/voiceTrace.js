@@ -378,11 +378,18 @@ function createVoiceTrace(opts = {}) {
   function noteTransform(info = {}) {
     const before = String(info.before || '');
     const after = String(info.after || '');
-    if (before.trim() === after.trim()) return;
+    const trustedPlace = String(info.trustedPlace || '');
+    // VOICE_BUSINESS_PLACES: a sentence a business place kept is recorded
+    // even when unchanged, so Ops can audit the rescue.
+    if (before.trim() === after.trim() && !trustedPlace) return;
     pushStage({
+      ...(trustedPlace ? { trustedPlace } : {}),
       stage: 'transform',
       name: String(info.stage || info.name || 'speech'),
-      reason: String(info.reason || (after.trim() ? 'rewritten' : 'dropped')),
+      reason:
+        trustedPlace && before.trim() === after.trim()
+          ? 'kept'
+          : String(info.reason || (after.trim() ? 'rewritten' : 'dropped')),
       dropReasons: (Array.isArray(info.dropReasons) ? info.dropReasons : [])
         .map((reason) => String(reason || ''))
         .filter(Boolean),
