@@ -51,6 +51,12 @@ const {
 } = require('./src/speech/greetingPreroll');
 const { buildNotifyOutcome, ownerAlreadyNotified } = require('./src/notifications/notifyOutcome');
 const { createGreetingWarmer, greetingWarmEnabled } = require('./src/speech/greetingWarm');
+const {
+  shouldReinvite: shouldReinviteBareGreeting,
+  bareGreetingReplyLine,
+  isBareGreetingOrAffirmation,
+  bareGreetingReplyEnabled,
+} = require('./src/speech/bareGreetingReply');
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
 const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
 const {
@@ -2135,6 +2141,10 @@ mediaWss.on('connection', (ws, req) => {
   let utteranceStartedAt = 0;
   /** Idle check-in only after the caller has actually spoken. */
   let heardCallerUtterance = false;
+  // VOICE_BARE_GREETING_REPLY: re-invites spoken for a bare Hello/Yes before
+  // the caller's first real turn (src/speech/bareGreetingReply.js).
+  let firstRealCallerTurnDone = false;
+  let bareGreetingReinvites = 0;
   /** Brain END is in flight. No idle nudge and no next caller turn. */
   let callEnding = false;
   const overlapHold = createOverlapHold();
@@ -2554,10 +2564,61 @@ mediaWss.on('connection', (ws, req) => {
     return agentReplay.pickReplay();
   }
 
+  // A bare "Hello" / "Yes" / "Halo" / "Uko?" before the first real turn gets a
+  // short spoken re-invite, never silence (VOICE_BARE_GREETING_REPLY, off).
+  function maybeReinviteBareGreeting(text, source) {
+    if (
+      !shouldReinviteBareGreeting({
+        text,
+        firstRealTurnDone: firstRealCallerTurnDone,
+        reinvites: bareGreetingReinvites,
+        speaking,
+        turnBusy,
+        callEnding: callEnding || callIsOver() || speechOutageStarted,
+      })
+    ) {
+      return false;
+    }
+    const line = bareGreetingReplyLine({
+      text,
+      callLanguage,
+      agentName,
+      businessName: spokenName || businessName,
+      count: bareGreetingReinvites,
+    });
+    bareGreetingReinvites += 1;
+    idleNudge.clear();
+    console.log(
+      `[ws/media][${sidLabel()}] bare_greeting_reinvite n=${bareGreetingReinvites} src=${source}: ${String(text || '').slice(0, 40)}`
+    );
+    void speakText(line)
+      .then((spoken) => {
+        if (spoken?.ok) {
+          callTranscript.pushAgent(line);
+          messages.push({ role: 'assistant', content: line, local: true });
+        }
+      })
+      .catch((err) => {
+        console.error(`[ws/media][${sidLabel()}] bare_greeting_reinvite failed:`, err?.message || err);
+      });
+    return true;
+  }
+
   function releaseQueuedCallerSpeech(endedGeneration) {
     const gen =
       endedGeneration != null ? endedGeneration : activePlaybackGeneration;
     const { text, duplicate } = overlapHold.drain(gen);
+    // A bare Hello said over the greeting was answered by the greeting
+    // itself. Do not re-invite for it (VOICE_BARE_GREETING_REPLY).
+    if (
+      text &&
+      !firstRealCallerTurnDone &&
+      bareGreetingReplyEnabled() &&
+      isBareGreetingOrAffirmation(text)
+    ) {
+      console.log(`[ws/media][${sidLabel()}] bare_greeting_over_greeting dropped gen=${gen}`);
+      return;
+    }
     if (duplicate) {
       console.log(
         `[ws/media][${sidLabel()}] caller_turn_duplicate_suppressed gen=${gen}`
@@ -3251,6 +3312,13 @@ mediaWss.on('connection', (ws, req) => {
     // A new caller turn may speak. The previous barge must not swallow it.
     suppressReplyRemainder = false;
 
+    if (maybeReinviteBareGreeting(clean, 'turn')) {
+      voiceTrace.beginTurn({ callerText: clean });
+      voiceTrace.noteTurnEnd({ decision: 'reinvite', reason: 'bare_greeting' });
+      voiceTrace.commitTurn({ outcome: 'reinvite' });
+      return;
+    }
+
     const idleDecision = decideCallerEvent({
       text: clean,
       speaking: false,
@@ -3283,6 +3351,7 @@ mediaWss.on('connection', (ws, req) => {
       voiceTrace.commitTurn({ outcome: 'skip' });
       return;
     }
+    if (!isBareGreetingOrAffirmation(clean)) firstRealCallerTurnDone = true;
 
     overlapHold.discardExcept(0);
     turnBusy = true;
@@ -4872,9 +4941,43 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
 
+      // VOICE_BARE_GREETING_REPLY: a bare Hello/Yes before the first real turn
+      // used to end here as an empty replay or an ignored backchannel. Send it
+      // through the normal turn-end merge instead ("Hello" + "I need a
+      // cleaner" stays one turn); runCallerTurn speaks the re-invite if it is
+      // still bare.
+      if (
+        !decision.queue &&
+        (decision.replay ||
+          decision.interrupt ||
+          decision.action === 'ignore' ||
+          decision.action === 'skip' ||
+          decision.action === 'barge_listen') &&
+        shouldReinviteBareGreeting({
+          text: preroll.applied ? preroll.text : text,
+          firstRealTurnDone: firstRealCallerTurnDone,
+          reinvites: bareGreetingReinvites,
+          speaking: decision.interrupt ? false : speaking,
+          turnBusy,
+          callEnding: callEnding || callIsOver() || speechOutageStarted,
+        })
+      ) {
+        noteCallerSpeechForIdle(text);
+        voiceTrace.noteTurnEnd({ decision: 'queue', reason: 'bare_greeting' });
+        appendFinalPart(utteranceParts, evt.text);
+        scheduleUtteranceFlush();
+        return;
+      }
+
       if (decision.replay) {
         voiceTrace.noteTurnEnd({ decision: 'replay', reason: decision.reason || 'replay' });
-        const replay = hearAgainReplayText();
+        let replay = hearAgainReplayText();
+        // The cached-PCM greeting never reaches agentReplay, so a hear-again
+        // right after it found no line and went silent. Fall back to the last
+        // spoken question (VOICE_BARE_GREETING_REPLY).
+        if (!replay && bareGreetingReplyEnabled() && agentAwaitingReply(lastAgentText)) {
+          replay = String(lastAgentText || '').trim();
+        }
         if (replay) {
           if (callerEventClearsIdle(decision)) noteCallerSpeechForIdle(text);
           console.log(
