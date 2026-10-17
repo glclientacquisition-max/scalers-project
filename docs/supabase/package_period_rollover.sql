@@ -7,7 +7,7 @@
 -- and rebuild included units from the package (+ grants that count in the new
 -- period). Pending downgrades / period changes / unassigns apply here.
 --
--- Run after: package_state_rules.sql, package_catalog.sql (tenant_subscriptions, counters,
+-- Run after: admin_business_archive.sql (tenants.archived_at), package_state_rules.sql, package_catalog.sql (tenant_subscriptions, counters,
 --            tenants_protect_wallet_columns), wallet_security_beta.sql
 --            (ops_audit_log). Requires the pg_cron extension.
 -- ASCII-only (safe for Supabase SQL Editor).
@@ -58,6 +58,9 @@
 --                       + billing_grant_minutes_for_period(new period)
 --    so upgrade proration and expired grants drop off. Grant rows are never
 --    deleted. Requires package_state_rules.sql.
+--    Archived tenants (tenants.archived_at set) are skipped: no renewal, no
+--    counter reset, so the last period stays as the final usage record. After
+--    Unarchive the next run catches the row up to the current month.
 -- ---------------------------------------------------------------------------
 drop function if exists public.roll_package_periods(boolean);
 
@@ -104,6 +107,7 @@ begin
     from public.tenant_subscriptions s
     join public.tenants t on t.id = s.tenant_id
     where s.status in ('active', 'cancelled')
+      and t.archived_at is null  -- archived: no renewal; counters stay as the final usage (archive_tenant_billing, #737)
       and s.current_period_end is not null
       and s.current_period_end <= now()
     for update of s skip locked

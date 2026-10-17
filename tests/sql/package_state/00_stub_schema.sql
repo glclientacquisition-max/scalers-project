@@ -13,7 +13,8 @@ create table public.tenants (
   soft_spend_limit_enabled boolean not null default false, soft_spend_limit_kes numeric, on_demand_usage_enabled boolean not null default false,
   wallet_low_alert_sent_at timestamptz, wallet_empty_alert_sent_at timestamptz, line_paid_through date, line_grace_days int, line_status text default 'active',
   sms_included_units integer not null default 200, sms_used_units integer not null default 0,
-  email_included_units integer not null default 100, email_used_units integer not null default 0, seat_included integer not null default 5);
+  email_included_units integer not null default 100, email_used_units integer not null default 0, seat_included integer not null default 5,
+  archived_at timestamptz);
 create table public.tenant_members (id uuid primary key default gen_random_uuid(), tenant_id uuid references public.tenants(id), user_id uuid);
 create or replace function public.current_user_tenant_ids() returns setof uuid language sql stable security definer set search_path=public as $$ select tenant_id from public.tenant_members where user_id = auth.uid() $$;
 grant execute on function public.current_user_tenant_ids() to authenticated, service_role;

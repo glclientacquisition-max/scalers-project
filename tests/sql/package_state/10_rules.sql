@@ -89,3 +89,25 @@ update tenant_subscriptions s set current_period_start = now() - interval '31 da
   term_start = now() - interval '366 days', term_end = now() - interval '1 minute', pending_effective_at = now() - interval '1 minute'
 where s.tenant_id = 'aaaaaaaa-0000-0000-0000-000000000005';
 select r.applied_change, (select sku from billing_packages where id=r.package_id_after) pkg_after, r.period, r.minutes_included_after, r.term_end_after - r.new_period_start as term_len from roll_package_periods(false) r;
+\echo === archived tenants do not roll (archive_tenant_billing, #737)
+do $$
+declare v_id uuid := 'aaaaaaaa-0000-0000-0000-000000000002'; v_end timestamptz; n int;
+begin
+  perform set_config('scalers.wallet_write', '1', true);
+  update tenants set archived_at = now(), sms_used_units = 9 where id = v_id;
+  update tenant_subscriptions set current_period_start = now() - interval '31 days', current_period_end = now() - interval '1 minute' where tenant_id = v_id;
+  select current_period_end into v_end from tenant_subscriptions where tenant_id = v_id;
+  select count(*) into n from roll_package_periods(false) r where r.tenant_id = v_id;
+  if n <> 0 then raise exception 'FAIL: archived tenant rolled'; end if;
+  if (select current_period_end from tenant_subscriptions where tenant_id = v_id) <> v_end
+     or (select sms_used_units from tenants where id = v_id) <> 9 then
+    raise exception 'FAIL: archived tenant period or counters changed';
+  end if;
+  update tenants set archived_at = null where id = v_id;
+  select count(*) into n from roll_package_periods(false) r where r.tenant_id = v_id;
+  if n <> 1 then raise exception 'FAIL: unarchived tenant did not catch up'; end if;
+  if (select current_period_end from tenant_subscriptions where tenant_id = v_id) <= now() then
+    raise exception 'FAIL: catch-up left the period in the past';
+  end if;
+  raise notice 'archived skip: ok';
+end $$;
