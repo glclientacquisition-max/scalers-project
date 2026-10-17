@@ -23,8 +23,7 @@ import {
 } from "@/lib/packageCatalog";
 import { assignmentFromBusiness } from "@/lib/packagePriceLabel";
 import { usedOfIncluded } from "@/lib/packageUsageAlign";
-
-const ACTOR_STORAGE_KEY = "scalers.ops.actor";
+import { chargingAction, packageChange, requestErrorText } from "@/lib/adminBillingCopy";
 
 const MODE_OPTIONS: { value: BillingMode; label: string }[] = [
   { value: "off", label: "Beta (free), meter only" },
@@ -64,7 +63,7 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
   const [savingCharge, setSavingCharge] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [actor, setActor] = useState("ops");
+  const [packageConfirmOpen, setPackageConfirmOpen] = useState(false);
   const [history, setHistory] = useState<BillingHistoryEntry[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
@@ -75,20 +74,14 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
 
   const [grantMinutes, setGrantMinutes] = useState("60");
   const [grantNote, setGrantNote] = useState("");
+  // One idempotency key per open Sheet: a double click or retry of the same
+  // grant replays instead of granting twice. A fresh key after success.
+  const [grantKey, setGrantKey] = useState(() => crypto.randomUUID());
 
   const [mode, setMode] = useState<BillingMode>(detail.row.billing_enforcement);
   const [modeNote, setModeNote] = useState(
     detail.row.billing_enforcement === "off" ? detail.beta_notes || "Beta program" : `On-demand (${detail.row.billing_enforcement})`
   );
-
-  useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(ACTOR_STORAGE_KEY);
-      if (saved?.trim()) setActor(saved.trim());
-    } catch {
-      // ignore
-    }
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,15 +99,6 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
     };
   }, [detail.row.id]);
 
-  function persistActor(next: string) {
-    setActor(next);
-    try {
-      sessionStorage.setItem(ACTOR_STORAGE_KEY, next.trim() || "ops");
-    } catch {
-      // ignore
-    }
-  }
-
   function openTask(next: BillingTask) {
     setError(null);
     setStatus(null);
@@ -127,11 +111,11 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
     const res = await fetch("/api/admin/billing", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, actor: actor.trim() || "ops" }),
+      body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setError(json.error || "Request failed");
+      setError(requestErrorText(json));
       return false;
     }
     setStatus(okText);
@@ -149,11 +133,12 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
     const ok = await post(body, okText);
     setBusy(false);
     if (ok) setTask(null);
+    return ok;
   }
 
   async function submitCharging() {
-    const graduating = row.billing_enforcement === "off" && mode !== "off";
-    if (graduating) {
+    if (chargingStep.disabled) return;
+    if (chargingStep.needsConfirm) {
       setTask(null);
       setChargeOpen(true);
       return;
@@ -165,8 +150,26 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
         mode,
         note: modeNote.trim(),
       },
-      `Charging mode → ${chargingModeLabel(mode)}.`
+      `Charging is now ${chargingModeLabel(mode)}.`
     );
+  }
+
+  async function confirmPackage() {
+    setBusy(true);
+    const ok = await post(
+      {
+        action: "assign_package",
+        business_id: row.id,
+        package_id: packageId,
+        period,
+      },
+      `Package is now ${chosenPackage?.name ?? "updated"}.`
+    );
+    setBusy(false);
+    if (ok) {
+      setPackageConfirmOpen(false);
+      setTask(null);
+    }
   }
 
   async function confirmCharge() {
@@ -178,7 +181,7 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
         mode,
         note: modeNote.trim(),
       },
-      `Charging mode → ${chargingModeLabel(mode)}.`
+      `Charging is now ${chargingModeLabel(mode)}.`
     );
     setSavingCharge(false);
     setChargeOpen(false);
@@ -188,6 +191,18 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
   const rates = detail.rates;
   const minutesLine = usedOfIncluded(row.minutesUsed, row.minutesIncluded);
   const nowPackage = `Now ${sub?.packageName || "none"}${sub?.period ? ` / ${sub.period}` : ""}`;
+  const chargingStep = chargingAction(row.billing_enforcement, mode);
+  const chosenPackage = detail.packages.find((p) => p.id === packageId) ?? null;
+  const currentPackage = sub?.packageId ? detail.packages.find((p) => p.id === sub.packageId) ?? null : null;
+  const change = chosenPackage
+    ? packageChange({
+        current: currentPackage ? { ...currentPackage, period: sub?.period ?? null } : null,
+        next: chosenPackage,
+        period,
+        minutesIncluded: row.minutesIncluded,
+        minutesUsed: row.minutesUsed,
+      })
+    : null;
 
   return (
     <div className="space-y-8">
@@ -201,61 +216,51 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
       </div>
 
       {error ? (
-        <p className="text-sm text-warn" role="alert">
+        <p className="text-body text-warn" role="alert">
           {error}
         </p>
       ) : null}
       {status ? (
-        <p className="text-sm text-ok" role="status">
+        <p className="text-body text-ok" role="status">
           {status}
         </p>
       ) : null}
 
-      <label className="block max-w-xs text-sm">
-        Ops actor
-        <input
-          value={actor}
-          onChange={(e) => persistActor(e.target.value)}
-          className={`mt-1 ${deskFieldClass}`}
-          placeholder="your name"
-        />
-      </label>
-
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Package</h2>
-        <p className="mt-1 text-sm text-ink-2">{nowPackage}</p>
+        <p className="mt-1 text-body text-ink-2">{nowPackage}</p>
         <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("package")}>
-          Assign or change
+          {sub?.packageId ? "Change package" : "Assign package"}
         </Button>
       </section>
 
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Usage</h2>
-        <p className="mt-2 text-sm tabular-nums text-ink">
+        <p className="mt-2 text-body tabular-nums text-ink">
           Minutes {minutesLine}
           {sub
             ? ` · SMS ${usedOfIncluded(sub.usage.smsUsed, sub.usage.smsIncluded)} · Email ${usedOfIncluded(sub.usage.emailUsed, sub.usage.emailIncluded)}`
             : null}
         </p>
-        <p className="mt-2 text-sm text-ink-2">
+        <p className="mt-2 text-body text-ink-2">
           On-demand rates (read-only): inbound KES {inboundKesPerMinute(rates.inboundKesPerSecond)}/min,
           outbound KES {outboundKesPerMinute(rates.outboundKesPerSecond)}/min. Owner opted in:{" "}
           {row.on_demand_usage_enabled ? "Yes" : "No"}.
         </p>
-        {sub?.gap ? <p className="mt-2 text-sm text-attention">{sub.gap}</p> : null}
+        {sub?.gap ? <p className="mt-2 text-body text-attention">{sub.gap}</p> : null}
       </section>
 
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Charging</h2>
-        <p className="mt-1 text-sm text-ink-2">{planConsequence(row.billing_enforcement)}</p>
+        <p className="mt-1 text-body text-ink-2">{planConsequence(row.billing_enforcement)}</p>
         <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("charging")}>
           Change charging
         </Button>
       </section>
 
-      <section className="border-b border-line/70 pb-6">
+      <section className="border-b border-hairline/70 pb-6">
         <h2 className="text-title font-medium text-ink">Grant minutes</h2>
-        <p className="mt-1 text-sm text-ink-2">
+        <p className="mt-1 text-body text-ink-2">
           Adds to included minutes for this period.
         </p>
         <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("grant")}>
@@ -266,17 +271,18 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
       <section>
         <h2 className="text-title font-medium text-ink">History</h2>
         {!historyLoaded ? (
-          <p className="mt-2 text-sm text-ink-2">Loading…</p>
+          <p className="mt-2 text-body text-ink-2">Loading…</p>
         ) : history.length === 0 ? (
           <Empty title="No history yet." />
         ) : (
-          <ul className="mt-4 divide-y divide-line/70">
+          <ul className="mt-4 divide-y divide-hairline/70">
             {history.map((entry) => (
-              <li key={entry.id} className={`flex justify-between gap-3 py-2 text-sm ${adminTdClass}`}>
-                <div>
-                  <p className="font-medium text-ink">{entry.summary}</p>
+              <li key={entry.id} className={`flex justify-between gap-3 py-2 text-body ${adminTdClass}`}>
+                <div className="min-w-0">
+                  <p className="font-medium text-ink">{entry.title}</p>
+                  {entry.detail ? <p className="break-words text-ink">{entry.detail}</p> : null}
                   <p className="text-meta text-ink-2">
-                    {new Date(entry.created_at).toLocaleString("en-KE")} · {entry.kind}
+                    {[entry.when, entry.actor].filter(Boolean).join(" · ")}
                   </p>
                 </div>
                 {entry.amount_kes != null ? (
@@ -303,21 +309,14 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
           <Button
             type="button"
             block
-            pending={busy}
-            disabled={!packageId}
-            onClick={() =>
-              void submit(
-                {
-                  action: "assign_package",
-                  business_id: row.id,
-                  package_id: packageId,
-                  period,
-                },
-                "Package updated."
-              )
-            }
+            disabled={!change}
+            onClick={() => {
+              setError(null);
+              setTask(null);
+              setPackageConfirmOpen(true);
+            }}
           >
-            Assign or change
+            Review change
           </Button>
         }
       >
@@ -366,10 +365,10 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
             type="button"
             block
             pending={busy}
-            disabled={modeNote.trim().length < 3}
+            disabled={chargingStep.disabled || modeNote.trim().length < 3}
             onClick={() => void submitCharging()}
           >
-            {mode === "off" ? "Stop charging" : "Save charging mode"}
+            {chargingStep.label}
           </Button>
         }
       >
@@ -416,10 +415,12 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
                   business_id: row.id,
                   minutes: Math.floor(Number(grantMinutes)),
                   note: grantNote.trim(),
-                  idempotency_key: crypto.randomUUID(),
+                  idempotency_key: grantKey,
                 },
                 "Minutes granted."
-              )
+              ).then((ok) => {
+                if (ok) setGrantKey(crypto.randomUUID());
+              })
             }
           >
             Grant minutes
@@ -447,7 +448,7 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
                 {...props}
                 value={grantNote}
                 onChange={(e) => setGrantNote(e.target.value)}
-                placeholder="Beachhead comp, dispute, …"
+                placeholder="Comp for a dropped call"
               />
             )}
           </Field>
@@ -469,6 +470,26 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
           <p>Start on-demand charging for {row.business_name}.</p>
           <p>{planConsequence(mode)}</p>
         </div>
+      </ConfirmSheet>
+
+      <ConfirmSheet
+        open={packageConfirmOpen && Boolean(change)}
+        theme="admin"
+        pending={busy}
+        title={change?.title ?? "Change package?"}
+        confirmLabel={change?.confirmLabel ?? "Change package"}
+        onClose={() => {
+          if (!busy) setPackageConfirmOpen(false);
+        }}
+        onConfirm={() => void confirmPackage()}
+      >
+        <SheetNote error={error} />
+        <p className="pb-3">{row.business_name}</p>
+        <ul className="list-disc space-y-2 pl-5">
+          {change?.lines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
       </ConfirmSheet>
     </div>
   );

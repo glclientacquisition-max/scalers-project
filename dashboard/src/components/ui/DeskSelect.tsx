@@ -75,7 +75,7 @@ export function DeskSelect<T extends string>({
         )}
       >
         <Select.Value
-          className="min-w-0 flex-1 truncate data-[placeholder]:text-ink-soft/70"
+          className="min-w-0 flex-1 truncate data-[placeholder]:text-ink-2"
           placeholder={placeholder || "Select"}
         />
         <Select.Icon className="pointer-events-none shrink-0 text-ink-2">

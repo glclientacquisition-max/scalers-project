@@ -23,7 +23,7 @@ describe("desk control craft", () => {
     assert.match(chrome, /export const btnPrimaryFill/);
     assert.match(chrome, /bg-accent-fill/);
     // Light-mode value stays the AA-passing deep blue; dark flips via the token.
-    assert.match(globals, /--accent-fill: #005ccc/);
+    assert.match(globals, /--accent-fill: var\(--accent\)/); // Frontend 2.0: fill follows the semantic accent token
     assert.match(chrome, /export const btnPrimary/);
     assert.match(chrome, /export const deskHitClass/);
     assert.match(chrome, /export const btnDock/);
@@ -101,9 +101,9 @@ describe("desk control craft", () => {
   });
 
   it("corrects the Desk CTA color in lane prompts", () => {
-    const prompts = read("docs/agents/PROMPTS.md");
+    const prompts = read("docs/reference/lanes/PROMPTS.md");
     assert.doesNotMatch(prompts, /primary CTA #0096FF/);
-    assert.match(prompts, /filled primary CTA `#005CCC`/);
-    assert.match(prompts, /ribbon\/focus\/tab underline `#0096FF`/);
+    assert.match(prompts, /one filled `#005CCC`/);
+    assert.match(prompts, /ribbon\/focus `#0096FF`/);
   });
 });

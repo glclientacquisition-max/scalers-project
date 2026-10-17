@@ -74,6 +74,9 @@ const {
   VOICE_SYSTEM_PROMPT_VERSION,
 } = require('./src/prompts');
 const { createVoiceTrace } = require('./src/speech/voiceTrace');
+const toolSmooth = require('./src/speech/toolSmooth');
+/** VOICE_TOOL_SMOOTH: per-connection heard-audio clock. Empty when the flags are off. */
+const MEDIA_CLOCKS = new WeakMap();
 const voiceTraceBySid = new Map();
 
 function bindVoiceTrace(callSid, trace) {
@@ -121,8 +124,12 @@ function noteTracedGeminiTools(callSid, before, after, results) {
       args: summarizeToolArgs(argsSource),
     });
   }
-  if (after?.consentBlocked || after?.needsVisitTime) {
-    const status = after.consentBlocked ? 'consent_blocked' : 'needs_visit_time';
+  if (after?.consentBlocked || after?.needsVisitTime || after?.fragmentBlocked) {
+    const status = after.consentBlocked
+      ? 'consent_blocked'
+      : after.fragmentBlocked
+        ? 'fragment_turn'
+        : 'needs_visit_time';
     for (const [field, name] of TRACE_TOOL_FIELDS) {
       if (!before?.[field] || seen.has(name)) continue;
       trace.noteTool({
@@ -174,11 +181,21 @@ const { logBrainTrace } = require('./src/conversation/brainObservability');
 const {
   executeBrainTools,
   formatToolConfirmation,
+  brainLinesForResults,
 } = require('./src/conversation/toolExecution');
 const { deriveCallResolution } = require('./src/conversation/callResolution');
+const {
+  planConfirmFileRead,
+  planRejectedCreate,
+  markReaskSpoken,
+  noteRejectedCreate,
+  settleRejectedCreate,
+  reaskSlotLine,
+} = require('./src/conversation/callFixesD199');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
 const {
   schedulePostCallTranscriptReview,
+  sweepUnreviewedCalls,
   toolFlagsFromBrain,
   withSummaryWriteLock,
 } = require('./src/conversation/callTranscriptReview');
@@ -362,7 +379,20 @@ const {
   turnRequestsTool,
 } = require('./src/speech/toolHold');
 const { appendFinalPart, joinUtteranceParts } = require('./src/speech/utteranceJoin');
-const { queueToolOutcome, takeToolOutcome } = require('./src/conversation/toolOutcomeQueue');
+const { queueToolOutcome, takeToolOutcome, peekToolOutcome } = require('./src/conversation/toolOutcomeQueue');
+const {
+  owedConfirmFoldEnabled,
+  foldOwedIntoReply,
+  stripSavedClaimAfterReceipt,
+} = require('./src/speech/owedConfirmFold');
+const {
+  findDuplicateServiceRequest,
+  noteServiceRequestCreated,
+} = require('./src/conversation/requestDedupe');
+const { lineUnavailableResponse } = require('./src/sautikit/inactiveTenantGate');
+const { createClosedLineCalls } = require('./src/sautikit/closedLineCalls');
+const closedLineCalls = createClosedLineCalls();
+const { startLineUnavailableClipRefresh } = require('./src/sautikit/lineUnavailableAudio');
 const { coverageNextStepFor } = require('./src/conversation/coverageNextStep');
 const {
   createSpokenStreamBuffer,
@@ -411,7 +441,8 @@ const {
   extractRecordingFields,
   isRecordingEvent,
 } = require('./src/sautikit/recordingEvents');
-const { fetchCallRecording } = require('./src/sautikit/recordingFetch');
+const { fetchCallRecording, recordingScopeDenied } = require('./src/sautikit/recordingFetch');
+const { finalizeOnceEnabled, finalizeDecision } = require('./src/callFinalizeOnce');
 const {
   summarizeHeaders,
   summarizeBody,
@@ -434,6 +465,7 @@ const {
   appointmentCallerEvent,
   requestCallerEvent,
 } = require('./src/notifications/callerSms');
+const { trustedToolPhone } = require('./src/conversation/callerPhoneGuard');
 const {
   TEXTBACK_META_KEY,
   SUPPRESS_WINDOW_MS,
@@ -988,6 +1020,20 @@ async function attachProviderRecording({
         );
         break;
       }
+      if (fetched.scopeDenied) {
+        // Key cannot read recordings: mark unavailable once, no retry, no noise.
+        for (const sid of ids) {
+          try {
+            await db.mergeCallSummaryMeta({
+              callSid: sid,
+              patch: { recording_status: 'unavailable', recording_unavailable_reason: 'provider_scope' },
+            });
+          } catch {
+            /* best-effort */
+          }
+        }
+        return null;
+      }
       if (fetched.status === 404 || fetched.status === 410) {
         console.warn(
           `[${source}] no provider recording callSid=${id} status=${fetched.status}`
@@ -1033,6 +1079,7 @@ function scheduleRecordingFetch(callSids, source) {
   if (!ids.length) return;
   const key = ids.join('|');
   if (recordingFetchScheduled.has(key)) return;
+  if (recordingScopeDenied()) return;
   recordingFetchScheduled.add(key);
   setTimeout(() => {
     attachProviderRecording({
@@ -1148,6 +1195,20 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
     });
     const summary = deriveCallSummary({ brainState });
     const primaryIntent = summary.primaryIntent || null;
+    if (opts.writeResolution === false) {
+      // Run-once loser: only hand its live turns to the debounced review.
+      const profile = callTenantProfiles.get(callSid) || {};
+      schedulePostCallTranscriptReview({
+        callSid,
+        vertical: profile.vertical || '',
+        derived,
+        summary,
+        toolFlags: toolFlagsFromBrain(brainState, call?.id || null),
+        turns: Array.isArray(opts.turns) ? opts.turns : null,
+        callStatus: opts.callStatus || null,
+      });
+      return null;
+    }
     const saved = await db.setCallResolution({
       callSid,
       resolution: derived.resolution,
@@ -1217,6 +1278,18 @@ async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, s
       durationSeconds: durationSeconds ?? null,
       found: Boolean(updated),
     });
+    const decision = finalizeDecision({
+      enabled: finalizeOnceEnabled(),
+      won: updated?.finalizeWinner,
+      hasTurns: Array.isArray(turns) && turns.length > 0,
+    });
+    if (decision !== 'run') {
+      console.log(`[${source}] finalize skipped ${callSid} (another webhook won) decision=${decision}`);
+      if (decision === 'review_only') {
+        await persistCallResolution(callSid, source, { turns, callStatus: status, writeResolution: false });
+      }
+      return updated;
+    }
     // Best-effort outcome while Brain state may still be in memory.
     await persistCallResolution(callSid, source, { turns, callStatus: status });
     await persistFirstForwardAcceptance(callSid, durationSeconds);
@@ -1335,6 +1408,14 @@ async function handleVoiceIncoming(req, res) {
     // call-set-up (it carries callerNumber/destinationNumber/isActive). Open
     // the stream, persist the call, and let the later Completed event close it.
     const sid = extracted.callSid || callSid;
+    if (closedLineCalls.has(sid, callSid)) {
+      // A closed line (#639) already got line-unavailable + Hangup. Its later
+      // lifecycle webhooks touch nothing: no call row, minutes or alerts.
+      console.log(`[voice/incoming] closed-line call ${sid} lifecycle edge — empty <Response/>`);
+      return res
+        .type('text/xml')
+        .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
     if (shouldSkipMediaStream(callSessionState, req.body, sid)) {
       const transferXml = consumeLiveTransferWebhook({
         callSid: sid,
@@ -1373,6 +1454,20 @@ async function handleVoiceIncoming(req, res) {
     if (telephonyReject) {
       console.warn(`[${callSid}] telephony wallet exhausted — reject`);
       return res.type('text/xml').send(telephonyReject);
+    }
+
+    // An archived or suspended business never takes the call: a short line-
+    // unavailable message and hang up, before Stream and before the call row
+    // (no minutes, no model, no outage alert). Fails open on lookup errors.
+    try {
+      const line = await db.inboundTenantLine({ toNumber, fromNumber });
+      if (line && line.closed === true) {
+        console.warn(`[${callSid}] tenant line closed (${line.reason}) tenant=${line.tenantId} — line unavailable, hang up`);
+        closedLineCalls.remember(sid, callSid, extracted.callSid);
+        return res.type('text/xml').send(await lineUnavailableResponse());
+      }
+    } catch (lineErr) {
+      console.warn('[voice/incoming] tenant line check failed (answering):', lineErr?.message || lineErr);
     }
 
     const preTerminal = detectCallTermination(req.body, callSessionState).terminal;
@@ -1683,6 +1778,12 @@ app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
       );
     }
 
+    if (callSid && closedLineCalls.has(callSid, sidByProviderCallId.get(callSid))) {
+      // Closed line (#639): no call row, no recording fetch, no owner alert.
+      console.log(`[voice/events] closed-line call ${callSid} — ignored`);
+      return;
+    }
+
     const termination = detectCallTermination(body, kind);
     const rec = extractRecordingFields(body);
     const attachSids = resolveAttachCallSids(body, [callSid]);
@@ -1811,6 +1912,8 @@ const OUTBOUND_PCM_FRAME_BYTES = 640;
 
 function sendPcmToMedia(ws, pcm) {
   if (!ws || ws.readyState !== WebSocket.OPEN || !pcm || !pcm.length) return;
+  const mediaClock = MEDIA_CLOCKS.get(ws);
+  if (mediaClock) mediaClock.onSend(pcm.length);
   // Fixed phone gain on the whole utterance. Do not even-out 20 ms frames (pumping).
   const boosted = applyPcmGain(pcm, resolveVoiceProfile().gain);
   // Prefer small frames for smoother playback on the telephony side.
@@ -1831,6 +1934,8 @@ function sendPcmToMedia(ws, pcm) {
  */
 function clearMediaPlayback(ws) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const mediaClock = MEDIA_CLOCKS.get(ws);
+  if (mediaClock) mediaClock.onClear();
   const payloads = [
     { type: 'killAudio' },
     // Compatibility fallbacks seen across forks / Twilio-style bridges.
@@ -2017,6 +2122,18 @@ mediaWss.on('connection', (ws, req) => {
     if (!timing) return null;
     const summary = timing.log(extra);
     callTranscript.stampFromSummary(summary);
+    if (smooth.any) {
+      stopHoldFill();
+      if (smooth.trace && mediaClock) {
+        voiceTrace.noteAudioSegments({
+          segments: mediaClock.segmentsSince(timing.turnStartedAt),
+          holdsQueued,
+          receiptCached: receiptCachedTurn,
+        });
+      }
+      holdsQueued = 0;
+      receiptCachedTurn = false;
+    }
     voiceTrace.commitTurn({
       outcome: extra?.outcome || 'ok',
       latency: summary,
@@ -2089,6 +2206,69 @@ mediaWss.on('connection', (ws, req) => {
   let thinkingAckAtMs = 0;
   // An ack or a hold played on this turn: a tool outcome drops its "Okay." lead.
   let ackPlayedTurn = null;
+  // VOICE_TOOL_SMOOTH (default off): heard-audio clock, cached hold gap-fill, cached receipts.
+  const smooth = toolSmooth.toolSmoothFlags();
+  const mediaClock = smooth.trace || smooth.hold ? toolSmooth.createMediaClock() : null;
+  if (mediaClock) MEDIA_CLOCKS.set(ws, mediaClock);
+  let holdFillTimer = null;
+  let holdsQueued = 0;
+  /** Filler text this turn: the hold pack skips it (ack rule plays "Naangalia." on tool turns). */
+  let turnFillerText = '';
+  let receiptCachedTurn = false;
+  function stopHoldFill() {
+    if (holdFillTimer) clearInterval(holdFillTimer);
+    holdFillTimer = null;
+  }
+  // Items 1-2: while the tool runs, queue a cached same-voice hold line just before
+  // the queued audio (ack/filler) runs out. Cached only: never a live-TTS seam.
+  function holdLinesForTurn() {
+    return toolSmooth.holdFillLines(callLanguage).filter((l) => l !== turnFillerText);
+  }
+  function lookupHoldPcm(line) {
+    return lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
+  }
+  /** Returns false when the first hold line is not cached (caller falls back to live hold). */
+  function startHoldFill() {
+    if (!mediaClock || holdFillTimer) return Boolean(holdFillTimer);
+    const first = holdLinesForTurn()[0];
+    if (!isFillerCacheEnabled() || !lookupHoldPcm(first).pcm) {
+      console.log(`[ws/media][${sidLabel()}] tool-smooth hold miss (not warmed), live hold: ${first}`);
+      return false;
+    }
+    const turnAtStart = activeTurnTiming;
+    holdFillTimer = setInterval(() => {
+      if (!turnBusy || bargeInActive || activeTurnTiming !== turnAtStart || ttsSpeedScale !== 1) return stopHoldFill();
+      if (!toolSmooth.shouldQueueHold({ toolPending: true, remainingMs: mediaClock.remainingMs(), played: holdsQueued })) {
+        if (holdsQueued >= toolSmooth.HOLD_MAX) stopHoldFill();
+        return;
+      }
+      const line = holdLinesForTurn()[holdsQueued];
+      if (!line) return stopHoldFill();
+      const found = lookupHoldPcm(line);
+      if (!found.pcm) {
+        console.log(`[ws/media][${sidLabel()}] tool-smooth hold miss n=${holdsQueued}: ${line}`);
+        return stopHoldFill();
+      }
+      holdsQueued += 1;
+      ackPlayedTurn = activeTurnTiming;
+      voiceTrace.noteFiller({ text: line, before: line, language: callLanguage });
+      console.log(`[ws/media][${sidLabel()}] tool-smooth hold queued n=${holdsQueued} remaining=${mediaClock.remainingMs()}ms: ${line}`);
+      mediaClock.tag('hold');
+      sendPcmToMedia(ws, found.pcm);
+      mediaClock.tag('tts');
+    }, 40);
+    return true;
+  }
+  // Item 3: a receipt already rendered at call start plays with no TTS start-up seam.
+  function playCachedReceipt(line) {
+    if (!isFillerCacheEnabled() || ttsSpeedScale !== 1) return null;
+    const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
+    if (!found.pcm) return null;
+    receiptCachedTurn = true;
+    voiceTrace.noteTts({ text: found.prepared.text, before: String(line), language: found.prepared.language });
+    console.log(`[ws/media][${sidLabel()}] tool-smooth receipt cached bytes=${found.pcm.length}: ${line}`);
+    return playCachedFillerPcm(found.pcm, { text: line, trace: false, kind: 'receipt' });
+  }
   /** Rolling interim hypothesis while agent is busy (for barge-in). */
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
@@ -2273,7 +2453,7 @@ mediaWss.on('connection', (ws, req) => {
     return waitMs;
   }
 
-  async function playCachedFillerPcm(pcm, { text, trace = true } = {}) {
+  async function playCachedFillerPcm(pcm, { text, trace = true, kind = 'filler' } = {}) {
     if (!pcm || !pcm.length) return { ok: false, empty: true };
     const streamId = newCachedFillerStreamId();
     bargeInActive = false;
@@ -2288,7 +2468,9 @@ mediaWss.on('connection', (ws, req) => {
     if (trace) {
       voiceTrace.noteFiller({ text: String(text || ''), before: String(text || ''), language: callLanguage });
     }
+    if (mediaClock) mediaClock.tag(kind);
     if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
+    if (mediaClock) mediaClock.tag('tts');
     const waitMs = pcmDurationMs(pcm, 16000);
     await sleep(waitMs);
     if (activePlaybackGeneration === gen) {
@@ -2490,6 +2672,10 @@ mediaWss.on('connection', (ws, req) => {
 
   async function speakToolHold(spoken) {
     if (!spoken?.speak || bargeInActive) return;
+    if (smooth.hold && spoken.kind === 'hold' && mediaClock) {
+      if (startHoldFill()) return;
+      // Cache miss: fall through to the live hold line below (never silent).
+    }
     if (
       spoken.kind === 'hold' &&
       thinkingAckTurn &&
@@ -2673,6 +2859,7 @@ mediaWss.on('connection', (ws, req) => {
 
   function cancelSpeech(reason) {
     voiceTrace.noteBarge({ reason: String(reason || '') });
+    if (smooth.any) stopHoldFill();
     const endingGen = activePlaybackGeneration;
     clearFillerTimer();
     idleNudge.clear();
@@ -3134,18 +3321,38 @@ mediaWss.on('connection', (ws, req) => {
       }
       // A booking or callback confirmed after a barge-in is still owed.
       // Speak it first, before a local fact or the model reply.
-      const owedOutcome = takeToolOutcome(brainState);
-      if (owedOutcome) {
-        callBrainStates.set(callKey, brainState);
-        console.log(`[ws/media][${callKey}] speaking queued tool outcome`);
-        callTranscript.pushAgent(owedOutcome);
-        const owedSpoken = await speakText(owedOutcome);
-        if (owedSpoken?.ok) {
-          messages.push({ role: 'assistant', content: owedOutcome, local: true });
-        } else {
-          queueToolOutcome(brainState, owedOutcome);
+      // VOICE_OWED_CONFIRM_FOLD=on folds it into the next reply as one line
+      // (HD_0daf1d0fd631 / HD_9c1864aacd5f doubled acknowledgements).
+      let owedReceiptForFold = '';
+      if (owedConfirmFoldEnabled()) {
+        owedReceiptForFold = peekToolOutcome(brainState);
+      } else {
+        const owedOutcome = takeToolOutcome(brainState);
+        if (owedOutcome) {
           callBrainStates.set(callKey, brainState);
+          console.log(`[ws/media][${callKey}] speaking queued tool outcome`);
+          callTranscript.pushAgent(owedOutcome);
+          const owedSpoken = await speakText(owedOutcome);
+          if (owedSpoken?.ok) {
+            messages.push({ role: 'assistant', content: owedOutcome, local: true });
+          } else {
+            queueToolOutcome(brainState, owedOutcome);
+            callBrainStates.set(callKey, brainState);
+          }
         }
+      }
+      function consumeOwedFold(replyLines) {
+        if (!owedConfirmFoldEnabled() || !owedReceiptForFold) {
+          return { lines: replyLines, folded: false };
+        }
+        const folded = foldOwedIntoReply(owedReceiptForFold, replyLines);
+        takeToolOutcome(brainState);
+        callBrainStates.set(callKey, brainState);
+        owedReceiptForFold = '';
+        if (folded.folded) {
+          console.log(`[ws/media][${callKey}] folded queued tool outcome into reply`);
+        }
+        return folded;
       }
       const slotsBeforeReply = slotRows(brainState);
       const localReply = resolveLocalReply({
@@ -3229,6 +3436,57 @@ mediaWss.on('connection', (ws, req) => {
       }
       const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
       const nameJustConfirmed = brainState?.caller?.nameJustConfirmed === true;
+      // BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 8): "Yeah" to the name ask
+      // after "About my booking": visit_open first, before any other content.
+      const confirmRead = nameJustConfirmed
+        ? planConfirmFileRead(brainState, { language: callLanguage, now: new Date() })
+        : null;
+      if (confirmRead?.line) {
+        callBrainStates.set(callKey, brainState);
+        console.log(`[ws/media][${callKey}] confirm read before model: ${confirmRead.line}`);
+        voiceTrace.noteBrainLines(confirmRead.lines);
+        bargeInActive = false;
+        suppressReplyRemainder = false;
+        callTranscript.pushAgent(confirmRead.line);
+        turnTiming.markFirstSpokenChunk();
+        await speakText(confirmRead.line, { tracePath: 'visit_read' });
+        spokeThisTurn = true;
+        return;
+      }
+      // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): a create the guard
+      // rejected is never left silent. Re-ask the slot once (reask_slot); the
+      // slot came in: save it; re-ask unanswered or a closing: save a callback.
+      const rescue = planRejectedCreate(brainState, { language: callLanguage, text: clean });
+      if (rescue && !(rescue.kind === 'reask' && !nameGate.runModel && fileNameAsk && !nameJustConfirmed)) {
+        if (rescue.kind === 'reask') {
+          markReaskSpoken(brainState);
+          callBrainStates.set(callKey, brainState);
+          console.log(`[ws/media][${callKey}] rejected create re-ask before model: ${rescue.line}`);
+          voiceTrace.noteBrainLines(rescue.lines);
+          bargeInActive = false;
+          suppressReplyRemainder = false;
+          callTranscript.pushAgent(rescue.line);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(rescue.line);
+          spokeThisTurn = true;
+          return;
+        }
+        callBrainStates.set(callKey, brainState);
+        const rescued = await applyGeminiTools(callKey, rescue.parsed);
+        const rescueLine = formatToolConfirmation(rescued?.results || [], callLanguage);
+        console.log(`[ws/media][${callKey}] rejected create ${rescue.kind}: ${rescueLine}`);
+        voiceTrace.noteBrainLines(brainLinesForResults(rescued?.results || [], callLanguage).lines);
+        if (rescueLine) {
+          bargeInActive = false;
+          suppressReplyRemainder = false;
+          callTranscript.pushAgent(rescueLine);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(rescueLine);
+          spokeThisTurn = true;
+          return;
+        }
+        brainState = callBrainStates.get(callKey) || brainState;
+      }
       const askingName = !nameGate.runModel && Boolean(fileNameAsk) && !nameJustConfirmed;
       const endClose = planBrainEndClose({
         action: nextBestAction.action,
@@ -3320,7 +3578,8 @@ mediaWss.on('connection', (ws, req) => {
         }
         bargeInActive = false;
         suppressReplyRemainder = false;
-        for (const line of planned.lines) {
+        const plannedFold = consumeOwedFold(planned.lines);
+        for (const line of plannedFold.lines) {
           callTranscript.pushAgent(line);
           turnTiming.markFirstSpokenChunk();
           const nameAsk = askingName && line === fileNameAsk;
@@ -3397,6 +3656,9 @@ mediaWss.on('connection', (ws, req) => {
         openVisits: brainState?.returning?.openVisits,
         appointments: visitAppointments,
         cursor: brainState?.conversation?.visitReview || null,
+        // BRAIN_CALL_FIXES_D199: requests with visits; code file answers.
+        openRequests: brainState?.returning?.openRequests,
+        fileState: brainState,
       });
       if (visitRead.runModel === false && visitRead.line) {
         if (!brainState.conversation || typeof brainState.conversation !== 'object') {
@@ -3405,6 +3667,7 @@ mediaWss.on('connection', (ws, req) => {
         brainState.conversation.visitReview = visitRead.cursor;
         callBrainStates.set(callKey, brainState);
         console.log(`[ws/media][${callKey}] visit read before model: ${visitRead.line}`);
+        if (Array.isArray(visitRead.lines)) voiceTrace.noteBrainLines(visitRead.lines);
         bargeInActive = false;
         suppressReplyRemainder = false;
         callTranscript.pushAgent(visitRead.line);
@@ -3471,6 +3734,7 @@ mediaWss.on('connection', (ws, req) => {
         fillerMode === 'ack' || fillerMode === 'auto'
           ? pickContextualAck(clean, fillerLanguage(callLanguage))
           : process.env.VOICE_FILLER;
+      if (smooth.hold) turnFillerText = fillerText || '';
       let fillerStarted = false;
       let firstSpokenChunk = false;
 
@@ -3529,6 +3793,7 @@ mediaWss.on('connection', (ws, req) => {
 
       function stopFillerForReply() {
         clearFillerTimer();
+        if (smooth.any) stopHoldFill();
         if (!fillerStarted) return;
         fillerStarted = false;
         // Drop filler PCM via generation bump + cancel ONLY the filler stream.
@@ -4044,23 +4309,44 @@ mediaWss.on('connection', (ws, req) => {
         }
       }
 
+      // BRAIN_CALL_FIXES_D199: the fact lines behind this reply (trace brain.lines[]).
+      if (Array.isArray(result?.brainLines) && result.brainLines.length) {
+        voiceTrace.noteBrainLines(result.brainLines);
+      }
       if (result?.actionConfirmation && !bargeInActive) {
-        const confirmation = String(result.actionConfirmation).trim();
+        let confirmation = String(result.actionConfirmation).trim();
+        if (owedConfirmFoldEnabled() && owedReceiptForFold) {
+          const folded = consumeOwedFold([confirmation]);
+          confirmation = folded.lines.join(' ').trim();
+        } else if (owedConfirmFoldEnabled() && !owedReceiptForFold) {
+          // Receipt already folded into an earlier line this turn: drop a second claim.
+          confirmation = stripSavedClaimAfterReceipt(confirmation);
+        }
         const lookupSpoken = spokenChunks.join(' ').trim();
         // The lookup sentence is already on the stream. Do not speakText it.
         const alreadySaid =
           /take a message|nitachukua ujumbe/i.test(lookupSpoken) &&
           /take a message|nitachukua ujumbe/i.test(confirmation);
-        if (!(spokeLookupSentence && confirmation === lookupSpoken) && !alreadySaid) {
+        if (confirmation && !(spokeLookupSentence && confirmation === lookupSpoken) && !alreadySaid) {
           await actionProgressSpeak;
           // "Alright." already played: say "They'll call you back.", not
           // "Okay. They'll call you back." (HD_4d6ac592aeb3 t4).
-          const outcomeLine = trimAckLead(result.actionConfirmation, {
+          const outcomeLine = trimAckLead(confirmation, {
             acked: ackPlayedTurn === turnTiming,
           });
           callTranscript.pushAgent(outcomeLine);
-          await speakText(outcomeLine);
+          if (smooth.any) stopHoldFill();
+          await ((smooth.receipt && playCachedReceipt(outcomeLine)) || speakText(outcomeLine));
           spokeThisTurn = true;
+        }
+      } else if (owedConfirmFoldEnabled() && owedReceiptForFold && !bargeInActive) {
+        // No model confirmation this turn: still deliver the owed receipt once.
+        const folded = consumeOwedFold([]);
+        for (const line of folded.lines) {
+          callTranscript.pushAgent(line);
+          await speakText(line);
+          spokeThisTurn = true;
+          messages.push({ role: 'assistant', content: line, local: true });
         }
       }
 
@@ -4687,6 +4973,19 @@ mediaWss.on('connection', (ws, req) => {
                 `[ws/media][${sidLabel()}] filler pcm warmed n=${result.warmed}`
               );
             }
+            // Item 4: hold + common receipt packs, same voice x lang x speed key.
+            if (!smooth.prefetch) return null;
+            return warmFillerAckPcm({
+              tts,
+              voiceId: tenantSonioxVoiceId,
+              extraLexicon: ttsLexiconOverrides,
+              phrases: toolSmooth.warmPhrases(callLanguage),
+              // Pause while a turn is live instead of aborting (77ce8123: C1 warmed 0, C2 5/16).
+              waitWhile: () => turnBusy,
+              shouldAbort: () => speechOutageStarted || !tts,
+            }).then((r) => {
+              if (r?.warmed) console.log(`[ws/media][${sidLabel()}] tool-smooth pcm warmed n=${r.warmed}`);
+            });
           })
           .catch(() => {});
       }
@@ -4877,6 +5176,14 @@ const mediaKeepalive = setInterval(() => {
 }, 15000);
 
 mediaWss.on('close', () => clearInterval(mediaKeepalive));
+
+// Daily data-quality snapshot (no pg_cron on our projects). Service role only.
+try {
+  const { supabase: dqClient } = require('./src/lib/supabaseClient');
+  if (dqClient) require('./src/lib/dataQualityDaily').startDataQualityDaily({ rpc: (fn) => dqClient.rpc(fn) });
+} catch (err) {
+  console.warn('[data-quality] not started:', err?.message || err);
+}
 
 // ---------------------------------------------------------------------------
 // Owner lead notification (Telegram interim; WhatsApp when Business is linked).
@@ -5600,6 +5907,9 @@ wss.on('connection', (ws) => {
           openVisits: brainState?.returning?.openVisits,
           appointments: promptAppointments,
           cursor: brainState?.conversation?.visitReview || null,
+          // BRAIN_CALL_FIXES_D199: requests with visits; code file answers.
+          openRequests: brainState?.returning?.openRequests,
+          fileState: brainState,
         });
         if (promptVisitRead.runModel === false && promptVisitRead.line) {
           if (!brainState.conversation || typeof brainState.conversation !== 'object') {
@@ -5782,9 +6092,9 @@ async function applyGeminiTools(callSid, parsed) {
     state,
     capabilities
   );
-  if (enforcedParsed.consentBlocked || enforcedParsed.needsVisitTime) {
+  if (enforcedParsed.consentBlocked || enforcedParsed.needsVisitTime || enforcedParsed.fragmentBlocked) {
     console.log(
-      `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : 'needs_visit_time'}`
+      `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : enforcedParsed.fragmentBlocked ? 'fragment_turn' : 'needs_visit_time'}`
     );
   }
   const execution = await executeBrainTools({
@@ -5812,21 +6122,41 @@ async function applyGeminiTools(callSid, parsed) {
     fieldMeta: groundedProfile.fieldMeta || null,
     handlers: {
       createServiceRequest: async (request) => {
+        if (owedConfirmFoldEnabled()) {
+          const dup = findDuplicateServiceRequest(state, request);
+          if (dup) {
+            console.log(
+              `[${callSid}] service_request deduped id=${dup.id || 'unknown'} type=${request.type || ''}`
+            );
+            return { ...dup, deduped: true };
+          }
+        }
         const created = await db.createServiceRequest({
           callSid,
           type: request.type,
           name: request.name || parsed.name,
-          phone: request.phone,
+          phone: trustedToolPhone(request.phone, state.caller?.phone),
           item: request.item,
           quantity: request.quantity,
           whenText: request.whenText,
           notes: request.notes || parsed.reason,
         });
         if (created) {
+          if (owedConfirmFoldEnabled()) {
+            noteServiceRequestCreated(state, request, created);
+          }
           console.log(
             `[${callSid}] service_request created id=${created.id} type=${created.request_type}`
           );
-          maybeSendServiceRequestNotification(callSid, created).catch((err) => {
+          const fixesD199 = require('./src/conversation/callFixesD199');
+          const alertRow = fixesD199.callFixesD199Enabled()
+            ? {
+                ...created,
+                caller_name:
+                  fixesD199.alertCallerName({ state, rowName: created.caller_name }) || null,
+              }
+            : created;
+          maybeSendServiceRequestNotification(callSid, alertRow).catch((err) => {
             console.error(`[${callSid}] service request notify error:`, err?.message || err);
           });
         }
@@ -5837,7 +6167,7 @@ async function applyGeminiTools(callSid, parsed) {
           id: request.id,
           type: request.type,
           name: request.name || parsed.name,
-          phone: request.phone,
+          phone: trustedToolPhone(request.phone, state.caller?.phone),
           item: request.item,
           quantity: request.quantity,
           whenText: request.whenText,
@@ -5855,7 +6185,7 @@ async function applyGeminiTools(callSid, parsed) {
           callSid,
           serviceName: appointment.serviceName,
           name: appointment.name || parsed.name,
-          phone: appointment.phone,
+          phone: trustedToolPhone(appointment.phone, state.caller?.phone),
           whenText: appointment.whenText,
           landmark: appointment.landmark,
           notes: appointment.notes || parsed.reason,
@@ -5866,17 +6196,40 @@ async function applyGeminiTools(callSid, parsed) {
           console.log(
             `[${callSid}] appointment created id=${created.id} service=${created.service_name}`
           );
-          maybeSendAppointmentNotification(callSid, created, 'created').catch((err) => {
+          const fixesD199 = require('./src/conversation/callFixesD199');
+          const alertRow = fixesD199.callFixesD199Enabled()
+            ? {
+                ...created,
+                caller_name:
+                  fixesD199.alertCallerName({ state, rowName: created.caller_name }) || null,
+              }
+            : created;
+          maybeSendAppointmentNotification(callSid, alertRow, 'created').catch((err) => {
             console.error(`[${callSid}] appointment notify error:`, err?.message || err);
           });
         }
         return created;
       },
       updateAppointment: async (appointment) => {
+        // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 1): the row and the VISIT
+        // UPDATED alert carry the code-held confirmed name, never the junk
+        // name an older call saved on the row ("Caller: like").
+        const fixesD199 = require('./src/conversation/callFixesD199');
+        const heldName = fixesD199.callFixesD199Enabled()
+          ? fixesD199.alertCallerName({ state })
+          : '';
         const updated = await db.updateAppointment({
           callSid,
+          ...(heldName
+            ? {
+                callerName: heldName,
+                // Only a junk row name ("like") is replaced, never a real one.
+                replaceCallerName: (rowName) =>
+                  !fixesD199.alertCallerName({ state: { caller: {} }, rowName }),
+              }
+            : {}),
           appointmentId: appointment.appointmentId,
-          phone: appointment.phone,
+          phone: trustedToolPhone(appointment.phone, state.caller?.phone),
           status: appointment.status,
           whenText: appointment.whenText,
           landmark: appointment.landmark,
@@ -5889,7 +6242,14 @@ async function applyGeminiTools(callSid, parsed) {
           console.log(
             `[${callSid}] appointment updated id=${updated.id} status=${updated.status}`
           );
-          maybeSendAppointmentNotification(callSid, updated, 'updated').catch((err) => {
+          const alertRow = fixesD199.callFixesD199Enabled()
+            ? {
+                ...updated,
+                caller_name:
+                  fixesD199.alertCallerName({ state, rowName: updated.caller_name }) || null,
+              }
+            : updated;
+          maybeSendAppointmentNotification(callSid, alertRow, 'updated').catch((err) => {
             console.error(`[${callSid}] appointment update notify error:`, err?.message || err);
           });
         }
@@ -5917,7 +6277,41 @@ async function applyGeminiTools(callSid, parsed) {
     });
   }
 
+  if (enforcedParsed.fragmentBlocked) {
+    // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 6): no write on a cut-off
+    // turn; the ask_need line asks what they need.
+    const ask = require('./src/conversation/callFixesD199').askNeedLine(
+      state.language?.current || 'en'
+    );
+    execution.results.unshift({
+      action: 'create_service_request',
+      status: 'blocked',
+      code: 'fragment_turn',
+      reason: 'The caller had not said what they need.',
+      askLine: ask.line,
+      askLines: ask.lines,
+    });
+  }
   let updatedState = recordActionResults(state, execution.results);
+  // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): hold a rejected create until it
+  // is re-asked and saved, or saved as a callback. The invalid result carries
+  // the reask_slot line ("Saa nane usiku au saa nane mchana?").
+  settleRejectedCreate(updatedState, execution.results);
+  if (enforcedParsed.needsVisitTime) {
+    const held = noteRejectedCreate(updatedState, {
+      slot: 'when',
+      whenText: String(enforcedParsed.needsVisitTime),
+      appointment: enforcedParsed.rejectedAppointment || null,
+    });
+    if (held) {
+      const reask = reaskSlotLine(updatedState, updatedState.language?.current || 'en');
+      const invalid = execution.results.find((r) => r.code === 'unparsed_when' && r.status === 'invalid');
+      if (invalid && reask?.line) {
+        invalid.reaskLine = reask.line;
+        invalid.reaskLines = reask.lines;
+      }
+    }
+  }
   if (execution.shouldEndCall) {
     updatedState = setNextBestAction(updatedState, {
       action: 'END',
@@ -6210,6 +6604,11 @@ async function runGeminiTurnStreaming(
   // the caller is still owed it on the next one (toolOutcomeQueue).
   const bargedActionConfirmation = heldTools.toolHoldCancelled ? actionConfirmation : '';
   if (heldTools.toolHoldCancelled) actionConfirmation = '';
+  // BRAIN_CALL_FIXES_D199: fact lines behind the confirmation (trace brain.lines[]).
+  let brainLines = brainLinesForResults(
+    execution.results,
+    callBrainStates.get(callSid)?.language?.current || 'en'
+  ).lines;
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({
@@ -6220,6 +6619,14 @@ async function runGeminiTurnStreaming(
     }),
     finalSpeechGuardOpts(callSid, execution.results)
   );
+  // BRAIN_CALL_FIXES_D199: lines the speech guard put in (confirm_identity_first).
+  {
+    const conv = callBrainStates.get(callSid)?.conversation;
+    if (conv && Array.isArray(conv.pendingBrainLines) && conv.pendingBrainLines.length) {
+      brainLines = [...brainLines, ...conv.pendingBrainLines];
+      conv.pendingBrainLines = [];
+    }
+  }
 
   const geminiParts = modelPartsForHistory({
     geminiParts: modelParts,
@@ -6240,6 +6647,7 @@ async function runGeminiTurnStreaming(
     model,
     actionConfirmation,
     bargedActionConfirmation,
+    brainLines,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
     streamed: !streamFailed,
@@ -6326,6 +6734,11 @@ async function runGeminiTurn(
   // the caller is still owed it on the next one (toolOutcomeQueue).
   const bargedActionConfirmation = heldTools.toolHoldCancelled ? actionConfirmation : '';
   if (heldTools.toolHoldCancelled) actionConfirmation = '';
+  // BRAIN_CALL_FIXES_D199: fact lines behind the confirmation (trace brain.lines[]).
+  let brainLines = brainLinesForResults(
+    execution.results,
+    callBrainStates.get(callSid)?.language?.current || 'en'
+  ).lines;
   const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({
@@ -6336,6 +6749,14 @@ async function runGeminiTurn(
     }),
     finalSpeechGuardOpts(callSid, execution.results)
   );
+  // BRAIN_CALL_FIXES_D199: lines the speech guard put in (confirm_identity_first).
+  {
+    const conv = callBrainStates.get(callSid)?.conversation;
+    if (conv && Array.isArray(conv.pendingBrainLines) && conv.pendingBrainLines.length) {
+      brainLines = [...brainLines, ...conv.pendingBrainLines];
+      conv.pendingBrainLines = [];
+    }
+  }
 
   const thoughtSignature = extractThoughtSignature(response) || undefined;
   messages.push({
@@ -6357,13 +6778,61 @@ async function runGeminiTurn(
     model,
     actionConfirmation,
     bargedActionConfirmation,
+    brainLines,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
   };
 }
 
+/**
+ * Retry recording copies marked pending_copy: ask SautiKit for a fresh presigned
+ * URL (the stored one may have expired) and copy once more, no long backoff.
+ */
+async function sweepPendingRecordingCopies({ limit = 10 } = {}) {
+  const rows = await db.listPendingRecordingCopies({ limit });
+  let copied = 0;
+  for (const row of rows) {
+    const callSid = row.sautikit_call_sid;
+    if (!callSid) continue;
+    try {
+      const fetched = await fetchCallRecording(callSid);
+      const url = fetched.downloadUrl || row.recording_url;
+      if (!url) continue;
+      const result = await db.copyRecordingToStorage({ callSid, url, delays: [], fromSweep: true });
+      if (result?.ok) copied += 1;
+    } catch (err) {
+      console.warn(`[recording-sweep] ${callSid} failed:`, err?.message || err);
+    }
+  }
+  if (rows.length) console.log(`[recording-sweep] pending ${rows.length}, copied ${copied}`);
+}
+
+/**
+ * Catch up post-call reviews lost to a restart, deploy or model timeout, from the
+ * stored transcript. Off with POST_CALL_REVIEW_SWEEP=off; never in tests.
+ */
+function startReviewSweep() {
+  const flag = String(process.env.POST_CALL_REVIEW_SWEEP || 'on').toLowerCase();
+  if (['off', '0', 'false', 'no'].includes(flag) || process.env.NODE_ENV === 'test') return;
+  let running = false;
+  const tick = () => {
+    if (running) return;
+    running = true;
+    sweepUnreviewedCalls()
+      .catch((err) => console.warn('[review-sweep] failed:', err?.message || err))
+      .then(() => sweepPendingRecordingCopies())
+      .catch((err) => console.warn('[recording-sweep] failed:', err?.message || err))
+      .finally(() => {
+        running = false;
+      });
+  };
+  setTimeout(tick, 60_000).unref?.();
+  setInterval(tick, 10 * 60_000).unref?.();
+}
+
 server.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);
+  startReviewSweep();
   console.log(`📞 Voice webhook: POST /voice/incoming (SautiKit XML Stream → /ws/media)`);
   console.log(`📡 Media WebSocket: /ws/media (Host-based wss URL for Localtunnel)`);
   if (PUBLIC_BASE_URL) {
@@ -6451,6 +6920,11 @@ server.listen(PORT, () => {
   if (process.env.SAUTIKIT_API_KEY) {
     startTelephonyWalletProbe();
     console.log(`✓ Telephony wallet probe scheduled (VOICE_TELEPHONY_WALLET_PROBE_MS)`);
+  }
+  // Line-unavailable clips for closed lines (#639): upload to SautiKit and
+  // keep the 7-day signed URLs fresh. No key/scope or no table: one warn, <Say>.
+  if (startLineUnavailableClipRefresh()) {
+    console.log(`✓ Line-unavailable clip refresh scheduled (VOICE_LINE_UNAVAILABLE_REFRESH_MS)`);
   }
   if (String(process.env.VOICE_PLATFORM_OPS_DRY_RUN || '').toLowerCase() === 'true') {
     console.log(`ℹ Platform ops alerts in DRY_RUN (log only)`);

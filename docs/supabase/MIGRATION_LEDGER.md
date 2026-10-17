@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-10-11
+---
+
 # Migration ledger
 
 **Status:** Authoritative index (hardened Phase 3F, 2026-08-15)  
@@ -163,7 +168,7 @@ Every database change merged to `main` must add a row to the **Change registry**
 ### Process
 
 1. Author SQL in `docs/supabase/<name>.sql` with `-- Run after:` header.
-2. Update [`README.md`](./README.md) and [`DATABASE_APPLY_ORDER.md`](../database/DATABASE_APPLY_ORDER.md) if order changes.
+2. Update [`README.md`](./README.md) and [`DATABASE_APPLY_ORDER.md`](../how-to/DATABASE_APPLY_ORDER.md) if order changes.
 3. Add ledger row before or with merge PR.
 4. After staging apply: set `staging_applied = YES`, date, verification notes.
 5. After production apply (human-approved): set `production_applied = YES`, date, executor.
@@ -280,6 +285,12 @@ CLI version timestamps are **INFERRED** from version string `YYYYMMDDHHMMSS` (UT
 
 ## Related documents
 
-- [`DATABASE_EVOLUTION.md`](../database/DATABASE_EVOLUTION.md)
-- [`DATABASE_APPLY_ORDER.md`](../database/DATABASE_APPLY_ORDER.md)
-- [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../operations/STAGING_REBUILD_EXECUTION_REPORT.md)
+- [`DATABASE_EVOLUTION.md`](../explanation/database/DATABASE_EVOLUTION.md)
+- [`DATABASE_APPLY_ORDER.md`](../how-to/DATABASE_APPLY_ORDER.md)
+- [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../archive/STAGING_REBUILD_EXECUTION_REPORT.md)
+
+## Pending (not applied): team invites
+
+| File | Purpose | Status |
+| --- | --- | --- |
+| `supabase/migrations/20261011000000_team_invites.sql` | Roles owner/admin/staff/viewer (member→staff), one owner per tenant, `tenant_invites`, `tenant_member_audit`, seat/invite/accept/transfer RPCs, restrictive RLS (owner/admin settings; viewer read-only), signup trigger skips invitees. | **Not applied.** Staging first. App flag `TEAM_INVITES_ENABLED` default off. Re-check `handle_new_user_tenant` body against production before applying. |

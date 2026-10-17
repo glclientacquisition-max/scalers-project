@@ -375,7 +375,7 @@ export function infraFromEnv(env: {
   return [
     {
       id: "railway",
-      title: "Railway",
+      title: "Voice service",
       tone: env.voiceReachable === true ? "ok" : env.voiceReachable === false ? "attention" : "neutral",
       label: env.voiceReachable === true ? "OK" : env.voiceReachable === false ? "Unreachable" : "Unknown",
       detail:
@@ -387,7 +387,7 @@ export function infraFromEnv(env: {
     },
     {
       id: "vercel",
-      title: "Vercel",
+      title: "Desk host",
       tone: "neutral",
       label: env.vercelEnv ? "Host set" : "Unknown",
       detail: env.vercelEnv
@@ -396,7 +396,7 @@ export function infraFromEnv(env: {
     },
     {
       id: "supabase",
-      title: "Supabase",
+      title: "Database",
       tone: supabaseSet ? "neutral" : "neutral",
       label: supabaseSet ? "URL set" : "Unknown",
       detail: supabaseSet

@@ -29,7 +29,7 @@ export function ContactTimelineWhat({
       {open ? (
         <>
           <p className="font-medium text-ink">{headline}</p>
-          <p className="mt-0.5 text-ink-soft">{extra}</p>
+          <p className="mt-0.5 text-ink-2">{extra}</p>
         </>
       ) : (
         <p className={`font-medium text-ink ${deskPreviewClass}`}>{headline}</p>

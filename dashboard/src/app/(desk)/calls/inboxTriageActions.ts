@@ -1,5 +1,7 @@
 "use server";
 
+import { memberDenied } from "@/lib/requireMember";
+
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import {
@@ -70,6 +72,8 @@ export async function inboxToggleRead(
   callId: string,
   unread: boolean
 ): Promise<InboxTriageResult> {
+  const denied = await memberDenied("inbox.view");
+  if (denied) return denied;
   return writeInboxTriage(callId, {
     inbox_read_at: unread ? new Date().toISOString() : null,
   });
@@ -77,6 +81,8 @@ export async function inboxToggleRead(
 
 /** Stamp `inbox_read_at` when the owner opens `/calls/[id]`. Clears the unread dot, not Needs you. */
 export async function inboxMarkSeen(callId: string): Promise<InboxTriageResult> {
+  const denied = await memberDenied("inbox.view");
+  if (denied) return denied;
   return writeInboxTriage(
     callId,
     { inbox_read_at: new Date().toISOString() },
@@ -88,6 +94,8 @@ export async function inboxToggleMute(
   callId: string,
   muted: boolean
 ): Promise<InboxTriageResult> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   return writeInboxTriage(callId, { inbox_muted: !muted });
 }
 
@@ -95,6 +103,8 @@ export async function inboxTogglePin(
   callId: string,
   pinnedAt: string | null
 ): Promise<InboxTriageResult> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   return writeInboxTriage(callId, {
     inbox_pinned_at: pinnedAt ? null : new Date().toISOString(),
   });
@@ -104,6 +114,8 @@ export async function inboxAssignTeammate(
   callId: string,
   assignee: string
 ): Promise<InboxTriageResult> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -134,6 +146,8 @@ export async function inboxAddLabel(
   callId: string,
   label: string
 ): Promise<InboxTriageResult> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   const ctx = await loadWorkspace();
   if (!ctx) return { error: "Not signed in." };
 
@@ -173,6 +187,8 @@ export async function inboxAddLabel(
 }
 
 export async function inboxSnooze(callId: string): Promise<InboxTriageResult> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return denied;
   return writeInboxTriage(callId, {
     inbox_snoozed_until: inboxSnoozeUntilIso(),
   });

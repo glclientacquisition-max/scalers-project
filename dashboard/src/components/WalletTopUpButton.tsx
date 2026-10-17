@@ -1,12 +1,13 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
 import { useActionState, useCallback, useEffect, useState } from "react";
 import {
   initiateWalletTopUp,
   type WalletTopUpState,
 } from "@/app/(desk)/wallet/topupActions";
 import { WALLET_TOPUP_PRESETS_KES } from "@/lib/walletTopUp";
-import { btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
+import { pendingSpinnerClass } from "@/components/ui/deskChrome";
 import { DeskDialog } from "@/components/ui/DeskDialog";
 import { settingsChipClass } from "@/components/settingsUi";
 
@@ -38,12 +39,12 @@ export function WalletTopUpButton({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={btnPrimary}>
+      <Button onClick={() => setOpen(true)}>
         Add balance
-      </button>
+      </Button>
 
       <DeskDialog open={open} title="Add balance" onClose={close} pending={pending}>
-          <p className="mt-1 text-sm text-ink-soft">
+          <p className="mt-1 text-body text-ink-2">
             {topUpEnabled
               ? "Choose an amount. Payment posts to your ops ledger when checkout is live."
               : "Online top-up is not live on this workspace."}
@@ -70,21 +71,21 @@ export function WalletTopUpButton({
             <input type="hidden" name="amount_kes" value={String(amount)} />
 
             {state.error ? (
-              <p className="text-sm text-warn" role="alert">
+              <p className="text-body text-warn" role="alert">
                 {state.error}
               </p>
             ) : null}
             {state.ok && state.message ? (
-              <p className="text-sm text-ok" role="status">
+              <p className="text-body text-ok" role="status">
                 {state.message}
               </p>
             ) : null}
 
-            <button
+            <Button
               type="submit"
               disabled={pending || !topUpEnabled}
-              className={`${btnPrimary} w-full gap-2`}
-            >
+             
+             className="w-full gap-2">
               {pending ? (
                 <>
                   <span aria-hidden="true" className={pendingSpinnerClass} />
@@ -95,7 +96,7 @@ export function WalletTopUpButton({
               ) : (
                 "Top up not live yet"
               )}
-            </button>
+            </Button>
           </form>
       </DeskDialog>
     </>

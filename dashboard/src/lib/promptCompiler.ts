@@ -116,6 +116,8 @@ export async function compileReceptionistPrompt(opts: {
   businessPolicies?: unknown;
   fieldMeta?: unknown;
   holdGate?: unknown;
+  /** Template only, no model call: fast enough to write inside a save. */
+  localOnly?: boolean;
 }): Promise<{ prompt: string; source: "gemini" | "local" }> {
   const answers: OnboardingAnswers = {
     servicesPricing: opts.servicesOffered.trim(),
@@ -161,7 +163,7 @@ export async function compileReceptionistPrompt(opts: {
     holdGate: opts.holdGate ?? null,
   };
 
-  if (!process.env.GEMINI_API_KEY) {
+  if (opts.localOnly || !process.env.GEMINI_API_KEY) {
     return {
       prompt: compilePromptLocally(opts.businessName, answers, extras),
       source: "local",

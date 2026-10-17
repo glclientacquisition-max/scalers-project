@@ -74,13 +74,13 @@ describe("DeskBack icon", () => {
     const lead = read("dashboard/src/components/ui/DeskBack.tsx");
     const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
     const imported = read("dashboard/src/app/(desk)/contacts/import/page.tsx");
-    const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
+    const constitution = read("docs/explanation/frontend/FRONTEND_CONSTITUTION.md");
     assert.match(lead, /export function DeskRecordLead/);
     assert.match(lead, /data-desk-record-lead/);
     assert.match(contact, /<DeskRecordLead/);
     assert.match(imported, /<DeskRecordLead/);
     assert.match(toolbar, /<DeskRecordLead/);
-    assert.match(read("dashboard/src/components/AdminNav.tsx"), /<DeskBack href=\{parent\.href\}>/);
+    assert.match(read("dashboard/src/components/AdminNav.tsx"), /<DeskBack href=\{href\(parent\.href\)\}>/);
     assert.match(constitution, /Back never owns its own row/);
     assert.doesNotMatch(contact, /<DeskBack[\s\S]{0,80}<\/DeskBack>\s*<div className="mt-6 grid/);
     assert.doesNotMatch(imported, /<DeskBack[\s\S]{0,80}<\/DeskBack>\s*<h1 className="mt-4/);

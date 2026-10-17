@@ -51,11 +51,11 @@ export function CoverageAreaField({
                 <button
                   type="button"
                   onClick={() => removeArea(areaId)}
-                  className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-hairline bg-surface px-3 text-body text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   aria-label={`Remove ${label}`}
                 >
                   <span className="min-w-0 truncate">{label}</span>
-                  <span aria-hidden="true" className="text-ink-soft">
+                  <span aria-hidden="true" className="text-ink-2">
                     ×
                   </span>
                 </button>
@@ -109,11 +109,11 @@ export function CoverageAreaField({
           id={listId}
           role="listbox"
           aria-label="Coverage"
-          className="max-h-60 overflow-y-auto rounded-lg border border-line bg-surface"
+          className="max-h-60 overflow-y-auto rounded-lg border border-hairline bg-surface"
         >
           {!query.trim() ? (
             <li>
-              <p className="px-3 pt-2 text-xs font-medium text-ink-soft">
+              <p className="px-3 pt-2 text-meta font-medium text-ink-2">
                 Type an estate name
               </p>
             </li>
@@ -128,12 +128,12 @@ export function CoverageAreaField({
             return (
               <li key={area.id}>
                 {showCounty ? (
-                  <p className="px-3 pt-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  <p className="px-3 pt-2 text-meta font-medium text-ink-2">
                     Counties
                   </p>
                 ) : null}
                 {showPlace ? (
-                  <p className="px-3 pt-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  <p className="px-3 pt-2 text-meta font-medium text-ink-2">
                     Estates
                   </p>
                 ) : null}
@@ -144,8 +144,8 @@ export function CoverageAreaField({
                   aria-selected={index === activeIndex}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => addArea(area.id)}
-                  className={`flex min-h-11 w-full items-center px-3 text-left text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
-                    index === activeIndex ? "bg-line" : ""
+                  className={`flex min-h-11 w-full items-center px-3 text-left text-body text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                    index === activeIndex ? "bg-hairline" : ""
                   }`}
                 >
                   {area.label}

@@ -13,7 +13,7 @@ describe("desk phone shell", () => {
   const root = read("dashboard/src/app/layout.tsx");
   const css = read("dashboard/src/app/globals.css");
   const player = read("dashboard/src/components/CallAudioPlayer.tsx");
-  const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
+  const constitution = read("docs/explanation/frontend/FRONTEND_CONSTITUTION.md");
 
   it("keeps one DESK_LINKS list for phone tabs and the desktop rail", () => {
     assert.match(nav, /export const DESK_LINKS/);

@@ -76,11 +76,11 @@ describe("settings list rest", () => {
     assert.match(form, /label="On a call"/);
   });
 
-  it("shows policy rules only after they have text, plus Add rule", () => {
-    const rules = form.slice(form.indexOf('title="Rules"'), form.indexOf('title="When unsure"'));
-    assert.match(rules, /openPolicyIds\.includes\(field\.id\)/);
-    assert.match(rules, /Add rule/);
-    assert.doesNotMatch(rules, /POLICY_FIELDS\.map\(\(field\)/);
+  it("shows policy rules only once set (or with old text), plus Add a rule", () => {
+    const editor = fs.readFileSync(path.join(__dirname, "..", "dashboard/src/components/structured/PolicyRulesEditor.tsx"), "utf8");
+    assert.match(editor, /filter\(\(t\) => rules\[t\] \|\| legacyOnly\(t\)\)/);
+    assert.match(editor, /Add a rule/);
+    assert.match(form, /<PolicyRulesEditor/);
     assert.match(form, /title="When unsure"/);
     assert.match(form, /What to say/);
   });

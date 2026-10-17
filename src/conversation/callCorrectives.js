@@ -152,8 +152,13 @@ function ackIsConsent(questionsAsked, text) {
   if (looksLikeLeaveIt(text)) return false;
   const lastAsk = (Array.isArray(questionsAsked) ? questionsAsked : []).slice(-1)[0];
   if (lastAsk === 'confirm' && looksLikeNonConsentAck(text)) return true;
-  if (lastAsk === 'offer' && (looksLikeShortAffirmation(text) || looksLikeNonConsentAck(text))) {
-    return true;
+  if (lastAsk === 'offer') {
+    // BRAIN_CONFIRMED_COVERAGE: a bare Okay / Sawa / OK / Poa is not a yes to
+    // "Should I note it for the team?" (HD_23445a4f780c t12-t13 saved a
+    // request on "Okay."). An explicit yes is: yes, ndio, sure, please do.
+    const { confirmedCoverageEnabled, looksLikeExplicitYes } = require('./confirmedCoverage');
+    if (confirmedCoverageEnabled()) return looksLikeExplicitYes(text);
+    if (looksLikeShortAffirmation(text) || looksLikeNonConsentAck(text)) return true;
   }
   return false;
 }

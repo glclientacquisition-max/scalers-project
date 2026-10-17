@@ -91,16 +91,8 @@ export function ContactPhoneRow({
       ariaLabel={title}
       leading={<Avatar name={row.name} size={40} />}
       title={title}
-      preview={
-        unsaved ? (
-          <span className="flex min-w-0 flex-col gap-2">
-            <span className={deskPreviewClass}>{subline}</span>
-            <ContactNameForm contactId={row.id} initialName={row.name} variant="row" />
-          </span>
-        ) : (
-          <span className={deskPreviewClass}>{subline}</span>
-        )
-      }
+      preview={<span className={deskPreviewClass}>{subline}</span>}
+      below={unsaved ? <ContactNameForm contactId={row.id} initialName={row.name} variant="row" /> : undefined}
       when={lastCall}
       actions={<ContactListDock phone={row.phone} />}
       className={cx(selected && "bg-accent-tonal/40 ring-1 ring-inset ring-brand/30")}

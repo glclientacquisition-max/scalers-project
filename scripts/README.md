@@ -13,4 +13,4 @@ These files stay in one folder. `package.json` and CI call them by path. Move on
 | Speech harness | `soniox-tts-listen-harness.js`, `score-voice-naturalness.js`, `generate-kenya-lexicon.js`, `render-outage-clips.js`, `data/kenyanWordlists.js` |
 | Pronunciation checks | `verify-pronunciation-studio.ts`, `verify-pronunciation-fallback.ts` |
 
-npm names are in the root `package.json` `scripts` block. Tunnel steps: [`docs/operations/WEBHOOK_TUNNEL.md`](../docs/operations/WEBHOOK_TUNNEL.md).
+npm names are in the root `package.json` `scripts` block. Tunnel steps: [`docs/how-to/WEBHOOK_TUNNEL.md`](../docs/how-to/WEBHOOK_TUNNEL.md).

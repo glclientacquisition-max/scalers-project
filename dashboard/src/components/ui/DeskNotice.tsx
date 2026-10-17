@@ -137,8 +137,8 @@ export function NotifyHost() {
   return (
     <DeskNotice open={!!notice}>
       {notice ? (
-        <div className="rounded-xl border border-line bg-surface px-3 py-3 shadow-xl">
-          <p className="text-sm text-ink">{notice.message}</p>
+        <div className="rounded-2xl border border-hairline bg-surface px-4 py-3 shadow-sheet">
+          <p className="text-body text-ink">{notice.message}</p>
         </div>
       ) : null}
     </DeskNotice>

@@ -13,9 +13,9 @@ describe("desk preview truncate", () => {
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
   const purpose = read("dashboard/src/lib/inboxPurpose.ts");
   const mandate = read(".cursor/rules/scalers-design-ux.mdc");
-  const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
-  const master = read("docs/frontend/design-system/MASTER.md");
-  const calls = read("docs/frontend/design-system/pages/calls.md");
+  const constitution = read("docs/explanation/frontend/FRONTEND_CONSTITUTION.md");
+  const master = read("docs/reference/design-system/MASTER.md");
+  const calls = read("docs/reference/design-system/pages/calls.md");
 
   it("ships one preview class and a table cell that can ellipsize", () => {
     assert.match(chrome, /export const deskPreviewClass = "min-w-0 truncate"/);
@@ -59,7 +59,7 @@ describe("desk preview truncate", () => {
     assert.match(phone, /contactListSubline/);
     assert.match(phone, /function lastCallStamp/);
     assert.match(phone, /formatCallWhenRelative/);
-    assert.doesNotMatch(phone, /font-mono text-sm text-ink/);
+    assert.doesNotMatch(phone, /font-mono text-body text-ink/);
     assert.doesNotMatch(phone, /line-clamp-2|break-words|overflow-wrap|whitespace-normal/);
     assert.match(phone, /<ContactListDock phone=\{row\.phone\} \/>/);
     assert.match(phone, /<CallLink number=\{number\} \/>/);

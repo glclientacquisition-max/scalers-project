@@ -1,13 +1,13 @@
 ---
 description: Scalers Desk UI/UX lane — owner desk, onboarding, marketing visuals
-globs: dashboard/src/app/**,dashboard/src/components/**,dashboard/src/app/globals.css,docs/agents/DESK_UX.md,dashboard/README.md
+globs: dashboard/src/app/**,dashboard/src/components/**,dashboard/src/app/globals.css,docs/reference/lanes/DESK_UX.md,dashboard/README.md
 alwaysApply: false
 ---
 
 # Desk UI/UX lane
 
-Full contract: `docs/agents/DESK_UX.md`.
-Frontend 2.0 charter: `docs/frontend/FRONTEND_2_0_CHARTER.md` (wins). History: `docs/frontend/FRONTEND_CONSTITUTION.md`, `docs/frontend/FRONTEND_RECONNAISSANCE.md`.
+Full contract: `docs/reference/lanes/DESK_UX.md`.
+Frontend 2.0 charter: `docs/explanation/frontend/FRONTEND_2_0_CHARTER.md` (wins). History: `docs/explanation/frontend/FRONTEND_CONSTITUTION.md`, `docs/archive/FRONTEND_RECONNAISSANCE.md`.
 
 - Own owner desk + marketing UX in `dashboard/`.
 - Always apply the platform design mandate: `.cursor/rules/scalers-design-ux.mdc` (also `alwaysApply`).

@@ -1,5 +1,8 @@
 "use server";
 
+import { bustTenantCache } from "@/lib/tenantCache";
+import { memberDenied } from "@/lib/requireMember";
+
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
   appendDismissal,
@@ -137,6 +140,7 @@ async function persistQueueFields(opts: {
     .from("tenants")
     .update(patch)
     .eq("id", opts.tenantId);
+  bustTenantCache(opts.tenantId);
   if (error) {
     logDeskError("pronunciation-scan", error.message);
     return pronunciationWriteError("review", error.message);
@@ -174,6 +178,8 @@ export async function loadPronunciationReviewQueueAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
+  const denied = await memberDenied("settings.view");
+  if (denied) return denied;
   try {
     if (!(await isAuthenticated())) {
       return { error: "Sign in to load review queue." };
@@ -205,6 +211,8 @@ export async function geminiScanRecentCallsAction(
   _prev: GeminiScanState,
   formData: FormData
 ): Promise<GeminiScanState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   try {
     return await runGeminiScanRecentCalls(formData);
   } catch (err) {
@@ -339,6 +347,7 @@ async function runGeminiScanRecentCalls(
       pronunciation_gemini_scan_logs: nextLogs,
     })
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   const pending = nextQueue.filter((c) => c.status === "pending");
 
@@ -368,6 +377,8 @@ export async function approveGeminiScanCandidateAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to approve." };
   }
@@ -460,6 +471,7 @@ export async function approveGeminiScanCandidateAction(
       pronunciation_review_queue: nextQueue,
     })
     .eq("id", tenant.id);
+  bustTenantCache(tenant.id);
 
   if (error) {
     return ownerSaveFailed(
@@ -483,6 +495,8 @@ export async function dismissGeminiScanCandidateAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in to dismiss." };
   }
@@ -541,6 +555,8 @@ export async function queueGeminiCandidateForRecordingAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState & { practicePrompt?: string; practicePhrase?: string }> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return denied;
   if (!(await isAuthenticated())) {
     return { error: "Sign in first." };
   }

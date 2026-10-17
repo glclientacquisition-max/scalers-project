@@ -1,3 +1,4 @@
+import { bustTenantCache } from "@/lib/tenantCache";
 import "server-only";
 
 /**
@@ -12,7 +13,9 @@ import "server-only";
 import { recompileAfterCatalogImport } from "@/lib/catalogImportRecompile";
 import {
   holdCaptureTenant,
+  reconcileCatalogScore,
   scoreCaptureTenant,
+  type ProvenanceMeta,
   type ScoreTenant,
 } from "@/lib/completenessStub";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -21,6 +24,7 @@ import {
   confirmTenantField as confirmTenantFieldRpc,
   getTenantCompletenessScore as getTenantCompletenessScoreRpc,
   getTenantHoldGate as getTenantHoldGateRpc,
+  listTenantFieldMeta,
   upsertTenantFieldMeta,
   type TenantCompletenessScore,
   type TenantHoldGate,
@@ -66,7 +70,26 @@ export async function getTenantCompletenessScore(
   tenantId: string
 ): Promise<TenantCompletenessScore | null> {
   const live = await getTenantCompletenessScoreRpc(tenantId);
-  if (live) return live;
+  if (live) {
+    // Live SQL misses Settings-saved service prices (price_range); score the
+    // catalogue from the real rows so Overview matches what the owner saved.
+    try {
+      const [tenant, metaRows] = await Promise.all([
+        loadScoreTenant(tenantId),
+        listTenantFieldMeta(tenantId),
+      ]);
+      if (!tenant) return live;
+      const meta: ProvenanceMeta = {};
+      for (const row of metaRows || []) {
+        if (row?.field_path && row?.source) {
+          meta[row.field_path] = row.source as ProvenanceMeta[string];
+        }
+      }
+      return reconcileCatalogScore(live, tenant, meta);
+    } catch {
+      return live;
+    }
+  }
   const missing = await rpcIsMissing("tenant_completeness_score", { p_tenant_id: tenantId });
   if (!missing) return null;
   const tenant = await loadScoreTenant(tenantId);
@@ -160,6 +183,7 @@ export async function persistOwnerConfirm(
   }
 
   const updated = await client.from("tenants").update(patch).eq("id", tenantId);
+  bustTenantCache(tenantId);
   return !updated.error;
 }
 

@@ -22,6 +22,16 @@ const REVIEW_MODEL =
   'gemini-3.5-flash-lite';
 
 const REVIEW_TIMEOUT_MS = 8000;
+const REVIEW_TIMEOUT_MAX_MS = 30000;
+
+/**
+ * Long calls need longer than 8 s to review. A 215 s call (about 2,000 transcript
+ * characters) timed out and left no call_facts row at all.
+ */
+function reviewTimeoutMs(transcriptChars) {
+  const n = Math.max(0, Number(transcriptChars) || 0);
+  return Math.min(REVIEW_TIMEOUT_MAX_MS, Math.max(REVIEW_TIMEOUT_MS, Math.round(4000 + n * 9)));
+}
 const DEFAULT_SCHEDULE_DELAY_MS = 600;
 const DEFAULT_WAIT_MS = 1200;
 const DEFAULT_RETRY_MS = 1500;
@@ -80,7 +90,22 @@ Return ONLY valid JSON (no markdown fences):
   "needs_human": false,
   "needs_owner": false,
   "urgent": false,
-  "confidence": 0.0
+  "confidence": 0.0,
+  "facts": {
+    "intent": "price_check|availability|product_info|order_place|order_status|hold_or_pickup|book_visit|quote_request|delivery_question|payment_question|directions|hours|complaint|return_refund|warranty|emergency|human_request|general_enquiry|wrong_number|spam|other",
+    "secondary_intents": [],
+    "outcome": "sale_or_order|hold|booking|callback|info_only|lost|abandoned",
+    "lost_reason": "price_too_high|out_of_stock|not_offered|outside_coverage|closed_hours|delivery_fee|wanted_human|competitor|other|null",
+    "products_mentioned": [{ "name": "item as the caller said it", "qty": null, "quoted_price_ksh": null }],
+    "price_objection": false,
+    "objection_price_ksh": null,
+    "competitor_mentioned": null,
+    "est_value_ksh": null,
+    "caller_area": null,
+    "language": "en|sw|sheng|mixed",
+    "sentiment": "positive|neutral|negative",
+    "unanswered_question": null
+  }
 }
 
 Rules:
@@ -96,7 +121,34 @@ Rules:
 - If a hold or visit was clearly saved, primary_intent is hold_or_pickup or book_visit and needs_human is false.
 - A saved visit is a request until the owner Confirms. Say exactly: Visit request saved — confirm on desk. Do not say booked, confirmed, or scheduled as done. If visitSaved is false and no callback was saved, done is None.
 - If the caller asked for a person and no hold/visit was saved, needs_human is true.
-- Prefer the trusted Brain snapshot for tools that already succeeded.`;
+- Prefer the trusted Brain snapshot for tools that already succeeded.
+- facts: structured data for the owner's reports. Use only what was said. Unknown is null, never a guess.
+- facts.outcome: sale_or_order only when an order was clearly agreed; hold or booking only when saved; lost when the caller wanted to buy or book and did not (give lost_reason); info_only when a question was answered; callback when someone must call back; abandoned when they hung up early.
+- facts.products_mentioned: each item they asked about, as they named it. qty only if said. quoted_price_ksh is the price said on the call in Kenya shillings (number only).
+- facts.price_objection: true if the caller said it was too expensive or asked for a lower price; objection_price_ksh is the price they wanted, if said.
+- facts.competitor_mentioned: another shop or brand they compared with, short, or null.
+- facts.est_value_ksh: total value of what they wanted to buy or book, only from prices said or in the snapshot.
+- facts.caller_area: the estate, town or area the caller is in or wants service at, or null.
+- facts.language: the caller's language. sheng for Nairobi street slang (niaje, poa, doh, ganji, msee), sw for Swahili, mixed when they switch with English.
+- facts.unanswered_question: a question the Business Assistant could not answer, in the caller's words, short; null if none.`;
+
+/**
+ * BRAIN_CALL_FIXES_D199 (HD_ceba9d9b3f37 8a): no canned hours phrases; the
+ * review names only topics that came up on the call.
+ */
+function reviewSystemPrompt() {
+  if (!require('./callFixesD199').callFixesD199Enabled()) return REVIEW_SYSTEM;
+  return REVIEW_SYSTEM.replace(' Hours answered. Escalation', ' Escalation')
+    .replace(' A finished hours answer may be "Hours were answered."', '')
+    .replace(
+      'False when hours/FAQ was answered',
+      'False when a question the caller asked was answered'
+    )
+    .replace(
+      '- Prefer the trusted Brain snapshot',
+      '- done and next name only topics the caller raised. Never mention hours, price, directions, coverage or payments unless the caller asked about them.\n- Prefer the trusted Brain snapshot'
+    );
+}
 
 const NAME_EXTRACT_SYSTEM = `You extract the caller's own name from ONE finished phone call.
 
@@ -107,6 +159,7 @@ If they spelled letter by letter, join those letters.
 Prefer the usual Kenyan spelling of the same name (Isha or Eisha is Aisha). Asha is not Aisha. Do not invent a name they never used.`;
 
 const { isVisitClassEscalateReason } = require('./playbooks/homeServices');
+const { buildCallFactsRow, normalizeCallFacts } = require('./callFacts');
 
 const pendingReviews = new Map();
 
@@ -247,6 +300,12 @@ function unfinishedWant(flags) {
 function applySnapshotCard(out, flags) {
   if (flags?.holdOpen && !flags?.callbackSaved && !flags?.visitRequested) {
     out.done = HOLD_OPEN_NOTE;
+    out.applied.card = true;
+  }
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 8): an enquiry row is an
+  // enquiry, not a hold.
+  if (flags?.enquirySaved && !flags?.holdOpen && !flags?.visitRequested) {
+    out.done = `Enquiry saved${flags.enquiryItem ? `: ${flags.enquiryItem}` : ''}.`;
     out.applied.card = true;
   }
   let next = '';
@@ -445,6 +504,7 @@ function parseReviewJson(text) {
     needs_owner: needsOwner === true,
     urgent: urgent === true,
     confidence: clampConfidence(obj.confidence),
+    facts: normalizeCallFacts(obj.facts),
   };
 }
 
@@ -483,7 +543,18 @@ function toolFlagsFromBrain(brainState, callId = null) {
   ).toLowerCase();
   const holdStatus = String(hold?.requestStatus || hold?.record?.status || 'open').toLowerCase();
   const holdType = String(hold?.requestType || hold?.value?.type || '').toLowerCase();
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 8): the kind comes from the
+  // row written. Only a hold row is a hold.
+  const fixesOn = require('./callFixesD199').callFixesD199Enabled();
+  const realHold = !holdType || holdType === 'hold' || holdType === 'hold_or_pickup' || holdType === 'order';
   return {
+    ...(fixesOn
+      ? {
+          enquirySaved: Boolean(hold) && !realHold && holdType !== 'callback',
+          enquiryItem: String(hold?.value?.item || hold?.record?.item || '').trim(),
+          holdKind: hold ? holdType || 'hold' : null,
+        }
+      : {}),
     holdSaved: ok('create_service_request'),
     callbackSaved: ok('create_service_request') && holdType === 'callback',
     visitSaved: ok('create_appointment') || ok('update_appointment'),
@@ -508,7 +579,8 @@ function toolFlagsFromBrain(brainState, callId = null) {
     refusedWhen: Array.isArray(brainState?.actions?.refusedHours)
       ? brainState.actions.refusedHours.filter(Boolean)
       : [],
-    holdOpen: Boolean(hold) && (!holdStatus || holdStatus === 'open'),
+    holdOpen:
+      Boolean(hold) && (!holdStatus || holdStatus === 'open') && (!fixesOn || realHold),
     escalateSaved: ok('escalate'),
     escalateReason: String(
       escalate?.value?.reason || escalate?.record?.reason || ''
@@ -571,7 +643,20 @@ function askSnapshot(brainState) {
 /**
  * Conservative merge: owner sentence is welcome; tool outcomes are not undone.
  */
-function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical } = {}) {
+function callerTurnTexts(turns) {
+  return (Array.isArray(turns) ? turns : [])
+    .filter((turn) => String(turn?.speaker || '').toLowerCase() === 'caller')
+    .map(turnText)
+    .filter(Boolean);
+}
+
+/** "Alvin asked about that's all." is not a reason (HD_ceba9d9b3f37 8b). */
+function closingAsGoal(text) {
+  const match = String(text || '').match(/\basked about\s+(.+?)[.!?]*$/i);
+  return Boolean(match && require('./callFixesD199').notAGoal(match[1]));
+}
+
+function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical, callerTurns } = {}) {
   const flags = toolFlags || {};
   const derivedIntent = derived?.primaryIntent || null;
   const derivedResolution = derived?.resolution || 'unknown';
@@ -585,24 +670,66 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical }
     next: '',
     applied: { reason: false, intent: false, resolution: false, card: false },
   };
+  // BRAIN_CALL_FIXES_D199 (Aris HD_d3900cbf2b2d 8): the owner-review kind is
+  // what was written: a visit row is book_visit, a hold row hold_or_pickup,
+  // an enquiry or callback row the derived intent. No write: the model's.
+  if (require('./callFixesD199').callFixesD199Enabled() && review) {
+    let kind = review.primary_intent || null;
+    if (flags.visitSaved) kind = 'book_visit';
+    else if (flags.holdKind) {
+      const holdish = ['hold', 'hold_or_pickup', 'order'].includes(flags.holdKind);
+      kind = holdish
+        ? 'hold_or_pickup'
+        : derivedIntent && derivedIntent !== 'hold_or_pickup'
+          ? derivedIntent
+          : 'order_enquiry';
+    }
+    out.reviewKind = kind;
+  }
 
   const cleaned = review ? cleanReason(review.reason) : '';
   const cleanedWant = review
     ? cleanReason(review.want || review.reason)
     : '';
-  const cleanedDone = review ? cleanReason(review.done) : '';
-  const cleanedNext = review ? cleanReason(review.next) : '';
+  let cleanedDone = review ? cleanReason(review.done) : '';
+  let cleanedNext = review ? cleanReason(review.next) : '';
   const mood = review ? normalizeMood(review.mood) : 'unknown';
+  const fixesD199 = require('./callFixesD199');
+  if (fixesD199.callFixesD199Enabled() && review) {
+    // HD_ceba9d9b3f37 (8a): "Hours were answered." on a call that never
+    // raised hours. A done/next sentence keeps its topic only when the
+    // intent or the caller's own words raised it.
+    const topicCtx = {
+      intent: [flags.intent, derivedIntent],
+      callerTurns: Array.isArray(callerTurns) ? callerTurns : [],
+    };
+    const done = fixesD199.keepRaisedTopics(cleanedDone, topicCtx);
+    cleanedDone = done.text;
+    if (!cleanedDone && review.done) cleanedDone = 'None.';
+    const next = fixesD199.keepRaisedTopics(cleanedNext, topicCtx);
+    cleanedNext = next.text;
+    if (!cleanedNext && review.next) cleanedNext = 'None.';
+    out.applied.topicsDropped = [...new Set([...done.dropped, ...next.dropped])];
+    if (closingAsGoal(out.reason)) out.reason = '';
+  }
 
-  if (cleaned.length >= REASON_MIN) {
+  const closingReason = fixesD199.callFixesD199Enabled() && closingAsGoal(cleaned);
+  const closingWant = fixesD199.callFixesD199Enabled() && closingAsGoal(cleanedWant);
+  if (cleaned.length >= REASON_MIN && !closingReason) {
     out.reason = cleaned;
     out.applied.reason = true;
   }
-  if (cleanedWant.length >= REASON_MIN) {
+  if (cleanedWant.length >= REASON_MIN && !closingWant) {
     out.want = cleanedWant;
     out.applied.card = true;
   } else if (out.reason) {
     out.want = out.reason;
+  }
+  if ((closingReason || closingWant) && !out.reason && derivedResolution === 'resolved') {
+    // The closing was the only "goal": the call was answered.
+    out.reason = 'Answered.';
+    out.applied.reason = true;
+    if (!out.want) out.want = out.reason;
   }
   if (flags.holdOpen) {
     if (/\bfulfilled\b|\bready\b/i.test(out.reason)) {
@@ -1069,6 +1196,26 @@ function withSummaryWriteLock(callSid, fn) {
   return run;
 }
 
+async function defaultSaveFacts({ callSid, ctx, review, turns }) {
+  const db = require('../db');
+  const call = ctx.call || (await db.getCall(callSid));
+  if (!call?.id || !call?.tenant_id) return null;
+  const catalogue = await db.getTenantCatalogue(call.tenant_id);
+  const callerText = (turns || [])
+    .filter((t) => String(t?.role || t?.speaker || '').toLowerCase().match(/caller|user/))
+    .map((t) => turnText(t))
+    .join(' ');
+  const row = buildCallFactsRow({
+    call,
+    facts: review.facts,
+    review,
+    callerText,
+    catalogue,
+    model: process.env.POST_CALL_REVIEW_MODEL || 'gemini',
+  });
+  return db.upsertCallFacts(row);
+}
+
 async function defaultSave({ callSid, merged, review, derived, summary }) {
   return withSummaryWriteLock(callSid, () =>
     writeReviewedSummary({ callSid, merged, review, derived, summary })
@@ -1089,7 +1236,8 @@ async function writeReviewedSummary({ callSid, merged, review, derived, summary 
       needs_owner: Boolean(review?.needs_owner),
       urgent: Boolean(review?.urgent),
       confidence: clampConfidence(review?.confidence),
-      primary_intent: review?.primary_intent || null,
+      primary_intent:
+        merged.reviewKind !== undefined ? merged.reviewKind : review?.primary_intent || null,
       applied: merged.applied,
       at: new Date().toISOString(),
     },
@@ -1190,6 +1338,65 @@ async function runPostCallHangupJobs(ctx, deps = {}) {
   return { ok: true, extracted, persisted: named, review };
 }
 
+/** Leave a trace on the call so failures are visible and the sweep knows what to retry. */
+async function recordReviewStatus(ctx, status, deps = {}) {
+  const callSid = String(ctx?.callSid || '').trim();
+  if (!callSid || !status) return;
+  const attempts = Number(ctx?.reviewAttempt) || 1;
+  try {
+    if (deps.recordStatus) return await deps.recordStatus({ callSid, status, attempts });
+    if (deps.save) return; // Injected save (tests, replays): no live db.
+    const db = require('../db');
+    await db.mergeCallSummaryMeta({
+      callSid,
+      patch: { review_status: status, review_attempts: attempts, review_at: new Date().toISOString() },
+    });
+  } catch (err) {
+    console.warn(`[transcript-review] ${callSid} status write failed:`, err?.message || err);
+  }
+}
+
+/** Statuses that will never improve on retry. */
+const FINAL_REVIEW_STATUSES = new Set(['ok', 'thin', 'no_turns']);
+const MAX_REVIEW_ATTEMPTS = 3;
+
+/**
+ * Durable catch-up: the post-call review runs on an in-memory timer, so a restart,
+ * deploy or model timeout loses it. This finds ended calls with speech and no
+ * reviewed call_facts row and runs the review from the stored transcript.
+ */
+async function sweepUnreviewedCalls(deps = {}) {
+  const findCalls = deps.findCalls || ((opts) => require('../db').listUnreviewedCalls(opts));
+  const review = deps.review || ((ctx) => runPostCallTranscriptReview(ctx, { waitMs: 0, retryMs: 0 }));
+  const rows = (await findCalls({ sinceDays: deps.sinceDays ?? 14, limit: deps.limit ?? 20 })) || [];
+  let reviewed = 0;
+  let failed = 0;
+  for (const call of rows) {
+    const meta = call.summary && typeof call.summary === 'object' ? call.summary : {};
+    const status = String(meta.review_status || '');
+    const attempts = Number(meta.review_attempts) || 0;
+    if (FINAL_REVIEW_STATUSES.has(status) || attempts >= MAX_REVIEW_ATTEMPTS) continue;
+    const callSid = String(call.sautikit_call_sid || '').trim();
+    if (!callSid) continue;
+    try {
+      const out = await review({
+        callSid,
+        call,
+        derived: { resolution: call.resolution || 'unknown', primaryIntent: call.primary_intent || null },
+        summary: meta,
+        reviewAttempt: attempts + 1,
+      });
+      if (out?.ok) reviewed += 1;
+      else failed += 1;
+    } catch (err) {
+      failed += 1;
+      console.warn(`[review-sweep] ${callSid} failed:`, err?.message || err);
+    }
+  }
+  if (rows.length) console.log(`[review-sweep] checked ${rows.length}, reviewed ${reviewed}, failed ${failed}`);
+  return { checked: rows.length, reviewed, failed };
+}
+
 async function runPostCallTranscriptReview(ctx, deps = {}) {
   const callSid = String(ctx?.callSid || '').trim();
   if (!callSid) return { ok: false, reason: 'no_call' };
@@ -1222,10 +1429,12 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
       return { ok: true, merged, silence: true };
     }
     console.warn(`[transcript-review] ${callSid} no turns`);
+    await recordReviewStatus(ctx, 'no_turns', deps);
     return { ok: false, reason: 'no_turns' };
   }
 
   if (callerSpeechChars(turns) < 12) {
+    await recordReviewStatus(ctx, 'thin', deps);
     return { ok: false, reason: 'thin' };
   }
 
@@ -1234,23 +1443,35 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
     '\n\n'
   );
 
-  let raw;
-  try {
-    raw = await generateText({
-      system: REVIEW_SYSTEM,
-      user,
-      timeoutMs: deps.timeoutMs ?? REVIEW_TIMEOUT_MS,
-    });
-  } catch (err) {
-    console.warn(
-      `[transcript-review] ${callSid} generate failed:`,
-      err?.message || err
-    );
-    return { ok: false, reason: 'generate_failed' };
+  const timeoutMs = deps.timeoutMs ?? reviewTimeoutMs(transcript.length);
+  const delay = deps.delay || sleep;
+  let review = null;
+  let failure = null;
+  // One retry: a slow or failed model call must not silently drop the structured record.
+  for (let attempt = 1; attempt <= 2 && !review; attempt += 1) {
+    let raw;
+    try {
+      raw = await generateText({ system: reviewSystemPrompt(), user, timeoutMs });
+    } catch (err) {
+      console.warn(
+        `[transcript-review] ${callSid} generate failed (attempt ${attempt}, ${timeoutMs} ms):`,
+        err?.message || err
+      );
+      failure = 'generate_failed';
+      if (attempt < 2) await delay(1500);
+      continue;
+    }
+    review = parseReviewJson(raw);
+    if (!review) {
+      failure = 'parse_failed';
+      console.warn(`[transcript-review] ${callSid} parse failed (attempt ${attempt})`);
+    }
   }
-
-  const review = parseReviewJson(raw);
-  if (!review) return { ok: false, reason: 'parse_failed' };
+  if (!review) {
+    await recordReviewStatus(ctx, failure, deps);
+    return { ok: false, reason: failure };
+  }
+  await recordReviewStatus(ctx, 'ok', deps);
 
   const merged = mergeTranscriptReview({
     derived: ctx.derived,
@@ -1258,7 +1479,17 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
     toolFlags: ctx.toolFlags,
     review,
     vertical: ctx.vertical,
+    callerTurns: callerTurnTexts(turns),
   });
+
+  // Structured record for reports. Never blocks or fails the owner card.
+  try {
+    // Injected save (tests, replays) means no live db; facts then only via deps.saveFacts.
+    const saveFacts = deps.saveFacts || (deps.save ? null : defaultSaveFacts);
+    if (saveFacts) await saveFacts({ callSid, ctx, review, turns });
+  } catch (err) {
+    console.warn(`[transcript-review] ${callSid} call_facts failed:`, err?.message || err);
+  }
 
   if (
     !merged.applied.reason &&
@@ -1337,6 +1568,7 @@ function resetTranscriptReviewScheduleForTests() {
 module.exports = {
   NAME_EXTRACT_SYSTEM,
   REVIEW_SYSTEM,
+  reviewSystemPrompt,
   callerSpeechChars,
   cleanReason,
   extractCallerNameFromTranscript,
@@ -1352,6 +1584,9 @@ module.exports = {
   resetTranscriptReviewScheduleForTests,
   runPostCallHangupJobs,
   runPostCallTranscriptReview,
+  reviewTimeoutMs,
+  sweepUnreviewedCalls,
+  recordReviewStatus,
   schedulePostCallTranscriptReview,
   toolFlagsFromBrain,
 };

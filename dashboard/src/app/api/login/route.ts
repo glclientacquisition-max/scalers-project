@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { adminLoginHref, hostOnlyCookieOptions } from "@/lib/adminHost";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
+import { welcomeHomePath } from "@/lib/authRedirect";
+import { acceptPendingInvitesForUser, DESK_TENANT_COOKIE, deskTenantCookieOptions } from "@/lib/inviteAccept";
 
 export async function POST(request: NextRequest) {
   const form = await request.formData();
@@ -45,9 +47,18 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     return NextResponse.redirect(new URL("/login?error=1", request.url), 303);
+  }
+
+  // Invited people who confirmed on another device land here: finish their invite.
+  if (data.user) {
+    const joined = await acceptPendingInvitesForUser(data.user).catch(() => null);
+    if (joined && joined.ok) {
+      res.headers.set("Location", new URL(welcomeHomePath(joined.businessName), request.url).toString());
+      res.cookies.set(DESK_TENANT_COOKIE, joined.tenantId, deskTenantCookieOptions);
+    }
   }
 
   return res;

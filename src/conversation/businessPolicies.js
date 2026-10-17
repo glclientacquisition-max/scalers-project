@@ -1,6 +1,7 @@
 // Normalize tenant business_policies for live ground truth.
 
 const { formatCoverageList, parseCoverageAreas } = require('./coverageAreas');
+const { confirmedCoverageEnabled, confirmedCoveragePromptRule } = require('./confirmedCoverage');
 
 const POLICY_LABELS = {
   payment: 'Payment',
@@ -43,6 +44,8 @@ function normalizePolicies(raw) {
   if (Array.isArray(obj.coverage_areas)) {
     out.coverage_areas = parseCoverageAreas(obj.coverage_areas);
   }
+  const outside = require('./outsideAreas').readCoverageOutside(obj);
+  if (outside) out.coverage_outside = outside;
   // Any other text the owner saved (for example a minimum notice rule).
   // Metadata and gated keys stay out; provenance decides the rest upstream.
   const { isPolicyMetaKey, policyKeyLabel } = require('./provenance');
@@ -93,6 +96,7 @@ function formatPoliciesBlock(policies) {
     anyContent = true;
     lines.push(`- ${label}: ${text}`);
   }
+  const gate = confirmedCoverageEnabled();
   if (Array.isArray(p.coverage_areas)) {
     lines.push(
       `- Coverage: ${formatCoverageList(p.coverage_areas) || '(none listed)'}`
@@ -100,10 +104,22 @@ function formatPoliciesBlock(policies) {
     lines.push(
       'COVERAGE RULE: The Coverage line is the only service area. A county on it covers every town in that county. Delivery text is timing and other instructions.'
     );
+    if (gate) lines.push(confirmedCoveragePromptRule(true));
+    if (p.coverage_outside) {
+      const fee = p.coverage_outside.feeKsh;
+      lines.push(
+        `- Outside these areas: anywhere in Kenya, ${fee != null ? `fee KSh ${fee.toLocaleString('en-US')}` : 'the team calls back with the fee'}. Listed areas keep their own terms. A place you cannot place in Kenya: ask which county it is in. Outside Kenya is not covered: offer to note it.`
+      );
+    }
+  } else if (gate) {
+    // BRAIN_CONFIRMED_COVERAGE: factPolicyMap left an unconfirmed list out.
+    lines.push('- Coverage: (not confirmed by the owner)');
+    lines.push(confirmedCoveragePromptRule(false));
   }
   if (!anyContent && !Array.isArray(p.coverage_areas)) {
     return [
       '(no policy text on file)',
+      ...(gate ? ['- Coverage: (not confirmed by the owner)', confirmedCoveragePromptRule(false)] : []),
       'POLICY RULE: For any policy ask (returns, refunds, payment, etc.), say you do not have that detail. Offer to save a note ONLY if the caller asks. Never invent policy wording. Never force name/reason capture.',
     ].join('\n');
   }

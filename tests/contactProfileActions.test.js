@@ -12,7 +12,7 @@ describe("contact profile action dock", () => {
   const page = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
   const dock = read("dashboard/src/components/ContactActionDock.tsx");
   const ticketDock = read("dashboard/src/components/InboxTicketActionDock.tsx");
-  const contactsNote = read("docs/frontend/design-system/pages/contacts.md");
+  const contactsNote = read("docs/reference/design-system/pages/contacts.md");
 
   it("puts Call and WhatsApp on Saved and Unsaved profiles when a phone exists", () => {
     assert.match(page, /<ContactActionDock/);
@@ -59,11 +59,11 @@ describe("contact profile Name this caller", () => {
     assert.match(form, /junk \? "Name this caller" : "Name"/);
     assert.match(form, />\s*Save\s*</);
     assert.match(form, /flex min-w-0 flex-wrap items-center gap-2/);
-    assert.match(form, /text-lg font-semibold/);
+    assert.match(form, /text-title font-semibold/);
     assert.match(form, /updateContactName/);
     assert.match(form, /router\.refresh\(/);
     assert.match(form, /pendingSpinnerClass/);
-    assert.match(form, /btnPrimary/);
+    assert.match(form, /btnPrimary|<Button\b/); // kit Button replaced the one-off class
     assert.doesNotMatch(form, /router\.push/);
     assert.doesNotMatch(form, /[\u2014\u2013]/);
   });

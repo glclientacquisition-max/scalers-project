@@ -1,0 +1,4 @@
+# Internal link check for Markdown (docs CI). Offline: only repo-relative links and anchors-free file paths.
+offline = true
+no_progress = true
+exclude_path = ["node_modules", "dashboard/node_modules", ".agents", ".cursor/skills", "CHANGELOG.md", "docs/archive"]

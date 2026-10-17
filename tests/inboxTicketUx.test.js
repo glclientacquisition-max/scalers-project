@@ -19,7 +19,7 @@ describe("inbox ticket action chrome", () => {
     assert.match(ticket, /<DeskBack href=\{backHref\}>\{backHref === "\/home" \? "Home" : "Inbox"\}<\/DeskBack>/);
     assert.match(ticket, /Jump to latest/);
     assert.match(ticket, /dockedAction/);
-    assert.match(ticket, /border border-line bg-surface text-ink/);
+    assert.match(ticket, /border border-hairline bg-surface text-ink/);
     assert.match(ticket, /sr-only">Jump to latest/);
     assert.match(ticket, /InboxSmsDock/);
     assert.match(ticket, /\{!archived \? \(/);

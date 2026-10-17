@@ -57,7 +57,10 @@ export function tenantNeedsOnboarding(tenant: {
   services_offered?: string | null;
   business_hours?: string | null;
   agent_tone?: string | null;
+  /** Single source of truth once migrated: set by the setup finish action (and backfilled). */
+  setup_completed_at?: string | null;
 }): boolean {
+  if (tenant.setup_completed_at !== undefined) return !tenant.setup_completed_at;
   // Structured profile from onboarding/settings means setup is done.
   const hasProfile =
     Boolean(String(tenant.services_offered || "").trim()) &&

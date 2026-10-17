@@ -93,8 +93,8 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(chrome, /deskNavBadgeClass =\s*"[^"]*bg-accent-fill/);
     assert.match(layout, /DeskNeedsCountLive/);
     assert.match(layout, /DeskNavHost/);
-    assert.match(layout, /<DeskRail \/>/);
-    assert.match(layout, /<DeskTabBar \/>/);
+    assert.match(layout, /<DeskRail(?: hideHrefs=\{hideHrefs\})? \/>/);
+    assert.match(layout, /<DeskTabBar(?: hideHrefs=\{hideHrefs\})? \/>/);
     assert.doesNotMatch(layout, /fallback=\{<DeskRail/);
     assert.doesNotMatch(layout, /fallback=\{<DeskTabBar/);
     assert.match(layout, /loadCachedInboxNeedsCount/);
@@ -104,10 +104,10 @@ describe("desk shell chrome", () => {
   });
 
   it("puts large DESK_LINKS titles on list roots only", () => {
-    const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
-    const master = read("docs/frontend/design-system/MASTER.md");
+    const constitution = read("docs/explanation/frontend/FRONTEND_CONSTITUTION.md");
+    const master = read("docs/reference/design-system/MASTER.md");
     assert.match(chrome, /export const deskListTitleClass/);
-    assert.match(chrome, /deskListTitleClass =\s*\n\s*"font-display text-3xl/);
+    assert.match(chrome, /deskListTitleClass =\s*\n\s*"font-display text-display/);
     assert.match(chrome, /sm:text-4xl/);
     assert.match(constitution, /deskListTitleClass/);
     assert.match(master, /deskListTitleClass/);
@@ -127,7 +127,7 @@ describe("desk shell chrome", () => {
     assert.match(settingsShell, /<SettingsPageHeader[\s\S]*?index/);
     assert.doesNotMatch(
       settingsUi,
-      /<p className="font-sans text-\[11px\] font-semibold uppercase tracking-\[0\.14em\] text-ink-soft">\s*Business Profile\s*<\/p>/
+      /<p className="font-sans text-\[11px\] font-semibold uppercase tracking-\[0\.14em\] text-ink-2">\s*Business Profile\s*<\/p>/
     );
     assert.doesNotMatch(
       settingsUi,
@@ -171,7 +171,7 @@ describe("desk shell chrome", () => {
     assert.match(signOut, />\s*Stay\s*</);
     assert.match(signOut, /setConfirming\(true\)/);
     assert.match(signOut, /type="submit"/);
-    assert.match(signOut, /btnPrimary/);
+    assert.match(signOut, /btnPrimary|<Button\b/); // kit Button replaced the one-off class
     assert.match(signOut, /if \(!confirming\)/);
     assert.doesNotMatch(settingsUi, /SignOutButton/);
     assert.match(settingsUi, />Settings</);
@@ -180,7 +180,7 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(settingsShell, /SettingsSignOutRow/);
     assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /<SignOutButton layout="menu"/);
     assert.doesNotMatch(read("dashboard/src/components/DeskAccountBar.tsx"), />\s*Sign out\s*</);
-    assert.match(settingsUi, /uppercase tracking-wide text-gray-500/);
+    assert.match(settingsUi, /settingsBlockTitleClass =\s*"text-meta font-medium text-ink-2"/);
     assert.match(settingsShell, /text-meta font-medium text-ink-2/);
     assert.match(settingsShell, /data-settings-menu/);
     assert.match(settingsShell, /SettingsChevron/);
@@ -197,7 +197,7 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(homeHeader, /size="xs"/);
     assert.doesNotMatch(homeHeader, /size="lg"/);
     assert.doesNotMatch(homeHeader, /deskListTitleClass/);
-    assert.doesNotMatch(homeHeader, /text-lg font-semibold/);
+    assert.doesNotMatch(homeHeader, /text-title font-semibold/);
     assert.doesNotMatch(home, /BrandLockup/);
     assert.doesNotMatch(home, /nairobiGreeting/);
     assert.doesNotMatch(home, /pageTitleClass/);

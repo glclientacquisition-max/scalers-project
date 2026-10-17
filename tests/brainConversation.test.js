@@ -1,5 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+// Delivery-text coverage is the flag-off path; BRAIN_CONFIRMED_COVERAGE=on twins: confirmedCoverage.test.js.
+const { flagOff } = require('./helpers/ownerCoverage');
 const {
   createBrainState,
   inferIntent,
@@ -392,7 +394,7 @@ describe('multi-turn Brain outcomes', () => {
     assert.doesNotMatch(entityValue(turn.state.entities.location), /^Nairobi$/i);
   });
 
-  it('saves an in-coverage area after one follow-up and flags confirm access', () => {
+  it('saves an in-coverage area after one follow-up and flags confirm access', flagOff(() => {
     const homeProfile = {
       vertical: 'home_services',
       servicesCatalog: [{ name: 'Carpet cleaning', price_range: '1,500-2,000' }],
@@ -423,9 +425,9 @@ describe('multi-turn Brain outcomes', () => {
     });
     assert.equal(turn.state.visitPlace.confirmAccess, true);
     assert.equal(turn.decision.action, 'CREATE_REQUEST');
-  });
+  }));
 
-  it('does not book a visit outside Train coverage', () => {
+  it('does not book a visit outside Train coverage', flagOff(() => {
     const homeProfile = {
       vertical: 'home_services',
       servicesCatalog: [{ name: 'Home cleaning', price_range: 'quoted on site' }],
@@ -447,7 +449,7 @@ describe('multi-turn Brain outcomes', () => {
     assert.equal(turn.state.visitPlace.blocked, 'outside');
     assert.equal(turn.decision.action, 'ANSWER');
     assert.notEqual(turn.decision.action, 'CREATE_REQUEST');
-  });
+  }));
 
   it('does not save a visit after the caller refuses a location twice', () => {
     const homeProfile = {

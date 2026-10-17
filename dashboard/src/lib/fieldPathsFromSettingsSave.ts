@@ -57,6 +57,12 @@ function policyPaths(out: string[], seen: Set<string>, policies: BusinessPolicie
   if (String(policies.payment || "").trim() || String(policies.deposit || "").trim()) {
     pushUnique(out, seen, "payments.methods");
   }
+  const holds = policies.holds as { allowed?: unknown } | undefined;
+  if (holds && typeof holds === "object" && String(holds.allowed ?? "").trim()) {
+    pushUnique(out, seen, "policies.holds");
+    pushUnique(out, seen, "policies.holds.allowed");
+  }
+  if (String(policies.booking_mode || "").trim()) pushUnique(out, seen, "policies.booking_mode");
   const coverage = policies.coverage_areas;
   if (Array.isArray(coverage) && coverage.length > 0) {
     pushUnique(out, seen, "policies.coverage_areas");

@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Scalers Frontend 2.0 mandate
 
-Charter: `docs/frontend/FRONTEND_2_0_CHARTER.md`. It wins over older frontend docs. Bar: WhatsApp, Instagram, Truecaller clarity on a mid-range Android at 08:00 EAT.
+Charter: `docs/explanation/frontend/FRONTEND_2_0_CHARTER.md`. It wins over older frontend docs. Bar: WhatsApp, Instagram, Truecaller clarity on a mid-range Android at 08:00 EAT.
 
 ## Build from the kit
 

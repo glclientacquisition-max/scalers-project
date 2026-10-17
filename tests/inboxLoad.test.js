@@ -20,8 +20,8 @@ function mergeOpenAndTapeRows(open, tape) {
 
 describe("inbox open-work window", () => {
   const load = read("dashboard/src/lib/inboxLoad.ts");
-  const calls = read("docs/frontend/design-system/pages/calls.md");
-  const home = read("docs/frontend/design-system/pages/home.md");
+  const calls = read("docs/reference/design-system/pages/calls.md");
+  const home = read("docs/reference/design-system/pages/home.md");
 
   it("keeps an old open hold when the closed tape is full of newer rows", () => {
     const open = [{ id: "old-open", created_at: "2020-01-01T00:00:00.000Z" }];

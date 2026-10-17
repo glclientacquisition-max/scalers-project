@@ -174,7 +174,9 @@ function platformOpsDegradeBody(kind = 'speech', detail = {}) {
       ? 'Reasoning'
       : kind === 'telephony'
         ? 'Phone line'
-        : 'Speech';
+        : kind === 'audio'
+          ? 'Phone audio'
+          : 'Speech';
   const lines = [`Scalers platform ${lane} is degraded.`];
   const cause = String(detail.cause || '').trim();
   if (cause) lines.push(`Cause: ${cause.slice(0, 160)}.`.replace(/\.\.$/, '.'));

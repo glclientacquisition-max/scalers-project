@@ -7,6 +7,7 @@
 //
 // Preserves the orchestration-facing API used by server.js (async).
 
+const { finalizeOnceEnabled, TERMINAL } = require('./callFinalizeOnce');
 const { supabase } = require('./lib/supabaseClient');
 const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
 const { mergeContactIdentity } = require('./conversation/contactIdentity');
@@ -19,6 +20,7 @@ const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 't
 const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 0);
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
 const { billableTalkSeconds, inboundOpen } = require('./billing/packageOverage');
+const recordingCopy = require('./sautikit/recordingCopy');
 
 function throwIfError(context, error) {
   if (error) {
@@ -117,14 +119,15 @@ async function resolveTenantId({ toNumber, fromNumber, tenantId }) {
     // Also try digit-normalized match for +254 vs 254 variants.
     const digits = String(candidate).replace(/\D/g, '');
     if (!digits) continue;
-    const { data: all, error: listError } = await supabase
-      .from('tenants')
-      .select('id, sautikit_virtual_number')
-      .eq('is_active', true);
+    // Every owner of the number, live first: an archived or suspended owner
+    // still resolves to itself (the inbound gate closes its line) instead of
+    // falling through to unassigned_did or another tenant.
+    const { data: all, error: listError } = await selectTenantLineRows();
     throwIfError('resolveTenantId(list)', listError);
-    const hit = (all || []).find(
-      (row) => String(row.sautikit_virtual_number || '').replace(/\D/g, '') === digits
-    );
+    // Same number rule as the inbound gate (+254 / 254 / 0 forms).
+    const { isTenantLineInactive, sameNumber } = require('./sautikit/inactiveTenantGate');
+    const owners = (all || []).filter((row) => sameNumber(row.sautikit_virtual_number, candidate));
+    const hit = owners.find((row) => !isTenantLineInactive(row)) || owners[0];
     if (hit?.id) return hit.id;
   }
 
@@ -169,6 +172,97 @@ async function listActiveTenantDids() {
   const fromEnv = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
   const fromDb = (data || []).map((r) => r.sautikit_virtual_number).filter(isAssignableDid);
   return [...new Set([...fromDb, ...fromEnv.filter(isAssignableDid)])];
+}
+
+// Platform audio hosted by SautiKit (line-unavailable clips, #639). Service
+// role only. The url is a presigned link: never log it.
+const PLATFORM_AUDIO_COLUMNS = 'key, url, expires_at, uploaded_at, file_sha256, size_bytes, mime_type, last_error, last_error_at';
+
+async function getPlatformAudio(keys = []) {
+  const list = (Array.isArray(keys) ? keys : []).filter(Boolean);
+  if (!list.length) return [];
+  const { data, error } = await supabase.from('voice_platform_audio').select(PLATFORM_AUDIO_COLUMNS).in('key', list);
+  throwIfError('getPlatformAudio', error);
+  return data || [];
+}
+
+async function upsertPlatformAudio({ key, url, expiresAt, fileSha256, sizeBytes, mimeType } = {}) {
+  if (!key || !url || !expiresAt) throw new Error('[db] upsertPlatformAudio: key, url and expiresAt are required');
+  const { error } = await supabase.from('voice_platform_audio').upsert(
+    {
+      key,
+      url,
+      expires_at: expiresAt,
+      uploaded_at: new Date().toISOString(),
+      file_sha256: fileSha256 || null,
+      size_bytes: sizeBytes == null ? null : Number(sizeBytes),
+      mime_type: mimeType || null,
+      last_error: null,
+      last_error_at: null,
+    },
+    { onConflict: 'key' }
+  );
+  throwIfError('upsertPlatformAudio', error);
+  return true;
+}
+
+/** Keeps the current url; only records the failure. */
+async function notePlatformAudioError({ key, error: message } = {}) {
+  if (!key) return false;
+  const { error } = await supabase
+    .from('voice_platform_audio')
+    .update({ last_error: String(message || 'error').slice(0, 200), last_error_at: new Date().toISOString() })
+    .eq('key', key);
+  throwIfError('notePlatformAudioError', error);
+  return true;
+}
+
+// Line-state columns, newest first. archived_at comes from
+// admin_business_archive.sql (#636), line_status from line_rental_grace.sql.
+// A missing column drops out and never closes a line.
+const TENANT_LINE_SELECTS = Object.freeze([
+  'id, sautikit_virtual_number, is_active, archived_at, line_status',
+  'id, sautikit_virtual_number, is_active, archived_at',
+  'id, sautikit_virtual_number, is_active, line_status',
+  'id, sautikit_virtual_number, is_active',
+]);
+
+async function selectTenantLineRows() {
+  let last = { data: null, error: null };
+  for (const columns of TENANT_LINE_SELECTS) {
+    last = await supabase.from('tenants').select(columns);
+    if (!last.error) return last;
+    if (!/column|schema cache|does not exist/i.test(last.error.message || '')) return last;
+  }
+  return last;
+}
+
+/**
+ * The tenant rows that own the dialled number, active or not, and whether the
+ * line is closed (every owner inactive or archived). Fails open: any error, a
+ * DEFAULT_TENANT_ID deploy, or no number gives { closed: false }.
+ * src/sautikit/inactiveTenantGate.js
+ */
+async function inboundTenantLine({ toNumber, fromNumber } = {}) {
+  const { tenantLineState, sameNumber } = require('./sautikit/inactiveTenantGate');
+  if (DEFAULT_TENANT_ID) return { closed: false, reason: 'default_tenant', tenantId: null };
+  const candidates = [toNumber, fromNumber].filter(Boolean);
+  if (!candidates.length) return { closed: false, reason: 'no_number', tenantId: null };
+  try {
+    const { data, error } = await selectTenantLineRows();
+    if (error) {
+      console.warn('[db] inboundTenantLine:', error.message);
+      return { closed: false, reason: 'lookup_failed', tenantId: null };
+    }
+    for (const candidate of candidates) {
+      const owners = (data || []).filter((row) => sameNumber(row.sautikit_virtual_number, candidate));
+      if (owners.length) return tenantLineState(owners);
+    }
+    return { closed: false, reason: 'no_tenant', tenantId: null };
+  } catch (err) {
+    console.warn('[db] inboundTenantLine:', err?.message || err);
+    return { closed: false, reason: 'lookup_failed', tenantId: null };
+  }
 }
 
 /**
@@ -561,7 +655,7 @@ async function uploadRecordingBuffer({
  * Matches on sautikit_call_sid. Idempotent — safe to call from multiple webhooks.
  * Does not reopen a call that is already terminal unless upgrading duration.
  */
-async function updateCallStatus({ callSid, status, durationSeconds, force = false }) {
+async function updateCallStatus({ callSid, status, durationSeconds, force = false, finalizeOnce = finalizeOnceEnabled() }) {
   if (!callSid) {
     throw new Error('[db] updateCallStatus: callSid required');
   }
@@ -645,15 +739,46 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
     return existing;
   }
 
-  const { data, error } = await supabase
-    .from('calls')
-    .update(patch)
-    .eq('sautikit_call_sid', callSid)
-    .select('*')
-    .maybeSingle();
+  // Run-once: flipping to terminal only from a non-terminal status, so the
+  // first webhook wins and later ones learn they lost (finalizeWinner=false).
+  const claimTerminal =
+    finalizeOnce && !alreadyTerminal && !force && TERMINAL.includes(String(patch.status || ''));
+  let query = supabase.from('calls').update(patch).eq('sautikit_call_sid', callSid);
+  if (claimTerminal) query = query.not('status', 'in', `(${TERMINAL.join(',')})`);
+  const { data, error } = await query.select('*').maybeSingle();
 
   throwIfError('updateCallStatus', error);
-  const shaped = shapeCall(data);
+  let lost = false;
+  let row = data;
+  if (claimTerminal && !data) {
+    // Lost the race: keep any duration fill, never the status flip.
+    lost = true;
+    const { status: _ignored, ...rest } = patch;
+    if (Object.keys(rest).length) {
+      const again = await supabase
+        .from('calls')
+        .update(rest)
+        .eq('sautikit_call_sid', callSid)
+        .select('*')
+        .maybeSingle();
+      throwIfError('updateCallStatus', again.error);
+      row = again.data;
+    } else {
+      const fresh = await supabase
+        .from('calls')
+        .select('*')
+        .eq('sautikit_call_sid', callSid)
+        .maybeSingle();
+      row = fresh.data || null;
+    }
+  }
+  const shaped = shapeCall(row);
+  if (shaped && lost) {
+    Object.defineProperty(shaped, 'finalizeWinner', { value: false, enumerable: false });
+  }
+  if (shaped && claimTerminal && !lost) {
+    Object.defineProperty(shaped, 'finalizeWinner', { value: true, enumerable: false });
+  }
 
   await settleCallUsage({
     callId: shaped?.id,
@@ -858,52 +983,32 @@ async function chargeCallToWallet({ callId, minutes, rateKesPerMin } = {}) {
   return row || null;
 }
 
+/**
+ * Save the provider recording URL right away, then copy the file into Storage in
+ * the background (SautiKit often 404s for a few seconds after Completed). If the
+ * copy never lands, the call is marked recording_status='pending_copy' and the
+ * sweep (sweepPendingRecordingCopies) retries with a fresh provider URL.
+ * Pass copy: 'await' to wait for the copy (tests), or copy: false to skip it.
+ */
 async function attachRecording({
   callSid,
   recordingUrl,
   recordingSid,
   sourceUrl,
   authHeader,
+  copy = 'background',
+  copyOptions = {},
 }) {
   const existing = await getCall(callSid);
   if (!existing) {
     throw new Error(`[db] attachRecording: no call for ${callSid}`);
   }
 
-  let finalUrl = recordingUrl || sourceUrl || null;
-  let recordingPath = null;
-
+  const finalUrl = recordingUrl || sourceUrl || null;
   const downloadUrl = sourceUrl || recordingUrl;
-  if (downloadUrl) {
-    try {
-      const headers = {};
-      if (authHeader) headers.Authorization = authHeader;
-
-      const response = await fetch(downloadUrl, { headers });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} downloading recording`);
-      }
-
-      const buffer = Buffer.from(await response.arrayBuffer());
-      const uploaded = await uploadRecordingBuffer({
-        callSid,
-        recordingSid,
-        buffer,
-        contentType: response.headers.get('content-type') || 'audio/mpeg',
-      });
-      finalUrl = uploaded.recordingUrl || finalUrl;
-      recordingPath = uploaded.recordingPath;
-    } catch (err) {
-      console.warn(
-        `[db] attachRecording: Storage upload failed for ${callSid}, keeping provider URL:`,
-        err?.message || err
-      );
-    }
-  }
 
   const meta = parseSummary(existing.summary);
   if (recordingSid) meta.recording_sid = recordingSid;
-  if (recordingPath) meta.recording_path = recordingPath;
 
   const { data, error } = await supabase
     .from('calls')
@@ -917,7 +1022,98 @@ async function attachRecording({
     .maybeSingle();
 
   throwIfError('attachRecording', error);
+
+  if (downloadUrl && copy) {
+    const job = copyRecordingToStorage({
+      callSid,
+      url: downloadUrl,
+      recordingSid,
+      authHeader,
+      ...copyOptions,
+    }).catch((err) => {
+      console.warn(`[db] attachRecording: copy job failed for ${callSid}:`, err?.message || err);
+      return { ok: false };
+    });
+    if (copy === 'await') await job;
+  }
+
   return shapeCall(data);
+}
+
+/**
+ * Download + upload with retry. On success store the Storage URL/path and clear
+ * any pending_copy marker; on failure mark pending_copy (or copy_failed once the
+ * sweep has tried MAX_SWEEP_ATTEMPTS times).
+ */
+async function copyRecordingToStorage({
+  callSid,
+  url,
+  recordingSid,
+  authHeader,
+  fetchImpl,
+  delays,
+  sleep,
+  fromSweep = false,
+} = {}) {
+  const result = await recordingCopy.copyRecordingWithRetry({
+    callSid,
+    url,
+    recordingSid,
+    authHeader,
+    upload: uploadRecordingBuffer,
+    ...(fetchImpl ? { fetchImpl } : {}),
+    ...(delays ? { delays } : {}),
+    ...(sleep ? { sleep } : {}),
+  });
+
+  const current = await getCall(callSid);
+  if (!current) return result;
+  const meta = parseSummary(current.summary);
+
+  if (result.ok) {
+    if (result.recordingPath) meta.recording_path = result.recordingPath;
+    if (recordingSid) meta.recording_sid = recordingSid;
+    delete meta.recording_status;
+    delete meta.recording_copy_attempts;
+    delete meta.recording_copy_last_error;
+    const update = { summary: serializeSummary(meta) };
+    if (result.recordingUrl) update.recording_url = result.recordingUrl;
+    const { error } = await supabase
+      .from('calls')
+      .update(update)
+      .eq('sautikit_call_sid', callSid);
+    throwIfError('copyRecordingToStorage', error);
+    return result;
+  }
+
+  const sweepAttempts = Number(meta.recording_copy_attempts || 0) + (fromSweep ? 1 : 0);
+  meta.recording_copy_attempts = sweepAttempts;
+  meta.recording_copy_last_error = String(result.lastError?.message || result.lastError || 'unknown').slice(0, 200);
+  meta.recording_status =
+    sweepAttempts >= recordingCopy.MAX_SWEEP_ATTEMPTS
+      ? recordingCopy.COPY_FAILED
+      : recordingCopy.PENDING_COPY;
+  const { error } = await supabase
+    .from('calls')
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid);
+  throwIfError('copyRecordingToStorage', error);
+  console.warn(
+    `[db] recording copy ${meta.recording_status} callSid=${callSid}, keeping provider URL: ${meta.recording_copy_last_error}`
+  );
+  return result;
+}
+
+/** Calls whose recording copy is still owed (summary.recording_status = pending_copy). */
+async function listPendingRecordingCopies({ limit = 20 } = {}) {
+  const { data, error } = await supabase
+    .from('calls')
+    .select('sautikit_call_sid, summary, recording_url, created_at')
+    .like('summary', `%"recording_status":"${recordingCopy.PENDING_COPY}"%`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  throwIfError('listPendingRecordingCopies', error);
+  return data || [];
 }
 
 async function getTenantById(tenantId) {
@@ -1795,6 +1991,8 @@ async function updateAppointment({
   serviceName,
   windowStart,
   windowEnd,
+  callerName,
+  replaceCallerName,
 } = {}) {
   let resolvedTenantId = tenantId || null;
   let callRow = null;
@@ -1830,6 +2028,10 @@ async function updateAppointment({
     const endIso = new Date(windowEnd).toISOString();
     if (!Number.isNaN(Date.parse(endIso))) patch.window_end = endIso;
   }
+  // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 1): only the code-held confirmed
+  // name is passed here; it replaces a junk name an older call saved, never
+  // a real one (replaceCallerName decides).
+  const heldName = String(callerName || '').trim();
 
   if (Object.keys(patch).length <= 1) {
     return null;
@@ -1884,6 +2086,26 @@ async function updateAppointment({
     return null;
   }
   throwIfError('updateAppointment', error);
+  if (
+    data &&
+    heldName &&
+    data.caller_name !== heldName &&
+    typeof replaceCallerName === 'function' &&
+    replaceCallerName(data.caller_name)
+  ) {
+    const { data: named, error: nameErr } = await supabase
+      .from('appointments')
+      .update({ caller_name: heldName.slice(0, 120) })
+      .eq('id', data.id)
+      .eq('tenant_id', resolvedTenantId)
+      .select('*')
+      .maybeSingle();
+    if (nameErr) {
+      console.warn('[db] updateAppointment caller_name skipped:', nameErr.message);
+      return data;
+    }
+    return named || data;
+  }
   return data || null;
 }
 
@@ -2058,6 +2280,10 @@ async function insertNotifySend(row = {}) {
     idempotency_key: row.idempotency_key,
     overage: Boolean(row.overage),
   };
+  if (row.status === 'failed') {
+    payload.status = 'failed';
+    payload.error = row.error || null;
+  }
   let { data, error } = await supabase
     .from('notify_sends')
     .insert(payload)
@@ -2066,6 +2292,19 @@ async function insertNotifySend(row = {}) {
   if (error && /overage/i.test(error.message || '')) {
     const rest = { ...payload };
     delete rest.overage;
+    ({ data, error } = await supabase
+      .from('notify_sends')
+      .insert(rest)
+      .select('id')
+      .maybeSingle());
+  }
+  if (error && payload.status && /'?(status|error)'? column|column .*(status|error)/i.test(error.message || '')) {
+    // notify_sends_status.sql not applied yet: keep the failed row, note it in body.
+    const rest = { ...payload };
+    delete rest.status;
+    delete rest.error;
+    delete rest.overage;
+    rest.body = `[FAILED: ${String(row.error || 'send_failed').slice(0, 120)}] ${rest.body || ''}`.slice(0, 2000);
     ({ data, error } = await supabase
       .from('notify_sends')
       .insert(rest)
@@ -2282,7 +2521,76 @@ async function confirmTenantField({ tenantId, fieldPath, userId = null } = {}) {
   return data || null;
 }
 
+/**
+ * Ended calls with speech that have no reviewed (or owner) call_facts row yet.
+ * Feeds the review sweep. Newest first; calls under 3 minutes old are left to the live timer.
+ */
+async function listUnreviewedCalls({ sinceDays = 14, limit = 20, minSeconds = 10 } = {}) {
+  const since = new Date(Date.now() - sinceDays * 86400000).toISOString();
+  const settled = new Date(Date.now() - 3 * 60000).toISOString();
+  const { data: calls, error } = await supabase
+    .from('calls')
+    .select('id, tenant_id, created_at, sautikit_call_sid, resolution, primary_intent, summary, duration_seconds')
+    .gte('created_at', since)
+    .lte('created_at', settled)
+    .gte('duration_seconds', minSeconds)
+    .order('created_at', { ascending: false })
+    .limit(Math.max(limit * 5, 50));
+  throwIfError('listUnreviewedCalls', error);
+  const list = calls || [];
+  if (!list.length) return [];
+  const { data: facts, error: factErr } = await supabase
+    .from('call_facts')
+    .select('call_id')
+    .in('call_id', list.map((c) => c.id))
+    .in('source', ['review', 'owner']);
+  throwIfError('listUnreviewedCalls.facts', factErr);
+  const done = new Set((facts || []).map((f) => f.call_id));
+  return list
+    .filter((c) => !done.has(c.id))
+    .map((c) => ({ ...c, summary: parseSummary(c.summary) }))
+    .slice(0, limit);
+}
+
+/** Per-call structured record. Owner-corrected rows keep their intent/outcome (trusted). */
+async function upsertCallFacts(row) {
+  if (!row?.call_id || !row?.tenant_id) return null;
+  const { mergeWithExisting } = require('./conversation/callFacts');
+  const { data: existing, error: readErr } = await supabase
+    .from('call_facts')
+    .select('source, intent, outcome, lost_reason, owner_corrected_by, owner_corrected_at')
+    .eq('call_id', row.call_id)
+    .maybeSingle();
+  throwIfError('upsertCallFacts.read', readErr);
+  const next = mergeWithExisting(row, existing);
+  const { error } = await supabase.from('call_facts').upsert(next, { onConflict: 'call_id' });
+  throwIfError('upsertCallFacts', error);
+  return next;
+}
+
+async function getTenantCatalogue(tenantId) {
+  if (!tenantId) return [];
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('product_catalog, services_catalog')
+    .eq('id', tenantId)
+    .maybeSingle();
+  throwIfError('getTenantCatalogue', error);
+  const a = Array.isArray(data?.product_catalog) ? data.product_catalog : [];
+  const b = Array.isArray(data?.services_catalog) ? data.services_catalog : [];
+  return [...a, ...b];
+}
+
 module.exports = {
+  copyRecordingToStorage,
+  listPendingRecordingCopies,
+  upsertCallFacts,
+  getTenantCatalogue,
+  resolveTenantId,
+  inboundTenantLine,
+  getPlatformAudio,
+  upsertPlatformAudio,
+  notePlatformAudioError,
   upsertCall,
   saveCallerInfo,
   saveEscalation,
@@ -2312,6 +2620,7 @@ module.exports = {
   updateAppointment,
   listOpenAppointments,
   mergeCallSummaryMeta,
+  listUnreviewedCalls,
   insertNotifySend,
   findNotifySend,
   findNotifySendByProviderMessageId,
