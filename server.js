@@ -5700,6 +5700,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       reason: event.caller?.reason || call.reason,
       callerNumber: call.from_number,
       recordingUrl: call.recording_url,
+      missed: require('./src/notifications/templates').isMissedCall(call),
     };
     const inbox = staffRecipients('inbox', {
       teamDirectory,
