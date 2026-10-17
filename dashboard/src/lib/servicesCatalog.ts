@@ -1,3 +1,4 @@
+import { sanitizePricing, type StructuredPrice } from "./structuredData";
 import { stableRowId } from "@/lib/factHash";
 
 export type ServiceItem = {
@@ -15,6 +16,8 @@ export type ServiceItem = {
   /** Required for a Home catalog row to count. Absent does not count. */
   site_visit_required?: boolean;
   /** owner | seed | import | inferred | call_suggested */
+  /** Typed price (structuredData.ts). Text field stays for old readers. */
+  pricing?: StructuredPrice;
   source?: string;
   status?: string;
 };
@@ -63,6 +66,8 @@ export function normalizeServicesCatalog(raw: unknown): ServiceItem[] {
       };
       const id = stableRowId(r);
       if (id) item.id = id;
+      const pricing = sanitizePricing(r.pricing);
+      if (pricing) item.pricing = pricing;
       const mode = String(r.pricing_mode || r.pricingMode || "").trim();
       if (mode) item.pricing_mode = mode.slice(0, 40);
       const visit = r.site_visit_required ?? r.siteVisitRequired;

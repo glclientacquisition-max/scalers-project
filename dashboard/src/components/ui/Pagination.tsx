@@ -40,8 +40,8 @@ function countLabel(noun: string | undefined, count: number): string {
 
 function pagerControlClass(enabled: boolean) {
   return enabled
-    ? `inline-flex min-h-11 items-center rounded-lg border border-line px-3 text-sm font-medium text-ink ${deskShiftClass} hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`
-    : "inline-flex min-h-11 items-center rounded-lg border border-line/50 px-3 text-sm text-ink-soft opacity-50";
+    ? `inline-flex min-h-11 items-center rounded-lg border border-hairline px-3 text-body font-medium text-ink ${deskShiftClass} hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`
+    : "inline-flex min-h-11 items-center rounded-lg border border-hairline/50 px-3 text-body text-ink-2 opacity-50";
 }
 
 export function Pagination({
@@ -58,13 +58,13 @@ export function Pagination({
   const label = countLabel(noun, total);
   const frame = [
     "flex flex-wrap items-center justify-between gap-3",
-    className || "mt-5 border-t border-line/70 pt-4",
+    className || "mt-5 border-t border-hairline/70 pt-4",
   ].join(" ");
 
   if (total <= 0) return null;
   if (total <= pageSize) {
     return (
-      <p className={className ? `${className} text-sm text-ink-soft` : "mt-4 text-sm text-ink-soft"}>
+      <p className={className ? `${className} text-body text-ink-2` : "mt-4 text-body text-ink-2"}>
         {total} {label}
       </p>
     );
@@ -99,7 +99,7 @@ export function Pagination({
 
   return (
     <div className={frame}>
-      <p className="text-sm text-ink-soft">
+      <p className="text-body text-ink-2">
         {from}-{to} of {total}
         {noun ? ` ${label}` : ""}
       </p>
@@ -139,17 +139,17 @@ export function Pagination({
               min={1}
               max={totalPages}
               defaultValue={safePage}
-              className={`h-11 w-14 rounded-lg border border-line bg-surface px-2 text-center text-sm tabular-nums text-ink-soft ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-brand`}
+              className={`h-11 w-14 rounded-lg border border-hairline bg-surface px-2 text-center text-body tabular-nums text-ink-2 ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-brand`}
             />
             <button
               type="submit"
-              className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 text-sm font-medium text-ink-soft hover:border-accent hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="inline-flex min-h-11 items-center rounded-lg border border-hairline px-3 text-body font-medium text-ink-2 hover:border-accent hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               Go
             </button>
           </form>
         ) : (
-          <span className="px-1 text-sm text-ink-soft">
+          <span className="px-1 text-body text-ink-2">
             {safePage} / {totalPages}
           </span>
         )}

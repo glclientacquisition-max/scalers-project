@@ -1,4 +1,6 @@
 import { cache } from "react";
+import { cacheLife, cacheTag } from "next/cache";
+import { tenantCacheTag } from "@/lib/tenantCache";
 import { cookies } from "next/headers";
 import { getSupabaseAdmin, type TenantRow } from "@/lib/supabase";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -6,12 +8,13 @@ import { defaultTenantLlmPrompt } from "@/lib/prompts";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { DESK_TENANT_COOKIE } from "@/lib/deskTenantCookie";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizePhone } from "@/lib/setupFlow";
 
 const TENANT_SELECT_NO_GREETING_IDENTITY =
-  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, sms_included_units, sms_used_units, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
+  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, service_areas, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, sms_included_units, sms_used_units, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
 
 const TENANT_SELECT =
-  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, spoken_name, greeting_invite, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, sms_included_units, sms_used_units, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
+  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, spoken_name, greeting_invite, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, service_areas, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, sms_included_units, sms_used_units, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
 
 const TENANT_SELECT_NO_SMS_ALLOWANCE =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
@@ -110,19 +113,28 @@ export const listOwnerWorkspaces = cache(async (): Promise<OwnerWorkspace[]> => 
   return ids.map((id) => ({ id, business_name: names.get(id) || null }));
 });
 
-async function ownerTenantId(
-  supabase: SupabaseClient,
+/**
+ * The signed-in user's memberships, oldest first, read once per request.
+ * The shell, the page, and every role check share this one round trip.
+ */
+export const memberRowsForUser = cache(
+  async (userId: string): Promise<Array<{ tenant_id: string; role: string | null }>> => {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("tenant_members")
+      .select("tenant_id, role")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data || []).filter((row): row is { tenant_id: string; role: string | null } => Boolean(row?.tenant_id));
+  }
+);
+
+export async function ownerTenantId(
+  _supabase: SupabaseClient,
   userId: string
 ): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("tenant_members")
-    .select("tenant_id")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  const ids = (data || [])
-    .map((row) => row.tenant_id)
-    .filter((id): id is string => Boolean(id));
+  const ids = (await memberRowsForUser(userId)).map((row) => row.tenant_id);
   if (!ids.length) return null;
   const picked = (await cookies()).get(DESK_TENANT_COOKIE)?.value || "";
   if (picked && ids.includes(picked)) return picked;
@@ -131,6 +143,8 @@ async function ownerTenantId(
 
 const SHELL_SELECT =
   "id, business_name, vertical, services_offered, business_hours, agent_tone";
+/** Adds the setup flag (migration 20261011150000). Falls back to SHELL_SELECT before it is applied. */
+const SHELL_SELECT_SETUP = `${SHELL_SELECT}, setup_completed_at`;
 
 export type DeskShellTenant = {
   id: string;
@@ -140,6 +154,8 @@ export type DeskShellTenant = {
   business_hours: string | null;
   agent_tone: string | null;
   llm_system_prompt: string | null;
+  /** Present (string or null) once the setup migration is applied; undefined before. */
+  setup_completed_at?: string | null;
 };
 
 function shellProfileComplete(row: {
@@ -167,9 +183,17 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
 
   let { data, error } = await supabase
     .from("tenants")
-    .select(SHELL_SELECT)
+    .select(SHELL_SELECT_SETUP)
     .eq("id", tenantId)
     .maybeSingle();
+
+  if (error && /setup_completed_at/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from("tenants")
+      .select(SHELL_SELECT)
+      .eq("id", tenantId)
+      .maybeSingle());
+  }
 
   if (error && /vertical|services_offered|business_hours|agent_tone|column/i.test(error.message)) {
     ({ data, error } = await supabase
@@ -192,6 +216,10 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
     agent_tone: row.agent_tone ?? null,
     llm_system_prompt: null,
   };
+  if (row.setup_completed_at !== undefined) {
+    shell.setup_completed_at = row.setup_completed_at ?? null;
+    return shell;
+  }
   if (shellProfileComplete(shell)) return shell;
 
   const prompt = await supabase
@@ -206,15 +234,18 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
 });
 
 /** Resolve the signed-in user's tenant (via tenant_members), or legacy first-active. */
-export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
-  const user = await getAuthUser();
-
-  if (user) {
-    // Owner path: Auth session client — RLS enforces membership.
-    const supabase = await createSupabaseServerClient();
-    const tenantId = await ownerTenantId(supabase, user.id);
-    if (!tenantId) return null;
-
+/**
+ * Tenant row by id, cached across requests for a short window and busted on save
+ * (bustTenantCache). Only ever called with an id the signed-in user is a member of
+ * (ownerTenantId checks tenant_members under RLS), so the key is the tenant and no row
+ * can be served to another workspace. Writers outside this app (voice server, SQL) are
+ * covered by the 15 s revalidate.
+ */
+async function cachedTenantRow(tenantId: string): Promise<TenantRow | null> {
+  "use cache";
+  cacheTag(tenantCacheTag(tenantId));
+  cacheLife({ stale: 15, revalidate: 15, expire: 60 });
+  const supabase = getSupabaseAdmin();
     let { data, error } = await supabase
       .from("tenants")
       .select(TENANT_SELECT)
@@ -287,6 +318,20 @@ export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
 
     if (error) throw error;
     return (data as TenantRow) || null;
+}
+
+export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
+  const user = await getAuthUser();
+
+  if (user) {
+    // Owner path: Auth session client — RLS enforces membership.
+    const supabase = await createSupabaseServerClient();
+    const tenantId = await ownerTenantId(supabase, user.id);
+    if (!tenantId) return null;
+
+    // Membership is checked above under RLS; the row read is cached per tenant.
+    void supabase;
+    return cachedTenantRow(tenantId);
   }
 
   // Legacy shared-password desk: first active tenant (ops/demo). Service role.
@@ -425,7 +470,8 @@ export async function ensureTenantForUser(opts: {
   }
 
   const businessName = opts.businessName.trim();
-  const phone = opts.notificationPhone.trim() || "pending";
+  const rawPhone = opts.notificationPhone.trim();
+  const phone = rawPhone ? normalizePhone(rawPhone) || rawPhone : "pending";
 
   const row: Record<string, unknown> = {
     business_name: businessName,

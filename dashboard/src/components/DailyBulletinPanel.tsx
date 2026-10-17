@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
@@ -7,6 +8,7 @@ import { CALLERS_HEAR_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
 import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import { parseVertical } from "@/lib/vertical";
 import {
+  bulletinExpiryPreset,
   deskBulletinItems,
   eatDateLocal,
   eatTimeLocal,
@@ -14,11 +16,13 @@ import {
   formatBulletinComposePreview,
   formatBulletinWindowLabel,
   joinEatDateTime,
+  type BulletinAnnounce,
   type BulletinExpiry,
   type BulletinItem,
 } from "@/lib/dailyBulletin";
 import {
   clearBulletinAction,
+  editBulletinAction,
   postBulletinAction,
   type BulletinActionState,
 } from "@/app/(desk)/settings/bulletinActions";
@@ -37,6 +41,11 @@ const EXPIRY_OPTIONS: { id: BulletinExpiry; label: string }[] = [
   { id: "schedule", label: "Pick" },
 ];
 
+const ANNOUNCE_OPTIONS: { id: BulletinAnnounce; label: string }[] = [
+  { id: "always", label: "Tell every caller" },
+  { id: "ask", label: "Only if they ask" },
+];
+
 const START_OPTIONS = [
   { id: "now", label: "Now" },
   { id: "later", label: "Later" },
@@ -49,13 +58,17 @@ function tonightParts() {
   return { date: eatDateLocal(end), time: eatTimeLocal(end) };
 }
 
-export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
+function DailyBulletinPanelInner({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
   const callersHearExample = useMountedPoolPick(
     placeholderPool(CALLERS_HEAR_POOLS, parseVertical(tenant.vertical))
   );
   const tonight = tonightParts();
   const [text, setText] = useState("");
+  const [announce, setAnnounce] = useState<BulletinAnnounce>("ask");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [clearingId, setClearingId] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState<"post" | "edit" | "clear" | null>(null);
   const [expiry, setExpiry] = useState<BulletinExpiry>("today");
   const [startWhen, setStartWhen] = useState<(typeof START_OPTIONS)[number]["id"]>(
     "now"
@@ -73,6 +86,10 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   );
   const [clearState, clearAction, clearPending] = useActionState(
     clearBulletinAction,
+    initial
+  );
+  const [editState, editAction, editPending] = useActionState(
+    editBulletinAction,
     initial
   );
 
@@ -98,6 +115,8 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   }, [tenant.daily_bulletin]);
 
   useEffect(() => {
+    if (!postState.at) return;
+    setLastAction("post");
     if (postState.ok) {
       setText("");
       router.refresh();
@@ -105,22 +124,70 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   }, [postState, router]);
 
   useEffect(() => {
+    if (!editState.at) return;
+    setLastAction("edit");
+    if (editState.ok) {
+      resetCompose();
+      router.refresh();
+    }
+  }, [editState, router]);
+
+  useEffect(() => {
+    if (!clearState.at) return;
+    setLastAction("clear");
     if (clearState.ok) router.refresh();
+    else setClearingId(null);
   }, [clearState, router]);
 
-  const flash = postState.error || clearState.error
-    ? postState.error || clearState.error
-    : postState.message || clearState.message;
-  const flashIsError = Boolean(postState.error || clearState.error);
+  // Once the refreshed list no longer has it, the optimistic hide is done.
+  useEffect(() => {
+    if (clearingId && !items.some((i) => i.id === clearingId)) setClearingId(null);
+  }, [items, clearingId]);
+
+  // Only the latest action speaks, so a clear never shows the earlier post's message.
+  const latest = lastAction === "post" ? postState : lastAction === "edit" ? editState : lastAction === "clear" ? clearState : initial;
+  const flash = latest.error || latest.message;
+  const flashIsError = Boolean(latest.error);
+  const composePending = postPending || editPending;
+
+  function resetCompose() {
+    setEditingId(null);
+    setText("");
+    setAnnounce("ask");
+    setExpiry("today");
+    setStartWhen("now");
+    const t = tonightParts();
+    setEndDate(t.date);
+    setEndTime(t.time);
+  }
+
+  const startEdit = (item: BulletinItem) => {
+    setEditingId(item.id);
+    setText(item.text);
+    setAnnounce(item.announce ?? "ask");
+    const preset = bulletinExpiryPreset(item.ends_at);
+    setExpiry(preset);
+    setStartWhen("now");
+    if (preset === "schedule" && item.ends_at) {
+      const end = new Date(item.ends_at);
+      setEndDate(eatDateLocal(end));
+      setEndTime(eatTimeLocal(end));
+    }
+    if (typeof window !== "undefined") document.getElementById("bulletin_text")?.focus();
+  };
+  const cancelEdit = () => resetCompose();
+  const shown = items;
 
   return (
     <section className="min-w-0 w-full space-y-3">
-      <form action={postAction} data-pull-dirty-guard="" className="min-w-0 space-y-3">
+      <form action={editingId ? editAction : postAction} data-pull-dirty-guard="" className="min-w-0 space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
+        <input type="hidden" name="announce" value={announce} />
+        {editingId ? <input type="hidden" name="bulletin_id" value={editingId} /> : null}
         <input type="hidden" name="expiry" value={expiry} />
         <input type="hidden" name="starts_at" value={startsLocal} />
         <input type="hidden" name="ends_at" value={endsLocal} />
-        <SettingsGroup title="Callers hear">
+        <SettingsGroup title={editingId ? "Edit update" : "Callers hear"}>
           <div className="flex min-w-0 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
               <label className="sr-only" htmlFor="bulletin_text">
@@ -132,22 +199,38 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 maxLength={160}
-                placeholder={callersHearExample}
+                placeholder={`e.g. ${callersHearExample}`}
                 className={`${settingsFieldClass} mt-0 min-w-0`}
               />
             </div>
-            <button
-              type="submit"
-              disabled={postPending || !text.trim()}
-              className={settingsPrimaryButtonClass}
-            >
-              {postPending ? "Posting…" : "Post update"}
-            </button>
+            <div className="flex shrink-0 gap-2">
+              {editingId ? (
+                <button type="button" onClick={cancelEdit} className={settingsGhostButtonClass}>
+                  Cancel
+                </button>
+              ) : null}
+              <button
+                type="submit"
+                disabled={composePending || !text.trim()}
+                className={settingsPrimaryButtonClass}
+              >
+                {editingId ? (editPending ? "Saving…" : "Save update") : postPending ? "Posting…" : "Post update"}
+              </button>
+            </div>
           </div>
         </SettingsGroup>
 
+        <p className="px-1 text-meta font-medium text-ink-2">Who hears it</p>
         <SettingsSegmented
-          label="Until"
+          label="Who hears it"
+          value={announce}
+          options={ANNOUNCE_OPTIONS}
+          onChange={setAnnounce}
+        />
+
+        <p className="px-1 text-meta font-medium text-ink-2">How long</p>
+        <SettingsSegmented
+          label="How long"
           value={expiry}
           options={EXPIRY_OPTIONS}
           onChange={setExpiry}
@@ -156,7 +239,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
         {expiry === "schedule" ? (
           <div className="min-w-0 space-y-3">
             <div className="min-w-0 space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+              <p className="text-meta font-medium text-ink-2">
                 From
               </p>
               <SettingsSegmented
@@ -189,7 +272,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
               ) : null}
             </div>
             <div className="min-w-0 space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+              <p className="text-meta font-medium text-ink-2">
                 Until
               </p>
               <div className="grid min-w-0 grid-cols-2 gap-2">
@@ -216,37 +299,48 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
           </div>
         ) : null}
 
-        <p className="px-1 text-sm text-ink-soft">{preview}</p>
+        <p className="px-1 text-body text-ink-2">{preview}</p>
       </form>
 
-      {items.length === 0 ? (
-        <p className="px-1 text-sm text-ink-soft">
+      {shown.length === 0 ? (
+        <p className="px-1 text-body text-ink-2">
           No live updates.
         </p>
       ) : (
         <SettingsGroup title="Posted">
-          {items.map((item) => (
+          {shown.map((item) => (
             <div
               key={item.id}
-              className="flex min-w-0 flex-wrap items-start justify-between gap-3 px-4 py-3"
+              className={`flex min-w-0 flex-wrap items-start justify-between gap-3 px-4 py-3 transition-opacity ${clearingId === item.id ? "opacity-50" : ""}`}
             >
               <div className="min-w-0 flex-1 basis-[12rem]">
-                <p className="text-sm font-medium text-ink [overflow-wrap:anywhere]">
+                <p className="text-body font-medium text-ink [overflow-wrap:anywhere]">
                   {item.text}
                 </p>
-                <p className="mt-1 text-xs text-ink-soft">
+                <p className="mt-1 text-meta text-ink-2">
                   {formatBulletinWindowLabel(item)}
+                  {" · "}
+                  {item.announce === "always" ? "Every caller" : "If they ask"}
                 </p>
               </div>
-              <form action={clearAction} className="shrink-0">
+              <button
+                type="button"
+                onClick={() => startEdit(item)}
+                disabled={composePending || clearPending || clearingId === item.id}
+                className={settingsGhostButtonClass}
+              >
+                Edit
+              </button>
+              <form action={clearAction} onSubmit={() => setClearingId(item.id)} className="shrink-0">
                 <input type="hidden" name="tenant_id" value={tenant.id} />
                 <input type="hidden" name="bulletin_id" value={item.id} />
                 <button
                   type="submit"
-                  disabled={clearPending}
+                  disabled={clearPending || clearingId === item.id}
+                  aria-busy={clearingId === item.id}
                   className={settingsGhostButtonClass}
                 >
-                  Clear
+                  {clearingId === item.id ? "Clearing…" : "Clear"}
                 </button>
               </form>
             </div>
@@ -256,7 +350,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
 
       {flash ? (
         <p
-          className={`text-sm [overflow-wrap:anywhere] ${flashIsError ? "text-warn" : "text-ok"}`}
+          className={`text-body [overflow-wrap:anywhere] ${flashIsError ? "text-warn" : "text-ok"}`}
           role={flashIsError ? "alert" : undefined}
         >
           {flash}
@@ -265,3 +359,5 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
     </section>
   );
 }
+
+export const DailyBulletinPanel = withRoleGate("settings.edit", DailyBulletinPanelInner);

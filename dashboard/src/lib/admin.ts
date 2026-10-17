@@ -10,6 +10,8 @@ export type AdminBusiness = {
   sautikit_virtual_number: string;
   whatsapp_notification_number: string;
   is_active: boolean | null;
+  /** When the business was archived. null before docs/supabase/admin_business_archive.sql or when never archived. */
+  archived_at: string | null;
   package_name: string | null;
   package_period: "month" | "year" | null;
   billing_enforcement: "off" | "soft" | "hard";
@@ -49,31 +51,27 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
     whatsapp_notification_number: string;
     is_active: boolean | null;
     billing_enforcement?: string | null;
+    archived_at?: string | null;
   };
 
+  const BASE =
+    "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active";
+  // Optional columns, newest first. Each one drops out if the database does not have it yet.
+  let optional = ["billing_enforcement", "archived_at"];
   let data: BusinessRow[] | null = null;
   let error: { message: string } | null = null;
 
-  {
+  for (;;) {
     const res = await admin
       .from("tenants")
-      .select(
-        "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active, billing_enforcement"
-      )
+      .select([BASE, ...optional].join(", "))
       .order("created_at", { ascending: true });
-    data = (res.data as BusinessRow[] | null) || null;
+    data = (res.data as unknown as BusinessRow[] | null) || null;
     error = res.error;
-  }
-
-  if (error && /billing_enforcement/i.test(error.message)) {
-    const res = await admin
-      .from("tenants")
-      .select(
-        "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active"
-      )
-      .order("created_at", { ascending: true });
-    data = (res.data as BusinessRow[] | null) || null;
-    error = res.error;
+    if (!error) break;
+    const missing = optional.find((col) => new RegExp(col, "i").test(error?.message || ""));
+    if (!missing) break;
+    optional = optional.filter((col) => col !== missing);
   }
 
   if (error) throw error;
@@ -82,6 +80,7 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
     const pack = packages.get(String(row.id));
     return {
       ...row,
+      archived_at: row.archived_at || null,
       package_name: pack?.packageName || null,
       package_period: pack?.period || null,
       billing_enforcement:
@@ -126,22 +125,4 @@ export async function getAdminOverview(): Promise<AdminOverview> {
       (b) => b.status === "waiting" || (b.status === "active" && !b.package_name),
     ),
   };
-}
-
-export async function releaseDidFromBusiness(businessId: string): Promise<string | null> {
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.rpc("release_did_from_business", {
-    p_tenant_id: businessId,
-  });
-  if (error) throw error;
-  return (data as string) || null;
-}
-
-export async function removeBusinessAndReleaseDid(businessId: string): Promise<string | null> {
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.rpc("remove_business_and_release_did", {
-    p_tenant_id: businessId,
-  });
-  if (error) throw error;
-  return (data as string) || null;
 }

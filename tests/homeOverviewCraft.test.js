@@ -21,14 +21,14 @@ describe("home overview craft", () => {
     assert.doesNotMatch(header, /deskListTitleClass/);
     assert.doesNotMatch(header, /<h1/);
     assert.doesNotMatch(header, /\{business\}/);
-    assert.doesNotMatch(header, /text-lg font-semibold/);
+    assert.doesNotMatch(header, /text-title font-semibold/);
     assert.doesNotMatch(header, /BrandLockup/);
     assert.match(account, /markOnly/);
     assert.match(account, /md:hidden/);
     assert.match(account, /name="Scalers"/);
     assert.match(account, /size="sm"/);
     assert.match(header, /<time dateTime=\{today\.iso\}>/);
-    assert.match(header, /text-sm text-ink-soft/);
+    assert.match(header, /text-body text-ink-2/);
     assert.doesNotMatch(lockup, /min-h-11/);
     assert.match(sm, /box: "h-8 w-8"/);
     assert.match(sm, /width: 32/);
@@ -70,7 +70,7 @@ describe("home overview craft", () => {
     assert.doesNotMatch(queues, /label: "Needs you"/);
     assert.doesNotMatch(queues, /purpose: "needs"/);
     assert.doesNotMatch(queues, /count: work\.needs/);
-    const note = read("docs/frontend/design-system/pages/home.md");
+    const note = read("docs/reference/design-system/pages/home.md");
     assert.match(note, /Return calls/);
     assert.match(note, /copy\.returnCtaMany/);
     const cta = page.slice(page.indexOf("let ctaHref"), page.indexOf("const showCta"));
@@ -109,21 +109,21 @@ describe("home overview craft", () => {
     assert.doesNotMatch(page, />Manage</);
     const actions = read("dashboard/src/app/(desk)/settings/bulletinActions.ts");
     assert.match(actions, /revalidatePath\("\/home"\)/);
-    const note = read("docs/frontend/design-system/pages/home.md");
+    const note = read("docs/reference/design-system/pages/home.md");
     assert.match(note, /DailyBulletinPanel/);
   });
 
   it("keeps one blue action and shows Next to return on phone", () => {
     assert.match(page, /variant="ghost"/);
     assert.doesNotMatch(page, /variant="primary"/);
-    assert.match(page, /hidden rounded-2xl border border-line bg-surface p-4 lg:block/);
+    assert.match(page, /hidden rounded-2xl border border-hairline bg-surface p-4 lg:block/);
     assert.match(page, /lg:hidden/);
     assert.match(page, /next-return-phone/);
     assert.match(page, /nextReturn\.callerPhone \|\| nextReturn\.callId/);
   });
 
   it("gives queue counts visual weight", () => {
-    assert.match(page, /tabular-nums text-base font-semibold text-ink/);
+    assert.match(page, /tabular-nums text-body font-semibold text-ink/);
     assert.match(page, /deskPreviewClass/);
     assert.doesNotMatch(page, /nextHold\?\.headline/);
     assert.doesNotMatch(page, /nextJob\?\.headline/);
@@ -142,10 +142,10 @@ describe("home overview craft", () => {
     assert.match(page, /line === "live" && !score\.ready_badge/);
     assert.match(page, /<HomeReviewSettingsNudge/);
     const nudge = read("dashboard/src/components/HomeReviewSettingsNudge.tsx");
-    assert.match(nudge, /Review settings/);
+    assert.match(nudge, /aria-label="Settings review"/);
     assert.doesNotMatch(nudge, /ScoreRing/);
     assert.doesNotMatch(nudge, /DOMAINS\.map/);
-    const note = read("docs/frontend/design-system/pages/home.md");
+    const note = read("docs/reference/design-system/pages/home.md");
     assert.doesNotMatch(note, /Setup/);
     assert.doesNotMatch(note, /HomeCapture/);
   });

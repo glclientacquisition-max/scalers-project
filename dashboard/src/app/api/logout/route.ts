@@ -5,6 +5,7 @@ import { hostOnlyCookieOptions, hostnameOf, isAdminHostName } from "@/lib/adminH
 import { LEGACY_SESSION_COOKIE, SESSION_COOKIE } from "@/lib/auth";
 import { DESK_TENANT_COOKIE } from "@/lib/deskTenantCookie";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
+import { inviteTokenFromNext, safeNextPath } from "@/lib/authRedirect";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,9 +14,18 @@ export async function POST(request: NextRequest) {
     // Stateless cookie may already be gone.
   }
 
+  // Only an invite page may be the post-logout destination ("Sign out and continue").
+  let inviteNext: string | null = null;
+  try {
+    const form = await request.formData();
+    const want = safeNextPath(form.get("next"), "");
+    if (want && inviteTokenFromNext(want)) inviteNext = want;
+  } catch {
+    // No form body.
+  }
   const nextPath = isAdminHostName(hostnameOf(request.headers.get("host")))
     ? "/admin/login"
-    : "/login";
+    : inviteNext || "/login";
   const res = NextResponse.redirect(new URL(nextPath, request.url), 303);
   res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
   res.cookies.set(LEGACY_SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });

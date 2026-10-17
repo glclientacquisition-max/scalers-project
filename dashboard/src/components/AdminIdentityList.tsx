@@ -26,7 +26,7 @@ export function AdminIdentityRow({
   actions?: ReactNode;
 }) {
   return (
-    <li className="border-t border-line/70 px-4 py-3 first:border-t-0">
+    <li className="border-t border-hairline/70 px-4 py-3 first:border-t-0">
       <p className={`text-body font-medium text-ink ${deskPreviewClass}`}>{title}</p>
       <div className="mt-0.5 flex min-w-0 items-baseline gap-3">
         <p className={`min-w-0 flex-1 text-meta text-ink-2 ${deskPreviewClass}`}>{line}</p>
@@ -38,13 +38,13 @@ export function AdminIdentityRow({
 }
 
 export const adminRowActionClass =
-  "inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-accent hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50";
+  "inline-flex min-h-11 items-center rounded-xl px-3 text-body font-medium text-accent hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50";
 
 export const adminRowMutedClass =
-  "inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50";
+  "inline-flex min-h-11 items-center rounded-xl px-3 text-body font-medium text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50";
 
 export const adminRowDangerClass =
-  "inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-attention hover:bg-attention-tonal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50";
+  "inline-flex min-h-11 items-center rounded-xl px-3 text-body font-medium text-attention hover:bg-attention-tonal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50";
 
 export const adminThClass = "px-4 py-3 text-left text-meta font-medium text-ink-2";
 

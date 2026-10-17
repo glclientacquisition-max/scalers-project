@@ -148,8 +148,8 @@ describe("contacts person-file History lock", () => {
 });
 
 describe("contacts person-file chrome", () => {
-  const accept = read("docs/product/CONTACTS_PERSON_FILE_ACCEPT.md");
-  const note = read("docs/frontend/design-system/pages/contacts.md");
+  const accept = read("docs/reference/acceptance/CONTACTS_PERSON_FILE_ACCEPT.md");
+  const note = read("docs/reference/design-system/pages/contacts.md");
   const profile = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
   const page = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const timeline = read("dashboard/src/components/ContactTimeline.tsx");

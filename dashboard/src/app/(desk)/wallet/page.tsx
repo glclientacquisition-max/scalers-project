@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { memberCan } from "@/lib/requireMember";
+import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
 import { getCurrentTenant, createWorkspaceDataClient } from "@/lib/tenant";
 import { getTenantUsageSummary } from "@/lib/wallet";
 import {
@@ -48,6 +50,7 @@ export default function WalletPage(props: WalletPageProps) {
 }
 
 async function WalletBody({ searchParams }: WalletPageProps) {
+  if (!(await memberCan("usage.view"))) return <DeskNoAccess what="Usage" />;
   const sp = await searchParams;
   const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
   const tenant = await getCurrentTenant();
@@ -114,19 +117,19 @@ async function WalletBody({ searchParams }: WalletPageProps) {
     <div className="max-w-3xl">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <h1 className={deskListTitleClass}>Usage</h1>
-        <p className="text-sm text-ink-soft">{packLabel}</p>
+        <p className="text-body text-ink-2">{packLabel}</p>
       </header>
 
-      {usage.isBeta ? <p className="mt-3 text-sm text-ink-soft">Free beta</p> : null}
+      {usage.isBeta ? <p className="mt-3 text-body text-ink-2">Free beta</p> : null}
 
       {capNotice ? (
-        <p className="mt-4 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
+        <p className="mt-4 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-body text-warn">
           {capNotice}
         </p>
       ) : null}
 
-      <section className="mt-6 rounded-2xl border border-line bg-surface p-5">
-        <p className="text-sm text-ink-soft">Minutes left</p>
+      <section className="mt-6 rounded-2xl border border-hairline bg-surface p-5">
+        <p className="text-body text-ink-2">Minutes left</p>
         <p className="mt-1 font-display text-display tabular-nums text-ink">
           {count(minutesLeft)}
         </p>
@@ -142,12 +145,12 @@ async function WalletBody({ searchParams }: WalletPageProps) {
             <div className="h-full bg-accent" style={{ width: `${minuteLeftPct}%` }} />
           </div>
         ) : (
-          <p className="mt-2 text-sm text-ink-soft">No package minutes</p>
+          <p className="mt-2 text-body text-ink-2">No package minutes</p>
         )}
 
-        <table className="mt-6 w-full text-left text-sm">
+        <table className="mt-6 w-full text-left text-body">
           <caption className="sr-only">Included amounts</caption>
-          <thead className="border-b border-line text-ink-soft">
+          <thead className="border-b border-hairline text-ink-2">
             <tr>
               <th scope="col" className="py-2 pr-3 font-medium">Included</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">Left</th>
@@ -156,10 +159,10 @@ async function WalletBody({ searchParams }: WalletPageProps) {
           </thead>
           <tbody>
             {buckets.map((row) => (
-              <tr key={row.label} className="border-b border-line">
+              <tr key={row.label} className="border-b border-hairline">
                 <th scope="row" className="py-3 pr-3 font-normal text-ink">{row.label}</th>
                 <td className="px-3 py-3 text-right font-medium tabular-nums text-ink">{count(row.left)}</td>
-                <td className="py-3 pl-3 text-right tabular-nums text-ink-soft">{count(row.used)}</td>
+                <td className="py-3 pl-3 text-right tabular-nums text-ink-2">{count(row.used)}</td>
               </tr>
             ))}
           </tbody>
@@ -173,24 +176,24 @@ async function WalletBody({ searchParams }: WalletPageProps) {
         />
       </div>
 
-      <section className="mt-6 rounded-2xl border border-line bg-surface p-5">
-        <h2 className="font-display text-xl tracking-tight text-ink">On-demand rates</h2>
-        <table className="mt-3 w-full text-left text-sm">
+      <section className="mt-6 rounded-2xl border border-hairline bg-surface p-5">
+        <h2 className="font-display text-title tracking-tight text-ink">On-demand rates</h2>
+        <table className="mt-3 w-full text-left text-body">
           <caption className="sr-only">Prices past the included amounts</caption>
           <tbody>
-            <tr className="border-b border-line">
+            <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">Calls</th>
               <td className="py-3 text-right tabular-nums text-ink">KES {kes(inboundMin)}/min</td>
             </tr>
-            <tr className="border-b border-line">
+            <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">SMS</th>
               <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.smsKes)}</td>
             </tr>
-            <tr className="border-b border-line">
+            <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">Email</th>
               <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.emailKes)}</td>
             </tr>
-            <tr className="border-b border-line">
+            <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">WhatsApp</th>
               <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.whatsappKes)}</td>
             </tr>
@@ -198,25 +201,25 @@ async function WalletBody({ searchParams }: WalletPageProps) {
         </table>
       </section>
 
-      <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">
-        <h2 className="px-4 pt-4 font-display text-xl tracking-tight text-ink">Activity</h2>
+      <section className="mt-6 overflow-hidden rounded-2xl border border-hairline bg-surface">
+        <h2 className="px-4 pt-4 font-display text-title tracking-tight text-ink">Activity</h2>
         {usage.recentLedger.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-ink-soft">
+          <p className="px-4 py-3 text-body text-ink-2">
             {usage.isBeta ? "No charges during beta." : "No charges yet."}
           </p>
         ) : (
-          <table className="mt-2 w-full text-left text-sm">
-            <thead className="border-b border-line text-ink-soft">
+          <table className="mt-2 w-full text-left text-body">
+            <thead className="border-b border-hairline text-ink-2">
               <tr>
-                <th scope="col" className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                <th scope="col" className="px-4 py-2 text-meta font-semibold">
                   When
                 </th>
-                <th scope="col" className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                <th scope="col" className="px-4 py-2 text-meta font-semibold">
                   Kind
                 </th>
                 <th
                   scope="col"
-                  className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-[0.14em]"
+                  className="px-4 py-2 text-right text-meta font-semibold"
                 >
                   KES
                 </th>
@@ -226,14 +229,14 @@ async function WalletBody({ searchParams }: WalletPageProps) {
               {usage.recentLedger.map((row) => {
                 const credit = row.amount_kes > 0;
                 return (
-                  <tr key={row.id} className="border-t border-line/70">
-                    <td className="whitespace-nowrap px-4 py-2 text-ink-soft">
+                  <tr key={row.id} className="border-t border-hairline/70">
+                    <td className="whitespace-nowrap px-4 py-2 text-ink-2">
                       {new Date(row.created_at).toLocaleString("en-KE")}
                     </td>
                     <td className={`${deskPreviewCellClass} px-4 py-2`}>
                       <p className={deskPreviewClass}>
                         <span className="font-medium text-ink">{kindLabel(row.kind)}</span>
-                        {row.note ? <span className="text-ink-soft"> · {row.note}</span> : null}
+                        {row.note ? <span className="text-ink-2"> · {row.note}</span> : null}
                       </p>
                     </td>
                     <td

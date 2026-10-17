@@ -15,7 +15,7 @@ export function CallRecording({
   if (!src) {
     if (variant === "player") return null;
     return (
-      <p className="mt-3 text-sm text-ink-soft" data-testid="call-recording-empty">
+      <p className="mt-3 text-body text-ink-2" data-testid="call-recording-empty">
         {NO_RECORDING_COPY}
       </p>
     );

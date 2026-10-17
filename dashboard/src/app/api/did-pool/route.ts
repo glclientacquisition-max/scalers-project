@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { adminFacingError, logAdminError } from "@/lib/adminErrors";
+import { adminActorName } from "@/lib/adminActor";
+import { recordAdminAction } from "@/lib/adminAudit";
+import { releasePoolNumber } from "@/lib/adminBusinessActions";
+import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
+import { adminFacingError, logAdminError, operatorError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import {
@@ -7,7 +11,6 @@ import {
   listDidPool,
   listPendingTenants,
   normalizeE164,
-  releaseAssignedDid,
 } from "@/lib/didPool";
 
 export async function GET() {
@@ -18,8 +21,7 @@ export async function GET() {
     const [pool, pendingBusinesses] = await Promise.all([listDidPool(), listPendingTenants()]);
     return NextResponse.json({ pool, pendingBusinesses, pendingTenants: pendingBusinesses });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: operatorError("did-pool", err, "Could not load the number pool.") }, { status: 500 });
   }
 }
 
@@ -36,6 +38,12 @@ export async function POST(request: Request) {
       const row = await addDidToPool({
         e164: String(body.e164 || ""),
         notes: typeof body.notes === "string" ? body.notes : undefined,
+      });
+      await recordAdminAction({
+        actor: await adminActorName(),
+        action: "add_number",
+        before: null,
+        after: { number: (row as { e164?: string } | null)?.e164 ?? String(body.e164 || ""), pool: "available" },
       });
       return NextResponse.json({ ok: true, row });
     }
@@ -56,11 +64,18 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
+      await recordAdminAction({
+        actor: await adminActorName(),
+        action: "assign_number",
+        businessId: tenantId,
+        before: { number: null },
+        after: { number: data },
+      });
       return NextResponse.json({ ok: true, e164: data });
     }
 
     if (action === "release") {
-      const result = await releaseAssignedDid(String(body.e164 || ""));
+      const result = await releasePoolNumber(String(body.e164 || ""), await adminActorName());
       return NextResponse.json({ ok: true, ...result });
     }
 
@@ -76,11 +91,21 @@ export async function POST(request: Request) {
         p_e164: e164,
       });
       if (error) throw error;
+      await recordAdminAction({
+        actor: await adminActorName(),
+        action: "assign_number",
+        businessId: tenantId,
+        before: { number: null },
+        after: { number: data || e164 },
+      });
       return NextResponse.json({ ok: true, e164: data });
     }
 
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (err) {
+    if (isAdminActionBlocked(err)) {
+      return NextResponse.json({ error: err.message, blocked: true }, { status: 409 });
+    }
     logAdminError("did-pool", err);
     return NextResponse.json(
       { error: adminFacingError(err, "Could not update the number pool.") },

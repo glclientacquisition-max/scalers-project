@@ -13,7 +13,7 @@ describe("universal row anatomy", () => {
   const row = read("dashboard/src/components/ui/deskRow.tsx");
   const inbox = read("dashboard/src/components/InboxItemRow.tsx");
   const avatar = read("dashboard/src/components/InboxRowAvatar.tsx");
-  const master = read("docs/frontend/design-system/MASTER.md");
+  const master = read("docs/reference/design-system/MASTER.md");
 
   it("ships the shared primitives", () => {
     assert.match(row, /export function RowIdentity/);
@@ -27,7 +27,7 @@ describe("universal row anatomy", () => {
   });
 
   it("keeps the identity circle neutral and state-free", () => {
-    assert.match(row, /border border-line bg-surface-muted text-xs font-semibold text-ink-soft/);
+    assert.match(row, /border border-hairline bg-surface-muted text-meta font-semibold text-ink-2/);
     // No per-name rainbow: the circle never hashes a name into a color.
     assert.doesNotMatch(row, /hash|hsl\(|palette/i);
   });
@@ -70,7 +70,7 @@ describe("universal row anatomy", () => {
     assert.match(endless, /contactListSections/);
     assert.doesNotMatch(endless, /ContactTableRow|DeskDataTable/);
     assert.match(endless, /divide-hairline/);
-    assert.match(phone, /gap-3 overflow-hidden border-t border-line\/70 px-4 py-3/);
+    assert.match(phone, /gap-3 overflow-hidden border-t border-hairline\/70 px-4 py-3/);
     assert.doesNotMatch(list, /RowStateDot|InboxRowCheck|break-words|overflow-wrap/);
   });
 
@@ -82,7 +82,7 @@ describe("universal row anatomy", () => {
 describe("inbox call action", () => {
   const call = read("dashboard/src/components/CallLink.tsx");
   const inbox = read("dashboard/src/components/InboxItemRow.tsx");
-  const master = read("docs/frontend/design-system/MASTER.md");
+  const master = read("docs/reference/design-system/MASTER.md");
 
   it("is a tel: deep link with E.164 plus prefix", () => {
     assert.match(call, /export function telHref/);

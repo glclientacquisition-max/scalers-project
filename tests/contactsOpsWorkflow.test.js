@@ -31,8 +31,8 @@ function loadInboxHrefs() {
 }
 
 describe("contacts ops workflow ACCEPT", () => {
-  const accept = read("docs/product/CONTACTS_OPS_WORKFLOW_ACCEPT.md");
-  const note = read("docs/frontend/design-system/pages/contacts.md");
+  const accept = read("docs/reference/acceptance/CONTACTS_OPS_WORKFLOW_ACCEPT.md");
+  const note = read("docs/reference/design-system/pages/contacts.md");
   const page = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const profile = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
   const add = read("dashboard/src/components/AddContactPanel.tsx");

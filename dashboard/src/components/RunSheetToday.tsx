@@ -53,18 +53,18 @@ export function RunSheetToday({
 
   return (
     <div className="mt-8">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-        <p className="text-sm font-semibold text-ink">{heading}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-3">
+        <p className="text-body font-semibold text-ink">{heading}</p>
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={prevHref}
-            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
+            className="inline-flex min-h-11 items-center rounded-xl border border-hairline px-3 text-body font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
           >
             Prev
           </Link>
           <Link
             href={nextHref}
-            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
+            className="inline-flex min-h-11 items-center rounded-xl border border-hairline px-3 text-body font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
           >
             Next
           </Link>
@@ -72,19 +72,19 @@ export function RunSheetToday({
       </div>
 
       {rows.length === 0 ? (
-        <div className="border-y border-line py-12 text-center">
-          <p className="font-display text-2xl tracking-tight text-ink">{copy.todayEmpty}</p>
+        <div className="border-y border-hairline py-12 text-center">
+          <p className="font-display text-page tracking-tight text-ink">{copy.todayEmpty}</p>
           <Link href={listHref} className={`${btnGhost} mt-6`}>
             List
           </Link>
         </div>
       ) : (
         <>
-          <ul className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+          <ul className="mt-4 overflow-hidden rounded-2xl border border-hairline bg-surface md:hidden">
             {rows.map((item) => (
               <li
                 key={item.id}
-                className="relative flex min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0"
+                className="relative flex min-w-0 items-center gap-3 border-t border-hairline/70 px-4 py-3 first:border-t-0"
               >
                 <DeskRowHit
                   href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: pile }) : null}
@@ -92,12 +92,12 @@ export function RunSheetToday({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-3">
-                    <p className={`${deskRowMutedClass} text-sm font-semibold tracking-tight ${deskPreviewClass}`}>
+                    <p className={`${deskRowMutedClass} text-body font-semibold tracking-tight ${deskPreviewClass}`}>
                       {item.callerName || "Caller"}
                     </p>
-                    <p className="shrink-0 text-xs text-ink-soft">{clockFor(item)}</p>
+                    <p className="shrink-0 text-meta text-ink-2">{clockFor(item)}</p>
                   </div>
-                  <p className={`${deskRowMutedClass} mt-0.5 text-sm text-ink ${deskPreviewClass}`}>
+                  <p className={`${deskRowMutedClass} mt-0.5 text-body text-ink ${deskPreviewClass}`}>
                     {item.headline}
                   </p>
                 </div>
@@ -109,45 +109,45 @@ export function RunSheetToday({
           </ul>
           <div className="mt-4 hidden md:block">
             <DeskDataTable minWidthClass="min-w-[720px]">
-              <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
+              <thead className="border-b border-hairline bg-surface-muted/60 text-ink-2">
                 <tr>
-                  <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                  <th scope="col" className="px-5 py-4 text-meta font-semibold">
                     When
                   </th>
-                  <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                  <th scope="col" className="px-5 py-4 text-meta font-semibold">
                     {purpose === "hold" ? "Item" : "Work"}
                   </th>
-                  <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                  <th scope="col" className="px-5 py-4 text-meta font-semibold">
                     Who
                   </th>
                   {purpose === "job" ? (
-                    <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                    <th scope="col" className="px-5 py-4 text-meta font-semibold">
                       Place
                     </th>
                   ) : null}
-                  <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">
+                  <th scope="col" className="px-5 py-4 text-right text-meta font-semibold">
                     Action
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((item) => (
-                  <tr key={item.id} className="relative border-b border-line last:border-b-0">
-                    <td className="px-5 py-3 text-sm font-semibold text-ink">
+                  <tr key={item.id} className="relative border-b border-hairline last:border-b-0">
+                    <td className="px-5 py-3 text-body font-semibold text-ink">
                       <DeskRowHit
                         href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: pile }) : null}
                         label="Conversation"
                       />
                       {clockFor(item)}
                     </td>
-                    <td className={`px-5 py-3 text-sm text-ink ${deskPreviewCellClass}`}>
+                    <td className={`px-5 py-3 text-body text-ink ${deskPreviewCellClass}`}>
                       <p className={deskPreviewClass}>{item.headline}</p>
                     </td>
-                    <td className="max-w-[10rem] px-5 py-3 text-sm text-ink">
+                    <td className="max-w-[10rem] px-5 py-3 text-body text-ink">
                       <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
                     </td>
                     {purpose === "job" ? (
-                      <td className="max-w-[12rem] px-5 py-3 text-sm text-ink-soft">
+                      <td className="max-w-[12rem] px-5 py-3 text-body text-ink-2">
                         <p className={deskPreviewClass}>{placeFor(item)}</p>
                       </td>
                     ) : null}

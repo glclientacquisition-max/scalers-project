@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
@@ -29,7 +30,7 @@ const initial: AlertsActionState = {};
 
 export const ALERTS_SETTINGS_FORM_ID = "alerts-settings-form";
 
-export function AlertsPanel({
+function AlertsPanelInner({
   tenant,
   businessName,
 }: {
@@ -173,3 +174,5 @@ export function AlertsPanel({
     </section>
   );
 }
+
+export const AlertsPanel = withRoleGate("settings.edit", AlertsPanelInner);

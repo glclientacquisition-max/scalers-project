@@ -11,6 +11,7 @@ import {
 } from "@/lib/businessSettingsNav";
 import { settingsIndexStatuses } from "@/lib/settingsOptionStatus";
 import type { TenantRow } from "@/lib/supabase";
+import { parsePaymentsText } from "@/lib/payments";
 
 /**
  * Settings job list and rail. DASHBOARD_OPEN=true only.
@@ -34,9 +35,31 @@ const tenant = {
   soniox_voice_id: "7b197f3c-84b4-4404-986f-114e4dac1432",
   vertical: "retail",
   team_directory: [{ name: "Amina", role: "Desk", phone: "+254700000001" }],
-  faqs: [],
+  faqs: [
+    { question: "Do you print on Sundays?", answer: "Yes, from 10 to 2. Bigger jobs are ready on Monday." },
+    { question: "Can I pay by M-Pesa?", answer: "Yes. Use the till number on the counter, then show the message to the cashier before you collect your prints. We also take cash and card for orders over KSh 1,000, and we can send an invoice to your company if you print with us every month." },
+  ],
   business_locations: [{ label: "Westlands", address: "Opposite Naivas" }],
+  // Old free text plus payments read from it (unconfirmed), as an owner upgrading sees it.
+  business_policies: {
+    payment: "M-Pesa till 123456 or cash on delivery",
+    payments: parsePaymentsText("M-Pesa till 123456 or cash on delivery"),
+    returns: "Unused within 7 days with receipt",
+    extra: { "Minimum order": "KSh 500" },
+  },
   is_active: true,
+} as TenantRow;
+
+const homeTenant = {
+  ...tenant,
+  id: "dev-settings-jobs-home",
+  business_name: "Done and Dusted Cleaning",
+  vertical: "home_services",
+  business_policies: {
+    payment: "Paybill 542542 account your name. 50% deposit before we start",
+    payments: parsePaymentsText("Paybill 542542 account your name. 50% deposit before we start"),
+    coverage_areas: ["Nairobi"],
+  },
 } as TenantRow;
 
 type DevSettingsJobsProps = {
@@ -52,6 +75,7 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
   const panelRaw = Array.isArray(params.panel) ? params.panel[0] : params.panel;
   const tab = parseBusinessSettingsTab(tabRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
+  const t = params.vertical === "home_services" ? homeTenant : tenant;
 
   const curatedVoices = [
     {
@@ -72,12 +96,12 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             <DeskPhonePull />
           </Suspense>
           <BusinessSettingsShell
-            tenant={tenant}
+            tenant={t}
             tab={tab}
             trainPanel={trainPanel}
             curatedVoices={curatedVoices}
             optionStatus={settingsIndexStatuses(
-              tenant,
+              t,
               curatedVoices,
               SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target))
             )}

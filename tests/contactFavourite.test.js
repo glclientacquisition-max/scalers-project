@@ -60,7 +60,7 @@ describe("contacts recents and favourites rate cards", () => {
   const button = read("dashboard/src/components/ContactFavouriteButton.tsx");
   const actions = read("dashboard/src/app/(desk)/contacts/actions.ts");
   const helpers = read("dashboard/src/lib/contactFavourite.ts");
-  const note = read("docs/frontend/design-system/pages/contacts.md");
+  const note = read("docs/reference/design-system/pages/contacts.md");
   const nav = read("dashboard/src/components/DeskNav.tsx");
 
   it("puts Recents Favourites Saved Unsaved on one Inbox filter row", () => {

@@ -11,8 +11,8 @@ Product: a calm Kenya desk. WhatsApp-class density. Navy ink, ribbon `#0096FF`, 
 
 ## Before any catalog
 
-1. Read `docs/frontend/FRONTEND_CONSTITUTION.md` and `docs/frontend/design-system/MASTER.md`.
-2. Stay in Desk paths (`docs/agents/DESK_UX.md`).
+1. Read `docs/explanation/frontend/FRONTEND_CONSTITUTION.md` and `docs/reference/design-system/MASTER.md`.
+2. Stay in Desk paths (`docs/reference/lanes/DESK_UX.md`).
 3. Copy: `/no-ai-slop`. Motion: `/desk-motion` only (pending, live, land, shift, press). New overlays are the `Sheet` bottom drawer. Do not add a centered dialog or a second overlay.
 
 Do not run `npx ui-skills get` to pull impeccable, frontend-design, shadcn themes, GSAP, Lottie, or a second `DESIGN.md`. Those fight the constitution.

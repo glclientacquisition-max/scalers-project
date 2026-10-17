@@ -55,7 +55,7 @@ export function HeroCall() {
           <Mark className="h-10 w-10 object-contain" />
           <p className="mt-8 text-sm text-ink-soft">Answered</p>
           <p className="mt-1 font-display text-2xl tracking-tight">Client</p>
-          <p className="mt-2 text-base">Call assistant</p>
+          <p className="mt-2 text-base">Business Assistant</p>
         </div>
         <div className="min-w-0">
           <p className="font-display text-4xl leading-tight tracking-tight text-ink sm:text-5xl">
@@ -83,7 +83,7 @@ const DESK = [
 
 const STEPS = [
   "You set the business in the Desk: who you are, hours, services, and the answers.",
-  "The assistant takes the call.",
+  "Your Business Assistant takes the call.",
   "You get SMS, WhatsApp, or email, then work it in the inbox: call back, WhatsApp, or an SMS you approve.",
 ] as const;
 
@@ -113,7 +113,7 @@ export function HowStage() {
           <div className="hiw-mock flex flex-col justify-center overflow-hidden rounded-2xl border border-line glass-chrome p-4" aria-hidden>
             <p className="text-sm text-ink-soft">Answered</p>
             <p className="mt-1 font-display text-xl tracking-tight">Client</p>
-            <p className="mt-2 text-base">Call assistant</p>
+            <p className="mt-2 text-base">Business Assistant</p>
             <p className="mt-4 font-display text-2xl leading-tight tracking-tight">They asked for a booking.</p>
           </div>
           <p className="text-base leading-relaxed text-ink">{STEPS[1]}</p>

@@ -229,9 +229,12 @@ function DeskDestinationLink({
 export function DeskRail({
   needsCount = 0,
   homeHref = "/home",
+  hideHrefs = [],
 }: {
   needsCount?: number;
   homeHref?: string;
+  /** Team roles: destinations this member can't open. */
+  hideHrefs?: readonly string[];
 }) {
   const fromShell = useDeskNeedsCount();
   const count = needsCount || fromShell;
@@ -239,7 +242,7 @@ export function DeskRail({
   return (
     <div
       data-desk-rail=""
-      className="glass-chrome hidden h-full w-[5.5rem] shrink-0 flex-col border-r border-line/80 md:flex"
+      className="glass-chrome hidden h-full w-[5.5rem] shrink-0 flex-col border-r border-hairline/80 md:flex"
     >
       <div className="flex h-14 items-center justify-center">
         <DeskHint label="Scalers">
@@ -255,7 +258,7 @@ export function DeskRail({
         </DeskHint>
       </div>
       <nav aria-label="Workspace" className="flex flex-1 flex-col items-center gap-1 px-1 pt-1">
-        {DESK_LINKS.map((item) => (
+        {DESK_LINKS.filter((item) => !hideHrefs.includes(item.href)).map((item) => (
           <DeskDestinationLink
             key={item.href}
             href={item.href}
@@ -264,7 +267,7 @@ export function DeskRail({
             ariaLabel={inboxLinkAria(item.label, count) || item.label}
             className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5"
             activeClassName="bg-accent/10 text-accent-deep"
-            idleClassName="text-ink-soft hover:bg-surface-muted hover:text-ink"
+            idleClassName="text-ink-2 hover:bg-surface-muted hover:text-ink"
             labelClassName="max-w-full truncate text-[10px] font-medium leading-none"
           />
         ))}
@@ -280,7 +283,13 @@ function retapPhoneTab() {
 }
 
 /** Phone thumb destinations. Same DESK_LINKS as the desktop rail. Hidden on nested insides. */
-export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
+export function DeskTabBar({
+  needsCount = 0,
+  hideHrefs = [],
+}: {
+  needsCount?: number;
+  hideHrefs?: readonly string[];
+}) {
   const pathname = usePathname();
   const fromShell = useDeskNeedsCount();
   const count = needsCount || fromShell;
@@ -290,10 +299,10 @@ export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
     <nav
       data-desk-tabbar=""
       aria-label="Workspace"
-      className="glass-chrome fixed inset-x-0 bottom-0 z-50 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-visible border-t border-line/80 pb-[env(safe-area-inset-bottom)] shadow-none md:hidden"
+      className="glass-chrome fixed inset-x-0 bottom-0 z-50 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-visible border-t border-hairline/80 pb-[env(safe-area-inset-bottom)] shadow-none md:hidden"
     >
       <ul className="flex">
-        {DESK_LINKS.map((item) => (
+        {DESK_LINKS.filter((item) => !hideHrefs.includes(item.href)).map((item) => (
           <li key={item.href} className="min-w-0 flex-1 overflow-visible">
             <DeskDestinationLink
               href={deskPhoneTabHref(item.href, pathname)}
@@ -303,7 +312,7 @@ export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
               onRetap={retapPhoneTab}
               className="flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 overflow-visible px-0.5 pt-1.5 text-[10px] leading-tight"
               activeClassName="font-semibold text-accent-deep"
-              idleClassName="font-medium text-ink-soft"
+              idleClassName="font-medium text-ink-2"
               labelClassName="max-w-full whitespace-nowrap text-center"
             />
           </li>

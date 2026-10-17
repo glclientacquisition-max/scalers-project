@@ -76,7 +76,7 @@ export function PronunciationStudioPreview() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <p className="mb-4 text-xs text-ink-soft">Local preview. ChapterOne fixture.</p>
+      <p className="mb-4 text-meta text-ink-2">Local preview. ChapterOne fixture.</p>
       <PronunciationCoach
         tenantId={FIXTURE.tenantId}
         businessName={FIXTURE.businessName}

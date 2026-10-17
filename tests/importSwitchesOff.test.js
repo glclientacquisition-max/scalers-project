@@ -263,7 +263,7 @@ describe("import switches start off", () => {
     assert.match(ghost, /export const settingsGhostButtonClass =/);
     assert.match(
       ghost.slice(ghost.indexOf("export const settingsGhostButtonClass")),
-      /min-h-11[\s\S]{0,180}text-ink-soft/
+      /min-h-11[\s\S]{0,180}text-ink-2/
     );
     assert.doesNotMatch(catalog, /ListSelectAll|selected_services/);
   });

@@ -223,7 +223,7 @@ export function InboxPileBoard({
               ids={pageRows.map((item) => item.id)}
               scopeKey={`${purpose}:${page}:${q}`}
             >
-              <ul className={`mt-8 list-none overflow-hidden rounded-2xl border border-line bg-surface lg:hidden ${inboxPhoneWindowClass}`}>
+              <ul className={`mt-8 list-none overflow-hidden rounded-2xl border border-hairline bg-surface lg:hidden ${inboxPhoneWindowClass}`}>
                 {showArchivedEntry ? (
                   <InboxArchivedPhoneRow count={counts.archived} ret={ret} />
                 ) : null}
@@ -240,57 +240,57 @@ export function InboxPileBoard({
               </ul>
               <div className="mt-8 hidden lg:block">
                 <DeskDataTable minWidthClass="min-w-0">
-                  <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
+                  <thead className="border-b border-hairline bg-surface-muted/60 text-ink-2">
                     <tr>
                       {inboxTableKind(purpose) === "hold" ? (
                         <>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-meta font-semibold">
                             <span className="flex items-center gap-3">
                               <InboxHeaderCheck />
                               Item
                             </span>
                           </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-meta font-semibold">
                             Who
                           </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-meta font-semibold">
                             Needed
                           </th>
                         </>
                       ) : null}
                       {inboxTableKind(purpose) === "job" ? (
                         <>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-meta font-semibold">
                             <span className="flex items-center gap-3">
                               <InboxHeaderCheck />
                               {copy.jobColumn}
                             </span>
                           </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-meta font-semibold">
                             Who
                           </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-meta font-semibold">
                             Place
                           </th>
                         </>
                       ) : null}
                       {inboxTableKind(purpose) === "mixed" ? (
                         <>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-meta font-semibold">
                             <span className="flex items-center gap-3">
                               <InboxHeaderCheck />
                               Work
                             </span>
                           </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-meta font-semibold">
                             Needed
                           </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-meta font-semibold">
                             When
                           </th>
                         </>
                       ) : null}
-                      <th scope="col" className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-[0.14em]">
+                      <th scope="col" className="px-3 py-2 text-right text-meta font-semibold">
                         Action
                       </th>
                     </tr>

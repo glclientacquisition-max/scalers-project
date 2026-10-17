@@ -11,6 +11,8 @@ import { adminRowActionClass, adminTdClass, adminThClass } from "@/components/Ad
 import { deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
+import { ListRow } from "@/components/ui/ListRow";
+import { numberLabel, searchableNumber } from "@/lib/adminBillingCopy";
 import { usedOfIncluded } from "@/lib/packageUsageAlign";
 
 type BillingFilter = "all" | "beta" | "charging" | "low" | "exhausted";
@@ -44,7 +46,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
       if (!q) return true;
       return (
         r.business_name.toLowerCase().includes(q) ||
-        r.sautikit_virtual_number.toLowerCase().includes(q) ||
+        searchableNumber(r.sautikit_virtual_number).includes(q) ||
         (r.packageName || "").toLowerCase().includes(q)
       );
     });
@@ -53,7 +55,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
   return (
     <div className="space-y-4">
       <section
-        className="grid grid-cols-2 border-y border-line/70 sm:grid-cols-4"
+        className="grid grid-cols-2 border-y border-hairline/70 sm:grid-cols-4"
         aria-label="Billing totals"
       >
         <Kpi label="Beta (free)" value={overview.betaCount} />
@@ -62,9 +64,9 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
         <Kpi label="Exhausted" value={overview.exhaustedCount} warn={overview.exhaustedCount > 0} />
       </section>
 
-      <p className="text-sm text-ink-2">
-        Observe every client: package minutes and on-demand charging mode. Edit SKUs, rates, and
-        assignments on{" "}
+      <p className="text-body text-ink-2">
+        Package minutes and charging for every business. Open a business to change its package.
+        Prices and rates live on{" "}
         <Link href="/admin/packages" className="font-medium text-accent underline-offset-2 hover:underline">
           Packages
         </Link>
@@ -72,7 +74,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
       </p>
 
       <div className="flex flex-wrap items-end gap-2 sm:gap-3">
-        <label className="min-w-[200px] grow text-sm">
+        <label className="min-w-[200px] grow text-body">
           Search
           <input
             value={query}
@@ -81,7 +83,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
             placeholder="Business, number, or package"
           />
         </label>
-        <div className="text-sm">
+        <div className="text-body">
           <span className="font-medium text-ink">Filter</span>
           <DeskSelect
             aria-label="Filter businesses"
@@ -94,10 +96,32 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[880px] text-left text-sm">
+      <div className="sm:hidden">
+        {filtered.length === 0 ? (
+          <Empty title="No businesses match." line="Widen your filter or search for another name." />
+        ) : (
+          <ul className="divide-y divide-hairline/70 border-y border-hairline/70" aria-label="Businesses">
+            {filtered.map((r) => (
+              <ListRow
+                key={r.id}
+                href={`/admin/billing/${r.id}`}
+                title={r.business_name}
+                when={r.statusLabel}
+                preview={[
+                  `${r.packageName || "No package"}${r.period ? ` / ${r.period}` : ""}`,
+                  `${usedOfIncluded(r.minutesUsed, r.minutesIncluded)} min`,
+                  chargingModeLabel(r.billing_enforcement),
+                ].join(" · ")}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="hidden overflow-x-auto sm:block">
+        <table className="w-full min-w-[880px] text-left text-body">
           <thead className="text-ink-2">
-            <tr className="border-b border-line/70">
+            <tr className="border-b border-hairline/70">
               <th className={adminThClass}>Business</th>
               <th className={adminThClass}>Package</th>
               <th className={adminThClass}>Minutes</th>
@@ -111,15 +135,15 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7}>
-                  <Empty title="No businesses match." line="Widen your filter or assign a package from a client row." />
+                  <Empty title="No businesses match." line="Widen your filter or search for another name." />
                 </td>
               </tr>
             ) : (
               filtered.map((r) => (
-                <tr key={r.id} className="border-t border-line/70">
+                <tr key={r.id} className="border-t border-hairline/70">
                   <td className={adminTdClass}>
                     <p className={`text-body font-medium text-ink ${deskPreviewClass}`}>{r.business_name}</p>
-                    <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>{r.sautikit_virtual_number}</p>
+                    <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>{numberLabel(r.sautikit_virtual_number)}</p>
                   </td>
                   <td className={`${adminTdClass} text-ink-2`}>
                     {r.packageName || "No package"}
@@ -150,7 +174,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
 
 function Kpi({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
   return (
-    <div className="border-t border-line/70 px-3 py-2 sm:border-t-0 sm:border-l sm:px-4 sm:py-2.5 sm:first:border-l-0">
+    <div className="border-t border-hairline/70 px-3 py-2 sm:border-t-0 sm:border-l sm:px-4 sm:py-2.5 sm:first:border-l-0">
       <p className={`text-body font-medium tabular-nums ${warn ? "text-attention" : "text-ink"}`}>{value}</p>
       <p className="mt-0.5 truncate text-meta text-ink-2">{label}</p>
     </div>

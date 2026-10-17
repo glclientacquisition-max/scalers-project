@@ -16,6 +16,7 @@
 // from a stale copy.
 
 const { inboundOpen } = require('../billing/packageOverage');
+const { isTenantLineInactive, tenantLineState, sameNumber } = require('./inactiveTenantGate');
 
 const DEFAULT_TTL_MS = 30_000;
 
@@ -95,24 +96,26 @@ function createInboundDirectory(opts = {}) {
     return [...new Set([...fromDb, ...envDids])];
   }
 
-  // Same rules as db.resolveTenantId: exact DID on any row, then digit match
-  // on active rows, trying the callee then the caller.
-  function findTenant(s, { toNumber, fromNumber }) {
+  // Same rules as db.resolveTenantId: every owner of the number (+254 / 254 /
+  // 0 forms), live owner first (isTenantLineInactive), trying the callee then
+  // the caller. An archived or suspended owner still resolves to itself so
+  // the closed-line gate can answer for it.
+  function ownersOf(s, { toNumber, fromNumber }) {
+    const rows = s?.rows || [];
+    for (const candidate of [toNumber, fromNumber].filter(Boolean)) {
+      const owners = rows.filter((r) => r && r.id && sameNumber(r.sautikit_virtual_number, candidate));
+      if (owners.length) return owners;
+    }
+    return [];
+  }
+
+  function findTenant(s, numbers) {
     const rows = s?.rows || [];
     if (defaultTenantId) {
       return rows.find((r) => r.id === defaultTenantId) || { id: defaultTenantId };
     }
-    for (const candidate of [toNumber, fromNumber].filter(Boolean)) {
-      const exact = rows.find((r) => r.sautikit_virtual_number === candidate);
-      if (exact) return exact;
-      const digits = digitsOf(candidate);
-      if (!digits) continue;
-      const hit = rows.find(
-        (r) => r.is_active !== false && digitsOf(r.sautikit_virtual_number) === digits
-      );
-      if (hit) return hit;
-    }
-    return null;
+    const owners = ownersOf(s, numbers);
+    return owners.find((r) => !isTenantLineInactive(r)) || owners[0] || null;
   }
 
   function packageGate(s, tenant) {
@@ -140,7 +143,8 @@ function createInboundDirectory(opts = {}) {
         ? correct({ fromNumber: numbers.fromNumber, toNumber: numbers.toNumber, tenantDids: dids })
         : { fromNumber: numbers.fromNumber, toNumber: numbers.toNumber, swapped: false };
       const tenant = findTenant(snapshot, fixed);
-      return { dids, fixed, tenant };
+      const owners = defaultTenantId ? [] : ownersOf(snapshot, fixed);
+      return { dids, fixed, tenant, owners };
     };
     let r = resolve(s);
     const hasNumber = Boolean(r.fixed.toNumber || r.fixed.fromNumber);
@@ -164,10 +168,13 @@ function createInboundDirectory(opts = {}) {
       gate: packageGate(s, tenant),
       line: tenant
         ? {
-            active: tenant.is_active !== false,
+            active: !isTenantLineInactive(tenant),
             archived: Boolean(tenant.archived_at),
           }
         : null,
+      // Closed-line decision for #639/#651 (same as db.inboundTenantLine).
+      // null with DEFAULT_TENANT_ID or no number: the gate fails open.
+      lineState: defaultTenantId || !hasNumber ? null : tenantLineState(r.owners),
       refreshed,
       lookupMs: now() - started,
       ageMs: s ? now() - s.loadedAt : null,

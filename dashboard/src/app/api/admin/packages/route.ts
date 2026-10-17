@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
+import { adminActorName } from "@/lib/adminActor";
+import { recordAdminAction } from "@/lib/adminAudit";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import {
-  assignBusinessPackage,
   loadPackageCatalog,
   parseCount,
   parseDiscountPercent,
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const action = String(body.action || "");
+  const actor = await adminActorName();
 
   try {
     if (action === "save_rates") {
@@ -50,14 +52,17 @@ export async function POST(request: Request) {
       ) {
         return NextResponse.json({ error: "Rates must be zero or more. Discount 0 to 100." }, { status: 400 });
       }
-      await saveRateCard({
+      const next = {
         inboundKesPerSecond,
         outboundKesPerSecond,
         whatsappKes,
         smsKes,
         emailKes,
         annualDiscountPercent,
-      });
+      };
+      const before = (await loadPackageCatalog().catch(() => null))?.rates ?? null;
+      await saveRateCard(next);
+      await recordAdminAction({ actor, action: "save_rates", before, after: next });
       return NextResponse.json({ ok: true });
     }
 
@@ -88,7 +93,8 @@ export async function POST(request: Request) {
       ) {
         return NextResponse.json({ error: "Package numbers must be zero or more" }, { status: 400 });
       }
-      await saveBillingPackage({
+      const before = (await loadPackageCatalog().catch(() => null))?.packages.find((p) => p.id === id) ?? null;
+      const next = {
         id,
         sku,
         name,
@@ -101,23 +107,14 @@ export async function POST(request: Request) {
         dids,
         sortOrder,
         isActive: body.is_active !== false,
-      });
+      };
+      await saveBillingPackage(next);
+      await recordAdminAction({ actor, action: "save_package", before, after: next, detail: { package_id: id, name } });
       return NextResponse.json({ ok: true });
     }
 
-    if (action === "assign") {
-      const tenantId = String(body.business_id || "");
-      const packageId = String(body.package_id || "");
-      const period = String(body.period || "month");
-      if (!tenantId || !packageId) {
-        return NextResponse.json({ error: "Business and package required" }, { status: 400 });
-      }
-      if (period !== "month" && period !== "year") {
-        return NextResponse.json({ error: "Period must be month or year" }, { status: 400 });
-      }
-      await assignBusinessPackage({ tenantId, packageId, period });
-      return NextResponse.json({ ok: true });
-    }
+    // Package assignment lives on the business's Billing page (/api/admin/billing assign_package).
+    // One path, one confirm.
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (err) {

@@ -30,7 +30,7 @@ describe("business settings depth", () => {
     assert.doesNotMatch(form, />Alerts</);
     assert.match(form, /placeholder="Aisha"/);
     assert.match(form, /placeholder="Westlands Books"/);
-    assert.match(form, /placeholder="\+254 700 000 000"/);
+    assert.match(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /"\+254 700 000 000"/);
     assert.doesNotMatch(form, /e\.g\. Aisha|Used for SMS|Owner alert phone/);
   });
 
@@ -47,7 +47,7 @@ describe("business settings depth", () => {
     assert.doesNotMatch(modes, /missing access|upgrade|Gemini|Soniox|GPT/i);
     assert.match(form, /title="When unsure"/);
     assert.match(form, /What to say/);
-    assert.match(form, /placeholder="Wanjiku Mwangi"/);
+    assert.match(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /"Wanjiku Mwangi"/);
     assert.match(form, /Add service/);
     assert.match(form, /placeholder="Shop voice"/);
     assert.match(form, /placeholder="Opposite Naivas"/);
@@ -198,7 +198,7 @@ describe("business settings depth", () => {
     assert.match(voice, /title="Voice"/);
     assert.match(voice, /title="Tools"/);
     assert.match(voice, /Hear sample/);
-    assert.match(voice, /htmlFor="soniox_voice_id"/);
+    assert.match(voice, /id="soniox_voice_id"/); // SettingsSelect wires its own label
     assert.match(voice, /htmlFor="soniox_voice_label"/);
     assert.doesNotMatch(voice, /Handoff/);
     assert.doesNotMatch(voice, /HANDOFF_OPTIONS/);
@@ -210,7 +210,8 @@ describe("business settings depth", () => {
       form.indexOf('panel === "faqs"')
     );
     assert.match(team, /Add person/);
-    assert.match(team, /liveTransferExecutor \|\| handoffMode === "live_transfer"/);
+    assert.match(team, /\{liveTransferExecutor \? \(/);
+    assert.doesNotMatch(team, /handoffMode === "live_transfer" \? \(/);
     assert.match(
       team,
       /liveTransferExecutor \|\| handoffMode === "live_transfer"[\s\S]*liveConnectBlurb\(liveDest\?\.name\)/
@@ -225,7 +226,8 @@ describe("business settings depth", () => {
     assert.doesNotMatch(team, /Message teammate/);
     assert.doesNotMatch(team, />Handoff</);
     assert.doesNotMatch(team, /btnPrimaryFill|settingsPrimaryButtonClass/);
-    assert.match(team, /<span>Role<\/span>/);
+    // #655 moved roles to Members (logins); the alert contact list has no Role column.
+    assert.match(team, /<AlertContactsList/);
     assert.doesNotMatch(team, /Handles/);
     assert.match(form, /name="handoff_mode"/);
     assert.doesNotMatch(team, /Alert phone/);
@@ -238,8 +240,10 @@ describe("business settings depth", () => {
       form.indexOf('panel === "policies"'),
       form.indexOf('panel === "tools"')
     );
-    assert.match(block, /No rules yet\. Add payment or cancellation/);
-    assert.match(block, /Add rule/);
+    const editor = fs.readFileSync(path.join(__dirname, "..", "dashboard/src/components/structured/PolicyRulesEditor.tsx"), "utf8");
+    assert.match(editor, /No rules yet\. Add the ones callers ask about/);
+    assert.match(editor, /Add a rule/);
+    assert.match(block, /<PolicyRulesEditor/);
     assert.doesNotMatch(block, /Paybill|Till number|KES 500|same-day guarantee/);
   });
 });

@@ -5,7 +5,7 @@ export function HomeOverviewHeader({
 }) {
   return (
     <header className="min-w-0">
-      <p className="truncate text-sm text-ink-soft">
+      <p className="truncate text-body text-ink-2">
         <time dateTime={today.iso}>{today.label}</time>
       </p>
     </header>

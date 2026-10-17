@@ -1,4 +1,5 @@
 import { pickCallOwnerReason } from "@/lib/callSummarySentence";
+import { applyOwnerFacts, type OwnerFacts } from "@/lib/ownerCallFacts";
 import {
   leadStatusLabel,
   parseCallResolution,
@@ -18,6 +19,9 @@ export type Lead = {
   leadStatus: LeadStatus;
   resolution: CallResolution;
   primaryIntent: string | null;
+  /** Owner's corrected Wanted / Result labels, when they fixed this call. */
+  ownerWanted?: string | null;
+  ownerResult?: string | null;
 };
 
 export const STATUS_FILTERS = [
@@ -32,8 +36,12 @@ export type StatusFilterId = (typeof STATUS_FILTERS)[number]["id"];
 
 export { leadStatusLabel };
 
-export function toLead(call: CallRow): Lead {
+export function toLead(call: CallRow, facts?: OwnerFacts | null): Lead {
   const meta = parseSummary(call.summary);
+  const owned = applyOwnerFacts(
+    { primaryIntent: call.primary_intent?.trim() || null, resolution: parseCallResolution(call.resolution) },
+    facts,
+  );
   return {
     call,
     name: typeof meta.name === "string" ? meta.name : null,
@@ -41,8 +49,10 @@ export function toLead(call: CallRow): Lead {
     notified: Boolean(meta.owner_notified || meta.whatsapp_sent),
     urgent: String(call.sentiment || "").toLowerCase() === "urgent",
     leadStatus: parseLeadStatus(call.lead_status),
-    resolution: parseCallResolution(call.resolution),
-    primaryIntent: call.primary_intent?.trim() || null,
+    resolution: owned.resolution as CallResolution,
+    primaryIntent: owned.primaryIntent,
+    ownerWanted: owned.wanted,
+    ownerResult: owned.result,
   };
 }
 

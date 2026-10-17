@@ -22,7 +22,7 @@
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
 //
 // Target guard: staging (sgcdncjxauhsbunobmob) and local URLs run. Anything
-// else, including prod ALCR fjxcdccgyhnvnnlnovcl (docs/operations/ENVIRONMENTS.md),
+// else, including prod ALCR fjxcdccgyhnvnnlnovcl (docs/reference/operations/ENVIRONMENTS.md),
 // is refused (dry run included) unless --i-have-alvin-ok is passed.
 //
 // Exit codes: 0 ok, 1 write errors, 2 bad arguments or guard refusal,

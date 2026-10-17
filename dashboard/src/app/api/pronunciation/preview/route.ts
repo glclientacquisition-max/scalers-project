@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
 import { fetchTtsPreviewWav } from "@/lib/voicePreview";
+import { currentMemberRole, memberDenied } from "@/lib/requireMember";
 
 export async function POST(request: Request) {
   if (!(await isAuthenticated())) {
@@ -8,6 +9,13 @@ export async function POST(request: Request) {
       status: 401,
     });
   }
+
+  // Voice previews spend TTS credit and live in Settings: settings access required.
+  if (!(await currentMemberRole())) {
+    return NextResponse.json({ error: "Open your business workspace to preview pronunciation." }, { status: 403 });
+  }
+  const denied = await memberDenied("settings.view");
+  if (denied) return NextResponse.json({ error: denied.error }, { status: 403 });
 
   const body = await request.json().catch(() => ({}));
   const text = String(body.text || "").trim();

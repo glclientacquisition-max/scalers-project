@@ -223,7 +223,9 @@ function noopTrace() {
     noteBarge: noop,
     noteSpeakPacket: noop,
     noteSpeakSlots: noop,
+    noteBrainLines: noop,
     noteCall: noop,
+    noteAudioSegments: noop,
     commitTurn: noop,
     finishCall: async () => null,
   };
@@ -426,6 +428,16 @@ function createVoiceTrace(opts = {}) {
     });
   }
 
+  // VOICE_TOOL_SMOOTH_TRACE: heard audio spans for this turn (ms from turn start).
+  function noteAudioSegments(info = {}) {
+    pushStage({
+      stage: 'audio_segments',
+      segments: (info.segments || []).slice(0, 40).map((s) => ({ kind: String(s.kind || ''), startMs: Math.round(s.startMs), endMs: Math.round(s.endMs) })),
+      holdsQueued: Number(info.holdsQueued) || 0,
+      receiptCached: !!info.receiptCached,
+    });
+  }
+
   function noteBarge(info = {}) {
     pushStage({
       stage: 'barge_in',
@@ -457,6 +469,22 @@ function createVoiceTrace(opts = {}) {
       slots,
       at: new Date().toISOString(),
     });
+  }
+
+  // Brain fact lines (docs/specs/fact-lines.md) on this turn: brain.lines[].
+  // Voice's scorer checks them against the DB.
+  function noteBrainLines(lines = []) {
+    if (!open) return;
+    const rows = (Array.isArray(lines) ? lines : []).slice(0, 24).map((line) => ({
+      template: String(line?.template || ''),
+      lang: line?.lang || null,
+      slots: line?.slots && typeof line.slots === 'object' ? line.slots : {},
+      gate: line?.gate && typeof line.gate === 'object' ? line.gate : {},
+      text: redactText(line?.text || ''),
+    }));
+    if (!rows.length) return;
+    if (!open.brain || typeof open.brain !== 'object') open.brain = { lines: [] };
+    open.brain.lines.push(...rows);
   }
 
   function noteCall(stage = {}) {
@@ -580,7 +608,9 @@ function createVoiceTrace(opts = {}) {
     noteBarge: guard(noteBarge),
     noteSpeakPacket: guard(noteSpeakPacket),
     noteSpeakSlots: guard(noteSpeakSlots),
+    noteBrainLines: guard(noteBrainLines),
     noteCall: guard(noteCall),
+    noteAudioSegments: guard(noteAudioSegments),
     commitTurn: guard(commitTurn),
     finishCall: async () => {
       try {

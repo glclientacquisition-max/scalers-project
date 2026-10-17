@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,7 +28,7 @@ import {
 const previewInitial: ContactImportPreviewState = {};
 const applyInitial: ContactImportApplyState = {};
 
-export function ContactImportForm() {
+function ContactImportFormInner() {
   const router = useRouter();
   const [csvText, setCsvText] = useState("");
   const [pickerOn, setPickerOn] = useState(false);
@@ -92,53 +93,53 @@ export function ContactImportForm() {
             primary
             onPick={pickFromPhone}
           />
-          {pickerError ? <p className="text-sm text-warn">{pickerError}</p> : null}
+          {pickerError ? <p className="text-body text-warn">{pickerError}</p> : null}
 
           <form action={previewAction} data-pull-dirty-guard="" className="space-y-4">
-            <label className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+            <label className="text-meta font-medium text-ink-2">
               CSV
               <input
                 type="file"
                 name="csv"
                 accept=".csv,text/csv"
                 required={!pickerOn}
-                className={`${settingsFieldClass} file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium`}
+                className={`${settingsFieldClass} file:mr-3 file:border-0 file:bg-transparent file:text-body file:font-medium`}
               />
             </label>
             <button type="submit" disabled={previewPending} className={settingsPrimaryButtonClass}>
               {previewPending ? "Checking" : "Preview"}
             </button>
             {previewState.error ? (
-              <p className="text-sm text-warn">{previewState.error}</p>
+              <p className="text-body text-warn">{previewState.error}</p>
             ) : null}
           </form>
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-ink">
+          <p className="text-body text-ink">
             {summary?.create || 0} will be created. {summary?.skipped || 0} skipped as
             duplicates. {summary?.rejected || 0} rejected as invalid.
           </p>
 
           {plan.rejected.length ? (
-            <div className="overflow-x-auto rounded-2xl border border-line">
-              <table className="w-full min-w-[520px] text-left text-sm">
-                <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
+            <div className="overflow-x-auto rounded-2xl border border-hairline">
+              <table className="w-full min-w-[520px] text-left text-body">
+                <thead className="border-b border-hairline bg-surface-muted/60 text-ink-2">
                   <tr>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">
+                    <th className="px-4 py-3 text-meta font-semibold">
                       Row
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">
+                    <th className="px-4 py-3 text-meta font-semibold">
                       Phone
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">
+                    <th className="px-4 py-3 text-meta font-semibold">
                       Reason
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {plan.rejected.map((row) => (
-                    <tr key={row.rowNumber} className="border-t border-line/70">
+                    <tr key={row.rowNumber} className="border-t border-hairline/70">
                       <td className="px-4 py-3">{row.rowNumber}</td>
                       <td className="px-4 py-3 font-mono">{row.phone || "None"}</td>
                       <td className="px-4 py-3 text-warn">{row.reason}</td>
@@ -150,7 +151,7 @@ export function ContactImportForm() {
           ) : null}
 
           {plan.skipped.length ? (
-            <ul className="space-y-1 text-sm text-ink-soft">
+            <ul className="space-y-1 text-body text-ink-2">
               {plan.skipped.map((row) => (
                 <li key={`${row.rowNumber}-${row.phone}`}>
                   Row {row.rowNumber}: {row.phone} {row.reason}
@@ -189,10 +190,12 @@ export function ContactImportForm() {
             </button>
           </form>
           {applyState.error ? (
-            <p className="text-sm text-warn">{applyState.error}</p>
+            <p className="text-body text-warn">{applyState.error}</p>
           ) : null}
         </div>
       )}
     </div>
   );
 }
+
+export const ContactImportForm = withRoleGate("contacts.import", ContactImportFormInner);

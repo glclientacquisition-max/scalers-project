@@ -1,6 +1,13 @@
 "use client";
 
+import { AlertContactsList } from "@/components/AlertContactsList";
+
+import { withRoleGate } from "@/components/DeskRole";
+import { CharCount as KitCharCount, FieldCard, TextAreaField, TextField } from "@/components/ui/TextField";
+import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
+import { normalizeContactPhone } from "@/lib/teamValidation";
 import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
   canonicalizeAgentTone,
@@ -15,6 +22,7 @@ import {
   scheduleForForm,
   type DayKey,
   type HoursSchedule,
+  formatHoursForOwner,
 } from "@/lib/hoursSchedule";
 import {
   AFTER_HOURS_OPTIONS,
@@ -91,20 +99,31 @@ import {
 } from "@/lib/sonioxVoiceCatalog";
 import {
   emptyLocation,
-  LOCATIONS_MAX,
+  upgradeLegacyPlace,
   normalizeBusinessLocations,
   type BusinessLocation,
 } from "@/lib/businessLocations";
 import {
+  bookingModePatch,
+  HOLD_HOURS_OPTIONS,
+  holdRulesValue,
   normalizeBusinessPolicies,
+  readBookingMode,
+  readHoldRules,
   POLICY_FIELDS,
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
-import { CoverageAreaField } from "@/components/CoverageAreaField";
+import { PlacesEditor } from "@/components/structured/PlacesEditor";
+import { ServiceAreasEditor } from "@/components/structured/ServiceAreasEditor";
+import { savedBaseline, serviceAreasForForm, suggestHomeAreas, type ServiceAreas } from "@/lib/serviceAreas";
 import { stableRowId } from "@/lib/factHash";
+import { catalogBaseline, isUnpricedRow } from "@/lib/catalogPricing";
 import { DeskSelect } from "@/components/ui/DeskSelect";
-import { PronunciationCoach } from "@/components/PronunciationCoach";
-import { deskShiftClass } from "@/components/ui/deskChrome";
+import { PaymentsEditor } from "@/components/structured/PaymentsEditor";
+import { PolicyRulesEditor } from "@/components/structured/PolicyRulesEditor";
+import dynamic from "next/dynamic";
+// Pronunciation is one panel of many; load it only when that panel renders.
+const PronunciationCoach = dynamic(() => import("@/components/PronunciationCoach").then((m) => m.PronunciationCoach));
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { notify } from "@/components/ui/DeskNotice";
 import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
@@ -125,7 +144,6 @@ import {
   settingsFormBodyClass,
   settingsDenseFieldClass,
   settingsValueFieldClass,
-  settingsFieldClass,
   settingsGhostButtonClass,
   settingsPanelClass,
   settingsTableFieldClass,
@@ -207,7 +225,6 @@ const TEAM_NOTIFY_FLAGS: Array<{
 ];
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 
-type PolicyFieldId = (typeof POLICY_FIELDS)[number]["id"];
 
 /** Pull location prose from legacy free-text hours when schedule.location is empty. */
 function extractLocationFallback(businessHours: string): string {
@@ -231,7 +248,25 @@ function placeLocationLine(loc: Pick<BusinessLocation, "label" | "address" | "la
 
 const initial: SettingsCompileState = {};
 
-const fieldClass = settingsFieldClass;
+/**
+ * A dropped connection (TypeError: network error) must not throw the page into the error
+ * boundary: the write has usually landed, so report it and let the form refetch.
+ */
+async function saveSettingsSafely(
+  prev: SettingsCompileState,
+  formData: FormData
+): Promise<SettingsCompileState> {
+  try {
+    const res = await saveAndCompileSettings(prev, formData);
+    // Toast here, not from component state: a save can remount the form.
+    if (res.ok) notify("Saved · training line");
+    return res;
+  } catch (err) {
+    console.warn("[settings] save response lost:", err instanceof Error ? err.message : err);
+    return { networkError: true };
+  }
+}
+
 const tableFieldClass = settingsTableFieldClass;
 const denseFieldClass = settingsDenseFieldClass;
 
@@ -253,12 +288,24 @@ function PolicyTextarea({
   placeholder: string;
 }) {
   return (
-    <ExpandTextarea
-      id={id}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-    />
+    <div>
+      <ExpandTextarea
+        id={id}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        maxLength={POLICY_TEXT_MAX}
+      />
+      <CharCount value={value} max={POLICY_TEXT_MAX} />
+    </div>
+  );
+}
+
+function CharCount({ value, max }: { value: string; max: number }) {
+  return (
+    <div className="mt-1.5 flex justify-end">
+      <KitCharCount length={value.length} max={max} />
+    </div>
   );
 }
 
@@ -287,12 +334,17 @@ function CatalogPager({
       total={total}
       noun={noun}
       onPage={(next) => onPage(next - 1)}
-      className="border-t border-line bg-surface-canvas px-3 py-3"
+      className="border-t border-hairline bg-surface-canvas px-3 py-3"
     />
   );
 }
 
-export function TenantForm({
+function isOwnerTeamRow(phone: string, ownerPhone: string | null | undefined): boolean {
+  const a = normalizeContactPhone(phone);
+  return Boolean(a && a === normalizeContactPhone(ownerPhone));
+}
+
+function TenantFormInner({
   tenant,
   panel = "identity",
   curatedVoices,
@@ -300,6 +352,8 @@ export function TenantForm({
   sidebar = null,
   liveTransferExecutor = false,
   showBack = true,
+  membersSlot = null,
+  structuredSlot = null,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -308,6 +362,10 @@ export function TenantForm({
   sidebar?: ReactNode;
   liveTransferExecutor?: boolean;
   showBack?: boolean;
+  /** Team & access: Members section (feature flag TEAM_INVITES_ENABLED). */
+  membersSlot?: ReactNode;
+  /** Typed-data groups (payments, price checks, category) rendered by the server page per panel. */
+  structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -337,6 +395,11 @@ export function TenantForm({
   const [bulkProductsError, setBulkProductsError] = useState<string | null>(null);
   const [servicePage, setServicePage] = useState(0);
   const [productPage, setProductPage] = useState(0);
+  const [unpricedOnly, setUnpricedOnly] = useState(false);
+  useEffect(() => {
+    // Read after mount so server and first client render agree.
+    if (new URLSearchParams(window.location.search).get("filter") === "unpriced") setUnpricedOnly(true);
+  }, []);
   const [faqPage, setFaqPage] = useState(0);
   const [unknownFallback, setUnknownFallback] = useState(
     tenant.unknown_answer_fallback || ""
@@ -366,19 +429,15 @@ export function TenantForm({
     parseHandoffMode(tenant.handoff_mode)
   );
   const [locations, setLocations] = useState<BusinessLocation[]>(() => {
-    const rows = normalizeBusinessLocations(tenant.business_locations);
+    const rows = normalizeBusinessLocations(tenant.business_locations).map(upgradeLegacyPlace);
     return rows.length ? rows.map((row) => markSavedRow(row)) : [emptyLocation()];
   });
-  const [openLocationIndexes, setOpenLocationIndexes] = useState<number[]>([]);
+  const [serviceAreas, setServiceAreas] = useState<ServiceAreas>(() =>
+    serviceAreasForForm(tenant.service_areas, tenant.business_policies?.coverage_areas, tenant.vertical)
+  );
   const [policies, setPolicies] = useState<BusinessPolicies>(() =>
     normalizeBusinessPolicies(tenant.business_policies)
   );
-  const [openPolicyIds, setOpenPolicyIds] = useState<PolicyFieldId[]>(() => {
-    const initial = normalizeBusinessPolicies(tenant.business_policies);
-    return POLICY_FIELDS.filter((field) => String(initial[field.id] || "").trim()).map(
-      (field) => field.id
-    );
-  });
   const [agentTools, setAgentTools] = useState<AgentTools>(() =>
     parseAgentTools(tenant.agent_tools)
   );
@@ -404,7 +463,16 @@ export function TenantForm({
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
   );
-  const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
+  const router = useRouter();
+  const [state, formAction, pending] = useActionState(saveSettingsSafely, initial);
+  // Price text as loaded. The server keeps the stored (maybe just confirmed) price for any row
+  // whose text the owner did not touch in this form.
+  const [catalogBaseJson] = useState(() =>
+    JSON.stringify({
+      ...catalogBaseline(normalizeServicesCatalog(tenant.services_catalog) as unknown as Record<string, unknown>[], "service"),
+      ...catalogBaseline(normalizeProductCatalog(tenant.product_catalog) as unknown as Record<string, unknown>[], "product"),
+    })
+  );
 
   const ttsLexiconJson = useMemo(
     () => JSON.stringify(lexiconForStorage(ttsLexicon)),
@@ -446,6 +514,7 @@ export function TenantForm({
     [locations]
   );
   const policiesJson = useMemo(() => JSON.stringify(policies), [policies]);
+  const serviceAreasJson = useMemo(() => JSON.stringify(serviceAreas), [serviceAreas]);
   const faqDupIndexes = useMemo(() => {
     const seen = new Map<string, number>();
     const dups = new Set<number>();
@@ -470,20 +539,40 @@ export function TenantForm({
     () => JSON.stringify(products.filter((p) => p.name.trim())),
     [products]
   );
-  const servicePageCount = Math.max(1, Math.ceil(services.length / SERVICE_PAGE_SIZE));
-  const productPageCount = Math.max(1, Math.ceil(products.length / PRODUCT_PAGE_SIZE));
+  // ?filter=unpriced (from the Overview "Add prices" row) shows only items with no price.
+  // The set is frozen while you type (a row must not vanish on its first digit) and is
+  // re-read only when rows are added or removed. Same "no price" rule as the count.
+  const unpricedFrozen = useMemo(
+    () =>
+      unpricedOnly
+        ? {
+            services: services.flatMap((row, i) => (isUnpricedRow(row, "service") ? [i] : [])),
+            products: products.flatMap((row, i) => (isUnpricedRow(row, "product") ? [i] : [])),
+          }
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- frozen on purpose: lengths only, not text
+    [unpricedOnly, services.length, products.length]
+  );
+  const serviceIdx = useMemo(
+    () => unpricedFrozen?.services.filter((i) => i < services.length) ?? services.map((_, i) => i),
+    [services, unpricedFrozen]
+  );
+  const productIdx = useMemo(
+    () => unpricedFrozen?.products.filter((i) => i < products.length) ?? products.map((_, i) => i),
+    [products, unpricedFrozen]
+  );
+  const servicePageCount = Math.max(1, Math.ceil(serviceIdx.length / SERVICE_PAGE_SIZE));
+  const productPageCount = Math.max(1, Math.ceil(productIdx.length / PRODUCT_PAGE_SIZE));
   const faqPageCount = Math.max(1, Math.ceil(faqs.length / FAQ_PAGE_SIZE));
   const safeServicePage = Math.min(servicePage, servicePageCount - 1);
   const safeProductPage = Math.min(productPage, productPageCount - 1);
   const safeFaqPage = Math.min(faqPage, faqPageCount - 1);
-  const visibleServices = services.slice(
-    safeServicePage * SERVICE_PAGE_SIZE,
-    safeServicePage * SERVICE_PAGE_SIZE + SERVICE_PAGE_SIZE
-  );
-  const visibleProducts = products.slice(
-    safeProductPage * PRODUCT_PAGE_SIZE,
-    safeProductPage * PRODUCT_PAGE_SIZE + PRODUCT_PAGE_SIZE
-  );
+  const visibleServices = serviceIdx
+    .slice(safeServicePage * SERVICE_PAGE_SIZE, safeServicePage * SERVICE_PAGE_SIZE + SERVICE_PAGE_SIZE)
+    .map((i) => services[i]);
+  const visibleProducts = productIdx
+    .slice(safeProductPage * PRODUCT_PAGE_SIZE, safeProductPage * PRODUCT_PAGE_SIZE + PRODUCT_PAGE_SIZE)
+    .map((i) => products[i]);
   const visibleFaqs = faqs.slice(
     safeFaqPage * FAQ_PAGE_SIZE,
     safeFaqPage * FAQ_PAGE_SIZE + FAQ_PAGE_SIZE
@@ -516,8 +605,11 @@ export function TenantForm({
 
   useEffect(() => {
     // Compile finished before ok - owners should hear the line was trained, not only "Saved".
-    if (state.ok) notify("Saved · training line");
-  }, [state]);
+    if (state.networkError) {
+      notify("Connection dropped. Showing your latest saved details.");
+      router.refresh();
+    }
+  }, [state, router]);
 
   useEffect(() => {
     return () => {
@@ -649,6 +741,16 @@ export function TenantForm({
     );
   }
 
+  function setProductHoldable(index: number, holdable: boolean) {
+    const current = products[index];
+    if (current && current.name.trim()) {
+      queueOwnerPath(`catalog.product.${current.sku.trim() || String(index + 1)}.name`);
+    }
+    setProducts((prev) =>
+      prev.map((row, i) => (i === index ? carrySavedRow({ ...row, holdable, source: "owner" }, row) : row))
+    );
+  }
+
   function updateSocialChannel(
     index: number,
     key: keyof SocialChannel,
@@ -682,34 +784,6 @@ export function TenantForm({
     }));
   }
 
-  function toggleLocationDetails(index: number) {
-    setOpenLocationIndexes((prev) =>
-      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
-    );
-  }
-
-  function removeLocation(index: number) {
-    setLocations((prev) => prev.filter((_, i) => i !== index));
-    setOpenLocationIndexes((prev) =>
-      prev.flatMap((i) => {
-        if (i === index) return [];
-        return [i > index ? i - 1 : i];
-      })
-    );
-  }
-
-  function updateLocation(
-    index: number,
-    key: keyof BusinessLocation,
-    value: string
-  ) {
-    setLocations((prev) =>
-      prev.map((row, i) =>
-        i === index ? carrySavedRow({ ...row, [key]: value }, row) : row
-      )
-    );
-  }
-
   const bulkPreview = useMemo(
     () => previewSuggestedServices(parseBulkServices(bulkServicesText), vertical),
     [bulkServicesText, vertical]
@@ -718,6 +792,35 @@ export function TenantForm({
     () => previewSuggestedProducts(parseBulkProducts(bulkProductsText)),
     [bulkProductsText]
   );
+
+  // Warn before leaving only while a save is actually in flight.
+  useEffect(() => {
+    if (!pending) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [pending]);
+
+  // Locations drawers ("Save 3 areas", "Done") save the page straight away.
+  const saveAfterLocationsRef = useRef(false);
+  useEffect(() => {
+    if (!saveAfterLocationsRef.current) return;
+    saveAfterLocationsRef.current = false;
+    const form = document.getElementById(TENANT_SETTINGS_FORM_ID);
+    if (form instanceof HTMLFormElement) form.requestSubmit();
+  }, [serviceAreas, locations]);
+
+  // A pasted list is saved straight away (the sheet says "Add and save"), not left pending.
+  const saveAfterPasteRef = useRef(false);
+  useEffect(() => {
+    if (!saveAfterPasteRef.current) return;
+    saveAfterPasteRef.current = false;
+    const form = document.getElementById(TENANT_SETTINGS_FORM_ID);
+    if (form instanceof HTMLFormElement) form.requestSubmit();
+  }, [services, products]);
 
   function applyBulkServices() {
     const parsed = suggestImportedServices(parseBulkServices(bulkServicesText), vertical);
@@ -731,6 +834,7 @@ export function TenantForm({
       const existing = prev.filter((s) => s.name.trim());
       return [...existing, ...parsed].slice(0, 40);
     });
+    saveAfterPasteRef.current = true;
     setBulkServicesText("");
     setBulkServicesError(null);
   }
@@ -751,6 +855,7 @@ export function TenantForm({
       }
       return [...map.values()].slice(0, PRODUCT_CATALOG_MAX);
     });
+    saveAfterPasteRef.current = true;
     setBulkProductsText("");
     setBulkProductsError(null);
   }
@@ -795,6 +900,7 @@ export function TenantForm({
     vertical,
     handoffMode,
     locationsJson,
+    serviceAreasJson,
     policiesJson,
     agentName,
     spokenName,
@@ -815,7 +921,7 @@ export function TenantForm({
   useEffect(() => {
     if (!state.ok || savedStateRef.current === state) return;
     savedStateRef.current = state;
-    setBaseline(draftKey);
+    setBaseline((prev) => savedBaseline(state, draftKey, prev));
   }, [state, draftKey]);
   useSettingsLeaveSource("form", formDirty);
   const [removeAsk, setRemoveAsk] = useState<{
@@ -857,7 +963,7 @@ export function TenantForm({
             alert={state.error}
             action={
               panel === "pronunciation" ? (
-                <p className="max-w-[11rem] text-right text-xs leading-snug text-ink-soft">
+                <p className="max-w-[11rem] text-right text-meta leading-snug text-ink-2">
                   Saves live - no sticky Save
                 </p>
               ) : (
@@ -873,6 +979,7 @@ export function TenantForm({
       <input type="hidden" name="services_offered" value={servicesOfferedSummary} />
       <input type="hidden" name="services_catalog" value={servicesJson} />
       <input type="hidden" name="product_catalog" value={productsJson} />
+      <input type="hidden" name="catalog_baseline" value={catalogBaseJson} />
       <input type="hidden" name="social_handles" value={socialJson} />
       <input type="hidden" name="services_notes" value={servicesNotes} />
       <input type="hidden" name="business_hours" value={businessHoursSummary} />
@@ -882,6 +989,7 @@ export function TenantForm({
       <input type="hidden" name="vertical" value={vertical} />
       <input type="hidden" name="handoff_mode" value={handoffMode} />
       <input type="hidden" name="business_locations" value={locationsJson} />
+      <input type="hidden" name="service_areas" value={JSON.stringify(serviceAreas)} />
       <input type="hidden" name="business_policies" value={policiesJson} />
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="spoken_name" value={spokenName} />
@@ -898,7 +1006,8 @@ export function TenantForm({
       <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
       <section className={panel === "identity" ? "space-y-3" : "hidden"}>
-        <SettingsGroup title="Assistant">
+        {panel === "identity" ? structuredSlot?.identity : null}
+        <SettingsGroup title="Business Assistant">
           <SettingsRow label="Assistant name" htmlFor="agent_name">
             <input
               id="agent_name"
@@ -1008,7 +1117,7 @@ export function TenantForm({
         >
           {socialHandles.channels.length === 0 ? (
             <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p className="text-sm text-ink-soft">No public contacts yet</p>
+              <p className="text-body text-ink-2">No public contacts yet</p>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -1035,7 +1144,7 @@ export function TenantForm({
             </div>
           ) : (
             <div className="min-w-0">
-            <div className="divide-y divide-line lg:hidden">
+            <div className="divide-y divide-hairline lg:hidden">
               {socialHandles.channels.map((channel, index) => (
                 <div
                   key={`social-m-${index}`}
@@ -1104,9 +1213,9 @@ export function TenantForm({
             </div>
             <div className="hidden lg:block">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-sm">
+                <table className="w-full min-w-[520px] text-body">
                   <thead>
-                    <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
+                    <tr className="border-b border-hairline bg-surface-canvas text-left text-meta font-medium text-ink-2">
                       <th className="px-3 py-2 font-medium w-36">Type</th>
                       <th className="px-3 py-2 font-medium w-28">Label</th>
                       <th className="px-3 py-2 font-medium">Handle / URL</th>
@@ -1115,7 +1224,7 @@ export function TenantForm({
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line bg-surface">
+                  <tbody className="divide-y divide-hairline bg-surface">
                     {socialHandles.channels.map((channel, index) => (
                       <tr key={`social-ch-${index}`} className="align-middle">
                         <td className="px-3 py-1.5">
@@ -1196,6 +1305,7 @@ export function TenantForm({
       </section>
 
       <section className={panel === "catalog" ? "space-y-4" : "hidden"}>
+        {panel === "catalog" ? structuredSlot?.catalog : null}
         <CatalogSectionShell
           vertical={vertical}
           title="Catalogue"
@@ -1217,7 +1327,7 @@ export function TenantForm({
                 type="button"
                 onClick={() => {
                   setServices((prev) => [...prev, emptyService()]);
-                  setServicePage(Math.floor(services.length / SERVICE_PAGE_SIZE));
+                  setServicePage(Math.floor(serviceIdx.length / SERVICE_PAGE_SIZE));
                 }}
                 className={settingsGhostButtonClass}
               >
@@ -1239,17 +1349,17 @@ export function TenantForm({
             }}
             previewRows={bulkPreview}
             onApply={applyBulkServices}
-            applyLabel="Add to services"
+            applyLabel="Add and save"
           />
           {bulkServicesError ? (
-            <p className="text-sm text-warn" role="alert">
+            <p className="text-body text-warn" role="alert">
               {bulkServicesError}
             </p>
           ) : null}
 
-          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
+          <div className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline lg:hidden">
             {visibleServices.map((service, localIndex) => {
-              const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
+              const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
               return (
                 <div key={`service-m-${index}`} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2">
                   <div className="min-w-0">
@@ -1266,7 +1376,7 @@ export function TenantForm({
                       requestRemove(
                         service,
                         `Remove ${service.name.trim() || "this service"}?`,
-                        "It leaves the catalog when you save.",
+                        "It leaves the catalogue when you save.",
                         () =>
                           setServices((prev) =>
                             prev.length <= 1
@@ -1294,17 +1404,17 @@ export function TenantForm({
             <CatalogPager
               page={safeServicePage}
               pageSize={SERVICE_PAGE_SIZE}
-              total={services.length}
+              total={serviceIdx.length}
               noun="service"
               onPage={setServicePage}
             />
           </div>
 
-          <div className="hidden overflow-hidden rounded-xl border border-line lg:block">
+          <div className="hidden overflow-hidden rounded-xl border border-hairline lg:block">
             <div className="overflow-x-auto">
-              <table className="w-full table-fixed text-sm">
+              <table className="w-full table-fixed text-body">
                 <thead>
-                  <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  <tr className="border-b border-hairline bg-surface-canvas text-left text-meta font-medium text-ink-2">
                     <th className="min-w-0 px-3 py-2.5 font-medium">Name</th>
                     <th className="px-3 py-2.5 font-medium">Price</th>
                     <th className="px-3 py-2.5 font-medium">Notes</th>
@@ -1314,9 +1424,9 @@ export function TenantForm({
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line bg-surface">
+                <tbody className="divide-y divide-hairline bg-surface">
                   {visibleServices.map((service, localIndex) => {
-                    const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
+                    const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
                     return (
                       <tr key={`service-${index}`} className="align-middle">
                         <td className="min-w-0 px-3 py-2">
@@ -1383,7 +1493,7 @@ export function TenantForm({
                               requestRemove(
                                 service,
                                 `Remove ${service.name.trim() || "this service"}?`,
-                                "It leaves the catalog when you save.",
+                                "It leaves the catalogue when you save.",
                                 () =>
                                   setServices((prev) =>
                                     prev.length <= 1
@@ -1407,14 +1517,14 @@ export function TenantForm({
             <CatalogPager
               page={safeServicePage}
               pageSize={SERVICE_PAGE_SIZE}
-              total={services.length}
+              total={serviceIdx.length}
               noun="service"
               onPage={setServicePage}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-ink-soft" htmlFor="services_notes">
+            <label className="block text-meta font-medium text-ink-2" htmlFor="services_notes">
               Notes
             </label>
             <textarea
@@ -1444,7 +1554,7 @@ export function TenantForm({
                 type="button"
                 onClick={() => {
                   setProducts((prev) => [...prev, emptyProduct()]);
-                  setProductPage(Math.floor(products.length / PRODUCT_PAGE_SIZE));
+                  setProductPage(Math.floor(productIdx.length / PRODUCT_PAGE_SIZE));
                 }}
                 className={settingsGhostButtonClass}
               >
@@ -1468,19 +1578,36 @@ export function TenantForm({
             }}
             previewRows={bulkProductPreview}
             onApply={applyBulkProducts}
-            applyLabel="Add to catalogue"
+            applyLabel="Add and save"
           />
           {bulkProductsError ? (
-            <p className="text-sm text-warn" role="alert">
+            <p className="text-body text-warn" role="alert">
               {bulkProductsError}
             </p>
           ) : null}
 
+          {unpricedOnly ? (
+            <div data-unpriced-filter="" className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-accent-tonal px-4 py-2">
+              <p className="text-meta text-ink">
+                Showing {productIdx.length + serviceIdx.length} without a price. Add one, or choose Ask so callers get a call back.
+              </p>
+              <button
+                type="button"
+                onClick={() => setUnpricedOnly(false)}
+                className="inline-flex min-h-11 shrink-0 items-center text-meta font-medium text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                Show all
+              </button>
+            </div>
+          ) : null}
           {products.length === 0 ? null : (
             <>
-            <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
+            <p id="holdable" className="scroll-mt-24 px-1 text-meta text-ink-2">
+              Turn on Hold for items your Business Assistant may hold for a caller.
+            </p>
+            <div className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline lg:hidden">
               {visibleProducts.map((product, localIndex) => {
-                const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
+                const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
                 return (
                   <div key={`product-m-${index}`} className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_2.75rem] items-center gap-2 px-3 py-2">
                     <div className="min-w-0">
@@ -1497,7 +1624,7 @@ export function TenantForm({
                         requestRemove(
                           product,
                           `Remove ${product.name.trim() || "this product"}?`,
-                          "It leaves the catalog when you save.",
+                          "It leaves the catalogue when you save.",
                           () => setProducts((prev) => prev.filter((_, i) => i !== index))
                         )
                       }
@@ -1528,22 +1655,30 @@ export function TenantForm({
                         onChange={(next) => updateProduct(index, "in_stock", next)}
                       />
                     </div>
+                    <div className="col-span-3 flex min-h-11 items-center justify-between gap-3">
+                      <span className="text-meta text-ink-2">Hold</span>
+                      <ToolSwitch
+                        checked={product.holdable === true}
+                        label={`Can hold ${product.name.trim() || `product ${index + 1}`}`}
+                        onChange={(next) => setProductHoldable(index, next)}
+                      />
+                    </div>
                   </div>
                 );
               })}
               <CatalogPager
                 page={safeProductPage}
                 pageSize={PRODUCT_PAGE_SIZE}
-                total={products.length}
+                total={productIdx.length}
                 noun="product"
                 onPage={setProductPage}
               />
             </div>
-            <div className="hidden overflow-hidden rounded-xl border border-line lg:block">
+            <div className="hidden overflow-hidden rounded-xl border border-hairline lg:block">
               <div className="overflow-x-auto">
-                <table className="w-full table-fixed text-sm">
+                <table className="w-full table-fixed text-body">
                   <thead>
-                    <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
+                    <tr className="border-b border-hairline bg-surface-canvas text-left text-meta font-medium text-ink-2">
                       <th className="min-w-0 px-3 py-2.5 font-medium">Name</th>
                       <th className="px-3 py-2.5 font-medium">Price</th>
                       <th className="px-3 py-2.5 font-medium">Category</th>
@@ -1553,9 +1688,9 @@ export function TenantForm({
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line bg-surface">
+                  <tbody className="divide-y divide-hairline bg-surface">
                     {visibleProducts.map((product, localIndex) => {
-                      const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
+                      const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
                       return (
                         <tr key={`product-${index}`} className="align-middle">
                           <td className="min-w-0 px-3 py-2">
@@ -1616,6 +1751,14 @@ export function TenantForm({
                                 updateProduct(index, "in_stock", next)
                               }
                             />
+                            <span className="mt-1 flex items-center justify-between gap-2 text-meta text-ink-2">
+                              Hold
+                              <ToolSwitch
+                                checked={product.holdable === true}
+                                label={`Can hold ${product.name.trim() || `product ${index + 1}`}`}
+                                onChange={(next) => setProductHoldable(index, next)}
+                              />
+                            </span>
                           </td>
                           <td className="px-2 py-2">
                             <button
@@ -1624,7 +1767,7 @@ export function TenantForm({
                                 requestRemove(
                                   product,
                                   `Remove ${product.name.trim() || "this product"}?`,
-                                  "It leaves the catalog when you save.",
+                                  "It leaves the catalogue when you save.",
                                   () => setProducts((prev) => prev.filter((_, i) => i !== index))
                                 )
                               }
@@ -1643,7 +1786,7 @@ export function TenantForm({
               <CatalogPager
                 page={safeProductPage}
                 pageSize={PRODUCT_PAGE_SIZE}
-                total={products.length}
+                total={productIdx.length}
                 noun="product"
                 onPage={setProductPage}
               />
@@ -1657,7 +1800,7 @@ export function TenantForm({
 
       <section className={panel === "hours" ? "space-y-6" : "hidden"}>
         <SettingsGroup title="Hours">
-          <div className="hidden bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-500 lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
+          <div className="hidden bg-surface-canvas px-3 py-2 text-meta font-medium text-ink-2 lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
             <span>Day</span>
             <span>Open</span>
             <span>Opens</span>
@@ -1669,7 +1812,7 @@ export function TenantForm({
             return (
               <div key={day} className="px-4 py-2 lg:px-3 lg:py-1.5">
                 <div className="flex min-h-12 items-center justify-between gap-3 lg:hidden">
-                  <span className="min-w-0 truncate text-sm font-medium text-ink">
+                  <span className="min-w-0 truncate text-body font-medium text-ink">
                     {DAY_LABELS[day]}
                   </span>
                   <ToolSwitch
@@ -1682,7 +1825,7 @@ export function TenantForm({
                   <div className="mt-2 grid grid-cols-2 gap-2 lg:hidden">
                     <div className="min-w-0">
                       <label
-                        className="block text-xs font-medium text-ink-soft"
+                        className="block text-meta font-medium text-ink-2"
                         htmlFor={`open-m-${day}`}
                       >
                         Opens
@@ -1692,12 +1835,12 @@ export function TenantForm({
                         type="time"
                         value={slot.open}
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="mt-1 min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                        className="mt-1 min-h-11 min-w-0 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-body text-ink outline-none placeholder:text-ink-2/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
                       />
                     </div>
                     <div className="min-w-0">
                       <label
-                        className="block text-xs font-medium text-ink-soft"
+                        className="block text-meta font-medium text-ink-2"
                         htmlFor={`close-m-${day}`}
                       >
                         Closes
@@ -1707,13 +1850,13 @@ export function TenantForm({
                         type="time"
                         value={slot.close}
                         onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="mt-1 min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                        className="mt-1 min-h-11 min-w-0 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-body text-ink outline-none placeholder:text-ink-2/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
                       />
                     </div>
                   </div>
                 ) : null}
                 <div className="hidden lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
-                  <span className="min-w-0 truncate text-sm font-medium text-ink">
+                  <span className="min-w-0 truncate text-body font-medium text-ink">
                     {DAY_LABELS[day]}
                   </span>
                   <ToolSwitch
@@ -1731,7 +1874,7 @@ export function TenantForm({
                         type="time"
                         value={slot.open}
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-body text-ink outline-none placeholder:text-ink-2/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
                       />
                       <label className="sr-only" htmlFor={`close-${day}`}>
                         Closes
@@ -1741,11 +1884,11 @@ export function TenantForm({
                         type="time"
                         value={slot.close}
                         onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-body text-ink outline-none placeholder:text-ink-2/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
                       />
                     </>
                   ) : (
-                    <span className="col-span-2 text-xs text-ink-soft">Closed</span>
+                    <span className="col-span-2 text-meta text-ink-2">Closed</span>
                   )}
                 </div>
               </div>
@@ -1757,271 +1900,173 @@ export function TenantForm({
       <section
         className={panel === "locations" ? "space-y-3" : "hidden"}
       >
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <p className={settingsBlockTitleClass}>Places</p>
-          <button
-            type="button"
-            disabled={locations.length >= LOCATIONS_MAX}
-            onClick={() =>
-              setLocations((prev) =>
-                prev.length >= LOCATIONS_MAX ? prev : [...prev, emptyLocation()]
-              )
-            }
-            className={`${settingsGhostButtonClass} disabled:opacity-50`}
-          >
-            Add place
-          </button>
-        </div>
-        <div className="overflow-hidden rounded-xl border border-line">
-          <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem] items-center gap-2 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
-            <span>Label</span>
-            <span>Area</span>
-            <span className="sr-only">Details</span>
-            <span className="sr-only">Remove</span>
-          </div>
-          {locations.map((loc, index) => {
-            const placeOpen = openLocationIndexes.includes(index);
-            const placeDetailLabel =
-              vertical === "home_services"
-                ? "Landmark, directions, and notes"
-                : "Landmark, directions, and coverage";
-            return (
-            <div key={`loc-${index}`} className="border-b border-line last:border-b-0">
-              <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem] items-center gap-2 px-3 py-2">
-                <div className="min-w-0">
-                  <label className="sr-only" htmlFor={`loc-label-${index}`}>
-                    Label
-                  </label>
-                  <input
-                    id={`loc-label-${index}`}
-                    value={loc.label}
-                    onChange={(e) => {
-                      updateLocation(index, "label", e.target.value);
-                      if (index === 0) {
-                        setLocationNotes(
-                          placeLocationLine({
-                            label: e.target.value,
-                            address: loc.address,
-                            landmark: loc.landmark,
-                          })
-                        );
-                      }
-                    }}
-                    placeholder="Main shop"
-                    className={`${denseFieldClass} min-w-0 truncate`}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <label className="sr-only" htmlFor={`loc-address-${index}`}>
-                    Area
-                  </label>
-                  <ExpandTextarea
-                    id={`loc-address-${index}`}
-                    value={loc.address}
-                    maxLength={200}
-                    onChange={(value) => {
-                      updateLocation(index, "address", value);
-                      if (index === 0) {
-                        setLocationNotes(
-                          placeLocationLine({
-                            label: loc.label,
-                            address: value,
-                            landmark: loc.landmark,
-                          })
-                        );
-                      }
-                    }}
-                    placeholder="Westlands, Nairobi"
-                    className="min-w-0 truncate break-words [overflow-wrap:anywhere]"
-                  />
-                </div>
-                <button
-                  type="button"
-                  aria-expanded={placeOpen}
-                  aria-label={placeDetailLabel}
-                  onClick={() => toggleLocationDetails(index)}
-                  className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    className={`h-4 w-4 ${placeOpen ? "rotate-90" : ""}`}
-                    aria-hidden="true"
-                  >
-                    <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <div className="flex items-start justify-end">
-                  {locations.length > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        requestRemove(
-                          loc,
-                          `Remove ${loc.label.trim() || "this place"}?`,
-                          "It leaves the places when you save.",
-                          () => removeLocation(index)
-                        )
-                      }
-                      className={settingsTrashButtonClass}
-                      aria-label={`Remove location ${index + 1}`}
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  ) : (
-                    <span className="h-11 w-11" aria-hidden />
-                  )}
-                </div>
-              </div>
-              {placeOpen ? (
-                <div className="grid grid-cols-1 gap-3 px-3 pb-3">
-                  <div className="min-w-0">
-                    <label
-                      className="block text-xs font-medium text-ink-soft"
-                      htmlFor={`loc-landmark-${index}`}
-                    >
-                      Landmark
-                    </label>
-                    <input
-                      id={`loc-landmark-${index}`}
-                      value={loc.landmark}
-                      onChange={(e) => {
-                        updateLocation(index, "landmark", e.target.value);
-                        if (index === 0) {
-                          setLocationNotes(
-                            placeLocationLine({
-                              label: loc.label,
-                              address: loc.address,
-                              landmark: e.target.value,
-                            })
-                          );
-                        }
-                      }}
-                      placeholder="Opposite Naivas"
-                      className={`${denseFieldClass} mt-1`}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label
-                      className="block text-xs font-medium text-ink-soft"
-                      htmlFor={`loc-directions-${index}`}
-                    >
-                      Directions
-                    </label>
-                    <textarea
-                      id={`loc-directions-${index}`}
-                      value={loc.directions}
-                      onChange={(e) => updateLocation(index, "directions", e.target.value)}
-                      rows={2}
-                      placeholder="From Waiyaki Way, turn at the Shell. Left side."
-                      className={`${denseFieldClass} mt-1 leading-relaxed`}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label
-                      className="block text-xs font-medium text-ink-soft"
-                      htmlFor={`loc-coverage-${index}`}
-                    >
-                      {vertical === "home_services" ? "Notes" : "Coverage"}
-                    </label>
-                    <ExpandTextarea
-                      id={`loc-coverage-${index}`}
-                      value={loc.coverage_notes}
-                      maxLength={300}
-                      onChange={(value) =>
-                        updateLocation(index, "coverage_notes", value)
-                      }
-                      placeholder={
-                        vertical === "home_services"
-                          ? "Call ahead for the gate"
-                          : "Kiambu and Ruiru"
-                      }
-                      className="min-w-0 break-words [overflow-wrap:anywhere]"
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            );
-          })}
-        </div>
+        <ServiceAreasEditor
+          value={serviceAreas}
+          vertical={vertical}
+          homeAreas={[
+            ...locations.map((l) => l.area_id || "").filter(Boolean),
+            ...suggestHomeAreas(locations.map((l) => l.address).join(", ")),
+          ]}
+          onChange={setServiceAreas}
+          onSave={(next) => {
+            setServiceAreas(next);
+            saveAfterLocationsRef.current = true;
+          }}
+        />
+        <PlacesEditor
+          value={locations}
+          title={serviceAreas.no_premises ? "Your base (optional)" : locations.length > 1 ? "Branches" : "Your places"}
+          hint={
+            serviceAreas.no_premises
+              ? "For reference only. Callers are not sent here."
+              : locations.length > 1
+                ? "Your Business Assistant sends callers to the nearest branch."
+                : undefined
+          }
+          businessHours={formatHoursForOwner(hoursSchedule)}
+          onSave={(rows) => {
+            setLocations(rows);
+            const first = rows[0];
+            setLocationNotes(first ? placeLocationLine(first) : "");
+            saveAfterLocationsRef.current = true;
+          }}
+        />
       </section>
 
       <section
         className={panel === "policies" ? "space-y-6" : "hidden"}
       >
-        <SettingsGroup title="Rules">
-          {vertical === "home_services" ? (
-            <SettingsStack label="Coverage" htmlFor="policy-coverage">
-              <CoverageAreaField
-                id="policy-coverage"
-                value={policies.coverage_areas || []}
-                onChange={(coverage_areas) =>
-                  setPolicies((prev) => ({ ...prev, coverage_areas }))
-                }
-              />
-            </SettingsStack>
-          ) : null}
-          {openPolicyIds.length === 0 ? (
-            <p className="px-4 py-2 text-sm text-ink-soft" role="status">
-              No rules yet. Add payment or cancellation to start - write what callers should hear.
-            </p>
-          ) : null}
-          {POLICY_FIELDS.filter((field) => openPolicyIds.includes(field.id)).map((field) => (
-            <SettingsStack
-              key={field.id}
-              label={field.label}
-              htmlFor={`policy-${field.id}`}
-            >
-              <PolicyTextarea
-                id={`policy-${field.id}`}
-                value={policies[field.id]}
-                onChange={(value) => {
-                  if (value !== policies[field.id]) queueOwnerPath(`policies.${field.id}`);
-                  setPolicies((prev) => ({
-                    ...prev,
-                    [field.id]: value,
-                    provenance: {
-                      ...prev.provenance,
-                      [field.id]: { source: "owner", confirmed: true },
-                    },
-                  }));
-                }}
-                placeholder={
-                  field.id === "delivery" && vertical === "home_services"
-                    ? "Same day before 2pm"
-                    : field.placeholder
-                }
-              />
-            </SettingsStack>
-          ))}
-          {openPolicyIds.length < POLICY_FIELDS.length ? (
-            <div className="px-4 py-2">
-              <label className="sr-only" htmlFor="add-policy-rule">
-                Add rule
-              </label>
-              <DeskSelect
-                id="add-policy-rule"
-                aria-label="Add rule"
-                value=""
-                placeholder="Add rule"
-                className={`${settingsGhostButtonClass} w-auto`}
-                options={POLICY_FIELDS.filter(
-                  (field) => !openPolicyIds.includes(field.id)
-                ).map((field) => ({
-                  value: field.id,
-                  label: field.label,
-                }))}
-                onChange={(id) => {
-                  setOpenPolicyIds((prev) =>
-                    prev.includes(id) ? prev : [...prev, id]
-                  );
-                }}
-              />
-            </div>
-          ) : null}
+        {panel === "policies" ? (
+          <PaymentsEditor
+            value={policies.payments ?? null}
+            legacyText={policies.payment}
+            errors={state.fields}
+            onChange={(payments) => {
+              queueOwnerPath("policies.payment");
+              setPolicies((prev) => ({ ...prev, payments }));
+            }}
+          />
+        ) : null}
+        {vertical === "home_services" ? (
+          <div id="bookings" className="scroll-mt-24">
+            <SettingsGroup title="Bookings">
+              <SettingsRow
+                label="Book a time slot directly"
+                control="switch"
+                hint="Off: callers ask for a time and you confirm it. On: your Business Assistant books the time."
+              >
+                <ToolSwitch
+                  checked={readBookingMode(policies) === "confirmed_slot"}
+                  label="Book a time slot directly"
+                  onChange={(next) => {
+                    queueOwnerPath("policies.booking_mode");
+                    setPolicies((prev) => ({ ...prev, ...bookingModePatch(next ? "confirmed_slot" : "request") }));
+                  }}
+                />
+              </SettingsRow>
+            </SettingsGroup>
+          </div>
+        ) : (
+          <div id="holds" className="scroll-mt-24">
+            <SettingsGroup title="Holds">
+              <SettingsRow label="Hold items for customers" control="switch" hint="Your Business Assistant can hold a holdable item and alerts you each time.">
+                <ToolSwitch
+                  checked={readHoldRules(policies.holds).allowed === "yes"}
+                  label="Hold items for customers"
+                  onChange={(next) => {
+                    const prevRules = readHoldRules(policies.holds);
+                    queueOwnerPath("policies.holds.allowed");
+                    queueOwnerPath("policies.holds");
+                    setPolicies((prev) => ({
+                      ...prev,
+                      holds: holdRulesValue({
+                        allowed: next ? "yes" : "no",
+                        max_hours: prevRules.max_hours ?? 24,
+                        deposit_required: prevRules.deposit_required || "no",
+                      }),
+                    }));
+                  }}
+                />
+              </SettingsRow>
+              {readHoldRules(policies.holds).allowed === "yes" ? (
+                <>
+                  <SettingsStack label="Longest hold">
+                    <SettingsSegmented
+                      label="Longest hold"
+                      value={String(readHoldRules(policies.holds).max_hours ?? 24)}
+                      options={HOLD_HOURS_OPTIONS.map((h) => ({ id: String(h), label: h < 24 ? `${h} hours` : h === 24 ? "1 day" : `${h / 24} days` }))}
+                      onChange={(id) => {
+                        queueOwnerPath("policies.holds");
+                        setPolicies((prev) => ({
+                          ...prev,
+                          holds: holdRulesValue({ ...readHoldRules(prev.holds), max_hours: Number(id) }),
+                        }));
+                      }}
+                    />
+                  </SettingsStack>
+                  <SettingsRow label="Deposit needed" control="switch">
+                    <ToolSwitch
+                      checked={readHoldRules(policies.holds).deposit_required === "yes"}
+                      label="Deposit needed"
+                      onChange={(next) => {
+                        queueOwnerPath("policies.holds");
+                        setPolicies((prev) => ({
+                          ...prev,
+                          holds: holdRulesValue({ ...readHoldRules(prev.holds), deposit_required: next ? "yes" : "no" }),
+                        }));
+                      }}
+                    />
+                  </SettingsRow>
+                </>
+              ) : null}
+              {policies.deposit ? (
+                <SettingsStack label="Hold note" htmlFor="policy-deposit">
+                  <PolicyTextarea
+                    id="policy-deposit"
+                    value={policies.deposit}
+                    onChange={(value) => {
+                      if (value !== policies.deposit) queueOwnerPath("policies.deposit");
+                      setPolicies((prev) => ({
+                        ...prev,
+                        deposit: value,
+                        provenance: { ...prev.provenance, deposit: { source: "owner", confirmed: true } },
+                      }));
+                    }}
+                    placeholder="Hold until 6pm with a name"
+                  />
+                </SettingsStack>
+              ) : null}
+            </SettingsGroup>
+          </div>
+        )}
+
+        <PolicyRulesEditor
+          rules={policies.rules ?? {}}
+          legacy={{ returns: policies.returns, delivery: policies.delivery, cancellation: policies.cancellation, warranty: policies.warranty }}
+          vertical={vertical}
+          errors={state.fields}
+          onChange={(rules) => {
+            for (const key of ["returns", "delivery", "cancellation", "warranty"]) queueOwnerPath(`policies.${key}`);
+            setPolicies((prev) => ({ ...prev, rules }));
+          }}
+        />
+
+        <SettingsGroup title="Anything else">
+          <SettingsStack label="Other rules callers should know" htmlFor="policy-other">
+            <PolicyTextarea
+              id="policy-other"
+              value={policies.other}
+              onChange={(value) => {
+                if (value !== policies.other) queueOwnerPath("policies.other");
+                setPolicies((prev) => ({
+                  ...prev,
+                  other: value,
+                  provenance: { ...prev.provenance, other: { source: "owner", confirmed: true } },
+                }));
+              }}
+              placeholder={POLICY_FIELDS.find((f) => f.id === "other")?.placeholder ?? ""}
+            />
+          </SettingsStack>
         </SettingsGroup>
 
         <SettingsGroup title="When unsure">
@@ -2050,7 +2095,7 @@ export function TenantForm({
               }))}
             />
           ) : (
-            <p className="px-4 py-3 text-sm text-ink-soft">No voices loaded.</p>
+            <p className="px-4 py-3 text-body text-ink-2">No voices loaded.</p>
           )}
           <SettingsRow label="Voice label" htmlFor="soniox_voice_label">
             <input
@@ -2064,7 +2109,7 @@ export function TenantForm({
             />
           </SettingsRow>
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2">
-            <p className="text-sm text-ink-soft">
+            <p className="text-body text-ink-2">
               {sonioxVoiceLabel.trim() || sonioxVoiceId
                 ? displaySonioxVoiceLabel(
                     sonioxVoiceLabel,
@@ -2098,12 +2143,12 @@ export function TenantForm({
               </audio>
             </div>
           ) : voiceSampleError ? (
-            <p className="px-4 py-2 text-xs text-warn" role="alert" data-testid="voice-sample-empty">
+            <p className="px-4 py-2 text-meta text-warn" role="alert" data-testid="voice-sample-empty">
               {voiceSampleError}
             </p>
           ) : null}
           <div className="space-y-1.5 px-4 py-3">
-            <p className="text-sm font-medium text-ink">On a call</p>
+            <p className="text-body font-medium text-ink">On a call</p>
             <SettingsSegmented
               label="On a call"
               value={afterHoursMode}
@@ -2170,8 +2215,11 @@ export function TenantForm({
       </section>
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
-        {liveTransferExecutor || handoffMode === "live_transfer" ? (
+        {membersSlot}
+        {/* Live connect only appears once the runtime supports it. Today Scalers is callbacks only. */}
+        {liveTransferExecutor ? (
           <>
+            <div id="handoff" className="scroll-mt-24">
             <SettingsGroup>
               <SettingsRow label="Live connect" control="switch">
                 <ToolSwitch
@@ -2183,147 +2231,32 @@ export function TenantForm({
                 />
               </SettingsRow>
             </SettingsGroup>
-            <p className="px-1 text-xs text-ink-soft">
+            </div>
+            <p className="px-1 text-meta text-ink-2">
               {liveConnectBlurb(liveDest?.name)}
             </p>
           </>
         ) : null}
 
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <p className={settingsBlockTitleClass}>People</p>
-            <button
-              type="button"
-              onClick={() => setTeam((prev) => [...prev, emptyMember()])}
-              className={settingsGhostButtonClass}
-            >
-              Add person
-            </button>
-          </div>
-          <p id="team-notify-channels" className="px-1 text-xs text-ink-soft">
-            {TEAM_NOTIFY_CHANNEL_NOTE}
-          </p>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border border-line">
-          <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
-            <span>Name</span>
-            <span>Role</span>
-            <span>Phone</span>
-            <span>Email</span>
-            <span className="grid w-[15rem] grid-cols-3 gap-1 text-center text-caption font-medium normal-case tracking-normal">
-              {TEAM_NOTIFY_FLAGS.map((flag) => (
-                <span key={flag.key} title={TEAM_NOTIFY_CHANNEL_NOTE}>
-                  {flag.label}
-                </span>
-              ))}
-            </span>
-            <span className="sr-only">Remove</span>
-          </div>
-          {team.map((member, index) => (
-            <div
-              key={`team-${index}`}
-              className="grid grid-cols-1 gap-3 border-b border-line px-3 py-3 last:border-b-0 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-start lg:gap-x-3 lg:py-2"
-            >
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-name-${index}`}>
-                  Name
-                </label>
-                <input
-                  id={`team-name-${index}`}
-                  value={member.name}
-                  onChange={(e) => updateTeam(index, "name", e.target.value)}
-                  placeholder="Wanjiku Mwangi"
-                  title={member.name || undefined}
-                  className={`${denseFieldClass} mt-1 min-w-0 break-words [overflow-wrap:anywhere] lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-role-${index}`}>
-                  Role
-                </label>
-                <input
-                  id={`team-role-${index}`}
-                  value={member.role}
-                  onChange={(e) => updateTeam(index, "role", e.target.value)}
-                  placeholder="Orders and payments"
-                  className={`${denseFieldClass} mt-1 lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-phone-${index}`}>
-                  Phone
-                </label>
-                <input
-                  id={`team-phone-${index}`}
-                  value={member.phone}
-                  onChange={(e) => updateTeam(index, "phone", e.target.value)}
-                  placeholder="+254 700 000 000"
-                  className={`${denseFieldClass} mt-1 lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-email-${index}`}>
-                  Email
-                </label>
-                <input
-                  id={`team-email-${index}`}
-                  type="email"
-                  value={member.email || ""}
-                  onChange={(e) => updateTeam(index, "email", e.target.value)}
-                  placeholder="wanjiku@shop.co.ke"
-                  title={member.email || undefined}
-                  className={`${denseFieldClass} mt-1 min-w-0 break-words [overflow-wrap:anywhere] lg:mt-0`}
-                />
-              </div>
-              <div
-                className="grid w-[15rem] grid-cols-3 gap-1"
-                role="group"
-                aria-label={`Notify for ${member.name || `teammate ${index + 1}`}`}
-                aria-describedby="team-notify-channels"
-              >
-                {TEAM_NOTIFY_FLAGS.map((flag) => {
-                  const selected = member[flag.key] === true;
-                  return (
-                    <div key={flag.key} className="flex min-h-11 flex-col items-center justify-center">
-                      <span className="text-xs font-medium text-ink-soft lg:sr-only" title={TEAM_NOTIFY_CHANNEL_NOTE}>
-                        {flag.label}
-                      </span>
-                      <ToolSwitch
-                        checked={selected}
-                        label={`${flag.label} for ${member.name || `teammate ${index + 1}`}`}
-                        hint={TEAM_NOTIFY_CHANNEL_NOTE}
-                        onChange={(next) => updateTeam(index, flag.key, next)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex items-start justify-end lg:pt-1">
-                <button
-                  type="button"
-                  onClick={() =>
-                    requestRemove(
-                      member,
-                      `Remove ${member.name.trim() || "this person"}?`,
-                      "They leave the team when you save.",
-                      () =>
-                        setTeam((prev) =>
-                          prev.length <= 1
-                            ? [emptyMember()]
-                            : prev.filter((_, i) => i !== index)
-                        )
-                    )
-                  }
-                  className={settingsTrashButtonClass}
-                  aria-label={`Remove teammate ${index + 1}`}
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <AlertContactsList
+          team={team}
+          flags={TEAM_NOTIFY_FLAGS}
+          note={TEAM_NOTIFY_CHANNEL_NOTE}
+          addLabel="Add person"
+          onChange={updateTeam}
+          canRemove={(m) => !isOwnerTeamRow(m.phone, tenant.whatsapp_notification_number)}
+          onAdd={() => setTeam((prev) => [...prev, emptyMember()])}
+          onRemove={(index) => {
+            const member = team[index];
+            if (!member) return;
+            requestRemove(
+              member,
+              `Remove ${member.name.trim() || "this person"}?`,
+              "They leave the team when you save.",
+              () => setTeam((prev) => (prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)))
+            );
+          }}
+        />
       </section>
 
       <section
@@ -2333,7 +2266,7 @@ export function TenantForm({
         <div className="flex flex-wrap items-end justify-between gap-2 px-1">
           <p className={settingsBlockTitleClass} aria-live="polite">
             FAQs
-            <span className="ml-2 font-medium normal-case tracking-normal text-ink-soft">
+            <span className="ml-2 font-medium normal-case tracking-normal text-ink-2">
               {filledFaqCount} of {FAQ_MAX}
             </span>
           </p>
@@ -2352,81 +2285,66 @@ export function TenantForm({
 
         {faqs.length > 0 ? (
         <>
-        <div className="overflow-hidden rounded-xl border border-line">
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.75rem] items-center gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
-            <span>Question</span>
-            <span>Answer</span>
-            <span className="sr-only">Remove</span>
-          </div>
+        <ol className="space-y-3" aria-label="FAQs" data-faq-list="">
           {visibleFaqs.map((faq, localIndex) => {
             const index = safeFaqPage * FAQ_PAGE_SIZE + localIndex;
+            const dup = faqDupIndexes.has(index);
             return (
-            <div
-              key={`faq-${index}`}
-              className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.75rem] items-start gap-x-3 border-b border-line px-3 py-2.5 last:border-b-0"
-            >
-              <div className="min-w-0">
-                <label className="sr-only" htmlFor={`faq-q-${index}`}>
-                  Question
-                </label>
-                <input
+            <li key={`faq-${index}`}>
+              <FieldCard
+                data-faq-card=""
+                title={`FAQ ${index + 1}`}
+                action={
+                  <button
+                    type="button"
+                    onClick={() =>
+                      requestRemove(
+                        faq,
+                        "Remove this FAQ?",
+                        "It leaves the list when you save.",
+                        () => setFaqs((prev) => prev.filter((_, i) => i !== index))
+                      )
+                    }
+                    className={settingsTrashButtonClass}
+                    aria-label={`Remove FAQ ${index + 1}`}
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                }
+              >
+                <TextField
                   id={`faq-q-${index}`}
+                  label={<>Question<span className="sr-only"> {index + 1}</span></>}
                   value={faq.question}
                   maxLength={FAQ_QUESTION_MAX}
+                  placeholder="Do you deliver on Sundays?"
                   onChange={(e) => updateFaq(index, "question", e.target.value)}
-                  aria-invalid={faqDupIndexes.has(index) || undefined}
-                  aria-describedby={
-                    faqDupIndexes.has(index) ? `faq-dup-${index}` : undefined
-                  }
-                  className={`${fieldClass} py-2`}
+                  error={dup ? "Same as another FAQ. Keep one clear wording." : null}
                 />
-                {faqDupIndexes.has(index) ? (
-                  <p id={`faq-dup-${index}`} className="mt-1 text-xs text-warn" role="status">
-                    Same as another FAQ. Keep one clear wording.
-                  </p>
-                ) : null}
-              </div>
-              <div className="min-w-0">
-                <label className="sr-only" htmlFor={`faq-a-${index}`}>
-                  Answer
-                </label>
-                <textarea
+                <TextAreaField
                   id={`faq-a-${index}`}
+                  label={<>Answer<span className="sr-only"> to FAQ {index + 1}</span></>}
                   value={faq.answer}
                   maxLength={FAQ_ANSWER_MAX}
+                  rows={3}
+                  hint="Write it the way you would say it on the phone."
                   onChange={(e) => updateFaq(index, "answer", e.target.value)}
-                  rows={2}
-                  className={`${fieldClass} py-2 leading-relaxed`}
                 />
-              </div>
-              <div className="flex items-start justify-end">
-                <button
-                  type="button"
-                  onClick={() =>
-                    requestRemove(
-                      faq,
-                      "Remove this FAQ?",
-                      "It leaves the list when you save.",
-                      () => setFaqs((prev) => prev.filter((_, i) => i !== index))
-                    )
-                  }
-                  className={settingsTrashButtonClass}
-                  aria-label={`Remove FAQ ${index + 1}`}
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
+              </FieldCard>
+            </li>
             );
           })}
-          <CatalogPager
-            page={safeFaqPage}
-            pageSize={FAQ_PAGE_SIZE}
-            total={faqs.length}
-            noun="FAQ"
-            onPage={setFaqPage}
-          />
-        </div>
+        </ol>
+        {faqs.length > FAQ_PAGE_SIZE ? (
+        <Pagination
+          page={safeFaqPage + 1}
+          pageSize={FAQ_PAGE_SIZE}
+          total={faqs.length}
+          noun="FAQ"
+          onPage={(next) => setFaqPage(next - 1)}
+          className="rounded-2xl border border-hairline bg-surface px-3 py-3"
+        />
+        ) : null}
         </>
         ) : null}
       </section>
@@ -2451,3 +2369,5 @@ export function TenantForm({
     </form>
   );
 }
+
+export const TenantForm = withRoleGate("settings.edit", TenantFormInner);

@@ -158,6 +158,9 @@ function identityStatus(
   return fitsStatus(name);
 }
 
+/** Shown where the Business Assistant cannot answer well until the owner fills it in. */
+export const NEEDS_SETUP = "Needs setup";
+
 export function settingsOptionStatus(
   target: SettingsStatusTarget,
   tenant: SettingsStatusTenant,
@@ -165,7 +168,7 @@ export function settingsOptionStatus(
 ): string {
   if (target.tab === "test") {
     const did = String(tenant.sautikit_virtual_number || "").trim();
-    return did && !/^pending:/i.test(did) ? "Line live" : "";
+    return did && !/^pending:/i.test(did) ? "Line live" : "Not live yet";
   }
   if (target.tab === "catalog") {
     const services = namedCount(tenant.services_catalog);
@@ -173,18 +176,18 @@ export function settingsOptionStatus(
     if (services && products) return countLabel(services + products, "item", "items");
     if (services) return countLabel(services, "service", "services");
     if (products) return countLabel(products, "product", "products");
-    return "";
+    return NEEDS_SETUP;
   }
   if (target.tab !== "train") return "";
   switch (target.panel) {
     case "hours": {
       const days = openDayCount(tenant.hours_schedule);
-      return days ? `${days} day${days === 1 ? "" : "s"}` : "";
+      return days ? `${days} day${days === 1 ? "" : "s"}` : NEEDS_SETUP;
     }
     case "tools":
       return voiceStatus(tenant, voices);
     case "faqs":
-      return countLabel(faqCount(tenant.faqs), "question", "questions");
+      return countLabel(faqCount(tenant.faqs), "question", "questions") || NEEDS_SETUP;
     case "team":
       return countLabel(namedCount(tenant.team_directory), "person", "people");
     case "locations":

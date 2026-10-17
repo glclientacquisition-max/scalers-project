@@ -52,8 +52,17 @@ function coverageAnswerWithoutNextStep(text) {
  * The next-step question owed after this spoken reply, or ''.
  * Home services only: a shop answer about delivery areas is not a visit.
  */
+// BRAIN_CONFIRMED_COVERAGE: the guard's "I'll have the team confirm {place}."
+const TEAM_CONFIRM_LINE = /\b(?:I'll have the team confirm|ithibitishe eneo|Nitaambia team ithibitishe)\b/i;
+
 function coverageNextStepFor(text, { profile = {}, language = 'en', state = null } = {}) {
   if (String(profile?.vertical || '').toLowerCase() !== 'home_services') return '';
+  if (require('./confirmedCoverage').confirmedCoverageEnabled()) {
+    const spoken = String(text || '').trim();
+    if (spoken && !/\?\s*$/.test(spoken) && TEAM_CONFIRM_LINE.test(spoken)) {
+      return coverageNextStep(language, state);
+    }
+  }
   if (!coverageAnswerWithoutNextStep(text)) return '';
   if (OUTSIDE_ANSWER.test(String(text || ''))) {
     return isSwahili(language) ? 'Naweza kukuachia ujumbe kwa timu yetu?' : 'Should I note it for the team?';

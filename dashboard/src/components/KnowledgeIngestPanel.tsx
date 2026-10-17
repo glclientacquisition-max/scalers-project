@@ -1,5 +1,6 @@
 "use client";
 
+import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { KNOWLEDGE_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
@@ -68,7 +69,7 @@ function serviceCsvPlaceholder(vertical: string | null | undefined): string {
   return "name,price\nHome cleaning,2500 KES\nSofa cleaning,1500 KES";
 }
 
-export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
+function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
   const knowledgePasteExample = useMountedPoolPick(
     placeholderPool(KNOWLEDGE_PASTE_POOLS, parseVertical(tenant.vertical))
@@ -205,7 +206,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
 
             {mode === "text" || mode === "csv" ? (
               <div className="flex flex-col gap-1.5">
-                <label className="block text-xs font-medium text-ink-soft" htmlFor="ingest_paste">
+                <label className="block text-meta font-medium text-ink-2" htmlFor="ingest_paste">
                   {mode === "csv" ? "CSV" : "Text"}
                 </label>
                 <textarea
@@ -234,7 +235,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               </div>
             ) : (
               <div className="flex flex-col gap-1.5">
-                <label className="block text-xs font-medium text-ink-soft" htmlFor="ingest_url">
+                <label className="block text-meta font-medium text-ink-2" htmlFor="ingest_url">
                   URL
                 </label>
                 <input
@@ -259,7 +260,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
             )}
 
             {extractPending ? (
-              <p className="text-right text-xs text-ink-soft">
+              <p className="text-right text-meta text-ink-2">
                 Scanning
               </p>
             ) : null}
@@ -267,10 +268,10 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-sm text-ink">
+          <div className="rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-body text-ink">
             From <span className="font-medium">{draft.sourceLabel}</span>
             {extractState.message ? (
-              <span className="mt-1 block text-ink-soft">{extractState.message}</span>
+              <span className="mt-1 block text-ink-2">{extractState.message}</span>
             ) : null}
           </div>
 
@@ -434,7 +435,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 {draft.faqs.map((f, i) => (
                   <div key={`faq-${i}`} className="space-y-2 px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-ink">FAQ {i + 1}</p>
+                      <p className="text-body font-medium text-ink">FAQ {i + 1}</p>
                       <ToolSwitch
                         checked={selectedFaqs.has(i)}
                         onChange={() => toggle(selectedFaqs, i, setSelectedFaqs)}
@@ -443,7 +444,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                     </div>
                     <div>
                       <label
-                        className="block text-xs font-medium text-ink-soft"
+                        className="block text-meta font-medium text-ink-2"
                         htmlFor={`ingest-faq-q-${i}`}
                       >
                         Question
@@ -455,12 +456,12 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                         onChange={(e) =>
                           updateDraftFaq(i, "question", e.target.value)
                         }
-                        className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
+                        className="mt-1 w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-body text-ink outline-none placeholder:text-ink-2/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
                       />
                     </div>
                     <div>
                       <label
-                        className="block text-xs font-medium text-ink-soft"
+                        className="block text-meta font-medium text-ink-2"
                         htmlFor={`ingest-faq-a-${i}`}
                       >
                         Answer
@@ -473,7 +474,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                         onChange={(e) =>
                           updateDraftFaq(i, "answer", e.target.value)
                         }
-                        className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink leading-relaxed outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
+                        className="mt-1 w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-body text-ink leading-relaxed outline-none placeholder:text-ink-2/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
                       />
                     </div>
                   </div>
@@ -520,7 +521,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
           ) : null}
 
           <div className="space-y-1.5">
-            <p className="px-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+            <p className="px-1 text-meta font-medium text-ink-2">
               Keep or replace
             </p>
             <SettingsSegmented
@@ -594,7 +595,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               Start over
             </button>
             {nothingSelected ? (
-              <p className="w-full text-sm text-ink">Select what to add.</p>
+              <p className="w-full text-body text-ink">Select what to add.</p>
             ) : null}
           </form>
         </div>
@@ -603,7 +604,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
       {flash ? (
         <p
           className={[
-            "text-sm",
+            "text-body",
             flashIsError ? "text-warn" : "text-accent-deep",
           ].join(" ")}
           role={flashIsError ? "alert" : "status"}
@@ -614,3 +615,5 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
     </section>
   );
 }
+
+export const KnowledgeIngestPanel = withRoleGate("settings.edit", KnowledgeIngestPanelInner);

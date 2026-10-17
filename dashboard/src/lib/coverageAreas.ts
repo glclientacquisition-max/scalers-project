@@ -1,4 +1,4 @@
-import INDEX from "./data/kenyaPlaceCounties.json";
+import INDEX from "./data/kenyaPlaceCounties.json" with { type: "json" };
 import { rankCoverageAreas } from "./coverageRank";
 
 export const COVERAGE_AREA_MAX = 40;
@@ -85,4 +85,32 @@ export function searchCoverageAreas(
   limit = 20
 ): CoverageAreaOption[] {
   return rankCoverageAreas(DIRECTORY, query, selected, limit);
+}
+
+export type AreaOption = { id: string; label: string; kind: CoverageAreaKind; hint: string; added: boolean };
+
+/** "Corner, Kiambu, Nairobi" (a name in two counties) reads "Corner, Kiambu or Nairobi". */
+function pickerLabel(o: CoverageAreaOption): string {
+  if (o.kind === "county") return `${o.label} County`;
+  const [name, ...counties] = o.label.split(", ");
+  return counties.length > 1 ? `${name}, ${counties.slice(0, -1).join(", ")} or ${counties[counties.length - 1]}` : o.label;
+}
+
+/**
+ * Search for pickers: counties read "Kiambu County", estates and towns "Ruaka, Kiambu".
+ * Directory rows whose name just repeats a word ("Kiambu Kiambu") are left out.
+ */
+export function searchAreaOptions(query: string, selected: readonly string[], limit = 8): AreaOption[] {
+  // Already-added areas stay in the results, marked Added, instead of vanishing.
+  const added = new Set(selected);
+  return searchCoverageAreas(query, [], limit * 2)
+    .filter((o) => !/\b(\w+) \1\b/i.test(o.label))
+    .slice(0, limit)
+    .map((o) => ({
+      id: o.id,
+      kind: o.kind,
+      label: pickerLabel(o),
+      hint: added.has(o.id) ? "Added" : o.kind === "county" ? "Whole county" : "Estate or town",
+      added: added.has(o.id),
+    }));
 }

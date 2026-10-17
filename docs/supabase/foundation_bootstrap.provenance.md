@@ -1,3 +1,8 @@
+---
+owner: platform
+last_reviewed: 2026-08-16
+---
+
 # Foundation bootstrap provenance
 
 **Status:** Production-authoritative / historically-unverified  
@@ -83,4 +88,4 @@ No row-level queries. No production mutations.
 
 - [`MIGRATION_LEDGER.md`](./MIGRATION_LEDGER.md) — dual migration model and column lineage
 - [`README.md`](./README.md) — full apply order
-- [`../governance/HISTORY_GAPS.md`](../governance/HISTORY_GAPS.md) — what remains unknown
+- [`../governance/HISTORY_GAPS.md`](../explanation/governance/HISTORY_GAPS.md) — what remains unknown
