@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-166 variables.
+168 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -160,6 +160,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_LIVE_TRANSFER_BETA_OUTBOUND` | voice | `src/billing/liveTransferLegs.js` |
 | `VOICE_LIVE_TRANSFER_IGNORE_HOURS` | voice | `src/conversation/liveTransferReady.js` |
 | `VOICE_LLM_STREAM` | voice | `server.js` |
+| `VOICE_MEDIA_PACING` | voice | `src/speech/mediaLink.js` |
 | `VOICE_OUTAGE_CLIP_DIR` | voice | `src/speech/outageClips.js` |
 | `VOICE_OUTAGE_OWNER_COOLDOWN_MS` | voice | `src/speech/speechOutageNotify.js` |
 | `VOICE_OUTAGE_TMP_DIR` | voice | `src/speech/outageClips.js` |

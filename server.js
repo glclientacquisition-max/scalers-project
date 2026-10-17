@@ -94,6 +94,11 @@ const { createVoiceTrace } = require('./src/speech/voiceTrace');
 const toolSmooth = require('./src/speech/toolSmooth');
 /** VOICE_TOOL_SMOOTH: per-connection heard-audio clock. Empty when the flags are off. */
 const MEDIA_CLOCKS = new WeakMap();
+// Media link hardening (src/speech/mediaLink.js). Pacer only with
+// VOICE_MEDIA_PACING; link stats always (logs only).
+const mediaLink = require('./src/speech/mediaLink');
+const MEDIA_PACERS = new WeakMap();
+const MEDIA_LINKS = new WeakMap();
 const voiceTraceBySid = new Map();
 
 function bindVoiceTrace(callSid, trace) {
@@ -2128,6 +2133,14 @@ function sendPcmToMedia(ws, pcm) {
   if (mediaClock) mediaClock.onSend(pcm.length);
   // Fixed phone gain on the whole utterance. Do not even-out 20 ms frames (pumping).
   const boosted = applyPcmGain(pcm, resolveVoiceProfile().gain);
+  const link = MEDIA_LINKS.get(ws);
+  const pacer = MEDIA_PACERS.get(ws);
+  if (pacer) {
+    // VOICE_MEDIA_PACING: 20 ms frames, about 200 ms ahead of real time.
+    pacer.enqueue(boosted);
+    if (link) link.noteSend(boosted.length, ws.bufferedAmount);
+    return;
+  }
   // Prefer small frames for smoother playback on the telephony side.
   for (let offset = 0; offset < boosted.length; offset += OUTBOUND_PCM_FRAME_BYTES) {
     const slice = boosted.subarray(offset, offset + OUTBOUND_PCM_FRAME_BYTES);
@@ -2138,6 +2151,7 @@ function sendPcmToMedia(ws, pcm) {
       break;
     }
   }
+  if (link) link.noteSend(boosted.length, ws.bufferedAmount);
 }
 
 /**
@@ -2148,6 +2162,12 @@ function clearMediaPlayback(ws) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   const mediaClock = MEDIA_CLOCKS.get(ws);
   if (mediaClock) mediaClock.onClear();
+  // VOICE_MEDIA_PACING: drop the paced queue first so nothing more goes out.
+  const pacer = MEDIA_PACERS.get(ws);
+  if (pacer) {
+    const dropped = pacer.flush();
+    if (dropped) console.log(`[ws/media] paced queue flushed frames=${dropped} (${dropped * mediaLink.FRAME_MS}ms)`);
+  }
   const payloads = [
     { type: 'killAudio' },
     // Compatibility fallbacks seen across forks / Twilio-style bridges.
@@ -2192,8 +2212,47 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   ws.isAlive = true;
+  // Always-on link stats (logs only) and, with VOICE_MEDIA_PACING, the pacer.
+  const linkStats = mediaLink.createMediaLinkStats({ label: () => sessionCallSid || 'unknown' });
+  MEDIA_LINKS.set(ws, linkStats);
+  let linkConnectNoted = false;
+  function noteLinkConnect() {
+    if (linkConnectNoted || !sessionCallSid) return;
+    const answeredAt = inboundCalls.streamIssuedAt(sessionCallSid);
+    if (!answeredAt) return;
+    linkConnectNoted = true;
+    linkStats.noteConnect({ answeredAt, connectedAt });
+  }
+  noteLinkConnect();
+  const mediaPacingOn = mediaLink.mediaPacingEnabled();
+  if (mediaPacingOn) {
+    MEDIA_PACERS.set(
+      ws,
+      mediaLink.createPcmPacer({
+        send: (frame) => {
+          if (ws.readyState !== WebSocket.OPEN) throw new Error('media socket not open');
+          ws.send(frame, { binary: true });
+        },
+        onError: (err) => console.warn('[ws/media] outbound PCM send failed:', err?.message || err),
+      })
+    );
+  }
+  const linkTick = setInterval(() => linkStats.tick({ open: ws.readyState === WebSocket.OPEN }), 250);
+  if (linkTick.unref) linkTick.unref();
+  // One early RTT sample; the keepalive adds one every 15 s.
+  const linkPing = setTimeout(() => {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    try {
+      linkStats.notePingSent();
+      ws.ping();
+    } catch {
+      /* ignore */
+    }
+  }, 2000);
+  if (linkPing.unref) linkPing.unref();
   ws.on('pong', () => {
     ws.isAlive = true;
+    linkStats.notePong();
   });
 
   let textFrames = 0;
@@ -5474,6 +5533,7 @@ mediaWss.on('connection', (ws, req) => {
             }
             if (maybeSid && !sessionCallSid) {
               sessionCallSid = String(maybeSid);
+              noteLinkConnect();
               callSpokenTranscripts.set(sessionCallSid, callTranscript);
               ttsSpeedScale = 1;
               publishVoiceTrace();
@@ -5495,6 +5555,7 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       binaryFrames += 1;
+      linkStats.noteInbound();
       if (binaryFrames <= 5 || binaryFrames % 50 === 0) {
         console.log(
           `[ws/media] binary audio frame #${binaryFrames} (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
@@ -5530,6 +5591,11 @@ mediaWss.on('connection', (ws, req) => {
     console.log(
       `[ws/media] closed after ${ms}ms code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
     );
+    clearInterval(linkTick);
+    clearTimeout(linkPing);
+    const closingPacer = MEDIA_PACERS.get(ws);
+    linkStats.summary({ code, paced: mediaPacingOn, pacer: closingPacer ? closingPacer.stats() : null });
+    if (closingPacer) closingPacer.close();
     clearFillerTimer();
     speakCommit.clear();
     idleNudge.close();
@@ -5607,6 +5673,8 @@ const mediaKeepalive = setInterval(() => {
     }
     ws.isAlive = false;
     try {
+      const link = MEDIA_LINKS.get(ws);
+      if (link) link.notePingSent();
       ws.ping();
     } catch (err) {
       console.warn('[ws/media] ping failed:', err?.message || err);

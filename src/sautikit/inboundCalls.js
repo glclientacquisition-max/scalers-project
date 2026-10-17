@@ -31,6 +31,12 @@ function createInboundCalls({ now = () => Date.now(), ttlMs = STREAM_TTL_MS } = 
     streamIssued.set(sid, now());
   }
 
+  /** When the Stream answer went out for this call (ms), or null. */
+  function streamIssuedAt(callSid) {
+    const at = streamIssued.get(String(callSid || '').trim());
+    return at && now() - at < ttlMs ? at : null;
+  }
+
   function streamIssuedFor(callSid) {
     const at = streamIssued.get(String(callSid || '').trim());
     return Boolean(at && now() - at < ttlMs);
@@ -73,7 +79,7 @@ function createInboundCalls({ now = () => Date.now(), ttlMs = STREAM_TTL_MS } = 
     }
   }
 
-  return { markStreamIssued, streamIssuedFor, trackRow, tenantIdFor, awaitRow, prune };
+  return { markStreamIssued, streamIssuedFor, streamIssuedAt, trackRow, tenantIdFor, awaitRow, prune };
 }
 
 /**
