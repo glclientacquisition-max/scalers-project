@@ -52,6 +52,7 @@ const {
 const { buildNotifyOutcome, ownerAlreadyNotified } = require('./src/notifications/notifyOutcome');
 const { createGreetingWarmer, greetingWarmEnabled } = require('./src/speech/greetingWarm');
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
+const { createLineFallback } = require('./src/speech/ttsRespeak');
 const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
 const {
   pickSpeechOutageLine,
@@ -4981,8 +4982,14 @@ mediaWss.on('connection', (ws, req) => {
         playbackBytes += pcm.length;
         if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
         // Live clone-voice audio means we can record downtime clips for the next outage.
-        scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
+        // Fallback audio (espeak / Gemini) is not the clone voice.
+        if (!meta.fallback) scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
       },
+      // VOICE_TTS_RESPEAK: a line Soniox lost mid-call is spoken again, or
+      // through this chain, unless the caller barged in or the call is over.
+      fallbackPcm: createLineFallback({ voiceId: () => tenantSonioxVoiceId }),
+      shouldRespeak: () =>
+        !bargeInActive && !speechOutageStarted && ws.readyState === WebSocket.OPEN,
     });
     tts = session;
     ttsSessionVoiceId = resolveSonioxVoice(voiceId);
