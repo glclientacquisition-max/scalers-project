@@ -184,7 +184,9 @@ function createSonioxTtsSession({
         resolve();
       });
 
-      socket.once('error', (err) => {
+      // on, not once: a second 'error' on this socket (after open, or after
+      // the first one) with no listener is an uncaught 'error' event = crash.
+      socket.on('error', (err) => {
         clearTimeout(timer);
         console.error(`[soniox-tts][${callSid}] ws error:`, err?.message || err);
         if (ws === socket) connectPromise = null;
@@ -435,10 +437,25 @@ function createSonioxTtsSession({
         respeaksUsed += 1;
         waiter.respeaks += 1;
       }
-      void respeak(waiter, err, evt, { nothingSent });
+      recover(respeak(waiter, err, evt, { nothingSent }), waiter, err, 'respeak');
       return;
     }
-    void fallBack(waiter, err, evt, info.transient ? 'budget' : 'not_transient');
+    recover(fallBack(waiter, err, evt, info.transient ? 'budget' : 'not_transient'), waiter, err, 'fallback');
+  }
+
+  /**
+   * Recovery runs fire-and-forget. If it throws (onAudio, a fallback hook),
+   * fail that one line instead of leaving an unhandled rejection.
+   */
+  function recover(promise, waiter, err, label) {
+    Promise.resolve(promise).catch((recErr) => {
+      console.warn(`[soniox-tts][${callSid}] ${label} failed:`, recErr?.message || recErr);
+      try {
+        settle(waiter, 'reject', err || recErr);
+      } catch {
+        /* ignore */
+      }
+    });
   }
 
   async function respeak(waiter, err, evt, { nothingSent }) {
@@ -726,7 +743,7 @@ function createSonioxTtsSession({
       }
       if (waiter.settled) return done;
       if (waiter.fallbackMode) {
-        void runFallback(waiter);
+        recover(runFallback(waiter), waiter, waiter.fallbackErr, 'fallback');
         return done;
       }
       // A re-speak in progress sends text_end itself once it reconnects.
