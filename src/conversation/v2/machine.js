@@ -319,7 +319,13 @@ function infoAnswer(state, u, profile, kind) {
   }
   if (kind === 'services') {
     const cat = vertical(profile) === 'retail' ? (profile.productCatalog || []).map((p) => p.name) : (profile.servicesCatalog || []).map((x) => x.name);
-    if (u.service) { const sp = spoken(profile, u.service, state.lang); return R.info({ kind: 'offered', label: sp ? sp.label : u.service.name, price: sp ? sp.price : u.service.price_range || null, request: requestMode(profile) }, state.lang); }
+    if (u.service) {
+      const sp = spoken(profile, u.service, state.lang); const price = sp ? sp.price : u.service.price_range || null;
+      // the line asks "shall I take a request / book?": a "yes" next turn must move on, not repeat it
+      if (vertical(profile) === 'home') { state.offer = 'book'; state.offerService = u.service.name; }
+      // "Do you do X? How much?": answer the price part too (no listed price -> the owner quotes)
+      return R.info({ kind: 'offered', label: sp ? sp.label : u.service.name, price, noPrice: !price && u.intents.includes('price'), request: requestMode(profile) }, state.lang);
+    }
     if (u.products[0]) return R.info({ kind: 'offered', label: u.products[0].name, price: u.products[0].price ? `KSh ${u.products[0].price}` : null, request: requestMode(profile) }, state.lang);
     if (!cat.length) return R.info({ kind: 'want_know' }, state.lang);
     // HD_89aa48bf657f: home services are listed as plain categories in the caller's language, never raw catalogue names
@@ -346,6 +352,8 @@ function infoAnswer(state, u, profile, kind) {
     return R.info({ kind: 'coverage', area: u.area, general, fromList: listed.length > 0, more: listed.length > 4, request: requestMode(profile) }, state.lang);
   }
   if (kind === 'payment_how') {
+    // owner-confirmed payment text only, in the caller's language; nothing confirmed -> the team confirms
+    return require('./payment').paymentLine(profile, u.text, state.lang);
     const M = { mpesa_paybill: ['M-Pesa Paybill', 'M-Pesa Paybill'], mpesa_till: ['M-Pesa Till', 'M-Pesa Till'], bank: ['bank transfer', 'benki'], cash: ['cash', 'pesa taslimu'], card: ['card', 'kadi'], pochi: ['Pochi la Biashara', 'Pochi la Biashara'], airtel: ['Airtel Money', 'Airtel Money'] };
     const ms = (profile.businessPolicies?.payments?.methods || []).map((m) => M[m]?.[L.isSw(state.lang) ? 1 : 0]).filter(Boolean);
     return R.info({ kind: 'payment_how', methods: ms.length ? ms.join(L.isSw(state.lang) ? ', ' : ', ').replace(/, ([^,]+)$/, L.isSw(state.lang) ? ' au $1' : ' or $1') : null }, state.lang);
@@ -356,11 +364,13 @@ function infoAnswer(state, u, profile, kind) {
   if (kind === 'price') {
     const named = /\b(cleaning|clean|for (an?|the)? ?\w+|ya \w+)\b/i.test(u.text);
     const svc = u.service || (!named && u.text.split(/\s+/).length <= 5 && state.slots.service && (profile.servicesCatalog || []).find((x) => x.name === state.slots.service)); const prod = u.products[0];
+    // "How much is the travel fee to Kileleshwa?": the area's confirmed fee, not "which service?"
+    if (!svc && !prod && (u.area || u.place)) { const term = AT.matchArea(u.area?.name || u.place, profile.areaTerms); if (term) return AT.coveredAreaLine(term, L.isSw(state.lang) ? 'sw' : 'en'); }
     if (!svc && !prod && !/\b(oven|fridge|gutter|\w+ cleaning)\b/i.test(u.text)) return R.info({ kind: 'which_price' }, state.lang);
     if (svc && scOn()) { const sp = spoken(profile, svc, state.lang); if (sp.price && svc.pricing?.confirmed !== false) return R.info({ kind: 'price', found: true, label: sp.label, price: sp.price }, state.lang); if (svc.price_range) return R.info({ kind: 'price', found: false }, state.lang); }
     if (svc && svc.price_range && svc.pricing?.confirmed !== false) return R.info({ kind: 'price', found: true, label: svc.name, price: svc.price_range }, state.lang);
     if (prod && prod.price) return R.info({ kind: 'price', found: true, label: prod.name, price: `KSh ${prod.price}` }, state.lang);
-    state.offer = 'quote';
+    state.offer = 'quote'; state.offerService = svc ? svc.name : null;
     return R.info({ kind: 'price', found: false }, state.lang);
   }
   if (kind === 'availability') {
@@ -543,7 +553,8 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     const gaveDetail = !!(u.when?.date || u.when?.time || u.place || u.service);
     if (offer === 'book' && !u.no && !u.done && gaveDetail && !u.intents.filter((i) => i !== 'book').length) { state.intent = 'book'; state.slots.service = state.slots.service || state.offerService; mergeSlots(state, u, profile); const st = stepIntent(state, u, profile); return out(st.line); }
     if (u.yes && !u.intents.length) {
-      if (offer === 'book') { state.intent = 'book'; state.slots.service = state.offerService; mergeSlots(state, u, profile); const st = stepIntent(state, u, profile); return out(st.line); }
+      // a quote for a named home service is taken as a visit request (the owner calls with the price)
+      if (offer === 'book' || offer === 'quote' && state.offerService && vertical(profile) === 'home') { state.intent = 'book'; state.slots.service = state.offerService; mergeSlots(state, u, profile); const st = stepIntent(state, u, profile); return out(st.line); }
       return out(propose(state, { tool: 'create_handoff', kind: offer === 'quote' ? 'quote' : 'callback', reason: 'callback' }));
     }
   }
@@ -590,6 +601,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     if (u.ack) {
       state.acks = (state.acks || 0) + 1;
       if (state.acks >= 3) { state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
+      if (state.slots.service && vertical(profile) === 'home') { state.offer = 'book'; state.offerService = state.slots.service; }
       return out(R.info({ kind: 'ack', service: state.slots.service, request: requestMode(profile) }, lang));
     }
     if (u.fragment && state.turn > 1) { state.repairs = (state.repairs || 0) + 1; if (state.repairs <= 2) return out(R.info({ kind: 'repair' }, lang)); }
