@@ -4,6 +4,9 @@
 // Twilio has been removed from the telephony path.
 
 require('dotenv').config();
+// Log-and-continue on unhandled rejections; uncaught exceptions stay fatal.
+require('./src/lib/processGuards').installProcessGuards();
+const { asyncRoute } = require('./src/lib/asyncRoute');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -52,6 +55,7 @@ const {
 const { buildNotifyOutcome, ownerAlreadyNotified } = require('./src/notifications/notifyOutcome');
 const { createGreetingWarmer, greetingWarmEnabled } = require('./src/speech/greetingWarm');
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
+const { createLineFallback } = require('./src/speech/ttsRespeak');
 const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
 const {
   pickSpeechOutageLine,
@@ -700,25 +704,25 @@ app.get('/healthz', (_req, res) => {
 });
 
 /** Ops: force a TextSMS balance probe (no SMS charged). */
-app.get('/internal/sms/status', async (req, res) => {
+app.get('/internal/sms/status', asyncRoute('internal/sms/status', async (req, res) => {
   if (!voicePreviewAuthorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const status = await probeSmsCredentials({ force: true });
   return res.status(200).json({ ok: Boolean(status.verified), sms: status });
-});
+}));
 
 /** Ops: force SautiKit wallet probe (may fire telephony platform alert). */
-app.post('/internal/telephony/wallet-probe', async (req, res) => {
+app.post('/internal/telephony/wallet-probe', asyncRoute('internal/telephony/wallet-probe', async (req, res) => {
   if (!voicePreviewAuthorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const result = await probeSautikitWallet();
   return res.status(200).json(result);
-});
+}));
 
 /** Staging proof: fire platform ops alert with VOICE_PLATFORM_OPS_DRY_RUN=true. */
-app.post('/internal/platform/ops-alert', async (req, res) => {
+app.post('/internal/platform/ops-alert', asyncRoute('internal/platform/ops-alert', async (req, res) => {
   if (!voicePreviewAuthorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -728,7 +732,7 @@ app.post('/internal/platform/ops-alert', async (req, res) => {
     message: String(req.body?.message || 'staging probe').trim(),
   });
   return res.status(200).json({ ok: Boolean(result.ok), result });
-});
+}));
 
 /**
  * Desk: re-render a tenant's greeting PCM after Identity / greeting / voice /
@@ -3163,7 +3167,9 @@ mediaWss.on('connection', (ws, req) => {
           name: planned.name,
           reason: 'Live line could not complete. Team to follow up.',
         });
-        maybeSendWhatsAppNotification(sidLabel());
+        maybeSendWhatsAppNotification(sidLabel()).catch((err) => {
+          console.error(`[ws/media][${sidLabel()}] owner notify failed:`, err?.message || err);
+        });
       } catch (err) {
         console.error(
           `[ws/media][${sidLabel()}] llm recovery save failed:`,
@@ -4769,9 +4775,11 @@ mediaWss.on('connection', (ws, req) => {
     if (evt.type === 'error') {
       const classified = evt.classified || classifySonioxError(evt.raw);
       if (classified.billing || classified.fatal) {
-        void handleSpeechProviderOutage(
+        handleSpeechProviderOutage(
           `stt ${classified.code || classified.message}`
-        );
+        ).catch((err) => {
+          console.error(`[ws/media][${sidLabel()}] stt outage handler failed:`, err?.message || err);
+        });
       }
       return;
     }
@@ -4867,12 +4875,16 @@ mediaWss.on('connection', (ws, req) => {
           console.log(
             `[ws/media][${sidLabel()}] agent_question_replay reason=${decision.reason}`
           );
-          void speakText(replay, { isReplay: true }).then(() => {
-            if (callEnding) return;
-            if (agentAwaitingReply(replay)) {
-              idleNudge.arm({ skip: !heardCallerUtterance });
-            }
-          });
+          speakText(replay, { isReplay: true })
+            .then(() => {
+              if (callEnding) return;
+              if (agentAwaitingReply(replay)) {
+                idleNudge.arm({ skip: !heardCallerUtterance });
+              }
+            })
+            .catch((err) => {
+              console.warn(`[ws/media][${sidLabel()}] replay speak failed:`, err?.message || err);
+            });
         }
         return;
       }
@@ -4981,8 +4993,14 @@ mediaWss.on('connection', (ws, req) => {
         playbackBytes += pcm.length;
         if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
         // Live clone-voice audio means we can record downtime clips for the next outage.
-        scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
+        // Fallback audio (espeak / Gemini) is not the clone voice.
+        if (!meta.fallback) scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
       },
+      // VOICE_TTS_RESPEAK: a line Soniox lost mid-call is spoken again, or
+      // through this chain, unless the caller barged in or the call is over.
+      fallbackPcm: createLineFallback({ voiceId: () => tenantSonioxVoiceId }),
+      shouldRespeak: () =>
+        !bargeInActive && !speechOutageStarted && ws.readyState === WebSocket.OPEN,
     });
     tts = session;
     ttsSessionVoiceId = resolveSonioxVoice(voiceId);
@@ -5001,7 +5019,10 @@ mediaWss.on('connection', (ws, req) => {
         callSid: sidLabel(),
         onEvent: onSttEvent,
         // Prefer awaited profile; fall back quickly if load is slow (audio still buffers).
-        contextPromise: tenantWarm.then((ctx) => ctx || buildSttContext(sttTenantSnapshot)),
+        // .catch here: if the STT socket never opens, nothing else subscribes.
+        contextPromise: tenantWarm
+          .then((ctx) => ctx || buildSttContext(sttTenantSnapshot))
+          .catch(() => null),
       });
       stt.ready.catch((err) => {
         console.error(`[ws/media] Soniox STT failed to start:`, err?.message || err);
@@ -5340,7 +5361,9 @@ mediaWss.on('connection', (ws, req) => {
       }
       tts = null;
     }
-    void voiceTrace.finishCall();
+    voiceTrace.finishCall().catch((err) => {
+      console.warn(`[ws/media] voice trace finish failed:`, err?.message || err);
+    });
     if (sessionCallSid && callTranscript.size()) {
       db.appendTranscript({ callSid: sessionCallSid, turns: callTranscript.turns() }).catch(
         (err) => {
@@ -5657,7 +5680,14 @@ async function maybeQueueLiveTransfer({
 
 async function maybeSendWhatsAppNotification(callSid, opts = {}) {
   // Lead alert: WhatsApp owner number when sender is ready; email fallback otherwise.
-  const call = await db.getCall(callSid);
+  // Never rejects: two mid-call callers fire this without awaiting it.
+  let call = null;
+  try {
+    call = await db.getCall(callSid);
+  } catch (err) {
+    console.error(`[${callSid}] Owner notification skipped (call lookup failed):`, err?.message || err);
+    return;
+  }
   if (!call) return;
 
   if (!shouldSendOwnerLead(call)) return;
@@ -6561,7 +6591,9 @@ async function applyGeminiTools(callSid, parsed) {
       (result.status === 'succeeded' || result.status === 'updated')
   );
   if (savedInfo?.name && savedInfo?.reason && !escalationRequested && !visitSaved) {
-    maybeSendWhatsAppNotification(callSid, { midCall: true });
+    maybeSendWhatsAppNotification(callSid, { midCall: true }).catch((err) => {
+      console.error(`[${callSid}] mid-call owner notify failed:`, err?.message || err);
+    });
   }
   if (visitSaved) {
     persistCallResolution(callSid, 'tool', { review: false }).catch((err) => {
