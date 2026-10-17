@@ -273,7 +273,28 @@ async function instanceAlreadyDelivered(ledger, to) {
   return { delivered: false };
 }
 
+/**
+ * Closed-tenant guard (VOICE_CLOSED_TENANT_GUARD, default on): nothing leaves
+ * for an archived, suspended or is_active=false business. Sends with no
+ * tenant id still pass. A lookup error answers open (logged).
+ */
+async function closedTenantSendGate(ledger, to) {
+  const tenantId = ledger?.tenantId;
+  // No tenant id or nothing to send to: nothing to guard.
+  if (!tenantId || !destKeys(to).length) return null;
+  const { tenantLineForAction } = require('../sautikit/closedTenantGuard');
+  const line = await tenantLineForAction(tenantId);
+  if (!line.closed) return null;
+  console.warn(
+    `[notify] send blocked: tenant line closed (${line.reason}) tenant=${tenantId}` +
+      ` kind=${ledger?.kind || 'unknown'}${ledger?.callSid ? ` call=${ledger.callSid}` : ''}`
+  );
+  return { ok: false, reason: 'tenant_line_closed', lineState: line.reason, key: null };
+}
+
 async function beginInstanceSend(ledger, to) {
+  const closed = await closedTenantSendGate(ledger, to);
+  if (closed) return closed;
   const flight = claimInstanceFlight(ledger, to);
   if (!flight.ok) return { ok: false, reason: flight.reason, key: null };
   const prior = await instanceAlreadyDelivered(ledger, to);
