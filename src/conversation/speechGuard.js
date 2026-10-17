@@ -10,8 +10,18 @@ const { entityValue, findCatalogMatch } = require('./entityExtraction');
 const { looksLikeOfferAsk } = require('./fileRead');
 const { fileServicePriceLine } = require('./catalogueMouth');
 const { hoursAskLine, looksLikeHoursAsk } = require('./knownFacts');
-const { parseHoursSchedule } = require('./businessHours');
 const { numbersIn } = require('./numberWords');
+const {
+  trustedFactsEnabled,
+  trustedFactsFor,
+  clockKeys,
+  fileHoursFacts,
+  callerClockAsk,
+  askLanguage,
+  sentenceStatesTrustedFact,
+  timeFactLine,
+  dateFactLine,
+} = require('./trustedFacts');
 const { assessCoverage, coverageStatus, coverageAskPlace, foldCanonicalPlace } = require('./visitLocation');
 const {
   confirmedCoverageEnabled,
@@ -110,6 +120,11 @@ const SPECIFIC_ASK_EXTRA =
 // an honest line, not by silence.
 const NUMBER_ASK =
   /\b(how much|how many|price|prices|cost|costs|charge|charges|rate|rates|bei|pesa ngapi|ngapi|what time|saa ngapi|when do you (?:open|close)|hours)\b/i;
+
+/** A number ask, including every "what's the time" form (VOICE_GUARD_TRUSTED_FACTS). */
+function callerAskedNumber(text, trusted) {
+  return NUMBER_ASK.test(text) || Boolean(trusted && callerClockAsk(text));
+}
 const PRICE_ASK =
   /\b(how much|price|prices|cost|costs|charge|charges|rate|rates|bei|gharama|pesa ngapi|pesa gani)\b/i;
 
@@ -289,24 +304,6 @@ function knownNumbers({ callerTurns = [], profile = {}, toolResults = [], extra 
   return known;
 }
 
-function clockKey(hourRaw, minuteRaw, apRaw) {
-  const hour = String(Number(hourRaw));
-  const minute = minuteRaw == null || minuteRaw === '' ? '' : String(Number(minuteRaw)).padStart(2, '0');
-  const ap = String(apRaw || '').replace(/\./g, '').toLowerCase();
-  if (!minute || minute === '00') return `${hour}${ap}`;
-  return `${hour}:${minute}${ap}`;
-}
-
-/** AM/PM clocks in a text. "8 AM" and "8:00 AM" share one key. */
-function clockKeys(text) {
-  const keys = new Set();
-  const raw = String(text || '');
-  for (const hit of raw.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/gi)) {
-    keys.add(clockKey(hit[1], hit[2], hit[3]));
-  }
-  return keys;
-}
-
 function allowedClocks({ callerTurns = [], toolResults = [], extra = '' } = {}) {
   return clockKeys(
     [
@@ -324,40 +321,7 @@ function sentenceHasUnsaidClock(sentence, allowed) {
   return false;
 }
 
-/**
- * Clocks and numbers that state the business's own hours on file: the 12-hour
- * clock ("8am", "6pm"), the 24-hour hour, and the Kiswahili hour ("saa mbili"
- * is 8 AM, "saa kumi na mbili" is 6 PM). Only used when the caller asked the
- * hours, so a visit clock is still never authorized by the hours (#489).
- */
-function fileHoursFacts(profile = {}) {
-  const parsed = parseHoursSchedule(profile?.hoursSchedule);
-  const clocks = new Set();
-  const numbers = new Set(['0']);
-  if (!parsed) return null;
-  for (const day of Object.values(parsed.days || {})) {
-    if (!day) continue;
-    for (const hhmm of [day.open, day.close]) {
-      const [hRaw, mRaw] = String(hhmm || '').split(':');
-      const h24 = Number(hRaw);
-      const minute = Number(mRaw || 0);
-      if (!Number.isFinite(h24)) continue;
-      const h12 = h24 % 12 || 12;
-      const ap = h24 < 12 ? 'am' : 'pm';
-      clocks.add(clockKey(h12, minute ? String(minute) : '', ap));
-      numbers.add(String(h24));
-      numbers.add(String(h12));
-      if (minute) numbers.add(String(minute));
-      const swHour = (h12 + 6) % 12 || 12;
-      numbers.add(String(swHour));
-      if (swHour > 10) {
-        numbers.add('10');
-        numbers.add(String(swHour - 10));
-      }
-    }
-  }
-  return clocks.size ? { clocks, numbers } : null;
-}
+// fileHoursFacts lives in trustedFacts.js with the other prompt-injected facts.
 
 /** An answer to an hours ask whose clocks and numbers are all the hours on file. */
 function sentenceStatesFileHours(sentence, hoursFacts) {
@@ -536,23 +500,67 @@ function ackFallback(language) {
 }
 
 /** One line when a spoken filter removes text, so a silent drop shows up in call logs. */
-function logSpokenFilterDrop(reason, dropped) {
+function logSpokenFilterDrop(reason, dropped, ctx) {
   const text = String(dropped || '').replace(/\s+/g, ' ').trim();
   if (!text) return;
+  if (ctx && !firstDropThisTurn(ctx, reason, text)) return;
   console.warn(
     `[speech-filter] drop reason=${reason} chars=${text.length} text=${JSON.stringify(text.slice(0, 180))}`
   );
 }
 
+/**
+ * The streamed sentence and the final full reply both pass the guard, so one
+ * removal used to log twice (HD_95e6745c0df1). Remember what this turn already
+ * logged on the conversation (plain JSON, survives a state copy).
+ */
+function firstDropThisTurn(ctx, reason, text) {
+  const state = ctx?.state;
+  if (!state || typeof state !== 'object') return true;
+  const conv = (state.conversation ||= {});
+  const turn = Number(conv.turnCount || 0);
+  const key = `${reason}|${text.slice(0, 180)}`;
+  if (!conv.guardDropLog || conv.guardDropLog.turn !== turn) conv.guardDropLog = { turn, keys: [] };
+  if (conv.guardDropLog.keys.includes(key)) return false;
+  conv.guardDropLog.keys.push(key);
+  if (conv.guardDropLog.keys.length > 40) conv.guardDropLog.keys.shift();
+  return true;
+}
+
+// Everyday words in the agent's own speech that the Kenya place index holds
+// exactly or one edit away: "hivi karibuni" bound to Jaribuni and dropped a
+// correct callback answer (HD_95e6745c0df1 t16). Others from a scan of 30 days
+// of prod agent speech: order->Border, kabla->Kabula, kalamu->Kalama,
+// chukua->Chuka, wangu, salama, mlango, baraka, hotel, stage->State.
+// These never count as a place in agent speech. Real estates that double as
+// words (Kahawa, Sukari) stay bindable. The caller-side binder is unchanged.
+const AGENT_EVERYDAY_WORDS = new Set([
+  'order', 'orders', 'state', 'stage', 'estate', 'extension', 'extensions', 'point', 'hotel',
+  'holds', 'centre', 'tower', 'kasuku', 'kalamu', 'kabla', 'karibuni', 'wangu', 'salama',
+  'chukua', 'mlango', 'baraka', 'chupa', 'mambo', 'ukiwa', 'tayari', 'dukani', 'kifaa',
+  'rangi', 'uongo', 'mbaya', 'kubwa', 'ndogo', 'chache', 'mtoto', 'chaki', 'hospitali', 'dunia',
+]);
+
+function maskEverydayWords(text) {
+  return String(text || '')
+    .split(/(\s+)/)
+    .map((part) => {
+      const key = part.toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]/g, '');
+      return key && AGENT_EVERYDAY_WORDS.has(key) ? '0' : part;
+    })
+    .join('');
+}
+
 function placeNamesIn(text) {
-  return new Set(bindSpokenPlace(text, { fuzzy: true }));
+  const source = trustedFactsEnabled() ? maskEverydayWords(text) : text;
+  return new Set(bindSpokenPlace(source, { fuzzy: true }));
 }
 
 function noteDrop(ctx, reason, sentence) {
   if (Array.isArray(ctx?.dropReasons) && !ctx.dropReasons.includes(reason)) {
     ctx.dropReasons.push(reason);
   }
-  logSpokenFilterDrop(reason, sentence);
+  logSpokenFilterDrop(reason, sentence, ctx);
 }
 
 /** A locality the slot, the caller, and the file do not hold. */
@@ -614,6 +622,13 @@ function guardSpokenReply(text, ctx = {}) {
   }
   const known = knownNumbers(ctx);
   const clocks = allowedClocks(ctx);
+  // VOICE_GUARD_TRUSTED_FACTS: the current Kenya time and date the prompt gave
+  // the model, built once per turn from the prompt's own clock instant.
+  const trusted = trustedFactsEnabled() ? trustedFactsFor(ctx) : null;
+  const lastCallerForFacts = String((ctx.callerTurns || []).slice(-1)[0] || '');
+  const clockAsk = trusted ? callerClockAsk(lastCallerForFacts) : '';
+  const answerLanguage = trusted ? askLanguage(lastCallerForFacts, ctx.language) : ctx.language;
+  let droppedClockAnswer = false;
   const saved = toolSucceededThisTurn(ctx.toolResults);
   const holdOk = holdOrOrderSucceeded(ctx.toolResults);
   let droppedHoldPayment = false;
@@ -727,9 +742,11 @@ function guardSpokenReply(text, ctx = {}) {
     }
     if (
       !sentenceStatesFileHours(sentence, hoursFacts) &&
-      (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known))
+      (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known)) &&
+      !sentenceStatesTrustedFact(sentence, trusted, { known, clocks, ask: clockAsk })
     ) {
       droppedNumber = true;
+      if (clockAsk) droppedClockAnswer = true;
       noteDrop(ctx, 'unsaid_number', sentence);
       continue;
     }
@@ -802,12 +819,24 @@ function guardSpokenReply(text, ctx = {}) {
   if (groundedHours) {
     out = !out || NOT_ON_FILE.test(out) ? groundedHours : `${groundedHours} ${out}`;
   }
-  const askedNumber = NUMBER_ASK.test(lastCallerTurn);
+  // The caller asked the time or date and the model's answer was dropped (a
+  // wrong clock, an ETA-shaped sentence). Speak the code-generated fact line
+  // in the caller's language instead of "not on file" or a bare filler.
+  const groundedClock =
+    trusted && !groundedPrice && !groundedHours && droppedClockAnswer
+      ? clockAsk === 'date'
+        ? dateFactLine(trusted, answerLanguage)
+        : timeFactLine(trusted, answerLanguage)
+      : '';
+  if (groundedClock) {
+    out = !out || NOT_ON_FILE.test(out) ? groundedClock : `${groundedClock} ${out}`;
+  }
+  const askedNumber = callerAskedNumber(lastCallerTurn, trusted);
   const priced = groundedPrice;
   if (out) {
     const lead =
-      !groundedPrice && !groundedHours && askedNumber && droppedNumber
-        ? unknownFallback(ctx.language)
+      !groundedPrice && !groundedHours && !groundedClock && askedNumber && droppedNumber
+        ? unknownFallback(answerLanguage)
         : '';
     return withMessageOnlyCallback(lead ? `${lead} ${out}` : out, ctx, appendCallback);
   }
@@ -834,7 +863,7 @@ function guardSpokenReply(text, ctx = {}) {
   if (!out && droppedHoldPayment) return 'The owner will follow up.';
   if (ctx.allowEmpty && !askedNumber) return '';
   if (askedNumber && priced) return withMessageOnlyCallback(priced, ctx, appendCallback);
-  return droppedNumber ? unknownFallback(ctx.language) : ackFallback(ctx.language);
+  return droppedNumber ? unknownFallback(answerLanguage) : ackFallback(ctx.language);
 }
 
 module.exports = {

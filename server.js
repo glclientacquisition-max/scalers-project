@@ -335,6 +335,7 @@ const {
   isSpeakSlotOutcome,
 } = require('./src/conversation/speakSlots');
 const { narratesInternalAction, groundFilePriceLine } = require('./src/conversation/speechGuard');
+const { promptClockStale, stampPromptClock } = require('./src/conversation/trustedFacts');
 const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -2238,7 +2239,9 @@ mediaWss.on('connection', (ws, req) => {
     weakStt: false,
     tokenLanguages: [],
   };
-  let systemPrompt = buildSystemPrompt();
+  // VOICE_GUARD_TRUSTED_FACTS: the clock instant behind CURRENT TIME IN KENYA.
+  let promptClockAt = new Date();
+  let systemPrompt = buildSystemPrompt({}, { now: promptClockAt });
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
   let agentName = process.env.AGENT_NAME || 'Receptionist';
@@ -2486,7 +2489,8 @@ mediaWss.on('connection', (ws, req) => {
       afterHoursMode = profile.afterHoursMode || 'serve';
       openStatus = openClosedStatus(hoursSchedule);
       closureNotice = bulletinClosureNotice(profile.dailyBulletin);
-      systemPrompt = buildSystemPrompt(profile);
+      promptClockAt = new Date();
+      systemPrompt = buildSystemPrompt(profile, { now: promptClockAt });
       ttsLexiconOverrides = Array.isArray(profile.ttsLexicon)
         ? profile.ttsLexicon
         : [];
@@ -3377,11 +3381,20 @@ mediaWss.on('connection', (ws, req) => {
         }
       )
     );
-    if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
-      systemPrompt = buildSystemPrompt(brainProfile);
+    // The prompt clock was frozen at call start, so 3 minutes in the model still
+    // said 3:51 (HD_95e6745c0df1). Rebuild when the Kenya minute moved, and
+    // stamp the instant so the speech guard trusts the same clock.
+    const promptNow = new Date();
+    if (
+      liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp ||
+      promptClockStale(promptClockAt, promptNow)
+    ) {
+      promptClockAt = promptNow;
+      systemPrompt = buildSystemPrompt(brainProfile, { now: promptClockAt });
     }
     const nextBestAction = determineNextBestAction({ state: brainState, capabilities });
     brainState = setNextBestAction(brainState, nextBestAction);
+    stampPromptClock(brainState, promptClockAt);
     if (
       previousBrainState?.caller?.nameConfirmed !== true &&
       brainState?.caller?.nameConfirmed === true
@@ -5974,7 +5987,8 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
 
 wss.on('connection', (ws) => {
   let callSid = null;
-  let systemPrompt = buildSystemPrompt();
+  let promptClockAt = new Date();
+  let systemPrompt = buildSystemPrompt({}, { now: promptClockAt });
   let messages = [{ role: 'system', content: systemPrompt }];
   let transcriptLog = [];
   let callLanguage = 'unknown';
@@ -6003,7 +6017,8 @@ wss.on('connection', (ws) => {
           const profile = await db.getTenantProfile({ callSid, toNumber: data.to });
           await hydrateCallerMemory(profile, callSid);
           brainProfile = profile;
-          systemPrompt = buildSystemPrompt(profile);
+          promptClockAt = new Date();
+          systemPrompt = buildSystemPrompt(profile, { now: promptClockAt });
           const parsedTools = parseAgentTools(profile.agentTools);
           callAgentTools.set(callSid, parsedTools);
           callTenantProfiles.set(callSid, profile);
@@ -6057,11 +6072,17 @@ wss.on('connection', (ws) => {
             profile: brainProfile,
           })
         );
-        if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
-          systemPrompt = buildSystemPrompt(brainProfile);
+        const promptNow = new Date();
+        if (
+          liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp ||
+          promptClockStale(promptClockAt, promptNow)
+        ) {
+          promptClockAt = promptNow;
+          systemPrompt = buildSystemPrompt(brainProfile, { now: promptClockAt });
         }
         const decision = determineNextBestAction({ state: brainState, capabilities });
         brainState = setNextBestAction(brainState, decision);
+        stampPromptClock(brainState, promptClockAt);
         callBrainStates.set(callSid, brainState);
         logBrainTrace({
           callSid,
