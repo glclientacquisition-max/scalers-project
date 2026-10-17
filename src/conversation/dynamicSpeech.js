@@ -422,6 +422,8 @@ function stripPrematureOutcomeClaims(text, opts = {}) {
  */
 function polishSpokenDetail(text, opts = {}) {
   const dropReasons = [];
+  // VOICE_NO_SILENCE_AFTER_FILLER: which sentences the guard dropped, and why.
+  const droppedSentences = require('../speech/noSilenceAfterFiller').noSilenceAfterFillerEnabled() ? [] : null;
   let spoken = stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true });
   // Guard whole sentences first. Stripping a verb phrase after the fact would
   // leave a fragment ("that for you.") that the guard can no longer see.
@@ -436,6 +438,7 @@ function polishSpokenDetail(text, opts = {}) {
       language: opts.language,
       allowEmpty: true,
       dropReasons,
+      ...(droppedSentences ? { droppedSentences } : {}),
       ...(opts.now != null ? { now: opts.now } : {}),
     });
   }
@@ -468,7 +471,9 @@ function polishSpokenDetail(text, opts = {}) {
   if (dropReasons.length) reason = dropReasons[0];
   else if (!after) reason = 'dropped';
   else if (after !== before) reason = 'rewritten';
-  return { text: out, reason, dropReasons };
+  const result = { text: out, reason, dropReasons };
+  if (droppedSentences && droppedSentences.length) result.droppedSentences = droppedSentences;
+  return result;
 }
 
 function polishSpokenReply(text, opts = {}) {
@@ -679,6 +684,7 @@ function planEmptyGeminiSpeech({
   llmDown = false,
   alreadyOffered = false,
   toolResults = [],
+  toolOutcomeFirst = false,
 } = {}) {
   const savedForThem = fileReadLine({
     text: userText,
@@ -701,6 +707,12 @@ function planEmptyGeminiSpeech({
       kind: 'reasoning_outage',
       line: pickLlmRecoveryLine({ language, alreadyOffered }),
     };
+  }
+  // VOICE_NO_SILENCE_AFTER_FILLER: a succeeded tool is acknowledged even when
+  // the hear-again repair was spent earlier (HD_c427511e5773 t4 -> t11).
+  if (toolOutcomeFirst) {
+    const first = spokenToolOutcome(toolResults, language, userText);
+    if (first) return { speak: true, kind: 'tool_outcome', line: first };
   }
   if (alreadyOffered) return { speak: false, kind: 'quiet_continue', line: '' };
   const outcome = spokenToolOutcome(toolResults, language, userText);

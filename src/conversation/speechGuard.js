@@ -25,6 +25,11 @@ const {
   isZoneFactKind,
   sentenceReadsClock,
 } = require('./trustedFacts');
+const {
+  noSilenceAfterFillerEnabled,
+  isCallbackClaim,
+  callbackToolSucceeded,
+} = require('../speech/noSilenceAfterFiller');
 const { assessCoverage, coverageStatus, coverageAskPlace, foldCanonicalPlace } = require('./visitLocation');
 const {
   confirmedCoverageEnabled,
@@ -568,6 +573,9 @@ function noteDrop(ctx, reason, sentence) {
   if (Array.isArray(ctx?.dropReasons) && !ctx.dropReasons.includes(reason)) {
     ctx.dropReasons.push(reason);
   }
+  // VOICE_NO_SILENCE_AFTER_FILLER: the stream holds saved_claim sentences
+  // until the tool results are in.
+  if (Array.isArray(ctx?.droppedSentences)) ctx.droppedSentences.push({ reason, sentence: String(sentence || '') });
   logSpokenFilterDrop(reason, sentence, ctx);
 }
 
@@ -638,6 +646,13 @@ function guardSpokenReply(text, ctx = {}) {
   const answerLanguage = trusted ? askLanguage(lastCallerForFacts, ctx.language) : ctx.language;
   let droppedClockAnswer = false;
   const saved = toolSucceededThisTurn(ctx.toolResults);
+  // VOICE_NO_SILENCE_AFTER_FILLER (default off): "let me escalate this to our
+  // team" is a callback claim, not a live transfer. It passes when escalate or
+  // create_service_request succeeded this turn, and otherwise drops as
+  // saved_claim (held by the stream) instead of transfer_claim
+  // (HD_c427511e5773 t10). Other saved-claim rules are unchanged.
+  const noSilence = noSilenceAfterFillerEnabled();
+  const callbackOk = noSilence && callbackToolSucceeded(ctx.toolResults);
   const holdOk = holdOrOrderSucceeded(ctx.toolResults);
   let droppedHoldPayment = false;
   const transferOk = Boolean(ctx.capabilities?.liveTransfer || ctx.capabilities?.transfer);
@@ -722,12 +737,19 @@ function guardSpokenReply(text, ctx = {}) {
       noteDrop(ctx, 'hold_payment', sentence);
       continue;
     }
+    // Only reclassifies what TRANSFER_CLAIM already drops ("escalate"): no new drops.
+    const callbackClaim = noSilence && isCallbackClaim(sentence) && TRANSFER_CLAIM.test(sentence);
+    if (callbackClaim && !callbackOk) {
+      droppedJob = true;
+      noteDrop(ctx, 'saved_claim', sentence);
+      continue;
+    }
     if (!saved && (SAVED_CLAIM.test(sentence) || JOB_CLOSE.test(sentence))) {
       droppedJob = true;
       noteDrop(ctx, 'saved_claim', sentence);
       continue;
     }
-    if (!transferOk && TRANSFER_CLAIM.test(sentence)) {
+    if (!transferOk && TRANSFER_CLAIM.test(sentence) && !(callbackClaim && callbackOk)) {
       noteDrop(ctx, 'transfer_claim', sentence);
       continue;
     }
