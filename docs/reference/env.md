@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-160 variables.
+161 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -141,6 +141,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_BARGE_EARLY_MS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_BARGE_GRACE_MS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_BARGE_MIN_CHARS` | voice | `src/speech/turnTaking.js` |
+| `VOICE_DURATION_SETTLE_WAIT_MS` | voice | `server.js` |
 | `VOICE_FAST_INBOUND` | scripts | `scripts/bench-inbound-webhook.js` |
 | `VOICE_FILLER` | voice | `server.js`<br>`src/conversation/language.js` |
 | `VOICE_FILLER_CACHE` | voice | `src/speech/fillerPcmCache.js` |

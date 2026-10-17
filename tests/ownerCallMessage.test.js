@@ -297,18 +297,17 @@ describe('one terminal close per call (prod HD_d3900cbf2b2d: webhook Completed +
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   const dbSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'db.js'), 'utf8');
 
-  it('only the update that leaves a live status is the terminal transition', () => {
-    assert.match(dbSrc, /TERMINAL_CLAIM_FILTER = 'status\.is\.null,status\.not\.in\.\(complete,completed,failed,no_answer\)'/);
-    assert.match(dbSrc, /if \(claimsTerminal\) \{\n\s+query = query\.or\(TERMINAL_CLAIM_FILTER\);/);
-    assert.match(dbSrc, /shaped\.terminal_transition = terminalTransition;/);
+  // Main-based cut: the DB-guarded run-once close is #692 (CALL_FINALIZE_ONCE).
+  it('only the update that leaves a live status wins the close (#692 finalizeWinner)', () => {
+    assert.match(dbSrc, /if \(claimTerminal\) query = query\.not\('status', 'in', `\(\$\{TERMINAL\.join\(','\)\}\)`\);/);
+    assert.match(dbSrc, /'finalizeWinner', \{ value: false/);
   });
 
-  it('the second close skips resolution, review, first-forward and the owner message', () => {
+  it('the losing close skips resolution, first-forward and the owner message', () => {
     const fn = src.slice(src.indexOf('async function markCallTerminalFromWebhook'));
     const body = fn.slice(0, fn.indexOf('\n}\n'));
-    const guard = body.indexOf("updated.terminal_transition !== true");
+    const guard = body.indexOf('const decision = finalizeDecision(');
     assert.ok(guard > 0);
-    assert.ok(guard < body.indexOf('persistCallResolution('));
     assert.ok(guard < body.indexOf('persistFirstForwardAcceptance('));
     assert.ok(guard < body.indexOf('sendOwnerCallMessage('));
   });
