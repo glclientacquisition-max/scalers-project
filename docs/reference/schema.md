@@ -52,7 +52,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `notify_sms_billable` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 
-## Functions (88)
+## Functions (89)
 
 | Function | Defined in |
 | --- | --- |
@@ -129,6 +129,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `set_tenant_soft_spend_limit` | `docs/supabase/wallet_soft_spend_limit.sql` |
 | `settle_notify_send` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `sms_counter_drift` | `docs/supabase/notify_send_reserve_settle.sql` |
+| `sms_counter_drift_log` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `snapshot_data_quality` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `suspend_line_for_nonpayment` | `docs/supabase/line_rental_grace.sql` |
 | `tenant_completeness_score` | `docs/supabase/tenant_field_provenance.sql`<br>`supabase/migrations/20261011170000_completeness_matches_onboarding.sql` |
