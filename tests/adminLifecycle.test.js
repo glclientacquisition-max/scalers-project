@@ -107,11 +107,44 @@ describe("server actions", () => {
     });
   }
 
-  it("archive stops billing through the existing billing-mode RPC, with a TODO hook for the rest", () => {
-    assert.match(fnBody(actions, "archiveBusiness"), /stopBillingForArchive\(/);
+  it("archive stops billing through archive_tenant_billing, with the billing-mode RPC as fallback", () => {
+    assert.match(fnBody(actions, "archiveBusiness"), /stopBillingForArchive\(business, actor, reason, dated\)/);
     const stop = fnBody(actions, "stopBillingForArchive");
+    assert.match(stop, /rpc\("archive_tenant_billing", \{/);
+    assert.match(stop, /isMissingBillingRpc\(error\)/);
     assert.match(stop, /setTenantBillingMode\(\{ businessId: business\.id, mode: "off"/);
-    assert.match(actions, /TODO\(ops-billing\)/);
+    assert.doesNotMatch(actions, /TODO\(ops-billing\)/);
+  });
+
+  it("unarchive records billing through unarchive_tenant_billing and turns nothing back on", () => {
+    const restore = fnBody(actions, "restoreBusiness");
+    assert.match(restore, /resumeBillingAfterUnarchive\(businessId, actor, reason\)/);
+    const resume = fnBody(actions, "resumeBillingAfterUnarchive");
+    assert.match(resume, /rpc\("unarchive_tenant_billing", \{/);
+    assert.doesNotMatch(resume, /setTenantBillingMode|set_tenant_on_demand_usage/);
+  });
+
+  it("archive billing SQL: one audited function, a reverse, and a guard trigger", () => {
+    const sql = read("docs/supabase/archive_tenant_billing.sql");
+    assert.match(sql, /create or replace function public\.archive_tenant_billing\(/);
+    assert.match(sql, /create or replace function public\.unarchive_tenant_billing\(/);
+    assert.match(sql, /create trigger tenants_archived_billing_guard/);
+    assert.match(sql, /'archive_tenant_billing'/);
+    // The reverse never switches billing mode or on-demand back on.
+    const reverse = sql.slice(sql.indexOf("function public.unarchive_tenant_billing("));
+    assert.doesNotMatch(reverse, /set billing_enforcement|on_demand_usage_enabled = true/);
+  });
+
+  it("refresh_line_status keeps an admin suspension", () => {
+    const sql = read("docs/supabase/admin_business_suspend.sql");
+    assert.match(sql, /if v_tenant\.suspended_at is not null then\s+v_status := 'suspended';/);
+    assert.match(sql, /Suspended by an admin\. Restore the line before a non-payment suspension\./);
+  });
+
+  it("purge can null notify_sends text and call_id, and keeps a usage summary", () => {
+    const sql = read("docs/supabase/purge_archived_tenants.sql");
+    assert.match(sql, /current_setting\('scalers\.notify_purge', true\) = '1'/);
+    assert.match(sql, /'usage_by_month', v_usage/);
   });
 
   it("the route takes every reason from the body and the actor from the session", () => {

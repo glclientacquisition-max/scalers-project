@@ -94,3 +94,148 @@ $$;
 
 revoke all on function public.admin_set_business_suspended(uuid, boolean, text) from public, anon, authenticated;
 grant execute on function public.admin_set_business_suspended(uuid, boolean, text) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Line-rental rules must not lift an admin suspension (ops-billing, #737).
+--
+-- refresh_line_status (line_rental_grace.sql) recomputes active | grace |
+-- suspended from billing mode and line_paid_through. Before this patch it would
+-- turn an admin-suspended line back to 'active' (beta, or rental paid). Now it
+-- keeps 'suspended' while tenants.suspended_at is set; only
+-- admin_set_business_suspended(..., false) clears suspended_at and then calls
+-- refresh_line_status to pick active vs grace.
+--
+-- suspend_line_for_nonpayment also refuses an admin-suspended line: it would
+-- otherwise see 'suspended', disable the DID and park the number as pending:,
+-- so an admin Restore would bring the line back with no number.
+--
+-- Both are replaced only where line_rental_grace.sql is already applied
+-- (staging has them; prod does not, checked 17 Oct 2026). This file never
+-- creates them on a project that lacks them.
+-- ---------------------------------------------------------------------------
+do $patch$
+begin
+  if to_regprocedure('public.refresh_line_status(uuid)') is not null then
+    execute $fn$
+create or replace function public.refresh_line_status(p_tenant_id uuid)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $body$
+declare
+  v_tenant record;
+  v_status text;
+begin
+  if p_tenant_id is null then
+    raise exception 'tenant_id required';
+  end if;
+
+  select
+    t.id,
+    coalesce(t.billing_enforcement, 'off') as billing_enforcement,
+    t.line_paid_through,
+    coalesce(t.line_grace_days, 3) as line_grace_days,
+    coalesce(t.line_status, 'active') as line_status,
+    t.suspended_at,
+    (
+      t.sautikit_virtual_number is not null
+      and t.sautikit_virtual_number !~* '^pending:'
+    ) as has_did
+  into v_tenant
+  from public.tenants t
+  where t.id = p_tenant_id
+  for update;
+
+  if not found then
+    raise exception 'tenant not found';
+  end if;
+
+  -- An admin suspension wins over every rental rule until an admin restores it.
+  if v_tenant.suspended_at is not null then
+    v_status := 'suspended';
+  -- Beta and DID-less tenants are always active.
+  elsif v_tenant.billing_enforcement = 'off' or not v_tenant.has_did then
+    v_status := 'active';
+  elsif v_tenant.line_paid_through is null then
+    v_status := 'active';
+  elsif now() <= v_tenant.line_paid_through then
+    v_status := 'active';
+  elsif now() <= v_tenant.line_paid_through + (v_tenant.line_grace_days || ' days')::interval then
+    v_status := 'grace';
+  else
+    v_status := 'suspended';
+  end if;
+
+  if v_status is distinct from v_tenant.line_status then
+    perform set_config('scalers.wallet_write', '1', true);
+    update public.tenants
+    set line_status = v_status
+    where id = p_tenant_id;
+  end if;
+
+  return v_status;
+end;
+$body$;
+$fn$;
+    execute 'revoke all on function public.refresh_line_status(uuid) from public, anon, authenticated';
+    execute 'grant execute on function public.refresh_line_status(uuid) to service_role';
+  end if;
+
+  if to_regprocedure('public.suspend_line_for_nonpayment(uuid)') is not null then
+    execute $fn$
+create or replace function public.suspend_line_for_nonpayment(p_tenant_id uuid)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $body$
+declare
+  v_e164 text;
+  v_status text;
+begin
+  if p_tenant_id is null then
+    raise exception 'tenant_id required';
+  end if;
+
+  if exists (select 1 from public.tenants t where t.id = p_tenant_id and t.suspended_at is not null) then
+    raise exception 'Suspended by an admin. Restore the line before a non-payment suspension.';
+  end if;
+
+  v_status := public.refresh_line_status(p_tenant_id);
+  if v_status <> 'suspended' then
+    raise exception 'line is not past grace (status=%)', v_status;
+  end if;
+
+  select t.sautikit_virtual_number into v_e164
+  from public.tenants t
+  where t.id = p_tenant_id;
+
+  if v_e164 is null or v_e164 like 'pending:%' then
+    return null;
+  end if;
+
+  -- Keep the number out of the available pool until ops decides to release.
+  update public.sautikit_did_pool
+  set
+    status = 'disabled',
+    notes = coalesce(notes, '') || ' [suspended for non-payment]'
+  where e164 = v_e164;
+
+  -- Voice ignores pending: DIDs; tenant keeps row for history.
+  perform set_config('scalers.wallet_write', '1', true);
+  update public.tenants
+  set
+    sautikit_virtual_number = 'pending:' || p_tenant_id::text,
+    line_status = 'suspended'
+  where id = p_tenant_id;
+
+  return v_e164;
+end;
+$body$;
+$fn$;
+    execute 'revoke all on function public.suspend_line_for_nonpayment(uuid) from public, anon, authenticated';
+    execute 'grant execute on function public.suspend_line_for_nonpayment(uuid) to service_role';
+  end if;
+end;
+$patch$;

@@ -211,21 +211,82 @@ export async function unsuspendBusiness(businessId: string, actor: string, rawRe
   });
 }
 
+/** PostgREST / Postgres "function not found": the billing SQL is not applied on this project yet. */
+export function isMissingBillingRpc(err: unknown): boolean {
+  const { message, code } = adminErrorParts(err);
+  return (
+    code === "PGRST202" ||
+    code === "42883" ||
+    (/(archive|unarchive)_tenant_billing/i.test(message) && /could not find|does not exist/i.test(message))
+  );
+}
+
 /**
- * Billing stop on archive. Uses the Admin's existing "stop charging" (billing mode off),
- * which writes its own ops_audit_log row. Restore does not switch charging back on.
+ * Billing stop on archive: one audited, idempotent SQL call
+ * (docs/supabase/archive_tenant_billing.sql, archive_tenant_billing). It turns
+ * billing mode and on-demand off, stops line rental, keeps the period rollover
+ * from renewing the package while archived, and writes one ops_audit_log row
+ * with the settings from before. No invoice table exists yet; the SQL documents
+ * that hook. While archived, a trigger refuses turning charging back on.
  *
- * TODO(ops-billing): when packages + on-demand billing lands, also
- *  - skip archived businesses in package period renewal and invoice runs;
- *  - turn on-demand off and void or hold open invoices;
- *  - stop line rental (refresh_line_status / apply_line_rental) for archived rows.
- * Swap this body for that one call; the archive flow already calls it.
+ * Until that file is applied, fall back to the Admin's "stop charging"
+ * (billing mode off), which writes its own ops_audit_log row.
  */
-export async function stopBillingForArchive(business: BusinessRow, actor: string, reason: string) {
+export async function stopBillingForArchive(
+  business: BusinessRow,
+  actor: string,
+  reason: string,
+  archiveDated = true,
+) {
   const before = business.billing_enforcement || "off";
+  // Without an archive date (older schema) the SQL refuses, so go straight to the fallback.
+  if (archiveDated) {
+    const { data, error } = await getSupabaseAdmin().rpc("archive_tenant_billing", {
+      p_tenant_id: business.id,
+      p_actor: actor,
+      p_reason: reason,
+    });
+    bustTenantCache(business.id);
+    if (!error) {
+      const row = (Array.isArray(data) ? data[0] : data) as
+        | { changed?: boolean; billing_before?: string; billing_after?: string }
+        | null;
+      return {
+        before: row?.billing_before || before,
+        after: row?.billing_after || "off",
+        changed: Boolean(row?.changed),
+      };
+    }
+    if (!isMissingBillingRpc(error)) throw error;
+  }
   if (before === "off") return { before, after: "off", changed: false };
   await setTenantBillingMode({ businessId: business.id, mode: "off", note: `Archived: ${reason}`, actor });
   return { before, after: "off", changed: true };
+}
+
+/**
+ * Billing after unarchive (unarchive_tenant_billing): records it and reports the
+ * pre-archive settings. It turns nothing back on. Billing mode and on-demand stay
+ * off until an admin chooses. Missing SQL means there is nothing to resume.
+ */
+export async function resumeBillingAfterUnarchive(businessId: string, actor: string, reason: string) {
+  const { data, error } = await getSupabaseAdmin().rpc("unarchive_tenant_billing", {
+    p_tenant_id: businessId,
+    p_actor: actor,
+    p_reason: reason,
+  });
+  if (error) {
+    if (isMissingBillingRpc(error)) return null;
+    throw error;
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { billing_enforcement?: string; pre_archive_billing?: string | null; pre_archive_on_demand?: boolean | null }
+    | null;
+  return {
+    billing: row?.billing_enforcement || "off",
+    preArchiveBilling: row?.pre_archive_billing ?? null,
+    preArchiveOnDemand: row?.pre_archive_on_demand ?? null,
+  };
 }
 
 /** Archive: closed, hidden from default lists, billing stopped, owner sign-in blocked. Number kept. */
@@ -239,7 +300,7 @@ export async function archiveBusiness(businessId: string, actor: string, rawReas
     { archived_at: archivedAt, archived_by: actor },
     { is_active: false },
   );
-  const billing = await stopBillingForArchive(business, actor, reason);
+  const billing = await stopBillingForArchive(business, actor, reason, dated);
   await recordAdminAction({
     actor,
     action: "archive_business",
@@ -258,12 +319,14 @@ export async function restoreBusiness(businessId: string, actor: string, rawReas
   const business = await loadExisting(businessId);
   if (lifecycleOf(business).state !== "archived") throw new AdminActionBlocked("This business is not archived.");
   await updateTenant(businessId, { archived_at: null, archived_by: null }, { is_active: true });
+  const billing = await resumeBillingAfterUnarchive(businessId, actor, reason);
   await recordAdminAction({
     actor,
     action: "restore_business",
     businessId,
     reason,
     before: { active: false, archived_at: business.archived_at || null },
-    after: { active: true },
+    after: { active: true, billing: billing?.billing || business.billing_enforcement || "off" },
+    detail: billing ? { pre_archive_billing: billing.preArchiveBilling, pre_archive_on_demand: billing.preArchiveOnDemand } : undefined,
   });
 }
