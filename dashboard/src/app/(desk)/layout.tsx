@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { deskMemberRole } from "@/lib/requireMember";
 import { can, hiddenDeskHrefs } from "@/lib/permissions";
 import { DeskRoleProvider, ViewOnlyBanner } from "@/components/DeskRole";
+import { WorkspaceClosed } from "@/components/WorkspaceClosed";
 import { WorkspaceNotReady } from "@/components/WorkspaceNotReady";
 import { redirect } from "next/navigation";
 import { DeskAccountBar } from "@/components/DeskAccountBar";
@@ -52,6 +53,10 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const tenant = await getDeskShellTenant();
   timer.mark("shell");
   console.info(timer.line("desk-shell"));
+  // Archived by a Super Admin: no Desk, no onboarding, just a plain closed screen.
+  if (tenant?.archived) {
+    return <WorkspaceClosed businessName={tenant.business_name || null} />;
+  }
   const role = await deskMemberRole(tenant?.id);
   if (tenant && tenantNeedsOnboarding(tenant)) {
     // Only people who can edit settings can finish setup; everyone else waits for them.

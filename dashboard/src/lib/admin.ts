@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { listDidPool, listPendingTenants, type DidPoolRow, type PendingTenant } from "@/lib/didPool";
 import { loadBusinessPackageNames } from "@/lib/packageCatalog";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { businessLifecycle } from "@/lib/adminBusinessModel";
 
 export type AdminBusiness = {
   id: string;
@@ -12,10 +13,14 @@ export type AdminBusiness = {
   is_active: boolean | null;
   /** When the business was archived. null before docs/supabase/admin_business_archive.sql or when never archived. */
   archived_at: string | null;
+  /** tenants.line_status: active | grace | suspended. "active" before line_rental_grace.sql. */
+  line_status: string;
+  /** Set when a Super Admin suspended the line (admin_business_suspend.sql). null for non-payment. */
+  suspended_at: string | null;
   package_name: string | null;
   package_period: "month" | "year" | null;
   billing_enforcement: "off" | "soft" | "hard";
-  status: "active" | "waiting" | "archived";
+  status: "active" | "waiting" | "suspended" | "archived";
 };
 
 export type AdminOverview = {
@@ -35,8 +40,18 @@ export type AdminOverview = {
 function businessStatus(row: {
   is_active: boolean | null;
   sautikit_virtual_number: string;
+  archived_at?: string | null;
+  line_status?: string | null;
+  suspended_at?: string | null;
 }): AdminBusiness["status"] {
-  if (row.is_active === false) return "archived";
+  const life = businessLifecycle({
+    isActive: row.is_active,
+    archivedAt: row.archived_at,
+    lineStatus: row.line_status,
+    suspendedAt: row.suspended_at,
+  });
+  if (life.state === "archived") return "archived";
+  if (life.state === "suspended") return "suspended";
   if (String(row.sautikit_virtual_number || "").startsWith("pending:")) return "waiting";
   return "active";
 }
@@ -52,12 +67,14 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
     is_active: boolean | null;
     billing_enforcement?: string | null;
     archived_at?: string | null;
+    line_status?: string | null;
+    suspended_at?: string | null;
   };
 
   const BASE =
     "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active";
   // Optional columns, newest first. Each one drops out if the database does not have it yet.
-  let optional = ["billing_enforcement", "archived_at"];
+  let optional = ["billing_enforcement", "archived_at", "line_status", "suspended_at"];
   let data: BusinessRow[] | null = null;
   let error: { message: string } | null = null;
 
@@ -81,6 +98,8 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
     return {
       ...row,
       archived_at: row.archived_at || null,
+      line_status: row.line_status || "active",
+      suspended_at: row.suspended_at || null,
       package_name: pack?.packageName || null,
       package_period: pack?.period || null,
       billing_enforcement:

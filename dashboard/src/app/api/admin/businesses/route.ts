@@ -3,9 +3,10 @@ import { recordAdminAction } from "@/lib/adminAudit";
 import { adminActorName } from "@/lib/adminActor";
 import {
   archiveBusiness,
-  deleteArchivedBusiness,
   releaseBusinessNumber,
   restoreBusiness,
+  suspendBusiness,
+  unsuspendBusiness,
 } from "@/lib/adminBusinessActions";
 import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
@@ -47,23 +48,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, e164 });
     }
 
+    if (action === "suspend") {
+      await suspendBusiness(businessId, actor, body.reason);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "unsuspend") {
+      await unsuspendBusiness(businessId, actor, body.reason);
+      return NextResponse.json({ ok: true });
+    }
+
     if (action === "archive") {
-      const reason = String(body.reason || "").trim();
-      const result = await archiveBusiness(businessId, actor, reason);
+      const result = await archiveBusiness(businessId, actor, body.reason);
       return NextResponse.json({ ok: true, ...result });
     }
 
     if (action === "restore") {
-      await restoreBusiness(businessId, actor);
+      await restoreBusiness(businessId, actor, body.reason);
       return NextResponse.json({ ok: true });
     }
 
-    if (action === "delete_permanently") {
-      const e164 = await deleteArchivedBusiness(businessId, actor, String(body.confirm_name || ""));
-      return NextResponse.json({ ok: true, e164 });
-    }
-
-    // "remove" (hard delete in one step) is gone: Archive, then permanent delete after the grace period.
+    // No hard delete from Admin ("remove" and "delete_permanently" are gone).
+    // Archived data is purged by the nightly job after ARCHIVE_RESTORE_DAYS.
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (err) {
     if (isAdminActionBlocked(err)) {

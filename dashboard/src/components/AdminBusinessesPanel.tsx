@@ -7,7 +7,12 @@ import type { QualityBadge } from "@/lib/adminQualityModel";
 import { formatScore } from "@/lib/adminQualityModel";
 import type { PendingTenant } from "@/lib/didPool";
 import type { WalletLedgerRow } from "@/lib/wallet";
-import { archiveState, releaseBlockReason } from "@/lib/adminBusinessModel";
+import {
+  ARCHIVE_RESTORE_DAYS,
+  businessLifecycle,
+  reasonOk,
+  releaseBlockReason,
+} from "@/lib/adminBusinessModel";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Empty } from "@/components/ui/Empty";
@@ -24,7 +29,9 @@ const createdLabel = new Intl.DateTimeFormat("en-KE", {
   timeZone: "Africa/Nairobi",
 });
 
-type ShopFilter = "all" | "waiting" | "active" | "archived";
+/** "all" is every business that is not archived. Archived ones have their own filter. */
+type ShopFilter = "all" | "waiting" | "active" | "suspended" | "archived";
+type LifecycleAction = "suspend" | "unsuspend" | "archive" | "restore";
 type SheetKind =
   | "shop"
   | "assign"
@@ -32,23 +39,75 @@ type SheetKind =
   | "plan"
   | "charges"
   | "package"
-  | "archive"
-  | "restore"
-  | "delete";
+  | "lifecycle";
 type PlanChoice = "beta" | "on";
 type PackOption = { id: string; name: string; isActive?: boolean };
 
 function statusLabel(status: AdminBusiness["status"]) {
   if (status === "waiting") return "Waiting";
+  if (status === "suspended") return "Suspended";
   if (status === "archived") return "Archived";
   return "Active";
 }
 
 function statusTone(status: AdminBusiness["status"]): StampTone {
-  if (status === "waiting") return "attention";
+  if (status === "waiting" || status === "suspended") return "attention";
   if (status === "active") return "ok";
   return "neutral";
 }
+
+function lifecycleOf(b: AdminBusiness) {
+  return businessLifecycle({
+    isActive: b.is_active,
+    archivedAt: b.archived_at,
+    lineStatus: b.line_status,
+    suspendedAt: b.suspended_at,
+  });
+}
+
+const SUSPENDED_LINE = "Suspended: line unavailable";
+
+/** "Purges on 16 Nov 2026" (East Africa date), or a plain note when there is no archive date. */
+function purgeLabel(b: AdminBusiness) {
+  const life = lifecycleOf(b);
+  if (life.state !== "archived" || !life.purgesAt) return "Archived before dates were kept. Not purged.";
+  const at = new Date(life.purgesAt);
+  // Past the window: the next scheduled purge takes it.
+  if (at.getTime() <= Date.now()) return "Purge due";
+  return `Purges on ${createdLabel.format(at)}`;
+}
+
+/** Copy for the one confirm drawer every lifecycle action shares. */
+const LIFECYCLE: Record<
+  LifecycleAction,
+  { title: string; confirm: string; danger?: boolean; body: (b: AdminBusiness) => string }
+> = {
+  suspend: {
+    title: "Suspend this line?",
+    confirm: "Suspend",
+    danger: true,
+    body: (b) =>
+      `Callers to ${b.business_name} hear that the line is unavailable. Refused calls are not charged. Calls, contacts, package and billing stay as they are.`,
+  },
+  unsuspend: {
+    title: "Restore this line?",
+    confirm: "Restore line",
+    body: (b) => `${b.business_name} starts taking calls again.`,
+  },
+  archive: {
+    title: "Archive this business?",
+    confirm: "Archive",
+    danger: true,
+    body: (b) =>
+      `The line closes, charging stops, and the owner can't sign in. ${b.business_name} leaves the main list. Unarchive within ${ARCHIVE_RESTORE_DAYS} days. After that its calls, recordings, contacts and setup are deleted. Billing records stay.`,
+  },
+  restore: {
+    title: "Unarchive this business?",
+    confirm: "Unarchive",
+    body: (b) =>
+      `${b.business_name} goes back on the list, the owner can sign in, and the line opens. Charging stays off until you turn it on in Plan.`,
+  },
+};
 
 function formatCreated(iso: string) {
   const date = new Date(iso);
@@ -104,13 +163,9 @@ function releaseReason(b: AdminBusiness) {
   return releaseBlockReason({ linked: true, businessName: b.business_name, isActive: b.is_active });
 }
 
-function deleteOpensLabel(iso: string | null) {
-  if (!iso) return "";
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "" : `Opens ${createdLabel.format(date)},`;
-}
-
 function previewLine(b: AdminBusiness) {
+  if (b.status === "archived") return purgeLabel(b);
+  if (b.status === "suspended") return SUSPENDED_LINE;
   const pack = packLabel(b);
   if (b.status === "waiting") return pack === "None" ? "Waiting" : pack;
   return pack === "None" ? phoneLine(b) : `${phoneLine(b)} · ${pack}`;
@@ -144,8 +199,8 @@ export function AdminBusinessesPanel({
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [sheet, setSheet] = useState<{ kind: SheetKind; id: string } | null>(null);
-  const [confirmText, setConfirmText] = useState("");
-  const [archiveReason, setArchiveReason] = useState("");
+  const [lifecycle, setLifecycle] = useState<LifecycleAction>("suspend");
+  const [reason, setReason] = useState("");
   const [plan, setPlan] = useState<PlanChoice>("beta");
   const [charges, setCharges] = useState<WalletLedgerRow[]>([]);
   const [packs, setPacks] = useState<PackOption[]>([]);
@@ -160,7 +215,7 @@ export function AdminBusinessesPanel({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return businesses.filter((b) => {
-      if (filter !== "all" && b.status !== filter) return false;
+      if (filter === "all" ? b.status === "archived" : b.status !== filter) return false;
       if (!q) return true;
       return (
         b.business_name.toLowerCase().includes(q) ||
@@ -200,8 +255,7 @@ export function AdminBusinessesPanel({
       setError(json.error || "Could not save.");
       return false;
     }
-    setConfirmText("");
-    setArchiveReason("");
+    setReason("");
     setSheet(next === "shop" && shopId ? { kind: "shop", id: shopId } : null);
     setStatus("Saved.");
     startTransition(() => router.refresh());
@@ -242,6 +296,12 @@ export function AdminBusinessesPanel({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load.");
     }
+  }
+
+  function openLifecycle(action: LifecycleAction, id: string) {
+    setLifecycle(action);
+    setReason("");
+    openKind("lifecycle", id);
   }
 
   function openShop(id: string) {
@@ -317,13 +377,24 @@ export function AdminBusinessesPanel({
         <Segmented
           label="Businesses filter"
           items={[
-            { key: "all", label: "All", count: businesses.length, active: filter === "all" },
+            {
+              key: "all",
+              label: "All",
+              count: businesses.filter((b) => b.status !== "archived").length,
+              active: filter === "all",
+            },
             { key: "waiting", label: "Waiting", count: waiting.length, active: filter === "waiting" },
             {
               key: "active",
               label: "Active",
               count: businesses.filter((b) => b.status === "active").length,
               active: filter === "active",
+            },
+            {
+              key: "suspended",
+              label: "Suspended",
+              count: businesses.filter((b) => b.status === "suspended").length,
+              active: filter === "suspended",
             },
             {
               key: "archived",
@@ -410,6 +481,12 @@ export function AdminBusinessesPanel({
         <SheetNote error={error} />
         {open ? (
           <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
+            {open.status === "suspended" ? (
+              <ListRow title="Status" preview={SUSPENDED_LINE} stamp={<Stamp tone="attention">Suspended</Stamp>} />
+            ) : null}
+            {open.status === "archived" ? (
+              <ListRow title="Status" preview={purgeLabel(open)} stamp={<Stamp tone="neutral">Archived</Stamp>} />
+            ) : null}
             <ListRow title="Number" preview={phoneLine(open)} />
             {badges[open.id] ? (
               <ListRow
@@ -498,53 +575,44 @@ export function AdminBusinessesPanel({
                 />
               )
             ) : null}
-            {open.status === "archived" ? (
-              <>
-                <ListRow
-                  title="Restore"
-                  preview="Back to the active list"
-                  onOpen={() => openKind("restore", open.id)}
-                />
-                {(() => {
-                  const state = archiveState({ isActive: open.is_active, archivedAt: open.archived_at });
-                  if (state.canDelete) {
-                    return (
+            {(() => {
+              const life = lifecycleOf(open);
+              if (life.state === "archived") {
+                return (
+                  <ListRow
+                    title="Unarchive"
+                    preview={life.purgesAt ? `Until ${createdLabel.format(new Date(life.purgesAt))}` : "Back on the list"}
+                    onOpen={() => openLifecycle("restore", open.id)}
+                  />
+                );
+              }
+              return (
+                <>
+                  {life.state === "suspended" ? (
+                    life.byAdmin ? (
                       <ListRow
-                        title="Delete permanently"
-                        preview="Deletes its calls. Can't be undone."
-                        onOpen={() => openKind("delete", open.id)}
+                        title="Restore line"
+                        preview="Start taking calls again"
+                        onOpen={() => openLifecycle("unsuspend", open.id)}
                       />
-                    );
-                  }
-                  const why = state.deleteOpensAt
-                    ? `${deleteOpensLabel(state.deleteOpensAt)} 30 days after archive.`
-                    : "Off. No archive date on file.";
-                  return (
+                    ) : (
+                      <ListRow title="Restore line" preview="Suspended for non-payment. Comes back when paid." />
+                    )
+                  ) : (
                     <ListRow
-                      title="Delete permanently"
-                      preview={<span id={`delete-why-${open.id}`}>{why}</span>}
-                      actions={
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled
-                          aria-describedby={`delete-why-${open.id}`}
-                        >
-                          Delete
-                        </Button>
-                      }
+                      title="Suspend"
+                      preview="Pause calls. Data and billing stay."
+                      onOpen={() => openLifecycle("suspend", open.id)}
                     />
-                  );
-                })()}
-              </>
-            ) : (
-              <ListRow
-                title="Archive"
-                preview="Hides it from active lists. Restore any time."
-                onOpen={() => openKind("archive", open.id)}
-              />
-            )}
+                  )}
+                  <ListRow
+                    title="Archive"
+                    preview={`Close and hide. Unarchive within ${ARCHIVE_RESTORE_DAYS} days.`}
+                    onOpen={() => openLifecycle("archive", open.id)}
+                  />
+                </>
+              );
+            })()}
           </ul>
         ) : null}
       </Sheet>
@@ -741,85 +809,30 @@ export function AdminBusinessesPanel({
       </Sheet>
 
       <ConfirmSheet
-        open={sheet?.kind === "archive"}
+        open={sheet?.kind === "lifecycle"}
         theme="admin"
-        title="Archive this business?"
-        confirmLabel="Archive"
+        title={LIFECYCLE[lifecycle].title}
+        confirmLabel={LIFECYCLE[lifecycle].confirm}
+        danger={LIFECYCLE[lifecycle].danger}
         pending={pending}
-        confirmDisabled={archiveReason.trim().length < 3}
+        confirmDisabled={!reasonOk(reason)}
         onClose={() => {
-          setArchiveReason("");
+          setReason("");
           setSheet(open ? { kind: "shop", id: open.id } : null);
         }}
         onConfirm={() =>
-          open && void run({ action: "archive", business_id: open.id, reason: archiveReason.trim() })
+          open && void run({ action: lifecycle, business_id: open.id, reason: reason.trim() })
         }
       >
         <SheetNote error={error} />
-        <p className="pb-3">
-          It leaves the active lists and keeps its calls and number. Restore any time. Permanent delete
-          opens 30 days after today.
-        </p>
-        <Field id="biz-archive-reason" label="Reason" hint="Shows in the audit log">
+        <p className="pb-3">{open ? LIFECYCLE[lifecycle].body(open) : ""}</p>
+        <Field id="biz-lifecycle-reason" label="Reason" hint="3 characters or more. Shows in Activity.">
           {(props) => (
             <Input
               {...props}
               autoComplete="off"
-              value={archiveReason}
-              onChange={(event) => setArchiveReason(event.target.value)}
-            />
-          )}
-        </Field>
-      </ConfirmSheet>
-
-      <ConfirmSheet
-        open={sheet?.kind === "restore"}
-        theme="admin"
-        title="Restore this business?"
-        confirmLabel="Restore"
-        pending={pending}
-        onClose={() => setSheet(open ? { kind: "shop", id: open.id } : null)}
-        onConfirm={() => open && void run({ action: "restore", business_id: open.id })}
-      >
-        <SheetNote error={error} />
-        <p>{open ? `${open.business_name} goes back on the active list.` : ""}</p>
-      </ConfirmSheet>
-
-      <ConfirmSheet
-        open={sheet?.kind === "delete"}
-        theme="admin"
-        title="Delete permanently?"
-        confirmLabel="Delete"
-        danger
-        pending={pending}
-        confirmDisabled={!open || confirmText.trim() !== open.business_name.trim()}
-        onClose={() => {
-          setConfirmText("");
-          setSheet(open ? { kind: "shop", id: open.id } : null);
-        }}
-        onConfirm={() =>
-          open &&
-          void run(
-            { action: "delete_permanently", business_id: open.id, confirm_name: confirmText.trim() },
-            "/api/admin/businesses",
-            "close",
-          )
-        }
-      >
-        <SheetNote error={error} />
-        <p className="pb-3">
-          {open
-            ? `Deletes ${open.business_name}, its members, calls, and transcripts, and frees its number. This can't be undone.`
-            : ""}
-        </p>
-        <Field id="biz-delete-name" label="Type the business name">
-          {(props) => (
-            <Input
-              {...props}
-              autoComplete="off"
-              spellCheck={false}
-              value={confirmText}
-              onChange={(event) => setConfirmText(event.target.value)}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
             />
           )}
         </Field>
