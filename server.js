@@ -2617,10 +2617,31 @@ mediaWss.on('connection', (ws, req) => {
     return buildSttContext(sttTenantSnapshot);
   }
 
-  async function ensureTenantPrompt() {
+  // One load per call. The bind path and the greeting both call this; two
+  // concurrent loads each rebuilt the prompt and Brain state
+  // (HD_b82fbfef7649).
+  let tenantPromptInFlight = null;
+  let tenantPromptInFlightSid = null;
+  function ensureTenantPrompt() {
     if (profileLoaded && profileCallSid === sessionCallSid) {
-      return buildSttContext(sttTenantSnapshot);
+      return Promise.resolve(buildSttContext(sttTenantSnapshot));
     }
+    if (tenantPromptInFlight && tenantPromptInFlightSid === sessionCallSid) {
+      return tenantPromptInFlight;
+    }
+    const sid = sessionCallSid;
+    const run = loadTenantPrompt().finally(() => {
+      if (tenantPromptInFlight === run) {
+        tenantPromptInFlight = null;
+        tenantPromptInFlightSid = null;
+      }
+    });
+    tenantPromptInFlight = run;
+    tenantPromptInFlightSid = sid;
+    return run;
+  }
+
+  async function loadTenantPrompt() {
     try {
       // The webhook writes the call row after Stream XML (fast inbound path).
       // Use the tenant it resolved, and let the row land before later reads.

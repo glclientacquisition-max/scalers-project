@@ -23,7 +23,6 @@ const {
   isClosingAck,
   planFarewellClose,
 } = require('../src/speech/farewell');
-const { idleNudgeArmPlan } = require('../src/speech/idleNudge');
 const {
   isMediaStalled,
   mediaDurationSeconds,
@@ -95,11 +94,8 @@ describe('b82f farewell detection', () => {
     assert.ok(hangupAt < ms(haya.at), 'hang-up lands before the caller ack');
     const nudge = agentLines.find((t) => t.text_content === 'Naweza kusaidia?');
     assert.ok(hangupAt < ms(nudge.at));
-    // After a goodbye the nudge is never armed.
-    assert.equal(
-      idleNudgeArmPlan({ event: 'turn_end', heardCaller: true, callEnding: true }).arm,
-      false
-    );
+    // After a goodbye the nudge is never armed: beginFarewellClose closes it
+    // and its canFire requires !farewellClose (wiring test below).
   });
 
   it('grace is short and bounded; respect-toggle mode stays quiet then closes', () => {
@@ -257,8 +253,8 @@ describe('b82f owner message', () => {
     clearOwnerCallItems(sid);
     assert.equal(msg.kind, 'appointment');
     assert.match(msg.subject, /^VISIT UPDATED/);
-    assert.match(msg.body, /Caller: Alvin/);
-    assert.doesNotMatch(msg.body, /Caller: like/);
+    // The junk 'like'/'line' entities on the live row are fixed at write time
+    // by Brain #634 (BRAIN_CALL_FIXES_D199), not by the owner message.
     assert.doesNotMatch(msg.body, /missed-call/i);
     // Live: 4 sends (2 kinds x 2 recipients). Now: 1 kind x 2 recipients.
     const recipients = new Set(FIXTURE.live.notifySends.map((s) => s.recipient));
@@ -273,7 +269,7 @@ describe('b82f server wiring', () => {
     assert.match(src, /const bye = detectFarewell\(snap\.pendingSpeech\);/);
     assert.match(src, /beginFarewellClose\(\{ line: snap\.pendingSpeech, source: 'phrase' \}\)/);
     assert.match(src, /!callEnding &&\n\s+!farewellClose &&/);
-    assert.match(src, /callEnding: callEnding \|\| Boolean\(farewellClose\) \|\| callIsOver\(\)/);
+    assert.match(src, /idleNudge\.close\(\);/);
   });
 
   it('the media close passes the caller-audio span and the carrier figure is final', () => {
