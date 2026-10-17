@@ -37,12 +37,13 @@
 // ignored via src/sautikit/closedLineCalls.js; with no call row they could
 // not charge, alert or write a missed-call lead anyway.
 //
-// #645 (VOICE_FAST_INBOUND inbound directory, 30 s cache): this gate does not
-// read that cache; it does one direct tenants read per inbound call, so an
-// archive or suspension takes effect on the next call. If #645 wants to drop
-// that read, its directory must select archived_at and line_status, decide
-// with isTenantLineInactive(row) / tenantLineState(owners) from this file
-// (live owner first), and keep the gate before Stream and the call row.
+// #645 (VOICE_FAST_INBOUND inbound directory, 30 s cache): on the fast path
+// the directory selects archived_at and line_status and decides with
+// tenantLineState(owners) from this file (live owner first), so the gate adds
+// no round trip; an archive or suspension takes effect within the cache TTL.
+// The legacy path (fast inbound off or directory error) does one direct
+// tenants read via db.inboundTenantLine. Either way the gate runs before
+// Stream and the call row. tests/inboundDirectoryLineState.test.js.
 
 // Same words as the recorded clips (approved copy).
 const LINE_UNAVAILABLE_EN = 'Hello. This line is not available right now. Thank you for calling.';

@@ -1,0 +1,487 @@
+{
+  "schema": "scalers.voice.prod-timeline",
+  "schemaVersion": 1,
+  "callId": "HD_d3900cbf2b2d",
+  "source": "Prod (main 96ac39eb) Railway logs + voice_turn_traces, 2026-10-09 17:18-17:19Z (20:18-20:19 EAT). Times are UTC as logged.",
+  "webhook": {
+    "route": "/",
+    "userAgent": "Sautikit-VoiceProxy",
+    "callSessionState": "Ringing",
+    "receivedAt": "2026-10-09T17:18:19.017Z",
+    "respondedAt": "2026-10-09T17:18:21.068Z",
+    "respondedMs": 2051,
+    "sequentialSupabaseReads": 6,
+    "readsOnPath": [
+      "listActiveTenantDids",
+      "packageInboundOpen.resolveTenantId",
+      "packageInboundOpen.tenants",
+      "upsertCall.resolveTenantId",
+      "upsertCall.getCall",
+      "upsertCall.upsert"
+    ]
+  },
+  "hangupWebhook": {
+    "route": "/",
+    "receivedAt": "2026-10-09T17:19:34.997Z",
+    "body": {
+      "callSessionState": "Completed",
+      "durationInSeconds": 73,
+      "isActive": "(present)",
+      "direction": "(present)"
+    },
+    "observed": "classified as call set-up: package gate + upsertCall + Stream XML + voice/incoming-setup-terminal; no recording fetch"
+  },
+  "media": {
+    "wsOpenedAt": "2026-10-09T17:18:22.227Z",
+    "firstFrameBytes": 39040,
+    "normalFrameBytes": 640,
+    "greetingFirstPcmAt": "2026-10-09T17:18:23.598Z",
+    "connectToGreetingPcmMs": 1356,
+    "greetingCached": false,
+    "greetingStartSttMs": 2330,
+    "greeting": "Good evening, Aris, this is Lynn. We're closed now. Tukusaidie vipi.",
+    "bargeCancelAt": "2026-10-09T17:18:23.942Z"
+  },
+  "turn1Stt": [
+    {
+      "at": "2026-10-09T17:18:23.889Z",
+      "kind": "interim",
+      "text": "And",
+      "tokens": [
+        {
+          "text": "And",
+          "startMs": 720,
+          "endMs": 780
+        }
+      ]
+    },
+    {
+      "at": "2026-10-09T17:18:23.941Z",
+      "kind": "interim",
+      "text": "I'm",
+      "tokens": [
+        {
+          "text": "I",
+          "startMs": 720,
+          "endMs": 780
+        },
+        {
+          "text": "'",
+          "startMs": 780,
+          "endMs": 840
+        },
+        {
+          "text": "m",
+          "startMs": 840,
+          "endMs": 900
+        }
+      ]
+    },
+    {
+      "at": "2026-10-09T17:18:23.986Z",
+      "kind": "interim",
+      "text": "I'm not",
+      "tokens": [
+        {
+          "text": "I",
+          "startMs": 720,
+          "endMs": 780
+        },
+        {
+          "text": "'",
+          "startMs": 780,
+          "endMs": 840
+        },
+        {
+          "text": "m",
+          "startMs": 840,
+          "endMs": 900
+        },
+        {
+          "text": " not",
+          "startMs": 960,
+          "endMs": 1020
+        }
+      ]
+    },
+    {
+      "at": "2026-10-09T17:18:24.079Z",
+      "kind": "interim",
+      "text": "I'm not go",
+      "tokens": [
+        {
+          "text": "I",
+          "startMs": 720,
+          "endMs": 780
+        },
+        {
+          "text": "'",
+          "startMs": 780,
+          "endMs": 840
+        },
+        {
+          "text": "m",
+          "startMs": 840,
+          "endMs": 900
+        },
+        {
+          "text": " not",
+          "startMs": 960,
+          "endMs": 1020
+        },
+        {
+          "text": " go",
+          "startMs": 1200,
+          "endMs": 1260
+        }
+      ]
+    },
+    {
+      "at": "2026-10-09T17:18:24.126Z",
+      "kind": "interim",
+      "text": "I'm not going",
+      "tokens": [
+        {
+          "text": "I",
+          "startMs": 720,
+          "endMs": 780
+        },
+        {
+          "text": "'",
+          "startMs": 780,
+          "endMs": 840
+        },
+        {
+          "text": "m",
+          "startMs": 840,
+          "endMs": 900
+        },
+        {
+          "text": " not",
+          "startMs": 960,
+          "endMs": 1020
+        },
+        {
+          "text": " go",
+          "startMs": 1200,
+          "endMs": 1260
+        },
+        {
+          "text": "ing",
+          "startMs": 1320,
+          "endMs": 1380
+        }
+      ]
+    },
+    {
+      "at": "2026-10-09T17:18:24.183Z",
+      "kind": "interim",
+      "text": "I'm not going to",
+      "tokens": [
+        {
+          "text": "I",
+          "startMs": 720,
+          "endMs": 780
+        },
+        {
+          "text": "'",
+          "startMs": 780,
+          "endMs": 840
+        },
+        {
+          "text": "m",
+          "startMs": 840,
+          "endMs": 900
+        },
+        {
+          "text": " not",
+          "startMs": 960,
+          "endMs": 1020
+        },
+        {
+          "text": " go",
+          "startMs": 1200,
+          "endMs": 1260
+        },
+        {
+          "text": "ing",
+          "startMs": 1320,
+          "endMs": 1380
+        },
+        {
+          "text": " to",
+          "startMs": 1440,
+          "endMs": 1500
+        }
+      ]
+    },
+    {
+      "at": "2026-10-09T17:18:24.284Z",
+      "kind": "interim",
+      "text": "I'm not going to sc",
+      "tokens": [
+        {
+          "text": "I",
+          "startMs": 720,
+          "endMs": 780
+        },
+        {
+          "text": "'",
+          "startMs": 780,
+          "endMs": 840
+        },
+        {
+          "text": "m",
+          "startMs": 840,
+          "endMs": 900
+        },
+        {
+          "text": " not",
+          "startMs": 960,
+          "endMs": 1020
+        },
+        {
+          "text": " go",
+          "startMs": 1200,
+          "endMs": 1260
+        },
+        {
+          "text": "ing",
+          "startMs": 1320,
+          "endMs": 1380
+        },
+        {
+          "text": " to",
+          "startMs": 1440,
+          "endMs": 1500
+        },
+        {
+          "text": " sc",
+          "startMs": 1740,
+          "endMs": 1800
+        }
+      ]
+    },
+    {
+      "at": "2026-10-09T17:18:24.326Z",
+      "kind": "interim",
+      "text": "I'm not going to scam",
+      "tokens": [
+        {
+          "text": "I",
+          "startMs": 720,
+          "endMs": 780
+        },
+        {
+          "text": "'",
+          "startMs": 780,
+          "endMs": 840
+        },
+        {
+          "text": "m",
+          "startMs": 840,
+          "endMs": 900
+        },
+        {
+          "text": " not",
+          "startMs": 960,
+          "endMs": 1020
+        },
+        {
+          "text": " go",
+          "startMs": 1200,
+          "endMs": 1260
+        },
+        {
+          "text": "ing",
+          "startMs": 1320,
+          "endMs": 1380
+        },
+        {
+          "text": " to",
+          "startMs": 1440,
+          "endMs": 1500
+        },
+        {
+          "text": " sc",
+          "startMs": 1740,
+          "endMs": 1800
+        },
+        {
+          "text": "am",
+          "startMs": 1800,
+          "endMs": 1860
+        }
+      ]
+    },
+    {
+      "at": "2026-10-09T17:18:24.428Z",
+      "kind": "interim",
+      "text": "I'm not going to scam y",
+      "tokens": [
+        {
+          "text": "I",
+          "startMs": 720,
+          "endMs": 780
+        },
+        {
+          "text": "'",
+          "startMs": 780,
+          "endMs": 840
+        },
+        {
+          "text": "m",
+          "startMs": 840,
+          "endMs": 900
+        },
+        {
+          "text": " not",
+          "startMs": 960,
+          "endMs": 1020
+        },
+        {
+          "text": " go",
+          "startMs": 1200,
+          "endMs": 1260
+        },
+        {
+          "text": "ing",
+          "startMs": 1320,
+          "endMs": 1380
+        },
+        {
+          "text": " to",
+          "startMs": 1440,
+          "endMs": 1500
+        },
+        {
+          "text": " sc",
+          "startMs": 1740,
+          "endMs": 1800
+        },
+        {
+          "text": "am",
+          "startMs": 1800,
+          "endMs": 1860
+        },
+        {
+          "text": " y",
+          "startMs": 2040,
+          "endMs": 2100
+        }
+      ]
+    },
+    {
+      "at": "2026-10-09T17:18:24.729Z",
+      "kind": "final",
+      "text": "I'm not going to scam y",
+      "tokens": [
+        {
+          "text": "I",
+          "startMs": 720,
+          "endMs": 780
+        },
+        {
+          "text": "'",
+          "startMs": 780,
+          "endMs": 840
+        },
+        {
+          "text": "m",
+          "startMs": 840,
+          "endMs": 900
+        },
+        {
+          "text": " not",
+          "startMs": 960,
+          "endMs": 1020
+        },
+        {
+          "text": " go",
+          "startMs": 1200,
+          "endMs": 1260
+        },
+        {
+          "text": "ing",
+          "startMs": 1320,
+          "endMs": 1380
+        },
+        {
+          "text": " to",
+          "startMs": 1440,
+          "endMs": 1500
+        },
+        {
+          "text": " sc",
+          "startMs": 1740,
+          "endMs": 1800
+        },
+        {
+          "text": "am",
+          "startMs": 1800,
+          "endMs": 1860
+        },
+        {
+          "text": " y",
+          "startMs": 2040,
+          "endMs": 2100
+        }
+      ]
+    },
+    {
+      "at": "2026-10-09T17:18:24.736Z",
+      "kind": "final",
+      "text": "ou.",
+      "tokens": [
+        {
+          "text": "ou.",
+          "startMs": 2820,
+          "endMs": 2880
+        }
+      ]
+    }
+  ],
+  "turn3": {
+    "text": "Uh, what do you guys deal with?",
+    "finalAt": "2026-10-09T17:18:41.528Z",
+    "flushedAt": "2026-10-09T17:18:43.933Z",
+    "observedWaitMs": 2405,
+    "observedReasons": [
+      "turn_end wait 800",
+      "unfinished hold 1600"
+    ]
+  },
+  "turn4Model": {
+    "outputText": "We sell stationery and art supplies like notebooks, pens, drawing books, T-squares, calculators, rulers, and sticky notes. You can also shop online on our website at arisstationaries.co.ke.",
+    "spokenObserved": "You can also shop online on our website at arisstationaries. co. ke.",
+    "tenantWebsite": "https://www.arisstationaries.co.ke/",
+    "businessName": "Aris Kenya",
+    "spokenName": "Aris"
+  },
+  "turn5Tool": {
+    "thinkingAckAt": "2026-10-09T17:19:10.180Z",
+    "toolStartAt": "2026-10-09T17:19:11.940Z",
+    "toolWriteDoneAt": "2026-10-09T17:19:12.650Z",
+    "replyAt": "2026-10-09T17:19:12.780Z",
+    "holdSkippedLog": "tool hold skipped after thinking-ack 1757ms: Just a second.",
+    "silenceMs": 2100
+  },
+  "notify": {
+    "summary": {
+      "whatsapp_sent": true,
+      "owner_notify_channel": "email"
+    },
+    "attempts": [
+      "sms:TextSMS 402 Insufficient credits",
+      "whatsapp:SautiKit 502",
+      "whatsapp:SautiKit 502",
+      "whatsapp:SautiKit 502"
+    ],
+    "delivered": "email"
+  },
+  "recording": {
+    "prodCallsWithRecordingUrl21d": 0,
+    "stagingCallsWithRecordingUrl": "159/581",
+    "prodVoiceEventsPosts": 0
+  }
+}
