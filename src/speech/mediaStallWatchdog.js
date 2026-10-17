@@ -1,5 +1,5 @@
 // Inbound-frame-gap watchdog. When the media socket is open but no binary
-// frame arrives for over VOICE_MEDIA_STALL_MS (default 2000), log media_stall.
+// frame arrives for over VOICE_MEDIA_STALL_LOG_MS (default 2000), log media_stall.
 // off (default) via VOICE_MEDIA_STALL_WATCHDOG. Covers HD_226f814d7ab0 /
 // HD_9ed756701096 (carrier audio stalled after the greeting).
 
@@ -14,7 +14,7 @@ function mediaStallWatchdogEnabled(env = process.env) {
 }
 
 function mediaStallGapMs(env = process.env) {
-  const n = Number(env.VOICE_MEDIA_STALL_MS);
+  const n = Number(env.VOICE_MEDIA_STALL_LOG_MS);
   if (Number.isFinite(n) && n >= MIN_GAP_MS && n <= MAX_GAP_MS) return n;
   return DEFAULT_GAP_MS;
 }

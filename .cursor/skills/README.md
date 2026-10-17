@@ -38,7 +38,7 @@ Scalers design (local, same layout):
 | `/ui-ux-pro-max-scalers` | Desk and Super Admin UI checklist. Charter, MASTER tokens, and `desk-motion` win. |
 | `/design-an-interface-scalers` | Design a Desk or Admin surface twice before coding. |
 
-Frontend 2.0 design pack (2026-09-30, charter `docs/frontend/FRONTEND_2_0_CHARTER.md` §7):
+Frontend 2.0 design pack (2026-09-30, charter `docs/explanation/frontend/FRONTEND_2_0_CHARTER.md` §7):
 
 | Skill | From | Job |
 | --- | --- | --- |
@@ -56,7 +56,7 @@ Frontend 2.0 design pack (2026-09-30, charter `docs/frontend/FRONTEND_2_0_CHARTE
 2. Read `CONTEXT.md` for names. Do not invent synonyms the glossary forbids.
 3. Grill (`grill-with-docs`) before non-trivial Brain or Platform work.
 4. TDD against the lane gate (`npm run test:brain`, `npm run test:mvp`, …).
-5. Wayfinder maps and specs live as markdown under `docs/specs/`.
+5. Wayfinder maps and specs live as markdown under `docs/rfcs/`.
 6. Code-review is two-axis: standards vs spec. Do not merge the axes.
 7. After desk UI work: `/ui-skills` then `/reticle`. Copy: `/no-ai-slop`.
 8. Before presenting desk or admin UI: `/impeccable` (context, then Operate critique or detect) and `/no-ai-slop` on strings. Charter tokens and kit still win. Admin is a universal app: no vendor setup controls on product screens.

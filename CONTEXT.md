@@ -56,7 +56,7 @@ Getting a human involved. Shipped path is async notify (WhatsApp/email). Live Di
 _Avoid_: warm transfer (not shipped as default)
 
 **Lane**:
-One agent chat owns one subsystem (`docs/agents/{LANE}.md`). One task, one PR.
+One agent chat owns one subsystem (`docs/reference/lanes/{LANE}.md`). One task, one PR.
 _Avoid_: full-repo rewrite, mega-thread
 
 **Eval**:

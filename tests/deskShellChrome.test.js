@@ -104,8 +104,8 @@ describe("desk shell chrome", () => {
   });
 
   it("puts large DESK_LINKS titles on list roots only", () => {
-    const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
-    const master = read("docs/frontend/design-system/MASTER.md");
+    const constitution = read("docs/explanation/frontend/FRONTEND_CONSTITUTION.md");
+    const master = read("docs/reference/design-system/MASTER.md");
     assert.match(chrome, /export const deskListTitleClass/);
     assert.match(chrome, /deskListTitleClass =\s*\n\s*"font-display text-display/);
     assert.match(chrome, /sm:text-4xl/);

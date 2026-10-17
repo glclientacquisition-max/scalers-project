@@ -11,6 +11,11 @@ const {
 const { createBrainState, formatBrainStateForPrompt } = require('../src/conversation/brainState');
 const { buildSystemPrompt } = require('../src/prompts');
 
+// BRAIN_CALL_FIXES_D199=on (HD_1677e57f73f9 item 3): a past-dated requested
+// visit is only in the past_open count line, never read as open.
+const PAST_RULE = () => require('../src/conversation/callFixesD199').callFixesD199Enabled();
+const PAST_ONE = 'There is one past-dated request the team still has to confirm.';
+
 describe('returning-caller card', () => {
   it('builds a named unique-line card from contact plus open work', () => {
     const card = buildCallerMemoryCard({
@@ -691,6 +696,17 @@ describe('returning-caller card', () => {
         created_at: '2026-06-01T06:00:00.000Z',
       },
     });
+    if (PAST_RULE()) {
+      assert.equal(card.nextAppointment, null);
+      assert.deepEqual(card.openVisits, []);
+      assert.equal(card.pastOpenCount, 1);
+      assert.doesNotMatch(card.lastReason, /\b(tomorrow|today|kesho|leo)\b/i);
+      const pastBlock = formatReturningCallerForPrompt(bindCallerMemoryCard(card, 'Jane'));
+      assert.doesNotMatch(pastBlock, /Open: visit/);
+      assert.match(pastBlock, /Past-dated, not confirmed: 1 row/);
+      assert.doesNotMatch(pastBlock, /\b(tomorrow|today|kesho|leo)\b/i);
+      return;
+    }
     assert.match(card.nextAppointment, /carpet cleaning/i);
     assert.doesNotMatch(card.nextAppointment, /\b(tomorrow|today|kesho|leo|past)\b/i);
     assert.doesNotMatch(card.openVisits[0], /\b(tomorrow|today|kesho|leo|past)\b/i);
@@ -777,7 +793,12 @@ describe('returning-caller card', () => {
     });
     assert.match(card.nextAppointment, /sofa cleaning/);
     assert.doesNotMatch(card.nextAppointment, /tomorrow/);
-    assert.match(card.openVisits.join(' '), /carpet cleaning/i);
+    if (PAST_RULE()) {
+      assert.doesNotMatch(card.openVisits.join(' '), /carpet cleaning/i);
+      assert.equal(card.pastOpenCount, 1);
+    } else {
+      assert.match(card.openVisits.join(' '), /carpet cleaning/i);
+    }
     assert.doesNotMatch(card.openVisits.join(' '), /\b(tomorrow|past)\b/i);
     assert.doesNotMatch(card.recentBookings.join(' '), /\btomorrow\b/i);
   });

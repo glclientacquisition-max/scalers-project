@@ -6,7 +6,7 @@
 //   node scripts/score-voice-naturalness.js --file turns.json --logs spoken.log
 //
 // JSON shape: { callSid?, turns: [{ speaker, text }] }
-// Does not retune Soniox. Measure first. See docs/agents/VOICE_NATURALNESS.md.
+// Does not retune Soniox. Measure first. See docs/explanation/voice/VOICE_NATURALNESS.md.
 
 const fs = require('fs');
 const path = require('path');
@@ -33,7 +33,7 @@ Exit 0 if no Voice-owned fails. Brain notes do not fail the process.
 function main() {
   const opts = parseArgs(process.argv);
   if (!opts.file) {
-    console.error('Need --file <turns.json>. See docs/agents/VOICE_NATURALNESS.md');
+    console.error('Need --file <turns.json>. See docs/explanation/voice/VOICE_NATURALNESS.md');
     process.exit(2);
   }
   const raw = JSON.parse(fs.readFileSync(opts.file, 'utf8'));

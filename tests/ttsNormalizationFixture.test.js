@@ -43,7 +43,10 @@ for (const c of fixture.cases) {
     if (c.expectProductionText != null) {
       assert.strictEqual(
         prepared.text,
-        c.expectProductionText,
+        // VOICE_SW_TIME on: cases with a Swahili-clock variant expect it.
+        require('../src/speech/swahiliTime').swTimeEnabled() && c.expectProductionTextSwTime != null
+          ? c.expectProductionTextSwTime
+          : c.expectProductionText,
         `${c.id} production text mismatch`
       );
     }

@@ -1,6 +1,7 @@
 // Language-aware spoken forms for money, times, day ranges, and phones.
 
 const { minutesToHour12 } = require('../conversation/appointmentHours');
+const swTime = require('./swahiliTime');
 
 const EN_ONES = [
   'zero',
@@ -393,7 +394,10 @@ function expandSwahiliBarePrices(text, lang = 'en') {
   );
 }
 
-function speak12hTime(hour, mins, isPm, lang) {
+function speak12hTime(hour, mins, isPm, lang, opts = {}) {
+  if (lang === 'sw' && swTime.swTimeEnabled()) {
+    return swTime.speakSwClock(swTime.to24(hour, isPm), mins || 0, opts);
+  }
   if (lang === 'sw') {
     // Keep hour numeral + clear period; full Swahili clock mapping is easy to get wrong.
     const period = isPm ? 'jioni' : 'asubuhi';
@@ -428,6 +432,11 @@ function expandTimeRanges12h(text, lang = 'en') {
       'gi'
     ),
     (full, saaPrefix, h1, m1, mer1, h2, m2, mer2) => {
+      if (ttsLang === 'sw' && swTime.swTimeEnabled()) {
+        const a = swTime.to24(Number(h1), /^p/i.test(mer1)); const b = swTime.to24(Number(h2), /^p/i.test(mer2));
+        const same = swTime.swPeriod(a) === swTime.swPeriod(b) && Number(m1 || 0) !== 45;
+        return `${swTime.speakSwClock(a, Number(m1 || 0), { period: !same })} ${joiner} ${swTime.speakSwClock(b, Number(m2 || 0))}`;
+      }
       let left = speak12hTime(
         Number(h1),
         m1 != null ? Number(m1) : null,
@@ -452,6 +461,13 @@ function expandTimeRanges12h(text, lang = 'en') {
       'gi'
     ),
     (full, saaPrefix, h1, h2, m2, mer2) => {
+      if (ttsLang === 'sw' && swTime.swTimeEnabled()) {
+        const pm = /^p/i.test(mer2);
+        let a = swTime.to24(Number(h1), pm); const b = swTime.to24(Number(h2), pm);
+        if (a > b && pm) a -= 12; // 11-1pm: 11 is AM
+        const same = swTime.swPeriod(a) === swTime.swPeriod(b);
+        return `${swTime.speakSwClock(a, 0, { period: !same })} ${joiner} ${swTime.speakSwClock(b, Number(m2 || 0))}`;
+      }
       const right = speak12hTime(
         Number(h2),
         m2 != null ? Number(m2) : null,
@@ -487,6 +503,10 @@ function expandSwahiliClockTimes(text) {
     (full, h, m, period) => {
       const hour = Number(h);
       if (hour < 1 || hour > 12) return full;
+      if (swTime.swTimeEnabled()) {
+        const h24 = swTime.hour24FromDigitPeriod(hour, period.toLowerCase());
+        if (h24 != null) return swTime.speakSwClock(h24, m != null ? Number(m) : 0);
+      }
       const mins = m != null ? Number(m) : 0;
       const p = period.toLowerCase();
       if (mins) return `saa ${hour} na dakika ${mins} ${p}`;
@@ -514,6 +534,7 @@ const NOT_MERIDIEM = '(?!\\s*(?:a\\.?m\\.?|p\\.?m\\.?))';
 function speak24hClock(hour24, minute, lang) {
   const label = minutesToHour12(hour24 * 60 + minute);
   if (lang !== 'sw') return label;
+  if (swTime.swTimeEnabled()) return swTime.speakSwClock(hour24, minute);
   const parsed = /^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/.exec(label);
   if (!parsed) return label;
   const hour12 = Number(parsed[1]);

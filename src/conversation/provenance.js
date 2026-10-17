@@ -23,6 +23,11 @@
 
 const { readCoverageAreas } = require('./coverageAreas');
 const {
+  confirmedCoverageEnabled,
+  confirmedCoverageReading,
+  coverageOwnerRowConfirms,
+} = require('./confirmedCoverage');
+const {
   hashFactValue,
   catalogRowFactValue,
   faqFactValue,
@@ -423,7 +428,15 @@ function factPolicyMap(policies, fieldMeta = null) {
     else unknown.push(label);
   }
   const coverage = readCoverageAreas(obj);
-  if (coverage) out.coverage_areas = coverage;
+  if (coverage && confirmedCoverageEnabled()) {
+    // BRAIN_CONFIRMED_COVERAGE: only an owner-confirmed list reaches the prompt.
+    const scoped = { businessPolicies: obj, fieldMeta };
+    const confirmed = coverage.length
+      ? confirmedCoverageReading(scoped).confirmed
+      : coverageOwnerRowConfirms(scoped); // owner confirmed "no areas listed"
+    if (confirmed) out.coverage_areas = coverage;
+    else unknown.push('Areas we serve');
+  } else if (coverage) out.coverage_areas = coverage;
   for (const [key, raw] of Object.entries(obj)) {
     if (Object.prototype.hasOwnProperty.call(POLICY_TOPICS, key) || isPolicyMetaKey(key)) continue;
     if (typeof raw !== 'string' && typeof raw !== 'number') continue;

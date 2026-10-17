@@ -6,7 +6,17 @@
 export const ADMIN_SETUP_INCOMPLETE = "Setup is incomplete. Contact support.";
 
 const INTERNAL =
-  /docs\/supabase|\.sql\b|row-level security|permission denied|\brls\b|schema cache|column .+ does not exist|relation .+ does not exist|function .+ does not exist|PGRST/i;
+  /docs\/supabase|\.sql\b|row-level security|permission denied|\brls\b|schema cache|column .+ does not exist|relation .+ does not exist|function .+ does not exist|PGRST|is ambiguous|violates .+ constraint|syntax error|invalid input syntax|\[object Object\]|^\s*[{[]/i;
+
+/**
+ * A database error code other than a deliberate `raise exception` (P0001) is a fault, not
+ * something the operator can act on. Show the fallback and keep the detail in the log.
+ */
+function isFaultCode(code: string | null): boolean {
+  if (!code) return false;
+  if (code === "P0001") return false;
+  return /^[0-9A-Z]{5}$/.test(code) || /^PGRST/i.test(code);
+}
 
 /** PostgREST "table not in schema cache" and Postgres "undefined_table". */
 const MISSING_TABLE_CODES = new Set(["PGRST205", "42P01"]);
@@ -67,7 +77,7 @@ export function adminFacingError(
   }
   const { message: text, code } = adminErrorParts(raw);
   const message = text.trim();
-  if (code && INTERNAL_CODE.test(code)) return fallback;
+  if (code && (INTERNAL_CODE.test(code) || isFaultCode(code))) return fallback;
   if (!message || INTERNAL.test(message) || /\bambiguous\b|\[object Object\]/i.test(message)) return fallback;
   if (hasVendorOrInfraName(message)) return fallback;
   if (message.length > 180) return fallback;

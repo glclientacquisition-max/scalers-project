@@ -13,7 +13,7 @@ Default is read-only on product source. Do not install deps, format the tree, co
 
 If the user asks to implement a selected finding, stay in Desk paths and keep the constitution.
 
-Plans the user wants written go under `docs/specs/`, not `design-plans/`.
+Plans the user wants written go under `docs/rfcs/`, not `design-plans/`.
 
 ## 1. Select the surface
 
@@ -26,8 +26,8 @@ Trace the rendered path: route, layout, primitives, tokens. Shared names alone a
 Governing sources, in order:
 
 1. `.cursor/rules/scalers-design-ux.mdc`
-2. `docs/frontend/FRONTEND_CONSTITUTION.md`
-3. `docs/frontend/design-system/MASTER.md` and the page file under `docs/frontend/design-system/pages/`
+2. `docs/explanation/frontend/FRONTEND_CONSTITUTION.md`
+3. `docs/reference/design-system/MASTER.md` and the page file under `docs/reference/design-system/pages/`
 4. Live tokens in `dashboard/src/app/globals.css`
 
 Drafts and task lists are not law unless accepted.

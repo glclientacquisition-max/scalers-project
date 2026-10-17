@@ -22,6 +22,11 @@ const {
   placesInCounties,
 } = require('./kenyaPlaces');
 const { coveredByAreas, readCoverageAreas } = require('./coverageAreas');
+const {
+  confirmedCoverageEnabled,
+  confirmedCoverageReading,
+  teamConfirmCoverageLine,
+} = require('./confirmedCoverage');
 
 const CONFIRM_ACCESS_NOTE = 'confirm access';
 const AREA_UNCONFIRMED_NOTE = 'area not confirmed, check coverage';
@@ -226,7 +231,7 @@ function settingsCountyText(profile = {}) {
  * outside: coverage text exists and neither the place nor its county matches.
  * The office address can match a written name. It does not expand a county.
  */
-function assessCoverage(text, profile = {}) {
+function assessCoverageFromFile(text, profile = {}) {
   const selected = readCoverageAreas(profile.businessPolicies);
   const mentioned = coverageTokens(text);
   // Outside means the place is known and sits elsewhere. A landmark nobody
@@ -256,6 +261,64 @@ function assessCoverage(text, profile = {}) {
 }
 
 /**
+ * Coverage for a place: inside | outside | unknown, plus 'unconfirmed' when
+ * BRAIN_CONFIRMED_COVERAGE is on.
+ * Flag off: assessCoverageFromFile (picker list, else Delivery / coverage notes).
+ * Flag on: only the owner-confirmed coverage list (GIGO reader, FACT_HASH_MODE
+ * aware) can say inside or outside. A place Kenya knows, with no confirmed
+ * list, is 'unconfirmed' ("I'll have the team confirm {place}"). A landmark
+ * with no area stays 'unknown' so the ladder still asks for the area.
+ */
+function rawCoverageOutside(profile = {}) {
+  let p = profile?.businessPolicies;
+  if (typeof p === 'string') {
+    try {
+      p = JSON.parse(p);
+    } catch {
+      p = null;
+    }
+  }
+  return p && typeof p === 'object' && !Array.isArray(p) ? p.coverage_outside : undefined;
+}
+
+/**
+ * The profile coverage is judged on. Flag off: the profile as is. Flag on: the
+ * owner-confirmed list plus coverage_outside when the list is confirmed, else
+ * null (no claim). coverageStatus and coverageAskSpeech both read this.
+ */
+function coverageProfile(profile = {}) {
+  if (!confirmedCoverageEnabled()) return profile || {};
+  const reading = confirmedCoverageReading(profile || {});
+  if (!reading.confirmed) return null;
+  const outside = rawCoverageOutside(profile);
+  return {
+    vertical: profile?.vertical,
+    businessPolicies: {
+      coverage_areas: reading.areas,
+      ...(outside !== undefined ? { coverage_outside: outside } : {}),
+    },
+  };
+}
+
+function coverageStatus(text, profile = {}) {
+  if (!confirmedCoverageEnabled()) return assessCoverageFromFile(text, profile);
+  const judged = coverageProfile(profile);
+  if (judged) return assessCoverageFromFile(text, judged);
+  if (!coverageTokens(text).length) return 'unknown';
+  return countiesForPlace(text).length ? 'unconfirmed' : 'unknown';
+}
+
+/**
+ * inside | outside | unknown. With BRAIN_CONFIRMED_COVERAGE on, an
+ * unconfirmed area reads 'unknown', so no guard, visit write, or speech
+ * treats a seed list as fact.
+ */
+function assessCoverage(text, profile = {}) {
+  const status = coverageStatus(text, profile);
+  return status === 'unconfirmed' ? 'unknown' : status;
+}
+
+/**
  * Wave 1 ladder. Assumption A5: after one detail follow-up, area-only saves
  * only when coverage text matches. Outside never saves. Two refusals do not save.
  */
@@ -271,10 +334,12 @@ function decideVisitPlace(
 ) {
   const place = cleanPlace(text, 240);
   const quality = classifyVisitLocation(place);
-  const coverage =
+  const status =
     quality === 'empty' || quality === 'refused'
       ? 'unknown'
-      : assessCoverage(place, profile);
+      : coverageStatus(place, profile);
+  const coverage = status === 'unconfirmed' ? 'unknown' : status;
+  const coverageUnconfirmed = status === 'unconfirmed';
   const pinNote =
     Boolean(place) &&
     mentionsPin(place) &&
@@ -285,6 +350,7 @@ function decideVisitPlace(
   // ask which area once. Never refuse it, never book it blind.
   if (
     coverage === 'unknown' &&
+    !coverageUnconfirmed &&
     (quality === 'findable' || quality === 'pin_promised') &&
     !areaAsked &&
     hasCoverageText(profile)
@@ -344,7 +410,8 @@ function decideVisitPlace(
       bookable: true,
       blocked: '',
       confirmAccess: false,
-      areaUnconfirmed: coverage === 'unknown' && hasCoverageText(profile),
+      areaUnconfirmed: coverageUnconfirmed || (coverage === 'unknown' && hasCoverageText(profile)),
+      ...(coverageUnconfirmed ? { coverageUnconfirmed: true } : {}),
       pinNote,
     };
   }
@@ -369,6 +436,22 @@ function decideVisitPlace(
       bookable: true,
       blocked: '',
       confirmAccess: true,
+      pinNote,
+    };
+  }
+
+  // Flag on: the area is a real place but no owner confirmed coverage. Save
+  // the visit with "area not confirmed" for the owner. Never refuse it.
+  if (coverageUnconfirmed) {
+    return {
+      quality,
+      coverage,
+      ask: false,
+      bookable: true,
+      blocked: '',
+      confirmAccess: false,
+      areaUnconfirmed: true,
+      coverageUnconfirmed: true,
       pinNote,
     };
   }
@@ -559,6 +642,10 @@ function coverageAskPlace(text) {
   }
   if (!placeWords(place).length) return '';
   if (isNoisePlace(place)) return '';
+  // BRAIN_CALL_FIXES_D199 (c): only a real place name runs the coverage check.
+  // "What about the mansion one?" is a file row, not a place (HD_d199 t4).
+  const fixes = require('./callFixesD199');
+  if (fixes.callFixesD199Enabled() && !fixes.coverageRealPlace(place)) return '';
   return place;
 }
 
@@ -611,18 +698,32 @@ function coverageAskSpeech(text, profile = {}, language = 'en', state = null) {
   const rawPlace = coverageAskPlace(text);
   if (!rawPlace) return '';
   const place = foldCanonicalPlace(rawPlace, profile) || rawPlace;
-  const coverage = assessCoverage(place, profile);
+  const coverage = coverageStatus(place, profile);
   const lang = String(language || 'en').toLowerCase();
   const sw = lang === 'sw' || lang.startsWith('swahili');
   const sheng = lang === 'sheng';
-  const anywhere = readCoverageOutside(profile.businessPolicies);
+  // Flag on: the anywhere-in-Kenya answer counts only on a confirmed list
+  // (coverageProfile null -> the 'team will confirm' branch below).
+  const judged = coverageProfile(profile);
+  const anywhere = judged ? readCoverageOutside(judged.businessPolicies) : null;
   if (anywhere) {
-    const detail = coverageDetail(place, profile);
+    const detail = coverageDetail(place, judged);
     if (detail === 'kenya') {
       return `${kenyaCoverageLine({ place, homeServices: true, language })} ${noteJobQuestion(language)}`;
     }
     if (detail === 'outside_kenya') return outsideKenyaLine(language);
     if (detail === 'unknown_place') return whichCountyLine(language);
+  }
+  if (
+    confirmedCoverageEnabled() &&
+    coverage !== 'inside' &&
+    coverage !== 'outside' &&
+    countiesForPlace(place).length
+  ) {
+    // A real place with no confirmed answer: no claim either way. The need is
+    // recorded on brain state (brainState.js). Text that is not a place
+    // ("the shops") falls through to the no-claim unsure line.
+    return `${teamConfirmCoverageLine(place, language)} ${coverageNextStepQuestion(language, state)}`;
   }
   if (coverage === 'inside') {
     const next = coverageNextStepQuestion(language, state);
@@ -661,8 +762,12 @@ function unsureCoverageSpeech(language = 'en') {
   return `I'm not sure we cover that area. ${ask}`;
 }
 
-function visitBlockSpeech(blocked, language = 'en') {
+function visitBlockSpeech(blocked, language = 'en', place = '') {
   const lang = String(language || 'en').toLowerCase();
+  // Flag on: no "coverage list" talk. The team confirms the place.
+  if (blocked === 'unknown_coverage' && confirmedCoverageEnabled()) {
+    return teamConfirmCoverageLine(place, language);
+  }
   const sw = lang === 'sw' || lang.startsWith('swahili');
   const sheng = lang === 'sheng';
   if (blocked === 'outside') {
@@ -700,6 +805,8 @@ module.exports = {
   mentionsPin,
   classifyVisitLocation,
   assessCoverage,
+  assessCoverageFromFile,
+  coverageStatus,
   hasCoverageText,
   decideVisitPlace,
   preferVisitPlace,
