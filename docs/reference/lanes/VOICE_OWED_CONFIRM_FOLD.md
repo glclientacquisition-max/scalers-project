@@ -1,3 +1,8 @@
+---
+owner: voice
+last_reviewed: 2026-10-17
+---
+
 # VOICE_OWED_CONFIRM_FOLD
 
 Flagged fix for doubled agent acknowledgements after a barged booking/callback
