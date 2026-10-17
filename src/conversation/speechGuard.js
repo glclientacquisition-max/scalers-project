@@ -25,6 +25,13 @@ const {
   isZoneFactKind,
   sentenceReadsClock,
 } = require('./trustedFacts');
+const {
+  businessPlacesEnabled,
+  businessPlacesFor,
+  maskBusinessPlaces,
+  callerAsksLocation,
+  locationFactLine,
+} = require('./businessPlaces');
 const { assessCoverage, coverageStatus, coverageAskPlace, foldCanonicalPlace } = require('./visitLocation');
 const {
   confirmedCoverageEnabled,
@@ -564,6 +571,21 @@ function placeNamesIn(text) {
   return new Set(bindSpokenPlace(source, { fuzzy: true }));
 }
 
+function noteBusinessPlace(ctx, source, sentence) {
+  if (Array.isArray(ctx?.trustedPlaces) && !ctx.trustedPlaces.includes(source)) ctx.trustedPlaces.push(source);
+  console.log(`[speech-guard] business place kept source=${source} chars=${String(sentence || '').length}`);
+}
+
+function firstLocationFactThisTurn(ctx) {
+  const state = ctx?.state;
+  if (!state || typeof state !== 'object') return true;
+  const conv = (state.conversation ||= {});
+  const turn = Number(conv.turnCount || 0);
+  if (conv.locationFactTurn === turn) return false;
+  conv.locationFactTurn = turn;
+  return true;
+}
+
 function noteDrop(ctx, reason, sentence) {
   if (Array.isArray(ctx?.dropReasons) && !ctx.dropReasons.includes(reason)) {
     ctx.dropReasons.push(reason);
@@ -572,12 +594,21 @@ function noteDrop(ctx, reason, sentence) {
 }
 
 /** A locality the slot, the caller, and the file do not hold. */
-function sentenceNamesUnboundPlace(sentence, allowedText) {
+function sentenceNamesUnboundPlace(sentence, allowedText, extraNames = null) {
   const allowed = placeNamesIn(allowedText);
   for (const name of placeNamesIn(sentence)) {
-    if (!allowed.has(name)) return true;
+    if (!allowed.has(name) && !(extraNames && extraNames.has(name))) return true;
   }
   return false;
+}
+
+/** The place names in a sentence that only a business place rescued. */
+function businessRescueSource(sentence, allowedText, places) {
+  const allowed = placeNamesIn(allowedText);
+  for (const name of placeNamesIn(sentence)) {
+    if (!allowed.has(name) && places.names.has(name)) return places.sources.get(name) || 'business_county';
+  }
+  return '';
 }
 
 /**
@@ -649,6 +680,10 @@ function guardSpokenReply(text, ctx = {}) {
     safeJson(ctx.state?.entities || {}),
     String(ctx.extra || ''),
   ].join(' ');
+  // VOICE_BUSINESS_PLACES (default off): the tenant's own location rows and
+  // their curated aliases are trusted places (HD_c427511e5773 t3/t4).
+  const businessPlaces = businessPlacesEnabled() ? businessPlacesFor(ctx.profile || {}) : null;
+  let droppedLocationAnswer = false;
   const kept = [];
   let droppedNumber = false;
   let droppedJob = false;
@@ -754,7 +789,20 @@ function guardSpokenReply(text, ctx = {}) {
       : '';
     const zoneFact = isZoneFactKind(factKind);
     const zoneWords = zoneFact || (trusted && sentenceReadsClock(sentence));
-    if (sentenceNamesUnboundPlace(zoneWords ? maskTimeZonePlaces(sentence) : sentence, allowedPlaces)) {
+    const placeSentence = zoneWords ? maskTimeZonePlaces(sentence) : sentence;
+    let unboundPlace;
+    if (businessPlaces) {
+      const masked = maskBusinessPlaces(placeSentence, businessPlaces);
+      unboundPlace = sentenceNamesUnboundPlace(masked.text, allowedPlaces, businessPlaces.names);
+      if (!unboundPlace && sentenceNamesUnboundPlace(placeSentence, allowedPlaces)) {
+        const source = masked.masked ? 'business_alias' : businessRescueSource(placeSentence, allowedPlaces, businessPlaces);
+        noteBusinessPlace(ctx, source || 'business_alias', sentence);
+      }
+    } else {
+      unboundPlace = sentenceNamesUnboundPlace(placeSentence, allowedPlaces);
+    }
+    if (unboundPlace) {
+      if (businessPlaces) droppedLocationAnswer = true;
       droppedJob = true;
       // A clock sentence dropped on a clock-ask turn still gets the fact line.
       if (clockAsk && (zoneFact || clockKeys(sentence).size || numbersIn(sentence).size)) droppedClockAnswer = true;
@@ -855,6 +903,25 @@ function guardSpokenReply(text, ctx = {}) {
       : '';
   if (groundedClock) {
     out = !out || NOT_ON_FILE.test(out) ? groundedClock : `${groundedClock} ${out}`;
+  }
+  // VOICE_BUSINESS_PLACES: a location answer the place check dropped speaks
+  // the file's own landmark and directions, once per turn, instead of
+  // "Sorry, say that again?" (HD_c427511e5773 t4).
+  if (
+    businessPlaces &&
+    !out &&
+    droppedLocationAnswer &&
+    !groundedPrice &&
+    !groundedHours &&
+    !groundedClock &&
+    callerAsksLocation(lastCallerTurn) &&
+    firstLocationFactThisTurn(ctx)
+  ) {
+    const fact = locationFactLine(ctx.profile || {}, answerLanguage);
+    if (fact) {
+      noteBusinessPlace(ctx, 'location_fact', fact);
+      out = fact;
+    }
   }
   const askedNumber = callerAskedNumber(lastCallerTurn, trusted);
   const priced = groundedPrice;

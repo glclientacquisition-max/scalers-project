@@ -4134,6 +4134,7 @@ mediaWss.on('connection', (ws, req) => {
             after: polished,
             reason: polishedDetail.reason || (polished.trim() ? 'rewritten' : 'dropped'),
             dropReasons: polishedDetail.dropReasons,
+            ...(polishedDetail.trustedPlace ? { trustedPlace: polishedDetail.trustedPlace } : {}),
           });
         }
         if (!polished) {
