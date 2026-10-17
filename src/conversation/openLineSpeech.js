@@ -211,8 +211,15 @@ function planVisitReadTurn({
       return { runModel: false, line: answer.line, lines: answer.lines, cursor: current, kind: answer.kind };
     }
     // (b) the first open read: every open visit, then requests and holds, as fact lines.
+    // Visit read, last one only: "more" after a paged read reads the next page.
+    if (Number(fileState.conversation?.fileReadPage) > 0 && (more || fixesD199.looksLikeReadMoreAsk(callerText))) {
+      const read = fixesD199.pagedFileRead(fileState, languageOf(language), { text: callerText, more: true, now });
+      if (read?.line) {
+        return { runModel: false, line: read.line, lines: read.lines, cursor: { phase: 'done', page: 0 }, kind: read.kind };
+      }
+    }
     if (lookup && !more && !history) {
-      const read = fixesD199.openFileRead(fileState, languageOf(language), { now });
+      const read = fixesD199.openFileRead(fileState, languageOf(language), { now, text: callerText });
       if (read) {
         return { runModel: false, line: read.line, lines: read.lines, cursor: { phase: 'done', page: 0 }, kind: 'open_read' };
       }

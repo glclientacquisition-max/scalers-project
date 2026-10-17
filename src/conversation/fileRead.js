@@ -298,7 +298,7 @@ function priorCallerText(state) {
  * visit, hold, or order lookup. Nothing open and nothing recent is the
  * existing "Nothing is still open."
  */
-function spokenFileRead({ text = '', state = {}, language } = {}) {
+function spokenFileRead({ text = '', state = {}, language, now } = {}) {
   const forced = Boolean(state?.conversation?.speakFileRead);
   if (state?.conversation) state.conversation.speakFileRead = false;
   const current = String(text || '');
@@ -311,9 +311,52 @@ function spokenFileRead({ text = '', state = {}, language } = {}) {
   const fileAsk = looksLikeFileRead(current) || looksLikePastBookingTalk(current) || upcoming || readThem;
   const followUp =
     Boolean(state?.conversation?.toldNothingOnFile) && looksLikeEmptyFileFollowUp(current);
-  if (!forced && !fileAsk && !followUp) return '';
+  // BRAIN_CALL_FIXES_D199 (visit read, last one only): "more" after a paged read.
+  // eslint-disable-next-line global-require
+  const fixesD199 = require('./callFixesD199');
+  const pagedOn =
+    fixesD199.callFixesD199Enabled() &&
+    Array.isArray(state?.returning?.openRows) &&
+    state.returning.openRows.length > 0;
+  const moreAsk =
+    pagedOn && Number(state?.conversation?.fileReadPage) > 0 && fixesD199.looksLikeReadMoreAsk(current);
+  // past_open is read on demand only ("and the past-dated ones?").
+  const pastAsk = pagedOn && fixesD199.looksLikePastDatedAsk(current);
+  if (!forced && !fileAsk && !followUp && !moreAsk && !pastAsk) return '';
   const onlyHistory = !forced && historyOnlyAsk(current);
   const wantHistory = looksLikePastBookingTalk(context);
+  if (pagedOn) {
+    const lang = language || state?.language?.current || 'en';
+    const when = now instanceof Date ? now : new Date();
+    if (pastAsk && !fileAsk && !moreAsk) {
+      const read = fixesD199.pagedFileRead(state, lang, { text: current, pastOnly: true, now: when });
+      if (read?.line) return read.line;
+    }
+    if (moreAsk) {
+      const read = fixesD199.pagedFileRead(state, lang, { text: current, more: true, now: when });
+      if (read?.line) return read.line;
+    } else if (fixesD199.looksLikeLastOneAsk(context)) {
+      // "Mara ya mwisho", "the last one": the newest open row only.
+      const read = fixesD199.pagedFileRead(state, lang, { text: context, now: when });
+      if (read?.kind === 'last_one') return read.line;
+    } else if (!onlyHistory) {
+      // Newest first, two rows, then more_open; past_open only when asked.
+      // Two or fewer current rows (or none): the older read below already
+      // fits the page; it only drops the automatic past_open count.
+      const read = fixesD199.pagedFileRead(state, lang, { text: context, now: when });
+      if (read?.line && read.openCount > fixesD199.OPEN_READ_PAGE) {
+        if (!wantHistory) return read.line;
+        // "The previous ones and the upcoming ones": the history after the page.
+        const said = [read.line];
+        for (const row of Array.isArray(state.returning?.recentBookings) ? state.returning.recentBookings : []) {
+          const kind = SPOKEN_LEAD.test(spokenBits(row)[0] || '') ? 'request' : 'visit';
+          const line = speakSavedLine(row, language, kind);
+          if (line && !said.includes(line)) said.push(line);
+        }
+        return said.join(' ');
+      }
+    }
+  }
   const file = state.returning || {};
   const lines = [];
   if (!onlyHistory) {
@@ -329,7 +372,7 @@ function spokenFileRead({ text = '', state = {}, language } = {}) {
     }
     // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 3): past-dated requested rows
     // are a count line only (past_open), never read as open.
-    if (file.pastOpenCount > 0) {
+    if (file.pastOpenCount > 0 && (!pagedOn || pastAsk)) {
       const { factLine, renderLine } = require('./factLine');
       const lang = String(language || 'en').toLowerCase() === 'en' ? 'en' : 'sw';
       const said = renderLine(factLine('past_open', { count: file.pastOpenCount }, { lang }));

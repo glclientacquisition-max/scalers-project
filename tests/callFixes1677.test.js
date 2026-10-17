@@ -263,10 +263,17 @@ describe('HD_1677e57f73f9 replay, BRAIN_CALL_FIXES_D199=on', () => {
       assert.deepEqual(card.openVisits, []);
       assert.equal(card.nextVisitWhen, null);
       assert.equal(card.pastOpenCount, 5);
+      // Visit read, last one only: the past-dated count is read on demand only.
       const read = fixes.openFileRead({ returning: { openRows: card.openRows } }, 'en', { now: NOW });
-      assert.deepEqual(read.lines.map((l) => l.template), ['request_open', 'request_open', 'past_open']);
+      assert.deepEqual(read.lines.map((l) => l.template), ['request_open', 'request_open']);
+      assert.equal(read.line, 'You have an enquiry for Carpet cleaning. You have an enquiry for General cleaning issue.');
+      const asked = fixes.openFileRead({ returning: { openRows: card.openRows } }, 'en', {
+        now: NOW,
+        text: 'and the past-dated ones?',
+      });
+      assert.deepEqual(asked.lines.map((l) => l.template), ['request_open', 'request_open', 'past_open']);
       assert.equal(
-        read.line,
+        asked.line,
         'You have an enquiry for Carpet cleaning. You have an enquiry for General cleaning issue. There are 5 past-dated requests the team still has to confirm.'
       );
       // Today's 9 AM at 1 PM is past.

@@ -431,39 +431,116 @@ function planFileAnswer({ text = '', state = {}, language = 'en', now = new Date
   return null;
 }
 
-const OPEN_READ_REQUESTS = 4;
-
 function rowIsPast(row) {
   return row.past === true || /^past\b/i.test(String(row.when || ''));
 }
 
-/**
- * Open-file read: every current open visit (today's included), then the
- * newest open requests and holds (up to OPEN_READ_REQUESTS), then more_open
- * with the count of older open rows left out (past-dated or over the cap).
- */
-function openFileRead(state, language = 'en', { now = new Date() } = {}) {
+// ------------------------------------- visit read, last one only (17 Oct)
+
+const OPEN_READ_PAGE = 2;
+
+// "Mara ya mwisho", "the last one", "niliitisha": the newest row only.
+const LAST_ONE_ASK =
+  /\b(?:mara ya mwisho|ya mwisho|ile ya mwisho|last (?:one|time|booking|request|order|visit|hold|thing|job)|my last|the latest|latest (?:one|booking|request|order|visit)|most recent|newest|niliitisha|nilikuwa nimeitisha|nilikua nimeitisha)\b/i;
+
+// The past-dated count is read only on demand.
+const PAST_DATED_ASK =
+  /\b(?:past[- ]dated|past (?:ones|requests|visits|bookings|dates)|old(?:er)? (?:ones|requests|visits|bookings)|overdue|expired|missed (?:ones|visits)|zilizopita|zamani|ambazo (?:hazijathibitishwa|timu bado))\b/i;
+
+function looksLikeLastOneAsk(text) {
+  return LAST_ONE_ASK.test(String(text || ''));
+}
+
+function looksLikePastDatedAsk(text) {
+  return PAST_DATED_ASK.test(String(text || ''));
+}
+
+const READ_MORE_ASK =
+  /\b(?:any ?more|more|next|the rest|others?|other ones|continue|go on|keep going|what else|endelea|zaidi|zingine|nyingine|zilizobaki|ingine)\b/i;
+
+/** After a paged read: "Any more?", "the rest", "zingine". Short turns only. */
+function looksLikeReadMoreAsk(text) {
+  const raw = String(text || '').trim();
+  if (!raw || raw.split(/\s+/).length > 8) return false;
+  if (looksLikePastDatedAsk(raw)) return false;
+  // eslint-disable-next-line global-require
+  return READ_MORE_ASK.test(raw) || require('./openLineSpeech').looksLikeVisitReviewMore(raw);
+}
+
+/** Open visits and requests whose time has not passed, newest first. */
+function currentRowsNewestFirst(state) {
   const rows = Array.isArray(state?.returning?.openRows) ? state.returning.openRows : [];
-  if (!rows.length) return null;
-  const visits = rows.filter((row) => row.kind === 'visit' && !rowIsPast(row));
-  const requests = rows
-    .filter((row) => row.kind === 'request' && !rowIsPast(row))
+  return rows
+    .filter((row) => row && !rowIsPast(row))
     .slice()
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
-  const spoken = [...visits, ...requests.slice(0, OPEN_READ_REQUESTS)];
-  const lines = spoken.map((row) => fileRowLine(row, language));
-  // HD_1677e57f73f9 (3): past-dated rows still 'requested' are their own
-  // bucket, never read as open or upcoming; only a count.
-  const past = rows.filter(rowIsPast).length;
-  const more = requests.length - Math.min(requests.length, OPEN_READ_REQUESTS);
-  if (more > 0) {
-    lines.push(factLine('more_open', { count: more }, { lang: language, gate: { open_rows: rows.length, spoken: spoken.length } }));
+}
+
+function nothingFurtherLine(language) {
+  const lang = String(language || 'en').toLowerCase();
+  return lang === 'sw' || lang === 'sheng' ? 'Hakuna zaidi.' : 'Nothing further back.';
+}
+
+/**
+ * Paged file read (BRAIN_CALL_FIXES_D199). A last/latest ask reads the
+ * newest open row only. A general read is newest first, at most
+ * OPEN_READ_PAGE rows, then more_open with the count left; "more" reads the
+ * next page. past_open is read only when the caller asks about past-dated
+ * rows. Returns { line, lines, kind, rowIds } or null.
+ */
+function pagedFileRead(state, language = 'en', { text = '', more = false, pastOnly = false, now = new Date() } = {}) {
+  const rows = Array.isArray(state?.returning?.openRows) ? state.returning.openRows : [];
+  if (!rows.length) return null;
+  const conv = state?.conversation && typeof state.conversation === 'object' ? state.conversation : null;
+  const current = currentRowsNewestFirst(state);
+  const pastCount = rows.filter(rowIsPast).length;
+  const pastAsk = looksLikePastDatedAsk(text);
+  const lines = [];
+  let spoken = [];
+  let kind;
+  if (pastOnly) {
+    kind = 'past_open';
+  } else if (!more && current.length && looksLikeLastOneAsk(text)) {
+    kind = 'last_one';
+    spoken = current.slice(0, 1);
+    lines.push(fileRowLine(spoken[0], language));
+    if (conv) conv.fileReadPage = 0;
+  } else {
+    kind = more ? 'open_more' : 'open_read';
+    const page = more ? Math.max(0, Number(conv?.fileReadPage) || 0) : 0;
+    const from = page * OPEN_READ_PAGE;
+    spoken = current.slice(from, from + OPEN_READ_PAGE);
+    const left = Math.max(0, current.length - from - spoken.length);
+    lines.push(...spoken.map((row) => fileRowLine(row, language)));
+    if (left > 0) {
+      lines.push(
+        factLine('more_open', { count: left }, { lang: language, gate: { open_rows: current.length, spoken: from + spoken.length } })
+      );
+    }
+    if (conv) conv.fileReadPage = page + 1;
+    if (more && !spoken.length && !pastAsk) {
+      return { line: nothingFurtherLine(language), lines: [], kind, rowIds: [] };
+    }
   }
-  if (past > 0) {
-    lines.push(factLine('past_open', { count: past }, { lang: language, gate: { past_rows: past, now: now.toISOString() } }));
+  // HD_1677e57f73f9 (3): past-dated rows are a count only, and only on demand.
+  if (pastAsk && pastCount > 0) {
+    lines.push(factLine('past_open', { count: pastCount }, { lang: language, gate: { past_rows: pastCount, now: now.toISOString() } }));
   }
+  if (!lines.length) return null;
   const rendered = renderLines(lines, { now });
-  return rendered.line && spoken.length ? rendered : rendered.line && past ? rendered : null;
+  if (!rendered.line) return null;
+  // One row read: "when did I ask for that?" points at it.
+  if (conv && kind === 'last_one' && spoken[0]?.id) conv.lastFileRowId = spoken[0].id;
+  return { ...rendered, kind, rowIds: spoken.map((row) => row.id).filter(Boolean), openCount: current.length };
+}
+
+/**
+ * Open-file read (first read on a "what do I have" ask): the paged read.
+ * Newest first, two rows, then more_open; past_open only when asked.
+ */
+function openFileRead(state, language = 'en', { now = new Date(), text = '' } = {}) {
+  const read = pagedFileRead(state, language, { text, now });
+  return read && read.line ? read : null;
 }
 
 /**
@@ -1248,6 +1325,11 @@ function cleanGoalText(goal, profile = {}) {
 
 module.exports = {
   FLAG,
+  pagedFileRead,
+  looksLikeReadMoreAsk,
+  looksLikeLastOneAsk,
+  looksLikePastDatedAsk,
+  OPEN_READ_PAGE,
   isWhenSlotValue,
   isPlaceSlotValue,
   dropJunkSlots,

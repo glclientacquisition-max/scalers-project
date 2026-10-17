@@ -86,7 +86,12 @@ describe('visit and hold read before the empty-file line', () => {
     const line = heard(card, "I'm inquiring about my bookings");
     assert.match(line, /You have pet stain, tomorrow 10:00 AM/);
     if (PAST_RULE()) {
-      assert.equal(line, `You have pet stain, tomorrow 10:00 AM. ${PAST_ONE}`);
+      // Visit read, last one only: the past-dated count is on demand only.
+      assert.equal(line, 'You have pet stain, tomorrow 10:00 AM.');
+      assert.equal(
+        heard(card, 'What about the past-dated ones on my bookings?'),
+        `You have pet stain, tomorrow 10:00 AM. ${PAST_ONE}`
+      );
       const pastBlock = formatReturningCallerForPrompt(bindCallerMemoryCard(card, 'Alvin'));
       assert.doesNotMatch(pastBlock, /Open: visit \| carpet cleaning/i);
       assert.match(pastBlock, /Open: visit \| pet stain/i);
@@ -356,7 +361,7 @@ describe('backend read plays instead of an unnamed-visit question', () => {
     const line = played(yes);
     if (PAST_RULE()) {
       assert.doesNotMatch(line, /carpet cleaning|Rongai/i);
-      assert.match(line, new RegExp(PAST_ONE));
+      assert.doesNotMatch(line, new RegExp(PAST_ONE));
     } else {
       assert.match(line, /You have carpet cleaning, past/i);
       assert.match(line, /Rongai/);
@@ -381,7 +386,7 @@ describe('backend read plays instead of an unnamed-visit question', () => {
     assert.match(played(upcoming), /pet stain, tomorrow 10:00 AM/i);
     if (PAST_RULE()) {
       assert.doesNotMatch(played(upcoming), /carpet cleaning/i);
-      assert.match(played(upcoming), new RegExp(PAST_ONE));
+      assert.doesNotMatch(played(upcoming), new RegExp(PAST_ONE));
     } else {
       assert.match(played(upcoming), /carpet cleaning/i);
     }
@@ -392,7 +397,7 @@ describe('backend read plays instead of an unnamed-visit question', () => {
     assert.match(played(read), /pet stain/i);
     if (PAST_RULE()) {
       assert.doesNotMatch(played(read), /carpet cleaning/i);
-      assert.match(played(read), new RegExp(PAST_ONE));
+      assert.doesNotMatch(played(read), new RegExp(PAST_ONE));
     } else {
       assert.match(played(read), /carpet cleaning/i);
     }
@@ -410,7 +415,7 @@ describe('backend read plays instead of an unnamed-visit question', () => {
     assert.match(played(later), /You have pet stain, tomorrow 10:00 AM/);
     if (PAST_RULE()) {
       assert.doesNotMatch(played(later), /carpet cleaning/i);
-      assert.match(played(later), new RegExp(PAST_ONE));
+      assert.doesNotMatch(played(later), new RegExp(PAST_ONE));
     } else {
       assert.match(played(later), /You have carpet cleaning/);
     }
@@ -514,7 +519,14 @@ describe('windowless requested visits and compliments', () => {
       assert.equal(card.openVisits.length, 6);
       assert.equal(card.pastOpenCount, 3);
       assert.doesNotMatch(line, /Pet stain removal|carpet and pet stain|callback SMS confirmation/);
-      assert.match(line, /There are 3 past-dated requests the team still has to confirm\.$/);
+      // Visit read, last one only: newest two, then the count left; the
+      // past-dated count only when asked.
+      assert.doesNotMatch(line, /past-dated/);
+      assert.equal((line.match(/You have a [^.]+ visit request/g) || []).length, 2);
+      assert.match(line, /There are 4 more open requests on file\.$/);
+      const asked = heard(card, 'What are my bookings, and the past-dated ones?');
+      assert.match(asked, /There are 3 past-dated requests the team still has to confirm\.$/);
+      return;
     } else {
       assert.equal(card.openVisits.length, 7);
       assert.match(line, /Pet stain removal/);
@@ -650,8 +662,9 @@ describe('a when stays on the row that has it', () => {
       assert.deepEqual(card.openVisits, ['Mattress cleaning | requested | Runda']);
       assert.equal(card.pastOpenCount, 5);
       const pastSentence = heard(card, 'What are my bookings?');
+      assert.equal(pastSentence, 'You have Mattress cleaning, Runda.');
       assert.equal(
-        pastSentence,
+        heard(card, 'What are my bookings, and the past-dated ones?'),
         'You have Mattress cleaning, Runda. There are 5 past-dated requests the team still has to confirm.'
       );
       assert.doesNotMatch(pastSentence, /Couch|Kilimani|Westlands|Barnabas|22 Sep|12:00/);
