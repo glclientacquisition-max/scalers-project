@@ -54,6 +54,7 @@ const {
 } = require('./src/speech/greetingPreroll');
 const { buildNotifyOutcome, ownerAlreadyNotified } = require('./src/notifications/notifyOutcome');
 const { createGreetingWarmer, greetingWarmEnabled } = require('./src/speech/greetingWarm');
+const { timeAnswerEnforceEnabled, planTimeAnswer } = require('./src/conversation/timeAnswerEnforce');
 const {
   shouldReinvite: shouldReinviteBareGreeting,
   bareGreetingReplyLine,
@@ -4694,6 +4695,37 @@ mediaWss.on('connection', (ws, req) => {
           callTranscript.pushAgent(coverageNext);
           const askSpoken = await speakText(coverageNext);
           if (askSpoken?.ok) messages.push({ role: 'assistant', content: coverageNext, local: true });
+        }
+      }
+
+      // VOICE_TIME_ANSWER_ENFORCE (default off): a time or date question always
+      // gets the trusted current time or date in the caller's language when
+      // nothing spoken this turn said it (HD_60e56c6acc88: hours, never the
+      // time). Once per turn; skipped when the reply or the guard's fact line
+      // already said it.
+      if (!bargeInActive && tts && timeAnswerEnforceEnabled()) {
+        const timeAnswer = planTimeAnswer({
+          callerText: clean,
+          spokenText: [
+            spokenChunks.join(' '),
+            spokeThisTurn ? String(result?.spokenText || '') : '',
+          ].join(' '),
+          state: brainState,
+          profile: brainProfile,
+          language: callLanguage,
+        });
+        if (timeAnswer.speak) {
+          console.log(
+            `[ws/media][${sidLabel()}] time answer enforced ask=${timeAnswer.ask} lang=${timeAnswer.language}`
+          );
+          callTranscript.pushAgent(timeAnswer.line);
+          voiceTrace.noteCanned({ path: 'time_answer', text: timeAnswer.line });
+          if (!spokeThisTurn) turnTiming.markFirstSpokenChunk();
+          const timeSpoken = await speakText(timeAnswer.line, { skipFileGate: true });
+          if (timeSpoken?.ok !== false) {
+            spokeThisTurn = true;
+            messages.push({ role: 'assistant', content: timeAnswer.line, local: true });
+          }
         }
       }
 

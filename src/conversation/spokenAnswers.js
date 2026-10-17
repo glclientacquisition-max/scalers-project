@@ -113,7 +113,11 @@ function spokenQuestionLedger(turns = []) {
     if (row.speaker !== 'caller') return;
     const topic = callerQuestionTopic(row.text);
     if (!topic) return;
-    const label = TOPIC_LABEL[topic] || clip(row.text);
+    // VOICE_TIME_ANSWER_ENFORCE: owner-facing labels never quote the caller's
+    // raw words (HD_60e56c6acc88); an unlabelled question is "a question".
+    const label =
+      TOPIC_LABEL[topic] ||
+      (require('./timeAnswerEnforce').timeAnswerEnforceEnabled() ? 'a question' : clip(row.text));
     if (asked.some((q) => q.label === label)) return;
     asked.push({ topic, label, text: clip(row.text, 160), index });
   });

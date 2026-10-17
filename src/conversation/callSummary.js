@@ -26,6 +26,38 @@ function safeCallerName(state) {
   return isPlausibleCallerName(raw) ? raw : null;
 }
 
+// VOICE_TIME_ANSWER_ENFORCE (default off): the owner-facing Goal and reason
+// are built from the structured need, in English, never the caller's raw
+// words (HD_60e56c6acc88: "Goal: Are you doing— Ni saa ngapi, Shai").
+const STRUCTURED_GOAL_TEXT = Object.freeze({
+  learn_business_hours: 'opening hours',
+  find_business_location: 'your location',
+  learn_price: 'a price',
+  check_availability: 'item availability',
+  learn_business_policy: 'a business policy',
+  reserve_for_pickup: 'holding an item for pickup',
+  place_order_or_request: 'placing an order',
+  make_booking_request: 'booking a visit',
+  cancel_or_change_request: 'changing or cancelling a request',
+  speak_to_human: 'speaking to someone',
+  resolve_problem: 'a problem',
+  find_product: 'a product',
+  resolve_enquiry: 'a general enquiry',
+});
+
+function structuredGoalText(state = {}) {
+  const { callerClockAsk } = require('./trustedFacts');
+  const turns = [
+    ...(Array.isArray(state.conversation?.answersReceived) ? state.conversation.answersReceived : []),
+    state.goal?.description || '',
+  ];
+  const clock = turns.map((t) => callerClockAsk(t)).find(Boolean);
+  if (clock === 'time') return 'the current time';
+  if (clock === 'date') return "today's date";
+  const primary = String(state.goal?.primary || '').trim();
+  return STRUCTURED_GOAL_TEXT[primary] || '';
+}
+
 function safeGoalDescription(raw) {
   const goal = clean(callerGoalText(raw), 160);
   if (!goal) return '';
@@ -102,7 +134,9 @@ function deriveCallSummary(opts = {}) {
   }
 
   const name = safeCallerName(state);
-  const goal = safeGoalDescription(state.goal?.description || '');
+  const goal = require('./timeAnswerEnforce').timeAnswerEnforceEnabled()
+    ? structuredGoalText(state)
+    : safeGoalDescription(state.goal?.description || '');
   const reason = buildOwnerReason({
     callerName: name,
     primaryIntent,
@@ -197,5 +231,6 @@ function buildOwnerReason({ callerName, primaryIntent, goal, products, results }
 }
 
 module.exports = {
+  structuredGoalText,
   deriveCallSummary,
 };

@@ -345,7 +345,9 @@ test('(4) the name detour is never saved as the call reason', () => {
 });
 
 test('(4) the lead reason falls back to the caller need Brain recorded', () =>
-  withEnv({ BRAIN_CALL_FIXES_D199: 'on' }, () => {
+  // Legacy wording; VOICE_TIME_ANSWER_ENFORCE=on says "the current time"
+  // instead (tests/timeAnswerEnforce.test.js).
+  withEnv({ BRAIN_CALL_FIXES_D199: 'on', VOICE_TIME_ANSWER_ENFORCE: null }, () => {
     const brain = liveBrain();
     brain.caller = { ...brain.caller, name: 'Alvin', nameConfirmed: true };
     const need = usableLeadReason(deriveCallSummary({ brainState: brain }).reason);

@@ -656,6 +656,13 @@ function closingAsGoal(text) {
   return Boolean(match && require('./callFixesD199').notAGoal(match[1]));
 }
 
+/** Questions the caller asked that no spoken agent line answered. */
+function openQuestions(derived, summary) {
+  const fromDerived = Array.isArray(derived?.unansweredQuestions) ? derived.unansweredQuestions : null;
+  const fromSummary = Array.isArray(summary?.unanswered_questions) ? summary.unanswered_questions : null;
+  return (fromDerived || fromSummary || []).map((q) => String(q || '').trim()).filter(Boolean);
+}
+
 function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical, callerTurns } = {}) {
   const flags = toolFlags || {};
   const derivedIntent = derived?.primaryIntent || null;
@@ -861,8 +868,17 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical, 
     conf >= FAQ_RESOLVE_CONFIDENCE &&
     !flags.handoff;
 
+  // VOICE_TIME_ANSWER_ENFORCE (default off): the review model's "FAQ, no
+  // human needed" never turns a call the spoken ledger left unresolved
+  // (unanswered_questions non-empty) into resolved. HD_60e56c6acc88: "the
+  // time" was unanswered, review applied resolution: resolved.
+  const keepUnresolved =
+    require('./timeAnswerEnforce').timeAnswerEnforceEnabled() &&
+    derivedResolution === 'unresolved' &&
+    openQuestions(derived, summary).length > 0;
   if (faqLike && derivedResolution !== 'needs_human') {
     if (
+      !keepUnresolved &&
       derivedResolution !== 'resolved' &&
       derivedResolution !== 'abandoned'
     ) {
