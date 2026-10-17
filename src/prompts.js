@@ -97,13 +97,15 @@ NAME ACCURACY (critical — names go to owner notifications):
  * Live per-call header — highest priority over the compiled prompt.
  * Injects clock, identity, open/closed, and mood adaptation.
  */
-function buildContextHeader(profile = {}) {
+function buildContextHeader(profile = {}, opts = {}) {
   const agentName =
     String(profile.agentName || process.env.AGENT_NAME || 'Receptionist').trim() ||
     'Receptionist';
   const businessName =
     profile.businessName || process.env.BUSINESS_NAME || 'the business';
-  const nowLabel = formatEatNowLabel(new Date());
+  // The speech guard trusts this same instant (trustedFacts.js); the server
+  // passes it in and stamps it on the call state.
+  const nowLabel = formatEatNowLabel(opts.now ? new Date(opts.now) : new Date());
   const status = openClosedStatus(profile.hoursSchedule);
   const scheduleSummary = formatScheduleSummary(profile.hoursSchedule);
 
@@ -224,7 +226,7 @@ Enquiry and take-a-message always work, even when the file is incomplete.
 If you append create_service_request, create_appointment, or update_appointment, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome. If you append ONLY save_caller_info, you MUST speak your natural response. Do not read open visits, holds, callbacks, or orders unless they just asked about them.`;
 }
 
-function buildSystemPrompt(profile = {}) {
+function buildSystemPrompt(profile = {}, opts = {}) {
   const businessName =
     profile.businessName || process.env.BUSINESS_NAME || 'the business';
   const knowledge =
@@ -233,7 +235,7 @@ function buildSystemPrompt(profile = {}) {
     DEFAULT_KNOWLEDGE;
   const languagePolicy = tenantLanguagePolicy();
   const languageLine = formatVoiceLanguagesLine();
-  const header = buildContextHeader(profile);
+  const header = buildContextHeader(profile, { now: opts.now });
   const liveTruth = buildLiveGroundTruth(profile);
   const liveBlock = liveTruth ? `\n\n${liveTruth}\n` : '\n';
   const playbook = formatPlaybookForPrompt(profile);
