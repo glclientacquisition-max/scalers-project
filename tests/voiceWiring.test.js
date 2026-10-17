@@ -424,8 +424,8 @@ assert.doesNotMatch(
 
 assert.match(
   source,
-  /if \(state === 'completed' && hasCallSetupFields\) return false;/,
-  'SautiKit initial callback with callSessionState=Completed must still open the media stream'
+  /if \(state === 'completed' && hasCallSetupFields && !streamIssued\) return false;/,
+  'SautiKit initial callback with callSessionState=Completed must still open the media stream (only before Stream went out; after that it is the hangup, prod HD_d3900cbf2b2d)'
 );
 
 assert.match(
