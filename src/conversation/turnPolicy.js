@@ -97,6 +97,16 @@ function fileNameAskLine(state) {
  * the line, the only reply is "Am I speaking with {name}?" and the model
  * does not run. A heard greeting or a committed ask is not asked again.
  */
+/**
+ * The file-name ask waits this turn. Mark it on the caller so a later "Okay"
+ * or "Yes" (to the answer the model gave) is not read as a yes to a name ask
+ * nobody spoke (HD_cd0c01f28b05 follow-up). Spoken asks clear the mark.
+ */
+function deferNameAsk(caller, extra = {}) {
+  if (caller && caller.fileNameAskSpoken !== true) caller.fileNameAskDeferred = true;
+  return { runModel: true, line: '', nameAskDeferred: true, ...extra };
+}
+
 function planCallerModelTurn(state, opts = {}) {
   const caller = state?.caller;
   if (
@@ -136,6 +146,17 @@ function planCallerModelTurn(state, opts = {}) {
   ) {
     return { runModel: false, line: '', hold: 'unfinished' };
   }
+  // A caller question owns its turn (HD_cd0c01f28b05): "What time is it?" got
+  // only "Am I speaking with Alwyn?" and was never answered. A public question
+  // that no committed local fact line answers goes to the model now. The name
+  // ask stays due for the next turn. See questionFirst.js for what is excluded.
+  if (line && opts.publicAnswerCommitted !== true) {
+    const qf = require('./questionFirst');
+    if (qf.questionBeforeNameEnabled()) {
+      const asked = qf.questionOwnsTurn(latest);
+      if (asked) return deferNameAsk(caller, { deferredFor: asked });
+    }
+  }
   // A held fragment the caller left hanging is answered by the model, never
   // by an early-return line (HD_72ab69cbab2b T1). The name ask stays due.
   if (line && opts.holdTimedOut === true) {
@@ -145,7 +166,7 @@ function planCallerModelTurn(state, opts = {}) {
     if (fixes.callFixesD199Enabled() && fixes.substantiveCallerTurn(latest)) {
       return { runModel: false, line };
     }
-    return { runModel: true, line: '', nameAskDeferred: true };
+    return deferNameAsk(caller);
   }
   // Staging listen: Gemini speaks the catalogue even when a file name is pending.
   // The name ask stays for the next turn. Flag off keeps the name-ask early return.
@@ -160,9 +181,12 @@ function planCallerModelTurn(state, opts = {}) {
     require('./callFixesD199').callFixesD199Enabled() &&
     require('./dynamicSpeech').looksLikePhaticCallerTurn(latest)
   ) {
-    return { runModel: true, line: '', nameAskDeferred: true };
+    return deferNameAsk(caller);
   }
-  if (line) return { runModel: false, line };
+  if (line) {
+    if (caller) caller.fileNameAskDeferred = false;
+    return { runModel: false, line };
+  }
   return { runModel: true, line: '' };
 }
 

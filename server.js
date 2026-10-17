@@ -272,6 +272,9 @@ const {
 const callAgentTools = new Map();
 /** Structured semantic state and actual runtime capabilities, keyed by callSid. */
 const callBrainStates = new Map();
+// Spoken transcript per live media call (rows pushed after the speech guard).
+// The hangup summary reads it when the webhook carries no turns (HD_cd0c01f28b05).
+const callSpokenTranscripts = new Map();
 const callBrainCapabilities = new Map();
 /** Per-call tenant grounding (product catalogue) for hold/order validation. */
 const callTenantProfiles = new Map();
@@ -345,6 +348,8 @@ const {
   isSpeakSlotOutcome,
 } = require('./src/conversation/speakSlots');
 const { narratesInternalAction, groundFilePriceLine } = require('./src/conversation/speechGuard');
+const { promptClockStale, stampPromptClock } = require('./src/conversation/trustedFacts');
+const { usableLeadReason } = require('./src/conversation/leadReason');
 const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -1253,9 +1258,14 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
 async function writeHangupSummary(callSid, source, opts, brainState) {
   try {
     const call = await db.getCall(callSid);
+    const spokenTurns =
+      Array.isArray(opts.turns) && opts.turns.length
+        ? opts.turns
+        : callSpokenTranscripts.get(callSid)?.turns() || null;
     const derived = deriveCallResolution({
       brainState,
       callId: call?.id || null,
+      spokenTurns,
     });
     const summary = deriveCallSummary({ brainState });
     const primaryIntent = summary.primaryIntent || null;
@@ -1291,6 +1301,13 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
           actions: summary.actions,
           instructions: summary.instructions,
           language: summary.language,
+          // What the caller heard answered, from the spoken transcript.
+          ...(Array.isArray(derived.answeredQuestions)
+            ? {
+                answered_questions: derived.answeredQuestions,
+                unanswered_questions: derived.unansweredQuestions || [],
+              }
+            : {}),
         },
       });
     } catch (err) {
@@ -2252,7 +2269,9 @@ mediaWss.on('connection', (ws, req) => {
     weakStt: false,
     tokenLanguages: [],
   };
-  let systemPrompt = buildSystemPrompt();
+  // VOICE_GUARD_TRUSTED_FACTS: the clock instant behind CURRENT TIME IN KENYA.
+  let promptClockAt = new Date();
+  let systemPrompt = buildSystemPrompt({}, { now: promptClockAt });
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
   let agentName = process.env.AGENT_NAME || 'Receptionist';
@@ -2264,6 +2283,7 @@ mediaWss.on('connection', (ws, req) => {
   let closureNotice = null;
   let messages = [{ role: 'system', content: systemPrompt }];
   const callTranscript = createCallTranscript();
+  if (sessionCallSid) callSpokenTranscripts.set(sessionCallSid, callTranscript);
   function logTurnTiming(timing, extra) {
     if (!timing) return null;
     const summary = timing.log(extra);
@@ -2500,7 +2520,8 @@ mediaWss.on('connection', (ws, req) => {
       afterHoursMode = profile.afterHoursMode || 'serve';
       openStatus = openClosedStatus(hoursSchedule);
       closureNotice = bulletinClosureNotice(profile.dailyBulletin);
-      systemPrompt = buildSystemPrompt(profile);
+      promptClockAt = new Date();
+      systemPrompt = buildSystemPrompt(profile, { now: promptClockAt });
       ttsLexiconOverrides = Array.isArray(profile.ttsLexicon)
         ? profile.ttsLexicon
         : [];
@@ -3452,11 +3473,20 @@ mediaWss.on('connection', (ws, req) => {
         }
       )
     );
-    if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
-      systemPrompt = buildSystemPrompt(brainProfile);
+    // The prompt clock was frozen at call start, so 3 minutes in the model still
+    // said 3:51 (HD_95e6745c0df1). Rebuild when the Kenya minute moved, and
+    // stamp the instant so the speech guard trusts the same clock.
+    const promptNow = new Date();
+    if (
+      liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp ||
+      promptClockStale(promptClockAt, promptNow)
+    ) {
+      promptClockAt = promptNow;
+      systemPrompt = buildSystemPrompt(brainProfile, { now: promptClockAt });
     }
     const nextBestAction = determineNextBestAction({ state: brainState, capabilities });
     brainState = setNextBestAction(brainState, nextBestAction);
+    stampPromptClock(brainState, promptClockAt);
     if (
       previousBrainState?.caller?.nameConfirmed !== true &&
       brainState?.caller?.nameConfirmed === true
@@ -3670,9 +3700,15 @@ mediaWss.on('connection', (ws, req) => {
         fileNameAskCommitted: fileNameAsksCommitted > 0,
         unfinishedDecided: true,
         holdTimedOut: opts.holdTimedOut === true,
+        // A committed local fact line already answers the question first.
+        publicAnswerCommitted: Boolean(localPacket),
       });
       if (nameGate.nameAskDeferred) {
-        console.log(`[ws/media][${callKey}] name ask deferred: held fragment timed out, model replies`);
+        console.log(
+          nameGate.deferredFor
+            ? `[ws/media][${callKey}] name ask deferred: caller asked (${nameGate.deferredFor}), model answers first`
+            : `[ws/media][${callKey}] name ask deferred: held fragment timed out, model replies`
+        );
       }
       const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
       const nameJustConfirmed = brainState?.caller?.nameJustConfirmed === true;
@@ -5385,6 +5421,7 @@ mediaWss.on('connection', (ws, req) => {
             }
             if (maybeSid && !sessionCallSid) {
               sessionCallSid = String(maybeSid);
+              callSpokenTranscripts.set(sessionCallSid, callTranscript);
               ttsSpeedScale = 1;
               publishVoiceTrace();
               console.log(`[ws/media] bound session callSid=${sessionCallSid}`);
@@ -5496,6 +5533,7 @@ mediaWss.on('connection', (ws, req) => {
         .finally(() => {
           callAgentTools.delete(sessionCallSid);
           callBrainStates.delete(sessionCallSid);
+          callSpokenTranscripts.delete(sessionCallSid);
           callBrainCapabilities.delete(sessionCallSid);
           callTenantProfiles.delete(sessionCallSid);
         });
@@ -5831,15 +5869,21 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
     }
 
-    const event = ownerLeadEvent(
-      { ...call, callUrl: callDeskUrl(call.id) },
-      businessName
-    );
+    // HD_cd0c01f28b05: the lead reason is the caller's need. A missing reason
+    // or the name detour ("correct name spelling") falls back to the need
+    // Brain recorded this call ("Alvin asked about what time it is.").
+    const leadCall = { ...call, callUrl: callDeskUrl(call.id) };
+    if (!usableLeadReason(call.reason) && brain) {
+      const need = usableLeadReason(deriveCallSummary({ brainState: brain }).reason);
+      if (need && !/^\S+ called\.$/.test(need)) leadCall.reason = need;
+      else if (call.reason) leadCall.reason = null;
+    }
+    const event = ownerLeadEvent(leadCall, businessName);
     const body = renderEventText(event);
     const lead = {
       businessName,
       name: event.caller?.name || call.name,
-      reason: event.caller?.reason || call.reason,
+      reason: event.caller?.reason || leadCall.reason,
       callerNumber: call.from_number,
       recordingUrl: call.recording_url,
     };
@@ -6107,7 +6151,8 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
 
 wss.on('connection', (ws) => {
   let callSid = null;
-  let systemPrompt = buildSystemPrompt();
+  let promptClockAt = new Date();
+  let systemPrompt = buildSystemPrompt({}, { now: promptClockAt });
   let messages = [{ role: 'system', content: systemPrompt }];
   let transcriptLog = [];
   let callLanguage = 'unknown';
@@ -6136,7 +6181,8 @@ wss.on('connection', (ws) => {
           const profile = await db.getTenantProfile({ callSid, toNumber: data.to });
           await hydrateCallerMemory(profile, callSid);
           brainProfile = profile;
-          systemPrompt = buildSystemPrompt(profile);
+          promptClockAt = new Date();
+          systemPrompt = buildSystemPrompt(profile, { now: promptClockAt });
           const parsedTools = parseAgentTools(profile.agentTools);
           callAgentTools.set(callSid, parsedTools);
           callTenantProfiles.set(callSid, profile);
@@ -6190,11 +6236,17 @@ wss.on('connection', (ws) => {
             profile: brainProfile,
           })
         );
-        if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
-          systemPrompt = buildSystemPrompt(brainProfile);
+        const promptNow = new Date();
+        if (
+          liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp ||
+          promptClockStale(promptClockAt, promptNow)
+        ) {
+          promptClockAt = promptNow;
+          systemPrompt = buildSystemPrompt(brainProfile, { now: promptClockAt });
         }
         const decision = determineNextBestAction({ state: brainState, capabilities });
         brainState = setNextBestAction(brainState, decision);
+        stampPromptClock(brainState, promptClockAt);
         callBrainStates.set(callSid, brainState);
         logBrainTrace({
           callSid,
