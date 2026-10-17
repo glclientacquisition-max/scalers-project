@@ -125,7 +125,14 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
   const ready = new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error('Soniox STT connect timeout'));
+      // Do not leave a half-open socket behind a rejected session.
+      try {
+        ws.terminate?.();
+      } catch {
+        /* ignore */
+      }
     }, 10000);
+    timer.unref?.();
 
     ws.once('open', () => {
       clearTimeout(timer);
@@ -187,7 +194,10 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
       });
     });
 
-    ws.once('error', (err) => {
+    // on, not once: ws can emit 'error' more than once (connect error, then a
+    // bad frame or reset mid-call). With no listener left, the second one is
+    // thrown as an uncaught 'error' event and kills the process.
+    ws.on('error', (err) => {
       clearTimeout(timer);
       console.error(`[soniox-stt][${callSid}] ws error:`, err?.message || err);
       reject(err);

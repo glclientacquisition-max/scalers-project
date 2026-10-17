@@ -4,6 +4,9 @@
 // Twilio has been removed from the telephony path.
 
 require('dotenv').config();
+// Log-and-continue on unhandled rejections; uncaught exceptions stay fatal.
+require('./src/lib/processGuards').installProcessGuards();
+const { asyncRoute } = require('./src/lib/asyncRoute');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -51,7 +54,14 @@ const {
 } = require('./src/speech/greetingPreroll');
 const { buildNotifyOutcome, ownerAlreadyNotified } = require('./src/notifications/notifyOutcome');
 const { createGreetingWarmer, greetingWarmEnabled } = require('./src/speech/greetingWarm');
+const {
+  shouldReinvite: shouldReinviteBareGreeting,
+  bareGreetingReplyLine,
+  isBareGreetingOrAffirmation,
+  bareGreetingReplyEnabled,
+} = require('./src/speech/bareGreetingReply');
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
+const { createLineFallback } = require('./src/speech/ttsRespeak');
 const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
 const {
   pickSpeechOutageLine,
@@ -700,25 +710,25 @@ app.get('/healthz', (_req, res) => {
 });
 
 /** Ops: force a TextSMS balance probe (no SMS charged). */
-app.get('/internal/sms/status', async (req, res) => {
+app.get('/internal/sms/status', asyncRoute('internal/sms/status', async (req, res) => {
   if (!voicePreviewAuthorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const status = await probeSmsCredentials({ force: true });
   return res.status(200).json({ ok: Boolean(status.verified), sms: status });
-});
+}));
 
 /** Ops: force SautiKit wallet probe (may fire telephony platform alert). */
-app.post('/internal/telephony/wallet-probe', async (req, res) => {
+app.post('/internal/telephony/wallet-probe', asyncRoute('internal/telephony/wallet-probe', async (req, res) => {
   if (!voicePreviewAuthorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const result = await probeSautikitWallet();
   return res.status(200).json(result);
-});
+}));
 
 /** Staging proof: fire platform ops alert with VOICE_PLATFORM_OPS_DRY_RUN=true. */
-app.post('/internal/platform/ops-alert', async (req, res) => {
+app.post('/internal/platform/ops-alert', asyncRoute('internal/platform/ops-alert', async (req, res) => {
   if (!voicePreviewAuthorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -728,7 +738,7 @@ app.post('/internal/platform/ops-alert', async (req, res) => {
     message: String(req.body?.message || 'staging probe').trim(),
   });
   return res.status(200).json({ ok: Boolean(result.ok), result });
-});
+}));
 
 /**
  * Desk: re-render a tenant's greeting PCM after Identity / greeting / voice /
@@ -2134,6 +2144,10 @@ mediaWss.on('connection', (ws, req) => {
   let utteranceStartedAt = 0;
   /** Idle check-in only after the caller has actually spoken. */
   let heardCallerUtterance = false;
+  // VOICE_BARE_GREETING_REPLY: re-invites spoken for a bare Hello/Yes before
+  // the caller's first real turn (src/speech/bareGreetingReply.js).
+  let firstRealCallerTurnDone = false;
+  let bareGreetingReinvites = 0;
   /** Brain END is in flight. No idle nudge and no next caller turn. */
   let callEnding = false;
   const overlapHold = createOverlapHold();
@@ -2550,10 +2564,61 @@ mediaWss.on('connection', (ws, req) => {
     return agentReplay.pickReplay();
   }
 
+  // A bare "Hello" / "Yes" / "Halo" / "Uko?" before the first real turn gets a
+  // short spoken re-invite, never silence (VOICE_BARE_GREETING_REPLY, off).
+  function maybeReinviteBareGreeting(text, source) {
+    if (
+      !shouldReinviteBareGreeting({
+        text,
+        firstRealTurnDone: firstRealCallerTurnDone,
+        reinvites: bareGreetingReinvites,
+        speaking,
+        turnBusy,
+        callEnding: callEnding || callIsOver() || speechOutageStarted,
+      })
+    ) {
+      return false;
+    }
+    const line = bareGreetingReplyLine({
+      text,
+      callLanguage,
+      agentName,
+      businessName: spokenName || businessName,
+      count: bareGreetingReinvites,
+    });
+    bareGreetingReinvites += 1;
+    idleNudge.clear();
+    console.log(
+      `[ws/media][${sidLabel()}] bare_greeting_reinvite n=${bareGreetingReinvites} src=${source}: ${String(text || '').slice(0, 40)}`
+    );
+    void speakText(line)
+      .then((spoken) => {
+        if (spoken?.ok) {
+          callTranscript.pushAgent(line);
+          messages.push({ role: 'assistant', content: line, local: true });
+        }
+      })
+      .catch((err) => {
+        console.error(`[ws/media][${sidLabel()}] bare_greeting_reinvite failed:`, err?.message || err);
+      });
+    return true;
+  }
+
   function releaseQueuedCallerSpeech(endedGeneration) {
     const gen =
       endedGeneration != null ? endedGeneration : activePlaybackGeneration;
     const { text, duplicate } = overlapHold.drain(gen);
+    // A bare Hello said over the greeting was answered by the greeting
+    // itself. Do not re-invite for it (VOICE_BARE_GREETING_REPLY).
+    if (
+      text &&
+      !firstRealCallerTurnDone &&
+      bareGreetingReplyEnabled() &&
+      isBareGreetingOrAffirmation(text)
+    ) {
+      console.log(`[ws/media][${sidLabel()}] bare_greeting_over_greeting dropped gen=${gen}`);
+      return;
+    }
     if (duplicate) {
       console.log(
         `[ws/media][${sidLabel()}] caller_turn_duplicate_suppressed gen=${gen}`
@@ -3163,7 +3228,9 @@ mediaWss.on('connection', (ws, req) => {
           name: planned.name,
           reason: 'Live line could not complete. Team to follow up.',
         });
-        maybeSendWhatsAppNotification(sidLabel());
+        maybeSendWhatsAppNotification(sidLabel()).catch((err) => {
+          console.error(`[ws/media][${sidLabel()}] owner notify failed:`, err?.message || err);
+        });
       } catch (err) {
         console.error(
           `[ws/media][${sidLabel()}] llm recovery save failed:`,
@@ -3247,6 +3314,13 @@ mediaWss.on('connection', (ws, req) => {
     // A new caller turn may speak. The previous barge must not swallow it.
     suppressReplyRemainder = false;
 
+    if (maybeReinviteBareGreeting(clean, 'turn')) {
+      voiceTrace.beginTurn({ callerText: clean });
+      voiceTrace.noteTurnEnd({ decision: 'reinvite', reason: 'bare_greeting' });
+      voiceTrace.commitTurn({ outcome: 'reinvite' });
+      return;
+    }
+
     const idleDecision = decideCallerEvent({
       text: clean,
       speaking: false,
@@ -3279,6 +3353,7 @@ mediaWss.on('connection', (ws, req) => {
       voiceTrace.commitTurn({ outcome: 'skip' });
       return;
     }
+    if (!isBareGreetingOrAffirmation(clean)) firstRealCallerTurnDone = true;
 
     overlapHold.discardExcept(0);
     turnBusy = true;
@@ -4769,9 +4844,11 @@ mediaWss.on('connection', (ws, req) => {
     if (evt.type === 'error') {
       const classified = evt.classified || classifySonioxError(evt.raw);
       if (classified.billing || classified.fatal) {
-        void handleSpeechProviderOutage(
+        handleSpeechProviderOutage(
           `stt ${classified.code || classified.message}`
-        );
+        ).catch((err) => {
+          console.error(`[ws/media][${sidLabel()}] stt outage handler failed:`, err?.message || err);
+        });
       }
       return;
     }
@@ -4859,20 +4936,58 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
 
+      // VOICE_BARE_GREETING_REPLY: a bare Hello/Yes before the first real turn
+      // used to end here as an empty replay or an ignored backchannel. Send it
+      // through the normal turn-end merge instead ("Hello" + "I need a
+      // cleaner" stays one turn); runCallerTurn speaks the re-invite if it is
+      // still bare.
+      if (
+        !decision.queue &&
+        (decision.replay ||
+          decision.interrupt ||
+          decision.action === 'ignore' ||
+          decision.action === 'skip' ||
+          decision.action === 'barge_listen') &&
+        shouldReinviteBareGreeting({
+          text: preroll.applied ? preroll.text : text,
+          firstRealTurnDone: firstRealCallerTurnDone,
+          reinvites: bareGreetingReinvites,
+          speaking: decision.interrupt ? false : speaking,
+          turnBusy,
+          callEnding: callEnding || callIsOver() || speechOutageStarted,
+        })
+      ) {
+        noteCallerSpeechForIdle(text);
+        voiceTrace.noteTurnEnd({ decision: 'queue', reason: 'bare_greeting' });
+        appendFinalPart(utteranceParts, evt.text);
+        scheduleUtteranceFlush();
+        return;
+      }
+
       if (decision.replay) {
         voiceTrace.noteTurnEnd({ decision: 'replay', reason: decision.reason || 'replay' });
-        const replay = hearAgainReplayText();
+        let replay = hearAgainReplayText();
+        // The cached-PCM greeting never reaches agentReplay, so a hear-again
+        // right after it found no line and went silent. Fall back to the last
+        // spoken question (VOICE_BARE_GREETING_REPLY).
+        if (!replay && bareGreetingReplyEnabled() && agentAwaitingReply(lastAgentText)) {
+          replay = String(lastAgentText || '').trim();
+        }
         if (replay) {
           if (callerEventClearsIdle(decision)) noteCallerSpeechForIdle(text);
           console.log(
             `[ws/media][${sidLabel()}] agent_question_replay reason=${decision.reason}`
           );
-          void speakText(replay, { isReplay: true }).then(() => {
-            if (callEnding) return;
-            if (agentAwaitingReply(replay)) {
-              idleNudge.arm({ skip: !heardCallerUtterance });
-            }
-          });
+          speakText(replay, { isReplay: true })
+            .then(() => {
+              if (callEnding) return;
+              if (agentAwaitingReply(replay)) {
+                idleNudge.arm({ skip: !heardCallerUtterance });
+              }
+            })
+            .catch((err) => {
+              console.warn(`[ws/media][${sidLabel()}] replay speak failed:`, err?.message || err);
+            });
         }
         return;
       }
@@ -4981,8 +5096,14 @@ mediaWss.on('connection', (ws, req) => {
         playbackBytes += pcm.length;
         if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
         // Live clone-voice audio means we can record downtime clips for the next outage.
-        scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
+        // Fallback audio (espeak / Gemini) is not the clone voice.
+        if (!meta.fallback) scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
       },
+      // VOICE_TTS_RESPEAK: a line Soniox lost mid-call is spoken again, or
+      // through this chain, unless the caller barged in or the call is over.
+      fallbackPcm: createLineFallback({ voiceId: () => tenantSonioxVoiceId }),
+      shouldRespeak: () =>
+        !bargeInActive && !speechOutageStarted && ws.readyState === WebSocket.OPEN,
     });
     tts = session;
     ttsSessionVoiceId = resolveSonioxVoice(voiceId);
@@ -5001,7 +5122,10 @@ mediaWss.on('connection', (ws, req) => {
         callSid: sidLabel(),
         onEvent: onSttEvent,
         // Prefer awaited profile; fall back quickly if load is slow (audio still buffers).
-        contextPromise: tenantWarm.then((ctx) => ctx || buildSttContext(sttTenantSnapshot)),
+        // .catch here: if the STT socket never opens, nothing else subscribes.
+        contextPromise: tenantWarm
+          .then((ctx) => ctx || buildSttContext(sttTenantSnapshot))
+          .catch(() => null),
       });
       stt.ready.catch((err) => {
         console.error(`[ws/media] Soniox STT failed to start:`, err?.message || err);
@@ -5340,7 +5464,9 @@ mediaWss.on('connection', (ws, req) => {
       }
       tts = null;
     }
-    void voiceTrace.finishCall();
+    voiceTrace.finishCall().catch((err) => {
+      console.warn(`[ws/media] voice trace finish failed:`, err?.message || err);
+    });
     if (sessionCallSid && callTranscript.size()) {
       db.appendTranscript({ callSid: sessionCallSid, turns: callTranscript.turns() }).catch(
         (err) => {
@@ -5657,7 +5783,14 @@ async function maybeQueueLiveTransfer({
 
 async function maybeSendWhatsAppNotification(callSid, opts = {}) {
   // Lead alert: WhatsApp owner number when sender is ready; email fallback otherwise.
-  const call = await db.getCall(callSid);
+  // Never rejects: two mid-call callers fire this without awaiting it.
+  let call = null;
+  try {
+    call = await db.getCall(callSid);
+  } catch (err) {
+    console.error(`[${callSid}] Owner notification skipped (call lookup failed):`, err?.message || err);
+    return;
+  }
   if (!call) return;
 
   if (!shouldSendOwnerLead(call)) return;
@@ -6561,7 +6694,9 @@ async function applyGeminiTools(callSid, parsed) {
       (result.status === 'succeeded' || result.status === 'updated')
   );
   if (savedInfo?.name && savedInfo?.reason && !escalationRequested && !visitSaved) {
-    maybeSendWhatsAppNotification(callSid, { midCall: true });
+    maybeSendWhatsAppNotification(callSid, { midCall: true }).catch((err) => {
+      console.error(`[${callSid}] mid-call owner notify failed:`, err?.message || err);
+    });
   }
   if (visitSaved) {
     persistCallResolution(callSid, 'tool', { review: false }).catch((err) => {

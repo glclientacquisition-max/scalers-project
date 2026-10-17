@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-160 variables.
+165 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -168,6 +168,11 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_TELEPHONY_WALLET_PROBE` | voice | `src/sautikit/walletProbe.js` |
 | `VOICE_TELEPHONY_WALLET_PROBE_MS` | voice | `src/sautikit/walletProbe.js` |
 | `VOICE_TRANSFER_TIMEOUT_S` | voice | `src/sautikit/pendingLiveTransfer.js` |
+| `VOICE_TTS_FALLBACK_GEMINI_MS` | voice | `src/speech/emergencyTts.js` |
+| `VOICE_TTS_IDLE_RECYCLE_MS` | voice | `src/speech/sonioxTts.js` |
+| `VOICE_TTS_RESPEAK` | voice | `src/speech/sonioxTts.js` |
+| `VOICE_TTS_RESPEAK_CONNECT_MS` | voice | `src/speech/sonioxTts.js` |
+| `VOICE_TTS_RESPEAK_MAX` | voice | `src/speech/sonioxTts.js` |
 | `VOICE_TURN_END_CAP_MS` | voice | `src/speech/turnTaking.js` |
 | `WALLET_CHARGING_ENABLED` | voice | `src/db.js` |
 | `WALLET_RATE_KES_PER_MINUTE` | desk, voice | `dashboard/src/lib/wallet.ts`<br>`src/billing/liveTransferLegs.js`<br>`src/db.js` |
