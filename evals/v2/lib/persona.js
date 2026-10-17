@@ -5,6 +5,7 @@
 // up when nothing is asked. An LLM persona slot exists (EVAL_PERSONA=llm) but no
 // key is configured on the box, so runs use the scripted persona.
 const { rngFor } = require('./rng');
+const { isReadbackQuestion } = require('./readback');
 const pick = (x, r) => (Array.isArray(x) ? x[Math.floor(r() * x.length)] : x);
 
 function createPersona(scn, seed) {
@@ -19,7 +20,7 @@ function createPersona(scn, seed) {
     if (k < script.length) return script[k++];
     const a = String(lastAgentText || '');
     // a read-back question ("..., Nithibitishe?") is answered as a read-back even when it names a time
-    const isReadback = /\?\s*$/.test(a) && /\b(shall i|nithibitishe|niendelee|go ahead)\b/i.test(a);
+    const isReadback = (/\?\s*$/.test(a) && /\b(shall i|nithibitishe|niendelee|go ahead)\b/i.test(a)) || isReadbackQuestion(a);
     const ask = (key, re) => !isReadback && re.test(a) && f[key] != null ? key : null;
     const key =
       ask('kesho', /\b(do you mean|unamaanisha)\b/i) ||
@@ -31,7 +32,7 @@ function createPersona(scn, seed) {
       ask('service', /\b(what do you need|tufanye nini|which service)\b/i) ||
       ask('which', /\b(which (one|visit|booking)|ipi)\b/i);
     if (key) { answered[key] = (answered[key] || 0) + 1; if (answered[key] > 3) return null; const v = f[key]; return v && v.seq ? v.seq[Math.min(answered[key] - 1, v.seq.length - 1)] : pick(v, r); }
-    if (/\?\s*$/.test(a) && /\b(shall|should|go ahead|confirm|correct|right|sawa\?|niendelee|nithibitishe|is that|ni sawa|book it|save)\b/i.test(a)) {
+    if (isReadbackQuestion(a) || (/\?\s*$/.test(a) && /\b(shall|should|go ahead|confirm|correct|right|sawa\?|niendelee|nithibitishe|is that|ni sawa|book it|save)\b/i.test(a))) {
       // edge cases: the first read-back gets a scripted reply (barge-in / change of mind), then yes
       if (f.onReadback && !answered.rb) { answered.rb = 1; return pick(f.onReadback, r); }
       answered.yes = (answered.yes || 0) + 1; if (answered.yes > 3) return null; return sw ? pick(['Ndio.', 'Ndio, sawa.'], r) : pick(['Yes.', 'Yes please.'], r);

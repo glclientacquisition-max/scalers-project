@@ -42,3 +42,16 @@ is a seeded stand-in, not Gemini. `EVAL_PERSONA=llm` is reserved for an LLM pers
 
 Templates borrow test themes from Duckling (BSD) / SUTime and CheckList (MIT); no code or data copied.
 Audio variants (TTS + 8 kHz telephone noise, DTMF, real barge-in timing) are not covered here.
+
+## Regression-9 (`regression/`, `npm run test:bugs`)
+
+The nine known bugs from the Oct 15-16 calls as permanent EN + SW cases (synthetic, fixture
+tenants, no call data). `node evals/v2/regression/run.js --flags v2 --k 4` exits 1 on any FAIL.
+Voice-side bugs (6-9) are probes marked `xfail` with an owner note: XFAIL and XPASS never fail
+the run; an XPASS means the owner can drop the xfail. Offline: no network, DB, model key or
+SAUTIKIT_API_KEY. Platform's CI gate (#718, check `bug-test-pack`) runs `npm run test:bugs`.
+Also in the pack: synthetic replays of the Brain-owned causes from the Jirani staging call
+HD_b4396ad63677 (JB1 facts not single-sourced, JB2b post-check line deletion, JB4 saved contact
+name, JB5 "pickup" as hold, JB8 greeting wording) on `fixtures/tenants/synthetic_cleaner.json`
+(fictional tenant, same spoken-doc shape). Read-back cues shared by the persona and the write
+check live in `lib/readback.js` (incl. SW "Nipeleke/Tupeleke/Nitume ombi…?"; not "nikutumie").

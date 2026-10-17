@@ -1,0 +1,345 @@
+{
+ "tenantId": "synthetic-mtaa-bora",
+ "vertical": "home_services",
+ "businessName": "Mtaa Bora Cleaning Services",
+ "agentName": "Neema",
+ "servicesCatalog": [
+  {
+   "id": "svc_syn_sofa",
+   "name": "Sofa Cleaning (per seat)",
+   "notes": "Fabric and leather sofas",
+   "source": "owner",
+   "pricing": {
+    "mode": "fixed",
+    "unit": "seat",
+    "source": "owner",
+    "max_ksh": null,
+    "min_ksh": 700,
+    "in_stock": null,
+    "confirmed": true,
+    "amount_ksh": 700,
+    "parsed_from": "KSh 700 per seat"
+   },
+   "category": "",
+   "in_stock": "",
+   "price_range": "KSh 700 per seat",
+   "out_of_scope": ""
+  },
+  {
+   "id": "svc_syn_carpet",
+   "name": "Carpet Cleaning",
+   "notes": "Wall-to-wall and loose carpets",
+   "source": "owner",
+   "pricing": {
+    "mode": "from",
+    "unit": "m²",
+    "source": "owner",
+    "max_ksh": null,
+    "min_ksh": 2000,
+    "in_stock": null,
+    "confirmed": true,
+    "amount_ksh": 2000,
+    "parsed_from": "From KSh 2,000 per m²"
+   },
+   "category": "",
+   "in_stock": "",
+   "price_range": "From KSh 2,000 per m²",
+   "out_of_scope": ""
+  },
+  {
+   "id": "svc_syn_1br",
+   "name": "1-Bedroom House Cleaning",
+   "notes": "Standard clean by house size",
+   "source": "owner",
+   "pricing": {
+    "mode": "fixed",
+    "unit": null,
+    "source": "owner",
+    "max_ksh": null,
+    "min_ksh": 2500,
+    "in_stock": null,
+    "confirmed": true,
+    "amount_ksh": 2500,
+    "parsed_from": "KSh 2,500"
+   },
+   "category": "",
+   "in_stock": "",
+   "price_range": "KSh 2,500",
+   "out_of_scope": ""
+  },
+  {
+   "id": "svc_syn_2br",
+   "name": "2-Bedroom House Cleaning",
+   "notes": "Standard clean by house size",
+   "source": "owner",
+   "pricing": {
+    "mode": "fixed",
+    "unit": null,
+    "source": "owner",
+    "max_ksh": null,
+    "min_ksh": 3500,
+    "in_stock": null,
+    "confirmed": true,
+    "amount_ksh": 3500,
+    "parsed_from": "KSh 3,500"
+   },
+   "category": "",
+   "in_stock": "",
+   "price_range": "KSh 3,500",
+   "out_of_scope": ""
+  },
+  {
+   "id": "svc_syn_3br",
+   "name": "3-Bedroom House Cleaning",
+   "notes": "Standard clean by house size",
+   "source": "owner",
+   "pricing": {
+    "mode": "fixed",
+    "unit": null,
+    "source": "owner",
+    "max_ksh": null,
+    "min_ksh": 4500,
+    "in_stock": null,
+    "confirmed": true,
+    "amount_ksh": 4500,
+    "parsed_from": "KSh 4,500"
+   },
+   "category": "",
+   "in_stock": "",
+   "price_range": "KSh 4,500",
+   "out_of_scope": ""
+  },
+  {
+   "id": "svc_syn_deep",
+   "name": "Deep Cleaning",
+   "notes": "Move-in or after building work (post-construction): dust, paint spots, cement residue",
+   "source": "owner",
+   "pricing": {
+    "mode": "from",
+    "unit": null,
+    "source": "owner",
+    "max_ksh": null,
+    "min_ksh": 6000,
+    "in_stock": null,
+    "confirmed": true,
+    "amount_ksh": 6000,
+    "parsed_from": "From KSh 6,000"
+   },
+   "category": "",
+   "in_stock": "",
+   "price_range": "From KSh 6,000",
+   "out_of_scope": ""
+  },
+  {
+   "id": "svc_syn_moveout",
+   "name": "Move-out Clean",
+   "notes": "Empty premises before handover",
+   "source": "owner",
+   "pricing": {
+    "mode": "from",
+    "unit": null,
+    "source": "owner",
+    "max_ksh": null,
+    "min_ksh": 4000,
+    "in_stock": null,
+    "confirmed": true,
+    "amount_ksh": 4000,
+    "parsed_from": "From KSh 4,000"
+   },
+   "category": "",
+   "in_stock": "",
+   "price_range": "From KSh 4,000",
+   "out_of_scope": ""
+  }
+ ],
+ "productCatalog": [],
+ "businessPolicies": {
+  "other": "",
+  "booking": {
+   "source": "owner",
+   "confirmed": true
+  },
+  "deposit": "",
+  "payment": "You can pay by M-Pesa Paybill 542542, account 707222, bank transfer to Equity Bank, account 123456, Done and Dusted LTD or cash. Customers pay before delivery or when they collect.",
+  "returns": "",
+  "delivery": "",
+  "payments": {
+   "bank": {
+    "bank_name": "Equity Bank",
+    "account_no": "123456",
+    "account_name": "Done and Dusted LTD"
+   },
+   "card": null,
+   "note": null,
+   "pochi": null,
+   "airtel": null,
+   "source": "owner",
+   "methods": [
+    "mpesa_paybill",
+    "bank",
+    "cash"
+   ],
+   "timings": [
+    "before_delivery",
+    "at_pickup"
+   ],
+   "version": 2,
+   "confirmed": true,
+   "mpesa_send": null,
+   "mpesa_till": null,
+   "mpesa_paybill": {
+    "account": "707222",
+    "business_no": "542542",
+    "account_mode": "fixed"
+   },
+   "deposit_percent": null
+  },
+  "warranty": "",
+  "provenance": {
+   "payment": {
+    "source": "owner",
+    "confirmed": true
+   }
+  },
+  "booking_mode": "request",
+  "cancellation": "",
+  "coverage_areas": [
+   "county:nairobi",
+   "place:kitengela",
+   "county:kiambu",
+   "place:juja",
+   "place:ongata rongai",
+   "place:syokimau"
+  ]
+ },
+ "businessLocations": [
+  {
+   "name": "Main office",
+   "address": "Ngong Road, Nairobi"
+  }
+ ],
+ "hoursSchedule": {
+  "days": {
+   "fri": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "mon": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "sat": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "sun": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "thu": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "tue": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "wed": {
+    "open": "08:00",
+    "close": "18:00"
+   }
+  },
+  "location": "Main · Nairobi and the close surroundings",
+  "timezone": "Africa/Nairobi"
+ },
+ "agentTools": {
+  "end_call": false,
+  "escalate": true
+ },
+ "serviceAreas": {
+  "areas": [
+   {
+    "id": "county:nairobi",
+    "eta": null,
+    "modes": [
+     "visit"
+    ],
+    "source": "import",
+    "fee_ksh": null,
+    "fee_mode": "ask",
+    "confirmed": false,
+    "min_order_ksh": null
+   },
+   {
+    "id": "place:kitengela",
+    "eta": null,
+    "modes": [
+     "visit"
+    ],
+    "source": "import",
+    "fee_ksh": null,
+    "fee_mode": "ask",
+    "confirmed": false,
+    "min_order_ksh": null
+   },
+   {
+    "id": "county:kiambu",
+    "eta": null,
+    "modes": [
+     "visit"
+    ],
+    "source": "import",
+    "fee_ksh": null,
+    "fee_mode": "ask",
+    "confirmed": false,
+    "min_order_ksh": null
+   },
+   {
+    "id": "place:juja",
+    "eta": null,
+    "modes": [
+     "visit"
+    ],
+    "source": "import",
+    "fee_ksh": null,
+    "fee_mode": "ask",
+    "confirmed": false,
+    "min_order_ksh": null
+   },
+   {
+    "id": "place:ongata rongai",
+    "eta": null,
+    "modes": [
+     "visit"
+    ],
+    "source": "import",
+    "fee_ksh": null,
+    "fee_mode": "ask",
+    "confirmed": false,
+    "min_order_ksh": null
+   },
+   {
+    "id": "place:syokimau",
+    "eta": null,
+    "modes": [
+     "visit"
+    ],
+    "source": "import",
+    "fee_ksh": null,
+    "fee_mode": "ask",
+    "confirmed": false,
+    "min_order_ksh": null
+   }
+  ],
+  "reach": "visit",
+  "version": 1,
+  "rider_paid": null,
+  "delivered_by": []
+ },
+ "faqs": [],
+ "voiceLanguages": [
+  "en",
+  "sw",
+  "sheng"
+ ]
+}
