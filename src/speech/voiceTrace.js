@@ -576,7 +576,12 @@ function createVoiceTrace(opts = {}) {
       diagnosis,
       release: voiceRelease(traceEnv),
     };
-    await sink.write(record);
+    try {
+      await sink.write(record);
+    } catch (err) {
+      // Fire-and-forget at hang-up: a failed trace write must not reject.
+      console.warn('[voice-trace] call write failed:', err?.message || err);
+    }
     return record;
   }
 
