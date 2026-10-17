@@ -98,6 +98,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY` | voice | `src/notifications/whatsappTemplates.js` |
 | `SCALERS_OPS_ALERT_EMAIL` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/setupNotify.ts` |
 | `SCALERS_OPS_ALERT_EMAILS` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/setupNotify.ts` |
+| `SMOKE_TENANT_ID` | scripts | `scripts/smoke-db.js` |
 | `SMOKE_VOICE_PORT` | scripts | `scripts/smoke-recording-webhook.js` |
 | `SONIOX_API_KEY` | voice | `src/speech/sonioxStt.js`<br>`src/speech/sonioxTts.js`<br>`src/speech/sonioxVoice.js` |
 | `SONIOX_ENDPOINT_LATENCY_ADJ` | voice | `src/speech/sonioxStt.js` |

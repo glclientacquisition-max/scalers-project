@@ -122,11 +122,16 @@ function createInboundDirectory(opts = {}) {
     if (!tenant || !s?.packageColumns || tenant.minutes_included === undefined) {
       return { open: true, reason: s?.packageColumns ? 'unassigned' : 'columns_missing' };
     }
-    return inboundOpen({
-      minutesIncluded: tenant.minutes_included,
-      secondsUsed: tenant.seconds_used,
-      onDemand: Boolean(tenant.on_demand_usage_enabled),
-    });
+    const enforcement = tenant.billing_enforcement || 'off';
+    return {
+      ...inboundOpen({
+        minutesIncluded: tenant.minutes_included,
+        secondsUsed: tenant.seconds_used,
+        onDemand: Boolean(tenant.on_demand_usage_enabled),
+        enforcement,
+      }),
+      enforcement,
+    };
   }
 
   /**

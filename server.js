@@ -254,6 +254,7 @@ const {
   opsCooldownMs,
 } = require('./src/notifications/platformOpsAlert');
 const { platformOpsRecipients } = require('./src/notifications/platformOpsRecipients');
+const { maybeAlertPackageUsage } = require('./src/billing/packageUsageAlerts');
 const {
   selectProductsForTurn,
   formatTargetedProductsForPrompt,
@@ -1472,6 +1473,27 @@ async function maybeSendMissedTextback({ callSid, call }) {
 //    Mounted on BOTH `/` and `/voice/incoming` because some number routing
 //    configs point at the tunnel root (logs showed POST / → 404 before).
 // ---------------------------------------------------------------------------
+/**
+ * Package cap decision for a new inbound call (fast and legacy paths).
+ * Fires the beta 80% / 100% ops notice and logs; true = refuse the call.
+ */
+function packageGateRefuses(callSid, gate) {
+  if (gate?.usage) {
+    // Beta tenants are never rejected at the cap; ops get 80% / 100% notices.
+    void maybeAlertPackageUsage(gate.usage).catch((err) => {
+      console.warn('[package-usage] alert failed:', err?.message || err);
+    });
+  }
+  if (gate?.reason === 'beta_over_cap') {
+    console.log(`[${callSid}] package minutes used, billing in beta — answering (metered, not charged)`);
+  }
+  if (gate && gate.open === false) {
+    console.warn(`[${callSid}] package exhausted (billing ${gate.usage?.enforcement || '?'}, on-demand off) — reject`);
+    return true;
+  }
+  return false;
+}
+
 async function handleVoiceIncoming(req, res) {
   const webhookStartedAt = Date.now();
   try {
@@ -1644,7 +1666,9 @@ async function handleVoiceIncoming(req, res) {
 
     if (directoryHit) {
       if (directoryHit.gate && directoryHit.gate.open === false) {
-        console.warn(`[${callSid}] package exhausted — reject`);
+        // Same decision as db.packageInboundOpen (billing_enforcement is in
+        // the directory row): beta never rejects at the cap (#631).
+        console.warn(`[${callSid}] package exhausted (billing ${directoryHit.gate.enforcement || '?'}, on-demand off) — reject`);
         return res
           .type('text/xml')
           .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
@@ -1679,8 +1703,7 @@ async function handleVoiceIncoming(req, res) {
     } else {
       try {
         const gate = await db.packageInboundOpen({ toNumber, fromNumber });
-        if (gate && gate.open === false) {
-          console.warn(`[${callSid}] package exhausted — reject`);
+        if (packageGateRefuses(callSid, gate)) {
           return res
             .type('text/xml')
             .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');

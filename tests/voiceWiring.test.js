@@ -688,8 +688,13 @@ assert.match(
 
 assert.match(
   source,
-  /package exhausted — reject/,
-  'a used-up package with on-demand off must not open the media stream'
+  /package exhausted \(billing .*on-demand off\) — reject/,
+  'a used-up package with on-demand off and billing enforced must not open the media stream'
+);
+assert.match(
+  source,
+  /maybeAlertPackageUsage\(gate\.usage\)/,
+  'the package gate must raise the beta 80% / 100% ops notice'
 );
 
 const telephonyRejectAt = source.indexOf('telephonyBillingRejectXml()');
