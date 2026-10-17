@@ -1,6 +1,3 @@
-# PROPOSED .github/workflows/docs.yml
-# Not installed by the PR that added it: the agent token has no `workflow` scope.
-# To install: copy this file to .github/workflows/docs.yml in a commit made with a token that has workflow scope.
 name: Docs
 
 on:

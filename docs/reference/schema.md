@@ -21,7 +21,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `catalogue_price_history` | `amount_ksh`, `confirmed`, `effective_from`, `id`, `in_stock`, `item_key`, `item_name`, `kind`, `max_ksh`, `min_ksh`, `mode`, `source`, `tenant_id`, `unit` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `contacts` | `created_at`, `id`, `last_reason`, `metadata`, `name`, `notes`, `phone`, `tenant_id`, `updated_at` | `docs/supabase/contacts_and_requests.sql` |
 | `data_quality_snapshots` | `report`, `taken_on`, `tenant_id` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
-| `notify_sends` | `audience`, `billed_to`, `body`, `call_id`, `call_sid`, `channel`, `created_at`, `id`, `idempotency_key`, `kind`, `overage`, `provider_message_id`, `recipient`, `tenant_id`, `units` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/sms_allowance.sql` |
+| `notify_sends` | `audience`, `billed_to`, `body`, `call_id`, `call_sid`, `channel`, `created_at`, `error`, `id`, `idempotency_key`, `kind`, `overage`, `provider_message_id`, `recipient`, `status`, `tenant_id`, `units` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_sends_status.sql`<br>`docs/supabase/sms_allowance.sql` |
 | `ops_audit_log` | `action`, `actor`, `amount_kes`, `created_at`, `detail`, `id`, `tenant_id` | `docs/supabase/wallet_security_beta.sql` |
 | `platform_ops_notices` | `acked_at`, `detail`, `id`, `kind`, `notified_at`, `opened_at`, `resolved_at`, `status` | `docs/supabase/platform_ops_notices.sql` |
 | `platform_ops_settings` | `emails`, `id`, `kinds`, `people`, `sautikit_warn_minor`, `updated_at` | `docs/supabase/platform_ops_notices.sql`<br>`docs/supabase/platform_ops_people.sql` |
