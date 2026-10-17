@@ -96,11 +96,28 @@ describe("outbound sends check the line before any ledger or charge", () => {
     const body = fnBody(read(`${DASH}/app/(desk)/calls/escalateActions.ts`), "pingTeammateAction");
     const guard = body.indexOf("outboundSendBlock(workspace.client, tenant.id)");
     assert.ok(guard > 0, "ping guard missing");
-    assert.match(body, /if \(blocked\) return \{ error: blocked\.message \}/);
+    assert.match(body, /if \(blocked\) return \{ error: pingBlockMessage\(blocked\) \}/);
     for (const later of ["fetch(", ".insert(", ".update("]) {
       const at = body.indexOf(later);
       if (at >= 0) assert.ok(at > guard, `${later} runs before the line check`);
     }
+  });
+
+  it("maps the voice server's 409 tenant_line_closed to plain owner text, not a retry", () => {
+    const paused = "Your line is paused, so teammates can't be pinged right now.";
+    const closed = "This business is closed.";
+    assert.equal(line.escalateRefusalMessage({ ok: false, reason: "tenant_line_closed", lineState: "suspended" }), paused);
+    assert.equal(line.escalateRefusalMessage({ ok: false, reason: "tenant_line_closed", lineState: { closed: true, reason: "suspended" } }), paused);
+    assert.equal(line.escalateRefusalMessage({ ok: false, reason: "tenant_line_closed", lineState: "archived" }), closed);
+    assert.equal(line.escalateRefusalMessage({ ok: false, reason: "tenant_line_closed", lineState: { reason: "inactive" } }), closed);
+    assert.equal(line.escalateRefusalMessage({ ok: false, reason: "instance_already_sent" }), null);
+    assert.equal(line.escalateRefusalMessage(null), null);
+    assert.equal(line.pingBlockMessage({ reason: "line_paused", message: "x" }), paused);
+    assert.equal(line.pingBlockMessage({ reason: "business_closed", message: "x" }), closed);
+    const body = fnBody(read(`${DASH}/app/(desk)/calls/escalateActions.ts`), "pingTeammateAction");
+    const refusal = body.indexOf("escalateRefusalMessage(json)");
+    assert.ok(refusal > 0 && refusal < body.indexOf("Notification retry pending"), "409 must be mapped before the retry branch");
+    assert.match(body, /if \(refused\) return \{ error: refused \}/);
   });
 
   it("every caller SMS goes through the guarded ledger", () => {

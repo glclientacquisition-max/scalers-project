@@ -22,6 +22,7 @@ export type TenantLineReason = "archived" | "suspended" | "inactive";
 export type DeskLineState = "open" | "paused" | "closed";
 
 export const LINE_PAUSED_SEND_ERROR = "Your line is paused, so messages can't go out right now.";
+export const LINE_PAUSED_PING_ERROR = "Your line is paused, so teammates can't be pinged right now.";
 export const BUSINESS_CLOSED_ERROR = "This business is closed.";
 export const LINE_PAUSED_BANNER = "Your line is paused. Callers hear that the line is unavailable.";
 
@@ -71,4 +72,27 @@ export function sendBlockMessage(reason: string | null | undefined): string | nu
   if (reason === "business_closed") return BUSINESS_CLOSED_ERROR;
   if (reason === "line_paused") return LINE_PAUSED_SEND_ERROR;
   return null;
+}
+
+/** Owner text for a refused teammate ping, from our own line check (sendBlock reason). */
+export function pingBlockMessage(block: SendBlock): string {
+  return block.reason === "line_paused" ? LINE_PAUSED_PING_ERROR : BUSINESS_CLOSED_ERROR;
+}
+
+/**
+ * Owner text for the voice server's refusal (409 { ok: false, reason: "tenant_line_closed", lineState }).
+ * lineState is the gate's reason ("archived" | "suspended" | "inactive"), either as a string or as
+ * { reason }. Returns null for any other response.
+ */
+export function escalateRefusalMessage(json: unknown): string | null {
+  if (!json || typeof json !== "object") return null;
+  const body = json as { reason?: unknown; lineState?: unknown };
+  if (String(body.reason || "") !== "tenant_line_closed") return null;
+  const raw =
+    body.lineState && typeof body.lineState === "object"
+      ? (body.lineState as { reason?: unknown; state?: unknown }).reason ??
+        (body.lineState as { state?: unknown }).state
+      : body.lineState;
+  const state = String(raw || "").trim().toLowerCase();
+  return state === "suspended" || state === "paused" ? LINE_PAUSED_PING_ERROR : BUSINESS_CLOSED_ERROR;
 }

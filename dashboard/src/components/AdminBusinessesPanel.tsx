@@ -11,10 +11,12 @@ import {
   ARCHIVE_RESTORE_DAYS,
   businessLifecycle,
   reasonOk,
+  resumeBillingOffer,
   releaseBlockReason,
 } from "@/lib/adminBusinessModel";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
+import { Switch } from "@/components/ui/Switch";
 import { Empty } from "@/components/ui/Empty";
 import { Field, Input } from "@/components/ui/Field";
 import { ListRow } from "@/components/ui/ListRow";
@@ -105,7 +107,7 @@ const LIFECYCLE: Record<
     title: "Unarchive this business?",
     confirm: "Unarchive",
     body: (b) =>
-      `${b.business_name} goes back on the list, the owner can sign in, and the line opens. Charging stays off until you turn it on in Plan.`,
+      `${b.business_name} goes back on the list, the owner can sign in, and the line opens.`,
   },
 };
 
@@ -201,6 +203,7 @@ export function AdminBusinessesPanel({
   const [sheet, setSheet] = useState<{ kind: SheetKind; id: string } | null>(null);
   const [lifecycle, setLifecycle] = useState<LifecycleAction>("suspend");
   const [reason, setReason] = useState("");
+  const [resumeBilling, setResumeBilling] = useState(false);
   const [plan, setPlan] = useState<PlanChoice>("beta");
   const [charges, setCharges] = useState<WalletLedgerRow[]>([]);
   const [packs, setPacks] = useState<PackOption[]>([]);
@@ -301,6 +304,7 @@ export function AdminBusinessesPanel({
   function openLifecycle(action: LifecycleAction, id: string) {
     setLifecycle(action);
     setReason("");
+    setResumeBilling(false);
     openKind("lifecycle", id);
   }
 
@@ -821,11 +825,24 @@ export function AdminBusinessesPanel({
           setSheet(open ? { kind: "shop", id: open.id } : null);
         }}
         onConfirm={() =>
-          open && void run({ action: lifecycle, business_id: open.id, reason: reason.trim() })
+          open &&
+          void run({
+            action: lifecycle,
+            business_id: open.id,
+            reason: reason.trim(),
+            ...(lifecycle === "restore" ? { resume_billing: resumeBilling } : {}),
+          })
         }
       >
         <SheetNote error={error} />
         <p className="pb-3">{open ? LIFECYCLE[lifecycle].body(open) : ""}</p>
+        {lifecycle === "restore" && open ? (
+          <RestoreBillingChoice
+            offer={resumeBillingOffer(open.pre_archive)}
+            checked={resumeBilling}
+            onChange={setResumeBilling}
+          />
+        ) : null}
         <Field id="biz-lifecycle-reason" label="Reason" hint="3 characters or more. Shows in Activity.">
           {(props) => (
             <Input
@@ -838,5 +855,29 @@ export function AdminBusinessesPanel({
         </Field>
       </ConfirmSheet>
     </>
+  );
+}
+
+/** Unarchive: explicit "back on as before" choice, off by default. */
+function RestoreBillingChoice({
+  offer,
+  checked,
+  onChange,
+}: {
+  offer: { label: string; summary: string } | null;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  if (!offer) {
+    return <p className="pb-3">Charging stays off. Turn it on in Plan when you&apos;re ready.</p>;
+  }
+  return (
+    <div data-restore-billing="" className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-hairline px-3 py-2">
+      <div className="min-w-0">
+        <p className="text-body font-medium text-ink">{offer.label}</p>
+        <p className="text-meta text-ink-2">{offer.summary}</p>
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} label={offer.label} />
+    </div>
   );
 }

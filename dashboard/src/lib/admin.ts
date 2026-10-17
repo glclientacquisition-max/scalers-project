@@ -2,7 +2,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { listDidPool, listPendingTenants, type DidPoolRow, type PendingTenant } from "@/lib/didPool";
 import { loadBusinessPackageNames } from "@/lib/packageCatalog";
 import { requireSuperAdmin } from "@/lib/adminGuard";
-import { businessLifecycle } from "@/lib/adminBusinessModel";
+import { businessLifecycle, preArchiveFromAudit, type PreArchiveBilling } from "@/lib/adminBusinessModel";
 
 export type AdminBusiness = {
   id: string;
@@ -21,7 +21,41 @@ export type AdminBusiness = {
   package_period: "month" | "year" | null;
   billing_enforcement: "off" | "soft" | "hard";
   status: "active" | "waiting" | "suspended" | "archived";
+  /** Archived only: charging right before archive, for the Unarchive "as before" choice. */
+  pre_archive: PreArchiveBilling | null;
 };
+
+/**
+ * Pre-archive charging per business from ops_audit_log (newest archive row wins).
+ * Best effort: a missing table or failed read just means no "as before" offer.
+ */
+export async function loadPreArchiveBilling(tenantIds: string[]): Promise<Map<string, PreArchiveBilling>> {
+  const out = new Map<string, PreArchiveBilling>();
+  if (!tenantIds.length) return out;
+  try {
+    const { data, error } = await getSupabaseAdmin()
+      .from("ops_audit_log")
+      .select("tenant_id, action, detail, created_at")
+      .in("tenant_id", tenantIds)
+      .in("action", ["archive_tenant_billing", "archive_business"])
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error || !data) return out;
+    const byTenant = new Map<string, Array<{ action?: string | null; detail?: unknown }>>();
+    for (const row of data as Array<{ tenant_id: string; action: string; detail: unknown }>) {
+      const list = byTenant.get(String(row.tenant_id)) || [];
+      list.push(row);
+      byTenant.set(String(row.tenant_id), list);
+    }
+    for (const [id, rows] of byTenant) {
+      const pre = preArchiveFromAudit(rows);
+      if (pre) out.set(id, pre);
+    }
+  } catch {
+    // No offer is the safe default.
+  }
+  return out;
+}
 
 export type AdminOverview = {
   totalBusinesses: number;
@@ -93,6 +127,8 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
 
   if (error) throw error;
   const packages = await loadBusinessPackageNames();
+  const archivedIds = (data || []).filter((row) => businessStatus(row) === "archived").map((row) => String(row.id));
+  const preArchive = await loadPreArchiveBilling(archivedIds);
   return (data || []).map((row) => {
     const pack = packages.get(String(row.id));
     return {
@@ -107,6 +143,7 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
           ? row.billing_enforcement
           : "off",
       status: businessStatus(row),
+      pre_archive: preArchive.get(String(row.id)) || null,
     } as AdminBusiness;
   });
 }

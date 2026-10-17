@@ -10,6 +10,7 @@ import { setTenantBillingMode } from "@/lib/adminWallets";
 import { adminErrorParts } from "@/lib/adminErrors";
 import { normalizeE164 } from "@/lib/didPool";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { loadPreArchiveBilling } from "@/lib/admin";
 
 /**
  * Server side of the Super Admin safety and lifecycle rules:
@@ -314,19 +315,66 @@ export async function archiveBusiness(businessId: string, actor: string, rawReas
 }
 
 /** Unarchive: back on the lists and the line opens. Charging stays off until someone turns it on. */
-export async function restoreBusiness(businessId: string, actor: string, rawReason: unknown) {
+/**
+ * Unarchive: back on the list, owner can sign in, line opens. Charging stays off unless the
+ * admin explicitly chose "back on as before" (resumeBilling, default false). The choice and
+ * what was turned on are recorded in the restore_business audit row.
+ */
+export async function restoreBusiness(
+  businessId: string,
+  actor: string,
+  rawReason: unknown,
+  resumeBilling = false,
+) {
   const reason = requireReason(rawReason);
   const business = await loadExisting(businessId);
   if (lifecycleOf(business).state !== "archived") throw new AdminActionBlocked("This business is not archived.");
   await updateTenant(businessId, { archived_at: null, archived_by: null }, { is_active: true });
   const billing = await resumeBillingAfterUnarchive(businessId, actor, reason);
+
+  // Pre-archive settings: from unarchive_tenant_billing, else from the archive audit row.
+  let pre: { billing: string | null; onDemand: boolean | null } | null = billing
+    ? { billing: billing.preArchiveBilling, onDemand: billing.preArchiveOnDemand }
+    : null;
+  if (!pre?.billing) {
+    const fromAudit = (await loadPreArchiveBilling([businessId])).get(businessId);
+    if (fromAudit) pre = { billing: fromAudit.billing, onDemand: fromAudit.onDemand };
+  }
+
+  const resumed = { billing: billing?.billing || business.billing_enforcement || "off", on_demand: false };
+  if (resumeBilling && pre) {
+    if (pre.billing === "soft" || pre.billing === "hard") {
+      const res = await setTenantBillingMode({
+        businessId,
+        mode: pre.billing,
+        note: `Unarchived, back on as before: ${reason}`,
+        actor,
+      });
+      resumed.billing = res.billing_enforcement;
+    }
+    if (pre.onDemand === true) {
+      const { error } = await getSupabaseAdmin().rpc("set_tenant_on_demand_usage", {
+        p_tenant_id: businessId,
+        p_enabled: true,
+      });
+      if (error) throw error;
+      resumed.on_demand = true;
+    }
+    bustTenantCache(businessId);
+  }
+
   await recordAdminAction({
     actor,
     action: "restore_business",
     businessId,
     reason,
     before: { active: false, archived_at: business.archived_at || null },
-    after: { active: true, billing: billing?.billing || business.billing_enforcement || "off" },
-    detail: billing ? { pre_archive_billing: billing.preArchiveBilling, pre_archive_on_demand: billing.preArchiveOnDemand } : undefined,
+    after: { active: true, billing: resumed.billing, on_demand: resumed.on_demand },
+    detail: {
+      resume_billing_choice: resumeBilling,
+      pre_archive_billing: pre?.billing ?? null,
+      pre_archive_on_demand: pre?.onDemand ?? null,
+    },
   });
+  return { billing: resumed.billing, onDemand: resumed.on_demand, resumeBilling };
 }

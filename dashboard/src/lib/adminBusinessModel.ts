@@ -91,3 +91,57 @@ export class AdminActionBlocked extends Error {
 export function isAdminActionBlocked(err: unknown): err is AdminActionBlocked {
   return Boolean(err && typeof err === "object" && (err as { blocked?: unknown }).blocked === true);
 }
+
+/** Charging settings a business had right before it was archived. */
+export type PreArchiveBilling = { billing: "off" | "soft" | "hard"; onDemand: boolean | null };
+
+function billingModeOf(value: unknown): PreArchiveBilling["billing"] | null {
+  const mode = String(value ?? "").trim().toLowerCase();
+  return mode === "off" || mode === "soft" || mode === "hard" ? mode : null;
+}
+
+/**
+ * Pre-archive charging from ops_audit_log rows, newest first. archive_tenant_billing
+ * (detail.before) is the full record; archive_business (detail.before.billing) is the
+ * fallback when the billing SQL is not applied. Stops at the first archive row it can read.
+ */
+export function preArchiveFromAudit(
+  rows: Array<{ action?: string | null; detail?: unknown }> | null | undefined,
+): PreArchiveBilling | null {
+  for (const row of rows || []) {
+    const detail = (row?.detail && typeof row.detail === "object" ? row.detail : {}) as {
+      before?: { billing_enforcement?: unknown; on_demand_usage_enabled?: unknown; billing?: unknown };
+    };
+    if (row?.action === "archive_tenant_billing") {
+      const billing = billingModeOf(detail.before?.billing_enforcement);
+      if (!billing) continue;
+      const od = detail.before?.on_demand_usage_enabled;
+      return { billing, onDemand: typeof od === "boolean" ? od : null };
+    }
+    if (row?.action === "archive_business") {
+      const billing = billingModeOf(detail.before?.billing);
+      if (billing) return { billing, onDemand: null };
+    }
+  }
+  return null;
+}
+
+/**
+ * The explicit unarchive choice: what "as before" would turn back on, or null when
+ * nothing was on. Default in the sheet is off; charging stays off unless chosen.
+ */
+export function resumeBillingOffer(pre: PreArchiveBilling | null | undefined): { label: string; summary: string } | null {
+  if (!pre) return null;
+  const charging = pre.billing !== "off";
+  const onDemand = pre.onDemand === true;
+  if (!charging && !onDemand) return null;
+  const label =
+    charging && onDemand
+      ? "Turn charging and on-demand back on as before?"
+      : charging
+        ? "Turn charging back on as before?"
+        : "Turn on-demand back on as before?";
+  const parts = [`charging ${charging ? "on" : "off"}`];
+  if (pre.onDemand !== null) parts.push(`on-demand ${onDemand ? "on" : "off"}`);
+  return { label, summary: `Before archive: ${parts.join(", ")}. Off keeps charging off.` };
+}

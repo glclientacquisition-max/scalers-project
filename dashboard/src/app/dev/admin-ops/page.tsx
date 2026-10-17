@@ -60,6 +60,7 @@ const BUSINESSES: AdminBusiness[] = [
     package_period: null,
     billing_enforcement: "off",
     status: "waiting",
+    pre_archive: null,
   },
   {
     id: "biz-live",
@@ -75,6 +76,7 @@ const BUSINESSES: AdminBusiness[] = [
     package_period: "month",
     billing_enforcement: "soft",
     status: "active",
+    pre_archive: null,
   },
   {
     id: "biz-suspended",
@@ -90,6 +92,7 @@ const BUSINESSES: AdminBusiness[] = [
     package_period: "month",
     billing_enforcement: "soft",
     status: "suspended",
+    pre_archive: null,
   },
   {
     id: "biz-archived",
@@ -105,6 +108,7 @@ const BUSINESSES: AdminBusiness[] = [
     package_period: null,
     billing_enforcement: "off",
     status: "archived",
+    pre_archive: null,
   },
   {
     id: "biz-archived-recent",
@@ -120,6 +124,7 @@ const BUSINESSES: AdminBusiness[] = [
     package_period: "month",
     billing_enforcement: "off",
     status: "archived",
+    pre_archive: { billing: "soft", onDemand: true },
   },
   ...Array.from({ length: 24 }, (_, index) => ({
     id: `biz-page-${index + 1}`,
@@ -135,6 +140,7 @@ const BUSINESSES: AdminBusiness[] = [
     package_period: index % 2 === 0 ? ("month" as const) : null,
     billing_enforcement: "off" as const,
     status: "active" as const,
+    pre_archive: null,
   })),
 ];
 

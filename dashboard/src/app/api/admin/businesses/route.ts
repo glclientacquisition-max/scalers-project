@@ -64,8 +64,9 @@ export async function POST(request: Request) {
     }
 
     if (action === "restore") {
-      await restoreBusiness(businessId, actor, body.reason);
-      return NextResponse.json({ ok: true });
+      // Charging comes back only on an explicit "as before" choice (default off).
+      const result = await restoreBusiness(businessId, actor, body.reason, body.resume_billing === true);
+      return NextResponse.json({ ok: true, ...result });
     }
 
     // No hard delete from Admin ("remove" and "delete_permanently" are gone).

@@ -241,3 +241,50 @@ describe("purge SQL", () => {
     assert.match(schedule, /purge_archived_tenants\(30, false\)/);
   });
 });
+
+describe("unarchive: explicit 'back on as before' choice", () => {
+  it("reads pre-archive charging from the archive audit rows", () => {
+    assert.deepEqual(
+      model.preArchiveFromAudit([
+        { action: "archive_tenant_billing", detail: { before: { billing_enforcement: "soft", on_demand_usage_enabled: true } } },
+        { action: "archive_business", detail: { before: { billing: "off" } } },
+      ]),
+      { billing: "soft", onDemand: true },
+    );
+    assert.deepEqual(model.preArchiveFromAudit([{ action: "archive_business", detail: { before: { billing: "hard" } } }]), {
+      billing: "hard",
+      onDemand: null,
+    });
+    assert.equal(model.preArchiveFromAudit([]), null);
+    assert.equal(model.preArchiveFromAudit([{ action: "archive_business", detail: {} }]), null);
+  });
+
+  it("offers only what was on, with the agreed question", () => {
+    assert.equal(model.resumeBillingOffer(null), null);
+    assert.equal(model.resumeBillingOffer({ billing: "off", onDemand: false }), null);
+    assert.equal(model.resumeBillingOffer({ billing: "soft", onDemand: true }).label, "Turn charging and on-demand back on as before?");
+    assert.equal(model.resumeBillingOffer({ billing: "hard", onDemand: false }).label, "Turn charging back on as before?");
+    assert.equal(model.resumeBillingOffer({ billing: "off", onDemand: true }).label, "Turn on-demand back on as before?");
+    assert.match(model.resumeBillingOffer({ billing: "soft", onDemand: null }).summary, /^Before archive: charging on\. Off keeps charging off\.$/);
+    for (const pre of [{ billing: "soft", onDemand: true }, { billing: "off", onDemand: true }]) {
+      const o = model.resumeBillingOffer(pre);
+      assert.doesNotMatch(`${o.label} ${o.summary}`, /\u2014/);
+    }
+  });
+
+  it("defaults off, sends the choice, and records it in the audit row", () => {
+    const panel = read(`${DASH}/components/AdminBusinessesPanel.tsx`);
+    assert.match(panel, /setReason\(""\);\n\s+setResumeBilling\(false\);/);
+    assert.match(panel, /lifecycle === "restore" \? \{ resume_billing: resumeBilling \} : \{\}/);
+    assert.match(panel, /<Switch checked=\{checked\} onCheckedChange=\{onChange\} label=\{offer\.label\} \/>/);
+    const route = read(`${DASH}/app/api/admin/businesses/route.ts`);
+    assert.match(route, /restoreBusiness\(businessId, actor, body\.reason, body\.resume_billing === true\)/);
+    const actions = read(`${DASH}/lib/adminBusinessActions.ts`);
+    const body = fnBody(actions, "restoreBusiness");
+    assert.match(body, /resumeBilling = false/);
+    assert.match(body, /if \(resumeBilling && pre\)/);
+    assert.match(body, /resume_billing_choice: resumeBilling/);
+    assert.ok(body.indexOf("resumeBillingAfterUnarchive(") < body.indexOf("setTenantBillingMode("));
+    assert.ok(body.indexOf("setTenantBillingMode(") < body.indexOf("recordAdminAction("));
+  });
+});
