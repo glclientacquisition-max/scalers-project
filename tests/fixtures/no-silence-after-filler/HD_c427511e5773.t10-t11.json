@@ -1,0 +1,22 @@
+{
+  "_doc": "Aris prod HD_c427511e5773, 17 Oct 2026 (release 41a63296; code path unchanged on 8ee9b161). t10: a callback promise with no tool, dropped as saved_claim. t11: tool-only reply; the fold branch stripped the fresh receipt, the repair budget was spent on t4, outcome speech_quiet after 'Mm-hmm.' + 'Let me check.'.",
+  "profile": { "businessName": "Aris Kenya", "vertical": "retail" },
+  "t10": {
+    "caller": "Uh, how many centimeters can I get?",
+    "model": "I don't have the exact length measurements listed for the T-square, Alvin. Let me escalate this to our team, and someone will contact you back with the details.",
+    "spoken": "I don't have the exact length measurements listed for the T-square, Alvin.",
+    "dropped": "Let me escalate this to our team, and someone will contact you back with the details.",
+    "toolResults": []
+  },
+  "t11": {
+    "caller": "Okay, thank you. I'll pass by tomorrow.",
+    "model": "###TOOL###\n{\"create_service_request\":{\"item\":\"PVC detachable T-square\",\"name\":\"Alvin Yegon\",\"notes\":\"Wants to know length in cm and plans to pass by tomorrow\",\"type\":\"enquiry\",\"when_text\":\"tomorrow\"}}\n###ENDTOOL###",
+    "fillers": ["Mm-hmm.", "Let me check."],
+    "toolResults": [
+      { "action": "create_service_request", "status": "succeeded", "reason": "", "requestType": "enquiry", "item": "PVC detachable T-square", "whenText": "tomorrow" },
+      { "action": "save_caller_info", "status": "succeeded", "reason": "enquiry — PVC detachable T-square — tomorrow" }
+    ],
+    "emptyRepairOfferedBefore": true,
+    "outcomeBefore": "speech_quiet"
+  }
+}

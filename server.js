@@ -55,6 +55,12 @@ const {
 const { buildNotifyOutcome, ownerAlreadyNotified } = require('./src/notifications/notifyOutcome');
 const { createGreetingWarmer, greetingWarmEnabled } = require('./src/speech/greetingWarm');
 const {
+  noSilenceAfterFillerEnabled,
+  gapFallbackLine,
+  planHeldClaims,
+  stripFreshReceipt,
+} = require('./src/speech/noSilenceAfterFiller');
+const {
   shouldReinvite: shouldReinviteBareGreeting,
   bareGreetingReplyLine,
   isBareGreetingOrAffirmation,
@@ -3542,6 +3548,11 @@ mediaWss.on('connection', (ws, req) => {
       .join('\n\n');
 
     let spokeThisTurn = false;
+    // VOICE_NO_SILENCE_AFTER_FILLER: saved_claim sentences the stream held
+    // until the tool results are in, and whether the tool receipt was spoken.
+    const noSilenceTurn = noSilenceAfterFillerEnabled();
+    const heldClaims = [];
+    let confirmationSpokeThisTurn = false;
     let progressAlreadySpoken = false;
     let hidInternalNarration = false;
     let speechHold = { holdSpeech: false, holdNameConfirm: false, holdVisitLookup: false };
@@ -3594,6 +3605,10 @@ mediaWss.on('connection', (ws, req) => {
       // VOICE_OWED_CONFIRM_FOLD=on folds it into the next reply as one line
       // (HD_0daf1d0fd631 / HD_9c1864aacd5f doubled acknowledgements).
       let owedReceiptForFold = '';
+      // VOICE_NO_SILENCE_AFTER_FILLER: true only when an owed receipt was
+      // actually folded this turn (an empty owedReceiptForFold also means
+      // nothing was ever owed; HD_c427511e5773 t11).
+      let owedFoldedThisTurn = false;
       if (owedConfirmFoldEnabled()) {
         owedReceiptForFold = peekToolOutcome(brainState);
       } else {
@@ -3619,6 +3634,7 @@ mediaWss.on('connection', (ws, req) => {
         takeToolOutcome(brainState);
         callBrainStates.set(callKey, brainState);
         owedReceiptForFold = '';
+        if (folded.folded) owedFoldedThisTurn = true;
         if (folded.folded) {
           console.log(`[ws/media][${callKey}] folded queued tool outcome into reply`);
         }
@@ -4127,6 +4143,11 @@ mediaWss.on('connection', (ws, req) => {
           language: callLanguage,
         });
         const polished = polishedDetail.text;
+        if (typeof noSilenceTurn !== 'undefined' && noSilenceTurn && Array.isArray(polishedDetail.droppedSentences)) {
+          for (const drop of polishedDetail.droppedSentences) {
+            if (drop.reason === 'saved_claim' && drop.sentence) heldClaims.push(drop.sentence);
+          }
+        }
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
           voiceTrace.noteTransform({
             stage: 'polish',
@@ -4597,7 +4618,14 @@ mediaWss.on('connection', (ws, req) => {
         if (owedConfirmFoldEnabled() && owedReceiptForFold) {
           const folded = consumeOwedFold([confirmation]);
           confirmation = folded.lines.join(' ').trim();
-        } else if (owedConfirmFoldEnabled() && !owedReceiptForFold) {
+        } else if (
+          stripFreshReceipt({
+            foldEnabled: owedConfirmFoldEnabled(),
+            owedReceipt: owedReceiptForFold,
+            owedFolded: owedFoldedThisTurn,
+            enabled: noSilenceTurn,
+          })
+        ) {
           // Receipt already folded into an earlier line this turn: drop a second claim.
           confirmation = stripSavedClaimAfterReceipt(confirmation);
         }
@@ -4617,6 +4645,7 @@ mediaWss.on('connection', (ws, req) => {
           if (smooth.any) stopHoldFill();
           await ((smooth.receipt && playCachedReceipt(outcomeLine)) || speakText(outcomeLine));
           spokeThisTurn = true;
+          confirmationSpokeThisTurn = true;
         }
       } else if (owedConfirmFoldEnabled() && owedReceiptForFold && !bargeInActive) {
         // No model confirmation this turn: still deliver the owed receipt once.
@@ -4646,6 +4675,30 @@ mediaWss.on('connection', (ws, req) => {
 
       if (!result?.actionConfirmation && result?.bargedActionConfirmation) {
         queueToolOutcome(callBrainStates.get(callKey), result.bargedActionConfirmation);
+      }
+
+      // VOICE_NO_SILENCE_AFTER_FILLER: claims the stream held (saved_claim
+      // before the tools ran) are judged against the tool results now. A
+      // succeeded tool: the receipt covers it, or the claim is re-guarded and
+      // spoken. No tool: an honest offer replaces the promise (HD_c427511e5773 t10).
+      if (noSilenceTurn && heldClaims.length && !bargeInActive && tts) {
+        const plan = planHeldClaims({
+          held: heldClaims,
+          toolResults: result?.toolResults || [],
+          confirmationSpoken: confirmationSpokeThisTurn,
+          language: callLanguage,
+          regard: (text) => polishSpokenReply(text, finalSpeechGuardOpts(callKey, result?.toolResults || [])),
+        });
+        if (plan.line) {
+          console.log(`[ws/media][${sidLabel()}] held claim ${plan.kind} reason=${plan.reason} lang=${callLanguage}`);
+          callTranscript.pushAgent(plan.line);
+          voiceTrace.noteCanned({ path: plan.kind === 'offer' ? 'callback_offer' : 'held_claim', text: plan.line });
+          const heldSpoken = await speakText(plan.line);
+          if (heldSpoken?.ok !== false) {
+            spokeThisTurn = true;
+            messages.push({ role: 'assistant', content: plan.line, local: true });
+          }
+        }
       }
 
       // Empty Gemini success asks them to repeat once. A 503 or a broken
@@ -4679,9 +4732,11 @@ mediaWss.on('connection', (ws, req) => {
             llmDown: false,
             alreadyOffered: emptyRepairOffered,
             toolResults: result?.toolResults,
+            toolOutcomeFirst: noSilenceTurn,
           });
           if (planned.speak && planned.line) {
-            emptyRepairOffered = true;
+            // The repair budget is for hear-again, not for a tool receipt.
+            if (!(noSilenceTurn && planned.kind === 'tool_outcome')) emptyRepairOffered = true;
             console.warn(
               `[ws/media][${sidLabel()}] turn speech repair action=${nextBestAction.action} kind=${planned.kind}`
             );
@@ -4696,6 +4751,29 @@ mediaWss.on('connection', (ws, req) => {
             );
             turnOutcome = 'speech_quiet';
           }
+        }
+      }
+
+      // VOICE_NO_SILENCE_AFTER_FILLER: a filler or hold is never the last
+      // audio of a turn. One line in the caller's language: the tool receipt,
+      // the open slot question, or a neutral continue (HD_c427511e5773 t11).
+      if (noSilenceTurn && !spokeThisTurn && !bargeInActive && tts && ackPlayedTurn === turnTiming) {
+        const gap = gapFallbackLine({
+          toolResults: result?.toolResults || [],
+          language: callLanguage,
+          slotLine: '',
+        });
+        if (gap.line) {
+          console.warn(
+            `[ws/media][${sidLabel()}] turn speech gap_fallback kind=${gap.kind} lang=${callLanguage} action=${nextBestAction.action}`
+          );
+          callTranscript.pushAgent(gap.line);
+          turnTiming.markFirstSpokenChunk();
+          if (smooth.any) stopHoldFill();
+          await speakText(gap.line, { tracePath: 'gap_fallback' });
+          spokeThisTurn = true;
+          turnOutcome = 'gap_fallback';
+          messages.push({ role: 'assistant', content: gap.line, local: true });
         }
       }
 
