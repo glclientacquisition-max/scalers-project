@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
-import { recordAdminAction } from "@/lib/adminAudit";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import {
   grantTenantPackageMinutes,
@@ -8,7 +7,8 @@ import {
   loadBillingHistory,
 } from "@/lib/adminBilling";
 import { isLegacyAuthenticated } from "@/lib/auth";
-import { assignBusinessPackage, unassignBusinessPackage } from "@/lib/packageCatalog";
+import { recordAdminAction } from "@/lib/adminAudit";
+import { assignBusinessPackage, loadBusinessPackageNames, unassignBusinessPackage } from "@/lib/packageCatalog";
 import {
   setTenantBillingMode,
   type BillingMode,
@@ -87,6 +87,7 @@ export async function POST(request: Request) {
       if (period !== "month" && period !== "year") {
         return NextResponse.json({ error: "Pick monthly or yearly." }, { status: 400 });
       }
+      const before = (await loadBusinessPackageNames().catch(() => null))?.get(businessId) ?? null;
       const change = await assignBusinessPackage({
         tenantId: businessId,
         packageId,
@@ -94,18 +95,22 @@ export async function POST(request: Request) {
         actor,
         note: note || undefined,
       });
+      const after = (await loadBusinessPackageNames().catch(() => null))?.get(businessId) ?? { packageId, period };
+      await recordAdminAction({ actor, action: "assign_package", businessId, before, after });
       return NextResponse.json({ ok: true, ...change });
     }
 
     if (action === "unassign_package") {
       const when = String(body.when || "");
       if (when !== "now" && when !== "period_end") {
-        return NextResponse.json({ error: "Choose now or end of period" }, { status: 400 });
+        return NextResponse.json({ error: "Pick now or the end of the period." }, { status: 400 });
       }
       if (note.length < 3) {
-        return NextResponse.json({ error: "Reason required (min 3 chars)" }, { status: 400 });
+        return NextResponse.json({ error: "Add a reason (3 letters or more)." }, { status: 400 });
       }
+      const before = (await loadBusinessPackageNames().catch(() => null))?.get(businessId) ?? null;
       const result = await unassignBusinessPackage({ tenantId: businessId, when, note, actor });
+      await recordAdminAction({ actor, action: "unassign_package", businessId, before, after: { when, ...result } });
       return NextResponse.json({ ok: true, ...result });
     }
 
