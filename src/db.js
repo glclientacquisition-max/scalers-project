@@ -308,11 +308,30 @@ async function inboundTenantLine({ toNumber, fromNumber } = {}) {
  * inbound directory (src/sautikit/inboundDirectory.js). Optional columns
  * fall back so an older schema still answers.
  */
+/**
+ * Explicit package state for the inbound directory, same rule as
+ * getTenantPackageUsage: 'active' subscription = package; no row or
+ * 'cancelled' = no package. package_status stays undefined (unknown, gate
+ * fails open at 0 minutes) when the subscriptions read fails.
+ */
+async function attachPackageStatus(rows) {
+  try {
+    const { data, error } = await supabase.from('tenant_subscriptions').select('tenant_id, status');
+    if (error) return;
+    const byTenant = new Map((data || []).map((r) => [r.tenant_id, r.status]));
+    for (const row of rows) {
+      if (row && row.id) row.package_status = byTenant.get(row.id) || 'none';
+    }
+  } catch {
+    // unknown: leave package_status undefined
+  }
+}
+
 async function listInboundTenantRows() {
   const selects = [
     // archived_at / line_status drive the closed-line gate (#639/#651).
     // billing_enforcement: beta (off) never rejects at the cap (#631).
-    'id, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement',
+    'id, business_name, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement',
     'id, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled',
     'id, sautikit_virtual_number, is_active, archived_at, minutes_included, seconds_used, on_demand_usage_enabled',
     'id, sautikit_virtual_number, is_active, line_status, minutes_included, seconds_used, on_demand_usage_enabled',
@@ -324,8 +343,10 @@ async function listInboundTenantRows() {
   for (const columns of selects) {
     const { data, error } = await supabase.from('tenants').select(columns);
     if (!error) {
+      const rows = data || [];
+      if (/minutes_included/.test(columns)) await attachPackageStatus(rows);
       return {
-        rows: data || [],
+        rows,
         packageColumns: /minutes_included/.test(columns),
       };
     }
@@ -355,15 +376,22 @@ async function getTenantPackageUsage(tenantId) {
   }
   if (!data) return null;
   let periodStart = null;
+  // null = unknown (lookup failed). false = explicit no package: no row or
+  // status 'cancelled'. Never treat 0 included minutes as unlimited.
+  let hasPackage = null;
   try {
     const { data: sub, error: subErr } = await supabase
       .from('tenant_subscriptions')
-      .select('current_period_start')
+      .select('current_period_start, status')
       .eq('tenant_id', tenantId)
       .maybeSingle();
-    if (!subErr) periodStart = sub?.current_period_start || null;
+    if (!subErr) {
+      periodStart = sub?.current_period_start || null;
+      hasPackage = Boolean(sub && sub.status === 'active');
+    }
   } catch {
     periodStart = null;
+    hasPackage = null;
   }
   return {
     tenantId: data.id,
@@ -373,6 +401,7 @@ async function getTenantPackageUsage(tenantId) {
     onDemand: Boolean(data.on_demand_usage_enabled),
     enforcement: data.billing_enforcement || 'off',
     periodStart,
+    hasPackage,
   };
 }
 
@@ -407,6 +436,7 @@ async function packageInboundOpen({ toNumber, fromNumber, tenantId } = {}) {
       secondsUsed: usage.secondsUsed,
       onDemand: usage.onDemand,
       enforcement: usage.enforcement,
+      hasPackage: usage.hasPackage,
     }),
     usage,
   };

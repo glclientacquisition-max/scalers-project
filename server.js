@@ -255,6 +255,7 @@ const {
 } = require('./src/notifications/platformOpsAlert');
 const { platformOpsRecipients } = require('./src/notifications/platformOpsRecipients');
 const { maybeAlertPackageUsage } = require('./src/billing/packageUsageAlerts');
+const { packageRefusalXml } = require('./src/billing/packageOverage');
 const {
   selectProductsForTurn,
   formatTargetedProductsForPrompt,
@@ -1487,8 +1488,13 @@ function packageGateRefuses(callSid, gate) {
   if (gate?.reason === 'beta_over_cap') {
     console.log(`[${callSid}] package minutes used, billing in beta — answering (metered, not charged)`);
   }
+  if (gate?.reason === 'beta_no_package') {
+    console.log(`[${callSid}] no package, billing in beta — answering (metered, not charged)`);
+  }
   if (gate && gate.open === false) {
-    console.warn(`[${callSid}] package exhausted (billing ${gate.usage?.enforcement || '?'}, on-demand off) — reject`);
+    console.warn(
+      `[${callSid}] ${gate.reason === 'no_package' ? 'no package' : 'package exhausted'} (billing ${gate.usage?.enforcement || '?'}, on-demand off) — refuse`
+    );
     return true;
   }
   return false;
@@ -1668,10 +1674,12 @@ async function handleVoiceIncoming(req, res) {
       if (directoryHit.gate && directoryHit.gate.open === false) {
         // Same decision as db.packageInboundOpen (billing_enforcement is in
         // the directory row): beta never rejects at the cap (#631).
-        console.warn(`[${callSid}] package exhausted (billing ${directoryHit.gate.enforcement || '?'}, on-demand off) — reject`);
+        console.warn(
+          `[${callSid}] ${directoryHit.gate.reason === 'no_package' ? 'no package' : 'package exhausted'} (billing ${directoryHit.gate.enforcement || '?'}, on-demand off) — refuse`
+        );
         return res
           .type('text/xml')
-          .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+          .send(packageRefusalXml({ businessName: directoryHit.businessName }));
       }
       if (directoryHit.unassigned) {
         console.warn(`[${callSid}] unassigned number — reject`);
@@ -1706,7 +1714,7 @@ async function handleVoiceIncoming(req, res) {
         if (packageGateRefuses(callSid, gate)) {
           return res
             .type('text/xml')
-            .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+            .send(packageRefusalXml({ businessName: gate.usage?.businessName }));
         }
       } catch (gateErr) {
         console.warn(
