@@ -58,6 +58,11 @@ function AppointmentStatusToggleInner({
           </button>
         );
       })}
+      {state.notice ? (
+        <p className="basis-full text-caption text-ink-2" role="status">
+          {state.notice}
+        </p>
+      ) : null}
     </form>
   );
 }

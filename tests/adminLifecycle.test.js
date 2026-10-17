@@ -158,7 +158,7 @@ describe("screens", () => {
     assert.ok(layout.indexOf("tenant?.archived") < layout.indexOf("tenantNeedsOnboarding(tenant)"));
     assert.match(layout, /<WorkspaceClosed/);
     assert.match(read(`${DASH}/app/onboarding/page.tsx`), /shell\?\.archived/);
-    assert.match(read(`${DASH}/lib/tenant.ts`), /archived: Boolean\(row\.archived_at\) \|\| row\.is_active === false/);
+    assert.match(read(`${DASH}/lib/tenant.ts`), /archived: deskLineState\(row\) === "closed"/);
   });
 });
 

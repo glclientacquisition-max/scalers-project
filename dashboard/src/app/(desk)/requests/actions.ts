@@ -13,6 +13,8 @@ import { stampScheduleWindows } from "@/lib/visitCalendar";
 export type RequestStatusState = {
   error?: string;
   ok?: boolean;
+  /** Saved, but the caller text did not go out (line paused or business closed). */
+  notice?: string;
 };
 
 export async function updateServiceRequestStatus(
@@ -48,6 +50,7 @@ export async function updateServiceRequestStatus(
     return ownerSaveFailed("request", error.message, "Could not save request.");
   }
 
+  let notice: string | undefined;
   const prefs = parseNotifyChannels(tenant.notify_channels);
   const type = String(row?.request_type || "").toLowerCase();
   if (
@@ -73,18 +76,21 @@ export async function updateServiceRequestStatus(
       body,
     });
     if (!sent.ok) console.warn("[request caller sms]", sent.reason);
+    if (sent.message) notice = sent.message;
   }
 
   revalidatePath("/requests");
   revalidatePath("/calls");
   revalidatePath("/home");
   if (row?.call_id) revalidatePath(`/calls/${row.call_id}`);
-  return { ok: true };
+  return notice ? { ok: true, notice } : { ok: true };
 }
 
 export type RequestScheduleState = {
   error?: string;
   ok?: boolean;
+  /** Saved, but the caller text did not go out (line paused or business closed). */
+  notice?: string;
 };
 
 export async function updateServiceRequestSchedule(
@@ -145,6 +151,7 @@ export async function updateServiceRequestSchedule(
   }
 
   const whenChanged = String(existing?.when_text || "").trim() !== whenText;
+  let notice: string | undefined;
   const prefs = parseNotifyChannels(tenant.notify_channels);
   const type = String(row?.request_type || "").toLowerCase();
   if (
@@ -169,11 +176,12 @@ export async function updateServiceRequestSchedule(
       body,
     });
     if (!sent.ok) console.warn("[request caller sms]", sent.reason);
+    if (sent.message) notice = sent.message;
   }
 
   revalidatePath("/requests");
   revalidatePath("/calls");
   revalidatePath("/home");
   if (row?.call_id) revalidatePath(`/calls/${row.call_id}`);
-  return { ok: true };
+  return notice ? { ok: true, notice } : { ok: true };
 }

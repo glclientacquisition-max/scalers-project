@@ -10,6 +10,7 @@ import { getVoicePublicBase } from "@/lib/sautikit";
 import { parseSummary } from "@/lib/supabase";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { outboundSendBlock } from "@/lib/tenantLine";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type PingTeammateResult = {
@@ -61,6 +62,10 @@ export async function pingTeammateAction(opts: {
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return { error: "Not signed in." };
+
+  // Paused or closed line: no ping goes out and nothing is recorded.
+  const blocked = await outboundSendBlock(workspace.client, tenant.id);
+  if (blocked) return { error: blocked.message };
 
   const { data: call, error: loadError } = await workspace.client
     .from("calls")

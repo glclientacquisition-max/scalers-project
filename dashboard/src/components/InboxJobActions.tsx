@@ -131,6 +131,11 @@ function InboxJobActionsInner({
           {err}
         </p>
       ) : null}
+      {state.notice ? (
+        <p className="text-caption text-ink-2" role="status">
+          {state.notice}
+        </p>
+      ) : null}
     </form>
   );
 }

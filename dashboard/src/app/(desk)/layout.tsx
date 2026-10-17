@@ -3,6 +3,7 @@ import { deskMemberRole } from "@/lib/requireMember";
 import { can, hiddenDeskHrefs } from "@/lib/permissions";
 import { DeskRoleProvider, ViewOnlyBanner } from "@/components/DeskRole";
 import { WorkspaceClosed } from "@/components/WorkspaceClosed";
+import { LinePausedBanner } from "@/components/LinePausedBanner";
 import { WorkspaceNotReady } from "@/components/WorkspaceNotReady";
 import { redirect } from "next/navigation";
 import { DeskAccountBar } from "@/components/DeskAccountBar";
@@ -93,6 +94,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           </Suspense>
           <DeskOffline />
           <ViewOnlyBanner />
+          {tenant?.linePaused ? <LinePausedBanner /> : null}
           <main data-desk-main="" className={deskMainClass}>
             <Suspense fallback={null}>
               <DeskPhonePull />
