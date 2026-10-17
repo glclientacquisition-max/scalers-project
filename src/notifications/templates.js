@@ -3,7 +3,8 @@
 // No em dashes or en dashes. No Want/Done/Mood card on staff SMS.
 
 const STAFF_TITLES = Object.freeze({
-  lead: 'New missed-call lead',
+  lead: 'New call lead',
+  missed_lead: 'New missed-call lead',
   escalation: 'Escalation',
   service_request: 'Request',
   appointment: 'Visit request',
@@ -31,6 +32,20 @@ function staffTitle(kind, override) {
 
 function staffAction(kind) {
   return STAFF_ACTIONS[kind] || null;
+}
+
+/** Request alert footer by request type. Holds and orders are fulfilled; the rest are callbacks. */
+function serviceRequestAction(type) {
+  const t = String(type || 'enquiry').toLowerCase();
+  if (t === 'hold' || t === 'hold_or_pickup') return 'Open Inbox Holds to mark fulfilled.';
+  if (t === 'order') return 'Open Inbox Holds to fulfil the order.';
+  return 'Open Inbox to call the customer back.';
+}
+
+/** A real missed call: the line did not answer (same rule as the missed-call text back). */
+function isMissedCall(call) {
+  const status = String(call?.status || '').toLowerCase();
+  return status === 'failed' || status === 'no_answer';
 }
 
 function serviceRequestTitle(type) {
@@ -249,6 +264,8 @@ function escalationBody({
 }
 
 module.exports = {
+  serviceRequestAction,
+  isMissedCall,
   STAFF_ACTIONS,
   STAFF_TITLES,
   appointmentTitle,

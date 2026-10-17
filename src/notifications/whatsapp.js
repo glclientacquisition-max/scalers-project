@@ -46,12 +46,14 @@ function senderFields() {
   throw new Error('Set SAUTIKIT_WHATSAPP_NUMBER_ID or SAUTIKIT_WHATSAPP_CONNECTION_ID');
 }
 
-function buildLeadText({ businessName, name, reason, callerNumber, recordingUrl }) {
+function buildLeadText({ businessName, name, reason, callerNumber, recordingUrl, missed = false }) {
+  // 'missed' only for a real missed call (templates.isMissedCall); an answered call is a call lead.
+  const title = missed ? 'New missed-call lead' : 'New call lead';
   const lines = [
-    `New missed-call lead${businessName ? `. ${businessName}` : ''}`,
+    `${title}${businessName ? `. ${businessName}` : ''}`,
     `Name: ${name || 'Caller'}`,
     `Phone: ${callerNumber || '.'}`,
-    `Reason: ${reason || 'Missed call'}`,
+    `Reason: ${reason || (missed ? 'Missed call' : 'Not given')}`,
   ];
   if (recordingUrl) lines.push(`Recording: ${recordingUrl}`);
   return lines.join('\n');

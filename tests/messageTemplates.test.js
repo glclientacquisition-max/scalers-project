@@ -49,7 +49,7 @@ describe('Scalers message catalog', () => {
     assert.equal(
       text,
       [
-        'New missed-call lead. Done and Dusted Cleaning Services',
+        'New call lead. Done and Dusted Cleaning Services',
         'Name: Alvin',
         'Phone: +254790381872',
         'Reason: Alvin called to ask about roof cleaning services.',

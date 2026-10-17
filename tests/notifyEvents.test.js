@@ -24,7 +24,7 @@ describe('notify events', () => {
     assert.equal(
       text,
       [
-        'New missed-call lead. Done and Dusted Cleaning Services',
+        'New call lead. Done and Dusted Cleaning Services',
         'Name: Jane',
         'Phone: +254790381872',
         'Reason: Book carpet cleaning',
@@ -33,7 +33,7 @@ describe('notify events', () => {
     );
     assert.equal(
       renderEventSubject(event),
-      'New missed-call lead. Done and Dusted Cleaning Services'
+      'New call lead. Done and Dusted Cleaning Services'
     );
   });
 
@@ -143,7 +143,7 @@ describe('notify events', () => {
       'Done and Dusted Cleaning Services'
     );
     const text = renderEventText(event);
-    assert.match(text, /New missed-call lead\. Done and Dusted Cleaning Services/);
+    assert.match(text, /New call lead\. Done and Dusted Cleaning Services/);
     assert.match(text, /Intent: book_visit/);
     assert.doesNotMatch(text, /Summary:/);
     assert.doesNotMatch(text, /Want:/);
