@@ -66,7 +66,7 @@ describe('greeting streams one push per sentence', () => {
     assert.doesNotMatch(greet, /session\.pushText\(prepared\.text\)/);
     assert.doesNotMatch(greet, /session\.pushText\(text\)/);
     assert.match(iife, /playCachedFillerPcm\(found\.pcm/);
-    assert.match(iife, /speakGreetingSentences\(greetingLine,/);
+    assert.match(iife, /speakGreetingSentences\(spokenGreeting,/);
     assert.match(iife, /greetingCacheKey:\s*found\.key/);
     assert.match(iife, /speakGreetingSentences\(fallback\)/);
     const fallbackAt = iife.indexOf('const fallback = buildGreeting');

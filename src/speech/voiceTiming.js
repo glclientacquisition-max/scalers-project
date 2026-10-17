@@ -127,14 +127,17 @@ function persistableLatencyMs(summary = {}) {
 /**
  * Structured media-call transcript so appendTranscript can write latency_ms.
  */
-function createCallTranscript() {
-  /** @type {{ speaker: string, text: string, latencyMs: number|null }[]} */
+function createCallTranscript(opts = {}) {
+  const now = typeof opts.now === 'function' ? opts.now : () => Date.now();
+  /** @type {{ speaker: string, text: string, latencyMs: number|null, at: string }[]} */
   const rows = [];
 
+  // `at` is when the turn was heard / spoken, so transcript rows are not all
+  // stamped with the flush time (HD_b82fbfef7649).
   function push(speaker, text) {
     const clean = String(text || '').trim();
     if (!clean) return null;
-    const row = { speaker, text: clean, latencyMs: null };
+    const row = { speaker, text: clean, latencyMs: null, at: new Date(now()).toISOString() };
     rows.push(row);
     return row;
   }
