@@ -19,7 +19,7 @@ const FLAGS = {
 }[args.flags || 'v2'];
 if (!FLAGS) { console.error(`unknown --flags ${args.flags} (supported: v2)`); process.exit(2); }
 const NOW = new Date('2026-10-14T05:00:00Z'); // Wed 08:00 EAT
-const tenants = { done_and_dusted: require('../fixtures/tenants/done_and_dusted.json'), retail_shop: require('../fixtures/tenants/retail_shop.json') };
+const tenants = { done_and_dusted: require('../fixtures/tenants/done_and_dusted.json'), retail_shop: require('../fixtures/tenants/retail_shop.json'), synthetic_cleaner: require('../fixtures/tenants/synthetic_cleaner.json') };
 const list = args.only ? cases.filter((c) => new RegExp(args.only).test(c.id)) : cases;
 const quiet = async (fn) => { const l = console.log, w = console.warn; console.log = () => {}; console.warn = () => {}; try { return await fn(); } finally { console.log = l; console.warn = w; } };
 
@@ -35,7 +35,7 @@ const quiet = async (fn) => { const l = console.log, w = console.warn; console.l
           const profile = tenants[c.tenant];
           let run;
           try {
-            run = await quiet(() => runCall({ root: ROOT, scenarioId: c.id, modelSeed: seed, profile, seed: c.seed || {}, model: createModel({ scenarioId: c.id, seed }), caller: createPersona(c, seed), now: NOW, businessName: profile.businessName, agentName: profile.agentName || 'Shy' }));
+            run = await quiet(() => runCall({ root: ROOT, scenarioId: c.id, modelSeed: seed, profile, seed: c.seed || {}, model: createModel({ scenarioId: c.id, seed }), caller: createPersona(c, seed), now: NOW, businessName: profile.businessName, agentName: profile.agentName || 'Shy', callLanguage: c.callLanguage || null }));
           } catch (e) { fails.push(`seed${seed} harness_error ${e.message}`); continue; }
           const own = [...(c.check ? c.check(run) : []), ...cases.lint(run), ...cases.writeNeedsReadback(run)];
           if (c.expect) { const s = scoreRun(c, run); if (!s.pass) own.push(...s.fails); }
