@@ -8,6 +8,19 @@ const {
 } = require('../src/conversation/callResolution');
 const { createBrainState, recordActionResults } = require('../src/conversation/brainState');
 
+/** Run fn with BRAIN_CALL_FIXES_D199 set to value (null = unset). */
+function withD199(value, fn) {
+  const prev = process.env.BRAIN_CALL_FIXES_D199;
+  if (value == null) delete process.env.BRAIN_CALL_FIXES_D199;
+  else process.env.BRAIN_CALL_FIXES_D199 = value;
+  try {
+    return fn();
+  } finally {
+    if (prev == null) delete process.env.BRAIN_CALL_FIXES_D199;
+    else process.env.BRAIN_CALL_FIXES_D199 = prev;
+  }
+}
+
 describe('deriveCallResolution', () => {
   it('marks succeeded holds as resolved', () => {
     let state = createBrainState();
@@ -165,14 +178,20 @@ describe('deriveCallResolution', () => {
     assert.equal(out.primaryIntent, 'hold_or_pickup');
   });
 
-  it('locks persist intent at human when escalate saved after a FAQ', () => {
-    const out = deriveCallResolution({
-      brainState: { ...createBrainState(), intent: 'hours' },
-      toolResults: [{ action: 'escalate', status: 'succeeded' }],
-    });
-    assert.equal(out.resolution, 'needs_human');
-    assert.equal(out.primaryIntent, 'human');
-  });
+  // 17 Oct audit (#732): flag off keeps the old 'human' label; BRAIN_CALL_FIXES_D199=on
+  // keeps the caller's ask.
+  for (const flag of [null, 'on']) {
+    it(`locks persist intent at human when escalate saved after a FAQ (BRAIN_CALL_FIXES_D199=${flag || 'off'})`, () =>
+      withD199(flag, () => {
+        const on = flag === 'on';
+        const out = deriveCallResolution({
+          brainState: { ...createBrainState(), intent: 'hours' },
+          toolResults: [{ action: 'escalate', status: 'succeeded' }],
+        });
+        assert.equal(out.resolution, 'needs_human');
+        assert.equal(out.primaryIntent, on ? 'hours_open' : 'human');
+      }));
+  }
 
   it('keeps the exact requested-visit note after a later END turn wipes lastResults', () => {
     let state = createBrainState();
