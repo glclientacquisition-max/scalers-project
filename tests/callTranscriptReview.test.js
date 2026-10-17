@@ -17,6 +17,19 @@ const {
 } = require('../src/conversation/callTranscriptReview');
 const { createBrainState, recordActionResults } = require('../src/conversation/brainState');
 
+/** Run fn with BRAIN_CALL_FIXES_D199 set to value (null = unset). */
+function withD199(value, fn) {
+  const prev = process.env.BRAIN_CALL_FIXES_D199;
+  if (value == null) delete process.env.BRAIN_CALL_FIXES_D199;
+  else process.env.BRAIN_CALL_FIXES_D199 = value;
+  try {
+    return fn();
+  } finally {
+    if (prev == null) delete process.env.BRAIN_CALL_FIXES_D199;
+    else process.env.BRAIN_CALL_FIXES_D199 = prev;
+  }
+}
+
 afterEach(() => {
   resetTranscriptReviewScheduleForTests();
   delete process.env.POST_CALL_GEMINI_REVIEW;
@@ -156,25 +169,31 @@ describe('mergeTranscriptReview', () => {
     assert.equal(merged.primaryIntent, 'hold_or_pickup');
   });
 
-  it('never downgrades a successful escalate', () => {
-    const merged = mergeTranscriptReview({
-      derived: { primaryIntent: 'human', resolution: 'needs_human' },
-      summary: { reason: 'Amina needs you to return the call.' },
-      toolFlags: escalateFlags,
-      review: {
-        reason: 'Hours question was answered.',
-        primary_intent: 'hours_open',
-        needs_human: false,
-        needs_owner: false,
-        confidence: 0.99,
-      },
-    });
-    assert.equal(merged.primaryIntent, 'human');
-    assert.equal(merged.resolution, 'needs_human');
-    assert.equal(merged.applied.intent, false);
-    assert.equal(merged.applied.resolution, false);
-    assert.match(merged.reason, /Amina needs you/);
-  });
+  // 17 Oct audit (#732): flag off keeps the old 'human' label; BRAIN_CALL_FIXES_D199=on
+  // keeps the caller's ask.
+  for (const flag of [null, 'on']) {
+    it(`never downgrades a successful escalate (BRAIN_CALL_FIXES_D199=${flag || 'off'})`, () =>
+      withD199(flag, () => {
+        const on = flag === 'on';
+        const merged = mergeTranscriptReview({
+          derived: { primaryIntent: 'human', resolution: 'needs_human' },
+          summary: { reason: 'Amina needs you to return the call.' },
+          toolFlags: escalateFlags,
+          review: {
+            reason: 'Hours question was answered.',
+            primary_intent: 'hours_open',
+            needs_human: false,
+            needs_owner: false,
+            confidence: 0.99,
+          },
+        });
+        assert.equal(merged.primaryIntent, on ? 'hours_open' : 'human');
+        assert.equal(merged.resolution, 'needs_human');
+        assert.equal(merged.applied.intent, on);
+        assert.equal(merged.applied.resolution, false);
+        assert.match(merged.reason, /Amina needs you/);
+      }));
+  }
 
   it('never overrides a saved hold with needs_human', () => {
     const merged = mergeTranscriptReview({
@@ -263,34 +282,40 @@ describe('mergeTranscriptReview', () => {
     assert.doesNotMatch(`${merged.done} ${merged.next} ${merged.reason}`, /Visit not booked|confirm on desk/i);
   });
 
-  it('asks them back when the visit update failed', () => {
-    const merged = mergeTranscriptReview({
-      derived: { primaryIntent: 'cancel', resolution: 'needs_human' },
-      summary: { reason: 'Caller wanted to move the visit.' },
-      toolFlags: {
-        holdSaved: false,
-        visitSaved: false,
-        callbackSaved: false,
-        updateFailed: true,
-        callerName: 'Amina',
-        service: 'carpet cleaning',
-        place: 'Runda',
-        when: '',
-        intent: 'cancellation',
-      },
-      review: {
-        want: 'Move the visit.',
-        done: 'None.',
-        next: 'None.',
-        mood: 'neutral',
-        reason: 'Move the visit.',
-        confidence: 0.9,
-      },
-    });
-    assert.equal(merged.next, 'Call them back.');
-    assert.equal(merged.resolution, 'needs_human');
-    assert.equal(merged.primaryIntent, 'human');
-  });
+  // 17 Oct audit (#732): flag off keeps the old 'human' label; BRAIN_CALL_FIXES_D199=on
+  // keeps the caller's ask.
+  for (const flag of [null, 'on']) {
+    it(`asks them back when the visit update failed (BRAIN_CALL_FIXES_D199=${flag || 'off'})`, () =>
+      withD199(flag, () => {
+        const on = flag === 'on';
+        const merged = mergeTranscriptReview({
+          derived: { primaryIntent: 'cancel', resolution: 'needs_human' },
+          summary: { reason: 'Caller wanted to move the visit.' },
+          toolFlags: {
+            holdSaved: false,
+            visitSaved: false,
+            callbackSaved: false,
+            updateFailed: true,
+            callerName: 'Amina',
+            service: 'carpet cleaning',
+            place: 'Runda',
+            when: '',
+            intent: 'cancellation',
+          },
+          review: {
+            want: 'Move the visit.',
+            done: 'None.',
+            next: 'None.',
+            mood: 'neutral',
+            reason: 'Move the visit.',
+            confidence: 0.9,
+          },
+        });
+        assert.equal(merged.next, 'Call them back.');
+        assert.equal(merged.resolution, 'needs_human');
+        assert.equal(merged.primaryIntent, on ? 'cancel' : 'human');
+      }));
+  }
 
   it('does not say a visit was saved when no row succeeded', () => {
     const merged = mergeTranscriptReview({
@@ -319,43 +344,49 @@ describe('mergeTranscriptReview', () => {
     assert.doesNotMatch(merged.reason, /visit request saved/i);
   });
 
-  it('states the last place and time for a talked visit with nothing saved', () => {
-    const merged = mergeTranscriptReview({
-      derived: { primaryIntent: 'book_visit', resolution: 'unresolved' },
-      summary: { reason: 'Caller asked for carpet cleaning.' },
-      toolFlags: {
-        holdSaved: false,
-        visitSaved: false,
-        callbackSaved: false,
-        visitRequested: false,
-        visitAsk: true,
-        service: 'carpet cleaning',
-        place: 'Runda',
-        when: 'morning',
-        callerName: '',
-        refusedWhen: ['7:00 AM'],
-        refusedPlaces: ['Rongai'],
-      },
-      review: {
-        reason: 'Callback was noted for carpet cleaning in Rongai at 7:00 AM.',
-        want: 'They want carpet cleaning in Rongai at 7:00 AM. Callback was noted.',
-        done: 'Callback was noted.',
-        next: 'Callback noted.',
-        mood: 'calm',
-        primary_intent: 'book_visit',
-        needs_human: false,
-        confidence: 0.4,
-      },
-    });
-    assert.equal(merged.resolution, 'needs_human');
-    assert.equal(merged.primaryIntent, 'human');
-    assert.equal(merged.want, 'Carpet cleaning in Runda in the morning. No name.');
-    assert.equal(merged.done, 'None.');
-    assert.equal(merged.next, 'Call them back.');
-    assert.doesNotMatch(merged.want, /7:00|Rongai|callback was noted/i);
-    assert.doesNotMatch(merged.reason, /callback was noted/i);
-    assert.doesNotMatch(merged.done, /callback/i);
-  });
+  // 17 Oct audit (#732): flag off keeps the old 'human' label; BRAIN_CALL_FIXES_D199=on
+  // keeps the caller's ask.
+  for (const flag of [null, 'on']) {
+    it(`states the last place and time for a talked visit with nothing saved (BRAIN_CALL_FIXES_D199=${flag || 'off'})`, () =>
+      withD199(flag, () => {
+        const on = flag === 'on';
+        const merged = mergeTranscriptReview({
+          derived: { primaryIntent: 'book_visit', resolution: 'unresolved' },
+          summary: { reason: 'Caller asked for carpet cleaning.' },
+          toolFlags: {
+            holdSaved: false,
+            visitSaved: false,
+            callbackSaved: false,
+            visitRequested: false,
+            visitAsk: true,
+            service: 'carpet cleaning',
+            place: 'Runda',
+            when: 'morning',
+            callerName: '',
+            refusedWhen: ['7:00 AM'],
+            refusedPlaces: ['Rongai'],
+          },
+          review: {
+            reason: 'Callback was noted for carpet cleaning in Rongai at 7:00 AM.',
+            want: 'They want carpet cleaning in Rongai at 7:00 AM. Callback was noted.',
+            done: 'Callback was noted.',
+            next: 'Callback noted.',
+            mood: 'calm',
+            primary_intent: 'book_visit',
+            needs_human: false,
+            confidence: 0.4,
+          },
+        });
+        assert.equal(merged.resolution, 'needs_human');
+        assert.equal(merged.primaryIntent, on ? 'book_visit' : 'human');
+        assert.equal(merged.want, 'Carpet cleaning in Runda in the morning. No name.');
+        assert.equal(merged.done, 'None.');
+        assert.equal(merged.next, 'Call them back.');
+        assert.doesNotMatch(merged.want, /7:00|Rongai|callback was noted/i);
+        assert.doesNotMatch(merged.reason, /callback was noted/i);
+        assert.doesNotMatch(merged.done, /callback/i);
+      }));
+  }
 
   it('keeps a callback sentence only when a callback row exists', () => {
     const merged = mergeTranscriptReview({
