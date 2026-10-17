@@ -1,0 +1,49 @@
+# Candidate PR guard. staging/candidate-* branches are built by Platform and
+# Voice with fast-forward pushes, and Railway staging can follow one of them,
+# so a PR merged into a candidate silently changes staging.
+# This closes any PR whose base is staging/candidate-* and fails with a clear
+# message. Open the PR against main instead.
+# Both triggers are used: pull_request runs when the PR head carries this file
+# (branches cut from main), pull_request_target runs when the candidate base
+# carries it. Neither checks out or runs PR code.
+# Limit: this cannot stop a direct git push to a candidate branch. Ruleset
+# "staging-candidates" blocks force-push and deletion on those branches.
+name: Candidate PR guard
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+    branches: ["staging/candidate-**"]
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+    branches: ["staging/candidate-**"]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: candidate-pr-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  candidate-pr-guard:
+    name: candidate-pr-guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close PR into a staging candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          msg="Open PRs against main; candidates are built by Platform/Voice. PRs into ${BASE} are closed automatically because Railway staging can follow that branch."
+          echo "::error::${msg}"
+          state=$(gh pr view "$PR" -R "$REPO" --json state --jq .state)
+          if [ "$state" = "OPEN" ]; then
+            gh pr close "$PR" -R "$REPO" --comment "$msg" || echo "::warning::could not close PR ${PR}"
+          fi
+          exit 1
