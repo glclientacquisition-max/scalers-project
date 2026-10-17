@@ -35,6 +35,8 @@
 --      authenticated and drop the legacy fallback in code.
 -- Run after: notify_send_ledger.sql, sms_allowance.sql, package_catalog.sql
 -- (tenant_subscriptions). ASCII-only. Re-runnable.
+-- The purge branch of notify_sends_deny_mutation reads tenants.archived_at
+-- (admin_business_archive.sql; present on prod and staging).
 
 begin;
 
@@ -103,12 +105,31 @@ create policy notify_sends_insert_caller_member
 -- ---------------------------------------------------------------------------
 -- 2. Append-only stays, except a settle/re-arm inside the RPCs below.
 --    Identity columns never change; a `sent` row is final.
+--    Second exception: purge_archived_tenants (#737) may blank body, recipient
+--    and call_id (FK on delete set null) for an archived business only, while
+--    scalers.notify_purge = '1'. Keep this function identical in
+--    purge_archived_tenants.sql so apply order does not matter.
 -- ---------------------------------------------------------------------------
 create or replace function public.notify_sends_deny_mutation()
 returns trigger
 language plpgsql
 as $$
 begin
+  if tg_op = 'UPDATE' and current_setting('scalers.notify_purge', true) = '1' then
+    if (to_jsonb(new) - array['body', 'recipient', 'call_id'])
+         is distinct from (to_jsonb(old) - array['body', 'recipient', 'call_id'])
+      or (new.body is not null and new.body is distinct from old.body)
+      or (new.recipient is not null and new.recipient is distinct from old.recipient)
+      or (new.call_id is not null and new.call_id is distinct from old.call_id)
+    then
+      raise exception 'notify_sends: a purge may only blank body, recipient and call_id';
+    end if;
+    if not exists (select 1 from public.tenants t
+                   where t.id = old.tenant_id and t.archived_at is not null) then
+      raise exception 'notify_sends: purge only touches archived businesses';
+    end if;
+    return new;
+  end if;
   if tg_op = 'UPDATE' and current_setting('scalers.notify_settle', true) = '1' then
     if new.id is distinct from old.id
       or new.tenant_id is distinct from old.tenant_id
