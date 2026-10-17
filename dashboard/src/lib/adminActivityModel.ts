@@ -14,8 +14,11 @@ export type ActivityRow = {
 };
 
 const ACTIONS: Record<string, string> = {
+  suspend_business: "Suspended line",
+  unsuspend_business: "Restored line",
   archive_business: "Archived business",
-  restore_business: "Restored business",
+  restore_business: "Unarchived business",
+  purge_business: "Purged archived data",
   delete_business: "Deleted business for good",
   release_number: "Released number",
   assign_number: "Assigned number",

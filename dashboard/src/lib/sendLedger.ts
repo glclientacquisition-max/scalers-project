@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendDeskCallerSms } from "@/lib/callerSms";
+import { outboundSendBlock } from "@/lib/tenantLine";
 
 export type CallerLedgerKind =
   | "caller_appointment_confirmed"
@@ -150,7 +151,10 @@ export async function sendRecordedDeskCallerSms(opts: {
   kind: CallerLedgerKind | string;
   to: string;
   body: string;
-}): Promise<{ ok: boolean; reason?: string; overage?: boolean }> {
+}): Promise<{ ok: boolean; reason?: string; overage?: boolean; message?: string }> {
+  // Paused or closed line: nothing goes out, nothing is recorded or charged.
+  const blocked = await outboundSendBlock(opts.client, opts.tenantId);
+  if (blocked) return { ok: false, reason: blocked.reason, message: blocked.message };
   const prior = await deskLedgerLookup(opts.client, opts);
   if (prior === "sent") {
     return { ok: false, reason: "instance_already_sent" };

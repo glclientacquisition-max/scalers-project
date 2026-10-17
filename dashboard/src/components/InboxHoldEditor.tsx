@@ -43,6 +43,11 @@ function InboxHoldEditorInner({
           {pending ? "Saving" : "Save"}
         </Button>
         {state.error ? <p className="text-body text-warn">Could not save.</p> : null}
+        {state.notice ? (
+          <p className="text-body text-ink-2" role="status">
+            {state.notice}
+          </p>
+        ) : null}
       </form>
     </div>
   );

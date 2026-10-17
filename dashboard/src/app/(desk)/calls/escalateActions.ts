@@ -10,6 +10,8 @@ import { getVoicePublicBase } from "@/lib/sautikit";
 import { parseSummary } from "@/lib/supabase";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { outboundSendBlock } from "@/lib/tenantLine";
+import { escalateRefusalMessage, pingBlockMessage } from "@/lib/tenantLineState";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type PingTeammateResult = {
@@ -61,6 +63,10 @@ export async function pingTeammateAction(opts: {
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return { error: "Not signed in." };
+
+  // Paused or closed line: no ping goes out and nothing is recorded.
+  const blocked = await outboundSendBlock(workspace.client, tenant.id);
+  if (blocked) return { error: pingBlockMessage(blocked) };
 
   const { data: call, error: loadError } = await workspace.client
     .from("calls")
@@ -116,6 +122,10 @@ export async function pingTeammateAction(opts: {
       | { ok?: boolean; reason?: string; escalation_notify?: Record<string, unknown> }
       | null;
     revalidatePath(`/calls/${callId}`);
+
+    // Voice refused because the line is paused or the business is closed (409). Not a retry.
+    const refused = escalateRefusalMessage(json);
+    if (refused) return { error: refused };
 
     if (String(json?.reason || "") === "instance_already_sent") {
       return { ok: true, line: "Already pinged this ticket." };
