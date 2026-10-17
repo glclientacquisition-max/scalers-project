@@ -220,7 +220,8 @@ describe('4. STT finals keep their word boundary', () => {
   it('server.js uses the helper at every join and final push', () => {
     assert.doesNotMatch(SERVER, /utteranceParts\.join\(''\)/);
     assert.equal((SERVER.match(/joinUtteranceParts\(utteranceParts\)/g) || []).length, 2);
-    assert.equal((SERVER.match(/appendFinalPart\(utteranceParts, evt\.text\)/g) || []).length, 2);
+    // 3: the two STT final pushes plus the bare-greeting route (VOICE_BARE_GREETING_REPLY).
+    assert.equal((SERVER.match(/appendFinalPart\(utteranceParts, evt\.text\)/g) || []).length, 3);
   });
 });
 
