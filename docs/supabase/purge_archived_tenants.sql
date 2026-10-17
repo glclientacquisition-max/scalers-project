@@ -31,12 +31,81 @@
 -- whose recordings are still there, so call rows are never deleted ahead of
 -- their audio.
 --
+-- Usage billing after a purge (ops-billing audit, 17 Oct 2026):
+--   Nothing that bills reads old calls. Minutes bill from tenants.seconds_used /
+--   minutes_included (counters on the kept tenant row) and wallet_ledger;
+--   SMS bills from notify_sends (notify_sms_billable, PR #647); grants and
+--   subscriptions are kept; tenant_billing_state (PR #650) reads none of calls.
+--   consume_call_seconds / charge_call_to_wallet look up one live call by id, so
+--   a late retry for a purged call fails with "call not found" and charges nothing.
+--   Calls are the only per-month minute history, so before deleting them the
+--   purge writes a per-month summary (calls, duration_seconds,
+--   package_seconds_applied) and the tenant's counters into its audit row.
+--
+-- notify_sends is append-only (notify_sends_deny_mutation). Deleting calls sets
+-- notify_sends.call_id to null (FK on delete set null) and the purge blanks body
+-- and recipient; both are UPDATEs the trigger used to refuse, so every business
+-- with any notify_sends row failed with 'error'. The trigger below allows exactly
+-- that (body, recipient, call_id to null; nothing else; archived businesses only)
+-- while scalers.notify_purge = '1', which only this function sets.
+--
 -- Every real purge writes one ops_audit_log row per business (actor 'purge').
 -- Missing tables or columns are skipped, so this runs on prod and staging.
 -- Never touches a business that is not archived.
 --
 -- Apply: staging only for now. Prod needs Alvin's GO. Schedule lives in
 -- purge_archived_tenants_schedule.sql and is not applied anywhere.
+
+-- ---------------------------------------------------------------------------
+-- notify_sends stays append-only. Two narrow exceptions:
+--   scalers.notify_settle = '1'  settle / re-arm inside the PR #647 RPCs
+--                                (same text as notify_send_reserve_settle.sql);
+--   scalers.notify_purge  = '1'  purge_archived_tenants: body, recipient and
+--                                call_id may become null, nothing else, and only
+--                                for an archived business.
+-- Keep this function identical in notify_send_reserve_settle.sql (#647).
+-- ---------------------------------------------------------------------------
+create or replace function public.notify_sends_deny_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'UPDATE' and current_setting('scalers.notify_purge', true) = '1' then
+    if (to_jsonb(new) - array['body', 'recipient', 'call_id'])
+         is distinct from (to_jsonb(old) - array['body', 'recipient', 'call_id'])
+      or (new.body is not null and new.body is distinct from old.body)
+      or (new.recipient is not null and new.recipient is distinct from old.recipient)
+      or (new.call_id is not null and new.call_id is distinct from old.call_id)
+    then
+      raise exception 'notify_sends: a purge may only blank body, recipient and call_id';
+    end if;
+    if not exists (select 1 from public.tenants t
+                   where t.id = old.tenant_id and t.archived_at is not null) then
+      raise exception 'notify_sends: purge only touches archived businesses';
+    end if;
+    return new;
+  end if;
+  if tg_op = 'UPDATE' and current_setting('scalers.notify_settle', true) = '1' then
+    if new.id is distinct from old.id
+      or new.tenant_id is distinct from old.tenant_id
+      or new.idempotency_key is distinct from old.idempotency_key
+      or new.kind is distinct from old.kind
+      or new.created_at is distinct from old.created_at
+      or new.audience is distinct from old.audience
+      or new.billed_to is distinct from old.billed_to
+      or new.call_id is distinct from old.call_id
+      or new.call_sid is distinct from old.call_sid
+    then
+      raise exception 'notify_sends: identity columns are immutable';
+    end if;
+    if old.status = 'sent' then
+      raise exception 'notify_sends: sent rows are final';
+    end if;
+    return new;
+  end if;
+  raise exception 'notify_sends is append-only';
+end;
+$$;
 
 create or replace function public.archived_tenant_recording_objects(
   p_days integer,
@@ -93,6 +162,8 @@ declare
   v_sets text[];
   v_default text;
   v_nullable text;
+  v_usage jsonb;
+  v_counters jsonb;
   -- Child tables deleted by tenant_id, children of calls/contacts first.
   c_delete constant text[] := array[
     'call_facts', 'voice_turn_traces', 'caller_files', 'appointments',
@@ -157,6 +228,40 @@ begin
       if not p_dry_run and v_rec > 0 then
         continue;
       end if;
+
+      -- Real run: let the notify_sends trigger accept the call_id / text blanking.
+      perform set_config('scalers.notify_purge', case when p_dry_run then '0' else '1' end, true);
+
+      -- Usage history: calls are the only per-month minute record. Summarise them
+      -- into the audit row before they go. Billing itself never reads calls.
+      v_usage := '{}'::jsonb;
+      if to_regclass('public.calls') is not null then
+        execute format(
+          'select coalesce(jsonb_object_agg(m, jsonb_build_object(''calls'', n, ''duration_seconds'', d, ''package_seconds_applied'', ps)), ''{}''::jsonb)
+             from (select to_char(c.created_at at time zone ''Africa/Nairobi'', ''YYYY-MM'') as m,
+                          count(*) as n,
+                          coalesce(sum(c.duration_seconds), 0) as d,
+                          %s as ps
+                     from public.calls c where c.tenant_id = $1 group by 1) x',
+          case when exists (select 1 from information_schema.columns
+                            where table_schema = 'public' and table_name = 'calls'
+                              and column_name = 'package_seconds_applied')
+               then 'coalesce(sum(c.package_seconds_applied), 0)' else 'null::bigint' end)
+          into v_usage using v_t.id;
+        item := 'calls usage by month (kept in audit log)';
+        n_rows := (select count(*) from jsonb_object_keys(v_usage));
+        action := 'keep';
+        return next;
+      end if;
+      select jsonb_strip_nulls(jsonb_build_object(
+               'seconds_used', x->'seconds_used',
+               'minutes_included', x->'minutes_included',
+               'sms_used_units', x->'sms_used_units',
+               'sms_included_units', x->'sms_included_units',
+               'billing_enforcement', x->'billing_enforcement',
+               'on_demand_usage_enabled', x->'on_demand_usage_enabled'))
+        into v_counters
+      from (select to_jsonb(t) as x from public.tenants t where t.id = v_t.id) q;
 
       -- Transcripts go with calls (FK cascade); count them for the report.
       if to_regclass('public.transcripts') is not null and to_regclass('public.calls') is not null then
@@ -244,9 +349,12 @@ begin
       if not p_dry_run then
         insert into public.ops_audit_log (actor, action, tenant_id, detail)
         values ('purge', 'purge_business', v_t.id,
-                jsonb_build_object('archived_at', v_t.archived_at, 'days', p_days, 'deleted', v_summary));
+                jsonb_build_object('archived_at', v_t.archived_at, 'days', p_days, 'deleted', v_summary,
+                           'usage_by_month', v_usage, 'counters', v_counters));
       end if;
+      perform set_config('scalers.notify_purge', '0', true);
     exception when others then
+      perform set_config('scalers.notify_purge', '0', true);
       tenant_id := v_t.id; business_name := v_t.business_name; archived_at := v_t.archived_at;
       item := left(sqlerrm, 200); n_rows := 0; action := 'error';
       return next;

@@ -50,7 +50,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | --- | --- |
 | `data_quality_daily` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 
-## Functions (82)
+## Functions (85)
 
 | Function | Defined in |
 | --- | --- |
@@ -76,6 +76,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `adjust_tenant_wallet` | `docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_metering.sql`<br>`docs/supabase/wallet_security_beta.sql` |
 | `admin_set_business_suspended` | `docs/supabase/admin_business_suspend.sql` |
 | `apply_line_rental` | `docs/supabase/line_rental_grace.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_security_beta.sql` |
+| `archive_tenant_billing` | `docs/supabase/archive_tenant_billing.sql` |
 | `archived_tenant_recording_objects` | `docs/supabase/purge_archived_tenants.sql` |
 | `assign_did_from_pool` | `docs/supabase/did_number_pool.sql` |
 | `assign_specific_did_to_tenant` | `docs/supabase/did_number_pool.sql` |
@@ -103,7 +104,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `ke_mobile_valid` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `member_can_admin` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `member_can_write` | `supabase/migrations/20261011000000_team_invites.sql` |
-| `notify_sends_deny_mutation` | `docs/supabase/notify_send_ledger.sql` |
+| `notify_sends_deny_mutation` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/purge_archived_tenants.sql` |
 | `parse_payments_text` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `parse_price_ksh` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `payments_to_v2` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
@@ -112,7 +113,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `policy_rules_valid` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `purge_archived_tenants` | `docs/supabase/purge_archived_tenants.sql` |
 | `purge_voice_turn_traces` | `docs/supabase/voice_turn_traces.sql` |
-| `refresh_line_status` | `docs/supabase/line_rental_grace.sql` |
+| `refresh_line_status` | `docs/supabase/admin_business_suspend.sql`<br>`docs/supabase/line_rental_grace.sql` |
 | `release_did_from_business` | `docs/supabase/super_admin_ops.sql` |
 | `remove_business_and_release_did` | `docs/supabase/super_admin_ops.sql` |
 | `reopen_tenant_field` | `docs/supabase/tenant_field_confirm_v2.sql` |
@@ -123,15 +124,17 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `set_tenant_on_demand_usage` | `docs/supabase/wallet_on_demand_alerts.sql` |
 | `set_tenant_soft_spend_limit` | `docs/supabase/wallet_soft_spend_limit.sql` |
 | `snapshot_data_quality` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
-| `suspend_line_for_nonpayment` | `docs/supabase/line_rental_grace.sql` |
+| `suspend_line_for_nonpayment` | `docs/supabase/admin_business_suspend.sql`<br>`docs/supabase/line_rental_grace.sql` |
 | `tenant_completeness_score` | `docs/supabase/tenant_field_provenance.sql`<br>`supabase/migrations/20261011170000_completeness_matches_onboarding.sql` |
 | `tenant_hold_gate` | `docs/supabase/tenant_field_provenance.sql` |
 | `tenant_member_directory` | `supabase/migrations/20261011140000_team_scale.sql` |
 | `tenant_seat_available` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `tenant_seats_used` | `supabase/migrations/20261011000000_team_invites.sql` |
+| `tenants_archived_billing_guard` | `docs/supabase/archive_tenant_billing.sql` |
 | `tenants_protect_wallet_columns` | `docs/supabase/foundation_bootstrap.sql`<br>`docs/supabase/line_rental_grace.sql`<br>`docs/supabase/package_catalog.sql`<br>`docs/supabase/package_entitlements.sql`<br>`docs/supabase/sms_allowance.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql`<br>`docs/supabase/wallet_security_beta.sql`<br>`docs/supabase/wallet_soft_spend_limit.sql` |
 | `to_e164_ke` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `transfer_tenant_ownership` | `supabase/migrations/20261011000000_team_invites.sql` |
+| `unarchive_tenant_billing` | `docs/supabase/archive_tenant_billing.sql` |
 | `upsert_tenant_field_meta` | `docs/supabase/tenant_field_provenance.sql` |
 | `voice_platform_audio_touch` | `docs/supabase/voice_platform_audio.sql` |
 | `waive_tenant_overage` | `docs/supabase/admin_billing_ops.sql` |
