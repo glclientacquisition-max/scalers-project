@@ -232,14 +232,47 @@ const TENANT_LINE_SELECTS = Object.freeze([
   'id, sautikit_virtual_number, is_active',
 ]);
 
-async function selectTenantLineRows() {
+async function selectTenantLineRows({ tenantId = null } = {}) {
   let last = { data: null, error: null };
   for (const columns of TENANT_LINE_SELECTS) {
-    last = await supabase.from('tenants').select(columns);
+    let query = supabase.from('tenants').select(columns);
+    if (tenantId) query = query.eq('id', tenantId);
+    last = await query;
     if (!last.error) return last;
     if (!/column|schema cache|does not exist/i.test(last.error.message || '')) return last;
   }
   return last;
+}
+
+// Per-tenant line state for paths outside an inbound call (closed-tenant
+// guard, src/sautikit/closedTenantGuard.js). Cached ~60 s; errors fail open.
+let tenantLineCache = null;
+function tenantLineCacheInstance() {
+  if (!tenantLineCache) {
+    const { createTenantLineCache } = require('./sautikit/closedTenantGuard');
+    tenantLineCache = createTenantLineCache({
+      loadRows: (tenantId) => selectTenantLineRows({ tenantId }),
+    });
+  }
+  return tenantLineCache;
+}
+
+/**
+ * Whether this tenant's line is closed (archived, suspended or is_active =
+ * false), same rules as the inbound gate (tenantLineState). Cached ~60 s.
+ * Never throws: a lookup error answers { closed: false, reason: 'lookup_failed' }.
+ * @returns {Promise<{ closed: boolean, reason: string, tenantId: string|null }>}
+ */
+async function tenantLineClosed(tenantId) {
+  return tenantLineCacheInstance().lineFor(tenantId);
+}
+
+/** Drop a cached line state (tests, or after a known status change). */
+function forgetTenantLine(tenantId) {
+  if (tenantLineCache) {
+    if (tenantId) tenantLineCache.invalidate(tenantId);
+    else tenantLineCache.clear();
+  }
 }
 
 /**
@@ -1168,149 +1201,77 @@ async function listPendingRecordingCopies({ limit = 20 } = {}) {
   return data || [];
 }
 
+// Line-state columns tried on top of each getTenantById select, newest first.
+// A schema without one of them drops it and keeps the rest of the row.
+const TENANT_ROW_LINE_COLUMNS = Object.freeze([', archived_at, line_status', ', archived_at', ', line_status', '']);
+
+async function selectTenantRowWithLine(tenantId, columns) {
+  let last = { data: null, error: null };
+  for (const extra of TENANT_ROW_LINE_COLUMNS) {
+    last = await supabase
+      .from('tenants')
+      .select(columns + extra)
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (!last.error) return last;
+    if (!extra || !/archived_at|line_status/i.test(last.error.message || '')) return last;
+  }
+  return last;
+}
+
 async function getTenantById(tenantId) {
   if (!tenantId) return null;
-  let { data, error } = await supabase
-    .from('tenants')
-    .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'
-    )
-    .eq('id', tenantId)
-    .maybeSingle();
+  let { data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active');
 
   if (error && /spoken_name|greeting_invite/i.test(error.message || '')) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'));
   }
 
   if (error && /billing_enforcement|wallet_balance_kes/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, is_active'));
   }
 
   if (error && /notify_channels/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, is_active'));
   }
 
   if (error && /soniox_voice_id|soniox_voice_label/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, vertical, handoff_mode, business_locations, business_policies, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, vertical, handoff_mode, business_locations, business_policies, is_active'));
   }
 
   // Older DBs may lack newer KA columns — peel them off gradually.
   if (error && /product_catalog|social_handles/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, vertical, handoff_mode, business_locations, business_policies, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, vertical, handoff_mode, business_locations, business_policies, is_active'));
   }
   if (
     error &&
     /vertical|handoff_mode|business_locations|business_policies/i.test(error.message)
   ) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, is_active'));
   }
   if (error && /tts_lexicon/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, is_active'));
   }
   if (error && /agent_tools/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'));
   }
   if (error && /alert_email/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'));
   }
   if (error && /daily_bulletin/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, is_active'));
   }
   if (error && /services_catalog/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, faqs, team_directory, unknown_answer_fallback, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, faqs, team_directory, unknown_answer_fallback, is_active'));
   }
   if (error && /faqs|team_directory|services_offered|unknown_answer_fallback/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, is_active'));
   }
   if (error && /after_hours_mode/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, is_active'));
   }
   if (error && /hours_schedule|agent_name|agent_tone|business_hours|column/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, is_active'));
   }
 
   throwIfError('getTenantById', error);
@@ -1366,6 +1327,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       businessPolicies: {},
       billingEnforcement: null,
       walletBalanceKes: null,
+      lineState: null,
       openAppointments: [],
       fieldMeta: null,
       holdGate: null,
@@ -2661,6 +2623,9 @@ module.exports = {
   getCall,
   getTenantById,
   getTenantProfile,
+  tenantLineClosed,
+  forgetTenantLine,
+  selectTenantLineRows,
   listActiveTenantDids,
   markWhatsappSent,
   markEscalationSent,

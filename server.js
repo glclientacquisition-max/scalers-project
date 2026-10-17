@@ -197,6 +197,7 @@ const { determineNextBestAction } = require('./src/conversation/nextBestAction')
 const { logBrainTrace } = require('./src/conversation/brainObservability');
 const {
   executeBrainTools,
+  brainToolsWantWrite,
   formatToolConfirmation,
   brainLinesForResults,
 } = require('./src/conversation/toolExecution');
@@ -404,6 +405,12 @@ const {
 } = require('./src/conversation/requestDedupe');
 const { lineUnavailableResponse } = require('./src/sautikit/inactiveTenantGate');
 const { createClosedLineCalls } = require('./src/sautikit/closedLineCalls');
+const {
+  closedTenantGuardEnabled,
+  tenantLineForAction,
+  closedLineRefusal,
+  warmableTenantRows,
+} = require('./src/sautikit/closedTenantGuard');
 const closedLineCalls = createClosedLineCalls();
 const { startLineUnavailableClipRefresh } = require('./src/sautikit/lineUnavailableAudio');
 const { coverageNextStepFor } = require('./src/conversation/coverageNextStep');
@@ -753,6 +760,15 @@ app.post('/internal/greeting-warm', async (req, res) => {
   }
   const tenantId = String(req.body?.tenantId || '').trim();
   if (!tenantId) return res.status(400).json({ ok: false, reason: 'tenantId required' });
+  const line = await tenantLineForAction(tenantId);
+  if (line.closed) {
+    console.log(`[greeting-warm] tenant=${tenantId} skipped: line closed (${line.reason})`);
+    const refusal = closedLineRefusal(line);
+    return res.status(200).json({
+      ...refusal,
+      message: `This business line is ${refusal.lineState}. Greeting not rendered.`,
+    });
+  }
   try {
     const result = await greetingWarmer.warmTenant(tenantId);
     return res.status(200).json({
@@ -774,6 +790,21 @@ app.post('/internal/desk/escalate', async (req, res) => {
   const callSid = String(req.body?.callSid || '').trim();
   if (!callSid) {
     return res.status(400).json({ ok: false, reason: 'callSid required' });
+  }
+  if (closedTenantGuardEnabled()) {
+    // A closed business (archived, suspended, is_active=false) gets no re-ping.
+    // Lookup errors answer open; the send ledger checks again per send.
+    let tenantId = null;
+    try {
+      tenantId = (await db.getCall(callSid))?.tenant_id || null;
+    } catch (err) {
+      console.warn(`[desk/escalate] call lookup failed ${callSid} (continuing):`, err?.message || err);
+    }
+    const line = await tenantLineForAction(tenantId);
+    if (line.closed) {
+      console.warn(`[desk/escalate] refused ${callSid}: tenant line closed (${line.reason}) tenant=${tenantId}`);
+      return res.status(409).json(closedLineRefusal(line));
+    }
   }
   try {
     const result = await maybeSendEscalationNotification(callSid, {
@@ -1128,9 +1159,8 @@ const greetingWarmer = createGreetingWarmer({
   listTenantIds: async () => {
     if (process.env.TENANT_ID) return [process.env.TENANT_ID];
     const { rows } = await db.listInboundTenantRows();
-    return rows
-      .filter((r) => r && r.id && r.is_active !== false && !r.archived_at)
-      .map((r) => r.id);
+    // Closed lines (archived, suspended, is_active=false) never ring: no render.
+    return warmableTenantRows(rows).map((r) => r.id);
   },
   getProfile: (tenantId) => db.getTenantProfile({ tenantId }),
   createSession: ({ voiceId }) => createSonioxTtsSession({ callSid: 'greeting-warm', voiceId }),
@@ -5737,6 +5767,18 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
   }
 }
 
+/**
+ * The line state when this call's business is closed (archived, suspended,
+ * is_active=false), else null. The profile's lineState is from call start;
+ * the cached lookup (~60 s) catches a line closed mid-call. Guard off: null.
+ */
+async function callTenantLineClosed(profile) {
+  if (!closedTenantGuardEnabled()) return null;
+  if (profile?.lineState?.closed) return profile.lineState;
+  const line = await tenantLineForAction(profile?.id);
+  return line.closed ? line : null;
+}
+
 async function maybeQueueLiveTransfer({
   callSid,
   escalate,
@@ -5747,6 +5789,13 @@ async function maybeQueueLiveTransfer({
   const dest = liveTransferDestination(teamDirectory, escalate?.teammate);
   const ready = liveTransferReady({ profile });
   if (!ready.ready || !dest) return false;
+  const closedLine = await callTenantLineClosed(profile);
+  if (closedLine) {
+    console.warn(
+      `[${callSid}] live transfer skipped: tenant line closed (${closedLine.reason}) tenant=${profile?.id || 'unknown'}`
+    );
+    return false;
+  }
   const callerE164 = normalizeKenyaE164(callerNumber);
   if (callerE164 && callerE164 === dest.phone) {
     console.warn(
@@ -6452,8 +6501,15 @@ async function applyGeminiTools(callSid, parsed) {
       `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : enforcedParsed.fragmentBlocked ? 'fragment_turn' : 'needs_visit_time'}`
     );
   }
+  const closedLine = brainToolsWantWrite(enforcedParsed)
+    ? await callTenantLineClosed(groundedProfile)
+    : null;
+  if (closedLine) {
+    console.warn(`[${callSid}] tool writes refused: tenant line closed (${closedLine.reason})`);
+  }
   const execution = await executeBrainTools({
     parsed: enforcedParsed,
+    lineClosed: closedLine ? closedLine.reason || 'closed' : null,
     capabilities,
     completedFingerprints: state.actions.completedFingerprints,
     priorHolds: state.actions.openHolds || [],
