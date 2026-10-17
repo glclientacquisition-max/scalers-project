@@ -1,0 +1,41 @@
+# Bug test pack gate. Runs on every PR to main and on push to main.
+# Make the check "bug-test-pack" required on main to block failing PRs.
+name: Bug test pack
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: bug-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bug-test-pack:
+    name: bug-test-pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run bug test pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset SAUTIKIT_API_KEY
+          has() { node -e "process.exit(require('./package.json').scripts['$1']?0:1)"; }
+          # TODO(Brain): when the dedicated bug pack lands, add its script to
+          # package.json as "test:bugs". It then runs here automatically, first.
+          if has test:bugs; then npm run test:bugs; else echo "::notice::test:bugs not defined yet; running fallback packs"; fi
+          npm run test:voice
+          npm run test:mvp
+          if has test:v2-catalogue; then npm run test:v2-catalogue; else echo "::notice::test:v2-catalogue not defined yet; skipped"; fi
