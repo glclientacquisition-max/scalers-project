@@ -21,6 +21,9 @@ const {
   sentenceStatesTrustedFact,
   timeFactLine,
   dateFactLine,
+  maskTimeZonePlaces,
+  isZoneFactKind,
+  sentenceReadsClock,
 } = require('./trustedFacts');
 const { assessCoverage, coverageStatus, coverageAskPlace, foldCanonicalPlace } = require('./visitLocation');
 const {
@@ -539,6 +542,11 @@ const AGENT_EVERYDAY_WORDS = new Set([
   'holds', 'centre', 'tower', 'kasuku', 'kalamu', 'kabla', 'karibuni', 'wangu', 'salama',
   'chukua', 'mlango', 'baraka', 'chupa', 'mambo', 'ukiwa', 'tayari', 'dukani', 'kifaa',
   'rangi', 'uongo', 'mbaya', 'kubwa', 'ndogo', 'chache', 'mtoto', 'chaki', 'hospitali', 'dunia',
+  // HD_cd0c01f28b05: clock and date words in the code's own fact lines.
+  // "yaani" bound to Kaani ("Saa hii ni saa mbili usiku, yaani 8:00 PM.") and
+  // "tarehe" to Starehe. A scan of every time/date word in trustedFacts.js
+  // found only these two.
+  'yaani', 'tarehe',
 ]);
 
 function maskEverydayWords(text) {
@@ -735,15 +743,32 @@ function guardSpokenReply(text, ctx = {}) {
       noteDrop(ctx, coverageDrop, sentence);
       continue;
     }
-    if (sentenceNamesUnboundPlace(sentence, allowedPlaces)) {
+    // Trusted facts first (HD_cd0c01f28b05): "Right now in Kenya, it is
+    // 8:00 PM." is the prompt's own clock, and the place check used to drop it
+    // before the trusted-facts check ever saw it. A sentence whose numbers are
+    // whole forms of the current time or date is validated here; its country,
+    // capital and zone words are the time zone, so the place check reads it
+    // with those masked. Any other place in it still binds and still drops.
+    const factKind = trusted
+      ? sentenceStatesTrustedFact(sentence, trusted, { known, clocks, ask: clockAsk })
+      : '';
+    const zoneFact = isZoneFactKind(factKind);
+    const zoneWords = zoneFact || (trusted && sentenceReadsClock(sentence));
+    if (sentenceNamesUnboundPlace(zoneWords ? maskTimeZonePlaces(sentence) : sentence, allowedPlaces)) {
       droppedJob = true;
+      // A clock sentence dropped on a clock-ask turn still gets the fact line.
+      if (clockAsk && (zoneFact || clockKeys(sentence).size || numbersIn(sentence).size)) droppedClockAnswer = true;
       noteDrop(ctx, 'unbound_place', sentence);
+      continue;
+    }
+    if (zoneFact) {
+      kept.push(sentence);
       continue;
     }
     if (
       !sentenceStatesFileHours(sentence, hoursFacts) &&
       (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known)) &&
-      !sentenceStatesTrustedFact(sentence, trusted, { known, clocks, ask: clockAsk })
+      !factKind
     ) {
       droppedNumber = true;
       if (clockAsk) droppedClockAnswer = true;

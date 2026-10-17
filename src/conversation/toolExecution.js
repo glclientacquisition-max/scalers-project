@@ -343,6 +343,11 @@ function validateCallerInfo(parsed, { agentName = '', businessName = '', knownNa
     name: canonicalCallerName(parsed?.name, knownNames),
     reason: clean(parsed?.reason, 400),
   };
+  // HD_cd0c01f28b05: "correct name spelling" is the name detour, not why they
+  // called. It is never saved as the call reason (it went out on the lead).
+  if (value.reason && require('./leadReason').isNameDetourReason(value.reason)) {
+    value.reason = '';
+  }
   if (value.name && isReservedCallerName(value.name, { agentName, businessName })) {
     // Keep reason-only capture; drop the bad name so we don't poison the lead.
     value.name = '';

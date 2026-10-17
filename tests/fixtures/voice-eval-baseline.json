@@ -282,6 +282,20 @@
         "slow": 4
       },
       "nameAsks": 1
+    },
+    "HD_cd0c01f28b05": {
+      "score": 76,
+      "checks": {
+        "languageMismatch": 0,
+        "incomplete": 0,
+        "repeatedQuestion": 0,
+        "silence": 4,
+        "deletedAnswer": 0,
+        "respelling": 0,
+        "prematureTurn": 0,
+        "slow": 0
+      },
+      "nameAsks": 0
     }
   }
 }

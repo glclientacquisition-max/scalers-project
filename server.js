@@ -262,6 +262,9 @@ const {
 const callAgentTools = new Map();
 /** Structured semantic state and actual runtime capabilities, keyed by callSid. */
 const callBrainStates = new Map();
+// Spoken transcript per live media call (rows pushed after the speech guard).
+// The hangup summary reads it when the webhook carries no turns (HD_cd0c01f28b05).
+const callSpokenTranscripts = new Map();
 const callBrainCapabilities = new Map();
 /** Per-call tenant grounding (product catalogue) for hold/order validation. */
 const callTenantProfiles = new Map();
@@ -336,6 +339,7 @@ const {
 } = require('./src/conversation/speakSlots');
 const { narratesInternalAction, groundFilePriceLine } = require('./src/conversation/speechGuard');
 const { promptClockStale, stampPromptClock } = require('./src/conversation/trustedFacts');
+const { usableLeadReason } = require('./src/conversation/leadReason');
 const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -1244,9 +1248,14 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
 async function writeHangupSummary(callSid, source, opts, brainState) {
   try {
     const call = await db.getCall(callSid);
+    const spokenTurns =
+      Array.isArray(opts.turns) && opts.turns.length
+        ? opts.turns
+        : callSpokenTranscripts.get(callSid)?.turns() || null;
     const derived = deriveCallResolution({
       brainState,
       callId: call?.id || null,
+      spokenTurns,
     });
     const summary = deriveCallSummary({ brainState });
     const primaryIntent = summary.primaryIntent || null;
@@ -1282,6 +1291,13 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
           actions: summary.actions,
           instructions: summary.instructions,
           language: summary.language,
+          // What the caller heard answered, from the spoken transcript.
+          ...(Array.isArray(derived.answeredQuestions)
+            ? {
+                answered_questions: derived.answeredQuestions,
+                unanswered_questions: derived.unansweredQuestions || [],
+              }
+            : {}),
         },
       });
     } catch (err) {
@@ -2253,6 +2269,7 @@ mediaWss.on('connection', (ws, req) => {
   let closureNotice = null;
   let messages = [{ role: 'system', content: systemPrompt }];
   const callTranscript = createCallTranscript();
+  if (sessionCallSid) callSpokenTranscripts.set(sessionCallSid, callTranscript);
   function logTurnTiming(timing, extra) {
     if (!timing) return null;
     const summary = timing.log(extra);
@@ -3608,9 +3625,15 @@ mediaWss.on('connection', (ws, req) => {
         fileNameAskCommitted: fileNameAsksCommitted > 0,
         unfinishedDecided: true,
         holdTimedOut: opts.holdTimedOut === true,
+        // A committed local fact line already answers the question first.
+        publicAnswerCommitted: Boolean(localPacket),
       });
       if (nameGate.nameAskDeferred) {
-        console.log(`[ws/media][${callKey}] name ask deferred: held fragment timed out, model replies`);
+        console.log(
+          nameGate.deferredFor
+            ? `[ws/media][${callKey}] name ask deferred: caller asked (${nameGate.deferredFor}), model answers first`
+            : `[ws/media][${callKey}] name ask deferred: held fragment timed out, model replies`
+        );
       }
       const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
       const nameJustConfirmed = brainState?.caller?.nameJustConfirmed === true;
@@ -5274,6 +5297,7 @@ mediaWss.on('connection', (ws, req) => {
             }
             if (maybeSid && !sessionCallSid) {
               sessionCallSid = String(maybeSid);
+              callSpokenTranscripts.set(sessionCallSid, callTranscript);
               ttsSpeedScale = 1;
               publishVoiceTrace();
               console.log(`[ws/media] bound session callSid=${sessionCallSid}`);
@@ -5383,6 +5407,7 @@ mediaWss.on('connection', (ws, req) => {
         .finally(() => {
           callAgentTools.delete(sessionCallSid);
           callBrainStates.delete(sessionCallSid);
+          callSpokenTranscripts.delete(sessionCallSid);
           callBrainCapabilities.delete(sessionCallSid);
           callTenantProfiles.delete(sessionCallSid);
         });
@@ -5711,15 +5736,21 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
     }
 
-    const event = ownerLeadEvent(
-      { ...call, callUrl: callDeskUrl(call.id) },
-      businessName
-    );
+    // HD_cd0c01f28b05: the lead reason is the caller's need. A missing reason
+    // or the name detour ("correct name spelling") falls back to the need
+    // Brain recorded this call ("Alvin asked about what time it is.").
+    const leadCall = { ...call, callUrl: callDeskUrl(call.id) };
+    if (!usableLeadReason(call.reason) && brain) {
+      const need = usableLeadReason(deriveCallSummary({ brainState: brain }).reason);
+      if (need && !/^\S+ called\.$/.test(need)) leadCall.reason = need;
+      else if (call.reason) leadCall.reason = null;
+    }
+    const event = ownerLeadEvent(leadCall, businessName);
     const body = renderEventText(event);
     const lead = {
       businessName,
       name: event.caller?.name || call.name,
-      reason: event.caller?.reason || call.reason,
+      reason: event.caller?.reason || leadCall.reason,
       callerNumber: call.from_number,
       recordingUrl: call.recording_url,
     };

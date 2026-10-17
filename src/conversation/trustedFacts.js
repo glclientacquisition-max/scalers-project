@@ -402,6 +402,57 @@ function sentenceStatesTrustedFact(sentence, facts, opts = {}) {
   return '';
 }
 
+// ------------------------------------------------------ time-zone words
+
+// "Right now in Kenya, it is 8:00 PM." (HD_cd0c01f28b05): on a sentence that
+// states the trusted clock or date, the country, the capital and the zone are
+// the time zone, never a service place. Only these words, only on a sentence
+// sentenceStatesTrustedFact already passed; every other place still binds.
+const TIME_ZONE_PHRASE = new RegExp(
+  [
+    // English: in/here in/across Kenya, Kenya time, Nairobi time, East Africa(n) time, EAT
+    String.raw`\b(?:(?:here|right\s+here|over\s+here)\s+)?(?:in|across|for)\s+(?:all\s+of\s+)?(?:kenya|nairobi|east\s+africa)\b`,
+    String.raw`\b(?:kenya(?:n)?|nairobi|east\s+africa(?:n)?)\s+(?:standard\s+)?time\b`,
+    String.raw`\b(?:local\s+)?time\s+(?:here\s+)?in\s+(?:kenya|nairobi)\b`,
+    String.raw`\beat\b`,
+    // Kiswahili / Sheng: huku/hapa/kwetu Kenya, saa za Kenya/Nairobi/Afrika Mashariki, Kenya sasa
+    String.raw`\b(?:huku|hapa|kule|kwetu|ndani\s+ya)\s+(?:kenya|nairobi|afrika\s+mashariki)\b`,
+    String.raw`\b(?:kwa\s+)?(?:saa|masaa|time)\s+(?:za|ya|wa)\s+(?:kenya|nairobi|afrika\s+mashariki|east\s+africa)\b`,
+    String.raw`\b(?:kenya|nairobi)\s+(?:sasa|sai|saa\s+hii|now)\b`,
+  ].join('|'),
+  'gi'
+);
+// Bare country/capital words left after the phrases above ("Kenya, it's 8 PM").
+const TIME_ZONE_WORD = /\b(?:kenya(?:n)?|nairobi|afrika\s+mashariki|east\s+africa(?:n)?)\b/gi;
+
+/**
+ * The sentence with its time-zone words removed, for the place check only.
+ * Call it only on a sentence that states a trusted time or date fact.
+ */
+function maskTimeZonePlaces(sentence) {
+  return String(sentence || '')
+    .replace(TIME_ZONE_PHRASE, ' ')
+    .replace(TIME_ZONE_WORD, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * A sentence that reads a clock: a clock cue with a clock or a number in it
+ * ("it is 3:00 PM in Kenya", "saa tisa huku Kenya"). Its zone words are the time
+ * zone even when the clock is wrong; the number check then judges the clock.
+ */
+function sentenceReadsClock(sentence) {
+  const raw = String(sentence || '');
+  if (!CLOCK_CUE.test(raw)) return false;
+  return clockKeys(raw).size > 0 || numbersIn(raw).size > 0;
+}
+
+/** True when a trusted-fact kind is the clock or the date (zone words allowed). */
+function isZoneFactKind(kind) {
+  return kind === 'time' || kind === 'date';
+}
+
 // ------------------------------------------------------------ fact lines
 
 /** Code-generated answer to "what time is it", in the caller's language. */
@@ -439,4 +490,7 @@ module.exports = {
   sentenceStatesTrustedFact,
   timeFactLine,
   dateFactLine,
+  maskTimeZonePlaces,
+  isZoneFactKind,
+  sentenceReadsClock,
 };
