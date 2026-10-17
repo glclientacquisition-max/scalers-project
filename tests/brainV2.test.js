@@ -3,7 +3,7 @@
 const SC_ON = () => /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
 const priceRe = (n, lang, unit = '') => (SC_ON() ? new RegExp(lang === 'sw' ? `\\bshilingi ${n}${unit ? ` ${unit.sw}` : ''}\\b` : `\\b${n} shillings${unit ? ` ${unit.en}` : ''}\\b`) : new RegExp(`\\bKSh ${n}\\b`));
 const otherCurrency = (lang) => (SC_ON() ? (lang === 'sw' ? /\bKSh\b|\bshillings?\b/ : /\bKSh\b|\bshilingi\b/) : /$^/);
-const BOOK_ASK = /Ungependa kubook|Would you like to book/;
+const BOOK_ASK = /Ungependa kubook|Would you like to book|Nikuandikie ombi|take a request for the team|request for the team\?/;
 // BA v2 Phase 1 unit tests (BRAIN_V2, off by default). Model is mocked; no network.
 const test = require('node:test');
 const assert = require('node:assert');
@@ -44,7 +44,7 @@ test('Swahili clock: saa 4 = 10:00, saa nane mchana = 14:00, keshokutwa = +2d', 
 
 test('HD_212: held slots merge, read-back, commit only on yes, no callback row', async () => {
   const { out, log } = await talk(["Yes, I'm Alvin.", 'I need to book window cleaning for Friday.', 'Around Kitengela.', 'Saa 4', 'Yes.']);
-  assert.match(out[3].line, /Shall I book it\?$/);
+  assert.match(out[3].line, /Shall I send this request to the team\?$/); // DD: booking-for-me off
   assert.equal(log.filter((x) => x[0] === 'appt').length, 1);
   assert.equal(log[0][1].windowStart, '2026-10-16T07:00:00.000Z');
   assert.ok(!log.some((x) => x[0] === 'sr' || x[0] === 'esc'));
@@ -101,7 +101,7 @@ test('availability is never claimed without a receipt; prices only from the cata
 
 test('Swahili caller gets Swahili receipts', async () => {
   const { out } = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Ruiru', 'Wanjiru', 'Ndio.']);
-  assert.match(out[3].line, /^Sawa, nimeweka/);
+  assert.match(out[3].line, /^Sawa, nimeandika ombi lako/);
   assert.ok(out.every((o) => o.lang === 'sw'));
 });
 
@@ -164,7 +164,7 @@ test('acknowledgements, identity, earlier-call and off-catalogue turns get state
   r = await talk(['Eeh, unaongea na Alvin?']); assert.match(r.out[0].line, /^Alvin, unahitaji/);
   r = await talk(['Ah, tulifika wapi na ile mambo yetu ya jana?']); assert.match(r.out[0].line, /^Sioni booking/);
   r = await talk(['Mko na JK copier?']); assert.match(r.out[0].line, /^Sina JK copier kwenye orodha yetu/);
-  r = await talk(['Mnafanya carpet?', 'Ni sawa.']); assert.match(r.out[1].line, /^Ungependa kubook Carpet Cleaning\?/);
+  r = await talk(['Mnafanya carpet?', 'Ni sawa.']); assert.match(r.out[1].line, /^Nikuandikie ombi la Carpet Cleaning kwa timu\?/);
   r = await talk(['Nilikuwa nauliza, ni vipi naweza lipa?']); assert.match(r.out[0].line, /^Tunapokea M-Pesa Paybill/); assert.doesNotMatch(r.out[0].line, /\d{5}/);
 });
 
@@ -201,7 +201,7 @@ test('place: area is the place, landmark is a note (EN/SW near, karibu na, pale,
 const ACKRX = /^\s*(sawa sawa|sawa kabisa|ni sawa|sawa|okay|ok|haya|alright|sure|poa|asante)\s*[,.!]/i;
 test('ack rule: only a write receipt may open with an ack; never after an ack; acked drops it', async () => {
   const a = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Ruiru', 'Wanjiru', 'Ndio.', 'Sawa.', 'Hapana, ni hayo tu.']);
-  assert.match(a.out[3].line, /^Sawa, nimeweka/);
+  assert.match(a.out[3].line, /^Sawa, nimeandika ombi lako/);
   assert.doesNotMatch(a.out[4].line, ACKRX, 'reply to caller sawa goes straight on');
   assert.match(a.out[5].line, /Kwaheri/);
   const b = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Ruiru', 'Wanjiru', 'Ndio.', 'Hapana, ni hayo tu.']);
@@ -210,7 +210,7 @@ test('ack rule: only a write receipt may open with an ack; never after an ack; a
   const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] }); const h = V2.createDryRunHandlers(); let r;
   for (const text of ['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Ruiru', 'Wanjiru']) await V2.runTurn(st, { text, profile: DD, now: NOW, handlers: h });
   r = await V2.runTurn(st, { text: 'Ndio.', profile: DD, now: NOW, handlers: h, acked: true });
-  assert.match(r.line, /^Nimeweka Carpet Cleaning/);
+  assert.match(r.line, /^Nimeandika ombi lako la Carpet Cleaning/);
   const q = await talk(['Mnafanya carpet?', 'Sawa.', 'Sawa.', 'Ok.']);
   for (const o of q.out) assert.doesNotMatch(o.line, ACKRX);
   const f = await talk(['Okay']); assert.doesNotMatch(f.out[0].line, ACKRX, 'no ack on first turn');
@@ -250,7 +250,7 @@ test('HD_4ec204aafa93: a booking supersedes this call\'s open callback; one owne
   assert.deepEqual(out[3].toolResults[0].supersedes, ['esc_1']);
   const fin = V2.finishCall(st, { businessName: 'DD', callerPhone: '+254700000001' });
   assert.equal(fin.outcome, 'booked'); assert.deepEqual(fin.superseded, ['esc_1']);
-  assert.match(fin.ownerText, /Visit booked/); assert.match(fin.ownerText, /earlier callback request closed/);
+  assert.match(fin.ownerText, /Visit requested/); // DD: booking-for-me off (#708) assert.match(fin.ownerText, /earlier callback request closed/);
   assert.doesNotMatch(fin.ownerText, /asked for a callback/);
 });
 test('HD_4ec204aafa93: a day without a time keeps collecting and never rescues to a callback', async () => {

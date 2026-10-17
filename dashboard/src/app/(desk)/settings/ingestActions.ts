@@ -2,6 +2,7 @@
 
 import { formatServiceAreasForCompiler, normalizeServiceAreas, serviceAreasFromCoverage } from "@/lib/serviceAreas";
 import { bustTenantCache } from "@/lib/tenantCache";
+import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
 import { memberDenied } from "@/lib/requireMember";
 
 import { revalidatePath } from "next/cache";
@@ -461,6 +462,8 @@ export async function applyIngestAction(
   if (error) {
     return ownerSaveFailed("ingest", error.message);
   }
+  // Imported services / areas change what the Business Assistant says: rebuild the spoken catalogue.
+  requestSpokenCatalogueCompile(tenant.id, patch);
 
   revalidatePath("/settings");
 
