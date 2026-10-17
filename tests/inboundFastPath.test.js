@@ -65,11 +65,19 @@ describe('inbound directory (resolveTenantId parity, no reads on the hot path)',
     assert.equal(loads(), 3);
   });
 
-  it('package exhausted closes the gate; on-demand keeps it open', async () => {
-    const closed = await dirWith(rowsFor({ seconds_used: 6000 })).dir.lookup({ toNumber: DID });
+  it('package exhausted closes the gate when enforced; on-demand keeps it open', async () => {
+    const closed = await dirWith(rowsFor({ seconds_used: 6000, billing_enforcement: 'soft' })).dir.lookup({ toNumber: DID });
     assert.equal(closed.gate.open, false);
-    const od = await dirWith(rowsFor({ seconds_used: 6000, on_demand_usage_enabled: true })).dir.lookup({ toNumber: DID });
+    const od = await dirWith(rowsFor({ seconds_used: 6000, billing_enforcement: 'soft', on_demand_usage_enabled: true })).dir.lookup({ toNumber: DID });
     assert.equal(od.gate.open, true);
+  });
+
+  it('beta (billing_enforcement off or missing) never closes at the cap (#631)', async () => {
+    const beta = await dirWith(rowsFor({ seconds_used: 6000 })).dir.lookup({ toNumber: DID });
+    assert.equal(beta.gate.open, true);
+    assert.equal(beta.gate.reason, 'beta_over_cap');
+    const off = await dirWith(rowsFor({ seconds_used: 6000, billing_enforcement: 'off' })).dir.lookup({ toNumber: DID });
+    assert.equal(off.gate.open, true);
   });
 
   it('stale snapshot answers at once and refreshes in the background', async () => {

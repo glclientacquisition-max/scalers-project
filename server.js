@@ -254,7 +254,6 @@ const {
 } = require('./src/notifications/platformOpsAlert');
 const { platformOpsRecipients } = require('./src/notifications/platformOpsRecipients');
 const { maybeAlertPackageUsage } = require('./src/billing/packageUsageAlerts');
-const { isEnforced } = require('./src/billing/packageOverage');
 const {
   selectProductsForTurn,
   formatTargetedProductsForPrompt,
@@ -1636,21 +1635,13 @@ async function handleVoiceIncoming(req, res) {
     };
 
     if (directoryHit) {
-      // The in-memory gate is a fast hint. A refusal (or an enforced tenant
-      // the directory cannot place) is re-checked against the database
-      // before the caller is turned away.
-      const hint = directoryHit.gate;
-      if (hint && (hint.open === false || (hint.reason === 'package_unknown' && isEnforced(hint.enforcement)))) {
-        try {
-          const gate = await db.packageInboundOpen({ toNumber, fromNumber, tenantId: directoryHit.tenantId || undefined });
-          if (packageGateRefuses(callSid, gate)) {
-            return res
-              .type('text/xml')
-              .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
-          }
-        } catch (gateErr) {
-          console.warn('[voice/incoming] package gate failed (answering):', gateErr?.message || gateErr);
-        }
+      if (directoryHit.gate && directoryHit.gate.open === false) {
+        // Same decision as db.packageInboundOpen (billing_enforcement is in
+        // the directory row): beta never rejects at the cap (#631).
+        console.warn(`[${callSid}] package exhausted (billing ${directoryHit.gate.enforcement || '?'}, on-demand off) — reject`);
+        return res
+          .type('text/xml')
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
       }
       if (directoryHit.unassigned) {
         console.warn(`[${callSid}] unassigned number — reject`);

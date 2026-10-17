@@ -50,7 +50,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | --- | --- |
 | `data_quality_daily` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 
-## Functions (79)
+## Functions (80)
 
 | Function | Defined in |
 | --- | --- |
@@ -113,6 +113,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `release_did_from_business` | `docs/supabase/super_admin_ops.sql` |
 | `remove_business_and_release_did` | `docs/supabase/super_admin_ops.sql` |
 | `reopen_tenant_field` | `docs/supabase/tenant_field_confirm_v2.sql` |
+| `roll_package_periods` | `docs/supabase/package_period_rollover.sql` |
 | `save_daily_bulletin` | `supabase/migrations/20261012210000_three_features.sql` |
 | `save_onboarding_step` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
 | `service_areas_valid` | `supabase/migrations/20261012150000_locations_service_areas.sql`<br>`supabase/migrations/20261013090000_outside_areas.sql` |
