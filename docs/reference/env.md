@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-158 variables.
+159 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -86,7 +86,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `RESEND_API_KEY` | desk, voice | `dashboard/src/lib/opsMail.ts`<br>`src/notifications/email.js` |
 | `SAUTIKIT_ADMIN_OPS_KEY` | desk | `dashboard/src/lib/sautikit.ts` |
 | `SAUTIKIT_API_BASE` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/lineUnavailableAudio.js`<br>+3 more |
-| `SAUTIKIT_API_KEY` | desk, scripts, voice | `dashboard/src/lib/sautikit.ts`<br>`scripts/smoke-whatsapp-did.js`<br>`server.js`<br>+5 more |
+| `SAUTIKIT_API_KEY` | desk, scripts, voice | `dashboard/src/lib/sautikit.ts`<br>`scripts/setup-wallet-low-balance-webhook.js`<br>`scripts/smoke-whatsapp-did.js`<br>+6 more |
 | `SAUTIKIT_DID` | scripts, voice | `scripts/smoke-whatsapp-did.js`<br>`server.js`<br>`src/db.js`<br>+1 more |
 | `SAUTIKIT_VALIDATE_WEBHOOKS` | voice | `server.js`<br>`src/sautikit/webhook.js` |
 | `SAUTIKIT_VOICE_SIGNING_SECRET` | voice | `src/sautikit/webhook.js` |
@@ -125,8 +125,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_RECORDINGS_BUCKET` | voice | `src/db.js` |
-| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/supabase.ts`<br>`scripts/backfillFactHashes.js`<br>`scripts/verify-staging-schema.js`<br>+4 more |
-| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+6 more |
+| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/supabase.ts`<br>`scripts/backfillFactHashes.js`<br>`scripts/verify-staging-schema.js`<br>+5 more |
+| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+7 more |
 | `TENANT_DID` | voice | `server.js`<br>`src/db.js` |
 | `TENANT_ID` | scripts, voice | `scripts/smoke-db.js`<br>`src/db.js` |
 | `TEXTSMS_API_KEY` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
@@ -172,4 +172,5 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `WALLET_TOPUP_ENABLED` | desk | `dashboard/src/lib/walletTopUp.ts` |
 | `WALLET_TOPUP_PROVIDER` | desk | `dashboard/src/lib/walletTopUp.ts` |
 | `WALLET_TRANSFER_RATE_KES_PER_MINUTE` | voice | `src/billing/liveTransferLegs.js` |
+| `WALLET_WEBHOOK_SETUP_CONFIRM` | scripts | `scripts/setup-wallet-low-balance-webhook.js` |
 | `WHATSAPP_INBOUND_ACK` | voice | `src/sautikit/whatsappInbound.js` |
