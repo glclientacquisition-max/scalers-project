@@ -5,6 +5,7 @@ const {
   probeSautikitWallet,
 } = require('../src/sautikit/walletProbe');
 const { resetTelephonyProviderHealth } = require('../src/sautikit/telephonyProviderHealth');
+const { resetWalletLowBalance } = require('../src/sautikit/walletLowBalance');
 const {
   resetPlatformOpsAlert,
   setPlatformOpsDispatch,
@@ -14,6 +15,7 @@ describe('walletProbe', () => {
   beforeEach(() => {
     resetTelephonyProviderHealth();
     resetPlatformOpsAlert();
+    resetWalletLowBalance();
   });
 
   it('classifies empty wallet as telephony billing exhausted', () => {
@@ -28,8 +30,12 @@ describe('walletProbe', () => {
 
   it('probes wallet and alerts ops on first empty balance', async () => {
     let alerted = 0;
-    setPlatformOpsDispatch(async () => {
-      alerted += 1;
+    let walletLow = 0;
+    let lastBody = '';
+    setPlatformOpsDispatch(async ({ ledger, body }) => {
+      lastBody = body;
+      if (ledger.kind === 'platform_ops_wallet') walletLow += 1;
+      else alerted += 1;
       return { sent: [{ channel: 'email' }], errors: [] };
     });
     process.env.SCALERS_OPS_ALERT_EMAILS = 'ops@scalers.co.ke';
@@ -44,5 +50,9 @@ describe('walletProbe', () => {
     assert.equal(result.billingExhausted, true);
     await new Promise((r) => setTimeout(r, 20));
     assert.equal(alerted, 1);
+    // Empty wallet sends exactly one alert: line down, with the cause named.
+    assert.equal(walletLow, 0);
+    assert.equal(result.lowBalance.suppressed, 'empty_wallet');
+    assert.match(lastBody, /Cause: Phone wallet is empty, top up to restore calls\./);
   });
 });

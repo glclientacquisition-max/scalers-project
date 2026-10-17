@@ -9,7 +9,7 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (30)
+## Tables (32)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
@@ -40,6 +40,8 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `transcripts` | `call_id`, `created_at`, `id`, `latency_ms`, `speaker`, `text_content` | `docs/supabase/foundation_bootstrap.sql` |
 | `voice_platform_audio` | `expires_at`, `file_sha256`, `key`, `last_error`, `last_error_at`, `mime_type`, `size_bytes`, `updated_at`, `uploaded_at`, `url` | `docs/supabase/voice_platform_audio.sql` |
 | `voice_turn_traces` | `call_id`, `checks`, `created_at`, `diagnosis`, `id`, `payload`, `pii`, `record_kind`, `release`, `schema_version`, `score`, `tenant_id`, `turn_index` | `docs/supabase/voice_turn_traces.sql` |
+| `voice_wallet_alert_state` | `crossed`, `crossed_at`, `last_balance_minor`, `last_source`, `observed_at`, `rearmed_at`, `threshold_minor`, `updated_at` | `docs/supabase/voice_wallet_low_balance.sql` |
+| `voice_webhook_events` | `event_id`, `kind`, `received_at` | `docs/supabase/voice_wallet_low_balance.sql` |
 | `wallet_ledger` | `amount_kes`, `balance_after_kes`, `created_at`, `currency`, `id`, `kind`, `metadata`, `note`, `reference_id`, `reference_type`, `tenant_id` | `docs/supabase/one_wallet_billing.sql` |
 | `whatsapp_messages` | `body`, `created_at`, `direction`, `id`, `msg_type`, `payload`, `status`, `thread_id`, `wamid` | `docs/supabase/whatsapp_threads.sql` |
 | `whatsapp_threads` | `contact_name`, `contact_wa_id`, `created_at`, `e164`, `id`, `identity`, `last_inbound_at`, `last_outbound_at`, `phone_number_id`, `sautikit_number_id`, `updated_at` | `docs/supabase/whatsapp_threads.sql` |
@@ -50,7 +52,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | --- | --- |
 | `data_quality_daily` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 
-## Functions (79)
+## Functions (82)
 
 | Function | Defined in |
 | --- | --- |
@@ -131,5 +133,8 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `transfer_tenant_ownership` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `upsert_tenant_field_meta` | `docs/supabase/tenant_field_provenance.sql` |
 | `voice_platform_audio_touch` | `docs/supabase/voice_platform_audio.sql` |
+| `voice_wallet_alert_observe` | `docs/supabase/voice_wallet_low_balance.sql` |
+| `voice_wallet_alert_release` | `docs/supabase/voice_wallet_low_balance.sql` |
+| `voice_webhook_event_claim` | `docs/supabase/voice_wallet_low_balance.sql` |
 | `waive_tenant_overage` | `docs/supabase/admin_billing_ops.sql` |
 | `wallet_ledger_deny_mutation` | `docs/supabase/wallet_security_beta.sql` |
