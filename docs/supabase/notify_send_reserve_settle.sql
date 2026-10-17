@@ -573,14 +573,55 @@ $$;
 revoke all on function public.sms_counter_drift() from public, anon, authenticated;
 grant execute on function public.sms_counter_drift() to service_role;
 
+-- ---------------------------------------------------------------------------
+-- 7. Daily drift log: one ops_audit_log row (action sms_counter_drift) per
+--    tenant whose counter disagrees with the ledger + pending holds. Admin
+--    Activity shows it; nothing is changed. Returns the number of rows logged.
+-- ---------------------------------------------------------------------------
+create or replace function public.sms_counter_drift_log()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_n integer;
+begin
+  insert into public.ops_audit_log (actor, action, tenant_id, detail)
+  select 'cron', 'sms_counter_drift', d.tenant_id,
+         jsonb_build_object(
+           'period_start', d.period_start,
+           'counter', d.counter,
+           'ledger_sent_units', d.ledger_sent_units,
+           'pending_held_units', d.pending_held_units,
+           'drift', d.drift)
+  from public.sms_counter_drift() d
+  where d.drift <> 0;
+  get diagnostics v_n = row_count;
+  return v_n;
+end;
+$$;
+
+revoke all on function public.sms_counter_drift_log() from public, anon, authenticated;
+grant execute on function public.sms_counter_drift_log() to service_role;
+
 commit;
 
 -- ---------------------------------------------------------------------------
--- Cron (separate GO; pg_cron 1.6.4 is on prod):
--- select cron.schedule('notify-stale-release', '*/5 * * * *',
---   $c$select public.release_stale_notify_sends(interval '15 minutes', false)$c$);
--- Daily drift (feeds platform_ops_notices via the Admin ops cron, PR #640):
--- select * from public.sms_counter_drift() where drift <> 0;
+-- 8. Cron (pg_cron; applied as its own step after the checks below pass).
+--    Every 5 minutes: release reservations still pending after 15 minutes.
+--    Daily 04:20 UTC (07:20 EAT): log counter vs ledger drift.
+--    Re-running reschedules the same named jobs.
+-- ---------------------------------------------------------------------------
+select cron.schedule('notify-stale-release', '*/5 * * * *',
+  $c$select public.release_stale_notify_sends(interval '15 minutes', false)$c$);
+select cron.schedule('sms-counter-drift-daily', '20 4 * * *',
+  $c$select public.sms_counter_drift_log()$c$);
+
+-- ---------------------------------------------------------------------------
+-- Drift now: select * from public.sms_counter_drift() where drift <> 0;
+-- Cron check: select jobname, schedule, active from cron.job
+--             where jobname in ('notify-stale-release', 'sms-counter-drift-daily');
 --
 -- Checks after apply (STAGING, service role, one test tenant):
 -- 1) select * from reserve_notify_send('<t>', 'test:k1', 'lead', 'sms', '2547..', 'hi', 1);
@@ -598,6 +639,8 @@ commit;
 --   drop function if exists public.release_stale_notify_sends(interval, boolean);
 --   drop function if exists public.settle_notify_send(uuid, text, text, text);
 --   drop function if exists public.reserve_notify_send(uuid, text, text, text, text, text, integer, uuid, text, text, text, boolean);
+--   select cron.unschedule('notify-stale-release'); select cron.unschedule('sms-counter-drift-daily');
+--   drop function if exists public.sms_counter_drift_log();
 --   drop function if exists public.sms_counter_drift();
 --   drop view if exists public.notify_sms_billable;
 --   re-run notify_send_ledger.sql section for notify_sends_deny_mutation (strict append-only).
