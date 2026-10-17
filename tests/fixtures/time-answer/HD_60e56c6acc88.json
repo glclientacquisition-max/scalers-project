@@ -1,0 +1,38 @@
+{
+  "_doc": "Aris prod HD_60e56c6acc88, 17 Oct 2026 21:52:29 EAT, release 8ee9b161 (DB a7550c21-c846-40ae-8bd3-94091d33e919). The time question got opening hours; the hangup derived unresolved (unanswered: the time); the owner review overwrote it to resolved; the summary Goal quoted the caller's raw words.",
+  "callerAt": "2026-10-17T18:52:52.919Z",
+  "caller": "Are you doing— Ni saa ngapi, Shai?",
+  "callLanguage": "sw",
+  "spoken": [
+    "Tuko closed kwa sasa.",
+    "Siku za kazi ni Jumatatu hadi Ijumaa kuanzia saa tatu na kalahu asubuhi hadi saa kumi na mbili jioni.",
+    "Nawezaje kukusaidia mtandaoni?"
+  ],
+  "brainState": {
+    "intent": "general_enquiry",
+    "goal": { "primary": "resolve_enquiry", "description": "Are you doing— Ni saa ngapi, Shai?" },
+    "conversation": { "turnCount": 1, "answersReceived": ["Are you doing— Ni saa ngapi, Shai?"] },
+    "language": { "current": "sw" },
+    "entities": {}
+  },
+  "prodSummaryText": "Intent: general_enquiry. Goal: Are you doing— Ni saa ngapi, Shai",
+  "derived": { "resolution": "unresolved", "primaryIntent": "general_enquiry", "unansweredQuestions": ["the time"], "answeredQuestions": [] },
+  "summary": {
+    "reason": "Caller asked about Are you doing— Ni saa ngapi, Shai.",
+    "answered_questions": [],
+    "unanswered_questions": ["the time"]
+  },
+  "review": {
+    "reason": "Caller asked about what time it is.",
+    "want": "The caller asked about what time it is.",
+    "done": "None",
+    "mood": "unknown",
+    "next": "None",
+    "needs_human": false,
+    "needs_owner": false,
+    "urgent": false,
+    "confidence": 0.9,
+    "primary_intent": "general_enquiry"
+  },
+  "prodApplied": { "reason": true, "intent": false, "resolution": true, "card": true }
+}
