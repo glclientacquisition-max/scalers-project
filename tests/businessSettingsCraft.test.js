@@ -81,7 +81,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(nav, /id: "alerts"/);
     assert.doesNotMatch(nav, /id: "device"/);
     assert.match(nav, /title: "Business"/);
-    assert.match(nav, /title: "Assistant"/);
+    assert.match(nav, /title: "Business Assistant"/);
     assert.match(nav, /title: "Knowledge"/);
     assert.doesNotMatch(nav, /title: "Offer"/);
     assert.match(nav, /title: "People"/);
@@ -350,7 +350,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(voiceChunk, /Not ready/);
     const modes = read("dashboard/src/lib/afterHours.ts");
     assert.match(modes, /label: "Message only"/);
-    assert.match(modes, /label: "Full assistant"/);
+    assert.match(modes, /label: "Full Business Assistant"/);
     assert.doesNotMatch(modes, /Not ready/);
     assert.doesNotMatch(modes, /disabled:\s*true/);
     assert.match(form, /lg:hidden/);

@@ -183,7 +183,7 @@ export function ServiceAreasEditor({
       {!copy.areas ? null : value.areas.length === 0 ? (
         <div className="space-y-3 rounded-2xl border border-hairline bg-surface px-4 py-5 text-center">
           <p className="text-body font-medium text-ink">{copy.title}</p>
-          <p className="text-meta text-ink-2">{copy.empty} Your Business Assistant tells callers the price.</p>
+          <p className="text-meta text-ink-2">{copy.empty} Callers do not hear this fee on the call yet. You confirm it when you call back.</p>
           {canEdit ? (
             <Button onClick={() => openBulk()} data-areas-add="">
               Add areas

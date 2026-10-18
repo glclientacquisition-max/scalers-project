@@ -1,7 +1,8 @@
 /**
  * Structured business data: one taxonomy (src/data/taxonomy.json, mirrored here) and the
  * parsers that turn owner text into typed facts. Used by setup, Settings, the call review
- * correction sheet and the data-quality view. Display text is derived, never the source.
+ * correction sheet and the data-quality view. A generated label is shown only when it
+ * still carries every word the owner wrote. Otherwise the original wording stays.
  */
 import taxonomy from "./taxonomy.json" with { type: "json" };
 
@@ -48,6 +49,8 @@ export type StructuredPrice = {
   min_ksh: number | null;
   max_ksh: number | null;
   unit: string | null;
+  /** Owner's unit when it is not a taxonomy id ("sq ft", "day", "sofa"). Never a price. */
+  unit_label?: string | null;
   in_stock: boolean | null;
   /** owner = typed or confirmed by the owner; parsed = read from old text, needs "Is this right?" */
   source: "owner" | "parsed";
@@ -69,18 +72,36 @@ export function parseAmount(raw: unknown): number | null {
   return Math.round(n);
 }
 
+// "per"/"a" need a word boundary. A slash does not: "300 /kg" has no boundary before "/".
+// "sq ft" is not "sq m". "per unit" is not the taxonomy id "item" (that one hides the unit).
 const UNIT_WORDS: Array<[RegExp, string]> = [
-  [/\b(per|a|\/)\s*(kg|kilo)\b/, "kg"],
-  [/\b(per|a|\/)\s*(hr|hour)\b/, "hour"],
-  [/\b(per|a|\/)\s*(visit)\b/, "visit"],
-  [/\b(per|a|\/)\s*(room)\b/, "room"],
-  [/\b(per|a|\/)\s*(sqm|m2|square metre)\b/, "sqm"],
-  [/\b(per|a|\/)\s*(litre|liter|ltr)\b/, "litre"],
-  [/\b(per|a|\/)\s*(metre|meter|m)\b/, "metre"],
-  [/\b(per|a|\/)\s*(pack|packet|box)\b/, "pack"],
-  [/\b(per|a|\/)\s*(seat|seater)\b/, "seat"],
-  [/\b(each|pc|pcs|piece)\b/, "item"],
+  [/(?:\b(?:per|a)\s+|\/\s*)(kg|kilos?)\b/, "kg"],
+  [/\b(?:per|a)\s+(hr|hours?)\b/, "hour"],
+  [/\b(?:per|a)\s+(visits?)\b/, "visit"],
+  [/\b(?:per|a)\s+(rooms?)\b/, "room"],
+  [/(?:\b(?:per|a)\s+|\/\s*)(sqm|m2|m²|square metres?|square meters?|sq\s*m)\b/, "sqm"],
+  [/\b(?:per|a)\s+(litre|liter|ltr)s?\b/, "litre"],
+  [/\b(?:per|a)\s+(metres?|meters?|m)\b/, "metre"],
+  [/\b(?:per|a)\s+(packs?|packets?|box|boxes)\b/, "pack"],
+  [/\b(?:per|a)\s+(seats?|seaters?)\b/, "seat"],
+  [/\b(?:per|a)\s+(jobs?)\b/, "job"],
+  [/\b(each|pcs?|pieces?)\b/, "item"],
 ];
+
+/** Words a generated label may drop. "per"/"a"/"to" are glue. "flat" means a fixed price. */
+const PRICE_FILLER = ["ksh", "kes", "kshs", "sh", "shs", "flat", "only", "the", "per", "a", "an", "to"];
+
+function cleanUnitLabel(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase().replace(/\s+/g, " ").replace(/\s+per\s+.*$/, "");
+  if (!s || s.length > 32 || !/^[a-z][a-z ]{0,31}$/.test(s)) return null;
+  return s;
+}
+
+function matchUnitLabel(low: string): string | null {
+  const m = low.match(/(?:\b(?:per|a)\s+|\/\s*)([a-z][a-z0-9]*(?:\s+(?!per\b)[a-z][a-z0-9]*){0,3})\b/);
+  return cleanUnitLabel(m?.[1] ?? "");
+}
 
 /**
  * Read an old free-text price into typed fields. Never throws; anything it can't read
@@ -90,7 +111,8 @@ export function parsePriceText(raw: unknown): Omit<StructuredPrice, "in_stock" |
   const text = String(raw ?? "").trim();
   const low = text.toLowerCase();
   const unit = UNIT_WORDS.find(([re]) => re.test(low))?.[1] ?? null;
-  const base = { mode: "ask" as PricingMode, amount_ksh: null, min_ksh: null, max_ksh: null, unit, parsed_from: text || undefined };
+  const unit_label = unit ? null : matchUnitLabel(low);
+  const base = { mode: "ask" as PricingMode, amount_ksh: null, min_ksh: null, max_ksh: null, unit, unit_label, parsed_from: text || undefined };
   if (!text || /^(ask|call|varies|depends|tbd|on request)\b/.test(low)) return base;
   const cleaned = low
     .replace(/kshs?\.?|kes|\/=/g, " ")
@@ -101,7 +123,9 @@ export function parsePriceText(raw: unknown): Omit<StructuredPrice, "in_stock" |
     const hi = parseAmount(range[2]);
     if (lo != null && hi != null && hi >= lo) return { ...base, mode: "range", min_ksh: lo, max_ksh: hi, amount_ksh: lo };
   }
-  const from = /\b(from|starting|kuanzia|min(imum)?)\b/.test(low);
+  // "(min 3 hours)" is a duration, not a price floor. "minimum 500" still means from.
+  const durationMin = /\bmin(?:imum)?\s+\d+\s*(?:hours?|hrs?|days?|months?|mins?|minutes?)\b/.test(low);
+  const from = /\b(from|starting|kuanzia)\b/.test(low) || (/\bmin(?:imum)?\b/.test(low) && !durationMin);
   const num = cleaned.match(/(\d[\d.,]*(?:\s*k(?![a-z]))?)/);
   const amount = num ? parseAmount(num[1]) : null;
   if (amount == null) return base;
@@ -133,14 +157,102 @@ export function priceFromSetup(row: { pricing_mode?: string; price?: string; pri
   };
 }
 
+function unitSuffix(p: { unit?: string | null; unit_label?: string | null }): string {
+  if (p.unit && p.unit !== "item") return ` per ${labelOf(UNITS, p.unit) || p.unit}`;
+  const note = cleanUnitLabel(p.unit_label);
+  return note ? ` per ${note}` : "";
+}
+
 /** Display text derived from the typed price (what the prompt and old readers still see). */
-export function priceLabel(p: Pick<StructuredPrice, "mode" | "amount_ksh" | "min_ksh" | "max_ksh" | "unit">): string {
+export function priceLabel(p: Pick<StructuredPrice, "mode" | "amount_ksh" | "min_ksh" | "max_ksh" | "unit" | "unit_label">): string {
   const ksh = (n: number) => `KSh ${n.toLocaleString("en-US")}`;
-  const per = p.unit && p.unit !== "item" ? ` per ${labelOf(UNITS, p.unit) || p.unit}` : "";
+  const per = unitSuffix(p);
   if (p.mode === "ask" || p.amount_ksh == null) return "Ask";
   if (p.mode === "range" && p.max_ksh != null) return `${ksh(p.min_ksh ?? p.amount_ksh)}-${p.max_ksh.toLocaleString("en-US")}${per}`;
   if (p.mode === "from") return `From ${ksh(p.amount_ksh)}${per}`;
   return `${ksh(p.amount_ksh)}${per}`;
+}
+
+/** Significant words of a price line. Numbers lose commas and k/m suffixes. Glue words drop. */
+export function priceSigTokens(raw: string): string[] {
+  const stripped = raw.toLowerCase().replace(/\/=/g, " ").replace(/(\d),(?=\d)/g, "$1");
+  const out: string[] = [];
+  for (const tok of stripped.split(/[^a-z0-9.]+/)) {
+    if (!tok || tok === "." || PRICE_FILLER.includes(tok)) continue;
+    const amount = /^\d/.test(tok) ? parseAmount(tok) : null;
+    out.push(amount != null ? String(amount) : tok);
+  }
+  return out;
+}
+
+/** True when every significant word of `src` is already in `label`. */
+export function priceTextCovers(label: string, src: string): boolean {
+  const have = new Set(priceSigTokens(label));
+  return priceSigTokens(src).every((tok) => have.has(tok));
+}
+
+/** Fill a missing taxonomy unit, or the owner's own unit phrase, from the text they wrote. */
+export function withOwnerUnit<T extends Pick<StructuredPrice, "unit" | "unit_label">>(pricing: T, original: string): T {
+  const src = original.trim();
+  if (!src || pricing.unit) return pricing.unit ? { ...pricing, unit_label: null } : pricing;
+  const parsed = parsePriceText(src);
+  if (parsed.unit) return { ...pricing, unit: parsed.unit, unit_label: null };
+  const note = parsed.unit_label || cleanUnitLabel(pricing.unit_label);
+  return note ? { ...pricing, unit: null, unit_label: note } : pricing;
+}
+
+/**
+ * Price line callers should hear. The generated label wins only when it still
+ * says everything the owner wrote. "KSh 40 per sq ft" stays that. "KSh 3,000 flat"
+ * may become "KSh 3,000". "depends on size" is never replaced with "Ask".
+ */
+export function spokenPrice(
+  pricing: Pick<StructuredPrice, "mode" | "amount_ksh" | "min_ksh" | "max_ksh" | "unit" | "unit_label">,
+  original?: string | null,
+): string {
+  const src = String(original ?? "").trim();
+  const label = priceLabel(withOwnerUnit(pricing, src));
+  if (!src || priceTextCovers(label, src)) return label;
+  return src;
+}
+
+function sameMoney(a: Pick<StructuredPrice, "mode" | "amount_ksh" | "max_ksh">, b: Pick<StructuredPrice, "mode" | "amount_ksh" | "max_ksh">): boolean {
+  return a.mode === b.mode && a.amount_ksh === b.amount_ksh && a.max_ksh === b.max_ksh;
+}
+
+/**
+ * What Yes / Change stores. Yes keeps the owner's wording when the label would
+ * drop a unit or a qualifier. A changed amount keeps the unit. A unit the owner
+ * picked in the sheet replaces the old phrase.
+ */
+export function confirmPriceFields(args: {
+  storedText: string;
+  storedPricing: StructuredPrice | null;
+  incoming: StructuredPrice;
+}): { text: string; pricing: StructuredPrice } {
+  const storedText = args.storedText.trim();
+  const stored = args.storedPricing;
+  const incoming = args.incoming;
+  const sourceText = String(stored?.parsed_from || storedText).trim() || storedText;
+  const seeded: StructuredPrice = {
+    ...incoming,
+    unit: incoming.unit || stored?.unit || null,
+    unit_label: incoming.unit ? null : incoming.unit_label || stored?.unit_label || null,
+  };
+  const hydrated = withOwnerUnit(seeded, sourceText);
+  const untouched = !!stored && sameMoney(stored, incoming) && (incoming.unit || null) === (stored.unit || null);
+  if (untouched) {
+    const text = spokenPrice(hydrated, sourceText);
+    return {
+      text,
+      pricing: { ...hydrated, in_stock: incoming.in_stock, source: "owner", confirmed: true, parsed_from: (sourceText || text).slice(0, 120) },
+    };
+  }
+  const next: StructuredPrice = (incoming.unit || null) === (stored?.unit || null)
+    ? { ...hydrated, in_stock: incoming.in_stock, source: "owner", confirmed: true }
+    : { ...incoming, unit_label: incoming.unit ? null : incoming.unit_label ?? null, source: "owner", confirmed: true };
+  const text = priceLabel(next);
+  return { text, pricing: { ...next, parsed_from: text.slice(0, 120) } };
 }
 
 /** Item needs an owner "Is this right?" when its price was read from text and not confirmed. */
@@ -204,12 +316,14 @@ export function sanitizePricing(raw: unknown): StructuredPrice | null {
   const mode = String(r.mode || "");
   if (!["fixed", "from", "range", "ask"].includes(mode)) return null;
   const unit = typeof r.unit === "string" && UNITS.some((u) => u.id === r.unit) ? r.unit : null;
+  const unit_label = unit ? null : cleanUnitLabel(r.unit_label);
   return {
     mode: mode as PricingMode,
     amount_ksh: num(r.amount_ksh),
     min_ksh: num(r.min_ksh),
     max_ksh: num(r.max_ksh),
     unit,
+    ...(unit_label ? { unit_label } : {}),
     in_stock: typeof r.in_stock === "boolean" ? r.in_stock : null,
     source: r.source === "parsed" ? "parsed" : "owner",
     confirmed: r.confirmed === true,
@@ -233,5 +347,5 @@ export function syncPricing(item: { pricing?: unknown; unit?: string }, text: st
   const unitWord = String(item.unit || "").trim().toLowerCase();
   const unit = parsed.unit || UNITS.find((u) => u.id === unitWord || u.label === unitWord)?.id || null;
   const readable = parsed.mode !== "ask" || /^(ask|call|varies|on request)\b/i.test(t);
-  return { ...parsed, unit, in_stock: stock, source: "owner", confirmed: readable && Boolean(t) };
+  return { ...parsed, unit, unit_label: unit ? null : parsed.unit_label ?? null, in_stock: stock, source: "owner", confirmed: readable && Boolean(t) };
 }

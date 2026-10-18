@@ -300,7 +300,7 @@ export function CatalogueStep({
             onChange={(v) => onChange({ ...value, rows, holds, skipped: false, bookingMode: v })}
             options={[
               { value: "request", title: "I confirm each time", detail: "Callers ask for a time. You confirm it." },
-              { value: "confirmed_slot", title: "Book the time for me", detail: "Your Business Assistant books the time the caller asks for." },
+              { value: "confirmed_slot", title: "Note the time for me", detail: "Your Business Assistant notes the time they ask for. You confirm it." },
             ]}
           />
           <div className="px-4">
