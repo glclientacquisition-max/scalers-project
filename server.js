@@ -426,6 +426,7 @@ const {
   joinSpokenPieces,
   speakPreparedSentences,
 } = require('./src/speech/spokenStreamBuffer');
+const { createStreamJoinTrace } = require('./src/speech/streamJoinTrace');
 const { cutNoAiSlop } = require('./src/speech/noAiSlop');
 const {
   createOverlapHold,
@@ -4418,6 +4419,7 @@ mediaWss.on('connection', (ws, req) => {
             : String(result?.rawText || '').length,
           spokenEmitted: result?.spokenEmitted ?? null,
           firstTokenAt: result?.firstTokenAt || null,
+          stream: result?.streamJoins || null,
         });
       }
 
@@ -7046,6 +7048,7 @@ async function runGeminiTurnStreaming(
   let streamErr = null;
   let thoughtSignature = '';
   let modelParts = [];
+  let joinTrace = createStreamJoinTrace();
   const timeoutMs = geminiTurnTimeoutMs();
   let attempt = 0;
 
@@ -7055,6 +7058,7 @@ async function runGeminiTurnStreaming(
     buffer = createSpokenStreamBuffer({ catalogueBreath: breath });
     thoughtSignature = '';
     modelParts = [];
+    joinTrace = createStreamJoinTrace();
     streamErr = null;
     streamFailed = false;
     try {
@@ -7079,7 +7083,9 @@ async function runGeminiTurnStreaming(
             const delta = extractGeminiText(chunk);
             if (!delta) continue;
             if (!firstTokenAt) firstTokenAt = Date.now();
+            const joinedBefore = fullText;
             fullText = joinSpokenPieces(fullText, delta);
+            joinTrace.note(joinedBefore, delta, fullText);
             const pieces = buffer.push(delta);
             for (const piece of pieces) {
               if (shouldAbort?.()) break;
@@ -7099,8 +7105,9 @@ async function runGeminiTurnStreaming(
         timeoutMs,
         'Gemini stream'
       );
+      const joins = joinTrace.summary();
       console.log(
-        `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length}`
+        `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length} deltas=${joins.deltas} unspacedJoins=${joins.unspacedJoins}`
       );
       break;
     } catch (err) {
@@ -7234,6 +7241,7 @@ async function runGeminiTurnStreaming(
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
     streamed: !streamFailed,
+    streamJoins: joinTrace.summary(),
   };
 }
 

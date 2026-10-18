@@ -231,6 +231,19 @@ function noopTrace() {
   };
 }
 
+/** Stream join counts for the model stage (streamJoinTrace). Samples are redacted. */
+function streamStats(stream) {
+  const n = (v) => (Number.isFinite(v) ? v : 0);
+  return {
+    deltas: n(stream.deltas),
+    unspacedJoins: n(stream.unspacedJoins),
+    addedSpaces: n(stream.addedSpaces),
+    unspacedSamples: (Array.isArray(stream.unspacedSamples) ? stream.unspacedSamples : [])
+      .slice(0, 3)
+      .map((x) => redactText(String(x || ''))),
+  };
+}
+
 function createVoiceTrace(opts = {}) {
   const enabled = opts.enabled != null ? Boolean(opts.enabled) : voiceTraceEnabled(opts.env);
   if (!enabled) return noopTrace();
@@ -372,6 +385,7 @@ function createVoiceTrace(opts = {}) {
       outputText: redactText(info.outputText || ''),
       chars: Number.isFinite(info.chars) ? info.chars : String(info.outputText || '').length,
       spokenEmitted: info.spokenEmitted ?? null,
+      ...(info.stream && typeof info.stream === 'object' ? { stream: streamStats(info.stream) } : {}),
     });
   }
 
