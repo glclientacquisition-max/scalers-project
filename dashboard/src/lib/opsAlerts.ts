@@ -1,6 +1,7 @@
 import { isMissingTableError } from "@/lib/adminErrors";
 import {
   noticeBaseKind,
+  parseRearmMargin,
   platformCronSignals,
   positiveNumber,
   smsSignals,
@@ -15,6 +16,8 @@ import { isOpsMailConfigured, sendOpsMail } from "@/lib/opsMail";
 import {
   alertRecipients,
   opsAlertsDryRun,
+  opsAlertsStagingBlocked,
+  opsMailKeepsClaim,
   runOpsAlerts,
   type AlertNotice,
   type AlertRunResult,
@@ -43,7 +46,7 @@ function supabaseAlertStore(): AlertStore {
   const db = getSupabaseAdmin();
   return {
     async readOpenNotices() {
-      const { data, error } = await db.from(TABLE).select("id, kind, status, notified_at").in("status", LIVE);
+      const { data, error } = await db.from(TABLE).select("id, kind, status, notified_at, opened_at").in("status", LIVE);
       if (error) throw error;
       return (data || []) as AlertNotice[];
     },
@@ -154,16 +157,20 @@ function composeNotice(kind: string, recovered: boolean, detail: string): { subj
 }
 
 /**
- * One scheduled pass. Called only from the cron route, behind CRON_SECRET.
+ * One scheduled pass. Called only from GET /api/cron/ops-alerts, behind CRON_SECRET.
+ * Railway Voice calls that route. This module does not register a Vercel cron.
  * OPS_ALERTS_DRY_RUN unset, or anything but false: notices still open and resolve, no mail.
+ * Staging (staging Supabase, the staging Vercel project, or a scalers-staging host)
+ * never mails, even when dry run is off.
  */
 export async function runScheduledOpsAlerts(now: Date = new Date()): Promise<AlertRunResult> {
-  const dryRun = opsAlertsDryRun(process.env.OPS_ALERTS_DRY_RUN) || !isOpsMailConfigured();
+  const staging = opsAlertsStagingBlocked(process.env);
+  const dryRun = staging || opsAlertsDryRun(process.env.OPS_ALERTS_DRY_RUN) || !isOpsMailConfigured();
   const probe = await getSupabaseAdmin().from(TABLE).select("id", { count: "exact", head: true });
   if (probe.error) {
     if (!isMissingTableError(probe.error)) throw probe.error;
     console.warn("[ops-alerts] platform_ops_notices missing; skipping");
-    return { dryRun, recipients: 0, opened: [], resolved: [], sent: [], wouldSend: [], failed: [] };
+    return { dryRun, recipients: 0, opened: [], resolved: [], sent: [], wouldSend: [], quieted: [], failed: [] };
   }
 
   const store = supabaseAlertStore();
@@ -187,7 +194,12 @@ export async function runScheduledOpsAlerts(now: Date = new Date()): Promise<Ale
   const thresholds = walletThresholdsMinor(process.env.OPS_WALLET_ALERT_THRESHOLDS_KES, settings.sautikitWarnMinor);
   const signals: CronSignal[] = [
     ...platformCronSignals(gathered.signals, known),
-    ...walletSignals({ balanceMinor: walletMinor, thresholdsMinor: thresholds, openNotices }),
+    ...walletSignals({
+      balanceMinor: walletMinor,
+      thresholdsMinor: thresholds,
+      openNotices,
+      rearmMargin: parseRearmMargin(process.env.OPS_ALERTS_REARM_MARGIN),
+    }),
     ...smsSignals({
       balance: sms.balance,
       exhausted: sms.exhausted,
@@ -204,15 +216,17 @@ export async function runScheduledOpsAlerts(now: Date = new Date()): Promise<Ale
     recipients: settings.recipients,
     dryRun,
     now,
+    staleMs: positiveNumber(process.env.OPS_ALERTS_STALE_HOURS, 6) * 60 * 60 * 1000,
     compose: composeNotice,
     send: async (mail) => {
+      if (staging) throw new Error("staging");
       const out = await sendOpsMail({
         to: mail.to,
         subject: mail.subject,
         text: mail.text,
         ledger: { kind: `platform_ops_${noticeBaseKind(mail.kind)}`, key: mail.ledgerKey },
       });
-      if (!out.sent && out.skipped !== "already_sent") throw new Error(out.skipped || "not sent");
+      if (!opsMailKeepsClaim(out.sent, out.skipped)) throw new Error(out.skipped || "not sent");
     },
   });
   if (result.wouldSend.length) {

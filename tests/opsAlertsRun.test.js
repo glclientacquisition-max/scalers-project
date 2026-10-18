@@ -7,12 +7,18 @@ const {
   alertKindEnabled,
   alertRecipients,
   cronAuthorized,
+  noticeIsStale,
   opsAlertsDryRun,
+  opsAlertsStagingBlocked,
+  opsMailKeepsClaim,
+  replayedMailSkip,
   runOpsAlerts,
 } = require("../dashboard/src/lib/opsAlertsRun.ts");
 const {
   classifySmsCredit,
   kesLabel,
+  balanceStillLow,
+  parseRearmMargin,
   parseWalletThresholdsKes,
   platformCronSignals,
   smsLevelKind,
@@ -45,6 +51,7 @@ function memoryStore() {
         status: "open",
         detail,
         notified_at: opts?.silent ? nowIso : null,
+        opened_at: nowIso,
       });
       return true;
     },
@@ -74,7 +81,12 @@ function memoryStore() {
 function openNotices(store) {
   return store.rows
     .filter((row) => row.status === "open" || row.status === "acked")
-    .map((row) => ({ kind: row.kind, notified_at: row.notified_at, status: row.status }));
+        .map((row) => ({
+          kind: row.kind,
+          notified_at: row.notified_at,
+          status: row.status,
+          opened_at: row.opened_at,
+        }));
 }
 
 async function pass(store, balanceMinor, opts = {}) {
@@ -269,6 +281,142 @@ describe("ops alert cron", () => {
     );
     assert.equal(signals.find((row) => row.kind === "speech").hold, true);
     assert.equal(signals.some((row) => row.kind === "sautikit_low"), false);
+    const owned = platformCronSignals(
+      [
+        { kind: "speech", active: true, detail: "Down" },
+        { kind: "reasoning", active: true, detail: "Down" },
+        { kind: "phone_line", active: true, detail: "Down" },
+      ],
+      { speech: true, reasoning: true, phone: true },
+    );
+    assert.equal(owned.find((row) => row.kind === "speech").mail, false);
+    assert.equal(owned.find((row) => row.kind === "speech").recoverMail, false);
+    assert.equal(owned.find((row) => row.kind === "reasoning").mail, false);
+    assert.equal(owned.find((row) => row.kind === "reasoning").recoverMail, false);
+    assert.equal(owned.find((row) => row.kind === "phone_line").mail, true);
+  });
+
+  it("releases the claim when the ledger says the mail is still in flight", async () => {
+    assert.equal(replayedMailSkip("already_sent"), "already_sent");
+    assert.equal(replayedMailSkip("in_flight"), "in_flight");
+    assert.equal(replayedMailSkip(""), "in_flight");
+    assert.equal(opsMailKeepsClaim(0, "already_sent"), true);
+    assert.equal(opsMailKeepsClaim(0, "in_flight"), false);
+    assert.equal(opsMailKeepsClaim(1, ""), true);
+
+    const store = memoryStore();
+    const failed = await pass(store, 1_500, {
+      send: async () => {
+        throw new Error("in_flight");
+      },
+    });
+    assert.deepEqual(failed.result.failed, [walletThresholdKind(10_000)]);
+    const mailed = store.rows.find((row) => row.kind === walletThresholdKind(10_000));
+    assert.equal(mailed.notified_at, null);
+    const retried = await pass(store, 1_500);
+    assert.deepEqual(retried.result.sent.map((row) => row.kind), [walletThresholdKind(10_000)]);
+  });
+
+  it("does not re-arm while the balance hovers within 10 percent of the threshold", async () => {
+    assert.equal(parseRearmMargin("10%"), 0.1);
+    assert.equal(parseRearmMargin("0.10"), 0.1);
+    assert.equal(parseRearmMargin(""), 0.1);
+    const store = memoryStore();
+    const thresholds = [10_000];
+    const first = await pass(store, 9_000, { thresholds });
+    assert.deepEqual(first.result.sent.map((row) => row.kind), [walletThresholdKind(10_000)]);
+
+    const hover = await pass(store, 10_500, { thresholds });
+    assert.deepEqual(hover.result.sent, []);
+    assert.deepEqual(hover.result.resolved, []);
+    assert.equal(store.rows.filter((row) => row.status === "open").length, 1);
+    assert.equal(balanceStillLow(10_500, 10_000, true, 0.1), true);
+    assert.equal(balanceStillLow(11_000, 10_000, true, 0.1), true);
+
+    const clear = await pass(store, 11_001, { thresholds });
+    assert.deepEqual(clear.result.resolved, [walletThresholdKind(10_000)]);
+    assert.deepEqual(clear.result.sent, []);
+    assert.equal(balanceStillLow(11_001, 10_000, false, 0.1), false);
+
+    const again = await pass(store, 9_000, { thresholds });
+    assert.deepEqual(again.result.sent.map((row) => row.kind), [walletThresholdKind(10_000)]);
+  });
+
+  it("claims an old unsent notice without mailing it when dry run turns off", async () => {
+    const store = memoryStore();
+    const kind = walletThresholdKind(10_000);
+    const old = new Date(NOW.getTime() - 7 * 60 * 60 * 1000).toISOString();
+    store.rows.push({
+      id: "old",
+      kind,
+      status: "open",
+      detail: "KES 15, below KES 100",
+      notified_at: null,
+      opened_at: old,
+    });
+    const sent = [];
+    const staleMs = 6 * 60 * 60 * 1000;
+    const result = await runOpsAlerts({
+      store,
+      signals: walletSignals({
+        balanceMinor: 1_500,
+        thresholdsMinor: [10_000],
+        openNotices: openNotices(store),
+      }),
+      kinds: {},
+      recipients: ["ops@example.com"],
+      dryRun: false,
+      now: NOW,
+      staleMs,
+      compose: (_kind, _recovered, detail) => ({ subject: kind, text: detail }),
+      send: async (mail) => {
+        sent.push(mail);
+      },
+    });
+    assert.deepEqual(sent, []);
+    assert.deepEqual(result.sent, []);
+    assert.deepEqual(result.quieted, [kind]);
+    assert.equal(store.rows[0].notified_at, NOW.toISOString());
+    assert.equal(noticeIsStale(old, NOW, staleMs), true);
+
+    const fresh = memoryStore();
+    const freshSent = [];
+    const recent = await runOpsAlerts({
+      store: fresh,
+      signals: walletSignals({
+        balanceMinor: 1_500,
+        thresholdsMinor: [10_000],
+        openNotices: [],
+      }),
+      kinds: {},
+      recipients: ["ops@example.com"],
+      dryRun: false,
+      now: NOW,
+      staleMs,
+      compose: (_kind, _recovered, detail) => ({ subject: kind, text: detail }),
+      send: async (mail) => {
+        freshSent.push(mail);
+      },
+    });
+    assert.equal(freshSent.length, 1);
+    assert.deepEqual(recent.quieted, []);
+  });
+
+  it("blocks staging mail even when dry run is off", () => {
+    const stagingUrl = "https://sgcdncjxauhsbunobmob.supabase.co";
+    const prodUrl = "https://fjxcdccgyhnvnnlnovcl.supabase.co";
+    assert.equal(opsAlertsStagingBlocked({ SUPABASE_URL: stagingUrl, OPS_ALERTS_DRY_RUN: "false" }), true);
+    assert.equal(opsAlertsStagingBlocked({ VERCEL_PROJECT_ID: "prj_koYxAaXjOZ9QYA7hVB2SUOEAmyoB" }), true);
+    assert.equal(opsAlertsStagingBlocked({ VERCEL_URL: "scalers-staging.vercel.app" }), true);
+    assert.equal(opsAlertsStagingBlocked({ SUPABASE_URL: prodUrl, OPS_ALERTS_DRY_RUN: "false" }), false);
+    assert.equal(opsAlertsDryRun("false"), false);
+    const vercel = JSON.parse(fs.readFileSync("dashboard/vercel.json", "utf8"));
+    assert.equal(vercel.crons, undefined);
+    const ops = fs.readFileSync("dashboard/src/lib/opsAlerts.ts", "utf8");
+    assert.match(ops, /opsAlertsStagingBlocked\(process\.env\)/);
+    assert.match(ops, /if \(staging\) throw new Error\("staging"\)/);
+    const mail = fs.readFileSync("dashboard/src/lib/opsMail.ts", "utf8");
+    assert.match(mail, /replayedMailSkip\(reservation\.reason\)/);
   });
 });
 

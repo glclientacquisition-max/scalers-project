@@ -11,11 +11,5 @@
       "main": true,
       "cursor/staging-voice-468b": true
     }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/ops-alerts",
-      "schedule": "*/10 * * * *"
-    }
-  ]
+  }
 }

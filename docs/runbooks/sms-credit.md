@@ -29,4 +29,5 @@ Admin shows SMS. The notice says credits are below the warn line (default 100), 
 ## Rollback / recovery
 
 - The notice re-arms when a later reading is above that level. It does not send a recovery mail.
-- Turning the cron off is `OPS_ALERTS_DRY_RUN` left unset (dry run) or removing `CRON_SECRET`.
+- A failed recovery mail is not retried. The notice is already resolved.
+- Stopping the pass is `OPS_ALERTS_DRY_RUN` left unset (dry run) or removing `CRON_SECRET`. Staging never sends. Contract: [`OPS_ALERTS_ENDPOINT.md`](../reference/operations/OPS_ALERTS_ENDPOINT.md).

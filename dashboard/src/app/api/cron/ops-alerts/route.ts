@@ -3,8 +3,9 @@ import { runScheduledOpsAlerts } from "@/lib/opsAlerts";
 import { cronAuthorized } from "@/lib/opsAlertsRun";
 
 /**
- * Vercel cron, every 10 minutes (dashboard/vercel.json). Opens and resolves
- * platform notices and mails the Admin list once per notice.
+ * Authenticated ops-alert pass. Hobby Vercel cannot run a sub-daily cron, so
+ * nothing in vercel.json schedules this. Railway Voice calls it.
+ * Contract: docs/reference/operations/OPS_ALERTS_ENDPOINT.md
  * Refuses anything without `Authorization: Bearer $CRON_SECRET`.
  * With no CRON_SECRET set, or a secret under 16 characters, it refuses everything.
  */
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
       resolved: result.resolved.length,
       sent: result.sent.length,
       wouldSend: result.wouldSend.length,
+      quieted: result.quieted.length,
       failed: result.failed.length,
     });
   } catch (err) {

@@ -6,9 +6,10 @@
  * A mailed notice is claimed first (`notified_at` null to now). Only the run
  * that wins the claim sends. A failed send releases the claim. A silent latch
  * is inserted already claimed, so a second threshold does not send a second mail.
- * Dry run sends nothing and does not claim a mail. It does open notices, so the
- * first live run still sends each open mail once. Recovery mail is once, and
- * only when the signal asks for it and the opening alert was actually sent.
+ * Dry run sends nothing and does not claim a mail. A live run still sends a
+ * fresh notice once. A notice older than the stale window is claimed without
+ * mail, so turning dry run off does not empty the inbox. Recovery mail is
+ * once. A failed recovery send is not retried: the notice is already resolved.
  *
  * Recipients come from the Admin list. This module does not read the environment.
  */
@@ -29,6 +30,7 @@ export type AlertNotice = {
   kind: AlertKind;
   status: "open" | "acked" | "resolved";
   notified_at: string | null;
+  opened_at?: string | null;
 };
 
 export type AlertStore = {
@@ -52,6 +54,8 @@ export type AlertRunResult = {
   resolved: AlertKind[];
   sent: Array<{ kind: AlertKind; recovered: boolean }>;
   wouldSend: Array<{ kind: AlertKind; recovered: boolean }>;
+  /** Opened longer ago than the stale window. Claimed, not mailed. */
+  quieted: AlertKind[];
   failed: AlertKind[];
 };
 
@@ -100,7 +104,41 @@ export function alertKindEnabled(kind: string, flags: Record<string, boolean>): 
   return true;
 }
 
-/** Vercel cron sends `Authorization: Bearer <CRON_SECRET>`. No secret, or a short one, refuses every call. */
+/**
+ * Staging Desk must not send ops mail, even when dry run is explicitly off.
+ * The staging Supabase ref, the staging Vercel project, or a scalers-staging host.
+ */
+const STAGING_SUPABASE_REF = "sgcdncjxauhsbunobmob";
+const STAGING_VERCEL_PROJECT_ID = "prj_koYxAaXjOZ9QYA7hVB2SUOEAmyoB";
+
+export function opsAlertsStagingBlocked(env: NodeJS.ProcessEnv | Record<string, string | undefined>): boolean {
+  if (String(env.VERCEL_PROJECT_ID || "") === STAGING_VERCEL_PROJECT_ID) return true;
+  const haystack = [env.SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_URL, env.VERCEL_URL, env.NEXT_PUBLIC_APP_URL]
+    .map((value) => String(value || ""))
+    .join(" ");
+  if (haystack.includes(STAGING_SUPABASE_REF)) return true;
+  return /scalers-staging/i.test(haystack);
+}
+
+/** A replayed ledger row that already went out keeps the claim. in_flight does not. */
+export function replayedMailSkip(reason: string | null | undefined): "already_sent" | "in_flight" {
+  return reason === "already_sent" ? "already_sent" : "in_flight";
+}
+
+/** True only when the message went out, or the ledger already has it as sent. */
+export function opsMailKeepsClaim(sent: number, skipped: string): boolean {
+  return sent > 0 || skipped === "already_sent";
+}
+
+/** Older than the window. Missing opened_at is not stale. */
+export function noticeIsStale(openedAt: string | null | undefined, now: Date, staleMs: number | undefined): boolean {
+  if (!staleMs || staleMs <= 0 || !openedAt) return false;
+  const opened = Date.parse(openedAt);
+  if (!Number.isFinite(opened)) return false;
+  return now.getTime() - opened > staleMs;
+}
+
+/** Bearer `Authorization: Bearer <CRON_SECRET>`. No secret, or a short one, refuses every call. */
 export function cronAuthorized(header: string | null | undefined, secret: string | undefined | null): boolean {
   const want = String(secret || "");
   if (want.length < 16) return false;
@@ -119,6 +157,8 @@ export async function runOpsAlerts(input: {
   recipients: string[];
   dryRun: boolean;
   now: Date;
+  /** Unnotified notices older than this are claimed and not mailed. Unset or 0 leaves them. */
+  staleMs?: number;
   compose: (kind: AlertKind, recovered: boolean, detail: string) => { subject: string; text: string };
   send: (mail: AlertMail) => Promise<void>;
 }): Promise<AlertRunResult> {
@@ -131,6 +171,7 @@ export async function runOpsAlerts(input: {
     resolved: [],
     sent: [],
     wouldSend: [],
+    quieted: [],
     failed: [],
   };
   const canMail = recipients.length > 0;
@@ -181,6 +222,10 @@ export async function runOpsAlerts(input: {
       continue;
     }
     if (notice.notified_at || !canMail) continue;
+    if (!dryRun && noticeIsStale(notice.opened_at, input.now, input.staleMs)) {
+      if (await store.claimNotified(notice.id, nowIso)) result.quieted.push(notice.kind);
+      continue;
+    }
     const mail = compose(notice.kind, false, signal.detail);
     if (dryRun) {
       result.wouldSend.push({ kind: notice.kind, recovered: false });

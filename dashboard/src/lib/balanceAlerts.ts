@@ -18,6 +18,8 @@ export type SmsCreditLevel = (typeof SMS_LEVELS)[number];
 export const DEFAULT_WALLET_THRESHOLDS_KES = [500, 100];
 export const DEFAULT_SMS_WARN_BELOW = 100;
 export const DEFAULT_SMS_CRITICAL_AT = 20;
+/** Stay latched until the balance is above threshold * (1 + margin). */
+export const DEFAULT_REARM_MARGIN = 0.1;
 
 export type CronSignal = {
   kind: string;
@@ -85,6 +87,35 @@ export function parseWalletThresholdsKes(raw: string | null | undefined): number
   return [...out].sort((a, b) => b - a);
 }
 
+/**
+ * Fraction above the threshold. `0.10` and `10%` both mean ten percent.
+ * A number greater than 1 is read as a percent (10 means 10%).
+ */
+export function parseRearmMargin(raw: string | null | undefined, fallback = DEFAULT_REARM_MARGIN): number {
+  const text = String(raw ?? "").trim();
+  if (!text) return fallback;
+  const value = Number(text.replace(/%$/, ""));
+  if (!Number.isFinite(value) || value < 0) return fallback;
+  if (text.endsWith("%") || value > 1) return value / 100;
+  return value;
+}
+
+/** Minor units. The notice stays open until the balance is strictly above this. */
+export function rearmCeilingMinor(thresholdMinor: number, margin: number): number {
+  const m = Number.isFinite(margin) && margin >= 0 ? margin : DEFAULT_REARM_MARGIN;
+  return Math.ceil(thresholdMinor * (1 + m));
+}
+
+/**
+ * Crossed when the balance is at or under the threshold.
+ * An open notice stays crossed until the balance is above the ceiling.
+ */
+export function balanceStillLow(balance: number, threshold: number, open: boolean, margin: number): boolean {
+  if (balance <= threshold) return true;
+  if (!open) return false;
+  return balance <= rearmCeilingMinor(threshold, margin);
+}
+
 /** Admin low-money amount plus the env list. Zero or blank admin amount is skipped. */
 export function walletThresholdsMinor(
   envRaw: string | null | undefined,
@@ -106,6 +137,8 @@ export function walletSignals(input: {
   balanceMinor: number | null;
   thresholdsMinor: number[];
   openNotices: readonly OpenNotice[];
+  /** Default 0.10. Re-arm only above threshold * (1 + margin). */
+  rearmMargin?: number;
 }): CronSignal[] {
   const open = liveNotices(input.openNotices);
   const openKinds = new Set(open.map((notice) => notice.kind));
@@ -119,6 +152,7 @@ export function walletSignals(input: {
   }
 
   const balance = input.balanceMinor;
+  const margin = input.rearmMargin ?? DEFAULT_REARM_MARGIN;
   const empty = balance <= 0;
   const crossed = thresholds.filter((threshold) => balance <= threshold);
   const unsent = crossed.filter((threshold) => !notified.has(walletThresholdKind(threshold)));
@@ -151,11 +185,17 @@ export function walletSignals(input: {
   for (const threshold of thresholds) {
     const kind = walletThresholdKind(threshold);
     const isCrossed = balance <= threshold;
+    const open = openKinds.has(kind);
+    const active = balanceStillLow(balance, threshold, open, margin);
+    const ceiling = rearmCeilingMinor(threshold, margin);
     signals.push(
       signal({
         kind,
-        active: isCrossed,
-        detail: `${kesLabel(balance)}, below ${kesLabel(threshold)}`,
+        active,
+        detail:
+          open && !isCrossed && active
+            ? `${kesLabel(balance)}, holding until ${kesLabel(ceiling)}`
+            : `${kesLabel(balance)}, below ${kesLabel(threshold)}`,
         mail: !empty && isCrossed && lowestUnsent === threshold,
         recoverMail: false,
       }),
@@ -250,13 +290,15 @@ export function platformCronSignals(base: BaseSignal[], known: HealthKnown): Cro
         (row.kind === "speech" && !known.speech) ||
         (row.kind === "reasoning" && !known.reasoning) ||
         (row.kind === "phone_line" && !known.phone);
+      // Voice notePlatformOpsDegrade already mails speech and reasoning.
+      const voiceOwnsMail = row.kind === "speech" || row.kind === "reasoning";
       return signal({
         kind: row.kind,
         active: holdRow ? false : row.active,
         detail: row.detail,
         hold: holdRow,
-        mail: true,
-        recoverMail: true,
+        mail: !voiceOwnsMail,
+        recoverMail: !voiceOwnsMail,
       });
     });
 }

@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-175 variables.
+177 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -69,8 +69,10 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `NEXT_RUNTIME` | desk | `dashboard/src/lib/adminQuality.ts` |
 | `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+4 more |
 | `OPS_ALERTS_DRY_RUN` | desk | `dashboard/src/lib/opsAlerts.ts` |
+| `OPS_ALERTS_REARM_MARGIN` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_ALERTS_SIMULATE_SMS_CREDIT` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_ALERTS_SIMULATE_WALLET_MINOR` | desk | `dashboard/src/lib/opsAlerts.ts` |
+| `OPS_ALERTS_STALE_HOURS` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_EMAIL_FROM` | desk | `dashboard/src/lib/opsMail.ts` |
 | `OPS_SMS_CREDIT_CRITICAL_AT` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_SMS_CREDIT_WARN_BELOW` | desk | `dashboard/src/lib/opsAlerts.ts` |
