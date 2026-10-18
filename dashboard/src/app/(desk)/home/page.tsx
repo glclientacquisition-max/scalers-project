@@ -45,6 +45,7 @@ import { Stamp } from "@/components/ui/Stamp";
 import { HomeCapture } from "@/components/HomeCapture";
 import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { HomeCallSetupCard } from "@/components/HomeCallSetupCard";
+import { HomeUsageSection } from "@/components/HomeUsageSection";
 import { toLocal07 } from "@/lib/callForwarding";
 import { loadCallSetupState } from "@/lib/callSetupServer";
 import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
@@ -507,29 +508,14 @@ async function HomeOverviewBody() {
             </section>
 
             <RoleGate action="usage.view" mode="hide">
-            <section aria-label="Usage" className="border-t border-hairline px-4 py-4">
-              <p className="text-body font-medium tabular-nums text-ink">
-                {minutesLeft.toLocaleString("en-KE")} min left
-              </p>
-              <p className="mt-0.5 text-meta text-ink-2">{packLabel}</p>
-              {minuteStatus ? (
-                <p className="mt-0.5 text-meta font-medium text-ink">{minuteStatus}</p>
-              ) : null}
-              {lowNotice ? (
-                <p role="status" className="mt-1 text-meta font-medium text-warn">{lowNotice}</p>
-              ) : null}
-              {lowNotice && lowNoticeNote ? (
-                <p className="mt-0.5 text-meta text-ink-2">{lowNoticeNote}</p>
-              ) : null}
-              {lowNotice || (minuteStatus && !isBeta) ? (
-                <Link
-                  href="/wallet"
-                  className={`mt-1 inline-flex min-h-11 items-center text-body font-medium text-accent hover:underline ${focusRingVisible}`}
-                >
-                  Usage
-                </Link>
-              ) : null}
-            </section>
+            <HomeUsageSection
+              minutesLeft={minutesLeft}
+              packLabel={packLabel}
+              minuteStatus={minuteStatus}
+              lowNotice={lowNotice}
+              lowNoticeNote={lowNoticeNote}
+              showLink={Boolean(lowNotice || (minuteStatus && !isBeta))}
+            />
             </RoleGate>
 
             {showCta ? (

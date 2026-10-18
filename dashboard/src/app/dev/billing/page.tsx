@@ -1,33 +1,28 @@
 import { notFound } from "next/navigation";
+import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { BillingFixture } from "./BillingFixture";
+import { BILLING_PREVIEWS, type BillingPreview } from "./previews";
 
 export const instant = false;
 
-/** Plan and Billing fixtures. DASHBOARD_OPEN=true only. Not a live workspace. */
+/** Plan, Billing, Usage, Team, and Home fixtures in the desk shell. DASHBOARD_OPEN=true only. Not a live workspace. */
 export default async function DevBillingPage({
   searchParams,
 }: {
   searchParams: Promise<{ view?: string }>;
 }) {
   if (process.env.DASHBOARD_OPEN !== "true") notFound();
-  const raw = (await searchParams).view || "beta";
-  const allowed = [
-    "beta",
-    "plan",
-    "plan-annual",
-    "plan-confirm",
-    "billing",
-    "billing-empty",
-    "usage-beta",
-    "usage-paid",
-    "trial",
-    "banner",
-    "team",
-  ] as const;
-  const view = allowed.includes(raw as (typeof allowed)[number]) ? (raw as (typeof allowed)[number]) : "beta";
+  const raw = (await searchParams).view || "plan-beta";
+  const view: BillingPreview = BILLING_PREVIEWS.includes(raw as BillingPreview) ? (raw as BillingPreview) : "plan-beta";
   return (
-    <div className="desk-theme flex min-h-dvh flex-col bg-canvas px-4 py-4 sm:px-6 md:p-6">
-      <BillingFixture view={view} />
+    <div className={deskShellClass}>
+      <DeskRail needsCount={0} homeHref="/dev/billing?view=home-beta" />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
+        <main data-desk-main="" className={deskMainClass}>
+          <BillingFixture view={view} />
+        </main>
+        <DeskTabBar needsCount={0} />
+      </div>
     </div>
   );
 }
