@@ -4,12 +4,12 @@ const {
   EXAMPLE_COMPANY,
   OWNER_SUPPLIED_DETAILS,
   invoiceModel,
-  receiptModel,
   renderInvoiceHtml,
   renderReceiptHtml,
 } = require("../dashboard/src/lib/invoicePay/documents");
 const { renderInvoicePdf, renderReceiptPdf } = require("../dashboard/src/lib/invoicePay/pdf");
-const { shapeBillingHistory } = require("../dashboard/src/lib/invoicePay/history");
+const { invoiceDocumentFor, shapeBillingHistory } = require("../dashboard/src/lib/invoicePay/history");
+const { openInvoice, paidInvoice, receiptDoc, splitInvoice } = require("../dashboard/src/lib/invoicePay/samples");
 const {
   issuedNotice,
   dueSoonNotice,
@@ -18,80 +18,131 @@ const {
 } = require("../src/billing/invoiceNotices");
 const { sendClaimedBillingNotices } = require("../src/billing/billingNoticeSend");
 
-const sampleInvoice = {
-  number: "SCL-2026-000001",
-  issuedAt: "2026-10-18T08:00:00Z",
-  dueAt: "2026-10-25T08:00:00Z",
-  periodStart: "2026-10-01T00:00:00Z",
-  periodEnd: "2026-10-31T21:00:00Z",
-  subtotalKes: "7000.00",
-  creditsAppliedKes: "500.00",
-  totalKes: "6500.00",
-  amountPaidKes: "0",
-};
-
-const sampleLines = [
-  { kind: "plan", description: "Business Assistant plan", quantity: "1", unitAmountKes: "5000.00", amountKes: "5000.00" },
-  { kind: "extra_minutes", description: "Extra minutes", quantity: "100", unitAmountKes: "6.00", amountKes: "600.00" },
-  { kind: "extra_seats", description: "Extra seats", quantity: "1", unitAmountKes: "800.00", amountKes: "800.00" },
-  { kind: "message_credits", description: "Message credits", quantity: "50", unitAmountKes: "2.00", amountKes: "100.00" },
-  { kind: "proration", description: "Proration", quantity: "1", unitAmountKes: "500.00", amountKes: "500.00" },
-];
-
-const sampleBillTo = {
-  businessName: "example business",
-  ownerName: "example owner",
-  email: "example@example.com",
-  phone: "example phone",
-};
-
 function sampleDocs() {
-  const invoice = invoiceModel({
-    invoice: sampleInvoice,
-    lines: sampleLines,
-    billTo: sampleBillTo,
-    payUrl: "https://app.scalers.co.ke/pay/example-token",
-  });
-  const receipt = receiptModel({
-    billTo: sampleBillTo,
-    receipt: {
-      number: "RCT-2026-000001",
-      invoiceNumber: "SCL-2026-000001",
-      reference: "example-bachs-ref",
-      amountKes: "6500.00",
-      method: "M-Pesa",
-      paidAt: "2026-10-18T12:00:00Z",
-    },
-  });
-  return { invoice, receipt };
+  return { invoice: openInvoice(), receipt: receiptDoc() };
 }
 
 describe("invoice documents", () => {
-  it("shows the example company, the lines, and no VAT", () => {
+  it("shows the example company, the locked prices, and no VAT", () => {
     const { invoice, receipt } = sampleDocs();
     assert.equal(invoice.company.address, EXAMPLE_COMPANY.address);
     assert.match(invoice.company.kraPin, /^example/);
-    assert.equal(invoice.total, "KSh 6,500");
-    assert.equal(invoice.credits, "KSh 500");
+    assert.equal(invoice.statusLabel, "Open");
     assert.equal(invoice.lines.length, 5);
+    assert.equal(invoice.lines[0].label, "Growth plan, monthly (Business Assistant)");
+    assert.equal(invoice.lines[0].detail, "1 Oct 2026 to 1 Nov 2026");
+    assert.equal(invoice.lines[0].unit, "KSh 18,000");
+    assert.equal(invoice.lines[1].label, "Extra minutes, inbound");
+    assert.equal(invoice.lines[1].unit, "KSh 25");
+    assert.equal(invoice.lines[2].unit, "KSh 500");
+    assert.equal(invoice.lines[3].unit, "KSh 1");
+    assert.equal(invoice.totals.find((row) => row.label === "Subtotal").value, "KSh 20,600");
+    assert.equal(invoice.totals.find((row) => row.label === "Credits applied").value, "KSh 600");
+    assert.equal(invoice.totals.find((row) => row.emphasis).label, "Amount due");
+    assert.equal(invoice.totals.find((row) => row.emphasis).value, "KSh 20,000");
+    assert.equal(invoice.payLabel, "Pay KSh 20,000");
+    assert.equal(invoice.partLabel, "");
     assert.match(invoice.payUrl, /\/pay\/example-token$/);
-    const html = renderInvoiceHtml(invoice);
+    const html = renderInvoiceHtml(invoice).replace(/src="data:image[^"]*"/, 'src=""');
     const receiptHtml = renderReceiptHtml(receipt);
-    assert.match(html, /Business Assistant/);
-    assert.match(html, /Pay now/);
-    assert.match(html, /KSh 7,000/);
+    assert.match(html, /<h1>Invoice<\/h1>/);
+    assert.match(html, /class="pill">Open</);
+    assert.match(html, /<h2>From<\/h2>[\s\S]*example address/);
+    assert.match(html, /<h2>Bill to<\/h2>/);
+    assert.match(
+      html,
+      /Unit price[\s\S]*Growth plan, monthly \(Business Assistant\)[\s\S]*1 Oct 2026 to 1 Nov 2026[\s\S]*Amount due[\s\S]*Pay KSh 20,000[\s\S]*Page 1 of 1/
+    );
     assert.match(html, /example KRA PIN/);
+    assert.match(html, /Pay with M-Pesa/);
     assert.doesNotMatch(html, /VAT/);
     assert.doesNotMatch(receiptHtml, /VAT/);
-    assert.match(receiptHtml, /PAID/);
+    assert.match(receiptHtml, /Paid KSh 20,000 on 18 Oct 2026/);
     assert.match(receiptHtml, /example-bachs-ref/);
+    assert.match(receiptHtml, /Extra seats/);
     assert.ok(OWNER_SUPPLIED_DETAILS.some((line) => /KRA PIN/.test(line)));
     const pdf = renderInvoicePdf(invoice);
     const receiptPdf = renderReceiptPdf(receipt);
+    const raw = pdf.toString("latin1");
     assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
-    assert.match(pdf.toString("latin1"), /SCL-2026-000001/);
-    assert.match(receiptPdf.toString("latin1"), /PAID/);
-    assert.doesNotMatch(pdf.toString("latin1"), /VAT/);
+    assert.match(raw, /DCTDecode/);
+    assert.match(raw, /SCL-2026-000001/);
+    assert.match(raw, /Amount due/);
+    assert.match(raw, /From/);
+    assert.match(raw, /Page 1 of 1/);
+    assert.match(raw, /Pay KSh 20,000/);
+    assert.doesNotMatch(raw, /48 748 m/);
+    assert.doesNotMatch(raw, /VAT/);
+    const receiptRaw = receiptPdf.toString("latin1");
+    assert.match(receiptRaw, /Paid KSh 20,000 on 18 Oct 2026/);
+    assert.match(receiptRaw, /example-bachs-ref/);
+    assert.doesNotMatch(receiptRaw, /VAT/);
+  });
+
+  it("marks a paid invoice and splits a balance above KSh 150,000", () => {
+    const paid = paidInvoice();
+    assert.equal(paid.statusLabel, "Paid");
+    assert.equal(paid.payLabel, "");
+    assert.equal(paid.totals.find((row) => row.label === "Amount due").value, "KSh 0");
+    assert.doesNotMatch(renderInvoiceHtml(paid), /Pay KSh/);
+    const split = splitInvoice();
+    assert.equal(split.statusLabel, "Open");
+    assert.equal(split.lines[1].quantity, "5,600");
+    assert.equal(split.lines[1].unit, "KSh 25");
+    assert.equal(split.payLabel, "Pay KSh 80,000");
+    assert.equal(split.partLabel, "Part 1 of 2");
+    assert.match(renderInvoiceHtml(split), /Part 1 of 2/);
+    assert.match(renderInvoicePdf(split).toString("latin1"), /Part 1 of 2/);
+  });
+
+  it("derives Overdue from an open invoice past its due date", () => {
+    const overdue = invoiceDocumentFor(
+      {
+        invoice_number: "SCL-2026-000009",
+        status: "open",
+        due_at: "2020-01-01T00:00:00Z",
+        subtotal_kes: "10",
+        total_kes: "10",
+        amount_paid_kes: "0",
+      },
+      [],
+      { businessName: "example business" },
+      ""
+    );
+    assert.equal(overdue.statusLabel, "Overdue");
+    assert.equal(overdue.payLabel, "");
+    const voided = invoiceModel({
+      now: "2026-10-18T08:00:00Z",
+      invoice: { number: "SCL-2026-000010", status: "void", totalKes: "10", subtotalKes: "10", amountPaidKes: "0" },
+    });
+    assert.equal(voided.statusLabel, "Void");
+  });
+
+  it("numbers a second page when the line table runs past one sheet", () => {
+    const long = invoiceModel({
+      now: "2026-10-18T08:00:00Z",
+      invoice: {
+        number: "SCL-2026-000099",
+        status: "open",
+        issuedAt: "2026-10-18T08:00:00Z",
+        dueAt: "2026-10-25T08:00:00Z",
+        subtotalKes: "40",
+        totalKes: "40",
+        amountPaidKes: "0",
+      },
+      lines: Array.from({ length: 40 }, () => ({
+        kind: "extra_minutes",
+        description: "Extra minutes, inbound",
+        quantity: "1",
+        unitAmountKes: "1",
+        amountKes: "1",
+      })),
+    });
+    const raw = renderInvoicePdf(long).toString("latin1");
+    const count = Number(raw.match(/\/Count (\d+)/)[1]);
+    assert.ok(count >= 2);
+    assert.match(raw, new RegExp(`Page 1 of ${count}`));
+    assert.match(raw, new RegExp(`Page ${count} of ${count}`));
   });
 
   it("lists invoices and receipts for the owner history API", () => {

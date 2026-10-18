@@ -24,12 +24,19 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!receipt.data) return NextResponse.json({ error: "not found" }, { status: 404 });
   const invoice = await admin
     .from("invoices")
-    .select("invoice_number")
+    .select("invoice_number, period_start, period_end, subtotal_kes, credits_applied_kes, total_kes")
     .eq("id", receipt.data.invoice_id)
     .eq("tenant_id", tenant.id)
     .maybeSingle();
+  const lines = await admin
+    .from("invoice_lines")
+    .select("kind, description, quantity, unit_amount_kes, amount_kes, sort_order")
+    .eq("tenant_id", tenant.id)
+    .eq("invoice_id", receipt.data.invoice_id)
+    .order("sort_order", { ascending: true });
+  if (lines.error) return NextResponse.json({ error: "Could not load this receipt." }, { status: 503 });
   const url = new URL(request.url);
-  const doc = receiptDocumentFor(receipt.data, billToFromTenant(tenant), invoice.data?.invoice_number || "");
+  const doc = receiptDocumentFor(receipt.data, billToFromTenant(tenant), invoice.data || {}, lines.data || []);
   if (url.searchParams.get("format") === "pdf") {
     const pdf = renderReceiptPdf(doc);
     return new NextResponse(new Uint8Array(pdf), {

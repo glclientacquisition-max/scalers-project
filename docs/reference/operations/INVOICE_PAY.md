@@ -102,9 +102,11 @@ Set these on Vercel Preview (staging). Leave them off production.
 
 ## Documents
 
-An issued invoice has an HTML view and a PDF. Both show Scalers, Business Assistant, bill-to (business name, owner, email, phone), invoice number, issue date, due date, billing period, line items (plan, extra minutes, extra seats, message credits, proration) with quantity, unit price, and amount, subtotal, credits applied when any were applied, total due in KSh, amount paid, and balance. Payment instructions say to pay with M-Pesa. A live invoice does not embed the pay token. The sample artifacts use `https://app.scalers.co.ke/pay/example-token`.
+An issued invoice has an HTML view and a PDF. Both are A4. The header has the Scalers wordmark on the left. On the right: Invoice, the number, the issue date, the due date, and a status pill (Open, Paid, Overdue, or Void). From and Bill to are two columns. The line table headers are Description, Qty, Unit price, and Amount. The billing period sits under the plan line. Totals are right aligned: Subtotal, Credits applied when any were applied, Total, Amount paid, and Amount due. When a pay URL is passed, the page includes a Pay KSh link and a short M-Pesa note. Above KSh 150,000 that link is the next M-Pesa part (Part 1 of 2, and so on). A live invoice does not embed the pay token, so the link is absent there. The footer has the support contact, the invoice number, and Page x of y. There is no VAT line.
 
-A receipt shows the receipt number, the M-Pesa or Bachs reference, the amount, the method, the date, and `PAID`.
+A receipt uses the same frame. It leads with Paid KSh X on the payment date, then the method (M-Pesa), the reference, the invoice it settles, and the same line items.
+
+Sample renders use the prices the owner locked for those examples: Growth monthly KSh 18,000, extra seats KSh 500, inbound minutes KSh 25, message credits KSh 1. Proration, credits applied, the bill-to, and the company address on the samples stay example. The package catalogue is unchanged. The sample pay link is `https://app.scalers.co.ke/pay/example-token`.
 
 Company lines that are not in the repo are labelled example: address, city, KRA PIN, phone, and billing email. The owner supplies these before a customer invoice:
 

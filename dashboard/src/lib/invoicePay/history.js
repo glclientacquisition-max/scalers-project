@@ -62,10 +62,21 @@ function shapeBillingHistory(input) {
   };
 }
 
+function documentLines(lines) {
+  return (lines || []).map((line) => ({
+    kind: line.kind,
+    description: line.description,
+    quantity: line.quantity,
+    unitAmountKes: line.unit_amount_kes,
+    amountKes: line.amount_kes,
+  }));
+}
+
 function invoiceDocumentFor(row, lines, billTo, payUrl) {
   return invoiceModel({
     invoice: {
       number: row.invoice_number,
+      status: row.status,
       issuedAt: row.issued_at,
       dueAt: row.due_at,
       periodStart: row.period_start,
@@ -75,28 +86,31 @@ function invoiceDocumentFor(row, lines, billTo, payUrl) {
       totalKes: row.total_kes,
       amountPaidKes: row.amount_paid_kes,
     },
-    lines: (lines || []).map((line) => ({
-      kind: line.kind,
-      description: line.description,
-      quantity: line.quantity,
-      unitAmountKes: line.unit_amount_kes,
-      amountKes: line.amount_kes,
-    })),
+    lines: documentLines(lines),
     billTo,
     payUrl,
   });
 }
 
-function receiptDocumentFor(row, billTo, invoiceNumber) {
+function receiptDocumentFor(row, billTo, invoice, lines) {
+  const source = invoice && typeof invoice === "object" ? invoice : { invoice_number: invoice || "" };
   return receiptModel({
     receipt: {
       number: row.receipt_number,
-      invoiceNumber,
+      invoiceNumber: source.invoice_number || "",
       reference: row.provider_ref,
       amountKes: row.amount_kes,
       method: row.method,
       paidAt: row.paid_at,
     },
+    invoice: {
+      periodStart: source.period_start,
+      periodEnd: source.period_end,
+      subtotalKes: source.subtotal_kes,
+      creditsAppliedKes: source.credits_applied_kes,
+      totalKes: source.total_kes,
+    },
+    lines: documentLines(lines),
     billTo,
   });
 }
