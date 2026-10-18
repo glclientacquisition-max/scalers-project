@@ -1,5 +1,5 @@
 /**
- * Invoice pay copy. Paid is a server status. No token, no Pay button. No /pay route.
+ * Invoice pay copy. Paid is a server status. The Desk never builds a pay URL; it follows the one the API returns.
  * Run: node --experimental-strip-types --test tests/invoicePayState.test.ts
  */
 import { describe, it } from "node:test";
@@ -19,39 +19,58 @@ describe("invoicePayState", () => {
   });
 
   it("says Checking payment after a return until the webhook marks it paid", () => {
-    const view = invoicePayState({ status: "open", returnedFromPay: true, payToken: "tok" });
+    const view = invoicePayState({
+      status: "open",
+      returnedFromPay: true,
+      payLinkPath: "/api/billing/invoices/1/pay-link",
+    });
     assert.equal(view.label, "Checking payment");
     assert.equal(view.showPayButton, false);
     assert.equal(invoicePayState({ status: "paid", returnedFromPay: true }).label, "Paid");
   });
 
-  it("hides Pay KSh X when there is no token", () => {
-    const view = invoicePayState({ status: "open", payToken: null });
-    assert.equal(view.showPayButton, false);
-    assert.equal(view.payHref, null);
-    assert.equal(view.note, null);
-    const withToken = invoicePayState({ status: "open", payToken: "abc" });
-    assert.equal(withToken.showPayButton, true);
-    assert.equal(withToken.payHref, "/pay/abc");
+  it("shows Pay only when a pay link exists and the account is not beta", () => {
+    const hidden = invoicePayState({ status: "open", payLinkPath: null });
+    assert.equal(hidden.showPayButton, false);
+    assert.equal(hidden.payLinkPath, null);
+    const beta = invoicePayState({
+      status: "open",
+      payLinkPath: "/api/billing/invoices/1/pay-link",
+      beta: true,
+    });
+    assert.equal(beta.showPayButton, false);
+    const ready = invoicePayState({ status: "open", payLinkPath: "/api/billing/invoices/1/pay-link" });
+    assert.equal(ready.showPayButton, true);
+    assert.equal(ready.payLinkPath, "/api/billing/invoices/1/pay-link");
+    assert.equal(invoicePayState({ status: "paid", payLinkPath: "/api/billing/invoices/1/pay-link" }).showPayButton, false);
   });
 
   it("hides drafts", () => {
     assert.equal(invoicePayState({ status: "draft" }).hidden, true);
   });
 
-  it("does not let the client set paid, and does not ship /pay", () => {
+  it("does not let the client set paid", () => {
     const check = fs.readFileSync(
       path.join(root, "dashboard/src/components/plan/PaymentCheck.tsx"),
       "utf8",
     );
     assert.match(check, /router\.refresh/);
     assert.doesNotMatch(check, /status:\s*["']paid["']|setStatus\(|paid:\s*true/);
-    assert.equal(fs.existsSync(path.join(root, "dashboard/src/app/pay")), false);
-    assert.equal(fs.existsSync(path.join(root, "dashboard/src/app/(desk)/pay")), false);
+    const state = fs.readFileSync(path.join(root, "dashboard/src/lib/invoicePayState.ts"), "utf8");
+    assert.doesNotMatch(state, /\/pay\/\$\{/);
+    assert.doesNotMatch(state, /pay_token|payToken|credit_kes/);
     const actions = fs.readFileSync(
       path.join(root, "dashboard/src/app/(desk)/settings/plan/planActions.ts"),
       "utf8",
     );
     assert.doesNotMatch(actions, /ok:\s*true/);
+  });
+
+  it("sends Pay to the pay URL the API returns, never one the Desk builds", () => {
+    const list = fs.readFileSync(path.join(root, "dashboard/src/components/plan/BillingHistory.tsx"), "utf8");
+    assert.match(list, /fetch\(item\.payLinkPath, \{ method: "POST"/);
+    assert.match(list, /const dest = payLinkDestination\(body\);/);
+    assert.match(list, /window\.location\.assign\(dest\.href\)/);
+    assert.doesNotMatch(list, /["'`]\/pay\//);
   });
 });

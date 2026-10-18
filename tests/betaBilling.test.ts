@@ -23,7 +23,6 @@ describe("free beta surface", () => {
           {
             billingStatus: status || "beta",
             openInvoiceKes: 9000,
-            payToken: "tok",
             trialEnded: false,
             voicemailUntil: "2026-10-16T00:00:00+03:00",
           },

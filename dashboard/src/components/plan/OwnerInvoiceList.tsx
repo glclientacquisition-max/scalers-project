@@ -1,4 +1,4 @@
-import { ButtonLink } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
 
 export type OwnerInvoiceListItem = {
@@ -8,11 +8,13 @@ export type OwnerInvoiceListItem = {
   statusLabel: string;
   payHref?: string | null;
   payLabel?: string | null;
+  payPending?: boolean;
+  onPay?: () => void;
 };
 
 export function OwnerInvoiceList({ invoices }: { invoices: OwnerInvoiceListItem[] }) {
   if (invoices.length === 0) {
-    return <Empty title="No invoices" line="They show here when one is issued." />;
+    return <Empty title="No invoices yet" line="They show here when one is issued." />;
   }
   return (
     <ul className="mt-4 overflow-hidden rounded-2xl border border-hairline bg-surface">
@@ -25,7 +27,19 @@ export function OwnerInvoiceList({ invoices }: { invoices: OwnerInvoiceListItem[
             </div>
             <p className="shrink-0 text-body tabular-nums text-ink">{invoice.totalLabel}</p>
           </div>
-          {invoice.payHref && invoice.payLabel ? (
+          {invoice.payLabel && invoice.onPay ? (
+            <div className="mt-3">
+              <Button
+                type="button"
+                variant="tonal"
+                size="sm"
+                pending={invoice.payPending}
+                onClick={invoice.onPay}
+              >
+                {invoice.payLabel}
+              </Button>
+            </div>
+          ) : invoice.payHref && invoice.payLabel ? (
             <div className="mt-3">
               <ButtonLink href={invoice.payHref} variant="tonal" size="sm">
                 {invoice.payLabel}

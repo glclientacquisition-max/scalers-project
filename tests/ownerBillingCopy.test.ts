@@ -22,6 +22,15 @@ const OWNER_SCREENS = [
   "dashboard/src/app/dev/billing/BillingFixture.tsx",
   "dashboard/src/lib/billingBanner.ts",
   "dashboard/src/lib/invoicePayState.ts",
+  "dashboard/src/lib/billingHistory.ts",
+  "dashboard/src/components/plan/BillingHistory.tsx",
+  "dashboard/src/lib/ownerPlanLoad.ts",
+  "dashboard/src/lib/ownerUsageLoad.ts",
+  "dashboard/src/lib/planEntry.ts",
+  "dashboard/src/components/plan/BetaPlanSummary.tsx",
+  "dashboard/src/components/plan/UsageBar.tsx",
+  "dashboard/src/components/plan/TeamSeatsNote.tsx",
+  "dashboard/src/components/HomeUsageSection.tsx",
 ];
 
 const BANNED = [
@@ -34,6 +43,7 @@ const BANNED = [
   /Inbox only/,
   /at the rates below/,
   /sending stops/,
+  /credit_kes/,
 ];
 
 describe("owner billing copy", () => {
@@ -58,28 +68,54 @@ describe("owner billing copy", () => {
     }
   });
 
-  it("links Usage to Plan and keeps Plan active in the settings rail", () => {
+  it("links Usage to Plan through planEntry and keeps Plan inside the settings console", () => {
     const usage = fs.readFileSync(path.join(root, "dashboard/src/components/plan/UsageSummary.tsx"), "utf8");
     const frame = fs.readFileSync(path.join(root, "dashboard/src/components/plan/SettingsPlanFrame.tsx"), "utf8");
     const wallet = fs.readFileSync(path.join(root, "dashboard/src/app/(desk)/wallet/page.tsx"), "utf8");
-    assert.match(usage, /Change plan/);
-    assert.match(usage, /href="\/settings\/plan"/);
-    assert.match(wallet, /showChangePlan=\{canChangePlan && !extras\.freeBeta\}/);
+    assert.match(usage, /entry\.href/);
+    assert.match(wallet, /planEntry\(extras\.billingStatus, canChangePlan\)/);
+    assert.match(wallet, /showActivity = !extras\.freeBeta/);
     const picker = fs.readFileSync(path.join(root, "dashboard/src/components/plan/PlanPicker.tsx"), "utf8");
-    const fixture = fs.readFileSync(path.join(root, "dashboard/src/app/dev/billing/BillingFixture.tsx"), "utf8");
-    assert.match(picker, /useState<PlanSku \| null>\(startConfirm \? upgradeSku : null\)/);
-    assert.match(picker, /const selected = picked && !showCurrent/);
-    assert.match(picker, /Extra seats: \{model\.extraSeats\}/);
+    assert.match(picker, /useState<PlanSku \| null>\(startConfirm\)/);
+    assert.match(picker, /Switch to \$\{plan\.name\}/);
+    assert.match(picker, /Your plan/);
+    assert.match(picker, /Every plan includes/);
+    assert.match(picker, /planUpgradeCopy/);
+    assert.match(picker, /planDowngradeChanges/);
+    assert.match(picker, /seatBlockCopy/);
+    assert.doesNotMatch(picker, /Continue/);
+    assert.doesNotMatch(picker, /sticky/);
+    assert.doesNotMatch(picker, /accent-tonal/);
+    assert.doesNotMatch(picker, /Most popular/i);
+    assert.doesNotMatch(picker, /line-through/);
+    assert.match(picker, /Extra seats/);
     assert.match(picker, /setExtraSeatsAction/);
     assert.doesNotMatch(picker, /EXTRA_SEAT_MONTHLY_KES/);
     const members = fs.readFileSync(path.join(root, "dashboard/src/components/MembersPanel.tsx"), "utf8");
     assert.match(members, /Add a seat, \$\{formatKsh\(seatPrice\)\} a month/);
+    assert.match(members, /seatIncreaseCopy/);
+    assert.match(members, /variant="tonal"/);
+    assert.match(members, /block/);
+    assert.doesNotMatch(members, /for the rest of this period/);
+    assert.match(picker, /seatIncreaseCopy/);
+    assert.match(picker, /seatReductionCopy/);
+    assert.match(picker, /className="w-full"/);
+    assert.doesNotMatch(picker, /for the rest of this period/);
+    assert.doesNotMatch(picker, /Takes effect on the next bill/);
     assert.match(members, /setExtraSeatsAction/);
     assert.doesNotMatch(members, /Upgrade your package/);
     assert.doesNotMatch(members, /upgrade instead/i);
-    assert.match(picker, /selected \? "border-accent bg-accent-tonal" : "border-hairline bg-surface"/);
-    assert.match(fixture, /showChangePlan=\{!beta\}/);
+    assert.match(members, /planEntry\.label/);
     assert.match(frame, /SettingsRail/);
     assert.match(frame, /data-desk-nested/);
+    assert.match(frame, /data-settings-console/);
+    assert.match(frame, /settingsPanelClass/);
+  });
+
+  it("keeps beta Plan and Billing free of prices", () => {
+    const beta = fs.readFileSync(path.join(root, "dashboard/src/components/plan/BetaPlanSummary.tsx"), "utf8");
+    assert.match(beta, /Free during beta/);
+    assert.match(beta, /No invoices during beta/);
+    assert.doesNotMatch(beta, /KSh|formatKsh/);
   });
 });

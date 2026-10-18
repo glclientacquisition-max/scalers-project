@@ -1,25 +1,35 @@
 "use client";
 
+import { useState } from "react";
+import { AlertContactsList } from "@/components/AlertContactsList";
 import { BillingNote } from "@/components/DeskBillingBanner";
+import { HomeUsageSection } from "@/components/HomeUsageSection";
 import { MembersPanel } from "@/components/MembersPanel";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
+import { BillingHistory } from "@/components/plan/BillingHistory";
+import { BetaInvoicesEmpty, BetaPlanSummary, betaPlanRows } from "@/components/plan/BetaPlanSummary";
 import { OwnerInvoiceList } from "@/components/plan/OwnerInvoiceList";
 import { PlanPicker } from "@/components/plan/PlanPicker";
 import { SettingsPlanFrame } from "@/components/plan/SettingsPlanFrame";
-import { UsageSummary } from "@/components/plan/UsageSummary";
+import { TeamSeatsNote } from "@/components/plan/TeamSeatsNote";
+import { UsageSummary, type UsageListRow } from "@/components/plan/UsageSummary";
 import { deskListTitleClass } from "@/components/ui/deskChrome";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { ownerBillingSurface } from "@/lib/betaBilling";
 import { pickBillingBanner } from "@/lib/billingBanner";
-import { ownerBillingView } from "@/lib/billingStateModel";
+import { mapBillingHistory, type BillingHistoryBody } from "@/lib/billingHistory";
+import { lowBalanceNotice, ownerBillingView, type OwnerBillingView } from "@/lib/billingStateModel";
 import { seatSummary } from "@/lib/invites";
-import { invoicePayState } from "@/lib/invoicePayState";
+import { messageCreditsUsage, type CreditBurns } from "@/lib/messageCredits";
 import type { MembersData } from "@/lib/membersLoad";
-import type { OwnerInvoiceRow, OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
+import type { OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
+import { planEntry } from "@/lib/planEntry";
 import { annualPriceKes, annualSavingKes, formatKsh, type SeatOffer } from "@/lib/planPricing";
+import type { TeamDirectoryEntry } from "@/lib/supabase";
 import { trialRemaining } from "@/lib/trialRemaining";
+import type { BillingPreview } from "./previews";
 
 const PREVIEW_NOW = new Date("2026-10-18T09:00:00+03:00");
+const PERIOD_END = "2026-11-01T00:00:00+03:00";
 
 function sample(
   sku: PlanSku,
@@ -51,7 +61,12 @@ const plans = [
   sample("scale", "Scale", 35000, 10, 1600, 20, 5500),
 ];
 
-function growthModel(cycle: PlanCycle, trialText: string | null = null): OwnerPlanModel {
+/** QA business: Growth, paid monthly, 260 of 800 minutes used. */
+function growthModel({
+  cycle = "month",
+  trialText = null,
+  seatsUsed = 3,
+}: { cycle?: PlanCycle; trialText?: string | null; seatsUsed?: number } = {}): OwnerPlanModel {
   return {
     freeBeta: false,
     billingStatus: trialText ? "trialing" : "active",
@@ -60,134 +75,150 @@ function growthModel(cycle: PlanCycle, trialText: string | null = null): OwnerPl
     currentMonthlyKes: 18000,
     cycle,
     plans,
-    seatsUsed: 3,
+    seatsUsed,
     seatsIncluded: 8,
+    minutesIncluded: 800,
+    minutesUsed: 260,
     trialText,
     onDemandLocked: Boolean(trialText),
     invoices: [],
     notices: [],
     periodEndLabel: "31 Oct",
-    dayOfPeriod: 10,
-    daysInPeriod: 30,
-    daysLeft: 20,
+    dayOfPeriod: 18,
+    daysInPeriod: 31,
+    daysLeft: 14,
     extraSeatMonthlyKes: 500,
     extraSeats: 0,
     seatUnitKes: 500,
+    periodEndMonth: "October",
+    nextPeriodStartLabel: "1 Nov",
     banner: null,
   };
 }
 
-function invoiceItems(invoices: OwnerInvoiceRow[]) {
-  return invoices.flatMap((invoice) => {
-    const pay = invoicePayState({ status: invoice.status, payToken: invoice.payToken });
-    if (pay.hidden) return [];
-    const statusLabel =
-      pay.label === "Paid" || pay.label === "Checking payment"
-        ? pay.label
-        : invoice.dueAt
-          ? `Due by ${invoice.dueAt}`
-          : "Open";
-    return [
-      {
-        id: invoice.id,
-        number: invoice.number,
-        totalLabel: formatKsh(invoice.totalKes),
-        statusLabel,
-        payHref: pay.showPayButton ? pay.payHref : null,
-        payLabel: pay.showPayButton ? `Pay ${formatKsh(invoice.totalKes)}` : null,
-      },
-    ];
+const sampleHistory: BillingHistoryBody = {
+  invoices: [
+    { id: "inv-1042", number: "SCL-1042", status: "open", due_at: "2026-10-09T00:00:00+03:00", total_due: "KSh 18,000", amount_paid: "KSh 0", balance: "KSh 18,000", pay_link_path: "/api/billing/invoices/inv-1042/pay-link" },
+    { id: "inv-1040", number: "SCL-1040", status: "open", due_at: "2026-10-05T00:00:00+03:00", total_due: "KSh 300,000", amount_paid: "KSh 150,000", balance: "KSh 150,000", pay_link_path: "/api/billing/invoices/inv-1040/pay-link" },
+    { id: "inv-1039", number: "SCL-1039", status: "open", due_at: "2026-10-01T00:00:00+03:00", total_due: "KSh -1,000", amount_paid: "KSh 0", balance: "KSh 0", pay_link_path: "/api/billing/invoices/inv-1039/pay-link" },
+    { id: "inv-1038", number: "SCL-1038", status: "paid", due_at: "2026-09-09T00:00:00+03:00", total_due: "KSh 18,000", amount_paid: "KSh 18,000", balance: "KSh 0", pay_link_path: null },
+  ],
+};
+
+const noop = () => {};
+const sampleInvoices = mapBillingHistory(sampleHistory, { fromPay: false }).map((row) => ({ ...row, onPay: noop }));
+
+const BURNS: CreditBurns = { sms: 1, whatsapp: 2, email: 1 };
+
+/** Beta tenant: Starter, 297 of 300 minutes, every seat taken, a few messages sent. */
+function betaView(): OwnerBillingView {
+  return ownerBillingView({
+    state: {
+      package_state: "active",
+      package_name: "Starter",
+      included_minutes: 300,
+      used_minutes: 297,
+      sms_included: 50,
+      sms_used: 18,
+      on_demand_enabled: false,
+      mode_label: "beta",
+      period_end: PERIOD_END,
+    },
+    monthlyPriceKes: null,
+    smsMessages: null,
+    seatsIncluded: 3,
+    seatsUsed: 3,
+    messagesSent: { email: 9, whatsapp: 14 },
   });
 }
 
-const sampleInvoices: OwnerInvoiceRow[] = [
-  {
-    id: "inv-1042",
-    number: "INV-1042",
-    status: "open",
-    totalKes: 8120,
-    dueAt: "9 Oct",
-    periodStart: "1 Oct",
-    periodEnd: "31 Oct",
-    payToken: null,
-  },
-  {
-    id: "inv-1038",
-    number: "INV-1038",
-    status: "paid",
-    totalKes: 8120,
-    dueAt: "9 Sep",
-    periodStart: "1 Sep",
-    periodEnd: "30 Sep",
-    payToken: null,
-  },
-];
+const betaCredits = () => messageCreditsUsage(1000, BURNS, betaView().messageUse);
 
-function UsagePreview({ kind }: { kind: "beta" | "paid" }) {
-  const beta = kind === "beta";
-  const view = ownerBillingView({
+/** QA business: Growth, 680 of 800 minutes (warns), 5 of 8 seats. */
+function paidView(): OwnerBillingView {
+  return ownerBillingView({
     state: {
       package_state: "active",
       package_name: "Growth",
       included_minutes: 800,
-      used_minutes: beta ? 120 : 260,
+      used_minutes: 680,
       sms_included: 2500,
-      sms_used: beta ? 40 : 420,
-      on_demand_enabled: !beta,
-      mode_label: beta ? "beta" : "metered",
-      period_end: "2026-11-01T00:00:00+03:00",
+      sms_used: 420,
+      on_demand_enabled: true,
+      mode_label: "metered",
+      period_end: PERIOD_END,
     },
-    monthlyPriceKes: beta ? null : 18000,
+    monthlyPriceKes: 18000,
     smsMessages: null,
     seatsIncluded: 8,
-    seatsUsed: 3,
+    seatsUsed: 5,
+    messagesSent: { email: 64, whatsapp: 118 },
   });
-  const messageCredits = 2500;
-  const creditsUsed = beta ? 40 : 420;
-  const rows = view.rows
-    .filter((row) => row.key !== "email" && row.key !== "whatsapp" && row.key !== "minutes")
-    .map((row) =>
-      row.key === "sms"
-        ? {
-            key: row.key,
-            label: "Message credits",
-            included: messageCredits,
-            used: creditsUsed,
-            left: messageCredits - creditsUsed,
-          }
-        : {
-            key: row.key,
-            label: row.label,
-            included: row.included,
-            used: row.used,
-            left: row.left,
-          },
-    );
+}
 
+function usageRows(view: OwnerBillingView, includedCredits: number) {
+  const seat = view.rows.find((row) => row.key === "seats");
+  const creditUsage = messageCreditsUsage(includedCredits, BURNS, view.messageUse);
+  return {
+    seats: seat ? { key: "seats", label: "Seats", included: seat.included, used: seat.used, left: seat.left } : null,
+    credits: creditUsage ? ({ key: "credits", label: "Message credits", ...creditUsage } satisfies UsageListRow) : null,
+  };
+}
+
+function UsagePreview({ kind }: { kind: "beta" | "paid" }) {
+  const beta = kind === "beta";
+  const view = beta ? betaView() : paidView();
+  const rows = usageRows(view, beta ? 1000 : 2500);
   return (
-    <div>
-      <UsageSummary
-        minutesLeft={view.minutesLeft}
-        minutesIncluded={view.minutesIncluded}
-        minutesUsed={beta ? 120 : 260}
-        periodEndLabel={view.periodEndLabel}
-        beta={beta}
-        planLine={beta ? null : "Growth · KSh 18,000 a month"}
-        rows={rows}
-        showChangePlan={!beta}
-      />
+    <UsageSummary
+      minutesLeft={view.minutesLeft}
+      minutesIncluded={view.minutesIncluded}
+      minutesUsed={view.minutesIncluded - view.minutesLeft}
+      periodEndLabel={view.periodEndLabel}
+      beta={beta}
+      planLine={beta ? null : `Growth · ${formatKsh(18000)} a month`}
+      entry={planEntry(beta ? "beta" : "active", true)}
+      seats={rows.seats}
+      credits={rows.credits}
+    >
       {beta ? null : (
-        <div className="max-w-2xl">
+        <>
           <OnDemandUsagePanel tenantId="preview" enabled extraMinuteKes={26} />
-        </div>
+          <section className="overflow-hidden rounded-2xl border border-hairline bg-surface">
+            <h2 className="px-4 pt-4 font-display text-title tracking-tight text-ink">Activity</h2>
+            <table className="mt-2 w-full text-left text-body">
+              <thead className="border-b border-hairline text-ink-2">
+                <tr>
+                  <th scope="col" className="px-4 py-2 text-meta font-semibold">When</th>
+                  <th scope="col" className="px-4 py-2 text-meta font-semibold">Kind</th>
+                  <th scope="col" className="px-4 py-2 text-right text-meta font-semibold">KSh</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-hairline/70">
+                  <td className="whitespace-nowrap px-4 py-2 text-ink-2">1 Oct</td>
+                  <td className="px-4 py-2 font-medium text-ink">Line fee</td>
+                  <td className="px-4 py-2 text-right font-medium tabular-nums text-ink">-1,500</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        </>
       )}
-      <section className="mt-6 max-w-2xl overflow-hidden rounded-2xl border border-hairline bg-surface">
-        <h2 className="px-4 pt-4 font-display text-title tracking-tight text-ink">Activity</h2>
-        <p className="px-4 py-3 text-body text-ink-2">{beta ? "Nothing charged during beta." : "No charges yet."}</p>
-      </section>
-    </div>
+    </UsageSummary>
   );
 }
+
+const seatOffer: SeatOffer = {
+  extraSeatMonthlyKes: 500,
+  extraSeats: 0,
+  cycle: "month",
+  daysLeft: 14,
+  daysInPeriod: 31,
+  seatUnitKes: 500,
+  periodEndMonth: "October",
+  nextPeriodStartLabel: "1 Nov",
+};
 
 const fullTeam: MembersData = {
   members: [
@@ -199,104 +230,147 @@ const fullTeam: MembersData = {
   seats: seatSummary({ members: 3, invites: [], included: 3 }),
   totals: { members: 3, invites: 0 },
   limits: { members: 20, invites: 20 },
-  seatOffer: {
-    extraSeatMonthlyKes: 500,
-    extraSeats: 0,
-    cycle: "month",
-    daysLeft: 20,
-    daysInPeriod: 30,
-    seatUnitKes: 500,
-  } satisfies SeatOffer,
+  seatOffer,
 };
 
-export type BillingPreview =
-  | "beta"
-  | "plan"
-  | "plan-annual"
-  | "plan-confirm"
-  | "billing"
-  | "billing-empty"
-  | "usage-beta"
-  | "usage-paid"
-  | "trial"
-  | "banner"
-  | "team";
+const ALERT_FLAGS = [
+  { key: "receives_escalation", label: "Urgent" },
+  { key: "receives_inbox", label: "Follow-up" },
+  { key: "receives_ops", label: "Ops" },
+] as const;
 
-export function BillingFixture({ view }: { view: BillingPreview }) {
-  if (view === "plan" || view === "plan-annual" || view === "plan-confirm") {
-    return (
-      <SettingsPlanFrame title="Plan" activePath="/settings/plan">
-        <PlanPicker
-          model={growthModel(view === "plan-annual" ? "year" : "month")}
-          openSeat={false}
-          startConfirm={view === "plan-confirm"}
-        />
-      </SettingsPlanFrame>
-    );
-  }
-  if (view === "trial") {
-    const trial = trialRemaining({
-      now: PREVIEW_NOW,
-      trialEndsAt: "2026-10-30T09:00:00+03:00",
-      secondsUsed: 120,
-      minutesIncluded: 20,
-    });
-    return (
-      <SettingsPlanFrame title="Plan" meta={trial.text} activePath="/settings/plan">
-        <PlanPicker model={growthModel("month", trial.text)} openSeat={false} />
-      </SettingsPlanFrame>
-    );
-  }
-  if (view === "billing") {
-    return (
-      <SettingsPlanFrame title="Billing" activePath="/settings/billing">
-        <OwnerInvoiceList invoices={invoiceItems(sampleInvoices)} />
-      </SettingsPlanFrame>
-    );
-  }
-  if (view === "billing-empty") {
-    return (
-      <SettingsPlanFrame title="Billing" activePath="/settings/billing">
-        <OwnerInvoiceList invoices={[]} />
-      </SettingsPlanFrame>
-    );
-  }
-  if (view === "usage-beta" || view === "usage-paid") {
-    return <UsagePreview kind={view === "usage-beta" ? "beta" : "paid"} />;
-  }
-  if (view === "banner") {
-    const banner = pickBillingBanner(
-      {
-        billingStatus: "suspended",
-        voicemailUntil: "2026-10-25T18:00:00+03:00",
-        openInvoiceKes: 8120,
-        payToken: null,
-      },
-      PREVIEW_NOW,
-    );
-    return (
-      <div>
-        {banner ? <BillingNote banner={banner} bar /> : null}
-        <div className="pt-4">
-          <h1 className={deskListTitleClass}>Calls</h1>
-        </div>
-      </div>
-    );
-  }
-  if (view === "team") {
-    return (
-      <div className="mx-auto w-full max-w-lg">
-        <PageHeader title="Team" back={{ href: "/settings", label: "Settings" }} />
-        <div className="mt-6">
-          <MembersPanel data={fullTeam} viewerRole="owner" viewerId="owner" />
-        </div>
-      </div>
-    );
-  }
+function BetaTeamPreview() {
+  const [team, setTeam] = useState<TeamDirectoryEntry[]>([
+    { name: "Wanjiru Kamau", role: "Owner", phone: "+254711000111", receives_escalation: true, receives_inbox: true, receives_ops: true },
+    { name: "Otieno Ouma", role: "Supervisor", phone: "+254722000222", receives_escalation: true },
+    { name: "Achieng Atieno", role: "Cleaner", phone: "+254733000333", receives_inbox: true },
+  ]);
   return (
-    <SettingsPlanFrame title="Plan" activePath="/settings/plan">
-      <h2 className="mt-6 text-title text-ink">Free during beta</h2>
-      <p className="mt-1 text-body text-ink-2">Nothing is charged. Your Business Assistant keeps answering.</p>
+    <SettingsPlanFrame title="Team" activePath="/settings?tab=train&panel=team">
+      <div className="mt-4 space-y-4">
+        <TeamSeatsNote included={3} entry={planEntry("beta", true)} />
+        <AlertContactsList
+          team={team}
+          flags={ALERT_FLAGS}
+          note="Channels follow How we notify."
+          addLabel="Add person"
+          onChange={(index, key, value) =>
+            setTeam((prev) => prev.map((row, i) => (i === index ? { ...row, [key]: value } : row)))
+          }
+          onAdd={() => setTeam((prev) => [...prev, { name: "", role: "", phone: "" }])}
+          onRemove={(index) => setTeam((prev) => prev.filter((_, i) => i !== index))}
+        />
+      </div>
     </SettingsPlanFrame>
   );
+}
+
+function HomeBetaPreview() {
+  const view = betaView();
+  const low = lowBalanceNotice(view, betaCredits());
+  return (
+    <div className="mx-auto w-full max-w-sm pt-4">
+      <aside className="overflow-hidden rounded-2xl border border-hairline bg-surface">
+        <section aria-label="Line" className="px-4 py-4">
+          <p className="text-body font-medium text-ink">Line is live</p>
+        </section>
+        <HomeUsageSection
+          minutesLeft={view.minutesLeft}
+          packLabel={view.shortLabel}
+          minuteStatus={null}
+          lowNotice={low.lowNotice}
+          lowNoticeNote={low.lowNoticeNote}
+          showLink={Boolean(low.lowNotice)}
+        />
+      </aside>
+    </div>
+  );
+}
+
+function PlanPreview({ model, startConfirm = null }: { model: OwnerPlanModel; startConfirm?: PlanSku | null }) {
+  return (
+    <SettingsPlanFrame title="Plan" meta={model.trialText} activePath="/settings/plan">
+      <PlanPicker model={model} openSeat={false} startConfirm={startConfirm} />
+    </SettingsPlanFrame>
+  );
+}
+
+export function BillingFixture({ view }: { view: BillingPreview }) {
+  switch (view) {
+    case "plan":
+      return <PlanPreview model={growthModel()} />;
+    case "plan-annual":
+      return <PlanPreview model={growthModel({ cycle: "year" })} />;
+    case "plan-upgrade":
+      return <PlanPreview model={growthModel()} startConfirm="scale" />;
+    case "plan-downgrade":
+      return <PlanPreview model={growthModel()} startConfirm="starter" />;
+    case "plan-seat-block":
+      return <PlanPreview model={growthModel({ seatsUsed: 5 })} startConfirm="starter" />;
+    case "trial": {
+      const trial = trialRemaining({
+        now: PREVIEW_NOW,
+        trialEndsAt: "2026-10-30T09:00:00+03:00",
+        secondsUsed: 120,
+        minutesIncluded: 20,
+      });
+      return <PlanPreview model={growthModel({ trialText: trial.text })} />;
+    }
+    case "billing":
+      return (
+        <SettingsPlanFrame title="Billing" activePath="/settings/billing">
+          <OwnerInvoiceList invoices={sampleInvoices} />
+        </SettingsPlanFrame>
+      );
+    case "billing-empty":
+      return (
+        <SettingsPlanFrame title="Billing" activePath="/settings/billing">
+          <BillingHistory fromPay={false} />
+        </SettingsPlanFrame>
+      );
+    case "usage-paid":
+      return <UsagePreview kind="paid" />;
+    case "usage-beta":
+      return <UsagePreview kind="beta" />;
+    case "team-paid":
+      return (
+        <SettingsPlanFrame title="Team" activePath="/settings?tab=train&panel=team">
+          <div className="mt-4">
+            <MembersPanel data={fullTeam} viewerRole="owner" viewerId="owner" planEntry={planEntry("active", true)} />
+          </div>
+        </SettingsPlanFrame>
+      );
+    case "banner": {
+      const banner = pickBillingBanner(
+        { billingStatus: "suspended", voicemailUntil: "2026-10-25T18:00:00+03:00", openInvoiceKes: 8120 },
+        PREVIEW_NOW,
+      );
+      return (
+        <div>
+          {banner ? <BillingNote banner={banner} bar /> : null}
+          <div className="pt-4">
+            <h1 className={deskListTitleClass}>Calls</h1>
+          </div>
+        </div>
+      );
+    }
+    case "plan-beta": {
+      const beta = betaView();
+      return (
+        <SettingsPlanFrame title="Plan" activePath="/settings/plan">
+          <BetaPlanSummary planName={beta.packageName} periodEndLabel={beta.periodEndLabel} rows={betaPlanRows(beta, betaCredits())} />
+        </SettingsPlanFrame>
+      );
+    }
+    case "billing-beta":
+      return (
+        <SettingsPlanFrame title="Billing" activePath="/settings/billing">
+          <BetaInvoicesEmpty />
+        </SettingsPlanFrame>
+      );
+    case "home-beta":
+      return <HomeBetaPreview />;
+    case "team-beta":
+      return <BetaTeamPreview />;
+  }
 }

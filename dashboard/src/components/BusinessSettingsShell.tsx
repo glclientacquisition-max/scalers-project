@@ -70,6 +70,7 @@ export function BusinessSettingsShell({
   optionStatus = {},
   liveTransferExecutor = false,
   membersSlot = null,
+  seatNoteSlot = null,
   structuredSlot = null,
   callsSlot = null,
 }: {
@@ -80,6 +81,8 @@ export function BusinessSettingsShell({
   optionStatus?: Record<string, SettingsListStatus>;
   liveTransferExecutor?: boolean;
   membersSlot?: ReactNode;
+  /** Team: one note when every seat is taken. */
+  seatNoteSlot?: ReactNode;
   structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
   /** Calls & forwarding (server-built: reads tenants.call_setup and the calls table). */
   callsSlot?: ReactNode;
@@ -156,6 +159,7 @@ export function BusinessSettingsShell({
           sidebar={rail}
           liveTransferExecutor={liveTransferExecutor}
           membersSlot={formPanel === "team" ? membersSlot : null}
+          seatNoteSlot={formPanel === "team" ? seatNoteSlot : null}
           structuredSlot={structuredSlot}
         />
       ) : (

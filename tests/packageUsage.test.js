@@ -10,8 +10,10 @@ function read(rel) {
 describe("package usage meter", () => {
   it("ceils seconds to minutes and never goes negative", () => {
     const catalog = read("dashboard/src/lib/packageCatalog.ts");
-    assert.match(catalog, /export function minutesUsedFromSeconds/);
-    assert.match(catalog, /Math\.ceil\(Math\.max\(0, Number\(seconds\) \|\| 0\) \/ 60\)/);
+    const minutes = read("dashboard/src/lib/minutes.ts");
+    assert.match(catalog, /export \{ minutesUsedFromSeconds \}/);
+    assert.match(minutes, /export function minutesUsedFromSeconds/);
+    assert.match(minutes, /Math\.ceil\(Math\.max\(0, Number\.isFinite\(n\) \? n : 0\) \/ 60\)/);
     assert.match(catalog, /export function remainingCount/);
     assert.match(
       catalog,
@@ -35,16 +37,24 @@ describe("package usage meter", () => {
   it("shows minutes left and message credits on Usage", () => {
     const page = read("dashboard/src/app/(desk)/wallet/page.tsx");
     const summary = read("dashboard/src/components/plan/UsageSummary.tsx");
-    assert.match(page, /loadOwnerPackageMeter\(tenant\.id\)/);
+    assert.match(page, /loadOwnerUsageView\(tenant\)/);
+    assert.match(read("dashboard/src/lib/ownerUsageLoad.ts"), /loadOwnerPackageMeter\(tenant\.id\)/);
     assert.match(summary, /Minutes left/);
     assert.match(page, /label: "Message credits"/);
-    assert.match(page, /showChangePlan=\{canChangePlan && !extras\.freeBeta\}/);
+    assert.match(page, /planEntry\(extras\.billingStatus, canChangePlan\)/);
     assert.doesNotMatch(page, /a credit/);
     assert.doesNotMatch(page, /\bSMS\b/);
     assert.doesNotMatch(page, /On-demand rates/);
     assert.doesNotMatch(page, /WalletTopUpButton/);
     assert.doesNotMatch(page, /Top up prepaid/);
     assert.doesNotMatch(page, /daysRemainingAtPace/);
+  });
+
+  it("stacks each Usage column on its own at lg so the minutes card is not stretched", () => {
+    const summary = read("dashboard/src/components/plan/UsageSummary.tsx");
+    assert.match(summary, /lg:grid lg:grid-cols-12 lg:items-start/);
+    assert.match(summary, /contents lg:col-span-7 lg:flex lg:min-w-0 lg:flex-col lg:gap-6/);
+    assert.doesNotMatch(summary, /lg:row-span-2/);
   });
 
   it("does not list package prices on the landing page", () => {
@@ -103,7 +113,7 @@ describe("package usage meter", () => {
   it("previews landing prices and sends package changes to the business's Billing page", () => {
     const panel = read("dashboard/src/components/AdminPackagesPanel.tsx");
     const page = read("dashboard/src/app/admin/(console)/packages/page.tsx");
-    assert.match(panel, /adminMoney/);
+    assert.match(panel, /packagePriceLabel/);
     assert.match(panel, /Per year/);
     assert.match(panel, /live on landing/);
     assert.match(panel, /action: "save_package"/);
@@ -186,7 +196,7 @@ describe("package usage meter", () => {
     assert.doesNotMatch(page, /usageCapNotice/);
     assert.doesNotMatch(page, /Inbox only/);
     assert.doesNotMatch(page, /a credit/);
-    assert.match(page, /showChangePlan=\{canChangePlan && !extras\.freeBeta\}/);
+    assert.match(page, /planEntry\(extras\.billingStatus, canChangePlan\)/);
     assert.match(home, /homeMinuteStatus/);
     assert.match(copy, /if \(!input\.onDemand\) return "Calls stopped"/);
   });

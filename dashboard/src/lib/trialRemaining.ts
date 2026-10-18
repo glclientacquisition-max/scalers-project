@@ -1,3 +1,5 @@
+import { minutesLeft as minutesLeftOf } from "./minutes";
+
 /** Trial ends at whichever hits zero first: days on the clock, or included minutes. */
 
 export function trialRemaining(input: {
@@ -6,10 +8,7 @@ export function trialRemaining(input: {
   secondsUsed: number;
   minutesIncluded: number;
 }): { daysLeft: number; minutesLeft: number; ended: boolean; text: string } {
-  const minutesLeft = Math.max(
-    0,
-    Math.floor(input.minutesIncluded) - Math.ceil(Math.max(0, input.secondsUsed) / 60),
-  );
+  const minutesLeft = minutesLeftOf(input.minutesIncluded, input.secondsUsed);
   let daysLeft = 0;
   if (input.trialEndsAt) {
     const end = Date.parse(input.trialEndsAt);

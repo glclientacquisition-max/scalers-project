@@ -7,7 +7,7 @@ import {
 } from "@/lib/billingStateModel";
 
 const STATE_COLS =
-  "package_state, package_id, package_name, billing_term, period_start, period_end, included_minutes, used_minutes, remaining_minutes, sms_included, sms_used, sms_used_source, on_demand_enabled, enforcement_mode, mode_label, overage_owed_kes";
+  "package_state, package_id, package_name, billing_term, period_start, period_end, included_minutes, used_seconds, used_minutes, remaining_minutes, sms_included, sms_used, sms_used_source, on_demand_enabled, enforcement_mode, mode_label, overage_owed_kes";
 
 function num(raw: unknown): number {
   const n = Number(raw);
@@ -28,7 +28,7 @@ export async function loadOwnerBillingView(tenantId: string): Promise<OwnerBilli
       admin.from("tenant_billing_state").select(STATE_COLS).eq("tenant_id", tenantId).maybeSingle(),
       admin
         .from("tenants")
-        .select("seat_included, email_included_units, email_used_units, whatsapp_included_units, whatsapp_used_units")
+        .select("seat_included, email_used_units, whatsapp_used_units")
         .eq("id", tenantId)
         .maybeSingle(),
       admin.rpc("tenant_seats_used", { p_tenant: tenantId }),
@@ -40,10 +40,10 @@ export async function loadOwnerBillingView(tenantId: string): Promise<OwnerBilli
     const state = (stateRes.data || null) as (TenantBillingStateRow & { package_id?: string | null }) | null;
     const tenant = (tenantRes.error ? {} : tenantRes.data || {}) as Record<string, unknown>;
 
-    const packageId = state?.package_state === "active" ? state.package_id : null;
+    const active = state?.package_state === "active";
     const [priceRes, smsRes] = await Promise.all([
-      packageId
-        ? admin.from("billing_packages").select("monthly_price_kes").eq("id", packageId).maybeSingle()
+      active
+        ? admin.from("billing_subscription_read").select("version_monthly_price_kes").eq("tenant_id", tenantId).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       state?.period_start && state.sms_used_source === "ledger"
         ? (() => {
@@ -58,9 +58,10 @@ export async function loadOwnerBillingView(tenantId: string): Promise<OwnerBilli
         : Promise.resolve({ count: null, error: null }),
     ]);
 
-    const price = priceRes && !priceRes.error && priceRes.data
-      ? num((priceRes.data as { monthly_price_kes?: unknown }).monthly_price_kes)
+    const pinned = priceRes && !priceRes.error && priceRes.data
+      ? (priceRes.data as { version_monthly_price_kes?: unknown }).version_monthly_price_kes
       : null;
+    const price = pinned == null || pinned === "" ? null : num(pinned);
     const smsMessages =
       smsRes && !smsRes.error && typeof (smsRes as { count?: number | null }).count === "number"
         ? ((smsRes as { count: number }).count)
@@ -73,13 +74,27 @@ export async function loadOwnerBillingView(tenantId: string): Promise<OwnerBilli
       smsMessages,
       seatsIncluded: num(tenant.seat_included),
       seatsUsed,
-      alerts: {
-        email: { included: num(tenant.email_included_units), used: num(tenant.email_used_units) },
-        whatsapp: { included: num(tenant.whatsapp_included_units), used: num(tenant.whatsapp_used_units) },
-      },
+      messagesSent: { email: num(tenant.email_used_units), whatsapp: num(tenant.whatsapp_used_units) },
     });
   } catch (err) {
     console.warn("billing state load failed", err instanceof Error ? err.message : String(err));
+    return null;
+  }
+}
+
+/** Seats on the plan and seats in use (members plus open invites). Null when the counts are not there. */
+export async function loadSeatCount(tenantId: string): Promise<{ used: number; included: number } | null> {
+  if (!tenantId) return null;
+  try {
+    const admin = getSupabaseAdmin();
+    const [tenantRes, seatsRes] = await Promise.all([
+      admin.from("tenants").select("seat_included").eq("id", tenantId).maybeSingle(),
+      admin.rpc("tenant_seats_used", { p_tenant: tenantId }),
+    ]);
+    if (tenantRes.error || seatsRes.error || !tenantRes.data) return null;
+    const included = Math.max(0, Math.floor(num((tenantRes.data as { seat_included?: unknown }).seat_included)));
+    return { used: Math.max(0, Math.floor(num(seatsRes.data))), included };
+  } catch {
     return null;
   }
 }
