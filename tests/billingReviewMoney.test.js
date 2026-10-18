@@ -1,0 +1,339 @@
+/**
+ * Review tests for the M-Pesa pay path on #780 (cursor/invoice-pay-0c16).
+ * These assert the money outcome that must hold before live charges.
+ * They fail on the code under review. Do not flip them to test.failing.
+ */
+const { describe, it } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { toCents } = require("../dashboard/src/lib/invoicePay/money");
+const { signBachsBody } = require("../dashboard/src/lib/invoicePay/signature");
+const { handlePayWebhook } = require("../dashboard/src/lib/invoicePay/webhook");
+const { startInvoiceCheckout } = require("../dashboard/src/lib/invoicePay/checkoutFlow");
+const { sendClaimedBillingNotices } = require("../src/billing/billingNoticeSend");
+const { createMemoryLedger } = require("./invoicePayMemory");
+
+const SECRET = "whsec_review_only";
+const NOW = Date.parse("2026-10-18T12:00:00Z");
+const ROOT = path.join(__dirname, "..");
+
+function seedPayable(totalKes) {
+  const ledger = createMemoryLedger({ now: NOW });
+  ledger.seedTenant({ id: "t1", businessName: "Jirani Cleaning", billingEnforcement: "soft" });
+  ledger.seedInvoice({
+    id: "inv1",
+    tenantId: "t1",
+    totalKes,
+    subtotalKes: totalKes,
+    invoiceNumber: "SCL-2026-000042",
+    dueAt: "2026-10-24T21:00:00Z",
+  });
+  return { ledger, token: ledger.mint("inv1") };
+}
+
+function providerFactory() {
+  let n = 0;
+  return {
+    count() {
+      return n;
+    },
+    async createCheckout() {
+      n += 1;
+      return {
+        checkoutId: `cs_${n}`,
+        checkoutUrl: `https://sandbox-api.bachs.io/c/${n}`,
+        expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+      };
+    },
+  };
+}
+
+function signed(payload, now = NOW) {
+  const rawBody = JSON.stringify(payload);
+  const ts = String(Math.floor(now / 1000));
+  return { rawBody, headers: signBachsBody(SECRET, rawBody, ts).headers, secret: SECRET, now };
+}
+
+function collectedCents(ledger) {
+  return ledger.payments
+    .filter((row) => row.matchStatus !== "issue")
+    .reduce((sum, row) => sum + toCents(row.amountKes), 0n);
+}
+
+describe("pay-link races must not open two live M-Pesa checkouts", () => {
+  it("reuses one checkout when Pay is clicked twice before the first session is attached", async () => {
+    const { ledger, token } = seedPayable("1000.00");
+    let entered = 0;
+    let releaseSecond;
+    const secondMayStart = new Promise((resolve) => {
+      releaseSecond = resolve;
+    });
+    const provider = {
+      async createCheckout() {
+        entered += 1;
+        const n = entered;
+        if (n === 1) {
+          releaseSecond();
+          await new Promise((resolve) => setTimeout(resolve, 40));
+        }
+        return {
+          checkoutId: `cs_${n}`,
+          checkoutUrl: `https://sandbox-api.bachs.io/c/${n}`,
+          expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+        };
+      },
+    };
+    const firstPromise = startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    await secondMayStart;
+    const secondPromise = startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    const [first, second] = await Promise.all([firstPromise, secondPromise]);
+    assert.equal(entered, 1);
+    assert.equal(first.checkoutId, second.checkoutId);
+    assert.equal(ledger.attempts.filter((row) => row.status === "pending").length, 1);
+  });
+
+  it("cancels the expired pending checkout before minting a replacement", async () => {
+    const { ledger, token } = seedPayable("1000.00");
+    const provider = providerFactory();
+    const first = await startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    ledger.setNow(NOW + 61 * 60 * 1000);
+    await startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    const previous = ledger.attempts.find((row) => row.checkoutSessionId === first.checkoutId);
+    assert.equal(previous.status, "cancelled");
+    assert.equal(ledger.attempts.filter((row) => row.status === "pending").length, 1);
+  });
+
+  it("does not collect more than the invoice when two checkouts are both paid", async () => {
+    const { ledger, token } = seedPayable("1000.00");
+    const provider = providerFactory();
+    const first = await startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    ledger.setNow(NOW + 61 * 60 * 1000);
+    const second = await startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    for (const [checkoutId, eventId] of [
+      [first.checkoutId, "evt_first"],
+      [second.checkoutId, "evt_second"],
+    ]) {
+      await handlePayWebhook({
+        ...signed({
+          id: eventId,
+          type: "collection.succeeded",
+          data: {
+            checkout_id: checkoutId,
+            status: "SUCCEEDED",
+            charged_amount: "1000.00",
+            charged_currency: "KES",
+          },
+        }),
+        ledger,
+      });
+    }
+    assert.ok(
+      collectedCents(ledger) <= toCents("1000.00"),
+      `collected ${collectedCents(ledger)} cents from two checkouts`
+    );
+    assert.equal(ledger.invoices.get("inv1").status, "paid");
+    assert.equal(ledger.invoices.get("inv1").amountPaidKes, "1000");
+  });
+});
+
+describe("a collected shilling must reduce the invoice", () => {
+  it("applies a SUCCEEDED collection that is one cent over the part and marks the invoice paid", async () => {
+    const { ledger, token } = seedPayable("1000.00");
+    const provider = providerFactory();
+    const checkout = await startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    const result = await handlePayWebhook({
+      ...signed({
+        id: "evt_cent",
+        type: "collection.succeeded",
+        data: {
+          checkout_id: checkout.checkoutId,
+          status: "SUCCEEDED",
+          charged_amount: "1000.01",
+          charged_currency: "KES",
+        },
+      }),
+      ledger,
+    });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.action, "apply");
+    assert.equal(ledger.invoices.get("inv1").status, "paid");
+    assert.equal(ledger.invoices.get("inv1").amountPaidKes, "1000");
+  });
+
+  it("credits the shillings received on collection.underpaid", async () => {
+    const { ledger, token } = seedPayable("1000.00");
+    const provider = providerFactory();
+    const checkout = await startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    const result = await handlePayWebhook({
+      ...signed({
+        id: "evt_under",
+        type: "collection.underpaid",
+        data: {
+          checkout_id: checkout.checkoutId,
+          charged_amount: "400.00",
+          charged_currency: "KES",
+        },
+      }),
+      ledger,
+    });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.action, "apply");
+    assert.equal(ledger.invoices.get("inv1").status, "open");
+    assert.equal(ledger.invoices.get("inv1").amountPaidKes, "400");
+  });
+
+  it("applies a later exact KES collection after an earlier issue on the same checkout", async () => {
+    const { ledger, token } = seedPayable("1000.00");
+    const provider = providerFactory();
+    const checkout = await startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    await handlePayWebhook({
+      ...signed({
+        id: "evt_usd",
+        type: "collection.succeeded",
+        data: {
+          checkout_id: checkout.checkoutId,
+          status: "SUCCEEDED",
+          amount: "7.60",
+          currency: "USD",
+        },
+      }),
+      ledger,
+    });
+    const corrected = await handlePayWebhook({
+      ...signed({
+        id: "evt_kes",
+        type: "collection.succeeded",
+        data: {
+          checkout_id: checkout.checkoutId,
+          status: "SUCCEEDED",
+          charged_amount: "1000.00",
+          charged_currency: "KES",
+        },
+      }),
+      ledger,
+    });
+    assert.equal(corrected.body.action, "apply");
+    assert.equal(ledger.invoices.get("inv1").status, "paid");
+    assert.equal(ledger.invoices.get("inv1").amountPaidKes, "1000");
+  });
+
+  it("records a voided invoice collection and answers 200 instead of throwing", async () => {
+    const { ledger, token } = seedPayable("1000.00");
+    const provider = providerFactory();
+    const checkout = await startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    ledger.applyPayment = async () => {
+      throw new Error("invoice cannot be paid");
+    };
+    const result = await handlePayWebhook({
+      ...signed({
+        id: "evt_void",
+        type: "collection.succeeded",
+        data: {
+          checkout_id: checkout.checkoutId,
+          status: "SUCCEEDED",
+          charged_amount: "1000.00",
+          charged_currency: "KES",
+        },
+      }),
+      ledger,
+    });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.ok, true);
+    const visible = ledger.payments.find((row) => row.providerRef === checkout.checkoutId);
+    assert.ok(visible, "the collected shillings must be stored even when the invoice cannot be paid");
+    assert.equal(visible.matchStatus, "issue");
+  });
+});
+
+describe("billing notice sends", () => {
+  it("passes the notice idempotency key as the notify ledger key", async () => {
+    let seen = null;
+    await sendClaimedBillingNotices({
+      env: { BILLING_NOTICES_SEND: "on" },
+      claim: async () => [
+        {
+          id: "notice-1",
+          channel: "email",
+          recipient: "owner@example.com",
+          body: "Invoice SCL-2026-000042 is due.",
+          title: "Invoice",
+          kind: "platform_billing_invoice_issued",
+          tenant_id: "t1",
+          idempotency_key: "platform_billing_invoice_issued:inv1",
+        },
+      ],
+      settle: async () => {},
+      dispatch: async (input) => {
+        seen = input;
+        return { channel: "email", notifySendId: "send-1" };
+      },
+    });
+    assert.equal(seen.ledger.keyBase, "platform_billing_invoice_issued:inv1");
+  });
+});
+
+describe("pay attempt SQL", () => {
+  it("locks the invoice and treats a pending attempt as in flight before a checkout url exists", () => {
+    const sql = fs.readFileSync(path.join(ROOT, "docs/supabase/invoice_pay.sql"), "utf8");
+    const start = sql.indexOf("function public.create_invoice_pay_attempt");
+    const end = sql.indexOf("$$;", start);
+    const body = sql.slice(start, end);
+    assert.match(body, /for update/);
+    assert.doesNotMatch(body, /and checkout_url is not null/);
+    assert.match(
+      sql,
+      /create unique index[\s\S]{0,240}payment_attempts[\s\S]{0,240}where status = 'pending'/i
+    );
+  });
+});
