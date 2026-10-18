@@ -468,6 +468,21 @@ function polishSpokenDetail(text, opts = {}) {
       }
     }
   }
+  // VOICE_FACT_REFS: a payment number not on file is the cannot-answer line,
+  // never an invented "given when you pay" process (HD_b070f6939775).
+  if ((opts.state || opts.profile) && require('./factSheet').factRefsEnabled()) {
+    const turns = opts.callerTurns || opts.state?.conversation?.answersReceived || [];
+    const lastCaller = Array.isArray(turns) && turns.length ? turns[turns.length - 1] : '';
+    const paid = require('./factSheet').guardPaymentNumberClaim(spoken, lastCaller, {
+      language: opts.language,
+      profile: opts.profile,
+    });
+    if (paid.replaced) {
+      spoken = paid.text;
+      dropReasons.push('pay_number_unknown');
+      logSpokenFilterDrop('pay_number_unknown', lastCaller, opts);
+    }
+  }
   // Guard whole sentences first. Stripping a verb phrase after the fact would
   // leave a fragment ("that for you.") that the guard can no longer see.
   if (opts.state || opts.profile) {

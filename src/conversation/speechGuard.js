@@ -8,7 +8,11 @@ const { confirmationLanguage } = require('./language');
 const { factServices, factProducts, speechFactText } = require('./provenance');
 const { entityValue, findCatalogMatch } = require('./entityExtraction');
 const { looksLikeOfferAsk } = require('./fileRead');
-const { fileServicePriceLine } = require('./catalogueMouth');
+const {
+  fileServicePriceLine,
+  namesOtherTopic,
+  midSentencePrice,
+} = require('./catalogueMouth');
 const { hoursAskLine, looksLikeHoursAsk } = require('./knownFacts');
 const { numbersIn } = require('./numberWords');
 const {
@@ -439,8 +443,9 @@ function priceHits(profile, ask) {
 
 function formatFilePrice(hit, language) {
   const lang = confirmationLanguage(language);
-  if (lang === 'sw' || lang === 'sheng') return `${hit.name} ni ${hit.price}.`;
-  return `${hit.name} is ${hit.price}.`;
+  const price = midSentencePrice(hit.price);
+  if (lang === 'sw' || lang === 'sheng') return `${hit.name} ni ${price}.`;
+  return `${hit.name} is ${price}.`;
 }
 
 function filePriceAnswer(profile, callerText, language = 'en') {
@@ -469,13 +474,25 @@ function groundFilePriceLine(opts = {}) {
   const language = opts.language || opts.state?.language?.current || 'en';
   const direct = filePriceAnswer(profile, text, language);
   if (direct) return direct;
+  // VOICE_FACT_REFS (HD_b070f6939775): borrowing an earlier turn's service is
+  // only for a bare "how much is it?". A question naming something else (the
+  // Kileleshwa travel fee) never gets that price, and the walk back stops at
+  // a turn about another topic: the call moved on from that service.
+  const refsOn = require('./factSheet').factRefsEnabled();
+  if (refsOn && namesOtherTopic(text, profile)) return '';
+  let movedOn = false;
   const turns = Array.isArray(opts.callerTurns) ? opts.callerTurns : [];
   for (let i = turns.length - 1; i >= 0; i -= 1) {
     const turn = String(turns[i] || '').trim();
     if (!turn || turn.toLowerCase() === text.toLowerCase()) continue;
     const hits = priceHits(profile, turn);
     if (hits.length === 1) return formatFilePrice(hits[0], language);
+    if (refsOn && namesOtherTopic(turn, profile)) {
+      movedOn = true;
+      break;
+    }
   }
+  if (movedOn) return '';
   const named = [
     entityValue(opts.state?.entities?.service),
     entityValue(opts.state?.entities?.product),

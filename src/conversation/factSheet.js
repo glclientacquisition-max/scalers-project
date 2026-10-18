@@ -98,6 +98,37 @@ function pickUnknownAnswerLine(profile, language) {
   return { text: TEAM_DEFAULT_LINE[key], source: 'default' };
 }
 
+const PAY_NUMBER_ASK =
+  /\b(?:till|paybill|pay ?bill|pochi|account (?:number|no)|business (?:number|no)|namba ya (?:till|malipo|akaunti)|lipa na m-?pesa)\b/i;
+const PAY_NUMBER_TALK =
+  /\b(?:till|paybill|pay ?bill|pochi|account)\b[^.!?]*\b(?:number|no\.?|namba)\b|\b(?:number|namba)\b[^.!?]*\b(?:till|paybill|pochi|akaunti|account)\b/i;
+
+/**
+ * HD_b070f6939775: asked for a till number that is not on file, the model
+ * said "Our till number is given when you pay after the job is completed",
+ * an invented process. With the flag on, a sentence about a payment number
+ * that carries no digits, on a payment-number ask, becomes the cannot-answer
+ * line (once). A real number rendered from {pay.*} has digits and is kept.
+ * @returns {{ text: string, replaced: boolean }}
+ */
+function guardPaymentNumberClaim(text, callerText, opts = {}) {
+  const raw = String(text || '');
+  if (!PAY_NUMBER_ASK.test(String(callerText || '')) || !PAY_NUMBER_TALK.test(raw)) return { text: raw, replaced: false };
+  const line = unknownAnswerLine(opts.language, opts.profile || null);
+  let replaced = false;
+  const parts = raw.match(/[^.!?]+[.!?]*\s*/g) || [raw];
+  const out = [];
+  for (const part of parts) {
+    if (PAY_NUMBER_TALK.test(part) && !/\d/.test(part)) {
+      if (!replaced && !raw.includes(line)) out.push(`${line} `);
+      replaced = true;
+      continue;
+    }
+    out.push(part);
+  }
+  return { text: out.join('').replace(/\s+/g, ' ').trim(), replaced };
+}
+
 /** The cannot-answer line (see pickUnknownAnswerLine). Never empty. */
 function unknownAnswerLine(language, profile = null) {
   return pickUnknownAnswerLine(profile || {}, language).text;
@@ -407,6 +438,7 @@ function formatFactCard(sheet) {
     'To say one of these, write its ID in braces exactly as listed, for example "It is {price.example}." The system speaks the value in the caller\'s language.',
     'Never write these amounts, times or numbers yourself, in digits or in words. An ID marked (team to confirm) is spoken as a promise to check with the team.',
     'If a price, fee, time or number is not listed here, say you will check with the team. Write the ID only inside a full sentence.',
+    'A payment number (till, paybill, Pochi, account) not listed here is not on file: still write its ID ({pay.mpesa_till}, {pay.mpesa_paybill}, {pay.pochi}) and the system says the check-with-the-team line. Never say when, where or how a number is given.',
   ];
   for (const [kind, title] of CARD_SECTIONS) {
     const rows = facts.filter((f) => f.kind === kind);
@@ -592,6 +624,7 @@ module.exports = {
   findFactFor,
   unknownAnswerLine,
   pickUnknownAnswerLine,
+  guardPaymentNumberClaim,
   callbackSafeLine,
   TEAM_DEFAULT_LINE,
   personaOnlyPrompt,

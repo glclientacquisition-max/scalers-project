@@ -28,6 +28,12 @@ Owner decision, 18 Oct 2026. `factSheet.pickUnknownAnswerLine(profile, language)
 
 Every candidate passes `callbackSafeLine` first: no transfer (`TRANSFER_CLAIM`), no saved or booked claim (`SAVED_CLAIM`, booking words), no job-close line. A line that fails falls to the next step. The column is read in its own query, only with the flag on (`loadUnknownAnswerSpoken` in `db.js`); a missing column or any error gives null. With the flag on, the GIGO unknown-fact line (serve mode) and the prompt's UNKNOWN block also use the team wording instead of "confirm with the owner".
 
+## Carried-over prices and payment numbers (HD_b070f6939775)
+
+- A local price line may borrow a service named on an earlier turn only for a bare "how much is it?". With the flag on, a question that names something else (fee, travel, delivery, till, paybill, hours, or a word no catalogue row has, such as "Kileleshwa") never gets that price, and the walk back stops at a caller turn about another topic (`catalogueMouth.namesOtherTopic` / `topicMovedOn`, used by `groundFilePriceLine` and `resolveSpokenService`).
+- A payment number not on file: the FACT CARD tells the model to write the `{pay.*}` ID anyway (it renders as the cannot-answer line). As a backstop, on a payment-number ask a sentence about a till, paybill or account number with no digits becomes the cannot-answer line (`factSheet.guardPaymentNumberClaim`, trace reason `pay_number_unknown`).
+- File price lines say "is from KSh 2,500" mid-sentence.
+
 ## Replay eval
 
 `npm run eval:fact-refs` replays 69 judged production and staging speech-check rows (`tests/fixtures/fact-refs-eval/`). It prints false deletions and false "not on file" before and after. `npm run test:fact-refs` fails if the after numbers regress.
