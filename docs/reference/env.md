@@ -65,7 +65,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `NEXT_PUBLIC_SUPABASE_URL` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `NEXT_PUBLIC_WALLET_RATE_KES_PER_MINUTE` | desk | `dashboard/src/lib/wallet.ts` |
 | `NEXT_RUNTIME` | desk | `dashboard/src/lib/adminQuality.ts` |
-| `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+3 more |
+| `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+4 more |
 | `OPS_EMAIL_FROM` | desk | `dashboard/src/lib/opsMail.ts` |
 | `OWNER_ALERT_EMAIL` | voice | `server.js` |
 | `PATH` | scripts | `scripts/smoke-recording-webhook.js` |
