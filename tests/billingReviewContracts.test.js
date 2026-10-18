@@ -67,6 +67,55 @@ describe("package version editor SQL", () => {
   });
 });
 
+describe("member wallet debit and period roll", () => {
+  const actions = gitShow(ACTIONS, "docs/supabase/owner_billing_actions.sql");
+
+  it("revokes consume_sms_units from authenticated and skips a beta subscription", () => {
+    const start = actions.indexOf("function public.consume_sms_units");
+    const end = actions.indexOf("function public.reserve_notify_send", start);
+    const chunk = actions.slice(start, end);
+    assert.match(
+      chunk,
+      /revoke all on function public\.consume_sms_units\(uuid, integer\)\s+from public, anon, authenticated/
+    );
+    assert.doesNotMatch(chunk, /to authenticated, service_role/);
+    assert.match(chunk, /billing_status = 'beta'/);
+  });
+
+  it("keeps a seat-removal credit on the draft invoice total", () => {
+    const body = functionBody(actions, "_owner_next_invoice_line");
+    assert.doesNotMatch(body, /greatest\(v_sum, 0\)/);
+  });
+
+  it("rolls allowances from the pinned package version", () => {
+    const roll = fs.readFileSync(path.join(__dirname, "../docs/supabase/package_period_rollover.sql"), "utf8");
+    const body = functionBody(roll, "roll_package_periods");
+    assert.match(body, /billing_package_versions/);
+  });
+});
+
+describe("legacy billing mode and invoice freeze", () => {
+  it("refuses to turn enforcement on while billing_status stays beta", () => {
+    const sql = fs.readFileSync(path.join(__dirname, "../docs/supabase/wallet_security_beta.sql"), "utf8");
+    const body = functionBody(sql, "set_tenant_billing_mode");
+    assert.match(body, /billing_status/);
+    assert.match(body, /tenant_subscriptions/);
+  });
+
+  it("does not let a draft update occupy the next invoice number", () => {
+    const sql = fs.readFileSync(path.join(__dirname, "../docs/supabase/billing_data_layer.sql"), "utf8");
+    const body = functionBody(sql, "invoices_freeze");
+    assert.match(body, /new\.invoice_number is not null|new\.status is distinct from 'draft'/);
+  });
+
+  it("revokes execute on payments_issue_receipt from public", () => {
+    const sql = fs.readFileSync(path.join(__dirname, "../docs/supabase/invoice_documents.sql"), "utf8");
+    const start = sql.indexOf("function public.payments_issue_receipt");
+    const chunk = sql.slice(start, start + 1200);
+    assert.match(chunk, /revoke all on function public\.payments_issue_receipt\(\) from public, anon, authenticated/);
+  });
+});
+
 describe("Bachs webhook route", () => {
   it("logs a failed apply and does not answer 500 when the invoice cannot be paid", () => {
     const route = fs.readFileSync(

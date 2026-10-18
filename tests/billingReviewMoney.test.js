@@ -11,6 +11,7 @@ const { toCents } = require("../dashboard/src/lib/invoicePay/money");
 const { signBachsBody } = require("../dashboard/src/lib/invoicePay/signature");
 const { handlePayWebhook } = require("../dashboard/src/lib/invoicePay/webhook");
 const { startInvoiceCheckout } = require("../dashboard/src/lib/invoicePay/checkoutFlow");
+const { payView } = require("../dashboard/src/lib/invoicePay/view");
 const { sendClaimedBillingNotices } = require("../src/billing/billingNoticeSend");
 const { createMemoryLedger } = require("./invoicePayMemory");
 
@@ -335,5 +336,89 @@ describe("pay attempt SQL", () => {
       sql,
       /create unique index[\s\S]{0,240}payment_attempts[\s\S]{0,240}where status = 'pending'/i
     );
+  });
+});
+
+describe("checkout return and overpay", () => {
+  it("credits the extra when checkout.completed is followed by OVERPAID on the same checkout", async () => {
+    const { ledger, token } = seedPayable("100.00");
+    const provider = providerFactory();
+    const checkout = await startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    await handlePayWebhook({
+      ...signed({
+        id: "evt_done",
+        type: "checkout.completed",
+        data: {
+          checkout_id: checkout.checkoutId,
+          payment_status: "paid",
+          charged_amount: "100.00",
+          charged_currency: "KES",
+        },
+      }),
+      ledger,
+    });
+    const over = await handlePayWebhook({
+      ...signed({
+        id: "evt_over",
+        type: "collection.succeeded",
+        data: {
+          checkout_id: checkout.checkoutId,
+          status: "OVERPAID",
+          charged_amount: "150.00",
+          charged_currency: "KES",
+        },
+      }),
+      ledger,
+    });
+    assert.equal(over.body.duplicate, undefined);
+    assert.equal(over.body.overpaid, true);
+    const stored = ledger.payments.find((row) => row.providerRef === checkout.checkoutId);
+    assert.equal(stored.amountKes, "150.00");
+    assert.equal(ledger.invoices.get("inv1").status, "paid");
+    assert.equal(ledger.invoices.get("inv1").amountPaidKes, "100");
+  });
+
+  it("does not put the raw pay token on the Bachs success URL", async () => {
+    const { ledger, token } = seedPayable("100.00");
+    let successUrl = "";
+    const provider = {
+      async createCheckout(input) {
+        successUrl = input.successUrl;
+        return {
+          checkoutId: "cs_1",
+          checkoutUrl: "https://sandbox-api.bachs.io/c/1",
+          expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+        };
+      },
+    };
+    await startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+    });
+    assert.equal(successUrl.includes(token), false);
+  });
+
+  it("does not show Payment received for a checkout that belongs to another invoice", () => {
+    const view = payView({
+      lookup: {
+        found: true,
+        state: "payable",
+        businessName: "Jirani Cleaning",
+        invoiceNumber: "SCL-2026-000042",
+        totalKes: "1000.00",
+        amountPaidKes: "0",
+        dueAt: null,
+      },
+      checkout: { id: "cs_other_invoice", status: "succeeded", returning: true },
+    });
+    assert.notEqual(view.state, "received");
+    assert.notEqual(view.title, "Payment received");
   });
 });

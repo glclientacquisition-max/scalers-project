@@ -22,9 +22,9 @@ Failing tests that encode the required money outcomes live on `cursor/billing-re
 
 ```text
 node --test tests/billingReviewMoney.test.js tests/billingReviewContracts.test.js
-# tests 14
+# tests 23
 # pass 0
-# fail 14
+# fail 23
 ```
 
 ## Safe to ship to prod?
@@ -34,9 +34,9 @@ No pull request in this set is safe to take live M-Pesa, and none is safe to tur
 | PR | Verdict |
 | --- | --- |
 | #775 | **No.** Keep it as the staging schema the others sit on. Do not apply it to production until the pay and debit fixes below are in the same release. Re-applying this file after `invoice_documents.sql` puts invoice numbers back to `SC-` and the due-notice kind back to `platform_billing_invoice_due`. |
-| #781 | **No.** A null spend cap uses half the monthly price and ignores `spend_limit_share_percent`. Call debit uses `billing_rate_card` id 1, not the pinned version rate, and it debits a business whose `billing_status` is still `beta` once enforcement is `soft` or `hard`. The extra-seat backfill raises if the #778 freeze is already installed and a published paid row still has a null seat price. |
-| #780 | **No.** Two Pay clicks, or a second click after the 60 minute checkout expires, open two Bachs sessions. Paying both takes the money twice. A succeeded collection that is not an exact shilling match, and any `collection.underpaid`, leaves the invoice open. A payment against a void invoice is a silent HTTP 500 and is then dropped when Bachs stops retrying. Live mode is hard-refused today. Lifting that refuse without the fixes below would charge customers twice. |
-| #778 | **No for turning billing on.** The editor does not itself create an invoice, and a move does not change `billing_status` or enforcement. `admin_set_tenant_billing_mode` accepts `billing_status = beta` together with enforcement `soft` or `hard`. After that confirmed write, #781 debits calls and applies the spend cap while the business is still beta. Version per-minute rates are not what the debit uses. |
+| #781 | **No.** A null spend cap uses half the monthly price and ignores `spend_limit_share_percent`. Call debit uses `billing_rate_card` id 1, not the pinned version rate, and it debits a business whose `billing_status` is still `beta` once enforcement is `soft` or `hard`. `consume_sms_units` stays executable by any member JWT and now debits the wallet. A seat-removal credit is floored off the draft total. The monthly roll writes catalogue seats and minutes back over the pinned version. The extra-seat backfill raises if the #778 freeze is already installed and a published paid row still has a null seat price. |
+| #780 | **No.** Two Pay clicks, or a second click after the 60 minute checkout expires, open two Bachs sessions. Paying both takes the money twice. A succeeded collection that is not an exact shilling match, and any `collection.underpaid`, leaves the invoice open. `checkout.completed` with `payment_status: paid` then drops a later `OVERPAID` on the same checkout, so the extra shillings never become a credit. A payment against a void invoice is a silent HTTP 500 and is then dropped when Bachs stops retrying. The Bachs success URL carries the raw pay token. Live mode is hard-refused today. Lifting that refuse without the fixes below would charge customers twice. |
+| #778 | **No for turning billing on.** The editor does not itself create an invoice, and a move does not change `billing_status` or enforcement. `admin_set_tenant_billing_mode` accepts `billing_status = beta` together with enforcement `soft` or `hard`. The older admin action `set_billing_mode` still calls `set_tenant_billing_mode`, which writes enforcement and leaves status `beta`. After either write, #781 debits calls and applies the spend cap while the business is still beta. Version per-minute rates are not what the debit uses. |
 
 ## Blocker
 
@@ -199,6 +199,48 @@ On current staging the paid rows are already 500, so a re-run matches zero rows 
 
 Exact fix: around that update, `alter table public.billing_package_versions disable trigger billing_package_versions_freeze`, run the update, then `enable trigger`. Apply #781's backfill before #778 only if you also keep this disable, because a later re-apply of #781 must still succeed after the freeze exists.
 
+### H6. Any member JWT can debit the SMS wallet
+
+On `main`, `consume_sms_units` is already granted to `authenticated` and, when on-demand is on, only increments `sms_used_units`. It does not touch the wallet (`docs/supabase/sms_allowance.sql:160-172` and `:190-193` on `main`).
+
+#781 replaces that function and, in the on-demand branch, calls `_wallet_apply_delta` for `overage_units * sms_kes` (`owner_billing_actions.sql:1828-1869`). The grant is unchanged (`:1897-1900`): revoked from `public` and `anon`, granted to `authenticated` and `service_role`. The only caller check is membership (`:1770-1774`), not owner. `p_units` is `greatest(coalesce(p_units, 1), 1)` (`:1757`), with no upper bound. The function does not read `billing_status`.
+
+`billing_spend_allows_charge` returns true when `billing_spend_limit_kes` is null (`:1431-1432`). `_wallet_apply_delta` has no balance floor. A member of a tenant whose enforcement is `soft` or `hard`, with on-demand on and no spend cap, can post one RPC and drive the wallet negative. Where the cap exists, one call can spend the whole remaining cap without an SMS being sent.
+
+Repro, as a staff JWT for that tenant: `POST /rest/v1/rpc/consume_sms_units` with `{"p_tenant_id":"<tenant>","p_units":1000000}`. Another tenant's id raises `not allowed`. The contract test fails because the revoke list is `public, anon` and the grant still says `to authenticated, service_role`.
+
+Exact fix: `revoke all ... from public, anon, authenticated` and grant `service_role` only. Cap `p_units` at the segment count the notify sender actually passes. Return the beta meter branch when `billing_status` is `beta`, same as enforcement `off`. Keep the wallet debit on the service-role notify path only.
+
+### H7. `checkout.completed` then `OVERPAID` drops the extra shillings
+
+`checkout.completed` applies when `payment_status` is `paid` and the KES amount equals the part. It stores `attempt.amountKes`, not a larger collected amount (`webhook.js:88-93` and `:211-212`), and marks the attempt `succeeded`. A later `collection.succeeded` with status `OVERPAID` hits the duplicate return at `webhook.js:183-184`. `apply_payment` will not replace the smaller row for the same checkout id (`billing_data_layer.sql:1522-1528`).
+
+Money: the customer pays KSh 150 on a KSh 100 invoice. If the completed event arrives first with KSh 100, the books show an exact payment. The KSh 50 never becomes `tenant_credits`, and reconciliation does not see `status = OVERPAID`. The reverse order is fine: `OVERPAID` first credits the received amount.
+
+A separate hole on the same line: status `OVERPAID` with a positive KES amount below the part is applied (`webhook.js:108`) before the equality check. That under-credits and then locks the checkout the same way as H1.
+
+Repro: the test "credits the extra when checkout.completed is followed by OVERPAID" got `duplicate: true` after a KSh 100 completed event and a KSh 150 `OVERPAID` event. The stored payment stayed KSh 100.
+
+Exact fix: if a later event on the same checkout has a larger KES amount and status `OVERPAID`, update the payment row to that amount and insert `tenant_credits` for the difference. Do not treat `OVERPAID` below the part as a full apply. Use the underpaid path in H1.
+
+### H8. A seat-removal credit is deleted, and the monthly roll puts catalogue allowances back
+
+`owner_set_extra_seats` stores a removal as a negative line (`owner_billing_actions.sql:1193-1196`) because `billing_prorate_kes` ignores negatives. `_owner_next_invoice_line` then sets the draft total to `greatest(sum(lines), 0)` (`:1085-1088`). Remove 1 seat, 10 of 30 days, unit KSh 500. The line is `round(500 * 10 / 30, 0) = -167`. The draft total becomes 0. The KSh 167 is not copied onto a renewal invoice and is not a wallet credit.
+
+`_owner_apply_allowances` sets `seat_included` from the pinned version plus extra seats (`:710-715`). `roll_package_periods` later calls `_tenant_set_allowances` (`docs/supabase/package_period_rollover.sql:261-264`), which writes `billing_packages.seats` (`docs/supabase/package_state_rules.sql:193`). Catalogue Starter is 2 seats. Version 2 Starter is 3. After the roll, `seat_included` is 2, `extra_seats` is unchanged, and the draft still bills the extra seats. Invites stop at the catalogue cap. The business paid for seats the cap rejects. Minutes move the same way: a Scale version pinned at 1,600 is put back to the catalogue 2,000, so 400 minutes that should have been overage are included.
+
+The seat-total test fails because the function still contains `greatest(v_sum, 0)`. The roll test fails because `roll_package_periods` does not mention `billing_package_versions`.
+
+Exact fix: let a negative line reduce `total_kes` below zero, and turn a negative draft into a `tenant_credits` row when the invoice is issued, or store the removal as a credit with its own idempotency key. Change `roll_package_periods` to copy minutes, seats, and message allowances from the pinned `billing_package_versions` row plus `extra_seats`, not from `billing_packages`.
+
+### H9. The old admin mode switch turns charging on and leaves status `beta`
+
+`POST /api/admin/billing` action `set_billing_mode` still calls `setTenantBillingMode` (`dashboard/src/app/api/admin/billing/route.ts:117-131`). That RPC is `set_tenant_billing_mode` (`dashboard/src/lib/adminWallets.ts:60`), which updates `tenants.billing_enforcement` and does not touch `tenant_subscriptions.billing_status` (`docs/supabase/wallet_security_beta.sql:348-359`). It is service-role only (`:535-536`). The ops cookie is the gate. A note of 3 characters is the only extra check. There is no pair rule.
+
+New rows default to `billing_status = beta` (`billing_data_layer.sql:436`) and enforcement `off`. After this action sets `soft`, status stays `beta`, and H4 debits. `admin_set_tenant_billing_mode` is not the only writer. The contract test fails because `set_tenant_billing_mode` does not mention `billing_status` or `tenant_subscriptions`.
+
+Exact fix: make `set_tenant_billing_mode` raise when the requested enforcement is not `off` and the subscription is still `beta`, and require the caller to set status to `active` in the same transaction. Point the admin route at `admin_set_tenant_billing_mode` with `p_confirm` true, or delete the old action once that function is the only writer.
+
 ## Medium
 
 ### M1. A reclaimed billing notice can send twice across an hour boundary
@@ -229,6 +271,32 @@ This is unproven against the sandbox response shape. The code path is unconditio
 
 Exact fix: if the create response omits `expires_at`, set it from `expires_in_minutes` (the request already sends 60, capped at 1440) before attach. On attach failure, mark the attempt `failed` and cancel the session id.
 
+### M4. The Bachs return URL is a bearer, and a foreign checkout paints "Payment received"
+
+`startInvoiceCheckout` sets `successUrl` to `/pay/${token}?return=1` (`dashboard/src/lib/invoicePay/checkoutFlow.js:37-38`). The token is stored only as a hash (`invoice_pay.sql:222-227`). Bachs receives the raw token in the success and cancel URLs, so Bachs logs and the browser history hold a bearer that `pay_invoice_by_token` honors until expiry or rotate. The test "does not put the raw pay token on the Bachs success URL" failed because `successUrl.includes(token)` is true.
+
+`loadPayView` loads whatever `checkout_id` is on the query after the token lookup (`dashboard/src/lib/invoicePay/loadPay.ts:16-22`). `invoice_pay_attempt_by_checkout` does not compare invoice ids (`invoice_pay.sql:479-497`). `payView` turns `status = succeeded` into state `received` and title "Payment received" while the looked-up invoice is still `payable` (`view.js:64-69`). It does not mark the invoice paid. A customer who opens `/pay/<token-for-A>?return=1&checkout_id=<succeeded-checkout-for-B>` sees a paid screen for an open invoice and may not pay A.
+
+Exact fix: put a one-time return id in the Bachs URL, not the pay token. In `loadPayView`, ignore a checkout whose `invoice_id` is not the token's invoice. `payView` should say "Payment received" only when `lookup.state` is `paid`.
+
+### M5. A draft update can occupy the next invoice number
+
+`invoices_freeze` returns `new` for every update while `old.status = 'draft'` (`billing_data_layer.sql:747-748`). A service-role update can set `status = 'open'` and `invoice_number = 'SCL-2026-000006'` without touching `billing_invoice_counters`. `finalize_invoice` then does `last_number = last_number + 1` (`invoice_documents.sql:254-258`). If that string is already taken, the unique violation aborts the transaction and the increment rolls back. Every later finalize retries the same number and fails. `authenticated` has select only, so this is a service-role path. The contract test fails because the draft branch does not reject a non-null `invoice_number` or a status other than `draft`.
+
+Exact fix: in the draft branch, raise when `new.invoice_number is not null` or `new.status is distinct from 'draft'`. Number and status changes go through `finalize_invoice` only.
+
+### M6. `tenant_subscriptions` takes a lock when the data layer is applied
+
+`billing_data_layer.sql:451-452` sets `billing_status` not null after the backfill at `:412-433`. That is an existing table, so the alter takes `ACCESS EXCLUSIVE` for the check. `invoice_pay.sql:55` adds a column with `default now()` on `payment_attempts`. `now()` is volatile, so PostgreSQL will rewrite the table rather than use a metadata-only default. On a first production apply `payment_attempts` is empty and the rewrite is cheap. `tenant_subscriptions` is not empty. Indexes in these scripts are `CREATE INDEX` without `CONCURRENTLY`, which is legal in the SQL editor transaction and blocks writes for the build. There is no down script. A second run of the status backfill updates only nulls, so it does not reset status.
+
+Exact fix: apply on staging first, in a quiet window, with a backup. Add the `payment_attempts` column as nullable, backfill, then set the default, if the table is already large. Do not run `SET NOT NULL` on `tenant_subscriptions` inside a long transaction that also rebuilds indexes.
+
+### M7. An upgrade on the last day of the period switches the plan and charges KSh 0
+
+`billing_period_days` returns `days_left = 0` when today is the Nairobi end date (`owner_billing_actions.sql:250-268`). `billing_prorate_kes` then returns 0. `owner_change_plan` updates the plan and allowances before the invoice (`:943-961`). The invoice function returns null when charge and credit are both 0 (`:742-743`). Upgrade Starter to Scale on that date: KSh 0 charged, Scale minutes applied, until `roll_package_periods` runs. Same-day on the first day of a 31-day month is a full charge (`days_left = 31`). 31 Oct against a 1 Nov end is `days_left = 1`. Those two match the integer proration and are not this bug.
+
+Exact fix: when `days_left = 0`, schedule the upgrade at the next period instead of applying it now, or charge the full new period price.
+
 ## Low
 
 ### L1. `toCents` of a JavaScript number uses `toFixed(2)`
@@ -246,6 +314,16 @@ Exact fix: change the SQL check to `^https://`.
 ### L3. `billing_add_months` is granted to `authenticated`
 
 On #781 this is a pure date function. It does not write money. Leave the grant, or revoke it for consistency with the other billing functions. Not a charge path.
+
+### L4. `payments_issue_receipt` is granted to `PUBLIC`
+
+`invoice_documents.sql:417-437` creates the trigger function and does not revoke it. PostgreSQL grants `EXECUTE` to `PUBLIC` on a new function. A direct `select public.payments_issue_receipt()` errors because `NEW` is not assigned, and it does not issue a receipt. `issue_invoice_receipt` is revoked (`:414-415`). The contract test fails because there is no `revoke all on function public.payments_issue_receipt()`.
+
+Exact fix: revoke from `public`, `anon`, and `authenticated` after the create. The trigger still runs as the table owner.
+
+### L5. Inside the same hour, a reclaimed notice can be marked failed after it was sent
+
+M1 covers the next-hour duplicate. Inside the same hour the notify key matches, the second dispatch returns no channel, and `billingNoticeSend.js:34` settles the row `failed`. The customer already got the message. The row says failed. Fix is the same `keyBase`: a replay must settle `sent` when the notify ledger says the send already exists.
 
 ## Checked, and holding
 
