@@ -74,6 +74,27 @@ export function sanitizeSpokenLine(raw: string, lang: "en" | "sw"): string {
   return line;
 }
 
+function sameLine(a: string, b: string): boolean {
+  const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+  return norm(a) === norm(b);
+}
+
+/**
+ * The owner's own line, trimmed. Empty when the box is blank or still the team default,
+ * so the tenant keeps null and voice uses whatever the default is on the day of the call.
+ */
+export function ownerUnknownAnswer(raw: unknown): string {
+  const line = String(raw ?? "").trim();
+  if (!line) return "";
+  if (sameLine(line, UNKNOWN_ANSWER_DEFAULT_EN) || sameLine(line, UNKNOWN_ANSWER_DEFAULT_SW)) return "";
+  return line;
+}
+
+/** What the Settings box opens with: the owner's line, or the team default when none is stored. */
+export function unknownAnswerBoxText(stored: unknown): string {
+  return ownerUnknownAnswer(stored) || UNKNOWN_ANSWER_DEFAULT_EN;
+}
+
 /** Deterministic lines when Gemini is missing, slow, or returns nothing usable. */
 export function localSpokenLines(source: string): SpokenLinePair {
   return {
@@ -115,7 +136,7 @@ async function linesFor(source: string, generate: SpokenGenerator | null | undef
 }
 
 /**
- * Empty fallback stores null.
+ * An empty or default fallback stores null.
  * An owner edit of the spoken lines keeps source when it still matches.
  * A changed fallback regenerates and ignores those edits.
  */
@@ -128,7 +149,7 @@ export async function resolveUnknownAnswerSpoken(input: {
   now?: string;
   generate?: SpokenGenerator | null;
 }): Promise<UnknownAnswerSpoken | null> {
-  const source = String(input.fallback || "").trim();
+  const source = ownerUnknownAnswer(input.fallback);
   if (!source) return null;
 
   const stored = parseUnknownAnswerSpoken(input.stored);
@@ -154,4 +175,31 @@ export async function resolveUnknownAnswerSpoken(input: {
     source,
     updated_at: stamp(input.now),
   };
+}
+
+/**
+ * Both columns for a save that owns the unsure line.
+ * A blank box, the untouched default, and Reset to default all store null.
+ */
+export async function planUnknownAnswerSave(input: {
+  submitted: unknown;
+  storedSpoken?: unknown;
+  editedEn?: string;
+  editedSw?: string;
+  touched?: boolean;
+  now?: string;
+  generate?: SpokenGenerator | null;
+}): Promise<{ unknown_answer_fallback: string | null; unknown_answer_spoken: UnknownAnswerSpoken | null }> {
+  const line = ownerUnknownAnswer(input.submitted);
+  if (!line) return { unknown_answer_fallback: null, unknown_answer_spoken: null };
+  const spoken = await resolveUnknownAnswerSpoken({
+    fallback: line,
+    stored: input.storedSpoken,
+    editedEn: input.editedEn,
+    editedSw: input.editedSw,
+    touched: input.touched,
+    now: input.now,
+    generate: input.generate,
+  });
+  return { unknown_answer_fallback: line, unknown_answer_spoken: spoken };
 }

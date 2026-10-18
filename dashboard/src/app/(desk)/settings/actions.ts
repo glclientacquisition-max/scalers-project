@@ -68,7 +68,7 @@ import {
   settingsFieldFromScope,
   settingsScopeValidationError,
 } from "@/lib/settingsSaveScope";
-import { resolveUnknownAnswerSpoken } from "@/lib/unknownAnswerSpoken";
+import { ownerUnknownAnswer, planUnknownAnswerSave } from "@/lib/unknownAnswerSpoken";
 import { generateUnknownAnswerSpoken } from "@/lib/unknownAnswerSpokenModel";
 import { withoutUnknownSpokenColumn } from "@/lib/peelMissingColumns";
 import { factHashModeFromEnv, loadCompileProvenance } from "@/lib/tenantFieldProvenance";
@@ -281,8 +281,8 @@ export async function saveAndCompileSettings(
   );
   const unknownAnswerFallback = pick(
     "unknownAnswerFallback",
-    String(formData.get("unknown_answer_fallback") || "").trim(),
-    String(tenant.unknown_answer_fallback || "").trim()
+    ownerUnknownAnswer(formData.get("unknown_answer_fallback")),
+    ownerUnknownAnswer(tenant.unknown_answer_fallback)
   );
   let teamDirectory = pick(
     "teamDirectory",
@@ -518,16 +518,16 @@ export async function saveAndCompileSettings(
       )
     : provenance.fieldMeta;
   const ownsUnknown = settingsFieldFromScope(scope, "unknownAnswerFallback", true, false);
-  const spokenPromise = ownsUnknown
-    ? resolveUnknownAnswerSpoken({
-        fallback: unknownAnswerFallback,
-        stored: tenant.unknown_answer_spoken,
+  const unknownPlanPromise = ownsUnknown
+    ? planUnknownAnswerSave({
+        submitted: formData.get("unknown_answer_fallback"),
+        storedSpoken: tenant.unknown_answer_spoken,
         editedEn: String(formData.get("unknown_answer_spoken_en") || ""),
         editedSw: String(formData.get("unknown_answer_spoken_sw") || ""),
         touched: String(formData.get("unknown_answer_spoken_touched") || "") === "1",
         generate: generateUnknownAnswerSpoken,
       })
-    : Promise.resolve(null);
+    : null;
 
   const compileInput = {
     businessName,
@@ -553,14 +553,15 @@ export async function saveAndCompileSettings(
   // Fast path: write the facts with the template prompt now (milliseconds), so the owner
   // sees "Saved" quickly and a reload shows the new data. The model-written prompt and
   // the fact bookkeeping run after the response (see after() below).
-  const [{ prompt }, unknownAnswerSpoken] = await Promise.all([
+  const [{ prompt }, unknownPlan] = await Promise.all([
     compileReceptionistPrompt({ ...compileInput, localOnly: true }),
-    spokenPromise,
+    unknownPlanPromise,
   ]);
+  const unknownAnswerSpoken = unknownPlan?.unknown_answer_spoken ?? null;
   const source = "local" as const;
 
   patch.llm_system_prompt = prompt;
-  if (ownsUnknown) patch.unknown_answer_spoken = unknownAnswerSpoken;
+  if (unknownPlan) Object.assign(patch, unknownPlan);
   const tCompile = Date.now();
   let { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
   if (error) {

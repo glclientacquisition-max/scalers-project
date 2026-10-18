@@ -2,17 +2,21 @@
 
 import { useState } from "react";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
-import { UnknownAnswerSpokenFields } from "@/components/UnknownAnswerSpokenFields";
-import { SettingsGroup, SettingsStack, settingsFieldClass, settingsFormBodyClass } from "@/components/settingsUi";
+import { UnknownAnswerField } from "@/components/UnknownAnswerField";
+import { SettingsGroup, settingsFormBodyClass } from "@/components/settingsUi";
 import { UNKNOWN_ANSWER_DEFAULT_EN } from "@/lib/unknownAnswerSpoken";
 
+const OWNER_LINE = "If we do not stock it, a teammate will call the caller back.";
+const OWNER_SPOKEN = {
+  en: "If we do not stock it, a teammate will call you back.",
+  sw: "Tukikosa bidhaa hiyo, mwenzetu atakupigia.",
+};
+
 /** Policies "When unsure" block, for layout screenshots. DASHBOARD_OPEN only. */
-export function UnknownAnswerFixture({ updating }: { updating: boolean }) {
-  const [fallback, setFallback] = useState(
-    "If we do not stock it, a teammate will call the caller back."
-  );
-  const [english, setEnglish] = useState("If we do not stock it, a teammate will call you back.");
-  const [swahili, setSwahili] = useState("Tukikosa, mwenzetu atakupigia.");
+export function UnknownAnswerFixture({ edited, updating }: { edited: boolean; updating: boolean }) {
+  const [text, setText] = useState(edited ? OWNER_LINE : UNKNOWN_ANSWER_DEFAULT_EN);
+  const [english, setEnglish] = useState(edited ? OWNER_SPOKEN.en : "");
+  const [swahili, setSwahili] = useState(edited ? OWNER_SPOKEN.sw : "");
 
   return (
     <div className={deskShellClass}>
@@ -21,22 +25,19 @@ export function UnknownAnswerFixture({ updating }: { updating: boolean }) {
         <main data-desk-main="" className={deskMainClass}>
           <div className={`${settingsFormBodyClass} min-w-0 px-4 py-6`} data-unknown-answer="">
             <SettingsGroup title="When unsure">
-              <SettingsStack label="What to say" htmlFor="unknown_answer_fallback">
-                <textarea
-                  id="unknown_answer_fallback"
-                  value={fallback}
-                  rows={3}
-                  onChange={(event) => setFallback(event.target.value)}
-                  placeholder={UNKNOWN_ANSWER_DEFAULT_EN}
-                  className={`${settingsFieldClass} min-h-[5.5rem]`}
-                />
-              </SettingsStack>
-              <UnknownAnswerSpokenFields
+              <UnknownAnswerField
+                text={text}
+                onText={setText}
+                onReset={() => {
+                  setText(UNKNOWN_ANSWER_DEFAULT_EN);
+                  setEnglish("");
+                  setSwahili("");
+                }}
                 english={english}
                 swahili={swahili}
-                updating={updating}
                 onEnglish={setEnglish}
                 onSwahili={setSwahili}
+                updating={updating}
               />
             </SettingsGroup>
           </div>

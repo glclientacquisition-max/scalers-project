@@ -9,7 +9,7 @@ import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import { compileReceptionistPrompt, parseAgentTone } from "@/lib/promptCompiler";
-import { resolveUnknownAnswerSpoken } from "@/lib/unknownAnswerSpoken";
+import { ownerUnknownAnswer, resolveUnknownAnswerSpoken } from "@/lib/unknownAnswerSpoken";
 import { generateUnknownAnswerSpoken } from "@/lib/unknownAnswerSpokenModel";
 import { withoutUnknownSpokenColumn } from "@/lib/peelMissingColumns";
 import { DEFAULT_AGENT_TONE } from "@/lib/onboarding";
@@ -390,8 +390,9 @@ export async function applyIngestAction(
   const businessName = nameSuggestion || tenant.business_name;
 
   const agentTools = parseAgentTools(tenant.agent_tools);
+  const unknownLine = ownerUnknownAnswer(merged.unknownAnswerFallback);
   const spokenPromise = resolveUnknownAnswerSpoken({
-    fallback: merged.unknownAnswerFallback,
+    fallback: unknownLine,
     stored: tenant.unknown_answer_spoken,
     generate: generateUnknownAnswerSpoken,
   });
@@ -404,7 +405,7 @@ export async function applyIngestAction(
     agentName,
     teamDirectory: merged.team,
     faqs: merged.faqs,
-    unknownAnswerFallback: merged.unknownAnswerFallback,
+    unknownAnswerFallback: unknownLine,
     escalateEnabled: agentTools.escalate,
     vertical,
     handoffMode,
@@ -418,7 +419,7 @@ export async function applyIngestAction(
   if (!workspace) return { error: "Not signed in." };
 
   const patch: Record<string, unknown> = {
-    unknown_answer_fallback: merged.unknownAnswerFallback || null,
+    unknown_answer_fallback: unknownLine || null,
     unknown_answer_spoken: unknownAnswerSpoken,
     llm_system_prompt: prompt,
   };

@@ -46,7 +46,7 @@ describe("business settings depth", () => {
     assert.doesNotMatch(modes, /Keep helping/);
     assert.doesNotMatch(modes, /missing access|upgrade|Gemini|Soniox|GPT/i);
     assert.match(form, /title="When unsure"/);
-    assert.match(form, /What to say/);
+    assert.match(read("dashboard/src/components/UnknownAnswerField.tsx"), /What to say/);
     assert.match(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /"Wanjiku Mwangi"/);
     assert.match(form, /Add service/);
     assert.match(form, /placeholder="Shop voice"/);

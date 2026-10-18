@@ -9,8 +9,7 @@ import {
   tenantNeedsOnboarding,
 } from "@/lib/onboarding";
 import { compileReceptionistPrompt, parseAgentTone } from "@/lib/promptCompiler";
-import { resolveUnknownAnswerSpoken } from "@/lib/unknownAnswerSpoken";
-import { generateUnknownAnswerSpoken } from "@/lib/unknownAnswerSpokenModel";
+import { ownerUnknownAnswer } from "@/lib/unknownAnswerSpoken";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerFacingError } from "@/lib/ownerFacingError";
 import { parseVertical } from "@/lib/vertical";
@@ -128,13 +127,8 @@ export async function completeOnboardingAction(
       ? formatServicesForCompiler(services, "")
       : formatProductsForCompiler(products);
   const hoursLocation = schedule ? formatHoursForCompiler(schedule) : "";
-  const unknownAnswerFallback = "I'll check with the owner.";
+  const unknownAnswerFallback = ownerUnknownAnswer(tenant.unknown_answer_fallback);
   const productsText = formatProductsForCompiler(products);
-  const spokenPromise = resolveUnknownAnswerSpoken({
-    fallback: unknownAnswerFallback,
-    stored: tenant.unknown_answer_spoken,
-    generate: generateUnknownAnswerSpoken,
-  });
 
   const answers: OnboardingAnswers = {
     servicesPricing: servicesOffered,
@@ -157,7 +151,6 @@ export async function completeOnboardingAction(
     unknownAnswerFallback,
     teamDirectory,
   });
-  const unknownAnswerSpoken = await spokenPromise;
 
   if (!prompt || prompt.length < 80) {
     return { error: "Could not build a receptionist prompt. Try again.", step: 3 };
@@ -197,8 +190,6 @@ export async function completeOnboardingAction(
     llm_system_prompt: prompt,
     agent_tools: { escalate: true, end_call: true },
     after_hours_mode: "serve",
-    unknown_answer_fallback: unknownAnswerFallback,
-    unknown_answer_spoken: unknownAnswerSpoken,
   };
   if (schedule) {
     patch.hours_schedule = schedule;
