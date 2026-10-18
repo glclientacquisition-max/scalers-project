@@ -168,12 +168,17 @@ function packLegacyLeadFields(lead = {}, toFallback = '') {
   ];
 }
 
-function parametersForKind(kind, { body, lead = {}, to, templateName } = {}) {
+function parametersForKind(kind, { body, lead = {}, to, templateName, alertLines } = {}) {
   const name = templateName || templateNameForKind(kind);
   if (!usesCatalogLayout(name)) {
     return packLegacyLeadFields(lead, to).map((value) => sanitizeParam(value));
   }
   if (isApprovedFirstTemplate(name)) {
+    // Staff call alerts: the SMS / session-text structure in the same three
+    // variables (templates.js staffAlertTemplateLines). Template text unchanged.
+    if (Array.isArray(alertLines) && alertLines.length === 3) {
+      return alertLines.map((value) => sanitizeParam(value));
+    }
     return packGeneric(body, lead).map((value) => sanitizeParam(value));
   }
   let raw;
@@ -207,9 +212,10 @@ function buildStaffWhatsAppTemplate({
   to,
   templateName,
   language,
+  alertLines,
 } = {}) {
   const name = templateName || templateNameForKind(kind);
-  const parameters = parametersForKind(kind, { body, lead, to, templateName: name });
+  const parameters = parametersForKind(kind, { body, lead, to, templateName: name, alertLines });
   return {
     name,
     language_code: language || templateLanguage(),

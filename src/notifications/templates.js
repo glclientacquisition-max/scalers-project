@@ -358,13 +358,7 @@ function shortCallLink(shortCode, deskBase) {
 function renderStaffSms({ kind, lead = {}, shortCode = null, deskBase = null } = {}) {
   const k = String(kind || '').trim();
   if (!STAFF_SMS_KINDS.has(k)) return null;
-  let label = STAFF_SMS_LABELS[k];
-  let detail = oneLine(lead && lead.reason);
-  const m = /^([A-Z][A-Z /]+?):\s*/.exec(detail);
-  if (m && STAFF_SMS_TITLE_LABELS[m[1].trim()]) {
-    label = STAFF_SMS_TITLE_LABELS[m[1].trim()];
-    detail = detail.slice(m[0].length).trim();
-  }
+  const { label, reason: detail } = staffLabelReason(k, lead && lead.reason);
   const biz = clip(oneLine(lead && lead.businessName), 24);
   const name = clip(oneLine(lead && lead.name) || 'Caller', 20);
   const phone = smsPhone(lead && lead.callerNumber);
@@ -379,13 +373,165 @@ function renderStaffSms({ kind, lead = {}, shortCode = null, deskBase = null } =
   return out.length <= SMS_MAX ? out : clip(out, SMS_MAX);
 }
 
+// ---------------------------------------------------------------------------
+// Staff call alert for WhatsApp and email: same structure as the SMS, no
+// length cap, full reason and details. Built from the lead plus the rows that
+// renderStaffText already put in the body ("When: ...", "Where: ...").
+// Callbacks only: never imply a live transfer or a confirmed booking.
+// ---------------------------------------------------------------------------
+const STAFF_DETAIL_ROWS = Object.freeze([
+  ['Service', 'Service'],
+  ['Item', 'Item'],
+  ['Qty', 'Qty'],
+  ['When', 'When'],
+  ['Where', 'Where'],
+  ['Notes', 'Notes'],
+  ['Caller asked for', 'Asked for'],
+]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function plainLine(text) {
+  return String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+}
+
+/** Label (lowercase) and reason without the "VISIT REQUEST:" style prefix. */
+function staffLabelReason(kind, reason, clean = oneLine) {
+  let label = STAFF_SMS_LABELS[kind];
+  let detail = clean(reason);
+  const m = /^([A-Z][A-Z /]+?):\s*/.exec(detail);
+  if (m && STAFF_SMS_TITLE_LABELS[m[1].trim()]) {
+    label = STAFF_SMS_TITLE_LABELS[m[1].trim()];
+    detail = detail.slice(m[0].length).trim();
+  }
+  return { label, reason: detail };
+}
+
+/** "When: ..." style rows renderStaffText / escalationBody wrote into the body. */
+function staffDetailsFromText(body) {
+  const out = [];
+  const lines = String(body || '').split(/\r?\n/);
+  for (const [key, label] of STAFF_DETAIL_ROWS) {
+    const row = lines.find((l) => l.trim().toLowerCase().startsWith(`${key.toLowerCase()}:`));
+    const value = row ? plainLine(row.trim().slice(key.length + 1)) : '';
+    if (value) out.push([label, value]);
+  }
+  return out;
+}
+
+/** Tappable number: +2547XXXXXXXX for Kenyan numbers, else the digits as given. */
+function telHref(raw) {
+  const t = String(raw || '').trim();
+  const digits = t.replace(/[^\d+]/g, '');
+  const ke = /^(?:\+?254|0)([17]\d{8})$/.exec(digits);
+  if (ke) return `tel:+254${ke[1]}`;
+  const plain = digits.replace(/(?!^)\+/g, '');
+  return /\d{6,}/.test(plain) ? `tel:${plain}` : null;
+}
+
+function callUrlFrom({ body, callId, deskBase }) {
+  const m = /^Open call:\s*(https?:\/\/\S+)\s*$/im.exec(String(body || ''));
+  if (m) return m[1];
+  const id = String(callId || '').trim();
+  if (!UUID_RE.test(id)) return null;
+  const base = String(deskBase || 'https://app.scalers.co.ke').trim().replace(/\/+$/, '');
+  const withProto = /^https?:\/\//i.test(base) ? base : `https://${base}`;
+  return `${withProto}/calls/${id}`;
+}
+
+/**
+ * Structured staff call alert, or null when kind is not a staff call alert.
+ * link: https short link when the call has a code, else the full call URL.
+ */
+function staffAlert({ kind, lead = {}, body = '', shortCode = null, deskBase = null, callId = null } = {}) {
+  const k = String(kind || '').trim();
+  if (!STAFF_SMS_KINDS.has(k)) return null;
+  const l = lead && typeof lead === 'object' ? lead : {};
+  const labelled = staffLabelReason(k, l.reason, plainLine);
+  const { label } = labelled;
+  let { reason } = labelled;
+  const rawPhone = plainLine(l.callerNumber || l.phone);
+  const name = plainLine(l.name);
+  let details = staffDetailsFromText(body);
+  // Requests and visits: what they want is the item / service; when, where,
+  // qty and notes stay as their own rows.
+  const what = (k === 'service_request' || k === 'appointment') && details.find(([key]) => key === 'Item' || key === 'Service');
+  if (what) {
+    reason = what[1];
+    details = details.filter((row) => row !== what);
+  } else {
+    details = details.filter(([, value]) => !reason.toLowerCase().includes(value.toLowerCase()));
+  }
+  if (k === 'escalation') {
+    const m = /^Escalation for (.+?)(?:\.\s|\s\(fallback\)|$)/m.exec(String(body || ''));
+    const who = m ? plainLine(m[1]) : '';
+    if (who && who !== 'the team') details.unshift(['For', who]);
+  }
+  const short = shortCallLink(shortCode, deskBase);
+  return {
+    kind: k,
+    businessName: plainLine(l.businessName),
+    label,
+    name: name && name !== 'Caller' ? name : '',
+    phone: rawPhone ? smsPhone(rawPhone) : '',
+    tel: telHref(rawPhone),
+    reason,
+    details,
+    recordingUrl: /^https?:\/\//i.test(String(l.recordingUrl || '')) ? String(l.recordingUrl).trim() : null,
+    link: short ? `https://${short}` : callUrlFrom({ body, callId, deskBase }),
+    shortLink: Boolean(short),
+  };
+}
+
+function waSafe(text) {
+  // Caller text must not open or close WhatsApp bold / italic / strike.
+  return plainLine(text).replace(/[*_~`]/g, '');
+}
+
+/**
+ * WhatsApp session text for a staff call alert. Bold first line only.
+ *
+ *   *Mama Njeri Gas: visit request - to confirm*
+ *   Wanjiku Kamau, 0712 345 678
+ *   Gas cooker installation
+ *   When: Thursday 10am
+ *   Where: Kahawa West, near Quickmart
+ *   https://app.scalers.co.ke/c/K7P2QXZ
+ */
+function renderStaffWhatsApp(alert) {
+  if (!alert) return null;
+  const biz = waSafe(alert.businessName);
+  const head = biz ? `${biz}: ${alert.label}` : alert.label.charAt(0).toUpperCase() + alert.label.slice(1);
+  const who = [waSafe(alert.name) || (alert.phone ? '' : 'Caller'), alert.phone].filter(Boolean).join(', ');
+  const lines = [`*${head}*`, who];
+  if (alert.reason) lines.push(waSafe(alert.reason));
+  for (const [label, value] of alert.details) lines.push(`${label}: ${waSafe(value)}`);
+  if (alert.recordingUrl) lines.push(`Recording: ${alert.recordingUrl}`);
+  if (alert.link) lines.push(alert.link);
+  return lines.filter(Boolean).join('\n');
+}
+
+/** The three body variables of the approved scalers_staff_alert template (no URLs). */
+function staffAlertTemplateLines(alert) {
+  if (!alert) return null;
+  const biz = plainLine(alert.businessName);
+  const head = biz ? `${biz}: ${alert.label}` : alert.label;
+  const who = [alert.name || (alert.phone ? '' : 'Caller'), alert.phone].filter(Boolean).join(', ');
+  const rest = [alert.reason, ...alert.details.map(([label, value]) => `${label}: ${value}`)].filter(Boolean);
+  return [head, who, rest.join('. ') || 'Open the call in the desk.'];
+}
+
 module.exports = {
   SHORT_CODE_RE,
   SMS_MAX,
   STAFF_SMS_KINDS,
   isGsm7Basic,
   renderStaffSms,
+  renderStaffWhatsApp,
   shortCallLink,
+  staffAlert,
+  staffAlertTemplateLines,
+  staffDetailsFromText,
+  telHref,
   smsPhone,
   toGsm7,
   STAFF_ACTIONS,

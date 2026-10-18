@@ -30,7 +30,15 @@ const {
   sendReserved,
 } = require('./sendLedger');
 const { escalationHold, noteInboxOnly } = require('./escalationGate');
-const { STAFF_SMS_KINDS, renderStaffSms, toGsm7 } = require('./templates');
+const {
+  STAFF_SMS_KINDS,
+  renderStaffSms,
+  renderStaffWhatsApp,
+  staffAlert,
+  staffAlertTemplateLines,
+  toGsm7,
+} = require('./templates');
+const { renderStaffAlertEmail } = require('./alertEmail');
 const { callShortCode } = require('./callShortLink');
 
 function whatsAppSenderReady() {
@@ -45,7 +53,7 @@ function smsSenderReady() {
   return isSmsConfigured();
 }
 
-async function sendEmailFallback({ to, body, lead = {}, subject } = {}) {
+async function sendEmailFallback({ to, body, lead = {}, subject, mail = null } = {}) {
   const dest = normalizeEmail(to);
   if (!emailFallbackReady() || !dest) {
     return {
@@ -54,10 +62,12 @@ async function sendEmailFallback({ to, body, lead = {}, subject } = {}) {
     };
   }
   const built = buildLeadEmail(lead);
+  // Staff call alerts: HTML card + plain text (alertEmail.js). Others: text as before.
   const result = await sendOwnerEmail({
     to: dest,
-    subject: subject || built.subject,
-    text: body || built.text,
+    subject: (mail && mail.subject) || subject || built.subject,
+    text: (mail && mail.text) || body || built.text,
+    html: mail ? mail.html : undefined,
     lead,
   });
   return { channel: 'email', to: dest, result };
@@ -69,20 +79,26 @@ function deskBaseUrl() {
 }
 
 /**
- * SMS body: explicit smsBody, else the one-segment staff alert (with the
- * short call link when calls.short_code is set), else the full text.
+ * Per-channel bodies for a staff call alert (lead, escalation, request, visit,
+ * voicemail, callback): one-segment SMS, WhatsApp session text plus the three
+ * scalers_staff_alert variables, and the HTML / text email. Other kinds
+ * (billing, wallet, ops, caller texts) keep `text` on every channel.
  */
-async function staffSmsText({ smsBody, text, lead, ledger, kind } = {}) {
-  if (smsBody && String(smsBody).trim()) return toGsm7(smsBody);
-  const k = kind || (ledger && ledger.kind);
-  if (!STAFF_SMS_KINDS.has(String(k || '').trim())) return text;
-  const short = renderStaffSms({
-    kind: k,
-    lead: lead && typeof lead === 'object' ? lead : {},
-    shortCode: await callShortCode(ledger),
-    deskBase: deskBaseUrl(),
-  });
-  return short || text;
+async function staffChannelBodies({ smsBody, text, lead, ledger, kind } = {}) {
+  const k = String(kind || (ledger && ledger.kind) || '').trim();
+  const explicitSms = smsBody && String(smsBody).trim() ? toGsm7(smsBody) : null;
+  if (!STAFF_SMS_KINDS.has(k)) return { smsText: explicitSms || text, wa: null, mail: null };
+  const safeLead = lead && typeof lead === 'object' ? lead : {};
+  const shortCode = await callShortCode(ledger);
+  const deskBase = deskBaseUrl();
+  const smsText = explicitSms || renderStaffSms({ kind: k, lead: safeLead, shortCode, deskBase }) || text;
+  const alert = staffAlert({ kind: k, lead: safeLead, body: text, shortCode, deskBase, callId: ledger && ledger.callId });
+  if (!alert) return { smsText, wa: null, mail: null };
+  return {
+    smsText,
+    wa: { sessionBody: renderStaffWhatsApp(alert), alertLines: staffAlertTemplateLines(alert) },
+    mail: renderStaffAlertEmail(alert),
+  };
 }
 
 async function trySendSms({ to, body }) {
@@ -92,10 +108,17 @@ async function trySendSms({ to, body }) {
   return { channel: 'sms', to: dest, result };
 }
 
-async function trySendWhatsApp({ to, body, lead, kind }) {
+async function trySendWhatsApp({ to, body, lead, kind, wa = null }) {
   const dest = normalizeWhatsAppTo(to);
   if (!whatsAppSenderReady() || !dest) return null;
-  const result = await sendOwnerWhatsApp({ to: dest, body, lead, kind });
+  const result = await sendOwnerWhatsApp({
+    to: dest,
+    body,
+    lead,
+    kind,
+    sessionBody: wa ? wa.sessionBody : undefined,
+    alertLines: wa ? wa.alertLines : undefined,
+  });
   return { channel: 'whatsapp', to: dest, result };
 }
 
@@ -112,9 +135,12 @@ async function trySendWhatsApp({ to, body, lead, kind }) {
  */
 async function dispatchAlert({ to, email, body, smsBody, lead = {}, subject, channels, ledger, kind } = {}) {
   const text = body || buildLeadText(lead);
-  // Staff call alerts go out on SMS as one GSM-7 segment (templates.js
-  // renderStaffSms). WhatsApp and email keep the full text.
-  const smsText = await staffSmsText({ smsBody, text, lead, ledger, kind });
+  // Staff call alerts: one GSM-7 segment on SMS (renderStaffSms), the same
+  // structure without the cap on WhatsApp (renderStaffWhatsApp) and an HTML
+  // card on email (alertEmail.js). Everything else keeps `text`.
+  const { smsText, wa, mail } = await staffChannelBodies({ smsBody, text, lead, ledger, kind });
+  const waText = (wa && wa.sessionBody) || text;
+  const mailText = (mail && mail.text) || text;
   const errors = [];
   const prefs = parseNotifyChannels(channels);
   const dests = [normalizeSmsTo(to), normalizeWhatsAppTo(to), normalizeEmail(email)].filter(
@@ -154,7 +180,7 @@ async function dispatchAlert({ to, email, body, smsBody, lead = {}, subject, cha
         kind: ledgerKind,
         channel,
         to: dest,
-        body: channel === 'sms' ? smsText : text,
+        body: channel === 'sms' ? smsText : channel === 'whatsapp' ? waText : channel === 'email' ? mailText : text,
         strict: ledger?.strict,
       },
       send
@@ -166,7 +192,9 @@ async function dispatchAlert({ to, email, body, smsBody, lead = {}, subject, cha
   // Legacy path (reserve_notify_send not applied yet): record after the send.
   async function accept(result) {
     if (result?.channel) {
-      const recorded = await recordDispatchResult(ledger, result, result.channel === 'sms' ? smsText : text);
+      const sentBody =
+        result.channel === 'sms' ? smsText : result.channel === 'whatsapp' ? waText : result.channel === 'email' ? mailText : text;
+      const recorded = await recordDispatchResult(ledger, result, sentBody);
       const claim = durableSendClaim(recorded);
       if (!claim.ok) {
         return { channel: null, reason: claim.reason, errors: [...errors] };
@@ -234,7 +262,7 @@ async function dispatchAlert({ to, email, body, smsBody, lead = {}, subject, cha
         const waTo = normalizeWhatsAppTo(to);
         if (!legacy && whatsAppSenderReady() && waTo) {
           const out = await viaReserve('whatsapp', waTo, () =>
-            trySendWhatsApp({ to, body: text, lead, kind: ledgerKind })
+            trySendWhatsApp({ to, body: text, lead, kind: ledgerKind, wa })
           );
           if (!out.legacy) {
             if (out.sent) return out.result;
@@ -245,8 +273,8 @@ async function dispatchAlert({ to, email, body, smsBody, lead = {}, subject, cha
           }
         }
         if (legacy) {
-          const wa = await trySendWhatsApp({ to, body: text, lead, kind: ledgerKind });
-          if (wa) return accept(wa);
+          const waSent = await trySendWhatsApp({ to, body: text, lead, kind: ledgerKind, wa });
+          if (waSent) return accept(waSent);
         }
       } catch (err) {
         errors.push(`whatsapp:${err?.message || err}`);
@@ -263,9 +291,9 @@ async function dispatchAlert({ to, email, body, smsBody, lead = {}, subject, cha
       const mailTo = normalizeEmail(email);
       if (!legacy && emailFallbackReady() && mailTo) {
         const out = await viaReserve('email', mailTo, async () => {
-          const mail = await sendEmailFallback({ to: email, body: text, lead, subject });
-          if (!mail.channel) throw new Error(mail.reason || 'email_failed');
-          return mail;
+          const sent = await sendEmailFallback({ to: email, body: text, lead, subject, mail });
+          if (!sent.channel) throw new Error(sent.reason || 'email_failed');
+          return sent;
         });
         if (!out.legacy) {
           if (out.sent) return out.result;
@@ -275,19 +303,20 @@ async function dispatchAlert({ to, email, body, smsBody, lead = {}, subject, cha
           return { channel: null, reason: out.reason || 'send_failed', errors };
         }
       }
-      const mail = await sendEmailFallback({
+      const sentMail = await sendEmailFallback({
         to: email,
         body: text,
         lead,
         subject,
+        mail,
       });
-      if (mail.channel) return accept(mail);
+      if (sentMail.channel) return accept(sentMail);
 
       if (!smsSenderReady() && !whatsAppSenderReady()) {
         return { channel: null, reason: 'no_notify_channel_configured', errors };
       }
       if (!normalizeSmsTo(to) && !normalizeWhatsAppTo(to)) {
-        return { channel: null, reason: mail.reason || 'no_destination_number', errors };
+        return { channel: null, reason: sentMail.reason || 'no_destination_number', errors };
       }
       return { channel: null, reason: 'send_failed', errors };
     }

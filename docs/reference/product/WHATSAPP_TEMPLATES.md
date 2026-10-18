@@ -1,6 +1,6 @@
 ---
 owner: voice
-last_reviewed: 2026-10-09
+last_reviewed: 2026-10-18
 ---
 
 # Staff WhatsApp templates (Meta approval)
@@ -52,6 +52,29 @@ Kind env wins. If a kind name is unset, that event uses `SAUTIKIT_WHATSAPP_TEMPL
 Desk: `NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE=true` (default on).
 
 A SautiKit `202` is not delivery. Meta error `131042` means the WhatsApp Business account has no currency. Session text inside an open 24h window can still arrive. Template pings do not, until WhatsApp Manager billing has a country and currency. The desk then shows "WhatsApp billing is not set."
+
+## Staff call alerts: fields per path (#777)
+
+Call alerts (lead, call back, request, visit, voicemail, callback) use the same structure as the staff SMS: `business: label`, caller name and `07xx xxx xxx`, what they want, details, link.
+
+| Path | When | What is sent |
+| --- | --- | --- |
+| Session text | 24h window open (`sendOwnerWhatsApp` found a recent inbound) | Free-form `renderStaffWhatsApp` (`templates.js`). First line bold, full reason, `When` / `Where` / `Qty` / `Notes` rows, recording, `https://app.scalers.co.ke/c/<code>` (or the full call URL). |
+| `scalers_staff_alert` | Window closed, no kind env (today's default) | Template text unchanged. `{{1}}` `Mama Njeri Gas: missed call`. `{{2}}` `Wanjiku Kamau, 0712 345 678`. `{{3}}` reason plus details (`Gas cooker installation. When: Thursday 10am. Where: Kahawa West`). No URL: variables cannot carry one. |
+| `scalers_lead` ... `scalers_request` | Only once a kind env is set | Unchanged packing (approved bodies have fixed wording around each variable). |
+
+The link cannot reach a cold staff phone without a new template. Proposed (needs Meta approval; not wired):
+
+`scalers_call_alert`, Utility, English (US), header none, footer `Scalers`.
+
+```
+{{1}}
+{{2}}
+{{3}}
+Open the call to act. Do not reply to this chat.
+```
+
+Button: Visit website, `Open call`, dynamic URL `https://app.scalers.co.ke/c/{{1}}`. Samples: `Mama Njeri Gas: missed call` / `Wanjiku Kamau, 0712 345 678` / `Wants 13kg gas refill to Kahawa West today` / button `K7P2QXZ`. After approval the send path needs a button component with the short code, and `SAUTIKIT_WHATSAPP_TEMPLATE` (or the kind env) pointed at it.
 
 ## Bodies to paste
 
