@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import { Button } from "@/components/ui/Button";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Empty } from "@/components/ui/Empty";
 import { Field, Input } from "@/components/ui/Field";
 import { ListRow } from "@/components/ui/ListRow";
+import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { Switch } from "@/components/ui/Switch";
 import {
@@ -20,6 +22,35 @@ import {
   type OpsPerson,
   type OpsSettings,
 } from "@/lib/platformOpsModel";
+import {
+  RETENTION_MAX_DAYS,
+  RETENTION_MIN_DAYS,
+  RETENTION_NEVER,
+} from "@/lib/recordingRetentionPolicy";
+
+type RetentionMode = "env" | "days" | "never";
+
+function initRetention(settings: OpsSettings): { mode: RetentionMode; days: string } {
+  if (settings.recordingRetentionDays === RETENTION_NEVER) return { mode: "never", days: "30" };
+  if (settings.recordingRetentionDays != null) {
+    return { mode: "days", days: String(settings.recordingRetentionDays) };
+  }
+  return { mode: "env", days: "30" };
+}
+
+function retentionStored(mode: RetentionMode, days: string): number | null {
+  if (mode === "never") return RETENTION_NEVER;
+  if (mode === "env") return null;
+  const n = Math.floor(Number(days));
+  if (n >= RETENTION_MIN_DAYS && n <= RETENTION_MAX_DAYS) return n;
+  return RETENTION_MIN_DAYS;
+}
+
+function retentionSummary(mode: RetentionMode, days: string): string {
+  if (mode === "never") return "Never delete";
+  if (mode === "env") return "Env default";
+  return `${days} days`;
+}
 
 function warnKes(minor: number): string {
   return String(Math.round((Number(minor) || 0) / 100));
@@ -95,7 +126,13 @@ export function AdminPlatformOpsForm({
   persisted: boolean;
 }) {
   const [people, setPeople] = useState<OpsPerson[]>(settings.people);
-  const [sheet, setSheet] = useState<"person" | "alerts" | null>(null);
+  const [sheet, setSheet] = useState<"person" | "alerts" | "recordings" | null>(null);
+  const initRet = initRetention(settings);
+  const [retentionMode, setRetentionMode] = useState<RetentionMode>(initRet.mode);
+  const [retentionDays, setRetentionDays] = useState(initRet.days);
+  const [purgeConfirm, setPurgeConfirm] = useState<{ count: number; capped: boolean } | null>(
+    null,
+  );
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -110,16 +147,25 @@ export function AdminPlatformOpsForm({
     [kinds],
   );
 
+  function settingsBody(extra: Record<string, unknown> = {}) {
+    return {
+      action: "save_settings",
+      people,
+      kinds,
+      sautikit_warn_minor: Math.round(Number(warn) * 100),
+      recording_retention_days: retentionStored(retentionMode, retentionDays),
+      ...extra,
+    };
+  }
+
   async function savePeople(next: OpsPerson[], ok: string) {
     setBusy("save");
     setError("");
     setStatus("");
     try {
       await postOps({
-        action: "save_settings",
+        ...settingsBody(),
         people: next,
-        kinds,
-        sautikit_warn_minor: Math.round(Number(warn) * 100),
       });
       setPeople(next);
       setStatus(ok);
@@ -135,12 +181,7 @@ export function AdminPlatformOpsForm({
     setError("");
     setStatus("");
     try {
-      await postOps({
-        action: "save_settings",
-        people,
-        kinds,
-        sautikit_warn_minor: Math.round(Number(warn) * 100),
-      });
+      await postOps(settingsBody());
       setStatus("Saved.");
       setSheet(null);
     } catch (err) {
@@ -148,6 +189,67 @@ export function AdminPlatformOpsForm({
     } finally {
       setBusy(null);
     }
+  }
+
+  async function commitRecordingRetention() {
+    setBusy("save");
+    setError("");
+    setStatus("");
+    try {
+      await postOps(settingsBody());
+      setStatus("Saved.");
+      setSheet(null);
+      setPurgeConfirm(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveRecordings() {
+    const next = retentionStored(retentionMode, retentionDays);
+    const prev = settings.recordingRetentionDays;
+    const lowering =
+      typeof next === "number" &&
+      typeof prev === "number" &&
+      next < prev;
+    const toFinite = next !== RETENTION_NEVER && next != null;
+    const fromLonger =
+      prev === RETENTION_NEVER ||
+      prev == null ||
+      (typeof prev === "number" && typeof next === "number" && next < prev);
+    if (toFinite && (lowering || (fromLonger && next !== prev))) {
+      setBusy("save");
+      setError("");
+      try {
+        const res = await fetch("/api/admin/platform-ops", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "recording_retention_preview",
+            recording_retention_days: next,
+          }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          count?: number;
+          capped?: boolean;
+          error?: string;
+        };
+        if (!res.ok) throw new Error(json.error || "Could not preview.");
+        if ((json.count || 0) > 0) {
+          setPurgeConfirm({ count: json.count || 0, capped: Boolean(json.capped) });
+          setBusy(null);
+          return;
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not preview.");
+        setBusy(null);
+        return;
+      }
+      setBusy(null);
+    }
+    await commitRecordingRetention();
   }
 
   function addPerson() {
@@ -218,6 +320,18 @@ export function AdminPlatformOpsForm({
       </section>
 
       <section>
+        <p className="px-4 text-caption text-ink-3">Recordings</p>
+        <ul className="divide-y divide-hairline">
+          <ListRow
+            title="Delete call recordings after"
+            preview={retentionSummary(retentionMode, retentionDays)}
+            when={<ChevronRightIcon className="h-5 w-5 text-ink-3" aria-hidden="true" />}
+            onOpen={() => setSheet("recordings")}
+          />
+        </ul>
+      </section>
+
+      <section>
         <p className="px-4 text-caption text-ink-3">Alerts</p>
         <ul className="divide-y divide-hairline">
           <ListRow
@@ -269,6 +383,59 @@ export function AdminPlatformOpsForm({
                 autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+              />
+            )}
+          </Field>
+        </div>
+      </Sheet>
+
+      <ConfirmSheet
+        open={purgeConfirm != null}
+        onClose={() => setPurgeConfirm(null)}
+        title="Delete recordings sooner?"
+        confirmLabel="Save"
+        pending={busy === "save"}
+        onConfirm={() => void commitRecordingRetention()}
+      >
+        {purgeConfirm
+          ? `About ${purgeConfirm.count}${purgeConfirm.capped ? "+" : ""} recordings will be deleted at the next scheduled run. Nothing is removed until then.`
+          : null}
+      </ConfirmSheet>
+
+      <Sheet
+        open={sheet === "recordings"}
+        onOpenChange={(open) => setSheet(open ? "recordings" : null)}
+        title="Recording retention"
+        footer={
+          <Button type="button" pending={busy === "save"} onClick={() => void saveRecordings()}>
+            Save
+          </Button>
+        }
+      >
+        <div className="space-y-4">
+          <Segmented
+            label="Retention"
+            items={[
+              { key: "env", label: "Env default", active: retentionMode === "env" },
+              { key: "days", label: "Days", active: retentionMode === "days" },
+              { key: "never", label: "Never", active: retentionMode === "never" },
+            ]}
+            onSelect={(key) => setRetentionMode(key as RetentionMode)}
+          />
+          <Field id="recording-retention-days" label="Delete after" hint="Days">
+            {(props) => (
+              <Input
+                {...props}
+                type="number"
+                min={RETENTION_MIN_DAYS}
+                max={RETENTION_MAX_DAYS}
+                step={1}
+                className="tabular-nums"
+                value={retentionDays}
+                onChange={(event) => {
+                  setRetentionMode("days");
+                  setRetentionDays(event.target.value);
+                }}
               />
             )}
           </Field>
