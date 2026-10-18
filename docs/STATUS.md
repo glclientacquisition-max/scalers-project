@@ -43,6 +43,7 @@ Times EAT. SHAs are the squash commits on `main` (first-parent log). Older histo
 
 | PR | SHA | Merged | What |
 | --- | --- | --- | --- |
+| #733 | see merge commit | 18 Oct | Brain: D199 visit read, "last one only" and paged. "Mara ya mwisho" / "my last booking" reads only the newest open request; "what do I have open" reads 2 at a time, then "N more"; "any more?" reads the next 2; the past-dated count is read only when asked. Live under `BRAIN_CALL_FIXES_D199` (on in prod). Rollback = revert, or D199 off. Approved: Alvin (GO 15:12 EAT via Chief). Deploy ids in the closing docs PR. |
 | #763 | `2842c4f4` | 18 Oct 14:59 | Voice: speech guard reads glued clocks and shillings ("KSh500", "from9:30 AM") like the spaced form, for checking only; streamed model stages record where model text loses spaces (VOICE.md invariant 19). No flag. Railway `c4a235da` SUCCESS, `/healthz` ok on `2842c4f4`. Rollback = revert. Approved by Alvin 14:33 EAT via Chief. |
 | #760 | `2cb6e075` | 18 Oct 14:57 | Voice: an ended call gets no new media session; every call is finalized once (`VOICE_ENDED_CALL_GUARD`, VOICE.md invariant 18). Merged with the flag off (no behaviour change); flag turned on 15:01 (see below). Railway `508601d2` SUCCESS, `/healthz` ok on `2cb6e075`. Rollback = revert (or flag off). Approved by Alvin 14:33 EAT via Chief. |
 | #732 | `13ddf19d` | 18 Oct 14:48 | Brain: a past-booking question in sw/Sheng/en goes to the visit read; honest outcome labels. Live under `BRAIN_CALL_FIXES_D199` (on in prod). Railway `d458494a` SUCCESS, Vercel `dpl_7WNEx3Up` READY. |
@@ -87,6 +88,7 @@ Earlier merges since 9 Oct (see git log for detail):
 - **18 Oct, #760 ended-call guard merged** (`2cb6e075`, 14:57 EAT; Railway `508601d2` SUCCESS), flag default off so no prod behaviour change; rollback revert. `VOICE_ENDED_CALL_GUARD` (only the exact value `on` enables; VOICE.md invariant 18): an ended call gets no new media session and every call is finalized once (HD_49d726c3dc9b). Approved by Alvin 14:33 EAT via Chief; Voice deploy slot.
 - **18 Oct, #763 glued words merged** (`2842c4f4`, 14:59 EAT; Railway `c4a235da` SUCCESS): changes speech-guard behaviour for glued prices and times. The guard now reads a clock or shilling amount glued to the word before it ("from9:30 AM", "KSh500") the same as the spaced form, for checking only (spoken text unchanged; product codes like "A4" are not numbers), so a glued invented price is caught like a spaced one. Streamed model stages also record where model text loses spaces (`stream.unspacedJoins`; VOICE.md invariant 19). No flag. Rollback: revert. Approved by Alvin 14:33 EAT via Chief; Voice deploy slot.
 - **18 Oct 15:01 EAT: `VOICE_ENDED_CALL_GUARD=on` set on Railway prod Voice** (service `9b09d8c6`, env `8dd0b8ef`; only this variable). Value `on` because only the exact value `on` enables it (#760, VOICE.md invariant 18). Redeploy: Railway `7b7e28c5` SUCCESS, same commit `2842c4f4`, started 15:01:14 EAT; `/healthz` ok on `2842c4f4`; boot logs clean. No calls were in progress before or after the flip; Aris `line_status` active and the +254709221536 mapping unchanged. Rollback: unset `VOICE_ENDED_CALL_GUARD` (or set it `off`) on Railway prod and redeploy. Approver: Alvin, 14:33 EAT via Chief.
+- **2026-10-18 — Brain: #733 merged** see merge commit: a past-booking read now reads only the newest open request when the caller asks for the last one ("mara ya mwisho", "last one", "niliitisha"); "what do I have open" reads the newest 2, then says how many more; "any more?" / "zingine" reads the next 2, and "Nothing further back." / "Hakuna zaidi." when none are left; the past-dated count is read only when the caller asks for it (no automatic count after every read). Gated by `BRAIN_CALL_FIXES_D199`, which is ON in prod, so this changes live calls. Rollback: revert, or `BRAIN_CALL_FIXES_D199` off. Approved: Alvin (GO 15:12 EAT via Chief).
 
 ---
 
@@ -113,7 +115,9 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | #643 | Voice | Phone wallet low-balance alert. | GO'd, frozen. |
 | #731 | Voice | One owner alert per call, goodbye hangs up, 10 s no-audio close (main cut of #644 + #646). | GO'd, frozen. |
 | #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | Prod SQL and merge wait for a scored Aris call. Purge schedule not applied until a recordings deletion route exists. |
-| #733 | Brain | D199 visit read (last one only, paged). (#732 merged 18 Oct 14:48, `13ddf19d`.) | Need Alvin's GO. |
+| #733 | Brain | D199 visit read (last one only, paged). (#732 merged 18 Oct 14:48, `13ddf19d`.) | **Shipped 18 Oct** (GO Alvin 15:12 EAT via Chief; see section 2). |
+| #751 | Brain | Honest owner text: `summary.topic` in owner words, rebuilt owner reason and `want`, leave-offs never a goal, team-directory name asks, junk quantities dropped (D199). | GO Alvin 15:12 EAT via Chief; merges next in the Voice slot. |
+| #761 | Brain | Trusted hours (Nairobi day plus that day's hours; closed/open claims checked against the grid), honest hours summary, name gate (`BRAIN_TRUSTED_HOURS`, off). | GO Alvin 15:12 EAT via Chief (flag stays off); merges after #751. |
 | #762 | Desk | Call setup per account (follow-up to #755): picks saved on the account (one-time copy from the browser); "Forwarding works" only when a call from the owner's named test phone arrives within 30 minutes of starting the test (other calls only show "Calls are reaching your assistant"); fix checklist when the test fails; Settings > Calls & forwarding; Overview note after 7 days without a call. | **Pending ship (18 Oct).** GO Alvin 14:55 EAT. Prod SQL applied 14:59 EAT (Ops changes). Code merges in the next Voice deploy slot, right after #758. Until then prod Desk keeps using browser storage. |
 
 **Ops-Billing (dated per the STATUS rule):**
@@ -204,7 +208,7 @@ Public copy never mentions unbuilt features.
 2. **Send the SautiKit ticket** (21:52 media degradation, 22:00–22:25 missing dials, which secret signs voice and `events_url` posts).
 3. **Recording decision:** record with a spoken notice, record without one, or don't record.
 4. **Set staging Jirani `events_url`** in the SautiKit dashboard (staging workspace `1f85601c`).
-5. **GO or no** for Brain #733 (#732 merged 18 Oct 14:48).
+5. **Brain #733, #751, #761:** GO given 15:12 EAT via Chief; shipping one at a time in the Voice slot. `BRAIN_TRUSTED_HOURS` stays off until a staging pass and a separate GO.
 6. **Carried:** top up TextSMS; staging full-scope SautiKit key for Railway staging Voice (masked card); Meta WhatsApp currency (131042).
 
 ---
