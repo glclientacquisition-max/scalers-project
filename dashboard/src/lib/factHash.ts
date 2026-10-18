@@ -234,13 +234,6 @@ function firstDefined(...values: any[]): any {
   return undefined;
 }
 
-/** Desk quote-on-request modes hash the same (ask is legacy synonym for quote). */
-function canonicalPriceMode(mode: unknown): string {
-  const m = String(mode ?? '').trim().toLowerCase();
-  if (m === 'ask') return 'quote';
-  return m;
-}
-
 /**
  * catalog.<kind>.<key>.price: { price, mode } minus empty leaves, or null.
  * Same alias order as the Brain catalogue reader (factReaders.catalogRows).
@@ -251,8 +244,7 @@ export function priceFactValue(row: any, kind: 'service' | 'product'): Record<st
     kind === 'product'
       ? firstDefined(row.price, row.price_range)
       : firstDefined(row.price_range, row.priceRange, row.price);
-  const modeRaw = firstDefined(row.price_mode, row.pricing_mode, row.priceMode, row.pricingMode);
-  const mode = canonicalPriceMode(modeRaw);
+  const mode = firstDefined(row.price_mode, row.pricing_mode, row.priceMode, row.pricingMode);
   const out: Record<string, any> = {};
   if (!isEmptyLeaf(price)) out.price = price;
   if (!isEmptyLeaf(mode)) out.mode = mode;
