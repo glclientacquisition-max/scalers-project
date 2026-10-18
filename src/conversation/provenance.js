@@ -700,6 +700,9 @@ function speechFactText(profile = {}) {
     products,
     services,
     faqs,
+    // Settings › Locations: owner-confirmed area fees and times only, so the
+    // speech check keeps "KSh 300 travel fee" and still drops a guessed fee.
+    areaFees: require('./areaTerms').speakableAreaFacts(profile.areaTerms),
   });
 }
 
