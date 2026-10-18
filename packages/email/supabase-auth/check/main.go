@@ -67,6 +67,11 @@ func main() {
 			if !strings.Contains(html, "482913") {
 				problems = append(problems, "code missing")
 			}
+		} else if strings.Contains(filepath.Base(f), "reset-password") {
+			// Any-device reset link: Desk's /auth/callback verifies the token hash.
+			if !strings.Contains(html, `href="https://app.scalers.co.ke/auth/callback?next=/reset-password&amp;token_hash=hash123&amp;type=recovery"`) {
+				problems = append(problems, "token hash reset link missing from href")
+			}
 		} else if !strings.Contains(html, `href="https://example.supabase.co/auth/v1/verify?token=abc&amp;type=signup`) {
 			problems = append(problems, "confirmation link missing from href")
 		}

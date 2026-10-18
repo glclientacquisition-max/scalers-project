@@ -23,6 +23,12 @@ export const V = {
   email: "{{ .Email }}",
   newEmail: "{{ .NewEmail }}",
   site: "{{ .SiteURL }}",
+  /**
+   * Password reset link that works on any device: Desk's /auth/callback verifies the token hash
+   * server-side (verifyOtp, type recovery) instead of a PKCE code that only works in the browser
+   * that asked. Built on SiteURL, not RedirectTo, so Admin/API sends without redirect_to still work.
+   */
+  recoveryUrl: "{{ .SiteURL }}/auth/callback?next=/reset-password&token_hash={{ .TokenHash }}&type=recovery",
 } as const;
 
 /** Dashboard field names and Management API keys for each template. */
@@ -37,7 +43,7 @@ export const AUTH_TEMPLATES: Record<AuthKind, { file: string; dashboard: string;
 
 export const SECURITY_LINE = "If you didn't ask for this, you can ignore this email.";
 const REASON = "This is an account email from Scalers. We only send it when someone asks for it.";
-const fallback = (): Block => ({ t: "rawlink", label: "If the button doesn't work, copy this link into your browser:", href: V.url });
+const fallback = (href: string = V.url): Block => ({ t: "rawlink", label: "If the button doesn't work, copy this link into your browser:", href });
 
 function spec(s: Omit<EmailSpec, "audience" | "essential" | "reason">): EmailSpec {
   return { audience: "owner", essential: true, reason: REASON, ...s };
@@ -89,9 +95,9 @@ export const authSpecs: Record<AuthKind, EmailSpec> = {
       { t: "p", text: ["We got a request to reset the password for ", { strong: V.email }, ". Tap the button to choose a new one."] },
       { t: "p", muted: true, text: "The link works once and expires in 1 hour." },
       { t: "note", tone: "neutral", text: `${SECURITY_LINE} Your password stays the same.` },
-      fallback(),
+      fallback(V.recoveryUrl),
     ],
-    cta: { label: "Choose a new password", href: V.url },
+    cta: { label: "Choose a new password", href: V.recoveryUrl },
   }),
   email_change: spec({
     subject: "Confirm your new email for Scalers",

@@ -29,7 +29,15 @@ for (const kind of AUTH_KINDS) {
       assert.equal((t.html.match(/class="btn"/g) || []).length, 0);
     } else {
       assert.equal((t.html.match(/class="btn"/g) || []).length, 1, "exactly one primary button");
-      assert.match(t.html, /<a href="\{\{ \.ConfirmationURL \}\}" class="btn"/, "button must use {{ .ConfirmationURL }}");
+      if (kind === "recovery") {
+        // Any-device reset: token hash verified by Desk's /auth/callback, never the PKCE ConfirmationURL.
+        const href = '{{ .SiteURL }}/auth/callback?next=/reset-password&amp;token_hash={{ .TokenHash }}&amp;type=recovery';
+        assert.ok(t.html.includes(`<a href="${href}" class="btn"`), "reset button must use the token hash link");
+        assert.ok(!t.html.includes("{{ .ConfirmationURL }}"), "reset email must not use ConfirmationURL");
+        assert.ok(t.text.includes("{{ .SiteURL }}/auth/callback?next=/reset-password&token_hash={{ .TokenHash }}&type=recovery"));
+      } else {
+        assert.match(t.html, /<a href="\{\{ \.ConfirmationURL \}\}" class="btn"/, "button must use {{ .ConfirmationURL }}");
+      }
       assert.match(t.html, /bgcolor="#005ccc"/, "table-cell button colour for Outlook");
     }
     if (kind === "email_change") assert.ok(t.html.includes("{{ .NewEmail }}"));
