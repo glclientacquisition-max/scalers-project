@@ -92,6 +92,7 @@ describe('gigo validators never fill a default', () => {
     assert.deepEqual(validatePrice('KES 1,500 - 3,000'), { ok: true, value: { text: 'KES 1,500 - 3,000' } });
     assert.deepEqual(validatePrice('Quoted on site'), { ok: true, value: { text: 'Quoted on site', mode: 'ask' } });
     assert.deepEqual(validatePrice('', 'ask'), { ok: true, value: { text: '', mode: 'ask' } });
+    assert.deepEqual(validatePrice('', 'quote'), { ok: true, value: { text: '', mode: 'quote' } });
     assert.deepEqual(validatePrice('ask'), { ok: true, value: { text: '', mode: 'ask' } });
     assert.equal(validatePrice('').reason, 'missing');
     for (const bad of ['tbd', '0', 'N/A', '-500', 'cheap', '???', '999999999999']) {

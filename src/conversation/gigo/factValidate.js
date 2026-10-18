@@ -57,7 +57,7 @@ function validatePrice(raw, mode) {
   const text = asText(raw);
   const m = asText(mode).toLowerCase();
   if (!text) {
-    if (m === 'ask' || m === 'quote') return { ok: true, value: { text: '', mode: 'ask' } };
+    if (m === 'ask' || m === 'quote') return { ok: true, value: { text: '', mode: m === 'quote' ? 'quote' : 'ask' } };
     return MISSING;
   }
   if (/^(?:ask|ask for (?:a )?(?:price|quote))$/i.test(text)) {
