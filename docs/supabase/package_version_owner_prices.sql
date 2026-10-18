@@ -379,4 +379,7 @@ begin
   ) then
     raise exception 'owner price seed changed the live catalogue';
   end if;
+  if coalesce((select new_signup_trial_enabled from public.billing_lifecycle_settings where id = 1), true) then
+    raise exception 'owner price seed turned on new signup trial';
+  end if;
 end $$;

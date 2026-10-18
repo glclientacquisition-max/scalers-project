@@ -34,6 +34,7 @@ Writes also refuse when the configured database URL is production, unless `ADMIN
   "ok": true,
   "price_change_approval_threshold_kes": null,
   "package_editor_enabled": true,
+  "new_signup_trial_enabled": false,
   "features": [{ "key": "calls", "label": "Calls" }],
   "packages": [
     {
@@ -47,7 +48,7 @@ Writes also refuse when the configured database URL is production, unless `ADMIN
 }
 ```
 
-`price_change_approval_threshold_kes` is null when a second admin is not required. `package_editor_enabled` false means the database refuses editor writes (import of a promoted version still works).
+`price_change_approval_threshold_kes` is null when a second admin is not required. `package_editor_enabled` false means the database refuses editor writes (import of a promoted version still works). `new_signup_trial_enabled` defaults false. While it is false, creating a business does not add a subscription.
 
 `features` is the catalogue. A draft patch must include every key once. Keys today: `calls`, `inbox`, `voicemail`, `bookings`, `catalogue`, `sms_alerts`, `whatsapp_alerts`, `email_alerts`, `staff`.
 
@@ -221,7 +222,9 @@ Checks the database enforces, in addition to the route: no negative numbers, rea
 
 [`package_version_owner_prices.sql`](../../supabase/package_version_owner_prices.sql) publishes the locked prices (ex-VAT, KSh) through the editor functions. Staging only. It does not move a business, change billing enforcement, or create an invoice. Current businesses stay on free beta. The new versions apply only when a new subscription is inserted. It does not change `billing_packages` or `billing_rate_card`, so the public catalogue screen keeps the previous prices until Desk reads versions. A second run does not publish another version. It refuses when the editor is off, when a second-admin threshold is set, or when a draft is already open. It also refuses if a pin, a billing mode, or an invoice count changed during the run.
 
-Annual price is the usual rounding of monthly times 12 times (1 minus the discount). Starter discount is 17 percent. Growth and Scale are 10 percent. Call rates are stored per second at 5 decimals, the same rounding the desk uses, so the minute figures below display back as written. Outbound on-demand is 34 per minute on every plan, including the trial. 1 credit = KSh 1. Burns are SMS segment 1, WhatsApp alert 2, email 1.
+These figures are the seeded version 2 rows. Message credits are 1,000 on Starter, 2,500 on Growth, 5,500 on Scale, and 70 on the trial. Burn rates on version 2 are SMS 1, WhatsApp 2, and email 1. 1 credit = KSh 1. Inbound overage is 26, 25, and 24 per minute. Outbound overage is 34 per minute on all four, including the trial. The trial version is 14 days, 20 minutes, 70 credits, and on-demand is locked off.
+
+Annual price is the usual rounding of monthly times 12 times (1 minus the discount). Starter discount is 17 percent. Growth and Scale are 10 percent. Call rates are stored per second at 5 decimals, the same rounding the desk uses, so the minute figures below display back as written.
 
 | Package | Monthly | Annual | Minutes | Seats | Numbers | Credits | Inbound overage |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -230,7 +233,21 @@ Annual price is the usual rounding of monthly times 12 times (1 minus the discou
 | Scale | 35,000 | 378,000 | 1,600 | 20 | 1 | 5,500 | 24 / min |
 | Trial | 0 | 0 | 20 | 2 | 1 | 70 | copied |
 
-Trial is 14 days. `on_demand_allowed` is false, so the stored call rates are not offered. Seats and numbers stay the copied version 1 values (2 and 1). Inbound stays the copied version 1 rate (0.10 per second). The owner table did not set a trial inbound price, and 0 would be a free rate. `allowances_placeholder` is false on these four versions because the credit numbers are an owner decision. The old `sms`, `email`, and `staff_wa` columns are copied from the previous version and left as they are. Version 1 stays published and unchanged.
+Trial version 2 is 14 days, 20 minutes, and 70 credits. `on_demand_allowed` is false, so the stored call rates are not offered. Seats and numbers stay the copied version 1 values (2 and 1). Inbound stays the copied version 1 rate (0.10 per second). The owner table did not set a trial inbound price, and 0 would be a free rate. `allowances_placeholder` is false on these four versions because the credit numbers are an owner decision. The old `sms`, `email`, and `staff_wa` columns are copied from the previous version and left as they are. Version 1 stays published and unchanged.
+
+## New signup trial
+
+A business is created by `handle_new_user_tenant` when someone signs up with a business name. Onboarding updates that business. It does not create one. An invite signup does not create a business.
+
+`new_signup_trial_enabled` on `billing_lifecycle_settings` defaults false. While it is false, signup does not add a subscription. When the owner sets it true, inserting a business that has no subscription pins the latest published trial version. Billing enforcement stays off. `trial_ends_at` stays empty. Trial expiry is a later change. Existing businesses are not updated. Turn it on with:
+
+```sql
+update public.billing_lifecycle_settings
+set new_signup_trial_enabled = true
+where id = 1;
+```
+
+Do not set that on production until the owner says so. Staging stays false.
 
 ## Promote a version from staging to production
 

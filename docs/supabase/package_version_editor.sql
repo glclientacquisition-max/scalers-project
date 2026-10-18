@@ -40,7 +40,8 @@
 -- ---------------------------------------------------------------------------
 alter table public.billing_lifecycle_settings
   add column if not exists price_change_approval_threshold_kes numeric,
-  add column if not exists package_editor_enabled boolean not null default true;
+  add column if not exists package_editor_enabled boolean not null default true,
+  add column if not exists new_signup_trial_enabled boolean not null default false;
 
 alter table public.billing_lifecycle_settings
   drop constraint if exists billing_lifecycle_settings_threshold_check;
@@ -55,6 +56,9 @@ comment on column public.billing_lifecycle_settings.price_change_approval_thresh
 
 comment on column public.billing_lifecycle_settings.package_editor_enabled is
   'When false, draft, edit, publish, archive, approve, and move are refused. Import of a promoted version still runs. Staging stays true.';
+
+comment on column public.billing_lifecycle_settings.new_signup_trial_enabled is
+  'When false, a new business gets no subscription from signup. When true, inserting a business with no subscription pins the latest published trial version. Does not change billing enforcement. Does not start trial expiry. Default false.';
 
 alter table public.billing_package_versions
   add column if not exists copied_from_id uuid,
@@ -682,6 +686,7 @@ as $$
   select jsonb_build_object(
     'price_change_approval_threshold_kes', s.price_change_approval_threshold_kes,
     'package_editor_enabled', s.package_editor_enabled,
+    'new_signup_trial_enabled', s.new_signup_trial_enabled,
     'features', coalesce((
       select jsonb_agg(jsonb_build_object('key', f.key, 'label', f.label) order by f.key)
       from public.billing_features f
@@ -1580,6 +1585,51 @@ begin
 end;
 $$;
 
+-- Brand-new businesses only. handle_new_user_tenant inserts the tenant on
+-- signup. Onboarding updates that row and does not create one. This trigger
+-- runs after that insert. The flag defaults off, so production signup is
+-- unchanged until the owner sets new_signup_trial_enabled. Existing rows are
+-- not updated. Billing enforcement is not written. trial_ends_at stays null.
+-- Trial expiry is a later change.
+create or replace function public.tenants_a_new_signup_trial()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_enabled boolean;
+  v_package uuid;
+begin
+  select new_signup_trial_enabled into v_enabled
+  from public.billing_lifecycle_settings
+  where id = 1;
+  if not coalesce(v_enabled, false) then
+    return new;
+  end if;
+  if exists (
+    select 1 from public.tenant_subscriptions where tenant_id = new.id
+  ) then
+    return new;
+  end if;
+  select id into v_package from public.billing_packages where sku = 'trial';
+  if v_package is null or public.billing_latest_package_version(v_package) is null then
+    return new;
+  end if;
+  insert into public.tenant_subscriptions (tenant_id, package_id, status)
+  values (new.id, v_package, 'active');
+  return new;
+end;
+$$;
+
+drop trigger if exists tenants_a_new_signup_trial on public.tenants;
+create trigger tenants_a_new_signup_trial
+  after insert on public.tenants
+  for each row execute function public.tenants_a_new_signup_trial();
+
+comment on function public.tenants_a_new_signup_trial() is
+  'When new_signup_trial_enabled is true, a new business with no subscription is pinned to the latest published trial version. Enforcement stays off. Existing businesses are not updated.';
+
 -- ---------------------------------------------------------------------------
 -- 6. Grants. Service role only. Owners do not edit versions.
 -- ---------------------------------------------------------------------------
@@ -1605,6 +1655,7 @@ revoke all on function public.admin_move_subscribers_to_package_version(uuid, uu
 revoke all on function public.admin_set_price_approval_threshold(numeric, text, text) from public, anon, authenticated;
 revoke all on function public.admin_export_package_version(uuid) from public, anon, authenticated;
 revoke all on function public.admin_import_promoted_package_version(jsonb, text, text) from public, anon, authenticated;
+revoke all on function public.tenants_a_new_signup_trial() from public, anon, authenticated;
 
 grant execute on function public._package_editor_actor(text, text) to service_role;
 grant execute on function public._package_editor_open() to service_role;
@@ -1628,6 +1679,7 @@ grant execute on function public.admin_move_subscribers_to_package_version(uuid,
 grant execute on function public.admin_set_price_approval_threshold(numeric, text, text) to service_role;
 grant execute on function public.admin_export_package_version(uuid) to service_role;
 grant execute on function public.admin_import_promoted_package_version(jsonb, text, text) to service_role;
+grant execute on function public.tenants_a_new_signup_trial() to service_role;
 
 alter table public.billing_package_version_approvals enable row level security;
 revoke all on table public.billing_package_version_approvals from public, anon, authenticated;

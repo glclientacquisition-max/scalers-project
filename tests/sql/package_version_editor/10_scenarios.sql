@@ -58,6 +58,9 @@ begin
   if v_list -> 'price_change_approval_threshold_kes' <> 'null'::jsonb then
     raise exception 'approval threshold should start unset';
   end if;
+  if v_list ->> 'new_signup_trial_enabled' <> 'false' then
+    raise exception 'new signup trial should start off';
+  end if;
   select (ver ->> 'monthly_price_kes')::numeric into v_starter
   from jsonb_array_elements(v_list -> 'packages') pkg
   cross join lateral jsonb_array_elements(pkg -> 'versions') ver
@@ -754,4 +757,72 @@ begin
     raise exception 'promote audit row missing';
   end if;
   update public.billing_lifecycle_settings set package_editor_enabled = true where id = 1;
+end $$;
+
+-- A new business gets the latest trial only while new_signup_trial_enabled is on.
+-- Existing businesses stay. Enforcement stays off. Trial expiry is not started.
+do $$
+declare
+  v_id uuid := '99999999-9999-9999-9999-999999999994';
+  v_off uuid := '99999999-9999-9999-9999-999999999995';
+  v_legacy uuid;
+  v_pin uuid;
+  v_sku text;
+  v_enf text;
+  v_status text;
+  v_ends timestamptz;
+  v_invoices int;
+begin
+  select package_version_id into v_legacy
+  from public.tenant_subscriptions
+  where tenant_id = '11111111-1111-1111-1111-111111111111';
+  select count(*) into v_invoices from public.invoices;
+
+  insert into public.tenants (
+    id, business_name, sautikit_virtual_number, whatsapp_notification_number
+  ) values (
+    v_off, 'Flag Off Signup', 'pending:' || v_off::text, '+254700000095'
+  );
+  if exists (select 1 from public.tenant_subscriptions where tenant_id = v_off) then
+    raise exception 'a signup created a trial while the flag is off';
+  end if;
+  if (select billing_enforcement from public.tenants where id = v_off) <> 'off' then
+    raise exception 'a signup turned enforcement on';
+  end if;
+
+  update public.billing_lifecycle_settings
+  set new_signup_trial_enabled = true
+  where id = 1;
+
+  insert into public.tenants (
+    id, business_name, sautikit_virtual_number, minutes_included, whatsapp_notification_number
+  ) values (
+    v_id, 'Flag On Signup', 'pending:' || v_id::text, 0, '+254700000094'
+  );
+  select p.sku, s.package_version_id, t.billing_enforcement, s.billing_status, s.trial_ends_at
+    into v_sku, v_pin, v_enf, v_status, v_ends
+  from public.tenant_subscriptions s
+  join public.tenants t on t.id = s.tenant_id
+  join public.billing_packages p on p.id = s.package_id
+  where s.tenant_id = v_id;
+  if v_sku <> 'trial'
+     or v_pin is distinct from public.billing_latest_package_version(
+       (select id from public.billing_packages where sku = 'trial')
+     )
+     or v_enf <> 'off'
+     or v_status <> 'beta'
+     or v_ends is not null
+     or (select minutes_included from public.tenants where id = v_id) <> 0
+     or (select count(*) from public.invoices) <> v_invoices
+     or (select package_version_id from public.tenant_subscriptions
+         where tenant_id = '11111111-1111-1111-1111-111111111111') is distinct from v_legacy
+     or (select billing_enforcement from public.tenants
+         where id = '11111111-1111-1111-1111-111111111111') <> 'off'
+  then
+    raise exception 'new signup trial pin, enforcement, or an existing business changed';
+  end if;
+
+  update public.billing_lifecycle_settings
+  set new_signup_trial_enabled = false
+  where id = 1;
 end $$;

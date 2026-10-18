@@ -156,6 +156,9 @@ describe("package version editor commands", () => {
     assert.match(sql, /message credits are required/);
     assert.match(sql, /a beta business is not moved onto a package version/);
     assert.match(sql, /a package change keeps the current version/);
+    assert.match(sql, /new_signup_trial_enabled boolean not null default false/);
+    assert.match(sql, /tenants_a_new_signup_trial/);
+    assert.doesNotMatch(sql, /billing_enforcement\s*=/);
     assert.doesNotMatch(sql, /insert into public\.invoices/i);
     assert.match(sql, /sms_kes = v_sms_burn/);
     assert.match(sql, /message_credits stays null/);
