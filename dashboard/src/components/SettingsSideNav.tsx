@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import {
   ArrowDownTrayIcon,
@@ -107,8 +108,24 @@ export function SettingsMenu({
   const manageBilling = useCan("billing.manage");
   const sections = visibleSections(manageBilling);
   const isRail = variant === "rail";
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || !isRail) return;
+    const current = nav.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!current) return;
+    const target = current.closest("section") ?? current;
+    const navRect = nav.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    if (targetRect.bottom > navRect.bottom - 8) {
+      nav.scrollTop += targetRect.bottom - navRect.bottom + 12;
+    } else if (targetRect.top < navRect.top + 8) {
+      nav.scrollTop -= navRect.top - targetRect.top + 12;
+    }
+  }, [isRail, path]);
   return (
     <nav
+      ref={navRef}
       aria-label="Settings sections"
       data-settings-menu={variant}
       className={isRail ? settingsRailClass : "grid min-w-0 w-full gap-6 xl:grid-cols-2 xl:items-start xl:gap-x-8"}

@@ -173,7 +173,8 @@ describe("business settings craft", () => {
     assert.match(side, /variant: "index" \| "rail"/);
     assert.match(side, /settingsRailWrapClass/);
     assert.match(ui, /hidden min-w-0 shrink-0 md:block md:w-64/);
-    assert.match(ui, /md:sticky md:top-0 md:pt-4/);
+    assert.match(ui, /md:sticky md:top-0 md:max-h-\[calc\(100dvh-3rem\)\] md:overflow-y-auto/);
+    assert.match(side, /scrollTop/);
   });
 
   it("parks Sign out in the account menu and Appearance off the settings index", () => {

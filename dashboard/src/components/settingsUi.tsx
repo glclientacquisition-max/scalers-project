@@ -36,7 +36,8 @@ export const settingsConsoleClass =
 export const settingsRailWrapClass =
   "hidden min-w-0 shrink-0 md:block md:w-64";
 
-export const settingsRailClass = "min-w-0 md:sticky md:top-0 md:pt-4";
+export const settingsRailClass =
+  "min-w-0 md:sticky md:top-0 md:max-h-[calc(100dvh-3rem)] md:overflow-y-auto md:overscroll-contain md:pt-4";
 
 export const settingsPanelClass =
   "min-w-0 flex-1 pb-[var(--desk-tabbar-clearance)] md:pb-0";
