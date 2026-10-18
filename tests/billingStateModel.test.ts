@@ -90,7 +90,8 @@ describe("ownerBillingView rows", () => {
   it("low SMS shows a notice even with extra usage on, and beta says nothing is charged", () => {
     const v = ownerBillingView(input(esgaRow));
     assert.ok(v.lowNotice);
-    assert.match(String(v.lowNotice), /During beta nothing is charged/);
+    assert.doesNotMatch(String(v.lowNotice), /beta/);
+    assert.match(String(v.lowNoticeNote), /During beta nothing is charged/);
     const metered = ownerBillingView(input({ ...esgaRow, mode_label: "metered" }));
     assert.match(String(metered.lowNotice), /next invoice/);
   });

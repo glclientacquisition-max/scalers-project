@@ -153,6 +153,7 @@ async function HomeOverviewBody() {
         minutesLeft,
       });
   const lowNotice = billing?.lowNotice || null;
+  const lowNoticeNote = billing?.lowNoticeNote || null;
   const digest = inbox.callsTruncated
     ? null
     : homeDigestLine(inbox.items, dayStart, vertical);
@@ -517,10 +518,13 @@ async function HomeOverviewBody() {
               {lowNotice ? (
                 <p role="status" className="mt-1 text-meta font-medium text-warn">{lowNotice}</p>
               ) : null}
+              {lowNotice && lowNoticeNote ? (
+                <p className="mt-0.5 text-meta text-ink-2">{lowNoticeNote}</p>
+              ) : null}
               {lowNotice || (minuteStatus && !isBeta) ? (
                 <Link
                   href="/wallet"
-                  className={`mt-1 inline-flex min-h-11 items-center text-body font-medium text-warn hover:underline ${focusRingVisible}`}
+                  className={`mt-1 inline-flex min-h-11 items-center text-body font-medium text-accent hover:underline ${focusRingVisible}`}
                 >
                   Usage
                 </Link>

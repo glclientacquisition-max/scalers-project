@@ -70,6 +70,8 @@ export type OwnerBillingView = {
   minutesLeft: number;
   /** Low-balance banner for minutes or SMS. Null when nothing is low. */
   lowNotice: string | null;
+  /** Neutral line under lowNotice. Beta says nothing is charged. */
+  lowNoticeNote: string | null;
   /** What the on-demand switch means right now, in owner words. */
   onDemandHint: string;
   periodEndLabel: string | null;
@@ -168,6 +170,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
   const lowMinutes = isLow(minutesIncluded, minutesLeft);
   const lowSms = isLow(smsIncluded, smsLeft);
   let lowNotice: string | null = null;
+  let lowNoticeNote: string | null = null;
   if (mode !== "none" && (lowMinutes || lowSms)) {
     const what =
       lowMinutes && lowSms
@@ -177,7 +180,8 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
           : `${count(smsLeft)} of ${count(smsIncluded)} message credits left`;
     const until = endLabel ? ` until ${endLabel}` : "";
     if (mode === "beta") {
-      lowNotice = `${what}${until}. During beta nothing is charged and calls keep working.`;
+      lowNotice = `${what}${until}.`;
+      lowNoticeNote = "During beta nothing is charged and calls keep working.";
     } else if (onDemand) {
       lowNotice = `${what}${until}. Extra usage is on, so anything past this is billed on your next invoice.`;
     } else {
@@ -210,6 +214,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     minutesIncluded,
     minutesLeft,
     lowNotice,
+    lowNoticeNote,
     onDemandHint,
     periodEndLabel: endLabel,
   };
