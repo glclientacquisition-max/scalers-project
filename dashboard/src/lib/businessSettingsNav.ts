@@ -88,7 +88,7 @@ export type SettingsNavItem = {
 };
 
 export type SettingsNavSection = {
-  id: "business" | "knowledge" | "assistant" | "people";
+  id: "business" | "knowledge" | "assistant" | "people" | "billing";
   title: string;
   items: SettingsNavItem[];
 };
@@ -96,8 +96,9 @@ export type SettingsNavSection = {
 /**
  * Settings destinations. /settings with no section is the Settings home on every width
  * (phone: the whole screen; tablet and desktop: the right pane beside the rail).
- * One header each: Business, Knowledge, Assistant, People.
+ * One header each: Business, Knowledge, Assistant, People, then Plan and billing.
  * Import sits directly under Catalog. Team is People, ahead of Alerts.
+ * Plan and Billing are the last section. The rail shows them to the owner and an admin.
  * Appearance is the account-menu theme cluster. It is not a settings tab.
  * URLs stay `?tab=` / `?panel=`.
  */
@@ -110,8 +111,6 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       { label: "Hours", description: "When you are open, including holidays", target: { tab: "train", panel: "hours" } },
       { label: "Locations", description: "Where callers can find you", target: { tab: "train", panel: "locations" } },
       { label: "Policies", description: "Payments, delivery, returns and other rules", target: { tab: "train", panel: "policies" } },
-      { label: "Plan", description: "Package, minutes and seats", target: { href: "/settings/plan" } },
-      { label: "Billing", description: "Invoices and notices", target: { href: "/settings/billing" } },
     ],
   },
   {
@@ -141,6 +140,14 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       { label: "How we notify", description: "Where new calls and leads reach you", target: { tab: "alerts" } },
     ],
   },
+  {
+    id: "billing",
+    title: "Plan and billing",
+    items: [
+      { label: "Plan", description: "Package, minutes and seats", target: { href: "/settings/plan" } },
+      { label: "Billing", description: "Invoices and notices", target: { href: "/settings/billing" } },
+    ],
+  },
 ];
 
 export function settingsNavHref(target: SettingsNavTarget): string {
@@ -153,9 +160,13 @@ export function settingsNavHref(target: SettingsNavTarget): string {
 export function settingsNavItemActive(
   target: SettingsNavTarget,
   tab: BusinessSettingsTab,
-  trainPanel: SettingsPanel
+  trainPanel: SettingsPanel,
+  pathname?: string | null,
 ): boolean {
-  if ("href" in target) return false;
+  if ("href" in target) {
+    const path = pathname || "";
+    return path === target.href || path.startsWith(`${target.href}/`);
+  }
   if (target.tab === "train") {
     return tab === "train" && trainPanel === target.panel;
   }

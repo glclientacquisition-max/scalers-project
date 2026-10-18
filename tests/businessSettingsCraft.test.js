@@ -15,6 +15,7 @@ function loadSettingsNav() {
       SETTINGS_NAV,
       businessSettingsHref,
       parseBusinessSettingsPanel,
+      settingsNavItemActive,
     } from ${JSON.stringify(nav)};
     const sections = SETTINGS_NAV.map((section) => ({
       id: section.id,
@@ -27,6 +28,12 @@ function loadSettingsNav() {
       trainHref: businessSettingsHref("train"),
       testHref: businessSettingsHref("test"),
       trainPanel: parseBusinessSettingsPanel(undefined, "train"),
+      planOn: settingsNavItemActive({ href: "/settings/plan" }, "menu", "identity", "/settings/plan"),
+      planChild: settingsNavItemActive({ href: "/settings/plan" }, "menu", "identity", "/settings/plan/seat"),
+      billingOn: settingsNavItemActive({ href: "/settings/billing" }, "menu", "identity", "/settings/billing"),
+      planOff: settingsNavItemActive({ href: "/settings/plan" }, "train", "hours", "/settings"),
+      billingOff: settingsNavItemActive({ href: "/settings/billing" }, "menu", "identity", "/settings/plan"),
+      omitted: settingsNavItemActive({ href: "/settings/plan" }, "menu", "identity"),
     }));
   `;
   const ran = spawnSync(
@@ -46,6 +53,7 @@ describe("business settings craft", () => {
   const save = read("dashboard/src/components/TenantSettingsSaveButton.tsx");
   const page = read("dashboard/src/app/(desk)/settings/page.tsx");
   const nav = read("dashboard/src/lib/businessSettingsNav.ts");
+  const side = read("dashboard/src/components/SettingsSideNav.tsx");
   const alerts = read("dashboard/src/components/AlertsPanel.tsx");
   const theme = read("dashboard/src/components/ThemePicker.tsx");
 
@@ -77,6 +85,7 @@ describe("business settings craft", () => {
     assert.match(nav, /id: "assistant"/);
     assert.match(nav, /id: "knowledge"/);
     assert.match(nav, /id: "people"/);
+    assert.match(nav, /id: "billing"/);
     assert.doesNotMatch(nav, /id: "offer"/);
     assert.doesNotMatch(nav, /id: "alerts"/);
     assert.doesNotMatch(nav, /id: "device"/);
@@ -85,6 +94,7 @@ describe("business settings craft", () => {
     assert.match(nav, /title: "Knowledge"/);
     assert.doesNotMatch(nav, /title: "Offer"/);
     assert.match(nav, /title: "People"/);
+    assert.match(nav, /title: "Plan and billing"/);
     assert.doesNotMatch(nav, /label: "Assistant"/);
     assert.doesNotMatch(nav, /id: "receptionist"/);
     assert.doesNotMatch(nav, /title: "Receptionist"/);
@@ -128,7 +138,9 @@ describe("business settings craft", () => {
     assert.match(shell, /KnowledgeIngestPanel/);
     assert.match(shell, /CatalogImportPanel/);
     assert.match(shell, /TestLinePanel/);
-    assert.match(shell, /SETTINGS_NAV/);
+    assert.match(side, /SETTINGS_NAV/);
+    assert.match(side, /useCan\("billing.manage"\)/);
+    assert.match(shell, /SettingsRail/);
     assert.doesNotMatch(shell, />\s*Train\s*</);
     assert.doesNotMatch(nav, /Security/);
     assert.match(nav, /label: "Plan"/);
@@ -151,15 +163,15 @@ describe("business settings craft", () => {
   });
 
   it("uses non-clickable group headers and a phone index of destination rows", () => {
-    assert.match(shell, /text-meta font-medium text-ink-2/);
+    assert.match(side, /text-meta font-medium text-ink-2/);
     assert.match(ui, /settingsBlockTitleClass =\s*"text-meta font-medium text-ink-2"/);
     assert.match(ui, /pointer-events-none/);
-    assert.match(shell, /data-settings-menu=\{variant\}/);
+    assert.match(side, /data-settings-menu=\{variant\}/);
     assert.match(shell, /data-settings-home=""/);
-    assert.match(shell, /SettingsChevron/);
-    assert.match(shell, /min-h-11/);
-    assert.match(shell, /variant: "index" \| "rail"/);
-    assert.match(shell, /settingsRailWrapClass/);
+    assert.match(side, /SettingsChevron/);
+    assert.match(side, /min-h-11/);
+    assert.match(side, /variant: "index" \| "rail"/);
+    assert.match(side, /settingsRailWrapClass/);
     assert.match(ui, /hidden min-w-0 shrink-0 md:block md:w-64/);
     assert.match(ui, /md:sticky md:top-0 md:pt-4/);
   });
@@ -225,10 +237,10 @@ describe("business settings craft", () => {
     assert.match(nav, /\| "menu"/);
     assert.match(nav, /return "menu"/);
     assert.match(nav, /if \(tab === "menu"\) return "\/settings"/);
-    assert.match(shell, /variant: "index" \| "rail"/);
-    assert.match(shell, /settingsRailWrapClass/);
-    assert.match(shell, /SettingsChevron/);
-    assert.match(shell, /min-h-11/);
+    assert.match(side, /variant: "index" \| "rail"/);
+    assert.match(side, /settingsRailWrapClass/);
+    assert.match(side, /SettingsChevron/);
+    assert.match(side, /min-h-11/);
     assert.match(ui, /SettingsBackLink/);
     assert.match(form, /showBack/);
   });
@@ -265,7 +277,7 @@ describe("business settings craft", () => {
     assert.match(ui, /hover:border-accent\/35/);
     assert.match(ui, /active:scale-\[0\.99\]/);
     assert.match(ui, /focus-visible:ring-accent\/40/);
-    assert.match(shell, /active:bg-surface-2/);
+    assert.match(side, /active:bg-surface-2/);
     assert.match(save, /active:scale-\[0\.99\]/);
     assert.match(form, /SettingsPageHeader/);
     assert.doesNotMatch(shell, /glass|mesh|MetricCard/);
@@ -276,7 +288,7 @@ describe("business settings craft", () => {
     assert.match(shell, /data-settings-console="" data-desk-nested=""/);
     assert.match(shell, /settingsConsoleClass/);
     assert.match(shell, /settingsPanelClass/);
-    assert.match(shell, /settingsRailWrapClass/);
+    assert.match(side, /settingsRailWrapClass/);
     assert.doesNotMatch(shell, /max-w-5xl|max-w-xl/);
     assert.doesNotMatch(test, /max-w-xl/);
     assert.match(ui, /md:w-64/);
@@ -292,9 +304,9 @@ describe("business settings craft", () => {
     assert.doesNotMatch(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /grid-cols-\[/);
     // FAQs are grouped cards (kit FieldCard + TextField + TextAreaField), not a two-column table.
     assert.match(form, /data-faq-list=""[\s\S]*<FieldCard[\s\S]*<TextAreaField/);
-    assert.match(shell, /rounded-2xl border border-hairline bg-surface/);
-    assert.match(shell, /bg-accent-tonal/);
-    assert.doesNotMatch(shell, /border-l-2/);
+    assert.match(side, /rounded-2xl border border-hairline bg-surface/);
+    assert.match(side, /bg-accent-tonal/);
+    assert.doesNotMatch(side, /border-l-2/);
     const deskNav = read("dashboard/src/components/DeskNav.tsx");
     assert.match(deskNav, /data-settings-console/);
     assert.match(deskNav, /md:has-\[\[data-settings-console\]\]:max-w-none/);
@@ -369,8 +381,6 @@ describe("business settings craft", () => {
       "Hours",
       "Locations",
       "Policies",
-      "Plan",
-      "Billing",
       "Catalogue",
       "Import",
       "FAQs",
@@ -380,11 +390,22 @@ describe("business settings craft", () => {
       "Calls & forwarding",
       "Team",
       "How we notify",
+      "Plan",
+      "Billing",
     ]);
     assert.deepEqual(
       got.sections.map((section) => section.title),
-      ["Business", "Knowledge", "Assistant", "People"]
+      ["Business", "Knowledge", "Assistant", "People", "Plan and billing"]
     );
+    const billing = got.sections.find((section) => section.id === "billing");
+    assert.deepEqual(billing.labels, ["Plan", "Billing"]);
+    assert.equal(got.sections.at(-1).id, "billing");
+    assert.equal(got.planOn, true);
+    assert.equal(got.planChild, true);
+    assert.equal(got.billingOn, true);
+    assert.equal(got.planOff, false);
+    assert.equal(got.billingOff, false);
+    assert.equal(got.omitted, false);
     assert.equal(new Set(got.sections.map((section) => section.id)).size, got.sections.length);
     assert.equal(got.labels[got.labels.indexOf("Catalogue") + 1], "Import");
     assert.equal(got.labels.indexOf("Identity") + 1, got.labels.indexOf("Hours"));
@@ -421,11 +442,13 @@ describe("business settings craft", () => {
     assert.match(menu, /<SettingsMenu[\s\S]*variant="index"/);
     // Settings home has the full content width: no rail beside it, two columns of groups on wide desktop.
     assert.doesNotMatch(menu, /\{rail\}/);
-    assert.match(shell, /xl:grid-cols-2/);
+    assert.match(side, /xl:grid-cols-2/);
     // Inside a section: rail with a "Settings" title link, and the back link shows on every width.
-    assert.match(shell, /href="\/settings"[\s\S]{0,240}>\s*Settings\s*<\/Link>/);
+    assert.match(side, /href="\/settings"[\s\S]{0,240}>\s*Settings\s*<\/Link>/);
     assert.match(ui, /<DeskBack href="\/settings">/);
     assert.match(activeFn, /tab === "train" && trainPanel === target\.panel/);
+    assert.match(activeFn, /path === target\.href \|\| path\.startsWith/);
+    assert.doesNotMatch(activeFn, /if \("href" in target\) return false/);
     assert.doesNotMatch(activeFn, /selectHubIdentity/);
     assert.doesNotMatch(shell, /selectHubAppearance/);
     assert.doesNotMatch(shell, /<AppearancePanel \/>/);
@@ -510,7 +533,7 @@ describe("business settings craft", () => {
     assert.match(form, /id="business_name"[\s\S]{0,240}title=\{businessName/);
     assert.match(ui, /title=\{businessName\}/);
     assert.match(ui, /break-words text-body font-medium text-ink/);
-    assert.match(shell, /title=\{status\?\.title \|\| statusText\}/); // truncated status keeps its full text on hover
+    assert.match(side, /title=\{status\?\.title \|\| statusText\}/); // truncated status keeps its full text on hover
   });
 
   it("packs Profile sub-strips instead of stretching them across the pane", () => {
@@ -535,11 +558,11 @@ describe("business settings craft", () => {
       /justify-between|flex-1|md:gap-8/
     );
 
-    const rail = shell.slice(
-      shell.indexOf("const isRail = variant === \"rail\""),
-      shell.indexOf("function settingsLineState")
+    const rail = side.slice(
+      side.indexOf("const isRail = variant === \"rail\""),
+      side.indexOf("function SettingsRowIcon")
     );
-    assert.match(shell, /flex min-h-11 w-full items-center gap-3 px-3 text-body font-medium text-ink/);
+    assert.match(side, /flex min-h-11 w-full items-center gap-3 px-3 text-body font-medium text-ink/);
     assert.match(rail, /rounded-2xl border border-hairline/);
     assert.match(rail, /<SettingsChevron active=\{active\} \/>/);
     assert.doesNotMatch(rail, /border-l-2/);
@@ -565,10 +588,10 @@ describe("business settings craft", () => {
     assert.match(ui, /settingsSelectMaxClass/);
     assert.match(form, /settingsFormBodyClass/);
     assert.match(alerts, /settingsFormBodyClass/);
-    assert.match(shell, /min-h-11/);
-    assert.match(shell, /mt-6/);
-    assert.match(shell, /mb-2/);
-    assert.doesNotMatch(shell, /min-h-9/);
+    assert.match(side, /min-h-11/);
+    assert.match(side, /mt-6/);
+    assert.match(side, /mb-2/);
+    assert.doesNotMatch(side, /min-h-9/);
     assert.match(form, /No public contacts yet/);
     assert.match(form, /title="Public contacts"/);
     assert.doesNotMatch(

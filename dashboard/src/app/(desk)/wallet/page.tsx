@@ -3,38 +3,31 @@ import { memberCan } from "@/lib/requireMember";
 import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
 import { getCurrentTenant, createWorkspaceDataClient } from "@/lib/tenant";
 import { getTenantUsageSummary } from "@/lib/wallet";
-import { inboundKesPerMinute, loadOwnerPackageMeter } from "@/lib/packageCatalog";
+import { loadOwnerPackageMeter } from "@/lib/packageCatalog";
 import { loadUsageBillingExtras } from "@/lib/ownerPlanLoad";
-import { formatKsh, spendLimitDisplayKes } from "@/lib/planPricing";
+import { formatKsh } from "@/lib/planPricing";
 import { loadOwnerBillingView } from "@/lib/billingStateLoad";
 import { ownerBillingView } from "@/lib/billingStateModel";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
+import { UsageSummary } from "@/components/plan/UsageSummary";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { Pagination } from "@/components/ui/Pagination";
-import { deskListTitleClass, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import { clampListPage, DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 
 import { DeskPageGate } from "@/components/DeskPageGate";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
-  if (kind === "sms_charge") return "SMS";
+  if (kind === "sms_charge") return "Message";
   if (kind === "line_rental") return "Line fee";
   if (kind === "admin_adjustment") return "Adjustment";
   if (kind === "topup") return "Top-up";
   if (kind === "trial_credit") return "Trial credit";
   return kind;
-}
-
-function count(n: number): string {
-  return n.toLocaleString("en-KE");
-}
-
-function kes(n: number): string {
-  return n.toLocaleString("en-KE", { maximumFractionDigits: 2 });
 }
 
 type WalletPageProps = {
@@ -68,8 +61,9 @@ async function WalletBody({ searchParams }: WalletPageProps) {
   let billing;
   let pack;
   let extras;
+  let canChangePlan = false;
   try {
-    [usage, billing, pack, extras] = await Promise.all([
+    [usage, billing, pack, extras, canChangePlan] = await Promise.all([
       getTenantUsageSummary(workspace.client, tenant.id, {
         ledgerPage: page,
         ledgerPageSize: DEFAULT_PAGE_SIZE,
@@ -82,6 +76,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
       loadOwnerBillingView(tenant.id),
       loadOwnerPackageMeter(tenant.id),
       loadUsageBillingExtras(tenant.id),
+      memberCan("billing.manage"),
     ]);
   } catch {
     return <DeskLoadError>Could not load Usage.</DeskLoadError>;
@@ -120,10 +115,9 @@ async function WalletBody({ searchParams }: WalletPageProps) {
     redirect(safePage > 1 ? `/wallet?page=${safePage}` : "/wallet");
   }
 
-  const inboundMin = extras.inboundPerMinuteKes ?? inboundKesPerMinute(pack.rates.inboundKesPerSecond);
-  const outboundMin = extras.outboundPerMinuteKes;
-  const usageRows =
-    extras.messageCredits == null
+  const creditIncluded = extras.messageCredits;
+  const usageRows = (
+    creditIncluded == null
       ? view.rows
       : view.rows
           .filter((row) => row.key !== "email" && row.key !== "whatsapp")
@@ -132,138 +126,41 @@ async function WalletBody({ searchParams }: WalletPageProps) {
               ? {
                   ...row,
                   label: "Message credits",
-                  included: extras.messageCredits as number,
-                  used: 0,
-                  left: extras.messageCredits as number,
-                  note: "1 credit is KSh 1 on demand",
+                  included: creditIncluded,
+                  left: Math.max(0, creditIncluded - row.used),
+                  note: null,
                 }
               : row,
-          );
-  const spendLimit = extras.freeBeta
-    ? null
-    : spendLimitDisplayKes(tenant.soft_spend_limit_kes, extras.monthlyPriceKes);
-  const minutesLeft = view.minutesLeft;
-  const minuteMax = Math.max(0, view.minutesIncluded);
-  const minuteLeftPct = minuteMax > 0 ? Math.min(100, Math.round((minutesLeft / minuteMax) * 100)) : 0;
+          )
+  ).filter((row) => row.key !== "minutes");
+  const planLine =
+    extras.freeBeta || extras.monthlyPriceKes == null
+      ? null
+      : `${view.packageName ? `${view.packageName} · ` : ""}${formatKsh(extras.monthlyPriceKes)} a month`;
 
   return (
-    <div className="max-w-3xl">
-      <header>
-        <h1 className={deskListTitleClass}>Usage</h1>
-        <p className="mt-2 text-body text-ink-2">{view.headline}</p>
-      </header>
+    <div>
+      <UsageSummary
+        minutesLeft={view.minutesLeft}
+        minutesIncluded={view.minutesIncluded}
+        minutesUsed={Math.max(0, view.minutesIncluded - view.minutesLeft)}
+        periodEndLabel={view.periodEndLabel}
+        beta={extras.freeBeta}
+        planLine={planLine}
+        rows={usageRows}
+        showChangePlan={canChangePlan}
+      />
+      {extras.freeBeta || extras.onDemandLocked ? null : (
+        <div className="max-w-2xl">
+          <OnDemandUsagePanel
+            tenantId={tenant.id}
+            enabled={Boolean(tenant.on_demand_usage_enabled)}
+            extraMinuteKes={extras.inboundPerMinuteKes}
+          />
+        </div>
+      )}
 
-      {view.lowNotice ? (
-        <p
-          role="status"
-          className="mt-4 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-body text-warn"
-        >
-          {view.lowNotice}
-        </p>
-      ) : null}
-
-      <section className="mt-6 rounded-2xl border border-hairline bg-surface p-5">
-        <p className="text-body text-ink-2">
-          Minutes left{view.periodEndLabel ? ` until ${view.periodEndLabel}` : ""}
-        </p>
-        <p className="mt-1 font-display text-display tabular-nums text-ink">
-          {count(minutesLeft)}
-        </p>
-        {minuteMax > 0 ? (
-          <div
-            className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2"
-            role="meter"
-            aria-label="Minutes left"
-            aria-valuemin={0}
-            aria-valuemax={minuteMax}
-            aria-valuenow={minutesLeft}
-          >
-            <div className="h-full bg-accent" style={{ width: `${minuteLeftPct}%` }} />
-          </div>
-        ) : (
-          <p className="mt-2 text-body text-ink-2">No package minutes</p>
-        )}
-
-        <table className="mt-6 w-full text-left text-body">
-          <caption className="sr-only">What your package includes this month</caption>
-          <thead className="border-b border-hairline text-ink-2">
-            <tr>
-              <th scope="col" className="py-2 pr-3 font-medium">This month</th>
-              <th scope="col" className="px-2 py-2 text-right font-medium">Included</th>
-              <th scope="col" className="px-2 py-2 text-right font-medium">Used</th>
-              <th scope="col" className="py-2 pl-2 text-right font-medium">Left</th>
-            </tr>
-          </thead>
-          <tbody>
-            {usageRows.map((row) => (
-              <tr key={row.key} className="border-b border-hairline">
-                <th scope="row" className="py-3 pr-3 font-normal text-ink">
-                  {row.label}
-                  {row.note ? <span className="block text-meta text-ink-2">{row.note}</span> : null}
-                </th>
-                <td className="px-2 py-3 text-right tabular-nums text-ink-2">{count(row.included)}</td>
-                <td className="px-2 py-3 text-right tabular-nums text-ink-2">{count(row.used)}</td>
-                <td className="py-3 pl-2 text-right font-medium tabular-nums text-ink">{count(row.left)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <div className="mt-6">
-        <OnDemandUsagePanel
-          tenantId={tenant.id}
-          enabled={Boolean(tenant.on_demand_usage_enabled)}
-          hint={view.onDemandHint}
-          locked={extras.onDemandLocked}
-        />
-        {extras.freeBeta ? null : (
-          <p className="mt-3 text-body text-ink-2">
-            When on-demand is off and credits run out, sending stops and updates go to your Inbox only.
-          </p>
-        )}
-        {spendLimit != null ? (
-          <p className="mt-3 text-body text-ink">
-            Spend limit <span className="tabular-nums">{formatKsh(spendLimit)}</span>
-            {Number(tenant.soft_spend_limit_kes) > 0 ? null : (
-              <span className="text-ink-2"> Suggested until you set one.</span>
-            )}
-          </p>
-        ) : null}
-      </div>
-
-      <section className="mt-6 rounded-2xl border border-hairline bg-surface p-5">
-        <h2 className="font-display text-title tracking-tight text-ink">{view.ratesTitle}</h2>
-        <table className="mt-3 w-full text-left text-body">
-          <caption className="sr-only">{view.ratesTitle}</caption>
-          <tbody>
-            <tr className="border-b border-hairline">
-              <th scope="row" className="py-3 pr-3 font-normal text-ink">Calls</th>
-              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(inboundMin)} a minute</td>
-            </tr>
-            {outboundMin != null ? (
-              <tr className="border-b border-hairline">
-                <th scope="row" className="py-3 pr-3 font-normal text-ink">Outbound</th>
-                <td className="py-3 text-right tabular-nums text-ink">KSh {kes(outboundMin)} a minute</td>
-              </tr>
-            ) : null}
-            <tr className="border-b border-hairline">
-              <th scope="row" className="py-3 pr-3 font-normal text-ink">SMS</th>
-              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.smsKes)} a credit</td>
-            </tr>
-            <tr className="border-b border-hairline">
-              <th scope="row" className="py-3 pr-3 font-normal text-ink">Email</th>
-              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.emailKes)}</td>
-            </tr>
-            <tr className="border-b border-hairline">
-              <th scope="row" className="py-3 pr-3 font-normal text-ink">WhatsApp</th>
-              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.whatsappKes)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      <section className="mt-6 overflow-hidden rounded-2xl border border-hairline bg-surface">
+      <section className="mt-6 max-w-2xl overflow-hidden rounded-2xl border border-hairline bg-surface">
         <h2 className="px-4 pt-4 font-display text-title tracking-tight text-ink">Activity</h2>
         {usage.recentLedger.length === 0 ? (
           <p className="px-4 py-3 text-body text-ink-2">

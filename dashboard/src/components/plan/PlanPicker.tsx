@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { SegmentedControl } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
+import { cx } from "@/lib/cx";
 import {
   confirmPlanChange,
   confirmSeatPurchase,
@@ -17,12 +18,24 @@ import {
   proratedUpgradeKes,
   splitPayNote,
 } from "@/lib/planPricing";
-import type { OwnerPlanModel, PlanCycle, PlanSku } from "@/lib/ownerPlanLoad";
+import type { OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
 
 const idle: PlanActionState = { ok: false };
 
 function numberWord(count: number, one: string, many: string): string {
   return `${count.toLocaleString("en-KE")} ${count === 1 ? one : many}`;
+}
+
+function inclusionLines(plan: PublishedPlan): string[] {
+  const lines = [
+    numberWord(plan.minutes, "minute", "minutes"),
+    numberWord(plan.seats, "seat", "seats"),
+  ];
+  if (plan.messageCredits != null) {
+    lines.push(numberWord(plan.messageCredits, "message credit", "message credits"));
+  }
+  lines.push(plan.dids === 1 ? "1 number" : numberWord(plan.dids, "number", "numbers"));
+  return lines;
 }
 
 export function PlanPicker({
@@ -38,7 +51,9 @@ export function PlanPicker({
   const upgradeSku =
     model.plans.find((plan) => plan.monthlyKes > (model.plans.find((row) => row.sku === model.currentSku)?.monthlyKes ?? 0))
       ?.sku ?? model.currentSku;
-  const [sku, setSku] = useState<PlanSku | null>(startConfirm ? upgradeSku : model.currentSku);
+  const [sku, setSku] = useState<PlanSku | null>(
+    startConfirm ? upgradeSku : model.trialText ? null : model.currentSku,
+  );
   const [cycle, setCycle] = useState<PlanCycle>(model.cycle);
   const [confirmOpen, setConfirmOpen] = useState(false);
   useEffect(() => {
@@ -51,7 +66,10 @@ export function PlanPicker({
   const [seatState, seatAction, seatPending] = useActionState(confirmSeatPurchase, idle);
 
   const selected = model.plans.find((plan) => plan.sku === sku) || null;
-  const dirty = Boolean(selected && (selected.sku !== model.currentSku || cycle !== model.cycle));
+  const committedSku = model.trialText ? null : model.currentSku;
+  const dirty = Boolean(
+    selected && (selected.sku !== committedSku || (!model.trialText && cycle !== model.cycle)),
+  );
   const current = model.plans.find((plan) => plan.sku === model.currentSku) || null;
   const upgrading = Boolean(selected && current && selected.monthlyKes > current.monthlyKes);
   const downgrading = Boolean(selected && current && selected.monthlyKes < current.monthlyKes);
@@ -65,27 +83,31 @@ export function PlanPicker({
       ? proratedUpgradeKes(current.monthlyKes, selected.monthlyKes, model.dayOfPeriod, model.daysInPeriod)
       : null;
 
-  let confirmLine = "Plan changes open soon.";
+  const fromName = current?.name || "Your plan";
+  const toName = selected?.name || "this plan";
+  let whenLine = "Applies now.";
+  if (downgrading) {
+    whenLine = model.periodEndLabel
+      ? `Starts on ${model.periodEndLabel}.`
+      : "Starts at the end of this period.";
+  } else if (selected && !upgrading && cycle !== model.cycle) {
+    whenLine = "Starts at the end of this period.";
+  }
+  let amountLine: string | null = null;
   if (selected && upgrading) {
-    confirmLine =
+    amountLine =
       prorated != null
         ? `Pay ${formatKsh(prorated)} now.`
         : "Pay the difference for the days left in this period.";
-  } else if (selected && downgrading) {
-    confirmLine = model.periodEndLabel
-      ? `Starts on ${model.periodEndLabel}.`
-      : "Starts at the end of this period.";
   } else if (selected && cycle === "year") {
-    confirmLine = `${formatKsh(selected.annualKes)} a year.`;
+    amountLine = `${formatKsh(selected.annualKes)} a year.`;
   } else if (selected) {
-    confirmLine = `${formatKsh(selected.monthlyKes)} a month, ex VAT.`;
+    amountLine = `${formatKsh(selected.monthlyKes)} a month.`;
   }
 
   return (
-    <div className="mt-6">
-      {model.trialText ? <p className="text-body text-ink">{model.trialText}</p> : null}
+    <div className="mt-6 flex flex-1 flex-col">
       <SegmentedControl
-        className="mt-4"
         label="Billing period"
         value={cycle}
         onChange={(value) => setCycle(value === "year" ? "year" : "month")}
@@ -98,57 +120,54 @@ export function PlanPicker({
       {model.plans.length === 0 ? (
         <p className="mt-6 text-body text-ink-2">Plans show here once a package is published.</p>
       ) : (
-        <fieldset className="mt-4 overflow-hidden rounded-2xl border border-hairline bg-surface">
+        <fieldset className="mt-4">
           <legend className="sr-only">Plan</legend>
-          {model.plans.map((plan) => {
-            const active = plan.sku === sku;
-            const price =
-              cycle === "year"
-                ? `${formatKsh(plan.annualKes)} a year`
-                : `${formatKsh(plan.monthlyKes)} a month, ex VAT`;
-            const facts = [
-              numberWord(plan.minutes, "minute", "minutes"),
-              numberWord(plan.seats, "seat", "seats"),
-              plan.messageCredits != null
-                ? numberWord(plan.messageCredits, "message credit", "message credits")
-                : null,
-              plan.dids === 1 ? "1 number" : numberWord(plan.dids, "number", "numbers"),
-            ]
-              .filter(Boolean)
-              .join(" · ");
-            return (
-              <label
-                key={plan.sku}
-                className="flex min-h-11 cursor-pointer items-start gap-3 border-b border-hairline px-4 py-3 last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-brand"
-              >
-                <input
-                  type="radio"
-                  name="plan"
-                  className="mt-1 h-5 w-5"
-                  checked={active}
-                  onChange={() => setSku(plan.sku)}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline gap-3">
-                    <span className="text-body font-medium text-ink">{plan.name}</span>
-                    {plan.sku === model.currentSku ? (
-                      <span className="text-meta text-ink-2">Current</span>
-                    ) : null}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {model.plans.map((plan) => {
+              const active = plan.sku === sku;
+              const price = cycle === "year" ? plan.annualKes : plan.monthlyKes;
+              const showCurrent = !model.trialText && plan.sku === model.currentSku;
+              return (
+                <label
+                  key={plan.sku}
+                  className={cx(
+                    "flex min-h-11 cursor-pointer flex-col rounded-2xl border p-4 focus-within:ring-2 focus-within:ring-brand",
+                    active ? "border-accent bg-accent-tonal" : "border-hairline bg-surface",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="plan"
+                    className="sr-only"
+                    checked={active}
+                    onChange={() => setSku(plan.sku)}
+                  />
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-title text-ink">{plan.name}</span>
+                    {showCurrent ? <span className="text-meta text-ink-2">Current</span> : null}
                   </span>
-                  <span className="mt-0.5 block text-body tabular-nums text-ink">{price}</span>
-                  <span className="mt-0.5 block text-meta text-ink-2">{facts}</span>
+                  <span className="mt-3 flex items-baseline gap-1">
+                    <span className="text-display tabular-nums text-ink">{formatKsh(price)}</span>
+                    <span className="text-meta text-ink-2">{cycle === "year" ? "/year" : "/month"}</span>
+                  </span>
+                  <ul className="mt-3 space-y-1 text-meta text-ink-2">
+                    {inclusionLines(plan).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
                   {cycle === "year" ? (
-                    <span className="mt-0.5 block text-meta text-ink-2">
+                    <span className="mt-3 block text-meta text-ink-2">
                       Save {formatKsh(plan.savingKes)} a year
                     </span>
                   ) : null}
                   {cycle === "year" && splitPayNote(plan.annualKes) ? (
-                    <span className="mt-0.5 block text-meta text-ink-2">{splitPayNote(plan.annualKes)}</span>
+                    <span className="mt-1 block text-meta text-ink-2">{splitPayNote(plan.annualKes)}</span>
                   ) : null}
-                </span>
-              </label>
-            );
-          })}
+                </label>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-meta text-ink-2">Prices exclude VAT.</p>
         </fieldset>
       )}
 
@@ -158,9 +177,9 @@ export function PlanPicker({
         </Button>
       </div>
 
-      <div className="sticky bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom))] z-20 -mx-4 mt-8 border-t border-hairline bg-surface px-4 py-3 md:static md:bottom-auto md:mx-0 md:border-0 md:bg-transparent md:px-0">
-        <Button type="button" disabled={!dirty} onClick={() => setConfirmOpen(true)}>
-          Continue
+      <div className="sticky bottom-0 z-20 mt-auto border-t border-hairline bg-canvas pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <Button type="button" block disabled={!dirty} onClick={() => setConfirmOpen(true)}>
+          {model.trialText ? "Choose a plan" : "Continue"}
         </Button>
       </div>
 
@@ -173,13 +192,19 @@ export function PlanPicker({
           <form action={planAction}>
             <input type="hidden" name="sku" value={selected?.sku || ""} />
             <input type="hidden" name="cycle" value={cycle} />
-            <Button type="submit" variant="tonal" pending={planPending} disabled={seatsOver || !selected}>
+            <Button type="submit" variant="tonal" block pending={planPending} disabled={seatsOver || !selected}>
               Confirm
             </Button>
           </form>
         }
       >
-        <p className="text-body text-ink">{confirmLine}</p>
+        <p className="text-body text-ink">
+          {fromName} to {toName}.
+        </p>
+        <p className="mt-1 text-body text-ink-2">{whenLine}</p>
+        {amountLine && !downgrading ? (
+          <p className="mt-3 text-title tabular-nums text-ink">{amountLine}</p>
+        ) : null}
         {seatsOver && selected ? (
           <p className="mt-2 text-body text-ink-2">
             This plan has {selected.seats} seats. You use {model.seatsUsed}. Remove people before it starts.
@@ -198,7 +223,7 @@ export function PlanPicker({
         footer={
           <form action={seatAction}>
             <input type="hidden" name="quantity" value={seats} />
-            <Button type="submit" variant="tonal" pending={seatPending}>
+            <Button type="submit" variant="tonal" block pending={seatPending}>
               Confirm
             </Button>
           </form>
