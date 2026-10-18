@@ -1,0 +1,16 @@
+Subject: Your Scalers confirmation code
+Preheader: Enter this code in Scalers to confirm it's you.
+
+Confirm it's you [Account security]
+
+Enter this code in Scalers to finish what you started. We ask for it before important account changes.
+
+Your code {{ .Token }}
+
+The code works once and expires in 1 hour. Never share it, not even with Scalers staff.
+
+If you didn't ask for this, you can ignore this email. Nothing changes without this code.
+
+--
+This is an account email from Scalers. We only send it when someone asks for it.
+Need help? Write to support@scalers.co.ke.

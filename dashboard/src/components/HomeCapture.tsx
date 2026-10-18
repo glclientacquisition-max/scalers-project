@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ListRow } from "@/components/ui/ListRow";
@@ -7,7 +8,19 @@ import { Stamp } from "@/components/ui/Stamp";
 import { BaStakesPreview } from "@/components/BaStakesPreview";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import type { StakeLine } from "@/lib/baStakes";
-import { reviewGapCopy, type CaptureScore } from "@/lib/completenessStub";
+import {
+  captureRowState,
+  reviewGapCopy,
+  type CaptureRowState,
+  type CaptureScore,
+} from "@/lib/completenessStub";
+import { focusRingVisible } from "@/components/ui/deskChrome";
+
+const STATE_LABEL: Record<CaptureRowState, string> = {
+  confirmed: "Confirmed",
+  check: "To check",
+  missing: "Missing",
+};
 
 const DOMAINS: Array<{ key: string; label: string; href: string; fallback: string }> = [
   { key: "identity", label: "Identity", href: businessSettingsHref("train", "identity"), fallback: "Confirm the business name" },
@@ -49,15 +62,30 @@ export function HomeCapture({
   tenantId,
   vertical,
   score,
+  filled = {},
   stakes,
 }: {
   tenantId: string;
   vertical: string | null | undefined;
   score: CaptureScore;
+  /** Areas with something saved (owner, import or seed). Filled but unconfirmed reads "To check", never 0%. */
+  filled?: Record<string, boolean>;
   stakes: StakeLine[];
 }) {
   const [dismissed, setDismissed] = useState(false);
-  const nudge = reviewGapCopy(score.next_gaps[0]?.action || "");
+  const rowsState = DOMAINS.map((domain) => {
+    const pct = Math.round(Number(score.domains[domain.key] ?? 0));
+    return { domain, pct, state: captureRowState(pct, Boolean(filled[domain.key])) };
+  });
+  const confirmedCount = rowsState.filter((row) => row.state === "confirmed").length;
+  const checkCount = rowsState.filter((row) => row.state === "check").length;
+  const firstGap = score.next_gaps[0];
+  const nextRow =
+    rowsState.find((row) => row.domain.key === firstGap?.domain && row.state !== "confirmed") ||
+    rowsState.find((row) => row.state === "missing") ||
+    rowsState.find((row) => row.state === "check") ||
+    null;
+  const nudge = reviewGapCopy(firstGap?.action || "");
   const storageKey = `scalers.captureNudge.${tenantId}`;
 
   useEffect(() => {
@@ -89,14 +117,14 @@ export function HomeCapture({
   return (
     <section className="mt-6" aria-labelledby="setup-heading">
       <div className="flex items-center gap-3">
-        <ScoreRing value={score.overall} />
+        <ScoreRing value={Math.round((confirmedCount / DOMAINS.length) * 100)} />
         <div className="min-w-0">
           <h2 id="setup-heading" className="text-title text-ink">
             Setup
           </h2>
           <p className="text-meta tabular-nums text-ink-2">
-            {score.overall}%
-            {score.ready_badge ? " · Ready" : ""}
+            {confirmedCount} of {DOMAINS.length} confirmed
+            {checkCount > 0 ? ` · ${checkCount} to check` : ""}
           </p>
         </div>
         {score.ready_badge ? <Stamp tone="ok">Ready</Stamp> : null}
@@ -106,7 +134,16 @@ export function HomeCapture({
       {!score.ready_badge && !dismissed ? (
         <div className="mt-3 flex items-start justify-between gap-3 rounded-2xl border border-hairline bg-surface px-4 py-3">
           <div className="min-w-0">
-            <p className="text-body text-ink">Finish setup</p>
+            {nextRow ? (
+              <Link
+                href={nextRow.domain.href}
+                className={`inline-flex min-h-11 items-center text-body font-medium text-accent-deep hover:underline ${focusRingVisible}`}
+              >
+                Finish setup: {nextRow.domain.label}
+              </Link>
+            ) : (
+              <p className="text-body text-ink">Finish setup</p>
+            )}
             <p className="mt-0.5 text-meta text-ink-2">
               {nudge || "Add what is missing, then save in Settings."}
             </p>
@@ -118,8 +155,7 @@ export function HomeCapture({
       ) : null}
 
       <ul className="mt-3 divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
-        {DOMAINS.map((domain) => {
-          const pct = Math.round(Number(score.domains[domain.key] ?? 0));
+        {rowsState.map(({ domain, state }) => {
           const gap = reviewGapCopy(
             score.next_gaps.find((item) => item.domain === domain.key)?.action || ""
           );
@@ -127,13 +163,23 @@ export function HomeCapture({
             vertical === "home_services" && domain.key === "policies"
               ? "Add call-out and cancellation terms"
               : domain.fallback;
+          const preview =
+            state === "confirmed"
+              ? "Confirmed by you"
+              : state === "check"
+                ? gap || "Saved. Open it and confirm it is right."
+                : fallback;
           return (
             <ListRow
               key={domain.key}
               href={domain.href}
               title={domain.label}
-              preview={pct >= 100 ? "Confirmed" : gap || fallback}
-              when={<span className="tabular-nums">{pct}%</span>}
+              preview={preview}
+              when={
+                <span className={state === "missing" ? "text-warn" : undefined}>
+                  {STATE_LABEL[state]}
+                </span>
+              }
             />
           );
         })}

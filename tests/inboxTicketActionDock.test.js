@@ -29,9 +29,9 @@ describe("ticket action dock", () => {
     assert.match(dock, /label="Done"/);
     assert.match(dock, /label="Call"/);
     assert.match(dock, /label="WhatsApp"/);
-    assert.match(ping, />Ping</);
+    assert.match(ping, />Alert</);
     assert.match(ping, /variant === "dock"/);
-    assert.match(ping, /Ping teammate/);
+    assert.match(ping, /Alert a teammate/);
     assert.match(ping, /<IconButton/);
     assert.match(ping, /<Sheet/);
     assert.doesNotMatch(dock, /[\u2014\u2013]/);

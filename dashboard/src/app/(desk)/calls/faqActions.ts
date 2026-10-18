@@ -1,5 +1,6 @@
 "use server";
 
+import { loadTranscriptTurns } from "@/lib/transcriptLoad";
 import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
 
@@ -23,7 +24,7 @@ import {
   suggestFaqsFromTranscript,
   type FaqSuggestion,
 } from "@/lib/faqFromTranscript";
-import type { FaqEntry, TeamDirectoryEntry, TranscriptRow } from "@/lib/supabase";
+import type { FaqEntry, TeamDirectoryEntry } from "@/lib/supabase";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
 import { parseAgentTools } from "@/lib/agentTools";
 
@@ -103,17 +104,14 @@ export async function suggestFaqsFromCallAction(
     return { error: "Call not found." };
   }
 
-  const { data: transcripts, error: txErr } = await workspace.client
-    .from("transcripts")
-    .select("id, created_at, call_id, speaker, text_content, latency_ms")
-    .eq("call_id", callId)
-    .order("created_at", { ascending: true });
+  // Spoken order: seq when Voice has written it, then created_at.
+  const { turns, error: txErr } = await loadTranscriptTurns(workspace.client, callId);
 
   if (txErr) {
-    return { error: txErr.message };
+    console.warn("[faq-suggest] transcript load failed:", txErr.message);
+    return { error: "Could not read this call. Try again." };
   }
 
-  const turns = (transcripts || []) as TranscriptRow[];
   if (!turns.length) {
     return { error: "No conversation yet on this call." };
   }

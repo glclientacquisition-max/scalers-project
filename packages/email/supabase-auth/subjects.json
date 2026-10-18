@@ -1,0 +1,44 @@
+{
+  "confirmation": {
+    "dashboard": "Confirm signup",
+    "subject": "Confirm your email for Scalers",
+    "apiSubject": "mailer_subjects_confirmation",
+    "apiContent": "mailer_templates_confirmation_content",
+    "file": "confirm-signup.html"
+  },
+  "invite": {
+    "dashboard": "Invite user",
+    "subject": "You're invited to join Scalers",
+    "apiSubject": "mailer_subjects_invite",
+    "apiContent": "mailer_templates_invite_content",
+    "file": "invite.html"
+  },
+  "magic_link": {
+    "dashboard": "Magic Link",
+    "subject": "Your Scalers sign in link",
+    "apiSubject": "mailer_subjects_magic_link",
+    "apiContent": "mailer_templates_magic_link_content",
+    "file": "magic-link.html"
+  },
+  "recovery": {
+    "dashboard": "Reset Password",
+    "subject": "Reset your Scalers password",
+    "apiSubject": "mailer_subjects_recovery",
+    "apiContent": "mailer_templates_recovery_content",
+    "file": "reset-password.html"
+  },
+  "email_change": {
+    "dashboard": "Change Email Address",
+    "subject": "Confirm your new email for Scalers",
+    "apiSubject": "mailer_subjects_email_change",
+    "apiContent": "mailer_templates_email_change_content",
+    "file": "change-email.html"
+  },
+  "reauthentication": {
+    "dashboard": "Reauthentication",
+    "subject": "Your Scalers confirmation code",
+    "apiSubject": "mailer_subjects_reauthentication",
+    "apiContent": "mailer_templates_reauthentication_content",
+    "file": "reauthentication.html"
+  }
+}

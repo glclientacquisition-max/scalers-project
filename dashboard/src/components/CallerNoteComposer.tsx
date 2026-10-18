@@ -58,6 +58,9 @@ function CallerNoteComposerInner({
 }) {
   const [open, setOpen] = useState(!collapsed);
   const [note, setNote] = useState("");
+  // One stable ledger key per note (row:<tenant>:<call>:caller_note:<noteId>):
+  // a double-submit is deduped; a new note after a send gets a new id.
+  const [noteId, setNoteId] = useState(() => crypto.randomUUID());
   const [polishState, polishAction, polishPending] = useActionState(
     polishCallerNoteAction,
     polishInitial
@@ -70,6 +73,10 @@ function CallerNoteComposerInner({
   useEffect(() => {
     if (polishState.text) setNote(polishState.text);
   }, [polishState.text]);
+
+  useEffect(() => {
+    if (sendState.ok && sendState.token) setNoteId(crypto.randomUUID());
+  }, [sendState.ok, sendState.token]);
 
   const canSend = callerSmsOn && Boolean(callerPhone) && note.trim().length > 0;
   if (!callerSmsOn) return null;
@@ -125,6 +132,7 @@ function CallerNoteComposerInner({
       </form>
       <form action={sendAction} className="flex items-center gap-2">
         <input type="hidden" name="call_id" value={callId} />
+        <input type="hidden" name="note_id" value={noteId} />
         <input type="hidden" name="caller_phone" value={callerPhone || ""} />
         <input type="hidden" name="note" value={note} />
         <button

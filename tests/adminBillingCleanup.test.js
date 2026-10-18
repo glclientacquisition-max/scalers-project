@@ -93,6 +93,20 @@ describe("admin billing: plain history", () => {
       copy.billingAuditDetail({ action: "assign_package", actor: "desk", detail: { before: null, after: { packageName: "Growth", period: "year" } } }),
       "None → Growth / year",
     );
+    // SQL snapshot shape (assign/unassign_tenant_package detail.before / detail.after).
+    const snap = (sku, name, status = "active") => ({ package_sku: sku, package_name: name, period: status === "active" ? "month" : null, period_start: "2026-10-01T00:00:00+03:00", period_end: "2026-11-01T00:00:00+03:00", status });
+    assert.equal(
+      copy.billingAuditDetail({ action: "assign_package", actor: "alvin", detail: { before: snap(null, null, "none"), after: snap("starter", "Starter"), note: "first" } }),
+      "None → Starter / month · first",
+    );
+    assert.equal(
+      copy.billingAuditDetail({ action: "unassign_package", actor: "alvin", detail: { before: snap("growth", "Growth"), after: snap(null, null, "none"), note: "closed" } }),
+      "Growth / month → None · closed",
+    );
+    assert.equal(
+      copy.billingAuditDetail({ action: "set_on_demand_usage", actor: "owner@x", detail: { before: { on_demand_usage_enabled: false }, after: { on_demand_usage_enabled: true } } }),
+      "On-demand on",
+    );
     assert.equal(copy.billingAuditDetail({ action: "set_billing_mode", actor: "x", detail: { mode: "soft", note: "pilot" } }), "Now On-demand soft · pilot");
     assert.equal(copy.billingAuditDetail({ action: "grant_package_minutes", actor: "x", detail: { minutes_granted: 60, note: "comp" } }), "+60 min · comp");
     assert.equal(copy.ledgerKindLabel("call_charge"), "Call charge");

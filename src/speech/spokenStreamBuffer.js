@@ -74,6 +74,20 @@ function envInt(name, fallback) {
  * @param {{ final?: boolean, earlyFlushChars?: number, earlyFlushWords?: number }} [opts]
  * @returns {{ chunks: string[], rest: string }}
  */
+// Only when the sentence talks about a site or email and its last word is a
+// lowercase label. A held sentence must not sit behind a tool block, which
+// drops trailing prose, so ordinary endings ("Thanks, Jane.") flush at once.
+const ADDRESS_CUE =
+  /\b(?:website|web\s*site|site|web|online|email|e-mail|mail|www|visit|tovuti|tembelea|barua\s+pepe|mtandaoni|link|page|domain)\b|@/i;
+
+function mayContinueAsAddress(sentence) {
+  const text = String(sentence || '');
+  const tail = text.match(/(\S+)\.$/);
+  if (!tail) return false;
+  if (!/^[a-z0-9][a-z0-9.@_-]*$/.test(tail[1])) return false;
+  return ADDRESS_CUE.test(text.slice(0, -tail[0].length)) || /[@.]/.test(tail[1]);
+}
+
 function splitSpeakableChunks(text, opts = {}) {
   const final = Boolean(opts.final);
   const earlyFlushChars = Number(
@@ -102,6 +116,12 @@ function splitSpeakableChunks(text, opts = {}) {
   let lastIndex = 0;
   let m;
   while ((m = re.exec(src)) !== null) {
+    // Mid-stream, a "." that ends the buffer straight after a letter or digit
+    // may be the inside of an address ("arisstationaries." + "co.ke."). Wait
+    // for the next delta, which settles it within one model chunk.
+    if (!final && re.lastIndex >= src.length && mayContinueAsAddress(m[1])) {
+      break;
+    }
     const piece = m[1].trim();
     if (piece) chunks.push(piece);
     lastIndex = re.lastIndex;

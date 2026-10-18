@@ -14,8 +14,11 @@ export type ActivityRow = {
 };
 
 const ACTIONS: Record<string, string> = {
+  suspend_business: "Suspended line",
+  unsuspend_business: "Restored line",
   archive_business: "Archived business",
-  restore_business: "Restored business",
+  restore_business: "Unarchived business",
+  purge_business: "Purged archived data",
   delete_business: "Deleted business for good",
   release_number: "Released number",
   assign_number: "Assigned number",
@@ -23,6 +26,10 @@ const ACTIONS: Record<string, string> = {
   buy_number: "Bought number",
   sync_numbers: "Synced numbers",
   assign_package: "Changed package",
+  unassign_package: "Removed package",
+  sms_counter_drift: "SMS counter drift",
+  set_on_demand_usage: "Changed on-demand",
+  usage_counter_reconcile: "Corrected usage counters",
   save_package: "Edited package",
   save_rates: "Changed rates",
   grant_package_minutes: "Granted minutes",

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
-import { fetchTtsPreviewWav } from "@/lib/voicePreview";
+import { fetchTtsPreviewWav, VOICE_PREVIEW_UNREACHABLE_COPY } from "@/lib/voicePreview";
+import { NO_VOICE_SAMPLE_COPY } from "@/lib/previewAudio";
+import { getCurrentTenant } from "@/lib/tenant";
 import { currentMemberRole, memberDenied } from "@/lib/requireMember";
 
 export async function POST(request: Request) {
@@ -26,12 +28,21 @@ export async function POST(request: Request) {
     );
   }
 
+  // Greeting previews: the voice line says the raw greeting exactly as callers
+  // hear it. The tenant comes from the session, never from the request body.
+  let greeting: { tenantId: string } | null = null;
+  if (body.greeting === true) {
+    const tenant = await getCurrentTenant();
+    if (tenant?.id) greeting = { tenantId: tenant.id };
+  }
+
   try {
     const result = await fetchTtsPreviewWav({
       text,
       lexicon: body.lexicon,
       language: body.language,
       voiceId: body.voiceId ?? body.soniox_voice_id ?? null,
+      greeting,
     });
     const headers = new Headers({
       "Content-Type": "audio/wav",
@@ -47,10 +58,18 @@ export async function POST(request: Request) {
     if (result.voiceId) {
       headers.set("X-Soniox-Voice", result.voiceId);
     }
+    if (result.greetingSource) {
+      headers.set("X-Greeting-Source", result.greetingSource);
+    }
+    if (result.greetingText) {
+      headers.set("X-Greeting-Text", encodeURIComponent(result.greetingText));
+    }
     return new NextResponse(new Uint8Array(result.wav), { status: 200, headers });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Could not generate phone preview.";
+    const raw = err instanceof Error ? err.message : String(err);
+    const ownerSafe = [VOICE_PREVIEW_UNREACHABLE_COPY, NO_VOICE_SAMPLE_COPY, "Preview used a different voice than this line."];
+    if (!ownerSafe.includes(raw)) console.warn("[pronunciation-preview] failed:", raw);
+    const message = ownerSafe.includes(raw) ? raw : VOICE_PREVIEW_UNREACHABLE_COPY;
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

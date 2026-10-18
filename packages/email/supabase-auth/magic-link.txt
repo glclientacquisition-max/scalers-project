@@ -1,0 +1,16 @@
+Subject: Your Scalers sign in link
+Preheader: Tap to sign in. The link works once and expires in 1 hour.
+
+Sign in to Scalers
+
+Tap the button to sign in as {{ .Email }}. No password needed.
+
+The link works once and expires in 1 hour.
+
+If you didn't ask for this, you can ignore this email. Nobody can sign in without this link.
+
+Sign in to Scalers: {{ .ConfirmationURL }}
+
+--
+This is an account email from Scalers. We only send it when someone asks for it.
+Need help? Write to support@scalers.co.ke.

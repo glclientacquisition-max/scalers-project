@@ -8,6 +8,7 @@ import { ThemePicker } from "@/components/ThemePicker";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { HomeCapture } from "@/components/HomeCapture";
 import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
+import { HomeCallSetupCard } from "@/components/HomeCallSetupCard";
 import { LivePing } from "@/components/ui/deskRow";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
 import { CapabilityGatesPanel } from "@/components/CapabilityGatesPanel";
@@ -17,11 +18,14 @@ import type { TenantRow } from "@/lib/supabase";
 /**
  * Local Overview identity harness (no desk login). DASHBOARD_OPEN=true only.
  */
-export default async function DevHomePage({ searchParams }: { searchParams: Promise<{ vertical?: string }> }) {
+export default async function DevHomePage({ searchParams }: { searchParams: Promise<{ vertical?: string; tenant?: string }> }) {
   if (process.env.DASHBOARD_OPEN !== "true") {
     notFound();
   }
-  const home = (await searchParams).vertical === "home_services";
+  const sp = await searchParams;
+  const home = sp.vertical === "home_services";
+  // Same localStorage key as /dev/setup/line?tenant=x, so "I tested it" there hides the card here.
+  const callSetupTenant = `dev-tenant${sp.tenant ? `-${sp.tenant.replace(/[^a-z0-9-]/gi, "").slice(0, 24)}` : ""}`;
   const gates = capabilityGates(
     home
       ? { vertical: "home_services", services_catalog: [{ name: "Sofa cleaning", source: "owner" }] }
@@ -91,6 +95,7 @@ export default async function DevHomePage({ searchParams }: { searchParams: Prom
                   : shopStakes({ products: [], hoursText: "", holdsAllowed: false })
               }
             />
+            <HomeCallSetupCard tenantId={callSetupTenant} numberReady />
             <CapabilityGatesPanel gates={gates} />
             <HomeReviewSettingsNudge
               tenantId="dev-home-live-nudge"

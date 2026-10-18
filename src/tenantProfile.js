@@ -9,6 +9,16 @@
  * @param {object} row  tenants row
  * @param {{ openAppointments?: object[], fieldMeta?: object|null, holdGate?: object|null }} [extras]
  */
+/**
+ * { closed: true, reason } for an archived, suspended or is_active=false row;
+ * null when the line is live. src/sautikit/inactiveTenantGate.js decides.
+ */
+function tenantRowLineState(row) {
+  const { tenantLineInactiveReason } = require('./sautikit/inactiveTenantGate');
+  const reason = tenantLineInactiveReason(row);
+  return reason ? { closed: true, reason, tenantId: row?.id || null } : null;
+}
+
 function tenantProfileFromRow(row, extras = {}) {
   const { parseAgentTools } = require('./conversation/agentTools');
   const { parseLexiconOverrides } = require('./speech/pronunciationLexicon');
@@ -56,6 +66,9 @@ function tenantProfileFromRow(row, extras = {}) {
       row.billing_enforcement != null ? String(row.billing_enforcement) : null,
     walletBalanceKes:
       row.wallet_balance_kes != null ? Number(row.wallet_balance_kes) : null,
+    // archived / suspended / is_active=false, same rules as the inbound gate.
+    // null when the row is live (or an older schema lacks the columns).
+    lineState: tenantRowLineState(row),
     openAppointments: Array.isArray(extras.openAppointments) ? extras.openAppointments : [],
     fieldMeta: extras.fieldMeta || null,
     holdGate: extras.holdGate || null,
