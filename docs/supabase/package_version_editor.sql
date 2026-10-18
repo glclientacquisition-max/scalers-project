@@ -26,8 +26,9 @@
 -- those burns into sms_kes, whatsapp_kes, and email_kes so the stored rate
 -- matches. It does not edit the old sms, email, and staff_wa included columns.
 -- Seeded versions leave message_credits null. An admin sets the pool on the
--- draft. WhatsApp burn is copied from the current rate (the owner has not
--- chosen 1 or 2). Metering still reads the old buckets until a later change.
+-- draft. Owner defaults, still editable on a draft: SMS segment 1, WhatsApp
+-- alert 2, email 1. A draft copies the burns from the version it starts from.
+-- Metering still reads the old buckets until a later change.
 
 -- ---------------------------------------------------------------------------
 -- 1. Editor settings and version bookkeeping.
@@ -85,13 +86,13 @@ comment on column public.billing_package_versions.message_credits is
   'One shared allowance for SMS, WhatsApp, and email. Null on a seeded version until an admin sets it. Not three buckets.';
 
 comment on column public.billing_package_versions.sms_credit_burn is
-  'Credits burned per SMS segment. 1 credit = KSh 1, so this is also the SMS on-demand rate. Copied from sms_kes.';
+  'Credits burned per SMS segment. Owner default is 1. 1 credit = KSh 1, so this is also the SMS on-demand rate. Editable on a draft.';
 
 comment on column public.billing_package_versions.whatsapp_credit_burn is
-  'Credits burned per WhatsApp message. Copied from whatsapp_kes. The owner has not chosen 1 or 2.';
+  'Credits burned per WhatsApp alert. Owner default is 2, matching the on-demand rate. Editable on a draft.';
 
 comment on column public.billing_package_versions.email_credit_burn is
-  'Credits burned per email. 1 credit = KSh 1. Copied from email_kes.';
+  'Credits burned per email. Owner default is 1. 1 credit = KSh 1. Editable on a draft.';
 
 do $$
 begin

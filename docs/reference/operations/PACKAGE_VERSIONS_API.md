@@ -9,7 +9,7 @@ Desk builds the Packages screens. This is the server contract. The live catalogu
 
 A package version is what a Business Assistant package includes: monthly price, included minutes, one shared message-credit allowance, a burn rate for SMS, WhatsApp, and email, seats, numbers, call overage rates, features, and (for the trial only) trial length in days. Published versions are frozen. A business stays on the version it was given until an admin moves it.
 
-Messages are one allowance. 1 credit = KSh 1 at the on-demand rate. `sms_credit_burn` is credits per SMS segment, `whatsapp_credit_burn` is credits per WhatsApp message, and `email_credit_burn` is credits per email. The copied rates are SMS 1, WhatsApp 2, and email 1. WhatsApp 1 or 2 is still the owner's choice. 2 is the rate already on the card, not a new decision.
+Messages are one allowance. 1 credit = KSh 1 at the on-demand rate. The owner defaults are 1 credit per SMS segment, 2 credits per WhatsApp alert, and 1 credit per email. A draft copies those burns. An admin can change each one. Changing a burn is a price change.
 
 The trial is the package with sku `trial`. It is not on the public catalogue (`is_active` is false). Version 1 is 20 minutes and 14 days. SMS 20 and email 30 on that version are placeholders (`allowances_placeholder` true) and are not the credit pool. `message_credits` on every seeded version is null until an admin sets it. Edit the trial the same way as Starter, Growth, and Scale.
 
@@ -61,7 +61,7 @@ Each version:
 | `annual_price_kes` | Computed: monthly times 12 times (1 minus `annual_discount_percent` / 100), rounded. Not stored. |
 | `seats`, `minutes`, `dids` | Included counts the editor can change. Integers, zero or more. |
 | `message_credits` | One shared allowance for SMS, WhatsApp, and email. Null on a seeded version. An editor publish requires a number, zero or more. |
-| `sms_credit_burn`, `whatsapp_credit_burn`, `email_credit_burn` | Credits burned per SMS segment, WhatsApp message, and email. Integers, zero or more. 1 credit = KSh 1. |
+| `sms_credit_burn`, `whatsapp_credit_burn`, `email_credit_burn` | Credits burned per SMS segment, WhatsApp alert, and email. Integers, zero or more. Defaults 1, 2, and 1. Editable on a draft. 1 credit = KSh 1. |
 | `sms`, `email`, `staff_wa` | Old included buckets. Shown so the seeded numbers stay visible. The editor does not change them. |
 | `inbound_kes_per_second`, `outbound_kes_per_second` | Call overage rates. Zero or more. |
 | `whatsapp_kes`, `sms_kes`, `email_kes` | Stored on-demand rates. The editor writes the burn into the matching rate. A patch does not send these fields. |
