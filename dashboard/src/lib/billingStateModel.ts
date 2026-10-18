@@ -10,7 +10,7 @@
  */
 
 import type { MessageCreditsUsage } from "./messageCredits";
-import { minutesUsedFromSeconds } from "./minutes";
+import { minuteMeter } from "./minutes";
 
 export type BillingMode = "beta" | "metered" | "capped" | "none";
 
@@ -22,10 +22,8 @@ export type TenantBillingStateRow = {
   period_start?: string | null;
   period_end?: string | null;
   included_minutes?: number | string | null;
-  /** Metered seconds (tenants.seconds_used). Minutes used come from this, not the rounded used_minutes. */
+  /** Metered seconds (tenants.seconds_used). All minutes come from this, never the view's rounded minute columns. */
   used_seconds?: number | string | null;
-  used_minutes?: number | string | null;
-  remaining_minutes?: number | string | null;
   sms_included?: number | string | null;
   sms_used?: number | string | null;
   sms_used_source?: string | null;
@@ -73,6 +71,10 @@ export type OwnerBillingView = {
   minutesIncluded: number;
   minutesUsed: number;
   minutesLeft: number;
+  /** Fewer than 60 seconds remain. Screens say "Under 1 min left" instead of minutesLeft. */
+  minutesUnderOne: boolean;
+  /** "12 min 30 s over" past the included minutes, else null. */
+  minutesOverLabel: string | null;
   onDemand: boolean;
   /** Low-minutes line. Credits join it only through lowBalanceNotice. Null when nothing is low. */
   lowNotice: string | null;
@@ -129,18 +131,23 @@ function isLow(included: number, left: number): boolean {
  * that hides the credits row on Usage.
  */
 export function lowBalanceNotice(
-  view: Pick<OwnerBillingView, "mode" | "minutesIncluded" | "minutesLeft" | "periodEndLabel" | "onDemand">,
+  view: Pick<OwnerBillingView, "mode" | "minutesIncluded" | "minutesLeft" | "periodEndLabel" | "onDemand"> &
+    Partial<Pick<OwnerBillingView, "minutesUnderOne">>,
   credits: MessageCreditsUsage | null,
 ): LowBalance {
   const lowMinutes = isLow(view.minutesIncluded, view.minutesLeft);
   const lowCredits = credits ? isLow(credits.included, credits.left) : false;
   if (view.mode === "none" || (!lowMinutes && !lowCredits)) return { lowNotice: null, lowNoticeNote: null };
   const until = view.periodEndLabel ? ` until ${view.periodEndLabel}` : "";
+  const underOne = Boolean(view.minutesUnderOne);
   let what: string;
   if (lowMinutes && lowCredits && credits) {
-    what = `Minutes and message credits are running low. ${count(view.minutesLeft)} minutes and ${count(credits.left)} credits left${until}.`;
+    const minutes = underOne ? "Under 1 min" : `${count(view.minutesLeft)} minutes`;
+    what = `Minutes and message credits are running low. ${minutes} and ${count(credits.left)} credits left${until}.`;
   } else if (lowCredits && credits) {
     what = `Message credits are running low. ${count(credits.left)} of ${count(credits.included)} left${until}.`;
+  } else if (underOne) {
+    what = `Under 1 min left${until}.`;
   } else {
     what = `${count(view.minutesLeft)} of ${count(view.minutesIncluded)} minutes left${until}.`;
   }
@@ -180,12 +187,8 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     shortLabel = "No package";
   }
 
-  const minutesIncluded = Math.max(0, Math.floor(num(state?.included_minutes)));
-  const minutesUsed =
-    state?.used_seconds != null && state.used_seconds !== ""
-      ? minutesUsedFromSeconds(state.used_seconds)
-      : Math.max(0, Math.ceil(num(state?.used_minutes)));
-  const minutesLeft = Math.max(0, minutesIncluded - minutesUsed);
+  const meter = minuteMeter(state?.included_minutes, state?.used_seconds);
+  const { included: minutesIncluded, used: minutesUsed, left: minutesLeft } = meter;
   const smsIncluded = Math.max(0, Math.floor(num(state?.sms_included)));
   const smsUsed = Math.max(0, Math.floor(num(state?.sms_used)));
   const smsLeft = Math.max(0, smsIncluded - smsUsed);
@@ -209,7 +212,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
   };
 
   const { lowNotice, lowNoticeNote } = lowBalanceNotice(
-    { mode, minutesIncluded, minutesLeft, periodEndLabel: endLabel, onDemand },
+    { mode, minutesIncluded, minutesLeft, minutesUnderOne: meter.underOneMinute, periodEndLabel: endLabel, onDemand },
     null,
   );
 
@@ -237,6 +240,8 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     minutesIncluded,
     minutesUsed,
     minutesLeft,
+    minutesUnderOne: meter.underOneMinute,
+    minutesOverLabel: meter.overLabel,
     onDemand,
     lowNotice,
     lowNoticeNote,

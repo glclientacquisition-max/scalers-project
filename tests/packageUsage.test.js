@@ -8,19 +8,19 @@ function read(rel) {
 }
 
 describe("package usage meter", () => {
-  it("ceils seconds to minutes and never goes negative", () => {
+  it("floors seconds to whole minutes and never goes negative", () => {
     const catalog = read("dashboard/src/lib/packageCatalog.ts");
     const minutes = read("dashboard/src/lib/minutes.ts");
     assert.match(catalog, /export \{ minutesUsedFromSeconds \}/);
     assert.match(minutes, /export function minutesUsedFromSeconds/);
-    assert.match(minutes, /Math\.ceil\(Math\.max\(0, Number\.isFinite\(n\) \? n : 0\) \/ 60\)/);
+    assert.match(minutes, /Math\.floor\(Math\.max\(0, finite\(seconds\)\) \/ 60\)/);
     assert.match(catalog, /export function remainingCount/);
     assert.match(
       catalog,
       /Math\.max\(0, Math\.floor\(Number\(included\) \|\| 0\) - Math\.max\(0, Number\(used\) \|\| 0\)\)/
     );
-    assert.equal(Math.ceil(90 / 60), 2);
-    assert.equal(Math.max(0, 300 - 2), 298);
+    assert.equal(Math.floor(90 / 60), 1);
+    assert.equal(Math.max(0, 300 - 1), 299);
     assert.equal(Math.max(0, 0 - 5), 0);
   });
 

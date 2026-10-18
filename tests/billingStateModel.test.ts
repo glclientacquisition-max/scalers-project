@@ -25,8 +25,7 @@ const esgaRow: TenantBillingStateRow = {
   period_start: "2026-09-30T21:00:00Z",
   period_end: "2026-10-31T21:00:00Z",
   included_minutes: 300,
-  used_minutes: 104.2,
-  remaining_minutes: 195.8,
+  used_seconds: 104 * 60 + 12,
   sms_included: 200,
   sms_used: 193,
   sms_used_source: "ledger",
@@ -106,7 +105,7 @@ describe("ownerBillingView rows", () => {
 
 describe("lowBalanceNotice", () => {
   const view = (over: Partial<TenantBillingStateRow> = {}) =>
-    ownerBillingView(input({ ...esgaRow, used_minutes: 0, ...over }));
+    ownerBillingView(input({ ...esgaRow, used_seconds: 0, ...over }));
   const credits = (left: number) => ({ included: 1000, used: 1000 - left, left });
 
   it("warns on the shared credit total in plain words, and beta says nothing is charged", () => {
@@ -125,7 +124,7 @@ describe("lowBalanceNotice", () => {
   });
 
   it("joins low minutes and low credits in one line", () => {
-    const low = lowBalanceNotice(view({ used_minutes: 290 }), credits(20));
+    const low = lowBalanceNotice(view({ used_seconds: 290 * 60 }), credits(20));
     assert.equal(
       low.lowNotice,
       "Minutes and message credits are running low. 10 minutes and 20 credits left until 31 Oct.",
@@ -137,7 +136,7 @@ describe("lowBalanceNotice", () => {
     assert.match(String(metered.lowNotice), /next invoice/);
     const capped = lowBalanceNotice(view({ mode_label: "capped", on_demand_enabled: false }), credits(40));
     assert.equal(capped.lowNotice, "Message credits are running low. 40 of 1,000 left until 31 Oct.");
-    const cappedMinutes = lowBalanceNotice(view({ mode_label: "capped", on_demand_enabled: false, used_minutes: 290 }), null);
+    const cappedMinutes = lowBalanceNotice(view({ mode_label: "capped", on_demand_enabled: false, used_seconds: 290 * 60 }), null);
     assert.match(String(cappedMinutes.lowNotice), /When minutes run out, calls stop unless you turn on extra usage\.$/);
     for (const low of [metered, capped, cappedMinutes]) {
       assert.doesNotMatch(String(low.lowNotice), /\bSMS\b|to callers stop/);

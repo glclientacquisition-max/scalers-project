@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { focusRingVisible } from "@/components/ui/deskChrome";
+import { minutesLeftLabel } from "@/lib/minutes";
 
 /** Home aside: minutes left, the plan line, and a warn line only when minutes run low. */
 export function HomeUsageSection({
   minutesLeft,
+  minutesUnderOne = false,
   packLabel,
   minuteStatus,
   lowNotice,
@@ -11,6 +13,7 @@ export function HomeUsageSection({
   showLink,
 }: {
   minutesLeft: number;
+  minutesUnderOne?: boolean;
   packLabel: string;
   minuteStatus: string | null;
   lowNotice: string | null;
@@ -20,7 +23,7 @@ export function HomeUsageSection({
   return (
     <section aria-label="Usage" className="border-t border-hairline px-4 py-4">
       <p className="text-body font-medium tabular-nums text-ink">
-        {minutesLeft.toLocaleString("en-KE")} min left
+        {minutesLeftLabel({ left: minutesLeft, underOneMinute: minutesUnderOne })}
       </p>
       <p className="mt-0.5 text-meta text-ink-2">{packLabel}</p>
       {minuteStatus ? <p className="mt-0.5 text-meta font-medium text-ink">{minuteStatus}</p> : null}

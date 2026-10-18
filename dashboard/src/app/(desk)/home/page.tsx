@@ -56,7 +56,8 @@ import { capabilityGates } from "@/lib/capabilityGates";
 import { CapabilityGatesPanel } from "@/components/CapabilityGatesPanel";
 import { parseHoursSchedule } from "@/lib/hoursSchedule";
 import { isBetaBilling } from "@/lib/wallet";
-import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
+import { minuteMeter } from "@/lib/minutes";
+import { loadOwnerPackageMeter } from "@/lib/packageCatalog";
 import { loadOwnerBillingView } from "@/lib/billingStateLoad";
 import { lowBalanceNotice } from "@/lib/billingStateModel";
 import { messageCreditsUsage } from "@/lib/messageCredits";
@@ -141,9 +142,9 @@ async function HomeOverviewBody() {
   // tenant_billing_state first (Ops-Billing #650); tenant counters only before it exists.
   const pack = billing ? null : await loadOwnerPackageMeter(tenant.id);
   const minutesIncluded = billing ? billing.minutesIncluded : pack?.minutesIncluded ?? 0;
-  const minutesLeft = billing
-    ? billing.minutesLeft
-    : remainingCount(pack?.minutesIncluded ?? 0, pack?.minutesUsed ?? 0);
+  const packMinutes = minuteMeter(pack?.minutesIncluded ?? 0, pack?.secondsUsed ?? 0);
+  const minutesLeft = billing ? billing.minutesLeft : packMinutes.left;
+  const minutesUnderOne = billing ? billing.minutesUnderOne : packMinutes.underOneMinute;
   const packLabel = billing
     ? billing.shortLabel
     : pack?.packageName
@@ -517,6 +518,7 @@ async function HomeOverviewBody() {
             <RoleGate action="usage.view" mode="hide">
             <HomeUsageSection
               minutesLeft={minutesLeft}
+              minutesUnderOne={minutesUnderOne}
               packLabel={packLabel}
               minuteStatus={minuteStatus}
               lowNotice={lowNotice}

@@ -22,7 +22,7 @@ export async function loadOwnerUsageView(tenant: {
           package_state: "active",
           package_name: pack.packageName,
           included_minutes: pack.minutesIncluded,
-          used_minutes: pack.minutesUsed,
+          used_seconds: pack.secondsUsed,
           sms_included: pack.smsIncluded,
           sms_used: pack.smsUsed,
           on_demand_enabled: onDemand,

@@ -129,6 +129,8 @@ export type OwnerPackageMeter = {
   period: "month" | "year" | null;
   minutesIncluded: number;
   minutesUsed: number;
+  /** Metered seconds behind minutesUsed, for the shared minutes rule. */
+  secondsUsed: number;
   smsIncluded: number;
   smsUsed: number;
   emailIncluded: number;
@@ -145,6 +147,7 @@ export function emptyOwnerPackageMeter(): OwnerPackageMeter {
     period: null,
     minutesIncluded: 0,
     minutesUsed: 0,
+    secondsUsed: 0,
     smsIncluded: 0,
     smsUsed: 0,
     emailIncluded: 0,
@@ -492,6 +495,7 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
       period,
       minutesIncluded: num(tenant.minutes_included),
       minutesUsed: minutesUsedFromSeconds(num(tenant.seconds_used)),
+      secondsUsed: Math.max(0, num(tenant.seconds_used)),
       smsIncluded: num(tenant.sms_included_units),
       smsUsed: num(tenant.sms_used_units),
       emailIncluded: num(tenant.email_included_units),

@@ -117,7 +117,7 @@ function betaView(): OwnerBillingView {
       package_state: "active",
       package_name: "Starter",
       included_minutes: 300,
-      used_minutes: 297,
+      used_seconds: 297 * 60,
       sms_included: 50,
       sms_used: 18,
       on_demand_enabled: false,
@@ -141,7 +141,7 @@ function paidView(): OwnerBillingView {
       package_state: "active",
       package_name: "Growth",
       included_minutes: 800,
-      used_minutes: 680,
+      used_seconds: 680 * 60,
       sms_included: 2500,
       sms_used: 420,
       on_demand_enabled: true,
@@ -173,7 +173,9 @@ function UsagePreview({ kind }: { kind: "beta" | "paid" }) {
     <UsageSummary
       minutesLeft={view.minutesLeft}
       minutesIncluded={view.minutesIncluded}
-      minutesUsed={view.minutesIncluded - view.minutesLeft}
+      minutesUsed={view.minutesUsed}
+      minutesUnderOne={view.minutesUnderOne}
+      minutesOverLabel={view.minutesOverLabel}
       periodEndLabel={view.periodEndLabel}
       beta={beta}
       planLine={beta ? null : `Growth · ${formatKsh(18000)} a month`}

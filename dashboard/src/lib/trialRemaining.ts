@@ -1,4 +1,4 @@
-import { minutesLeft as minutesLeftOf } from "./minutes";
+import { minuteMeter } from "./minutes";
 
 /** Trial ends at whichever hits zero first: days on the clock, or included minutes. */
 
@@ -8,7 +8,8 @@ export function trialRemaining(input: {
   secondsUsed: number;
   minutesIncluded: number;
 }): { daysLeft: number; minutesLeft: number; ended: boolean; text: string } {
-  const minutesLeft = minutesLeftOf(input.minutesIncluded, input.secondsUsed);
+  const meter = minuteMeter(input.minutesIncluded, input.secondsUsed);
+  const minutesLeft = meter.left;
   let daysLeft = 0;
   if (input.trialEndsAt) {
     const end = Date.parse(input.trialEndsAt);
@@ -24,6 +25,6 @@ export function trialRemaining(input: {
     daysLeft,
     minutesLeft,
     ended: false,
-    text: `Trial: ${daysLeft} days or ${minutesLeft} minutes left`,
+    text: `Trial: ${daysLeft} days or ${meter.underOneMinute ? "under 1 min" : `${minutesLeft} minutes`} left`,
   };
 }

@@ -43,6 +43,8 @@ export function UsageSummary({
   minutesLeft,
   minutesIncluded,
   minutesUsed,
+  minutesUnderOne = false,
+  minutesOverLabel = null,
   periodEndLabel,
   beta,
   planLine,
@@ -54,6 +56,10 @@ export function UsageSummary({
   minutesLeft: number;
   minutesIncluded: number;
   minutesUsed: number;
+  /** Fewer than 60 seconds remain: "Under 1 min left" replaces the number. */
+  minutesUnderOne?: boolean;
+  /** "12 min 30 s over" once past the included minutes. */
+  minutesOverLabel?: string | null;
   periodEndLabel: string | null;
   beta: boolean;
   planLine: string | null;
@@ -88,10 +94,19 @@ export function UsageSummary({
       <div className="mt-6 flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
         <div className="contents lg:col-span-7 lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
           <section aria-label="Minutes" className="order-1 min-w-0 rounded-2xl border border-hairline bg-surface p-4 lg:order-none">
-            <p className={`font-display text-display tabular-nums ${toneText(tone)}`}>{count(minutesLeft)}</p>
-            <p className="text-body text-ink-2">
-              Minutes left{periodEndLabel ? ` until ${periodEndLabel}` : ""}
-            </p>
+            {minutesUnderOne ? (
+              <>
+                <p className={`font-display text-display ${toneText(tone)}`}>Under 1 min left</p>
+                {periodEndLabel ? <p className="text-body text-ink-2">Until {periodEndLabel}</p> : null}
+              </>
+            ) : (
+              <>
+                <p className={`font-display text-display tabular-nums ${toneText(tone)}`}>{count(minutesLeft)}</p>
+                <p className="text-body text-ink-2">
+                  Minutes left{periodEndLabel ? ` until ${periodEndLabel}` : ""}
+                </p>
+              </>
+            )}
             {minuteMax > 0 ? (
               <>
                 <p className="mt-4 text-meta tabular-nums text-ink-2">
@@ -100,7 +115,7 @@ export function UsageSummary({
                 <UsageBar used={minutesUsed} included={minuteMax} tone={tone} label="Minutes used" className="mt-2" />
                 {tone !== "ok" ? (
                   <p role="status" className="mt-3 text-meta font-medium text-warn">
-                    {tone === "full" ? "Out of minutes" : "Running low on minutes"}
+                    {tone === "full" ? minutesOverLabel || "Out of minutes" : "Running low on minutes"}
                   </p>
                 ) : null}
                 {tone !== "ok" && entry ? (

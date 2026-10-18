@@ -106,6 +106,8 @@ async function WalletBody({ searchParams }: WalletPageProps) {
       minutesLeft={view.minutesLeft}
       minutesIncluded={view.minutesIncluded}
       minutesUsed={view.minutesUsed}
+      minutesUnderOne={view.minutesUnderOne}
+      minutesOverLabel={view.minutesOverLabel}
       periodEndLabel={view.periodEndLabel}
       beta={extras.freeBeta}
       planLine={planLine}
