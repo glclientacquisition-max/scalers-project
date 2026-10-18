@@ -45,6 +45,7 @@ import { Stamp } from "@/components/ui/Stamp";
 import { HomeCapture } from "@/components/HomeCapture";
 import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { HomeCallSetupCard } from "@/components/HomeCallSetupCard";
+import { HomeUsageSection } from "@/components/HomeUsageSection";
 import { toLocal07 } from "@/lib/callForwarding";
 import { loadCallSetupState } from "@/lib/callSetupServer";
 import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
@@ -57,6 +58,9 @@ import { parseHoursSchedule } from "@/lib/hoursSchedule";
 import { isBetaBilling } from "@/lib/wallet";
 import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
 import { loadOwnerBillingView } from "@/lib/billingStateLoad";
+import { lowBalanceNotice } from "@/lib/billingStateModel";
+import { messageCreditsUsage } from "@/lib/messageCredits";
+import { loadUsageBillingExtras } from "@/lib/ownerPlanLoad";
 import { coverageDisplayList } from "@/lib/coverageAreas";
 import { homeMinuteStatus } from "@/lib/usageCap";
 import { createDeskTimer } from "@/lib/deskTiming";
@@ -112,7 +116,7 @@ async function HomeOverviewBody() {
   const copy = nicheCopy(vertical);
 
   const numberReady = toLocal07(tenant.sautikit_virtual_number) !== null;
-  const [todayRes, inbox, billing, score, hold, insights, callSetup] = await Promise.all([
+  const [todayRes, inbox, billing, extras, score, hold, insights, callSetup] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
@@ -120,6 +124,7 @@ async function HomeOverviewBody() {
       .gte("created_at", dayStart),
     loadCachedInboxItems(tenant.id, vertical),
     loadOwnerBillingView(tenant.id),
+    loadUsageBillingExtras(tenant.id),
     getTenantCompletenessScore(tenant.id),
     getTenantHoldGate(tenant.id),
     loadCallInsights(client, tenant.id, 30, tenant.faqs),
@@ -144,7 +149,12 @@ async function HomeOverviewBody() {
     : pack?.packageName
       ? `${pack.packageName}${pack.period ? ` / ${pack.period}` : ""}`
       : "No package";
-  const minuteStatus = billing?.lowNotice
+  const low = billing
+    ? lowBalanceNotice(billing, messageCreditsUsage(extras.messageCredits, extras.creditBurns, billing.messageUse))
+    : null;
+  const lowNotice = low?.lowNotice || null;
+  const lowNoticeNote = low?.lowNoticeNote || null;
+  const minuteStatus = lowNotice
     ? null
     : homeMinuteStatus({
         isBeta,
@@ -152,7 +162,6 @@ async function HomeOverviewBody() {
         minutesIncluded,
         minutesLeft,
       });
-  const lowNotice = billing?.lowNotice || null;
   const digest = inbox.callsTruncated
     ? null
     : homeDigestLine(inbox.items, dayStart, vertical);
@@ -506,26 +515,14 @@ async function HomeOverviewBody() {
             </section>
 
             <RoleGate action="usage.view" mode="hide">
-            <section aria-label="Usage" className="border-t border-hairline px-4 py-4">
-              <p className="text-body font-medium tabular-nums text-ink">
-                {minutesLeft.toLocaleString("en-KE")} min left
-              </p>
-              <p className="mt-0.5 text-meta text-ink-2">{packLabel}</p>
-              {minuteStatus ? (
-                <p className="mt-0.5 text-meta font-medium text-ink">{minuteStatus}</p>
-              ) : null}
-              {lowNotice ? (
-                <p role="status" className="mt-1 text-meta font-medium text-warn">{lowNotice}</p>
-              ) : null}
-              {lowNotice || (minuteStatus && !isBeta) ? (
-                <Link
-                  href="/wallet"
-                  className={`mt-1 inline-flex min-h-11 items-center text-body font-medium text-warn hover:underline ${focusRingVisible}`}
-                >
-                  Usage
-                </Link>
-              ) : null}
-            </section>
+            <HomeUsageSection
+              minutesLeft={minutesLeft}
+              packLabel={packLabel}
+              minuteStatus={minuteStatus}
+              lowNotice={lowNotice}
+              lowNoticeNote={lowNoticeNote}
+              showLink={Boolean(lowNotice || (minuteStatus && !isBeta))}
+            />
             </RoleGate>
 
             {showCta ? (

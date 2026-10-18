@@ -20,7 +20,6 @@ function sub(daysStatus: BannerSub["billingStatus"], over: Partial<BannerSub> = 
     pauseOn: "2026-10-09T00:00:00+03:00",
     trialEnded: false,
     openInvoiceKes: 8120,
-    payToken: "tok_1",
     ...over,
   };
 }
@@ -57,27 +56,24 @@ describe("pickBillingBanner", () => {
   it("beta and a clear active plan have no banner", () => {
     assert.equal(pickBillingBanner(sub("beta"), at(0)), null);
     assert.equal(
-      pickBillingBanner(sub("active", { openInvoiceKes: null, payToken: null }), at(0)),
+      pickBillingBanner(sub("active", { openInvoiceKes: null }), at(0)),
       null,
     );
   });
 
   it("an open invoice before it is past due is the invoice banner", () => {
     const banner = pickBillingBanner(
-      { billingStatus: "active", openInvoiceKes: 1000, payToken: null, trialEnded: false },
+      { billingStatus: "active", openInvoiceKes: 1000, trialEnded: false },
       at(0),
     );
     assert.equal(banner?.kind, "invoice_due");
   });
 
-  it("hides Pay KSh when there is no token", () => {
-    const hidden = pickBillingBanner(sub("past_due", { payToken: null }), at(0));
-    assert.equal(hidden?.kind, "grace");
-    assert.equal(hidden?.action?.label, "View invoice");
-    assert.doesNotMatch(hidden?.action?.label || "", /Pay KSh/);
-    assert.equal(hidden?.action?.href, "/settings/billing");
-    const shown = pickBillingBanner(sub("past_due"), at(0));
-    assert.equal(shown?.action?.label, "Pay KSh 8,120");
-    assert.equal(shown?.action?.href, "/pay/tok_1");
+  it("opens Billing and does not use a stored pay token", () => {
+    const banner = pickBillingBanner(sub("past_due"), at(0));
+    assert.equal(banner?.kind, "grace");
+    assert.equal(banner?.action?.label, "View invoice");
+    assert.equal(banner?.action?.href, "/settings/billing");
+    assert.doesNotMatch(banner?.action?.href || "", /\/pay\//);
   });
 });

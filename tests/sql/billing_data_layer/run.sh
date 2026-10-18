@@ -11,6 +11,12 @@ $PSQL -d "$DB" -f tests/sql/billing_data_layer/00_stub_schema.sql
 $PSQL -d "$DB" -f tests/sql/billing_data_layer/05_legacy.sql
 for pass in 1 2; do
   $PSQL -d "$DB" -f docs/supabase/billing_data_layer.sql
+  $PSQL -d "$DB" -f docs/supabase/billing_data_layer_billing_status_not_null.sql
 done
 $PSQL -d "$DB" -f tests/sql/billing_data_layer/10_scenarios.sql
+$PSQL -d "$DB" -f tests/sql/billing_data_layer/20_scl_guard.sql
+$PSQL -d "$DB" -f docs/supabase/billing_data_layer.sql
+$PSQL -d "$DB" -f tests/sql/billing_data_layer/30_assert_scl.sql
+$PSQL -d "$DB" -f docs/supabase/billing_data_layer_down.sql
+$PSQL -d "$DB" -f tests/sql/billing_data_layer/40_assert_down.sql
 echo "billing_data_layer sql: ok"

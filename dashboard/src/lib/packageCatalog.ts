@@ -138,7 +138,6 @@ export type OwnerPackageMeter = {
   waUsed: number;
   seatsIncluded: number;
   seatsUsed: number;
-  rates: BillingRateCard;
 };
 
 export function emptyOwnerPackageMeter(): OwnerPackageMeter {
@@ -155,7 +154,6 @@ export function emptyOwnerPackageMeter(): OwnerPackageMeter {
     waUsed: 0,
     seatsIncluded: 0,
     seatsUsed: 0,
-    rates: { ...DEFAULT_RATES },
   };
 }
 
@@ -453,7 +451,7 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
   if (!tenantId) return empty;
   try {
     const admin = getSupabaseAdmin();
-    const [tenantRes, subRes, ratesRes, seatsRes] = await Promise.all([
+    const [tenantRes, subRes, seatsRes] = await Promise.all([
       admin
         .from("tenants")
         .select(
@@ -467,7 +465,6 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
         .eq("tenant_id", tenantId)
         .eq("status", "active")
         .maybeSingle(),
-      admin.from("billing_rate_card").select("*").eq("id", 1).maybeSingle(),
       // Seats in use = members plus unexpired invites (Ops-Billing tenant_seats_used),
       // not members alone.
       admin.rpc("tenant_seats_used", { p_tenant: tenantId }),
@@ -491,13 +488,6 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
       if (!packRes.error) packageName = packRes.data?.name ? String(packRes.data.name) : null;
     }
 
-    const rates =
-      ratesRes.error && isMissingCatalog(ratesRes.error.message)
-        ? { ...DEFAULT_RATES }
-        : ratesRes.error
-          ? { ...DEFAULT_RATES }
-          : mapRates((ratesRes.data || {}) as Record<string, unknown>);
-
     return {
       packageName,
       period,
@@ -511,7 +501,6 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
       waUsed: num(tenant.whatsapp_used_units),
       seatsIncluded: num(tenant.seat_included),
       seatsUsed: seatsRes.error ? 0 : num(seatsRes.data),
-      rates,
     };
   } catch {
     return empty;

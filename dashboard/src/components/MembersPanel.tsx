@@ -16,17 +16,18 @@ import {
 import { ROLE_BLURBS, ROLE_LABELS, assignableRoles, canManageMember, type Role } from "@/lib/permissions";
 import { daysLeft } from "@/lib/invites";
 import type { MembersData } from "@/lib/membersLoad";
+import type { PlanEntry } from "@/lib/planEntry";
 import { transferConfirmMatches } from "@/lib/memberConfirm";
 import { INVITES_PAGE, MEMBERS_PAGE } from "@/lib/teamLimits";
 import { setExtraSeatsAction, type PlanActionState } from "@/app/(desk)/settings/plan/planActions";
-import { Button, pendingDotClass } from "@/components/ui/Button";
+import { Button, ButtonLink, pendingDotClass } from "@/components/ui/Button";
 import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { IconButton } from "@/components/ui/IconButton";
 import { Input, Select } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";
 import { notify } from "@/components/ui/DeskNotice";
-import { formatKsh, proratedPortionKes } from "@/lib/planPricing";
+import { formatKsh, seatIncreaseCopy } from "@/lib/planPricing";
 import { SettingsGroup, settingsFieldClass, settingsGroupTitleClass } from "@/components/settingsUi";
 
 type Pending = {
@@ -49,7 +50,18 @@ const linkClass =
  * Settings > Team & access > Members. Renders inside the Settings <form>, so there are
  * no nested forms: every action is called directly and confirmed in a drawer.
  */
-export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData; viewerRole: Role; viewerId: string }) {
+export function MembersPanel({
+  data,
+  viewerRole,
+  viewerId,
+  planEntry = null,
+}: {
+  data: MembersData;
+  viewerRole: Role;
+  viewerId: string;
+  /** Change plan when every seat is taken. Null on beta. */
+  planEntry?: PlanEntry | null;
+}) {
   const [email, setEmail] = useState("");
   const roles = assignableRoles(viewerRole);
   const [role, setRole] = useState<Role>(roles.includes("staff") ? "staff" : roles[0] || "viewer");
@@ -91,9 +103,20 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
   const canInvite = roles.length > 0;
   const { seats, totals, limits } = data;
   const canBuySeat = Boolean(seats.full && seatPrice != null && maxAdd >= 1);
-  const seatDue =
-    canBuySeat && seatOffer?.seatUnitKes != null && seatOffer.daysLeft != null && seatOffer.daysInPeriod != null
-      ? proratedPortionKes(seatOffer.seatUnitKes * seatQty, seatOffer.daysLeft, seatOffer.daysInPeriod)
+  const seatLine =
+    canBuySeat &&
+    seatOffer?.seatUnitKes != null &&
+    seatOffer.daysLeft != null &&
+    seatOffer.daysInPeriod != null &&
+    seatPrice != null
+      ? seatIncreaseCopy({
+          quantity: seatQty,
+          monthlyKes: seatPrice,
+          unitKes: seatOffer.seatUnitKes,
+          daysLeft: seatOffer.daysLeft,
+          daysInPeriod: seatOffer.daysInPeriod,
+          periodMonth: seatOffer.periodEndMonth,
+        })
       : null;
 
   /** Runs one action at a time and always shows the outcome: inline + desk toast (survives a re-render). */
@@ -304,23 +327,30 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
       {canInvite ? (
         seats.full ? (
           <SettingsGroup title="Invite">
-            <p className="flex min-h-12 items-center px-4 py-2.5 text-body text-ink">
+            <p role="status" className="flex min-h-12 items-center px-4 py-2.5 text-body font-medium text-warn">
               All {seats.included} seats are in use.
             </p>
-            {canBuySeat ? (
-              <div className="flex justify-end px-4 py-3">
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="md"
-                  onClick={() => {
-                    setSeatQty(1);
-                    setSeatNote(null);
-                    setSeatOpen(true);
-                  }}
-                >
-                  Invite
-                </Button>
+            {canBuySeat || planEntry ? (
+              <div className="flex flex-wrap justify-end gap-2 px-4 py-3">
+                {planEntry ? (
+                  <ButtonLink href={planEntry.href} variant="tonal">
+                    {planEntry.label}
+                  </ButtonLink>
+                ) : null}
+                {canBuySeat ? (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="md"
+                    onClick={() => {
+                      setSeatQty(1);
+                      setSeatNote(null);
+                      setSeatOpen(true);
+                    }}
+                  >
+                    Invite
+                  </Button>
+                ) : null}
               </div>
             ) : null}
           </SettingsGroup>
@@ -402,11 +432,7 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
               <PlusIcon />
             </IconButton>
           </div>
-          <p className="mt-3 text-body text-ink-2">
-            {seatDue != null
-              ? `${formatKsh(seatDue)} for the rest of this period.`
-              : "Added to the next bill for the days left in this period."}
-          </p>
+          {seatLine ? <p className="mt-3 text-body text-ink-2">{seatLine}</p> : null}
           <div className="mt-4">
             <label className="mb-1.5 block text-meta font-medium text-ink" htmlFor="seat-invite-email">
               Email

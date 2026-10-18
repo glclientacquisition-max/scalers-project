@@ -39,7 +39,7 @@ export function OnDemandUsagePanel({
   const showMinutePrice = enabled && extraMinuteKes != null && extraMinuteKes > 0;
 
   return (
-    <section className="mt-6">
+    <section>
       <button
         type="button"
         onClick={() => setOpen(true)}

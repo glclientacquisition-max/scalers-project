@@ -5,13 +5,23 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  allowanceChanges,
+  allowanceLines,
+  annualPriceFromVersion,
   annualPriceKes,
   annualSavingKes,
   downgradeStartsOn,
+  nairobiMonthName,
   nairobiPeriodDays,
   proratedPortionKes,
   proratedUpgradeKes,
+  seatIncreaseCopy,
+  seatReductionCopy,
   seatUnitKes,
+  planDowngradeChanges,
+  planUpgradeCopy,
+  seatBlockCopy,
+  spendLimitDisplayKes,
   splitPayNote,
 } from "../dashboard/src/lib/planPricing.ts";
 import { planChangePort } from "../dashboard/src/lib/deskPlanChange.ts";
@@ -24,6 +34,16 @@ describe("plan pricing", () => {
     assert.equal(annualSavingKes(18000, 10), 21600);
     assert.equal(annualPriceKes(35000, 10), 378000);
     assert.equal(annualSavingKes(35000, 10), 42000);
+    assert.equal(annualPriceFromVersion(18000, 10, 200000), 200000);
+    assert.equal(annualPriceFromVersion(18000, 10, null), 194400);
+    assert.equal(annualPriceFromVersion(18000, 10, undefined), 194400);
+  });
+
+  it("uses the version spend share, and 50 when the column is missing", () => {
+    assert.equal(spendLimitDisplayKes(null, 18000, 40), 7200);
+    assert.equal(spendLimitDisplayKes(null, 18000, null), 9000);
+    assert.equal(spendLimitDisplayKes(null, 18000), 9000);
+    assert.equal(spendLimitDisplayKes(1000, 18000, 40), 1000);
   });
 
   it("adds the split note only above KSh 150,000", () => {
@@ -37,11 +57,43 @@ describe("plan pricing", () => {
   });
 
   it("prorates an extra seat from the version price and the days left", () => {
-    const clock = nairobiPeriodDays("2026-10-01T00:00:00+03:00", "2026-10-31T00:00:00+03:00", new Date("2026-10-11T09:00:00+03:00"));
+    const end = "2026-10-31T00:00:00+03:00";
+    const clock = nairobiPeriodDays("2026-10-01T00:00:00+03:00", end, new Date("2026-10-11T09:00:00+03:00"));
     assert.deepEqual(clock, { daysInPeriod: 30, daysLeft: 20 });
     const unit = seatUnitKes(500, "month", 10);
     assert.equal(unit, 500);
     assert.equal(proratedPortionKes(unit, clock!.daysLeft, clock!.daysInPeriod), 333);
+    assert.equal(nairobiMonthName(end), "October");
+    assert.equal(
+      seatIncreaseCopy({
+        quantity: 1,
+        monthlyKes: 500,
+        unitKes: unit,
+        daysLeft: clock!.daysLeft,
+        daysInPeriod: clock!.daysInPeriod,
+        periodMonth: nairobiMonthName(end),
+      }),
+      "KSh 333 today for the rest of October, then KSh 500 a month.",
+    );
+    assert.equal(
+      seatIncreaseCopy({
+        quantity: 2,
+        monthlyKes: 500,
+        unitKes: unit,
+        daysLeft: clock!.daysLeft,
+        daysInPeriod: clock!.daysInPeriod,
+        periodMonth: "October",
+      }),
+      "KSh 667 today for the rest of October, then KSh 1,000 a month.",
+    );
+    assert.equal(
+      seatReductionCopy({ seats: 0, monthlyKes: 500, nextPeriodStart: "31 Oct" }),
+      "From 31 Oct you pay KSh 0 a month for extra seats.",
+    );
+    assert.equal(
+      seatReductionCopy({ seats: 2, monthlyKes: 500, nextPeriodStart: "31 Oct" }),
+      "From 31 Oct you pay KSh 1,000 a month for extra seats.",
+    );
     assert.equal(seatUnitKes(500, "year", 10), annualPriceKes(500, 10));
   });
 
@@ -66,5 +118,41 @@ describe("plan change port", () => {
       if (prev === undefined) delete process.env.DESK_PLAN_CHANGE;
       else process.env.DESK_PLAN_CHANGE = prev;
     }
+  });
+});
+
+describe("plan change copy", () => {
+  const starter = { minutes: 300, seats: 3, messageCredits: 1000 };
+  const growth = { minutes: 800, seats: 8, messageCredits: 2500 };
+  const scale = { minutes: 1600, seats: 20, messageCredits: 5500 };
+
+  it("upgrade: today for the rest of the month, then the new price from the next period", () => {
+    const due = proratedUpgradeKes(18000, 35000, 10, 30);
+    assert.equal(
+      planUpgradeCopy({ dueKes: due, laterKes: 35000, cycle: "month", periodMonth: "October", nextPeriodStart: "1 Nov" }),
+      "KSh 11,333 today for the rest of October, then KSh 35,000 a month from 1 Nov.",
+    );
+  });
+
+  it("downgrade lists what changes at renewal", () => {
+    assert.equal(
+      planDowngradeChanges(growth, starter, "1 Nov"),
+      "From 1 Nov: 300 minutes (now 800), 3 seats (now 8), 1,000 message credits (now 2,500).",
+    );
+  });
+
+  it("before and after rows in card order", () => {
+    assert.deepEqual(allowanceChanges(growth, scale), [
+      { label: "Minutes", from: "800", to: "1,600" },
+      { label: "Seats", from: "8", to: "20" },
+      { label: "Message credits", from: "2,500", to: "5,500" },
+    ]);
+    assert.deepEqual(allowanceLines(growth), ["800 minutes", "8 seats", "2,500 message credits"]);
+  });
+
+  it("blocks a downgrade when too many seats are in use", () => {
+    assert.equal(seatBlockCopy(5, 3), "Remove 2 team members first.");
+    assert.equal(seatBlockCopy(4, 3), "Remove 1 team member first.");
+    assert.equal(seatBlockCopy(3, 3), null);
   });
 });
