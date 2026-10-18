@@ -83,3 +83,20 @@ export async function loadOwnerBillingView(tenantId: string): Promise<OwnerBilli
     return null;
   }
 }
+
+/** Seats on the plan and seats in use (members plus open invites). Null when the counts are not there. */
+export async function loadSeatCount(tenantId: string): Promise<{ used: number; included: number } | null> {
+  if (!tenantId) return null;
+  try {
+    const admin = getSupabaseAdmin();
+    const [tenantRes, seatsRes] = await Promise.all([
+      admin.from("tenants").select("seat_included").eq("id", tenantId).maybeSingle(),
+      admin.rpc("tenant_seats_used", { p_tenant: tenantId }),
+    ]);
+    if (tenantRes.error || seatsRes.error || !tenantRes.data) return null;
+    const included = Math.max(0, Math.floor(num((tenantRes.data as { seat_included?: unknown }).seat_included)));
+    return { used: Math.max(0, Math.floor(num(seatsRes.data))), included };
+  } catch {
+    return null;
+  }
+}

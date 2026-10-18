@@ -358,6 +358,7 @@ function TenantFormInner({
   liveTransferExecutor = false,
   showBack = true,
   membersSlot = null,
+  seatNoteSlot = null,
   structuredSlot = null,
 }: {
   tenant: TenantRow;
@@ -369,6 +370,8 @@ function TenantFormInner({
   showBack?: boolean;
   /** Team & access: Members section (feature flag TEAM_INVITES_ENABLED). */
   membersSlot?: ReactNode;
+  /** Team: one note when every seat is taken. */
+  seatNoteSlot?: ReactNode;
   /** Typed-data groups (payments, price checks, category) rendered by the server page per panel. */
   structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
 }) {
@@ -2292,6 +2295,7 @@ function TenantFormInner({
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
         {membersSlot}
+        {seatNoteSlot}
         {/* Live connect only appears once the runtime supports it. Today Scalers is callbacks only. */}
         {liveTransferExecutor ? (
           <>

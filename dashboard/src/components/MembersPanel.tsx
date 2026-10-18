@@ -16,10 +16,11 @@ import {
 import { ROLE_BLURBS, ROLE_LABELS, assignableRoles, canManageMember, type Role } from "@/lib/permissions";
 import { daysLeft } from "@/lib/invites";
 import type { MembersData } from "@/lib/membersLoad";
+import type { PlanEntry } from "@/lib/planEntry";
 import { transferConfirmMatches } from "@/lib/memberConfirm";
 import { INVITES_PAGE, MEMBERS_PAGE } from "@/lib/teamLimits";
 import { setExtraSeatsAction, type PlanActionState } from "@/app/(desk)/settings/plan/planActions";
-import { Button, pendingDotClass } from "@/components/ui/Button";
+import { Button, ButtonLink, pendingDotClass } from "@/components/ui/Button";
 import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { IconButton } from "@/components/ui/IconButton";
@@ -49,7 +50,18 @@ const linkClass =
  * Settings > Team & access > Members. Renders inside the Settings <form>, so there are
  * no nested forms: every action is called directly and confirmed in a drawer.
  */
-export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData; viewerRole: Role; viewerId: string }) {
+export function MembersPanel({
+  data,
+  viewerRole,
+  viewerId,
+  planEntry = null,
+}: {
+  data: MembersData;
+  viewerRole: Role;
+  viewerId: string;
+  /** Change plan when every seat is taken. Null on beta. */
+  planEntry?: PlanEntry | null;
+}) {
   const [email, setEmail] = useState("");
   const roles = assignableRoles(viewerRole);
   const [role, setRole] = useState<Role>(roles.includes("staff") ? "staff" : roles[0] || "viewer");
@@ -315,23 +327,30 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
       {canInvite ? (
         seats.full ? (
           <SettingsGroup title="Invite">
-            <p className="flex min-h-12 items-center px-4 py-2.5 text-body text-ink">
+            <p role="status" className="flex min-h-12 items-center px-4 py-2.5 text-body font-medium text-warn">
               All {seats.included} seats are in use.
             </p>
-            {canBuySeat ? (
-              <div className="flex justify-end px-4 py-3">
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="md"
-                  onClick={() => {
-                    setSeatQty(1);
-                    setSeatNote(null);
-                    setSeatOpen(true);
-                  }}
-                >
-                  Invite
-                </Button>
+            {canBuySeat || planEntry ? (
+              <div className="flex flex-wrap justify-end gap-2 px-4 py-3">
+                {planEntry ? (
+                  <ButtonLink href={planEntry.href} variant="tonal">
+                    {planEntry.label}
+                  </ButtonLink>
+                ) : null}
+                {canBuySeat ? (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="md"
+                    onClick={() => {
+                      setSeatQty(1);
+                      setSeatNote(null);
+                      setSeatOpen(true);
+                    }}
+                  >
+                    Invite
+                  </Button>
+                ) : null}
               </div>
             ) : null}
           </SettingsGroup>
