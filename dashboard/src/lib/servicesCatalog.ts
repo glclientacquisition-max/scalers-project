@@ -1,3 +1,4 @@
+import { hydrateCatalogPriceFields } from "./catalogPriceKind";
 import { isAskPriceWording } from "./catalogValidation";
 import { parsePriceText, sanitizePricing, type StructuredPrice } from "./structuredData";
 import { stableRowId } from "@/lib/factHash";
@@ -12,8 +13,11 @@ export type ServiceItem = {
   /** yes | no | unknown | "" (unset) */
   in_stock: string;
   category: string;
-  /** fixed | from | range | ask, or another owner-set mode. */
+  /** fixed | from | range | quote (legacy ask maps to quote). */
   pricing_mode?: string;
+  price_kind?: "fixed" | "from" | "range" | "quote";
+  price_min?: number | null;
+  price_max?: number | null;
   /** Required for a Home catalog row to count. Absent does not count. */
   site_visit_required?: boolean;
   /** owner | seed | import | inferred | call_suggested */
@@ -90,7 +94,13 @@ export function normalizeServicesCatalog(raw: unknown): ServiceItem[] {
       if (status === "golden" || status === "confirmed" || status === "suggested") {
         item.status = source === "seed" || source === "call_suggested" ? "suggested" : status;
       }
-      return item;
+      const pk = String(r.price_kind || r.priceKind || "").trim();
+      if (pk === "fixed" || pk === "from" || pk === "range" || pk === "quote") item.price_kind = pk;
+      const pmin = r.price_min ?? r.priceMin;
+      const pmax = r.price_max ?? r.priceMax;
+      if (pmin !== undefined && pmin !== null && pmin !== "") item.price_min = Number(pmin);
+      if (pmax !== undefined && pmax !== null && pmax !== "") item.price_max = Number(pmax);
+      return hydrateCatalogPriceFields(item);
     })
     .filter(
       (row) =>

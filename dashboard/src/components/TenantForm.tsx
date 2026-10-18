@@ -34,6 +34,12 @@ import {
   parseAgentTools,
   type AgentTools,
 } from "@/lib/agentTools";
+import { CatalogPriceEditor } from "@/components/settings/catalog/CatalogPriceEditor";
+import {
+  applyCatalogPriceFields,
+  catalogPriceInputsFromRow,
+  type PriceKind,
+} from "@/lib/catalogPriceKind";
 import {
   emptyService,
   extractServicesNotes,
@@ -352,12 +358,6 @@ function CatalogPager({
       className="border-t border-hairline bg-surface-canvas px-3 py-3"
     />
   );
-}
-
-function servicePricePlaceholder(service: Pick<ServiceItem, "pricing_mode" | "pricing">): string {
-  const mode = service.pricing_mode || service.pricing?.mode;
-  if (mode === "ask") return "You confirm";
-  return "KSh 2,500";
 }
 
 function isOwnerTeamRow(phone: string, ownerPhone: string | null | undefined): boolean {
@@ -757,6 +757,35 @@ function TenantFormInner({
       prev.map((row, i) =>
         i === index ? carrySavedRow({ ...row, [key]: value, source: "owner" }, row) : row
       )
+    );
+  }
+
+  function updateServicePrice(index: number, kind: PriceKind, minInput: string, maxInput: string) {
+    const current = services[index];
+    if (current?.name.trim()) {
+      queueOwnerPath(`catalog.service.${stableRowId(current) || String(index + 1)}.name`);
+    }
+    setServices((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        const next = applyCatalogPriceFields(row, kind, minInput, maxInput, "price_range");
+        return carrySavedRow({ ...next, source: "owner" }, row);
+      })
+    );
+  }
+
+  function updateProductPrice(index: number, kind: PriceKind, minInput: string, maxInput: string) {
+    const current = products[index];
+    if (current?.name.trim()) {
+      const sku = current.sku.trim() || String(index + 1);
+      queueOwnerPath(`catalog.product.${sku}.name`);
+    }
+    setProducts((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        const next = applyCatalogPriceFields(row, kind, minInput, maxInput, "price");
+        return carrySavedRow({ ...next, source: "owner" }, row);
+      })
     );
   }
 
@@ -1422,23 +1451,12 @@ function TenantFormInner({
             {visibleServices.map((service, localIndex) => {
               const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
               const priceError = catalogPriceError(state.fields, service.name);
+              const priceFields = catalogPriceInputsFromRow(service);
               return (
-                <div key={`service-m-${index}`} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_2.75rem] items-end gap-x-2 gap-y-2 px-3 py-2.5">
+                <div key={`service-m-${index}`} className="grid grid-cols-[minmax(0,1fr)_2.75rem] items-start gap-x-2 gap-y-2 px-3 py-2.5">
                   <div className="min-w-0">
                     <label className={serviceMobileLabelClass} htmlFor={`svc-name-m-${index}`}>Service</label>
                     <input id={`svc-name-m-${index}`} value={service.name} onChange={(e) => updateService(index, "name", e.target.value)} placeholder={vertical === "retail" ? "Book sourcing / special orders" : "Home cleaning"} className={denseFieldClass} />
-                  </div>
-                  <div className="min-w-0">
-                    <label className={serviceMobileLabelClass} htmlFor={`svc-price-m-${index}`}>Price</label>
-                    <input
-                      id={`svc-price-m-${index}`}
-                      value={service.price_range}
-                      onChange={(e) => updateService(index, "price_range", e.target.value)}
-                      placeholder={servicePricePlaceholder(service)}
-                      aria-invalid={priceError ? true : undefined}
-                      aria-describedby={priceError ? `svc-price-m-${index}-error` : undefined}
-                      className={denseFieldClass}
-                    />
                   </div>
                   <button
                     type="button"
@@ -1460,8 +1478,25 @@ function TenantFormInner({
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
+                  <CatalogPriceEditor
+                    idPrefix={`svc-price-m-${index}`}
+                    kind={priceFields.kind}
+                    minInput={priceFields.minInput}
+                    maxInput={priceFields.maxInput}
+                    fieldClass={denseFieldClass}
+                    labelClass={serviceMobileLabelClass}
+                    onKindChange={(kind) =>
+                      updateServicePrice(index, kind, priceFields.minInput, priceFields.maxInput)
+                    }
+                    onMinChange={(value) =>
+                      updateServicePrice(index, priceFields.kind, value, priceFields.maxInput)
+                    }
+                    onMaxChange={(value) =>
+                      updateServicePrice(index, priceFields.kind, priceFields.minInput, value)
+                    }
+                  />
                   {priceError ? (
-                    <p id={`svc-price-m-${index}-error`} className="col-span-3 text-meta text-warn" role="alert">
+                    <p id={`svc-price-m-${index}-error`} className="col-span-2 text-meta text-warn" role="alert">
                       {priceError}
                     </p>
                   ) : null}
@@ -1503,8 +1538,9 @@ function TenantFormInner({
                   {visibleServices.map((service, localIndex) => {
                     const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
                     const priceError = catalogPriceError(state.fields, service.name);
+                    const priceFields = catalogPriceInputsFromRow(service);
                     return (
-                      <tr key={`service-${index}`} className="align-middle">
+                      <tr key={`service-${index}`} className="align-top">
                         <td className="min-w-0 px-3 py-2">
                           <label className="sr-only" htmlFor={`svc-name-${index}`}>
                             Service name
@@ -1522,20 +1558,22 @@ function TenantFormInner({
                             className={tableFieldClass}
                           />
                         </td>
-                        <td className="px-3 py-2">
-                          <label className="sr-only" htmlFor={`svc-price-${index}`}>
-                            Price range
-                          </label>
-                          <input
-                            id={`svc-price-${index}`}
-                            value={service.price_range}
-                            onChange={(e) =>
-                              updateService(index, "price_range", e.target.value)
+                        <td className="min-w-[14rem] px-3 py-2">
+                          <CatalogPriceEditor
+                            idPrefix={`svc-price-${index}`}
+                            kind={priceFields.kind}
+                            minInput={priceFields.minInput}
+                            maxInput={priceFields.maxInput}
+                            fieldClass={tableFieldClass}
+                            onKindChange={(kind) =>
+                              updateServicePrice(index, kind, priceFields.minInput, priceFields.maxInput)
                             }
-                            placeholder={servicePricePlaceholder(service)}
-                            aria-invalid={priceError ? true : undefined}
-                            aria-describedby={priceError ? `svc-price-${index}-error` : undefined}
-                            className={tableFieldClass}
+                            onMinChange={(value) =>
+                              updateServicePrice(index, priceFields.kind, value, priceFields.maxInput)
+                            }
+                            onMaxChange={(value) =>
+                              updateServicePrice(index, priceFields.kind, priceFields.minInput, value)
+                            }
                           />
                           {priceError ? (
                             <p id={`svc-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">
@@ -1672,7 +1710,7 @@ function TenantFormInner({
           {unpricedOnly ? (
             <div data-unpriced-filter="" className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-accent-tonal px-4 py-2">
               <p className="text-meta text-ink">
-                Showing {productIdx.length + serviceIdx.length} without a price. Add one, or choose Ask so callers get a call back.
+                Showing {productIdx.length + serviceIdx.length} without a price. Add one, or choose Quote on request for a callback.
               </p>
               <button
                 type="button"
@@ -1692,23 +1730,12 @@ function TenantFormInner({
               {visibleProducts.map((product, localIndex) => {
                 const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
                 const priceError = catalogPriceError(state.fields, product.name);
+                const priceFields = catalogPriceInputsFromRow(product);
                 return (
-                  <div key={`product-m-${index}`} className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_2.75rem] items-center gap-2 px-3 py-2">
+                  <div key={`product-m-${index}`} className="grid grid-cols-[minmax(0,1fr)_2.75rem] items-start gap-2 px-3 py-2">
                     <div className="min-w-0">
                       <label className="sr-only" htmlFor={`prod-name-m-${index}`}>Name</label>
                       <input id={`prod-name-m-${index}`} value={product.name} onChange={(e) => updateProduct(index, "name", e.target.value)} placeholder="Atomic Habits" className={denseFieldClass} />
-                    </div>
-                    <div className="min-w-0">
-                      <label className="sr-only" htmlFor={`prod-price-m-${index}`}>Price</label>
-                      <input
-                        id={`prod-price-m-${index}`}
-                        value={product.price}
-                        onChange={(e) => updateProduct(index, "price", e.target.value)}
-                        placeholder="KSh 2,500"
-                        aria-invalid={priceError ? true : undefined}
-                        aria-describedby={priceError ? `prod-price-m-${index}-error` : undefined}
-                        className={denseFieldClass}
-                      />
                     </div>
                     <button
                       type="button"
@@ -1725,8 +1752,24 @@ function TenantFormInner({
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
+                    <CatalogPriceEditor
+                      idPrefix={`prod-price-m-${index}`}
+                      kind={priceFields.kind}
+                      minInput={priceFields.minInput}
+                      maxInput={priceFields.maxInput}
+                      fieldClass={denseFieldClass}
+                      onKindChange={(kind) =>
+                        updateProductPrice(index, kind, priceFields.minInput, priceFields.maxInput)
+                      }
+                      onMinChange={(value) =>
+                        updateProductPrice(index, priceFields.kind, value, priceFields.maxInput)
+                      }
+                      onMaxChange={(value) =>
+                        updateProductPrice(index, priceFields.kind, priceFields.minInput, value)
+                      }
+                    />
                     {priceError ? (
-                      <p id={`prod-price-m-${index}-error`} className="col-span-3 text-meta text-warn" role="alert">
+                      <p id={`prod-price-m-${index}-error`} className="col-span-2 text-meta text-warn" role="alert">
                         {priceError}
                       </p>
                     ) : null}
@@ -1789,8 +1832,9 @@ function TenantFormInner({
                     {visibleProducts.map((product, localIndex) => {
                       const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
                       const priceError = catalogPriceError(state.fields, product.name);
+                      const priceFields = catalogPriceInputsFromRow(product);
                       return (
-                        <tr key={`product-${index}`} className="align-middle">
+                        <tr key={`product-${index}`} className="align-top">
                           <td className="min-w-0 px-3 py-2">
                             <label className="sr-only" htmlFor={`prod-name-${index}`}>
                               Product name
@@ -1804,18 +1848,22 @@ function TenantFormInner({
                               className={tableFieldClass}
                             />
                           </td>
-                          <td className="px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-price-${index}`}>
-                              Price
-                            </label>
-                            <input
-                              id={`prod-price-${index}`}
-                              value={product.price}
-                              onChange={(e) => updateProduct(index, "price", e.target.value)}
-                              placeholder="KSh 2,500"
-                              aria-invalid={priceError ? true : undefined}
-                              aria-describedby={priceError ? `prod-price-${index}-error` : undefined}
-                              className={tableFieldClass}
+                          <td className="min-w-[14rem] px-3 py-2">
+                            <CatalogPriceEditor
+                              idPrefix={`prod-price-${index}`}
+                              kind={priceFields.kind}
+                              minInput={priceFields.minInput}
+                              maxInput={priceFields.maxInput}
+                              fieldClass={tableFieldClass}
+                              onKindChange={(kind) =>
+                                updateProductPrice(index, kind, priceFields.minInput, priceFields.maxInput)
+                              }
+                              onMinChange={(value) =>
+                                updateProductPrice(index, priceFields.kind, value, priceFields.maxInput)
+                              }
+                              onMaxChange={(value) =>
+                                updateProductPrice(index, priceFields.kind, priceFields.minInput, value)
+                              }
                             />
                             {priceError ? (
                               <p id={`prod-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">
