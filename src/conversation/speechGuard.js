@@ -344,6 +344,29 @@ function sentenceHasNewNumber(sentence, known) {
   return false;
 }
 
+const SAVED_WORK_ACTIONS = new Set(['create_service_request', 'create_appointment', 'update_appointment', 'escalate']);
+
+/** A request, visit or handoff saved on any turn of this call (brain state savedWork). */
+function workSavedThisCall(state) {
+  const rows = Array.isArray(state?.actions?.savedWork) ? state.actions.savedWork : [];
+  return rows.some(
+    (row) =>
+      row &&
+      SAVED_WORK_ACTIONS.has(row.action) &&
+      (row.status === 'succeeded' || row.status === 'updated' || row.status === 'duplicate')
+  );
+}
+
+/** True the first time per caller turn for this key (state.conversation). No state: always true. */
+function onceThisTurn(ctx, key) {
+  const conv = ctx?.state && typeof ctx.state === 'object' ? (ctx.state.conversation ||= {}) : null;
+  if (!conv) return true;
+  const turn = Number(conv.turnCount || 0);
+  if (turn > 0 && conv[key] === turn) return false;
+  conv[key] = turn;
+  return true;
+}
+
 function toolSucceededThisTurn(toolResults = []) {
   return (Array.isArray(toolResults) ? toolResults : []).some(
     (result) =>
@@ -637,7 +660,10 @@ function guardSpokenReply(text, ctx = {}) {
   const clockAsk = trusted ? callerClockAsk(lastCallerForFacts) : '';
   const answerLanguage = trusted ? askLanguage(lastCallerForFacts, ctx.language) : ctx.language;
   let droppedClockAnswer = false;
-  const saved = toolSucceededThisTurn(ctx.toolResults);
+  // VOICE_FACT_REFS: work saved on an earlier turn of this call still backs
+  // "the team will call you" (6 of 13 judged saved_claim drops, 18 Oct).
+  const factRefsOn = require('./factSheet').factRefsEnabled();
+  const saved = toolSucceededThisTurn(ctx.toolResults) || (factRefsOn && workSavedThisCall(ctx.state));
   const holdOk = holdOrOrderSucceeded(ctx.toolResults);
   let droppedHoldPayment = false;
   const transferOk = Boolean(ctx.capabilities?.liveTransfer || ctx.capabilities?.transfer);
@@ -651,6 +677,7 @@ function guardSpokenReply(text, ctx = {}) {
   ].join(' ');
   const kept = [];
   let droppedNumber = false;
+  const droppedNumberSentences = [];
   let droppedJob = false;
   let droppedUnboundFile = false;
   const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
@@ -771,6 +798,7 @@ function guardSpokenReply(text, ctx = {}) {
       !factKind
     ) {
       droppedNumber = true;
+      droppedNumberSentences.push(sentence);
       if (clockAsk) droppedClockAnswer = true;
       noteDrop(ctx, 'unsaid_number', sentence);
       continue;
@@ -831,7 +859,11 @@ function guardSpokenReply(text, ctx = {}) {
   const groundedPrice = cataloguePrice || speechPrice;
   if (groundedPrice) {
     const digit = String(groundedPrice).match(/\d[\d,]*/);
-    const already = Boolean(digit && out.includes(digit[0]));
+    // VOICE_FACT_REFS: a price the model said in words ("elfu moja na mia
+    // tano") is already said; do not add the digit line in front of it.
+    const already = Boolean(
+      digit && (out.includes(digit[0]) || (factRefsOn && numbersIn(out).has(digit[0].replace(/,/g, ''))))
+    );
     if (!already) {
       out = !out || NOT_ON_FILE.test(out) ? groundedPrice : `${groundedPrice} ${out}`;
     }
@@ -857,10 +889,36 @@ function guardSpokenReply(text, ctx = {}) {
     out = !out || NOT_ON_FILE.test(out) ? groundedClock : `${groundedClock} ${out}`;
   }
   const askedNumber = callerAskedNumber(lastCallerTurn, trusted);
+  // VOICE_FACT_REFS: a dropped number sentence is repaired with the owner's
+  // saved value for the fact it was about (or the caller asked about), in the
+  // caller's language. An unconfirmed fact gets the owner-confirm line. Once
+  // per caller turn: streamed sentences each pass through here.
+  let groundedFact = '';
+  if (factRefsOn && droppedNumber && !groundedPrice && !groundedHours && !groundedClock) {
+    const factSheet = require('./factSheet');
+    const fact = factSheet.findFactFor(
+      [...droppedNumberSentences, lastCallerTurn],
+      factSheet.factSheetFor(ctx.profile || {})
+    );
+    // No matching fact: the confirm line only when the caller asked for a
+    // number or nothing else is left to say. An unasked guess is just dropped,
+    // and the current time is never an owner fact.
+    const line = fact
+      ? factSheet.factSentence(fact, answerLanguage)
+      : clockAsk || callerClockAsk(lastCallerTurn)
+        ? ''
+        : askedNumber || !out.trim()
+          ? factSheet.confirmWithOwnerLine(answerLanguage)
+          : '';
+    if (line && !out.includes(line) && onceThisTurn(ctx, 'factRepairTurn')) groundedFact = line;
+  }
+  if (groundedFact) {
+    out = !out || NOT_ON_FILE.test(out) ? groundedFact : `${groundedFact} ${out}`;
+  }
   const priced = groundedPrice;
   if (out) {
     const lead =
-      !groundedPrice && !groundedHours && !groundedClock && askedNumber && droppedNumber
+      !groundedPrice && !groundedHours && !groundedClock && !groundedFact && askedNumber && droppedNumber
         ? unknownFallback(answerLanguage)
         : '';
     return withMessageOnlyCallback(lead ? `${lead} ${out}` : out, ctx, appendCallback);
@@ -906,4 +964,5 @@ module.exports = {
   numbersIn,
   splitSentences,
   toolSucceededThisTurn,
+  workSavedThisCall,
 };

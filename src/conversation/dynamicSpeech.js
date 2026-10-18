@@ -423,6 +423,27 @@ function stripPrematureOutcomeClaims(text, opts = {}) {
 function polishSpokenDetail(text, opts = {}) {
   const dropReasons = [];
   let spoken = stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true });
+  // VOICE_FACT_REFS: put the owner's values in for {price.x} / {fee.x} /
+  // {hours.x} / {pay.x} before the guard reads the sentence. The values are
+  // passed on as allowed facts; an unconfirmed or unknown ID became the
+  // owner-confirm line (factSheet.renderFactRefs).
+  let factText = '';
+  if ((opts.state || opts.profile) && spoken.includes('{')) {
+    const factSheet = require('./factSheet');
+    if (factSheet.factRefsEnabled()) {
+      const rendered = factSheet.renderFactRefs(spoken, factSheet.factSheetFor(opts.profile || {}), {
+        language: opts.language,
+      });
+      if (rendered.changed) {
+        spoken = rendered.text;
+        factText = rendered.factText;
+        if (rendered.unconfirmed.length || rendered.unknown.length) {
+          dropReasons.push('fact_ref_confirm');
+          logSpokenFilterDrop('fact_ref_confirm', [...rendered.unconfirmed, ...rendered.unknown].join(','), opts);
+        }
+      }
+    }
+  }
   // Guard whole sentences first. Stripping a verb phrase after the fact would
   // leave a fragment ("that for you.") that the guard can no longer see.
   if (opts.state || opts.profile) {
@@ -431,7 +452,7 @@ function polishSpokenDetail(text, opts = {}) {
       profile: opts.profile || {},
       toolResults: opts.toolResults || [],
       capabilities: opts.capabilities || {},
-      extra: JSON.stringify(opts.state?.entities || {}),
+      extra: factText ? `${JSON.stringify(opts.state?.entities || {})} ${factText}` : JSON.stringify(opts.state?.entities || {}),
       state: opts.state,
       language: opts.language,
       allowEmpty: true,
