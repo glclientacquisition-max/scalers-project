@@ -394,3 +394,102 @@ describe('(3) prose hours only', () => {
     assert.match(run(ON), /open today/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Jirani staging HD_af5868852bc7 (18 Oct 14:26 EAT, release 9fb557ff): the
+// summary saved "excited" from "And I'm excited about." and the model asked
+// "Am I speaking with Alwyn?" on that turn. Fixture read-only from staging.
+describe('HD_af5868852bc7: state words are not names; shared line hides the file name', () => {
+  const AF = require('./fixtures/brain-calls/HD_af5868852bc7.call.json');
+  const JIRANI = require('./fixtures/tenants/jirani-staging.json');
+  const { buildCallerMemoryCard } = require('../src/conversation/callerMemory');
+  const { inferIntent } = require('../src/conversation/brainState');
+  const { sanitizeStoredCallerName } = require('../src/conversation/callerNameQuality');
+  const { observeCallerInput } = require('../src/speech/callerTurnLabel');
+  const AF_NOW = new Date(AF.startedAt);
+
+  function afProfile() {
+    const profile = profileFromSnapshot(JSON.parse(JSON.stringify(JIRANI)));
+    profile.callerMemory = buildCallerMemoryCard({ contact: AF.callerFile.contact, openRequests: [], openAppointments: [], now: AF_NOW });
+    return profile;
+  }
+
+  // Same order as server.js per caller turn: entities, then observeCallerTurn.
+  function replayAf() {
+    const profile = afProfile();
+    let state = createBrainState(profile);
+    let last = AF.greeting;
+    for (const turn of AF.turns) {
+      const text = turn.caller;
+      const prov = inferIntent(text, { vertical: profile.vertical });
+      const intent = prov === 'general_enquiry' && state.goal.status === 'active' ? state.intent : prov;
+      const entities = extractConversationEntities(text, { profile, intent, state });
+      state = observeCallerTurn(
+        state,
+        observeCallerInput({ text, languageState: { language: 'en', detected: 'en', sticky: 'en' }, entities, profile, lastAgentText: last }, { turnEnd: {} })
+      );
+      last = turn.spoken || last;
+    }
+    return { state, profile };
+  }
+
+  it('fixture: turn 9 "And I\'m excited about." got the model line "Am I speaking with Alwyn?"; the file name is Alwyn, alternate Alvin', () => {
+    const t9 = AF.turns.find((t) => t.turn === 9);
+    assert.equal(t9.caller, "And I'm excited about.");
+    assert.equal(t9.source, 'model');
+    assert.equal(t9.modelOutput, 'Am I speaking with Alwyn?');
+    assert.equal(AF.callerFile.contact.name, 'Alwyn');
+    assert.equal(AF.callerFile.contact.metadata.alternate_names[0].name, 'Alvin');
+    assert.match(AF.stored.summary.text, /Caller: excited\./);
+    // Turn 8's answer was dropped by the guard and the rest was barged.
+    const t8 = AF.turns.find((t) => t.turn === 8);
+    assert.equal(t8.dropped[0].reason, 'unsaid_number');
+    assert.equal(t8.outcome, 'barge_in');
+  });
+
+  it('flag off pins the live call: "excited" is the caller name and the summary says so', () =>
+    withEnv({ ...OFF, BRAIN_CALL_FIXES_D199: 'on' }, () => {
+      const { state, profile } = replayAf();
+      assert.equal(state.caller.name, 'excited');
+      assert.match(deriveCallSummary({ brainState: state }).text, /Caller: excited\./);
+      assert.match(buildSystemPrompt(profile, { now: AF_NOW }), /shared line \(file name Alwyn;/);
+    }));
+
+  it('flag on: no name from "I\'m excited", no "Caller: excited", and the file name is not in the prompt', () =>
+    withEnv({ ...ON, BRAIN_CALL_FIXES_D199: 'on' }, () => {
+      const { state, profile } = replayAf();
+      assert.equal(state.caller.name || '', '');
+      const summary = deriveCallSummary({ brainState: state });
+      assert.equal(summary.callerName, null);
+      assert.doesNotMatch(summary.text, /excited/i);
+      assert.doesNotMatch(summary.reason, /excited/i);
+      const prompt = buildSystemPrompt(profile, { now: AF_NOW });
+      assert.doesNotMatch(prompt, /Alwyn/);
+      assert.match(prompt, /shared line \(nothing is saved for this speaker; .*do not ask Am I speaking with anyone/);
+    }));
+
+  it('flag on: adjective, emotion and state words are never a name on extraction, save_caller_info, service rows, or the stored name', () =>
+    withEnv(ON, () => {
+      const words = ['excited', 'Excited', 'happy', 'fine', 'good', 'sawa', 'poa', 'tired', 'so tired', 'busy', 'fiti', 'mzima', 'calling', 'okay'];
+      for (const w of words) {
+        assert.equal(isPlausibleCallerName(w), false, w);
+        assert.equal(validateCallerInfo({ name: w, reason: 'hours' }).value.name, '', w);
+        assert.equal(validateServiceRequest({ type: 'callback', name: w, item: 'hours' }, {}).value.name, '', w);
+        assert.equal(sanitizeStoredCallerName(w), null, w);
+      }
+      for (const text of ["And I'm excited about.", "I'm fine", 'Niko poa', "I'm good thanks", "I'm so tired"]) {
+        assert.equal(extractConversationEntities(text, {}).name || null, null, text);
+      }
+      assert.equal(extractConversationEntities("I'm Alvin", {}).name.value, 'Alvin');
+      for (const name of ['Alvin', 'Alwyn', 'Grace', 'Joy', 'Faith', 'Hope', 'Mercy', 'Precious', 'Ahmed', 'Fred', 'Wanjiru', 'Will']) {
+        assert.equal(isPlausibleCallerName(name), true, name);
+        assert.equal(sanitizeStoredCallerName(name), name, name);
+      }
+    }));
+
+  it('flag off keeps state words as before (pinned)', () =>
+    withEnv(OFF, () => {
+      assert.equal(isPlausibleCallerName('excited'), true);
+      assert.equal(sanitizeStoredCallerName('excited'), 'excited');
+    }));
+});

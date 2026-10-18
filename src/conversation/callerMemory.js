@@ -887,8 +887,14 @@ function formatReturningCallerForPrompt(card) {
     const who = card.boundName || card.name || 'this speaker';
     identity = `${who} (bound; not the household file; do not invent their history)`;
   } else if (card.sharedLine) {
-    const hint = fileWho ? `file name ${fileWho}; ` : '';
-    identity = `not bound; shared line (${hint}nothing is saved for this speaker; do not invent a booking, order, or hold)`;
+    // BRAIN_TRUSTED_HOURS (HD_af5868852bc7): on a shared line the file name is
+    // not this speaker's. With it in the prompt the model asked "Am I speaking
+    // with Alwyn?" on a turn where the caller said "I'm excited". Keep it out.
+    // eslint-disable-next-line global-require
+    const hideName = require('./trustedHours').trustedHoursEnabled();
+    const hint = fileWho && !hideName ? `file name ${fileWho}; ` : '';
+    const noConfirm = hideName ? '; do not ask Am I speaking with anyone; ask who is speaking only before you save something' : '';
+    identity = `not bound; shared line (${hint}nothing is saved for this speaker; do not invent a booking, order, or hold${noConfirm})`;
   } else if (fileWho) {
     identity = `not bound; phone file for ${fileWho}; confirm this name once before any visit; do not greet them as this name`;
   } else {

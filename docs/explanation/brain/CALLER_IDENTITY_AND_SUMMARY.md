@@ -84,7 +84,8 @@ resolution_note: string | null  // must match resolution class
 
 ### Trusted hours and honest summary (`BRAIN_TRUSTED_HOURS`, staging)
 
-Source: Aris prod HD_49d726c3dc9b, Esga prod HD_dfd531f8b083. Off unless
+Source: Aris prod HD_49d726c3dc9b, Esga prod HD_dfd531f8b083, Jirani staging
+HD_af5868852bc7. Off unless
 exactly `on`; independent of `BRAIN_CALL_FIXES_D199`.
 
 - An hours ask is the goal "opening hours on {Day}" (or "tomorrow"/"today").
@@ -103,6 +104,21 @@ exactly `on`; independent of `BRAIN_CALL_FIXES_D199`.
 - A question ("Do I need?") or a span with a pronoun, auxiliary, question
   word or function word is never a caller name (`isPlausibleCallerName`,
   `save_caller_info`, `create_service_request`). No name table grows.
+- A feeling, state or filler word is never a caller name either: "And I'm
+  excited about." saved "excited" on HD_af5868852bc7. A small closed stop-list
+  (`NAME_STATE_WORDS` in `entityExtraction.js`: excited, happy, fine, good,
+  tired, busy, sawa, poa, fiti, mzima, …) rejects a span made only of those
+  words. The same check runs in `isPlausibleCallerName` (extraction, summary
+  `callerName`, owner review), `save_caller_info`, `create_service_request`, and
+  `sanitizeStoredCallerName` (review merge, lead event). `KENYA_GIVEN_NAMES` is
+  unchanged. Names that are also words (Grace, Joy, Faith, Hope, Mercy) still
+  pass. "Happy", which some Kenyans use as a name, is rejected on this list.
+- Shared line: the phone file's name is not this speaker's, so the CONTEXT
+  HEADER `Speaker:` line no longer carries "file name X" and says not to ask
+  "Am I speaking with" anyone. On HD_af5868852bc7 the line read "shared line
+  (file name Alwyn; …)", the junk name "excited" was in CALL STATE, and the
+  model asked "Am I speaking with Alwyn?" on that turn, under the static
+  NAME ACCURACY rule that says to confirm a file name once.
 
 ### Never allowed as `goal.text`
 

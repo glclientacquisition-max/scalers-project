@@ -910,6 +910,39 @@ function isQuestionOrFunctionSpan(value) {
   return words.some((word) => NAME_FUNCTION_WORDS.has(word));
 }
 
+// BRAIN_TRUSTED_HOURS (HD_af5868852bc7): "And I'm excited about." saved the
+// caller as "excited". "I'm X" also introduces a feeling or a state. A small
+// closed list of adjective, emotion and state words (en, sw, Sheng) is never
+// a name. This is a stop-list, not a names list: KENYA_GIVEN_NAMES is unchanged.
+const NAME_STATE_WORDS = new Set([
+  // feelings and moods
+  'excited', 'happy', 'glad', 'sad', 'angry', 'upset', 'mad', 'annoyed', 'worried', 'scared', 'afraid',
+  'nervous', 'stressed', 'confused', 'curious', 'interested', 'disappointed', 'frustrated', 'pleased',
+  'thankful', 'grateful', 'sorry', 'excite', 'bored', 'lonely', 'calm', 'serious', 'impressed', 'surprised',
+  // states and condition
+  'fine', 'good', 'great', 'well', 'okay', 'ok', 'alright', 'cool', 'tired', 'sick', 'ill', 'busy', 'free',
+  'ready', 'done', 'sure', 'late', 'early', 'new', 'back', 'here', 'there', 'around', 'outside', 'inside',
+  'home', 'away', 'driving', 'calling', 'asking', 'looking', 'wondering', 'trying', 'waiting', 'coming',
+  'going', 'leaving', 'interested', 'available', 'unavailable', 'hungry', 'lost', 'stuck', 'confused',
+  'better', 'bad', 'awesome', 'perfect', 'nice', 'right', 'wrong', 'about', 'just', 'also', 'still',
+  'really', 'very', 'so', 'too', 'kinda', 'pretty', 'quite', 'fully', 'totally',
+  // Kiswahili and Sheng states
+  'sawa', 'poa', 'fiti', 'freshi', 'safi', 'mzima', 'mzuri', 'salama', 'shwari', 'buheri', 'njema',
+  'nzuri', 'mgonjwa', 'mchovu', 'nimechoka', 'nimefurahi', 'furaha', 'radhi', 'tayari', 'bado', 'sasa',
+  'hapa', 'huku', 'kawaida', 'sana', 'tu', 'pia', 'mbaya', 'mzito', 'bize', 'niko', 'nipo', 'uko',
+]);
+
+/** Every word is a feeling, state or filler word ("excited", "fine", "sawa", "so tired"). */
+function isStateWordSpan(value) {
+  const words = String(value || '')
+    .toLowerCase()
+    .replace(/[’]/g, "'")
+    .replace(/[^a-z' ]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  return words.length > 0 && words.every((word) => NAME_STATE_WORDS.has(word));
+}
+
 function isPlausibleCallerName(value) {
   const name = String(value || '').trim();
   if (!name || name.length < 2 || name.length > 40) return false;
@@ -931,7 +964,9 @@ function isPlausibleCallerName(value) {
   // BRAIN_TRUSTED_HOURS (Esga prod HD_dfd531f8b083 t11): the caller asked
   // "Do I need?" and the model saved the name "Do I need". A question or a
   // run of function words is never a name. No name table grows for this.
-  if (require('./trustedHours').trustedHoursEnabled() && isQuestionOrFunctionSpan(name)) return false;
+  if (require('./trustedHours').trustedHoursEnabled() && (isQuestionOrFunctionSpan(name) || isStateWordSpan(name))) {
+    return false;
+  }
   if (/^(?:impressed|amazed|delighted|grateful|thankful|pleased)$/i.test(lower)) return false;
   if (
     /\b(?:impressed|amazed|delighted|grateful|thankful|pleased|glad)\b/i.test(lower) &&
@@ -1279,5 +1314,6 @@ module.exports = {
   agentAskedPendingName,
   isPlausibleCallerName,
   isQuestionOrFunctionSpan,
+  isStateWordSpan,
   entityValue,
 };
