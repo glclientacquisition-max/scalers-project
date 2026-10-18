@@ -501,4 +501,53 @@ describe("invoice pay SQL", () => {
     assert.match(column.rows[0].column_default, /now\(\)/);
     assert.doesNotMatch(read("docs/supabase/invoice_pay.sql"), /updated_at timestamptz not null default now\(\)/);
   });
+
+  it("parks one unattached session per part and marks a displaced failed attempt not live", async () => {
+    const tenant = "99999999-9999-4999-8999-999999999999";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Park Shop', 'pending:park', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 2320, 2320) returning id`,
+      [tenant]
+    );
+    const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    const minted = await q("select token from public.mint_invoice_pay_token($1, false)", [invoice.rows[0].id]);
+    const first = await q("select public.create_invoice_pay_attempt($1, 2320) as row", [minted.rows[0].token]);
+    const attemptId = first.rows[0].row.id;
+    await q(
+      "select public.park_invoice_pay_attempt($1, 'chk_park_1', 'https://checkout.example/park', now() + interval '1 hour')",
+      [attemptId]
+    );
+    const again = await q("select public.create_invoice_pay_attempt($1, 2320) as row", [minted.rows[0].token]);
+    assert.equal(again.rows[0].row.id, attemptId);
+    assert.equal(again.rows[0].row.unattached, true);
+    const count = await q("select count(*)::int as n from public.payment_attempts where invoice_id = $1", [
+      invoice.rows[0].id,
+    ]);
+    assert.equal(count.rows[0].n, 1);
+    const live = await q("select public.invoice_pay_attempt_by_checkout('chk_park_1') as row");
+    assert.equal(live.rows[0].row.live_part, true);
+    assert.equal(live.rows[0].row.status, "pending_unattached");
+    await assert.rejects(
+      q(
+        `insert into public.payment_attempts (tenant_id, invoice_id, provider, status, amount_kes, part_index)
+         values ($1, $2, 'bachs', 'pending', 2320, 1)`,
+        [tenant, invoice.rows[0].id]
+      ),
+      /duplicate key|unique/
+    );
+    await q("select public.settle_invoice_pay_attempt($1, 'failed')", [attemptId]);
+    await q(
+      `insert into public.payment_attempts (
+         tenant_id, invoice_id, provider, status, amount_kes, part_index, part_count, checkout_session_id
+       ) values ($1, $2, 'bachs', 'pending', 2320, 1, 1, 'chk_park_2')`,
+      [tenant, invoice.rows[0].id]
+    );
+    const displaced = await q("select public.invoice_pay_attempt_by_checkout('chk_park_1') as row");
+    assert.equal(displaced.rows[0].row.live_part, false);
+    assert.equal(displaced.rows[0].row.status, "failed");
+  });
 });

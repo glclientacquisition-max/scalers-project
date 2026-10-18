@@ -334,7 +334,7 @@ describe("pay attempt SQL", () => {
     assert.doesNotMatch(body, /and checkout_url is not null/);
     assert.match(
       sql,
-      /create unique index[\s\S]{0,240}payment_attempts[\s\S]{0,240}where status = 'pending'/i
+      /create unique index[\s\S]{0,240}payment_attempts[\s\S]{0,240}where status in \('pending', 'pending_unattached'\)/i
     );
   });
 });

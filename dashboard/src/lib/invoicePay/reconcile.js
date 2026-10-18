@@ -90,7 +90,12 @@ function reconciliationReport(input) {
         });
       }
     }
-    if (attempt.status === "cancelled" || attempt.status === "superseded") {
+    if (
+      attempt.status === "cancelled" ||
+      attempt.status === "superseded" ||
+      attempt.status === "failed" ||
+      attempt.status === "pending_unattached"
+    ) {
       const cancelledPayment = paymentForCheckout(attempt.checkoutSessionId);
       const credited = credits.some(
         (credit) =>

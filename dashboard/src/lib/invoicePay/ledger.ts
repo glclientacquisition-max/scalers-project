@@ -64,6 +64,7 @@ function mapAttempt(data: unknown) {
     partIndex: Number(row.part_index || 0),
     partCount: Number(row.part_count || 0),
     checkoutSessionId: row.checkout_session_id ? text(row.checkout_session_id) : null,
+    livePart: row.live_part === true,
   };
 }
 
@@ -103,7 +104,21 @@ export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
         reused: row.reused === true,
         inFlight: row.in_flight === true,
         cancel: row.cancel === true,
+        unattached: row.unattached === true,
       };
+    },
+
+    async parkUnattached(
+      attemptId: string,
+      created: { checkoutId: string; checkoutUrl?: string | null; expiresAt?: string | null }
+    ) {
+      const { error } = await admin.rpc("park_invoice_pay_attempt", {
+        p_attempt_id: attemptId,
+        p_checkout_session_id: created.checkoutId,
+        p_checkout_url: created.checkoutUrl || null,
+        p_expires_at: created.expiresAt || null,
+      });
+      if (error) throw rpcError(error, "park failed");
     },
 
     async attachCheckout(

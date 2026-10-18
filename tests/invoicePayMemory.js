@@ -135,9 +135,15 @@ function createMemoryLedger(opts = {}) {
       if (!next) throw new Error("invoice has nothing left to pay");
       if (toCents(input.amountKes) !== toCents(next.amountKes)) throw new Error("pay amount does not match the next part");
       const pending = attempts.find(
-        (a) => a.invoiceId === lookup.invoiceId && a.status === "pending" && a.partIndex === next.index
+        (a) =>
+          a.invoiceId === lookup.invoiceId &&
+          (a.status === "pending" || a.status === "pending_unattached") &&
+          a.partIndex === next.index
       );
       if (pending) {
+        if (pending.status === "pending_unattached") {
+          return attemptResult(pending, { unattached: true });
+        }
         const expired = pending.expiresAt && new Date(pending.expiresAt).getTime() <= now;
         if (expired) {
           return attemptResult(pending, { cancel: true });
@@ -178,9 +184,38 @@ function createMemoryLedger(opts = {}) {
       row.checkoutUrl = created.checkoutUrl;
       row.expiresAt = created.expiresAt || null;
     },
+    async parkUnattached(attemptId, created) {
+      const row = attempts.find((a) => a.id === attemptId);
+      if (!row || (row.status !== "pending" && row.status !== "pending_unattached")) {
+        throw new Error("pay attempt is not pending");
+      }
+      row.status = "pending_unattached";
+      row.checkoutSessionId = created.checkoutId;
+      row.checkoutUrl = created.checkoutUrl || null;
+      row.expiresAt = created.expiresAt || null;
+    },
     async findAttemptByCheckout(checkoutId) {
       const row = [...attempts].reverse().find((a) => a.checkoutSessionId === checkoutId);
       if (!row) return null;
+      const invoice = invoices.get(row.invoiceId);
+      const next = invoice ? nextPart(splitKes(invoice.totalKes), invoice.amountPaidKes) : null;
+      const newer = attempts.some(
+        (other) =>
+          other.invoiceId === row.invoiceId &&
+          other.partIndex === row.partIndex &&
+          other.id !== row.id &&
+          (other.status === "pending" || other.status === "pending_unattached" || other.status === "succeeded") &&
+          new Date(other.createdAt).getTime() >= new Date(row.createdAt).getTime()
+      );
+      const livePart = Boolean(
+        invoice &&
+          invoice.status === "open" &&
+          next &&
+          next.index === row.partIndex &&
+          toCents(next.amountKes) === toCents(row.amountKes) &&
+          !newer &&
+          (row.status === "pending" || row.status === "pending_unattached" || row.status === "failed")
+      );
       return {
         id: row.id,
         invoiceId: row.invoiceId,
@@ -188,7 +223,10 @@ function createMemoryLedger(opts = {}) {
         status: row.status,
         amountKes: row.amountKes,
         currency: row.currency,
+        partIndex: row.partIndex,
+        partCount: row.partCount,
         checkoutSessionId: row.checkoutSessionId,
+        livePart,
       };
     },
     async markAttempt(attemptId, patch) {

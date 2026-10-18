@@ -194,7 +194,15 @@ async function handlePayWebhook(input) {
     attemptId: attempt.id,
   };
 
-  if (attempt.status === "cancelled" || attempt.status === "superseded") {
+  const displaced =
+    attempt.status === "cancelled" ||
+    attempt.status === "superseded" ||
+    ((attempt.status === "failed" || attempt.status === "pending_unattached") && attempt.livePart !== true);
+  if (displaced) {
+    const already = await input.ledger.findPaymentByRef("bachs", providerRef);
+    if (already) {
+      return { status: 200, body: { ok: true, duplicate: true, action: "apply" } };
+    }
     const amountKes = charge.kes ? String(charge.kes.amount) : null;
     if (amountKes && toCents(amountKes) != null && toCents(amountKes) > 0n) {
       await input.ledger.recordIssue({
