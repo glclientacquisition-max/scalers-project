@@ -1438,11 +1438,11 @@ function TenantFormInner({
                   </button>
                   <div className="col-span-3 min-w-0">
                     <label className={serviceMobileLabelClass} htmlFor={`svc-notes-m-${index}`}>Notes</label>
-                    <input id={`svc-notes-m-${index}`} value={service.notes} onChange={(e) => updateService(index, "notes", e.target.value)} placeholder="Free quotation" className={denseFieldClass} />
+                    <input id={`svc-notes-m-${index}`} value={service.notes} onChange={(e) => updateService(index, "notes", e.target.value)} className={denseFieldClass} />
                   </div>
                   <div className="col-span-2 min-w-0">
                     <label className={serviceMobileLabelClass} htmlFor={`svc-oos-m-${index}`}>Not offered</label>
-                    <input id={`svc-oos-m-${index}`} value={service.out_of_scope} onChange={(e) => updateService(index, "out_of_scope", e.target.value)} placeholder="No commercial offices" className={denseFieldClass} />
+                    <input id={`svc-oos-m-${index}`} value={service.out_of_scope} onChange={(e) => updateService(index, "out_of_scope", e.target.value)} className={denseFieldClass} />
                   </div>
                 </div>
               );
@@ -1514,7 +1514,6 @@ function TenantFormInner({
                             id={`svc-notes-${index}`}
                             value={service.notes}
                             onChange={(e) => updateService(index, "notes", e.target.value)}
-                            placeholder="Free quotation"
                             className={tableFieldClass}
                           />
                         </td>
@@ -1528,7 +1527,6 @@ function TenantFormInner({
                             onChange={(e) =>
                               updateService(index, "out_of_scope", e.target.value)
                             }
-                            placeholder="No commercial offices"
                             className={tableFieldClass}
                           />
                         </td>
