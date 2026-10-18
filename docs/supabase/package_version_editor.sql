@@ -19,6 +19,15 @@
 --
 -- Prices are copied from the version an admin starts from. This file does not
 -- write a new commercial price.
+--
+-- Messages are one shared allowance: message_credits. 1 credit = KSh 1 at the
+-- on-demand rate. sms_credit_burn, whatsapp_credit_burn, and email_credit_burn
+-- are credits per SMS segment, WhatsApp message, and email. The editor writes
+-- those burns into sms_kes, whatsapp_kes, and email_kes so the stored rate
+-- matches. It does not edit the old sms, email, and staff_wa included columns.
+-- Seeded versions leave message_credits null. An admin sets the pool on the
+-- draft. WhatsApp burn is copied from the current rate (the owner has not
+-- chosen 1 or 2). Metering still reads the old buckets until a later change.
 
 -- ---------------------------------------------------------------------------
 -- 1. Editor settings and version bookkeeping.
@@ -45,7 +54,44 @@ alter table public.billing_package_versions
   add column if not exists copied_from_id uuid,
   add column if not exists promote_fingerprint text,
   add column if not exists notes text,
-  add column if not exists price_set_by text;
+  add column if not exists price_set_by text,
+  add column if not exists message_credits integer,
+  add column if not exists sms_credit_burn numeric,
+  add column if not exists whatsapp_credit_burn numeric,
+  add column if not exists email_credit_burn numeric;
+
+-- Burns follow the existing per-channel KSh rate because 1 credit = KSh 1.
+-- message_credits stays null on rows that were seeded with separate buckets.
+update public.billing_package_versions
+set
+  sms_credit_burn = coalesce(sms_credit_burn, sms_kes),
+  whatsapp_credit_burn = coalesce(whatsapp_credit_burn, whatsapp_kes),
+  email_credit_burn = coalesce(email_credit_burn, email_kes)
+where sms_credit_burn is null
+   or whatsapp_credit_burn is null
+   or email_credit_burn is null;
+
+alter table public.billing_package_versions
+  drop constraint if exists billing_package_versions_message_credits_check;
+alter table public.billing_package_versions
+  add constraint billing_package_versions_message_credits_check check (
+    (message_credits is null or message_credits >= 0)
+    and (sms_credit_burn is null or sms_credit_burn >= 0)
+    and (whatsapp_credit_burn is null or whatsapp_credit_burn >= 0)
+    and (email_credit_burn is null or email_credit_burn >= 0)
+  );
+
+comment on column public.billing_package_versions.message_credits is
+  'One shared allowance for SMS, WhatsApp, and email. Null on a seeded version until an admin sets it. Not three buckets.';
+
+comment on column public.billing_package_versions.sms_credit_burn is
+  'Credits burned per SMS segment. 1 credit = KSh 1, so this is also the SMS on-demand rate. Copied from sms_kes.';
+
+comment on column public.billing_package_versions.whatsapp_credit_burn is
+  'Credits burned per WhatsApp message. Copied from whatsapp_kes. The owner has not chosen 1 or 2.';
+
+comment on column public.billing_package_versions.email_credit_burn is
+  'Credits burned per email. 1 credit = KSh 1. Copied from email_kes.';
 
 do $$
 begin
@@ -103,6 +149,10 @@ begin
      or new.promote_fingerprint is distinct from old.promote_fingerprint
      or new.notes is distinct from old.notes
      or new.price_set_by is distinct from old.price_set_by
+     or new.message_credits is distinct from old.message_credits
+     or new.sms_credit_burn is distinct from old.sms_credit_burn
+     or new.whatsapp_credit_burn is distinct from old.whatsapp_credit_burn
+     or new.email_credit_burn is distinct from old.email_credit_burn
   then
     raise exception 'published package version is frozen';
   end if;
@@ -344,7 +394,10 @@ as $$
     'monthly_price_kes', v.monthly_price_kes,
     'outbound_kes_per_second', v.outbound_kes_per_second,
     'sms_kes', v.sms_kes,
-    'whatsapp_kes', v.whatsapp_kes
+    'whatsapp_kes', v.whatsapp_kes,
+    'sms_credit_burn', v.sms_credit_burn,
+    'whatsapp_credit_burn', v.whatsapp_credit_burn,
+    'email_credit_burn', v.email_credit_burn
   )
   from public.billing_package_versions v
   where v.id = p_version_id
@@ -402,6 +455,9 @@ begin
      or v_draft.whatsapp_kes is distinct from v_current.whatsapp_kes
      or v_draft.sms_kes is distinct from v_current.sms_kes
      or v_draft.email_kes is distinct from v_current.email_kes
+     or v_draft.sms_credit_burn is distinct from v_current.sms_credit_burn
+     or v_draft.whatsapp_credit_burn is distinct from v_current.whatsapp_credit_burn
+     or v_draft.email_credit_burn is distinct from v_current.email_credit_burn
      or v_draft.annual_discount_percent is distinct from v_current.annual_discount_percent
   then
     return true;
@@ -442,6 +498,7 @@ begin
     'annual_discount_percent', (p_terms ->> 'annual_discount_percent')::numeric,
     'dids', (p_terms ->> 'dids')::integer,
     'email', (p_terms ->> 'email')::integer,
+    'email_credit_burn', (p_terms ->> 'email_credit_burn')::numeric,
     'email_kes', (p_terms ->> 'email_kes')::numeric,
     'features', coalesce((
       select jsonb_agg(jsonb_build_object('enabled', s.enabled, 'key', s.feature_key) order by s.feature_key)
@@ -451,15 +508,21 @@ begin
       ) s
     ), '[]'::jsonb),
     'inbound_kes_per_second', (p_terms ->> 'inbound_kes_per_second')::numeric,
+    'message_credits', case
+      when p_terms -> 'message_credits' is null or jsonb_typeof(p_terms -> 'message_credits') = 'null' then null
+      else (p_terms ->> 'message_credits')::integer
+    end,
     'minutes', (p_terms ->> 'minutes')::integer,
     'monthly_price_kes', (p_terms ->> 'monthly_price_kes')::numeric,
     'outbound_kes_per_second', (p_terms ->> 'outbound_kes_per_second')::numeric,
     'seats', (p_terms ->> 'seats')::integer,
     'sku', p_sku,
     'sms', (p_terms ->> 'sms')::integer,
+    'sms_credit_burn', (p_terms ->> 'sms_credit_burn')::numeric,
     'sms_kes', (p_terms ->> 'sms_kes')::numeric,
     'staff_wa', (p_terms ->> 'staff_wa')::integer,
     'trial_days', v_trial,
+    'whatsapp_credit_burn', (p_terms ->> 'whatsapp_credit_burn')::numeric,
     'whatsapp_kes', (p_terms ->> 'whatsapp_kes')::numeric
   );
   return public._package_version_sha256(v_payload::text);
@@ -482,6 +545,10 @@ as $$
     'annual_price_kes', round(v.monthly_price_kes * 12 * (1 - v.annual_discount_percent / 100)),
     'seats', v.seats,
     'minutes', v.minutes,
+    'message_credits', v.message_credits,
+    'sms_credit_burn', v.sms_credit_burn,
+    'whatsapp_credit_burn', v.whatsapp_credit_burn,
+    'email_credit_burn', v.email_credit_burn,
     'sms', v.sms,
     'email', v.email,
     'staff_wa', v.staff_wa,
@@ -615,7 +682,8 @@ begin
     package_id, version, status, monthly_price_kes, seats, minutes, sms, email, staff_wa, dids,
     inbound_kes_per_second, outbound_kes_per_second, whatsapp_kes, sms_kes, email_kes,
     annual_discount_percent, trial_days, allowances_placeholder, active_from,
-    copied_from_id, notes, price_set_by
+    copied_from_id, notes, price_set_by,
+    message_credits, sms_credit_burn, whatsapp_credit_burn, email_credit_burn
   ) values (
     v_package.id, v_next, 'draft',
     v_source.monthly_price_kes, v_source.seats, v_source.minutes, v_source.sms, v_source.email,
@@ -623,7 +691,8 @@ begin
     v_source.inbound_kes_per_second, v_source.outbound_kes_per_second, v_source.whatsapp_kes,
     v_source.sms_kes, v_source.email_kes, v_source.annual_discount_percent,
     v_source.trial_days, v_source.allowances_placeholder, v_source.active_from,
-    v_source.id, null, null
+    v_source.id, null, null,
+    v_source.message_credits, v_source.sms_credit_burn, v_source.whatsapp_credit_burn, v_source.email_credit_burn
   )
   returning id into v_id;
   insert into public.billing_package_version_features (package_version_id, feature_key, enabled)
@@ -710,15 +779,13 @@ declare
   v_monthly numeric;
   v_seats integer;
   v_minutes integer;
-  v_sms integer;
-  v_email integer;
-  v_staff_wa integer;
+  v_message_credits integer;
+  v_sms_burn integer;
+  v_whatsapp_burn integer;
+  v_email_burn integer;
   v_dids integer;
   v_inbound numeric;
   v_outbound numeric;
-  v_whatsapp numeric;
-  v_sms_kes numeric;
-  v_email_kes numeric;
   v_discount numeric;
   v_trial integer;
   v_placeholder boolean;
@@ -737,15 +804,13 @@ begin
   v_monthly := public._package_editor_money(p_patch, 'monthly_price_kes');
   v_seats := public._package_editor_count(p_patch, 'seats');
   v_minutes := public._package_editor_count(p_patch, 'minutes');
-  v_sms := public._package_editor_count(p_patch, 'sms');
-  v_email := public._package_editor_count(p_patch, 'email');
-  v_staff_wa := public._package_editor_count(p_patch, 'staff_wa');
+  v_message_credits := public._package_editor_count(p_patch, 'message_credits');
+  v_sms_burn := public._package_editor_count(p_patch, 'sms_credit_burn');
+  v_whatsapp_burn := public._package_editor_count(p_patch, 'whatsapp_credit_burn');
+  v_email_burn := public._package_editor_count(p_patch, 'email_credit_burn');
   v_dids := public._package_editor_count(p_patch, 'dids');
   v_inbound := public._package_editor_money(p_patch, 'inbound_kes_per_second');
   v_outbound := public._package_editor_money(p_patch, 'outbound_kes_per_second');
-  v_whatsapp := public._package_editor_money(p_patch, 'whatsapp_kes');
-  v_sms_kes := public._package_editor_money(p_patch, 'sms_kes');
-  v_email_kes := public._package_editor_money(p_patch, 'email_kes');
   v_discount := public._package_editor_money(p_patch, 'annual_discount_percent');
   if v_discount > 100 then
     raise exception 'discount must be 0 to 100';
@@ -784,9 +849,9 @@ begin
     v_monthly is distinct from v_old.monthly_price_kes
     or v_inbound is distinct from v_old.inbound_kes_per_second
     or v_outbound is distinct from v_old.outbound_kes_per_second
-    or v_whatsapp is distinct from v_old.whatsapp_kes
-    or v_sms_kes is distinct from v_old.sms_kes
-    or v_email_kes is distinct from v_old.email_kes
+    or v_sms_burn is distinct from v_old.sms_credit_burn
+    or v_whatsapp_burn is distinct from v_old.whatsapp_credit_burn
+    or v_email_burn is distinct from v_old.email_credit_burn
     or v_discount is distinct from v_old.annual_discount_percent;
   if v_price_changed then
     v_price_set_by := btrim(p_actor);
@@ -798,15 +863,16 @@ begin
     monthly_price_kes = v_monthly,
     seats = v_seats,
     minutes = v_minutes,
-    sms = v_sms,
-    email = v_email,
-    staff_wa = v_staff_wa,
+    message_credits = v_message_credits,
+    sms_credit_burn = v_sms_burn,
+    whatsapp_credit_burn = v_whatsapp_burn,
+    email_credit_burn = v_email_burn,
     dids = v_dids,
     inbound_kes_per_second = v_inbound,
     outbound_kes_per_second = v_outbound,
-    whatsapp_kes = v_whatsapp,
-    sms_kes = v_sms_kes,
-    email_kes = v_email_kes,
+    whatsapp_kes = v_whatsapp_burn,
+    sms_kes = v_sms_burn,
+    email_kes = v_email_burn,
     annual_discount_percent = v_discount,
     trial_days = v_trial,
     allowances_placeholder = v_placeholder,
@@ -917,6 +983,11 @@ begin
   select * into v_row from public.billing_package_versions where id = p_version_id for update;
   if not found or v_row.status <> 'draft' then
     raise exception 'this package version is not a draft';
+  end if;
+  if current_setting('scalers.package_version_promote', true) is distinct from '1'
+     and v_row.message_credits is null
+  then
+    raise exception 'message credits are required';
   end if;
   select sku into v_sku from public.billing_packages where id = v_row.package_id;
   v_before := public._package_version_json(p_version_id);
@@ -1217,16 +1288,20 @@ begin
     'annual_discount_percent', v.annual_discount_percent,
     'dids', v.dids,
     'email', v.email,
+    'email_credit_burn', v.email_credit_burn,
     'email_kes', v.email_kes,
     'inbound_kes_per_second', v.inbound_kes_per_second,
+    'message_credits', v.message_credits,
     'minutes', v.minutes,
     'monthly_price_kes', v.monthly_price_kes,
     'outbound_kes_per_second', v.outbound_kes_per_second,
     'seats', v.seats,
     'sms', v.sms,
+    'sms_credit_burn', v.sms_credit_burn,
     'sms_kes', v.sms_kes,
     'staff_wa', v.staff_wa,
     'trial_days', v.trial_days,
+    'whatsapp_credit_burn', v.whatsapp_credit_burn,
     'whatsapp_kes', v.whatsapp_kes
   );
   v_fingerprint := public.package_version_fingerprint(v_sku, v_terms, v_features);
@@ -1343,6 +1418,31 @@ begin
     whatsapp_kes = public._package_editor_money(v_terms, 'whatsapp_kes'),
     sms_kes = public._package_editor_money(v_terms, 'sms_kes'),
     email_kes = public._package_editor_money(v_terms, 'email_kes'),
+    message_credits = case
+      when v_terms -> 'message_credits' is null or jsonb_typeof(v_terms -> 'message_credits') = 'null' then null
+      else public._package_editor_count(v_terms, 'message_credits')
+    end,
+    sms_credit_burn = coalesce(
+      case
+        when v_terms -> 'sms_credit_burn' is null or jsonb_typeof(v_terms -> 'sms_credit_burn') = 'null' then null
+        else public._package_editor_count(v_terms, 'sms_credit_burn')
+      end,
+      public._package_editor_money(v_terms, 'sms_kes')
+    ),
+    whatsapp_credit_burn = coalesce(
+      case
+        when v_terms -> 'whatsapp_credit_burn' is null or jsonb_typeof(v_terms -> 'whatsapp_credit_burn') = 'null' then null
+        else public._package_editor_count(v_terms, 'whatsapp_credit_burn')
+      end,
+      public._package_editor_money(v_terms, 'whatsapp_kes')
+    ),
+    email_credit_burn = coalesce(
+      case
+        when v_terms -> 'email_credit_burn' is null or jsonb_typeof(v_terms -> 'email_credit_burn') = 'null' then null
+        else public._package_editor_count(v_terms, 'email_credit_burn')
+      end,
+      public._package_editor_money(v_terms, 'email_kes')
+    ),
     annual_discount_percent = public._package_editor_money(v_terms, 'annual_discount_percent'),
     allowances_placeholder = (v_terms ->> 'allowances_placeholder')::boolean,
     trial_days = case

@@ -9,14 +9,19 @@ export const PROD_SUPABASE_PROJECT_REF = "fjxcdccgyhnvnnlnovcl";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SKU_RE = /^[a-z][a-z0-9_-]{1,31}$/;
 
-const COUNT_KEYS = ["seats", "minutes", "sms", "email", "staff_wa", "dids"] as const;
+const COUNT_KEYS = [
+  "seats",
+  "minutes",
+  "message_credits",
+  "sms_credit_burn",
+  "whatsapp_credit_burn",
+  "email_credit_burn",
+  "dids",
+] as const;
 const MONEY_KEYS = [
   "monthly_price_kes",
   "inbound_kes_per_second",
   "outbound_kes_per_second",
-  "whatsapp_kes",
-  "sms_kes",
-  "email_kes",
   "annual_discount_percent",
 ] as const;
 
@@ -71,7 +76,8 @@ export function packageVersionEditorHttpStatus(message: string): { status: numbe
     text.includes("promote file") ||
     text.includes("say who") ||
     text.includes("approval threshold") ||
-    text.includes("allowances placeholder")
+    text.includes("allowances placeholder") ||
+    text.includes("message credits")
   ) {
     return { status: 400, error: "invalid" };
   }

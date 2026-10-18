@@ -1,6 +1,7 @@
 \set ON_ERROR_STOP 1
 
--- Fixture prices below (1111, 2222) are not Scalers prices. They exist only in this throwaway database.
+-- Fixture prices below (1111, 2222) are not Scalers prices.
+-- 111 message credits is not a Scalers allowance. They exist only in this throwaway database.
 
 create or replace function pg_temp.feature_patch(p_off text)
 returns jsonb
@@ -24,15 +25,13 @@ as $$
     'monthly_price_kes', v.monthly_price_kes,
     'seats', v.seats,
     'minutes', v.minutes,
-    'sms', v.sms,
-    'email', v.email,
-    'staff_wa', v.staff_wa,
+    'message_credits', coalesce(v.message_credits, 111),
+    'sms_credit_burn', coalesce(v.sms_credit_burn, v.sms_kes),
+    'whatsapp_credit_burn', coalesce(v.whatsapp_credit_burn, v.whatsapp_kes),
+    'email_credit_burn', coalesce(v.email_credit_burn, v.email_kes),
     'dids', v.dids,
     'inbound_kes_per_second', v.inbound_kes_per_second,
     'outbound_kes_per_second', v.outbound_kes_per_second,
-    'whatsapp_kes', v.whatsapp_kes,
-    'sms_kes', v.sms_kes,
-    'email_kes', v.email_kes,
     'annual_discount_percent', v.annual_discount_percent,
     'trial_days', v.trial_days,
     'allowances_placeholder', v.allowances_placeholder,
@@ -72,6 +71,20 @@ begin
   where pkg ->> 'sku' = 'trial' and (ver ->> 'version')::int = 1;
   if v_trial_minutes <> 20 or v_trial_days <> 14 or not v_placeholder then
     raise exception 'trial v1 was not left as 20 minutes, 14 days, placeholders';
+  end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(v_list -> 'packages') pkg
+    cross join lateral jsonb_array_elements(pkg -> 'versions') ver
+    where (ver ->> 'version')::int = 1
+      and (
+        ver -> 'message_credits' is distinct from 'null'::jsonb
+        or (ver ->> 'sms_credit_burn')::numeric is distinct from 1
+        or (ver ->> 'whatsapp_credit_burn')::numeric is distinct from 2
+        or (ver ->> 'email_credit_burn')::numeric is distinct from 1
+      )
+  ) then
+    raise exception 'seeded versions should keep a null credit pool and the copied burn rates';
   end if;
   if (select is_active from public.billing_packages where sku = 'trial') then
     raise exception 'trial must stay off the public catalogue';
@@ -179,6 +192,14 @@ begin
     'ada',
     'one more minute and bookings off'
   );
+  if (select sms from public.billing_package_versions where id = v_draft::uuid) <> 200
+     or (select email from public.billing_package_versions where id = v_draft::uuid) <> 100
+     or (select staff_wa from public.billing_package_versions where id = v_draft::uuid) <> 200
+     or (select message_credits from public.billing_package_versions where id = v_draft::uuid) <> 111
+     or (select sms_kes from public.billing_package_versions where id = v_draft::uuid) <> 1
+  then
+    raise exception 'an allowance edit rewrote the old message buckets';
+  end if;
   perform public.admin_publish_package_version(v_draft::uuid, now(), 'ada', 'publish starter');
 
   select v.version, t.minutes_included, t.seconds_used, t.billing_enforcement, s.billing_status, s.voicemail_until
@@ -335,11 +356,21 @@ begin
      or (select trial_days from public.billing_package_versions where id = v_draft::uuid) <> 14
      or (select sms from public.billing_package_versions where id = v_draft::uuid) <> 20
      or (select email from public.billing_package_versions where id = v_draft::uuid) <> 30
+     or (select message_credits from public.billing_package_versions where id = v_draft::uuid) is not null
+     or (select sms_credit_burn from public.billing_package_versions where id = v_draft::uuid) <> 1
+     or (select whatsapp_credit_burn from public.billing_package_versions where id = v_draft::uuid) <> 2
+     or (select email_credit_burn from public.billing_package_versions where id = v_draft::uuid) <> 1
      or not (select allowances_placeholder from public.billing_package_versions where id = v_draft::uuid)
      or (select monthly_price_kes from public.billing_package_versions where id = v_draft::uuid) <> 0
   then
     raise exception 'trial draft did not copy 20 minutes, 14 days, and the placeholders';
   end if;
+  begin
+    perform public.admin_publish_package_version(v_draft::uuid, now(), 'ada', 'publish before the pool');
+    raise exception 'a null credit pool should have failed';
+  exception when others then
+    if sqlerrm not like '%message credits are required%' then raise; end if;
+  end;
   begin
     perform public.admin_update_package_version_draft(
       v_draft::uuid,
@@ -357,6 +388,12 @@ begin
     'ada',
     'fixture trial length'
   );
+  if (select sms from public.billing_package_versions where id = v_draft::uuid) <> 20
+     or (select email from public.billing_package_versions where id = v_draft::uuid) <> 30
+     or (select message_credits from public.billing_package_versions where id = v_draft::uuid) <> 111
+  then
+    raise exception 'setting the trial pool rewrote the placeholder buckets';
+  end if;
   perform public.admin_publish_package_version(v_draft::uuid, now(), 'ada', 'publish trial fixture');
   select v.id into v_id
   from public.billing_package_versions v
@@ -449,10 +486,16 @@ begin
   v_draft := (public.admin_draft_package_version('growth', 'ada', 'rate draft')) ->> 'version_id';
   perform public.admin_update_package_version_draft(
     v_draft::uuid,
-    pg_temp.version_patch(v_draft::uuid, '{"sms_kes": 9}'::jsonb),
+    pg_temp.version_patch(v_draft::uuid, '{"sms_credit_burn": 9}'::jsonb),
     'ada',
     'fixture sms rate'
   );
+  if (select sms_credit_burn from public.billing_package_versions where id = v_draft::uuid) <> 9
+     or (select sms_kes from public.billing_package_versions where id = v_draft::uuid) <> 9
+     or (select sms from public.billing_package_versions where id = v_draft::uuid) <> 500
+  then
+    raise exception 'a burn change did not mirror into the SMS rate, or it rewrote the old bucket';
+  end if;
   begin
     perform public.admin_publish_package_version(v_draft::uuid, now(), 'ada', 'publish the rate');
     raise exception 'a rate change should have needed a second admin';
@@ -460,6 +503,28 @@ begin
     if sqlerrm not like '%second admin%' then raise; end if;
   end;
   perform public.admin_discard_package_version_draft(v_draft::uuid, 'ada', 'drop the rate draft');
+end $$;
+
+-- Setting the shared pool is an allowance. It does not need a second admin.
+-- 111 is a fixture, not a Scalers allowance. The old SMS bucket stays.
+do $$
+declare
+  v_draft uuid;
+begin
+  v_draft := (public.admin_draft_package_version('scale', 'ada', 'credits draft')) ->> 'version_id';
+  perform public.admin_update_package_version_draft(
+    v_draft::uuid,
+    pg_temp.version_patch(v_draft::uuid, '{}'::jsonb),
+    'ada',
+    'set the shared pool'
+  );
+  perform public.admin_publish_package_version(v_draft::uuid, now(), 'ada', 'publish credits only');
+  if (select message_credits from public.billing_package_versions where id = v_draft::uuid) <> 111
+     or (select sms from public.billing_package_versions where id = v_draft::uuid) <> 1500
+     or (select status from public.billing_package_versions where id = v_draft::uuid) <> 'published'
+  then
+    raise exception 'a message-credit pool should publish without a second admin';
+  end if;
 end $$;
 
 -- Threshold off: a price change publishes with one admin. 2222 is a fixture, not a price.
@@ -554,6 +619,9 @@ begin
   end if;
   if (select monthly_price_kes from public.billing_package_versions where id = v_first::uuid) <> 5000
      or (select minutes from public.billing_package_versions where id = v_first::uuid) <> 300
+     or (select message_credits from public.billing_package_versions where id = v_first::uuid) is not null
+     or (select sms from public.billing_package_versions where id = v_first::uuid) <> 200
+     or (select sms_credit_burn from public.billing_package_versions where id = v_first::uuid) <> 1
      or (select status from public.billing_package_versions where id = v_first::uuid) <> 'published'
   then
     raise exception 'promoted version did not keep the exported terms';

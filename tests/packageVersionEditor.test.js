@@ -73,15 +73,13 @@ describe("package version editor commands", () => {
         monthly_price_kes: 1111,
         seats: 2,
         minutes: -1,
-        sms: 0,
-        email: 0,
-        staff_wa: 0,
+        message_credits: 111,
+        sms_credit_burn: 1,
+        whatsapp_credit_burn: 2,
+        email_credit_burn: 1,
         dids: 1,
         inbound_kes_per_second: 0,
         outbound_kes_per_second: 0,
-        whatsapp_kes: 0,
-        sms_kes: 0,
-        email_kes: 0,
         annual_discount_percent: 0,
         trial_days: null,
         allowances_placeholder: false,
@@ -91,6 +89,32 @@ describe("package version editor commands", () => {
     });
     assert.equal(negative.ok, false);
     assert.match(negative.error, /zero or more/i);
+    const pool = mod.parseEditorCommand({
+      action: "update_draft",
+      version_id: "11111111-1111-1111-1111-111111111111",
+      reason: "fixture pool",
+      patch: {
+        monthly_price_kes: 1111,
+        seats: 2,
+        minutes: 20,
+        message_credits: 111,
+        sms_credit_burn: 1,
+        whatsapp_credit_burn: 2,
+        email_credit_burn: 1,
+        dids: 1,
+        inbound_kes_per_second: 0.1,
+        outbound_kes_per_second: 0.15,
+        annual_discount_percent: 17,
+        trial_days: null,
+        allowances_placeholder: true,
+        features: [{ key: "calls", enabled: true }],
+      },
+    });
+    assert.equal(pool.ok, true);
+    assert.equal(pool.command.patch.message_credits, 111);
+    assert.equal(pool.command.patch.sms_credit_burn, 1);
+    assert.equal("sms" in pool.command.patch, false);
+    assert.equal("sms_kes" in pool.command.patch, false);
   });
 
   it("keeps the actor out of the parsed command", async () => {
@@ -113,6 +137,14 @@ describe("package version editor commands", () => {
       status: 409,
       error: "approval_required",
     });
+    assert.deepEqual(mod.packageVersionEditorHttpStatus("message credits are required"), {
+      status: 400,
+      error: "invalid",
+    });
+    const sql = read("docs/supabase/package_version_editor.sql");
+    assert.match(sql, /message credits are required/);
+    assert.match(sql, /sms_kes = v_sms_burn/);
+    assert.match(sql, /message_credits stays null/);
     assert.equal(mod.packageEditorWritesAllowed({
       SUPABASE_URL: "https://fjxcdccgyhnvnnlnovcl.supabase.co",
     }), false);

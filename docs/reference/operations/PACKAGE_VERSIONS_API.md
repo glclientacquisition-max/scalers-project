@@ -7,9 +7,11 @@ last_reviewed: 2026-10-18
 
 Desk builds the Packages screens. This is the server contract. The live catalogue route `POST /api/admin/packages` is unchanged.
 
-A package version is what a Business Assistant package includes: monthly price, included minutes, SMS, email, seats, staff WhatsApp, numbers, overage rates, features, and (for the trial only) trial length in days. Published versions are frozen. A business stays on the version it was given until an admin moves it.
+A package version is what a Business Assistant package includes: monthly price, included minutes, one shared message-credit allowance, a burn rate for SMS, WhatsApp, and email, seats, numbers, call overage rates, features, and (for the trial only) trial length in days. Published versions are frozen. A business stays on the version it was given until an admin moves it.
 
-The trial is the package with sku `trial`. It is not on the public catalogue (`is_active` is false). Version 1 is 20 minutes and 14 days. SMS 20 and email 30 on that version are placeholders (`allowances_placeholder` true). Edit it the same way as Starter, Growth, and Scale.
+Messages are one allowance. 1 credit = KSh 1 at the on-demand rate. `sms_credit_burn` is credits per SMS segment, `whatsapp_credit_burn` is credits per WhatsApp message, and `email_credit_burn` is credits per email. The copied rates are SMS 1, WhatsApp 2, and email 1. WhatsApp 1 or 2 is still the owner's choice. 2 is the rate already on the card, not a new decision.
+
+The trial is the package with sku `trial`. It is not on the public catalogue (`is_active` is false). Version 1 is 20 minutes and 14 days. SMS 20 and email 30 on that version are placeholders (`allowances_placeholder` true) and are not the credit pool. `message_credits` on every seeded version is null until an admin sets it. Edit the trial the same way as Starter, Growth, and Scale.
 
 SQL: [`docs/supabase/package_version_editor.sql`](../../supabase/package_version_editor.sql), after [`billing_data_layer.sql`](../../supabase/billing_data_layer.sql). Staging only until Alvin's go. Re-apply the editor file after any re-apply of the data layer.
 
@@ -57,11 +59,15 @@ Each version:
 | `status` | `draft`, `published`, or `retired`. Archive sets `retired`. |
 | `monthly_price_kes` | Monthly price in KES. |
 | `annual_price_kes` | Computed: monthly times 12 times (1 minus `annual_discount_percent` / 100), rounded. Not stored. |
-| `seats`, `minutes`, `sms`, `email`, `staff_wa`, `dids` | Included counts. Integers, zero or more. |
-| `inbound_kes_per_second`, `outbound_kes_per_second`, `whatsapp_kes`, `sms_kes`, `email_kes` | Overage rates. Zero or more. |
+| `seats`, `minutes`, `dids` | Included counts the editor can change. Integers, zero or more. |
+| `message_credits` | One shared allowance for SMS, WhatsApp, and email. Null on a seeded version. An editor publish requires a number, zero or more. |
+| `sms_credit_burn`, `whatsapp_credit_burn`, `email_credit_burn` | Credits burned per SMS segment, WhatsApp message, and email. Integers, zero or more. 1 credit = KSh 1. |
+| `sms`, `email`, `staff_wa` | Old included buckets. Shown so the seeded numbers stay visible. The editor does not change them. |
+| `inbound_kes_per_second`, `outbound_kes_per_second` | Call overage rates. Zero or more. |
+| `whatsapp_kes`, `sms_kes`, `email_kes` | Stored on-demand rates. The editor writes the burn into the matching rate. A patch does not send these fields. |
 | `annual_discount_percent` | 0 to 100. |
 | `trial_days` | 1 to 90 on sku `trial`. Null on every other package. |
-| `allowances_placeholder` | True while SMS and email numbers are not a product decision. |
+| `allowances_placeholder` | True while the old SMS and email numbers are not a product decision. |
 | `active_from` | When this published version becomes the one new signups pin to. A future date does not move anyone and is not the pin target until that time. |
 | `published_at`, `retired_at`, `copied_from_id`, `notes`, `price_set_by` | Bookkeeping. `price_set_by` is the last admin who changed a price field on the draft. |
 | `subscriber_count` | Businesses pinned to this version. |
@@ -99,15 +105,13 @@ Replace the commercial fields of a draft. Send the whole patch. Counts are integ
     "monthly_price_kes": 5000,
     "seats": 2,
     "minutes": 300,
-    "sms": 200,
-    "email": 100,
-    "staff_wa": 0,
+    "message_credits": 111,
+    "sms_credit_burn": 1,
+    "whatsapp_credit_burn": 2,
+    "email_credit_burn": 1,
     "dids": 1,
     "inbound_kes_per_second": 0.1,
     "outbound_kes_per_second": 0.15,
-    "whatsapp_kes": 2,
-    "sms_kes": 1,
-    "email_kes": 1,
     "annual_discount_percent": 17,
     "trial_days": null,
     "allowances_placeholder": false,
@@ -117,9 +121,11 @@ Replace the commercial fields of a draft. Send the whole patch. Counts are integ
 }
 ```
 
-`trial_days` is required in the patch: null for a paid package, 1 to 90 for `trial`. `notes` is optional, at most 500 characters. The `features` array above shows the shape of one row. Send every catalogue key. Changing a price or rate sets `price_set_by` to the actor. Audit action `update_package_version_draft`.
+`message_credits` and the three burn rates are required. Do not send `sms`, `email`, `staff_wa`, `sms_kes`, `email_kes`, or `whatsapp_kes`. The editor copies each burn into the matching KSh rate because 1 credit = KSh 1. It leaves the old included buckets as they were on the copied version.
 
-The numbers above are the live Starter version 1, not a new price. Tests use obvious fixtures such as 1111. Do not invent a commercial price in the client.
+`trial_days` is required in the patch: null for a paid package, 1 to 90 for `trial`. `notes` is optional, at most 500 characters. The `features` array above shows the shape of one row. Send every catalogue key. Changing a price, a call rate, a burn, or the annual discount sets `price_set_by` to the actor. Changing `message_credits` does not. Audit action `update_package_version_draft`.
+
+Price, seats, minutes, call rates, burns, and the discount above are the live Starter version 1, except `message_credits`. 111 is a fixture shape, not a Scalers allowance. Seeded versions leave that field null. Tests use 1111 and 2222 the same way. Do not invent a commercial price or a credit pool in the client.
 
 ### `publish`
 
@@ -128,6 +134,8 @@ The numbers above are the live Starter version 1, not a new price. Tests use obv
 ```
 
 `active_from` is required (past or future, ISO 8601). Publishes the draft. Does not change any subscription. Result includes `subscribers_staying` (businesses on this package still pinned elsewhere). Audit action `publish_package_version`.
+
+Publish refuses a draft whose `message_credits` is null. The error text is `message credits are required`. A promote import of a seeded version may keep the pool null. That path does not use this action.
 
 ### `approve`
 
@@ -180,7 +188,7 @@ Result: `{ "version_id", "moved", "version" }`. One audit row per business, acti
 { "action": "set_price_approval_threshold", "threshold_kes": null, "reason": "Turn the second admin off" }
 ```
 
-`threshold_kes` null turns the rule off. A number (zero or more) turns it on. Zero means any monthly price change. Any change to an overage rate or the annual discount also needs approval while a threshold is set. Allowance edits (minutes, SMS counts, seats, features, trial length) do not. Audit action `set_price_approval_threshold`.
+`threshold_kes` null turns the rule off. A number (zero or more) turns it on. Zero means any monthly price change. Any change to a call overage rate, a burn rate, or the annual discount also needs approval while a threshold is set. Allowance edits (`message_credits`, minutes, seats, features, trial length) do not. Audit action `set_price_approval_threshold`.
 
 ## Errors
 
@@ -197,17 +205,18 @@ Result: `{ "version_id", "moved", "version" }`. One audit row per business, acti
 
 `message` on 400 and 409 is the database text, capitalized, at most 180 characters. It does not name vendors, SQL files, or environment variables.
 
-Checks the database enforces, in addition to the route: no negative numbers, reason required, actor required, trial length only on `trial`, every feature key once, discount 0 to 100, notes at most 500 characters, cannot archive the only published version, move stays on the same package.
+Checks the database enforces, in addition to the route: no negative numbers, reason required, actor required, trial length only on `trial`, every feature key once, discount 0 to 100, notes at most 500 characters, `message_credits` set before an editor publish, cannot archive the only published version, move stays on the same package.
 
 ## What publish does not do
 
 - It does not move existing subscribers. New signups pin to the latest published version whose `active_from` is already due.
-- It does not charge, send SMS, or change the live rate card used by today's catalogue screen.
+- It does not charge, send a message, or change the live rate card used by today's catalogue screen.
 - It does not put the trial on the public catalogue.
+- It does not make sending spend `message_credits`. Notify, consume, and the wallet still read the old SMS, WhatsApp, and email buckets. Burning one shared pool is a later change. Until then the editor only stores the allowance and the per-channel burn, and mirrors each burn into `sms_kes`, `whatsapp_kes`, and `email_kes`.
 
 ## Promote a version from staging to production
 
-`scripts/promote-package-version.js` exports one published version and imports it on another database. Import writes audit action `promote_package_version`, checks the fingerprint, and does not move subscribers. A second import of the same fingerprint returns the existing row (`already_present: true`). Import does not require `package_editor_enabled`.
+`scripts/promote-package-version.js` exports one published version and imports it on another database. Import writes audit action `promote_package_version`, checks the fingerprint, and does not move subscribers. A second import of the same fingerprint returns the existing row (`already_present: true`). Import does not require `package_editor_enabled`. A file may leave `message_credits` null so a seeded version can move without inventing a pool. Burn rates travel with the file. When a burn is missing, import copies the matching KSh rate.
 
 ```
 node scripts/promote-package-version.js export --version-id <uuid> --out version.json
