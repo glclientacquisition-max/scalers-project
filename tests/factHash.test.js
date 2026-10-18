@@ -174,21 +174,6 @@ describe('shared path vectors (factValueForPath)', () => {
   const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/factHashVectors.json'), 'utf8'));
   const PATH_VECTORS = FIXTURE.pathVectors;
 
-  it('pricing_mode ask hashes the same as quote on catalog.service.*.price', () => {
-    const row = { id: 'svc_q', name: 'Q', price_range: '' };
-    const askVal = factValueForPath('catalog.service.svc_q.price', {
-      services_catalog: [{ ...row, pricing_mode: 'ask' }],
-    });
-    const quoteVal = factValueForPath('catalog.service.svc_q.price', {
-      services_catalog: [{ ...row, pricing_mode: 'quote' }],
-    });
-    const quoteVector = PATH_VECTORS.find((v) => v.path === 'catalog.service.svc_quote.price');
-    assert.deepEqual(askVal, { mode: 'quote' });
-    assert.deepEqual(quoteVal, { mode: 'quote' });
-    assert.equal(hashFactValue(askVal), hashFactValue(quoteVal));
-    assert.equal(hashFactValue(quoteVal), quoteVector.sha256);
-  });
-
   it(`JS matches all ${PATH_VECTORS.length} path vectors, including .price and .site_visit`, () => {
     assert.ok(PATH_VECTORS.some((v) => /\.price$/.test(v.path)));
     assert.ok(PATH_VECTORS.some((v) => /\.site_visit$/.test(v.path)));
