@@ -50,8 +50,8 @@ test("parseBulkServices sets pricing_mode from pasted price text", () => {
 
   const quote = parseBulkServices("Install - Ask")[0];
   assert.equal(quote.pricing_mode, "quote");
-  assert.equal(catalogImportPriceLabel(quote), "Quote");
-  assert.equal(quote.price_range, "");
+  assert.equal(catalogImportPriceLabel(quote), "Ask");
+  assert.equal(quote.price_range, "Ask");
 });
 
 test("parseBulkProducts line import structures prices", () => {
@@ -64,7 +64,7 @@ test("parseBulkProducts line import structures prices", () => {
 test("parseProductCsv structures ask and range", () => {
   const rows = parseProductCsv("name,price\nWidget,call for price\nCable,500-800");
   assert.equal(rows[0].pricing_mode, "quote");
-  assert.equal(catalogImportPriceLabel(rows[0]), "Quote");
+  assert.equal(catalogImportPriceLabel(rows[0]), "call for price");
   assert.equal(rows[1].pricing_mode, "range");
   assert.equal(rows[1].price_max, 800);
   assert.match(String(rows[1].price), /500/);
@@ -73,8 +73,8 @@ test("parseProductCsv structures ask and range", () => {
 test("suggestImportedServices keeps structured quote (not literal Ask text)", () => {
   const [row] = suggestImportedServices(parseBulkServices("Plumbing - call for price"), null);
   assert.equal(row.pricing_mode, "quote");
-  assert.equal(row.price_range, "");
-  assert.equal(catalogImportPriceLabel(row), "Quote");
+  assert.equal(row.price_range, "call for price");
+  assert.equal(catalogImportPriceLabel(row), "call for price");
 });
 
 test("withImportedPricing hydrates structured fields on products", () => {
@@ -83,7 +83,7 @@ test("withImportedPricing hydrates structured fields on products", () => {
     "product"
   );
   assert.equal(row.pricing_mode, "from");
-  assert.match(String(row.price), /1,500/);
+  assert.equal(row.price, "from 1500");
   assert.equal(row.pricing?.confirmed, false);
 });
 
@@ -92,6 +92,26 @@ test("rowFromImport onboarding CSV mapping", () => {
   assert.equal(rowFromImport("b", "from 1500").pricing_mode, "from");
   assert.equal(rowFromImport("c", "500-800").pricing_mode, "range");
   assert.equal(rowFromImport("d", "KSh 2,000").price, "2,000");
+});
+
+const UNIT_SUFFIX_LINES = [
+  ["Carpet wash KSh 60 per sq ft", "fixed", 60, "KSh 60 per sq ft"],
+  ["Venue hire KSh 2,000 per seat", "fixed", 2000, "KSh 2,000 per seat"],
+  ["Consulting KSh 5,000 /hr", "fixed", 5000, "KSh 5,000 /hr"],
+  ["Labour KSh 800 kwa saa", "fixed", 800, "KSh 800 kwa saa"],
+  ["Pest control KSh 1,200 per visit", "fixed", 1200, "KSh 1,200 per visit"],
+  ["Rooms - from KSh 1,500 per room", "from", 1500, "from KSh 1,500 per room"],
+  ["Hourly cleaning - 500-800 per hour", "range", 500, "500-800 per hour"],
+];
+
+test("paste import keeps unit suffixes on price_range", () => {
+  for (const [line, mode, amount, priceRange] of UNIT_SUFFIX_LINES) {
+    const row = parseBulkServices(line)[0];
+    assert.equal(row.pricing_mode, mode, line);
+    assert.equal(row.price_range, priceRange, line);
+    assert.equal(row.price, String(amount), line);
+    if (mode === "range") assert.equal(row.price_max, 800, line);
+  }
 });
 
 test("structureImportedCatalogRow preview labels", () => {
@@ -113,6 +133,6 @@ test("structureImportedCatalogRow preview labels", () => {
       "price"
     );
   assert.equal(catalogImportPriceLabel(serviceRow("")), "Quote");
-  assert.match(catalogImportPriceLabel(serviceRow("from 1500")), /1,500/);
+  assert.equal(catalogImportPriceLabel(serviceRow("from 1500")), "from 1500");
   assert.match(catalogImportPriceLabel(productRow("2,000")), /2/);
 });

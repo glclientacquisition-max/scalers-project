@@ -159,7 +159,12 @@ function visiblePriceField(
   kind: PriceKind,
   parsedAmount: number | null
 ): string {
-  if (kind === "quote") return "";
+  if (kind === "quote") {
+    const display = usesPriceAsDisplayColumn(row)
+      ? String(row.price ?? "").trim()
+      : String(row.price_range ?? "").trim();
+    return display;
+  }
   const original = String(row.price ?? "").trim();
   if (usesPriceAsDisplayColumn(row) && original) return original;
   if (original && !/^[\d,]+$/.test(original)) return original;
@@ -225,28 +230,48 @@ export function applyCatalogPriceFields<T extends CatalogPriceRow>(
   } as T;
 }
 
-/** Apply parseCataloguePriceText to a pasted/import row (services: price_range, products: price). */
+/**
+ * Import paths only: derive pricing_mode / price / price_max from display text.
+ * Never rewrite price_range (services) or price (products); owner wording and units stay as typed.
+ */
 export function structureImportedCatalogRow<T extends CatalogPriceRow>(
   row: T,
   textKey: "price" | "price_range"
 ): T {
-  const text = String(row[textKey] ?? "").trim();
-  const parsed = parseCataloguePriceText(text);
-  const minInput = parsed.price != null ? String(parsed.price) : "";
-  const maxInput = parsed.priceMax != null ? String(parsed.priceMax) : "";
-  const withStructured = applyCatalogPriceFields(row, parsed.kind, minInput, maxInput, textKey);
-  return hydrateCatalogPriceFields(withStructured);
+  const display = String(row[textKey] ?? "");
+  const parsed = parseCataloguePriceText(display.trim());
+  const mode = kindToPricingMode(parsed.kind);
+  const priceMax = parsed.kind === "range" ? parsed.priceMax : null;
+
+  if (textKey === "price_range") {
+    return {
+      ...row,
+      pricing_mode: mode,
+      price_mode: mode,
+      price: parsed.kind === "quote" ? "" : amountString(parsed.price),
+      price_max: priceMax,
+      price_range: display,
+    } as T;
+  }
+
+  return {
+    ...row,
+    pricing_mode: mode,
+    price_mode: mode,
+    price_max: priceMax,
+    price: display,
+  } as T;
 }
 
-/** Preview line for import UIs: Quote, From KSh 1,500, KSh 500–800, etc. */
+/** Preview line for import UIs; shows owner display text when present. */
 export function catalogImportPriceLabel(row: CatalogPriceRow): string {
   const hydrated = hydrateCatalogPriceFields(row);
   const kind = pricingModeToKind(hydrated.pricing_mode ?? hydrated.price_mode) ?? "fixed";
-  if (kind === "quote") return "Quote";
   const display = usesPriceAsDisplayColumn(hydrated)
     ? String(hydrated.price ?? "").trim()
     : String(hydrated.price_range ?? "").trim();
   if (display) return display;
+  if (kind === "quote") return "Quote";
   const price = readStoredPrice(hydrated);
   const priceMax = readStoredMax(hydrated);
   return formatCatalogueLegacyPrice(kind, price, priceMax) || "Quote";
