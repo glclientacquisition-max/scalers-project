@@ -23,3 +23,10 @@ create policy tenants_select_member on public.tenants for select to authenticate
 grant select on public.tenants to authenticated; grant all on public.tenants to service_role;
 create table public.ops_audit_log (id uuid primary key default gen_random_uuid(), created_at timestamptz not null default now(),
   actor text not null default 'ops', action text not null, tenant_id uuid, amount_kes numeric, detail jsonb not null default '{}'::jsonb);
+-- Ops-Billing 18 Oct: calls (package_minute_consume.sql column), auth.users / auth.role()
+-- for the on-demand audit actor. notify_sends comes from the real notify SQL files (run.sh).
+create or replace function auth.role() returns text language sql stable as $$ select nullif(current_setting('request.jwt.claim.role', true), '') $$;
+grant execute on function auth.role() to authenticated;
+create table if not exists auth.users (id uuid primary key, email text);
+create table public.calls (id uuid primary key default gen_random_uuid(), tenant_id uuid references public.tenants(id) on delete cascade,
+  created_at timestamptz not null default now(), duration_seconds integer, package_seconds_applied integer not null default 0);
