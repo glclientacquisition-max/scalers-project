@@ -83,6 +83,11 @@ const {
   refreshCuratedVoicesFromDb,
 } = require('./src/speech/sonioxVoice');
 const { synthesizeTtsPreview } = require('./src/speech/ttsPreview');
+const {
+  wantsGreetingPreview,
+  previewTenantId,
+  synthesizeGreetingPreview,
+} = require('./src/speech/greetingPreview');
 const { writeWavResponse } = require('./src/speech/wavPack');
 const {
   buildSystemPrompt,
@@ -855,6 +860,31 @@ app.post('/api/tts/preview', async (req, res) => {
   }
   if (!isSonioxTtsConfigured()) {
     return res.status(503).json({ error: 'Soniox TTS not configured' });
+  }
+
+  // greeting=1: the exact greeting a call to this tenant would speak now
+  // (same builder, prepareForTts, lexicon and greeting cache). VOICE.md.
+  if (wantsGreetingPreview(req)) {
+    try {
+      const result = await synthesizeGreetingPreview({
+        tenantId: previewTenantId(req),
+        getProfile: (tenantId) => db.getTenantProfile({ tenantId }),
+        createSession: ({ voiceId }) => createSonioxTtsSession({ callSid: 'preview-greeting', voiceId }),
+      });
+      res.setHeader('Content-Type', 'audio/wav');
+      res.setHeader('Content-Disposition', 'inline; filename="greeting.wav"');
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Spoken-Text', encodeURIComponent(result.spokenText));
+      res.setHeader('X-Greeting-Text', encodeURIComponent(result.text));
+      res.setHeader('X-Greeting-Source', result.source);
+      res.setHeader('X-Tts-Language', result.language);
+      res.setHeader('X-Soniox-Voice', resolveSonioxVoice(result.voiceId));
+      return writeWavResponse(res, result.wav);
+    } catch (err) {
+      const status = Number(err?.status) || 500;
+      console.error(`[api/tts/preview] greeting failed status=${status}:`, err?.message || err);
+      return res.status(status).json({ error: err?.message || 'greeting preview failed' });
+    }
   }
 
   const text = String(req.body?.text || '').trim();

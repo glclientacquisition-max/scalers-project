@@ -104,7 +104,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SONIOX_ENDPOINT_LATENCY_ADJ` | voice | `src/speech/sonioxStt.js` |
 | `SONIOX_ENDPOINT_SENSITIVITY` | voice | `src/speech/sonioxStt.js` |
 | `SONIOX_MAX_ENDPOINT_DELAY_MS` | voice | `src/speech/sonioxStt.js`<br>`src/speech/turnTaking.js` |
-| `SONIOX_SAMPLE_RATE` | voice | `src/speech/sonioxStt.js`<br>`src/speech/sonioxTts.js` |
+| `SONIOX_SAMPLE_RATE` | voice | `src/speech/greetingPreview.js`<br>`src/speech/sonioxStt.js`<br>`src/speech/sonioxTts.js` |
 | `SONIOX_STT_CONTEXT` | voice | `src/speech/sttContext.js` |
 | `SONIOX_STT_CONTEXT_MAX_TERMS` | voice | `src/speech/sttContext.js` |
 | `SONIOX_STT_CONTEXT_WAIT_MS` | voice | `src/speech/sonioxStt.js` |
