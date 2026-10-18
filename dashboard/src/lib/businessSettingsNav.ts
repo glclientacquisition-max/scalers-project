@@ -35,9 +35,13 @@ export function isTrainPanelAlias(raw: string | undefined | null): boolean {
 }
 
 export function parseBusinessSettingsTab(
-  raw: string | undefined | null
+  raw: string | undefined | null,
+  panelRaw?: string | null
 ): BusinessSettingsTab {
   if (isTrainPanelAlias(raw)) return "train";
+  // The catalogue is its own tab. Old "Add prices" / "Check prices" links sent
+  // ?tab=train&panel=catalog, which fell through to Identity.
+  if ((raw === "train" || !raw) && panelRaw === "catalog") return "catalog";
   if (
     raw === "catalog" ||
     raw === "train" ||

@@ -33,10 +33,22 @@ function rangeIsPrice(left, right) {
   return true;
 }
 
+// Model text can arrive with a space missing ("from9:30 AM", "costs KSh500";
+// HD_49d726c3dc9b). For reading numbers only, a clock or a shilling amount glued
+// to the word before it is read as if spaced. The spoken text is never changed.
+// Product codes ("A4", "fx991") stay glued and are still not read as numbers.
+const GLUED_CLOCK = /([A-Za-z])(?=\d{1,2}:\d{2}(?!\d))/g;
+const GLUED_SHILLINGS = /\b(ksh|kes|sh)\.?(?=\d)/gi;
+const GLUED_AMOUNT = /([A-Za-z])(?=\d[\d,]*(?:\.\d+)?\s*(?:shillings?|bob|ksh|kes|\/=))/gi;
+
+function numberReadingText(text) {
+  return String(text || '').replace(GLUED_CLOCK, '$1 ').replace(GLUED_SHILLINGS, '$1 ').replace(GLUED_AMOUNT, '$1 ');
+}
+
 /** Every number a text states, as canonical digit strings. */
 function numbersIn(text) {
   const out = new Set();
-  const raw = String(text || '');
+  const raw = numberReadingText(text);
   for (const hit of raw.matchAll(RANGE_RE)) {
     if (!rangeIsPrice(hit[1], hit[2])) continue;
     const left = digitBody(hit[1]);
@@ -67,5 +79,6 @@ module.exports = {
   NUMBER_WORDS,
   QUANTITY_WORDS,
   numbersIn,
+  numberReadingText,
   quantityWord,
 };

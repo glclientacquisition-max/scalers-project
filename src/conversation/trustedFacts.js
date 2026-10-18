@@ -14,7 +14,7 @@
 // readers. No form is a hand-copied string.
 
 const { eatParts, formatEatNowLabel, parseHoursSchedule } = require('./businessHours');
-const { numbersIn } = require('./numberWords');
+const { numbersIn, numberReadingText } = require('./numberWords');
 const { normalizeLocations } = require('./businessLocations');
 const { speakSwClock, swHourWord } = require('../speech/swahiliTime');
 
@@ -37,7 +37,7 @@ function clockKey(hourRaw, minuteRaw, apRaw) {
 /** AM/PM clocks in a text. "8 AM" and "8:00 AM" share one key. */
 function clockKeys(text) {
   const keys = new Set();
-  const raw = String(text || '');
+  const raw = numberReadingText(text);
   for (const hit of raw.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/gi)) {
     keys.add(clockKey(hit[1], hit[2], hit[3]));
   }

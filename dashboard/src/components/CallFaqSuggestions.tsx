@@ -267,7 +267,7 @@ function CallFaqSuggestionsInner({
                           className="block text-meta font-medium text-[var(--ink-soft)]"
                           htmlFor={answerId}
                         >
-                          What the receptionist should say
+                          What your Business Assistant should say
                         </label>
                         <textarea
                           id={answerId}

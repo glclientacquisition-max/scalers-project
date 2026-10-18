@@ -65,6 +65,17 @@ const homeTenant = {
   },
 } as TenantRow;
 
+/** ?policies=messy: starter lines, a line written for the assistant, and old text with stray punctuation. */
+const messyPolicies = {
+  ...tenant.business_policies,
+  payment: "M-Pesa and cash. Confirm other methods with the team if asked.",
+  payments: parsePaymentsText("M-Pesa and cash. Confirm other methods with the team if asked."),
+  delivery: "Same-day Nairobi delivery for stocked items when available; countrywide shipping on request.",
+  deposit: "We can hold items for pickup when we have the caller name and pickup time.",
+  cancellation: ": Orders can be cancelled before we print..",
+  warranty: "The receptionist should route the caller to Amina for warranty questions.",
+};
+
 type DevSettingsJobsProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -76,9 +87,10 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
   const params = (await searchParams) || {};
   const tabRaw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const panelRaw = Array.isArray(params.panel) ? params.panel[0] : params.panel;
-  const tab = parseBusinessSettingsTab(tabRaw);
+  const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
-  const t = params.vertical === "home_services" ? homeTenant : tenant;
+  const base = params.vertical === "home_services" ? homeTenant : tenant;
+  const t = params.policies === "messy" ? ({ ...base, business_policies: messyPolicies } as TenantRow) : base;
 
   const curatedVoices = [
     {
