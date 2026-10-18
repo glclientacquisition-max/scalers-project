@@ -110,7 +110,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | --- | --- | --- | --- |
 | `BRAIN_CALL_FIXES_D199` | Brain | Turn on the #634 fixes on prod. | **On in prod** 18 Oct 13:31 EAT (Railway `67413ba8`, Vercel `dpl_4m1RFPGG`). Brain scores the next call. |
 | #758 | Desk | Settings quick fixes from the owner review (Alvin approved 13:21 EAT): Catalogue / prices links open the Catalogue, plus small Settings copy and display fixes. No SQL, no prompt or call-facing change. | **Shipped 18 Oct 15:08 EAT:** squash `52498db9`; Vercel prod `dpl_DBSyRwgU4eg9bRQwPnvQB2t9XuRT` READY on app, admin and www, no runtime errors; Railway `7dfbf4e9` SUCCESS, `/healthz` ok on `52498db9`. Rollback: promote `dpl_738F4MizcCCtAM87wfGPhqoAiiJx` (`adab1e81`) or revert `52498db9`. GO Alvin 14:55 EAT. |
-| #643 | Voice | Phone wallet low-balance alert. | GO'd, frozen. Superseded by the ops alert spine (`cursor/ops-alert-spine-7e2f`). Do not merge. |
+| #643 | Voice | Phone wallet low-balance alert. | GO'd, frozen. Superseded by #772. Do not merge. |
 | #731 | Voice | One owner alert per call, goodbye hangs up, 10 s no-audio close (main cut of #644 + #646). | GO'd, frozen. |
 | #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | Prod SQL and merge wait for a scored Aris call. Purge schedule not applied until a recordings deletion route exists. |
 | #733 | Brain | D199 visit read (last one only, paged). (#732 merged 18 Oct 14:48, `13ddf19d`.) | Need Alvin's GO. |
@@ -139,12 +139,12 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | --- | --- | --- |
 | "Desk: Settings quick fixes" (`desk/settings-quick-fixes`, draft) | Desk | **18 Oct, pending ship.** Owner review fixes Alvin approved 13:21 EAT: "Add prices"/"Check prices" open the Catalogue; Policies hide prompt text, starter text shows once, "Holds and deposits" label, "Tap" only on touch; Back gesture asks before dropping edits; remove place/area asks first; forgiving catalogue import (headers, semicolons, "2,500", file picker, row warnings, Update prices); visible phone service labels; honest "Add to catalogue" toast; Identity placeholder and toast; 44 px "Yes, this is right". No schema, prompt or call-field change. |
 | #709 (ready, not draft) | Business Assistant | Business Assistant: area travel fees on calls, alert titles, request footers, enquiry mapping. |
-| #640 | Platform | Ops alerts on Vercel cron instead of page load. Superseded by the ops alert spine. Do not merge. |
-| Ops alert spine (`cursor/ops-alert-spine-7e2f`) | Ops | One Desk cron (`/api/cron/ops-alerts`, every 10 minutes) sends each `platform_ops_notices` row once. Wallet thresholds (default KES 500 and KES 100, plus the Admin amount) and TextSMS credit (warn / critical / exhausted) use that same claim. Dry run unless `OPS_ALERTS_DRY_RUN=false`. No new SQL. Supersedes #640, #643, and #699. Not merged. |
+| #640 | Platform | Ops alerts on Vercel cron instead of page load. Superseded by #772. Do not merge. |
+| #772 | Ops | One Desk cron (`/api/cron/ops-alerts`, every 10 minutes) sends each `platform_ops_notices` row once. Wallet thresholds (default KES 500 and KES 100, plus the Admin amount) and TextSMS credit (warn / critical / exhausted) use that same claim. Dry run unless `OPS_ALERTS_DRY_RUN=false`. No new SQL. Supersedes #640, #643, and #699. Draft, not merged. |
 | #712–#716, #719–#725 | Voice/Brain | NLU-first intent, outage debounce, Swahili verb lock, booking outranks list, regression-9 pack and fixes (R6–R9). |
 | #695, #698, #701, #706, #707, #702, #705, #727 | Voice/Brain/Platform | Mouth lock, no-answer-delete, v2 catalogue, TurnArbiter, spoken catalogue (`hold-staging`). |
 | #691, #696, #697, #704 | Platform/Desk | Write receipts, graceful drain, Admin cleanup, smart import. |
-| #699 | Ops | Provider-health page and TextSMS credit check. Superseded by the ops alert spine (the credit check only). Do not merge. It would also revert live Voice files. |
+| #699 | Ops | Provider-health page and TextSMS credit check. Superseded by #772 (the credit check only). Do not merge. It would also revert live Voice files. |
 | #673, #678, #684 | Platform/Brain | Caller files memory v2; trust P1; fact hash contract. |
 | #675, #676, #677 | Voice | Silent-caller prompt + stall watchdog; repair-who + carrier-drop callback; language hysteresis. |
 | #679, #680, #681, #682, #683 | Brain/Voice | BA v2 Phase 0/1, shadow hook, ack rule, coverage single source. |
@@ -194,7 +194,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **Landing page** (#492 parked until its turn).
 - **Legal pack draft #653** (Terms, Privacy, DPA, call notice, beta terms). Parked; call notice ties to the recording decision.
 - **WhatsApp as the assistant doing work** (not just alerts).
-- **Platform ops cron** (wallet thresholds and TextSMS credit) is in the ops alert spine PR. Not on prod. Dry run until Alvin sets `OPS_ALERTS_DRY_RUN=false` and `CRON_SECRET`. No new SQL.
+- **Platform ops cron** (wallet thresholds and TextSMS credit) is #772. Not on prod. Dry run until Alvin sets `OPS_ALERTS_DRY_RUN=false` and `CRON_SECRET`. No new SQL.
 - Live call transfer: **not built** (callbacks only since #658; reviving it needs a new ADR and Alvin's yes).
 
 Public copy never mentions unbuilt features.
