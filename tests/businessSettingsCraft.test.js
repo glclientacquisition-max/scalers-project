@@ -130,7 +130,9 @@ describe("business settings craft", () => {
     assert.match(shell, /TestLinePanel/);
     assert.match(shell, /SETTINGS_NAV/);
     assert.doesNotMatch(shell, />\s*Train\s*</);
-    assert.doesNotMatch(nav, /Billing|Security/);
+    assert.doesNotMatch(nav, /Security/);
+    assert.match(nav, /label: "Plan"/);
+    assert.match(nav, /label: "Billing"/);
     assert.doesNotMatch(nav, /id: "general"|id: "operations"|id: "line"|id: "receptionist"/);
     assert.match(nav, /businessSettingsHref\("train"/);
     for (const panel of [
@@ -367,12 +369,15 @@ describe("business settings craft", () => {
       "Hours",
       "Locations",
       "Policies",
+      "Plan",
+      "Billing",
       "Catalogue",
       "Import",
       "FAQs",
       "Voice",
       "Pronunciation",
       "Test",
+      "Calls & forwarding",
       "Team",
       "How we notify",
     ]);
@@ -402,7 +407,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(nav, /SETTINGS_HOURS_HREF|settingsWideDefaultHref/);
     assert.match(page, /parseBusinessSettingsPanel\(panelRaw, tabRaw\)/);
     for (const item of nav.match(/\{ label: "[^"]+", description: "[^"]+"/g) || []) assert.ok(item.length < 120, item);
-    assert.equal((nav.match(/description: "/g) || []).length, 12);
+    assert.equal((nav.match(/description: "/g) || []).length, 15);
     const activeFn = nav.slice(
       nav.indexOf("export function settingsNavItemActive"),
       nav.indexOf("export function settingsNavItems")

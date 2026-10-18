@@ -267,10 +267,9 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
       {canInvite ? (
         seats.full ? (
           <SettingsGroup title="Invite">
-            <p className="flex min-h-12 items-center px-4 py-2.5 text-body text-ink">All {seats.included} seats are in use.</p>
-            <Link href="/wallet" className={linkClass + " justify-start"}>
-              Upgrade your package to invite more people
-            </Link>
+            <p className="flex min-h-12 items-center px-4 py-2.5 text-body text-ink">
+              All {seats.included} seats are in use.
+            </p>
           </SettingsGroup>
         ) : (
           <SettingsGroup title="Invite">

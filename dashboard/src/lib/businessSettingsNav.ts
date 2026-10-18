@@ -77,7 +77,8 @@ export function businessSettingsHref(tab: BusinessSettingsTab, panel?: SettingsP
 /** Sidebar target. Same tabs and panels. Grouped by owner job. */
 export type SettingsNavTarget =
   | { tab: Exclude<BusinessSettingsTab, "train" | "menu"> }
-  | { tab: "train"; panel: Exclude<SettingsPanel, "catalog"> };
+  | { tab: "train"; panel: Exclude<SettingsPanel, "catalog"> }
+  | { href: "/settings/plan" | "/settings/billing" };
 
 export type SettingsNavItem = {
   label: string;
@@ -109,6 +110,8 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       { label: "Hours", description: "When you are open, including holidays", target: { tab: "train", panel: "hours" } },
       { label: "Locations", description: "Where callers can find you", target: { tab: "train", panel: "locations" } },
       { label: "Policies", description: "Payments, delivery, returns and other rules", target: { tab: "train", panel: "policies" } },
+      { label: "Plan", description: "Package, minutes and seats", target: { href: "/settings/plan" } },
+      { label: "Billing", description: "Invoices and notices", target: { href: "/settings/billing" } },
     ],
   },
   {
@@ -141,6 +144,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
 ];
 
 export function settingsNavHref(target: SettingsNavTarget): string {
+  if ("href" in target) return target.href;
   return target.tab === "train"
     ? businessSettingsHref("train", target.panel)
     : businessSettingsHref(target.tab);
@@ -151,6 +155,7 @@ export function settingsNavItemActive(
   tab: BusinessSettingsTab,
   trainPanel: SettingsPanel
 ): boolean {
+  if ("href" in target) return false;
   if (target.tab === "train") {
     return tab === "train" && trainPanel === target.panel;
   }
@@ -181,8 +186,9 @@ export function settingsPanelHeading(
   if (tab === "test") return "Test";
   if (tab === "calls") return "Calls & forwarding";
   if (tab !== "train") return null;
-  const item = settingsNavItems().find(
-    (entry) => entry.target.tab === "train" && entry.target.panel === trainPanel
-  );
+  const item = settingsNavItems().find((entry) => {
+    const target = entry.target;
+    return "tab" in target && target.tab === "train" && target.panel === trainPanel;
+  });
   return item?.label ?? "Identity";
 }

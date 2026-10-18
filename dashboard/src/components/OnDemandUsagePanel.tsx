@@ -15,15 +15,18 @@ export function OnDemandUsagePanel({
   tenantId,
   enabled: initialEnabled,
   hint,
+  locked = false,
 }: {
   tenantId: string;
   enabled: boolean;
   /** What the saved setting means right now (billing mode aware). */
   hint?: string | null;
+  /** Trial keeps on-demand off. Display only. */
+  locked?: boolean;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(saveOnDemandUsage, initial);
-  const [enabled, setEnabled] = useState(initialEnabled);
+  const [enabled, setEnabled] = useState(locked ? false : initialEnabled);
 
   useEffect(() => {
     setEnabled(initialEnabled);
@@ -46,13 +49,15 @@ export function OnDemandUsagePanel({
           <input
             type="checkbox"
             className="h-5 w-5"
-            checked={enabled}
+            checked={locked ? false : enabled}
+            disabled={locked}
             onChange={(e) => setEnabled(e.target.checked)}
           />
           <span className="text-ink">
             Allow calls and SMS past what&apos;s included, at the rates below
           </span>
         </label>
+        {locked ? <p className="text-body text-ink-2">On-demand stays off until the trial ends.</p> : null}
 
         {state.error ? <p className="text-body text-warn">{state.error}</p> : null}
         {state.ok ? (
@@ -63,7 +68,7 @@ export function OnDemandUsagePanel({
 
         <Button
           type="submit"
-          disabled={pending || enabled === initialEnabled}
+          disabled={locked || pending || enabled === initialEnabled}
           className="gap-2">
           {pending ? (
             <>

@@ -73,7 +73,7 @@ describe("package usage meter", () => {
     assert.match(prices, /Prices are not on this page yet/);
     assert.match(prices, /inboundKesPerMinute > 0/);
     assert.match(prices, /past included/);
-    assert.match(prices, /calls KES \{formatKes\(board\.inboundKesPerMinute\)\}\/min\./);
+    assert.match(prices, /calls KSh \{formatKes\(board\.inboundKesPerMinute\)\}\/min\./);
     assert.doesNotMatch(prices, /<table/);
     assert.doesNotMatch(prices, /border-accent/);
     assert.doesNotMatch(prices, /5000|12000|25000/);
