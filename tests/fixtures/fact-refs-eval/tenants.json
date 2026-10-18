@@ -1,19 +1,19 @@
 {
- "c81b3480-0cc5-4224-b0e7-24c641d78db2": {
-  "_note": "Prod Esga Stationery subset, read-only 2026-10-18 for the fact-refs replay eval. Catalogue, hours, locations, policies (numbers of 5+ digits zeroed), area terms, field meta. No prompt, team, contacts or phones.",
+ "0f1a7c00-0000-4000-8000-00000000a002": {
+  "_note": "Mstari Supplies (retail, three branches in Nakuru). Fictional business for the fact-refs replay eval. Names, places, numbers and wording are invented; the shape of the data (catalogue, hours, locations, policies, area fees, confirmation rows) follows a real snapshot so the speech checks behave the same.",
   "tenant": {
-   "id": "c81b3480-0cc5-4224-b0e7-24c641d78db2",
-   "business_name": "Esga Stationery",
-   "spoken_name": "Esga",
-   "agent_name": "Lucy",
+   "id": "0f1a7c00-0000-4000-8000-00000000a002",
+   "business_name": "Mstari Supplies",
+   "spoken_name": "Mstari",
+   "agent_name": "Neema",
    "vertical": "retail",
    "handoff_mode": "callback",
    "after_hours_mode": "serve",
    "services_catalog": [
     {
-     "id": "svc_bb6b127c24ac47a8",
+     "id": "svc_972da9b8c6df535d",
      "name": "Wholesale Printing Materials & Stationery",
-     "notes": "Covers bulk orders of stationery, toners, and printers.",
+     "notes": "Bulk orders of stationery, toner and printers.",
      "source": "owner",
      "pricing": {
       "mode": "ask",
@@ -29,12 +29,12 @@
      "category": "Wholesale",
      "in_stock": "",
      "price_range": "Ask",
-     "out_of_scope": "Quoting specific prices over the phone before confirmation; applying retail rates."
+     "out_of_scope": "Giving exact prices on the phone before the team confirms; retail rates."
     },
     {
-     "id": "svc_c8cac52f66e04618",
+     "id": "svc_47ad98cd56515ea1",
      "name": "Retail Printing Materials & Stationery",
-     "notes": "Covers individual or small-quantity purchases of stationery, toners, and printers.",
+     "notes": "Single or small orders of stationery, toner and printers.",
      "source": "owner",
      "pricing": {
       "mode": "ask",
@@ -50,12 +50,12 @@
      "category": "Retail",
      "in_stock": "",
      "price_range": "Ask",
-     "out_of_scope": "Quoting specific prices over the phone before confirmation; applying wholesale discount rates to small orders."
+     "out_of_scope": "Giving exact prices on the phone before the team confirms; wholesale discounts on small orders."
     },
     {
-     "id": "svc_29ac058cb5484fb6",
+     "id": "svc_dd844c6b71bd51f6",
      "name": "General Pricing Inquiries",
-     "notes": "Identify if caller needs retail or wholesale; capture details and route to team.",
+     "notes": "Find out if the caller wants retail or wholesale, take details and pass to the team.",
      "source": "owner",
      "pricing": {
       "mode": "ask",
@@ -71,7 +71,7 @@
      "category": "Inquiries",
      "in_stock": "",
      "price_range": "Ask",
-     "out_of_scope": "Guessing or estimating numbers on the spot."
+     "out_of_scope": "Guessing amounts on the call."
     }
    ],
    "product_catalog": [],
@@ -103,44 +103,44 @@
       "close": "19:00"
      }
     },
-    "location": "Uchumi Main branch · Nakuru town   opposite Cleanshelf supermarket   from the back exit door · Uchumi branch (opposite Cleanshelf)",
+    "location": "Baraka Plaza branch · Nakuru town, opposite Tumaini supermarket, through the back door · Baraka Plaza branch (opposite Tumaini)",
     "timezone": "Africa/Nairobi"
    },
-   "business_hours": "Mon-Sat: 07:00-19:00 EAT; Sun: closed. Location: Uchumi Main branch · Nakuru town   opposite Cleanshelf supermarket   from the back exit door · Uchumi branch (opposite Cleanshelf)",
+   "business_hours": "Mon-Sat: 07:00-19:00 EAT; Sun: closed. Location: Baraka Plaza branch · Nakuru town, opposite Tumaini supermarket, through the back door · Baraka Plaza branch (opposite Tumaini)",
    "business_locations": [
     {
      "hours": "",
-     "label": "Uchumi Main branch",
-     "address": "Nakuru town   opposite Cleanshelf supermarket   from the back exit door",
+     "label": "Baraka Plaza branch",
+     "address": "Nakuru town, opposite Tumaini supermarket, through the back door",
      "area_id": "",
-     "landmark": "Uchumi branch (opposite Cleanshelf)",
-     "directions": "We're directly opposite Cleanshelf Supermarket, right next to the Prestige matatu stage if you're at Cleanshelf, just cross over and you'll see us.\"",
-     "coverage_notes": "We do Country wide delivery ofall stationary both wholesale and retail ,where ever you are we will be able to reach you."
+     "landmark": "Baraka Plaza branch (opposite Tumaini)",
+     "directions": "We're directly opposite Tumaini Supermarket, next to the matatu stage. From Tumaini, just cross the road and you'll see us.",
+     "coverage_notes": "We deliver stationery across Kenya, wholesale and retail, wherever you are."
     },
     {
      "hours": "",
-     "label": "Kirathimo Branch",
-     "address": "kirathimo builing mwaki sacco",
+     "label": "Jabali House Branch",
+     "address": "Jabali House, Soko stage",
      "area_id": "place:nakuru town",
-     "landmark": "Kirathimo branch (Free Area stage)",
-     "directions": "We're at Mwaki sacco stage, in a red building called Kirathimo you really can't miss it, just look for the red building once you get to Mwaki sacco. It's upstairs, where our team is ready to serve you",
-     "coverage_notes": "We do Country wide delivery ofall stationary both wholesale and retail ,where ever you are we will be able to reach you."
+     "landmark": "Jabali House branch (Free Area stage)",
+     "directions": "We're at Soko stage, upstairs in the blue Jabali House building. Look for the blue building when you reach the stage.",
+     "coverage_notes": "We deliver stationery across Kenya, wholesale and retail, wherever you are."
     },
     {
      "hours": "",
-     "label": "flamco branch",
-     "address": "Flamco building",
+     "label": "upendo branch",
+     "address": "Upendo Arcade",
      "area_id": "place:nakuru town",
-     "landmark": "Flamco branch (Nakuru town, Mosque Lane)",
-     "directions": "We're in Nakuru town, on Mosque Lane. If you're coming into town, ask anyone for Mosque Lane -we're right there.\"",
-     "coverage_notes": "We do Country wide delivery ofall stationary both wholesale and retail ,where ever you are we will be able to reach you."
+     "landmark": "Upendo branch (Nakuru town, Market Lane)",
+     "directions": "We're in Nakuru town, on Market Lane. Ask anyone for Market Lane and you'll find us.",
+     "coverage_notes": "We deliver stationery across Kenya, wholesale and retail, wherever you are."
     }
    ],
    "business_policies": {
-    "other": "Retail and wholesale orders require price confirmation by the esga team",
+    "other": "Retail and wholesale orders require price confirmation by the Mstari team",
     "deposit": "We can hold items for pickup when we have the caller name and pickup time.",
     "payment": "M-Pesa and cash. Confirm other methods with the team if asked.",
-    "returns": "Returns and exchanges follow shop policy,confirm details with the team if unsure.",
+    "returns": "Returns and exchanges follow shop policy; check details with the team.",
     "delivery": "",
     "payments": {
      "bank": null,
@@ -161,8 +161,8 @@
      "mpesa_paybill": null,
      "deposit_percent": null
     },
-    "warranty": ": the receptionist should not handle warranty claims directly. Instead, it should route the caller by giving them the manager's contact number.",
-    "cancellation": "When a customer asks to cancel an order, the receptionist should not confirm the cancellation directly. Instead, it should route the caller by providing the manager's contact number so they can follow up directly.",
+    "warranty": "Warranty claims go to the manager; share the manager's contact.",
+    "cancellation": "Cancellations go to the manager; share the manager's contact so they can follow up.",
     "coverage_areas": [
      "place:nakuru town"
     ],
@@ -367,19 +367,19 @@
    }
   ]
  },
- "24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0": {
-  "_note": "Prod Aris Kenya subset, read-only 2026-10-18 for the fact-refs replay eval. Catalogue, hours, locations, policies (numbers of 5+ digits zeroed), area terms, field meta. No prompt, team, contacts or phones.",
+ "0f1a7c00-0000-4000-8000-00000000a001": {
+  "_note": "Penpoint Stationers (retail, Nairobi). Fictional business for the fact-refs replay eval. Names, places, numbers and wording are invented; the shape of the data (catalogue, hours, locations, policies, area fees, confirmation rows) follows a real snapshot so the speech checks behave the same.",
   "tenant": {
-   "id": "24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0",
-   "business_name": "Aris Kenya",
-   "spoken_name": "Aris - The Home of Affordable Stationery",
-   "agent_name": "Lynn",
+   "id": "0f1a7c00-0000-4000-8000-00000000a001",
+   "business_name": "Penpoint Stationers",
+   "spoken_name": "Penpoint - Your Neighbourhood Stationer",
+   "agent_name": "Amani",
    "vertical": "retail",
    "handoff_mode": "callback",
    "after_hours_mode": "serve",
    "services_catalog": [
     {
-     "id": "svc_b9094f1d31ed3236",
+     "id": "svc_00ef4742e9e55a9f",
      "name": "Quotation",
      "notes": "Free",
      "source": "owner",
@@ -465,7 +465,7 @@
     },
     {
      "sku": "",
-     "name": "Bazooka (Drawing Tube)",
+     "name": "Mrija (Drawing Tube)",
      "unit": "",
      "notes": "",
      "price": "",
@@ -486,7 +486,7 @@
     },
     {
      "sku": "",
-     "name": "Astra BAB-ASTRA 4 PORT EXTENSION",
+     "name": "Nyota 4-way extension cable",
      "unit": "",
      "notes": "",
      "price": "",
@@ -507,7 +507,7 @@
     },
     {
      "sku": "",
-     "name": "Electric Water Kettle (Stainless Steel)",
+     "name": "Electric Kettle (Stainless Steel)",
      "unit": "",
      "notes": "",
      "price": "",
@@ -591,7 +591,7 @@
     },
     {
      "sku": "",
-     "name": "A5 gazelle notebook",
+     "name": "A5 swala notebook",
      "unit": "",
      "notes": "",
      "price": "",
@@ -822,7 +822,7 @@
     },
     {
      "sku": "",
-     "name": "Casio fx 991 ex (upgraded version)",
+     "name": "Nyota fx 991 ex (upgraded version)",
      "unit": "",
      "notes": "",
      "price": "",
@@ -843,7 +843,7 @@
     },
     {
      "sku": "",
-     "name": "Casio fx 82 ms",
+     "name": "Nyota fx 82 ms",
      "unit": "",
      "notes": "",
      "price": "",
@@ -885,7 +885,7 @@
     },
     {
      "sku": "",
-     "name": "M&g all in one set",
+     "name": "Nyota all in one set",
      "unit": "",
      "notes": "",
      "price": "",
@@ -906,7 +906,7 @@
     },
     {
      "sku": "",
-     "name": "Staedtler Pencils",
+     "name": "Tausi Pencils",
      "unit": "",
      "notes": "",
      "price": "",
@@ -927,7 +927,7 @@
     },
     {
      "sku": "",
-     "name": "Fine bic pen",
+     "name": "Fine jua pen",
      "unit": "",
      "notes": "",
      "price": "",
@@ -948,7 +948,7 @@
     },
     {
      "sku": "",
-     "name": "Crystal bic pen",
+     "name": "Crystal jua pen",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1011,7 +1011,7 @@
     },
     {
      "sku": "",
-     "name": "Obama blue pen box",
+     "name": "Simba blue pen box",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1032,7 +1032,7 @@
     },
     {
      "sku": "",
-     "name": "Smp table",
+     "name": "Study table",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1053,7 +1053,7 @@
     },
     {
      "sku": "",
-     "name": "Mg box files",
+     "name": "Nyota box files",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1074,7 +1074,7 @@
     },
     {
      "sku": "",
-     "name": "Damasa hb pencil",
+     "name": "Simba hb pencil",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1095,7 +1095,7 @@
     },
     {
      "sku": "",
-     "name": "Black whiteboard ink (leto)",
+     "name": "Black whiteboard ink (simba)",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1116,7 +1116,7 @@
     },
     {
      "sku": "",
-     "name": "Casio fx 82 ex",
+     "name": "Nyota fx 82 ex",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1137,7 +1137,7 @@
     },
     {
      "sku": "",
-     "name": "Casio fx 991 es plus",
+     "name": "Nyota fx 991 es plus",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1158,7 +1158,7 @@
     },
     {
      "sku": "",
-     "name": "Kangaroo staples small packet",
+     "name": "Kifaru staples small packet",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1200,7 +1200,7 @@
     },
     {
      "sku": "",
-     "name": "Red dragon fly scissors",
+     "name": "Kipepeo scissors",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1221,7 +1221,7 @@
     },
     {
      "sku": "",
-     "name": "Nataraj sharperner",
+     "name": "Tausi sharperner",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1263,7 +1263,7 @@
     },
     {
      "sku": "",
-     "name": "M&g metal school set",
+     "name": "Nyota metal school set",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1305,7 +1305,7 @@
     },
     {
      "sku": "",
-     "name": "Nataraj dustless eraser",
+     "name": "Tausi dustless eraser",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1326,7 +1326,7 @@
     },
     {
      "sku": "",
-     "name": "Mg coloured sticky notes 3x3",
+     "name": "Nyota coloured sticky notes 3x3",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1347,7 +1347,7 @@
     },
     {
      "sku": "",
-     "name": "Kangaroo staples 24-6x5m -many",
+     "name": "Kifaru staples 24-6x5m -many",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1368,7 +1368,7 @@
     },
     {
      "sku": "",
-     "name": "Obama blue pen",
+     "name": "Simba blue pen",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1389,7 +1389,7 @@
     },
     {
      "sku": "",
-     "name": "Asst permanent marker piang xiang",
+     "name": "Asst permanent marker kifaru",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1410,7 +1410,7 @@
     },
     {
      "sku": "",
-     "name": "Obama red pen",
+     "name": "Simba red pen",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1431,7 +1431,7 @@
     },
     {
      "sku": "",
-     "name": "Obama balck pen",
+     "name": "Simba balck pen",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1452,7 +1452,7 @@
     },
     {
      "sku": "",
-     "name": "Kangaroo stapler hd-45",
+     "name": "Kifaru stapler hd-45",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1473,7 +1473,7 @@
     },
     {
      "sku": "",
-     "name": "Kangaroo stapler hd-45s",
+     "name": "Kifaru stapler hd-45s",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1494,7 +1494,7 @@
     },
     {
      "sku": "",
-     "name": "Gem blue whiteboard pen (refillable)",
+     "name": "Jua blue whiteboard pen (refillable)",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1557,7 +1557,7 @@
     },
     {
      "sku": "",
-     "name": "Mg whiteboard markpen",
+     "name": "Nyota whiteboard markpen",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1578,7 +1578,7 @@
     },
     {
      "sku": "",
-     "name": "Oxford set (metallic)",
+     "name": "Nyota set (metallic)",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1599,7 +1599,7 @@
     },
     {
      "sku": "",
-     "name": "Mg zipper bag-a6",
+     "name": "Nyota zipper bag-a6",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1620,7 +1620,7 @@
     },
     {
      "sku": "",
-     "name": "30cm rok ruler",
+     "name": "30cm jua ruler",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1641,7 +1641,7 @@
     },
     {
      "sku": "",
-     "name": "Mg sticky note 3x2",
+     "name": "Nyota sticky note 3x2",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1683,7 +1683,7 @@
     },
     {
      "sku": "",
-     "name": "Mg modern drawing sharperner",
+     "name": "Nyota modern drawing sharperner",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1809,7 +1809,7 @@
     },
     {
      "sku": "",
-     "name": "Mg gel pen",
+     "name": "Nyota gel pen",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1830,7 +1830,7 @@
     },
     {
      "sku": "",
-     "name": "Mg correction pen",
+     "name": "Nyota correction pen",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1851,7 +1851,7 @@
     },
     {
      "sku": "",
-     "name": "Mg mini stapler",
+     "name": "Nyota mini stapler",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1872,7 +1872,7 @@
     },
     {
      "sku": "",
-     "name": "Mg stapler mgs 14..180",
+     "name": "Nyota stapler mgs 14..180",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1893,7 +1893,7 @@
     },
     {
      "sku": "",
-     "name": "Mg double clip file",
+     "name": "Nyota double clip file",
      "unit": "",
      "notes": "",
      "price": "",
@@ -1914,7 +1914,7 @@
     },
     {
      "sku": "",
-     "name": "Mg single clip file",
+     "name": "Nyota single clip file",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2019,7 +2019,7 @@
     },
     {
      "sku": "",
-     "name": "Rok cellotape small-2 inch",
+     "name": "Jua cellotape small-2 inch",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2040,7 +2040,7 @@
     },
     {
      "sku": "",
-     "name": "Rok cellotape small- 1 inch",
+     "name": "Jua cellotape small- 1 inch",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2061,7 +2061,7 @@
     },
     {
      "sku": "",
-     "name": "Rok cellotape small- 3/4 inch",
+     "name": "Jua cellotape small- 3/4 inch",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2082,7 +2082,7 @@
     },
     {
      "sku": "",
-     "name": "Rok cellotape small- 0.5 inch",
+     "name": "Jua cellotape small- 0.5 inch",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2102,7 +2102,7 @@
     },
     {
      "sku": "",
-     "name": "Rok masking tape small- 2 inch",
+     "name": "Jua masking tape small- 2 inch",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2122,7 +2122,7 @@
     },
     {
      "sku": "",
-     "name": "Rok masking tape small- 1 inch",
+     "name": "Jua masking tape small- 1 inch",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2142,7 +2142,7 @@
     },
     {
      "sku": "",
-     "name": "Rok masking tape small- 3/4 inch",
+     "name": "Jua masking tape small- 3/4 inch",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2162,7 +2162,7 @@
     },
     {
      "sku": "",
-     "name": "Rok masking tape small- 0.5 inch",
+     "name": "Jua masking tape small- 0.5 inch",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2243,7 +2243,7 @@
     },
     {
      "sku": "",
-     "name": "Haco ruler",
+     "name": "Kifaru ruler",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2263,7 +2263,7 @@
     },
     {
      "sku": "",
-     "name": "Mg highlighter",
+     "name": "Nyota highlighter",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2323,7 +2323,7 @@
     },
     {
      "sku": "",
-     "name": "Mg zipper bag-A4",
+     "name": "Nyota zipper bag-A4",
      "unit": "",
      "notes": "",
      "price": "",
@@ -2368,19 +2368,19 @@
       "close": "18:00"
      }
     },
-    "location": "Main · We have a hybrid system where we operate through our e-commrce website online where you order and have it delivered country wide or pickup in our outlets in person. · Inside UON premises",
+    "location": "Main · We sell online with delivery across Kenya, or you can pick up in person at our shop. · Inside RVU premises",
     "timezone": "Africa/Nairobi"
    },
-   "business_hours": "Mon-Fri: 09:30-18:00 EAT; Sat-Sun: closed. Location: Main · We have a hybrid system where we operate through our e-commrce website online where you order and have it delivered country wide or pickup in our outlets in person. · Inside UON premises",
+   "business_hours": "Mon-Fri: 09:30-18:00 EAT; Sat-Sun: closed. Location: Main · We sell online with delivery across Kenya, or you can pick up in person at our shop. · Inside RVU premises",
    "business_locations": [
     {
      "hours": "",
      "label": "Main",
-     "address": "We have a hybrid system where we operate through our e-commrce website online where you order and have it delivered country wide or pickup in our outlets in person.",
+     "address": "We sell online with delivery across Kenya, or you can pick up in person at our shop.",
      "area_id": "",
-     "landmark": "Inside UON premises",
-     "directions": "Along State house road-ground floor Hall 7",
-     "coverage_notes": "Country wide delivery via parcel grid delivery system"
+     "landmark": "Inside RVU premises",
+     "directions": "Along State Lane, ground floor of Block 7",
+     "coverage_notes": "Delivery across Kenya by courier"
     }
    ],
    "business_policies": {
@@ -2483,56 +2483,56 @@
    },
    "daily_bulletin": [
     {
-     "id": "dd4e3ab3-97ce-47ab-ba13-3d66ff234c9e",
-     "text": "jjjj",
+     "id": "b677e4ca-9222-51fb-8391-04284387f727",
+     "text": "We are out of pens today.",
      "active": false,
      "ends_at": "2026-08-13T06:00:29.047Z",
      "starts_at": "2026-08-13T06:00:22.348Z",
      "created_at": "2026-08-13T06:00:22.348Z"
     },
     {
-     "id": "ca4414ef-e3b9-4ed7-87f7-5d03061f6b5c",
-     "text": "today is a public holiday we take order but we cannot make same day delivery",
+     "id": "6e91b065-04dd-5337-bc54-4186cf7b5df5",
+     "text": "Closed today for the public holiday.",
      "active": true,
      "ends_at": "2026-08-09T20:59:59.999Z",
      "starts_at": "2026-08-09T13:14:48.828Z",
      "created_at": "2026-08-09T13:14:48.828Z"
     },
     {
-     "id": "9af6d4c1-17db-43a1-afd6-945778f88151",
-     "text": "we are out of pens",
+     "id": "37c2a0cf-5f18-5d81-ab61-3708ac73523f",
+     "text": "Orders taken today; delivery tomorrow.",
      "active": false,
      "ends_at": "2026-08-09T13:14:21.332Z",
      "starts_at": "2026-08-09T13:13:52.980Z",
      "created_at": "2026-08-09T13:13:52.980Z"
     },
     {
-     "id": "77264f0f-30e3-4873-9413-6536d0d601f7",
-     "text": "We are closed for the day due to maandamano interuptions in CBD",
+     "id": "b24c0fdb-a6f6-5b1d-b0a0-216215237a5c",
+     "text": "We are out of pens today.",
      "active": false,
      "ends_at": "2026-08-09T13:13:40.981Z",
      "starts_at": "2026-08-09T13:11:58.732Z",
      "created_at": "2026-08-09T13:11:58.732Z"
     },
     {
-     "id": "c3ccd523-c964-44c3-a058-310500125935",
-     "text": "we are out of pens",
+     "id": "d97341c0-4168-5769-a457-499fba5b16c7",
+     "text": "Closed today for the public holiday.",
      "active": false,
      "ends_at": "2026-08-09T13:11:04.448Z",
      "starts_at": "2026-08-09T08:27:58.492Z",
      "created_at": "2026-08-09T08:27:58.492Z"
     },
     {
-     "id": "6d51eb61-1006-4ec9-9815-99e5a0e49fc9",
-     "text": "We are closed for the day due to maandamano interuptions in CBD",
+     "id": "71dc319c-c576-5788-8799-47718f00e825",
+     "text": "Orders taken today; delivery tomorrow.",
      "active": false,
      "ends_at": "2026-08-09T13:11:27.169Z",
      "starts_at": "2026-08-09T13:11:01.926Z",
      "created_at": "2026-08-09T13:11:01.926Z"
     },
     {
-     "id": "d53fde81-cefb-4887-8413-33ae3a87e59f",
-     "text": "We are closed for the day due to maandamano interuptions in CBD",
+     "id": "7b6ef64a-be43-5bbd-8c05-f4b48169d50a",
+     "text": "We are out of pens today.",
      "active": false,
      "ends_at": "2026-08-08T16:06:24.946Z",
      "starts_at": "2026-08-07T23:07:25.436Z",
@@ -3287,13 +3287,13 @@
    }
   ]
  },
- "66ad5aa3-6d37-4e95-9aa1-e8eb34bc71d6": {
-  "_note": "Prod Chapter One Bookstore subset, read-only 2026-10-18 for the fact-refs replay eval. Catalogue, hours, locations, policies (numbers of 5+ digits zeroed), area terms, field meta. No prompt, team, contacts or phones.",
+ "0f1a7c00-0000-4000-8000-00000000a003": {
+  "_note": "Kurasa Booksellers (retail, Nairobi CBD). Fictional business for the fact-refs replay eval. Names, places, numbers and wording are invented; the shape of the data (catalogue, hours, locations, policies, area fees, confirmation rows) follows a real snapshot so the speech checks behave the same.",
   "tenant": {
-   "id": "66ad5aa3-6d37-4e95-9aa1-e8eb34bc71d6",
-   "business_name": "Chapter One Bookstore",
-   "spoken_name": "Chapter One",
-   "agent_name": "Purity",
+   "id": "0f1a7c00-0000-4000-8000-00000000a003",
+   "business_name": "Kurasa Booksellers",
+   "spoken_name": "Kurasa",
+   "agent_name": "Zawadi",
    "vertical": "retail",
    "handoff_mode": "callback",
    "after_hours_mode": "serve",
@@ -3334,8 +3334,8 @@
    "business_locations": [
     {
      "label": "Main",
-     "address": "on the Ground Floor (Shop G23) of the Norwich Union Building on Kimathi Street in Nairobi, Kenya, directly opposite the former Hilton",
-     "landmark": "on the Ground Floor (Shop G23) of the Norwich Union Building on Kimathi Street in Nairobi, Kenya, directly opposite the former Hilton",
+     "address": "on the Ground Floor (Shop B14) of Mvule House on Kimathi Lane in Nairobi, Kenya, directly opposite the former Savanna Hotel",
+     "landmark": "on the Ground Floor (Shop B14) of Mvule House on Kimathi Lane in Nairobi, Kenya, directly opposite the former Savanna Hotel",
      "directions": "",
      "coverage_notes": ""
     }

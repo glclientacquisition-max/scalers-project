@@ -3,7 +3,9 @@
 // Replay eval for VOICE_FACT_REFS (tests/fixtures/fact-refs-eval/cases.json).
 // Each case is one model sentence the live speech check deleted, judged by
 // hand. The replay runs it through the speech path (polishSpokenDetail) with
-// the flag off and on, against a snapshot of that business's file, and counts:
+// the flag off and on, against a fictional business file with the same shape
+// as the real one (tests/fixtures/fact-refs-eval/tenants.json and tenant-*.json),
+// and counts:
 // - false deletions: correct text (verdict FP/OFF) whose facts the caller no
 //   longer hears;
 // - false "not on file": correct text replaced by "I don't have that on file";
@@ -37,8 +39,8 @@ function withEnv(env, fn) {
 
 function loadCases() {
   const doc = require(path.join(FIXTURE_DIR, 'cases.json'));
-  const prodTenants = require(path.join(FIXTURE_DIR, 'prod-tenants.json'));
-  const snapshots = { ...prodTenants };
+  const fictionalTenants = require(path.join(FIXTURE_DIR, 'tenants.json'));
+  const snapshots = { ...fictionalTenants };
   for (const [id, rel] of Object.entries(doc.tenantFixtures || {})) {
     snapshots[id] = require(path.join(FIXTURE_DIR, rel));
   }

@@ -194,7 +194,7 @@ test('saved claims: a request saved on an earlier turn backs the claim with the 
     state.actions.savedWork = [{ action: 'create_service_request', status: 'succeeded' }];
     return state;
   };
-  const line = 'Ndiyo Chris, nimeandika penseli.';
+  const line = 'Ndiyo Kevin, nimeandika penseli.';
   withFlag('on', () => {
     assert.equal(speak(line, { language: 'sw', state: savedState(), caller: 'Umeandika pencils?' }).text, line);
     assert.notEqual(speak(line, { language: 'sw', caller: 'Umeandika pencils?' }).text, line);
