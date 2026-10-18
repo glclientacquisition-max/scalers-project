@@ -8,7 +8,7 @@
 #
 # Rules, in order:
 #   scalers-staging (prj_koYx...):
-#     - build only cursor/staging-voice-468b. Stage-PR aliases
+#     - build cursor/staging-voice-468b (Stage-PR) and staging/dash-* (manual Vercel desk). Stage-PR aliases
 #       scalers-staging.vercel.app to the READY deploy of that branch at the
 #       exact staging SHA, so it must always build there.
 #     - skip every other branch, including main (main skip matches the
@@ -61,7 +61,13 @@ if [ "$is_staging" = 1 ]; then
   if [ "$ref" = "$STAGING_BRANCH" ]; then
     build "scalers-staging builds $STAGING_BRANCH for the Stage-PR desk alias"
   fi
-  skip "scalers-staging builds only $STAGING_BRANCH, not ${ref:-an unnamed ref}"
+  # Manual Vercel-only dashboard merges (never touch Railway). Pattern: staging/dash-*
+  case "$ref" in
+    staging/dash-*)
+      build "scalers-staging builds $ref for a Vercel-only dashboard alias"
+      ;;
+  esac
+  skip "scalers-staging builds only $STAGING_BRANCH or staging/dash-*, not ${ref:-an unnamed ref}"
 fi
 
 if [ "$env_name" = "production" ]; then
