@@ -26,7 +26,11 @@ async function dispatchToStaff({
         lead,
         subject,
         channels,
-        ledger,
+        // Per-person ledger key (stable across SMS -> WhatsApp -> email).
+        ledger:
+          ledger && typeof ledger === 'object'
+            ? { ...ledger, recipientId: ledger.recipientId || person.id || null }
+            : ledger,
       });
       if (result?.channel) {
         sent.push({

@@ -688,8 +688,18 @@ assert.match(
 
 assert.match(
   source,
-  /package exhausted — reject/,
-  'a used-up package with on-demand off must not open the media stream'
+  /'no package' : 'package exhausted'\} \(billing .*on-demand off\) — refuse/,
+  'a used-up package (or no package) with on-demand off and billing enforced must not open the media stream'
+);
+assert.match(
+  source,
+  /\.send\(packageRefusalXml\(\{ businessName: gate\.usage\?\.businessName \}\)\)/,
+  'package refusals go through packageRefusalXml (Reject by default, voicemail behind a flag)'
+);
+assert.match(
+  source,
+  /maybeAlertPackageUsage\(gate\.usage\)/,
+  'the package gate must raise the beta 80% / 100% ops notice'
 );
 
 const telephonyRejectAt = source.indexOf('telephonyBillingRejectXml()');

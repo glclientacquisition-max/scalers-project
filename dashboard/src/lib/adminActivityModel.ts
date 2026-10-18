@@ -26,6 +26,8 @@ const ACTIONS: Record<string, string> = {
   buy_number: "Bought number",
   sync_numbers: "Synced numbers",
   assign_package: "Changed package",
+  unassign_package: "Removed package",
+  sms_counter_drift: "SMS counter drift",
   save_package: "Edited package",
   save_rates: "Changed rates",
   grant_package_minutes: "Granted minutes",

@@ -197,6 +197,7 @@ const { determineNextBestAction } = require('./src/conversation/nextBestAction')
 const { logBrainTrace } = require('./src/conversation/brainObservability');
 const {
   executeBrainTools,
+  brainToolsWantWrite,
   formatToolConfirmation,
   brainLinesForResults,
 } = require('./src/conversation/toolExecution');
@@ -253,6 +254,8 @@ const {
   opsCooldownMs,
 } = require('./src/notifications/platformOpsAlert');
 const { platformOpsRecipients } = require('./src/notifications/platformOpsRecipients');
+const { maybeAlertPackageUsage } = require('./src/billing/packageUsageAlerts');
+const { packageRefusalXml } = require('./src/billing/packageOverage');
 const {
   selectProductsForTurn,
   formatTargetedProductsForPrompt,
@@ -272,6 +275,9 @@ const {
 const callAgentTools = new Map();
 /** Structured semantic state and actual runtime capabilities, keyed by callSid. */
 const callBrainStates = new Map();
+// Spoken transcript per live media call (rows pushed after the speech guard).
+// The hangup summary reads it when the webhook carries no turns (HD_cd0c01f28b05).
+const callSpokenTranscripts = new Map();
 const callBrainCapabilities = new Map();
 /** Per-call tenant grounding (product catalogue) for hold/order validation. */
 const callTenantProfiles = new Map();
@@ -345,6 +351,8 @@ const {
   isSpeakSlotOutcome,
 } = require('./src/conversation/speakSlots');
 const { narratesInternalAction, groundFilePriceLine } = require('./src/conversation/speechGuard');
+const { promptClockStale, stampPromptClock } = require('./src/conversation/trustedFacts');
+const { usableLeadReason } = require('./src/conversation/leadReason');
 const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -404,6 +412,12 @@ const {
 } = require('./src/conversation/requestDedupe');
 const { lineUnavailableResponse } = require('./src/sautikit/inactiveTenantGate');
 const { createClosedLineCalls } = require('./src/sautikit/closedLineCalls');
+const {
+  closedTenantGuardEnabled,
+  tenantLineForAction,
+  closedLineRefusal,
+  warmableTenantRows,
+} = require('./src/sautikit/closedTenantGuard');
 const closedLineCalls = createClosedLineCalls();
 const { startLineUnavailableClipRefresh } = require('./src/sautikit/lineUnavailableAudio');
 const { coverageNextStepFor } = require('./src/conversation/coverageNextStep');
@@ -465,6 +479,7 @@ const {
   createWsPayloadSampler,
 } = require('./src/sautikit/safeLog');
 const { isWhatsAppConfigured, sendOwnerWhatsApp, markWhatsAppRead, normalizeWhatsAppTo } = require('./src/notifications/whatsapp');
+const { sendReserved } = require('./src/notifications/sendLedger');
 const {
   ownerLeadEvent,
   renderEventText,
@@ -753,6 +768,15 @@ app.post('/internal/greeting-warm', async (req, res) => {
   }
   const tenantId = String(req.body?.tenantId || '').trim();
   if (!tenantId) return res.status(400).json({ ok: false, reason: 'tenantId required' });
+  const line = await tenantLineForAction(tenantId);
+  if (line.closed) {
+    console.log(`[greeting-warm] tenant=${tenantId} skipped: line closed (${line.reason})`);
+    const refusal = closedLineRefusal(line);
+    return res.status(200).json({
+      ...refusal,
+      message: `This business line is ${refusal.lineState}. Greeting not rendered.`,
+    });
+  }
   try {
     const result = await greetingWarmer.warmTenant(tenantId);
     return res.status(200).json({
@@ -775,12 +799,28 @@ app.post('/internal/desk/escalate', async (req, res) => {
   if (!callSid) {
     return res.status(400).json({ ok: false, reason: 'callSid required' });
   }
+  if (closedTenantGuardEnabled()) {
+    // A closed business (archived, suspended, is_active=false) gets no re-ping.
+    // Lookup errors answer open; the send ledger checks again per send.
+    let tenantId = null;
+    try {
+      tenantId = (await db.getCall(callSid))?.tenant_id || null;
+    } catch (err) {
+      console.warn(`[desk/escalate] call lookup failed ${callSid} (continuing):`, err?.message || err);
+    }
+    const line = await tenantLineForAction(tenantId);
+    if (line.closed) {
+      console.warn(`[desk/escalate] refused ${callSid}: tenant line closed (${line.reason}) tenant=${tenantId}`);
+      return res.status(409).json(closedLineRefusal(line));
+    }
+  }
   try {
     const result = await maybeSendEscalationNotification(callSid, {
       teammate: String(req.body?.teammate || '').trim() || undefined,
       name: String(req.body?.callerName || '').trim() || undefined,
       reason: String(req.body?.reason || '').trim() || 'Desk ping',
       force: req.body?.force !== false,
+      pingId: String(req.body?.pingId || '').trim().slice(0, 80) || undefined,
     });
     return res.status(200).json(result);
   } catch (err) {
@@ -1128,9 +1168,8 @@ const greetingWarmer = createGreetingWarmer({
   listTenantIds: async () => {
     if (process.env.TENANT_ID) return [process.env.TENANT_ID];
     const { rows } = await db.listInboundTenantRows();
-    return rows
-      .filter((r) => r && r.id && r.is_active !== false && !r.archived_at)
-      .map((r) => r.id);
+    // Closed lines (archived, suspended, is_active=false) never ring: no render.
+    return warmableTenantRows(rows).map((r) => r.id);
   },
   getProfile: (tenantId) => db.getTenantProfile({ tenantId }),
   createSession: ({ voiceId }) => createSonioxTtsSession({ callSid: 'greeting-warm', voiceId }),
@@ -1253,9 +1292,14 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
 async function writeHangupSummary(callSid, source, opts, brainState) {
   try {
     const call = await db.getCall(callSid);
+    const spokenTurns =
+      Array.isArray(opts.turns) && opts.turns.length
+        ? opts.turns
+        : callSpokenTranscripts.get(callSid)?.turns() || null;
     const derived = deriveCallResolution({
       brainState,
       callId: call?.id || null,
+      spokenTurns,
     });
     const summary = deriveCallSummary({ brainState });
     const primaryIntent = summary.primaryIntent || null;
@@ -1291,6 +1335,13 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
           actions: summary.actions,
           instructions: summary.instructions,
           language: summary.language,
+          // What the caller heard answered, from the spoken transcript.
+          ...(Array.isArray(derived.answeredQuestions)
+            ? {
+                answered_questions: derived.answeredQuestions,
+                unanswered_questions: derived.unansweredQuestions || [],
+              }
+            : {}),
         },
       });
     } catch (err) {
@@ -1425,6 +1476,32 @@ async function maybeSendMissedTextback({ callSid, call }) {
 //    Mounted on BOTH `/` and `/voice/incoming` because some number routing
 //    configs point at the tunnel root (logs showed POST / → 404 before).
 // ---------------------------------------------------------------------------
+/**
+ * Package cap decision for a new inbound call (fast and legacy paths).
+ * Fires the beta 80% / 100% ops notice and logs; true = refuse the call.
+ */
+function packageGateRefuses(callSid, gate) {
+  if (gate?.usage) {
+    // Beta tenants are never rejected at the cap; ops get 80% / 100% notices.
+    void maybeAlertPackageUsage(gate.usage).catch((err) => {
+      console.warn('[package-usage] alert failed:', err?.message || err);
+    });
+  }
+  if (gate?.reason === 'beta_over_cap') {
+    console.log(`[${callSid}] package minutes used, billing in beta — answering (metered, not charged)`);
+  }
+  if (gate?.reason === 'beta_no_package') {
+    console.log(`[${callSid}] no package, billing in beta — answering (metered, not charged)`);
+  }
+  if (gate && gate.open === false) {
+    console.warn(
+      `[${callSid}] ${gate.reason === 'no_package' ? 'no package' : 'package exhausted'} (billing ${gate.usage?.enforcement || '?'}, on-demand off) — refuse`
+    );
+    return true;
+  }
+  return false;
+}
+
 async function handleVoiceIncoming(req, res) {
   const webhookStartedAt = Date.now();
   try {
@@ -1597,10 +1674,14 @@ async function handleVoiceIncoming(req, res) {
 
     if (directoryHit) {
       if (directoryHit.gate && directoryHit.gate.open === false) {
-        console.warn(`[${callSid}] package exhausted — reject`);
+        // Same decision as db.packageInboundOpen (billing_enforcement is in
+        // the directory row): beta never rejects at the cap (#631).
+        console.warn(
+          `[${callSid}] ${directoryHit.gate.reason === 'no_package' ? 'no package' : 'package exhausted'} (billing ${directoryHit.gate.enforcement || '?'}, on-demand off) — refuse`
+        );
         return res
           .type('text/xml')
-          .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+          .send(packageRefusalXml({ businessName: directoryHit.businessName }));
       }
       if (directoryHit.unassigned) {
         console.warn(`[${callSid}] unassigned number — reject`);
@@ -1632,11 +1713,10 @@ async function handleVoiceIncoming(req, res) {
     } else {
       try {
         const gate = await db.packageInboundOpen({ toNumber, fromNumber });
-        if (gate && gate.open === false) {
-          console.warn(`[${callSid}] package exhausted — reject`);
+        if (packageGateRefuses(callSid, gate)) {
           return res
             .type('text/xml')
-            .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+            .send(packageRefusalXml({ businessName: gate.usage?.businessName }));
         }
       } catch (gateErr) {
         console.warn(
@@ -1754,8 +1834,28 @@ async function handleWhatsAppWebhook(req, res) {
         await noteWhatsAppDeliveryFailed(row);
       },
       markRead: (wamid) => markWhatsAppRead(wamid),
-      sendText: async ({ to, body }) => {
-        const json = await sendOwnerWhatsApp({ to, body, windowOpen: true });
+      sendText: async ({ to, body, replyTo }) => {
+        // Platform-billed reply: notify_sends row (tenant null) keyed by the
+        // inbound wamid, so a webhook redelivery cannot send or count twice.
+        const waTo = normalizeWhatsAppTo(to);
+        const reserved = await sendReserved(
+          {
+            ledger: { tenantId: null, kind: 'platform_wa_reply' },
+            key: replyTo ? `wa:${replyTo}` : `wa:${waTo}:${new Date().toISOString().slice(0, 16)}`,
+            kind: 'platform_wa_reply',
+            channel: 'whatsapp',
+            to: waTo,
+            body,
+          },
+          () => sendOwnerWhatsApp({ to, body, windowOpen: true })
+        );
+        if (!reserved.legacy && !reserved.sent) {
+          console.warn(`[whatsapp/events] reply skipped (${reserved.reason})`);
+          return null;
+        }
+        const json = reserved.legacy
+          ? await sendOwnerWhatsApp({ to, body, windowOpen: true })
+          : reserved.result;
         await db.persistPlatformWhatsAppOutbound({
           identity: 'platform',
           phoneNumberId: platformPhoneNumberId(),
@@ -2252,7 +2352,9 @@ mediaWss.on('connection', (ws, req) => {
     weakStt: false,
     tokenLanguages: [],
   };
-  let systemPrompt = buildSystemPrompt();
+  // VOICE_GUARD_TRUSTED_FACTS: the clock instant behind CURRENT TIME IN KENYA.
+  let promptClockAt = new Date();
+  let systemPrompt = buildSystemPrompt({}, { now: promptClockAt });
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
   let agentName = process.env.AGENT_NAME || 'Receptionist';
@@ -2264,6 +2366,7 @@ mediaWss.on('connection', (ws, req) => {
   let closureNotice = null;
   let messages = [{ role: 'system', content: systemPrompt }];
   const callTranscript = createCallTranscript();
+  if (sessionCallSid) callSpokenTranscripts.set(sessionCallSid, callTranscript);
   function logTurnTiming(timing, extra) {
     if (!timing) return null;
     const summary = timing.log(extra);
@@ -2500,7 +2603,8 @@ mediaWss.on('connection', (ws, req) => {
       afterHoursMode = profile.afterHoursMode || 'serve';
       openStatus = openClosedStatus(hoursSchedule);
       closureNotice = bulletinClosureNotice(profile.dailyBulletin);
-      systemPrompt = buildSystemPrompt(profile);
+      promptClockAt = new Date();
+      systemPrompt = buildSystemPrompt(profile, { now: promptClockAt });
       ttsLexiconOverrides = Array.isArray(profile.ttsLexicon)
         ? profile.ttsLexicon
         : [];
@@ -3452,11 +3556,20 @@ mediaWss.on('connection', (ws, req) => {
         }
       )
     );
-    if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
-      systemPrompt = buildSystemPrompt(brainProfile);
+    // The prompt clock was frozen at call start, so 3 minutes in the model still
+    // said 3:51 (HD_95e6745c0df1). Rebuild when the Kenya minute moved, and
+    // stamp the instant so the speech guard trusts the same clock.
+    const promptNow = new Date();
+    if (
+      liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp ||
+      promptClockStale(promptClockAt, promptNow)
+    ) {
+      promptClockAt = promptNow;
+      systemPrompt = buildSystemPrompt(brainProfile, { now: promptClockAt });
     }
     const nextBestAction = determineNextBestAction({ state: brainState, capabilities });
     brainState = setNextBestAction(brainState, nextBestAction);
+    stampPromptClock(brainState, promptClockAt);
     if (
       previousBrainState?.caller?.nameConfirmed !== true &&
       brainState?.caller?.nameConfirmed === true
@@ -3670,9 +3783,15 @@ mediaWss.on('connection', (ws, req) => {
         fileNameAskCommitted: fileNameAsksCommitted > 0,
         unfinishedDecided: true,
         holdTimedOut: opts.holdTimedOut === true,
+        // A committed local fact line already answers the question first.
+        publicAnswerCommitted: Boolean(localPacket),
       });
       if (nameGate.nameAskDeferred) {
-        console.log(`[ws/media][${callKey}] name ask deferred: held fragment timed out, model replies`);
+        console.log(
+          nameGate.deferredFor
+            ? `[ws/media][${callKey}] name ask deferred: caller asked (${nameGate.deferredFor}), model answers first`
+            : `[ws/media][${callKey}] name ask deferred: held fragment timed out, model replies`
+        );
       }
       const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
       const nameJustConfirmed = brainState?.caller?.nameJustConfirmed === true;
@@ -5385,6 +5504,7 @@ mediaWss.on('connection', (ws, req) => {
             }
             if (maybeSid && !sessionCallSid) {
               sessionCallSid = String(maybeSid);
+              callSpokenTranscripts.set(sessionCallSid, callTranscript);
               ttsSpeedScale = 1;
               publishVoiceTrace();
               console.log(`[ws/media] bound session callSid=${sessionCallSid}`);
@@ -5496,6 +5616,7 @@ mediaWss.on('connection', (ws, req) => {
         .finally(() => {
           callAgentTools.delete(sessionCallSid);
           callBrainStates.delete(sessionCallSid);
+          callSpokenTranscripts.delete(sessionCallSid);
           callBrainCapabilities.delete(sessionCallSid);
           callTenantProfiles.delete(sessionCallSid);
         });
@@ -5644,6 +5765,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         callSid,
         kind: 'escalation',
         force,
+        pingId: escalate.pingId || null,
       },
     });
 
@@ -5737,6 +5859,18 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
   }
 }
 
+/**
+ * The line state when this call's business is closed (archived, suspended,
+ * is_active=false), else null. The profile's lineState is from call start;
+ * the cached lookup (~60 s) catches a line closed mid-call. Guard off: null.
+ */
+async function callTenantLineClosed(profile) {
+  if (!closedTenantGuardEnabled()) return null;
+  if (profile?.lineState?.closed) return profile.lineState;
+  const line = await tenantLineForAction(profile?.id);
+  return line.closed ? line : null;
+}
+
 async function maybeQueueLiveTransfer({
   callSid,
   escalate,
@@ -5747,6 +5881,13 @@ async function maybeQueueLiveTransfer({
   const dest = liveTransferDestination(teamDirectory, escalate?.teammate);
   const ready = liveTransferReady({ profile });
   if (!ready.ready || !dest) return false;
+  const closedLine = await callTenantLineClosed(profile);
+  if (closedLine) {
+    console.warn(
+      `[${callSid}] live transfer skipped: tenant line closed (${closedLine.reason}) tenant=${profile?.id || 'unknown'}`
+    );
+    return false;
+  }
   const callerE164 = normalizeKenyaE164(callerNumber);
   if (callerE164 && callerE164 === dest.phone) {
     console.warn(
@@ -5831,15 +5972,21 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
     }
 
-    const event = ownerLeadEvent(
-      { ...call, callUrl: callDeskUrl(call.id) },
-      businessName
-    );
+    // HD_cd0c01f28b05: the lead reason is the caller's need. A missing reason
+    // or the name detour ("correct name spelling") falls back to the need
+    // Brain recorded this call ("Alvin asked about what time it is.").
+    const leadCall = { ...call, callUrl: callDeskUrl(call.id) };
+    if (!usableLeadReason(call.reason) && brain) {
+      const need = usableLeadReason(deriveCallSummary({ brainState: brain }).reason);
+      if (need && !/^\S+ called\.$/.test(need)) leadCall.reason = need;
+      else if (call.reason) leadCall.reason = null;
+    }
+    const event = ownerLeadEvent(leadCall, businessName);
     const body = renderEventText(event);
     const lead = {
       businessName,
       name: event.caller?.name || call.name,
-      reason: event.caller?.reason || call.reason,
+      reason: event.caller?.reason || leadCall.reason,
       callerNumber: call.from_number,
       recordingUrl: call.recording_url,
     };
@@ -6107,7 +6254,8 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
 
 wss.on('connection', (ws) => {
   let callSid = null;
-  let systemPrompt = buildSystemPrompt();
+  let promptClockAt = new Date();
+  let systemPrompt = buildSystemPrompt({}, { now: promptClockAt });
   let messages = [{ role: 'system', content: systemPrompt }];
   let transcriptLog = [];
   let callLanguage = 'unknown';
@@ -6136,7 +6284,8 @@ wss.on('connection', (ws) => {
           const profile = await db.getTenantProfile({ callSid, toNumber: data.to });
           await hydrateCallerMemory(profile, callSid);
           brainProfile = profile;
-          systemPrompt = buildSystemPrompt(profile);
+          promptClockAt = new Date();
+          systemPrompt = buildSystemPrompt(profile, { now: promptClockAt });
           const parsedTools = parseAgentTools(profile.agentTools);
           callAgentTools.set(callSid, parsedTools);
           callTenantProfiles.set(callSid, profile);
@@ -6190,11 +6339,17 @@ wss.on('connection', (ws) => {
             profile: brainProfile,
           })
         );
-        if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
-          systemPrompt = buildSystemPrompt(brainProfile);
+        const promptNow = new Date();
+        if (
+          liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp ||
+          promptClockStale(promptClockAt, promptNow)
+        ) {
+          promptClockAt = promptNow;
+          systemPrompt = buildSystemPrompt(brainProfile, { now: promptClockAt });
         }
         const decision = determineNextBestAction({ state: brainState, capabilities });
         brainState = setNextBestAction(brainState, decision);
+        stampPromptClock(brainState, promptClockAt);
         callBrainStates.set(callSid, brainState);
         logBrainTrace({
           callSid,
@@ -6452,8 +6607,15 @@ async function applyGeminiTools(callSid, parsed) {
       `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : enforcedParsed.fragmentBlocked ? 'fragment_turn' : 'needs_visit_time'}`
     );
   }
+  const closedLine = brainToolsWantWrite(enforcedParsed)
+    ? await callTenantLineClosed(groundedProfile)
+    : null;
+  if (closedLine) {
+    console.warn(`[${callSid}] tool writes refused: tenant line closed (${closedLine.reason})`);
+  }
   const execution = await executeBrainTools({
     parsed: enforcedParsed,
+    lineClosed: closedLine ? closedLine.reason || 'closed' : null,
     capabilities,
     completedFingerprints: state.actions.completedFingerprints,
     priorHolds: state.actions.openHolds || [],
