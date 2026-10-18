@@ -18,3 +18,26 @@ export function recordingPlaybackKind(value: unknown): "player" | "empty" {
 }
 
 export const NO_RECORDING_COPY = "No recording available for this call.";
+
+/** Storage bucket Voice copies recordings into (src/db.js RECORDINGS_BUCKET). */
+export const RECORDINGS_BUCKET = "call-recordings";
+
+/** Seconds a Calls-page playback link stays valid. Re-signed on every page load. */
+export const RECORDING_PLAYBACK_TTL_SECONDS = 60 * 60;
+
+/**
+ * Storage path of this call's own recording, or null.
+ * Voice writes `${callSid}/<recording>.<ext>`; a path under any other call is
+ * ignored so one row can never point the player at another call's audio.
+ */
+export function recordingStoragePath(
+  meta: Record<string, unknown> | null | undefined,
+  callSid: string | null | undefined
+): string | null {
+  const raw = meta && typeof meta.recording_path === "string" ? meta.recording_path.trim() : "";
+  const sid = String(callSid || "").trim();
+  if (!raw || !sid) return null;
+  if (raw.includes("..") || raw.startsWith("/")) return null;
+  if (!raw.startsWith(`${sid}/`)) return null;
+  return raw;
+}

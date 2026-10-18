@@ -11,6 +11,7 @@ const {
   LANGUAGE_INVITE,
 } = require('./businessAssistantIntro');
 const { confirmationLanguage } = require('./language');
+const { RECORDING_NOTICE_EN, recordingNoticeOn } = require('./recordingNotice');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { prepareStreamedSpeech, looksLikeShortAffirmation } = require('./callCorrectives');
 const { dropSpeechSlop, guardSpokenReply, logSpokenFilterDrop } = require('./speechGuard');
@@ -53,6 +54,7 @@ function fallbackGreeting(businessName, opts = {}) {
     afterHoursMode: opts.afterHoursMode,
     closureNotice: opts.closureNotice,
     callerFileName: opts.callerFileName || opts.fileOwnerName,
+    recordingNotice: opts.recordingNotice,
     now: opts.now,
     variant: opts.variant,
   });
@@ -84,7 +86,9 @@ async function generateDynamicGreeting(opts) {
   ).toLowerCase();
 
   if (process.env.VOICE_GREETING) {
-    return String(process.env.VOICE_GREETING).trim();
+    const fixed = String(process.env.VOICE_GREETING).trim();
+    if (recordingNoticeOn() && !/\brecord/i.test(fixed)) return `${fixed} ${RECORDING_NOTICE_EN}`;
+    return fixed;
   }
 
   const afterHoursMode =
@@ -114,6 +118,8 @@ async function generateDynamicGreeting(opts) {
   };
   const instant = fallbackGreeting(businessName, introOpts);
   if (mode !== 'gemini') return instant;
+  // A rewritten opener could drop the recording notice; keep the fixed line.
+  if (recordingNoticeOn()) return instant;
 
   const timeoutMs = Math.max(
     300,

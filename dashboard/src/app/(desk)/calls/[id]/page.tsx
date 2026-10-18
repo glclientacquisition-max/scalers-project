@@ -18,6 +18,7 @@ import {
   shapeTicketChat,
 } from "@/lib/callSummarySentence";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { playableCallRecordingUrl } from "@/lib/recordingPlayback";
 import { InboxTicketView } from "@/components/InboxTicketView";
 import { LiveTicket } from "@/components/LiveTicket";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
@@ -184,6 +185,8 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
   timer.mark("contact");
   console.info(timer.line("call-detail"));
   const meta = parseSummary(row.summary);
+  // Row is already scoped to this tenant above; re-sign its private recording.
+  const recordingUrl = await playableCallRecordingUrl(row, meta);
   const summaryName = typeof meta.name === "string" ? meta.name.trim() : "";
   const contactName = person?.name?.trim() || "";
   const name = contactName || summaryName || null;
@@ -301,7 +304,7 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
         job={job}
         hold={hold}
         turns={turns}
-        recordingUrl={row.recording_url}
+        recordingUrl={recordingUrl}
         durationLabel={row.duration_seconds != null ? `${row.duration_seconds}s` : "N/A"}
         assistLabel={
           row.resolution != null || row.resolution_note
