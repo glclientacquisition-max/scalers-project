@@ -12,6 +12,8 @@ import {
   type SeatOffer,
 } from "@/lib/planPricing";
 import { trialRemaining } from "@/lib/trialRemaining";
+import { planRowText } from "@/lib/planEntry";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 const SELL = ["starter", "growth", "scale"] as const;
 
@@ -60,6 +62,9 @@ export type OwnerPlanModel = {
   plans: PublishedPlan[];
   seatsUsed: number;
   seatsIncluded: number;
+  /** Plan minutes this period and minutes used, from the subscription read. */
+  minutesIncluded: number;
+  minutesUsed: number;
   trialText: string | null;
   onDemandLocked: boolean;
   invoices: OwnerInvoiceRow[];
@@ -128,6 +133,8 @@ function betaModel(): OwnerPlanModel {
     plans: [],
     seatsUsed: 0,
     seatsIncluded: 0,
+    minutesIncluded: 0,
+    minutesUsed: 0,
     trialText: null,
     onDemandLocked: false,
     invoices: [],
@@ -439,10 +446,12 @@ export async function loadOwnerPlan(tenantId: string): Promise<{ ok: true; model
         surface: ownerBillingSurface(status),
         currentSku: isSku(row.package_sku) ? row.package_sku : null,
         currentMonthlyKes: row.version_monthly_price_kes == null ? null : num(row.version_monthly_price_kes),
-        cycle: "month",
+        cycle: seatOffer.cycle,
         plans,
         seatsUsed: Math.max(0, Math.round(num(seats.data))),
         seatsIncluded: Math.max(0, Math.round(num(row.version_seats))),
+        minutesIncluded: Math.max(0, Math.round(num(row.minutes_included))),
+        minutesUsed: Math.max(0, Math.ceil(num(row.seconds_used) / 60)),
         trialText: trial?.text ?? null,
         onDemandLocked: status === "trialing",
         invoices: invoices.rows,
@@ -534,5 +543,42 @@ export async function loadUsageBillingExtras(tenantId: string): Promise<UsageBil
     };
   } catch {
     return emptyExtras();
+  }
+}
+
+export type PlanRowStatus = { billingStatus: string; row: { text: string; title: string } | null };
+
+/** Settings Plan row: the plan name, "Choose a plan" on trial. Beta reads the package from tenant_billing_state. */
+export async function loadPlanRowStatus(tenantId: string): Promise<PlanRowStatus> {
+  const none: PlanRowStatus = { billingStatus: "beta", row: null };
+  if (!tenantId) return none;
+  try {
+    const ws = await createWorkspaceDataClient();
+    if (!ws) return none;
+    const sub = await ws.client
+      .from("billing_subscription_read")
+      .select("billing_status, package_sku")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    const row = (sub.error ? null : sub.data) as Record<string, unknown> | null;
+    const status = row ? String(row.billing_status || "beta") : "beta";
+    let name: string | null = null;
+    if (row && isSku(row.package_sku)) {
+      const pack = await ws.client.from("billing_packages").select("name").eq("sku", row.package_sku).maybeSingle();
+      if (!pack.error && pack.data) name = String((pack.data as { name?: unknown }).name || "") || null;
+    }
+    if (!name && isFreeBeta(status)) {
+      const state = await getSupabaseAdmin()
+        .from("tenant_billing_state")
+        .select("package_state, package_name")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      const data = (state.error ? null : state.data) as { package_state?: string; package_name?: string } | null;
+      if (data?.package_state === "active" && data.package_name) name = String(data.package_name);
+    }
+    const text = planRowText(status, name);
+    return { billingStatus: status, row: text ? { text, title: text } : null };
+  } catch {
+    return none;
   }
 }
