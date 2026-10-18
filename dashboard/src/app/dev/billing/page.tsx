@@ -26,7 +26,7 @@ export default async function DevBillingPage({
   ] as const;
   const view = allowed.includes(raw as (typeof allowed)[number]) ? (raw as (typeof allowed)[number]) : "beta";
   return (
-    <div className="desk-theme min-h-dvh bg-canvas">
+    <div className="desk-theme flex min-h-dvh flex-col bg-canvas px-4 py-4 sm:px-6 md:p-6">
       <BillingFixture view={view} />
     </div>
   );

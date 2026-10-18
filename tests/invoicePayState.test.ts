@@ -29,7 +29,7 @@ describe("invoicePayState", () => {
     const view = invoicePayState({ status: "open", payToken: null });
     assert.equal(view.showPayButton, false);
     assert.equal(view.payHref, null);
-    assert.equal(view.note, "Pay link coming by SMS and email");
+    assert.equal(view.note, null);
     const withToken = invoicePayState({ status: "open", payToken: "abc" });
     assert.equal(withToken.showPayButton, true);
     assert.equal(withToken.payHref, "/pay/abc");

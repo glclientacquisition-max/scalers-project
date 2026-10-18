@@ -39,9 +39,10 @@ export function nairobiDay(iso: string | null | undefined): string | null {
 
 function payAction(sub: BannerSub): BillingBannerAction | null {
   const amount = sub.openInvoiceKes;
-  if (amount == null || !(amount > 0)) return { label: "Billing", href: "/settings/billing" };
-  if (sub.payToken) return { label: `Pay ${formatKsh(amount)}`, href: `/pay/${sub.payToken}` };
-  return { label: "Billing", href: "/settings/billing" };
+  if (amount != null && amount > 0 && sub.payToken) {
+    return { label: `Pay ${formatKsh(amount)}`, href: `/pay/${sub.payToken}` };
+  }
+  return { label: "View invoice", href: "/settings/billing" };
 }
 
 /** At most one desk banner. Beta and a clear active plan return null. */
@@ -61,8 +62,8 @@ export function pickBillingBanner(sub: BannerSub | null | undefined, _now: Date)
       return {
         kind: "voicemail",
         text: day
-          ? `Callers can leave a voicemail until ${day}. Updates go to your Inbox only.`
-          : "Callers can leave a voicemail. Updates go to your Inbox only.",
+          ? `Callers can leave a voicemail until ${day}.`
+          : "Callers can leave a voicemail.",
         action,
       };
     }

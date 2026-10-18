@@ -45,7 +45,7 @@ describe("pickBillingBanner", () => {
     assert.match(grace?.text || "", /Payment due\. Your Business Assistant pauses on 9 Oct\./);
     const voice = pickBillingBanner(sub("suspended"), at(8));
     assert.match(voice?.text || "", /voicemail until 16 Oct/);
-    assert.match(voice?.text || "", /Inbox only/);
+    assert.doesNotMatch(voice?.text || "", /Inbox only/);
   });
 
   it("trial ended beats grace", () => {
@@ -73,6 +73,7 @@ describe("pickBillingBanner", () => {
   it("hides Pay KSh when there is no token", () => {
     const hidden = pickBillingBanner(sub("past_due", { payToken: null }), at(0));
     assert.equal(hidden?.kind, "grace");
+    assert.equal(hidden?.action?.label, "View invoice");
     assert.doesNotMatch(hidden?.action?.label || "", /Pay KSh/);
     assert.equal(hidden?.action?.href, "/settings/billing");
     const shown = pickBillingBanner(sub("past_due"), at(0));

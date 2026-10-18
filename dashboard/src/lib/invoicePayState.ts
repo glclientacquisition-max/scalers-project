@@ -42,7 +42,7 @@ export function invoicePayState(input: {
       label: "Open",
       showPayButton: false,
       payHref: null,
-      note: "Pay link coming by SMS and email",
+      note: null,
       hidden: false,
     };
   }
