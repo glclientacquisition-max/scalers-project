@@ -29,6 +29,8 @@ export type OpsSettings = {
   people: OpsPerson[];
   kinds: OpsKindFlags;
   sautikitWarnMinor: number;
+  /** null = RECORDING_RETENTION_DAYS env (default 30). -1 = never delete. */
+  recordingRetentionDays: number | null;
 };
 
 export type OpsSignal = {
@@ -99,7 +101,18 @@ export function defaultOpsSettings(): OpsSettings {
     people: [],
     kinds: defaultKindFlags(),
     sautikitWarnMinor: DEFAULT_SAUTIKIT_WARN_MINOR,
+    recordingRetentionDays: null,
   };
+}
+
+export function parseRecordingRetentionDays(raw: unknown): number | null {
+  if (raw === undefined || raw === null || raw === "") return null;
+  if (raw === "never" || raw === "Never") return -1;
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n)) return null;
+  if (n === -1) return -1;
+  if (n >= 7 && n <= 365) return n;
+  return null;
 }
 
 export function normalizeOpsEmail(raw: string): string {
