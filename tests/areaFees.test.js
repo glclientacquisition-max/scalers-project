@@ -182,4 +182,62 @@ for (const d199 of [undefined, 'on']) {
     assert.match(out.text, /KSh 300/);
     assert.deepEqual(out.dropReasons, []);
   }));
+
+  // HD_d3101ad5ebac turn 2: model spoke Swahili number words; unsaid_number
+  // deleted the fee sentence because numbersIn only saw "mia"=100 and "tatu"=3.
+  test(`speech check keeps Swahili and English fee words for a confirmed amount (${label})`, () => withEnv('BRAIN_CALL_FIXES_D199', d199, () => {
+    const p = home();
+    const trace = 'Ndiyo, tunafika Kileleshwa. Kuna ada ya usafiri ya shilingi mia tatu na tunasafisha siku hiyo hiyo. Ungetaka huduma gani?';
+    const out = guard(trace, p, ['nilikuwa nataka kujua kama mnafika Kileleshwa'], { language: 'sw' });
+    assert.match(out, /shilingi mia tatu/);
+    assert.match(out, /Ndiyo, tunafika Kileleshwa/);
+    assert.doesNotMatch(out, /^Ndiyo, tunafika Kileleshwa\. Ungetaka huduma gani\?$/);
+
+    const enWords = 'Yes, we reach Kileleshwa. There is a travel fee of three hundred shillings and we clean the same day.';
+    assert.match(guard(enWords, p, [ASK_EN]), /three hundred shillings/);
+
+    assert.match(guard('The travel fee is Sh 300.', p, [ASK_EN]), /Sh 300/);
+    assert.match(guard('The travel fee is KSh 300.', p, [ASK_EN]), /KSh 300/);
+    assert.match(guard('The travel fee is bob 300.', p, [ASK_EN]), /bob 300/);
+
+    const withMore = tenantProfileFromRow({
+      ...homeRow,
+      service_areas: {
+        ...homeRow.service_areas,
+        areas: [
+          ...homeRow.service_areas.areas,
+          area('place:runda', { fee_ksh: 350 }),
+          area('place:muthaiga', { fee_ksh: 1500 }),
+        ],
+      },
+      business_policies: {
+        ...homeRow.business_policies,
+        coverage_areas: [
+          ...homeRow.business_policies.coverage_areas,
+          'place:runda',
+          'place:muthaiga',
+        ],
+      },
+    });
+    assert.match(
+      guard('Ada ya usafiri Runda ni shilingi mia tatu na hamsini.', withMore, ['Runda?'], { language: 'sw' }),
+      /mia tatu na hamsini/,
+    );
+    assert.match(
+      guard('Ada ya usafiri Muthaiga ni shilingi elfu moja na mia tano.', withMore, ['Muthaiga?'], { language: 'sw' }),
+      /elfu moja na mia tano/,
+    );
+  }));
+
+  test(`speech check still strips unconfirmed number words (${label})`, () => withEnv('BRAIN_CALL_FIXES_D199', d199, () => {
+    const p = home();
+    // 450 is on an unconfirmed Lavington row — must not be spoken as words or digits
+    const sw = guard('Ada ya usafiri kwenda Lavington ni shilingi mia nne na hamsini.', p, ['Lavington ni pesa ngapi?'], { language: 'sw' });
+    assert.doesNotMatch(sw, /mia nne|450|hamsini/);
+    const en = guard('The travel fee to Lavington is four hundred and fifty shillings.', p, ['How much for Lavington?']);
+    assert.doesNotMatch(en, /four hundred|450|fifty shillings/);
+    // A confirmed 300 must not authorize a different spoken amount
+    const wrong = guard('Ada ya usafiri ni shilingi mia tano.', p, [ASK_SW], { language: 'sw' });
+    assert.doesNotMatch(wrong, /mia tano|500/);
+  }));
 }
