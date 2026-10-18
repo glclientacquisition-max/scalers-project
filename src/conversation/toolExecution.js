@@ -211,6 +211,11 @@ function validateServiceRequest(
     whenText: clean(raw.whenText, 160),
     notes: clean(raw.notes, 400),
   };
+  // BRAIN_TRUSTED_HOURS (HD_dfd531f8b083): "Do I need" is not a caller name;
+  // the request saves with no name (a hold still asks for one).
+  if (value.name && require('./trustedHours').trustedHoursEnabled() && !savableCallerName(value.name)) {
+    value.name = '';
+  }
   if (!value.item && !value.notes) {
     return { valid: false, reason: 'A request needs an item or concise notes.' };
   }
@@ -354,7 +359,13 @@ function validateCallerInfo(parsed, { agentName = '', businessName = '', knownNa
   }
   // BRAIN_CALL_FIXES_D199: #628's junk-name check gates the saved name too
   // (HD_d199dbbf6b79 t9 saved "like"). The name stays code-held.
-  if (value.name && require('./callFixesD199').callFixesD199Enabled() && !savableCallerName(value.name)) {
+  // BRAIN_TRUSTED_HOURS (HD_dfd531f8b083): the same gate, so "Do I need" is
+  // not saved while D199 is off.
+  if (
+    value.name &&
+    (require('./callFixesD199').callFixesD199Enabled() || require('./trustedHours').trustedHoursEnabled()) &&
+    !savableCallerName(value.name)
+  ) {
     value.name = '';
   }
   return {

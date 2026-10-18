@@ -31,13 +31,22 @@ const LOCATION_ASK =
   /\b(where are you|where(?:'re| are) you (?:based|located)|where is (?:the |your )?(?:shop|store|office|studio)|your address|mko wapi|uko wapi)\b/i;
 
 /** The topic of one caller turn, or '' when it asks nothing this module tracks. */
-function callerQuestionTopic(text) {
+function callerQuestionTopic(text, opts = {}) {
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return '';
   if (personalFileAsk(raw)) return '';
   const clock = callerClockAsk(raw);
   if (clock) return clock;
   if (looksLikeHoursAsk(raw)) return 'hours';
+  // BRAIN_TRUSTED_HOURS (HD_49d726c3dc9b): "Tuesday at what time will you be
+  // open?" and its "at what time?" follow-ups are the hours question.
+  const trustedHours = require('./trustedHours');
+  if (
+    trustedHours.trustedHoursEnabled() &&
+    trustedHours.hoursAskDay(raw, { previous: opts.previous, now: opts.now, looksLikeHoursAsk })
+  ) {
+    return 'hours';
+  }
   if (PRICE_ASK.test(raw)) return 'price';
   if (OFFER_ASK.test(raw)) return 'services';
   if (LOCATION_ASK.test(raw)) return 'location';
@@ -55,11 +64,15 @@ const NON_ANSWER = [
   /don'?t have that on file|not on file|don'?t have that detail|sina hiyo|siko na hiyo|sina maelezo|i'?m not sure|sijui/i,
 ];
 
+// BRAIN_TRUSTED_HOURS: "I'll have the team confirm." (hours_unknown) answers nothing.
+const TEAM_CONFIRM = /\bhave the team confirm\b|\btimu ithibitishe\b|\bteam iconfirm\b/i;
+
 function isNonAnswer(line) {
   const raw = String(line || '').trim();
   if (!raw) return true;
   const sentences = raw.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
-  return sentences.every((s) => NON_ANSWER.some((re) => re.test(s)));
+  const extra = require('./trustedHours').trustedHoursEnabled() ? [TEAM_CONFIRM] : [];
+  return sentences.every((s) => NON_ANSWER.some((re) => re.test(s)) || extra.some((re) => re.test(s)));
 }
 
 const DATE_WORD =
@@ -109,9 +122,11 @@ function spokenQuestionLedger(turns = []) {
     (row) => row && (row.speaker === 'agent' || row.speaker === 'caller') && String(row.text || '').trim()
   );
   const asked = [];
+  const callerSoFar = [];
   rows.forEach((row, index) => {
     if (row.speaker !== 'caller') return;
-    const topic = callerQuestionTopic(row.text);
+    const topic = callerQuestionTopic(row.text, { previous: [...callerSoFar] });
+    callerSoFar.push(row.text);
     if (!topic) return;
     const label = TOPIC_LABEL[topic] || clip(row.text);
     if (asked.some((q) => q.label === label)) return;

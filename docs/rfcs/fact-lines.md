@@ -1,6 +1,6 @@
 ---
 owner: brain
-last_reviewed: 2026-10-13
+last_reviewed: 2026-10-18
 ---
 
 # Fact lines: Brain templates, Voice wording
@@ -230,6 +230,51 @@ Source call: HD_d199dbbf6b79 (staging re-dial, 2026-10-09 11:41 EAT).
 - Wording (Brain fallback; Voice owns the wording): "Sure. What would you like
   to know?" / "Sawa. Ungependa kujua nini?" / Sheng "Poa. Unataka kujua nini?"
 - `gate`: `{ fragment: true, write: 'none' }`.
+
+### `hours_on` — the hours on file for one day
+
+Behind `BRAIN_TRUSTED_HOURS` (staging; on only when exactly `on`). Source
+call: Aris prod HD_49d726c3dc9b (2026-10-18 13:14 EAT).
+
+- Required: `day: enum(mon|tue|wed|thu|fri|sat|sun)`,
+  `status: enum(open|closed)`.
+- Optional: `relative: enum(today|tomorrow)` (computed in code in
+  Africa/Nairobi), `open: string` and `close: string` (`"HH:MM"`, 24-hour,
+  from the grid; present when `status` is `open`).
+- Gate: `tenants.hours_schedule` parses to a weekly grid. `closed` only when
+  the grid has no window for that day, or the day is today and an active
+  bulletin says closed. An FAQ or note never sets `status`.
+- Fires: (1) on a day or hours ask ("Tuesday at what time will you be open?",
+  "Kesho mko wazi?", and a bare "at what time?" right after one) when the
+  model's hours sentence does not match that day's grid, or was dropped by
+  the number rule (the grounded-hours slot; which number sentences pass is
+  Voice's rule, not this template's); (2) in place of any
+  model sentence that says a day is open or closed against the grid ("Tomorrow
+  is Monday and we will be closed." with Monday 09:30-18:00 on file). Once
+  per caller turn.
+- Wording (Brain fallback; Voice owns the wording):
+  - en: "On Tuesday we're open from 9:30 AM to 6 PM." / "Tomorrow, Monday,
+    we're open from 9:30 AM to 6 PM." / "On Saturday we're closed."
+  - sw: "Jumanne tuko wazi saa tatu na nusu asubuhi hadi saa kumi na mbili
+    jioni." / "Kesho Jumatatu tuko wazi …" / "Jumamosi tumefunga."
+  - sheng: "Jumanne tuko open saa tatu na nusu asubuhi mpaka saa kumi na
+    mbili jioni." / "Jumamosi tuko closed."
+- `gate`: `{ source: 'grid' | 'bulletin', day }`.
+
+### `hours_unknown` — no hours on file
+
+Behind `BRAIN_TRUSTED_HOURS`.
+
+- Slots: none.
+- Gate: `tenants.hours_schedule` is empty or does not parse, and
+  `business_hours` (prose) is empty too. The day's hours are never guessed
+  from an FAQ or the model. Prose-only hours are not judged by this guard;
+  the old hours path keeps them (HOURS NOTES in the prompt).
+- Fires: where `hours_on` would fire.
+- Wording (Brain fallback): en "I'll have the team confirm." / sw "Nitaomba
+  timu ithibitishe." / sheng "Nitaambia team iconfirm."
+- `gate`: `{ hours_schedule: null, day }`.
+- The spoken ledger (`spokenAnswers.js`) counts this line as no answer.
 
 ## Fallback
 

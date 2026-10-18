@@ -862,12 +862,52 @@ function isRejectedGoalText(text, opts = {}) {
 
 function callerGoalText(text, opts = {}) {
   if (opts.unfinished === true || opts.weak === true) return '';
+  // BRAIN_TRUSTED_HOURS (HD_49d726c3dc9b): "Tuesday at what time will you be
+  // open?" is the goal "opening hours on Tuesday"; its follow-ups ("Like at,
+  // at what time?") and a closing ("Bye.") are never the goal.
+  const trustedHours = require('./trustedHours');
+  if (trustedHours.trustedHoursEnabled()) {
+    if (trustedHours.isHoursFollowUp(text)) return '';
+    if (trustedHours.hoursAskDay(text, { now: opts.now })) return trustedHours.hoursGoalText(text, opts.now);
+  }
   const goal = usableGoalRemainder(text);
   // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 2, 4): a closing ("That's all.",
   // "asante", "hiyo tu") or a thinking filler is never the caller's goal.
   const fixes = require('./callFixesD199');
   if (goal && fixes.callFixesD199Enabled() && (fixes.notAGoal(text) || fixes.notAGoal(goal))) return '';
+  if (goal && trustedHours.trustedHoursEnabled() && (fixes.notAGoal(text) || fixes.notAGoal(goal))) return '';
   return goal;
+}
+
+// Pronouns, auxiliaries, question words and other function words (en, sw).
+// A name span holding one of these is a sentence fragment, not a name.
+const NAME_FUNCTION_WORDS = new Set([
+  'i', "i'm", 'im', 'me', 'my', 'mine', 'you', 'your', "you're", 'we', 'our', 'us', 'they', 'them', 'their',
+  'do', 'does', 'did', "don't", 'dont', 'is', 'am', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had',
+  'can', 'could', 'should', 'would', 'shall', 'must',
+  'need', 'needs', 'want', 'wants', 'know', 'think', 'get', 'got', 'go', 'give', 'take', 'make', 'buy', 'order', 'call',
+  'what', 'where', 'when', 'why', 'how', 'which', 'who', 'whom', 'whose',
+  'a', 'an', 'to', 'of', 'in', 'on', 'at', 'if', 'or', 'but', 'so', 'not', 'any', 'some', 'there',
+  'nini', 'gani', 'wapi', 'lini', 'nani', 'je', 'ni', 'mimi', 'wewe', 'sisi', 'nyinyi',
+  'nataka', 'nahitaji', 'naomba', 'ninataka', 'unataka', 'mnauza', 'mko', 'kuna', 'iko', 'ama',
+]);
+
+/**
+ * "Do I need", "What do you", "Nataka nini": a question (ends in "?") or a
+ * span with a pronoun, auxiliary, question word or function word. Names that
+ * are also English words ("Will", "May", "Grace") pass: those are not listed.
+ */
+function isQuestionOrFunctionSpan(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return false;
+  if (/\?\s*$/.test(raw)) return true;
+  const words = raw
+    .toLowerCase()
+    .replace(/[’]/g, "'")
+    .replace(/[.,!;:]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  return words.some((word) => NAME_FUNCTION_WORDS.has(word));
 }
 
 function isPlausibleCallerName(value) {
@@ -888,6 +928,10 @@ function isPlausibleCallerName(value) {
   }
   const words = name.split(/\s+/);
   if (words.some((word) => NAME_BLOCKLIST.has(word.toLowerCase()))) return false;
+  // BRAIN_TRUSTED_HOURS (Esga prod HD_dfd531f8b083 t11): the caller asked
+  // "Do I need?" and the model saved the name "Do I need". A question or a
+  // run of function words is never a name. No name table grows for this.
+  if (require('./trustedHours').trustedHoursEnabled() && isQuestionOrFunctionSpan(name)) return false;
   if (/^(?:impressed|amazed|delighted|grateful|thankful|pleased)$/i.test(lower)) return false;
   if (
     /\b(?:impressed|amazed|delighted|grateful|thankful|pleased|glad)\b/i.test(lower) &&
@@ -1234,5 +1278,6 @@ module.exports = {
   callerAskSpecificity,
   agentAskedPendingName,
   isPlausibleCallerName,
+  isQuestionOrFunctionSpan,
   entityValue,
 };

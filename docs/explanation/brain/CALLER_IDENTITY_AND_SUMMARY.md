@@ -1,6 +1,6 @@
 ---
 owner: brain
-last_reviewed: 2026-10-07
+last_reviewed: 2026-10-18
 ---
 
 # Caller identity and summary (runtime contract)
@@ -81,6 +81,28 @@ primary_intent: enum (existing desk taxonomy)
 resolution: enum
 resolution_note: string | null  // must match resolution class
 ```
+
+### Trusted hours and honest summary (`BRAIN_TRUSTED_HOURS`, staging)
+
+Source: Aris prod HD_49d726c3dc9b, Esga prod HD_dfd531f8b083. Off unless
+exactly `on`; independent of `BRAIN_CALL_FIXES_D199`.
+
+- An hours ask is the goal "opening hours on {Day}" (or "tomorrow"/"today").
+  A bare "at what time?" follow-up and a closing ("Bye.") are never the goal.
+- The spoken ledger counts "Tuesday at what time will you be open?" and its
+  follow-ups as the `hours` question. A guard-replaced line, "not on file",
+  or "I'll have the team confirm." is no answer, so the question lands in
+  `unanswered_questions`.
+- No card line may say the hours were answered while `hours` is unanswered.
+  `next` becomes "Call them back with the hours.".
+- A second hangup for the same sid from a session with no turns does not
+  replace the real call's snapshot in the review job.
+- The reviewed summary writes `language` from the caller turns (one language
+  at 75% or more of the turns with a detected language, else `mixed`) when
+  the hangup snapshot said `unknown`.
+- A question ("Do I need?") or a span with a pronoun, auxiliary, question
+  word or function word is never a caller name (`isPlausibleCallerName`,
+  `save_caller_info`, `create_service_request`). No name table grows.
 
 ### Never allowed as `goal.text`
 
