@@ -97,10 +97,10 @@ module.exports = [
   { bug: 5, id: 'R5_sw_no_relist_after_yes', title: "Generic replies (bare Sawa, 'regarding X', relist after Yes)", kind: 'call', lang: 'sw', tenant: 'done_and_dusted',
     turns: ['Bei ya sofa ni ngapi?', 'Ndio.'], facts: {}, check: (r) => (LIST.test(t(r, 1)) || /tukusaidie vipi/i.test(t(r, 1)) ? [`generic_after_yes "${t(r, 1)}"`] : []) },
 
-  // 6-9: Voice-side (src/speech, server.js). Probes on the Voice modules; xfail where the fix or
-  // a test seam is Voice's.
+  // 6-9: Voice-side (src/speech, server.js). Probes on the Voice seams; required (Voice fixes:
+  // R6 outageDebounce.decideSpeechOutage, R7 callerFileSpeech.shouldAskFileName, R8 toolSmooth.shouldQueueHold
+  // + TurnArbiter audio slot, R9 prepareForTts line language + per-language lexicon).
   { bug: 6, id: 'R6_stale_stream_not_outage', title: 'False speech outage + owner SMS on one stale TTS stream (HD_30a3970034a4)', kind: 'probe', lang: 'en+sw',
-    xfail: { owner: 'Voice', note: 'the race is in server.js speakText/outage path; needs a Voice test seam (e.g. an exported shouldDeclareSpeechOutage(errors)) that counts a single stale "Stream … not found" as non-fatal' },
     probe: (root) => {
       const { classifySonioxError } = require(`${root}/src/speech/sonioxErrors`);
       const c = classifySonioxError({ error_code: 400, error_message: 'Stream abc123 not found' });
@@ -111,7 +111,6 @@ module.exports = [
       return f;
     } },
   { bug: 7, id: 'R7_name_gate_no_repeat_over_question', title: 'Name-gate repeats "Am I speaking with <name>?" over a real question (HD_2847152f6c1e T3)', kind: 'probe', lang: 'en+sw',
-    xfail: { owner: 'Voice', note: 'canned file_name_ask lives in server.js; needs an exported name-gate decision (e.g. callerFileSpeech.shouldAskFileName({askedTurns, callerTextIsQuestion})) so EN "Do you have the engineering set?" / SW "Mko na engineering set?" suppress the repeat' },
     probe: (root) => {
       const m = require(`${root}/src/speech/callerFileSpeech`);
       if (typeof m.shouldAskFileName !== 'function') return ['no_name_gate_seam'];
@@ -120,7 +119,6 @@ module.exports = [
       return f;
     } },
   { bug: 8, id: 'R8_no_stacked_filler_and_hold', title: 'Filler + hold line + receipt stacked on a tool turn (HD_2847152f6c1e T4)', kind: 'probe', lang: 'en+sw',
-    xfail: { owner: 'Voice', note: 'toolSmooth must not queue the hold line when a filler already played this turn; needs shouldQueueHold to take the filler state (#687 follow-up)' },
     probe: (root) => {
       const m = require(`${root}/src/speech/toolSmooth`);
       const f = [];
@@ -131,7 +129,6 @@ module.exports = [
       return f;
     } },
   { bug: 9, id: 'R9_sw_place_not_respelled', title: 'Swahili place name respelled with English phonetics ("Na-koo-roo", HD_740090e11a2f)', kind: 'probe', lang: 'sw',
-    xfail: { owner: 'Voice', note: 'live respelling came from the phonetic/lexicon path with a Swahili call language; prepareForTts must keep Kenyan places as written in sw and detect the line as sw' },
     probe: (root) => {
       const { prepareForTts } = require(`${root}/src/speech/ttsNormalize`);
       const s = 'Tuko na matawi matatu Nakuru, Nairobi na Mombasa.';
