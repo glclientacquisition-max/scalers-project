@@ -1,6 +1,6 @@
 "use server";
 
-import { memberDenied } from "@/lib/requireMember";
+import { currentMemberRole, memberDenied } from "@/lib/requireMember";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
@@ -13,6 +13,9 @@ import {
 } from "@/lib/contactImport";
 import { sanitizeStoredCallerName } from "@/lib/callerNameQuality";
 import { mergeContactIdentity } from "@/lib/contactIdentity";
+import { contactNameLockFromEnv } from "@/lib/contactNameLockFlag";
+import { dismissAlternate, ownerRename, setSinglePerson } from "@/lib/contactNameLock";
+import { can } from "@/lib/permissions";
 import { storedPhoneCandidates } from "@/lib/handoffMode";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerFacingError } from "@/lib/ownerFacingError";
@@ -324,10 +327,14 @@ export async function updateContactName(
   if (!existing) return { error: "Missing contact." };
 
   const previousName = sanitizeStoredCallerName(existing.name);
-  const identity = mergeContactIdentity(
-    { name: incoming, metadata: contactMetadata(existing.metadata) },
-    previousName && previousName !== incoming ? { name: previousName } : {}
-  );
+  // DESK_CONTACT_NAME_LOCK on: the old name is not kept as an alternate, near-spellings of
+  // the new name are dropped, and an owner or admin rename locks the name.
+  const identity = contactNameLockFromEnv()
+    ? ownerRename(existing, incoming, new Date().toISOString(), { lock: await canManageContactIdentity() })
+    : mergeContactIdentity(
+        { name: incoming, metadata: contactMetadata(existing.metadata) },
+        previousName && previousName !== incoming ? { name: previousName } : {}
+      );
   if (!identity.name) return { error: "Enter a name." };
 
   const { error } = await ctx.workspace.client
@@ -386,4 +393,75 @@ export async function updateContactFavourite(
   revalidatePath("/contacts");
   revalidatePath(`/contacts/${id}`);
   return { ok: true };
+}
+
+/** Owner and admin (and the legacy ops desk, which has no member role). */
+async function canManageContactIdentity(): Promise<boolean> {
+  const role = await currentMemberRole();
+  return role === null || can(role, "contacts.import");
+}
+
+async function loadContactMetadata(
+  ctx: NonNullable<Awaited<ReturnType<typeof loadWorkspace>>>,
+  id: string
+): Promise<{ metadata: Record<string, unknown> | null } | { error: string }> {
+  const { data, error } = await ctx.workspace.client
+    .from("contacts")
+    .select("id, metadata")
+    .eq("id", id)
+    .eq("tenant_id", ctx.tenant.id)
+    .maybeSingle();
+  if (error) return { error: contactsWriteError(error.message) };
+  if (!data) return { error: "Missing contact." };
+  return { metadata: contactMetadata(data.metadata) };
+}
+
+async function saveContactMetadata(
+  ctx: NonNullable<Awaited<ReturnType<typeof loadWorkspace>>>,
+  id: string,
+  metadata: Record<string, unknown>
+): Promise<ContactNotesResult> {
+  const { error } = await ctx.workspace.client
+    .from("contacts")
+    .update({ metadata, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("tenant_id", ctx.tenant.id);
+  if (error) return { error: contactsWriteError(error.message) };
+  revalidatePath(`/contacts/${id}`);
+  return { ok: true };
+}
+
+/** "This number is one person" (owner or admin). On sets single_person and name_locked; off clears both. */
+export async function setContactSinglePerson(
+  contactId: string,
+  on: boolean
+): Promise<ContactNotesResult> {
+  const denied = await memberDenied("contacts.import");
+  if (denied) return denied;
+  if (!contactNameLockFromEnv()) return { error: "This isn't turned on yet." };
+  const ctx = await loadWorkspace();
+  if (!ctx) return { error: "Not signed in." };
+  const id = String(contactId || "").trim();
+  if (!id) return { error: "Missing contact." };
+  const loaded = await loadContactMetadata(ctx, id);
+  if ("error" in loaded) return { error: loaded.error };
+  return saveContactMetadata(ctx, id, setSinglePerson(loaded.metadata, Boolean(on), new Date().toISOString()));
+}
+
+/** Remove an "Also heard as" name (owner or admin): out of alternate_names, into alternate_names_dismissed. */
+export async function dismissContactAlternateName(
+  contactId: string,
+  name: string
+): Promise<ContactNotesResult> {
+  const denied = await memberDenied("contacts.import");
+  if (denied) return denied;
+  if (!contactNameLockFromEnv()) return { error: "This isn't turned on yet." };
+  const ctx = await loadWorkspace();
+  if (!ctx) return { error: "Not signed in." };
+  const id = String(contactId || "").trim();
+  const value = String(name || "").trim().slice(0, 80);
+  if (!id || !value) return { error: "Missing contact." };
+  const loaded = await loadContactMetadata(ctx, id);
+  if ("error" in loaded) return { error: loaded.error };
+  return saveContactMetadata(ctx, id, dismissAlternate(loaded.metadata, value, new Date().toISOString()));
 }

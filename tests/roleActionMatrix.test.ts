@@ -35,6 +35,7 @@ const EXPECT: Record<string, Array<"admin" | "staff" | "viewer">> = {
   updateServiceRequestStatus: ["admin", "staff"], updateServiceRequestSchedule: ["admin", "staff"], updateAppointmentStatus: ["admin", "staff"], updateAppointmentSchedule: ["admin", "staff"],
   loadContactsSlice: ["admin", "staff", "viewer"], ensureInboxContact: ["admin", "staff"], createContact: ["admin", "staff"], updateContactNotes: ["admin", "staff"],
   updateContactName: ["admin", "staff"], updateContactFavourite: ["admin", "staff"], previewContactCsv: ["admin"], applyContactCsv: ["admin"],
+  setContactSinglePerson: ["admin"], dismissContactAlternateName: ["admin"],
   saveAndCompileSettings: ["admin"], saveAlertsAction: ["admin"], postBulletinAction: ["admin"], clearBulletinAction: ["admin"],
   previewCatalogImportAction: ["admin"], applyCatalogImportAction: ["admin"], extractKnowledgeAction: ["admin"], applyIngestAction: ["admin"],
   screenPronunciationSuggestionsAction: ["admin"], confirmPronunciationRecording: ["admin"], persistPronunciationLexicon: ["admin"], minePronunciationFromCallsAction: ["admin"], quickAddPronunciationAction: ["admin"],

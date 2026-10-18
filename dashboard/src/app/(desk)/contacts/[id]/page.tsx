@@ -16,6 +16,9 @@ import {
   inboxThreadsFromContactHref,
 } from "@/lib/inboxHref";
 import { isContactFavourite } from "@/lib/contactFavourite";
+import { ContactIdentityPanel } from "@/components/ContactIdentityPanel";
+import { contactNameLockFromEnv } from "@/lib/contactNameLockFlag";
+import { readContactIdentity, visibleAlternates } from "@/lib/contactNameLock";
 import {
   contactLastCallFact,
   contactsReturnHref,
@@ -161,6 +164,7 @@ async function ContactDetailBody({ params, searchParams }: ContactDetailPageProp
     Boolean(ownerDone || ownerNext || ownerMood) ||
     !lastReasonIsHistoryDuplicate(lastReason, latestCall);
   const threadsHref = inboxThreadsFromContactHref(contact.phone);
+  const identity = contactNameLockFromEnv() ? readContactIdentity(contact.metadata) : null;
   const kpiCards = contactPersonFileKpiCards({
     interactionCount: timeline.length,
     visitsDoneCount: timeline.filter(
@@ -217,6 +221,15 @@ async function ContactDetailBody({ params, searchParams }: ContactDetailPageProp
                 </Link>
               ) : null}
             </div>
+            {identity ? (
+              <ContactIdentityPanel
+                contactId={contact.id}
+                name={contact.name}
+                singlePerson={identity.singlePerson}
+                lockedAt={identity.nameLocked?.at ?? null}
+                alternates={visibleAlternates(contact.metadata)}
+              />
+            ) : null}
             <ContactKpiStrip cards={kpiCards} hrefs={{
                 interactions: fileHref(id, sp, { history: "all" }),
                 visitsDone: fileHref(id, sp, { history: "job" }),
