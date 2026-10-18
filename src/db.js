@@ -590,20 +590,59 @@ async function appendTranscript({ callSid, transcript, turns }) {
 
   if (rows.length === 0) return [];
 
-  const payload = rows.map((turn) => ({
+  const basePayload = rows.map((turn) => ({
     call_id: call.id,
     speaker: turn.speaker,
     text_content: turn.text,
     latency_ms: turn.latencyMs ?? null,
   }));
 
-  const { data, error } = await supabase
+  // VOICE_TRANSCRIPT_ORDER: also write seq = array index (0-based) so readers
+  // can sort by seq, then created_at (every row of a call shares created_at).
+  // Tolerates transcripts.seq not existing yet: retry once without it and
+  // stop sending it for this process.
+  const withSeq = transcriptSeqWanted();
+  const payload = withSeq
+    ? basePayload.map((row, index) => ({ ...row, seq: index }))
+    : basePayload;
+
+  let { data, error } = await supabase
     .from('transcripts')
     .insert(payload)
     .select('*');
 
+  if (error && withSeq && isMissingSeqColumn(error)) {
+    transcriptSeqColumn = false;
+    console.warn('[db] appendTranscript: transcripts.seq missing — writing without seq (apply migration 20261018090000)');
+    ({ data, error } = await supabase
+      .from('transcripts')
+      .insert(basePayload)
+      .select('*'));
+  }
+
   throwIfError('appendTranscript(insert)', error);
+  if (withSeq && transcriptSeqColumn !== false) transcriptSeqColumn = true;
   return data;
+}
+
+/** null = unknown, false = column missing (seen once), true = written ok. */
+let transcriptSeqColumn = null;
+
+function transcriptSeqWanted() {
+  if (transcriptSeqColumn === false) return false;
+  return /^(1|true|on|yes)$/i.test(String(process.env.VOICE_TRANSCRIPT_ORDER || '').trim());
+}
+
+function isMissingSeqColumn(error) {
+  const msg = String((error && error.message) || '');
+  const code = String((error && error.code) || '');
+  if (!/\bseq\b/i.test(msg)) return false;
+  return code === '42703' || code === 'PGRST204' || /does not exist|schema cache|could not find/i.test(msg);
+}
+
+/** Test hook: forget the cached seq-column probe. */
+function forgetTranscriptSeqColumn() {
+  transcriptSeqColumn = null;
 }
 
 /**
@@ -2789,6 +2828,7 @@ async function getTenantCatalogue(tenantId) {
 }
 
 module.exports = {
+  forgetTranscriptSeqColumn,
   copyRecordingToStorage,
   listPendingRecordingCopies,
   upsertCallFacts,

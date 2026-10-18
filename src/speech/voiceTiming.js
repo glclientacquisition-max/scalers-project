@@ -171,6 +171,20 @@ function createCallTranscript() {
     pushAgent(text) {
       return push('agent', text);
     },
+    /**
+     * VOICE_TRANSCRIPT_ORDER: hold an agent line's place before it plays.
+     * Same row shape as pushAgent; release() takes it back out.
+     */
+    reserveAgent(text) {
+      return push('agent', text);
+    },
+    release(row) {
+      if (!row) return false;
+      const i = rows.indexOf(row);
+      if (i < 0) return false;
+      rows.splice(i, 1);
+      return true;
+    },
     stampFirstAgentSince,
     stampFromSummary,
     size() {
@@ -182,8 +196,45 @@ function createCallTranscript() {
   };
 }
 
+/**
+ * VOICE_TRANSCRIPT_ORDER (off by default). On: the greeting keeps the slot it
+ * had when it started playing, so caller turns spoken over a long greeting
+ * land after it (HD_f9b67efaf590). Off: today's push-after-playback order.
+ */
+function transcriptOrderEnabled(env = process.env) {
+  return /^(1|true|on|yes)$/i.test(String(env.VOICE_TRANSCRIPT_ORDER || '').trim());
+}
+
+/**
+ * Play a greeting and record it in the transcript.
+ *  - on:  reserve the row first; release it if run() throws or keep() says no.
+ *  - off: push the row after run() only when keep() says yes (unchanged).
+ * @template T
+ * @param {{ transcript: ReturnType<typeof createCallTranscript>, line: string, enabled?: boolean, run: () => Promise<T>, keep?: (result: T) => boolean }} opts
+ * @returns {Promise<T>}
+ */
+async function speakWithTranscriptSlot({ transcript, line, enabled, run, keep = () => true }) {
+  const slot = enabled ? transcript.reserveAgent(line) : null;
+  let result;
+  try {
+    result = await run();
+  } catch (err) {
+    if (slot) transcript.release(slot);
+    throw err;
+  }
+  const kept = Boolean(keep(result));
+  if (slot) {
+    if (!kept) transcript.release(slot);
+  } else if (kept) {
+    transcript.pushAgent(line);
+  }
+  return result;
+}
+
 module.exports = {
   createVoiceTurnTiming,
+  transcriptOrderEnabled,
+  speakWithTranscriptSlot,
   persistableLatencyMs,
   createCallTranscript,
   logConnectToGreetingPcm,
