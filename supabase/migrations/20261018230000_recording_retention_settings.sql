@@ -1,6 +1,5 @@
 -- Call recording retention (platform default + per-business override).
--- NOT applied automatically. Apply manually when ready.
--- Service role only (same as platform_ops_settings / tenants RLS).
+-- Nullable columns; safe to apply when ready. Not applied by agents.
 
 alter table public.platform_ops_settings
   add column if not exists recording_retention_days integer

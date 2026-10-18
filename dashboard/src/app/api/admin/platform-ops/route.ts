@@ -64,7 +64,31 @@ export async function POST(request: Request) {
             ? parseRecordingRetentionDays(body.recording_retention_days)
             : before?.recordingRetentionDays ?? null,
       });
-      await recordAdminAction({ actor, action: "save_alert_settings", before, after: settings });
+      const retentionBefore = before?.recordingRetentionDays ?? null;
+      const retentionAfter = settings.recordingRetentionDays ?? null;
+      const alertBefore = before
+        ? {
+            emails: before.emails,
+            people: before.people,
+            kinds: before.kinds,
+            sautikitWarnMinor: before.sautikitWarnMinor,
+          }
+        : null;
+      const alertAfter = {
+        emails: settings.emails,
+        people: settings.people,
+        kinds: settings.kinds,
+        sautikitWarnMinor: settings.sautikitWarnMinor,
+      };
+      await recordAdminAction({ actor, action: "save_alert_settings", before: alertBefore, after: alertAfter });
+      if (retentionBefore !== retentionAfter) {
+        await recordAdminAction({
+          actor,
+          action: "save_recording_retention_platform",
+          before: { recording_retention_days: retentionBefore },
+          after: { recording_retention_days: retentionAfter },
+        });
+      }
       return NextResponse.json({ ok: true, settings });
     }
 

@@ -15,15 +15,15 @@ test('platform ops API is admin-only and supports retention preview', () => {
   const route = read('dashboard/src/app/api/admin/platform-ops/route.ts');
   assert.match(route, /isLegacyAuthenticated/);
   assert.match(route, /recording_retention_preview/);
+  assert.match(route, /save_recording_retention_platform/);
   assert.match(route, /recording_retention_days/);
-  assert.match(route, /recordAdminAction/);
 });
 
 test('businesses API saves tenant recording override with audit', () => {
   const route = read('dashboard/src/app/api/admin/businesses/route.ts');
   assert.match(route, /isLegacyAuthenticated/);
-  assert.match(route, /save_recording_retention/);
-  assert.match(route, /save_recording_retention/);
+  assert.match(route, /action: "save_recording_retention"/);
+  assert.match(route, /recording_retention_days_override/);
   assert.match(route, /recordAdminAction/);
 });
 
