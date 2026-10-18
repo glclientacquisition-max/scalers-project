@@ -15,12 +15,12 @@ import { UsageSummary, type UsageListRow } from "@/components/plan/UsageSummary"
 import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { ownerBillingSurface } from "@/lib/betaBilling";
 import { pickBillingBanner } from "@/lib/billingBanner";
+import { mapBillingHistory, type BillingHistoryBody } from "@/lib/billingHistory";
 import { lowBalanceNotice, ownerBillingView, type OwnerBillingView } from "@/lib/billingStateModel";
 import { seatSummary } from "@/lib/invites";
-import { invoicePayState } from "@/lib/invoicePayState";
 import { messageCreditsUsage, type CreditBurns } from "@/lib/messageCredits";
 import type { MembersData } from "@/lib/membersLoad";
-import type { OwnerInvoiceRow, OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
+import type { OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
 import { planEntry } from "@/lib/planEntry";
 import { annualPriceKes, annualSavingKes, formatKsh, type SeatOffer } from "@/lib/planPricing";
 import type { TeamDirectoryEntry } from "@/lib/supabase";
@@ -95,33 +95,17 @@ function growthModel({
   };
 }
 
-function invoiceItems(invoices: OwnerInvoiceRow[]) {
-  return invoices.flatMap((invoice) => {
-    const pay = invoicePayState({ status: invoice.status, payLinkPath: null });
-    if (pay.hidden) return [];
-    const statusLabel =
-      pay.label === "Paid" || pay.label === "Checking payment"
-        ? pay.label
-        : invoice.dueAt
-          ? `Due by ${invoice.dueAt}`
-          : "Open";
-    return [
-      {
-        id: invoice.id,
-        number: invoice.number,
-        totalLabel: formatKsh(invoice.totalKes),
-        statusLabel,
-        payHref: null,
-        payLabel: pay.showPayButton ? `Pay ${formatKsh(invoice.totalKes)}` : null,
-      },
-    ];
-  });
-}
+const sampleHistory: BillingHistoryBody = {
+  invoices: [
+    { id: "inv-1042", number: "SCL-1042", status: "open", due_at: "2026-10-09T00:00:00+03:00", total_due: "KSh 18,000", amount_paid: "KSh 0", balance: "KSh 18,000", pay_link_path: "/api/billing/invoices/inv-1042/pay-link" },
+    { id: "inv-1040", number: "SCL-1040", status: "open", due_at: "2026-10-05T00:00:00+03:00", total_due: "KSh 300,000", amount_paid: "KSh 150,000", balance: "KSh 150,000", pay_link_path: "/api/billing/invoices/inv-1040/pay-link" },
+    { id: "inv-1039", number: "SCL-1039", status: "open", due_at: "2026-10-01T00:00:00+03:00", total_due: "KSh -1,000", amount_paid: "KSh 0", balance: "KSh 0", pay_link_path: "/api/billing/invoices/inv-1039/pay-link" },
+    { id: "inv-1038", number: "SCL-1038", status: "paid", due_at: "2026-09-09T00:00:00+03:00", total_due: "KSh 18,000", amount_paid: "KSh 18,000", balance: "KSh 0", pay_link_path: null },
+  ],
+};
 
-const sampleInvoices: OwnerInvoiceRow[] = [
-  { id: "inv-1042", number: "INV-1042", status: "open", totalKes: 8120, dueAt: "9 Oct", periodStart: "1 Oct", periodEnd: "31 Oct" },
-  { id: "inv-1038", number: "INV-1038", status: "paid", totalKes: 8120, dueAt: "9 Sep", periodStart: "1 Sep", periodEnd: "30 Sep" },
-];
+const noop = () => {};
+const sampleInvoices = mapBillingHistory(sampleHistory, { fromPay: false }).map((row) => ({ ...row, onPay: noop }));
 
 const BURNS: CreditBurns = { sms: 1, whatsapp: 2, email: 1 };
 
@@ -334,7 +318,7 @@ export function BillingFixture({ view }: { view: BillingPreview }) {
     case "billing":
       return (
         <SettingsPlanFrame title="Billing" activePath="/settings/billing">
-          <OwnerInvoiceList invoices={invoiceItems(sampleInvoices)} />
+          <OwnerInvoiceList invoices={sampleInvoices} />
         </SettingsPlanFrame>
       );
     case "billing-empty":
