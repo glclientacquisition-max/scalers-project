@@ -16,6 +16,7 @@ import {
   dialHref,
   forwardOffCode,
   forwardOnCode,
+  networkCodeNote,
   networkHelpLine,
   noAnswerFallbackCodes,
   phoneFromUserAgent,
@@ -115,30 +116,42 @@ function ChoiceCard({
   const on = forwardOnCode(choice, number, ring);
   const off = forwardOffCode(choice);
   return (
-    <article className={cx(cardBase, picked && "border-accent")} data-choice={choice}>
+    <article
+      className={
+        recommended
+          ? "rounded-2xl border-2 border-accent bg-accent/[0.06] p-4"
+          : cx("rounded-2xl border bg-surface p-4", picked ? "border-accent" : "border-hairline")
+      }
+      data-choice={choice}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h4 className="text-body font-semibold text-ink">
-            {copy.title}
-            {recommended ? (
-              <span className="ml-2 rounded-full bg-ok-tonal px-2 py-0.5 align-middle text-meta font-medium text-ok">
-                Recommended
-              </span>
-            ) : null}
-          </h4>
+          {recommended ? (
+            <span className="mb-1 inline-block rounded-full bg-ok-tonal px-2 py-0.5 text-meta font-medium text-ok">
+              Recommended
+            </span>
+          ) : null}
+          <h4 className="text-body font-semibold text-ink">{copy.title}</h4>
           <p className="mt-0.5 text-meta text-ink-2">{copy.line(ring)}</p>
         </div>
-        <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 text-meta font-medium text-ink-2">
-          <input
-            type="checkbox"
-            checked={picked}
-            onChange={onToggle}
-            className="h-5 w-5 accent-accent"
-          />
-          Using
-        </label>
+        {recommended ? null : (
+          <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 text-meta font-medium text-ink-2">
+            <input
+              type="checkbox"
+              checked={picked}
+              onChange={onToggle}
+              className="h-5 w-5 accent-accent"
+            />
+            Using
+          </label>
+        )}
       </div>
       <CopyCode className="mt-3" label="Turn on" code={on} dial={dialHref(on, phone)} />
+      {recommended && !picked ? (
+        <Button type="button" variant="tonal" size="md" className="mt-3" onClick={onToggle}>
+          Use this instead
+        </Button>
+      ) : null}
       <CopyCode className="mt-3" label="Turn off" code={off} dial={dialHref(off, phone)} size="sm" />
     </article>
   );
@@ -260,9 +273,8 @@ export function CallSetupStep({
                 className="w-full"
               />
             </div>
-            <p className="mt-2 text-meta text-ink-2">
-              These are the standard codes. If one doesn&apos;t work on your line, try the one-at-a-time codes below or
-              ask your network.
+            <p className="mt-2 text-meta text-ink-2" aria-live="polite">
+              {networkCodeNote(setup.network)}
             </p>
             {phone === "iphone" ? (
               <ul className="mt-2 grid gap-1 text-meta text-ink-2">
@@ -290,8 +302,16 @@ export function CallSetupStep({
             </p>
           </Step>
 
-          <Step n={stepN++} title="Turn it on">
+          <Step n={stepN++} title="Dial the code">
             <div className="grid gap-3">
+              <p className="text-body text-ink-2">
+                On the phone with your business SIM, dial the code, press call, and wait for the message saying it&apos;s
+                turned on. Then tap OK.
+              </p>
+              <p className="text-meta text-ink-2">
+                <span className="font-semibold text-attention">Airtime first. </span>
+                Check there&apos;s airtime, minutes or a talk-time bundle on that line before you dial.
+              </p>
               <ChoiceCard
                 choice="all"
                 number={number}
@@ -301,14 +321,15 @@ export function CallSetupStep({
                 recommended
                 onToggle={() => toggle("all")}
               />
-              <details className="group rounded-2xl" open={!usesAll || undefined}>
-                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-body font-medium text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand [&::-webkit-details-marker]:hidden">
-                  <span aria-hidden className="inline-block w-3 text-center transition-transform duration-fast group-open:rotate-90">
+              <details className="group rounded-2xl border border-hairline bg-surface" open={!usesAll || undefined}>
+                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 text-body font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand [&::-webkit-details-marker]:hidden">
+                  <span aria-hidden className="inline-block w-3 text-center text-ink-3 transition-transform duration-fast group-open:rotate-90">
                     ›
                   </span>
-                  Or choose one at a time
+                  Other choices
+                  <span className="text-meta font-normal text-ink-2">Pick one or more</span>
                 </summary>
-                <div className="mt-2 grid gap-3">
+                <div className="grid gap-3 px-3 pb-3">
                   {SEPARATE_CHOICES.map((choice) => (
                     <ChoiceCard
                       key={choice}
@@ -322,9 +343,6 @@ export function CallSetupStep({
                   ))}
                 </div>
               </details>
-              <p className="text-meta text-ink-2">
-                Press call, wait for the message saying it&apos;s turned on, then tap OK.
-              </p>
             </div>
           </Step>
         </>
@@ -371,6 +389,14 @@ export function CallSetupStep({
             )}
           </div>
 
+          {option === "main_number" && helpOpen && !tested ? (
+            <p role="status" className="mt-3 rounded-2xl border border-hairline bg-surface px-4 py-3 text-meta text-ink-2">
+              <span className="font-semibold text-ink">No answer? </span>
+              Check you dialled {pretty}, wait a minute and call again. If your assistant still doesn&apos;t answer, reply
+              to any Scalers email and we&apos;ll check your line.
+            </p>
+          ) : null}
+
           {option === "forward" ? (
             <details
               className="group mt-3 rounded-2xl border border-hairline bg-surface"
@@ -388,7 +414,7 @@ export function CallSetupStep({
                 <div>
                   <p className="font-semibold text-ink">&quot;Connection problem&quot; or &quot;Invalid code&quot;?</p>
                   <p className="mt-0.5">
-                    Use the separate choices instead. If &quot;When I don&apos;t answer&quot; still fails, try these in turn:
+                    Use Other choices instead. If &quot;When I don&apos;t answer&quot; still fails, try these in turn:
                   </p>
                   {noAnswerFallbackCodes(number, ring).map((code, i) => (
                     <CopyCode

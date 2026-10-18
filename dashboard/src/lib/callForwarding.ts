@@ -1,7 +1,8 @@
 /**
  * Call forwarding codes for the "Set up your calls" step (/onboarding/line).
  * Source of every code: Ops research 18 Oct 2026 (kenya_call_forwarding_research.md)
- * and the owner guide. Standard network codes, the same on Safaricom, Airtel and Telkom.
+ * and the owner guide. Standard network codes. The all-in-one code with ring time
+ * (**004*N**20#) was tested on Safaricom and Airtel by Alvin on 18 Oct 2026; Telkom is untested.
  *
  * Rules (unit tested in tests/callForwarding.test.ts):
  * - Ring time uses a double star (empty service slot): **61*N**20#. A single star
@@ -139,6 +140,20 @@ export const CHOICE_COPY: Record<ForwardChoice, { title: string; line: (ring: Ri
     line: () => "If your phone is off, the battery is flat, or there's no signal, the assistant answers.",
   },
 };
+
+/** Networks where the all-in-one code with ring time was tested on a real line (18 Oct 2026). */
+export const TESTED_NETWORKS: readonly NetworkId[] = ["safaricom", "airtel"];
+
+/** One honest line about the codes for the picked network. Telkom stays hedged until tested. */
+export function networkCodeNote(network: NetworkId | null | undefined): string {
+  if (network === "safaricom" || network === "airtel") {
+    return `Tested on ${NETWORK_LABEL[network]}. The recommended code works on your line.`;
+  }
+  if (network === "telkom") {
+    return "We haven't tested Telkom yet. These are the standard codes. If one doesn't work, use Other choices below or ask Telkom.";
+  }
+  return "Tested on Safaricom and Airtel. Telkom uses the same standard codes, but we haven't tested it yet.";
+}
 
 export function ringHelp(ring: RingSeconds): string {
   return `Your phone rings about ${ring} seconds before the assistant answers.`;

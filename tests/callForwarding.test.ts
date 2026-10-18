@@ -13,11 +13,13 @@ import {
   CHECK_CODES,
   DEFAULT_RING,
   FORWARD_CHOICES,
+  TESTED_NETWORKS,
   canTapToDial,
   dialHref,
   forwardOffCode,
   forwardOnCode,
   forwardsEveryCall,
+  networkCodeNote,
   noAnswerFallbackCodes,
   phoneFromUserAgent,
   ringSeconds,
@@ -103,6 +105,14 @@ describe("call forwarding codes", () => {
     assert.equal(telHref("##002#"), "tel:%23%23002%23");
     assert.equal(telHref("##61#"), "tel:%23%2361%23");
     assert.doesNotMatch(telHref(forwardOnCode("busy", N)), /#/);
+  });
+
+  it("network note: tested on Safaricom and Airtel, Telkom stays hedged", () => {
+    assert.match(networkCodeNote("safaricom"), /^Tested on Safaricom\./);
+    assert.match(networkCodeNote("airtel"), /^Tested on Airtel\./);
+    assert.match(networkCodeNote("telkom"), /haven't tested Telkom yet/);
+    assert.match(networkCodeNote(null), /Tested on Safaricom and Airtel.*haven't tested it yet/);
+    assert.deepEqual([...TESTED_NETWORKS], ["safaricom", "airtel"]);
   });
 
   it("tap-to-dial shows on Android only (never iPhone, never before the phone is known)", () => {
@@ -195,10 +205,15 @@ describe("saved picks and the Overview card", () => {
     }
     const step = readFileSync(files[0], "utf8");
     assert.match(step, /It can&apos;t put a caller through to you during the call/);
-    // Research: codes are standard but not confirmed on every network (Telkom medium, **004* untested).
+    // **004*N**20# tested on Safaricom and Airtel (Alvin, 18 Oct 2026). Telkom stays hedged.
     assert.doesNotMatch(step, /same codes work on all/i);
-    assert.match(step, /These are the standard codes\. If one doesn&apos;t work on your line, try the one-at-a-time codes below or\s+ask your network\./);
+    assert.match(step, /\{networkCodeNote\(setup\.network\)\}/);
     // "Recommended" on the all-in-one card stays static (no network or phone condition).
     assert.match(step, /choice="all"[\s\S]{0,200}?recommended\s/);
+    // Recommended code first; the three single choices sit under a plain disclosure.
+    assert.ok(step.indexOf('choice="all"') < step.indexOf("SEPARATE_CHOICES.map"), "recommended card first");
+    assert.match(step, /<details[^>]*>[\s\S]{0,600}?Other choices/);
+    // Airtime reminder shows before the codes in the dial step.
+    assert.ok(step.indexOf("Airtime first.") < step.indexOf('choice="all"'), "airtime before dialling");
   });
 });
