@@ -3,31 +3,36 @@ import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { BillingNote } from "@/components/DeskBillingBanner";
+import { BetaPlanSummary, betaPlanRows } from "@/components/plan/BetaPlanSummary";
 import { PlanPicker } from "@/components/plan/PlanPicker";
 import { SettingsPlanFrame } from "@/components/plan/SettingsPlanFrame";
+import { loadOwnerUsageView } from "@/lib/ownerUsageLoad";
 import { memberCan } from "@/lib/requireMember";
+import { loadSettingsStatuses } from "@/lib/settingsRailStatus";
 import { getCurrentTenant } from "@/lib/tenant";
 import { loadOwnerPlan } from "@/lib/ownerPlanLoad";
-
-function FreeBeta() {
-  return (
-    <SettingsPlanFrame title="Plan">
-      <h2 className="mt-6 text-title text-ink">Free during beta</h2>
-      <p className="mt-1 text-body text-ink-2">Nothing is charged. Your Business Assistant keeps answering.</p>
-    </SettingsPlanFrame>
-  );
-}
 
 async function PlanBody({ searchParams }: { searchParams: Promise<{ addon?: string }> }) {
   if (!(await memberCan("billing.manage"))) return <DeskNoAccess what="Plan" />;
   const addon = (await searchParams).addon || "";
   const tenant = await getCurrentTenant();
   if (!tenant) return <DeskNoWorkspace />;
-  const loaded = await loadOwnerPlan(tenant.id);
+  const [loaded, statuses] = await Promise.all([loadOwnerPlan(tenant.id), loadSettingsStatuses(tenant)]);
   if (!loaded.ok) return <DeskLoadError>Could not load Plan.</DeskLoadError>;
-  if (loaded.model.freeBeta || !loaded.model.surface.showPlanPicker) return <FreeBeta />;
+  if (loaded.model.freeBeta || !loaded.model.surface.showPlanPicker) {
+    const view = await loadOwnerUsageView(tenant);
+    return (
+      <SettingsPlanFrame title="Plan" optionStatus={statuses}>
+        <BetaPlanSummary
+          planName={view.packageName}
+          periodEndLabel={view.periodEndLabel}
+          rows={betaPlanRows(view)}
+        />
+      </SettingsPlanFrame>
+    );
+  }
   return (
-    <SettingsPlanFrame title="Plan" meta={loaded.model.trialText}>
+    <SettingsPlanFrame title="Plan" meta={loaded.model.trialText} optionStatus={statuses}>
       {loaded.model.surface.showDunningBanner && loaded.model.banner ? (
         <BillingNote banner={loaded.model.banner} />
       ) : null}
