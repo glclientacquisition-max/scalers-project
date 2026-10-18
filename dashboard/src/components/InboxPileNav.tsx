@@ -30,6 +30,7 @@ import { listAfterPullRefresh, nextShown } from "@/lib/endlessList";
 import { DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 import {
   adjacentPileHrefs,
+  canClientSwitchPile,
   filterCachedPile,
   inboxPileHref,
   SWIPE_PILES,
@@ -203,22 +204,36 @@ export function InboxPileNavProvider({
   hrefsRef.current = liveHrefs;
 
   const prefetchAdjacent = useCallback(() => {
+    // List mode switches piles on the client: a prefetch would only buy a
+    // full server inbox render nobody uses.
+    if (enableSelect) return;
     const { next, prev } = adjacentPileHrefs(localPurpose, hrefsRef.current);
     if (next) router.prefetch(next);
     if (prev) router.prefetch(prev);
-  }, [localPurpose, router]);
+  }, [enableSelect, localPurpose, router]);
 
   // Not on mount: router.prefetch is a full render of the adjacent tab (a full
   // inbox load each). InboxPileSwipe calls this when a swipe starts.
 
   const goPile = useCallback((next: string) => {
     if (next === localPurpose) return;
-    pendingRef.current = next;
+    const href = hrefsRef.current[next];
     setLocalPurpose(next as InboxPurposeFilterId);
     purposeRef.current = next as InboxPurposeFilterId;
-    const href = hrefsRef.current[next];
+    if (
+      href &&
+      canClientSwitchPile(next, href, hrefsRef.current, enableSelect) &&
+      typeof window !== "undefined"
+    ) {
+      // The list already holds every pile: filter here and only rewrite the
+      // address bar (Next keeps usePathname/useSearchParams in sync, no server
+      // render), so refresh and back keep ?purpose=.
+      window.history.replaceState(null, "", href);
+      return;
+    }
+    pendingRef.current = next;
     if (href) router.replace(href);
-  }, [localPurpose, router]);
+  }, [enableSelect, localPurpose, router]);
 
   const setQuery = useCallback((next: string) => {
     const value = next.slice(0, 64);

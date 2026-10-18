@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { canClientSwitchPile, filterCachedPile } from "../dashboard/src/lib/inboxSwipe.ts";
+import { nextShown, showMoreLabel } from "../dashboard/src/lib/endlessList.ts";
 import {
   itemIsOpenHold,
   itemIsOpenVisit,
@@ -59,5 +60,41 @@ describe("Inbox tab switch", () => {
     const nav = readFileSync("dashboard/src/components/InboxPileNav.tsx", "utf8");
     assert.match(nav, /setLocalPurpose\(next as InboxPurposeFilterId\)/);
     assert.match(nav, /itemMatchesPurpose\(item, pile as InboxPurposeFilterId\)/);
+  });
+
+  it("a long pile grows 25 at a time with a visible Show more until all rows show", () => {
+    const total = filterCachedPile(items, "human", match).rows.length; // 60 return calls
+    let shown = 25;
+    assert.equal(showMoreLabel(shown, total), "Show more · 35 left");
+    shown = nextShown(shown, total, 25);
+    assert.equal(shown, 50);
+    assert.equal(showMoreLabel(shown, total), "Show more · 10 left");
+    shown = nextShown(shown, total, 25);
+    assert.equal(shown, 60);
+    assert.equal(showMoreLabel(shown, total), null);
+    assert.equal(showMoreLabel(3, 3), null);
+  });
+
+  it("the board renders Show more off the client-filtered pile, and a tab switch resets to 25", () => {
+    const board = readFileSync("dashboard/src/components/InboxPileBoard.tsx", "utf8");
+    assert.match(board, /nav\.hasMore \? \(/);
+    assert.match(board, /onClick=\{nav\.loadMore\}/);
+    assert.match(board, /showMoreLabel\(pageRows\.length, nav\.listed\.length\)/);
+    const nav = readFileSync("dashboard/src/components/InboxPileNav.tsx", "utf8");
+    assert.match(nav, /const filterKey = `\$\{localPurpose\}/);
+    assert.match(nav, /setShown\(DEFAULT_PAGE_SIZE\)/);
+    assert.match(nav, /listed\.slice\(0, windowCount\)/);
+  });
+
+  it("a client tab switch rewrites the address bar without a server render", () => {
+    const nav = readFileSync("dashboard/src/components/InboxPileNav.tsx", "utf8");
+    const go = nav.slice(nav.indexOf("const goPile"), nav.indexOf("const setQuery"));
+    assert.match(go, /canClientSwitchPile\(next, href, hrefsRef\.current, enableSelect\)/);
+    assert.match(go, /window\.history\.replaceState\(null, "", href\);\s*return;/);
+    // Board views (view=week/today) still go through the server.
+    assert.match(go, /if \(href\) router\.replace\(href\)/);
+    assert.ok(go.indexOf("replaceState") < go.indexOf("router.replace"));
+    // List mode does not prefetch adjacent tabs (each one is a full server render).
+    assert.match(nav, /if \(enableSelect\) return;\s*const \{ next, prev \} = adjacentPileHrefs/);
   });
 });
