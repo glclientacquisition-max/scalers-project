@@ -35,7 +35,7 @@ const {
   renderStaffSms,
   renderStaffWhatsApp,
   staffAlert,
-  staffAlertTemplateLines,
+  staffSmsTemplateLines,
   toGsm7,
 } = require('./templates');
 const { renderStaffAlertEmail } = require('./alertEmail');
@@ -80,8 +80,9 @@ function deskBaseUrl() {
 
 /**
  * Per-channel bodies for a staff call alert (lead, escalation, request, visit,
- * voicemail, callback): one-segment SMS, WhatsApp session text plus the three
- * scalers_staff_alert variables, and the HTML / text email. Other kinds
+ * voicemail, callback): one-segment SMS, the same short body on WhatsApp
+ * (session text, first line bold) plus the three scalers_staff_alert
+ * variables, and the HTML / text email. Other kinds
  * (billing, wallet, ops, caller texts) keep `text` on every channel.
  */
 async function staffChannelBodies({ smsBody, text, lead, ledger, kind } = {}) {
@@ -92,13 +93,12 @@ async function staffChannelBodies({ smsBody, text, lead, ledger, kind } = {}) {
   const shortCode = await callShortCode(ledger);
   const deskBase = deskBaseUrl();
   const smsText = explicitSms || renderStaffSms({ kind: k, lead: safeLead, shortCode, deskBase }) || text;
-  const alert = staffAlert({ kind: k, lead: safeLead, body: text, shortCode, deskBase, callId: ledger && ledger.callId });
-  if (!alert) return { smsText, wa: null, mail: null };
-  return {
-    smsText,
-    wa: { sessionBody: renderStaffWhatsApp(alert), alertLines: staffAlertTemplateLines(alert) },
-    mail: renderStaffAlertEmail(alert),
+  const wa = {
+    sessionBody: renderStaffWhatsApp({ kind: k, lead: safeLead, shortCode, deskBase }),
+    alertLines: staffSmsTemplateLines({ kind: k, lead: safeLead }),
   };
+  const alert = staffAlert({ kind: k, lead: safeLead, body: text, shortCode, deskBase, callId: ledger && ledger.callId });
+  return { smsText, wa, mail: alert ? renderStaffAlertEmail(alert) : null };
 }
 
 async function trySendSms({ to, body }) {
@@ -136,7 +136,7 @@ async function trySendWhatsApp({ to, body, lead, kind, wa = null }) {
 async function dispatchAlert({ to, email, body, smsBody, lead = {}, subject, channels, ledger, kind } = {}) {
   const text = body || buildLeadText(lead);
   // Staff call alerts: one GSM-7 segment on SMS (renderStaffSms), the same
-  // structure without the cap on WhatsApp (renderStaffWhatsApp) and an HTML
+  // short body on WhatsApp (renderStaffWhatsApp, first line bold) and an HTML
   // card on email (alertEmail.js). Everything else keeps `text`.
   const { smsText, wa, mail } = await staffChannelBodies({ smsBody, text, lead, ledger, kind });
   const waText = (wa && wa.sessionBody) || text;

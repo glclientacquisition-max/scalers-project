@@ -55,13 +55,13 @@ A SautiKit `202` is not delivery. Meta error `131042` means the WhatsApp Busines
 
 ## Staff call alerts: fields per path (#777)
 
-Call alerts (lead, call back, request, visit, voicemail, callback) use the same structure as the staff SMS: `business: label`, caller name and `07xx xxx xxx`, what they want, details, link.
+Call alerts (lead, call back, request, visit, voicemail, callback) use the staff SMS body on WhatsApp too: 4 lines, same caps and truncation, at most 160 characters, first line bold.
 
 | Path | When | What is sent |
 | --- | --- | --- |
-| Session text | 24h window open (`sendOwnerWhatsApp` found a recent inbound) | Free-form `renderStaffWhatsApp` (`templates.js`). First line bold, full reason, `When` / `Where` / `Qty` / `Notes` rows, recording, `https://app.scalers.co.ke/c/<code>` (or the full call URL). |
-| `scalers_staff_alert` | Window closed, no kind env (today's default) | Template text unchanged. `{{1}}` `Mama Njeri Gas: missed call`. `{{2}}` `Wanjiku Kamau, 0712 345 678`. `{{3}}` reason plus details (`Gas cooker installation. When: Thursday 10am. Where: Kahawa West`). No URL: variables cannot carry one. |
-| `scalers_lead` ... `scalers_request` | Only once a kind env is set | Unchanged packing (approved bodies have fixed wording around each variable). |
+| Session text | 24h window open (`sendOwnerWhatsApp` found a recent inbound) | `renderStaffWhatsApp` (`templates.js`): `*Mama Njeri Gas: missed call*` / `Wanjiku Kamau, 0712 345 678` / reason / `app.scalers.co.ke/c/<code>`. No link line until `calls.short_code` exists. |
+| `scalers_staff_alert` (Active, code default) | Window closed, no kind env | Template text unchanged. `{{1}}` SMS line 1 `Mama Njeri Gas: missed call`. `{{2}}` line 2 `Wanjiku Kamau, 0712 345 678`. `{{3}}` line 3, the reason as truncated in the SMS. No link: variables cannot carry a URL. |
+| `scalers_lead`, `scalers_escalation`, `scalers_visit`, `scalers_request` (submitted list, not marked Active) | Only once the kind env is set | Unchanged packing. Their approved wording sits around each variable (`New missed-call lead. {{1}}`, `Escalation for {{1}}. {{2}}`, `{{1}}. {{2}}` with a fixed action line), so the short format does not fit without new template text. |
 
 The link cannot reach a cold staff phone without a new template. Proposed (needs Meta approval; not wired):
 

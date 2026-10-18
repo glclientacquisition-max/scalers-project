@@ -355,7 +355,7 @@ function shortCallLink(shortCode, deskBase) {
  * "..."). The short link is always kept when the call has a code.
  * @param {{ kind: string, lead?: { businessName?: string, name?: string, reason?: string, callerNumber?: string }, shortCode?: string|null, deskBase?: string|null }} opts
  */
-function renderStaffSms({ kind, lead = {}, shortCode = null, deskBase = null } = {}) {
+function renderStaffSms({ kind, lead = {}, shortCode = null, deskBase = null, max = SMS_MAX } = {}) {
   const k = String(kind || '').trim();
   if (!STAFF_SMS_KINDS.has(k)) return null;
   const { label, reason: detail } = staffLabelReason(k, lead && lead.reason);
@@ -364,19 +364,20 @@ function renderStaffSms({ kind, lead = {}, shortCode = null, deskBase = null } =
   const phone = smsPhone(lead && lead.callerNumber);
   let link = shortCallLink(shortCode, deskBase);
   const lines = [biz ? `${biz}: ${label}` : label, phone ? `${name}, ${phone}` : name];
-  if (link && lines.join('\n').length + link.length + 1 > SMS_MAX) link = null; // odd DESK_PUBLIC_URL
+  if (link && lines.join('\n').length + link.length + 1 > max) link = null; // odd DESK_PUBLIC_URL
   const fixed = lines.join('\n').length + (link ? link.length + 1 : 0);
-  const room = SMS_MAX - fixed - 1; // newline before the reason
+  const room = max - fixed - 1; // newline before the reason
   if (detail && room > 3) lines.push(clip(detail, room));
   if (link) lines.push(link);
   const out = lines.join('\n');
-  return out.length <= SMS_MAX ? out : clip(out, SMS_MAX);
+  return out.length <= max ? out : clip(out, max);
 }
 
 // ---------------------------------------------------------------------------
-// Staff call alert for WhatsApp and email: same structure as the SMS, no
-// length cap, full reason and details. Built from the lead plus the rows that
-// renderStaffText already put in the body ("When: ...", "Where: ...").
+// Staff call alert model for the email (alertEmail.js): same structure as the
+// SMS, no length cap, full reason and details. Built from the lead plus the
+// rows renderStaffText already put in the body ("When: ...", "Where: ...").
+// WhatsApp uses the short SMS body instead (renderStaffWhatsApp below).
 // Callbacks only: never imply a live transfer or a confirmed booking.
 // ---------------------------------------------------------------------------
 const STAFF_DETAIL_ROWS = Object.freeze([
@@ -482,42 +483,41 @@ function staffAlert({ kind, lead = {}, body = '', shortCode = null, deskBase = n
   };
 }
 
-function waSafe(text) {
-  // Caller text must not open or close WhatsApp bold / italic / strike.
-  return plainLine(text).replace(/[*_~`]/g, '');
+/**
+ * WhatsApp staff call alert: the SMS body (same 4 lines, caps, truncation and
+ * short link), first line bold, at most 160 characters including the bold.
+ *
+ *   *Mama Njeri Gas: missed call*
+ *   Wanjiku Kamau, 0712 345 678
+ *   Wants 13kg gas refill to Kahawa West today, asked regulator price
+ *   app.scalers.co.ke/c/K7P2QX
+ */
+function renderStaffWhatsApp({ kind, lead = {}, shortCode = null, deskBase = null } = {}) {
+  // Caller text must not open or close WhatsApp bold / italic.
+  const safeLead = lead && typeof lead === 'object' ? lead : {};
+  const clean = (v) => (v == null ? v : String(v).replace(/[*_]/g, ''));
+  const sms = renderStaffSms({
+    kind,
+    lead: { ...safeLead, businessName: clean(safeLead.businessName), name: clean(safeLead.name), reason: clean(safeLead.reason) },
+    shortCode,
+    deskBase,
+    max: SMS_MAX - 2, // room for the two bold asterisks
+  });
+  if (!sms) return null;
+  const lines = sms.split('\n');
+  lines[0] = `*${lines[0]}*`;
+  return lines.join('\n');
 }
 
 /**
- * WhatsApp session text for a staff call alert. Bold first line only.
- *
- *   *Mama Njeri Gas: visit request - to confirm*
- *   Wanjiku Kamau, 0712 345 678
- *   Gas cooker installation
- *   When: Thursday 10am
- *   Where: Kahawa West, near Quickmart
- *   https://app.scalers.co.ke/c/K7P2QXZ
+ * The three body variables of the approved scalers_staff_alert template:
+ * SMS lines 1-3 (no link: template variables cannot carry a URL).
  */
-function renderStaffWhatsApp(alert) {
-  if (!alert) return null;
-  const biz = waSafe(alert.businessName);
-  const head = biz ? `${biz}: ${alert.label}` : alert.label.charAt(0).toUpperCase() + alert.label.slice(1);
-  const who = [waSafe(alert.name) || (alert.phone ? '' : 'Caller'), alert.phone].filter(Boolean).join(', ');
-  const lines = [`*${head}*`, who];
-  if (alert.reason) lines.push(waSafe(alert.reason));
-  for (const [label, value] of alert.details) lines.push(`${label}: ${waSafe(value)}`);
-  if (alert.recordingUrl) lines.push(`Recording: ${alert.recordingUrl}`);
-  if (alert.link) lines.push(alert.link);
-  return lines.filter(Boolean).join('\n');
-}
-
-/** The three body variables of the approved scalers_staff_alert template (no URLs). */
-function staffAlertTemplateLines(alert) {
-  if (!alert) return null;
-  const biz = plainLine(alert.businessName);
-  const head = biz ? `${biz}: ${alert.label}` : alert.label;
-  const who = [alert.name || (alert.phone ? '' : 'Caller'), alert.phone].filter(Boolean).join(', ');
-  const rest = [alert.reason, ...alert.details.map(([label, value]) => `${label}: ${value}`)].filter(Boolean);
-  return [head, who, rest.join('. ') || 'Open the call in the desk.'];
+function staffSmsTemplateLines({ kind, lead = {} } = {}) {
+  const sms = renderStaffSms({ kind, lead });
+  if (!sms) return null;
+  const [head, who, reason] = sms.split('\n');
+  return [head, who, reason || 'No reason given'];
 }
 
 module.exports = {
@@ -529,7 +529,7 @@ module.exports = {
   renderStaffWhatsApp,
   shortCallLink,
   staffAlert,
-  staffAlertTemplateLines,
+  staffSmsTemplateLines,
   staffDetailsFromText,
   telHref,
   smsPhone,

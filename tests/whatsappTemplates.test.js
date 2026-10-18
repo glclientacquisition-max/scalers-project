@@ -288,10 +288,10 @@ describe('staff WhatsApp templates', () => {
     assert.equal(result.channel, 'whatsapp');
     assert.equal(calls[0].body.type, 'template');
     assert.equal(calls[0].body.template.name, APPROVED_FIRST_TEMPLATE);
-    // Template text unchanged; the three variables carry the SMS structure (#777).
+    // Template text unchanged; the three variables carry SMS lines 1-3 (#777).
     assert.deepEqual(
       calls[0].body.template.components[0].parameters.map((p) => p.text),
-      ['Shop: visit request - to confirm', 'Jane', 'Haircut']
+      ['Shop: visit request - to confirm', 'Jane', 'Visit']
     );
   });
 

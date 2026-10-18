@@ -1,12 +1,14 @@
 // Run: node --test tests/staffAlertChannels.test.js
-// Staff call alerts on WhatsApp and email (#777): same structure as the SMS
-// (business: label / caller, 07xx number / what they want / short link), no
-// 160 cap. WhatsApp: session text when the 24h window is open; the approved
-// scalers_staff_alert template (text unchanged) gets the same fields in its
-// three variables. Email: HTML card + plain text. Callbacks only.
+// Staff call alerts on WhatsApp and email (#777).
+// WhatsApp: the SMS body (same 4 lines, caps, truncation, short link), first
+// line bold, at most 160 characters. Session text when the 24h window is
+// open; the approved scalers_staff_alert template (text unchanged) gets SMS
+// lines 1-3 in its three variables. Email: HTML card + plain text (full
+// reason and details). Callbacks only.
 const { describe, it, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { staffAlert, renderStaffWhatsApp, staffAlertTemplateLines, telHref } = require('../src/notifications/templates');
+const { staffAlert, renderStaffSms, renderStaffWhatsApp, staffSmsTemplateLines, telHref, SMS_MAX } = require('../src/notifications/templates');
+const { smsSegments } = require('../src/notifications/sendLedger');
 const { renderStaffAlertEmail, ALERT_EMAIL_BRAND } = require('../src/notifications/alertEmail');
 const { setShortCodeLookup } = require('../src/notifications/callShortLink');
 const { resetInstanceFlights } = require('../src/notifications/sendLedger');
@@ -33,92 +35,94 @@ const LABELS = {
   callback: 'callback request',
 };
 
-describe('WhatsApp staff alert body', () => {
+const waOf = (spec, shortCode = CODE) => renderStaffWhatsApp({ ...spec, shortCode, deskBase: 'https://app.scalers.co.ke' });
+const SHORT = `app.scalers.co.ke/c/${CODE}`;
+const LONG_LEAD = {
+  businessName: 'Mama Njeri Gas & Hardware Supplies and General Merchants Ltd',
+  name: 'Wanjiku \u201cShiru\u201d Kamau-Njoroge Wa Mwangi \ud83d\ude00',
+  callerNumber: '+254712345678',
+  reason: 'Wants a 13kg gas refill delivered to Kahawa West today \u2013 asked about the price of a new regulator, a hose, and whether you deliver on Sunday \ud83d\ude4f',
+};
+
+describe('WhatsApp staff alert body: the SMS body, first line bold', () => {
   it('lead (snapshot)', () => {
     assert.equal(
-      renderStaffWhatsApp(alertOf(SAMPLES.lead)),
-      [
-        '*Mama Njeri Gas: missed call*',
-        'Wanjiku Kamau, 0712 345 678',
-        'Wants 13kg gas refill to Kahawa West today, asked regulator price',
-        `Recording: ${REC}`,
-        LINK,
-      ].join('\n')
+      waOf(SAMPLES.lead),
+      ['*Mama Njeri Gas: missed call*', 'Wanjiku Kamau, 0712 345 678', 'Wants 13kg gas refill to Kahawa West today, asked regulator price', SHORT].join('\n')
     );
   });
-  it('visit request (snapshot): full where and notes, no cap', () => {
+  it('visit request (snapshot): no where / notes rows', () => {
     assert.equal(
-      renderStaffWhatsApp(alertOf(SAMPLES.visitRequest)),
-      [
-        '*Mama Njeri Gas: visit request - to confirm*',
-        'Wanjiku Kamau, 0712 345 678',
-        'Gas cooker installation',
-        'When: Thursday 10am',
-        'Where: Kahawa West, near Quickmart',
-        'Notes: Bring a 2m hose',
-        LINK,
-      ].join('\n')
-    );
-  });
-  it('order (snapshot)', () => {
-    assert.equal(
-      renderStaffWhatsApp(alertOf(SAMPLES.order)),
-      ['*Mama Njeri Gas: order request*', 'Wanjiku Kamau, 0712 345 678', '13kg refill', 'Qty: 2', 'When: Tomorrow morning', 'Notes: Pay on delivery', LINK].join('\n')
-    );
-  });
-  it('escalation (snapshot): who it is for, never a transfer', () => {
-    assert.equal(
-      renderStaffWhatsApp(alertOf(SAMPLES.escalation)),
-      ['*Mama Njeri Gas: call back*', 'Wanjiku Kamau, 0712 345 678', 'Refund for a leaking 6kg cylinder bought Saturday', 'For: Peter (Manager)', `Recording: ${REC}`, LINK].join('\n')
+      waOf(SAMPLES.visitRequest),
+      ['*Mama Njeri Gas: visit request - to confirm*', 'Wanjiku Kamau, 0712 345 678', 'Gas cooker installation. Thursday 10am', SHORT].join('\n')
     );
   });
   for (const [name, spec] of Object.entries(SAMPLES)) {
-    it(`${name}: structure, bold first line only, banned words`, () => {
-      const body = renderStaffWhatsApp(alertOf(spec));
-      const lines = body.split('\n');
+    it(`${name}: same 4 lines as the SMS, <= 160, bold first line only`, () => {
+      const wa = waOf(spec);
+      const sms = renderStaffSms({ ...spec, shortCode: CODE, deskBase: 'https://app.scalers.co.ke' });
+      const lines = wa.split('\n');
+      assert.equal(lines.length, 4, wa);
       assert.equal(lines[0], `*Mama Njeri Gas: ${LABELS[name]}*`);
-      assert.equal(lines[1], 'Wanjiku Kamau, 0712 345 678');
-      assert.equal(lines.at(-1), LINK);
-      assert.equal((body.match(/\*/g) || []).length, 2, 'bold first line only');
-      assert.doesNotMatch(body, /\p{Extended_Pictographic}/u, 'no emoji');
-      assert.doesNotMatch(body, BANNED);
+      assert.deepEqual(lines.slice(1), sms.split('\n').slice(1), 'lines 2-4 match the SMS');
+      assert.equal(lines[3], SHORT);
+      assert.ok(wa.length <= SMS_MAX, `${wa.length}`);
+      assert.equal((wa.match(/\*/g) || []).length, 2);
+      assert.doesNotMatch(wa, /Where:|Notes:|Recording:|https?:\/\//);
+      assert.doesNotMatch(wa, /\p{Extended_Pictographic}/u);
+      assert.doesNotMatch(wa, BANNED);
     });
   }
-  it('no short code: falls back to the full call URL', () => {
-    const body = renderStaffWhatsApp(alertOf(SAMPLES.visitRequest, null));
-    assert.equal(body.split('\n').at(-1), FULL);
-  });
-  it('caller text cannot break the bold line', () => {
-    const body = renderStaffWhatsApp(alertOf({ ...SAMPLES.lead, lead: { ...SAMPLES.lead.lead, businessName: '*Mama* _Njeri_', name: 'Wa*njiku' } }));
-    assert.equal(body.split('\n')[0], '*Mama Njeri: missed call*');
-    assert.equal(body.split('\n')[1], 'Wanjiku, 0712 345 678');
-  });
-  it('approved template variables: same fields, no URLs, never empty', () => {
-    assert.deepEqual(staffAlertTemplateLines(alertOf(SAMPLES.visitRequest)), [
-      'Mama Njeri Gas: visit request - to confirm',
-      'Wanjiku Kamau, 0712 345 678',
-      'Gas cooker installation. When: Thursday 10am. Where: Kahawa West, near Quickmart. Notes: Bring a 2m hose',
-    ]);
-    for (const spec of Object.values(SAMPLES)) {
-      const lines = staffAlertTemplateLines(alertOf(spec));
-      assert.equal(lines.length, 3);
-      for (const v of lines) {
-        assert.ok(v.trim());
-        assert.doesNotMatch(v, /https?:\/\//);
+  it('worst case: <= 160 with the bold and an 8-char link, GSM-7, one segment', () => {
+    for (const kind of ['lead', 'escalation', 'service_request', 'appointment', 'voicemail', 'callback']) {
+      for (const reason of [LONG_LEAD.reason, `VISIT UPDATED: ${LONG_LEAD.reason}`, `HOLD / PICKUP: ${LONG_LEAD.reason}`]) {
+        const wa = renderStaffWhatsApp({ kind, lead: { ...LONG_LEAD, reason }, shortCode: 'K7P2QXZW', deskBase: 'https://app.scalers.co.ke' });
+        assert.ok(wa.length <= SMS_MAX, `${wa.length}:\n${wa}`);
+        assert.equal(smsSegments(wa), 1);
+        assert.equal(wa.split('\n')[3], 'app.scalers.co.ke/c/K7P2QXZW');
+        assert.match(wa.split('\n')[2], /\.\.\.$/);
       }
     }
   });
-  it('the session text payload uses the new body; template text untouched', () => {
+  it('no short code: no link line (as the SMS)', () => {
+    const wa = waOf(SAMPLES.visitRequest, null);
+    assert.equal(wa.split('\n').length, 3);
+    assert.doesNotMatch(wa, /\/c\//);
+  });
+  it('caller text cannot break the bold line', () => {
+    const wa = waOf({ ...SAMPLES.lead, lead: { ...SAMPLES.lead.lead, businessName: '*Mama* _Njeri_', name: 'Wa*njiku' } });
+    assert.equal(wa.split('\n')[0], '*Mama Njeri: missed call*');
+    assert.equal(wa.split('\n')[1], 'Wanjiku, 0712 345 678');
+  });
+  it('approved template variables: SMS lines 1-3, no URLs, never empty', () => {
+    assert.deepEqual(staffSmsTemplateLines(SAMPLES.visitRequest), [
+      'Mama Njeri Gas: visit request - to confirm',
+      'Wanjiku Kamau, 0712 345 678',
+      'Gas cooker installation. Thursday 10am',
+    ]);
+    assert.equal(staffSmsTemplateLines({ kind: 'lead', lead: { businessName: 'B', callerNumber: '+254712345678' } })[2], 'No reason given');
+    for (const spec of Object.values(SAMPLES)) {
+      const lines = staffSmsTemplateLines(spec);
+      assert.equal(lines.length, 3);
+      for (const v of lines) {
+        assert.ok(v.trim());
+        assert.doesNotMatch(v, /https?:\/\/|\/c\//);
+      }
+    }
+  });
+  it('session text payload uses the short body; cold send keeps scalers_staff_alert text', () => {
     process.env.SAUTIKIT_WHATSAPP_NUMBER_ID = process.env.SAUTIKIT_WHATSAPP_NUMBER_ID || 'num-test';
     const { buildWhatsAppSendPayload } = require('../src/notifications/whatsapp');
-    const alert = alertOf(SAMPLES.lead);
-    const open = buildWhatsAppSendPayload({ to: '+254711000000', body: SAMPLES.lead.body, lead: SAMPLES.lead.lead, kind: 'lead', windowOpen: true, sessionBody: renderStaffWhatsApp(alert), alertLines: staffAlertTemplateLines(alert) });
+    const sessionBody = waOf(SAMPLES.lead);
+    const alertLines = staffSmsTemplateLines(SAMPLES.lead);
+    const base = { to: '+254711000000', body: SAMPLES.lead.body, lead: SAMPLES.lead.lead, kind: 'lead', sessionBody, alertLines };
+    const open = buildWhatsAppSendPayload({ ...base, windowOpen: true });
     assert.equal(open.type, 'text');
-    assert.equal(open.text.body, renderStaffWhatsApp(alert));
-    const cold = buildWhatsAppSendPayload({ to: '+254711000000', body: SAMPLES.lead.body, lead: SAMPLES.lead.lead, kind: 'lead', windowOpen: false, sessionBody: renderStaffWhatsApp(alert), alertLines: staffAlertTemplateLines(alert) });
+    assert.equal(open.text.body, sessionBody);
+    const cold = buildWhatsAppSendPayload({ ...base, windowOpen: false });
     assert.equal(cold.type, 'template');
     assert.equal(cold.template.name, 'scalers_staff_alert');
-    assert.deepEqual(cold.template.components[0].parameters.map((p) => p.text), staffAlertTemplateLines(alert));
+    assert.deepEqual(cold.template.components[0].parameters.map((p) => p.text), alertLines);
   });
 });
 

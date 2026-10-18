@@ -174,8 +174,9 @@ function parametersForKind(kind, { body, lead = {}, to, templateName, alertLines
     return packLegacyLeadFields(lead, to).map((value) => sanitizeParam(value));
   }
   if (isApprovedFirstTemplate(name)) {
-    // Staff call alerts: the SMS / session-text structure in the same three
-    // variables (templates.js staffAlertTemplateLines). Template text unchanged.
+    // Staff call alerts: SMS lines 1-3 (business: label / name, 07xx number /
+    // reason, same caps) in the three variables (templates.js
+    // staffSmsTemplateLines). Template text unchanged; no link (no URLs).
     if (Array.isArray(alertLines) && alertLines.length === 3) {
       return alertLines.map((value) => sanitizeParam(value));
     }
