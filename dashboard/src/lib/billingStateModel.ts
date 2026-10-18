@@ -34,7 +34,7 @@ export type TenantBillingStateRow = {
 
 export type OwnerBillingInput = {
   state: TenantBillingStateRow | null;
-  /** billing_packages.monthly_price_kes for the active package. Never hardcoded. */
+  /** Pinned billing_package_versions.monthly_price_kes for the active package. Never hardcoded. */
   monthlyPriceKes: number | null;
   /** SMS messages behind the sms_used credits (one long message can be several credits). */
   smsMessages: number | null;

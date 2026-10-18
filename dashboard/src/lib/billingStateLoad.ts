@@ -40,10 +40,10 @@ export async function loadOwnerBillingView(tenantId: string): Promise<OwnerBilli
     const state = (stateRes.data || null) as (TenantBillingStateRow & { package_id?: string | null }) | null;
     const tenant = (tenantRes.error ? {} : tenantRes.data || {}) as Record<string, unknown>;
 
-    const packageId = state?.package_state === "active" ? state.package_id : null;
+    const active = state?.package_state === "active";
     const [priceRes, smsRes] = await Promise.all([
-      packageId
-        ? admin.from("billing_packages").select("monthly_price_kes").eq("id", packageId).maybeSingle()
+      active
+        ? admin.from("billing_subscription_read").select("version_monthly_price_kes").eq("tenant_id", tenantId).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       state?.period_start && state.sms_used_source === "ledger"
         ? (() => {
@@ -58,9 +58,10 @@ export async function loadOwnerBillingView(tenantId: string): Promise<OwnerBilli
         : Promise.resolve({ count: null, error: null }),
     ]);
 
-    const price = priceRes && !priceRes.error && priceRes.data
-      ? num((priceRes.data as { monthly_price_kes?: unknown }).monthly_price_kes)
+    const pinned = priceRes && !priceRes.error && priceRes.data
+      ? (priceRes.data as { version_monthly_price_kes?: unknown }).version_monthly_price_kes
       : null;
+    const price = pinned == null || pinned === "" ? null : num(pinned);
     const smsMessages =
       smsRes && !smsRes.error && typeof (smsRes as { count?: number | null }).count === "number"
         ? ((smsRes as { count: number }).count)
