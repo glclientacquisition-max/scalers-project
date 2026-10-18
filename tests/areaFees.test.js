@@ -245,8 +245,11 @@ for (const d199 of [undefined, 'on']) {
 }
 
 test('VOICE_AREA_FEES off: no area terms, no fee in the prompt, a Swahili fee word is read word by word as before', () => {
-  const prev = process.env.VOICE_AREA_FEES;
+  // VOICE_FACT_REFS also turns compound numbers on: clear it so a suite run
+  // with both flags on still checks the true flag-off path.
+  const prev = { fees: process.env.VOICE_AREA_FEES, refs: process.env.VOICE_FACT_REFS };
   process.env.VOICE_AREA_FEES = 'off';
+  delete process.env.VOICE_FACT_REFS;
   try {
     const profile = tenantProfileFromRow(homeRow);
     assert.equal(profile.areaTerms, null);
@@ -255,6 +258,8 @@ test('VOICE_AREA_FEES off: no area terms, no fee in the prompt, a Swahili fee wo
     const { numbersIn } = require('../src/conversation/numberWords');
     assert.deepEqual([...numbersIn('ada ni shilingi mia tatu')].sort(), ['100', '3']);
   } finally {
-    process.env.VOICE_AREA_FEES = prev;
+    process.env.VOICE_AREA_FEES = prev.fees;
+    if (prev.refs == null) delete process.env.VOICE_FACT_REFS;
+    else process.env.VOICE_FACT_REFS = prev.refs;
   }
 });
