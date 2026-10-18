@@ -3,6 +3,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { adminLoginHref, hostOnlyCookieOptions } from "@/lib/adminHost";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { welcomeHomePath } from "@/lib/authRedirect";
+import { loginNextPath } from "@/lib/shortCallLink";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { acceptPendingInvitesForUser, DESK_TENANT_COOKIE, deskTenantCookieOptions } from "@/lib/inviteAccept";
 
@@ -14,6 +15,10 @@ export async function POST(request: NextRequest) {
     .trim()
     .toLowerCase();
   const password = String(form.get("password") || "");
+  // Only short call links (/c/<code>); anything else lands on /home as before.
+  const next = loginNextPath(form.get("next"));
+  const failed = (to: string) =>
+    NextResponse.redirect(new URL(next ? `${to}&next=${encodeURIComponent(next)}` : to, request.url), 303);
 
   if (email === "admin@scalers.local" || email === "admin@sauti.local") {
     return NextResponse.redirect(
@@ -23,7 +28,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!email || !password) {
-    return NextResponse.redirect(new URL("/login?error=1", request.url), 303);
+    return failed("/login?error=1");
   }
 
   let url: string;
@@ -32,10 +37,10 @@ export async function POST(request: NextRequest) {
     url = getSupabaseUrl();
     anonKey = getSupabaseAnonKey();
   } catch {
-    return NextResponse.redirect(new URL("/login?error=config", request.url), 303);
+    return failed("/login?error=config");
   }
 
-  const res = NextResponse.redirect(new URL("/home", request.url), 303);
+  const res = NextResponse.redirect(new URL(next || "/home", request.url), 303);
 
   const supabase = createServerClient(url, anonKey, {
     cookies: {
@@ -54,7 +59,7 @@ export async function POST(request: NextRequest) {
   timer.mark("auth");
   if (error) {
     console.info(timer.line("login") + " result=denied");
-    return NextResponse.redirect(new URL("/login?error=1", request.url), 303);
+    return failed("/login?error=1");
   }
 
   // Invited people who confirmed on another device land here: finish their invite.

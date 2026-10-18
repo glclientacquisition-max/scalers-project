@@ -287,6 +287,8 @@ async function closedTenantSendGate(ledger, to) {
   const tenantId = ledger?.tenantId;
   // No tenant id or nothing to send to: nothing to guard.
   if (!tenantId || !destKeys(to).length) return null;
+  // Billing notices (#775) must still reach a suspended business.
+  if (ledger.billingNotice === true && String(ledger.kind || '').startsWith('platform_billing_')) return null;
   const { tenantLineForAction } = require('../sautikit/closedTenantGuard');
   const line = await tenantLineForAction(tenantId);
   if (!line.closed) return null;

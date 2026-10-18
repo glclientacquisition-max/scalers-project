@@ -29,6 +29,17 @@ const {
   releaseInstanceFlight,
   sendReserved,
 } = require('./sendLedger');
+const { escalationHold, noteInboxOnly } = require('./escalationGate');
+const {
+  STAFF_SMS_KINDS,
+  renderStaffSms,
+  renderStaffWhatsApp,
+  staffAlert,
+  staffSmsTemplateLines,
+  toGsm7,
+} = require('./templates');
+const { renderStaffAlertEmail } = require('./alertEmail');
+const { callShortCode } = require('./callShortLink');
 
 function whatsAppSenderReady() {
   return isWhatsAppConfigured();
@@ -42,7 +53,7 @@ function smsSenderReady() {
   return isSmsConfigured();
 }
 
-async function sendEmailFallback({ to, body, lead = {}, subject } = {}) {
+async function sendEmailFallback({ to, body, lead = {}, subject, mail = null } = {}) {
   const dest = normalizeEmail(to);
   if (!emailFallbackReady() || !dest) {
     return {
@@ -51,13 +62,43 @@ async function sendEmailFallback({ to, body, lead = {}, subject } = {}) {
     };
   }
   const built = buildLeadEmail(lead);
+  // Staff call alerts: HTML card + plain text (alertEmail.js). Others: text as before.
   const result = await sendOwnerEmail({
     to: dest,
-    subject: subject || built.subject,
-    text: body || built.text,
+    subject: (mail && mail.subject) || subject || built.subject,
+    text: (mail && mail.text) || body || built.text,
+    html: mail ? mail.html : undefined,
     lead,
   });
   return { channel: 'email', to: dest, result };
+}
+
+function deskBaseUrl() {
+  return String(process.env.DESK_PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://app.scalers.co.ke').trim() ||
+    'https://app.scalers.co.ke';
+}
+
+/**
+ * Per-channel bodies for a staff call alert (lead, escalation, request, visit,
+ * voicemail, callback): one-segment SMS, the same short body on WhatsApp
+ * (session text, first line bold) plus the three scalers_staff_alert
+ * variables, and the HTML / text email. Other kinds
+ * (billing, wallet, ops, caller texts) keep `text` on every channel.
+ */
+async function staffChannelBodies({ smsBody, text, lead, ledger, kind } = {}) {
+  const k = String(kind || (ledger && ledger.kind) || '').trim();
+  const explicitSms = smsBody && String(smsBody).trim() ? toGsm7(smsBody) : null;
+  if (!STAFF_SMS_KINDS.has(k)) return { smsText: explicitSms || text, wa: null, mail: null };
+  const safeLead = lead && typeof lead === 'object' ? lead : {};
+  const shortCode = await callShortCode(ledger);
+  const deskBase = deskBaseUrl();
+  const smsText = explicitSms || renderStaffSms({ kind: k, lead: safeLead, shortCode, deskBase }) || text;
+  const wa = {
+    sessionBody: renderStaffWhatsApp({ kind: k, lead: safeLead, shortCode, deskBase }),
+    alertLines: staffSmsTemplateLines({ kind: k, lead: safeLead }),
+  };
+  const alert = staffAlert({ kind: k, lead: safeLead, body: text, shortCode, deskBase, callId: ledger && ledger.callId });
+  return { smsText, wa, mail: alert ? renderStaffAlertEmail(alert) : null };
 }
 
 async function trySendSms({ to, body }) {
@@ -67,10 +108,17 @@ async function trySendSms({ to, body }) {
   return { channel: 'sms', to: dest, result };
 }
 
-async function trySendWhatsApp({ to, body, lead, kind }) {
+async function trySendWhatsApp({ to, body, lead, kind, wa = null }) {
   const dest = normalizeWhatsAppTo(to);
   if (!whatsAppSenderReady() || !dest) return null;
-  const result = await sendOwnerWhatsApp({ to: dest, body, lead, kind });
+  const result = await sendOwnerWhatsApp({
+    to: dest,
+    body,
+    lead,
+    kind,
+    sessionBody: wa ? wa.sessionBody : undefined,
+    alertLines: wa ? wa.alertLines : undefined,
+  });
   return { channel: 'whatsapp', to: dest, result };
 }
 
@@ -85,8 +133,14 @@ async function trySendWhatsApp({ to, body, lead, kind }) {
  * @param {object} [opts.lead]
  * @param {string} [opts.subject]
  */
-async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger, kind } = {}) {
+async function dispatchAlert({ to, email, body, smsBody, lead = {}, subject, channels, ledger, kind } = {}) {
   const text = body || buildLeadText(lead);
+  // Staff call alerts: one GSM-7 segment on SMS (renderStaffSms), the same
+  // short body on WhatsApp (renderStaffWhatsApp, first line bold) and an HTML
+  // card on email (alertEmail.js). Everything else keeps `text`.
+  const { smsText, wa, mail } = await staffChannelBodies({ smsBody, text, lead, ledger, kind });
+  const waText = (wa && wa.sessionBody) || text;
+  const mailText = (mail && mail.text) || text;
   const errors = [];
   const prefs = parseNotifyChannels(channels);
   const dests = [normalizeSmsTo(to), normalizeWhatsAppTo(to), normalizeEmail(email)].filter(
@@ -95,6 +149,18 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
   const gate = await beginInstanceSend(ledger, dests);
   if (!gate.ok) {
     return { channel: null, reason: gate.reason };
+  }
+  // #775: voicemails and call updates stay in the Inbox while the business is
+  // out of usage. Missing RPC or an error sends as today (escalationGate.js).
+  const hold = await escalationHold(ledger);
+  if (hold) {
+    releaseInstanceFlight(gate.key);
+    await noteInboxOnly(ledger, hold.reason);
+    console.warn(
+      `[notify] held for Inbox (${hold.reason}) kind=${(ledger && ledger.kind) || kind || 'unknown'}` +
+        (ledger?.callSid ? ` call=${ledger.callSid}` : '')
+    );
+    return { channel: null, reason: 'escalation_held', held: hold.reason };
   }
 
   // Reserve -> send -> settle under ONE per-person key. A failed or refused
@@ -108,7 +174,15 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
 
   async function viaReserve(channel, dest, send) {
     const out = await sendReserved(
-      { ledger, key, kind: ledgerKind, channel, to: dest, body: text, strict: ledger?.strict },
+      {
+        ledger,
+        key,
+        kind: ledgerKind,
+        channel,
+        to: dest,
+        body: channel === 'sms' ? smsText : channel === 'whatsapp' ? waText : channel === 'email' ? mailText : text,
+        strict: ledger?.strict,
+      },
       send
     );
     if (out.legacy) legacy = true;
@@ -118,7 +192,9 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
   // Legacy path (reserve_notify_send not applied yet): record after the send.
   async function accept(result) {
     if (result?.channel) {
-      const recorded = await recordDispatchResult(ledger, result, text);
+      const sentBody =
+        result.channel === 'sms' ? smsText : result.channel === 'whatsapp' ? waText : result.channel === 'email' ? mailText : text;
+      const recorded = await recordDispatchResult(ledger, result, sentBody);
       const claim = durableSendClaim(recorded);
       if (!claim.ok) {
         return { channel: null, reason: claim.reason, errors: [...errors] };
@@ -136,7 +212,7 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
         if (!legacy) {
           try {
             const out = await viaReserve('sms', smsTo, async () => {
-              const sms = await trySendSms({ to, body: text });
+              const sms = await trySendSms({ to, body: smsText });
               if (!sms) throw new Error('sms_unavailable');
               return sms;
             });
@@ -161,7 +237,7 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
           }
         }
         if (!handled) {
-          const claim = await claimTenantSms(ledger, text);
+          const claim = await claimTenantSms(ledger, smsText);
           if (!claim.allowed) {
             errors.push(`sms:${claim.reason || 'sms_allowance_exhausted'}`);
             console.warn(
@@ -170,7 +246,7 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
           } else {
             if (ledger && typeof ledger === 'object') ledger.overage = Boolean(claim.overage);
             try {
-              const sms = await trySendSms({ to, body: text });
+              const sms = await trySendSms({ to, body: smsText });
               if (sms) return accept(sms);
             } catch (err) {
               errors.push(`sms:${err?.message || err}`);
@@ -186,7 +262,7 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
         const waTo = normalizeWhatsAppTo(to);
         if (!legacy && whatsAppSenderReady() && waTo) {
           const out = await viaReserve('whatsapp', waTo, () =>
-            trySendWhatsApp({ to, body: text, lead, kind: ledgerKind })
+            trySendWhatsApp({ to, body: text, lead, kind: ledgerKind, wa })
           );
           if (!out.legacy) {
             if (out.sent) return out.result;
@@ -197,8 +273,8 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
           }
         }
         if (legacy) {
-          const wa = await trySendWhatsApp({ to, body: text, lead, kind: ledgerKind });
-          if (wa) return accept(wa);
+          const waSent = await trySendWhatsApp({ to, body: text, lead, kind: ledgerKind, wa });
+          if (waSent) return accept(waSent);
         }
       } catch (err) {
         errors.push(`whatsapp:${err?.message || err}`);
@@ -215,9 +291,9 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
       const mailTo = normalizeEmail(email);
       if (!legacy && emailFallbackReady() && mailTo) {
         const out = await viaReserve('email', mailTo, async () => {
-          const mail = await sendEmailFallback({ to: email, body: text, lead, subject });
-          if (!mail.channel) throw new Error(mail.reason || 'email_failed');
-          return mail;
+          const sent = await sendEmailFallback({ to: email, body: text, lead, subject, mail });
+          if (!sent.channel) throw new Error(sent.reason || 'email_failed');
+          return sent;
         });
         if (!out.legacy) {
           if (out.sent) return out.result;
@@ -227,19 +303,20 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
           return { channel: null, reason: out.reason || 'send_failed', errors };
         }
       }
-      const mail = await sendEmailFallback({
+      const sentMail = await sendEmailFallback({
         to: email,
         body: text,
         lead,
         subject,
+        mail,
       });
-      if (mail.channel) return accept(mail);
+      if (sentMail.channel) return accept(sentMail);
 
       if (!smsSenderReady() && !whatsAppSenderReady()) {
         return { channel: null, reason: 'no_notify_channel_configured', errors };
       }
       if (!normalizeSmsTo(to) && !normalizeWhatsAppTo(to)) {
-        return { channel: null, reason: mail.reason || 'no_destination_number', errors };
+        return { channel: null, reason: sentMail.reason || 'no_destination_number', errors };
       }
       return { channel: null, reason: 'send_failed', errors };
     }

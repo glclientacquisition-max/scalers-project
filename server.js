@@ -7432,6 +7432,8 @@ server.listen(PORT, () => {
     console.log(`🌐 PUBLIC_BASE_URL not set — Stream URLs use request Host header`);
   }
   console.log(`✓ Supabase database initialized`);
+  // #775 billing_notices outbox (off unless BILLING_NOTICES_SEND=on).
+  require('./src/notifications/billingNoticeSender').startBillingNoticeSender();
   if (fastInboundEnabled()) {
     // Warm the inbound directory so the first call never pays the read.
     inboundDirectory.refresh().catch((err) =>

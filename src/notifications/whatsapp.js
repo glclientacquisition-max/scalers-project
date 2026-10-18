@@ -66,6 +66,7 @@ function buildWhatsAppTemplatePayload({
   kind,
   body,
   lead = {},
+  alertLines,
 } = {}) {
   const toNorm = normalizeWhatsAppTo(to);
   if (!toNorm) throw new Error('WhatsApp destination number is empty');
@@ -77,6 +78,7 @@ function buildWhatsAppTemplatePayload({
     to: toNorm,
     templateName: templateName || undefined,
     language: language || undefined,
+    alertLines,
   });
   const name = templateName || built.name || genericTemplateName();
   const language_code = language || built.language_code || templateLanguage();
@@ -106,6 +108,8 @@ function buildWhatsAppSendPayload({
   templateName,
   language,
   components,
+  sessionBody,
+  alertLines,
 } = {}) {
   const toNorm = normalizeWhatsAppTo(to);
   if (!toNorm) throw new Error('WhatsApp destination number is empty');
@@ -116,7 +120,8 @@ function buildWhatsAppSendPayload({
       to: toNorm,
       type: 'text',
       text: {
-        body: body || buildLeadText(lead),
+        // Staff call alerts: templates.js renderStaffWhatsApp (free-form session text).
+        body: sessionBody || body || buildLeadText(lead),
         preview_url: Boolean(lead.recordingUrl),
       },
     };
@@ -130,6 +135,7 @@ function buildWhatsAppSendPayload({
     kind,
     body,
     lead,
+    alertLines,
   });
 }
 
@@ -297,6 +303,8 @@ async function sendOwnerWhatsApp({
   kind,
   windowOpen,
   lastInboundAt,
+  sessionBody,
+  alertLines,
 } = {}) {
   let open = windowOpen === true;
   if (windowOpen !== true && windowOpen !== false) {
@@ -318,11 +326,11 @@ async function sendOwnerWhatsApp({
       }
     }
   }
-  const payload = buildWhatsAppSendPayload({ to, body, lead, windowOpen: open, kind });
+  const payload = buildWhatsAppSendPayload({ to, body, lead, windowOpen: open, kind, sessionBody, alertLines });
   if (open) {
     return postWhatsAppMessage(payload);
   }
-  return sendTemplateWithFallback({ to, body, lead, kind });
+  return sendTemplateWithFallback({ to, body, lead, kind, alertLines });
 }
 
 /**

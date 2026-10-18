@@ -248,7 +248,298 @@ function escalationBody({
   return lines.join('\n');
 }
 
+// ---------------------------------------------------------------------------
+// Staff call-alert SMS: one GSM-7 segment (160 chars).
+// Owner/staff alerts for a call (lead, escalation, request, visit, voicemail,
+// callback) go out as SMS in this short form. WhatsApp and email keep the
+// full renderStaffText / escalationBody text. Basic GSM-7 only: one emoji,
+// curly quote or en dash would switch the SMS to UCS-2 (70 chars).
+// Callbacks only: never imply a live transfer or a confirmed booking.
+// ---------------------------------------------------------------------------
+const SMS_MAX = 160;
+const STAFF_SMS_KINDS = new Set(['lead', 'escalation', 'service_request', 'appointment', 'voicemail', 'callback']);
+const STAFF_SMS_LABELS = Object.freeze({
+  lead: 'missed call',
+  escalation: 'call back',
+  service_request: 'request',
+  appointment: 'visit request - to confirm',
+  voicemail: 'voicemail',
+  callback: 'callback request',
+});
+// Titles that serviceRequestTitle / appointmentTitle put in front of the reason.
+const STAFF_SMS_TITLE_LABELS = Object.freeze({
+  'ENQUIRY': 'enquiry',
+  'HOLD / PICKUP': 'hold request',
+  'ORDER': 'order request',
+  'CALLBACK': 'callback request',
+  'VISIT REQUEST': 'visit request - to confirm',
+  'VISIT UPDATED': 'visit changed - to confirm',
+  'VISIT CANCELLED': 'visit cancelled',
+});
+// Short call link code (calls.short_code): no 0/O/1/I/L.
+const SHORT_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{6,8}$/;
+
+// Basic GSM 03.38 characters that are also ASCII (extension chars [ ] { } ~ ^ | \ count double).
+const GSM7_BASIC_RE = /^[A-Za-z0-9 \n\r!"#$%&'()*+,\-./:;<=>?@_]*$/;
+
+function isGsm7Basic(text) {
+  return GSM7_BASIC_RE.test(String(text == null ? '' : text));
+}
+
+/** Plain GSM-7 text: straight quotes, hyphens, no emoji, no extension chars. */
+function toGsm7(text) {
+  return String(text == null ? '' : text)
+    .replace(/[\u2018\u2019\u201a\u201b\u2032`\u00b4]/g, "'")
+    .replace(/[\u201c\u201d\u201e\u201f\u2033\u00ab\u00bb]/g, '"')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/[\u00a0\u2000-\u200b\u202f\u205f\u3000\t]/g, ' ')
+    .replace(/[[{]/g, '(')
+    .replace(/[\]}]/g, ')')
+    .replace(/~/g, '-')
+    .replace(/[\\|]/g, '/')
+    .replace(/\u20ac/g, 'EUR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9 \n!"#$%&'()*+,\-./:;<=>?@_]/g, '')
+    .replace(/ {2,}/g, ' ')
+    .trim();
+}
+
+function oneLine(text) {
+  return toGsm7(String(text == null ? '' : text).replace(/\s*[\r\n]+\s*/g, ' '));
+}
+
+/** Cut to max chars with "...", on a word boundary when one is close. */
+function clip(text, max) {
+  const t = String(text || '');
+  if (t.length <= max) return t;
+  if (max <= 3) return t.slice(0, Math.max(0, max));
+  let cut = t.slice(0, max - 3);
+  const space = cut.lastIndexOf(' ');
+  if (space > 0 && space >= cut.length - 10) cut = cut.slice(0, space);
+  return `${cut.replace(/[\s.,;:&/+-]+$/, '')}...`;
+}
+
+/** Kenyan mobile / landline-mobile as 07xx xxx xxx or 01xx xxx xxx; anything else as given. */
+function smsPhone(raw) {
+  const t = oneLine(raw);
+  const digits = t.replace(/[\s()-]/g, '');
+  const m = /^(?:\+?254|0)([17]\d{8})$/.exec(digits);
+  if (m) {
+    const n = `0${m[1]}`;
+    return `${n.slice(0, 4)} ${n.slice(4, 7)} ${n.slice(7)}`;
+  }
+  return clip(t, 16);
+}
+
+/** host/c/<code>, or null when there is no valid short code (no link then). */
+function shortCallLink(shortCode, deskBase) {
+  const code = String(shortCode || '').trim();
+  if (!SHORT_CODE_RE.test(code)) return null;
+  const base = String(deskBase || 'app.scalers.co.ke').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  if (!base || !isGsm7Basic(base) || /\s/.test(base)) return null;
+  return `${base}/c/${code}`;
+}
+
+/**
+ * One-segment SMS for a staff call alert, or null when kind is not one
+ * (caller texts, billing notices, wallet / ops alerts keep their own text).
+ *
+ *   Mama Njeri Gas: missed call
+ *   Wanjiku Kamau, 0712 345 678
+ *   Wants 13kg gas refill to Kahawa West today, asked regulator price
+ *   app.scalers.co.ke/c/K7P2QX
+ *
+ * Business 24 chars, name 20, number 16; the reason gets the rest (with
+ * "..."). The short link is always kept when the call has a code.
+ * @param {{ kind: string, lead?: { businessName?: string, name?: string, reason?: string, callerNumber?: string }, shortCode?: string|null, deskBase?: string|null }} opts
+ */
+function renderStaffSms({ kind, lead = {}, shortCode = null, deskBase = null, max = SMS_MAX } = {}) {
+  const k = String(kind || '').trim();
+  if (!STAFF_SMS_KINDS.has(k)) return null;
+  const { label, reason: detail } = staffLabelReason(k, lead && lead.reason);
+  const biz = clip(oneLine(lead && lead.businessName), 24);
+  const name = clip(oneLine(lead && lead.name) || 'Caller', 20);
+  const phone = smsPhone(lead && lead.callerNumber);
+  let link = shortCallLink(shortCode, deskBase);
+  const lines = [biz ? `${biz}: ${label}` : label, phone ? `${name}, ${phone}` : name];
+  if (link && lines.join('\n').length + link.length + 1 > max) link = null; // odd DESK_PUBLIC_URL
+  const fixed = lines.join('\n').length + (link ? link.length + 1 : 0);
+  const room = max - fixed - 1; // newline before the reason
+  if (detail && room > 3) lines.push(clip(detail, room));
+  if (link) lines.push(link);
+  const out = lines.join('\n');
+  return out.length <= max ? out : clip(out, max);
+}
+
+// ---------------------------------------------------------------------------
+// Staff call alert model for the email (alertEmail.js): same structure as the
+// SMS, no length cap, full reason and details. Built from the lead plus the
+// rows renderStaffText already put in the body ("When: ...", "Where: ...").
+// WhatsApp uses the short SMS body instead (renderStaffWhatsApp below).
+// Callbacks only: never imply a live transfer or a confirmed booking.
+// ---------------------------------------------------------------------------
+const STAFF_DETAIL_ROWS = Object.freeze([
+  ['Service', 'Service'],
+  ['Item', 'Item'],
+  ['Qty', 'Qty'],
+  ['When', 'When'],
+  ['Where', 'Where'],
+  ['Notes', 'Notes'],
+  ['Caller asked for', 'Asked for'],
+]);
+// Recordings are paused (no call has recording_url yet). Staff alerts on every
+// channel (SMS, WhatsApp text and template, email) carry no recording link.
+// Set to true to show "Play recording" in the email again (alertEmail.js).
+const STAFF_ALERT_RECORDING_LINK = false;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function plainLine(text) {
+  return String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+}
+
+/** Label (lowercase) and reason without the "VISIT REQUEST:" style prefix. */
+function staffLabelReason(kind, reason, clean = oneLine) {
+  let label = STAFF_SMS_LABELS[kind];
+  let detail = clean(reason);
+  const m = /^([A-Z][A-Z /]+?):\s*/.exec(detail);
+  if (m && STAFF_SMS_TITLE_LABELS[m[1].trim()]) {
+    label = STAFF_SMS_TITLE_LABELS[m[1].trim()];
+    detail = detail.slice(m[0].length).trim();
+  }
+  return { label, reason: detail };
+}
+
+/** "When: ..." style rows renderStaffText / escalationBody wrote into the body. */
+function staffDetailsFromText(body) {
+  const out = [];
+  const lines = String(body || '').split(/\r?\n/);
+  for (const [key, label] of STAFF_DETAIL_ROWS) {
+    const row = lines.find((l) => l.trim().toLowerCase().startsWith(`${key.toLowerCase()}:`));
+    const value = row ? plainLine(row.trim().slice(key.length + 1)) : '';
+    if (value) out.push([label, value]);
+  }
+  return out;
+}
+
+/** Tappable number: +2547XXXXXXXX for Kenyan numbers, else the digits as given. */
+function telHref(raw) {
+  const t = String(raw || '').trim();
+  const digits = t.replace(/[^\d+]/g, '');
+  const ke = /^(?:\+?254|0)([17]\d{8})$/.exec(digits);
+  if (ke) return `tel:+254${ke[1]}`;
+  const plain = digits.replace(/(?!^)\+/g, '');
+  return /\d{6,}/.test(plain) ? `tel:${plain}` : null;
+}
+
+function callUrlFrom({ body, callId, deskBase }) {
+  const m = /^Open call:\s*(https?:\/\/\S+)\s*$/im.exec(String(body || ''));
+  if (m) return m[1];
+  const id = String(callId || '').trim();
+  if (!UUID_RE.test(id)) return null;
+  const base = String(deskBase || 'https://app.scalers.co.ke').trim().replace(/\/+$/, '');
+  const withProto = /^https?:\/\//i.test(base) ? base : `https://${base}`;
+  return `${withProto}/calls/${id}`;
+}
+
+/**
+ * Structured staff call alert, or null when kind is not a staff call alert.
+ * link: https short link when the call has a code, else the full call URL.
+ */
+function staffAlert({ kind, lead = {}, body = '', shortCode = null, deskBase = null, callId = null } = {}) {
+  const k = String(kind || '').trim();
+  if (!STAFF_SMS_KINDS.has(k)) return null;
+  const l = lead && typeof lead === 'object' ? lead : {};
+  const labelled = staffLabelReason(k, l.reason, plainLine);
+  const { label } = labelled;
+  let { reason } = labelled;
+  const rawPhone = plainLine(l.callerNumber || l.phone);
+  const name = plainLine(l.name);
+  let details = staffDetailsFromText(body);
+  // Requests and visits: what they want is the item / service; when, where,
+  // qty and notes stay as their own rows.
+  const what = (k === 'service_request' || k === 'appointment') && details.find(([key]) => key === 'Item' || key === 'Service');
+  if (what) {
+    reason = what[1];
+    details = details.filter((row) => row !== what);
+  } else {
+    details = details.filter(([, value]) => !reason.toLowerCase().includes(value.toLowerCase()));
+  }
+  if (k === 'escalation') {
+    const m = /^Escalation for (.+?)(?:\.\s|\s\(fallback\)|$)/m.exec(String(body || ''));
+    const who = m ? plainLine(m[1]) : '';
+    if (who && who !== 'the team') details.unshift(['For', who]);
+  }
+  const short = shortCallLink(shortCode, deskBase);
+  return {
+    kind: k,
+    businessName: plainLine(l.businessName),
+    label,
+    name: name && name !== 'Caller' ? name : '',
+    phone: rawPhone ? smsPhone(rawPhone) : '',
+    tel: telHref(rawPhone),
+    reason,
+    details,
+    recordingUrl:
+      STAFF_ALERT_RECORDING_LINK && /^https?:\/\//i.test(String(l.recordingUrl || '')) ? String(l.recordingUrl).trim() : null,
+    link: short ? `https://${short}` : callUrlFrom({ body, callId, deskBase }),
+    shortLink: Boolean(short),
+  };
+}
+
+/**
+ * WhatsApp staff call alert: the SMS body (same 4 lines, caps, truncation and
+ * short link), first line bold, at most 160 characters including the bold.
+ *
+ *   *Mama Njeri Gas: missed call*
+ *   Wanjiku Kamau, 0712 345 678
+ *   Wants 13kg gas refill to Kahawa West today, asked regulator price
+ *   app.scalers.co.ke/c/K7P2QX
+ */
+function renderStaffWhatsApp({ kind, lead = {}, shortCode = null, deskBase = null } = {}) {
+  // Caller text must not open or close WhatsApp bold / italic.
+  const safeLead = lead && typeof lead === 'object' ? lead : {};
+  const clean = (v) => (v == null ? v : String(v).replace(/[*_]/g, ''));
+  const sms = renderStaffSms({
+    kind,
+    lead: { ...safeLead, businessName: clean(safeLead.businessName), name: clean(safeLead.name), reason: clean(safeLead.reason) },
+    shortCode,
+    deskBase,
+    max: SMS_MAX - 2, // room for the two bold asterisks
+  });
+  if (!sms) return null;
+  const lines = sms.split('\n');
+  lines[0] = `*${lines[0]}*`;
+  return lines.join('\n');
+}
+
+/**
+ * The three body variables of the approved scalers_staff_alert template:
+ * SMS lines 1-3 (no link: template variables cannot carry a URL).
+ */
+function staffSmsTemplateLines({ kind, lead = {} } = {}) {
+  const sms = renderStaffSms({ kind, lead });
+  if (!sms) return null;
+  const [head, who, reason] = sms.split('\n');
+  return [head, who, reason || 'No reason given'];
+}
+
 module.exports = {
+  SHORT_CODE_RE,
+  SMS_MAX,
+  STAFF_ALERT_RECORDING_LINK,
+  STAFF_SMS_KINDS,
+  isGsm7Basic,
+  renderStaffSms,
+  renderStaffWhatsApp,
+  shortCallLink,
+  staffAlert,
+  staffSmsTemplateLines,
+  staffDetailsFromText,
+  telHref,
+  smsPhone,
+  toGsm7,
   STAFF_ACTIONS,
   STAFF_TITLES,
   appointmentTitle,

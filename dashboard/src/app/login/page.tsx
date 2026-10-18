@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { marketingHomeHref } from "@/lib/adminHost";
 import { getAuthUser } from "@/lib/auth";
+import { loginNextPath } from "@/lib/shortCallLink";
 import { Field, Input } from "@/components/ui/Field";
 import { PendingSubmit } from "./PendingSubmit";
 import { ResendDisclosure } from "./ResendDisclosure";
@@ -35,11 +36,13 @@ function notice(sp: { error?: string; link?: string }): { tone: "ok" | "warn"; t
 async function LoginGate({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; link?: string }>;
+  searchParams: Promise<{ error?: string; link?: string; next?: string }>;
 }) {
   const user = await getAuthUser();
-  if (user) redirect("/home");
   const sp = await searchParams;
+  // Short call links from staff SMS (/c/<code>) come back here after sign-in.
+  const next = loginNextPath(sp.next);
+  if (user) redirect(next || "/home");
   const msg = notice(sp);
   const homeHref = marketingHomeHref();
 
@@ -59,6 +62,7 @@ async function LoginGate({
         ) : null}
 
         <form action="/api/login" method="post" className="mt-6 space-y-4">
+          {next ? <input type="hidden" name="next" value={next} /> : null}
           <Field id="email" label="Email">
             {(p) => (
               <Input {...p} name="email" type="email" required autoFocus autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false} />
@@ -99,7 +103,7 @@ async function LoginGate({
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; link?: string }>;
+  searchParams: Promise<{ error?: string; link?: string; next?: string }>;
 }) {
   return (
     <Suspense fallback={<LoginFallback />}>

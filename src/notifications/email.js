@@ -29,9 +29,10 @@ function buildLeadEmail({ businessName, name, reason, callerNumber, recordingUrl
  * @param {string} opts.to
  * @param {string} [opts.subject]
  * @param {string} [opts.text]
+ * @param {string} [opts.html] HTML part (staff call alerts, alertEmail.js); text stays the plain part
  * @param {object} [opts.lead]
  */
-async function sendOwnerEmail({ to, subject, text, lead = {} } = {}) {
+async function sendOwnerEmail({ to, subject, text, html, lead = {} } = {}) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.ALERT_EMAIL_FROM;
   if (!apiKey) throw new Error('RESEND_API_KEY is not configured');
@@ -47,6 +48,7 @@ async function sendOwnerEmail({ to, subject, text, lead = {} } = {}) {
     subject: subject || built.subject,
     text: text || built.text,
   };
+  if (html && String(html).trim()) payload.html = String(html);
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',

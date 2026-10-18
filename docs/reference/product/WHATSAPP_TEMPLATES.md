@@ -1,6 +1,6 @@
 ---
 owner: voice
-last_reviewed: 2026-10-09
+last_reviewed: 2026-10-18
 ---
 
 # Staff WhatsApp templates (Meta approval)
@@ -52,6 +52,29 @@ Kind env wins. If a kind name is unset, that event uses `SAUTIKIT_WHATSAPP_TEMPL
 Desk: `NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE=true` (default on).
 
 A SautiKit `202` is not delivery. Meta error `131042` means the WhatsApp Business account has no currency. Session text inside an open 24h window can still arrive. Template pings do not, until WhatsApp Manager billing has a country and currency. The desk then shows "WhatsApp billing is not set."
+
+## Staff call alerts: fields per path (#777)
+
+Call alerts (lead, call back, request, visit, voicemail, callback) use the staff SMS body on WhatsApp too: 4 lines, same caps and truncation, at most 160 characters, first line bold.
+
+| Path | When | What is sent |
+| --- | --- | --- |
+| Session text | 24h window open (`sendOwnerWhatsApp` found a recent inbound) | `renderStaffWhatsApp` (`templates.js`): `*Mama Njeri Gas: missed call*` / `Wanjiku Kamau, 0712 345 678` / reason / `app.scalers.co.ke/c/<code>`. No link line until `calls.short_code` exists. |
+| `scalers_staff_alert` (Active, code default) | Window closed, no kind env | Template text unchanged. `{{1}}` SMS line 1 `Mama Njeri Gas: missed call`. `{{2}}` line 2 `Wanjiku Kamau, 0712 345 678`. `{{3}}` line 3, the reason as truncated in the SMS. No link: variables cannot carry a URL. |
+| `scalers_lead`, `scalers_escalation`, `scalers_visit`, `scalers_request` (submitted list, not marked Active) | Only once the kind env is set | Unchanged packing. Their approved wording sits around each variable (`New missed-call lead. {{1}}`, `Escalation for {{1}}. {{2}}`, `{{1}}. {{2}}` with a fixed action line), so the short format does not fit without new template text. |
+
+The link cannot reach a cold staff phone without a new template. Proposed (needs Meta approval; not wired):
+
+`scalers_call_alert`, Utility, English (US), header none, footer `Scalers`.
+
+```
+{{1}}
+{{2}}
+{{3}}
+Open the call to act. Do not reply to this chat.
+```
+
+Button: Visit website, `Open call`, dynamic URL `https://app.scalers.co.ke/c/{{1}}`. Samples: `Mama Njeri Gas: missed call` / `Wanjiku Kamau, 0712 345 678` / `Wants 13kg gas refill to Kahawa West today` / button `K7P2QXZ`. After approval the send path needs a button component with the short code, and `SAUTIKIT_WHATSAPP_TEMPLATE` (or the kind env) pointed at it.
 
 ## Bodies to paste
 
