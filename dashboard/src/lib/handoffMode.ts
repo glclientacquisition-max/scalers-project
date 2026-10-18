@@ -14,7 +14,7 @@ export const HANDOFF_OPTIONS: {
   {
     id: "callback",
     label: "Take a message for a callback",
-    blurb: "Your Business Assistant takes their details and alerts you on WhatsApp or email.",
+    blurb: "Your Business Assistant takes their details and alerts you by text or email.",
   },
 ];
 

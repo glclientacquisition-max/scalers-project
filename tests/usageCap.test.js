@@ -16,44 +16,51 @@ const empty = {
 };
 
 describe("usage cap copy", () => {
-  it("stays quiet while buckets remain, on beta, and when on-demand is on", () => {
+  it("stays quiet while buckets remain, and beta does not stop calls", () => {
     assert.equal(usageCapNotice(empty), null);
     assert.equal(
       usageCapNotice({ ...empty, isBeta: true, minutesLeft: 0 }),
-      "Included minutes used. Calls stopped."
+      "Included minutes used. During beta, calls keep working and nothing is charged."
     );
     assert.equal(usageCapNotice({ ...empty, isBeta: true, smsLeft: 0 }), null);
-    assert.equal(usageCapNotice({ ...empty, onDemand: true, minutesLeft: 0 }), null);
+    assert.doesNotMatch(
+      usageCapNotice({ ...empty, onDemand: true, minutesLeft: 0 }) || "",
+      /invoice/
+    );
     assert.equal(
       homeMinuteStatus({ isBeta: true, onDemand: false, minutesIncluded: 300, minutesLeft: 12 }),
       null
     );
   });
 
-  it("says calls stop and tenant SMS stops when those caps are hit", () => {
+  it("says calls stop when the cap is hit, and extra usage is billed without an invoice", () => {
     assert.equal(
       usageCapNotice({ ...empty, minutesLeft: 0 }),
-      "Included minutes used. Calls stopped."
+      "Included minutes used. Calls have stopped."
     );
     assert.equal(
       usageCapNotice({ ...empty, smsLeft: 0 }),
-      "Included SMS used. Tenant SMS stopped."
+      "Included SMS used. SMS to callers have stopped."
     );
     assert.equal(
       usageCapNotice({ ...empty, minutesLeft: 0, smsLeft: 0 }),
-      "Included used. Calls stopped. Tenant SMS stopped."
+      "Included minutes and SMS used. Calls and SMS to callers have stopped."
+    );
+    assert.equal(
+      usageCapNotice({ ...empty, onDemand: true, minutesLeft: 0 }),
+      "Included minutes used. Extra minutes are billed at the rates on Usage."
     );
     assert.equal(
       homeMinuteStatus({ isBeta: false, onDemand: false, minutesIncluded: 300, minutesLeft: 0 }),
-      "Stopped"
+      "Calls stopped"
     );
     assert.equal(
       homeMinuteStatus({ isBeta: true, onDemand: false, minutesIncluded: 300, minutesLeft: 0 }),
-      "Stopped"
+      null
     );
     assert.equal(
       homeMinuteStatus({ isBeta: false, onDemand: true, minutesIncluded: 300, minutesLeft: 0 }),
-      "On-demand"
+      "Extra usage"
     );
   });
 });

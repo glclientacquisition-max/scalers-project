@@ -155,6 +155,9 @@ export function CatalogImportSheet({
                 ) : null}
               </li>
             ))}
+            {previewRows.length > 8 ? (
+              <li className="px-4 py-2.5 text-meta text-ink-2">+{previewRows.length - 8} more</li>
+            ) : null}
           </ul>
         </div>
       ) : null}

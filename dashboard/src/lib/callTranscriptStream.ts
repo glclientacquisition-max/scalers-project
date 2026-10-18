@@ -115,12 +115,15 @@ function keepSystemLine(text: string): boolean {
  * Drops lifecycle noise and duplicate per-turn chrome.
  */
 export function buildCallTranscriptStream(
-  turns: Pick<TranscriptRow, "id" | "created_at" | "speaker" | "text_content">[]
+  turns: Pick<TranscriptRow, "id" | "created_at" | "speaker" | "text_content">[],
+  callStartedAt?: string | null,
 ): TranscriptStreamItem[] {
   const kept: TranscriptStreamItem[] = [];
   let lastSpeech: TranscriptSpeechSpeaker | null = null;
   let lastSpeechText: string | null = null;
   let lastMinute: string | null = null;
+  let anchoredCall = false;
+  const callMs = callStartedAt ? Date.parse(callStartedAt) : NaN;
 
   for (const turn of turns) {
     const text = String(turn.text_content || "").replace(/\s+/g, " ").trim();
@@ -134,10 +137,16 @@ export function buildCallTranscriptStream(
       continue;
     }
     if (lastSpeechText && isGreetingEcho(lastSpeechText, text)) continue;
-    const minute = nairobiMinuteKey(turn.created_at);
+    let stampIso = turn.created_at;
+    if (!anchoredCall && Number.isFinite(callMs)) {
+      anchoredCall = true;
+      const turnMs = Date.parse(turn.created_at);
+      if (Number.isFinite(turnMs) && Math.abs(turnMs - callMs) <= 90_000) stampIso = callStartedAt as string;
+    }
+    const minute = nairobiMinuteKey(stampIso);
     const clustered = lastSpeech === speaker;
     const stamp =
-      lastMinute === minute ? null : formatTranscriptStamp(turn.created_at);
+      lastMinute === minute ? null : formatTranscriptStamp(stampIso);
     if (stamp) lastMinute = minute;
     if (clustered && kept.length) {
       const prev = kept[kept.length - 1];
