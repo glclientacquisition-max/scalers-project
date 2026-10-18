@@ -3,14 +3,17 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { hostOnlyCookieOptions } from "@/lib/adminHost";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
-import { callbackFailurePath, safeNext, staleSessionCookies } from "@/lib/authCallback";
+import { callbackFailurePath, isResetNext, safeNext, staleSessionCookies } from "@/lib/authCallback";
+import { RECOVERY_COOKIE, recoveryCookieOptions } from "@/lib/passwordReset";
 
-const OTP_TYPES = new Set(["signup", "email", "magiclink", "email_change"]);
+const OTP_TYPES = new Set(["signup", "email", "magiclink", "email_change", "recovery"]);
 
 /**
  * Signup confirmation landing. Handles PKCE (?code=) and token-hash (?token_hash=&type=) links,
  * sets the session cookie and continues to setup. If the link opened in another browser
  * (no PKCE verifier) the email is still confirmed, so we ask the person to sign in.
+ * Password reset links come back here with next=/reset-password: success marks the session as a
+ * recovery session for a few minutes, failure lands on the reset page's "send a new link" state.
  */
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
@@ -44,9 +47,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const dest = signedIn ? next : callbackFailurePath(supabaseError);
+  const dest = signedIn ? next : callbackFailurePath(supabaseError, next);
   const res = NextResponse.redirect(new URL(dest, request.url), 303);
   for (const { name, value, options } of jar) res.cookies.set(name, value, hostOnlyCookieOptions(options));
+  if (signedIn && isResetNext(next)) res.cookies.set(RECOVERY_COOKIE, "1", hostOnlyCookieOptions<CookieOptions>(recoveryCookieOptions));
   // Never leave someone in a different account than the one they just confirmed: on success drop
   // leftover chunks of the old session; on failure sign the old session out so /login shows the
   // "email confirmed, sign in" screen instead of bouncing into the previous account.
