@@ -1,0 +1,240 @@
+{
+ "source": "staging voice_turn_traces + transcripts + calls + contacts, read-only SELECT, 2026-10-18",
+ "callSid": "HD_af5868852bc7",
+ "callId": "57771a3b-99c7-4857-9a52-42fdb1ee7125",
+ "tenant": "jirani-staging",
+ "tenantId": "78386574-aeb0-4b34-9296-00c5424cdd0e",
+ "release": "9fb557ff4bd34e3f38a03090eda76df99d8b06ef",
+ "releaseBranch": "staging/pin-759-760-763-main-1e18",
+ "startedAt": "2026-10-18T11:26:15.439Z",
+ "startedAtEat": "2026-10-18 14:26 EAT (Sunday)",
+ "greeting": "Jirani Cleaning Services, this is Wanjiru. You can speak in English or Kiswahili. We're closed now. Nikusaidie vipi?",
+ "callerFile": {
+  "contact": {
+   "name": "Alwyn",
+   "metadata": {
+    "alternate_names": [
+     {
+      "name": "Alvin",
+      "seen_at": "2026-10-17T17:01:08.493Z"
+     }
+    ]
+   }
+  },
+  "note": "Contact row read after the call (updated 11:27:49Z by this call's review); name and alternate_names predate the call (created 16 Oct, alternate seen 17 Oct)."
+ },
+ "turns": [
+  {
+   "turn": 1,
+   "caller": "Uh, Tuesday at what time are you open?",
+   "language": "en",
+   "spoken": "We're open 7:30 AM to 6 PM.",
+   "source": "speak_packet",
+   "modelOutput": null,
+   "dropped": [],
+   "bargeIn": [],
+   "outcome": "early_return",
+   "at": "2026-10-18T11:26:36.031413+00:00"
+  },
+  {
+   "turn": 2,
+   "caller": "And, uh, and Wednesday?",
+   "language": "en",
+   "spoken": "How can I help you with your cleaning?",
+   "source": "model",
+   "modelOutput": "We are open from 7:30 AM to 6:00 PM on both Tuesday and Wednesday. How can I help you with your cleaning?",
+   "dropped": [
+    {
+     "before": "We are open from 7:30 AM to 6:00 PM on both Tuesday and Wednesday.",
+     "reason": "unsaid_number"
+    }
+   ],
+   "bargeIn": [],
+   "outcome": "ok",
+   "at": "2026-10-18T11:26:46.34748+00:00"
+  },
+  {
+   "turn": 3,
+   "caller": "Wednesday are you open?",
+   "language": "en",
+   "spoken": "We're open 7:30 AM to 6 PM.",
+   "source": "speak_packet",
+   "modelOutput": null,
+   "dropped": [],
+   "bargeIn": [],
+   "outcome": "early_return",
+   "at": "2026-10-18T11:26:55.456725+00:00"
+  },
+  {
+   "turn": 4,
+   "caller": "And on Saturday.",
+   "language": "en",
+   "spoken": "",
+   "source": "none",
+   "modelOutput": null,
+   "dropped": [],
+   "bargeIn": [
+    "final speech/interrupt_tts"
+   ],
+   "outcome": "barge_in",
+   "at": "2026-10-18T11:27:01.216765+00:00"
+  },
+  {
+   "turn": 5,
+   "caller": "Are you open?",
+   "language": "en",
+   "spoken": "We're closed today.",
+   "source": "speak_packet",
+   "modelOutput": null,
+   "dropped": [],
+   "bargeIn": [],
+   "outcome": "early_return",
+   "at": "2026-10-18T11:27:02.037477+00:00"
+  },
+  {
+   "turn": 6,
+   "caller": "Like, on Saturday.",
+   "language": "en",
+   "spoken": "Yes, on Wednesday we are open from 7:30 AM to 6:00 PM, and on Saturday from 8:00 AM to 4:00 PM. How can I assist you?",
+   "source": "model",
+   "modelOutput": "Yes, on Wednesday we are open from 7:30 AM to 6:00 PM, and on Saturday from 8:00 AM to 4:00 PM. How can I assist you?",
+   "dropped": [],
+   "bargeIn": [],
+   "outcome": "ok",
+   "at": "2026-10-18T11:27:17.372937+00:00"
+  },
+  {
+   "turn": 7,
+   "caller": "And Sunday?",
+   "language": "en",
+   "spoken": "On Sunday we are closed for walk-ins, but we can still schedule a service for another day. What cleaning do you need?",
+   "source": "model",
+   "modelOutput": "On Sunday we are closed for walk-ins, but we can still schedule a service for another day. What cleaning do you need?",
+   "dropped": [],
+   "bargeIn": [],
+   "outcome": "ok",
+   "at": "2026-10-18T11:27:30.136434+00:00"
+  },
+  {
+   "turn": 8,
+   "caller": "Uh, okay, you work 12?",
+   "language": "en",
+   "spoken": "Would you like to schedule a clean during our operating hours?",
+   "source": "model",
+   "modelOutput": "We are open until 6:00 PM on weekdays, not midnight. Would you like to schedule a clean during our operating hours?",
+   "dropped": [
+    {
+     "before": "We are open until 6:00 PM on weekdays, not midnight.",
+     "reason": "unsaid_number"
+    }
+   ],
+   "bargeIn": [
+    "interim speech/interrupt_tts"
+   ],
+   "outcome": "barge_in",
+   "at": "2026-10-18T11:27:37.59212+00:00"
+  },
+  {
+   "turn": 9,
+   "caller": "And I'm excited about.",
+   "language": "en",
+   "spoken": "Am I speaking with Alwyn?",
+   "source": "model",
+   "modelOutput": "Am I speaking with Alwyn?",
+   "dropped": [],
+   "bargeIn": [],
+   "outcome": "ok",
+   "at": "2026-10-18T11:27:40.450485+00:00"
+  }
+ ],
+ "transcript": [
+  {
+   "speaker": "agent",
+   "text": "Jirani Cleaning Services, this is Wanjiru. We're closed now. Nikusaidie vipi?"
+  },
+  {
+   "speaker": "caller",
+   "text": "Uh, Tuesday at what time are you open?"
+  },
+  {
+   "speaker": "agent",
+   "text": "We're open 7:30 AM to 6 PM."
+  },
+  {
+   "speaker": "caller",
+   "text": "And, uh, and Wednesday?"
+  },
+  {
+   "speaker": "agent",
+   "text": "How can I help you with your cleaning?"
+  },
+  {
+   "speaker": "caller",
+   "text": "Wednesday are you open?"
+  },
+  {
+   "speaker": "agent",
+   "text": "We're open 7:30 AM to 6 PM."
+  },
+  {
+   "speaker": "caller",
+   "text": "And on Saturday."
+  },
+  {
+   "speaker": "caller",
+   "text": "Are you open?"
+  },
+  {
+   "speaker": "agent",
+   "text": "We're closed today."
+  },
+  {
+   "speaker": "caller",
+   "text": "Like, on Saturday."
+  },
+  {
+   "speaker": "agent",
+   "text": "Yes, on Wednesday we are open from 7:30 AM to 6:00 PM, and on Saturday from 8:00 AM to 4:00 PM. How can I assist you?"
+  },
+  {
+   "speaker": "caller",
+   "text": "And Sunday?"
+  },
+  {
+   "speaker": "agent",
+   "text": "On Sunday we are closed for walk-ins, but we can still schedule a service for another day. What cleaning do you need?"
+  },
+  {
+   "speaker": "caller",
+   "text": "Uh, okay, you work 12?"
+  },
+  {
+   "speaker": "agent",
+   "text": "Would you like to schedule a clean during our operating hours?"
+  },
+  {
+   "speaker": "caller",
+   "text": "And I'm excited about."
+  },
+  {
+   "speaker": "agent",
+   "text": "Am I speaking with Alwyn?"
+  }
+ ],
+ "stored": {
+  "resolution": "resolved",
+  "primary_intent": "hours_open",
+  "resolution_note": "Answered: hours.",
+  "summary": {
+   "text": "Intent: hours_open. Caller: excited. Goal: Tuesday at what time are you open",
+   "reason": "Excited asked about Tuesday at what time are you open.",
+   "owner_review_want": "Excited asked about the opening times for Tuesday, Wednesday, Saturday, and Sunday.",
+   "language": "en",
+   "answered_questions": [
+    "hours"
+   ],
+   "unanswered_questions": []
+  },
+  "contact_last_reason": "Excited asked about the opening times for Tuesday, Wednesday, Saturday, and Sunday."
+ }
+}

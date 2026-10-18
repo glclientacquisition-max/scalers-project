@@ -55,6 +55,61 @@ function distinctOtherPerson(primary, alternate) {
   return isPlausibleCallerName(leftover.join(' '));
 }
 
+/**
+ * BRAIN_NAME_FOLD: which stored alternates are this person, and which
+ * spelling the file speaks. Flag off: unchanged.
+ *  - metadata.single_person or metadata.name_locked: one person; every
+ *    alternate is dropped from the card and the name is contacts.name.
+ *  - alternate_names_dismissed: never on the card.
+ *  - an STT spelling of the primary (nameFold.js) is the same person. The
+ *    spelling is the most-seen one (the primary counts once, plus
+ *    metadata.name_seen_count; each stored alternate row once), else the
+ *    primary. Ties keep the primary.
+ */
+function foldFileNames(primary, alternates = [], metadata = {}) {
+  const match = require('./callerNameMatch');
+  const list = Array.isArray(alternates) ? alternates : [];
+  const none = { name: primary, alternates: list, variants: [], source: null, single: false };
+  if (!primary || !match.nameFoldEnabled()) return none;
+  const identity = require('./contactIdentity');
+  const meta = metadata && typeof metadata === 'object' ? metadata : {};
+  const kept = list.filter((alt) => !identity.isDismissedName(meta, alt));
+  const lock = identity.nameLockOf(meta);
+  if (lock || identity.isSinglePerson(meta)) {
+    return {
+      name: primary,
+      alternates: [],
+      variants: kept,
+      source: lock ? `locked_${lock.by}` : 'single_person',
+      single: true,
+    };
+  }
+  const variants = kept.filter(
+    (alt) => match.namesFold(alt, primary) && !match.namesLikelySame(alt, primary, { fold: false })
+  );
+  const rest = kept.filter((alt) => !variants.includes(alt));
+  if (!variants.length) return { ...none, alternates: rest };
+  const rows = Array.isArray(meta.alternate_names) ? meta.alternate_names : [];
+  const seen = (spelling) => rows.filter((row) => String(row?.name || '').trim() === spelling).length;
+  const primarySeen = 1 + (Number(meta.name_seen_count) > 0 ? Number(meta.name_seen_count) : 0);
+  let best = primary;
+  let bestSeen = primarySeen;
+  for (const alt of variants) {
+    const n = seen(alt);
+    if (n > bestSeen) {
+      best = alt;
+      bestSeen = n;
+    }
+  }
+  return {
+    name: best,
+    alternates: rest,
+    variants,
+    source: best === primary ? 'primary' : 'most_seen',
+    single: false,
+  };
+}
+
 function alternateNames(metadata) {
   const list = metadata && Array.isArray(metadata.alternate_names)
     ? metadata.alternate_names
@@ -78,8 +133,14 @@ function buildCallerMemoryCard({
 } = {}) {
   if (!contact || typeof contact !== 'object') return null;
   const phone = String(contact.phone || '').trim();
-  const name = String(contact.name || '').trim() || null;
-  const alternates = alternateNames(contact.metadata);
+  const storedName = String(contact.name || '').trim() || null;
+  const storedAlternates = alternateNames(contact.metadata);
+  // BRAIN_NAME_FOLD (Chief 18 Oct, HD_af5868852bc7): an STT spelling of the
+  // file name (Alwyn/Alvin) is the same person, not a shared line. Those
+  // spellings leave the alternate list and the file speaks one spelling.
+  const fold = foldFileNames(storedName, storedAlternates, contact.metadata);
+  const name = fold.name;
+  const alternates = fold.alternates;
   // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 5): a saved phrase ("so
   // disappointed"), a role word ("Mteja") or a cut-off of the owner's name
   // ("Chr") is not a second person; a shared line skips the file-name ask.
@@ -158,13 +219,16 @@ function buildCallerMemoryCard({
     Boolean(phone);
   if (!hasFile) return null;
 
-  return {
+  const card = {
     phone: phone || null,
     name,
     fileOwnerName: name,
     sharedLine,
     greetByName: Boolean(name) && !sharedLine,
     alternateNames: alternates,
+    ...(fold.variants.length || fold.single
+      ? { nameVariants: fold.variants, nameSpellingSource: fold.source }
+      : {}),
     lastReason: lastReason || null,
     notes: notes || null,
     openRequests: requests,
@@ -184,6 +248,21 @@ function buildCallerMemoryCard({
       ? { openRows: structuredOpenRows(lived.open, requestSplit.openItems), pastOpenCount }
       : {}),
   };
+  // BRAIN_NAME_FOLD: STT spellings of one name are one person on this phone,
+  // and so is a single_person or name_locked file. Chief 18 Oct: never ask
+  // "Am I speaking with" for them; the file is bound to that person from the
+  // first turn. A different name (shared line) keeps the old flow.
+  if ((fold.variants.length || fold.single) && name && !sharedLine) {
+    return {
+      ...card,
+      nameFolded: true,
+      identityBound: true,
+      boundName: name,
+      fileRole: 'primary',
+      householdFile: snapshotHouseholdFile(card),
+    };
+  }
+  return card;
 }
 
 /**

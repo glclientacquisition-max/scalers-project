@@ -138,6 +138,10 @@ function deriveCallSummary(opts = {}) {
     instructions,
     callerName: name || null,
     language: state.language?.current || null,
+    // BRAIN_NAME_FOLD: the caller confirmed the read-back of this name.
+    ...(require('./nameReadBack').nameLockFromState(state)
+      ? { nameLock: require('./nameReadBack').nameLockFromState(state) }
+      : {}),
   };
 }
 

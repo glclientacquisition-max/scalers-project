@@ -1,4 +1,9 @@
-const { namesLikelySame, preferredContactSpelling, compactNameKey } = require('./callerNameMatch');
+const {
+  namesLikelySame,
+  preferredContactSpelling,
+  compactNameKey,
+  nameFoldEnabled,
+} = require('./callerNameMatch');
 const { isJunkCallerName } = require('./callerNameQuality');
 const { normalizeKenyaE164 } = require('./liveTransferReady');
 
@@ -11,6 +16,11 @@ function trimName(raw) {
 
 function namesMatch(a, b) {
   return namesLikelySame(a, b);
+}
+
+/** Exact or known-variant match, never the BRAIN_NAME_FOLD sound fold. */
+function namesMatchStrict(a, b) {
+  return namesLikelySame(a, b, { fold: false });
 }
 
 /** Same contract as src/db.js: Kenya E.164, else trimmed original. */
@@ -35,13 +45,53 @@ function parseStoredContactPhone(raw) {
   return { ok: true, phone };
 }
 
+/**
+ * Owner lock contract (Desk DESK_CONTACT_NAME_LOCK, Voice
+ * VOICE_CONTACT_NAME_LOCK, Brain BRAIN_NAME_FOLD), all in contacts.metadata:
+ *   single_person: true                       one person on this phone
+ *   name_locked: { at, by: 'owner'|'caller' } contacts.name is the spelling
+ *   alternate_names_dismissed: [{ name, at }] never add these back
+ */
+function nameLockOf(metadata) {
+  const lock = metadata && typeof metadata === 'object' ? metadata.name_locked : null;
+  if (!lock) return null;
+  if (typeof lock === 'object' && !Array.isArray(lock)) {
+    return { at: lock.at || null, by: lock.by === 'caller' ? 'caller' : 'owner' };
+  }
+  return { at: null, by: 'owner' };
+}
+
+function isSinglePerson(metadata) {
+  return Boolean(metadata && typeof metadata === 'object' && metadata.single_person === true);
+}
+
+function dismissedAlternateNames(metadata) {
+  const list = metadata && typeof metadata === 'object' ? metadata.alternate_names_dismissed : null;
+  return (Array.isArray(list) ? list : [])
+    .map((row) => trimName(typeof row === 'string' ? row : row?.name))
+    .filter(Boolean);
+}
+
+function isDismissedName(metadata, name) {
+  const key = compactNameKey(name);
+  if (!key) return false;
+  return dismissedAlternateNames(metadata).some((d) => compactNameKey(d) === key);
+}
+
+/** The locked spelling: contacts.name when metadata.name_locked is set. Else null. */
+function lockedFileName(metadata, primary) {
+  return nameLockOf(metadata) ? trimName(primary) : null;
+}
+
 function normalizeAlternates(list, primary) {
   const seen = new Set();
   const next = [];
   for (const row of Array.isArray(list) ? list : []) {
     const name = trimName(row?.name);
     if (!name || isJunkCallerName(name)) continue;
-    if (primary && namesMatch(name, primary)) continue;
+    // BRAIN_NAME_FOLD: a stored STT spelling of the primary stays on the row
+    // (history and most-used spelling). Only an exact or known variant drops.
+    if (primary && namesMatchStrict(name, primary)) continue;
     const key = compactNameKey(name);
     if (!key || seen.has(key)) continue;
     seen.add(key);
@@ -73,12 +123,32 @@ function mergeContactIdentity(existing, incoming = {}) {
     : [];
 
   let name = primary;
+  const fold = nameFoldEnabled();
+  // BRAIN_NAME_FOLD lock contract: a locked name is never replaced or
+  // re-spelled, and nothing is added as an alternate.
+  if (fold && primary && nameLockOf(baseMeta)) {
+    return {
+      name: primary,
+      metadata: { ...baseMeta, alternate_names: normalizeAlternates(alternates, primary) },
+    };
+  }
+  // A dismissed name is never added back, and never becomes the name.
+  const dismissed = fold && incomingName && isDismissedName(baseMeta, incomingName);
+  if (dismissed && primary) {
+    return {
+      name: primary,
+      metadata: { ...baseMeta, alternate_names: normalizeAlternates(alternates, primary) },
+    };
+  }
   if (incomingName && !primary) {
-    name = preferredContactSpelling(incomingName, incomingName) || incomingName;
-  } else if (incomingName && primary && namesMatch(incomingName, primary)) {
+    name = dismissed ? null : preferredContactSpelling(incomingName, incomingName) || incomingName;
+  } else if (incomingName && primary && namesMatchStrict(incomingName, primary)) {
     name = preferredContactSpelling(primary, incomingName) || primary;
+  } else if (incomingName && primary && namesMatch(incomingName, primary)) {
+    // BRAIN_NAME_FOLD: an STT spelling (Alvin for Alwyn) is the same person.
+    // Keep the stored spelling; do not log it as an alternate.
+    name = primary;
   } else if (incomingName && primary && !namesMatch(incomingName, primary)) {
-    const key = incomingName.toLowerCase();
     const already = alternates.some((row) => namesMatch(row?.name, incomingName));
     if (!already) {
       alternates.unshift({
@@ -100,8 +170,14 @@ function mergeContactIdentity(existing, incoming = {}) {
 
 module.exports = {
   ALT_CAP,
+  dismissedAlternateNames,
+  isDismissedName,
+  isSinglePerson,
+  lockedFileName,
+  nameLockOf,
   mergeContactIdentity,
   namesMatch,
+  namesMatchStrict,
   normalizeStoredPhone,
   parseStoredContactPhone,
   trimName,

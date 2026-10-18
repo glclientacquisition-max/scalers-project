@@ -956,6 +956,10 @@ const ALT_CRUMB =
  * words are removed, then alternateNamesAPerson decides.
  */
 function alternateIsAPerson(primary, alternate) {
+  // BRAIN_NAME_FOLD: an STT spelling of the file name (Alwyn/Alvin) is the
+  // same person, with D199 on or off.
+  const match = require('./callerNameMatch');
+  if (match.nameFoldEnabled() && match.namesFold(primary, alternate)) return false;
   if (!callFixesD199Enabled()) return true;
   const owner = new Set(String(primary || '').toLowerCase().split(/\s+/).filter(Boolean));
   const leftover = String(alternate || '')

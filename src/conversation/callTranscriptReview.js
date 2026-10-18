@@ -1116,8 +1116,16 @@ async function persistCompletedCallContact(ctx = {}, deps = {}) {
         : ctx.summary?.name || call.name || null
     )
   );
+  // BRAIN_NAME_FOLD: a read-back the caller confirmed names the contact and
+  // locks it (metadata.name_locked { at, by: 'caller' }).
+  const lockName =
+    require('./nameFold').nameFoldEnabled() && ctx.summary?.nameLock?.name
+      ? sanitizeStoredCallerName(String(ctx.summary.nameLock.name))
+      : null;
+  const lockedIncoming = lockName && isPlausibleCallerName(lockName) ? lockName : null;
   const safeIncoming =
-    incomingName && isPlausibleCallerName(incomingName) ? incomingName : null;
+    lockedIncoming ||
+    (incomingName && isPlausibleCallerName(incomingName) ? incomingName : null);
   const meta =
     call.summary && typeof call.summary === 'object'
       ? call.summary
@@ -1155,6 +1163,9 @@ async function persistCompletedCallContact(ctx = {}, deps = {}) {
         call.reason ||
         null,
       callId: call.id || null,
+      ...(lockedIncoming
+        ? { metadata: { name_locked: { at: new Date().toISOString(), by: 'caller' } } }
+        : {}),
     });
     return { ok: true, contact };
   } catch (err) {
