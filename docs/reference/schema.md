@@ -70,7 +70,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (156)
+## Functions (157)
 
 | Function | Defined in |
 | --- | --- |
@@ -87,6 +87,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `_owner_next_invoice_line` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `_owner_open_proration_invoice` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `_owner_plan_target` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `_parse_catalogue_pricing_mode` | `docs/supabase/manual/catalogue_pricing_mode_json_backfill_DO_NOT_RUN.sql` |
 | `_price_amounts_kept` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_price_sig_tokens` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_price_text_covers` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
