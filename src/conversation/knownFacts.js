@@ -76,6 +76,20 @@ const HOURS_ASK_VARIANTS = [
   /\bwhen\s+(?:are|do)\s+you(?:\s+guys|\s+people)?\s+(?:open|close|operate)\b/i,
   /\bmna(?:fanya\s+kazi|fungua|funga)\s+(?:mpaka|hadi)\s+saa\s+ngapi\b/i,
   /\b(?:mpaka|hadi)\s+saa\s+ngapi\s+mna(?:fanya\s+kazi|fungua|funga)\b/i,
+  // HD_49d726c3dc9b t9 (prod Aris, 18 Oct 2026): "Uh, Tuesday at what time
+  // will you be open?" Future and day-led forms of the same ask. Each still
+  // names the business's own open/close verb, so a visit time stays out.
+  /\bwhat\s+time\s+(?:will|would|do|does|are|is|can)\s+(?:you|y'?all|the\s+(?:shop|store|office|business))(?:\s+guys|\s+people)?\s+(?:be\s+)?(?:open|opening|opened|close|closing|closed|operating)\b/i,
+  /\bwhen\s+(?:will|would|does|is)\s+(?:you|y'?all|the\s+(?:shop|store|office|business))(?:\s+guys|\s+people)?\s+(?:be\s+)?(?:open|opening|close|closing|closed)\b/i,
+  /\b(?:will|would)\s+you(?:\s+guys|\s+people)?\s+be\s+(?:open|closed)\b/i,
+  /\b(?:are|is)\s+(?:you|the\s+(?:shop|store|office))(?:\s+guys|\s+people)?\s+(?:open|closed)\s+(?:on|this|next|tomorrow|today|in\s+the)\b/i,
+  // Kiswahili and Sheng: a time or day word with the shop's own open/close verb.
+  /\b(?:saa\s+ngapi|lini)\b[^.?!]{0,30}\bm(?:na|ta|ta?kuwa|ko)\s*(?:fungua|funga|open|close|wazi)\b/i,
+  /\bm(?:na|ta|ta?kuwa|ko)\s*(?:fungua|funga|open|close|wazi)\b[^.?!]{0,30}\b(?:saa\s+ngapi|lini)\b/i,
+  /\bm(?:na|ta)(?:open|close)\b/i,
+  /\bmko\s+(?:open|closed)\b/i,
+  /\bmtakuwa\s+(?:wazi|open)\b/i,
+  /\bmtafungua\b/i,
 ];
 
 function looksLikeHoursAsk(text) {

@@ -433,6 +433,8 @@ function polishSpokenDetail(text, opts = {}) {
       capabilities: opts.capabilities || {},
       extra: JSON.stringify(opts.state?.entities || {}),
       state: opts.state,
+      // Brain's turn intent: intent=hours lets the hours on file through.
+      intent: opts.intent || opts.state?.intent || '',
       language: opts.language,
       allowEmpty: true,
       dropReasons,
