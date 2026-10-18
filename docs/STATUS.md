@@ -21,7 +21,7 @@ Prod DID **+254709221536** is Aris, the live paying customer: **never release, r
 
 **Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.
 
-Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage.
+Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage. Metering is live. Invoices and payments are not built. Bachs is the chosen payment provider. Prices are about to be raised. The new prices are not decided. Detail in [Billing](#billing).
 
 **Gate right now:** the next step is a clean, scored Aris call on prod. Until then, nothing else ships except live-call voice fixes Alvin approves (see section 4).
 
@@ -94,7 +94,7 @@ Earlier merges since 9 Oct (see git log for detail):
 
 Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since merged). So staging is behind prod: it lacks #631, #650, #647.
 
-- **#737** (Desk Suspend/Archive/Purge): SQL applied on **staging only** (*per team notes*).
+- **#737** (Desk Suspend/Archive/Purge): the functions are on staging and on production. Production recorded `admin_business_suspend_737`, `archive_tenant_billing_737` and `purge_archived_tenants_737` at 12:06 EAT on 18 Oct, before the 12:10 EAT merge. Staging has the functions. Those three names are not in staging's migration list. The purge schedule is not applied on either database.
 - Caller files memory v2 SQL (#673) is applied on **staging only** (carried from 14 Oct).
 - **#762** (Desk call setup per account): `tenants.call_setup` + `save_call_setup()` applied on staging 18 Oct 13:34 EAT; re-applied 14:19 EAT with the test phone fields (`test_from`, `test_started_at`) and the test-call check. Additive, 0 rows changed. **Also on prod since 18 Oct 14:59 EAT** (see Ops changes); the #762 code is not on prod yet.
 
@@ -112,7 +112,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | #758 | Desk | Settings quick fixes from the owner review (Alvin approved 13:21 EAT): Catalogue / prices links open the Catalogue, plus small Settings copy and display fixes. No SQL, no prompt or call-facing change. | **Shipped 18 Oct 15:08 EAT:** squash `52498db9`; Vercel prod `dpl_DBSyRwgU4eg9bRQwPnvQB2t9XuRT` READY on app, admin and www, no runtime errors; Railway `7dfbf4e9` SUCCESS, `/healthz` ok on `52498db9`. Rollback: promote `dpl_738F4MizcCCtAM87wfGPhqoAiiJx` (`adab1e81`) or revert `52498db9`. GO Alvin 14:55 EAT. |
 | #643 | Voice | Phone wallet low-balance alert. | GO'd, frozen. |
 | #731 | Voice | One owner alert per call, goodbye hangs up, 10 s no-audio close (main cut of #644 + #646). | GO'd, frozen. |
-| #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | Prod SQL and merge wait for a scored Aris call. Purge schedule not applied until a recordings deletion route exists. |
+| #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | **Merged** 18 Oct 12:10 EAT (`fbef28a8`). Production SQL was already recorded at 12:06 EAT (`admin_business_suspend_737`, `archive_tenant_billing_737`, `purge_archived_tenants_737`). Staging has the functions. They are not in staging's migration list. Purge schedule is not applied on either database. |
 | #733 | Brain | D199 visit read (last one only, paged). (#732 merged 18 Oct 14:48, `13ddf19d`.) | Need Alvin's GO. |
 | #762 | Desk | Call setup per account (follow-up to #755): picks saved on the account (one-time copy from the browser); "Forwarding works" only when a call from the owner's named test phone arrives within 30 minutes of starting the test (other calls only show "Calls are reaching your assistant"); fix checklist when the test fails; Settings > Calls & forwarding; Overview note after 7 days without a call. | **Pending ship (18 Oct).** GO Alvin 14:55 EAT. Prod SQL applied 14:59 EAT (Ops changes). Code merges in the next Voice deploy slot, right after #758. Until then prod Desk keeps using browser storage. |
 
@@ -185,7 +185,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 **Build order:** Admin → Settings/onboarding → UI/UX sweep → Packages → Landing → Voice/Brain on real calls. Live-call voice fixes ship any time, one at a time.
 
-- **Admin:** Suspend/Archive/Purge in #737; still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
+- **Admin:** Suspend/Archive shipped (#737, 18 Oct). Purge schedule not applied. Still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
 - **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
 - **Packages**: state rules and rollover shipped (#631, #650); package catalogue and invoices remain.
@@ -195,6 +195,16 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - Live call transfer: **not built** (callbacks only since #658; reviving it needs a new ADR and Alvin's yes).
 
 Public copy never mentions unbuilt features.
+
+---
+
+## Billing
+
+Metering is live: packages, usage caps, the SMS reserve, send and settle ledger, and monthly rollover. There are no invoices and no payments. Bachs is the chosen payment provider (collection per invoice later; Scalers keeps the subscription record). Prices are about to be raised. The new prices are not decided, so none are written here.
+
+This is Phase 0 of the 18 Oct 2026 ops and billing plan: correct the #737 and #643 migration records, and revoke anon execute on the seat functions (staging only). Later phases (invoices, Bachs checkout, the admin billing console) are not started.
+
+Paid-mode copy on Usage still says "next invoice". That wording is a Desk hand-off (`billingStateModel.ts`, `usageCap.ts`). Do not ship it as a promise until invoices exist.
 
 ---
 
