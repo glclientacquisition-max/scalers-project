@@ -76,7 +76,8 @@ export function Segmented({
             <Link
               key={item.key}
               href={item.href}
-              prefetch
+              // Default prefetch (shell only). A full `prefetch` here rendered
+              // every Inbox tab, each a full inbox load, on every visit.
               data-segmented-active={active ? "" : undefined}
               aria-current={active ? "page" : undefined}
               aria-disabled={item.disabled || undefined}

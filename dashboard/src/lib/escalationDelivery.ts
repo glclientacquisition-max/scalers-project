@@ -21,6 +21,16 @@ function channelLabel(raw: string): string {
   return raw;
 }
 
+/** Kenyan numbers stored as 2547… read as +2547… on screen. */
+export function displayPhone(raw: string): string {
+  const text = String(raw || "").trim();
+  if (/^254\d{9}$/.test(text)) return `+${text}`;
+  return text;
+}
+
+/** A send this long after the call ended came from the Desk (Alert teammate), not from the call. */
+export const DESK_ALERT_AFTER_MS = 10 * 60 * 1000;
+
 function liveChannels(raw: unknown): NotifyChannel[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((row): row is NotifyChannel => {
@@ -43,7 +53,8 @@ function hasEscalationTarget(meta: Record<string, unknown>): boolean {
 
 /** Desk line from `calls.summary.escalation_notify`. Never "Escalation sent" without a live channel. */
 export function formatEscalationDelivery(
-  meta: Record<string, unknown>
+  meta: Record<string, unknown>,
+  opts: { callEndedAt?: string | null; fromDesk?: boolean } = {}
 ): EscalationDelivery {
   const notify = meta.escalation_notify;
   if (notify && typeof notify === "object") {
@@ -66,10 +77,23 @@ export function formatEscalationDelivery(
     if (row.ok === true && row.soft !== true && stage === "notified" && channels.length) {
       const bits = channels.map((item) => {
         const label = channelLabel(String(item.channel));
-        const to = String(item.to || "").trim();
+        const to = displayPhone(String(item.to || ""));
         return to ? `${label} to ${to}` : label;
       });
       const at = typeof row.at === "string" && row.at ? formatCallWhen(row.at) : "";
+      const atMs = typeof row.at === "string" ? Date.parse(row.at) : Number.NaN;
+      const endMs = opts.callEndedAt ? Date.parse(opts.callEndedAt) : Number.NaN;
+      const fromDesk =
+        opts.fromDesk === true ||
+        (Number.isFinite(atMs) && Number.isFinite(endMs) && atMs - endMs > DESK_ALERT_AFTER_MS);
+      if (fromDesk) {
+        // A teammate alert sent from the Desk after the call, not an SMS from the call itself.
+        const target = meta.escalated_to && typeof meta.escalated_to === "object"
+          ? String((meta.escalated_to as { name?: unknown }).name || "").trim()
+          : "";
+        const who = target || "a teammate";
+        return { state: "sent", line: at ? `Alerted ${who} from Desk · ${at}` : `Alerted ${who} from Desk` };
+      }
       return {
         state: "sent",
         line: at ? `${bits.join(". ")}. ${at}` : bits.join(". "),

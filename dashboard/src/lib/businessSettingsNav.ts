@@ -168,8 +168,8 @@ export function settingsPanelHeading(
       .toLowerCase()
       .replace(/[\s-]+/g, "_");
     return v === "retail" || v === "shop" || v === "shops"
-      ? "Import Catalog"
-      : "Import Knowledge";
+      ? "Import catalogue"
+      : "Import knowledge";
   }
   if (tab === "test") return "Test";
   if (tab !== "train") return null;

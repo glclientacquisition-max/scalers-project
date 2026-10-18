@@ -1,12 +1,10 @@
 "use client";
 
 import {
-  useEffect,
   useRef,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useInboxRowUi } from "@/components/InboxRowUi";
 import { useInboxPileNav } from "@/components/InboxPileNav";
@@ -61,15 +59,9 @@ export function InboxPileSwipe({
     return enabled && !ui?.selecting;
   }
 
-  useEffect(() => {
-    const adj = adjacentPileHrefs(purpose, pileHrefs);
-    if (nav) {
-      nav.prefetchAdjacent();
-      return;
-    }
-    if (adj.next) router.prefetch(adj.next);
-    if (adj.prev) router.prefetch(adj.prev);
-  }, [nav, purpose, pileHrefs, router]);
+  // No prefetch on mount: each adjacent tab is a full inbox render on the
+  // server, and hidden prefetch Links fired them on every visit (owner review,
+  // 20s+ loads). Adjacent tabs prefetch only when a swipe starts (onPointerDown).
 
   function goPile(next: string) {
     const href = pileHrefs[next];
@@ -175,8 +167,6 @@ export function InboxPileSwipe({
     finishThen(inboxSwipeCommitPx(dir), () => goPile(next));
   }
 
-  const adj = adjacentPileHrefs(purpose, pileHrefs);
-
   return (
     <div
       ref={surfaceRef}
@@ -192,12 +182,6 @@ export function InboxPileSwipe({
         ignoreClickRef.current = false;
       }}
     >
-      {adj.next ? (
-        <Link href={adj.next} prefetch className="hidden" tabIndex={-1} aria-hidden="true" />
-      ) : null}
-      {adj.prev ? (
-        <Link href={adj.prev} prefetch className="hidden" tabIndex={-1} aria-hidden="true" />
-      ) : null}
       {children}
     </div>
   );

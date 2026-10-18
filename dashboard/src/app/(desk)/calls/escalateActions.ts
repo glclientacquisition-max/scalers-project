@@ -70,7 +70,7 @@ export async function pingTeammateAction(opts: {
     .maybeSingle();
 
   if (loadError) {
-    return ownerSaveFailed("ping-teammate", loadError.message, "Could not ping.");
+    return ownerSaveFailed("ping-teammate", loadError.message, "Could not send the alert.");
   }
   if (!call) return { error: "Missing call." };
 
@@ -112,6 +112,8 @@ export async function pingTeammateAction(opts: {
         language: "en",
       }),
       cache: "no-store",
+      // Never hold the Alert button open on a slow voice server.
+      signal: AbortSignal.timeout(8_000),
     });
     const json = (await res.json().catch(() => null)) as
       | { ok?: boolean; reason?: string; escalation_notify?: Record<string, unknown> }
@@ -134,16 +136,28 @@ export async function pingTeammateAction(opts: {
       };
     }
 
-    const delivery = formatEscalationDelivery({
-      escalated_to: { name: teammate.name, role: teammate.role, phone: teammate.phone },
-      escalation_notify: json.escalation_notify,
-    });
+    const delivery = formatEscalationDelivery(
+      {
+        escalated_to: { name: teammate.name, role: teammate.role, phone: teammate.phone },
+        escalation_notify: json.escalation_notify,
+      },
+      { fromDesk: true }
+    );
     return {
       ok: true,
       line: delivery.line || undefined,
       failed: delivery.state === "failed",
     };
-  } catch {
+  } catch (err) {
+    // Timed out: the alert may still go out, so do not record it as failed.
+    if (err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError")) {
+      console.warn(`[ping-teammate] voice line slow for call ${callId}; not marking failed`);
+      return {
+        failed: true,
+        line: "Still sending. Check this call again in a minute.",
+        error: "Still sending. Check this call again in a minute.",
+      };
+    }
     return persistNotifyFailed(workspace.client, tenant.id, callId, call.resolution_note);
   }
 }

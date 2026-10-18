@@ -174,6 +174,8 @@ export function getSautikitKeyDiagnostics(): SautikitKeyDiagnostics {
   };
 }
 
+export const SAUTIKIT_TIMEOUT_MS = 10_000;
+
 async function sautikitRequest<T>(
   path: string,
   opts: { method?: string; body?: unknown; apiKey: string }
@@ -189,6 +191,8 @@ async function sautikitRequest<T>(
     },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
     cache: "no-store",
+    // A slow telephony API must not hold a Desk page or action open.
+    signal: AbortSignal.timeout(SAUTIKIT_TIMEOUT_MS),
   });
 
   const json = (await res.json().catch(() => null)) as unknown;

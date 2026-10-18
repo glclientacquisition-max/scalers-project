@@ -259,6 +259,7 @@ export function InboxTicketView({
     scrollTop: 0,
   });
   const threadFreezeRef = useRef(false);
+  const openedRef = useRef(false);
   const seenTurnsRef = useRef(turns.length);
   if (seenTurnsRef.current !== turns.length) {
     seenTurnsRef.current = turns.length;
@@ -416,6 +417,15 @@ export function InboxTicketView({
         return () => {};
       }
       const el: HTMLElement = scroller;
+      // Below lg the summary and the chat share one scroller. Open at the top so the
+      // owner sees who called and what they want first; the jump button reaches the latest.
+      if (!openedRef.current) {
+        openedRef.current = true;
+        if (el === paneRef.current && !el.hasAttribute("data-thread-stick")) {
+          threadPlaceRef.current = { anchor: "start", scrollTop: 0 };
+          el.setAttribute("data-thread-stick", "start");
+        }
+      }
       applyStick(el, readStick(el));
       requestAnimationFrame(() => {
         if (!el.isConnected || readStick(el) !== "latest") return;

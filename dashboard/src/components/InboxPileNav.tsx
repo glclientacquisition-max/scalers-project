@@ -206,9 +206,8 @@ export function InboxPileNavProvider({
     if (prev) router.prefetch(prev);
   }, [localPurpose, router]);
 
-  useEffect(() => {
-    prefetchAdjacent();
-  }, [prefetchAdjacent]);
+  // Not on mount: router.prefetch is a full render of the adjacent tab (a full
+  // inbox load each). InboxPileSwipe calls this when a swipe starts.
 
   const goPile = useCallback((next: string) => {
     if (next === localPurpose) return;
