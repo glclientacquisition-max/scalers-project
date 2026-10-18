@@ -76,8 +76,8 @@ Read only. No idempotency key. Same classification as the write.
 | `same` | true | Already on that plan and period. Does not cancel a scheduled change |
 | `seats_exceed_plan` | false | Members plus pending invites (owner included) exceed the target version's seats. Also returns `seats_included` and `seats_used`. Pending columns stay empty |
 | `no_renewal` | false | A scheduled change has no term end and no period end |
-| `scheduled` | true | Downgrade, or annual to monthly. No invoice. `pending_change` is `downgrade` or `period_change`. `effective_at` is the term end, or the usage period end when there is no term. `credit_kes`, `charge_kes`, and `total_kes` are 0 |
-| `upgraded` | true | Applied now. Returns the quote fields plus `invoice_id` |
+| `scheduled` | true | Downgrade, annual to monthly, or a same-interval upgrade on the last day of the term (`days_left` 0). No invoice. `pending_change` is `downgrade`, `period_change`, or `upgrade`. `effective_at` is the term end, or the usage period end when there is no term. `credit_kes`, `charge_kes`, and `total_kes` are 0 |
+| `upgraded` | true | Applied now. Returns the quote fields plus `invoice_id`. A last-day monthly to annual still charges the full year |
 
 Monthly to annual applies now. Annual to monthly waits for `term_end`, which is after the current usage month, so the monthly rollover does not apply it early.
 
@@ -95,7 +95,7 @@ Plus the shared gate codes.
 
 ## owner_set_extra_seats(tenant, actor, extra_seats, idempotency_key)
 
-`extra_seats` is the new total of extra seats, 0 to 100, not a delta. Price is `extra_seat_monthly_kes` on the pinned version. A yearly plan annualizes that price with the version discount. The prorated amount is a line on a draft invoice (`billing_source` next). It is not finalized and nothing is collected. A removal is a negative line. The invoice total is never below 0. `seat_included` becomes version seats plus extra seats.
+`extra_seats` is the new total of extra seats, 0 to 100, not a delta. Price is `extra_seat_monthly_kes` on the pinned version. A yearly plan annualizes that price with the version discount. The prorated amount is a line on a draft invoice (`billing_source` next). It is not finalized and nothing is collected. A removal is a negative line, and the draft total can be negative. Issuing that invoice (`finalize_invoice`) writes one `tenant_credits` row for the absolute value, idempotency key `invoice-credit:<invoice id>`, and the issued invoice is paid at 0. `seat_included` becomes version seats plus extra seats.
 
 | Code | ok | Extra fields |
 | --- | --- | --- |
@@ -118,7 +118,7 @@ Null or 0 stores null. The cap is then the pinned monthly price times the versio
 
 ## Spend limit and usage
 
-`billing_spend_limit_kes(tenant)` is null when billing is off. Otherwise the stored `soft_spend_limit_kes`. When that is null, the cap is the pinned monthly price times `spend_limit_share_percent` on the pinned version. The share is 50 when that column is absent or null, so this works before and after the package version editor. A stored limit still wins over the share.
+`billing_spend_limit_kes(tenant)` is null when enforcement is off, and also when `billing_status` is `beta`, even if enforcement is on. Otherwise the stored `soft_spend_limit_kes`. When that is null, the cap is the pinned monthly price times `spend_limit_share_percent` on the pinned version. The share is 50 when that column is absent or null, so this works before and after the package version editor. A stored limit still wins over the share.
 
 `billing_period_on_demand_kes` sums on-demand `call_charge` and `sms_charge` rows in the current usage period (`wallet_ledger.metadata.on_demand` = `true`).
 
@@ -128,14 +128,16 @@ Null or 0 stores null. The cap is then the pinned monthly price times the versio
 
 The stop matches on-demand off:
 
-- `consume_call_seconds` still meters the call already in progress and does not debit once the limit would be passed. The next inbound call is refused after the directory sees `spend_limit_blocked`.
-- `consume_sms_units` and `reserve_notify_send` do not take an overage SMS.
+- `consume_call_seconds` still meters the call already in progress and does not debit once the limit would be passed. The next inbound call is refused after the directory sees `spend_limit_blocked`. The amount is 0 when enforcement is off or `billing_status` is `beta`. Otherwise the per-second rate is `inbound_kes_per_second` or `outbound_kes_per_second` on the pinned version. There is no rate-card price once those columns exist.
+- `consume_sms_units` is service role only. A Desk caller text that still uses it goes through the service role, not the member JWT. `p_units` is capped at 30, the most segments in a 2,000-character message. Enforcement off or `billing_status` beta meters and does not debit. `reserve_notify_send` does not take an overage SMS past the spend limit.
 - `tenant_escalation_allowed` stays `(uuid) returns (allowed boolean, reason text)`. Past the minute allowance, a closed spend limit returns `minutes_cap`, so WhatsApp and call updates stay in the Inbox. Billing notices are not gated by it.
 - Inbound answering inside the included minutes is unchanged. A missing `spend_limit_blocked` column fails open to the previous on-demand flag.
 
 The hold clears when `current_period_start` changes.
 
 Re-apply `owner_billing_actions.sql` after `package_minute_consume.sql`, `notify_send_reserve_settle.sql`, or `billing_data_layer.sql`. Those files own the original function bodies. This file replaces them with the spend-limit hook.
+
+`roll_package_periods` copies minutes, seats, and message allowances from the pinned `billing_package_versions` row plus `extra_seats`. A pending package change pins that package's published version in the same update as the package. A database with no version row still copies from `billing_packages`.
 
 ## Apply
 

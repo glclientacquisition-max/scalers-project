@@ -35,6 +35,9 @@
 -- plan for those same days. Monthly to annual credits the unused month and
 -- charges the full annual price (the new year starts today). The net is
 -- charge minus credit, and never below 0. No cash refund.
+-- A same-interval upgrade on the last day (days_left 0) would prorate to 0.
+-- That change waits for the renewal. It does not switch the plan for free.
+-- Monthly to annual on the last day still charges the full year.
 --
 -- Beta (billing_enforcement off, or billing_status beta) returns code beta.
 -- No proration invoice, no seat line, no spend-limit hold.
@@ -57,12 +60,50 @@ alter table public.billing_package_versions
   add constraint billing_package_versions_extra_seat_check
   check (extra_seat_monthly_kes is null or extra_seat_monthly_kes >= 0);
 
+-- The editor freeze rejects this write on a published row. It may not exist
+-- yet. The seat freeze is created below, so a re-run must pause that too.
+do $$
+begin
+  if exists (
+    select 1 from pg_trigger
+    where tgname = 'billing_package_versions_freeze_seat'
+      and tgrelid = 'public.billing_package_versions'::regclass
+  ) then
+    execute 'alter table public.billing_package_versions disable trigger billing_package_versions_freeze_seat';
+  end if;
+  if exists (
+    select 1 from pg_trigger
+    where tgname = 'billing_package_versions_freeze'
+      and tgrelid = 'public.billing_package_versions'::regclass
+  ) then
+    execute 'alter table public.billing_package_versions disable trigger billing_package_versions_freeze';
+  end if;
+end $$;
+
 update public.billing_package_versions v
 set extra_seat_monthly_kes = 500
 from public.billing_packages p
 where p.id = v.package_id
   and p.sku in ('starter', 'growth', 'scale')
   and v.extra_seat_monthly_kes is null;
+
+do $$
+begin
+  if exists (
+    select 1 from pg_trigger
+    where tgname = 'billing_package_versions_freeze'
+      and tgrelid = 'public.billing_package_versions'::regclass
+  ) then
+    execute 'alter table public.billing_package_versions enable trigger billing_package_versions_freeze';
+  end if;
+  if exists (
+    select 1 from pg_trigger
+    where tgname = 'billing_package_versions_freeze_seat'
+      and tgrelid = 'public.billing_package_versions'::regclass
+  ) then
+    execute 'alter table public.billing_package_versions enable trigger billing_package_versions_freeze_seat';
+  end if;
+end $$;
 
 alter table public.billing_package_versions
   alter column extra_seat_monthly_kes set default 500;
@@ -110,25 +151,20 @@ alter table public.tenant_subscriptions
   add constraint tenant_subscriptions_extra_seats_check
   check (extra_seats >= 0);
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'tenant_subscriptions_pending_check'
-  ) then
-    alter table public.tenant_subscriptions
-      add constraint tenant_subscriptions_pending_check check (
-        (pending_change is null
-          and pending_package_id is null and pending_period is null and pending_effective_at is null)
-        or (pending_change in ('downgrade', 'period_change')
-          and pending_package_id is not null
-          and pending_period in ('month', 'year')
-          and pending_effective_at is not null)
-        or (pending_change = 'unassign'
-          and pending_package_id is null and pending_period is null
-          and pending_effective_at is not null)
-      );
-  end if;
-end $$;
+-- 'upgrade' is a last-day plan change that waits for the renewal.
+alter table public.tenant_subscriptions drop constraint if exists tenant_subscriptions_pending_check;
+alter table public.tenant_subscriptions
+  add constraint tenant_subscriptions_pending_check check (
+    (pending_change is null
+      and pending_package_id is null and pending_period is null and pending_effective_at is null)
+    or (pending_change in ('downgrade', 'period_change', 'upgrade')
+      and pending_package_id is not null
+      and pending_period in ('month', 'year')
+      and pending_effective_at is not null)
+    or (pending_change = 'unassign'
+      and pending_package_id is null and pending_period is null
+      and pending_effective_at is not null)
+  );
 
 comment on column public.tenant_subscriptions.extra_seats is
   'Seats bought on top of the pinned version. KSh price is the version extra_seat_monthly_kes.';
@@ -190,6 +226,23 @@ create unique index if not exists invoices_one_next_draft
 
 comment on column public.invoices.billing_source is
   'proration: opened now for an upgrade. next: draft lines (extra seats) for the following invoice. Null on other invoices.';
+
+-- A seat removal is a negative draft total. The non-negative checks from the
+-- data layer would hide that credit. Issue turns it into tenant_credits.
+do $$
+declare
+  r record;
+begin
+  for r in
+    select con.conname
+    from pg_constraint con
+    where con.conrelid = 'public.invoices'::regclass
+      and con.contype = 'c'
+      and pg_get_constraintdef(con.oid) ~ 'subtotal_kes >=|total_kes >='
+  loop
+    execute format('alter table public.invoices drop constraint %I', r.conname);
+  end loop;
+end $$;
 
 create table if not exists public.billing_owner_action_keys (
   tenant_id uuid not null references public.tenants (id) on delete cascade,
@@ -810,6 +863,7 @@ declare
   v_invoice uuid;
   v_result jsonb;
   v_cur_name text;
+  v_left integer;
 begin
   v_gate := public._owner_billing_gate(p_tenant_id, p_actor, p_idempotency_key, 'owner_change_plan');
   if (v_gate->>'stop')::boolean then
@@ -887,6 +941,22 @@ begin
   else
     v_when := 'renewal';
     v_pending := 'downgrade';
+  end if;
+
+  -- Last day of the term: prorating both sides is 0, which would switch the
+  -- plan for free. Wait for the renewal. Monthly to annual still charges the
+  -- full year, so that path stays immediate.
+  if v_when = 'now' and not (v_sub.period = 'month' and v_period = 'year') then
+    select d.days_left into v_left
+    from public.billing_period_days(
+      coalesce(v_sub.term_start, v_sub.current_period_start),
+      coalesce(v_sub.term_end, v_sub.current_period_end),
+      now()
+    ) d;
+    if coalesce(v_left, 0) = 0 then
+      v_when := 'renewal';
+      v_pending := 'upgrade';
+    end if;
   end if;
 
   if v_when = 'renewal' then
@@ -1089,8 +1159,8 @@ begin
   );
   select coalesce(sum(amount_kes), 0) into v_sum from public.invoice_lines where invoice_id = v_id;
   update public.invoices
-  set subtotal_kes = greatest(v_sum, 0),
-      total_kes = greatest(v_sum, 0),
+  set subtotal_kes = v_sum,
+      total_kes = v_sum,
       updated_at = now()
   where id = v_id;
   return v_id;
@@ -1099,6 +1169,84 @@ $$;
 
 revoke all on function public._owner_next_invoice_line(uuid, text, numeric, timestamptz, timestamptz) from public, anon, authenticated;
 grant execute on function public._owner_next_invoice_line(uuid, text, numeric, timestamptz, timestamptz) to service_role;
+
+-- Issue. A negative draft (a seat credit) becomes one tenant_credits row.
+-- The issued invoice is then paid at 0, so the credit is not also an amount due.
+create or replace function public.finalize_invoice(p_invoice_id uuid)
+returns public.invoices
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_inv public.invoices%rowtype;
+  v_year integer;
+  v_n integer;
+  v_number text;
+  v_body text;
+  v_credit boolean;
+begin
+  select * into v_inv from public.invoices where id = p_invoice_id for update;
+  if not found then
+    raise exception 'invoice not found';
+  end if;
+  if v_inv.status <> 'draft' then
+    raise exception 'only a draft invoice can be finalized';
+  end if;
+
+  v_credit := coalesce(v_inv.total_kes, 0) < 0;
+  if v_credit then
+    insert into public.tenant_credits (tenant_id, amount_kes, reason, idempotency_key)
+    values (
+      v_inv.tenant_id,
+      -v_inv.total_kes,
+      'invoice_credit',
+      'invoice-credit:' || v_inv.id::text
+    )
+    on conflict (idempotency_key) do nothing;
+  end if;
+
+  v_year := extract(year from (now() at time zone 'Africa/Nairobi'))::integer;
+  insert into public.billing_invoice_counters (year, last_number)
+  values (v_year, 0)
+  on conflict (year) do nothing;
+  update public.billing_invoice_counters
+  set last_number = last_number + 1
+  where year = v_year
+  returning last_number into v_n;
+  v_number := 'SC-' || v_year::text || '-' || lpad(v_n::text, 6, '0');
+
+  update public.invoices
+  set status = case when v_credit then 'paid' else 'open' end,
+      invoice_number = v_number,
+      issued_at = coalesce(issued_at, now()),
+      subtotal_kes = case when v_credit then 0 else subtotal_kes end,
+      total_kes = case when v_credit then 0 else total_kes end,
+      paid_at = case when v_credit then coalesce(paid_at, now()) else paid_at end,
+      updated_at = now()
+  where id = p_invoice_id
+  returning * into v_inv;
+
+  if not v_credit then
+    v_body := 'Your Business Assistant invoice ' || v_number
+      || ' for KES ' || trim(to_char(v_inv.total_kes, 'FM999999990.00')) || ' is due.';
+    perform public.enqueue_billing_notice(
+      v_inv.tenant_id,
+      'platform_billing_invoice_due',
+      'platform_billing_invoice_due:' || v_inv.id::text,
+      'Invoice due',
+      v_body
+    );
+  end if;
+  return v_inv;
+end;
+$$;
+
+comment on function public.finalize_invoice(uuid) is
+  'Assigns SC-YYYY-000001 for the Africa/Nairobi year. A negative draft becomes one tenant_credits row (idempotency key invoice-credit:<id>) and a paid zero invoice. A positive draft queues platform_billing_invoice_due. Does not charge.';
+
+revoke all on function public.finalize_invoice(uuid) from public, anon, authenticated;
+grant execute on function public.finalize_invoice(uuid) to service_role;
 
 create or replace function public.owner_set_extra_seats(
   p_tenant_id uuid,
@@ -1240,7 +1388,8 @@ grant execute on function public.owner_set_extra_seats(uuid, uuid, integer, text
 -- 5. Spend limit. Null soft_spend_limit_kes means the pinned monthly price
 --    times spend_limit_share_percent. That column is added by the package
 --    version editor. When it is absent or null, the share is 50. Enforcement
---    off never blocks. A stored soft_spend_limit_kes still wins.
+--    off, or billing_status beta, never blocks. A stored soft_spend_limit_kes
+--    still wins once billing is on.
 -- ---------------------------------------------------------------------------
 create or replace function public.billing_spend_limit_kes(p_tenant_id uuid)
 returns numeric
@@ -1259,6 +1408,12 @@ begin
     return null;
   end if;
   if coalesce(v_tenant.billing_enforcement, 'off') = 'off' then
+    return null;
+  end if;
+  if exists (
+    select 1 from public.tenant_subscriptions s
+    where s.tenant_id = p_tenant_id and s.billing_status = 'beta'
+  ) then
     return null;
   end if;
   if v_tenant.soft_spend_limit_kes is not null then
@@ -1294,7 +1449,7 @@ end;
 $$;
 
 comment on function public.billing_spend_limit_kes(uuid) is
-  'On-demand spend cap for the usage period. The stored column when set, otherwise the pinned monthly price times spend_limit_share_percent. The share is 50 when that column is absent or null. Null when billing is off.';
+  'On-demand spend cap for the usage period. The stored column when set, otherwise the pinned monthly price times spend_limit_share_percent. The share is 50 when that column is absent or null. Null when enforcement is off or billing_status is beta.';
 
 revoke all on function public.billing_spend_limit_kes(uuid) from public, anon, authenticated;
 grant execute on function public.billing_spend_limit_kes(uuid) to service_role;
@@ -1605,6 +1760,7 @@ declare
   v_amount numeric := 0;
   v_reason text := 'included';
   v_new_applied integer;
+  v_billing_status text := '';
 begin
   if p_call_id is null then
     raise exception 'call_id required';
@@ -1654,6 +1810,9 @@ begin
 
   v_enforcement := v_tenant.billing_enforcement;
   v_ondemand := v_tenant.on_demand_usage_enabled;
+  select coalesce(s.billing_status, '') into v_billing_status
+  from public.tenant_subscriptions s
+  where s.tenant_id = v_call.tenant_id;
   v_included_seconds := v_tenant.minutes_included * 60;
   v_used := v_tenant.seconds_used;
   v_room := greatest(v_included_seconds - v_used, 0);
@@ -1665,20 +1824,34 @@ begin
   end if;
 
   -- branch: beta meter no debit
-  if v_enforcement = 'off' then
+  if v_enforcement = 'off' or v_billing_status = 'beta' then
     v_reason := 'beta';
     v_amount := 0;
   elsif v_overage > 0 and v_ondemand then
-    -- branch: on_demand debit overage seconds
+    -- branch: on_demand debit overage seconds from the pinned version.
+    -- No rate-card fallback when a version is pinned. Older databases may
+    -- lack the per-second columns, so feature-detect them.
     v_reason := 'on_demand';
-    select case
-      when lower(coalesce(p_direction, 'inbound')) = 'outbound'
-        then r.outbound_kes_per_second
-      else r.inbound_kes_per_second
-    end
-      into v_rate
-    from public.billing_rate_card r
-    where r.id = 1;
+    if exists (
+      select 1 from pg_catalog.pg_attribute
+      where attrelid = 'public.billing_package_versions'::regclass
+        and attname = 'inbound_kes_per_second'
+        and attnum > 0 and not attisdropped
+    ) and exists (
+      select 1 from pg_catalog.pg_attribute
+      where attrelid = 'public.billing_package_versions'::regclass
+        and attname = 'outbound_kes_per_second'
+        and attnum > 0 and not attisdropped
+    ) then
+      execute
+        'select case when lower(coalesce($1, ''inbound'')) = ''outbound''
+                then v.outbound_kes_per_second else v.inbound_kes_per_second end
+           from public.tenant_subscriptions s
+           join public.billing_package_versions v on v.id = s.package_version_id
+          where s.tenant_id = $2'
+        into v_rate
+        using p_direction, v_call.tenant_id;
+    end if;
     v_rate := coalesce(v_rate, 0);
     if v_rate < 0 then
       v_rate := 0;
@@ -1754,7 +1927,7 @@ end;
 $$;
 
 comment on function public.consume_call_seconds(uuid, integer, text) is
-  'Meter talk seconds into the package pool. Debit on-demand overage only when enforcement is not off and the spend limit still has room.';
+  'Meter talk seconds into the package pool. Overage is 0 when enforcement is off or billing_status is beta. Otherwise the per-second rate is the pinned package version. Debit only when the spend limit still has room.';
 
 revoke all on function public.consume_call_seconds(uuid, integer, text)
   from public, anon, authenticated;
@@ -1780,8 +1953,11 @@ set search_path = public
 as $$
 declare
   v_tenant record;
-  v_units integer := greatest(coalesce(p_units, 1), 1);
+  -- 30 is the most segments a 2,000-character message can be (UCS-2, 67 each).
+  -- That is the body the notify sender stores. A larger p_units is clamped.
+  v_units integer := least(greatest(coalesce(p_units, 1), 1), 30);
   v_enforcement text;
+  v_billing_status text := '';
   v_ondemand boolean;
   v_included integer;
   v_used integer;
@@ -1815,11 +1991,14 @@ begin
 
   v_enforcement := coalesce(v_tenant.billing_enforcement, 'off');
   v_ondemand := v_tenant.on_demand_usage_enabled;
+  select coalesce(s.billing_status, '') into v_billing_status
+  from public.tenant_subscriptions s
+  where s.tenant_id = p_tenant_id;
   v_included := v_tenant.sms_included_units;
   v_used := v_tenant.sms_used_units;
 
   -- branch: beta meter no debit
-  if v_enforcement = 'off' then
+  if v_enforcement = 'off' or v_billing_status = 'beta' then
     perform set_config('scalers.wallet_write', '1', true);
     update public.tenants
       set sms_used_units = v_used + v_units
@@ -1918,12 +2097,12 @@ end;
 $$;
 
 comment on function public.consume_sms_units(uuid, integer) is
-  'Claim tenant SMS. Beta meters. Paid stops at included unless on-demand. On-demand debits sms_kes unless the spend limit would be exceeded.';
+  'Claim tenant SMS. Service role only. Units are capped at 30 segments. Enforcement off or billing_status beta meters and does not debit. Paid stops at included unless on-demand. On-demand debits sms_kes unless the spend limit would be exceeded.';
 
 revoke all on function public.consume_sms_units(uuid, integer)
-  from public, anon;
+  from public, anon, authenticated;
 grant execute on function public.consume_sms_units(uuid, integer)
-  to authenticated, service_role;
+  to service_role;
 
 create or replace function public.reserve_notify_send(
   p_tenant_id uuid,

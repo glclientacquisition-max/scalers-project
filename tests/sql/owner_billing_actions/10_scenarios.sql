@@ -87,6 +87,13 @@ declare
   v_seats uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb7';
   v_spend uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb8';
   v_beta_spend uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb9';
+  v_lastday uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc1';
+  v_lastyear uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc2';
+  v_beta_on uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc3';
+  v_credit uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc4';
+  v_call_beta uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc5';
+  v_call_on uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc6';
+  v_amount numeric;
   v_res jsonb;
   v_quote jsonb;
   v_old uuid;
@@ -448,6 +455,107 @@ begin
   v_res := public.owner_set_extra_seats(v_beta_spend, v_owner, 4, 'beta-seats');
   if v_res->>'code' <> 'beta' or (select extra_seats from public.tenant_subscriptions where tenant_id = v_beta_spend) <> 0 then
     raise exception 'beta seats returned %', v_res;
+  end if;
+
+  -- Last day of the term: a same-interval upgrade waits. It does not switch for free.
+  perform public._test_owner_tenant(v_lastday, '+254700010010', 'starter', 2, 'month', v_owner, 'owner', 1, true, false);
+  update public.tenant_subscriptions
+  set current_period_end = now(), term_end = now()
+  where tenant_id = v_lastday;
+  v_res := public.owner_change_plan(v_lastday, v_owner, 'growth', 'month', 'last-day');
+  if v_res->>'code' <> 'scheduled' or v_res->>'pending_change' <> 'upgrade' then
+    raise exception 'last-day upgrade returned %', v_res;
+  end if;
+  if (select package_id from public.tenant_subscriptions where tenant_id = v_lastday)
+     <> (select id from public.billing_packages where sku = 'starter')
+     or (select count(*) from public.invoices where tenant_id = v_lastday) <> 0 then
+    raise exception 'last-day upgrade switched or invoiced %', v_res;
+  end if;
+
+  -- Monthly to annual on the last day still charges the full year.
+  perform public._test_owner_tenant(v_lastyear, '+254700010011', 'starter', 2, 'month', v_owner, 'owner', 1, true, false);
+  update public.tenant_subscriptions
+  set current_period_end = now(), term_end = now()
+  where tenant_id = v_lastyear;
+  v_res := public.owner_change_plan(v_lastyear, v_owner, 'starter', 'year', 'last-year');
+  if v_res->>'code' <> 'upgraded'
+     or (v_res->>'charge_kes')::numeric <> 69720
+     or (v_res->>'credit_kes')::numeric <> 0 then
+    raise exception 'last-day annual returned %', v_res;
+  end if;
+
+  -- billing_status beta has no spend cap even when enforcement is on.
+  perform public._test_owner_tenant(v_beta_on, '+254700010012', 'starter', 2, 'month', v_owner, 'owner', 1, true, true);
+  perform set_config('scalers.billing_transition', '1', true);
+  update public.tenant_subscriptions set billing_status = 'beta' where tenant_id = v_beta_on;
+  perform set_config('scalers.billing_transition', '', true);
+  if public.billing_spend_limit_kes(v_beta_on) is not null then
+    raise exception 'beta status still had a spend cap %', public.billing_spend_limit_kes(v_beta_on);
+  end if;
+
+  -- A seat removal stays negative on the draft. Issue writes one credit.
+  perform public._test_owner_tenant(v_credit, '+254700010013', 'starter', 2, 'month', v_owner, 'owner', 1, true, false);
+  update public.tenant_subscriptions set extra_seats = 1 where tenant_id = v_credit;
+  v_res := public.owner_set_extra_seats(v_credit, v_owner, 0, 'credit-remove');
+  if v_res->>'code' <> 'seats_updated' or (v_res->>'amount_kes')::numeric >= 0 then
+    raise exception 'seat removal returned %', v_res;
+  end if;
+  select total_kes into v_total from public.invoices where id = (v_res->>'invoice_id')::uuid;
+  if v_total >= 0 or v_total <> (v_res->>'amount_kes')::numeric then
+    raise exception 'draft total floored the seat credit % %', v_total, v_res;
+  end if;
+  perform public.finalize_invoice((v_res->>'invoice_id')::uuid);
+  if (select count(*) from public.tenant_credits
+      where idempotency_key = 'invoice-credit:' || (v_res->>'invoice_id')) <> 1
+     or (select amount_kes from public.tenant_credits
+         where idempotency_key = 'invoice-credit:' || (v_res->>'invoice_id')) <> -v_total
+     or (select total_kes from public.invoices where id = (v_res->>'invoice_id')::uuid) <> 0
+     or (select status from public.invoices where id = (v_res->>'invoice_id')::uuid) <> 'paid' then
+    raise exception 'issue did not turn the seat credit into one credit row';
+  end if;
+
+  -- Beta status meters the call at 0. An enforced pin uses the version rate.
+  perform public._test_owner_tenant(v_call_beta, '+254700010014', 'starter', 2, 'month', v_owner, 'owner', 1, true, true);
+  perform set_config('scalers.wallet_write', '1', true);
+  update public.tenants set minutes_included = 0, seconds_used = 0 where id = v_call_beta;
+  perform set_config('scalers.wallet_write', '', true);
+  perform set_config('scalers.billing_transition', '1', true);
+  update public.tenant_subscriptions set billing_status = 'beta' where tenant_id = v_call_beta;
+  perform set_config('scalers.billing_transition', '', true);
+  insert into public.calls (id, tenant_id) values ('dddddddd-dddd-dddd-dddd-ddddddddddd1', v_call_beta);
+  select c.amount_kes, c.reason into v_amount, v_reason
+  from public.consume_call_seconds('dddddddd-dddd-dddd-dddd-ddddddddddd1', 10, 'inbound') c;
+  if v_amount <> 0 or v_reason <> 'beta' then
+    raise exception 'beta call charged % %', v_amount, v_reason;
+  end if;
+
+  perform public._test_owner_tenant(v_call_on, '+254700010015', 'starter', 2, 'month', v_owner, 'owner', 1, true, true);
+  perform set_config('scalers.wallet_write', '1', true);
+  update public.tenants set minutes_included = 0, seconds_used = 0 where id = v_call_on;
+  perform set_config('scalers.wallet_write', '', true);
+  insert into public.calls (id, tenant_id) values ('dddddddd-dddd-dddd-dddd-ddddddddddd2', v_call_on);
+  select c.amount_kes, c.reason into v_amount, v_reason
+  from public.consume_call_seconds('dddddddd-dddd-dddd-dddd-ddddddddddd2', 10, 'inbound') c;
+  if v_reason <> 'on_demand' or v_amount <> round(10 * (
+       select v.inbound_kes_per_second
+       from public.billing_package_versions v
+       join public.tenant_subscriptions s on s.package_version_id = v.id
+       where s.tenant_id = v_call_on
+     ), 2) then
+    raise exception 'version call rate returned % %', v_amount, v_reason;
+  end if;
+  if (select count(*) from public.wallet_ledger where tenant_id = v_call_beta and kind = 'call_charge') <> 0 then
+    raise exception 'beta call wrote a wallet debit';
+  end if;
+
+  if has_function_privilege('authenticated', 'public.consume_sms_units(uuid, integer)', 'execute')
+     or has_function_privilege('anon', 'public.consume_sms_units(uuid, integer)', 'execute') then
+    raise exception 'consume_sms_units is granted to a member role';
+  end if;
+  select c.reason, c.sms_used_units into v_reason, v_n
+  from public.consume_sms_units(v_call_beta, 1000) c;
+  if v_reason <> 'beta' or v_n <> 30 then
+    raise exception 'beta sms cap returned % %', v_reason, v_n;
   end if;
 
   if position('billing_spend_allows_charge' in (select prosrc from pg_proc where proname = 'consume_call_seconds')) = 0

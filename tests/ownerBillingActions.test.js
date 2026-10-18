@@ -96,7 +96,7 @@ describe("owner billing sql contract", () => {
 
   it("hooks spend checks into consume, reserve, and escalation", () => {
     const call = sql.slice(sql.indexOf("function public.consume_call_seconds"));
-    assert.match(call.slice(0, 4000), /billing_spend_allows_charge/);
+    assert.match(call.slice(0, 7000), /billing_spend_allows_charge/);
     const sms = sql.slice(sql.indexOf("function public.consume_sms_units"));
     assert.match(sms.slice(0, 4500), /billing_spend_allows_charge/);
     const reserve = sql.slice(sql.indexOf("function public.reserve_notify_send"));
