@@ -18,7 +18,8 @@
 -- admin_import_promoted_package_version, not through the editor.
 --
 -- Prices are copied from the version an admin starts from. This file does not
--- write a new commercial price.
+-- write a new commercial price. The owner price table is
+-- package_version_owner_prices.sql. Run that after this file, on staging only.
 --
 -- Messages are one shared allowance: message_credits. 1 credit = KSh 1 at the
 -- on-demand rate. sms_credit_burn, whatsapp_credit_burn, and email_credit_burn
@@ -28,7 +29,8 @@
 -- Seeded versions leave message_credits null. An admin sets the pool on the
 -- draft. Owner defaults, still editable on a draft: SMS segment 1, WhatsApp
 -- alert 2, email 1. A draft copies the burns from the version it starts from.
--- Metering still reads the old buckets until a later change.
+-- on_demand_allowed is true on a paid version. The trial version can lock it
+-- off. Metering still reads the old buckets until a later change.
 
 -- ---------------------------------------------------------------------------
 -- 1. Editor settings and version bookkeeping.
@@ -59,7 +61,8 @@ alter table public.billing_package_versions
   add column if not exists message_credits integer,
   add column if not exists sms_credit_burn numeric,
   add column if not exists whatsapp_credit_burn numeric,
-  add column if not exists email_credit_burn numeric;
+  add column if not exists email_credit_burn numeric,
+  add column if not exists on_demand_allowed boolean not null default true;
 
 -- Burns follow the existing per-channel KSh rate because 1 credit = KSh 1.
 -- message_credits stays null on rows that were seeded with separate buckets.
@@ -93,6 +96,9 @@ comment on column public.billing_package_versions.whatsapp_credit_burn is
 
 comment on column public.billing_package_versions.email_credit_burn is
   'Credits burned per email. Owner default is 1. 1 credit = KSh 1. Editable on a draft.';
+
+comment on column public.billing_package_versions.on_demand_allowed is
+  'When false, this version does not offer on-demand minutes or credits. The trial locks it off. Editable on a draft.';
 
 do $$
 begin
@@ -154,6 +160,7 @@ begin
      or new.sms_credit_burn is distinct from old.sms_credit_burn
      or new.whatsapp_credit_burn is distinct from old.whatsapp_credit_burn
      or new.email_credit_burn is distinct from old.email_credit_burn
+     or new.on_demand_allowed is distinct from old.on_demand_allowed
   then
     raise exception 'published package version is frozen';
   end if;
@@ -500,6 +507,7 @@ begin
     'dids', (p_terms ->> 'dids')::integer,
     'email', (p_terms ->> 'email')::integer,
     'email_credit_burn', (p_terms ->> 'email_credit_burn')::numeric,
+    'on_demand_allowed', coalesce((p_terms ->> 'on_demand_allowed')::boolean, true),
     'email_kes', (p_terms ->> 'email_kes')::numeric,
     'features', coalesce((
       select jsonb_agg(jsonb_build_object('enabled', s.enabled, 'key', s.feature_key) order by s.feature_key)
@@ -550,6 +558,7 @@ as $$
     'sms_credit_burn', v.sms_credit_burn,
     'whatsapp_credit_burn', v.whatsapp_credit_burn,
     'email_credit_burn', v.email_credit_burn,
+    'on_demand_allowed', v.on_demand_allowed,
     'sms', v.sms,
     'email', v.email,
     'staff_wa', v.staff_wa,
@@ -684,7 +693,8 @@ begin
     inbound_kes_per_second, outbound_kes_per_second, whatsapp_kes, sms_kes, email_kes,
     annual_discount_percent, trial_days, allowances_placeholder, active_from,
     copied_from_id, notes, price_set_by,
-    message_credits, sms_credit_burn, whatsapp_credit_burn, email_credit_burn
+    message_credits, sms_credit_burn, whatsapp_credit_burn, email_credit_burn,
+    on_demand_allowed
   ) values (
     v_package.id, v_next, 'draft',
     v_source.monthly_price_kes, v_source.seats, v_source.minutes, v_source.sms, v_source.email,
@@ -693,7 +703,8 @@ begin
     v_source.sms_kes, v_source.email_kes, v_source.annual_discount_percent,
     v_source.trial_days, v_source.allowances_placeholder, v_source.active_from,
     v_source.id, null, null,
-    v_source.message_credits, v_source.sms_credit_burn, v_source.whatsapp_credit_burn, v_source.email_credit_burn
+    v_source.message_credits, v_source.sms_credit_burn, v_source.whatsapp_credit_burn, v_source.email_credit_burn,
+    v_source.on_demand_allowed
   )
   returning id into v_id;
   insert into public.billing_package_version_features (package_version_id, feature_key, enabled)
@@ -784,6 +795,7 @@ declare
   v_sms_burn integer;
   v_whatsapp_burn integer;
   v_email_burn integer;
+  v_on_demand boolean;
   v_dids integer;
   v_inbound numeric;
   v_outbound numeric;
@@ -837,6 +849,12 @@ begin
     raise exception 'allowances placeholder is required';
   end if;
   v_placeholder := (p_patch ->> 'allowances_placeholder')::boolean;
+  if p_patch -> 'on_demand_allowed' is null
+     or jsonb_typeof(p_patch -> 'on_demand_allowed') <> 'boolean'
+  then
+    raise exception 'on-demand setting is required';
+  end if;
+  v_on_demand := (p_patch ->> 'on_demand_allowed')::boolean;
   if p_patch ? 'notes' and jsonb_typeof(p_patch -> 'notes') <> 'null' then
     v_notes := nullif(btrim(p_patch ->> 'notes'), '');
     if v_notes is not null and length(v_notes) > 500 then
@@ -877,6 +895,7 @@ begin
     annual_discount_percent = v_discount,
     trial_days = v_trial,
     allowances_placeholder = v_placeholder,
+    on_demand_allowed = v_on_demand,
     notes = v_notes,
     price_set_by = v_price_set_by
   where id = p_version_id;
@@ -1291,6 +1310,7 @@ begin
     'email', v.email,
     'email_credit_burn', v.email_credit_burn,
     'email_kes', v.email_kes,
+    'on_demand_allowed', v.on_demand_allowed,
     'inbound_kes_per_second', v.inbound_kes_per_second,
     'message_credits', v.message_credits,
     'minutes', v.minutes,
@@ -1444,6 +1464,10 @@ begin
       end,
       public._package_editor_money(v_terms, 'email_kes')
     ),
+    on_demand_allowed = case
+      when v_terms -> 'on_demand_allowed' is null or jsonb_typeof(v_terms -> 'on_demand_allowed') = 'null' then true
+      else (v_terms ->> 'on_demand_allowed')::boolean
+    end,
     annual_discount_percent = public._package_editor_money(v_terms, 'annual_discount_percent'),
     allowances_placeholder = (v_terms ->> 'allowances_placeholder')::boolean,
     trial_days = case

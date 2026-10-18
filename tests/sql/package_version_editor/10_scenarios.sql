@@ -35,6 +35,7 @@ as $$
     'annual_discount_percent', v.annual_discount_percent,
     'trial_days', v.trial_days,
     'allowances_placeholder', v.allowances_placeholder,
+    'on_demand_allowed', coalesce(v.on_demand_allowed, true),
     'features', pg_temp.feature_patch(null)
   ) || coalesce(p_over, '{}'::jsonb)
   from public.billing_package_versions v

@@ -14,4 +14,8 @@ for pass in 1 2; do
   $PSQL -d "$DB" -f docs/supabase/package_version_editor.sql
 done
 $PSQL -d "$DB" -f tests/sql/package_version_editor/10_scenarios.sql
+# Owner prices, twice: the second apply must not publish another version.
+for pass in 1 2; do
+  $PSQL -d "$DB" -f docs/supabase/package_version_owner_prices.sql
+done
 echo "package_version_editor sql: ok"

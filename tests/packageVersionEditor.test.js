@@ -83,6 +83,7 @@ describe("package version editor commands", () => {
         annual_discount_percent: 0,
         trial_days: null,
         allowances_placeholder: false,
+        on_demand_allowed: true,
         features: [{ key: "calls", enabled: true }],
       },
       actor: "forged",
@@ -107,11 +108,13 @@ describe("package version editor commands", () => {
         annual_discount_percent: 17,
         trial_days: null,
         allowances_placeholder: true,
+        on_demand_allowed: false,
         features: [{ key: "calls", enabled: true }],
       },
     });
     assert.equal(pool.ok, true);
     assert.equal(pool.command.patch.message_credits, 111);
+    assert.equal(pool.command.patch.on_demand_allowed, false);
     assert.equal(pool.command.patch.sms_credit_burn, 1);
     assert.equal("sms" in pool.command.patch, false);
     assert.equal("sms_kes" in pool.command.patch, false);
@@ -138,6 +141,10 @@ describe("package version editor commands", () => {
       error: "approval_required",
     });
     assert.deepEqual(mod.packageVersionEditorHttpStatus("message credits are required"), {
+      status: 400,
+      error: "invalid",
+    });
+    assert.deepEqual(mod.packageVersionEditorHttpStatus("on-demand setting is required"), {
       status: 400,
       error: "invalid",
     });

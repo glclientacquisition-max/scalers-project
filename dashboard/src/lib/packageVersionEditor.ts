@@ -77,7 +77,8 @@ export function packageVersionEditorHttpStatus(message: string): { status: numbe
     text.includes("say who") ||
     text.includes("approval threshold") ||
     text.includes("allowances placeholder") ||
-    text.includes("message credits")
+    text.includes("message credits") ||
+    text.includes("on-demand setting")
   ) {
     return { status: 400, error: "invalid" };
   }
@@ -155,6 +156,8 @@ function patchOf(value: unknown): Record<string, unknown> | null {
   }
   if (typeof value.allowances_placeholder !== "boolean") return null;
   patch.allowances_placeholder = value.allowances_placeholder;
+  if (typeof value.on_demand_allowed !== "boolean") return null;
+  patch.on_demand_allowed = value.on_demand_allowed;
   const features = featuresOf(value.features);
   if (!features) return null;
   patch.features = features;
