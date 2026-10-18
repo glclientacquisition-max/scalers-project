@@ -41,9 +41,10 @@ function validateText(raw, { max = 400 } = {}) {
   return { ok: true, value: text };
 }
 
-const PRICE_MODES = new Set(['fixed', 'from', 'range', 'ask']);
+const PRICE_MODES = new Set(['fixed', 'from', 'range', 'ask', 'quote']);
 const QUOTE_RE = /\b(quote|quotation|quoted|on site|site visit|bei ya makubaliano|tutakupa bei)\b/i;
 const FREE_RE = /\b(free|bure)\b/i;
+const { normalisePrice } = require('../factPrice');
 
 /**
  * Price text from the owner ("2,500", "KES 1,500 - 3,000", "from 800",
@@ -56,23 +57,24 @@ function validatePrice(raw, mode) {
   const text = asText(raw);
   const m = asText(mode).toLowerCase();
   if (!text) {
-    // The owner said "ask for a quote" with no amount. That is a fact.
-    if (m === 'ask') return { ok: true, value: { text: '', mode: 'ask' } };
+    if (m === 'ask' || m === 'quote') return { ok: true, value: { text: '', mode: 'ask' } };
     return MISSING;
   }
-  if (/^(?:ask|ask for (?:a )?(?:price|quote)|on request|price on request|call (?:us )?for (?:a )?price)$/i.test(text)) {
+  if (/^(?:ask|ask for (?:a )?(?:price|quote))$/i.test(text)) {
     return { ok: true, value: { text: '', mode: 'ask' } };
   }
   if (isPlaceholder(text)) return GARBAGE;
-  const amounts = (text.match(/-?\d[\d,]*(?:\.\d+)?/g) || []).map((n) =>
-    Number(n.replace(/,/g, ''))
-  );
+  const norm = normalisePrice({ price: raw, price_range: raw, pricing_mode: m });
+  if (norm.kind === 'quote') {
+    if (QUOTE_RE.test(text)) return { ok: true, value: { text, mode: 'ask' } };
+    return { ok: true, value: { text: '', mode: 'ask' } };
+  }
+  const amounts = (text.match(/-?\d[\d,]*(?:\.\d+)?/g) || []).map((n) => Number(n.replace(/,/g, '')));
   if (amounts.length) {
     if (amounts.some((n) => !Number.isFinite(n) || n < 0)) return GARBAGE;
     if (amounts.every((n) => n === 0) && !FREE_RE.test(text)) return GARBAGE;
-    // Implausible for a Kenyan SME line item: more than KES 100 million.
     if (amounts.some((n) => n > 100_000_000)) return GARBAGE;
-  } else if (!QUOTE_RE.test(text) && !FREE_RE.test(text)) {
+  } else if (norm.kind === 'unknown' && !QUOTE_RE.test(text) && !FREE_RE.test(text)) {
     return GARBAGE;
   }
   const value = { text };

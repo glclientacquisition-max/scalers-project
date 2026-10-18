@@ -39,7 +39,7 @@
     "test:live-transfer": "node --test tests/liveTransferXml.test.js tests/liveTransferLegs.test.js",
     "test:caller-file-voice": "node --test tests/callerFileVoice.test.js tests/hdSpeakReplay.test.js",
     "test:prompt-facts": "node --test tests/tenantPromptFacts.test.js tests/areaFees.test.js",
-    "test:fact-refs": "node --test tests/factSheet.test.js tests/factRefsCarry.test.js",
+    "test:fact-refs": "node --test tests/factSheet.test.js tests/factRefsCarry.test.js tests/factPriceNormalise.test.js",
     "eval:fact-refs": "node scripts/eval-fact-refs.js",
     "test:lookups": "node --test tests/lookup.test.js tests/lookupRouter.test.js tests/lookupReplay.test.js tests/lookupGuards.test.js",
     "eval:release": "node scripts/eval-release.js",
