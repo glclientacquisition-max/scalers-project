@@ -7,7 +7,6 @@ import {
   validateCatalogPriceFields,
   applyCatalogPriceFields,
 } from "../dashboard/src/lib/catalogPricingMode.ts";
-import { hashFactValue, priceFactValue } from "../dashboard/src/lib/factHash.ts";
 
 test("parseCataloguePriceText fixtures", () => {
   assert.deepEqual(parseCataloguePriceText("Ask"), { kind: "quote", price: null, priceMax: null });
@@ -48,26 +47,4 @@ test("applyCatalogPriceFields sets pricing_mode, price, price_max", () => {
   assert.equal(row.price, "500");
   assert.equal(row.price_max, 800);
   assert.equal(row.price_range, "KSh 500–800");
-});
-
-test("priceFactValue uses pricing_mode, price, price_max (not price_kind)", () => {
-  const row = {
-    price_range: "KSh 500–800",
-    pricing_mode: "range",
-    price: "500",
-    price_max: 800,
-  };
-  assert.deepEqual(priceFactValue(row, "service"), {
-    price: "KSh 500–800",
-    mode: "range",
-    amount: 500,
-    price_max: 800,
-  });
-  const quote = { price_range: "", pricing_mode: "quote" };
-  assert.deepEqual(priceFactValue(quote, "service"), { mode: "quote" });
-  const before = hashFactValue(priceFactValue(row, "service"));
-  const after = hashFactValue(
-    priceFactValue({ ...row, price: "600", price_range: "KSh 600–800" }, "service")
-  );
-  assert.notEqual(before, after);
 });

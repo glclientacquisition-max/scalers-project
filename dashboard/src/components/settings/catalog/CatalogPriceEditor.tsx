@@ -60,7 +60,7 @@ export function CatalogPriceEditor({
       />
       {kind === "quote" ? (
         <p className="text-meta text-ink-2">
-          Not sure of the price? Pick Quote on request and the Business Assistant will arrange a callback.
+          Not sure of the price? Pick Quote and the Business Assistant will arrange a callback.
         </p>
       ) : (
         <div className={cx("grid gap-2", kind === "range" ? "grid-cols-2" : "grid-cols-1")}>
