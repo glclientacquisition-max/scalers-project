@@ -4,7 +4,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const jiti = require(path.join(root, "dashboard/node_modules/jiti"))(__filename, {
+// CI's "Voice and MVP tests" job installs only root deps, so fall back to the root jiti.
+let jitiModule;
+try {
+  jitiModule = require(path.join(root, "dashboard/node_modules/jiti"));
+} catch {
+  jitiModule = require("jiti");
+}
+const jiti = (jitiModule.createJiti || jitiModule)(__filename, {
   alias: { "@": path.join(root, "dashboard/src") },
 });
 const { parseBulkServices } = jiti(path.join(root, "dashboard/src/lib/servicesCatalog.ts"));
