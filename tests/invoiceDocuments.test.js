@@ -47,7 +47,8 @@ describe("invoice documents", () => {
     assert.equal(invoice.lines[2].unit, "KSh 500");
     assert.equal(invoice.lines[3].unit, "KSh 1");
     assert.equal(invoice.totals.find((row) => row.label === "Subtotal").value, "KSh 20,600");
-    assert.equal(invoice.totals.find((row) => row.label === "Credits applied").value, "KSh 600");
+    assert.equal(invoice.totals.find((row) => row.label === "Credits applied").value, "-KSh 600");
+    assert.equal(receipt.totals.find((row) => row.label === "Credits applied").value, "-KSh 600");
     assert.equal(invoice.totals.find((row) => row.emphasis).label, "Amount due");
     assert.equal(invoice.totals.find((row) => row.emphasis).value, "KSh 20,000");
     assert.equal(invoice.payLabel, "Pay KSh 20,000");
@@ -68,6 +69,8 @@ describe("invoice documents", () => {
       /Unit price[\s\S]*Growth plan, monthly \(Business Assistant\)[\s\S]*1 Oct 2026 to 1 Nov 2026[\s\S]*Amount due[\s\S]*Pay KSh 20,000[\s\S]*Page 1 of 1/
     );
     assert.match(html, /support@scalers\.co\.ke/);
+    assert.match(html, /-KSh 600/);
+    assert.match(receiptHtml, /-KSh 600/);
     assert.match(html, /Pay with M-Pesa/);
     assert.doesNotMatch(html, /VAT/);
     assert.doesNotMatch(receiptHtml, /VAT/);
@@ -85,10 +88,12 @@ describe("invoice documents", () => {
     assert.match(raw, /Amount due/);
     assert.match(raw, /From/);
     assert.match(raw, /Page 1 of 1/);
+    assert.match(raw, /-KSh 600/);
     assert.match(raw, /Pay KSh 20,000/);
     assert.doesNotMatch(raw, /48 748 m/);
     assert.doesNotMatch(raw, /VAT/);
     const receiptRaw = receiptPdf.toString("latin1");
+    assert.match(receiptRaw, /-KSh 600/);
     assert.match(receiptRaw, /Paid KSh 20,000 on 18 Oct 2026/);
     assert.match(receiptRaw, /example-bachs-ref/);
     assert.doesNotMatch(receiptRaw, /VAT/);
@@ -105,6 +110,7 @@ describe("invoice documents", () => {
     assert.equal(split.lines[1].quantity, "5,600");
     assert.equal(split.lines[1].unit, "KSh 25");
     assert.equal(split.payLabel, "Pay KSh 80,000");
+    assert.equal(split.totals.find((row) => row.label === "Credits applied").value, "-KSh 200");
     assert.equal(split.partLabel, "Part 1 of 2");
     assert.match(renderInvoiceHtml(split), /Part 1 of 2/);
     assert.match(renderInvoicePdf(split).toString("latin1"), /Part 1 of 2/);
