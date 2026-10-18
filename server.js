@@ -447,7 +447,7 @@ const {
   looksLikeJobNoun,
 } = require('./src/conversation/firstForwardAcceptance');
 const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
-const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
+const { sautikitWebhookGuard, installWebhookBodyParsers } = require('./src/sautikit/webhook');
 const {
   isWhatsAppEventKind,
   processWhatsAppReceived,
@@ -623,21 +623,9 @@ function getGeminiClient() {
 }
 
 const app = express();
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  })
-);
-app.use(
-  express.urlencoded({
-    extended: true,
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  })
-);
+// JSON (1mb) + urlencoded everywhere; raw bytes kept on req.rawBody for the
+// SautiKit signature guard, for every content type on its routes.
+installWebhookBodyParsers(app, express);
 
 // Diagnostic middleware — inbound HTTP summary (no raw headers; TD-P1-4).
 app.use((req, res, next) => {
