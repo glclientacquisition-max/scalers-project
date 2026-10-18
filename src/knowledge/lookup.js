@@ -84,6 +84,17 @@ function fallbackSpeech(profile) {
   return { en, sw };
 }
 
+// Why a lookup ended where it did. Written to the voice turn trace (stage
+// 'lookup') so a wrong "unconfirmed" or fallback is one query away.
+const DEFAULT_REASON = {
+  found: 'match',
+  not_on_file: 'not_speakable',
+  no_data: 'no_list',
+  not_found_in_list: 'no_match',
+  unconfirmed: 'not_confirmed',
+  ambiguous: 'several_matches',
+};
+
 function resultOf(status, extra, profile) {
   const speech = extra.speech || fallbackSpeech(profile);
   return {
@@ -95,11 +106,12 @@ function resultOf(status, extra, profile) {
     source: extra.source || '',
     confirmedAt: extra.confirmedAt || null,
     valueHash: extra.valueHash || null,
+    reason: extra.reason || DEFAULT_REASON[status] || '',
   };
 }
 
-function notOnFile(profile, id) {
-  return resultOf('not_on_file', { id, speech: fallbackSpeech(profile) }, profile);
+function notOnFile(profile, id, reason) {
+  return resultOf('not_on_file', { id, reason, speech: fallbackSpeech(profile) }, profile);
 }
 
 /** The list itself was never saved. Never speak that as "we don't do this". */
@@ -122,13 +134,25 @@ function notFoundInList(profile, id, optOutSpeech) {
  * @returns {boolean}
  */
 function factIsConfirmed(profile, fieldPath, value, row) {
+  return confirmReading(profile, fieldPath, value, row).ok;
+}
+
+/**
+ * The confirm decision plus why. Reasons: confirmed, hash_no_row,
+ * hash_missing, hash_mismatch, not_owner (source), or not_confirmed.
+ * @returns {{ ok: boolean, reason: string }}
+ */
+function confirmReading(profile, fieldPath, value, row) {
   const reading = classifyRecord(row && typeof row === 'object' ? row : {}, {
     packSeed: false,
     fieldMeta: profile?.fieldMeta || null,
     fieldPath: fieldPath || '',
     value,
   });
-  return reading.fact === true;
+  if (reading.fact === true) return { ok: true, reason: 'confirmed' };
+  if (reading.hashCheck) return { ok: false, reason: `hash_${reading.hashCheck}` };
+  if (reading.source && reading.source !== 'owner') return { ok: false, reason: `source_${reading.source}` };
+  return { ok: false, reason: 'not_confirmed' };
 }
 
 function optedOutOfUnlisted(profile, kind) {
@@ -139,16 +163,8 @@ function optedOutOfUnlisted(profile, kind) {
   return areas?.decline_unlisted === true;
 }
 
-function unconfirmed(profile, id, source) {
-  return resultOf('unconfirmed', { id, source, speech: fallbackSpeech(profile) }, profile);
-}
-
-function factsHeld(profile) {
-  const gate = profile?.holdGate;
-  if (!gate || typeof gate !== 'object' || typeof gate.allowed !== 'boolean') return false;
-  const reasons = Array.isArray(gate.reasons) ? gate.reasons.map(String) : [];
-  if (reasons.includes('provenance_rpc_missing')) return false;
-  return gate.allowed === false;
+function unconfirmed(profile, id, source, reason) {
+  return resultOf('unconfirmed', { id, source, reason, speech: fallbackSpeech(profile) }, profile);
 }
 
 function termsFor(profile) {
@@ -242,8 +258,12 @@ function rowPath(entry) {
 }
 
 function priceConfirmed(profile, entry, row) {
+  return priceReading(profile, entry, row).ok;
+}
+
+function priceReading(profile, entry, row) {
   const value = entry ? catalogRowFactValue(entry.row) : row;
-  return factIsConfirmed(profile, rowPath(entry), value, entry ? entry.row : row);
+  return confirmReading(profile, rowPath(entry), value, entry ? entry.row : row);
 }
 
 function lookupPrice(query, ctx, sheet) {
@@ -278,11 +298,12 @@ function lookupPrice(query, ctx, sheet) {
   const row = entry?.row || { name: fact.label, price: fact.legacyPrice || fact.value };
   const norm = normalisePrice(row);
   // quote, unknown, and a non-numeric price such as "Ask" are never spoken.
-  if (!priceIsSpeakable(norm)) return notOnFile(profile, fact.id);
-  if (!priceConfirmed(profile, entry, row)) return unconfirmed(profile, fact.id, 'catalogue');
+  if (!priceIsSpeakable(norm)) return notOnFile(profile, fact.id, `price_${norm.kind || 'unknown'}`);
+  const reading = priceReading(profile, entry, row);
+  if (!reading.ok) return unconfirmed(profile, fact.id, 'catalogue', reading.reason);
   const enVal = speakNormalisedPrice(norm, 'en');
   const swVal = speakNormalisedPrice(norm, 'sw');
-  if (!enVal || !swVal) return notOnFile(profile, fact.id);
+  if (!enVal || !swVal) return notOnFile(profile, fact.id, 'price_unspoken');
   const seed = ctx.seed;
   return resultOf('found', {
     id: fact.id,
@@ -402,9 +423,9 @@ function feeFactValue(area) {
   };
 }
 
-function feeConfirmed(profile, hit) {
+function feeReading(profile, hit) {
   const raw = rawArea(profile, hit.id);
-  return factIsConfirmed(profile, `service_areas.${hit.id}`, feeFactValue(raw), raw || {});
+  return confirmReading(profile, `service_areas.${hit.id}`, feeFactValue(raw), raw || {});
 }
 
 function lookupFee(query, ctx, terms) {
@@ -435,8 +456,10 @@ function lookupFee(query, ctx, terms) {
     return notFoundInList(profile, speech ? 'fee.out' : 'fee.missing', speech);
   }
   if (!hit) return notFoundInList(profile, 'fee');
-  if (!feeConfirmed(profile, hit) || (hit.feeMode !== 'free' && hit.feeKsh == null)) {
-    return unconfirmed(profile, `fee.${hit.id}`, 'area');
+  const feeRead = feeReading(profile, hit);
+  if (!feeRead.ok) return unconfirmed(profile, `fee.${hit.id}`, 'area', feeRead.reason);
+  if (hit.feeMode !== 'free' && hit.feeKsh == null) {
+    return unconfirmed(profile, `fee.${hit.id}`, 'area', 'fee_missing');
   }
   return resultOf('found', {
     id: `fee.${hit.id}`,
@@ -555,12 +578,11 @@ function lookupHours(query, ctx) {
   const parsed = parseHoursSchedule(profile.hoursSchedule);
   if (!parsed) return noData(profile, 'hours');
   const tenant = tenantRowFromProfile(profile);
-  if (!factIsConfirmed(profile, 'hours.weekly_grid', factValueForPath('hours.weekly_grid', tenant), {})) {
-    return unconfirmed(profile, 'hours', 'hours');
-  }
+  const hoursRead = confirmReading(profile, 'hours.weekly_grid', factValueForPath('hours.weekly_grid', tenant), {});
+  if (!hoursRead.ok) return unconfirmed(profile, 'hours', 'hours', hoursRead.reason);
   if (scope === 'open') {
     const status = openClosedStatus(parsed, now);
-    if (status === 'unknown') return notOnFile(profile, 'hours');
+    if (status === 'unknown') return notOnFile(profile, 'hours', 'open_status_unknown');
     const open = status === 'open';
     return resultOf('found', {
       id: 'hours.open',
@@ -605,9 +627,9 @@ function payBag(profile) {
   return asObject(asObject(profile.businessPolicies)?.payments) || {};
 }
 
-function payConfirmed(profile, pay) {
+function payReading(profile, pay) {
   const tenant = tenantRowFromProfile(profile);
-  return factIsConfirmed(profile, 'payments.methods', factValueForPath('payments.methods', tenant), pay);
+  return confirmReading(profile, 'payments.methods', factValueForPath('payments.methods', tenant), pay);
 }
 
 function paySlots(pay) {
@@ -662,7 +684,8 @@ function lookupPay(query, ctx) {
   }[kind];
   const slot = want ? slots.find((row) => row[0] === want) : slots[0];
   if (!slot) return notFoundInList(profile, `pay.${kind}`);
-  if (!payConfirmed(profile, pay)) return unconfirmed(profile, `pay.${slot[0]}`, 'pay');
+  const payRead = payReading(profile, pay);
+  if (!payRead.ok) return unconfirmed(profile, `pay.${slot[0]}`, 'pay', payRead.reason);
   const enDigits = speakDigits(slot[1], 'en');
   const swDigits = speakDigits(slot[1], 'sw');
   let en = `The ${slot[2]} is ${enDigits}.`;
@@ -689,7 +712,9 @@ function lookupServices(ctx) {
   const rows = catalogueEntries(profile);
   if (!rows.length) return noData(profile, 'services');
   const confirmed = rows.filter((entry) => priceConfirmed(profile, entry, entry.row));
-  if (!confirmed.length) return unconfirmed(profile, 'services', 'catalogue');
+  if (!confirmed.length) {
+    return unconfirmed(profile, 'services', 'catalogue', priceReading(profile, rows[0], rows[0].row).reason);
+  }
   const names = confirmed.map((entry) => speechName(entry.row.name));
   const more = names.length > 4;
   const shown = names.slice(0, 4);
@@ -715,7 +740,8 @@ function lookup(kind, query, ctx = {}) {
   const profile = ctx.profile || {};
   const key = String(kind || '').toLowerCase();
   const canonical = key === 'area_fee' || key === 'coverage' || key === 'area' ? 'fee' : key;
-  if (factsHeld(profile)) return unconfirmed(profile, canonical || 'held', 'hold');
+  // tenant_hold_gate (profile.holdGate) is the stock-reservation capability.
+  // It never decides whether a confirmed fact may be spoken.
   const terms = termsFor(profile);
   const sheet = sheetFor(profile, terms);
   if (canonical === 'price') return lookupPrice(query, ctx, sheet);
@@ -723,7 +749,7 @@ function lookup(kind, query, ctx = {}) {
   if (canonical === 'hours') return lookupHours(query, ctx);
   if (canonical === 'pay') return lookupPay(query, ctx);
   if (canonical === 'services') return lookupServices(ctx);
-  return notOnFile(profile, canonical || 'unknown');
+  return notOnFile(profile, canonical || 'unknown', 'unknown_kind');
 }
 
 function cataloguePhrases(profile) {
@@ -748,7 +774,7 @@ function lookupWithDeadline(kind, query, ctx = {}, opts = {}) {
     .then((result) => ({ timedOut: false, result }));
   return Promise.race([run, timeout]).finally(() => clearTimeout(timer)).then((out) => {
     if (out.timedOut || !out.result) {
-      const fb = notOnFile(ctx.profile || {}, 'timeout');
+      const fb = notOnFile(ctx.profile || {}, 'timeout', 'timeout');
       const lang = ctx.language;
       return {
         timedOut: true,

@@ -3750,9 +3750,18 @@ mediaWss.on('connection', (ws, req) => {
         turnId: `${sidLabel()}:${brainState?.conversation?.turnCount || 0}`,
       });
       if (lookupPlan?.handled) {
+        const lookupWhy = (lookupPlan.lookups || [])
+          .map((row) => `${row.kind}:${row.status}:${row.id || '-'}:${row.reason || '-'}`)
+          .join(',');
         console.log(
-          `[ws/media][${callKey}] lookup ${lookupPlan.outcome} brainMs=${Number(lookupPlan.brainMs).toFixed(1)} lang=${callLanguage}`
+          `[ws/media][${callKey}] lookup ${lookupPlan.outcome} ${lookupWhy} brainMs=${Number(lookupPlan.brainMs).toFixed(1)} lang=${callLanguage}`
         );
+        voiceTrace.noteLookup({
+          handled: true,
+          outcome: lookupPlan.outcome,
+          lookups: lookupPlan.lookups,
+          brainMs: lookupPlan.brainMs,
+        });
       }
       const localReply = lookupPlan?.handled
         ? { outcome: lookupPlan.outcome, line: lookupPlan.speech, lookup: true }

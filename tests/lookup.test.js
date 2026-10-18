@@ -209,12 +209,14 @@ test('EN and SW lookups make the same decision', () => {
   }
 });
 
-test('services list is capped and a held tenant only gets the fallback', () => {
+test('services list is capped, and a closed holds gate does not silence facts', () => {
   const list = say('services', 'which services', profiles().list, 'en');
   assert.match(list.speech, /deep cleaning, standard cleaning, sofa cleaning, carpet cleaning and more/);
-  const held = say('price', 'sofa cleaning', { ...profiles().carry, holdGate: { allowed: false, reasons: ['held'] } }, 'en');
-  assert.equal(held.result.status, 'unconfirmed');
-  assert.equal(held.speech, FALLBACK);
+  // tenant_hold_gate is the reservation capability. Most tenants have it closed.
+  const closed = { allowed: false, reasons: ['Holds are not enabled in policies.'] };
+  const priced = say('price', 'sofa cleaning', { ...profiles().carry, holdGate: closed }, 'en');
+  assert.equal(priced.result.status, 'found');
+  assert.match(priced.speech, /from two thousand five hundred shillings/);
 });
 
 test('an unconfirmed price, including hash mode, is not spoken', () => {
