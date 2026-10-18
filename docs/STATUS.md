@@ -100,6 +100,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | PR | Lane | What | State |
 | --- | --- | --- | --- |
 | `BRAIN_CALL_FIXES_D199` | Brain | Turn on the #634 fixes on prod. | **On in prod** 18 Oct 13:31 EAT (Railway `67413ba8`, Vercel `dpl_4m1RFPGG`). Brain scores the next call. |
+| #758 | Desk | Settings quick fixes from the owner review (Alvin approved 13:21 EAT): Catalogue / prices links open the Catalogue, plus small Settings copy and display fixes. No SQL, no prompt or call-facing change. | **Pending ship (18 Oct).** GO Alvin 14:55 EAT. Merges in the next Voice deploy slot, before #762. Rollback once shipped: promote the previous prod Desk deployment, or revert the squash commit. |
 | #643 | Voice | Phone wallet low-balance alert. | GO'd, frozen. |
 | #731 | Voice | One owner alert per call, goodbye hangs up, 10 s no-audio close (main cut of #644 + #646). | GO'd, frozen. |
 | #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | Prod SQL and merge wait for a scored Aris call. Purge schedule not applied until a recordings deletion route exists. |
