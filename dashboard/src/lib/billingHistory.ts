@@ -8,6 +8,8 @@ export type BillingHistoryInvoice = {
   status?: string;
   due_at?: string | null;
   total_due?: string;
+  amount_paid?: string | null;
+  balance?: string | null;
   pay_link_path?: string | null;
 };
 
@@ -30,12 +32,69 @@ const PAY_REASONS = new Set([
   "This invoice is not open",
 ]);
 
+/** M-Pesa's per-transaction cap. The pay page splits larger invoices into even parts. */
+const PART_LIMIT_CENTS = 150_000 * 100;
+
+/** Cents from "KSh 1,234.50", "KSh -1,000", or "-KSh 1,000". Null when it is not a KSh amount. */
+export function kshCents(label: string | null | undefined): number | null {
+  const m = /^\s*(-)?\s*(?:KSh\s*)?(-)?\s*(\d[\d,]*)(?:\.(\d{1,2}))?\s*$/i.exec(String(label ?? ""));
+  if (!m) return null;
+  const cents = Number(m[3].replace(/,/g, "")) * 100 + Number(((m[4] || "") + "00").slice(0, 2));
+  return m[1] || m[2] ? -cents : cents;
+}
+
+function formatCents(cents: number): string {
+  const abs = Math.abs(cents);
+  const whole = Math.floor(abs / 100).toLocaleString("en-US");
+  const frac = abs % 100;
+  return `KSh ${cents < 0 ? "-" : ""}${frac ? `${whole}.${String(frac).padStart(2, "0")}` : whole}`;
+}
+
+/** Same even split as the pay page: each part at most KSh 150,000, parts sum to the total. */
+export function splitParts(totalCents: number): number[] {
+  if (totalCents <= 0) return [];
+  if (totalCents <= PART_LIMIT_CENTS) return [totalCents];
+  const count = Math.ceil(totalCents / PART_LIMIT_CENTS);
+  const base = Math.floor(totalCents / count);
+  let rem = totalCents % count;
+  return Array.from({ length: count }, () => {
+    const extra = rem > 0 ? 1 : 0;
+    rem -= extra;
+    return base + extra;
+  });
+}
+
+/** The next unpaid part. Index is 1-based. Null when the parts are covered. */
+export function nextPart(parts: number[], paidCents: number): { index: number; count: number; cents: number } | null {
+  let cursor = 0;
+  for (let i = 0; i < parts.length; i += 1) {
+    if (paidCents < cursor + parts[i]) return { index: i + 1, count: parts.length, cents: cursor + parts[i] - paidCents };
+    cursor += parts[i];
+  }
+  return null;
+}
+
+function openState(invoice: BillingHistoryInvoice, due: string | null) {
+  const total = kshCents(invoice.total_due);
+  if (total == null) return { statusLabel: due ? `Due by ${due}` : "Open", payCents: null };
+  const paid = Math.max(0, kshCents(invoice.amount_paid) ?? 0);
+  const balance = kshCents(invoice.balance);
+  const owed = Math.min(total - paid, balance ?? Number.POSITIVE_INFINITY);
+  if (owed <= 0) return { statusLabel: "Nothing due", payCents: null };
+  const next = nextPart(splitParts(total), paid);
+  if (next && next.count > 1 && next.index > 1) {
+    return { statusLabel: `Part ${next.index - 1} of ${next.count} received`, payCents: next.cents };
+  }
+  if (paid > 0) return { statusLabel: `${formatCents(owed)} still due`, payCents: next ? next.cents : owed };
+  return { statusLabel: due ? `Due by ${due}` : "Open", payCents: next ? next.cents : owed };
+}
+
 export function mapBillingHistory(
   body: BillingHistoryBody | null | undefined,
   options: { fromPay: boolean; beta?: boolean },
 ): MappedInvoice[] {
   const beta = Boolean(options.beta);
-  const rows: MappedInvoice[] = (body?.invoices || []).flatMap((invoice) => {
+  const rows = (body?.invoices || []).flatMap((invoice) => {
     const id = invoice.id ? String(invoice.id) : "";
     if (!id) return [];
     const status = String(invoice.status || "");
@@ -46,24 +105,24 @@ export function mapBillingHistory(
       beta,
     });
     if (pay.hidden) return [];
-    const due = nairobiDay(invoice.due_at);
-    const statusLabel =
-      pay.label === "Paid" || pay.label === "Checking payment" ? pay.label : due ? `Due by ${due}` : "Open";
     const total = invoice.total_due || "";
-    return [
-      {
-        id,
-        number: invoice.number || "Invoice",
-        totalLabel: total,
-        statusLabel,
-        payLabel: pay.showPayButton && total ? `Pay ${total}` : null,
-        payLinkPath: pay.showPayButton ? pay.payLinkPath : null,
-      },
-    ];
+    const open = pay.label === "Open" ? openState(invoice, nairobiDay(invoice.due_at)) : null;
+    const payCents = pay.showPayButton ? (open?.payCents ?? null) : null;
+    const row: MappedInvoice = {
+      id,
+      number: invoice.number || "Invoice",
+      totalLabel: total,
+      statusLabel: open ? open.statusLabel : pay.label || (status === "void" ? "Void" : "Closed"),
+      payLabel: payCents != null ? `Pay ${formatCents(payCents)}` : null,
+      payLinkPath: payCents != null ? pay.payLinkPath : null,
+    };
+    return [{ row, owed: open?.payCents != null }];
   });
-  // Due invoices first, then the rest in the order the API sent them.
-  const owed = (row: MappedInvoice) => (row.statusLabel === "Paid" || row.statusLabel === "Checking payment" ? 1 : 0);
-  return rows.map((row, index) => ({ row, index })).sort((a, b) => owed(a.row) - owed(b.row) || a.index - b.index).map((item) => item.row);
+  // Invoices with money owed first, then the rest in the order the API sent them.
+  return rows
+    .map((item, index) => ({ ...item, index }))
+    .sort((a, b) => Number(b.owed) - Number(a.owed) || a.index - b.index)
+    .map((item) => item.row);
 }
 
 /** Redirect only to the one-time path the pay-link POST returns. */
