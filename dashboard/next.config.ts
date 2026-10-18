@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
     return [
       { source: "/inbox", destination: "/calls", permanent: false },
       { source: "/inbox/:path*", destination: "/calls/:path*", permanent: false },
+      // Owners type /setup: setup lives in Settings once the line is open (onboarding sends finished workspaces to /home).
+      { source: "/setup", destination: "/settings", permanent: false },
+      // Owners and docs say "Usage"; the page lives at /wallet.
+      { source: "/usage", destination: "/wallet", permanent: false },
     ];
   },
   turbopack: {

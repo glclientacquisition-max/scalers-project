@@ -95,7 +95,7 @@ export const deskListTitleClass =
 /** Corner overlay on the Inbox nav icon. 16px, not a second 44px control.
  * Ribbon wash matches the S mark: brand → accent-fill. */
 export const deskNavBadgeClass =
-  "pointer-events-none absolute -top-1 -end-1 z-20 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-fill px-0.5 text-[9px] font-semibold leading-none tabular-nums text-accent-on-fill";
+  "pointer-events-none absolute -top-1 -end-1 z-20 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-fill px-1 text-[9px] font-semibold leading-none tabular-nums text-accent-on-fill";
 
 /** List preview: one ellipsized line. Full copy lives on the record. */
 export const deskPreviewClass = "min-w-0 truncate";

@@ -5,7 +5,7 @@ import { EndlessSentinel } from "@/components/EndlessList";
 import { PullRefreshMark, pullRootVisible, usePhoneListPull, usePhoneTabRefresh } from "@/components/PhonePullRefresh";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
-import { inboxPhoneWindowClass, listWindowClass } from "@/lib/endlessList";
+import { inboxPhoneWindowClass, listWindowClass, showMoreLabel } from "@/lib/endlessList";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { callsHref } from "@/lib/callsTriage";
 import { nicheCopy } from "@/lib/inboxNiche";
@@ -321,6 +321,13 @@ export function InboxPileBoard({
             loaded={pageRows.length}
             onLoad={nav?.loadMore || (() => {})}
           />
+          {nav && nav.hasMore ? (
+            <div className="mt-4 flex justify-center">
+              <Button type="button" variant="ghost" onClick={nav.loadMore}>
+                {showMoreLabel(pageRows.length, nav.listed.length)}
+              </Button>
+            </div>
+          ) : null}
         </>
       )}
     </div>

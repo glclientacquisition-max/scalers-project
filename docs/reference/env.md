@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-167 variables.
+168 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -22,6 +22,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BENCH_VERBOSE` | scripts | `scripts/bench-inbound-webhook.js` |
 | `BETTER_AUTH_SECRET` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `BETTER_AUTH_URL` | desk | `dashboard/src/lib/admin-auth.ts` |
+| `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
 | `BUSINESS_KNOWLEDGE` | voice | `src/db.js`<br>`src/prompts.js`<br>`src/tenantProfile.js` |
 | `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+2 more |
@@ -65,7 +66,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `NEXT_PUBLIC_SUPABASE_URL` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `NEXT_PUBLIC_WALLET_RATE_KES_PER_MINUTE` | desk | `dashboard/src/lib/wallet.ts` |
 | `NEXT_RUNTIME` | desk | `dashboard/src/lib/adminQuality.ts` |
-| `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+3 more |
+| `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+4 more |
 | `OPS_EMAIL_FROM` | desk | `dashboard/src/lib/opsMail.ts` |
 | `OWNER_ALERT_EMAIL` | voice | `server.js` |
 | `PATH` | scripts | `scripts/smoke-recording-webhook.js` |

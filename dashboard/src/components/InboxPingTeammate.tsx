@@ -55,7 +55,7 @@ function InboxPingTeammateInner({
   if (hidden) return null;
 
   if (variant === "dock") {
-    const hint = one ? `Ping ${one.name}` : "Ping teammate";
+    const hint = one ? `Alert ${one.name}` : "Alert a teammate";
     return (
       <div className="flex w-16 flex-col items-center gap-1">
         <IconButton
@@ -73,14 +73,14 @@ function InboxPingTeammateInner({
         >
           <BellAlertIcon aria-hidden="true" />
         </IconButton>
-        <span className="text-caption font-medium leading-none text-ink-2">Ping</span>
+        <span className="text-caption font-medium leading-none text-ink-2">Alert</span>
         <Sheet
           open={open}
           onOpenChange={(next) => {
             if (!next && pending) return;
             setOpen(next);
           }}
-          title="Ping teammate"
+          title="Alert a teammate"
           description="Notify one Escalate person on this ticket."
         >
           <div className="flex flex-col gap-1">
@@ -120,7 +120,7 @@ function InboxPingTeammateInner({
           pending={pending}
           onClick={() => run(one.name)}
         >
-          {pending ? "Pinging" : `Ping ${one.name}`}
+          {pending ? "Sending" : `Alert ${one.name}`}
         </Button>
       ) : (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -149,7 +149,7 @@ function InboxPingTeammateInner({
             pending={pending}
             onClick={() => run(picked)}
           >
-            {pending ? "Pinging" : "Ping teammate"}
+            {pending ? "Sending" : "Alert a teammate"}
           </Button>
         </div>
       )}
