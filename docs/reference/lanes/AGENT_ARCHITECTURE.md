@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-05
+last_reviewed: 2026-10-18
 ---
 
 # Agent architecture
@@ -152,6 +152,20 @@ Loaded once per media session in `ensureTenantPrompt()`.
 | After hours | `after_hours_mode` serve vs message | `businessHours.js`, context header |
 | Soniox STT/TTS down | Catalog-voice downtime clip, hang up, one owner alert per business | `outageClips.js`, `speechOutageNotify.js`, [`VOICE_DOWNTIME_AT_SCALE.md`](../../explanation/voice/VOICE_DOWNTIME_AT_SCALE.md) |
 | Gemini down (credits/denied/timeout) | Live voice name ask, save caller, one owner alert per business | `dynamicSpeech.js` `pickLlmRecoveryLine`, `speechOutageNotify.js`, `geminiProviderHealth.js` |
+
+### Speech check (spoken-fact guard)
+
+Before TTS, each spoken sentence passes the speech check. Today that is `src/conversation/speechGuard.js` (Brain), which gates hours and numbers on the caller's wording; the 18 Oct audit found it removed correct answers and caught no invented ones. The approved redesign ([`speech-check-fact-sheet.md`](../../rfcs/speech-check-fact-sheet.md), all flags off, staging first) splits it:
+
+| Piece | Owner | Module | Flag |
+| --- | --- | --- | --- |
+| Per-call fact sheet (hours by day, now, prices, branches, unknowns) | Brain | `src/conversation/factSheet.js` | `BRAIN_FACT_SHEET` |
+| Claim checks (saved, hold, transfer, D199 name rules, coverage) | Brain | `src/conversation/speechGuard.js` | existing |
+| Value checks + repair with ready-made lines; never silent on a question | Voice | `src/speech/factGuard.js` | `VOICE_FACT_GUARD`, `VOICE_FACT_REPAIR`, `VOICE_FACT_GUARD_PRICES`, `VOICE_PLACE_TENANT_FIRST` |
+| Line wording (en, sw, Sheng) | Voice | `src/speech/spokenFacts/` | with `VOICE_FACT_REPAIR` |
+| Unconfirmed price gate | Brain | `src/conversation/pricingTrust.js` `canSpeakPrice` | `BRAIN_PRICE_CONFIRM_GATE` |
+
+Brain reviews the single hook from `speechGuard.js` into `factGuard.js` (Chief ruling, 18 Oct).
 
 ---
 

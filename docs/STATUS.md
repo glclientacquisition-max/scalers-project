@@ -5,7 +5,7 @@ last_reviewed: 2026-10-18
 
 # Scalers status and handoff (start here)
 
-**Last updated Sun 18 Oct 2026, 10:00 EAT.** Checked against `main` (`b66e1661`), `gh pr list`, main's first-parent log, and prod/staging `/healthz` on 18 Oct. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
+**Last updated Sun 18 Oct 2026, 15:20 EAT (closing docs for 18 Oct).** Checked against `main` (`408ad368`), `gh pr list`, main's first-parent log, Railway prod deployments, the merged PR bodies and the pending STATUS PRs (#750, #753, #756, #764, folded in here). Items marked *per team notes* come from lane agents and Alvin, not from the repo. Lines marked **`TBD:`** are placeholders for ships still in flight; fill them in when they land. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
 
 New agent or new human: read this whole page before you touch code.
 
@@ -15,7 +15,9 @@ New agent or new human: read this whole page before you touch code.
 
 ## 1. Where we are
 
-Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is pinned to **`aa872ade`** (branch `staging/pin-738-main-8ee9`: #738 on top of `main` @ `8ee9b161`); staging `/healthz` reports it, started 17 Oct 21:51 EAT. The old kitchen pin `1374b25d` is gone.
+Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `408ad368`** (#762, merged 18 Oct 15:13 EAT; Railway `4e311b26` SUCCESS, Vercel `dpl_8q6Xfe2j` READY). Brain's #733, #751 and #761 ship next, one at a time (section 4); when they land, update this line to **`TBD:#761-sha`** (or the last of the three). Staging Voice is pinned to **`9fb557ff`** (branch `staging/pin-759-760-763-main-1e18`: #759, #760 and #763 on top of `main` @ `1e18b2fa`; Railway staging `321b1fb6`, 18 Oct 14:21 EAT).
+
+**Prod flags flipped 18 Oct:** `BRAIN_CALL_FIXES_D199=on` (13:31 EAT) and `VOICE_ENDED_CALL_GUARD=on` (15:01 EAT). Details in section 2, "Flag flips".
 
 Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
 
@@ -23,12 +25,14 @@ Prod DID **+254709221536** is Aris, the live paying customer: **never release, r
 
 Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage.
 
-**Gate right now:** the next step is a clean, scored Aris call on prod. Until then, nothing else ships except live-call voice fixes Alvin approves (see section 4).
+**Gate right now:** Brain scores the next Aris call against D199 + #732 (and #733/#751 once shipped). #643 and #731 stay frozen until that review. The speech-check redesign is being built on staging only (section 4a).
+
+**Deploy rule (read before any merge):** prod Railway auto-deploys `main` with **no watch paths**, so **every merge, docs-only included, restarts prod Voice** and drops live calls. Merge only with **0 `in_progress` calls**, **one at a time through the deploy-slot holder**, then `/healthz` (SHA + `ok`) and an Aris check before the next merge. See section 8.
 
 | | Production | Staging |
 | --- | --- | --- |
-| Voice (Railway) | `scalers-project-production.up.railway.app`, deploys `main` on merge. `b66e1661` | `scalers-staging-staging.up.railway.app`, pinned `aa872ade` |
-| Desk (Vercel) | `scalers-project`, builds `main`. `b66e1661` | `scalers-staging` (one debounced API deploy, #665) |
+| Voice (Railway) | `scalers-project-production.up.railway.app`, deploys `main` on every merge (no watch paths). `408ad368` | `scalers-staging-staging.up.railway.app`, pinned `9fb557ff` |
+| Desk (Vercel) | `scalers-project`, builds `main`. `408ad368` (`dpl_8q6Xfe2j`) | `scalers-staging` (one debounced API deploy, #665) |
 | DID | **+254709221536** Aris, +254709221542 Esga | **+254709221537** Jirani |
 | SautiKit workspace | `e0e57aa5` | `1f85601c` |
 | Supabase | `fjxcdccgyhnvnnlnovcl` | `sgcdncjxauhsbunobmob` |
@@ -37,136 +41,205 @@ Design: all UI follows Frontend 2.0 ([`FRONTEND_2_0_CHARTER.md`](explanation/fro
 
 ---
 
-## 2. Shipped to prod (since 14 Oct)
+## 2. Shipped to prod
 
-Times EAT. SHAs are the squash commits on `main` (first-parent log). Older history: `git log --first-parent origin/main` and the previous STATUS in git (`30086771`, #686).
+Times EAT (git and Railway report UTC; +3 h). SHAs are the squash commits on `main`. Railway ids are prod Voice deploys (service `9b09d8c6`, env `8dd0b8ef`); `dpl_` ids are prod Desk on Vercel. "Not recorded" means neither the PR nor an earlier STATUS line names it. Older history: `git log --first-parent origin/main` and the previous STATUS in git (`30086771`, #686).
 
-| PR | SHA | Merged | What |
-| --- | --- | --- | --- |
-| #763 | `2842c4f4` | 18 Oct 14:59 | Voice: speech guard reads glued clocks and shillings ("KSh500", "from9:30 AM") like the spaced form, for checking only; streamed model stages record where model text loses spaces (VOICE.md invariant 19). No flag. Railway `c4a235da` SUCCESS, `/healthz` ok on `2842c4f4`. Rollback = revert. Approved by Alvin 14:33 EAT via Chief. |
-| #760 | `2cb6e075` | 18 Oct 14:57 | Voice: an ended call gets no new media session; every call is finalized once (`VOICE_ENDED_CALL_GUARD`, VOICE.md invariant 18). Merged with the flag off (no behaviour change); flag turned on 15:01 (see below). Railway `508601d2` SUCCESS, `/healthz` ok on `2cb6e075`. Rollback = revert (or flag off). Approved by Alvin 14:33 EAT via Chief. |
-| #732 | `13ddf19d` | 18 Oct 14:48 | Brain: a past-booking question in sw/Sheng/en goes to the visit read; honest outcome labels. Live under `BRAIN_CALL_FIXES_D199` (on in prod). Railway `d458494a` SUCCESS, Vercel `dpl_7WNEx3Up` READY. |
-| #752 | `1e18b2fa` | 18 Oct 13:28 | Email design system as a standalone package (`packages/email/`): shared layout, owner and ops templates, plain-text versions, render API and previews, branded Supabase Auth templates. Templates only: no send path and no change to the Voice or Desk build. Line-live email offers the Scalers number or one forwarding code `**004*N**20#` (tested on Safaricom and Airtel by Alvin, 18 Oct; Telkom untested), with the airtime note and a button to `/onboarding/line`. Rollback = revert. Deploy: Railway `587661ec` SUCCESS, `/healthz` ok on `1e18b2fa`. Approved by Alvin 13:11 EAT; deploy slot from Voice 13:22 EAT. |
-| #755 | `c4719c70` | 18 Oct 13:22 | Desk "Set up your calls" on `/onboarding/line`: use the Scalers number, or forward with pre-filled codes (recommended all-in-one `**004*N**S#` first, other choices `**61*`/`**67*`/`**62*` under a disclosure, each with its own off code, `##002#` for all), ring time 15/20/30, airtime note before dialling, Android-only tap-to-dial, test step with "I tested it", Overview card until tested. Picks in browser storage per tenant (no migration). `**004*N**20#` tested on Safaricom and Airtel by Alvin 18 Oct 13:09; Telkom untested. Deploys: Vercel `dpl_4m1RFPGGbeE7BN2Z7CXkXSq9frp9` READY 13:23, Railway `0182bcff` SUCCESS, `/healthz` ok on `c4719c70`. Rollback = revert. Approved by Alvin 13:11 EAT; deploy slot from Voice 13:22 EAT. |
-| #647 | `b66e1661` | 17 Oct 22:12 | Billing: SMS reserve → send → settle; the ledger is the SMS bill. |
-| #650 | `730ddee1` | 17 Oct 22:08 | Ops-Billing: explicit no-package state, package change rules, `tenant_billing_state` view. |
-| #631 | `134b493a` | 17 Oct 22:01 | Beta never rejects at the package minute cap; ops email at 80%/100%; period rollover cron (`5 * * * *`, hourly at :05, in `docs/supabase/package_period_rollover.sql`). |
-| #738 | `b568c288` | 17 Oct 21:56 | Closed-tenant guard for sends, Desk re-ping, tool writes, transfer and greeting warm (`VOICE_CLOSED_TENANT_GUARD`, on). Passed on staging at `aa872ade`. |
-| #734 | `8ee9b161` | 17 Oct 21:28 | Guard keeps correct time answers and never silences a direct question. **Merged without Alvin's retest;** Alvin chose to keep it on prod. Not yet signed off (see section 5). |
-| #735 | `41a63296` | 17 Oct 20:14 | Bare "Hello"/"Yes" after the greeting gets a spoken re-invite (`VOICE_BARE_GREETING_REPLY`, off). |
-| #736 | `be0acea4` | 17 Oct 20:10 | Re-speak a line the TTS socket lost; never crash on a TTS close (`VOICE_TTS_RESPEAK`, on). |
-| #645 | `0340e46e` | 17 Oct 17:10 | Prod greeting dead air at pickup + call-path gaps, recordings fetch. |
-| #717 | `74eff40e` | 17 Oct 12:02 | CI: docs workflow. |
-| #718 | `1c5a617e` | 17 Oct 12:00 | CI: bug-test-pack gate on PRs and pushes to `main`. |
-| #708 | `925aec26` | 17 Oct 01:34 | Calls: result label "Visit booked" → "Visit requested" (no migration). |
-| #687, #694, #674, #693, #692, #690, #703, #689, #688, #686, #649 | | 15 Oct | Tool-turn smoothness (`VOICE_TOOL_SMOOTH`, off); Swahili clock speech (`VOICE_SW_TIME`); owed booking confirm fold; failed SMS recorded + backoff; run-once finalize (`CALL_FINALIZE_ONCE`, off); recording degrades on 403; onboarding scroll hotfix; docs restructure and previous STATUS refresh; Admin billing cleanup. |
+### 2.1 Prod ships, 18 Oct (newest first)
 
-Billing state after #631/#650/#647 (*per team notes*): monthly rollover is live; current period ends 1 Nov 00:00 EAT.
+| PR | SHA | Merged | What | Deploys | Rollback | Approver |
+| --- | --- | --- | --- | --- | --- | --- |
+| #761 | **`TBD:#761-sha`** | **`TBD:#761-time`** | Brain: trusted hours, honest hours summary, name gate. Merged with `BRAIN_TRUSTED_HOURS` **off** (inert). Prerequisite for the fact sheet (section 4a). | Railway **`TBD:#761-railway`**, Vercel **`TBD:#761-vercel`** | Revert (flag stays off) | Alvin 15:12 EAT via Chief |
+| #751 | **`TBD:#751-sha`** | **`TBD:#751-time`** | Brain: owner text honest (stacked on #732). Runs under `BRAIN_CALL_FIXES_D199` (on), so it changes live behaviour. | Railway **`TBD:#751-railway`**, Vercel **`TBD:#751-vercel`** | Revert, or D199 off | Alvin 15:12 EAT via Chief |
+| #733 | **`TBD:#733-sha`** | **`TBD:#733-time`** | Brain: D199 visit read (last one only) + paged open read. Under D199 (on), live behaviour change. | Railway **`TBD:#733-railway`**, Vercel **`TBD:#733-vercel`** | Revert, or D199 off | Alvin 15:12 EAT via Chief |
+| #762 | `408ad368` | 15:13 | Desk call setup per account (follow-up to #755): picks saved on the account (one-time copy from browser storage, which stays the fallback); "Forwarding works" only when a call from the owner's named test phone arrives within 30 min of starting the test; fix checklist; Settings › Calls & forwarding; Overview nudge after 7 quiet days. Prod SQL applied first at 14:59 (2.3). | Railway `4e311b26` SUCCESS, Vercel `dpl_8q6Xfe2j` READY | Promote `dpl_DBSyRwgU` (#758) or revert; SQL rollback in 2.3 | Alvin 14:55 EAT |
+| #758 | `52498db9` | 15:08 | Desk Settings quick fixes from the owner review: "Add/Check prices" open the Catalogue; Policies copy and starter text; Back asks before dropping edits; forgiving catalogue import; small labels and toasts. No SQL, no prompt or call-facing change. | Railway `7dfbf4e9` SUCCESS, Vercel `dpl_DBSyRwgU4eg9bRQwPnvQB2t9XuRT` READY (app, admin, www) | Promote `dpl_738F4MizcCCtAM87wfGPhqoAiiJx` (`adab1e81`) or revert | Alvin 14:55 EAT (fixes approved 13:21) |
+| #765 | `adab1e81` | 15:04 | Docs: STATUS lines for #760, #763, `VOICE_ENDED_CALL_GUARD=on`, Brain #732. | Railway `45f5df30`, Vercel `dpl_738F4Miz` | Revert | Not recorded (Voice deploy slot) |
+| #763 | `2842c4f4` | 14:59 | Voice: speech guard reads glued clocks and shillings ("KSh500", "from9:30 AM") like the spaced form, for checking only; streamed model stages record where text loses spaces (VOICE.md invariant 19). No flag. | Railway `c4a235da` SUCCESS | Revert | Alvin 14:33 EAT via Chief |
+| #760 | `2cb6e075` | 14:57 | Voice: an ended call gets no new media session; every call finalized once (`VOICE_ENDED_CALL_GUARD`, VOICE.md invariant 18; HD_49d726c3dc9b). Merged flag-off; flag on at 15:01 (2.2). | Railway `508601d2` SUCCESS | Flag off, or revert | Alvin 14:33 EAT via Chief |
+| #732 | `13ddf19d` | 14:48 | Brain: past-booking question (sw/Sheng/en) goes to the visit read; honest outcome labels (enquiry needing a callback = `needs_human`; saved hold or closed info call = resolved; greetings only = abandoned; `primary_intent` `human` only when the caller asked for a person). Live under D199. **Not behind D199:** with `VOICE_QUESTION_BEFORE_NAME` on (default), the past-request phrase counts as a file ask and skips question-before-name. 0 calls in progress at merge. | Railway `d458494a` SUCCESS, Vercel `dpl_7WNEx3UpCP1m5qGHMDQWYkbDXvss` READY | Revert, or D199 off (does not undo the question-before-name skip) | Alvin 14:20 EAT |
+| #757 | `0c920541` | 14:23 | Docs: STATUS line for `BRAIN_CALL_FIXES_D199=on`; #752 SHA. | Railway `1c97356f` | Revert | Not recorded (Voice deploy slot) |
+| #748 | `0f280504` | 14:18 | Ops-Billing: rollover catch-up rebuilds counters instead of zeroing; on-demand usage audit; Activity before/after on assign/unassign; package SMS 80%/100% ops email (`src/billing/smsUsageAlerts.js`). Shipped after the D199 flip so Brain can separate effects. SQL in 2.3. | Railway `5b6ac74a`; Vercel not recorded | Revert code (SMS notices stop); SQL rollback in 2.3 | Alvin 14:11 EAT; slot from Voice 14:16 |
+| #752 | `1e18b2fa` | 13:28 | Email design system (`packages/email/`): layout, owner/ops templates, plain text, render API, previews, branded Supabase Auth templates. Templates only, no send path. Line-live email offers the Scalers number or `**004*N**20#` (tested Safaricom + Airtel by Alvin; Telkom untested). | Railway `587661ec` SUCCESS | Revert | Alvin 13:11 EAT; slot from Voice 13:22 |
+| #755 | `c4719c70` | 13:22 | Desk "Set up your calls" on `/onboarding/line`: Scalers number or pre-filled forwarding codes (`**004*N**S#` first; `**61*`/`**67*`/`**62*` under a disclosure; `##002#` off), ring time, airtime note, Android-only tap-to-dial, test step, Overview card. Browser storage per tenant (moved to the account by #762). | Railway `0182bcff` SUCCESS, Vercel `dpl_4m1RFPGGbeE7BN2Z7CXkXSq9frp9` READY 13:23 | Revert | Alvin 13:11 EAT; slot from Voice 13:22 |
+| #746 | `ae8508ea` | 12:59 | Docs: STATUS ops lines (events_url fixes, signature checks off, no prod recordings). | Railway `fcd141ba`, Vercel `dpl_A9joeVvUN5Lf2vF7gFdSJsLJAowE` | Revert | Not recorded |
+| #749 | `5520659c` | 12:53 | Desk owner-trust fixes from the 18 Oct review: no prefetch storm, parallel call detail, timeouts; one count selector (Home, Inbox, badge); Usage reads `tenant_billing_state`; setup checklist Confirmed/To check/Missing; copy; transcripts sort by `seq` when present. No SQL, no env. | Railway `f672d18c` SUCCESS, Vercel `dpl_Gs9xgvGR3eqPcRso7ZPKfENRJSVG` READY | Promote `dpl_7i6p9UVTdzQdmYp6JHrjKMz64hBt` / Railway redeploy `c902ba3a`, or revert | Alvin 12:04 EAT; slot from Ops-Billing 12:50 |
+| #754 | `a5beb387` | 12:47 | Desk password reset: "Forgot password?", `/forgot-password` (same answer for every address, rate limited), `/reset-password` behind a 15-min recovery marker, invite-page link. Redirect allow lists already covered it. | Railway `c902ba3a`, Vercel `dpl_7i6p9UVTdzQdmYp6JHrjKMz64hBt` READY | Revert | Alvin 12:05 EAT (deploy GO 12:43, Voice slot 12:43) |
+| #737 | `fbef28a8` | 12:10 | Super Admin lifecycle: Suspend / Restore line (`line_status='suspended'`, Voice gate #651), Archive / Unarchive (closes line, hides, stops charging, blocks owner sign-in), permanent delete removed; purge is a dry-run-by-default RPC, **schedule not applied**. Every action needs a typed reason and writes `ops_audit_log`. No tenant was suspended or archived. Prod SQL at 12:06 (2.3). | Railway `d18956e1` SUCCESS, Vercel `dpl_AdHZ1KhTKQM5T9pJirVxiNiQsiwV` READY | Promote `dpl_Hms48Q2MoZ9NKDecHQ56mD5rXtz6` / Railway redeploy `15c23e72` (both `4c3d8932`), or revert; SQL rollback in 2.3 | Alvin 12:04 EAT; slot from Voice with Chief's GO 12:05 |
+| #744 | `4c3d8932` | 09:43 | Docs: STATUS refresh 18 Oct. | Railway `15c23e72` | Revert | Not recorded |
+
+### 2.2 Flag flips, 18 Oct
+
+| When | Flag | Where | Deploy | Rollback | Approver |
+| --- | --- | --- | --- | --- | --- |
+| 15:01 | `VOICE_ENDED_CALL_GUARD=on` (only the exact value `on` enables; #760, VOICE.md invariant 18) | Railway prod Voice, only this variable | Redeploy `7b7e28c5` SUCCESS, same commit `2842c4f4`, started 15:01:14; `/healthz` ok; boot logs clean; 0 calls before/after; Aris `line_status` active, +254709221536 mapping unchanged | Unset (or `off`) and redeploy | Alvin 14:33 EAT via Chief |
+| 13:31 | `BRAIN_CALL_FIXES_D199=on` (code enables only on exact `on`, `src/conversation/callFixesD199.js`) | Railway prod Voice, only this variable | Redeploy `67413ba8` SUCCESS, same commit `1e18b2fa`, started 13:31:47; `/healthz` ok; 0 calls before/after; Aris active | Set `off` (or unset) and redeploy | Alvin (9 Oct GO) via Chief, 18 Oct 13:21 |
+| 13:22 | `BRAIN_CALL_FIXES_D199=on` | Vercel prod Desk (`scalers-project`, Production only; env created 13:22:48) | Picked up by the #755 build `dpl_4m1RFPGGbeE7BN2Z7CXkXSq9frp9` (READY 13:23:31). A later Desk deploy `dpl_7DFn1nMi` also carries it (*per team notes*). Effect: Desk's starter-text filter matches Brain's (`isSeedPolicyText`). | Delete the env var and redeploy, or promote `dpl_A9joeVvUN5Lf2vF7gFdSJsLJAowE` (`ae8508ea`, also drops #755) | Chief via Brain, ~13:22 |
+
+Brain scores the next Aris call against D199; #643 and #731 stay frozen until that review.
+
+### 2.3 Ops changes (not code), 18 Oct (newest first)
+
+- **14:59 — #762 prod SQL** (Supabase `fjxcdccgyhnvnnlnovcl`, `apply_migration` `tenant_call_setup`, file `supabase/migrations/20261018130000_tenant_call_setup.sql`, md5 `5d2069ab…`, from branch head `97ceb174`). Adds nullable `tenants.call_setup` jsonb, CHECK `tenants_call_setup_valid` (via `call_setup_valid()`), and RPC `save_call_setup(uuid, jsonb)` (security definer, `member_can_admin`, v2 `test_from` rule, 30-minute test-call check; signed-in users and service role, not anon; no direct column update). Function bodies identical to staging. 0 rows changed. Snapshot and rollback: `/workspace/reports/call-setup/v2/prod/` (`rollback-762-prod.sql`). Approver: Alvin 14:55; Voice cleared the additive SQL during its window.
+- **~14:15 — #748 SQL on prod** (staging ~14:13): `package_state_rules.sql`, `package_period_rollover.sql`, `on_demand_usage_audit.sql`. Prod function bodies match staging; cron jobs unchanged (`scalers-package-period-rollover` `5 * * * *`, `notify-stale-release`, `sms-counter-drift-daily`). First prod rollover with the fix: **1 Nov 00:05 EAT**. Staging Done and Dusted reconcile 14:14 (0 → 17,792 s, 0 → 150 SMS; audit `usage_counter_reconcile`). Rollback: `/workspace/scalers/ops/2026-10-18_748_prod_rollback.sql` and `..._staging_rollback.sql` (pre-apply snapshots `2026-10-18_748_{prod,staging}_pre.sql`). Approver: Alvin 14:11.
+- **13:02 — Prod Auth recovery template uses token-hash links** (`{{ .SiteURL }}/auth/callback?next=/reset-password&token_hash={{ .TokenHash }}&type=recovery` instead of the PKCE `{{ .ConfirmationURL }}`, which only worked in the requesting browser). Only `mailer_templates_recovery_content` changed (read back); mirrored in #752 (`7dce6190`). One test reset sent to the Aris owner account. Rollback: PATCH back `/workspace/scalers/ops/2026-10-18_recovery_template_pre_tokenhash.json`. Approver: Alvin 13:00. (From #756.)
+- **12:46 — 3 stale prod `calls` rows closed** (Supabase `fjxcdccgyhnvnnlnovcl`, data fix, no SHA). `status` `in_progress` → `failed` (the terminal status Voice uses for a failed call) on `ENVTEST_CALL_001` (Aris, 7 Aug), `sautikit_call_1786211288059` (Aris, 8 Aug) and `HD_c381db747fda` (Esga, 5 Oct), by exact id, guarded by `status = 'in_progress'`. Nothing else changed (no `ended_at` column; duration and package seconds stay 0; no triggers, billing, metering or alerts fired). In-progress rows older than 1 h after: 0. Audit: `ops_audit_log` `close_stale_calls` `6cd88235-8e5e-4750-afba-23390328bdb2`. Backup and rollback (not applied): `/workspace/scalers/ops/stale-calls-backup-20261018.json`, `/workspace/scalers/ops/stale-calls-rollback-20261018.sql`. Approver: Alvin via Chief, 12:45.
+- **12:06 — #737 prod SQL** in order: `admin_business_suspend.sql`, `archive_tenant_billing.sql`, `purge_archived_tenants.sql` (unchanged since `1768482f`, same as staging 17 Oct). All 7 function definitions match staging md5; new RPCs service-role only; `tenants.suspended_at/_by` added; `refresh_line_status`/`suspend_line_for_nonpayment` absent on prod, so skipped. **Not applied:** `purge_archived_tenants_schedule.sql` (purge stays off) and `line_rental_grace.sql`. Dry run `purge_archived_tenants(p_days => 30, p_dry_run => true)` → 0 rows (Chapter One eligible 9 Nov 12:50 EAT). Snapshot and rollback: `/workspace/reports/admin-lifecycle/prod/` (`rollback-737-prod.sql`). Approver: Alvin 12:04. (From #750.)
+- **12:03 — Branded Supabase Auth templates (#752 @ `9b356cc7`) on prod** through the Management API: 6 templates + 6 subjects, read back 12/12; OTP expiry 3600; SMTP untouched. **Staging not applied** (free tier with the built-in mailer refuses template edits; needs custom SMTP first). Rollback: PATCH back `/workspace/scalers/ops/2026-10-18_auth_templates_rollback_fjxcdccgyhnvnnlnovcl.json`. Approver: Alvin 10:59.
+- **11:00 — Prod Desk ops mail env** (Vercel Production): `RESEND_API_KEY` (sensitive), `OPS_EMAIL_FROM`, `SCALERS_OPS_ALERT_EMAILS`. Desk `opsMail.ts` had been skipping every platform ops email (`ops_mail_unconfigured`). Redeploy `dpl_Hms48Q2MoZ9NKDecHQ56mD5rXtz6` (same commit `4c3d8932`, env only). Test send HTTP 200. Rollback: remove the three vars and redeploy the prior production deployment. Approver: Alvin 10:46 (Ops-Billing chat). (From #753.)
+- **10:17 — Esga Stationery prod data** (no SHA): (a) on-demand usage **off** via `set_tenant_on_demand_usage(c81b3480…, false)`, audit `set_on_demand_usage` `fe9629cf`; rollback `select * from set_tenant_on_demand_usage('c81b3480-0cc5-4224-b0e7-24c641d78db2', true)`. (b) Cleared the unconfirmed seeded `business_policies.delivery` ("Same-day Nairobi delivery…"); Nakuru coverage untouched; `llm_system_prompt` unchanged; audit `clear_seed_policy` `1ab1fd8a` keeps the old text. Approver: Alvin 10:15. (From #750.)
+- **09:10 — SMS counter reconcile on prod:** Esga 440 → 193, Aris 207 → 147, SBS 8 → 4 (counter set to sent units from the ledger). Pre-snapshot and rollback (not applied): `/workspace/scalers/ops/2026-10-18_sms_counter_reconcile_pre.txt`, `/workspace/scalers/ops/2026-10-18_sms_counter_reconcile_rollback.sql`. Approver: not recorded in the repo.
+- **~08:41 — Esga `events_url` fixed** (+254709221542, prod workspace, PUT, read back with GET). Was prod `/` (events hit the inbound-call handler); now `https://scalers-project-production.up.railway.app/voice/events`. Voice webhook URL and number mapping unchanged. Rollback: PUT the old `/` value (not recommended). Approver: Alvin via Chief, 08:40.
+- **08:40 — Aris `events_url` fixed** (+254709221536, prod workspace, PUT, read back). Was the typo host `https://scalers-production-production.up.railway.app/voice/events` (dead; every Aris event including recording-ready got no answer); now `https://scalers-project-production.up.railway.app/voice/events`. Mapping unchanged. Rollback: PUT the old value (not recommended, dead host). Approver: Alvin via Chief, 08:40.
+- **Pending — staging Jirani `events_url`** (+254709221537, staging workspace `1f85601c`; agents have no staging SautiKit key). Alvin sets it in the SautiKit dashboard to `https://scalers-staging-staging.up.railway.app/voice/events`. Rollback: restore the previous value. Approver: Alvin.
+
+### 2.4 Admin lifecycle (#737), end to end
+
+- **17 Oct ~21:55:** SQL applied on **staging only** (files from `cd8db691`); staging test on Test Archive Co (`51a6c7c6`): suspend, refused second suspend, restore, archive, dry-run purge. Approver and rollback for the staging apply: not recorded (*per team notes*).
+- **18 Oct 12:06:** prod SQL (2.3). **12:10:** code merged `fbef28a8` (2.1).
+- **Not live:** the purge schedule (`purge_archived_tenants_schedule.sql`) is applied nowhere. A real purge needs `p_days >= 30` and skips any business that still has recordings in `call-recordings` (Storage blocks deletes from SQL), so it waits for a recordings deletion route. `ARCHIVE_RESTORE_DAYS = 30`.
+
+### 2.5 SMS billing and reconcile
+
+- **17 Oct 22:12:** #647 SMS reserve → send → settle; the ledger is the SMS bill.
+- **18 Oct 09:10:** prod SMS counters reconciled to the ledger (2.3).
+- **18 Oct 14:18:** #748 adds the package SMS 80%/100% ops email and makes catch-up rollovers rebuild `sms_used_units` from `notify_sms_billable` (+ pending holds) instead of zeroing. Prod has not rolled yet; counters matched ledgers on a read-only check (18 Oct 09:55). **#748 must be live before the first prod rollover, 1 Nov 00:05 EAT** — it is (merged 14:18, SQL ~14:15).
+
+### 2.6 Prod ships, evening of 17 Oct
+
+| PR | SHA | Merged | What | Deploys | Rollback | Approver |
+| --- | --- | --- | --- | --- | --- | --- |
+| #647 | `b66e1661` | 17 Oct 22:12 | Billing: SMS reserve → send → settle; the ledger is the SMS bill. | Railway `10049e86` | Revert | Not recorded |
+| #650 | `730ddee1` | 17 Oct 22:08 | Ops-Billing: explicit no-package state, package change rules, `tenant_billing_state` view. | Railway `afdc619c` | Revert | Not recorded |
+| #631 | `134b493a` | 17 Oct 22:01 | Beta never rejects at the package minute cap; ops email at 80%/100%; period rollover cron (`5 * * * *`, in `docs/supabase/package_period_rollover.sql`). | Railway `dbd4ce81` | Revert | Not recorded |
+| #738 | `b568c288` | 17 Oct 21:56 | Closed-tenant guard for sends, Desk re-ping, tool writes, transfer and greeting warm (`VOICE_CLOSED_TENANT_GUARD`, default on). Passed on staging at `aa872ade`. | Railway `ef9bea89` | `VOICE_CLOSED_TENANT_GUARD=off`, or revert | Alvin via Chief |
+| #734 | `8ee9b161` | 17 Oct 21:28 | Guard keeps correct time answers and never silences a direct question. **Merged without Alvin's retest;** Alvin chose to keep it. Not signed off (section 5). | Railway `a472c7c4` | Revert | Alvin (kept on prod) |
+| #735 | `41a63296` | 17 Oct 20:14 | Bare "Hello"/"Yes" after the greeting gets a spoken re-invite (`VOICE_BARE_GREETING_REPLY`, off). | Railway `c9bc8615` | Revert | Not recorded |
+| #736 | `be0acea4` | 17 Oct 20:10 | Re-speak a line the TTS socket lost; never crash on a TTS close (`VOICE_TTS_RESPEAK`, on). | Railway `fb46d6dd` | `VOICE_TTS_RESPEAK` off, or revert | Not recorded |
+| #645 | `0340e46e` | 17 Oct 17:10 | Prod greeting dead air at pickup + call-path gaps, recordings fetch. | Railway `145e438e` | Revert | Not recorded |
+| #717, #718 | `74eff40e`, `1c5a617e` | 17 Oct 12:02, 12:00 | CI: docs workflow; bug-test-pack gate on PRs and pushes to `main`. | | Revert | Not recorded |
+| #708 | `925aec26` | 17 Oct 01:34 | Calls: result label "Visit booked" → "Visit requested" (no migration). | | Revert | Not recorded |
 
 Earlier merges since 9 Oct (see git log for detail):
 
+- **15 Oct:** #687 tool-turn smoothness (`VOICE_TOOL_SMOOTH`, off); #694 Swahili clock speech (`VOICE_SW_TIME`); #674 owed booking confirm fold; #693 failed SMS recorded + backoff; #692 run-once finalize (`CALL_FINALIZE_ONCE`, off); #690 recording degrades on 403; #703 onboarding scroll hotfix; #689, #688, #686 docs restructure and previous STATUS refresh; #649 Admin billing cleanup.
 - **13 Oct:** #634 Brain `BRAIN_CALL_FIXES_D199`; #632 `BRAIN_CONFIRMED_COVERAGE` Phase 0; #672 Locations outside areas.
 - **12 Oct:** #671 insights/outcomes/reviews/Updates; #670 Appearance; #669 contrast; #668 /calls SSR guard; #667 Locations with delivery fees; #663 Payments and Policies; #666 Catalogue price save; #661 design leftovers; #664 speed; #662 Overview insights; #660 UI polish.
 - **11 Oct:** #665 Vercel deploy cut; #659 structured data; #658 callbacks only; #657 capability gates; #656 onboarding rebuild; #655 team invites; #654 QA fixes.
 - **9–10 Oct:** #652 STATUS refresh; Admin A0–A2 + Activity log (#636, #637, #641); Quality tab (#603); line-unavailable gate (#651); grant-minutes hotfix (#648); fact-confirm (#627); traces purge (#630, #635); ops alerts (#626); Admin sign-in check (#623, #613); docs (#601, #607, #619, #620, #624).
 
-### Ops changes (not code), 18 Oct
-
-- **18 Oct 14:59 EAT: #762 prod SQL applied** (Supabase `fjxcdccgyhnvnnlnovcl`, `apply_migration` `tenant_call_setup`, file `supabase/migrations/20261018130000_tenant_call_setup.sql`, md5 `5d2069ab…`). SHA: none (the PR is not merged; file from branch head `97ceb174`). Adds the nullable `tenants.call_setup` jsonb column, the CHECK `tenants_call_setup_valid` (via `call_setup_valid()`), and the `save_call_setup(uuid, jsonb)` RPC: security definer, gated by `member_can_admin`, with the v2 `test_from` rule and the 30-minute test-call check. Function definitions are identical to staging (md5 `5ebdb4db…` and `cc5387c3…`). `save_call_setup` can be run by signed-in users and the service role, not anon. Signed-in users can't update the column directly. 0 rows changed (0 tenants have `call_setup`). Snapshot and rollback on the box: `/workspace/reports/call-setup/v2/prod/` (`rollback-762-prod.sql`: drop the RPC, the check, the validator and the column). Approved by Alvin 18 Oct 14:55 EAT; Voice cleared the additive SQL during its window.
-- **SMS counter reconcile applied on prod** (09:10 EAT): Esga 440 → 193, Aris 207 → 147, SBS 8 → 4 (counter set to sent units from the ledger). Pre-snapshot and rollback (not applied) are on the box: `/workspace/scalers/ops/2026-10-18_sms_counter_reconcile_pre.txt` and `/workspace/scalers/ops/2026-10-18_sms_counter_reconcile_rollback.sql`.
-- **18 Oct 08:40 EAT: Aris `events_url` fixed** (+254709221536, prod workspace). SHA: none (SautiKit provider config). Changed from the dead host `https://scalers-production-production.up.railway.app/voice/events` (typo) to `https://scalers-project-production.up.railway.app/voice/events`, read back with a GET after the change. Every Aris event, including recording ready, had been getting no answer from the dead host. Voice webhook URL and number mapping unchanged (`/`). Rollback: PUT the old value (not recommended; it is a dead host). Approver: Alvin via Chief, 08:40.
-- **18 Oct ~08:41 EAT: Esga `events_url` fixed** (+254709221542, prod workspace). SHA: none (provider config). Changed from prod `/` to prod `/voice/events` (`https://scalers-project-production.up.railway.app/voice/events`), read back. Its call events had been reaching the inbound-call handler at `/`. Voice webhook URL and mapping unchanged. Rollback: PUT `https://scalers-project-production.up.railway.app/` (not recommended; it sends events to the inbound handler). Approver: Alvin via Chief, 08:40 (same GO).
-- **18 Oct 12:46 EAT: 3 stale prod `calls` rows closed** (Supabase `fjxcdccgyhnvnnlnovcl`). SHA: none (data fix). `status` `in_progress` → `failed` (the terminal status Voice uses for a failed call, `server.js` call-terminal classifier) on `ENVTEST_CALL_001` (Aris, 7 Aug), `sautikit_call_1786211288059` (Aris, 8 Aug) and `HD_c381db747fda` (Esga, 5 Oct), by exact id, guarded by `status = 'in_progress'`. Nothing else changed (`calls` has no `ended_at`; duration and package seconds stay 0). No triggers on `calls`; no billing, metering or alerts fired. In-progress rows older than 1 h: 0. Audit: `ops_audit_log` `close_stale_calls` (`6cd88235`). Backup and rollback (not applied) on the box: `/workspace/scalers/ops/stale-calls-backup-20261018.json`, `/workspace/scalers/ops/stale-calls-rollback-20261018.sql`. Approver: Alvin via Chief, 12:45.
-- **Pending: staging Jirani `events_url`** (+254709221537, separate staging workspace; the agents have no staging SautiKit key). SHA: none. Alvin is setting it in the SautiKit dashboard to `https://scalers-staging-staging.up.railway.app/voice/events`. Rollback: restore the previous value in the dashboard. Approver: Alvin.
-- **Not shipped: #743 webhook signature shadow** (draft, head `52e9effd`, `hold-staging`). `SAUTIKIT_VALIDATE_WEBHOOKS` and the signing secrets are unset on both envs, so **signature checking is OFF on prod and staging** today. Waits on SautiKit's answer about which secret signs voice and `events_url` posts, then Alvin's GO (staging first). Rollback once live: unset `SAUTIKIT_VALIDATE_WEBHOOKS`. Approver: Alvin, then Chief for prod.
-- **Known: no prod recordings.** `VOICE_STREAM_RECORD` is unset on prod, so Voice never asks SautiKit to record and there are no recordings to fetch (the `events_url` fix alone does not change this). SHA: none. Turning it on is one env change after Alvin and Chief's consent decision; rollback is to unset it. Approver: Alvin with Chief.
-- **Branded Supabase Auth email templates (#752 @ `9b356cc7`) applied on prod** (`fjxcdccgyhnvnnlnovcl`, 12:03 EAT) through the Management API: 6 templates and 6 subjects (confirm signup, invite, magic link, reset password, change email, reauthentication), read back 12/12. OTP expiry stays 3600. Sender name was already `Scalers`; SMTP settings untouched. **Staging (`sgcdncjxauhsbunobmob`) not applied:** Supabase refuses template edits on a free-tier project with the built-in mailer, so staging needs custom SMTP first. Redirect allow lists unchanged: prod `https://app.scalers.co.ke/**` and staging `https://scalers-staging.vercel.app/**` already cover `/auth/callback?next=/reset-password`. Rollback (pre-change values, PATCH them back): `/workspace/scalers/ops/2026-10-18_auth_templates_rollback_fjxcdccgyhnvnnlnovcl.json` (staging snapshot `..._sgcdncjxauhsbunobmob.json`). Approved by Alvin, 18 Oct 10:59 EAT. No prod test send yet: `yegonalvin20@gmail.com` has no prod account.
-- **Desk password reset (#754) merged to `main`, 18 Oct** (merge SHA and deploy time follow in the same-day docs PR). `/forgot-password`, `/reset-password`, "Forgot password?" on sign in, invite page hint now links to reset. Reset emails come back through `/auth/callback?next=/reset-password` (a 15 minute recovery marker gates the new password form). Prod and staging redirect allow lists already cover the reset link. Rollback: revert #754. Approved by Alvin 18 Oct 12:05 EAT (deploy GO 12:43 EAT, Voice slot 12:43 EAT).
-- **18 Oct 13:31 EAT: `BRAIN_CALL_FIXES_D199=on` set on Railway prod Voice** (service `9b09d8c6`, env `8dd0b8ef`; only this variable). Value `on` because the code turns it on only when the value is exactly `on` (`src/conversation/callFixesD199.js`). Redeploy: Railway `67413ba8` SUCCESS, same commit `1e18b2fa`, started 13:31:47 EAT; `/healthz` ok on `1e18b2fa`; boot logs clean. No calls were in progress before or after the flip; Aris `line_status` active and the +254709221536 mapping unchanged. Desk Vercel already had it on: `dpl_4m1RFPGG` from `c4719c70`, READY 13:23 EAT. Brain scores the next Aris call; #643 and #731 stay frozen until that review. Rollback: set `BRAIN_CALL_FIXES_D199=off` (or unset it) on Railway prod and redeploy (Desk: same on Vercel, then redeploy). Approver: Alvin (9 Oct GO) via Chief, 18 Oct 13:21 EAT.
-- **2026-10-18 — Brain: #732 merged `13ddf19d`** (14:48 EAT): a past-booking question in sw/Sheng/en ("Ni huduma gani nilikuwa nimeitisha?", "what did I book") goes to the visit read; honest outcome labels (an enquiry that needs an owner callback = `needs_human`; a saved hold or a closed info call = resolved; greetings only = abandoned; a prompt reason is never the note; `primary_intent` is `human` only when the caller asked for a person). Live under `BRAIN_CALL_FIXES_D199` (on in prod since 13:31). One part is not behind that flag: with `VOICE_QUESTION_BEFORE_NAME` on (the default), the past-request phrase also counts as a file ask, so it skips the question-before-name step even with D199 off. Deploy: Railway prod Voice `d458494a` SUCCESS, `/healthz` ok on `13ddf19d`; Vercel prod Desk `dpl_7WNEx3UpCP1m5qGHMDQWYkbDXvss` READY; Aris `line_status` active, 0 calls in progress at merge. Rollback: revert `13ddf19d`, or set `BRAIN_CALL_FIXES_D199` off (that undoes the labels and the visit read, not the question-before-name skip). Approved: Alvin (GO 14:20 EAT).
-- **18 Oct, #760 ended-call guard merged** (`2cb6e075`, 14:57 EAT; Railway `508601d2` SUCCESS), flag default off so no prod behaviour change; rollback revert. `VOICE_ENDED_CALL_GUARD` (only the exact value `on` enables; VOICE.md invariant 18): an ended call gets no new media session and every call is finalized once (HD_49d726c3dc9b). Approved by Alvin 14:33 EAT via Chief; Voice deploy slot.
-- **18 Oct, #763 glued words merged** (`2842c4f4`, 14:59 EAT; Railway `c4a235da` SUCCESS): changes speech-guard behaviour for glued prices and times. The guard now reads a clock or shilling amount glued to the word before it ("from9:30 AM", "KSh500") the same as the spaced form, for checking only (spoken text unchanged; product codes like "A4" are not numbers), so a glued invented price is caught like a spaced one. Streamed model stages also record where model text loses spaces (`stream.unspacedJoins`; VOICE.md invariant 19). No flag. Rollback: revert. Approved by Alvin 14:33 EAT via Chief; Voice deploy slot.
-- **18 Oct 15:01 EAT: `VOICE_ENDED_CALL_GUARD=on` set on Railway prod Voice** (service `9b09d8c6`, env `8dd0b8ef`; only this variable). Value `on` because only the exact value `on` enables it (#760, VOICE.md invariant 18). Redeploy: Railway `7b7e28c5` SUCCESS, same commit `2842c4f4`, started 15:01:14 EAT; `/healthz` ok on `2842c4f4`; boot logs clean. No calls were in progress before or after the flip; Aris `line_status` active and the +254709221536 mapping unchanged. Rollback: unset `VOICE_ENDED_CALL_GUARD` (or set it `off`) on Railway prod and redeploy. Approver: Alvin, 14:33 EAT via Chief.
-
 ---
 
 ## 3. On staging now (not on prod)
 
-Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since merged). So staging is behind prod: it lacks #631, #650, #647.
+Staging Voice runs `9fb557ff` (`staging/pin-759-760-763-main-1e18`: `main` @ `1e18b2fa` + #759 + #760 + #763). #760 and #763 have since merged; **#759 is superseded** (section 4a), so reset staging to `main` before fact-guard step 3 goes on staging. It carries `main` up to `1e18b2fa` only, so it lacks #748, #732, #757 onward, #758 and #762.
 
-- **#737** (Desk Suspend/Archive/Purge): SQL applied on **staging only** (*per team notes*).
 - Caller files memory v2 SQL (#673) is applied on **staging only** (carried from 14 Oct).
-- **#762** (Desk call setup per account): `tenants.call_setup` + `save_call_setup()` applied on staging 18 Oct 13:34 EAT; re-applied 14:19 EAT with the test phone fields (`test_from`, `test_started_at`) and the test-call check. Additive, 0 rows changed. **Also on prod since 18 Oct 14:59 EAT** (see Ops changes); the #762 code is not on prod yet.
+- #737 and #762 SQL: on staging and prod (section 2).
+- #748 SQL: on staging and prod; staging Done and Dusted reconciled 14:14.
+- Branded Auth templates: **prod only** (staging needs custom SMTP first).
 
 ---
 
 ## 4. Open PRs
 
-Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-staging` means Stage-PR leaves it out of the staging pin.
+Source: `gh pr list --state open`, 18 Oct 15:15 EAT. All drafts unless noted. `hold-staging` means Stage-PR leaves it out of the staging pin.
 
-**Queued for the next clean Aris call** (one at a time, in this order unless Alvin says otherwise):
+**In the deploy queue now** (one at a time, Brain holds the slot, then hands it back to Voice):
 
-| PR | Lane | What | State |
+| PR | Head | Lane | What | State |
+| --- | --- | --- | --- | --- |
+| #733 | `a698f77a` | Brain | D199 visit read: last one only + paged open read. Changes live behaviour (D199 on). | GO Alvin 15:12 EAT via Chief. Shipping first. Fill section 2.1 when merged. |
+| #751 | `b442b168` | Brain | Owner text honest (stacked on #732). Changes live behaviour (D199 on). | GO 15:12. Ships after #733. |
+| #761 | `d9518310` | Brain | Trusted hours, honest hours summary, name gate (`BRAIN_TRUSTED_HOURS`, **stays off**). Prerequisite for fact-sheet step 1. | GO 15:12 (flag off). Ships after #751. Draft until then. |
+
+Brain puts each STATUS line in its own PR (no separate docs merge).
+
+**Frozen until Brain's D199 call review:**
+
+| PR | Head | Lane | What |
 | --- | --- | --- | --- |
-| `BRAIN_CALL_FIXES_D199` | Brain | Turn on the #634 fixes on prod. | **On in prod** 18 Oct 13:31 EAT (Railway `67413ba8`, Vercel `dpl_4m1RFPGG`). Brain scores the next call. |
-| #758 | Desk | Settings quick fixes from the owner review (Alvin approved 13:21 EAT): Catalogue / prices links open the Catalogue, plus small Settings copy and display fixes. No SQL, no prompt or call-facing change. | **Shipped 18 Oct 15:08 EAT:** squash `52498db9`; Vercel prod `dpl_DBSyRwgU4eg9bRQwPnvQB2t9XuRT` READY on app, admin and www, no runtime errors; Railway `7dfbf4e9` SUCCESS, `/healthz` ok on `52498db9`. Rollback: promote `dpl_738F4MizcCCtAM87wfGPhqoAiiJx` (`adab1e81`) or revert `52498db9`. GO Alvin 14:55 EAT. |
-| #643 | Voice | Phone wallet low-balance alert. | GO'd, frozen. |
-| #731 | Voice | One owner alert per call, goodbye hangs up, 10 s no-audio close (main cut of #644 + #646). | GO'd, frozen. |
-| #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | Prod SQL and merge wait for a scored Aris call. Purge schedule not applied until a recordings deletion route exists. |
-| #733 | Brain | D199 visit read (last one only, paged). (#732 merged 18 Oct 14:48, `13ddf19d`.) | Need Alvin's GO. |
-| #762 | Desk | Call setup per account (follow-up to #755): picks saved on the account (one-time copy from the browser); "Forwarding works" only when a call from the owner's named test phone arrives within 30 minutes of starting the test (other calls only show "Calls are reaching your assistant"); fix checklist when the test fails; Settings > Calls & forwarding; Overview note after 7 days without a call. | **Pending ship (18 Oct).** GO Alvin 14:55 EAT. Prod SQL applied 14:59 EAT (Ops changes). Code merges in the next Voice deploy slot, right after #758. Until then prod Desk keeps using browser storage. |
+| #643 | `24503713` | Voice | Phone wallet low-balance alert (webhook + poll, restart-safe). GO'd, frozen. |
+| #731 | `83557c49` | Voice | One owner alert per call, goodbye hangs up, 10 s no-audio close (main cut of #644 + #646). GO'd, frozen. |
 
-**Ops-Billing (dated per the STATUS rule):**
+**Live-call voice fixes** (`hold-staging`, flags default off; each needs its own GO):
 
-- **18 Oct 2026, SHIPPED: #748** (squash merge of branch `ops-billing/rollover-audit-sms-alerts`, head `7e8ecff5`; merge SHA `0f280504e0a706b6efc81b70a50bfbda48549eea`). Approved by Alvin, GO 14:11 EAT; Scalers Voice granted the prod slot 14:16 EAT. **#748 shipped after D199 (flipped 13:31, Railway 67413ba8)**, so Brain can separate the effects.
-  - *What it changes:* (1) `package_period_rollover.sql`: a catch-up roll (jumps more than one period, or the new period already has usage) rebuilds `seconds_used` from `calls.package_seconds_applied` and `sms_used_units` from `notify_sms_billable` (+ pending holds) for the new period instead of zeroing; an on-time roll still zeroes. (2) New `on_demand_usage_audit.sql`: `set_tenant_on_demand_usage` writes an `ops_audit_log` row (`set_on_demand_usage`, actor, before, after). (3) `package_state_rules.sql`: assign/unassign Activity rows carry `detail.before` / `detail.after` `{package_sku, package_name, period, period_start, period_end, status}`; existing fields kept. (4) Voice: package SMS 80%/100% ops email (`src/billing/smsUsageAlerts.js`), deduped like the minute notices. (5) `docs/supabase/staging/dnd_usage_counter_reconcile.sql` (staging only).
-  - *SQL applied:* staging (scalers-staging) ~14:13 EAT, prod ~14:15 EAT: `package_state_rules.sql`, `package_period_rollover.sql`, `on_demand_usage_audit.sql`. Prod function bodies match staging; cron jobs unchanged (`scalers-package-period-rollover` `5 * * * *`, `notify-stale-release`, `sms-counter-drift-daily`). Staging test on Test Archive Co (rolled back): catch-up rebuilt counters, on-time zeroed, on-demand audit rows, assign/unassign before/after. Staging Done and Dusted reconcile run 14:14 EAT: 0 → 17,792 s, 0 → 150 SMS (audit `usage_counter_reconcile`, SMS drift 0). First prod rollover with the fix: 1 Nov 00:05 EAT.
-  - *Rollback:* SQL: `/workspace/scalers/ops/2026-10-18_748_prod_rollback.sql` and `2026-10-18_748_staging_rollback.sql` (pre-apply snapshots `2026-10-18_748_{prod,staging}_pre.sql`; functions only, audit rows stay). Reconcile: the rollback block at the bottom of the script. Code: revert the squash commit (SMS notices stop; nothing else depends on them).
+| PR | Head | Flag | What |
+| --- | --- | --- | --- |
+| #739 | `82e5f340` | `VOICE_BUSINESS_PLACES` | Trust the business's own address, landmarks and aliases in the place guard. Overlaps fact-guard step 6. |
+| #740 | `e5c0e9f6` | `VOICE_NO_SILENCE_AFTER_FILLER` | Always speak the tool receipt; no silence after "Let me check". |
+| #741 | `2132ca9b` | `VOICE_TIME_ANSWER_ENFORCE` | Speak the current time on a time question; keep unresolved outcomes. Time-answer part folds into fact-guard step 4. |
+| #742 | `b0e00786` | `VOICE_MEDIA_PACING` | Pace outbound audio in 20 ms frames, plus always-on media link logs. |
+| #743 | `52e9effd` | `SAUTIKIT_VALIDATE_WEBHOOKS=shadow` | Webhook signature shadow mode: two secrets, raw bytes, log which matched, fail open on missing secret. **Waits on SautiKit's answer on which secret signs** voice and `events_url` posts, then Alvin's GO (staging first). Signature checking is **off** on prod and staging today. Rollback once live: unset the variable. |
 
-**Live-call voice fixes** (`hold-staging`, flags default off):
+**Other Voice drafts from 18 Oct:**
 
-| PR | Flag | What |
+| PR / branch | Flag | State |
 | --- | --- | --- |
-| #739 | `VOICE_BUSINESS_PLACES` | Trust the business's own address, landmarks and aliases in the place guard (shop address was dropped). |
-| #740 | `VOICE_NO_SILENCE_AFTER_FILLER` | Always speak the tool receipt; no silence after "Let me check". |
-| #741 | `VOICE_TIME_ANSWER_ENFORCE` | Speak the current time on a time question; keep unresolved outcomes. |
-| #742 | `VOICE_MEDIA_PACING` | Pace outbound audio in 20 ms frames, plus always-on media link logs. |
-| #743 | `SAUTIKIT_VALIDATE_WEBHOOKS=shadow` | Webhook signature shadow mode: two secrets, raw bytes, log which matched, fail open on missing secret. |
+| #745 | `VOICE_TRANSCRIPT_ORDER` (off) | Greeting keeps its transcript slot; adds `transcripts.seq`. **Migration not applied** anywhere. Desk already sorts by `seq` when present (#749). |
+| #747 | none | `/api/tts/preview` `greeting=1` speaks the exact live greeting (Desk Settings › Test uses it, #749). |
+| #759 | — | **Superseded** by the fact-guard redesign (section 4a). Do not merge; its intent signal and tests move into steps 0 and 3. On the staging pin only. |
+| Contact name lock (`voice/contact-name-lock`, no PR yet) | `VOICE_CONTACT_NAME_LOCK` (off) | **In progress.** In `src/db.js` `upsertContact`: when `contacts.metadata.name_locked` (or `single_person`) is set, skip the name and alternate merge; never re-add a name in `metadata.alternate_names_dismissed`; keep other metadata keys. Alvin GO 15:09 EAT for staging, draft, no merge. Brain builds the near-spelling fold (`brain/name-fold`, `BRAIN_NAME_FOLD`) and lock-aware caller memory; Desk builds the toggle and remove button. Chief ruling 15:08: STT near-spellings are one person. |
+| Fact-guard stack (`voice/guard-replay-suite` and follow-ups, no PR yet) | `VOICE_FACT_GUARD`, `VOICE_FACT_REPAIR`, `VOICE_LOCAL_HOURS_CONTEXT`, `VOICE_FACT_GUARD_PRICES`, `VOICE_PLACE_TENANT_FIRST`, `BRAIN_PRICE_CONFIRM_GATE` (all off) | **In progress**, staging first (section 4a). |
+
+**Docs PRs folded into this closing PR** (close them after it merges): #750 (ship log), #753 (Desk ops mail env), #756 (#754 merge + recovery template), #764 (#732 lines).
 
 **Other open PRs:**
 
 | PR | Lane | What |
 | --- | --- | --- |
-| "Desk: Settings quick fixes" (`desk/settings-quick-fixes`, draft) | Desk | **18 Oct, pending ship.** Owner review fixes Alvin approved 13:21 EAT: "Add prices"/"Check prices" open the Catalogue; Policies hide prompt text, starter text shows once, "Holds and deposits" label, "Tap" only on touch; Back gesture asks before dropping edits; remove place/area asks first; forgiving catalogue import (headers, semicolons, "2,500", file picker, row warnings, Update prices); visible phone service labels; honest "Add to catalogue" toast; Identity placeholder and toast; 44 px "Yes, this is right". No schema, prompt or call-field change. |
-| #709 (ready, not draft) | Business Assistant | Business Assistant: area travel fees on calls, alert titles, request footers, enquiry mapping. |
+| #709 (ready, not draft) | Business Assistant | Area travel fees on calls, alert titles, request footers, enquiry mapping. |
+| #727 | Business Assistant | Staging fixes (request wording, catalogue freshness, v2 owner alert, payment + compound answers). |
 | #640 | Platform | Ops alerts on Vercel cron instead of page load. |
 | #712–#716, #719–#725 | Voice/Brain | NLU-first intent, outage debounce, Swahili verb lock, booking outranks list, regression-9 pack and fixes (R6–R9). |
-| #695, #698, #701, #706, #707, #702, #705, #727 | Voice/Brain/Platform | Mouth lock, no-answer-delete, v2 catalogue, TurnArbiter, spoken catalogue (`hold-staging`). |
+| #695, #698, #701, #706, #707, #702, #705 | Voice/Brain/Platform | Mouth lock, no-answer-delete, v2 catalogue, TurnArbiter, spoken catalogue (`hold-staging`). |
 | #691, #696, #699, #697, #704 | Platform/Desk | Write receipts, graceful drain, provider-health page, Admin cleanup, smart import. |
 | #673, #678, #684 | Platform/Brain | Caller files memory v2; trust P1; fact hash contract. |
 | #675, #676, #677 | Voice | Silent-caller prompt + stall watchdog; repair-who + carrier-drop callback; language hysteresis. |
 | #679, #680, #681, #682, #683 | Brain/Voice | BA v2 Phase 0/1, shadow hook, ack rule, coverage single source. |
-| #618, #621, #622, #625, #628, #629, #633, #638 | Voice | Dropped question, score honesty, scorer fixes, wait-barge, junk names, spoken facts, HD_ceba fixes. |
-| #644, #646 | Voice | **Closed, not merged** (18 Oct 09:41 EAT): superseded by #731 (main cut). No longer open. |
-| #602, #611, #615 | Platform/Desk | Quality read APIs; catalogue import preview; Stage-PR skip-staging filter. |
-| #587, #597, #614, #584, #583, #537 | Voice | Parked (`skip-staging`). |
-| #653, #492, #560, #440, #434, #356 | Various | Legal pack, landing, docs, ops, tester lane: parked. |
-| #639, #642 | Voice | **Closed, not merged** (18 Oct 09:41 EAT): superseded by #651 (line-unavailable gate) and the clips on SautiKit. No longer open. |
+| #628, #629, #633, #638 | Voice | Junk names, scorer, spoken facts (`VOICE_SPOKEN_FACTS`), HD_ceba fixes. |
+| #653 | Various | Legal pack (parked; call notice ties to the recording decision). |
+
+Closed, not merged (18 Oct 09:41 EAT): #644, #646 (superseded by #731), #639, #642 (superseded by #651 and the SautiKit clips).
+
+---
+
+## 4a. Speech-check redesign (fact sheet + fact guard)
+
+Plan and audit: [`rfcs/speech-check-fact-sheet.md`](rfcs/speech-check-fact-sheet.md). Alvin agreed 18 Oct and said "execute end to end"; build is **staging only, every flag off**; prod needs a GO per step.
+
+**Audit (prod, 9–18 Oct, 57 calls, 330 model turns):** 32 number/place drops, **26 fully correct**, 5 a 3-minute-stale clock, 1 correct hours plus a false claim; **0 invented values caught**; **7 of 7** "not on file" were false; **30** silent drops. Root cause: the guard gates facts on the caller's wording, not on the value vs the right key on file.
+
+| Step | Flag | Owner | State |
+| --- | --- | --- | --- |
+| 0 Replay suite (32 prod + 2 staging drops + synthetic invented, en/sw/Sheng) | none | Voice | In progress |
+| 1 Fact sheet built and traced | `BRAIN_FACT_SHEET` | Brain | Waits on #761 merged flag-off |
+| 2 Fact guard shadow | `VOICE_FACT_GUARD=shadow` | Voice | Not started |
+| 3 Hours/clock bound by day, wording gate retired | `VOICE_FACT_GUARD=on` | Voice (Brain reviews the hook) | Not started |
+| 4 Repair not delete; true "not on file"; never silent | `VOICE_FACT_REPAIR` | Voice (+ Brain templates) | Not started |
+| 5 Local hours line uses the named day | `VOICE_LOCAL_HOURS_CONTEXT` | Voice | Not started |
+| 6 Prices bound to item; tenant-first places | `VOICE_FACT_GUARD_PRICES`, `VOICE_PLACE_TENANT_FIRST` | Voice | Not started |
+| 6 (with) Unconfirmed-price gate: `canSpeakPrice` in `src/conversation/pricingTrust.js` | `BRAIN_PRICE_CONFIRM_GATE` | Brain (Voice wires `catalogueMouth.fileServicePriceLine` and `speechGuard.groundFilePriceLine`) | In progress |
+| 7 FACT CARD in prompt; contradicting FAQs out of compile; Desk "Check this" | `BRAIN_FACT_CARD` | Brain + Desk | Not started |
+
+**Chief's rulings (18 Oct):** Voice owns `src/speech/factGuard.js` and `src/speech/spokenFacts/`; Brain owns the claim checks in `src/conversation/speechGuard.js` and the fact sheet builder, and reviews the single hook. `pricing.confirmed=false` prices (not owner-typed, not legacy) are **never spoken as fact**: the assistant says the team will confirm the price, and the owner confirms it through Desk's "Check this" card.
 
 ---
 
 ## 5. Known broken / open issues
 
-- **Prod call recording is off.** `VOICE_STREAM_RECORD` is unset on prod (Railway variable list, 18 Oct), so prod has never recorded. Turning it on waits on Alvin's consent decision (spoken recording notice or not, Kenya Data Protection Act), then one env change.
-- **SautiKit media degradation, 17 Oct 21:52 EAT.** Calls `HD_ad18fd9088e0` and `HD_60e56c6acc88`: media socket opened 4.5–6 s after answer (about 1 s normally), inbound audio jitter about ±0.3 s then stalled, both sockets closed 1006, Completed webhooks 13–25 s late. Our server was idle. Ticket drafted; **Alvin to send.** These calls could not sign off #734 (*per team notes*).
-- **Aris redial 22:00–22:25 EAT, 17 Oct, never reached SautiKit.** No call in SautiKit's log or ours. Failure sits between the caller's carrier and SautiKit. Add to the ticket and ask for their ingress logs (*per team notes*).
-- **#734 not signed off.** On "Saa ngapi" the assistant gave opening hours instead of the time; fix is #741.
-- **Webhook signature checks off** on prod and staging (`SAUTIKIT_VALIDATE_WEBHOOKS` unset; not in prod's Railway variable list, 18 Oct): unsigned POSTs get 200. SautiKit has two secrets and it is unclear which signs voice and `events_url` posts. Plan: #743 shadow mode on staging, then enforce on staging, then prod after a clean call (Alvin's GO, 18 Oct). Question for SautiKit is in the ticket.
+- **Prod call recording is off.** `VOICE_STREAM_RECORD` is unset on prod, so prod has never recorded (the `events_url` fix alone does not change this). Turning it on waits on the consent decision (section 7), then one env change; rollback is to unset it.
+- **Webhook signature checks off** on prod and staging (`SAUTIKIT_VALIDATE_WEBHOOKS` unset): unsigned POSTs get 200. Plan: #743 shadow on staging, then enforce on staging, then prod after a clean call. Blocked on SautiKit's answer on which secret signs.
+- **Speech check drops correct answers** (audit in section 4a). Fix in progress behind flags.
+- **Aris FAQ contradicts the hours grid:** FAQ "Are you open on Monday? No, we will be closed on Monday" vs grid Mon 09:30–18:00; the compiled prompt carries both. Fact-guard step 7 removes contradicting FAQs from the compile; until then it needs Alvin's call (section 7).
+- **Quick hours answer can answer the wrong day** when a question arrives in two pieces (staging HD_af5868852bc7: "And on Saturday… are you open?" → "closed today"). Older code; fix is fact-guard step 5.
+- **SautiKit media degradation, 17 Oct 21:52 EAT** (`HD_ad18fd9088e0`, `HD_60e56c6acc88`) and **Aris redial 22:00–22:25, 17 Oct, never reached SautiKit.** Ticket drafted; Alvin to send (*per team notes*).
+- **#734 not signed off.** On "Saa ngapi" the assistant gave opening hours instead of the time; fix is #741 / fact-guard step 4.
+- **CI `bug-test-pack` may be flaky:** hung about 17 min after "home services playbooks" on `a1c979f3`; a rerun passed (*per team notes*, Brain).
 - **`/ws/media` is unguarded.** Anyone with a call ID could inject audio or start paid STT. Needs a per-call stream token (later).
 - **WhatsApp template (alert) sends fail with SautiKit 502.** Session text works. Alerts go by SMS.
-- **Staging Jirani `events_url`** still wrong (section 2, ops).
-- **Rollover catch-up zeroed usage (fixed 18 Oct, #748; SQL on staging and prod).** A roll that caught up a stale period zeroed the counters even when the new period already had usage; staging Done and Dusted reconciled 14:14 EAT. Hit staging Done and Dusted on 17 Oct 22:05 EAT (Admin/Desk show 0 minutes used for October). Prod has not rolled yet and its counters match the ledgers (read-only check, 18 Oct 09:55 EAT); the first prod roll is 1 Nov 00:05 EAT, so this fix should be live before then.
-- **Staging data:** two "Jirani Cleaning Services" tenants (`78386574` has the line, `da25c497` does not); placeholder tenants without a line (prod "Grok Test", two staging QA tenants). Clean up or keep: Alvin to decide (*per team notes*).
+- **Staging Jirani `events_url`** still wrong (section 2.3).
+- **Staging data:** two "Jirani Cleaning Services" tenants (`78386574` has the line, `da25c497` does not); placeholder tenants without a line. Clean up or keep: Alvin to decide (*per team notes*).
 
 *Carried from 14 Oct, not re-verified on 18 Oct. Lane owners: confirm or delete.*
 
@@ -185,7 +258,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 **Build order:** Admin → Settings/onboarding → UI/UX sweep → Packages → Landing → Voice/Brain on real calls. Live-call voice fixes ship any time, one at a time.
 
-- **Admin:** Suspend/Archive/Purge in #737; still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
+- **Admin:** Suspend/Archive shipped 18 Oct (#737; purge schedule not applied); still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
 - **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
 - **Packages**: state rules and rollover shipped (#631, #650); package catalogue and invoices remain.
@@ -198,28 +271,34 @@ Public copy never mentions unbuilt features.
 
 ---
 
-## 7. Alvin's to-do list
+## 7. Pending Alvin decisions and to-dos
 
-1. **Make a clean Aris test call** on +254709221536; Voice scores it. This unlocks section 4's queue.
-2. **Send the SautiKit ticket** (21:52 media degradation, 22:00–22:25 missing dials, which secret signs voice and `events_url` posts).
-3. **Recording decision:** record with a spoken notice, record without one, or don't record.
-4. **Set staging Jirani `events_url`** in the SautiKit dashboard (staging workspace `1f85601c`).
-5. **GO or no** for Brain #733 (#732 merged 18 Oct 14:48).
-6. **Carried:** top up TextSMS; staging full-scope SautiKit key for Railway staging Voice (masked card); Meta WhatsApp currency (131042).
+Items without repo detail are written as open questions; don't fill them in from memory.
+
+1. **Recording consent / `VOICE_STREAM_RECORD`** (unset on prod; Chief handling): record with a spoken notice, record without one, or don't record? Ties to the call notice in legal pack #653.
+2. **Esga beta and on-demand:** on-demand was turned off 18 Oct 10:17 with Alvin's approval (2.3). Open question: does Esga stay on beta, and should on-demand stay off? (Also raised in #749.)
+3. **Aris Monday FAQ** contradicts the hours grid (section 5). Open question: delete or correct the FAQ now in Settings, or wait for fact-guard step 7 and Desk's "Check this" card?
+4. **Staging Jirani `events_url`:** set it in the SautiKit dashboard (staging workspace `1f85601c`) to `https://scalers-staging-staging.up.railway.app/voice/events`.
+5. **SautiKit support ticket:** send it (17 Oct 21:52 media degradation, 22:00–22:25 missing dials, and which of the two secrets signs voice and `events_url` posts). The answer unblocks #743.
+6. **Top-up:** open question. The repo does not record which account (TextSMS shows HTTP 402 zero credit, section 5; a SautiKit top-up was also mentioned by the team), the amount, or the timing.
+7. **#748 before 1 Nov:** #748 is merged and its SQL is on prod (2.3), so the 1 Nov 00:05 EAT rollover runs the fixed catch-up. Open question for Alvin: anything else he wants checked before 1 Nov (for example a staging rollover rehearsal)?
+8. **Fact-guard steps to prod:** each step needs its own GO after a staging call.
+9. **Carried:** staging full-scope SautiKit key for Railway staging Voice (masked card); Meta WhatsApp currency (131042); staging duplicate Jirani tenants.
 
 ---
 
 ## 8. Rules
 
+- **Deploys (no watch paths).** Prod Railway Voice auto-deploys from `main` with **no watch paths** (Railway service config, 18 Oct; `railway.toml` sets none), so **every merge to `main`, docs-only included, rebuilds and restarts prod Voice** and drops live calls. Prod Desk (Vercel) also rebuilds. Therefore: merge only with **0 `in_progress` calls**, **one merge at a time through the current deploy-slot holder**, then check prod `/healthz` (SHA and `ok`) and the Aris line before handing the slot on. Batch STATUS lines into the PR they describe rather than a separate docs merge.
+- **Ship log.** Every prod ship, SQL apply (prod or staging) and flag flip gets a dated line in section 2: SHA, time EAT, what, deploy ids, rollback, approver.
 - **Billing.** Packages + on-demand only; beta charging off; no prepaid wallet; no waive overage.
-- **Prod flags:** `FACT_HASH_MODE` and `VOICE_STREAM_RECORD` are unset on prod (Railway variable list, 18 Oct); keep `VOICE_STREAM_RECORD` unset until the consent decision. Native functions stay off on Aris until speech-hold is staging-tested (*per team notes*).
-- **Deploys.** One deploy at a time. After each: check prod `/healthz` (SHA and `ok`), then an Aris check before the next one. Prod Voice has **no watch paths** (Railway service config, 18 Oct; `railway.toml` sets none), so every merge to `main`, docs-only included, rebuilds and restarts prod Voice and drops live calls. Merge when no call is active.
+- **Prod flags:** `FACT_HASH_MODE` and `VOICE_STREAM_RECORD` are unset on prod; keep `VOICE_STREAM_RECORD` unset until the consent decision. `BRAIN_CALL_FIXES_D199` and `VOICE_ENDED_CALL_GUARD` are `on` (18 Oct). Native functions stay off on Aris until speech-hold is staging-tested (*per team notes*).
 - **DID.** Never release, reassign or re-point **+254709221536** (Aris).
 - **Model.** Use an economical model by default; a bigger one only when the task needs it.
-- **Lanes.** Stay in your lane's owns paths ([`AGENTS.md`](../AGENTS.md), `.cursor/rules/*.mdc`). Schema, RPC, and auth changes go to Platform first.
-- **Needs Alvin's explicit yes:** any prod write (SQL, env vars, Railway, Vercel or SautiKit settings), rotating secrets, releasing a DID, and merging to `main`. Merging to `main` deploys prod Voice and prod Desk. Ops-Billing and Brain need his GO in their own chats.
+- **Lanes.** Stay in your lane's owns paths ([`AGENTS.md`](../AGENTS.md), `.cursor/rules/*.mdc`). Schema, RPC, and auth changes go to Platform first. Speech check: Voice owns `src/speech/factGuard.js` and `src/speech/spokenFacts/`; Brain owns `src/conversation/speechGuard.js` claim checks and the fact sheet.
+- **Needs Alvin's explicit yes:** any prod write (SQL, env vars, Railway, Vercel or SautiKit settings), rotating secrets, releasing a DID, and merging to `main`. Ops-Billing and Brain need his GO in their own chats.
 - **Secrets.** Never print, paste, or commit a secret. Docs list variable names only. Secrets go in through masked secret cards entered by Alvin.
 - **Git identity.** Never set git config. Commit with `git -c user.name='Alvin Yegon' -c user.email='alvin@scalers.co.ke'`.
-- **Test gates** (Node 22): `npm run test:voice`, `npm run test:brain`, `npm run test:mvp`, and `cd dashboard && npm run lint && npm run build`. Stage-PR changes: `npm run test:stage-pr`.
-- **Docs-only PRs** must not change runtime code. Say "docs-only" in the PR body.
+- **Test gates** (Node 22): `npm run test:voice`, `npm run test:brain`, `npm run test:mvp`, and `cd dashboard && npm run lint && npm run build`. Stage-PR changes: `npm run test:stage-pr`. Docs: `npm run docs:check`, `npm run docs:reference:check`.
+- **Docs-only PRs** must not change runtime code. Say "docs-only" in the PR body. They still restart prod Voice when merged.
 - **Before you finish:** update sections 1 to 5 of this file in the same PR when it changes what's live, in flight, or broken. Every merge to `main` updates section 2.

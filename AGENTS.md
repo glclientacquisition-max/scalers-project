@@ -14,6 +14,10 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 
 **Copy-paste chat starters:** [`docs/reference/lanes/PROMPTS.md`](docs/reference/lanes/PROMPTS.md)
 
+**Speech check ownership (Chief ruling, 18 Oct 2026):** Voice owns the value checks in `src/speech/factGuard.js` and the spoken wording in `src/speech/spokenFacts/`. Brain owns the claim checks in `src/conversation/speechGuard.js`, the fact sheet builder (`src/conversation/factSheet.js`) and `canSpeakPrice` (`src/conversation/pricingTrust.js`), and reviews the single hook from `speechGuard.js` into `factGuard.js`. Neither lane edits the other's file. Plan: [`docs/rfcs/speech-check-fact-sheet.md`](docs/rfcs/speech-check-fact-sheet.md).
+
+**Every merge to `main` restarts prod Voice** (Railway has no watch paths, docs-only included). Merge only with 0 `in_progress` calls, one at a time through the deploy-slot holder, then `/healthz` and an Aris check. See [`docs/STATUS.md`](docs/STATUS.md) section 8.
+
 ## Commands (Node 22)
 
 | What | Command |
@@ -24,7 +28,7 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 | MVP gate | `npm run test:mvp` |
 | Stage-PR changes | `npm run test:stage-pr` |
 | Desk gate | `cd dashboard && npm run lint && npm run build` |
-| Docs | `npm run docs:check` (frontmatter, stale > 90 days warns) · `npm run docs:reference` (regenerate `docs/reference/schema.md` + `env.md`) |
+| Docs | `npm run docs:check` (frontmatter, stale > 90 days warns) · `npm run docs:reference` (regenerate `docs/reference/schema.md` + `env.md`) · `npm run docs:reference:check` |
 
 Nested rules: [`src/AGENTS.md`](src/AGENTS.md) (Voice runtime + Brain), [`dashboard/AGENTS.md`](dashboard/AGENTS.md) (Desk + Super Admin). The nearest `AGENTS.md` wins. `CLAUDE.md` files only import these (`@AGENTS.md`).
 

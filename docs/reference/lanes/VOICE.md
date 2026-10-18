@@ -1,6 +1,6 @@
 ---
 owner: voice
-last_reviewed: 2026-10-17
+last_reviewed: 2026-10-18
 ---
 
 # Voice lane contract
@@ -15,6 +15,9 @@ Use this when the task is about audio path, latency, barge-in, fillers, TTS pron
 | --- | --- |
 | `server.js` | Media WS (`/ws/media`), inbound Stream XML wiring, speak/barge/filler/stream turn loop |
 | `src/speech/**` | Soniox STT/TTS, STT context, turn-taking, spoken buffer, TTS normalize, lexicon, Sheng rewrite |
+| `src/speech/factGuard.js` (new) | **Value checks** before TTS: extract clocks, money, counts, days and places; bind each to the fact-sheet key it names; pass, repair with the ready-made line, or `fact_unknown` (flags `VOICE_FACT_GUARD`, `VOICE_FACT_REPAIR`, `VOICE_FACT_GUARD_PRICES`, `VOICE_PLACE_TENANT_FIRST`). Chief ruling 18 Oct; plan in [`speech-check-fact-sheet.md`](../../rfcs/speech-check-fact-sheet.md) |
+| `src/speech/spokenFacts/` (new) | `renderFactLine` wording for the fact-line templates in en, sw and Sheng |
+| `scripts/replay-guard-suite.js`, `tests/fixtures/guard-replay/` (new) | Replay suite: real prod guard drops plus synthetic invented values; old vs new guard |
 | `src/sautikit/**` | Webhook signature / guards used by voice HTTP |
 | `tests/ttsNormalize.test.js` | TTS prep unit tests |
 | `tests/turnTaking.test.js` | Endpoint / barge-in unit tests |
@@ -40,6 +43,8 @@ Also OK: small imports from `src/conversation/language.js` / `dynamicSpeech.js` 
 - `docs/supabase/**` and wallet RPCs (Platform / Ops)
 - Prompt policy copy in `src/prompts.js` beyond what Voice already injects for latency (Brain owns conversation goals)
 - Billing enforcement product rules (Ops) — Voice may call `db.chargeCallToWallet` but must not redesign rates/ledger
+
+- `src/conversation/speechGuard.js` claim checks and the fact sheet builder (Brain). Voice adds only the single reviewed hook into `factGuard.js`, and wires its price lines (`catalogueMouth.fileServicePriceLine`, `speechGuard.groundFilePriceLine`) to Brain's `canSpeakPrice` behind `BRAIN_PRICE_CONFIRM_GATE`.
 
 If a change needs a new DB column or RPC: stop and hand off to **Platform**.
 

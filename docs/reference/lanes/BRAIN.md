@@ -1,6 +1,6 @@
 ---
 owner: brain
-last_reviewed: 2026-10-07
+last_reviewed: 2026-10-18
 ---
 
 # Brain lane contract
@@ -26,6 +26,10 @@ Use for prompts, conversation policy, tools, live knowledge, hours/bulletin logi
 | `dashboard/src/app/(desk)/calls/faqActions.ts` | FAQ suggestions from calls |
 | `dashboard/src/app/onboarding/actions.ts` | Onboarding compile into prompt |
 | `scripts/smoke-escalation-scenarios.js` | Escalation scenario smoke |
+| `src/conversation/speechGuard.js` | **Claim checks** (saved / job close / hold / transfer claims, D199 name and no-record rules, coverage, slop, message-only shaping). Value checks move out to Voice's `src/speech/factGuard.js` behind one hook that Brain reviews (Chief ruling, 18 Oct). Until the fact-guard steps land, the existing value checks stay here. |
+| `src/conversation/factSheet.js` (new) | Per-call fact sheet built from the provenance / GIGO readers and `trustedHours` (`BRAIN_FACT_SHEET`); read by the prompt, Voice's fact guard and the ready-made lines |
+| `src/conversation/pricingTrust.js` (new) | `canSpeakPrice(row, meta, { factHashMode })`: legacy row with no `pricing`, `pricing.confirmed === true`, or an owner-typed source → speakable. Callers check `BRAIN_PRICE_CONFIRM_GATE === 'on'`. `pricing.confirmed=false` prices are never spoken as fact |
+| `src/conversation/factLine.js`, `docs/rfcs/fact-lines.md` | Fact-line templates and gates (Voice owns the wording in `src/speech/spokenFacts/`) |
 
 Also OK: tiny Gemini tool-parse helpers inside `server.js` **only** when Brain tools change (`save_caller_info`, escalate, end_call). Prefer extracting to `src/conversation/` over growing the monolith.
 
@@ -35,7 +39,7 @@ Also OK: tiny Gemini tool-parse helpers inside `server.js` **only** when Brain t
 
 ## Do not touch
 
-- `src/speech/**`, media PCM / barge-in / Soniox wiring (Voice)
+- `src/speech/**`, media PCM / barge-in / Soniox wiring (Voice), including `src/speech/factGuard.js` and `src/speech/spokenFacts/` (Voice owns value checks and wording; Brain reviews only the `speechGuard.js` hook)
 - Desk layout, marketing hero, visual design polish (Desk UI/UX) — Brain may change settings *copy/fields* for knowledge, not restyle the shell
 - Wallet rates, DID pool, Super Admin ops (Ops)
 - New Supabase columns/RPCs without Platform
@@ -62,7 +66,7 @@ Core runtime modules:
 - `src/conversation/brainPolicy.js`, `nextBestAction.js` — authority + resolution ladder
 - `src/conversation/conversationRepair.js` — bounded contextual repair
 - `src/conversation/toolExecution.js` — validated actions and confirmed results
-- `src/conversation/turnPolicy.js`, `speechGuard.js`, `requiredCreateRequest.js` (`guardToolPlan`) — the three gates of the turn contract
+- `src/conversation/turnPolicy.js`, `speechGuard.js` (claim checks; value checks go to Voice's `factGuard.js`), `requiredCreateRequest.js` (`guardToolPlan`) — the three gates of the turn contract
 - `src/conversation/brainObservability.js` — PII-safe structured decision traces
 
 ## Invariants
