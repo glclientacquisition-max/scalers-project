@@ -5,6 +5,8 @@ last_reviewed: 2026-10-18
 
 # Billing stack review, 18 Oct 2026
 
+Round 2 is the current verdict. Round 1 is kept below it.
+
 Review only. No SQL applied. No production access. The four pull-request branches were not pushed.
 
 Reviewed heads:
@@ -17,6 +19,114 @@ Reviewed heads:
 | #778 | `cursor/admin-package-versions-b52e` | `965461f4` | Admin moves, beta switch, version fields |
 
 #780 and #781 and #778 are siblings on top of #775. This review was written from `f4ede208` (#775 + #780 in the tree) and from `git show` of the other two heads. Staging project `sgcdncjxauhsbunobmob` was not queried. Production `fjxcdccgyhnvnnlnovcl` was not opened.
+
+## Round 2
+
+Re-review only. The four pull-request branches were not pushed. No SQL was applied to staging `sgcdncjxauhsbunobmob` or production `fjxcdccgyhnvnnlnovcl`. Local Postgres 16.15 ran the harnesses. The integration branch `cursor/billing-review-round2-7822` merges the four heads below and was used only to run tests.
+
+| PR | Branch | Round 2 head |
+| --- | --- | --- |
+| #775 | `cursor/billing-data-layer-cc4b` | `be16ad70` |
+| #781 | `cursor/owner-billing-actions-5c64` | `c0e0afe3` |
+| #780 | `cursor/invoice-pay-0c16` | `5d003dfd` |
+| #778 | `cursor/admin-package-versions-b52e` | `cee8e054` |
+
+### Safe for prod schema apply, and safe for live money?
+
+The merged stack is not safe to apply as a production schema, and it is not safe to take live M-Pesa. One new blocker stops every invoice: after P1, later copies of `finalize_invoice` write the number and status without `scalers.billing_write`, and `invoices_freeze` rejects the write.
+
+| PR | Safe for prod schema apply | Safe for live money |
+| --- | --- | --- |
+| #775 | **Conditional.** P1 and P2 can land on a database whose backfill finds a published version for every subscription. The script raises and rolls back otherwise (`billing_data_layer.sql:457-461`). The down script drops the layer. Do not re-run P1 after P6. | **No.** P1 can issue an `SC-` invoice. Once P4, P6, or `billing_company.sql` replaces `finalize_invoice`, no invoice can be issued. |
+| #781 | **No**, once #775 is applied. The owner harness dies inside `owner_change_plan` because its `finalize_invoice` cannot pass the freeze. The extra-seat backfill itself disables both freeze triggers, writes KSh 500, and turns them back on. | **No.** Beta metering and the spend share are in this file. Invoices from a plan change cannot be issued, and the seat credit cannot commit. |
+| #780 | **No**, once #775 is applied. P5 (pay attempts) applies. P6 and `billing_company.sql` both replace `finalize_invoice` and both omit `scalers.billing_write`. | **No.** A cancelled attempt can still be collected, that money is stored as an issue and is not credited, and a second checkout can collect the same invoice. "Payment received" shows when any KES is already applied. |
+| #778 | **Yes, last.** The editor harness applied the file twice and then `package_version_owner_prices.sql` twice. It does not turn enforcement on. Set `package_editor_enabled` false before any production apply, as the file header says. | **No.** Do not turn a business active until the invoice freeze is fixed and an active business without a pin is refused. |
+
+### What the tests did
+
+Throwaway databases only. `sudo -u postgres psql`. Never Supabase.
+
+| Run | Result |
+| --- | --- |
+| `tests/sql/billing_data_layer/run.sh` | EXIT 0. Second apply of P1 after an SCL body printed `finalize_invoice already numbers SCL-; leaving the invoice_documents.sql body in place` (`billing_data_layer.sql:1532`). |
+| `tests/sql/owner_billing_actions/run.sh` | EXIT 3. `10_scenarios.sql:567`: `invoice number and status are set only by finalize_invoice`, from `invoices_freeze` line 11, called by owner `finalize_invoice` line 40, called by `owner_change_plan`. |
+| `tests/sql/package_version_editor/run.sh` | EXIT 0. |
+| Fresh database `billing_stack_p1_p7`, files in the P1–P7 order from `docs/supabase/README.md` (lines 174–182), then `billing_company.sql` because that file also replaces `finalize_invoice` | After P1: open invoice `SC-2026-000001`, body sets `billing_write`. After P4: freeze error, body has the credit path and `SC-`, no `billing_write`. After P6: freeze error, body is `SCL-`, credit path gone. After `billing_company.sql`: freeze error. After P7: freeze error (the editor does not replace finalize). A negative draft then raised the same freeze error and left `tenant_credits` at 0. |
+| `node --test tests/billingReviewMoney.test.js tests/billingReviewContracts.test.js` on the merged tree | 23 tests, 23 pass. |
+| Other billing node tests on the merged tree (`invoicePay`, `invoiceDocuments`, `ownerBillingActions`, `planProration`, `billingNoticeSend`, `billingDataLayerReview`, `billingModeContracts`, `packageVersionEditor`, `packageRates`, `packageOverage`, `packageStateRules`, `packageUsageAlerts`, `grantPackageMinutes`, `adminBillingCleanup`, `billingStateModel`) | 141 pass. `tests/inboundBillingGate.test.js` failed to load because `express` is not installed in this environment. |
+| `tests/packageUsage.test.js` | 5 failures are desk copy regexes. The seconds-to-minutes case passed. |
+| `tests/invoicePaySql.test.js` | Not run. `@electric-sql/pglite` is not installed. |
+
+### Finding status
+
+| ID | Status | Evidence |
+| --- | --- | --- |
+| B1 | Partly | `create_invoice_pay_attempt` locks the invoice (`invoice_pay.sql:388`) and treats any pending row as in flight, including a null URL (`:408-443`). An expired row is set `cancelled` in that call and the function returns `cancel: true` without inserting the replacement (`:416-431`). Unique partial index `payment_attempts_one_pending_part` (`:64-66`). The #784 overlapping-pay and expired-cancel tests passed. `checkoutFlow.js:55-62` swallows `cancelCheckout` errors and then calls `createAttempt` again. The SQL row is already cancelled, so the unique index allows the new pending row. A failed cancel leaves the old Bachs session payable. This review did not call that endpoint. |
+| H1 | Partly | `decidePayment` applies a positive `collection.underpaid` as `apply_partial` (`webhook.js:84-87`). `got >= expected` applies or `apply_overpaid` (`:112-114`). `OVERPAID` below the part is `apply_partial` (`:116`). The one-cent-over and underpaid #784 tests passed. A short terminal `SUCCEEDED` (`got < expected`, not overpaid) is still `issue` (`:117`). An issue row is not treated as applied (`:220-221`), so a later exact event can apply (`invoice_pay.sql:913`). If Bachs never sends that second event, the short collection stays an issue and is not credited. |
+| H2 | Fixed | The webhook catch records an issue and returns 200 (`webhook.js:247-255`). The route logs the message and returns 200 for `invoice cannot be paid` and `draft invoices are not payable` (`dashboard/src/app/api/billing/bachs/webhook/route.ts:41-46`). The #784 test passed. The catch body is `{ ok: true }` and does not include `action: "issue"`. |
+| H3 | Fixed | `billing_spend_limit_kes` returns null when enforcement is off or `billing_status` is beta (`owner_billing_actions.sql:1405-1412`). Otherwise it uses the pinned `spend_limit_share_percent` (`:1426-1442`). A null share coalesces to 50 (`:1432`). After P7 the column is `not null default 50` (`package_version_editor.sql:126`), so a stored null cannot exist. A missing version returns null (`:1439-1440`), which is no cap. See deviation (c). |
+| H4 | Partly | Enforcement off or `billing_status` beta debits 0 (`owner_billing_actions.sql:1822-1824`). A pinned version uses `inbound_kes_per_second` / `outbound_kes_per_second` (`:1841-1848`). There is no rate-card fallback. A missing row or a missing column becomes `coalesce(v_rate, 0)` (`:1850`) and the seconds are still metered. See deviation (a). |
+| H5 | Fixed | The extra-seat backfill disables `billing_package_versions_freeze` and `billing_package_versions_freeze_seat`, sets starter/growth/scale null seats to 500, and enables both triggers (`owner_billing_actions.sql:60-101`). P7 last is documented. The editor harness passed, including a second apply of owner prices. |
+| H6 | Fixed | `consume_sms_units` is revoked from `public`, `anon`, and `authenticated`, granted to `service_role`, and caps units at 30 (`owner_billing_actions.sql:2094-2100`). Beta or enforcement off meters without a debit (`:1996`). The #784 contract test passed. The SMS price still comes from `billing_rate_card` id 1. That is a price source, not a member wallet debit. Deviation (b) is `reserve_notify_send`, a different function. |
+| H7 | Partly | `adjust_payment_overpay` locks the payment, raises `amount_kes`, and inserts a credit for the delta only (`invoice_pay.sql:883-906`). The #784 test passed. The receipt trigger is `AFTER INSERT` only (`invoice_documents.sql:437-440`), so the receipt keeps the first amount. The adjust function does not change `invoices.amount_paid_kes`. The extra is a credit, not a second payment row. New finding N2. |
+| H8 | Partly | The owner `finalize_invoice` keeps a negative total, inserts one `tenant_credits` row with key `invoice-credit:<id>`, and would mark a paid zero invoice (`owner_billing_actions.sql:1192-1222`). That function does not set `scalers.billing_write`. On the merged stack the freeze raises and the credit rolls back (owner harness, and the P1–P7 probe: negative draft, `tenant_credits` count 0). P6 and `billing_company.sql` replace the function and drop the credit branch. `roll_package_periods` reads the pinned version (`package_period_rollover.sql:214-252`). |
+| H9 | Fixed | `admin_set_tenant_billing_mode` allows only `(beta, off)` or `(active, soft|hard)` and requires `p_confirm` (`package_version_editor.sql:1739-1756`). `set_tenant_billing_mode` refuses enforcement other than `off` while status is beta and does not set status to active (`wallet_security_beta.sql:348-357`). The admin billing route's `set_billing_mode` action calls `confirmTenantBillingMode`. The #784 contract tests passed. This function does not require a pin. See deviation (a). |
+| M1 | Fixed | `sendClaimedBillingNotices` sets `ledger.keyBase` to `row.idempotency_key` (`src/billing/billingNoticeSend.js:48`). The #784 test passed. `BILLING_NOTICES_SEND=on` remains the gate. |
+| M2 | Partly | P1 refuses to replace a body that already contains `SCL-` (`billing_data_layer.sql:1460-1467`). The data-layer harness printed that notice. P4's `CREATE OR REPLACE` is unconditional and writes `SC-` without `billing_write` (`owner_billing_actions.sql:1170-1237`). The owner file header says to re-apply it after the consume and notify SQL. That re-apply after P6 puts `SC-` back and still omits the flag. P6 and `billing_company.sql` also replace finalize unconditionally. |
+| M3 | Fixed | `checkoutFlow.js:121` sets expiry to now plus 60 minutes when Bachs omits `expiresAt`. Attach failure marks the attempt failed and best-effort cancels (`:128-136`). SQL attach still requires `expires_at` and `https://` (`invoice_pay.sql:519-524`). |
+| M4 | Partly | The success URL is `/pay/return/${returnId}` (`checkoutFlow.js:91`). The #784 raw-token test passed. `return_id` is unique (`invoice_pay.sql:60-62`) and has no expiry and no rotation. `pay_invoice_by_return` is service role only (`:861-862`), so the id does not start a charge. `payView` sets "Payment received" when a returning checkout succeeded and `amountPaidKes > 0`, while the invoice can still be payable (`view.js:69-72`). The next-part label stays on that screen. See deviation (d). |
+| M5 | Fixed in the trigger | `invoices_freeze` raises when a draft update sets a number or a non-draft status unless `scalers.billing_write` is `1` (`billing_data_layer.sql:763-768`). The #784 contract test passed. The functions that must set the flag do not. That is N1. |
+| M6 | Partly | P2 is its own script (`NOT VALID`, `VALIDATE`, `SET NOT NULL`). The data-layer harness applies it twice and passes. `billing_data_layer_down.sql` exists and drops the layer. Indexes are still `CREATE INDEX` without `CONCURRENTLY`. `invoice_pay.sql:56` still adds `updated_at timestamptz not null default now()`. `now()` is volatile. On a first apply `payment_attempts` is empty and the rewrite is cheap. Re-adding that column on a populated table rewrites it. `package_version_id` stays nullable. P2 sets `billing_status` not null only. |
+| M7 | Fixed for the free switch | Same-interval upgrade with `days_left = 0` waits for renewal (`owner_billing_actions.sql:941-954`). Monthly to annual on that day still charges the full year (`:982-994`). See deviation (e). |
+| L1 | Fixed | `toCents` returns null for a JavaScript number (`dashboard/src/lib/invoicePay/money.js:13`). The #784 test passed. |
+| L2 | Fixed | Attach refuses a URL that is not `^https://` (`invoice_pay.sql:519-520`). |
+| L3 | Unchanged | `billing_add_months` granted to `authenticated` is date math. It does not write money. |
+| L4 | Fixed | `payments_issue_receipt` is revoked from `public`, `anon`, and `authenticated` (`invoice_documents.sql:434-435`). The trigger still runs as the table owner. The #784 test passed. |
+| L5 | Fixed | `ledgerAlreadySent` settles the notice sent when the notify ledger says `instance_already_sent` or `already_sent` (`billingNoticeSend.js:10-13` and `:51`). The #784 notice test passed. |
+
+### Deviations
+
+**(a) Unpinned on-demand is KSh 0.** After a successful P1 there is no product path that leaves an existing subscription without a pin. The backfill fills a null pin only on rows whose `billing_status` is still null (`billing_data_layer.sql:429-446`), then raises if any row still has a null status or a null pin (`:457-461`). An insert with a null pin fills the latest published version or raises (`package_version_editor.sql:450-457`). The guard blocks a later change of a non-null pin unless `scalers.billing_version_move` is set (`:417-422`). `admin_move` writes `p_version.id` under that flag. `admin_set_tenant_billing_mode` and the transition to active do not check the pin (`package_version_editor.sql:1760-1781`). The column stays nullable. `consume_call_seconds` prices a missing rate as 0 and still adds the seconds (`owner_billing_actions.sql:1850-1854`). A hand update under `scalers.billing_admin_move` can store null because the pin trigger returns before the null fill (`package_version_editor.sql:447-448`).
+
+Recommend: `admin_set_tenant_billing_mode` raises when the new status is `active` and `package_version_id` is null. `consume_call_seconds` for an active on-demand business raises `rate_missing` when the pinned rate is absent, and does not meter those seconds as free. Do not treat a legal published rate of 0 as missing: `inbound_kes_per_second` is `not null` and `>= 0` (`billing_data_layer.sql:167`).
+
+**(b) `reserve_notify_send` is still granted to signed-in members.** This is not the H6 wallet debit. The function does not call `_wallet_apply_delta`. A member can reserve only caller SMS for their own tenant (`owner_billing_actions.sql:2177-2184`). `p_units` is `greatest(coalesce(p_units, 1), 1)` with no cap of 30 (`:2174`). A successful reserve increments `sms_used_units` by that count (`:2315-2318`). The spend check uses `billing_rate_card.sms_kes` and, when that rate is 0, does not stop the reserve (`:2205-2214`). Real KES still requires service-role `consume_sms_units`. Rank this Medium: a member can inflate the SMS counter and insert a pending `notify_sends` row. Revoke `authenticated`, or cap units at 30 the same way `consume_sms_units` does. `settle_notify_send` releases the counter on failure and also does not debit the wallet.
+
+**(c) Null `spend_limit_share_percent` falls back to 50.** That matches the column default. After P7 the column is `numeric not null default 50` (`package_version_editor.sql:126`). The coalesce matters when the column is absent (P4 before P7) or when the select finds no version, and in the second case the function returns null because `v_monthly` is null (`owner_billing_actions.sql:1432-1440`). Accept this. It does not block a schema apply.
+
+**(d) Late money on a cancelled attempt, the return id, and "Payment received".** A collection on a cancelled attempt with positive KES calls `recordIssue` with reason `cancelled` and returns 200 `{ action: "issue" }` (`webhook.js:197-206`). It does not call `applyPayment` and it does not insert `tenant_credits`. The row is stored. A replay of that same checkout does not apply it again. `billing_payment_reconciliation` lists `payments.match_status = 'issue'` (`invoice_pay.sql:768-775`), so ops can see the row. It does not become a credit by itself.
+
+The customer can still be double-paid. `create_invoice_pay_attempt` marks the expired row cancelled and returns. `checkoutFlow.js:55-62` then best-effort calls `cancelCheckout`, swallows every error, and opens a new pending attempt. The comment on those lines says a cancel failure must not open a second live row. The code opens one. The unique index allows it because the first row is no longer `pending`. If the old Bachs session is still payable, the customer can pay both. The old checkout becomes an issue. The new checkout applies. There is no automatic credit for the cancelled collection. This review did not call the undocumented cancel endpoint, so whether Bachs actually voids the session is unproven. The money path in this repo does not repair a late collection.
+
+"Payment received" is set for a returning succeeded checkout whenever `amountPaidKes > 0` (`view.js:69-72`), including a split whose invoice is still payable. The next part label remains. The return id is a stable bearer (`ret_` plus 32 bytes, unique index, no expiry). It resolves status. It does not start a charge.
+
+This fails the bar for live money. Store the late collection as now, and also insert one `tenant_credits` row keyed by the checkout id so a second successful checkout cannot leave the customer paid twice with no credit. Keep the issue row so ops can see it. Show "Payment received" only when the invoice status is `paid`.
+
+**(e) Negative draft, and monthly to annual on the last day.** The negative-draft credit is the right shape and the idempotency key is `invoice-credit:<id>`. It cannot commit: the owner finalize raises against the freeze, and P6 plus `billing_company.sql` delete the credit behavior. A paid zero invoice would not insert a payment, so the receipt trigger would not fire, if that function could commit. Ship the credit inside the finalize that also sets `scalers.billing_write` and numbers `SCL-`.
+
+Monthly to annual on the last day charges the full annual price, and the unused-month credit is 0 because `days_left` is 0 (`owner_billing_actions.sql:941-954` and `:982-994`). That matches the existing rule that a year is not prorated. The round 1 bug was the same-interval upgrade that switched the plan for KSh 0. That path now waits for renewal. Accept the full-year charge.
+
+### New bugs
+
+**N1. Blocker. No invoice can be issued after P1 once a later file replaces `finalize_invoice`.** `invoices_freeze` rejects a draft update that sets `invoice_number` or a non-draft status unless `scalers.billing_write` is `1` (`billing_data_layer.sql:763-768`). P1's own function sets the flag (`:1502-1504`) and the probe issued `SC-2026-000001`. The owner function (`owner_billing_actions.sql:1214-1223`), the documents function (`invoice_documents.sql:260-266`), and the company function (`billing_company.sql:100-113`) update number and status without the flag. The P1–P7 probe raised `invoice number and status are set only by finalize_invoice` after P4, after P6, after `billing_company.sql`, and after P7. The negative-draft credit inserted in the same owner function rolled back with it (`tenant_credits` count 0). `billing_company.sql` also refuses a beta subscription with the string `beta tenants have no pay link` (`:74-79`) and requires `billing_company.legal_name` (`:86-88`). If that file is applied it wins over P6, and it still cannot pass the freeze.
+
+Exact fix: one `finalize_invoice`. It sets `scalers.billing_write` before the update, numbers `SCL-YYYY-000001`, copies the letterhead, and on a negative total inserts the `invoice-credit:<id>` credit and marks the invoice paid at 0. P4, P6, and `billing_company.sql` must not replace that body with a copy that omits the flag. Re-applying `owner_billing_actions.sql` must not put `SC-` back.
+
+**N2. Medium. An overpay adjustment does not rewrite the receipt.** `adjust_payment_overpay` updates the payment and inserts the delta credit (`invoice_pay.sql:894-906`). `payments_issue_receipt` runs `AFTER INSERT` only (`invoice_documents.sql:437-440`). The receipt and the payment-received notice stay at the first amount. The customer is not double-credited. The document understates the collection. Re-issue the receipt when the stored amount rises, or include the credit on the same document.
+
+**N3. High. A cancelled attempt plus a replacement checkout can collect twice with no credit.** This is deviation (d). The first collection is stored as `match_status = issue`. The second applies. Ops can see the issue in `billing_payment_reconciliation`. Nothing turns it into `tenant_credits`.
+
+**N4. Medium. A short terminal SUCCEEDED stays an issue until a later exact event.** `webhook.js:117`. The money is stored. It is not applied and it is not credited. A later exact event on the same checkout can apply because an issue row is replaceable (`invoice_pay.sql:913` and `webhook.js:220-221`). If that event never arrives, the shillings sit in the issue report.
+
+**N5. The beta pair and the pay link agree. The debit agrees. The invoice function in `billing_company.sql` uses the pay-link error string.** `admin_set_tenant_billing_mode` and `mint_invoice_pay_token` both refuse beta and enforcement off (`package_version_editor.sql:1748-1756`, `invoice_pay.sql:216-225`). `consume_call_seconds` debits 0 for that pair (`owner_billing_actions.sql:1822-1824`). That part is consistent. `billing_company.sql:74-79` then refuses to finalize any invoice for a beta tenant with `beta tenants have no pay link`, which is the wrong gate on an issue function, and it still hits N1 before that check can matter for a non-beta tenant.
+
+### What round 2 did not re-open
+
+HMAC, `timingSafeEqual`, the 300 second skew, empty-secret 401, live-mode 403, pay-token entropy, invoice and receipt reads by session tenant, admin SQL not executable by `authenticated`, seat counting, extra seat KSh 500, and the `BILLING_NOTICES_SEND` gate were checked in round 1 and the new heads do not undo them. The #784 suites that cover the return URL, the overpay adjust, the notice key, and the beta pair passed on this merge. No Bachs sandbox call was made. Whether the cancel endpoint voids a session is unknown.
+
+## Round 1 record
+
+The heads and the ship table below are the first review. Round 2 replaces the ship verdicts.
 
 Failing tests that encode the required money outcomes live on `cursor/billing-review-tests-7822`. Command and result:
 
