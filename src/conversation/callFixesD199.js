@@ -532,6 +532,8 @@ const FILE_ASK =
 function looksLikeFileAsk(text) {
   const raw = String(text || '');
   if (FILE_ASK.test(raw) || looksLikeFileCatchUp(raw)) return true;
+  // HD_7522f9a7ba06: "Ni huduma gani nilikuwa nimeitisha?" asks for the file.
+  if (looksLikeOwnPastRequest(raw)) return true;
   try {
     // eslint-disable-next-line global-require
     return require('./openLineSpeech').looksLikeOpenVisitLookup(raw);
@@ -1246,8 +1248,141 @@ function cleanGoalText(goal, profile = {}) {
   return goal;
 }
 
+
+// ------------------------------------- HD_7522f9a7ba06 own past request
+
+// "Ni huduma gani nilikuwa nimeitisha?" asks what this caller already
+// requested, not for the services list. Past-tense first person with a
+// request verb: sw/Sheng ni-li-/nilikuwa nime- + itisha, omba, book,
+// agiza, order, request; en "what did I book/order".
+const OWN_PAST_REQUEST_SW =
+  /\b(?:nilikuwa\s+nime|nilikua\s+nime|nili)-?(?:itisha|omba|book|agiza|order|request|reserve|weka\s+(?:booking|oda|order|hold))\b/i;
+const OWN_PAST_REQUEST_EN =
+  /\b(?:what|which|wh?ich\s+\w+)\b[^?.!]{0,30}\b(?:did|have|had)\s+i\s+(?:book|booked|order|ordered|request|requested|ask(?:ed)?\s+for|reserve|reserved|hold|put\s+on\s+hold)\b|\bwhat\s+i\s+(?:booked|ordered|requested|asked\s+for)\b|\bwhat\s+was\s+my\s+(?:last\s+|previous\s+)?(?:booking|order|request)\b/i;
+
+/** The caller asks about their own earlier request (HD_7522f9a7ba06). */
+function looksLikeOwnPastRequest(text) {
+  const raw = String(text || '');
+  if (!raw.trim()) return false;
+  return OWN_PAST_REQUEST_SW.test(raw) || OWN_PAST_REQUEST_EN.test(raw);
+}
+
+// ------------------------------------- 17 Oct audit: outcome labels
+
+// Brain's next-best-action reasons are prompt text for the model. They are
+// never a resolution note (HD_a4b0a3d6f512 "Resolve from knowledge; clarify
+// once only if a specific fact is missing.", HD_e4573ff2f3ad "Attempt direct
+// resolution from relevant live ground truth before any capture or handoff.").
+const PROMPT_REASON_NOTE =
+  /\b(?:resolve from knowledge|clarify once|attempt (?:direct )?resolution|live ground truth|before any capture or handoff|awaiting the caller goal|caller goal is not established|ask one useful question|close with a short farewell|offer a human handoff|offer (?:to save )?a (?:concise )?message|the backend speaks|do not (?:ask|say|list|use|invent|read|talk|treat|paraphrase|restart|promise)|ask once:|speak (?:only|that list)|name what you already have|acknowledge briefly|repair attempts failed|next best action)\b/i;
+
+/** A Brain prompt reason that leaked into a note. */
+function isPromptReasonNote(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return false;
+  return PROMPT_REASON_NOTE.test(raw);
+}
+
+const VOCATIVE =
+  /^(?:(?:dada|kaka|boss|madam|madame|maam|ma'am|sir|bro|buda|mzee|mama|baba|sister|brother|mrembo|msee|customer care|lucy|lynn|shy)[\s,.!-]+)+/i;
+const SMALL_TALK_PART =
+  /^(?:(?:oh|ah|eh|uh|um|hi|hello|hey|halo|hallo|habari|sasa|mambo|niaje|vipi|poa|sawa|okay|ok|yes|yeah|dada|kaka|boss)\s*)*(?:habari(?: yako| yenu| zenu| za (?:asubuhi|mchana|jioni|leo|kazi))?|ni namna gani|namna gani|mnaendelea (?:aje|vipi)|unaendelea (?:aje|vipi)|uko (?:aje|poa|fiti|sawa)|mko (?:aje|poa|fiti|sawa)|mambo(?: vipi)?|niaje|vipi|sasa|how are you(?: doing)?(?: today)?|how(?:'s| is) it going|good (?:morning|afternoon|evening)|hi|hello|hey|halo|hallo)?$/i;
+
+/** Every clause is a greeting or wellbeing small talk ("Oh, habari, ni namna gani? Mnaendelea aje?"). */
+function smallTalkOnly(text) {
+  const parts = String(text || '')
+    .toLowerCase()
+    .split(/[,.?!;]+/)
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  return parts.length > 0 && parts.every((part) => SMALL_TALK_PART.test(part));
+}
+
+const NEED_CUE =
+  /\b(?:what|which|how|where|when|why|who|do you|does|can you|could you|is there|are you|have you|nini|gani|wapi|lini|ngapi|mbona|je|mna|mnauza|iko|kuna|bei|price|cost|how much|want|need|looking for|order|book|hold|reserve|buy|deliver|available|open|close|nataka|naomba|ningependa|nahitaji|nilikuwa nataka|natafuta|kununua|ku-order|ku-book|niletee|remember|history|previous)\b/i;
+const BUSINESS_TERM =
+  /\b(?:bei|price|prices|cost|pay|open|opening|close|closing|hours|saa|time|location|where|wapi|deliver|delivery|order|oda|book|booking|hold|stock|available|huduma|service|services|product|products|catalogue|item|items|files?|pens?|books?|paper|printing|stationery|cleaning|visit|appointment|request|history|previous|remember|branch|branches|ofisi|duka)\b/i;
+
+/**
+ * One caller line that carries a real need: not a greeting, closing,
+ * filler, or cut-off fragment, and it asks or wants something ("Halo?",
+ * "Okay, listen—", "Hey, come here— Yes?", "Dada, kazi gani?" do not).
+ */
+function callerNeedTurn(text) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return false;
+  if (notAGoal(raw) || isFragmentTurn(raw)) return false;
+  // eslint-disable-next-line global-require
+  const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
+  if (looksLikePhaticCallerTurn(raw) || smallTalkOnly(raw)) return false;
+  if (looksLikeOwnPastRequest(raw) || looksLikeFileAsk(raw)) return true;
+  if (!substantiveCallerTurn(raw)) return false;
+  // Speech cut mid-line and then a bare yes ("Hey, come here— Yes?").
+  if (/[—–]/.test(raw) && !BUSINESS_TERM.test(raw)) return false;
+  if (!NEED_CUE.test(raw)) return false;
+  const body = raw.replace(VOCATIVE, '').replace(/[?!.,]+/g, ' ').trim();
+  const words = body.split(/\s+/).filter((w) => w && !FILLER_WORDS.has(w.toLowerCase()));
+  // A two-word vague ask with no business word ("kazi gani") is not a need.
+  if (words.length <= 2 && !BUSINESS_TERM.test(body)) return false;
+  return true;
+}
+
+/** Any caller line (or the goal) carries a real need. */
+function callerHadNeed(lines = []) {
+  return (Array.isArray(lines) ? lines : []).some((line) => callerNeedTurn(line));
+}
+
+/**
+ * Tool flags from the stored call summary, for the review sweep (no live
+ * Brain state). HD_4139ea705878: the sweep saw no hold and upgraded a saved
+ * hold to needs_human.
+ */
+function storedSummaryToolFlags(meta = {}) {
+  const m = meta && typeof meta === 'object' ? meta : {};
+  const type = String(m.service_request_type || '').toLowerCase();
+  const hasRequest = Boolean(m.service_request_id || type);
+  const realHold = hasRequest && (!type || ['hold', 'hold_or_pickup', 'order'].includes(type));
+  const callback = hasRequest && type === 'callback';
+  const enquiry = hasRequest && !realHold && !callback;
+  return {
+    holdSaved: hasRequest,
+    holdKind: hasRequest ? type || 'hold' : null,
+    holdOpen: realHold,
+    enquirySaved: enquiry,
+    enquiryItem: enquiry ? String(m.service_request_item || '').trim() : '',
+    callbackSaved: callback,
+    visitSaved: Boolean(m.appointment_id),
+    escalateSaved: Boolean(m.escalation_sent || m.escalated_to),
+    escalateReason: String(m.escalate_reason || '').trim(),
+    fromStoredSummary: true,
+  };
+}
+
+const NON_ASK_INTENTS = new Set(['human', 'unknown', '']);
+
+/**
+ * primary_intent is what the caller asked. "human" only when they asked for
+ * a person, or nothing else is known.
+ */
+function callerAskIntent(...candidates) {
+  for (const raw of candidates) {
+    const key = String(raw || '').trim().toLowerCase();
+    if (!NON_ASK_INTENTS.has(key)) return key;
+  }
+  return 'human';
+}
+
+const NO_NEED_NOTE = 'No request: greeting or fragment only.';
+
 module.exports = {
   FLAG,
+  looksLikeOwnPastRequest,
+  isPromptReasonNote,
+  callerNeedTurn,
+  callerHadNeed,
+  storedSummaryToolFlags,
+  callerAskIntent,
+  NO_NEED_NOTE,
   isWhenSlotValue,
   isPlaceSlotValue,
   dropJunkSlots,

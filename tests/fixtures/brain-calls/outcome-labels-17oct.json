@@ -1,0 +1,637 @@
+{
+  "note": "17 Oct audit: prod calls whose outcome label was wrong (read-only from prod calls + transcripts, fjxcdccgyhnvnnlnovcl). prod = the stored resolution, primary_intent, resolution_note and owner_review. turns = transcript in order (A agent, C caller). savedRows = service_requests written on the call. Caller phones omitted.",
+  "calls": [
+    {
+      "callId": "HD_a4b0a3d6f512",
+      "tenant": "Esga",
+      "startedAtEat": "2026-10-10T09:50",
+      "durationSeconds": 24,
+      "prod": {
+        "resolution": "resolved",
+        "primary_intent": "general_enquiry",
+        "resolution_note": "Resolve from knowledge; clarify once only if a specific fact is missing.",
+        "owner_review": {
+          "done": "None.",
+          "mood": "unknown",
+          "next": "None.",
+          "want": "No clear ask.",
+          "reason": "No clear ask.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": false,
+            "reason": true,
+            "resolution": false
+          },
+          "confidence": 0.5,
+          "needs_human": false,
+          "needs_owner": false,
+          "primary_intent": "general_enquiry"
+        }
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "role": "agent",
+          "text": "Good morning, Esga, this is Lucy. Nikusaidie vipi."
+        },
+        {
+          "role": "caller",
+          "text": "Halo."
+        },
+        {
+          "role": "agent",
+          "text": "Halo! Hapa ni Esga Stationery. Nikujausaidie aje leo?"
+        },
+        {
+          "role": "caller",
+          "text": "Hey, come here— Yes?"
+        },
+        {
+          "role": "agent",
+          "text": "Esga Stationery, this is Lucy. How can I help you today?"
+        }
+      ]
+    },
+    {
+      "callId": "HD_d06d5aae4373",
+      "tenant": "Esga",
+      "startedAtEat": "2026-10-10T10:15",
+      "durationSeconds": 14,
+      "prod": {
+        "resolution": "resolved",
+        "primary_intent": "general_enquiry",
+        "resolution_note": "Resolve from knowledge; clarify once only if a specific fact is missing.",
+        "owner_review": null
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "role": "agent",
+          "text": "Good morning, Esga, this is Lucy. Nikusaidie vipi."
+        },
+        {
+          "role": "caller",
+          "text": "Halo?"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e00d94d4fea8",
+      "tenant": "Esga",
+      "startedAtEat": "2026-10-10T11:04",
+      "durationSeconds": 16,
+      "prod": {
+        "resolution": "resolved",
+        "primary_intent": "general_enquiry",
+        "resolution_note": "Resolve from knowledge; clarify once only if a specific fact is missing.",
+        "owner_review": {
+          "done": "None.",
+          "mood": "unknown",
+          "next": "None.",
+          "want": "The caller asked about what work is available.",
+          "reason": "Caller asked about Dada, kazi gani.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": false,
+            "reason": true,
+            "resolution": false
+          },
+          "confidence": 0.8,
+          "needs_human": false,
+          "needs_owner": false,
+          "primary_intent": "general_enquiry"
+        }
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "role": "caller",
+          "text": "One sec—"
+        },
+        {
+          "role": "caller",
+          "text": "Dada, kazi gani?"
+        }
+      ]
+    },
+    {
+      "callId": "HD_30a3970034a4",
+      "tenant": "Aris",
+      "startedAtEat": "2026-10-15T21:40",
+      "durationSeconds": 6,
+      "prod": {
+        "resolution": "resolved",
+        "primary_intent": "general_enquiry",
+        "resolution_note": "Resolve from knowledge; clarify once only if a specific fact is missing.",
+        "owner_review": {
+          "done": "None",
+          "mood": "urgent",
+          "next": "None.",
+          "want": "No clear ask.",
+          "reason": "No clear ask.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": false,
+            "reason": true,
+            "resolution": false
+          },
+          "confidence": 0.3,
+          "needs_human": true,
+          "needs_owner": false,
+          "primary_intent": "general_enquiry"
+        }
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "role": "caller",
+          "text": "Okay, listen—"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e4573ff2f3ad",
+      "tenant": "Aris",
+      "startedAtEat": "2026-10-11T21:48",
+      "durationSeconds": 121,
+      "prod": {
+        "resolution": "resolved",
+        "primary_intent": "availability",
+        "resolution_note": "Attempt direct resolution from relevant live ground truth before any capture or handoff.",
+        "owner_review": null
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "role": "caller",
+          "text": "And I find it really helpful"
+        },
+        {
+          "role": "agent",
+          "text": "Am I speaking with Alvin Yegon?"
+        },
+        {
+          "role": "caller",
+          "text": "to imagine that when there is a setback in my"
+        },
+        {
+          "role": "agent",
+          "text": "That is a great mindset to have! How can I help you today with Aris Kenya?"
+        },
+        {
+          "role": "caller",
+          "text": "life, that. So if you're going to try my hard"
+        },
+        {
+          "role": "caller",
+          "text": "est to fix it, I'm going to try my hardest to be a good person, to live the life I want to live. But I also should take a lot less credit for myself."
+        },
+        {
+          "role": "agent",
+          "text": "Am I speaking with Alvin Yegon?"
+        },
+        {
+          "role": "caller",
+          "text": "A lot less blame for myself."
+        },
+        {
+          "role": "agent",
+          "text": "Am I speaking with Alvin Yegon?"
+        },
+        {
+          "role": "caller",
+          "text": "Habari yako."
+        },
+        {
+          "role": "agent",
+          "text": "Am I speaking with Alvin Yegon?"
+        },
+        {
+          "role": "caller",
+          "text": "Yeah, you're speaking with Mr. Alvin Yegon, precisely. Yes, you can just call me Alvin Yegon."
+        },
+        {
+          "role": "agent",
+          "text": "Habari Yegon. How can I help you at Aris Kenya today?"
+        },
+        {
+          "role": "caller",
+          "text": "nilikuwa nataka ku-order"
+        },
+        {
+          "role": "caller",
+          "text": "Files today. Which ones do you have?"
+        },
+        {
+          "role": "agent",
+          "text": "We have the Mg box files, spring file teepee, spring file till, Mg double clip file, and Mg single clip file. I don't have the exact prices right now, but I can log an order or enquiry for you. Which specific file would "
+        },
+        {
+          "role": "caller",
+          "text": "And what about my previous nini, my previous hold? Can you review it?"
+        },
+        {
+          "role": "agent",
+          "text": "We don't have any previous hold saved under your file right now. I can help you place a new hold or enquiry for the files you need today."
+        },
+        {
+          "role": "caller",
+          "text": "What's in my history then?"
+        },
+        {
+          "role": "agent",
+          "text": "There are no active records or previous orders showing in your history right now. Would you like me to place a new order or hold for any of the files?"
+        },
+        {
+          "role": "caller",
+          "text": "No."
+        },
+        {
+          "role": "agent",
+          "text": "Sawa. Is there anything else I can help you with today?"
+        },
+        {
+          "role": "caller",
+          "text": "Now, let's just leave it there."
+        },
+        {
+          "role": "agent",
+          "text": "Sawa, thank you for calling Aris Kenya. Have a good evening!"
+        },
+        {
+          "role": "caller",
+          "text": "Let's just leave it at that."
+        },
+        {
+          "role": "agent",
+          "text": "Sawa, thank you for calling Aris Kenya. Have a good evening!"
+        },
+        {
+          "role": "caller",
+          "text": "Basi."
+        }
+      ]
+    },
+    {
+      "callId": "HD_e6d2aca7886c",
+      "tenant": "Esga",
+      "startedAtEat": "2026-10-13T10:31",
+      "durationSeconds": 85,
+      "prod": {
+        "resolution": "resolved",
+        "primary_intent": "order_enquiry",
+        "resolution_note": "Request saved (enquiry)",
+        "owner_review": {
+          "done": "Hold saved; awaiting owner Done.",
+          "mood": "calm",
+          "next": "None.",
+          "want": "Chris wanted to order a long list of items.",
+          "reason": "Chris wanted to order a long list of items.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": false,
+            "reason": true,
+            "resolution": false
+          },
+          "confidence": 0.9,
+          "needs_human": false,
+          "needs_owner": true,
+          "primary_intent": "hold_or_pickup"
+        }
+      },
+      "savedRows": [
+        {
+          "type": "enquiry",
+          "item": "Long list of stationery items"
+        },
+        {
+          "type": "enquiry",
+          "item": "From began yellow"
+        }
+      ],
+      "turns": [
+        {
+          "role": "agent",
+          "text": "Good morning, Esga, this is Lucy. Nikusaidie vipi."
+        },
+        {
+          "role": "caller",
+          "text": "I'm Lucy. Nilikuwa nataka ku-order vitu,"
+        },
+        {
+          "role": "agent",
+          "text": "Karibu Lucy. Ungependa ku-order vitu gani au bidhaa gani specifically?"
+        },
+        {
+          "role": "caller",
+          "text": "um, it's a long list. Sijui how we can proceed."
+        },
+        {
+          "role": "agent",
+          "text": "Unaweza kunitajia hizo bidhaa moja baada ya nyingine, au nikuunganishe na timu yetu wazichukue zote kwa pamoja?"
+        },
+        {
+          "role": "caller",
+          "text": "Because it's a really long"
+        },
+        {
+          "role": "agent",
+          "text": "Tell me your name so I can save the request."
+        },
+        {
+          "role": "caller",
+          "text": "Naitwa Chris."
+        },
+        {
+          "role": "agent",
+          "text": "Nimehifadhi ombi lako."
+        },
+        {
+          "role": "caller",
+          "text": "From began yellow."
+        },
+        {
+          "role": "agent",
+          "text": "I've saved your request."
+        },
+        {
+          "role": "caller",
+          "text": "Which request?"
+        },
+        {
+          "role": "caller",
+          "text": "Have you saved?"
+        },
+        {
+          "role": "agent",
+          "text": "Samahani, sema tena?"
+        },
+        {
+          "role": "caller",
+          "text": "No."
+        },
+        {
+          "role": "agent",
+          "text": "Je, ungependa nikusaidie vipi na hiyo orodha, Chris?"
+        }
+      ]
+    },
+    {
+      "callId": "HD_4139ea705878",
+      "tenant": "Aris",
+      "startedAtEat": "2026-10-11T16:34",
+      "durationSeconds": 59,
+      "prod": {
+        "resolution": "needs_human",
+        "primary_intent": "human",
+        "resolution_note": "Alvin Yegon left a hold for the Oxford set (metallic) for tomorrow morning.",
+        "owner_review": {
+          "done": "None.",
+          "mood": "calm",
+          "next": "Call them back.",
+          "want": "Alvin Yegon wanted to hold the Oxford set (metallic) for tomorrow morning.",
+          "reason": "Alvin Yegon left a hold for the Oxford set (metallic) for tomorrow morning.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": true,
+            "reason": true,
+            "resolution": true
+          },
+          "confidence": 0.95,
+          "needs_human": true,
+          "needs_owner": true,
+          "primary_intent": "hold_or_pickup"
+        }
+      },
+      "savedRows": [
+        {
+          "type": "hold",
+          "item": "Oxford set (metallic)"
+        }
+      ],
+      "turns": [
+        {
+          "role": "agent",
+          "text": "Aris - The Home of Affordable Stationery, this is Lynn. We're closed now. Tukusaidie vipi."
+        },
+        {
+          "role": "caller",
+          "text": "Uh, I was looking to hold the Oxford set. Is it available?"
+        },
+        {
+          "role": "agent",
+          "text": "Am I speaking with Alvin Yegon?"
+        },
+        {
+          "role": "caller",
+          "text": "Yeah."
+        },
+        {
+          "role": "agent",
+          "text": "We do have the Oxford set (metallic) available. Since we are closed right now, when would you like to pick it up?"
+        },
+        {
+          "role": "caller",
+          "text": "Tomorrow morning?"
+        },
+        {
+          "role": "caller",
+          "text": "Works best."
+        },
+        {
+          "role": "agent",
+          "text": "I've saved your request."
+        },
+        {
+          "role": "caller",
+          "text": "Okay, thank you."
+        },
+        {
+          "role": "agent",
+          "text": "You're welcome, Alvin. Have a great evening!"
+        }
+      ]
+    },
+    {
+      "callId": "HD_5290300eb772",
+      "tenant": "Aris",
+      "startedAtEat": "2026-10-13T17:03",
+      "durationSeconds": 130,
+      "prod": {
+        "resolution": "needs_human",
+        "primary_intent": "human",
+        "resolution_note": "Alvin Yegon asked about no, no, no.",
+        "owner_review": {
+          "done": "None.",
+          "mood": "calm",
+          "next": "Call them back.",
+          "want": "Alvin Yegon wanted to be reminded of his past conversation and items he had previously inquired about.",
+          "reason": "Alvin Yegon asked about no, no, no.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": true,
+            "reason": true,
+            "resolution": true
+          },
+          "confidence": 0.9,
+          "needs_human": true,
+          "needs_owner": false,
+          "primary_intent": "general_enquiry"
+        }
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "role": "agent",
+          "text": "Good evening, Aris - The Home of Affordable Stationery, this is Lynn. Tukusaidie vipi."
+        },
+        {
+          "role": "caller",
+          "text": "Oh, habari, ni namna gani? Mnaendelea aje?"
+        },
+        {
+          "role": "agent",
+          "text": "Je, naongea na Alvin Yegon?"
+        },
+        {
+          "role": "caller",
+          "text": "Yeah, you're speaking to Alvin Yegon."
+        },
+        {
+          "role": "agent",
+          "text": "Habari Alvin Yegon! Tuko vyema kabisa. Nawezaje kukusaidia leo?"
+        },
+        {
+          "role": "caller",
+          "text": "Why."
+        },
+        {
+          "role": "caller",
+          "text": "Greeting me twice?"
+        },
+        {
+          "role": "agent",
+          "text": "My apologies for that, Alvin! How can I help you today at Aris Kenya?"
+        },
+        {
+          "role": "caller",
+          "text": "Uh, I was inquiring: what, what, what—do you remember our past conversation?"
+        },
+        {
+          "role": "agent",
+          "text": "Yes, Alvin, you previously inquired about items like the Oxford set, whiteboard pens, extensions, and pencils. How can I assist you with those today?"
+        },
+        {
+          "role": "caller",
+          "text": "Aah, it was just that I wanted you to remind me"
+        },
+        {
+          "role": "agent",
+          "text": "You had open callbacks regarding an order inquiry, and previously asked about the Oxford set, Gem blue whiteboard pen, Astra extension, kettle, and papers. How can I help with those today?"
+        },
+        {
+          "role": "caller",
+          "text": "Na ni sawa?"
+        },
+        {
+          "role": "agent",
+          "text": "Ni sawa kabisa, Alvin. Je, kuna kitu kingine ungetaka nikusaidie nacho leo?"
+        },
+        {
+          "role": "caller",
+          "text": "Ah, no, no, no."
+        },
+        {
+          "role": "agent",
+          "text": "SawaAlvin, asante kwa kupiga simu Aris Kenya. Siku njema!"
+        },
+        {
+          "role": "caller",
+          "text": "Haya, mubarikiwe, mubarikiwe nawe."
+        },
+        {
+          "role": "agent",
+          "text": "Asante sana, Alvin. Unahitaji huduma gani?"
+        },
+        {
+          "role": "agent",
+          "text": "Naweza kusaidia?"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e2549533b468",
+      "tenant": "Esga",
+      "startedAtEat": "2026-10-15T13:19",
+      "durationSeconds": 53,
+      "prod": {
+        "resolution": "needs_human",
+        "primary_intent": "human",
+        "resolution_note": "Alvin k asked if printing materials are available.",
+        "owner_review": {
+          "done": "None.",
+          "mood": "calm",
+          "next": "Call them back.",
+          "want": "Alvin k asked if printing materials are available.",
+          "reason": "Alvin k asked if printing materials are available.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": true,
+            "reason": true,
+            "resolution": true
+          },
+          "confidence": 0.9,
+          "needs_human": true,
+          "needs_owner": false,
+          "primary_intent": "product_inquiry"
+        }
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "role": "caller",
+          "text": "Kama hizi ni local"
+        },
+        {
+          "role": "agent",
+          "text": "Je, naongea na Alvin k?"
+        },
+        {
+          "role": "agent",
+          "text": "Esga, this is Lucy. Nikusaidie vipi."
+        },
+        {
+          "role": "caller",
+          "text": "Yeah."
+        },
+        {
+          "role": "agent",
+          "text": "Tuko na printing materials na stationery za jumla na rejareja. Je, ungependa tukutafutie vitu gani specifically?"
+        },
+        {
+          "role": "caller",
+          "text": "Unaongea na Alvin? Ah, habari, uko aje?"
+        },
+        {
+          "role": "agent",
+          "text": "Nzuri sana, Alvin. Nawezaje kukusaidia leo na stationery au materials za printing?"
+        },
+        {
+          "role": "caller",
+          "text": "I want— I want to order printing materials. Are they available?"
+        },
+        {
+          "role": "agent",
+          "text": "Yes, we offer printing materials for both retail and wholesale. Which specific printing materials and quantities do you need, Alvin?"
+        }
+      ]
+    }
+  ]
+}

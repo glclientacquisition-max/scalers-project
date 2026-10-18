@@ -50,6 +50,7 @@ function deriveCallSummary(opts = {}) {
     highWaterPrimaryIntent({
       liveIntent: state.intent || opts.primaryIntent,
       results,
+      askedForPerson: state.conversation?.askedForPerson === true,
     }) ||
     normalizePrimaryIntent(state.intent) ||
     normalizePrimaryIntent(opts.primaryIntent) ||
