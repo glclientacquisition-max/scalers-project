@@ -152,6 +152,71 @@ export function seatIncreaseCopy(input: {
   return `${formatKsh(due)} today for the rest of ${input.periodMonth}, then ${then}.`;
 }
 
+/** Plan allowances the confirm sheet compares. Same order as the plan cards. */
+export type PlanAllowances = {
+  minutes: number;
+  seats: number;
+  messageCredits: number | null;
+};
+
+function plural(n: number, one: string, many: string): string {
+  return `${Math.round(n).toLocaleString("en-KE")} ${n === 1 ? one : many}`;
+}
+
+/** "300 minutes", "3 seats", "1,000 message credits". Minutes, seats, credits on every card. */
+export function allowanceLines(plan: PlanAllowances): string[] {
+  const lines = [plural(plan.minutes, "minute", "minutes"), plural(plan.seats, "seat", "seats")];
+  if (plan.messageCredits != null) lines.push(plural(plan.messageCredits, "message credit", "message credits"));
+  return lines;
+}
+
+/** Rows that change, e.g. { label: "Minutes", from: "800", to: "1,600" }. */
+export function allowanceChanges(from: PlanAllowances, to: PlanAllowances): { label: string; from: string; to: string }[] {
+  const n = (v: number) => Math.round(v).toLocaleString("en-KE");
+  const rows: { label: string; from: string; to: string }[] = [];
+  if (from.minutes !== to.minutes) rows.push({ label: "Minutes", from: n(from.minutes), to: n(to.minutes) });
+  if (from.seats !== to.seats) rows.push({ label: "Seats", from: n(from.seats), to: n(to.seats) });
+  if (from.messageCredits != null && to.messageCredits != null && from.messageCredits !== to.messageCredits) {
+    rows.push({ label: "Message credits", from: n(from.messageCredits), to: n(to.messageCredits) });
+  }
+  return rows;
+}
+
+/** "KSh 11,333 today for the rest of October, then KSh 35,000 a month from 1 Nov." No arithmetic shown. */
+export function planUpgradeCopy(input: {
+  dueKes: number;
+  laterKes: number;
+  cycle: "month" | "year";
+  periodMonth: string | null;
+  nextPeriodStart: string | null;
+}): string {
+  const today = input.periodMonth
+    ? `${formatKsh(input.dueKes)} today for the rest of ${input.periodMonth}`
+    : `${formatKsh(input.dueKes)} today`;
+  const then = `${formatKsh(input.laterKes)} ${input.cycle === "year" ? "a year" : "a month"}`;
+  return `${today}, then ${then}${input.nextPeriodStart ? ` from ${input.nextPeriodStart}` : ""}.`;
+}
+
+/** "From 1 Nov: 300 minutes (now 800), 3 seats (now 8)." Only what changes. */
+export function planDowngradeChanges(from: PlanAllowances, to: PlanAllowances, startLabel: string | null): string | null {
+  const parts: string[] = [];
+  const n = (v: number) => Math.round(v).toLocaleString("en-KE");
+  if (from.minutes !== to.minutes) parts.push(`${plural(to.minutes, "minute", "minutes")} (now ${n(from.minutes)})`);
+  if (from.seats !== to.seats) parts.push(`${plural(to.seats, "seat", "seats")} (now ${n(from.seats)})`);
+  if (from.messageCredits != null && to.messageCredits != null && from.messageCredits !== to.messageCredits) {
+    parts.push(`${plural(to.messageCredits, "message credit", "message credits")} (now ${n(from.messageCredits)})`);
+  }
+  if (!parts.length) return null;
+  return `${startLabel ? `From ${startLabel}` : "From your next period"}: ${parts.join(", ")}.`;
+}
+
+/** "Remove 2 team members first." Null when the new plan has room. */
+export function seatBlockCopy(seatsUsed: number, newSeats: number): string | null {
+  const over = seatsUsed - newSeats;
+  if (!(over > 0)) return null;
+  return `Remove ${over} team ${over === 1 ? "member" : "members"} first.`;
+}
+
 /** Seats being removed. The new extra-seat total starts with the next period. */
 export function seatReductionCopy(input: {
   seats: number;

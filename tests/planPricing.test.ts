@@ -5,6 +5,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  allowanceChanges,
+  allowanceLines,
   annualPriceFromVersion,
   annualPriceKes,
   annualSavingKes,
@@ -16,6 +18,9 @@ import {
   seatIncreaseCopy,
   seatReductionCopy,
   seatUnitKes,
+  planDowngradeChanges,
+  planUpgradeCopy,
+  seatBlockCopy,
   spendLimitDisplayKes,
   splitPayNote,
 } from "../dashboard/src/lib/planPricing.ts";
@@ -113,5 +118,41 @@ describe("plan change port", () => {
       if (prev === undefined) delete process.env.DESK_PLAN_CHANGE;
       else process.env.DESK_PLAN_CHANGE = prev;
     }
+  });
+});
+
+describe("plan change copy", () => {
+  const starter = { minutes: 300, seats: 3, messageCredits: 1000 };
+  const growth = { minutes: 800, seats: 8, messageCredits: 2500 };
+  const scale = { minutes: 1600, seats: 20, messageCredits: 5500 };
+
+  it("upgrade: today for the rest of the month, then the new price from the next period", () => {
+    const due = proratedUpgradeKes(18000, 35000, 10, 30);
+    assert.equal(
+      planUpgradeCopy({ dueKes: due, laterKes: 35000, cycle: "month", periodMonth: "October", nextPeriodStart: "1 Nov" }),
+      "KSh 11,333 today for the rest of October, then KSh 35,000 a month from 1 Nov.",
+    );
+  });
+
+  it("downgrade lists what changes at renewal", () => {
+    assert.equal(
+      planDowngradeChanges(growth, starter, "1 Nov"),
+      "From 1 Nov: 300 minutes (now 800), 3 seats (now 8), 1,000 message credits (now 2,500).",
+    );
+  });
+
+  it("before and after rows in card order", () => {
+    assert.deepEqual(allowanceChanges(growth, scale), [
+      { label: "Minutes", from: "800", to: "1,600" },
+      { label: "Seats", from: "8", to: "20" },
+      { label: "Message credits", from: "2,500", to: "5,500" },
+    ]);
+    assert.deepEqual(allowanceLines(growth), ["800 minutes", "8 seats", "2,500 message credits"]);
+  });
+
+  it("blocks a downgrade when too many seats are in use", () => {
+    assert.equal(seatBlockCopy(5, 3), "Remove 2 team members first.");
+    assert.equal(seatBlockCopy(4, 3), "Remove 1 team member first.");
+    assert.equal(seatBlockCopy(3, 3), null);
   });
 });
