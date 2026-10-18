@@ -119,7 +119,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 **Ops-Billing (dated per the STATUS rule):**
 
-- **18 Oct 2026, in flight:** billing data layer on branch `cursor/billing-data-layer-cc4b`. Staging SQL only (section 3). No charges, no send-path change, no prod SQL.
+- **18 Oct 2026, in flight: #775** billing data layer (`cursor/billing-data-layer-cc4b`). Staging SQL only (section 3). No charges, no send-path change, no prod SQL.
 
 
 
