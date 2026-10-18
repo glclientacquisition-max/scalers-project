@@ -48,8 +48,7 @@ export function UsageSummary({
   planLine,
   entry,
   seats,
-  messages,
-  alertsSeparate,
+  credits,
   children,
 }: {
   minutesLeft: number;
@@ -61,10 +60,8 @@ export function UsageSummary({
   /** Change plan or Choose a plan. Null on beta and without billing.manage. */
   entry: PlanEntry | null;
   seats: UsageListRow | null;
-  /** Message credits first, then team alert allowances. */
-  messages: UsageListRow[];
-  /** Team alerts have their own allowances and do not use message credits. */
-  alertsSeparate: boolean;
+  /** The plan's one message-credit allowance. Null hides Messages. */
+  credits: UsageListRow | null;
   /** Extra usage and activity, under the minutes card. */
   children?: ReactNode;
 }) {
@@ -114,7 +111,7 @@ export function UsageSummary({
           )}
         </section>
 
-        {seats || messages.length > 0 ? (
+        {seats || credits ? (
           <div className="min-w-0 space-y-6 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1">
             {seats ? (
               <section aria-labelledby="usage-team">
@@ -149,31 +146,26 @@ export function UsageSummary({
                 </ul>
               </section>
             ) : null}
-            {messages.length > 0 ? (
+            {credits ? (
               <section aria-labelledby="usage-messages">
                 <h2 id="usage-messages" className="mb-2 px-1 text-meta font-medium text-ink-2">
                   Messages
                 </h2>
-                <ul className="divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
-                  {messages.map((row) => (
-                    <AllowanceRow
-                      key={row.key}
-                      row={row}
-                      footer={(rowTone) =>
-                        rowTone === "full" && row.key === "sms" ? (
-                          <p role="status" className="mt-2 text-meta font-medium text-warn">
-                            No message credits left
-                          </p>
-                        ) : null
-                      }
-                    />
-                  ))}
+                <ul className="overflow-hidden rounded-2xl border border-hairline bg-surface">
+                  <AllowanceRow
+                    row={credits}
+                    footer={(rowTone) =>
+                      rowTone === "full" ? (
+                        <p role="status" className="mt-2 text-meta font-medium text-warn">
+                          No message credits left
+                        </p>
+                      ) : null
+                    }
+                  />
                 </ul>
-                {alertsSeparate ? (
-                  <p className="mt-2 px-1 text-meta text-ink-2">
-                    Message credits are for texts to callers. Team alerts have their own allowance.
-                  </p>
-                ) : null}
+                <p className="mt-2 px-1 text-meta text-ink-2">
+                  Texts, WhatsApp and email to you, your team and callers all use message credits.
+                </p>
               </section>
             ) : null}
           </div>

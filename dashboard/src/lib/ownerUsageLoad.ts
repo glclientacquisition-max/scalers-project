@@ -33,9 +33,6 @@ export async function loadOwnerUsageView(tenant: {
     smsMessages: null,
     seatsIncluded: pack.seatsIncluded,
     seatsUsed: pack.seatsUsed,
-    alerts: {
-      email: { included: pack.emailIncluded, used: pack.emailUsed },
-      whatsapp: { included: pack.waIncluded, used: pack.waUsed },
-    },
+    messagesSent: { email: pack.emailUsed, whatsapp: pack.waUsed },
   });
 }

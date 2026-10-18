@@ -6,6 +6,7 @@ import { getTenantUsageSummary } from "@/lib/wallet";
 import { loadUsageBillingExtras } from "@/lib/ownerPlanLoad";
 import { formatKsh } from "@/lib/planPricing";
 import { loadOwnerUsageView } from "@/lib/ownerUsageLoad";
+import { messageCreditsUsage } from "@/lib/messageCredits";
 import { planEntry } from "@/lib/planEntry";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
@@ -86,36 +87,13 @@ async function WalletBody({ searchParams }: WalletPageProps) {
     redirect(safePage > 1 ? `/wallet?page=${safePage}` : "/wallet");
   }
 
-  const creditIncluded = extras.messageCredits;
-  const toRow = (row: (typeof view.rows)[number], label: string): UsageListRow => ({
-    key: row.key,
-    label,
-    included: row.included,
-    used: row.used,
-    left: row.left,
-  });
   const seatsRow = view.rows.find((row) => row.key === "seats");
-  const smsRow = view.rows.find((row) => row.key === "sms");
-  const alertRows =
-    creditIncluded == null
-      ? view.rows.filter((row) => row.key === "email" || row.key === "whatsapp")
-      : [];
-  const messages: UsageListRow[] = [
-    ...(smsRow
-      ? [
-          creditIncluded == null
-            ? toRow(smsRow, "Message credits")
-            : {
-                key: "sms",
-                label: "Message credits",
-                included: creditIncluded,
-                used: smsRow.used,
-                left: Math.max(0, creditIncluded - smsRow.used),
-              },
-        ]
-      : []),
-    ...alertRows.map((row) => toRow(row, row.key === "email" ? "Team email alerts" : "Team WhatsApp alerts")),
-  ].filter((row) => row.included > 0);
+  const seats: UsageListRow | null =
+    seatsRow && seatsRow.included > 0
+      ? { key: "seats", label: "Seats", included: seatsRow.included, used: seatsRow.used, left: seatsRow.left }
+      : null;
+  const creditUsage = messageCreditsUsage(extras.messageCredits, extras.creditBurns, view.messageUse);
+  const credits: UsageListRow | null = creditUsage ? { key: "credits", label: "Message credits", ...creditUsage } : null;
   const planLine =
     extras.freeBeta || extras.monthlyPriceKes == null
       ? null
@@ -132,9 +110,8 @@ async function WalletBody({ searchParams }: WalletPageProps) {
       beta={extras.freeBeta}
       planLine={planLine}
       entry={entry}
-      seats={seatsRow && seatsRow.included > 0 ? toRow(seatsRow, "Seats") : null}
-      messages={messages}
-      alertsSeparate={alertRows.length > 0}
+      seats={seats}
+      credits={credits}
     >
       {extras.freeBeta || extras.onDemandLocked ? null : (
         <OnDemandUsagePanel

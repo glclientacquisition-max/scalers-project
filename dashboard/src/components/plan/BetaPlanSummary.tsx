@@ -4,18 +4,21 @@ import { Empty } from "@/components/ui/Empty";
 import { MINUTES_WARN_SHARE, meterTone } from "@/lib/planEntry";
 
 import type { OwnerBillingView } from "@/lib/billingStateModel";
+import type { MessageCreditsUsage } from "@/lib/messageCredits";
 
 export type BetaPlanRow = { key: string; label: string; included: number; used: number };
 
-const BETA_LABELS: Record<string, string> = { minutes: "Minutes", seats: "Seats", sms: "Message credits" };
+const BETA_LABELS: Record<string, string> = { minutes: "Minutes", seats: "Seats" };
 
-/** Minutes, seats, message credits: the order on every plan card. */
-export function betaPlanRows(view: Pick<OwnerBillingView, "rows">): BetaPlanRow[] {
-  return ["minutes", "seats", "sms"].flatMap((key) => {
+/** Minutes, seats, message credits: the order on every plan card. Credits hide without a plan allowance. */
+export function betaPlanRows(view: Pick<OwnerBillingView, "rows">, credits: MessageCreditsUsage | null): BetaPlanRow[] {
+  const rows = ["minutes", "seats"].flatMap((key) => {
     const row = view.rows.find((item) => item.key === key);
     if (!row || row.included <= 0) return [];
     return [{ key, label: BETA_LABELS[key], included: row.included, used: row.used }];
   });
+  if (credits) rows.push({ key: "credits", label: "Message credits", included: credits.included, used: credits.used });
+  return rows;
 }
 
 export function BetaInvoicesEmpty() {

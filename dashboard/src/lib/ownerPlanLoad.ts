@@ -11,6 +11,7 @@ import {
   spendLimitDisplayKes,
   type SeatOffer,
 } from "@/lib/planPricing";
+import { creditBurnsFrom, type CreditBurns } from "@/lib/messageCredits";
 import { trialRemaining } from "@/lib/trialRemaining";
 import { planRowText } from "@/lib/planEntry";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -86,6 +87,8 @@ export type UsageBillingExtras = {
   freeBeta: boolean;
   monthlyPriceKes: number | null;
   messageCredits: number | null;
+  /** Credits per text, WhatsApp, and email. Used to count credits; never shown. */
+  creditBurns: CreditBurns | null;
   inboundPerMinuteKes: number | null;
   outboundPerMinuteKes: number | null;
   /** Default when the owner has not saved a limit. Not a per-credit price. */
@@ -111,6 +114,9 @@ const VERSION_OPTIONAL = [
   "trial_days",
   "annual_price_kes",
   "spend_limit_share_percent",
+  "sms_credit_burn",
+  "whatsapp_credit_burn",
+  "email_credit_burn",
 ];
 const SUB_CORE = ["billing_status", "period", "package_version_id", "current_period_start", "current_period_end"];
 const SUB_OPTIONAL = ["term_start", "term_end", "extra_seats"];
@@ -158,6 +164,7 @@ function emptyExtras(): UsageBillingExtras {
     freeBeta: true,
     monthlyPriceKes: null,
     messageCredits: null,
+    creditBurns: null,
     inboundPerMinuteKes: null,
     outboundPerMinuteKes: null,
     spendLimitKes: null,
@@ -512,8 +519,9 @@ export async function loadUsageBillingExtras(tenantId: string): Promise<UsageBil
     if (sub.error || !sub.data) return emptyExtras();
     const row = sub.data as Record<string, unknown>;
     const status = String(row.billing_status || "beta");
-    if (isFreeBeta(status)) return { ...emptyExtras(), billingStatus: "beta", freeBeta: true };
+    const beta = isFreeBeta(status);
     let messageCredits: number | null = null;
+    let creditBurns: CreditBurns | null = null;
     let inbound: number | null = null;
     let outbound: number | null = null;
     let share: number | null = null;
@@ -524,18 +532,21 @@ export async function loadUsageBillingExtras(tenantId: string): Promise<UsageBil
         if (match.message_credits != null && match.message_credits !== "") {
           messageCredits = Math.round(num(match.message_credits));
         }
+        creditBurns = creditBurnsFrom(match);
         inbound = num(match.inbound_kes_per_second) * 60;
         outbound = num(match.outbound_kes_per_second) * 60;
         const shareRaw = match.spend_limit_share_percent;
         if (shareRaw != null && shareRaw !== "") share = num(shareRaw);
       }
     }
+    if (beta) return { ...emptyExtras(), billingStatus: "beta", freeBeta: true, messageCredits, creditBurns };
     const monthlyPriceKes = row.version_monthly_price_kes == null ? null : num(row.version_monthly_price_kes);
     return {
       billingStatus: status,
       freeBeta: false,
       monthlyPriceKes,
       messageCredits,
+      creditBurns,
       inboundPerMinuteKes: inbound,
       outboundPerMinuteKes: outbound,
       spendLimitKes: spendLimitDisplayKes(null, monthlyPriceKes, share),

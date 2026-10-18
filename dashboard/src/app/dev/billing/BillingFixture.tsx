@@ -18,6 +18,7 @@ import { pickBillingBanner } from "@/lib/billingBanner";
 import { ownerBillingView, type OwnerBillingView } from "@/lib/billingStateModel";
 import { seatSummary } from "@/lib/invites";
 import { invoicePayState } from "@/lib/invoicePayState";
+import { messageCreditsUsage, type CreditBurns } from "@/lib/messageCredits";
 import type { MembersData } from "@/lib/membersLoad";
 import type { OwnerInvoiceRow, OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
 import { planEntry } from "@/lib/planEntry";
@@ -122,7 +123,9 @@ const sampleInvoices: OwnerInvoiceRow[] = [
   { id: "inv-1038", number: "INV-1038", status: "paid", totalKes: 8120, dueAt: "9 Sep", periodStart: "1 Sep", periodEnd: "30 Sep" },
 ];
 
-/** Beta tenant: Starter, 297 of 300 minutes, every seat taken, no message credits used. */
+const BURNS: CreditBurns = { sms: 1, whatsapp: 2, email: 1 };
+
+/** Beta tenant: Starter, 297 of 300 minutes, every seat taken, a few messages sent. */
 function betaView(): OwnerBillingView {
   return ownerBillingView({
     state: {
@@ -131,7 +134,7 @@ function betaView(): OwnerBillingView {
       included_minutes: 300,
       used_minutes: 297,
       sms_included: 50,
-      sms_used: 0,
+      sms_used: 18,
       on_demand_enabled: false,
       mode_label: "beta",
       period_end: PERIOD_END,
@@ -140,9 +143,11 @@ function betaView(): OwnerBillingView {
     smsMessages: null,
     seatsIncluded: 3,
     seatsUsed: 3,
-    alerts: { email: { included: 100, used: 0 }, whatsapp: { included: 200, used: 0 } },
+    messagesSent: { email: 9, whatsapp: 14 },
   });
 }
+
+const betaCredits = () => messageCreditsUsage(1000, BURNS, betaView().messageUse);
 
 /** QA business: Growth, 680 of 800 minutes (warns), 5 of 8 seats. */
 function paidView(): OwnerBillingView {
@@ -162,35 +167,23 @@ function paidView(): OwnerBillingView {
     smsMessages: null,
     seatsIncluded: 8,
     seatsUsed: 5,
+    messagesSent: { email: 64, whatsapp: 118 },
   });
 }
 
-function usageRows(view: OwnerBillingView, withAlerts: boolean) {
-  const label: Record<string, string> = {
-    seats: "Seats",
-    sms: "Message credits",
-    email: "Team email alerts",
-    whatsapp: "Team WhatsApp alerts",
-  };
-  const toRow = (row: OwnerBillingView["rows"][number]): UsageListRow => ({
-    key: row.key,
-    label: label[row.key] || row.label,
-    included: row.included,
-    used: row.used,
-    left: row.left,
-  });
+function usageRows(view: OwnerBillingView, includedCredits: number) {
   const seat = view.rows.find((row) => row.key === "seats");
-  const messages = view.rows
-    .filter((row) => row.key === "sms" || (withAlerts && (row.key === "email" || row.key === "whatsapp")))
-    .filter((row) => row.included > 0)
-    .map(toRow);
-  return { seats: seat ? toRow(seat) : null, messages, alertsSeparate: messages.some((row) => row.key !== "sms") };
+  const creditUsage = messageCreditsUsage(includedCredits, BURNS, view.messageUse);
+  return {
+    seats: seat ? { key: "seats", label: "Seats", included: seat.included, used: seat.used, left: seat.left } : null,
+    credits: creditUsage ? ({ key: "credits", label: "Message credits", ...creditUsage } satisfies UsageListRow) : null,
+  };
 }
 
 function UsagePreview({ kind }: { kind: "beta" | "paid" }) {
   const beta = kind === "beta";
   const view = beta ? betaView() : paidView();
-  const rows = usageRows(view, beta);
+  const rows = usageRows(view, beta ? 1000 : 2500);
   return (
     <UsageSummary
       minutesLeft={view.minutesLeft}
@@ -201,8 +194,7 @@ function UsagePreview({ kind }: { kind: "beta" | "paid" }) {
       planLine={beta ? null : `Growth · ${formatKsh(18000)} a month`}
       entry={planEntry(beta ? "beta" : "active", true)}
       seats={rows.seats}
-      messages={rows.messages}
-      alertsSeparate={rows.alertsSeparate}
+      credits={rows.credits}
     >
       {beta ? null : (
         <>
@@ -380,7 +372,7 @@ export function BillingFixture({ view }: { view: BillingPreview }) {
       const beta = betaView();
       return (
         <SettingsPlanFrame title="Plan" activePath="/settings/plan">
-          <BetaPlanSummary planName={beta.packageName} periodEndLabel={beta.periodEndLabel} rows={betaPlanRows(beta)} />
+          <BetaPlanSummary planName={beta.packageName} periodEndLabel={beta.periodEndLabel} rows={betaPlanRows(beta, betaCredits())} />
         </SettingsPlanFrame>
       );
     }

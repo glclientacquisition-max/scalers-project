@@ -28,7 +28,7 @@ export async function loadOwnerBillingView(tenantId: string): Promise<OwnerBilli
       admin.from("tenant_billing_state").select(STATE_COLS).eq("tenant_id", tenantId).maybeSingle(),
       admin
         .from("tenants")
-        .select("seat_included, email_included_units, email_used_units, whatsapp_included_units, whatsapp_used_units")
+        .select("seat_included, email_used_units, whatsapp_used_units")
         .eq("id", tenantId)
         .maybeSingle(),
       admin.rpc("tenant_seats_used", { p_tenant: tenantId }),
@@ -73,10 +73,7 @@ export async function loadOwnerBillingView(tenantId: string): Promise<OwnerBilli
       smsMessages,
       seatsIncluded: num(tenant.seat_included),
       seatsUsed,
-      alerts: {
-        email: { included: num(tenant.email_included_units), used: num(tenant.email_used_units) },
-        whatsapp: { included: num(tenant.whatsapp_included_units), used: num(tenant.whatsapp_used_units) },
-      },
+      messagesSent: { email: num(tenant.email_used_units), whatsapp: num(tenant.whatsapp_used_units) },
     });
   } catch (err) {
     console.warn("billing state load failed", err instanceof Error ? err.message : String(err));

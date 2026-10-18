@@ -39,15 +39,12 @@ export type OwnerBillingInput = {
   /** tenants.seat_included and tenant_seats_used() (members + unexpired invites). */
   seatsIncluded: number;
   seatsUsed: number;
-  /** Team alert allowances still kept on tenants (not in the view yet). */
-  alerts?: {
-    email?: { included: number; used: number };
-    whatsapp?: { included: number; used: number };
-  };
+  /** WhatsApp and email sent this period, from the tenant counters. They draw on message credits too. */
+  messagesSent?: { email: number; whatsapp: number };
 };
 
 export type UsageRow = {
-  key: "minutes" | "sms" | "seats" | "email" | "whatsapp";
+  key: "minutes" | "sms" | "seats";
   label: string;
   included: number;
   used: number;
@@ -66,6 +63,8 @@ export type OwnerBillingView = {
   /** Rates table title. */
   ratesTitle: string;
   rows: UsageRow[];
+  /** Per-channel counts behind the shared message-credit total. Never shown per channel. */
+  messageUse: { sms: number; whatsapp: number; email: number };
   minutesIncluded: number;
   minutesLeft: number;
   /** Low-balance banner for minutes or SMS. Null when nothing is low. */
@@ -159,13 +158,11 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     { key: "sms", label: "Message credits", included: smsIncluded, used: smsUsed, left: smsLeft, note: smsNote },
     { key: "seats", label: "Team seats", included: seatsIncluded, used: seatsUsed, left: Math.max(0, seatsIncluded - seatsUsed), note: null },
   ];
-  for (const [key, label] of [["email", "Team email alerts"], ["whatsapp", "Team WhatsApp alerts"]] as const) {
-    const bucket = input.alerts?.[key];
-    if (!bucket || bucket.included <= 0) continue;
-    const included = Math.max(0, Math.floor(bucket.included));
-    const used = Math.max(0, Math.floor(bucket.used));
-    rows.push({ key, label, included, used, left: Math.max(0, included - used), note: null });
-  }
+  const messageUse = {
+    sms: smsUsed,
+    whatsapp: Math.max(0, Math.floor(num(input.messagesSent?.whatsapp))),
+    email: Math.max(0, Math.floor(num(input.messagesSent?.email))),
+  };
 
   const lowMinutes = isLow(minutesIncluded, minutesLeft);
   const lowSms = isLow(smsIncluded, smsLeft);
@@ -211,6 +208,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     shortLabel,
     ratesTitle: mode === "beta" ? "Rates after beta" : "Rates past what's included",
     rows,
+    messageUse,
     minutesIncluded,
     minutesLeft,
     lowNotice,

@@ -10,7 +10,8 @@ import { loadOwnerUsageView } from "@/lib/ownerUsageLoad";
 import { memberCan } from "@/lib/requireMember";
 import { loadSettingsStatuses } from "@/lib/settingsRailStatus";
 import { getCurrentTenant } from "@/lib/tenant";
-import { loadOwnerPlan } from "@/lib/ownerPlanLoad";
+import { loadOwnerPlan, loadUsageBillingExtras } from "@/lib/ownerPlanLoad";
+import { messageCreditsUsage } from "@/lib/messageCredits";
 
 async function PlanBody({ searchParams }: { searchParams: Promise<{ addon?: string }> }) {
   if (!(await memberCan("billing.manage"))) return <DeskNoAccess what="Plan" />;
@@ -20,13 +21,14 @@ async function PlanBody({ searchParams }: { searchParams: Promise<{ addon?: stri
   const [loaded, statuses] = await Promise.all([loadOwnerPlan(tenant.id), loadSettingsStatuses(tenant)]);
   if (!loaded.ok) return <DeskLoadError>Could not load Plan.</DeskLoadError>;
   if (loaded.model.freeBeta || !loaded.model.surface.showPlanPicker) {
-    const view = await loadOwnerUsageView(tenant);
+    const [view, extras] = await Promise.all([loadOwnerUsageView(tenant), loadUsageBillingExtras(tenant.id)]);
+    const credits = messageCreditsUsage(extras.messageCredits, extras.creditBurns, view.messageUse);
     return (
       <SettingsPlanFrame title="Plan" optionStatus={statuses}>
         <BetaPlanSummary
           planName={view.packageName}
           periodEndLabel={view.periodEndLabel}
-          rows={betaPlanRows(view)}
+          rows={betaPlanRows(view, credits)}
         />
       </SettingsPlanFrame>
     );
