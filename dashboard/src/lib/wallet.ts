@@ -146,6 +146,8 @@ export async function getTenantUsageSummary(
     softSpendLimitKes?: number | null;
     ledgerPage?: number;
     ledgerPageSize?: number;
+    /** Skip the month-to-date calls scan when the caller reads minutes from tenant_billing_state. */
+    skipCallRows?: boolean;
   }
 ): Promise<TenantUsageSummary> {
   const billingEnforcement = wallets.billingEnforcement || "off";
@@ -156,11 +158,13 @@ export async function getTenantUsageSummary(
   const ledgerPage = Math.max(1, Math.floor(wallets.ledgerPage || 1));
   const ledgerFrom = (ledgerPage - 1) * ledgerSize;
   const [callsRes, ledgerRes, chargesRes] = await Promise.all([
-    client
-      .from("calls")
-      .select("duration_seconds, ai_processing_minutes")
-      .eq("tenant_id", tenantId)
-      .gte("created_at", since),
+    wallets.skipCallRows
+      ? Promise.resolve({ data: [] as { duration_seconds: number | null; ai_processing_minutes: number | null }[], error: null })
+      : client
+          .from("calls")
+          .select("duration_seconds, ai_processing_minutes")
+          .eq("tenant_id", tenantId)
+          .gte("created_at", since),
     client
       .from("wallet_ledger")
       .select(

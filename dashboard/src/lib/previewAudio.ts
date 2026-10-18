@@ -81,6 +81,13 @@ export function previewErrorCopy(err: unknown): string {
   ) {
     return NO_VOICE_SAMPLE_COPY;
   }
+  // Browser timeout / offline: plain words, never the raw DOMException text.
+  if (
+    (err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError")) ||
+    /timed out|timeout|aborted|failed to fetch|network/i.test(raw)
+  ) {
+    return "Could not play the sample right now. Try again in a minute.";
+  }
   return raw;
 }
 

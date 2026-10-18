@@ -489,7 +489,9 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
         .eq("status", "active")
         .maybeSingle(),
       admin.from("billing_rate_card").select("*").eq("id", 1).maybeSingle(),
-      admin.from("tenant_members").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+      // Seats in use = members plus unexpired invites (Ops-Billing tenant_seats_used),
+      // not members alone.
+      admin.rpc("tenant_seats_used", { p_tenant: tenantId }),
     ]);
 
     if (tenantRes.error && /minutes_included|seconds_used|whatsapp_|email_|seat_included/i.test(tenantRes.error.message)) {
@@ -529,7 +531,7 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
       waIncluded: num(tenant.whatsapp_included_units),
       waUsed: num(tenant.whatsapp_used_units),
       seatsIncluded: num(tenant.seat_included),
-      seatsUsed: seatsRes.count ?? 0,
+      seatsUsed: seatsRes.error ? 0 : num(seatsRes.data),
       rates,
     };
   } catch {
