@@ -114,7 +114,7 @@ describe("admin console polish", () => {
     assert.match(page, /readPlatformOps/);
     assert.doesNotMatch(page, /evaluatePlatformOps/);
     assert.match(panel, /Needs you/);
-    assert.match(panel, /Calls today/);
+    assert.match(panel, /Volume today/);
     assert.match(panel, /ListRow/);
     assert.match(panel, /row\.href/);
     assert.match(panel, /Nothing waiting\./);

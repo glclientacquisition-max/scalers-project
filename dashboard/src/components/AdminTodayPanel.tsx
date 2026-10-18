@@ -75,7 +75,7 @@ export function AdminTodayPanel({
 
       <section id="calls" aria-labelledby="today-calls" className="scroll-mt-4">
         <h2 id="today-calls" className="px-4 text-caption text-ink-3">
-          Calls today
+          Volume today
         </h2>
         <ul className="divide-y divide-hairline">
           {numbers.map((row) => (

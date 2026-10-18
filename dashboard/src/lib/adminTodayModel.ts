@@ -79,7 +79,7 @@ export function todayNumberRows(counts: CallCounts, now: Date): TodayNumberRow[]
       key: "couldnt-answer",
       title: "Couldn't answer",
       value: "",
-      detail: "Per business on Calls. Traced calls only.",
+      detail: "Per business on Quality. Traced calls only.",
       available: false,
       href: "/admin/quality",
     },
