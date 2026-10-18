@@ -38,7 +38,9 @@ Payments, payment attempts, credits, and the audit log are not owner reads.
 | `billing_lifecycle_settings` | Voicemail hold days. `shadow_invoices` stays true until a later invoice builder is switched on. |
 | `billing_notice_outbox` | Pending and sending notices for the sender. |
 
-`sautikit_did_pool.status = 'quarantine'` is not Available. `quarantine_until` is a reuse hold (30 days is a placeholder, not a decision). It is not the 7-day voicemail window.
+`sautikit_did_pool.status = 'quarantine'` is not Available. `quarantine_until` is a reuse hold (30 days is a placeholder, not a decision). It is not the 7-day voicemail window. After `quarantine_until`, the number can be assigned again. `release_did_from_business` and `quarantine_pool_number` both clear `tenant_id` and store the business on `last_tenant_id`. Release also sets the business number to pending. Pool quarantine does not change the business number.
+
+`billing_notice_outbox` includes `sending` rows. The sender claims with `claim_billing_notices` (pending, or sending whose `claimed_at` is null or older than 15 minutes) and settles with `settle_billing_notice`. A notice already sent stays sent. `claimed_at` is for the sender. Owners still read `billing_notices`.
 
 ## What this layer does not do
 

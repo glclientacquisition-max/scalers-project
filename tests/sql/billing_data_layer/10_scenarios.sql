@@ -680,6 +680,9 @@ begin
   if v_first <> '+254700111001' then
     raise exception 'assign did not take the oldest available number, got %', v_first;
   end if;
+  update public.sautikit_did_pool
+  set last_tenant_id = 'cccccccc-cccc-cccc-cccc-cccccccccc99'
+  where e164 = '+254700111001';
   if public.release_did_from_business(v_id) <> '+254700111001' then
     raise exception 'release did not return the number';
   end if;
@@ -689,8 +692,9 @@ begin
   if (select status from public.sautikit_did_pool where e164 = '+254700111001') <> 'quarantine'
      or (select quarantine_until from public.sautikit_did_pool where e164 = '+254700111001') < now() + interval '29 days'
      or (select tenant_id from public.sautikit_did_pool where e164 = '+254700111001') is not null
+     or (select last_tenant_id from public.sautikit_did_pool where e164 = '+254700111001') is distinct from v_id
   then
-    raise exception 'release did not quarantine the pool row';
+    raise exception 'release did not quarantine the pool row for this business';
   end if;
 
   v_second := public.assign_did_from_pool(v_id);
@@ -715,6 +719,171 @@ begin
       raise;
     end if;
   end;
+
+  -- Unlinked pool quarantine clears tenant_id and keeps the previous business.
+  update public.sautikit_did_pool
+  set status = 'assigned', tenant_id = v_id, assigned_at = now(),
+      quarantine_until = null, quarantined_at = null, last_tenant_id = null
+  where e164 = '+254700111002';
+  perform public.quarantine_pool_number('+254700111002', now() + interval '30 days', 'test', 'pool release');
+  if (select tenant_id from public.sautikit_did_pool where e164 = '+254700111002') is not null
+     or (select last_tenant_id from public.sautikit_did_pool where e164 = '+254700111002') is distinct from v_id
+     or (select status from public.sautikit_did_pool where e164 = '+254700111002') <> 'quarantine'
+  then
+    raise exception 'pool quarantine should clear tenant_id and record last_tenant_id';
+  end if;
+end $$;
+
+-- Quarantine exit: sweeper, pool assign, and specific assign.
+do $$
+declare
+  v_pool uuid := 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee5';
+  v_specific uuid := 'ffffffff-ffff-ffff-ffff-fffffffffff6';
+  v_prev uuid := 'cccccccc-cccc-cccc-cccc-cccccccccc99';
+  v_got text;
+  v_count integer;
+begin
+  insert into public.tenants (id, business_name, sautikit_virtual_number)
+  values
+    (v_pool, 'Exit Pool', 'pending:' || v_pool::text),
+    (v_specific, 'Exit Specific', 'pending:' || v_specific::text);
+
+  insert into public.sautikit_did_pool (
+    e164, status, created_at, quarantine_until, quarantined_at, last_tenant_id
+  ) values
+    ('+254700111010', 'quarantine', now() - interval '10 minutes', now() - interval '1 hour', now() - interval '30 days', v_prev),
+    ('+254700111011', 'quarantine', now() - interval '5 minutes', now() - interval '1 hour', now() - interval '30 days', v_prev),
+    ('+254700111012', 'quarantine', now() - interval '1 minute', now() + interval '10 days', now(), v_prev);
+
+  v_count := public.release_expired_quarantine();
+  if v_count <> 2 then
+    raise exception 'sweeper should release two expired rows, got %', v_count;
+  end if;
+  if (select status from public.sautikit_did_pool where e164 = '+254700111010') <> 'available'
+     or (select quarantine_until from public.sautikit_did_pool where e164 = '+254700111010') is not null
+     or (select last_tenant_id from public.sautikit_did_pool where e164 = '+254700111010') is distinct from v_prev
+     or (select status from public.sautikit_did_pool where e164 = '+254700111012') <> 'quarantine'
+  then
+    raise exception 'sweeper should clear an expired hold and leave a future hold';
+  end if;
+
+  -- Put the two expired numbers back so pool assign must exit them itself.
+  update public.sautikit_did_pool
+  set status = 'quarantine',
+      quarantine_until = now() - interval '1 hour',
+      quarantined_at = now() - interval '30 days',
+      tenant_id = null
+  where e164 in ('+254700111010', '+254700111011');
+
+  v_got := public.assign_did_from_pool(v_pool);
+  if v_got <> '+254700111010' then
+    raise exception 'pool assign should take the oldest expired quarantine, got %', v_got;
+  end if;
+  if (select status from public.sautikit_did_pool where e164 = '+254700111011') <> 'available'
+     or (select quarantine_until from public.sautikit_did_pool where e164 = '+254700111011') is not null
+     or (select status from public.sautikit_did_pool where e164 = '+254700111012') <> 'quarantine'
+     or (select quarantine_until from public.sautikit_did_pool where e164 = '+254700111010') is not null
+  then
+    raise exception 'pool assign should sweep other expired rows and skip a future hold';
+  end if;
+
+  insert into public.sautikit_did_pool (
+    e164, status, created_at, quarantine_until, quarantined_at, last_tenant_id
+  ) values
+    ('+254700111020', 'quarantine', now() - interval '3 minutes', now() - interval '2 hours', now() - interval '30 days', v_prev),
+    ('+254700111021', 'quarantine', now() - interval '2 minutes', now() + interval '10 days', now(), v_prev),
+    ('+254700111022', 'quarantine', now() - interval '1 minute', now() - interval '2 hours', now() - interval '30 days', v_prev);
+
+  v_got := public.assign_specific_did_to_tenant(v_specific, '+254700111020');
+  if v_got <> '+254700111020' then
+    raise exception 'specific assign should take an expired quarantine row, got %', v_got;
+  end if;
+  if (select status from public.sautikit_did_pool where e164 = '+254700111020') <> 'assigned'
+     or (select tenant_id from public.sautikit_did_pool where e164 = '+254700111020') is distinct from v_specific
+     or (select quarantine_until from public.sautikit_did_pool where e164 = '+254700111020') is not null
+     or (select status from public.sautikit_did_pool where e164 = '+254700111022') <> 'available'
+     or (select status from public.sautikit_did_pool where e164 = '+254700111021') <> 'quarantine'
+  then
+    raise exception 'specific assign should clear the hold, sweep other expired rows, and leave a future hold';
+  end if;
+
+  begin
+    perform public.assign_specific_did_to_tenant(v_specific, '+254700111021');
+    raise exception 'specific assign should have refused the hold';
+  exception when others then
+    if sqlerrm not like '%quarantine%' then
+      raise;
+    end if;
+  end;
+end $$;
+
+-- Claim reclaims a stale sending row. Settle does not downgrade sent.
+do $$
+declare
+  v_id uuid := '12121212-1212-1212-1212-121212121288';
+  v_fresh public.billing_notices%rowtype;
+  v_stale public.billing_notices%rowtype;
+  v_claimed public.billing_notices%rowtype;
+  v_sent public.billing_notices%rowtype;
+  v_again public.billing_notices%rowtype;
+  v_send uuid := '12121212-1212-1212-1212-121212121201';
+  v_other uuid := '12121212-1212-1212-1212-121212121202';
+  v_key text;
+  n integer;
+begin
+  loop
+    select count(*) into n from public.claim_billing_notices(100);
+    exit when n = 0;
+  end loop;
+
+  insert into public.tenants (
+    id, business_name, sautikit_virtual_number, whatsapp_notification_number
+  ) values (
+    v_id, 'Notice Probe', 'pending:' || v_id::text, '+254700000188'
+  );
+
+  select * into v_stale from public.enqueue_billing_notice(
+    v_id, 'platform_billing_past_due', 'platform_billing_past_due:stale', 'Payment past due',
+    'Your Business Assistant payment is past due. The line stays on until it is suspended.');
+  select * into v_fresh from public.enqueue_billing_notice(
+    v_id, 'platform_billing_invoice_due', 'platform_billing_invoice_due:fresh', 'Invoice due',
+    'Your Business Assistant invoice SC-1 for KES 10 is due.');
+  v_key := v_stale.idempotency_key;
+
+  perform set_config('scalers.billing_notice_delivery', '1', true);
+  update public.billing_notices
+  set delivery_status = 'sending', claimed_at = now() - interval '16 minutes'
+  where id = v_stale.id;
+  update public.billing_notices
+  set delivery_status = 'sending', claimed_at = now()
+  where id = v_fresh.id;
+
+  select * into v_claimed from public.claim_billing_notices(20)
+  where id = v_stale.id;
+  if v_claimed.id is null or v_claimed.delivery_status <> 'sending'
+     or v_claimed.claimed_at < now() - interval '1 minute'
+     or v_claimed.idempotency_key is distinct from v_key
+  then
+    raise exception 'stale sending notice was not reclaimed';
+  end if;
+  if (select claimed_at from public.billing_notices where id = v_fresh.id) < now() - interval '1 minute'
+     or (select delivery_status from public.billing_notices where id = v_fresh.id) <> 'sending'
+  then
+    raise exception 'a fresh sending notice must not be reclaimed';
+  end if;
+
+  select * into v_sent from public.settle_billing_notice(v_stale.id, 'sent', v_send, null);
+  if v_sent.delivery_status <> 'sent' or v_sent.notify_send_id is distinct from v_send then
+    raise exception 'settle did not record sent';
+  end if;
+  select * into v_again from public.settle_billing_notice(v_stale.id, 'failed', v_other, 'later crash');
+  if v_again.delivery_status <> 'sent'
+     or v_again.notify_send_id is distinct from v_send
+     or v_again.last_error is not null
+     or v_again.idempotency_key is distinct from v_key
+  then
+    raise exception 'settle downgraded a sent notice';
+  end if;
 end $$;
 
 -- No destination still leaves a dashboard row. All-off channels still pick SMS.

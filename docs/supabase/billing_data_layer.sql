@@ -23,6 +23,10 @@
 --     "line not available" message. This file does not play either message.
 --   * sautikit_did_pool.quarantine_until is a reuse hold so a released number
 --     is not assigned again. 30 days is a PLACEHOLDER (Part F), not a decision.
+--     When quarantine_until has passed, release_expired_quarantine() returns
+--     the row to available. assign_did_from_pool calls that function, and
+--     both assign functions also accept an expired quarantine row. A future
+--     hold still blocks assignment.
 --
 -- Chief, billing notices are NOT call escalations:
 --   * billing_notices is the outbox. Kinds are platform_billing_*.
@@ -30,6 +34,9 @@
 --     then settle_billing_notice. Pass billed_to = 'platform' and
 --     audience = 'staff' (both stored on the row) and the stored
 --     idempotency_key. Do not gate these on tenant_escalation_allowed.
+--     claim sets claimed_at and reclaims a sending row whose claimed_at is
+--     null or older than 15 minutes. It does not change idempotency_key.
+--     settle_billing_notice leaves a sent row unchanged.
 --     Invoice due, trial ending, past due, trial ended, and line suspended
 --     stay on this outbox.
 --   * tenant_escalation_allowed(tenant_id) is the check for voicemail and
@@ -40,6 +47,14 @@
 -- business has notices, status events, or invoices. A before-delete flag lets
 -- those child rows cascade. Payments and credits stay restricted. The audit
 -- log stays.
+--
+-- tenant_id on quarantine (both functions agree): entering quarantine clears
+-- sautikit_did_pool.tenant_id and stores the business in last_tenant_id.
+-- release_did_from_business sets last_tenant_id = p_tenant_id and detaches
+-- the business number to pending:{id}, so voice lookup no longer finds that
+-- line. quarantine_pool_number sets last_tenant_id from the previous
+-- tenant_id and does not rewrite the business number. The Numbers screen
+-- calls it only when no business is linked.
 
 -- ---------------------------------------------------------------------------
 -- 0. Preconditions. Fail closed if an earlier script has not been applied.
@@ -839,9 +854,13 @@ create table if not exists public.billing_notices (
   notify_send_id uuid,
   last_error text,
   read_at timestamptz,
+  claimed_at timestamptz,
   created_at timestamptz not null default now(),
   unique (tenant_id, idempotency_key)
 );
+
+alter table public.billing_notices
+  add column if not exists claimed_at timestamptz;
 
 create index if not exists billing_notices_pending_idx
   on public.billing_notices (created_at)
@@ -850,8 +869,15 @@ create index if not exists billing_notices_pending_idx
 create index if not exists billing_notices_tenant_idx
   on public.billing_notices (tenant_id, created_at);
 
+create index if not exists billing_notices_sending_idx
+  on public.billing_notices (claimed_at)
+  where delivery_status = 'sending';
+
 comment on table public.billing_notices is
   'Billing outbox and the dashboard copy. One row, not three sends. Chief claims, sends on the existing notify path (billed_to platform, audience staff, stored idempotency_key), then settles. Do not gate on tenant_escalation_allowed. Call and voicemail updates are a different path.';
+
+comment on column public.billing_notices.claimed_at is
+  'When the sender last claimed the row. A sending row with claimed_at null or older than 15 minutes can be claimed again. idempotency_key stays.';
 
 create or replace function public.billing_notice_when(p_ts timestamptz)
 returns text
@@ -897,7 +923,8 @@ begin
   end if;
   if (new.delivery_status is distinct from old.delivery_status
       or new.notify_send_id is distinct from old.notify_send_id
-      or new.last_error is distinct from old.last_error)
+      or new.last_error is distinct from old.last_error
+      or new.claimed_at is distinct from old.claimed_at)
      and not v_delivery
   then
     raise exception 'delivery fields are the sender only';
@@ -906,6 +933,7 @@ begin
     if new.delivery_status is distinct from old.delivery_status
        or new.notify_send_id is distinct from old.notify_send_id
        or new.last_error is distinct from old.last_error
+       or new.claimed_at is distinct from old.claimed_at
     then
       raise exception 'mark-read cannot change delivery';
     end if;
@@ -1050,11 +1078,16 @@ begin
   perform set_config('scalers.billing_notice_delivery', '1', true);
   return query
   update public.billing_notices n
-  set delivery_status = 'sending'
+  set delivery_status = 'sending',
+      claimed_at = now()
   where n.id in (
     select id
     from public.billing_notices
     where delivery_status = 'pending'
+       or (
+         delivery_status = 'sending'
+         and (claimed_at is null or claimed_at < now() - interval '15 minutes')
+       )
     order by created_at
     for update skip locked
     limit p_limit
@@ -1064,7 +1097,7 @@ end;
 $$;
 
 comment on function public.claim_billing_notices(integer) is
-  'Marks pending billing notices as sending. Chief then uses the existing notify path. Does not send.';
+  'Marks pending billing notices as sending, and reclaims sending rows whose claimed_at is null or older than 15 minutes. Sets claimed_at. Does not change idempotency_key. Does not send.';
 
 revoke all on function public.claim_billing_notices(integer) from public, anon, authenticated;
 grant execute on function public.claim_billing_notices(integer) to service_role;
@@ -1090,9 +1123,9 @@ begin
   if not found then
     raise exception 'notice not found';
   end if;
-  if v_row.delivery_status = 'sent'
-     and v_row.notify_send_id is not distinct from p_notify_send_id
-  then
+  -- A sent notice stays sent. A later failed or skipped settle, or a
+  -- different notify_send_id, does not overwrite it.
+  if v_row.delivery_status = 'sent' then
     return v_row;
   end if;
   perform set_config('scalers.billing_notice_delivery', '1', true);
@@ -1105,6 +1138,9 @@ begin
   return v_row;
 end;
 $$;
+
+comment on function public.settle_billing_notice(uuid, text, uuid, text) is
+  'Records sent, failed, or skipped. A notice that is already sent is returned unchanged.';
 
 revoke all on function public.settle_billing_notice(uuid, text, uuid, text) from public, anon, authenticated;
 grant execute on function public.settle_billing_notice(uuid, text, uuid, text) to service_role;
@@ -1763,8 +1799,13 @@ grant execute on function public.tenant_escalation_allowed(uuid) to service_role
 
 -- ---------------------------------------------------------------------------
 -- 9. DID quarantine. Assignment skips a number until quarantine_until.
---    Voice lookup is unchanged: release still detaches the business number
---    to pending, and quarantine_pool_number keeps tenant_id.
+--    After that, release_expired_quarantine() returns it to available, and
+--    both assign functions will also take the expired row.
+--
+--    tenant_id: both quarantine_pool_number and release_did_from_business
+--    clear pool.tenant_id and write last_tenant_id. release_did_from_business
+--    also detaches the business number to pending:{id}. quarantine_pool_number
+--    does not change the business number.
 -- ---------------------------------------------------------------------------
 alter table public.sautikit_did_pool
   add column if not exists quarantine_until timestamptz,
@@ -1837,18 +1878,21 @@ begin
     raise exception 'quarantine until must be in the future';
   end if;
 
-  update public.sautikit_did_pool
-  set
-    status = 'quarantine',
-    quarantine_until = v_until,
-    quarantined_at = now(),
-    last_tenant_id = coalesce(tenant_id, last_tenant_id)
-  where e164 = v_e164
-  returning tenant_id into v_tenant;
-
+  select tenant_id into v_tenant
+  from public.sautikit_did_pool
+  where e164 = v_e164;
   if not found then
     raise exception 'DID % is not in the pool', v_e164;
   end if;
+
+  update public.sautikit_did_pool
+  set
+    status = 'quarantine',
+    tenant_id = null,
+    quarantine_until = v_until,
+    quarantined_at = now(),
+    last_tenant_id = coalesce(v_tenant, last_tenant_id)
+  where e164 = v_e164;
 
   perform public._billing_audit(
     p_actor,
@@ -1861,10 +1905,43 @@ end;
 $$;
 
 comment on function public.quarantine_pool_number(text, timestamptz, text, text) is
-  'Marks a pool number quarantine and keeps tenant_id so voice lookup is unchanged. Default length is the 30-day PLACEHOLDER. Does not route calls.';
+  'Marks a pool number quarantine, clears tenant_id, and keeps the previous business on last_tenant_id. Does not change the business number. Default length is the 30-day PLACEHOLDER. Does not route calls.';
 
 revoke all on function public.quarantine_pool_number(text, timestamptz, text, text) from public, anon, authenticated;
 grant execute on function public.quarantine_pool_number(text, timestamptz, text, text) to service_role;
+
+-- Exit from quarantine. A future hold stays. Called from both assign functions
+-- so a number is not stuck after quarantine_until.
+create or replace function public.release_expired_quarantine()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_count integer;
+begin
+  update public.sautikit_did_pool
+  set
+    status = 'available',
+    tenant_id = null,
+    last_tenant_id = coalesce(last_tenant_id, tenant_id),
+    assigned_at = null,
+    quarantine_until = null,
+    quarantined_at = null
+  where status = 'quarantine'
+    and quarantine_until is not null
+    and quarantine_until <= now();
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+comment on function public.release_expired_quarantine() is
+  'Returns expired quarantine rows to available and clears the hold. Keeps last_tenant_id. Does not assign a number.';
+
+revoke all on function public.release_expired_quarantine() from public, anon, authenticated;
+grant execute on function public.release_expired_quarantine() to service_role;
 
 -- Replaces did_number_pool.sql. Do not re-apply that file's assign functions after this.
 create or replace function public.assign_did_from_pool(p_tenant_id uuid)
@@ -1889,10 +1966,15 @@ begin
     return v_current;
   end if;
 
+  perform public.release_expired_quarantine();
+
   select *
   into v_row
   from public.sautikit_did_pool
-  where status = 'available'
+  where (
+      status = 'available'
+      or (status = 'quarantine' and quarantine_until <= now())
+    )
     and (quarantine_until is null or quarantine_until <= now())
   order by created_at asc
   for update skip locked
@@ -1906,7 +1988,9 @@ begin
   set
     status = 'assigned',
     tenant_id = p_tenant_id,
-    assigned_at = now()
+    assigned_at = now(),
+    quarantine_until = null,
+    quarantined_at = null
   where id = v_row.id;
 
   update public.tenants
@@ -1934,13 +2018,17 @@ begin
     raise exception 'tenant_id and e164 are required';
   end if;
 
+  -- The update below accepts an expired quarantine row before the sweeper
+  -- runs, so this path does not depend on release_expired_quarantine.
+  -- The sweeper still runs after a successful assign so other expired rows exit.
+
   if exists (
     select 1
     from public.sautikit_did_pool
     where e164 = v_e164
       and (
-        status = 'quarantine'
-        or (quarantine_until is not null and quarantine_until > now())
+        quarantine_until > now()
+        or (status = 'quarantine' and quarantine_until is null)
       )
   ) then
     raise exception 'DID % is in quarantine', v_e164;
@@ -1950,16 +2038,24 @@ begin
   set
     status = 'assigned',
     tenant_id = p_tenant_id,
-    assigned_at = now()
+    assigned_at = now(),
+    quarantine_until = null,
+    quarantined_at = null
   where e164 = v_e164
-    and status in ('available', 'reserved')
+    and (
+      status in ('available', 'reserved')
+      or (status = 'quarantine' and quarantine_until <= now())
+    )
   returning id into v_id;
 
   if v_id is null then
     raise exception 'DID % is not available in the pool', v_e164;
   end if;
 
-  -- Do not flip a quarantined row back to available.
+  perform public.release_expired_quarantine();
+
+  -- Do not flip a future quarantine row back to available. Expired rows
+  -- were already returned to available by release_expired_quarantine.
   update public.sautikit_did_pool
   set
     status = 'available',
@@ -2010,7 +2106,7 @@ begin
     status = 'quarantine',
     tenant_id = null,
     assigned_at = null,
-    last_tenant_id = coalesce(last_tenant_id, p_tenant_id),
+    last_tenant_id = p_tenant_id,
     quarantined_at = now(),
     quarantine_until = v_until
   where tenant_id = p_tenant_id
@@ -2033,6 +2129,9 @@ begin
   return v_e164;
 end;
 $$;
+
+comment on function public.release_did_from_business(uuid) is
+  'Detaches the business number to pending:{id}, clears pool.tenant_id, sets last_tenant_id to that business, and quarantines the number. Does not route calls.';
 
 revoke all on function public.assign_did_from_pool(uuid) from public, anon, authenticated;
 revoke all on function public.assign_specific_did_to_tenant(uuid, text) from public, anon, authenticated;
