@@ -39,6 +39,8 @@ export type OwnerBillingInput = {
   /** tenants.seat_included and tenant_seats_used() (members + unexpired invites). */
   seatsIncluded: number;
   seatsUsed: number;
+  /** Free beta: no invoices, and a missing package is not a charge. */
+  isBeta?: boolean;
   /** Team alert allowances still kept on tenants (not in the view yet). */
   alerts?: {
     email?: { included: number; used: number };
@@ -84,7 +86,7 @@ function num(raw: unknown): number {
 }
 
 function kes(n: number): string {
-  return `KES ${Math.round(n).toLocaleString("en-KE")}`;
+  return `KSh ${Math.round(n).toLocaleString("en-KE")}`;
 }
 
 function count(n: number): string {
@@ -128,13 +130,16 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     headline = `${packageName} · Free during beta. We count your usage so you can see it. Nothing is charged until we tell you.`;
     shortLabel = `${packageName} · Free during beta`;
   } else if (mode === "metered") {
-    headline = `${packageName} · ${priced}. Usage past what's included is added to your next invoice at the rates below.`;
+    headline = `${packageName} · ${priced}. Usage past what's included is billed at the rates below.`;
     shortLabel = `${packageName} · ${priced}`;
   } else if (mode === "capped") {
     headline = `${packageName} · ${priced}. When your included minutes run out, calls stop until ${endLabel || "the end of the month"} unless you turn on extra usage.`;
     shortLabel = `${packageName} · ${priced}`;
+  } else if (input.isBeta) {
+    headline = "Free during beta. Nothing is charged.";
+    shortLabel = "Free during beta";
   } else {
-    headline = "No package. All usage is billed at the rates below.";
+    headline = "No package.";
     shortLabel = "No package";
   }
 
@@ -179,7 +184,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     if (mode === "beta") {
       lowNotice = `${what}${until}. During beta nothing is charged and calls keep working.`;
     } else if (onDemand) {
-      lowNotice = `${what}${until}. Extra usage is on, so anything past this goes on your next invoice.`;
+      lowNotice = `${what}${until}. Extra usage is on, so anything past this is billed at the rates below.`;
     } else {
       lowNotice = lowMinutes
         ? `${what}${until}. When they run out, calls stop unless you turn on extra usage.`
@@ -193,10 +198,10 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
       ? "On. During beta nothing is charged. After beta, usage past what's included is billed at the rates below."
       : "Off. During beta nothing is charged. After beta, calls stop when included minutes run out.";
   } else if (mode === "none") {
-    onDemandHint = "Without a package, all usage is billed at the rates below.";
+    onDemandHint = input.isBeta ? "Nothing is charged during beta." : "No package.";
   } else {
     onDemandHint = onDemand
-      ? "On. Usage past what's included is added to your next invoice at the rates below."
+      ? "On. Usage past what's included is billed at the rates below."
       : `Off. When included minutes run out, calls stop until ${endLabel || "the end of the month"}.`;
   }
 
@@ -205,12 +210,24 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     packageName,
     headline,
     shortLabel,
-    ratesTitle: mode === "beta" ? "Rates after beta" : "Rates past what's included",
+    ratesTitle: mode === "beta" || (mode === "none" && input.isBeta) ? "Rates after beta" : "Rates past what's included",
     rows,
     minutesIncluded,
     minutesLeft,
     lowNotice,
     onDemandHint,
     periodEndLabel: endLabel,
+  };
+}
+
+/** Loader builds the view before the page knows beta. Same words as `isBeta` on the input. */
+export function presentFreeBeta(view: OwnerBillingView, isBeta: boolean): OwnerBillingView {
+  if (!isBeta || view.mode !== "none") return view;
+  return {
+    ...view,
+    headline: "Free during beta. Nothing is charged.",
+    shortLabel: "Free during beta",
+    ratesTitle: "Rates after beta",
+    onDemandHint: "Nothing is charged during beta.",
   };
 }

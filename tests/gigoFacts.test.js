@@ -5,7 +5,20 @@
 // Fixtures here use P0 owner rows (no value_hash). An ambient FACT_HASH_MODE=on
 // in the shell must not flip them; hash-mode cases set the flag per test.
 delete process.env.FACT_HASH_MODE;
-const { describe, it } = require('node:test');
+const { describe, it, before, after } = require('node:test');
+
+// These cases pin the flag-off wording ("confirm with the owner"). With
+// VOICE_FACT_REFS on, the team wording is covered in tests/factSheet.test.js,
+// so a suite run with the flag on must not leak in.
+let prevFactRefs;
+before(() => {
+  prevFactRefs = process.env.VOICE_FACT_REFS;
+  delete process.env.VOICE_FACT_REFS;
+});
+after(() => {
+  if (prevFactRefs == null) delete process.env.VOICE_FACT_REFS;
+  else process.env.VOICE_FACT_REFS = prevFactRefs;
+});
 const assert = require('node:assert/strict');
 const {
   validatePrice,
