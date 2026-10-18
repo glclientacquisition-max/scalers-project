@@ -10,12 +10,14 @@ import {
   verifyOpsResendDomain,
 } from "@/lib/opsMail";
 import { ackOpsNotice, loadOpsSettings, saveOpsSettings } from "@/lib/platformOps";
+import { countRecordingPurgeAtNextRun } from "@/lib/recordingRetentionAdmin";
 import {
   DEFAULT_SAUTIKIT_WARN_MINOR,
   OPS_NOTICE_KINDS,
   parseKindFlags,
   parseOpsEmails,
   parsePeople,
+  parseRecordingRetentionDays,
   type OpsNoticeKind,
 } from "@/lib/platformOpsModel";
 
@@ -41,6 +43,12 @@ export async function POST(request: Request) {
   const actor = await adminActorName();
 
   try {
+    if (action === "recording_retention_preview") {
+      const proposed = parseRecordingRetentionDays(body.recording_retention_days);
+      const { count, capped } = await countRecordingPurgeAtNextRun(proposed);
+      return NextResponse.json({ ok: true, count, capped });
+    }
+
     if (action === "save_settings") {
       const before = (await loadOpsSettings().catch(() => null))?.settings ?? null;
       const settings = await saveOpsSettings({
@@ -51,6 +59,10 @@ export async function POST(request: Request) {
         sautikitWarnMinor: Number.isFinite(Number(body.sautikit_warn_minor))
           ? Number(body.sautikit_warn_minor)
           : DEFAULT_SAUTIKIT_WARN_MINOR,
+        recordingRetentionDays:
+          body.recording_retention_days !== undefined
+            ? parseRecordingRetentionDays(body.recording_retention_days)
+            : before?.recordingRetentionDays ?? null,
       });
       await recordAdminAction({ actor, action: "save_alert_settings", before, after: settings });
       return NextResponse.json({ ok: true, settings });

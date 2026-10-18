@@ -1406,11 +1406,12 @@ function recordingRetentionCutoffIso(olderThanDays) {
 }
 
 /**
- * Calls older than the retention window that still have a recording pointer.
- * Skips rows already purged (summary.recording_deleted_at).
+ * Calls older than minOlderThanDays that still have a recording pointer.
+ * Per-tenant retention is applied in the purge batch (recordingRetention.js).
  */
-async function listCallsForRecordingRetentionPurge({ olderThanDays, limit = 50 } = {}) {
-  const cutoff = recordingRetentionCutoffIso(olderThanDays);
+async function listCallsForRecordingRetentionPurge({ olderThanDays, minOlderThanDays, limit = 50 } = {}) {
+  const days = minOlderThanDays ?? olderThanDays ?? 7;
+  const cutoff = recordingRetentionCutoffIso(days);
   const { data, error } = await supabase
     .from('calls')
     .select('id, tenant_id, sautikit_call_sid, recording_url, summary, created_at')
@@ -1419,6 +1420,24 @@ async function listCallsForRecordingRetentionPurge({ olderThanDays, limit = 50 }
     .order('created_at', { ascending: true })
     .limit(limit);
   throwIfError('listCallsForRecordingRetentionPurge', error);
+  return (data || []).filter((row) => {
+    const meta = parseSummary(row.summary);
+    if (meta.recording_deleted_at) return false;
+    return Boolean(row.recording_url || meta.recording_path);
+  });
+}
+
+/** Scan cap for admin purge preview counts. */
+async function listCallsWithRecordingsForRetentionScan({ minOlderThanDays = 7, limit = 5000 } = {}) {
+  const cutoff = recordingRetentionCutoffIso(minOlderThanDays);
+  const { data, error } = await supabase
+    .from('calls')
+    .select('tenant_id, created_at, recording_url, summary')
+    .lt('created_at', cutoff)
+    .or('recording_url.not.is.null,summary.like.%recording_path%')
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  throwIfError('listCallsWithRecordingsForRetentionScan', error);
   return (data || []).filter((row) => {
     const meta = parseSummary(row.summary);
     if (meta.recording_deleted_at) return false;
@@ -2982,6 +3001,7 @@ module.exports = {
   copyRecordingToStorage,
   listPendingRecordingCopies,
   listCallsForRecordingRetentionPurge,
+  listCallsWithRecordingsForRetentionScan,
   purgeCallRecordingRetention,
   recordingRetentionCutoffIso,
   upsertCallFacts,

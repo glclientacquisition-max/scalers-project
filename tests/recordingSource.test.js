@@ -72,8 +72,9 @@ test("CallRecording mounts the player only for a usable source", () => {
   assert.match(source, /CallAudioPlayer/);
   assert.match(source, /call-recording-empty/);
   assert.match(source, /call-recording-deleted/);
-  assert.match(source, /RECORDING_RETENTION_DELETED_COPY/);
-  assert.match(source, /RECORDING_RETENTION_NOTE/);
+  assert.match(source, /recordingRetentionDeletedLabel/);
+  assert.match(source, /recordingRetentionNote/);
+  assert.match(source, /effectiveRetention/);
   assert.match(source, /NO_RECORDING_COPY/);
   assert.match(source, /if \(!src\)/);
   assert.match(source, /variant === "player"/);

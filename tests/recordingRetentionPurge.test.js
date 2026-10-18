@@ -115,6 +115,11 @@ describe('recording retention purge', () => {
     assert.equal(listed.length, 2);
     assert.ok(listed.every((r) => r.created_at < cutoff));
 
+    const retentionContext = {
+      platformDays: 30,
+      overrides: new Map(),
+      envDays: 30,
+    };
     const batch = await purgeExpiredRecordingsBatch({
       listCalls: db.listCallsForRecordingRetentionPurge,
       purgeCall: db.purgeCallRecordingRetention,
@@ -122,7 +127,7 @@ describe('recording retention purge', () => {
         providerDeletes.push(sid);
         return { ok: true };
       },
-      olderThanDays: 30,
+      retentionContext,
       batchSize: 50,
       log: { info() {}, warn() {} },
     });
@@ -151,7 +156,7 @@ describe('recording retention purge', () => {
     const deps = {
       listCalls: db.listCallsForRecordingRetentionPurge,
       purgeCall: db.purgeCallRecordingRetention,
-      olderThanDays: 30,
+      retentionContext: { platformDays: 30, overrides: new Map(), envDays: 30 },
       log: { info() {}, warn() {} },
     };
     const first = await purgeExpiredRecordingsBatch(deps);
@@ -177,6 +182,40 @@ describe('recording retention purge', () => {
     assert.equal(result.purged, false);
     assert.equal(result.reason, 'tenant_mismatch');
     assert.ok(storageObjects.has('HD_guard/r.mp3'));
+  });
+
+  it('skips purge for never tenants while other tenants still purge', async () => {
+    const old = '2020-01-01T00:00:00.000Z';
+    seedRow({
+      sid: 'HD_never',
+      tenant: 't-never',
+      createdAt: old,
+      recordingUrl: 'https://provider/n.mp3',
+      summary: { recording_path: 'HD_never/r.mp3' },
+    });
+    storageObjects.add('HD_never/r.mp3');
+    seedRow({
+      sid: 'HD_purge',
+      tenant: 't-purge',
+      createdAt: old,
+      recordingUrl: 'https://provider/p.mp3',
+      summary: { recording_path: 'HD_purge/r.mp3' },
+    });
+    storageObjects.add('HD_purge/r.mp3');
+    const batch = await purgeExpiredRecordingsBatch({
+      listCalls: db.listCallsForRecordingRetentionPurge,
+      purgeCall: db.purgeCallRecordingRetention,
+      retentionContext: {
+        platformDays: 30,
+        overrides: new Map([['t-never', -1]]),
+        envDays: 30,
+      },
+      batchSize: 50,
+      log: { info() {}, warn() {} },
+    });
+    assert.equal(batch.purged, 1);
+    assert.ok(storageObjects.has('HD_never/r.mp3'));
+    assert.ok(!storageObjects.has('HD_purge/r.mp3'));
   });
 
   it('daily scheduler module exposes startRecordingRetentionDaily (wired from server.js)', () => {

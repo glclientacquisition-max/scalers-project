@@ -13,6 +13,7 @@ import { InboxSmsDock } from "@/components/InboxSmsDock";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { InboxTicketActionDock } from "@/components/InboxTicketActionDock";
 import { ContactStrip } from "@/components/ContactStrip";
+import type { EffectiveRetention } from "@/lib/recordingSource";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
 import { iconButtonClass } from "@/components/ui/IconButton";
@@ -207,6 +208,7 @@ export function InboxTicketView({
   turns,
   recordingUrl,
   recordingRetentionDeleted = false,
+  effectiveRecordingRetention,
   durationLabel,
   assistLabel,
   assistNote,
@@ -240,6 +242,7 @@ export function InboxTicketView({
   turns: TranscriptRow[];
   recordingUrl: string | null;
   recordingRetentionDeleted?: boolean;
+  effectiveRecordingRetention?: EffectiveRetention;
   durationLabel: string;
   assistLabel: string | null;
   assistNote: string | null;
@@ -591,6 +594,7 @@ export function InboxTicketView({
               <CallRecording
                 recordingUrl={recordingUrl}
                 retentionDeleted={recordingRetentionDeleted}
+                effectiveRetention={effectiveRecordingRetention}
               />
               {factsSlot ? <div className="pt-2">{factsSlot}</div> : null}
             </div>

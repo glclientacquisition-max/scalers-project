@@ -3,6 +3,8 @@
  * Does not inspect providers. A future signed URL is enough.
  */
 
+export type EffectiveRetention = number | "never";
+
 export function usableRecordingUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -19,12 +21,26 @@ export function recordingPlaybackKind(value: unknown): "player" | "empty" {
 
 export const NO_RECORDING_COPY = "No recording available for this call.";
 
-/** Matches Voice RECORDING_RETENTION_DAYS (src/lib/recordingRetention.js). */
+/** Default when no platform or tenant policy is loaded (env fallback). */
 export const RECORDING_RETENTION_DAYS = 30;
 
 export const RECORDING_RETENTION_DELETED_COPY = `Recording deleted after ${RECORDING_RETENTION_DAYS} days`;
 
 export const RECORDING_RETENTION_NOTE = `Recordings are kept for ${RECORDING_RETENTION_DAYS} days.`;
+
+export function recordingRetentionNote(effective: EffectiveRetention): string | null {
+  if (effective === "never") return null;
+  return `Recordings are kept for ${effective} days.`;
+}
+
+export function recordingRetentionDeletedLabel(effective: EffectiveRetention): string | null {
+  if (effective === "never") return null;
+  return `Recording deleted after ${effective} days`;
+}
+
+export function defaultEffectiveRecordingRetention(): EffectiveRetention {
+  return RECORDING_RETENTION_DAYS;
+}
 
 export function recordingDeletedByRetention(
   meta: Record<string, unknown> | null | undefined

@@ -1,14 +1,21 @@
 'use strict';
 
 /**
- * Daily purge of call recordings past RECORDING_RETENTION_DAYS (default 30).
+ * Daily purge of call recordings past effective retention (platform, tenant, env).
  * Uses the same hourly EAT tick as snapshot_data_quality (no pg_cron).
- *
- * SautiKit: we attempt DELETE /v1/calls/{id}/recording when purging. If the
- * API returns 404/405/501, provider-side retention applies (see recordingFetch).
  */
 
 const { eatDay, eatHour } = require('./dataQualityDaily');
+const {
+  callEligibleForRetentionPurge,
+  envRetentionDays,
+} = require('./recordingRetentionPolicy');
+const {
+  loadRecordingRetentionContext,
+  effectiveRetentionForTenant,
+  RETENTION_MIN_DAYS,
+} = require('./recordingRetentionSettings');
+const { minActiveRetentionDays } = require('./recordingRetentionPolicy');
 
 function retentionDays() {
   const n = Number(process.env.RECORDING_RETENTION_DAYS);
@@ -20,14 +27,15 @@ function retentionDays() {
  *   listCalls?: typeof import('../db').listCallsForRecordingRetentionPurge,
  *   purgeCall?: typeof import('../db').purgeCallRecordingRetention,
  *   deleteProvider?: (callSid: string) => Promise<{ ok?: boolean }>,
- *   olderThanDays?: number,
+ *   loadContext?: typeof loadRecordingRetentionContext,
+ *   retentionContext?: Awaited<ReturnType<typeof loadRecordingRetentionContext>>,
  *   batchSize?: number,
  *   log?: Console,
+ *   supabase?: import('@supabase/supabase-js').SupabaseClient,
  * }} deps
  */
 async function purgeExpiredRecordingsBatch(deps = {}) {
   const log = deps.log || console;
-  const days = deps.olderThanDays ?? retentionDays();
   const limit = deps.batchSize ?? 50;
   const listCalls = deps.listCalls;
   const purgeCall = deps.purgeCall;
@@ -36,10 +44,30 @@ async function purgeExpiredRecordingsBatch(deps = {}) {
     throw new Error('[recording-retention] listCalls and purgeCall required');
   }
 
-  const rows = await listCalls({ olderThanDays: days, limit });
+  const context =
+    deps.retentionContext ||
+    (deps.loadContext
+      ? await deps.loadContext(deps.supabase)
+      : await loadRecordingRetentionContext(require('../lib/supabaseClient').supabase));
+
+  const minDays = minActiveRetentionDays({
+    platformDays: context.platformDays,
+    overrides: context.overrides,
+    envDays: context.envDays,
+  });
+  if (minDays === null) {
+    return { candidates: 0, purged: 0, skipped: 0, retentionDisabled: true };
+  }
+
+  const rows = await listCalls({ minOlderThanDays: minDays, limit: limit * 4 });
+  const eligible = rows.filter((row) => {
+    const effective = effectiveRetentionForTenant(context, row.tenant_id);
+    return callEligibleForRetentionPurge(row.created_at, effective);
+  }).slice(0, limit);
+
   let purged = 0;
   let skipped = 0;
-  for (const row of rows) {
+  for (const row of eligible) {
     const callSid = row.sautikit_call_sid;
     if (!callSid) {
       skipped += 1;
@@ -62,12 +90,12 @@ async function purgeExpiredRecordingsBatch(deps = {}) {
     if (result.purged) purged += 1;
     else skipped += 1;
   }
-  if (purged || rows.length) {
+  if (purged || eligible.length) {
     log.info?.(
-      `[recording-retention] batch days=${days} candidates=${rows.length} purged=${purged} skipped=${skipped}`
+      `[recording-retention] batch minDays=${minDays} eligible=${eligible.length} purged=${purged} skipped=${skipped}`
     );
   }
-  return { candidates: rows.length, purged, skipped };
+  return { candidates: eligible.length, purged, skipped };
 }
 
 function startRecordingRetentionDaily({
@@ -87,7 +115,7 @@ function startRecordingRetentionDaily({
     if (day === lastDay || eatHour(now) < hour) return false;
     lastDay = day;
     try {
-      await purgeBatch({ olderThanDays: retentionDays() });
+      await purgeBatch();
       return true;
     } catch (err) {
       lastDay = null;
