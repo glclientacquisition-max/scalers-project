@@ -12,11 +12,10 @@ import {
 import { ackOpsNotice, loadOpsSettings, saveOpsSettings } from "@/lib/platformOps";
 import {
   DEFAULT_SAUTIKIT_WARN_MINOR,
-  OPS_NOTICE_KINDS,
+  isAckableOpsKind,
   parseKindFlags,
   parseOpsEmails,
   parsePeople,
-  type OpsNoticeKind,
 } from "@/lib/platformOpsModel";
 
 export async function GET() {
@@ -92,8 +91,8 @@ export async function POST(request: Request) {
     }
 
     if (action === "ack") {
-      const kind = String(body.kind || "") as OpsNoticeKind;
-      if (!OPS_NOTICE_KINDS.includes(kind)) {
+      const kind = String(body.kind || "");
+      if (!isAckableOpsKind(kind)) {
         return NextResponse.json({ error: "Unknown notice." }, { status: 400 });
       }
       await ackOpsNotice(kind);

@@ -41,10 +41,14 @@ describe("Super Admin Today: reads only", () => {
     assert.doesNotMatch(fnBody(ops, "loadOpsSettings"), WRITES);
     assert.doesNotMatch(fnBody(admin, "getAdminOverview"), WRITES);
     assert.doesNotMatch(fnBody(admin, "listBusinesses"), WRITES);
-    // Platform still runs the check, so alerts keep firing from there.
-    assert.match(fnBody(ops, "evaluatePlatformOps"), /persistOpen/);
-    assert.match(fnBody(ops, "evaluatePlatformOps"), /mailKinds/);
-    assert.match(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /evaluatePlatformOps/);
+    // Platform reads. The cron owns opening, claiming, and mailing notices.
+    assert.doesNotMatch(fnBody(ops, "evaluatePlatformOps"), /persistOpen|mailKinds|sendOpsMail/);
+    assert.match(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /readPlatformOps/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /evaluatePlatformOps/);
+    assert.match(read("dashboard/src/app/api/cron/ops-alerts/route.ts"), /cronAuthorized/);
+    assert.match(read("dashboard/src/lib/opsAlerts.ts"), /claimNotified/);
+    assert.doesNotMatch(read("dashboard/src/lib/textSmsBalance.ts"), /healthz/);
+    assert.doesNotMatch(read("dashboard/src/lib/opsAlerts.ts"), /\/healthz|templates\.js|ownerCallMessage/);
   });
 });
 

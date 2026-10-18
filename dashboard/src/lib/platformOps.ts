@@ -1,21 +1,17 @@
 import { adminErrorParts, isMissingTableError } from "@/lib/adminErrors";
 import { listDidPool, listPendingTenants } from "@/lib/didPool";
-import { sendOpsMail, isOpsMailConfigured } from "@/lib/opsMail";
+import { isOpsMailConfigured } from "@/lib/opsMail";
 import {
   defaultOpsSettings,
   deriveOpsSignals,
   deriveStatusStrip,
   emailsFromPeople,
   infraFromEnv,
-  kindLabel,
-  opsMailSubject,
   parseKindFlags,
   parseOpsEmails,
   parsePeople,
-  reconcileNotices,
   type OpsKindFlags,
   type OpsNotice,
-  type OpsNoticeKind,
   type OpsSettings,
   type OpsSignal,
 } from "@/lib/platformOpsModel";
@@ -176,42 +172,7 @@ export async function listOpenOpsNotices(): Promise<OpsNotice[]> {
   return (await readOpenOpsNotices()) ?? [];
 }
 
-async function persistOpen(kind: OpsNoticeKind, detail: string): Promise<void> {
-  const admin = getSupabaseAdmin();
-  const now = new Date().toISOString();
-  const { error } = await admin.from("platform_ops_notices").insert({
-    kind,
-    status: "open",
-    detail,
-    opened_at: now,
-    notified_at: now,
-  });
-  if (error) throw error;
-}
-
-async function persistNotify(kind: OpsNoticeKind, detail: string): Promise<void> {
-  const admin = getSupabaseAdmin();
-  const now = new Date().toISOString();
-  const { error } = await admin
-    .from("platform_ops_notices")
-    .update({ detail, notified_at: now })
-    .eq("kind", kind)
-    .in("status", ["open", "acked"]);
-  if (error) throw error;
-}
-
-async function persistResolve(kind: OpsNoticeKind): Promise<void> {
-  const admin = getSupabaseAdmin();
-  const now = new Date().toISOString();
-  const { error } = await admin
-    .from("platform_ops_notices")
-    .update({ status: "resolved", resolved_at: now })
-    .eq("kind", kind)
-    .in("status", ["open", "acked"]);
-  if (error) throw error;
-}
-
-export async function ackOpsNotice(kind: OpsNoticeKind): Promise<void> {
+export async function ackOpsNotice(kind: string): Promise<void> {
   const admin = getSupabaseAdmin();
   const { error } = await admin
     .from("platform_ops_notices")
@@ -219,31 +180,6 @@ export async function ackOpsNotice(kind: OpsNoticeKind): Promise<void> {
     .eq("kind", kind)
     .eq("status", "open");
   if (error) throw error;
-}
-
-async function mailKinds(
-  kinds: OpsNoticeKind[],
-  emails: string[],
-  signals: OpsSignal[],
-  recovered = false,
-): Promise<void> {
-  if (!isOpsMailConfigured() || !emails.length) return;
-  const byKind = new Map(signals.map((signal) => [signal.kind, signal]));
-  for (const kind of kinds) {
-    const signal = byKind.get(kind);
-    const detail = recovered ? `${kindLabel(kind)} recovered` : signal?.detail || kindLabel(kind);
-    const state = recovered ? "recovered" : "open";
-    await sendOpsMail({
-      to: emails,
-      subject: opsMailSubject(kind, recovered),
-      text: `${detail}\n\nOpen Platform: /admin/platform`,
-      // Platform notify_sends row; one per notice state per hour.
-      ledger: {
-        kind: `platform_ops_${kind}`,
-        key: `ops:desk:${kind}:${state}:${new Date().toISOString().slice(0, 13)}`,
-      },
-    });
-  }
 }
 
 type PlatformOpsSnapshot = {
@@ -257,7 +193,7 @@ type PlatformOpsSnapshot = {
 };
 
 /** Health reads and derived signals. Reads only: nothing here writes a notice or sends mail. */
-async function gatherPlatformSignals() {
+export async function gatherPlatformSignals() {
   const [{ settings, persisted }, pool, pending, expiredBeta, voice, telecom] = await Promise.all([
     loadOpsSettings(),
     listDidPool().catch(() => []),
@@ -280,7 +216,14 @@ async function gatherPlatformSignals() {
     waitingBusinesses: pending.length,
     expiredBetaCount: expiredBeta,
   });
-  return { settings, persisted, signals, strip: deriveStatusStrip(signals), voice };
+  return {
+    settings,
+    persisted,
+    signals,
+    strip: deriveStatusStrip(signals),
+    voice,
+    phoneKnown: telecom.status !== "not_configured",
+  };
 }
 
 function snapshotInfra(voice: Awaited<ReturnType<typeof fetchVoiceHealthz>>) {
@@ -311,43 +254,9 @@ export async function readPlatformOps(): Promise<PlatformOpsSnapshot> {
 }
 
 /**
- * Platform's check: reads the same signals, then opens, updates, and resolves notices and mails
- * the alert people. Runs when Platform loads. Today uses readPlatformOps instead.
+ * Read-only alias. Opening, resolving, and mailing notices belongs to the
+ * cron (`/api/cron/ops-alerts`), not to a Platform page load.
  */
 export async function evaluatePlatformOps(): Promise<PlatformOpsSnapshot> {
-  await requireSuperAdmin();
-  const { settings, persisted, signals, strip, voice } = await gatherPlatformSignals();
-  const existing = persisted ? await readOpenOpsNotices() : null;
-  // Without the notices table there is nothing to open, dedupe, or mail against.
-  const noticesReady = existing !== null;
-  const plan = reconcileNotices(existing ?? [], signals, settings.kinds);
-
-  if (noticesReady) {
-    const byKind = new Map(signals.map((signal) => [signal.kind, signal]));
-    for (const kind of plan.open) {
-      await persistOpen(kind, byKind.get(kind)?.detail || kindLabel(kind));
-    }
-    for (const kind of plan.notify.filter((k) => !plan.open.includes(k))) {
-      await persistNotify(kind, byKind.get(kind)?.detail || kindLabel(kind));
-    }
-    for (const kind of plan.resolve) {
-      await persistResolve(kind);
-    }
-    try {
-      await mailKinds(plan.notify, settings.emails, signals, false);
-      await mailKinds(plan.resolve, settings.emails, signals, true);
-    } catch (err) {
-      console.error("[admin:ops-mail]", err instanceof Error ? err.message : err);
-    }
-  }
-
-  return {
-    settings,
-    persisted,
-    signals,
-    strip,
-    notices: noticesReady ? await listOpenOpsNotices() : [],
-    infra: snapshotInfra(voice),
-    mailConfigured: isOpsMailConfigured(),
-  };
+  return readPlatformOps();
 }

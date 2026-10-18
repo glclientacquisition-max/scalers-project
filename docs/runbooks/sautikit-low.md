@@ -1,6 +1,6 @@
 ---
 owner: ops-billing
-last_reviewed: 2026-10-14
+last_reviewed: 2026-10-18
 ---
 
 # Runbook: `sautikit_low` alert
@@ -9,7 +9,7 @@ last_reviewed: 2026-10-14
 
 ## Symptom
 
-Desk ops notice: SautiKit wallet at or below `platform_ops_settings.sautikit_warn_minor` (default 50000 minor); critical when empty.
+Desk ops notice from the cron. The phone wallet crossed a threshold (default KES 500 and KES 100, plus Admin low-money). An empty wallet is one notice. A repeat reading does not open another. Recovery above a threshold re-arms it.
 
 ## Check
 
