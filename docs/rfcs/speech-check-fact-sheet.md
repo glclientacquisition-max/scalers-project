@@ -5,7 +5,7 @@ last_reviewed: 2026-10-18
 
 # Speech check redesign: one fact sheet, value checks, repair not delete
 
-**Status:** approved plan, build in progress on staging (18 Oct 2026). Alvin agreed the direction 18 Oct and said "execute end to end"; Chief ruled on ownership and prices the same day. Every step is behind a flag that starts off, goes to staging first, and needs its own GO from Alvin for prod. Current state of each step lives in [`STATUS.md`](../STATUS.md) (section 4).
+**Status:** approved plan, build in progress on staging (18 Oct 2026). Approved by Alvin 18 Oct 15:07 EAT in Voice's chat ("execute end to end"); ownership rulings by Chief 15:08 EAT, price ruling the same afternoon. Every step is behind a flag that starts off, goes to staging first, and needs its own GO from Alvin for prod. Current state of each step lives in [`STATUS.md`](../STATUS.md) (section 4).
 
 Full working notes (box, not in the repo): `/workspace/scalers/voice/research/2026-10-18_speech-guard-audit-and-industry.md` (audit and industry patterns) and `/workspace/scalers/voice/research/2026-10-18_fact-sheet-implementation-plan.md` (implementation plan, file and line references on `main` `2842c4f4`).
 
@@ -55,11 +55,11 @@ Each step: flag off by default, staging first, its own GO for prod, 0 live calls
 
 **Unconfirmed-price gate** (runs alongside step 6): `canSpeakPrice` in `src/conversation/pricingTrust.js` (Brain), behind `BRAIN_PRICE_CONFIRM_GATE` (on only when exactly `on`; off keeps today's behaviour; the flag check is the caller's job). It returns true when the row has no `pricing` record (legacy row), `pricing.confirmed === true`, or `pricing.source` is in Desk's closed owner-typed set; under `FACT_HASH_MODE` a meta hash mismatch forces false. A range counts as a price. When false, the slot falls to the existing `price_unknown` line ("the team will confirm the price"). Voice wires its two price paths to it: `catalogueMouth.fileServicePriceLine` and `speechGuard.groundFilePriceLine`.
 
-## Rulings (Chief of Scalers, 18 Oct)
+## Rulings (Chief of Scalers, 18 Oct 15:08 EAT)
 
 1. **Ownership.** Voice owns the value checks in `src/speech/factGuard.js` and the wording in `src/speech/spokenFacts/`. Brain keeps the claim checks in `src/conversation/speechGuard.js` (saved/job-close/hold/transfer claims, D199 name rules, coverage, slop) and the fact sheet builder (`src/conversation/factSheet.js`), and reviews the single hook from `speechGuard.js` into `factGuard.js`. After that hook, neither lane edits the other's file. Recorded in [`AGENTS.md`](../../AGENTS.md), [`BRAIN.md`](../reference/lanes/BRAIN.md) and [`VOICE.md`](../reference/lanes/VOICE.md).
 2. **Unconfirmed prices are not facts.** A `pricing.confirmed=false` price (that is not owner-typed or legacy, per `canSpeakPrice`) is never spoken as fact. The assistant says the team will confirm the price. The owner confirms prices through Desk's "Check this" card.
-3. **#761** merges with `BRAIN_TRUSTED_HOURS` off first (Alvin's GO 15:12 EAT via Chief); the build proceeds staging-first, flags off.
+3. **#761** merges with `BRAIN_TRUSTED_HOURS` off first (Alvin's GO 15:12 EAT in Chief's chat); the build proceeds staging-first, flags off.
 
 ## What happens to open drafts
 
