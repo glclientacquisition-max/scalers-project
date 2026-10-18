@@ -107,6 +107,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | PR | Lane | What | State |
 | --- | --- | --- | --- |
 | `BRAIN_CALL_FIXES_D199` | Brain | Turn on the #634 fixes on prod. | **On in prod** 18 Oct 13:31 EAT (Railway `67413ba8`, Vercel `dpl_4m1RFPGG`). Brain scores the next call. |
+| #758 | Desk | Settings quick fixes from the owner review (Alvin approved 13:21 EAT): Catalogue / prices links open the Catalogue, plus small Settings copy and display fixes. No SQL, no prompt or call-facing change. | **Pending ship (18 Oct).** GO Alvin 14:55 EAT. Merges in the next Voice deploy slot, before #762. Rollback once shipped: promote the previous prod Desk deployment, or revert the squash commit. |
 | #643 | Voice | Phone wallet low-balance alert. | GO'd, frozen. |
 | #731 | Voice | One owner alert per call, goodbye hangs up, 10 s no-audio close (main cut of #644 + #646). | GO'd, frozen. |
 | #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | Prod SQL and merge wait for a scored Aris call. Purge schedule not applied until a recordings deletion route exists. |
@@ -133,6 +134,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 | PR | Lane | What |
 | --- | --- | --- |
+| "Desk: Settings quick fixes" (`desk/settings-quick-fixes`, draft) | Desk | **18 Oct, pending ship.** Owner review fixes Alvin approved 13:21 EAT: "Add prices"/"Check prices" open the Catalogue; Policies hide prompt text, starter text shows once, "Holds and deposits" label, "Tap" only on touch; Back gesture asks before dropping edits; remove place/area asks first; forgiving catalogue import (headers, semicolons, "2,500", file picker, row warnings, Update prices); visible phone service labels; honest "Add to catalogue" toast; Identity placeholder and toast; 44 px "Yes, this is right". No schema, prompt or call-field change. |
 | #709 (ready, not draft) | Business Assistant | Business Assistant: area travel fees on calls, alert titles, request footers, enquiry mapping. |
 | #640 | Platform | Ops alerts on Vercel cron instead of page load. |
 | #712–#716, #719–#725 | Voice/Brain | NLU-first intent, outage debounce, Swahili verb lock, booking outranks list, regression-9 pack and fixes (R6–R9). |

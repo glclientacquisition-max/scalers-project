@@ -39,7 +39,7 @@ export function unpricedCount(tenant: { product_catalog?: unknown; services_cata
   );
 }
 
-export const UNPRICED_HREF = `${businessSettingsHref("train", "catalog")}&filter=unpriced`;
+export const UNPRICED_HREF = `${businessSettingsHref("catalog")}&filter=unpriced`;
 
 export { unpricedLabelText as unpricedLabel } from "./unpricedCopy";
 
@@ -79,7 +79,7 @@ export function structuredSettingsSlots({
 export function dataChecksFor(tenant: { product_catalog?: unknown; services_catalog?: unknown; business_policies?: unknown }): DataCheck[] {
   const out: DataCheck[] = [];
   const prices = pricesToConfirm(tenant).length;
-  if (prices) out.push({ href: businessSettingsHref("train", "catalog"), label: `Check ${prices} price${prices === 1 ? "" : "s"}`, detail: "We read them from your notes. Callers hear these." });
+  if (prices) out.push({ href: businessSettingsHref("catalog"), label: `Check ${prices} price${prices === 1 ? "" : "s"}`, detail: "We read them from your notes. Callers hear these." });
   const unpriced = unpricedCount(tenant);
   if (unpriced) out.push({ href: UNPRICED_HREF, label: unpricedLabelText(unpriced), detail: "Add a price, or choose Ask so callers get a call back." });
   const pay = paymentsFrom(tenant.business_policies);

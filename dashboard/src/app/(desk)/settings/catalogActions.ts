@@ -218,10 +218,9 @@ export async function applyCatalogImportAction(
   }
   if (!products.length) return { error: "No products selected." };
 
-  const mode =
-    String(formData.get("merge_mode") || "merge") === "replace"
-      ? "replace"
-      : "merge";
+  const rawMode = String(formData.get("merge_mode") || "merge");
+  const mode: "merge" | "update" | "replace" =
+    rawMode === "replace" ? "replace" : rawMode === "update" ? "update" : "merge";
   const includeSocial = String(formData.get("include_social") || "") === "1";
   let social = normalizeSocialHandles(tenant.social_handles);
   if (includeSocial) {
@@ -294,7 +293,8 @@ export async function applyCatalogImportAction(
     );
   }
 
-  let message = "Catalogue saved for the next call.";
+  // Unconfirmed rows are not what callers hear yet; say so instead of "saved for the next call".
+  let message = "Added to your catalogue. Check the prices to confirm them.";
   if (confirm) {
     try {
       const compiled = await recompileAfterCatalogImport({
@@ -303,10 +303,10 @@ export async function applyCatalogImportAction(
         productCatalog: merged,
       });
       message = compiled.ok
-        ? "Live catalog updated."
-        : "Live catalog updated. Assistant refresh pending.";
+        ? "Catalogue updated for the next call."
+        : "Catalogue updated. Business Assistant refresh pending.";
     } catch {
-      message = "Live catalog updated. Assistant refresh pending.";
+      message = "Catalogue updated. Business Assistant refresh pending.";
     }
     const first = merged[0];
     // Hash mode confirmed the imported rows above, before the recompile.
