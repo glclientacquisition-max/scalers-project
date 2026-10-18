@@ -120,7 +120,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 **Ops-Billing (dated per the STATUS rule):**
 
 - **18 Oct 2026, in flight: #775** billing data layer (`cursor/billing-data-layer-cc4b`). Staging SQL only (section 3). No charges, no send-path change, no prod SQL.
-- **18 Oct 2026, in flight:** invoice pay (`cursor/invoice-pay-0c16`), stacked on #775. Pay tokens, public `/pay/<token>`, mock Bachs checkout, webhook inbox, split parts above KSh 150,000, and a report-only reconciliation. SQL is `docs/supabase/invoice_pay.sql`. Not applied on staging or prod. No keys. Live mode is refused. Desk handoff: [`INVOICE_PAY.md`](reference/operations/INVOICE_PAY.md).
+- **18 Oct 2026, in flight: #780** invoice pay (`cursor/invoice-pay-0c16`), stacked on #775. Pay tokens, public `/pay/<token>`, mock Bachs checkout, webhook inbox, split parts above KSh 150,000, and a report-only reconciliation. SQL is `docs/supabase/invoice_pay.sql`. Not applied on staging or prod. No keys. Live mode is refused. Desk handoff: [`INVOICE_PAY.md`](reference/operations/INVOICE_PAY.md).
 
 
 
