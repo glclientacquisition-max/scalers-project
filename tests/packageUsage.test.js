@@ -50,6 +50,12 @@ describe("package usage meter", () => {
     assert.doesNotMatch(page, /daysRemainingAtPace/);
   });
 
+  it("stacks each Usage column on its own at lg so the minutes card is not stretched", () => {
+    const summary = read("dashboard/src/components/plan/UsageSummary.tsx");
+    assert.match(summary, /lg:grid lg:grid-cols-12 lg:items-start/);
+    assert.match(summary, /contents lg:col-span-7 lg:flex lg:min-w-0 lg:flex-col lg:gap-6/);
+    assert.doesNotMatch(summary, /lg:row-span-2/);
+  });
 
   it("does not list package prices on the landing page", () => {
     const catalog = read("dashboard/src/lib/packageCatalog.ts");

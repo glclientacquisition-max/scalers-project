@@ -83,36 +83,41 @@ export function UsageSummary({
         }
       />
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
-        <section aria-label="Minutes" className="min-w-0 rounded-2xl border border-hairline bg-surface p-4 lg:col-span-7">
-          <p className={`font-display text-display tabular-nums ${toneText(tone)}`}>{count(minutesLeft)}</p>
-          <p className="text-body text-ink-2">
-            Minutes left{periodEndLabel ? ` until ${periodEndLabel}` : ""}
-          </p>
-          {minuteMax > 0 ? (
-            <>
-              <p className="mt-4 text-meta tabular-nums text-ink-2">
-                {count(minutesUsed)} used of {count(minutesIncluded)}
-              </p>
-              <UsageBar used={minutesUsed} included={minuteMax} tone={tone} label="Minutes used" className="mt-2" />
-              {tone !== "ok" ? (
-                <p role="status" className="mt-3 text-meta font-medium text-warn">
-                  {tone === "full" ? "Out of minutes" : "Running low on minutes"}
+      {/* Each lg column stacks on its own so a tall right column never stretches the minutes card.
+          Below lg the left wrapper is display: contents and order keeps minutes, allowances, extra usage. */}
+      <div className="mt-6 flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
+        <div className="contents lg:col-span-7 lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
+          <section aria-label="Minutes" className="order-1 min-w-0 rounded-2xl border border-hairline bg-surface p-4 lg:order-none">
+            <p className={`font-display text-display tabular-nums ${toneText(tone)}`}>{count(minutesLeft)}</p>
+            <p className="text-body text-ink-2">
+              Minutes left{periodEndLabel ? ` until ${periodEndLabel}` : ""}
+            </p>
+            {minuteMax > 0 ? (
+              <>
+                <p className="mt-4 text-meta tabular-nums text-ink-2">
+                  {count(minutesUsed)} used of {count(minutesIncluded)}
                 </p>
-              ) : null}
-              {tone !== "ok" && entry ? (
-                <ButtonLink href={entry.href} variant="tonal" block className="mt-3">
-                  {entry.label}
-                </ButtonLink>
-              ) : null}
-            </>
-          ) : (
-            <p className="mt-2 text-body text-ink-2">No package minutes</p>
-          )}
-        </section>
+                <UsageBar used={minutesUsed} included={minuteMax} tone={tone} label="Minutes used" className="mt-2" />
+                {tone !== "ok" ? (
+                  <p role="status" className="mt-3 text-meta font-medium text-warn">
+                    {tone === "full" ? "Out of minutes" : "Running low on minutes"}
+                  </p>
+                ) : null}
+                {tone !== "ok" && entry ? (
+                  <ButtonLink href={entry.href} variant="tonal" block className="mt-3">
+                    {entry.label}
+                  </ButtonLink>
+                ) : null}
+              </>
+            ) : (
+              <p className="mt-2 text-body text-ink-2">No package minutes</p>
+            )}
+          </section>
+          {children ? <div className="order-3 min-w-0 space-y-6 lg:order-none">{children}</div> : null}
+        </div>
 
         {seats || credits ? (
-          <div className="min-w-0 space-y-6 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1">
+          <div className="order-2 min-w-0 space-y-6 lg:order-none lg:col-span-5 lg:col-start-8 lg:row-start-1">
             {seats ? (
               <section aria-labelledby="usage-team">
                 <h2 id="usage-team" className="mb-2 px-1 text-meta font-medium text-ink-2">
@@ -170,8 +175,6 @@ export function UsageSummary({
             ) : null}
           </div>
         ) : null}
-
-        {children ? <div className="min-w-0 space-y-6 lg:col-span-7">{children}</div> : null}
       </div>
     </div>
   );
