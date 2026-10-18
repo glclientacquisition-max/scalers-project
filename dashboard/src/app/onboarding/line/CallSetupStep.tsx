@@ -7,7 +7,6 @@ import { CopyCode } from "@/components/CopyCode";
 import { cx } from "@/lib/cx";
 import {
   ALL_OFF_CODE,
-  CHECK_CODES,
   CHOICE_COPY,
   NETWORKS,
   NETWORK_LABEL,
@@ -17,8 +16,6 @@ import {
   forwardOffCode,
   forwardOnCode,
   networkCodeNote,
-  networkHelpLine,
-  noAnswerFallbackCodes,
   phoneFromUserAgent,
   ringHelp,
   ringSeconds,
@@ -26,10 +23,12 @@ import {
   type NetworkId,
   type PhoneKind,
 } from "@/lib/callForwarding";
+import { saveCallSetupAction } from "./callSetupActions";
+import { CallSetupTest } from "./CallSetupTest";
 import {
   browserCallSetupStore,
   emptyCallSetup,
-  testIncludesBusy,
+  migrateLocalToDb,
   type CallSetup,
   type CallSetupOption,
 } from "@/lib/callSetupStore";
@@ -162,6 +161,8 @@ export function CallSetupStep({
   number,
   pretty,
   initialOption = null,
+  server = null,
+  testFromSuggestion = null,
 }: {
   tenantId: string;
   /** Scalers number in local 07 form, digits only. */
@@ -169,18 +170,59 @@ export function CallSetupStep({
   pretty: string;
   /** Dev fixture only: open on an option when nothing is saved. */
   initialOption?: CallSetupOption | null;
+  /** Account value. Null or unsupported: browser storage only (fixture, or before the column exists). */
+  server?: { supported: boolean; setup: CallSetup | null } | null;
+  /** Teammate's number (+254) to pre-fill the test phone, or null. */
+  testFromSuggestion?: string | null;
 }) {
   const store = useRef(browserCallSetupStore());
-  const [setup, setSetup] = useState<CallSetup>(() => ({ ...emptyCallSetup(), option: initialOption }));
+  const dbRef = useRef(Boolean(server?.supported));
+  // Saves run one at a time so two quick taps can't overwrite each other.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const persist = (patch: Partial<CallSetup>) => {
+    if (!dbRef.current) return;
+    queue.current = queue.current.then(() =>
+      saveCallSetupAction(tenantId, patch, { opened: true })
+        .then((res) => {
+          if (!res.ok && res.unsupported) dbRef.current = false;
+        })
+        .catch(() => undefined)
+    );
+  };
+  const [setup, setSetup] = useState<CallSetup>(() => ({
+    ...(server?.setup ?? emptyCallSetup()),
+    option: server?.setup?.option ?? initialOption,
+  }));
   const [loaded, setLoaded] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
+  const [watch, setWatch] = useState(false);
 
   useEffect(() => {
-    const saved = store.current.load(tenantId);
-    const phone = saved.phone ?? phoneFromUserAgent(navigator.userAgent);
-    setSetup({ ...saved, option: saved.option ?? initialOption, phone });
+    const local = store.current.load(tenantId);
+    const ua = phoneFromUserAgent(navigator.userAgent);
+    if (!dbRef.current) {
+      setSetup({ ...local, option: local.option ?? initialOption, phone: local.phone ?? ua });
+      setLoaded(true);
+      return;
+    }
+    const db = server?.setup ?? null;
+    // One-time copy of the v1 browser value; otherwise just stamp "opened" once.
+    const copy = migrateLocalToDb(db, local, new Date().toISOString());
+    const shown = copy ?? db ?? emptyCallSetup();
+    setSetup({ ...shown, option: shown.option ?? initialOption, phone: shown.phone ?? ua });
     setLoaded(true);
+    setWatch(true);
+    if (copy || !db?.opened_at) persist(copy ?? {});
+    // Server value is read once on mount; later edits are local first.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, initialOption]);
+
+  function updateLocal(patch: Partial<CallSetup>) {
+    setSetup((prev) => {
+      const next = { ...prev, ...patch };
+      store.current.save(tenantId, next);
+      return next;
+    });
+  }
 
   function update(patch: Partial<CallSetup>) {
     setSetup((prev) => {
@@ -188,6 +230,7 @@ export function CallSetupStep({
       store.current.save(tenantId, next);
       return next;
     });
+    persist(patch);
   }
 
   const ring = ringSeconds(setup.ring_seconds);
@@ -204,7 +247,6 @@ export function CallSetupStep({
     update({ choices: next.length ? next : ["all"] });
   }
 
-  const tested = Boolean(setup.tested_at);
   const option = setup.option;
   let stepN = 1;
 
@@ -350,112 +392,18 @@ export function CallSetupStep({
 
       {option ? (
         <Step n={stepN++} title="Test it">
-          <div className={cardBase}>
-            {tested ? (
-              <div role="status">
-                <p className="text-body font-semibold text-ok">You&apos;re all set.</p>
-                <p className="mt-1 text-body text-ink-2">
-                  {option === "forward"
-                    ? "Missed calls now go to your assistant."
-                    : `Calls to ${pretty} go to your assistant.`}
-                </p>
-                <Button type="button" variant="ghost" size="md" className="mt-2 -ml-4" onClick={() => update({ tested_at: null })}>
-                  Test again
-                </Button>
-              </div>
-            ) : (
-              <>
-                {option === "forward" ? (
-                  <p className="text-body text-ink-2">
-                    Ask a friend to call your business number. Let it ring and don&apos;t pick up. After about {ring}{" "}
-                    seconds your assistant should answer with your business name.
-                    {testIncludesBusy(setup.choices) ? " Then ask them to call again and press the red button." : ""}
-                  </p>
-                ) : (
-                  <p className="text-body text-ink-2">
-                    Call <span className="font-semibold tabular-nums text-ink">{pretty}</span> from your phone and listen
-                    to your assistant.
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" variant="primary" onClick={() => update({ tested_at: new Date().toISOString() })}>
-                    I tested it
-                  </Button>
-                  <Button type="button" variant="ghost" aria-expanded={helpOpen} onClick={() => setHelpOpen(true)}>
-                    It didn&apos;t work
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-
-          {option === "main_number" && helpOpen && !tested ? (
-            <p role="status" className="mt-3 rounded-2xl border border-hairline bg-surface px-4 py-3 text-meta text-ink-2">
-              <span className="font-semibold text-ink">No answer? </span>
-              Check you dialled {pretty}, wait a minute and call again. If your assistant still doesn&apos;t answer, reply
-              to any Scalers email and we&apos;ll check your line.
-            </p>
-          ) : null}
-
-          {option === "forward" ? (
-            <details
-              className="group mt-3 rounded-2xl border border-hairline bg-surface"
-              open={helpOpen || undefined}
-              onToggle={(event) => setHelpOpen((event.target as HTMLDetailsElement).open)}
-            >
-              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 text-body font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand [&::-webkit-details-marker]:hidden">
-                <span aria-hidden className="inline-block w-3 text-center text-ink-3 transition-transform duration-fast group-open:rotate-90">
-                  ›
-                </span>
-                If it didn&apos;t work
-              </summary>
-              <div className="grid gap-4 px-4 pb-4 text-meta text-ink-2">
-                <AirtimeNote />
-                <div>
-                  <p className="font-semibold text-ink">&quot;Connection problem&quot; or &quot;Invalid code&quot;?</p>
-                  <p className="mt-0.5">
-                    Use Other choices instead. If &quot;When I don&apos;t answer&quot; still fails, try these in turn:
-                  </p>
-                  {noAnswerFallbackCodes(number, ring).map((code, i) => (
-                    <CopyCode
-                      key={code}
-                      className="mt-2"
-                      label={i === 0 ? "Try this first" : "Then this (your network's ring time)"}
-                      code={code}
-                      dial={dialHref(code, phone)}
-                      size="sm"
-                    />
-                  ))}
-                </div>
-                {phone !== "iphone" ? (
-                  <p>
-                    <span className="font-semibold text-ink">Still an error on Android? </span>
-                    Turn off VoLTE or 4G calling for the business SIM, dial again, then turn it back on. Or open Phone,
-                    three dots, Settings, Calls, Call forwarding. Fill When busy, When unanswered and When unreachable
-                    with {number}. Leave Always forward off.
-                  </p>
-                ) : null}
-                <p>
-                  <span className="font-semibold text-ink">You used voicemail before? </span>
-                  These codes replace it, so missed calls go to your assistant instead.
-                </p>
-                <div>
-                  <p className="font-semibold text-ink">Check what&apos;s on</p>
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    {CHECK_CODES.map((code) => (
-                      <code key={code} translate="no" className="rounded-lg bg-surface-2 px-2 py-1 font-mono text-body text-ink">
-                        {code}
-                      </code>
-                    ))}
-                  </div>
-                </div>
-                <p>
-                  <span className="font-semibold text-ink">Still stuck? </span>
-                  {networkHelpLine(setup.network)} Or reply to any Scalers email and we&apos;ll help.
-                </p>
-              </div>
-            </details>
-          ) : null}
+          <CallSetupTest
+            tenantId={tenantId}
+            setup={setup}
+            number={number}
+            pretty={pretty}
+            ring={ring}
+            phone={phone}
+            suggestion={testFromSuggestion}
+            watch={watch}
+            onSave={update}
+            onLocal={updateLocal}
+          />
         </Step>
       ) : null}
 

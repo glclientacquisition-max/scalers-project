@@ -153,7 +153,14 @@ describe("saved picks and the Overview card", () => {
     assert.equal(store.parseCallSetup({ ring_seconds: 45 }).ring_seconds, 20);
     assert.equal(store.parseCallSetup({ tested_at: "not a date" }).tested_at, null);
     const row = { option: "main_number", network: "safaricom", phone: "android", choices: [], ring_seconds: 15, tested_at: "2026-10-18T09:00:00Z" };
-    assert.deepEqual(store.parseCallSetup(row), { ...row, choices: ["all"] });
+    // v2 (account copy) adds how/when fields and stores times as full ISO UTC.
+    assert.deepEqual(store.parseCallSetup(row), {
+      ...store.emptyCallSetup(),
+      ...row,
+      choices: ["all"],
+      tested_at: "2026-10-18T09:00:00.000Z",
+      tested_via: "manual",
+    });
   });
 
   it("shows 'Finish setting up your calls' once the number exists, until tested", () => {
@@ -176,7 +183,8 @@ describe("saved picks and the Overview card", () => {
     assert.match(line, /const local = pending \? null : toLocal07\(raw\)/);
     assert.match(line, /\{local \? <CallSetupStep/);
     const home = readFileSync("dashboard/src/app/(desk)/home/page.tsx", "utf8");
-    assert.match(home, /<HomeCallSetupCard tenantId=\{tenant\.id\} numberReady=\{toLocal07\(tenant\.sautikit_virtual_number\) !== null\}/);
+    assert.match(home, /const numberReady = toLocal07\(tenant\.sautikit_virtual_number\) !== null;/);
+    assert.match(home, /<HomeCallSetupCard[\s\S]{0,120}?numberReady=\{numberReady\}/);
     const card = readFileSync("dashboard/src/components/HomeCallSetupCard.tsx", "utf8");
     assert.match(card, /href="\/onboarding\/line"/);
     assert.match(card, /Finish setting up your calls/);

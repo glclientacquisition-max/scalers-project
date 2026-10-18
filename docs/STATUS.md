@@ -72,6 +72,7 @@ Earlier merges since 9 Oct (see git log for detail):
 
 ### Ops changes (not code), 18 Oct
 
+- **18 Oct 14:59 EAT: #762 prod SQL applied** (Supabase `fjxcdccgyhnvnnlnovcl`, `apply_migration` `tenant_call_setup`, file `supabase/migrations/20261018130000_tenant_call_setup.sql`, md5 `5d2069ab…`). SHA: none (the PR is not merged; file from branch head `97ceb174`). Adds the nullable `tenants.call_setup` jsonb column, the CHECK `tenants_call_setup_valid` (via `call_setup_valid()`), and the `save_call_setup(uuid, jsonb)` RPC: security definer, gated by `member_can_admin`, with the v2 `test_from` rule and the 30-minute test-call check. Function definitions are identical to staging (md5 `5ebdb4db…` and `cc5387c3…`). `save_call_setup` can be run by signed-in users and the service role, not anon. Signed-in users can't update the column directly. 0 rows changed (0 tenants have `call_setup`). Snapshot and rollback on the box: `/workspace/reports/call-setup/v2/prod/` (`rollback-762-prod.sql`: drop the RPC, the check, the validator and the column). Approved by Alvin 18 Oct 14:55 EAT; Voice cleared the additive SQL during its window.
 - **SMS counter reconcile applied on prod** (09:10 EAT): Esga 440 → 193, Aris 207 → 147, SBS 8 → 4 (counter set to sent units from the ledger). Pre-snapshot and rollback (not applied) are on the box: `/workspace/scalers/ops/2026-10-18_sms_counter_reconcile_pre.txt` and `/workspace/scalers/ops/2026-10-18_sms_counter_reconcile_rollback.sql`.
 - **18 Oct 08:40 EAT: Aris `events_url` fixed** (+254709221536, prod workspace). SHA: none (SautiKit provider config). Changed from the dead host `https://scalers-production-production.up.railway.app/voice/events` (typo) to `https://scalers-project-production.up.railway.app/voice/events`, read back with a GET after the change. Every Aris event, including recording ready, had been getting no answer from the dead host. Voice webhook URL and number mapping unchanged (`/`). Rollback: PUT the old value (not recommended; it is a dead host). Approver: Alvin via Chief, 08:40.
 - **18 Oct ~08:41 EAT: Esga `events_url` fixed** (+254709221542, prod workspace). SHA: none (provider config). Changed from prod `/` to prod `/voice/events` (`https://scalers-project-production.up.railway.app/voice/events`), read back. Its call events had been reaching the inbound-call handler at `/`. Voice webhook URL and mapping unchanged. Rollback: PUT `https://scalers-project-production.up.railway.app/` (not recommended; it sends events to the inbound handler). Approver: Alvin via Chief, 08:40 (same GO).
@@ -95,6 +96,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 - **#737** (Desk Suspend/Archive/Purge): SQL applied on **staging only** (*per team notes*).
 - Caller files memory v2 SQL (#673) is applied on **staging only** (carried from 14 Oct).
+- **#762** (Desk call setup per account): `tenants.call_setup` + `save_call_setup()` applied on staging 18 Oct 13:34 EAT; re-applied 14:19 EAT with the test phone fields (`test_from`, `test_started_at`) and the test-call check. Additive, 0 rows changed. **Also on prod since 18 Oct 14:59 EAT** (see Ops changes); the #762 code is not on prod yet.
 
 ---
 
@@ -107,11 +109,12 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | PR | Lane | What | State |
 | --- | --- | --- | --- |
 | `BRAIN_CALL_FIXES_D199` | Brain | Turn on the #634 fixes on prod. | **On in prod** 18 Oct 13:31 EAT (Railway `67413ba8`, Vercel `dpl_4m1RFPGG`). Brain scores the next call. |
-| #758 | Desk | Settings quick fixes from the owner review (Alvin approved 13:21 EAT): Catalogue / prices links open the Catalogue, plus small Settings copy and display fixes. No SQL, no prompt or call-facing change. | **Pending ship (18 Oct).** GO Alvin 14:55 EAT. Merges in the next Voice deploy slot, before #762. Rollback once shipped: promote the previous prod Desk deployment, or revert the squash commit. |
+| #758 | Desk | Settings quick fixes from the owner review (Alvin approved 13:21 EAT): Catalogue / prices links open the Catalogue, plus small Settings copy and display fixes. No SQL, no prompt or call-facing change. | **Shipped 18 Oct 15:08 EAT:** squash `52498db9`; Vercel prod `dpl_DBSyRwgU4eg9bRQwPnvQB2t9XuRT` READY on app, admin and www, no runtime errors; Railway `7dfbf4e9` SUCCESS, `/healthz` ok on `52498db9`. Rollback: promote `dpl_738F4MizcCCtAM87wfGPhqoAiiJx` (`adab1e81`) or revert `52498db9`. GO Alvin 14:55 EAT. |
 | #643 | Voice | Phone wallet low-balance alert. | GO'd, frozen. |
 | #731 | Voice | One owner alert per call, goodbye hangs up, 10 s no-audio close (main cut of #644 + #646). | GO'd, frozen. |
 | #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | Prod SQL and merge wait for a scored Aris call. Purge schedule not applied until a recordings deletion route exists. |
 | #733 | Brain | D199 visit read (last one only, paged). (#732 merged 18 Oct 14:48, `13ddf19d`.) | Need Alvin's GO. |
+| #762 | Desk | Call setup per account (follow-up to #755): picks saved on the account (one-time copy from the browser); "Forwarding works" only when a call from the owner's named test phone arrives within 30 minutes of starting the test (other calls only show "Calls are reaching your assistant"); fix checklist when the test fails; Settings > Calls & forwarding; Overview note after 7 days without a call. | **Pending ship (18 Oct).** GO Alvin 14:55 EAT. Prod SQL applied 14:59 EAT (Ops changes). Code merges in the next Voice deploy slot, right after #758. Until then prod Desk keeps using browser storage. |
 
 **Ops-Billing (dated per the STATUS rule):**
 

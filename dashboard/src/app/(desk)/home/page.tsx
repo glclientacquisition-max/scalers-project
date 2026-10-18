@@ -46,6 +46,8 @@ import { HomeCapture } from "@/components/HomeCapture";
 import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { HomeCallSetupCard } from "@/components/HomeCallSetupCard";
 import { toLocal07 } from "@/lib/callForwarding";
+import { loadCallSetupState } from "@/lib/callSetupServer";
+import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
 import { getTenantCompletenessScore, getTenantHoldGate } from "@/lib/deskProvenance";
 import { captureFilledDomains } from "@/lib/completenessStub";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
@@ -109,7 +111,8 @@ async function HomeOverviewBody() {
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const [todayRes, inbox, billing, score, hold, insights] = await Promise.all([
+  const numberReady = toLocal07(tenant.sautikit_virtual_number) !== null;
+  const [todayRes, inbox, billing, score, hold, insights, callSetup] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
@@ -120,7 +123,11 @@ async function HomeOverviewBody() {
     getTenantCompletenessScore(tenant.id),
     getTenantHoldGate(tenant.id),
     loadCallInsights(client, tenant.id, 30, tenant.faqs),
+    numberReady ? loadCallSetupState(tenant.id) : Promise.resolve(null),
   ]);
+  const callSetupStatus = callSetup?.supported
+    ? resolveCallSetupStatus({ numberReady, setup: callSetup.setup, activity: callSetup.activity, now: Date.now() })
+    : null;
   timer.mark("data");
   console.info(timer.line("home"));
   if (inbox.error) {
@@ -414,7 +421,14 @@ async function HomeOverviewBody() {
             </>
           ) : null}
         </section>
-        <HomeCallSetupCard tenantId={tenant.id} numberReady={toLocal07(tenant.sautikit_virtual_number) !== null} />
+        <RoleGate action="settings.edit" mode="hide">
+          <HomeCallSetupCard
+            tenantId={tenant.id}
+            numberReady={numberReady}
+            supported={Boolean(callSetup?.supported)}
+            status={callSetupStatus}
+          />
+        </RoleGate>
         <DataChecksCard checks={dataChecksFor(tenant)} />
         {insights ? (
           <CallInsights insights={insights} />

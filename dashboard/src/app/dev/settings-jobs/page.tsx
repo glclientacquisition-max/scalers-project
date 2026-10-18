@@ -1,6 +1,9 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { BusinessSettingsShell } from "@/components/BusinessSettingsShell";
+import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
+import { emptyCallSetup } from "@/lib/callSetupStore";
+import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
 import { DeskPhonePull } from "@/components/PhonePullSurface";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { defaultHoursSchedule } from "@/lib/hoursSchedule";
@@ -99,6 +102,38 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
     { id: "dev-voice-calm", description: "Calm and slow" },
   ];
 
+  // Calls & forwarding (?tab=calls): forwarding on Airtel, proven by a test call 2 days ago.
+  const now = Date.now();
+  const callSetup = {
+    ...emptyCallSetup(),
+    option: "forward" as const,
+    network: "airtel" as const,
+    opened_at: new Date(now - 3 * 86_400_000).toISOString(),
+    // "Forwarding works": the test call from a teammate's phone came in 2 days ago.
+    test_from: "+254722000111",
+    test_started_at: new Date(now - 2 * 86_400_000 - 120_000).toISOString(),
+  };
+  const callsSlot =
+    tab === "calls" ? (
+      <CallsForwardingPanel
+        tenantId={t.id}
+        number="0700000000"
+        pretty="+254 700 000 000"
+        supported
+        setup={callSetup}
+        status={resolveCallSetupStatus({
+          numberReady: true,
+          setup: callSetup,
+          activity: {
+            testMatchAt: new Date(now - 2 * 86_400_000).toISOString(),
+            firstCallAfterOpenAt: new Date(now - 2 * 86_400_000).toISOString(),
+            lastCallAt: new Date(now - 86_400_000).toISOString(),
+          },
+          now,
+        })}
+      />
+    ) : null;
+
   return (
     <div className={deskShellClass}>
       <DeskRail needsCount={0} homeHref="/dev/home" />
@@ -112,6 +147,7 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             tab={tab}
             trainPanel={trainPanel}
             curatedVoices={curatedVoices}
+            callsSlot={callsSlot}
             optionStatus={settingsIndexStatuses(
               t,
               curatedVoices,
