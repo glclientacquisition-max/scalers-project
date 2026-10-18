@@ -310,3 +310,263 @@ export function parseEditorCommand(body: unknown): ParsedEditorCommand {
 
   return { ok: false, error: "Unknown action." };
 }
+
+/** One Admin Activity row. Package-level writes omit businessId. A move is one row per business. */
+export type EditorActivityEntry = {
+  action: string;
+  businessId?: string | null;
+  before?: unknown;
+  after?: unknown;
+  reason: string;
+  detail?: Record<string, unknown>;
+};
+
+export type EditorBusinessSnap = {
+  id: string;
+  business_name?: string | null;
+  billing_status?: string | null;
+  billing_enforcement?: string | null;
+  package_version_id?: string | null;
+  minutes_included?: number | null;
+};
+
+/** Best-effort snapshot loaded before the write. Missing pieces stay unset. */
+export type EditorActivityBefore = {
+  version?: Record<string, unknown> | null;
+  businesses?: EditorBusinessSnap[];
+  signupEnabled?: boolean | null;
+  thresholdKes?: number | null;
+};
+
+const VERSION_ACTIVITY_KEYS = [
+  "sku",
+  "name",
+  "version",
+  "status",
+  "monthly_price_kes",
+  "annual_price_kes",
+  "minutes",
+  "seats",
+  "message_credits",
+  "dids",
+  "inbound_kes_per_second",
+  "outbound_kes_per_second",
+  "credit_kes",
+  "trial_days",
+  "on_demand_allowed",
+  "extra_seat_monthly_kes",
+] as const;
+
+const VERSION_NUMBER_KEYS = new Set<string>([
+  "version",
+  "monthly_price_kes",
+  "annual_price_kes",
+  "minutes",
+  "seats",
+  "message_credits",
+  "dids",
+  "inbound_kes_per_second",
+  "outbound_kes_per_second",
+  "credit_kes",
+  "trial_days",
+  "extra_seat_monthly_kes",
+]);
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function activityNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Same keys on the pre-read row and the RPC version, so Activity only lists real changes. */
+export function compactPackageVersion(raw: unknown): Record<string, unknown> | null {
+  const row = asRecord(raw);
+  if (!row) return null;
+  const out: Record<string, unknown> = {};
+  for (const key of VERSION_ACTIVITY_KEYS) {
+    if (!(key in row) || row[key] === undefined) continue;
+    if (key === "on_demand_allowed") {
+      out[key] = row[key] === null ? null : row[key] === true;
+      continue;
+    }
+    out[key] = VERSION_NUMBER_KEYS.has(key) ? activityNumber(row[key]) : row[key];
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+function resultVersion(result: unknown): Record<string, unknown> | null {
+  return asRecord(asRecord(result)?.version);
+}
+
+function versionDetail(versionId: string, snap: Record<string, unknown> | null): Record<string, unknown> | undefined {
+  const detail: Record<string, unknown> = { version_id: versionId };
+  if (typeof snap?.sku === "string" && snap.sku) detail.package_sku = snap.sku;
+  if (snap?.version != null) detail.version = snap.version;
+  return detail;
+}
+
+function businessBefore(snap: EditorBusinessSnap | undefined): Record<string, unknown> {
+  return {
+    package_version_id: snap?.package_version_id ?? null,
+    billing_status: snap?.billing_status ?? null,
+    billing_enforcement: snap?.billing_enforcement ?? null,
+    minutes_included: activityNumber(snap?.minutes_included),
+  };
+}
+
+/**
+ * Activity rows for one successful editor write.
+ * Action names match the SQL audit (`_billing_audit`). The route still writes that SQL row.
+ */
+export function packageEditorActivityEntries(
+  command: EditorCommand,
+  result: unknown,
+  before: EditorActivityBefore = {},
+): EditorActivityEntry[] {
+  const version = resultVersion(result);
+  const snap = compactPackageVersion(version) || compactPackageVersion(before.version);
+
+  switch (command.action) {
+    case "draft":
+      return [
+        {
+          action: "draft_package_version",
+          reason: command.reason,
+          before: null,
+          after: compactPackageVersion(version),
+          detail: versionDetail(String(version?.id || ""), compactPackageVersion(version)),
+        },
+      ];
+    case "update_draft":
+      return [
+        {
+          action: "update_package_version_draft",
+          reason: command.reason,
+          before: compactPackageVersion(before.version),
+          after: compactPackageVersion(version),
+          detail: versionDetail(command.versionId, snap),
+        },
+      ];
+    case "publish":
+      return [
+        {
+          action: "publish_package_version",
+          reason: command.reason,
+          before: compactPackageVersion(before.version),
+          after: compactPackageVersion(version),
+          detail: versionDetail(command.versionId, snap),
+        },
+      ];
+    case "archive":
+      return [
+        {
+          action: "archive_package_version",
+          reason: command.reason,
+          before: compactPackageVersion(before.version),
+          after: compactPackageVersion(version),
+          detail: versionDetail(command.versionId, snap),
+        },
+      ];
+    case "discard_draft": {
+      const prior = compactPackageVersion(before.version);
+      return [
+        {
+          action: "discard_package_version_draft",
+          reason: command.reason,
+          before: prior,
+          after: prior ? { ...prior, status: "discarded" } : { version_id: command.versionId, status: "discarded" },
+          detail: versionDetail(command.versionId, prior),
+        },
+      ];
+    }
+    case "approve": {
+      const prior = compactPackageVersion(before.version);
+      const next = compactPackageVersion(version) || prior;
+      return [
+        {
+          action: "approve_package_version",
+          reason: command.reason,
+          before: prior,
+          after: next ? { ...next, approved: true } : { approved: true },
+          detail: versionDetail(command.versionId, next),
+        },
+      ];
+    }
+    case "move_subscribers": {
+      const destination = compactPackageVersion(version);
+      const byId = new Map((before.businesses || []).map((row) => [row.id, row]));
+      return command.tenantIds.map((tenantId) => {
+        const row = byId.get(tenantId);
+        const was = businessBefore(row);
+        const detail: Record<string, unknown> = {
+          to_version_id: command.versionId,
+        };
+        if (row?.business_name) detail.business_name = row.business_name;
+        if (typeof destination?.sku === "string") detail.package_sku = destination.sku;
+        if (destination?.version != null) detail.version = destination.version;
+        return {
+          action: "move_package_version",
+          businessId: tenantId,
+          reason: command.reason,
+          before: was,
+          after: {
+            ...was,
+            package_version_id: command.versionId,
+            minutes_included: destination?.minutes ?? was.minutes_included,
+          },
+          detail,
+        };
+      });
+    }
+    case "set_billing_mode": {
+      const body = asRecord(result);
+      const row = (before.businesses || []).find((item) => item.id === command.tenantId);
+      const detail: Record<string, unknown> = {};
+      if (row?.business_name) detail.business_name = row.business_name;
+      return [
+        {
+          action: "set_tenant_billing_mode",
+          businessId: command.tenantId,
+          reason: command.reason,
+          before: {
+            billing_status: row?.billing_status ?? null,
+            billing_enforcement: row?.billing_enforcement ?? null,
+          },
+          after: {
+            billing_status: typeof body?.billing_status === "string" ? body.billing_status : command.billingStatus,
+            billing_enforcement:
+              typeof body?.billing_enforcement === "string" ? body.billing_enforcement : command.enforcement,
+          },
+          detail: Object.keys(detail).length ? detail : undefined,
+        },
+      ];
+    }
+    case "set_new_signup_trial":
+      return [
+        {
+          action: "set_new_signup_trial",
+          reason: command.reason,
+          before: { enabled: before.signupEnabled ?? null },
+          after: { enabled: command.enabled },
+        },
+      ];
+    case "set_price_approval_threshold":
+      return [
+        {
+          action: "set_price_approval_threshold",
+          reason: command.reason,
+          before: { threshold_kes: activityNumber(before.thresholdKes) },
+          after: { threshold_kes: command.thresholdKes },
+        },
+      ];
+    default: {
+      const unreachable: never = command;
+      return unreachable;
+    }
+  }
+}

@@ -247,4 +247,117 @@ describe("package version editor commands", () => {
       NEXT_PUBLIC_SUPABASE_URL: "https://sgcdncjxauhsbunobmob.supabase.co",
     }), true);
   });
+
+  it("records one Admin Activity row per editor write, and one per business on a move", async () => {
+    const mod = await import("../dashboard/src/lib/packageVersionEditor.ts");
+    const versionId = "11111111-1111-1111-1111-111111111111";
+    const tenantA = "22222222-2222-2222-2222-222222222222";
+    const tenantB = "33333333-3333-3333-3333-333333333333";
+    const reason = "fixture reason";
+    const version = {
+      id: versionId,
+      sku: "starter",
+      name: "Starter",
+      version: 2,
+      status: "published",
+      monthly_price_kes: "7000",
+      minutes: 100,
+    };
+    const commands = [
+      { action: "draft", sku: "starter", reason },
+      { action: "update_draft", versionId, patch: {}, reason },
+      { action: "publish", versionId, activeFrom: "2026-10-18T00:00:00Z", reason },
+      { action: "archive", versionId, reason },
+      { action: "discard_draft", versionId, reason },
+      { action: "approve", versionId, reason },
+      { action: "set_new_signup_trial", enabled: true, reason, confirm: true },
+      { action: "set_price_approval_threshold", thresholdKes: 500, reason },
+    ];
+    const actions = {
+      draft: "draft_package_version",
+      update_draft: "update_package_version_draft",
+      publish: "publish_package_version",
+      archive: "archive_package_version",
+      discard_draft: "discard_package_version_draft",
+      approve: "approve_package_version",
+      set_new_signup_trial: "set_new_signup_trial",
+      set_price_approval_threshold: "set_price_approval_threshold",
+    };
+    for (const command of commands) {
+      const entries = mod.packageEditorActivityEntries(command, { version }, {
+        version: { ...version, status: "draft", monthly_price_kes: 6000 },
+        signupEnabled: false,
+        thresholdKes: "0",
+      });
+      assert.equal(entries.length, 1, command.action);
+      assert.equal(entries[0].action, actions[command.action]);
+      assert.equal(entries[0].reason, reason);
+      assert.equal(entries[0].businessId ?? null, null);
+    }
+
+    const moved = mod.packageEditorActivityEntries(
+      { action: "move_subscribers", versionId, tenantIds: [tenantA, tenantB], reason, confirm: true },
+      { version },
+      {
+        businesses: [
+          {
+            id: tenantA,
+            business_name: "Jirani",
+            package_version_id: "44444444-4444-4444-4444-444444444444",
+            billing_status: "beta",
+            billing_enforcement: "off",
+            minutes_included: 20,
+          },
+        ],
+      },
+    );
+    assert.equal(moved.length, 2);
+    assert.equal(moved[0].action, "move_package_version");
+    assert.equal(moved[0].businessId, tenantA);
+    assert.equal(moved[0].detail.business_name, "Jirani");
+    assert.equal(moved[0].before.billing_status, "beta");
+    assert.equal(moved[0].after.package_version_id, versionId);
+    assert.equal(moved[0].after.minutes_included, 100);
+    assert.equal(moved[0].after.billing_enforcement, "off");
+    assert.equal(moved[1].businessId, tenantB);
+    assert.equal(moved[1].before.package_version_id, null);
+
+    const mode = mod.packageEditorActivityEntries(
+      {
+        action: "set_billing_mode",
+        tenantId: tenantA,
+        billingStatus: "active",
+        enforcement: "soft",
+        reason,
+        confirm: true,
+      },
+      { tenant_id: tenantA, billing_status: "active", billing_enforcement: "soft" },
+      {
+        businesses: [
+          { id: tenantA, business_name: "Jirani", billing_status: "beta", billing_enforcement: "off" },
+        ],
+      },
+    );
+    assert.equal(mode.length, 1);
+    assert.equal(mode[0].action, "set_tenant_billing_mode");
+    assert.equal(mode[0].businessId, tenantA);
+    assert.deepEqual(mode[0].before, { billing_status: "beta", billing_enforcement: "off" });
+    assert.deepEqual(mode[0].after, { billing_status: "active", billing_enforcement: "soft" });
+
+    const priced = mod.packageEditorActivityEntries(
+      { action: "update_draft", versionId, patch: {}, reason },
+      { version },
+      { version: { sku: "starter", version: 2, status: "draft", monthly_price_kes: "6000", minutes: 100 } },
+    );
+    assert.equal(priced[0].before.monthly_price_kes, 6000);
+    assert.equal(priced[0].after.monthly_price_kes, 7000);
+
+    const post = route.slice(route.indexOf("export async function POST"));
+    const write = post.indexOf("runEditorCommand(actor");
+    const audit = post.indexOf("recordAdminAction(");
+    assert.ok(write > 0 && audit > write);
+    assert.match(post, /packageEditorActivityEntries\(/);
+    assert.match(post, /adminActorName\(\)/);
+    assert.doesNotMatch(route, /actor:\s*body\./);
+  });
 });

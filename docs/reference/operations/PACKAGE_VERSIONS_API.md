@@ -21,7 +21,7 @@ Same gate as the other Super Admin routes: `isLegacyAuthenticated`. A caller who
 
 The actor is the signed-in admin (`adminActorName`). Desk must not send `actor`. A body field named `actor` is ignored.
 
-Every write needs `reason`: a non-empty string, at most 500 characters. The database writes that actor and reason to `billing_audit_log` and `ops_audit_log`.
+Every write needs `reason`: a non-empty string, at most 500 characters. The database writes that actor and reason to `billing_audit_log` and `ops_audit_log`. After the write succeeds, the route also calls `recordAdminAction` with the same action name, the signed-in actor, and the business id when the write is for one business. A move writes one Activity row per business. Package drafts, edits, publish, archive, discard, approve, the signup trial, and the price threshold have no business id. Both rows stay.
 
 Writes also refuse when the configured database URL is production, unless `ADMIN_PACKAGE_EDITOR_ALLOW_PROD` is exactly `on`. That response is `403` `{ "error": "package_editor_staging_only" }`. GET still lists. Do not set the flag.
 
