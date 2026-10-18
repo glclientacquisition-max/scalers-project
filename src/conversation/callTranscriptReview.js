@@ -349,8 +349,14 @@ function applyUnfinishedReturn(out, flags) {
   out.done = 'None.';
   out.next = 'Call them back.';
   out.applied.card = true;
-  if (out.primaryIntent !== 'human') {
-    out.primaryIntent = 'human';
+  // BRAIN_CALL_FIXES_D199 (17 Oct audit): the unfinished visit stays the
+  // caller's ask (book_visit), not "human".
+  const fixesD199 = require('./callFixesD199');
+  const nextIntent = fixesD199.callFixesD199Enabled()
+    ? fixesD199.callerAskIntent(out.primaryIntent, flags?.intent)
+    : 'human';
+  if (out.primaryIntent !== nextIntent) {
+    out.primaryIntent = nextIntent;
     out.applied.intent = true;
   }
   if (out.resolution !== 'needs_human') {
@@ -358,6 +364,11 @@ function applyUnfinishedReturn(out, flags) {
     out.applied.resolution = true;
   }
   return out;
+}
+
+/** A saved hold or visit still needs a person only for a callback or an escalate. */
+function handoffNeedForSaved(flags = {}) {
+  return Boolean(flags.callbackSaved || flags.escalateSaved || flags.visitRequested);
 }
 
 function silenceReviewMerged() {
@@ -811,6 +822,44 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical, 
 
   if (!review) return out;
 
+  // BRAIN_CALL_FIXES_D199 (17 Oct audit): labels from what happened.
+  const labelsOn = fixesD199.callFixesD199Enabled();
+  const realHoldSaved = labelsOn
+    ? Boolean(flags.holdSaved) && !flags.enquirySaved && !flags.callbackSaved
+    : Boolean(flags.holdSaved);
+  const savedWork = Boolean(
+    flags.holdSaved || flags.visitSaved || flags.visitRequested || flags.callbackSaved || flags.escalateSaved
+  );
+  const turnsKnown = Array.isArray(callerTurns) && callerTurns.length > 0;
+  const realNeed = !labelsOn || !turnsKnown || fixesD199.callerHadNeed(callerTurns);
+  if (labelsOn && !realNeed && !savedWork && !flags.handoff) {
+    // Only greetings or a fragment: never resolved, never a callback.
+    if (out.resolution === 'resolved' || out.resolution === 'needs_human') {
+      out.resolution = 'abandoned';
+      out.applied.resolution = derivedResolution !== 'abandoned';
+    }
+    if (/^call them back\.?$/i.test(out.next)) out.next = 'None.';
+    return out;
+  }
+  // A person is needed only for a callback, an escalation, a caller who
+  // asked for one, or an owner action with nothing saved (HD_e2549533b468
+  // and HD_5290300eb772 were info calls; HD_4139ea705878 a saved hold).
+  const handoffNeed =
+    !labelsOn ||
+    Boolean(flags.callbackSaved || flags.escalateSaved || flags.handoff || flags.enquirySaved) ||
+    review.primary_intent === 'human' ||
+    (review.needs_owner === true && !realHoldSaved && !flags.visitSaved);
+  const askIntent = labelsOn
+    ? review.primary_intent === 'human'
+      ? 'human'
+      : fixesD199.callerAskIntent(
+          out.reviewKind,
+          review.primary_intent,
+          derivedIntent,
+          flags.intent
+        )
+    : 'human';
+
   if (flags.escalateSaved) {
     const escalateReason =
       cleanReason(summary?.reason || flags?.escalateReason || '') || out.reason;
@@ -824,7 +873,8 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical, 
       out.applied.intent = derivedIntent !== 'book_visit';
       return out;
     }
-    out.primaryIntent = 'human';
+    out.primaryIntent = askIntent;
+    if (labelsOn) out.applied.intent = derivedIntent !== askIntent;
     out.resolution = 'needs_human';
     if (review.needs_human !== true) {
       out.reason = cleanReason(summary?.reason || '') || out.reason;
@@ -840,26 +890,42 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical, 
   const canUpgradeHuman =
     review.needs_human === true &&
     conf >= UPGRADE_HUMAN_CONFIDENCE &&
-    !flags.holdSaved &&
-    !flags.visitSaved;
+    !realHoldSaved &&
+    !flags.visitSaved &&
+    handoffNeed;
 
   if (canUpgradeHuman) {
-    out.primaryIntent = 'human';
+    out.primaryIntent = askIntent;
     out.resolution = 'needs_human';
-    out.applied.intent = derivedIntent !== 'human';
+    out.applied.intent = derivedIntent !== askIntent;
     out.applied.resolution = derivedResolution !== 'needs_human';
     return out;
   }
 
   if (flags.holdSaved || flags.visitSaved) {
+    if (
+      labelsOn &&
+      (realHoldSaved || flags.visitSaved) &&
+      out.resolution === 'needs_human' &&
+      !handoffNeedForSaved(flags)
+    ) {
+      // A saved hold or visit is the work done (HD_4139ea705878).
+      out.resolution = 'resolved';
+      out.applied.resolution = derivedResolution !== 'resolved';
+      if (out.primaryIntent === 'human') {
+        out.primaryIntent = askIntent;
+        out.applied.intent = derivedIntent !== askIntent;
+      }
+    }
     return out;
   }
 
-  const faqLike =
-    review.needs_human === false &&
-    review.needs_owner === false &&
-    conf >= FAQ_RESOLVE_CONFIDENCE &&
-    !flags.handoff;
+  const faqLike = labelsOn
+    ? !handoffNeed && review.needs_owner !== true && conf >= FAQ_RESOLVE_CONFIDENCE && !flags.handoff
+    : review.needs_human === false &&
+      review.needs_owner === false &&
+      conf >= FAQ_RESOLVE_CONFIDENCE &&
+      !flags.handoff;
 
   if (faqLike && derivedResolution !== 'needs_human') {
     if (
@@ -1163,7 +1229,12 @@ function alignSummarySpine({ summary, merged, derived } = {}) {
   let text = stripRejectedGoalClauses(replaceIntentLabel(summary?.text || '', primaryIntent));
   text = text.replace(/\s{2,}/g, ' ').trim();
   let resolutionNote = derived?.resolutionNote || null;
-  if (resolutionChanged) {
+  const fixesD199 = require('./callFixesD199');
+  const labelsOn = fixesD199.callFixesD199Enabled();
+  if (labelsOn && fixesD199.isPromptReasonNote(resolutionNote)) resolutionNote = null;
+  if (labelsOn && resolutionChanged && resolution === 'abandoned') {
+    resolutionNote = fixesD199.NO_NEED_NOTE;
+  } else if (resolutionChanged) {
     const reason = cleanReason(merged?.reason || '');
     if (resolution === 'needs_human') {
       resolutionNote = reason || 'Caller needed a person to call back.';
@@ -1222,6 +1293,15 @@ async function defaultSave({ callSid, merged, review, derived, summary }) {
   );
 }
 
+/** The note written with the reviewed resolution. Never Brain prompt text. */
+function reviewedNote(spine, derived, merged) {
+  const note = spine?.resolutionNote || derived?.resolutionNote || null;
+  const fixesD199 = require('./callFixesD199');
+  if (!fixesD199.callFixesD199Enabled() || !fixesD199.isPromptReasonNote(note)) return note;
+  if (merged?.resolution === 'abandoned') return fixesD199.NO_NEED_NOTE;
+  return cleanReason(merged?.reason || '') || 'Answered.';
+}
+
 async function writeReviewedSummary({ callSid, merged, review, derived, summary }) {
   const db = require('../db');
   const spine = alignSummarySpine({ summary, merged, derived });
@@ -1263,7 +1343,7 @@ async function writeReviewedSummary({ callSid, merged, review, derived, summary 
       callSid,
       resolution: spine?.resolution || merged.resolution,
       primaryIntent: spine?.primary_intent || merged.primaryIntent,
-      resolutionNote: spine?.resolutionNote || derived?.resolutionNote || null,
+      resolutionNote: reviewedNote(spine, derived, merged),
     });
   }
 }
@@ -1379,11 +1459,26 @@ async function sweepUnreviewedCalls(deps = {}) {
     const callSid = String(call.sautikit_call_sid || '').trim();
     if (!callSid) continue;
     try {
+      // BRAIN_CALL_FIXES_D199 (17 Oct audit, HD_4139ea705878): the sweep has
+      // no live Brain state; the saved rows come from the stored summary.
+      const fixesD199 = require('./callFixesD199');
+      const labelsOn = fixesD199.callFixesD199Enabled();
       const out = await review({
         callSid,
         call,
-        derived: { resolution: call.resolution || 'unknown', primaryIntent: call.primary_intent || null },
+        derived: {
+          resolution: call.resolution || 'unknown',
+          primaryIntent: call.primary_intent || null,
+          ...(labelsOn
+            ? {
+                resolutionNote: fixesD199.isPromptReasonNote(call.resolution_note)
+                  ? null
+                  : call.resolution_note || null,
+              }
+            : {}),
+        },
         summary: meta,
+        ...(labelsOn ? { toolFlags: fixesD199.storedSummaryToolFlags(meta) } : {}),
         reviewAttempt: attempts + 1,
       });
       if (out?.ok) reviewed += 1;

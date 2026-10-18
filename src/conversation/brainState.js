@@ -525,6 +525,11 @@ function observeCallerTurn(state, input = {}) {
   next.goal.status = 'active';
   // A completed handoff is not re-opened by a repeat ask; nextBestAction answers it.
   next.handoff.requested = intent === 'human' && next.handoff.completed !== true;
+  // BRAIN_CALL_FIXES_D199 (17 Oct audit): the caller asked for a person at
+  // some point on this call. primary_intent "human" only then.
+  if (intent === 'human' && require('./callFixesD199').callFixesD199Enabled()) {
+    next.conversation.askedForPerson = true;
+  }
 
   if (input.entities && typeof input.entities === 'object') {
     next.entities = { ...next.entities, ...input.entities };

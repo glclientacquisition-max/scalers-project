@@ -51,9 +51,17 @@ function looksLikeServiceDetailAsk(text) {
   return true;
 }
 
+/** BRAIN_CALL_FIXES_D199 (HD_7522f9a7ba06): "huduma gani nilikuwa nimeitisha" is the caller's own file. */
+function ownPastRequestAsk(text) {
+  // eslint-disable-next-line global-require
+  const fixesD199 = require('./callFixesD199');
+  return fixesD199.callFixesD199Enabled() && fixesD199.looksLikeOwnPastRequest(text);
+}
+
 function looksLikeOfferAsk(text) {
   const raw = String(text || '');
   if (looksLikeServiceDetailAsk(raw)) return false;
+  if (ownPastRequestAsk(raw)) return false;
   if (OFFER_ASK_RE.test(raw)) return true;
   // "which service is you offer" is the same list ask as "which services do you offer".
   if (/\b(?:which|what)\s+services?\b[^?.!]{0,40}\boffer\b/i.test(raw)) return true;
@@ -283,6 +291,8 @@ function speakSavedLine(line, language, kind) {
 function historyOnlyAsk(text) {
   const raw = String(text || '');
   if (!looksLikePastBookingTalk(raw)) return false;
+  // "What did I book?" covers what is still open as well as past rows.
+  if (ownPastRequestAsk(raw)) return false;
   if (/\bupcoming\b/i.test(raw)) return false;
   if (/\bread (?:them|it)\b/i.test(raw)) return false;
   if (looksLikeExistingVisitTalk(raw) && !/\bprevious\b/i.test(raw)) return false;
