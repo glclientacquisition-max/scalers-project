@@ -70,7 +70,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (155)
+## Functions (156)
 
 | Function | Defined in |
 | --- | --- |
@@ -153,7 +153,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `default_tenant_llm_prompt` | `docs/supabase/multi_tenant_onboarding.sql`<br>`docs/supabase/voice_languages.sql` |
 | `enqueue_billing_notice` | `docs/supabase/billing_data_layer.sql` |
 | `expire_stale_tenant_invites` | `supabase/migrations/20261011140000_team_scale.sql` |
-| `finalize_invoice` | `docs/supabase/billing_data_layer.sql` |
+| `finalize_invoice` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `grant_tenant_package_minutes` | `docs/supabase/fix_grant_package_minutes.sql` |
 | `handle_new_user_tenant` | `docs/supabase/did_number_pool.sql`<br>`docs/supabase/multi_tenant_onboarding.sql`<br>`docs/supabase/voice_languages.sql`<br>`supabase/migrations/20261011000000_team_invites.sql` |
 | `hit_rate_limit` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
@@ -215,6 +215,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_seats_used` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `tenant_subscriptions_a_billing_guard` | `docs/supabase/billing_data_layer.sql` |
 | `tenant_subscriptions_b_pin_version` | `docs/supabase/billing_data_layer.sql` |
+| `tenant_subscriptions_c_require_version_pin` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `tenant_subscriptions_clear_spend_hold` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `tenants_archived_billing_guard` | `docs/supabase/archive_tenant_billing.sql` |
 | `tenants_billing_purge_flag` | `docs/supabase/billing_data_layer.sql` |

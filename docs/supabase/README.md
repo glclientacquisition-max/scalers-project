@@ -140,9 +140,9 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 24k.1 | [`fix_grant_package_minutes.sql`](./fix_grant_package_minutes.sql) | `package_catalog.sql`, `admin_billing_ops.sql` | Hotfix: `grant_tenant_package_minutes` raised 42702 (OUT param `minutes_included` shadowed the column) on every call. Adds `tenant_minute_grants` (period-scoped, idempotent per key) + audit row. Safe to re-run. |
 | 24k.2 | [`package_state_rules.sql`](./package_state_rules.sql) | `fix_grant_package_minutes.sql`, `package_catalog.sql` | DRAFT. Explicit no package (`status = cancelled`, never unlimited), `unassign_tenant_package`, upgrade now (prorated, grants kept) / downgrade + period change at next period (`pending_*`), single grant-expiry rule `billing_grant_minutes_for_period`. Re-run `package_period_rollover.sql` after it. |
 | 24k.3 | [`tenant_billing_state.sql`](./tenant_billing_state.sql) | `package_state_rules.sql`, `owner_rls.sql` | DRAFT. `tenant_billing_state` view (security invoker) for the Admin period card and Desk banners, plus owner read policies. Re-run after `notify_send_reserve_settle.sql` to bill SMS from the ledger. |
-| 24k.4 | [`billing_data_layer.sql`](./billing_data_layer.sql) | `package_state_rules.sql`, `tenant_billing_state.sql`, `did_number_pool.sql`, `super_admin_ops.sql` | Versioned packages, billing status, invoices, payments, credits, billing notice outbox, `tenant_escalation_allowed`, DID quarantine. Does not charge and does not send. Replaces assign/release. Do not re-apply those functions from the older files after this. Staging first. Prod only after a backup and Alvin's GO. The file is the prod script. |
+| 24k.4 | [`billing_data_layer.sql`](./billing_data_layer.sql) | `package_state_rules.sql`, `tenant_billing_state.sql`, `did_number_pool.sql`, `super_admin_ops.sql` | Versioned packages, billing status, invoices, payments, credits, billing notice outbox, `tenant_escalation_allowed`, DID quarantine. Does not charge and does not send. Replaces assign/release. Do not re-apply those functions from the older files after this. Does not set `billing_status` NOT NULL (that is P2). Staging first. Prod only after a backup and Alvin's GO. The file is the prod script. Production order is the next section. Do not re-apply this file after P6. |
 | 24k.6 | [`owner_billing_actions.sql`](./owner_billing_actions.sql) | `billing_data_layer.sql`, then re-apply after `package_minute_consume.sql` and `notify_send_reserve_settle.sql` | Owner plan change, extra seats, spend limit. Service role only. Beta returns `beta` and writes no invoice. No payment provider. Desk stays behind `DESK_PLAN_CHANGE` (off). Staging first. Prod script is [`prod/owner_billing_actions.sql`](./prod/owner_billing_actions.sql). |
-| 24l | [`platform_ops_notices.sql`](./platform_ops_notices.sql) | none (staff tables) | Staff notice settings + open notices. Service role only. Applied on scalers-staging and production. The ops cron adds no columns: threshold notices are extra `kind` values. [`ops_alerts_prod_later.sql`](./ops_alerts_prod_later.sql) is a read-only check, not a migration. |
+| 24l | [`platform_ops_notices.sql`](./platform_ops_notices.sql) | none (staff tables) | Staff notice settings + open notices. Service role only. Applied on scalers-staging and production. The ops cron adds no columns: threshold notices are extra `kind` values. `ops_alerts_prod_later.sql` (added by the ops alerts pull request) is a read-only check, not a migration. |
 | 24m | [`platform_ops_people.sql`](./platform_ops_people.sql) | `platform_ops_notices.sql` | Escalate people jsonb (name, phone, email). Applied on scalers-staging with the Platform rebuild. |
 | 24n | [`voice_turn_traces.sql`](./voice_turn_traces.sql) | `platform_ops_people.sql` | Per-turn voice traces (`voice_turn_traces`) plus call `score`, `checks`, `diagnosis`, and `release`. Service role only. Not applied by deploy. Apply the whole file on staging before `VOICE_TRACE` can persist. Re-running it adds the score columns if an earlier draft of the table is already there. |
 | 24o | [`calls_inbox_assignee.sql`](./calls_inbox_assignee.sql) | `inbox_triage.sql` | Optional. `calls.inbox_assignee_name` / `inbox_assignee_phone` (text, nullable). Already on scalers-staging (manual, 2026-10); file written to match. Not on prod. |
@@ -157,6 +157,26 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 24y | [`purge_archived_tenants_schedule.sql`](./purge_archived_tenants_schedule.sql) | `purge_archived_tenants.sql` | pg_cron nightly purge (03:15 EAT). **Not applied anywhere.** Needs Alvin's GO and the recording cleanup first. |
 | 24z | [`archive_tenant_billing.sql`](./archive_tenant_billing.sql) | `admin_business_archive.sql`, `wallet_on_demand_alerts.sql` | `archive_tenant_billing` (on Archive: billing mode off, on-demand off, line rental stops, rollover skips archived, one audited row; invoice hook documented, no invoice table yet) and `unarchive_tenant_billing` (on Unarchive: audit only, turns nothing back on). Trigger `tenants_archived_billing_guard` refuses billing/on-demand on while archived. Service role only. Staging applied 2026-10-17, prod applied 2026-10-18 (Alvin's GO). |
 | 24f | [`whatsapp_threads.sql`](./whatsapp_threads.sql) | `notify_send_ledger.sql` | Platform two-way WhatsApp persist (`whatsapp_threads` / `whatsapp_messages`). Service role only. Not voice DID routing. |
+
+---
+
+## Production billing apply order
+
+One sequence for production, after a backup and Alvin's GO. Staging first (`sgcdncjxauhsbunobmob`). Never `fjxcdccgyhnvnnlnovcl` until that GO. These step numbers are only for this sequence. Do not reuse them, and do not reorder the files.
+
+Do not re-run P1 after P6. `invoice_documents.sql` replaces `finalize_invoice` with SCL- numbering. P1 leaves that body in place if it is already installed, and still replaces `enqueue_billing_notice`. Re-running the whole data-layer file after P6 is the wrong apply.
+
+| # | File | Notes |
+| --- | --- | --- |
+| P1 | [`billing_data_layer.sql`](./billing_data_layer.sql) | Versions, `billing_status` (still nullable), invoices, notices, quarantine. `finalize_invoice` here numbers `SC-YYYY-000001`. |
+| P2 | [`billing_data_layer_billing_status_not_null.sql`](./billing_data_layer_billing_status_not_null.sql) | Own transaction, immediately after P1. `NOT VALID` check, then `VALIDATE`, then `SET NOT NULL`. On production, run the three blocks separately so the exclusive lock does not cover the scan. |
+| P3 | Extra-seat backfill in `owner_billing_actions.sql` (#781) | The statement that sets `extra_seat_monthly_kes = 500`, with trigger `billing_package_versions_freeze` disabled. Distinct from P4 so the disable is not skipped. |
+| P4 | `owner_billing_actions.sql` (#781) | After P3. The same file holds the backfill and the rest. Run the backfill block first. |
+| P5 | `invoice_pay.sql` (#780) | Pay attempts and checkout. Add any new column on a table that already has rows as nullable, backfill, then set a constant default. Do not use `DEFAULT now()` on a populated table: `now()` is volatile and rewrites the table. |
+| P6 | `invoice_documents.sql` (#780) | Replaces `finalize_invoice` with `SCL-YYYY-000001`. That function must `set scalers.billing_write` before it writes the number and status, because `invoices_freeze` rejects a draft update that sets either. Do not re-run P1 after this step. |
+| P7 | `package_version_editor.sql` (#778) | Last, so the version freeze does not block P3. |
+
+Rollback of P1 and P2 is [`billing_data_layer_down.sql`](./billing_data_layer_down.sql). It drops the layer. Do not run it on staging or production unless that removal is the point.
 
 ---
 

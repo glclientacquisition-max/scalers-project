@@ -165,7 +165,7 @@ export function testedLine(
   if (status.tested) return { title: "Tested by you", detail: day, ok: true };
   if (status.reaching) {
     return {
-      title: "Calls are reaching your assistant",
+      title: "Calls are reaching your Business Assistant",
       detail: status.option === "main_number" ? "Not tested yet" : "Forwarding not tested yet",
       ok: false,
     };

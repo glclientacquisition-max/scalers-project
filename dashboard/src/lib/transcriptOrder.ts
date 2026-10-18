@@ -7,15 +7,35 @@
  */
 export type OrderedTurn = { id?: string | null; created_at?: string | null; seq?: number | null };
 
+function seqOf(row: OrderedTurn): number | null {
+  return typeof row.seq === "number" && Number.isFinite(row.seq) ? row.seq : null;
+}
+
+function timeOf(row: OrderedTurn): number | null {
+  const t = Date.parse(String(row.created_at || ""));
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
+ * A greeting written before Voice stored seq has no seq and an earlier clock.
+ * Same-millisecond rows still keep seq first (nulls last within 2s).
+ */
+function unsequencedIsOpening(unsequenced: OrderedTurn, sequenced: OrderedTurn): boolean {
+  const open = timeOf(unsequenced);
+  const sequencedAt = timeOf(sequenced);
+  if (open === null || sequencedAt === null) return false;
+  return open < sequencedAt - 2000;
+}
+
 export function compareTranscriptTurns(a: OrderedTurn, b: OrderedTurn): number {
-  const as = typeof a.seq === "number" && Number.isFinite(a.seq) ? a.seq : null;
-  const bs = typeof b.seq === "number" && Number.isFinite(b.seq) ? b.seq : null;
+  const as = seqOf(a);
+  const bs = seqOf(b);
   if (as !== null && bs !== null && as !== bs) return as - bs;
-  if (as !== null && bs === null) return -1;
-  if (as === null && bs !== null) return 1;
-  const at = Date.parse(String(a.created_at || ""));
-  const bt = Date.parse(String(b.created_at || ""));
-  if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return at - bt;
+  if (as !== null && bs === null) return unsequencedIsOpening(b, a) ? 1 : -1;
+  if (as === null && bs !== null) return unsequencedIsOpening(a, b) ? -1 : 1;
+  const at = timeOf(a);
+  const bt = timeOf(b);
+  if (at !== null && bt !== null && at !== bt) return at - bt;
   return String(a.id || "").localeCompare(String(b.id || ""));
 }
 

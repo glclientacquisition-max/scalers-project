@@ -157,6 +157,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | #618, #621, #622, #625, #628, #629, #633, #638 | Voice | Dropped question, score honesty, scorer fixes, wait-barge, junk names, spoken facts, HD_ceba fixes. |
 | #644, #646 | Voice | **Closed, not merged** (18 Oct 09:41 EAT): superseded by #731 (main cut). No longer open. |
 | #602, #611, #615 | Platform/Desk | Quality read APIs; catalogue import preview; Stage-PR skip-staging filter. |
+| #773 | Desk | QA copy and small layout fixes from `main` @ `408ad368`: Business Assistant in full, callbacks only, no invoice or area-price promises, free-beta Usage in KSh, Nairobi times, login redirect. Draft. No SQL. Area-price sentence returns when #709 ships. The `+N more` import line covers only the 8-row slice of #611. Paste list saves ask wording such as "price depends on size" and still saves the other rows when one price cannot be saved. |
 | #587, #597, #614, #584, #583, #537 | Voice | Parked (`skip-staging`). |
 | #653, #492, #560, #440, #434, #356 | Various | Legal pack, landing, docs, ops, tester lane: parked. |
 | #639, #642 | Voice | **Closed, not merged** (18 Oct 09:41 EAT): superseded by #651 (line-unavailable gate) and the clips on SautiKit. No longer open. |
@@ -197,7 +198,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **Admin:** Suspend/Archive shipped (#737, 18 Oct). Purge schedule not applied. Still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
 - **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
-- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status`, invoices, notices, `tenant_escalation_allowed`, number quarantine) and the owner plan-change RPCs (18 Oct, section 3), including the review fixes for beta metering, last-day upgrades, version allowances on roll, `SCL-` invoice numbers, and the active-plan pin. No charges and no prod SQL. Package catalogue UI and a pay action remain. Desk plan screens stay behind `DESK_PLAN_CHANGE` (off).
+- **Packages**: state rules and rollover shipped (#631, #650). The billing data layer (versions, `billing_status` NOT NULL, invoices, notices, `tenant_escalation_allowed`, number quarantine) and the owner plan-change RPCs are on staging and, since 19 Oct 2026 (P1–P8, Alvin's GO), on production. Every production business stays `beta` with enforcement off. A draft invoice cannot take a number. Notice sends stay off unless `BILLING_NOTICES_SEND=on`, and a reclaimed notice reuses its idempotency key. No charges. Package catalogue UI and a pay action remain. Desk plan screens stay behind `DESK_PLAN_CHANGE` (off).
 - **Landing page** (#492 parked until its turn).
 - **Legal pack draft #653** (Terms, Privacy, DPA, call notice, beta terms). Parked; call notice ties to the recording decision.
 - **WhatsApp as the assistant doing work** (not just alerts).
