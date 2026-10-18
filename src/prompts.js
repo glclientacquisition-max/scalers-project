@@ -10,7 +10,10 @@ const {
   openClosedStatus,
   formatScheduleSummary,
 } = require('./conversation/businessHours');
-const { buildLiveGroundTruth } = require('./conversation/liveKnowledge');
+const {
+  buildLiveGroundTruth,
+  buildOpenVisitsBlock,
+} = require('./conversation/liveKnowledge');
 const {
   formatBulletinForPrompt,
   bulletinImpliesClosed,
@@ -226,7 +229,7 @@ Enquiry and take-a-message always work, even when the file is incomplete.
 If you append create_service_request, create_appointment, or update_appointment, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome. If you append ONLY save_caller_info, you MUST speak your natural response. Do not read open visits, holds, callbacks, or orders unless they just asked about them.`;
 }
 
-function buildSystemPrompt(profile = {}, opts = {}) {
+function buildSystemPromptParts(profile = {}, opts = {}) {
   const businessName =
     profile.businessName || process.env.BUSINESS_NAME || 'the business';
   const knowledge =
@@ -236,10 +239,13 @@ function buildSystemPrompt(profile = {}, opts = {}) {
   const languagePolicy = tenantLanguagePolicy();
   const languageLine = formatVoiceLanguagesLine();
   const header = buildContextHeader(profile, { now: opts.now });
-  const liveTruth = buildLiveGroundTruth(profile);
-  const liveBlock = liveTruth ? `\n\n${liveTruth}\n` : '\n';
+  // PROMPT_CACHE_PREFIX: open visits move to the live tail with the header.
+  const liveTruth = buildLiveGroundTruth(profile, { omitOpenVisits: true });
+  const openVisits = buildOpenVisitsBlock(profile);
+  const liveBlock = liveTruth ? `${liveTruth}\n\n` : '';
   const playbook = formatPlaybookForPrompt(profile);
-  const playbookBlock = playbook ? `\n\n${playbook}\n` : '\n';
+  const playbookBlock = playbook ? `${playbook}\n\n` : '';
+  const tail = [openVisits, header].filter(Boolean).join('\n\n');
   const tools = parseAgentTools(profile.agentTools);
   const requestTools = serviceRequestToolBlock(holdOrdersEnabled(profile));
   const escalateTools = tools.escalate
@@ -256,12 +262,10 @@ Resolve what you can. If a caller asks for a person or unresolved refund help, o
     ? `If the call should end after goodbye, also append: ###ENDCALL###`
     : `END CALL TOOL: disabled for this business. Do NOT append ###ENDCALL###. After goodbye, wait for the caller or the line to close.`;
 
-  // Tenant-provided full prompt wins, but we still prepend live context + ground truth.
+  // Tenant-provided full prompt wins. Ground truth still comes first; the live
+  // context goes in the tail (PROMPT_CACHE_PREFIX).
   if (profile.llmSystemPrompt && String(profile.llmSystemPrompt).trim()) {
-    return `${header}
-${liveBlock}
-${playbookBlock}
-${String(profile.llmSystemPrompt).trim()}
+    const prefix = `${liveBlock}${playbookBlock}${String(profile.llmSystemPrompt).trim()}
 
 ${CONVERSATION_RULES}
 
@@ -285,15 +289,13 @@ If you append create_appointment or update_appointment, speak nothing. Never cla
 ${escalateTools}
 ${endCallTools}
 Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
+    return { prefix, tail };
   }
 
   const agentName =
     String(profile.agentName || 'Receptionist').trim() || 'Receptionist';
 
-  return `${header}
-${liveBlock}
-${playbookBlock}
-You are ${agentName}, the live phone business assistant for ${businessName} in Kenya.
+  const prefix = `${liveBlock}${playbookBlock}You are ${agentName}, the live phone business assistant for ${businessName} in Kenya.
 
 BUSINESS KNOWLEDGE (use this — do not invent facts outside it):
 ${knowledge}
@@ -334,10 +336,24 @@ ${escalateTools}
 ${endCallTools}
 
 Do not include any other JSON or markup in your spoken response. Never read the markers aloud.`;
+  return { prefix, tail };
+}
+
+/**
+ * PROMPT_CACHE_PREFIX: Gemini only reuses an implicit cache for a matching
+ * prefix of at least 4,096 tokens (Gemini 3.6 Flash). The prompt used to open
+ * with the live header (Kenya time, open/closed), so the prefix changed every
+ * minute. The fixed part per business now comes first and the live part last.
+ * Same text, new order.
+ */
+function buildSystemPrompt(profile = {}, opts = {}) {
+  const { prefix, tail } = buildSystemPromptParts(profile, opts);
+  return `${prefix}\n\n${tail}`;
 }
 
 module.exports = {
   buildSystemPrompt,
+  buildSystemPromptParts,
   buildGreeting,
   buildContextHeader,
   DEFAULT_KNOWLEDGE,

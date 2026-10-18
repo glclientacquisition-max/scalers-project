@@ -136,7 +136,7 @@ function formatUnknownAnswerPolicy(customLine = '') {
  * Authoritative live facts injected on every call.
  * Prefer these over older compiled prose if there is a conflict.
  */
-function buildLiveGroundTruth(profile = {}) {
+function buildLiveGroundTruth(profile = {}, opts = {}) {
   const { parseAgentTools } = require('./agentTools');
   const { parseVertical } = require('./vertical');
   const { parseHandoffMode } = require('./handoffMode');
@@ -192,11 +192,15 @@ function buildLiveGroundTruth(profile = {}) {
   const tools = parseAgentTools(profile.agentTools);
   const vertical = parseVertical(profile.vertical);
   const handoffMode = parseHandoffMode(profile.handoffMode);
-  const openVisits = isMessageOnlyMode(profile.afterHoursMode)
+  const openVisitsText = isMessageOnlyMode(profile.afterHoursMode)
     ? ''
     : formatOpenVisitsForPrompt(
         selectOpenVisitsForPrompt(profile.openAppointments, profile.callerMemory)
       );
+  // PROMPT_CACHE_PREFIX: open visits change per caller and per minute, so the
+  // prompt builder can take them out of this block and put them in the live
+  // tail (buildOpenVisitsBlock). The text itself is the same.
+  const openVisits = opts.omitOpenVisits ? '' : openVisitsText;
   const hasAny =
     services.length ||
     products.length ||
@@ -207,7 +211,7 @@ function buildLiveGroundTruth(profile = {}) {
     socialHandlesHaveContent(social) ||
     unknown ||
     extras ||
-    Boolean(openVisits) ||
+    Boolean(openVisitsText) ||
     unknownTopics.length;
   if (!hasAny) return '';
 
@@ -310,6 +314,17 @@ function buildLiveGroundTruth(profile = {}) {
   return parts.filter((p, i, arr) => !(p === '' && arr[i - 1] === '')).join('\n');
 }
 
+/** Open visits as they appear inside LIVE GROUND TRUTH, or '' (same rules). */
+function buildOpenVisitsBlock(profile = {}) {
+  const { formatOpenVisitsForPrompt } = require('./visitCalendar');
+  const { selectOpenVisitsForPrompt } = require('./callerMemory');
+  const { isMessageOnlyMode } = require('./messageOnly');
+  if (isMessageOnlyMode(profile.afterHoursMode)) return '';
+  return formatOpenVisitsForPrompt(
+    selectOpenVisitsForPrompt(profile.openAppointments, profile.callerMemory)
+  );
+}
+
 /** Human-readable services blob for tenants.services_offered / compiler. */
 function formatServicesForCompiler(services, extraNotes = '') {
   const rows = normalizeServices(services);
@@ -334,5 +349,6 @@ module.exports = {
   normalizeTeam,
   formatUnknownAnswerPolicy,
   buildLiveGroundTruth,
+  buildOpenVisitsBlock,
   formatServicesForCompiler,
 };

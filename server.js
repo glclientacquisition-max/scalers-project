@@ -237,6 +237,21 @@ const {
   spokenTextForToolTurn,
 } = require('./src/conversation/geminiVoice');
 const {
+  createCallUsageLedger,
+  usageFromResponse,
+  mergeStreamUsage,
+} = require('./src/conversation/geminiUsage');
+// Per-call Gemini tokens (input, cached, output, thinking). Best effort only.
+const callUsage = createCallUsageLedger({
+  getClient: () => {
+    try {
+      return require('./src/lib/supabaseClient').supabase || null;
+    } catch {
+      return null;
+    }
+  },
+});
+const {
   noteGeminiProviderError,
   noteGeminiProviderOk,
   getGeminiProviderHealth,
@@ -5649,6 +5664,10 @@ mediaWss.on('connection', (ws, req) => {
     voiceTrace.finishCall().catch((err) => {
       console.warn(`[ws/media] voice trace finish failed:`, err?.message || err);
     });
+    if (sessionCallSid) {
+      callUsage.rename(`media_${connectedAt}`, sessionCallSid);
+      callUsage.flush(sessionCallSid, { tenantId: brainProfile?.id || null }).catch(() => {});
+    }
     if (sessionCallSid && callTranscript.size()) {
       db.appendTranscript({ callSid: sessionCallSid, turns: callTranscript.turns() }).catch(
         (err) => {
@@ -6535,6 +6554,9 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     console.log(`[${callSid || 'unknown'}] WebSocket closed`);
     if (callSid) {
+      callUsage
+        .flush(callSid, { tenantId: callTenantProfiles.get(callSid)?.id || null })
+        .catch(() => {});
       forgetVoiceTrace(callSid);
       forgetVoiceTrace(sidLabel());
       db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') }).catch((err) => {
@@ -6628,6 +6650,9 @@ async function generateGeminiText({
       thinkingConfig: { thinkingLevel },
     },
   });
+  if (callSid && callSid !== 'greeting') {
+    callUsage.note(callSid, usageFromResponse(response), { model, kind: 'one_shot' });
+  }
   const text = extractGeminiText(response).trim();
   console.log(`[${callSid}] Gemini one-shot text chars=${text.length}`);
   return text;
@@ -7051,6 +7076,7 @@ async function runGeminiTurnStreaming(
   let joinTrace = createStreamJoinTrace();
   const timeoutMs = geminiTurnTimeoutMs();
   let attempt = 0;
+  let streamUsage = null;
 
   while (attempt < 3) {
     fullText = '';
@@ -7061,6 +7087,7 @@ async function runGeminiTurnStreaming(
     joinTrace = createStreamJoinTrace();
     streamErr = null;
     streamFailed = false;
+    streamUsage = null;
     try {
       console.log(
         `[${callSid}] Calling Gemini stream (model: ${model}, attempt: ${attempt + 1}, messages: ${messages.length}, timeoutMs=${timeoutMs})`
@@ -7074,6 +7101,7 @@ async function runGeminiTurnStreaming(
           });
 
           for await (const chunk of stream) {
+            streamUsage = mergeStreamUsage(streamUsage, chunk);
             if (shouldAbort?.()) {
               console.log(`[${callSid}] Gemini stream aborted (barge-in)`);
               break;
@@ -7105,6 +7133,7 @@ async function runGeminiTurnStreaming(
         timeoutMs,
         'Gemini stream'
       );
+      callUsage.note(callSid, streamUsage, { model, kind: 'turn_stream' });
       const joins = joinTrace.summary();
       console.log(
         `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length} deltas=${joins.deltas} unspacedJoins=${joins.unspacedJoins}`
@@ -7112,6 +7141,10 @@ async function runGeminiTurnStreaming(
       break;
     } catch (err) {
       streamErr = err;
+      // A cut stream may still be billed; a refused request is not.
+      if (streamUsage || isTimeoutError(err)) {
+        callUsage.note(callSid, streamUsage, { model, kind: 'turn_stream_cut' });
+      }
       const spoke = Boolean(String(fullText).trim());
       const next = nextGeminiStreamAttempt({
         err,
@@ -7277,6 +7310,7 @@ async function runGeminiTurn(
         'Gemini generateContent'
       );
       console.log(`[${callSid}] Gemini response received`);
+      callUsage.note(callSid, usageFromResponse(response), { model, kind: 'turn' });
       firstTokenAt = Date.now();
       lastErr = null;
       noteGeminiProviderOk();
