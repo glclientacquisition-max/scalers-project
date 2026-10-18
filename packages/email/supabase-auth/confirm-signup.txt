@@ -1,0 +1,16 @@
+Subject: Confirm your email for Scalers
+Preheader: One tap to confirm your email and finish setting up.
+
+Confirm your email
+
+Welcome to Scalers. Tap the button to confirm {{ .Email }} and finish setting up your account.
+
+The link works once and expires in 1 hour.
+
+If you didn't ask for this, you can ignore this email. No account is set up until the email is confirmed.
+
+Confirm my email: {{ .ConfirmationURL }}
+
+--
+This is an account email from Scalers. We only send it when someone asks for it.
+Need help? Write to support@scalers.co.ke.

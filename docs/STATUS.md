@@ -43,6 +43,8 @@ Times EAT. SHAs are the squash commits on `main` (first-parent log). Older histo
 
 | PR | SHA | Merged | What |
 | --- | --- | --- | --- |
+| #752 | squash commit of #752 (`git log --first-parent --grep '(#752)' origin/main`) | 18 Oct, after #755 | Email design system as a standalone package (`packages/email/`): shared layout, owner and ops templates, plain-text versions, render API and previews, branded Supabase Auth templates. Templates only: no send path and no change to the Voice or Desk build. Line-live email offers the Scalers number or one forwarding code `**004*N**20#` (tested on Safaricom and Airtel by Alvin, 18 Oct; Telkom untested), with the airtime note and a button to `/onboarding/line`. Rollback = revert. Approved by Alvin 13:11 EAT; deploy slot from Voice 13:22 EAT. |
+| #755 | `c4719c70` | 18 Oct 13:22 | Desk "Set up your calls" on `/onboarding/line`: use the Scalers number, or forward with pre-filled codes (recommended all-in-one `**004*N**S#` first, other choices `**61*`/`**67*`/`**62*` under a disclosure, each with its own off code, `##002#` for all), ring time 15/20/30, airtime note before dialling, Android-only tap-to-dial, test step with "I tested it", Overview card until tested. Picks in browser storage per tenant (no migration). `**004*N**20#` tested on Safaricom and Airtel by Alvin 18 Oct 13:09; Telkom untested. Deploys: Vercel `dpl_4m1RFPGGbeE7BN2Z7CXkXSq9frp9` READY 13:23, Railway `0182bcff` SUCCESS, `/healthz` ok on `c4719c70`. Rollback = revert. Approved by Alvin 13:11 EAT; deploy slot from Voice 13:22 EAT. |
 | #647 | `b66e1661` | 17 Oct 22:12 | Billing: SMS reserve → send → settle; the ledger is the SMS bill. |
 | #650 | `730ddee1` | 17 Oct 22:08 | Ops-Billing: explicit no-package state, package change rules, `tenant_billing_state` view. |
 | #631 | `134b493a` | 17 Oct 22:01 | Beta never rejects at the package minute cap; ops email at 80%/100%; period rollover cron (`5 * * * *`, hourly at :05, in `docs/supabase/package_period_rollover.sql`). |
@@ -116,7 +118,6 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 | PR | Lane | What |
 | --- | --- | --- |
-| #755 (18 Oct, draft) | Desk | **Pending ship.** "Set up your calls" on `/onboarding/line`: use the Scalers number, or forward your line with pre-filled codes (all-in-one `**004*N**S#`, no answer `**61*N**S#`, busy `**67*N#`, off `**62*N#`, each with its own off code, `##002#` for all), ring time 15/20/30, Android-only tap-to-dial, test step. Overview card "Finish setting up your calls" until tested. Picks saved in browser storage per tenant (no migration; a `tenants.call_setup` column can replace it). Approved by Alvin via Ops-Billing 18 Oct 12:03 EAT. Codes untested on real SIMs (Ops open item). |
 | #709 (ready, not draft) | Business Assistant | Business Assistant: area travel fees on calls, alert titles, request footers, enquiry mapping. |
 | #640 | Platform | Ops alerts on Vercel cron instead of page load. |
 | #712–#716, #719–#725 | Voice/Brain | NLU-first intent, outage debounce, Swahili verb lock, booking outranks list, regression-9 pack and fixes (R6–R9). |
