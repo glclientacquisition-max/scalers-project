@@ -1,3 +1,8 @@
+---
+owner: desk
+last_reviewed: 2026-10-18
+---
+
 # Super Admin ops workflows — implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans task-by-task.
