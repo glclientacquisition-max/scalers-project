@@ -21,6 +21,7 @@ const SELF_AUDITING = {
   // These call billing RPCs that insert into ops_audit_log themselves.
   grantTenantPackageMinutes: "rpc:grant_tenant_package_minutes",
   setTenantBillingMode: "rpc:set_tenant_billing_mode",
+  confirmTenantBillingMode: "rpc:admin_set_tenant_billing_mode",
 };
 
 function fnBody(src, name) {
@@ -67,7 +68,11 @@ describe("Activity: every admin write is recorded", () => {
   it("the self-auditing helpers really record", () => {
     for (const [fn, where] of Object.entries(SELF_AUDITING)) {
       if (where.startsWith("rpc:")) {
-        const lib = read(fn === "setTenantBillingMode" ? "dashboard/src/lib/adminWallets.ts" : "dashboard/src/lib/adminBilling.ts");
+        const lib = read(
+          fn === "setTenantBillingMode" || fn === "confirmTenantBillingMode"
+            ? "dashboard/src/lib/adminWallets.ts"
+            : "dashboard/src/lib/adminBilling.ts",
+        );
         assert.match(fnBody(lib, fn), new RegExp(where.slice(4)), fn);
         continue;
       }
