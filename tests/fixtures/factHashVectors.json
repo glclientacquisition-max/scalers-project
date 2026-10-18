@@ -295,6 +295,22 @@
         "id": "42",
         "name": "Numeric id is positional",
         "price": 600
+      },
+      {
+        "id": "svc_priced",
+        "name": "Mattress cleaning",
+        "price_range": "KES 2,500",
+        "source": "owner",
+        "pricing": {
+          "mode": "fixed",
+          "amount_ksh": 2500,
+          "min_ksh": null,
+          "max_ksh": null,
+          "unit": "per mattress",
+          "source": "owner",
+          "confirmed": true,
+          "parsed_from": "KES 2,500"
+        }
       }
     ],
     "product_catalog": [
@@ -441,6 +457,29 @@
       "path": "policies.payment",
       "value": "M-Pesa till 123456",
       "sha256": "52b0c0c1fc335d7fc448a19a880e034139f8dd0838ff0bf3d75da13182ee083b"
+    },
+    {
+      "name": "service row name path drops the pricing envelope (source, confirmed, parsed_from)",
+      "path": "catalog.service.svc_priced.name",
+      "value": {
+        "id": "svc_priced",
+        "name": "Mattress cleaning",
+        "price_range": "KES 2,500",
+        "pricing": {
+          "mode": "fixed",
+          "amount_ksh": 2500,
+          "unit": "per mattress"
+        }
+      },
+      "sha256": "c97ba94ad4e1195b1a25b84d44ec710b8a24007e55e5a77c50208b98552238fb"
+    },
+    {
+      "name": "service price with a typed pricing envelope",
+      "path": "catalog.service.svc_priced.price",
+      "value": {
+        "price": "KES 2,500"
+      },
+      "sha256": "79fcf663511cb31a2f3ea740a326daf742758f34ed549efbca339bcadc39bf17"
     }
   ]
 }

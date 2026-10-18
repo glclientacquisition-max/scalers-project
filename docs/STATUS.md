@@ -21,7 +21,7 @@ Prod DID **+254709221536** is Aris, the live paying customer: **never release, r
 
 **Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.
 
-Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage.
+Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage. Metering is live. Invoices and payments are not built. Bachs is the chosen payment provider. Prices are about to be raised. The new prices are not decided. Detail in [Billing](#billing).
 
 **Gate right now:** the next step is a clean, scored Aris call on prod. Until then, nothing else ships except live-call voice fixes Alvin approves (see section 4).
 
@@ -94,7 +94,7 @@ Earlier merges since 9 Oct (see git log for detail):
 
 Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since merged). So staging is behind prod: it lacks #631, #650, #647.
 
-- **#737** (Desk Suspend/Archive/Purge): SQL applied on **staging only** (*per team notes*).
+- **#737** (Desk Suspend/Archive/Purge): the functions are on staging and on production. Production recorded `admin_business_suspend_737`, `archive_tenant_billing_737` and `purge_archived_tenants_737` at 12:06 EAT on 18 Oct, before the 12:10 EAT merge. Staging has the functions. Those three names are not in staging's migration list. The purge schedule is not applied on either database.
 - Caller files memory v2 SQL (#673) is applied on **staging only** (carried from 14 Oct).
 - **#762** (Desk call setup per account): `tenants.call_setup` + `save_call_setup()` applied on staging 18 Oct 13:34 EAT; re-applied 14:19 EAT with the test phone fields (`test_from`, `test_started_at`) and the test-call check. Additive, 0 rows changed. **Also on prod since 18 Oct 14:59 EAT** (see Ops changes); the #762 code is not on prod yet.
 
@@ -112,7 +112,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | #758 | Desk | Settings quick fixes from the owner review (Alvin approved 13:21 EAT): Catalogue / prices links open the Catalogue, plus small Settings copy and display fixes. No SQL, no prompt or call-facing change. | **Shipped 18 Oct 15:08 EAT:** squash `52498db9`; Vercel prod `dpl_DBSyRwgU4eg9bRQwPnvQB2t9XuRT` READY on app, admin and www, no runtime errors; Railway `7dfbf4e9` SUCCESS, `/healthz` ok on `52498db9`. Rollback: promote `dpl_738F4MizcCCtAM87wfGPhqoAiiJx` (`adab1e81`) or revert `52498db9`. GO Alvin 14:55 EAT. |
 | #643 | Voice | Phone wallet low-balance alert. | GO'd, frozen. |
 | #731 | Voice | One owner alert per call, goodbye hangs up, 10 s no-audio close (main cut of #644 + #646). | GO'd, frozen. |
-| #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | Prod SQL and merge wait for a scored Aris call. Purge schedule not applied until a recordings deletion route exists. |
+| #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | **Merged** 18 Oct 12:10 EAT (`fbef28a8`). Production SQL was already recorded at 12:06 EAT (`admin_business_suspend_737`, `archive_tenant_billing_737`, `purge_archived_tenants_737`). Staging has the functions. They are not in staging's migration list. Purge schedule is not applied on either database. |
 | #733 | Brain | D199 visit read (last one only, paged). (#732 merged 18 Oct 14:48, `13ddf19d`.) | Need Alvin's GO. |
 | #762 | Desk | Call setup per account (follow-up to #755): picks saved on the account (one-time copy from the browser); "Forwarding works" only when a call from the owner's named test phone arrives within 30 minutes of starting the test (other calls only show "Calls are reaching your assistant"); fix checklist when the test fails; Settings > Calls & forwarding; Overview note after 7 days without a call. | **Pending ship (18 Oct).** GO Alvin 14:55 EAT. Prod SQL applied 14:59 EAT (Ops changes). Code merges in the next Voice deploy slot, right after #758. Until then prod Desk keeps using browser storage. |
 
@@ -143,12 +143,14 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | #712–#716, #719–#725 | Voice/Brain | NLU-first intent, outage debounce, Swahili verb lock, booking outranks list, regression-9 pack and fixes (R6–R9). |
 | #695, #698, #701, #706, #707, #702, #705, #727 | Voice/Brain/Platform | Mouth lock, no-answer-delete, v2 catalogue, TurnArbiter, spoken catalogue (`hold-staging`). |
 | #691, #696, #699, #697, #704 | Platform/Desk | Write receipts, graceful drain, provider-health page, Admin cleanup, smart import. |
-| #673, #678, #684 | Platform/Brain | Caller files memory v2; trust P1; fact hash contract. |
+| #673, #678, #684 | Platform/Brain | Caller files memory v2; trust P1; fact hash contract. **#684 is folded into #771** (cherry-pick onto `main`). Do not merge #684 as well. |
+| #771 | Desk/Platform | Price units on confirm (#685). Yes keeps the owner's price line, including per sq ft, per job, per day, a month, /kg, and wording the label cannot cover. Forward migration `20261018200000_price_unit_preserve.sql` is **not applied**. Staging first, needs backup before prod. |
 | #675, #676, #677 | Voice | Silent-caller prompt + stall watchdog; repair-who + carrier-drop callback; language hysteresis. |
 | #679, #680, #681, #682, #683 | Brain/Voice | BA v2 Phase 0/1, shadow hook, ack rule, coverage single source. |
 | #618, #621, #622, #625, #628, #629, #633, #638 | Voice | Dropped question, score honesty, scorer fixes, wait-barge, junk names, spoken facts, HD_ceba fixes. |
 | #644, #646 | Voice | **Closed, not merged** (18 Oct 09:41 EAT): superseded by #731 (main cut). No longer open. |
 | #602, #611, #615 | Platform/Desk | Quality read APIs; catalogue import preview; Stage-PR skip-staging filter. |
+| #773 | Desk | QA copy and small layout fixes from `main` @ `408ad368`: Business Assistant in full, callbacks only, no invoice or area-price promises, free-beta Usage in KSh, Nairobi times, login redirect. Draft. No SQL. Area-price sentence returns when #709 ships. The `+N more` import line covers only the 8-row slice of #611. Paste list saves ask wording such as "price depends on size" and still saves the other rows when one price cannot be saved. |
 | #587, #597, #614, #584, #583, #537 | Voice | Parked (`skip-staging`). |
 | #653, #492, #560, #440, #434, #356 | Various | Legal pack, landing, docs, ops, tester lane: parked. |
 | #639, #642 | Voice | **Closed, not merged** (18 Oct 09:41 EAT): superseded by #651 (line-unavailable gate) and the clips on SautiKit. No longer open. |
@@ -157,6 +159,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 ## 5. Known broken / open issues
 
+- **#685 price units (open, fix in #771, not merged).** Settings "Is this right?" shows and saves "KSh 40 per sq ft" as "KSh 40", so the Business Assistant can quote the short line. Migration `20261018200000_price_unit_preserve.sql` repairs backfilled rows. Not applied. Staging first, needs backup before prod.
 - **Prod call recording is off.** `VOICE_STREAM_RECORD` is unset on prod (Railway variable list, 18 Oct), so prod has never recorded. Turning it on waits on Alvin's consent decision (spoken recording notice or not, Kenya Data Protection Act), then one env change.
 - **SautiKit media degradation, 17 Oct 21:52 EAT.** Calls `HD_ad18fd9088e0` and `HD_60e56c6acc88`: media socket opened 4.5–6 s after answer (about 1 s normally), inbound audio jitter about ±0.3 s then stalled, both sockets closed 1006, Completed webhooks 13–25 s late. Our server was idle. Ticket drafted; **Alvin to send.** These calls could not sign off #734 (*per team notes*).
 - **Aris redial 22:00–22:25 EAT, 17 Oct, never reached SautiKit.** No call in SautiKit's log or ours. Failure sits between the caller's carrier and SautiKit. Add to the ticket and ask for their ingress logs (*per team notes*).
@@ -185,7 +188,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 **Build order:** Admin → Settings/onboarding → UI/UX sweep → Packages → Landing → Voice/Brain on real calls. Live-call voice fixes ship any time, one at a time.
 
-- **Admin:** Suspend/Archive/Purge in #737; still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
+- **Admin:** Suspend/Archive shipped (#737, 18 Oct). Purge schedule not applied. Still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
 - **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
 - **Packages**: state rules and rollover shipped (#631, #650); package catalogue and invoices remain.
@@ -195,6 +198,16 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - Live call transfer: **not built** (callbacks only since #658; reviving it needs a new ADR and Alvin's yes).
 
 Public copy never mentions unbuilt features.
+
+---
+
+## Billing
+
+Metering is live: packages, usage caps, the SMS reserve, send and settle ledger, and monthly rollover. There are no invoices and no payments. Bachs is the chosen payment provider (collection per invoice later; Scalers keeps the subscription record). Prices are about to be raised. The new prices are not decided, so none are written here.
+
+This is Phase 0 of the 18 Oct 2026 ops and billing plan: correct the #737 and #643 migration records, and revoke anon execute on the seat functions. That seat revoke is on staging (`20261018164459`) and production (`20261018180156`). `create_tenant_invite`, `accept_tenant_invite`, and `transfer_tenant_ownership` allowed the anon role on both databases. Each revoke keeps `service_role` only. Create is on staging (`20261018180447`). Accept and transfer are on staging (`20261018180648`). Production waits for the owner's OK. Later phases (invoices, Bachs checkout, the admin billing console) are not started.
+
+Paid-mode copy on Usage still says "next invoice". That wording is a Desk hand-off (`billingStateModel.ts`, `usageCap.ts`). Do not ship it as a promise until invoices exist.
 
 ---
 

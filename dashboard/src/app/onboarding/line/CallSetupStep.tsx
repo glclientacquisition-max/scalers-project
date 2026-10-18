@@ -255,9 +255,9 @@ export function CallSetupStep({
       <h2 id="calls-setup" className="text-title text-ink">
         Set up your calls
       </h2>
-      <p className="mt-1 text-body text-ink-2">Pick how callers reach your assistant. You can do both.</p>
+      <p className="mt-1 text-body text-ink-2">Pick how callers reach your Business Assistant. You can do both.</p>
 
-      <div role="radiogroup" aria-label="How callers reach your assistant" className="mt-3 grid gap-2">
+      <div role="radiogroup" aria-label="How callers reach your Business Assistant" className="mt-3 grid gap-2">
         <OptionCard
           active={option === "main_number"}
           title="Use your Scalers number as your business number"
@@ -268,7 +268,7 @@ export function CallSetupStep({
         <OptionCard
           active={option === "forward"}
           title="Keep your number and forward calls"
-          line="Your phone rings first. If you don't pick up, your assistant answers."
+          line="Your phone rings first. If you don't pick up, your Business Assistant answers."
           onSelect={() => update({ option: "forward" })}
         />
       </div>
@@ -278,11 +278,11 @@ export function CallSetupStep({
           <div className={cardBase}>
             <p className="text-body text-ink-2">
               Put <span className="font-semibold tabular-nums text-ink">{pretty}</span> on your website, Google profile,
-              business cards and WhatsApp. Every call goes straight to your assistant.
+              business cards and WhatsApp. Every call goes straight to your Business Assistant.
             </p>
             <CopyCode className="mt-3" label="Your number" code={number} dial={`tel:${number}`} />
             <p className="mt-3 text-meta text-ink-2">
-              Your assistant answers every call. It can&apos;t put a caller through to you during the call. When someone
+              Your Business Assistant answers every call. It can&apos;t put a caller through to you during the call. When someone
               needs you, it takes their name and what they need, sends you a message, and saves it in your Desk.
             </p>
           </div>

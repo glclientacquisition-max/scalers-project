@@ -142,15 +142,15 @@ export const CHOICE_COPY: Record<ForwardChoice, { title: string; line: (ring: Ri
   },
   no_answer: {
     title: "When I don't answer",
-    line: (ring) => `Your phone rings for about ${ring} seconds, then the assistant answers.`,
+    line: (ring) => `Your phone rings for about ${ring} seconds, then your Business Assistant answers.`,
   },
   busy: {
     title: "When I'm busy or reject a call",
-    line: () => "If you're on another call, or you press the red button, the assistant answers.",
+    line: () => "If you're on another call, or you press the red button, your Business Assistant answers.",
   },
   off: {
     title: "When my phone is off or has no network",
-    line: () => "If your phone is off, the battery is flat, or there's no signal, the assistant answers.",
+    line: () => "If your phone is off, the battery is flat, or there's no signal, your Business Assistant answers.",
   },
 };
 
@@ -169,5 +169,5 @@ export function networkCodeNote(network: NetworkId | null | undefined): string {
 }
 
 export function ringHelp(ring: RingSeconds): string {
-  return `Your phone rings about ${ring} seconds before the assistant answers.`;
+  return `Your phone rings about ${ring} seconds before your Business Assistant answers.`;
 }

@@ -153,3 +153,11 @@ export function withImportedPricing<T extends Row>(row: T, kind: CatalogKind, so
     source === "owner" ? p : { ...p, source: "parsed", confirmed: false, parsed_from: text.slice(0, 120) };
   return { ...row, pricing } as T;
 }
+
+/** catalog.<kind>.<key>.price for the row at `index` (service: stable id, product: sku, else its position). */
+export function catalogPricePath(kind: CatalogKind, rows: Row[], index: number): string | null {
+  const row = index >= 0 ? rows[index] : undefined;
+  if (!row || typeof row !== "object") return null;
+  const key = kind === "service" ? stableRowId(row) || String(index + 1) : norm(row.sku) || String(index + 1);
+  return `catalog.${kind}.${key}.price`;
+}
