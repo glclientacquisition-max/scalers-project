@@ -81,3 +81,19 @@ test("follow-ups are capped at 2 and say when they stop", () => {
     assert.ok(f!.stopWhen.length > 10, `${k} stop condition`);
   }
 });
+
+test("line live: one combined forwarding code with ring time, fallbacks and turn off", async () => {
+  const fx = fixtures.find((f) => f.kind === "line_live")!;
+  const e = await renderEmail(fx.kind, fx.props as never);
+  const dial = (fx.props as { dialNumber: string }).dialNumber;
+  for (const code of [`**004*${dial}**20#`, `**61*${dial}**20#`, `**67*${dial}#`, `**62*${dial}#`, "##002#"]) {
+    assert.ok(e.text.includes(code), `missing ${code} in text`);
+    assert.ok(e.html.includes(code), `missing ${code} in html`);
+  }
+  // Single-star timer form puts the seconds in the service slot and can stop voice forwarding.
+  assert.ok(!new RegExp(`\\*61\\*${dial}\\*20#`).test(e.text), "wrong single-star ring-time form");
+  assert.ok(!/\*\*21\*|\*\*002\*/.test(e.text), "must never forward every call");
+  assert.ok(!/href="tel:/.test(e.html), "no tel: links; iPhone blocks forwarding links");
+  const e15 = await renderEmail("line_live", { ...(fx.props as object), ringSeconds: 15 } as never);
+  assert.ok(e15.text.includes(`**004*${dial}**15#`) && e15.text.includes("about 15 seconds"));
+});

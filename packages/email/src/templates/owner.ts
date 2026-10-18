@@ -49,27 +49,45 @@ export function welcome(p: WelcomeProps, ctx: Ctx): EmailSpec {
 }
 
 /* 2. Line live ---------------------------------------------------------- */
-export type LineLiveProps = OwnerBase & { lineNumber: string; /** Digits for **61* dialling, e.g. 0709000000 */ dialNumber: string };
+export type RingSeconds = 5 | 10 | 15 | 20 | 25 | 30;
+export type LineLiveProps = OwnerBase & {
+  lineNumber: string;
+  /** Digits for the forwarding code, 07XXXXXXXX with no spaces, e.g. 0709000000 */
+  dialNumber: string;
+  /** Seconds the owner's phone rings before the assistant answers. Default 20. */
+  ringSeconds?: RingSeconds;
+};
+
+/** One code: busy, no answer after `s` seconds, and phone off or no signal. */
+export const forwardCode = (dial: string, s: RingSeconds = 20) => `**004*${dial}**${s}#`;
+/** Fallback when a network rejects the single code. */
+export const forwardFallbackCodes = (dial: string, s: RingSeconds = 20) => [`**61*${dial}**${s}#`, `**67*${dial}#`, `**62*${dial}#`];
+export const FORWARD_OFF_CODE = "##002#";
+
 export function lineLive(p: LineLiveProps, ctx: Ctx): EmailSpec {
+  const s = p.ringSeconds ?? 20;
+  const [noAnswer, busy, off] = forwardFallbackCodes(p.dialNumber, s);
   return {
     audience: "owner",
     essential: true,
     subject: `Your Scalers line is live: ${p.lineNumber}`,
-    preheader: "Forward your calls to this number and the assistant starts answering.",
+    preheader: "Dial one code on your business phone and the assistant answers the calls you miss.",
     pill: { tone: "ok", text: "Line live" },
     heading: "Your line is live",
     blocks: [
-      { t: "p", text: ["Calls for ", { strong: p.businessName }, " can now be answered on your Scalers number."] },
+      { t: "p", text: ["Calls for ", { strong: p.businessName }, " can now be answered on your Scalers number. Your phone still rings as normal. The assistant only answers when you're busy, don't pick up, or your phone is off."] },
       { t: "stats", items: [{ value: p.lineNumber, label: "Your Scalers number" }] },
       {
         t: "steps",
-        title: "Three steps to start",
+        title: "Set it up in two minutes",
         items: [
-          ["On the phone your customers call, dial ", { strong: `**61*${p.dialNumber}#` }, " and press call. Calls you don't answer will go to Scalers."],
-          ["To also catch calls when you're busy, dial ", { strong: `**67*${p.dialNumber}#` }, "."],
-          "Call your business number from another phone and let it ring. The assistant should pick up.",
+          ["On the phone your customers call, open the Phone app and type ", { strong: forwardCode(p.dialNumber, s) }, ". It works on Safaricom, Airtel and Telkom."],
+          "Press call. If you have two SIMs, pick the business one. Wait for the message saying it's turned on.",
+          `Test it: ask a friend to call your business number and don't pick up. After about ${s} seconds the assistant should answer.`,
         ],
       },
+      { t: "p", muted: true, text: [`The ${s} in the code is how many seconds your phone rings first. Change it to 15 for a quicker answer or 30 for more time to pick up.`] },
+      { t: "note", tone: "info", text: ["If you see an error, dial these three instead, one at a time: ", { strong: noAnswer }, ", ", { strong: busy }, " and ", { strong: off }, ". To turn it all off, dial ", { strong: FORWARD_OFF_CODE }, "."] },
       ...betaNote(p),
     ],
     cta: { label: "Test your line", href: desk(ctx, deskRoutes.home) },
