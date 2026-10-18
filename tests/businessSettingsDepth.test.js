@@ -39,8 +39,8 @@ describe("business settings depth", () => {
     assert.doesNotMatch(form, />When closed</);
     const modes = read("dashboard/src/lib/afterHours.ts");
     assert.match(modes, /label: "Message only"/);
-    assert.match(modes, /label: "Full assistant"/);
-    assert.match(modes, /Answer, book, and change a visit/);
+    assert.match(modes, /label: "Full Business Assistant"/);
+    assert.match(modes, /Answer questions and take a message/);
     assert.doesNotMatch(modes, /Not ready/);
     assert.doesNotMatch(modes, /disabled:\s*true/);
     assert.doesNotMatch(modes, /Keep helping/);

@@ -344,6 +344,12 @@ function CatalogPager({
   );
 }
 
+function servicePricePlaceholder(service: Pick<ServiceItem, "pricing_mode" | "pricing">): string {
+  const mode = service.pricing_mode || service.pricing?.mode;
+  if (mode === "ask") return "You confirm";
+  return "KSh 2,500";
+}
+
 function isOwnerTeamRow(phone: string, ownerPhone: string | null | undefined): boolean {
   const a = normalizeContactPhone(phone);
   return Boolean(a && a === normalizeContactPhone(ownerPhone));
@@ -394,6 +400,7 @@ function TenantFormInner({
   });
   const [bulkServicesText, setBulkServicesText] = useState("");
   const [bulkServicesError, setBulkServicesError] = useState<string | null>(null);
+  const [bulkServicesNote, setBulkServicesNote] = useState<string | null>(null);
   const [servicesImportOpen, setServicesImportOpen] = useState(false);
   const [productsImportOpen, setProductsImportOpen] = useState(false);
   const [bulkProductsText, setBulkProductsText] = useState("");
@@ -860,10 +867,15 @@ function TenantFormInner({
       );
       return;
     }
-    setServices((prev) => {
-      const existing = prev.filter((s) => s.name.trim());
-      return [...existing, ...parsed].slice(0, 40);
-    });
+    const existing = services.filter((s) => s.name.trim());
+    const combined = [...existing, ...parsed];
+    const dropped = Math.max(0, combined.length - 40);
+    setServices(combined.slice(0, 40));
+    setBulkServicesNote(
+      dropped > 0
+        ? `Services stay at 40. ${dropped} more ${dropped === 1 ? "was" : "were"} left out.`
+        : null,
+    );
     saveAfterPasteRef.current = true;
     setBulkServicesText("");
     setBulkServicesError(null);
@@ -1037,7 +1049,7 @@ function TenantFormInner({
       <section className={panel === "identity" ? "space-y-3" : "hidden"}>
         {panel === "identity" ? structuredSlot?.identity : null}
         <SettingsGroup title="Business Assistant">
-          <SettingsRow label="Assistant name" htmlFor="agent_name">
+          <SettingsRow label="Business Assistant name" htmlFor="agent_name">
             <input
               id="agent_name"
               value={agentName}
@@ -1342,7 +1354,7 @@ function TenantFormInner({
           isEmpty={false}
         >
         <div className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className={settingsBlockTitleClass}>Services</p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -1385,6 +1397,11 @@ function TenantFormInner({
               {bulkServicesError}
             </p>
           ) : null}
+          {bulkServicesNote ? (
+            <p className="text-body text-ink-2" role="status">
+              {bulkServicesNote}
+            </p>
+          ) : null}
 
           <div className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline lg:hidden">
             {visibleServices.map((service, localIndex) => {
@@ -1397,7 +1414,7 @@ function TenantFormInner({
                   </div>
                   <div className="min-w-0">
                     <label className={serviceMobileLabelClass} htmlFor={`svc-price-m-${index}`}>Price</label>
-                    <input id={`svc-price-m-${index}`} value={service.price_range} onChange={(e) => updateService(index, "price_range", e.target.value)} placeholder="from 2,500 KES" className={denseFieldClass} />
+                    <input id={`svc-price-m-${index}`} value={service.price_range} onChange={(e) => updateService(index, "price_range", e.target.value)} placeholder={servicePricePlaceholder(service)} className={denseFieldClass} />
                   </div>
                   <button
                     type="button"
@@ -1419,7 +1436,7 @@ function TenantFormInner({
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
-                  <div className="min-w-0">
+                  <div className="col-span-3 min-w-0">
                     <label className={serviceMobileLabelClass} htmlFor={`svc-notes-m-${index}`}>Notes</label>
                     <input id={`svc-notes-m-${index}`} value={service.notes} onChange={(e) => updateService(index, "notes", e.target.value)} placeholder="Free quotation" className={denseFieldClass} />
                   </div>
@@ -1485,7 +1502,7 @@ function TenantFormInner({
                             onChange={(e) =>
                               updateService(index, "price_range", e.target.value)
                             }
-                            placeholder="from 2,500 KES"
+                            placeholder={servicePricePlaceholder(service)}
                             className={tableFieldClass}
                           />
                         </td>
@@ -1647,7 +1664,7 @@ function TenantFormInner({
                     </div>
                     <div className="min-w-0">
                       <label className="sr-only" htmlFor={`prod-price-m-${index}`}>Price</label>
-                      <input id={`prod-price-m-${index}`} value={product.price} onChange={(e) => updateProduct(index, "price", e.target.value)} placeholder="2,500 KES" className={denseFieldClass} />
+                      <input id={`prod-price-m-${index}`} value={product.price} onChange={(e) => updateProduct(index, "price", e.target.value)} placeholder="KSh 2,500" className={denseFieldClass} />
                     </div>
                     <button
                       type="button"
@@ -1745,7 +1762,7 @@ function TenantFormInner({
                               id={`prod-price-${index}`}
                               value={product.price}
                               onChange={(e) => updateProduct(index, "price", e.target.value)}
-                              placeholder="2,500 KES"
+                              placeholder="KSh 2,500"
                               className={tableFieldClass}
                             />
                           </td>
@@ -1985,7 +2002,7 @@ function TenantFormInner({
               <SettingsRow
                 label="Book a time slot directly"
                 control="switch"
-                hint="Off: callers ask for a time and you confirm it. On: your Business Assistant books the time."
+                hint="Off: callers ask for a time and you confirm it. On: your Business Assistant notes the time they ask for, and you confirm it."
               >
                 <ToolSwitch
                   checked={readBookingMode(policies) === "confirmed_slot"}
