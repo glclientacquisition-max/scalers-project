@@ -110,7 +110,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 | PR | Lane | What |
 | --- | --- | --- |
-| PR_PENDING (18 Oct, draft) | Desk | **Pending ship.** "Set up your calls" on `/onboarding/line`: use the Scalers number, or forward your line with pre-filled codes (all-in-one `**004*N**S#`, no answer `**61*N**S#`, busy `**67*N#`, off `**62*N#`, each with its own off code, `##002#` for all), ring time 15/20/30, Android-only tap-to-dial, test step. Overview card "Finish setting up your calls" until tested. Picks saved in browser storage per tenant (no migration; a `tenants.call_setup` column can replace it). Approved by Alvin via Ops-Billing 18 Oct 12:03 EAT. Codes untested on real SIMs (Ops open item). |
+| #755 (18 Oct, draft) | Desk | **Pending ship.** "Set up your calls" on `/onboarding/line`: use the Scalers number, or forward your line with pre-filled codes (all-in-one `**004*N**S#`, no answer `**61*N**S#`, busy `**67*N#`, off `**62*N#`, each with its own off code, `##002#` for all), ring time 15/20/30, Android-only tap-to-dial, test step. Overview card "Finish setting up your calls" until tested. Picks saved in browser storage per tenant (no migration; a `tenants.call_setup` column can replace it). Approved by Alvin via Ops-Billing 18 Oct 12:03 EAT. Codes untested on real SIMs (Ops open item). |
 | #709 (ready, not draft) | Business Assistant | Business Assistant: area travel fees on calls, alert titles, request footers, enquiry mapping. |
 | #640 | Platform | Ops alerts on Vercel cron instead of page load. |
 | #712–#716, #719–#725 | Voice/Brain | NLU-first intent, outage debounce, Swahili verb lock, booking outranks list, regression-9 pack and fixes (R6–R9). |

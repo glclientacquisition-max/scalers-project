@@ -3,6 +3,7 @@
  * tenant-scoped key (no migration). The shape matches a future
  * `tenants.call_setup jsonb` column: swap `localCallSetupStore` for a server-backed
  * store with the same `load`/`save` and nothing else changes.
+ * Added in PR #755 (18 Oct 2026); the column is a follow-up decision for Alvin.
  */
 import {
   FORWARD_CHOICES,
