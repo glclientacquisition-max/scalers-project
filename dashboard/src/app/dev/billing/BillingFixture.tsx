@@ -15,7 +15,7 @@ import { UsageSummary, type UsageListRow } from "@/components/plan/UsageSummary"
 import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { ownerBillingSurface } from "@/lib/betaBilling";
 import { pickBillingBanner } from "@/lib/billingBanner";
-import { ownerBillingView, type OwnerBillingView } from "@/lib/billingStateModel";
+import { lowBalanceNotice, ownerBillingView, type OwnerBillingView } from "@/lib/billingStateModel";
 import { seatSummary } from "@/lib/invites";
 import { invoicePayState } from "@/lib/invoicePayState";
 import { messageCreditsUsage, type CreditBurns } from "@/lib/messageCredits";
@@ -282,6 +282,7 @@ function BetaTeamPreview() {
 
 function HomeBetaPreview() {
   const view = betaView();
+  const low = lowBalanceNotice(view, betaCredits());
   return (
     <div className="mx-auto w-full max-w-sm pt-4">
       <aside className="overflow-hidden rounded-2xl border border-hairline bg-surface">
@@ -292,9 +293,9 @@ function HomeBetaPreview() {
           minutesLeft={view.minutesLeft}
           packLabel={view.shortLabel}
           minuteStatus={null}
-          lowNotice={view.lowNotice}
-          lowNoticeNote={view.lowNoticeNote}
-          showLink={Boolean(view.lowNotice)}
+          lowNotice={low.lowNotice}
+          lowNoticeNote={low.lowNoticeNote}
+          showLink={Boolean(low.lowNotice)}
         />
       </aside>
     </div>

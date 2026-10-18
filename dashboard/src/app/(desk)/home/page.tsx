@@ -58,6 +58,9 @@ import { parseHoursSchedule } from "@/lib/hoursSchedule";
 import { isBetaBilling } from "@/lib/wallet";
 import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
 import { loadOwnerBillingView } from "@/lib/billingStateLoad";
+import { lowBalanceNotice } from "@/lib/billingStateModel";
+import { messageCreditsUsage } from "@/lib/messageCredits";
+import { loadUsageBillingExtras } from "@/lib/ownerPlanLoad";
 import { coverageDisplayList } from "@/lib/coverageAreas";
 import { homeMinuteStatus } from "@/lib/usageCap";
 import { createDeskTimer } from "@/lib/deskTiming";
@@ -113,7 +116,7 @@ async function HomeOverviewBody() {
   const copy = nicheCopy(vertical);
 
   const numberReady = toLocal07(tenant.sautikit_virtual_number) !== null;
-  const [todayRes, inbox, billing, score, hold, insights, callSetup] = await Promise.all([
+  const [todayRes, inbox, billing, extras, score, hold, insights, callSetup] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
@@ -121,6 +124,7 @@ async function HomeOverviewBody() {
       .gte("created_at", dayStart),
     loadCachedInboxItems(tenant.id, vertical),
     loadOwnerBillingView(tenant.id),
+    loadUsageBillingExtras(tenant.id),
     getTenantCompletenessScore(tenant.id),
     getTenantHoldGate(tenant.id),
     loadCallInsights(client, tenant.id, 30, tenant.faqs),
@@ -145,7 +149,12 @@ async function HomeOverviewBody() {
     : pack?.packageName
       ? `${pack.packageName}${pack.period ? ` / ${pack.period}` : ""}`
       : "No package";
-  const minuteStatus = billing?.lowNotice
+  const low = billing
+    ? lowBalanceNotice(billing, messageCreditsUsage(extras.messageCredits, extras.creditBurns, billing.messageUse))
+    : null;
+  const lowNotice = low?.lowNotice || null;
+  const lowNoticeNote = low?.lowNoticeNote || null;
+  const minuteStatus = lowNotice
     ? null
     : homeMinuteStatus({
         isBeta,
@@ -153,8 +162,6 @@ async function HomeOverviewBody() {
         minutesIncluded,
         minutesLeft,
       });
-  const lowNotice = billing?.lowNotice || null;
-  const lowNoticeNote = billing?.lowNoticeNote || null;
   const digest = inbox.callsTruncated
     ? null
     : homeDigestLine(inbox.items, dayStart, vertical);

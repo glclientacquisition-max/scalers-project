@@ -4,13 +4,19 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   billingModeOf,
+  lowBalanceNotice,
   ownerBillingView,
   periodEndLabel,
   type OwnerBillingInput,
   type TenantBillingStateRow,
 } from "../dashboard/src/lib/billingStateModel.ts";
+
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const esgaRow: TenantBillingStateRow = {
   package_state: "active",
@@ -87,23 +93,66 @@ describe("ownerBillingView rows", () => {
     assert.equal(seats.used, 1);
   });
 
-  it("low SMS shows a notice even with extra usage on, and beta says nothing is charged", () => {
+  it("the texts-only bucket never raises the notice on its own", () => {
     const v = ownerBillingView(input(esgaRow));
-    assert.ok(v.lowNotice);
-    assert.doesNotMatch(String(v.lowNotice), /beta/);
-    assert.match(String(v.lowNoticeNote), /During beta nothing is charged/);
-    const metered = ownerBillingView(input({ ...esgaRow, mode_label: "metered" }));
-    assert.match(String(metered.lowNotice), /next invoice/);
-  });
-
-  it("low rule: 10% or less of the included amount left (50 of 200 is not low, 20 of 200 is)", () => {
-    assert.equal(ownerBillingView(input({ ...esgaRow, used_minutes: 0, sms_used: 150 })).lowNotice, null);
-    assert.ok(ownerBillingView(input({ ...esgaRow, used_minutes: 0, sms_used: 180 })).lowNotice);
+    assert.equal(v.lowNotice, null);
   });
 
   it("no notice when nothing is low", () => {
     const v = ownerBillingView(input({ ...esgaRow, sms_used: 20 }));
     assert.equal(v.lowNotice, null);
+  });
+});
+
+describe("lowBalanceNotice", () => {
+  const view = (over: Partial<TenantBillingStateRow> = {}) =>
+    ownerBillingView(input({ ...esgaRow, used_minutes: 0, ...over }));
+  const credits = (left: number) => ({ included: 1000, used: 1000 - left, left });
+
+  it("warns on the shared credit total in plain words, and beta says nothing is charged", () => {
+    const low = lowBalanceNotice(view(), credits(40));
+    assert.equal(low.lowNotice, "Message credits are running low. 40 of 1,000 left until 31 Oct.");
+    assert.match(String(low.lowNoticeNote), /During beta nothing is charged/);
+  });
+
+  it("low rule: 10% or less of the allowance left (150 left is not low, 100 is)", () => {
+    assert.equal(lowBalanceNotice(view(), credits(150)).lowNotice, null);
+    assert.ok(lowBalanceNotice(view(), credits(100)).lowNotice);
+  });
+
+  it("hides the credits warning without message_credits, same as Usage", () => {
+    assert.equal(lowBalanceNotice(view({ sms_used: 199 }), null).lowNotice, null);
+  });
+
+  it("joins low minutes and low credits in one line", () => {
+    const low = lowBalanceNotice(view({ used_minutes: 290 }), credits(20));
+    assert.equal(
+      low.lowNotice,
+      "Minutes and message credits are running low. 10 minutes and 20 credits left until 31 Oct.",
+    );
+  });
+
+  it("paid modes: extra usage on bills next invoice; off names only what stops calls", () => {
+    const metered = lowBalanceNotice(view({ mode_label: "metered" }), credits(40));
+    assert.match(String(metered.lowNotice), /next invoice/);
+    const capped = lowBalanceNotice(view({ mode_label: "capped", on_demand_enabled: false }), credits(40));
+    assert.equal(capped.lowNotice, "Message credits are running low. 40 of 1,000 left until 31 Oct.");
+    const cappedMinutes = lowBalanceNotice(view({ mode_label: "capped", on_demand_enabled: false, used_minutes: 290 }), null);
+    assert.match(String(cappedMinutes.lowNotice), /When minutes run out, calls stop unless you turn on extra usage\.$/);
+    for (const low of [metered, capped, cappedMinutes]) {
+      assert.doesNotMatch(String(low.lowNotice), /\bSMS\b|to callers stop/);
+    }
+  });
+
+  it("Home builds the notice from the shared total", () => {
+    const home = fs.readFileSync(path.join(root, "dashboard/src/app/(desk)/home/page.tsx"), "utf8");
+    const model = fs.readFileSync(path.join(root, "dashboard/src/lib/billingStateModel.ts"), "utf8");
+    assert.match(
+      home,
+      /lowBalanceNotice\(billing, messageCreditsUsage\(extras\.messageCredits, extras\.creditBurns, billing\.messageUse\)\)/,
+    );
+    assert.doesNotMatch(home, /billing\?\.lowNotice/);
+    assert.doesNotMatch(model, /SMS to callers/);
   });
 });
 

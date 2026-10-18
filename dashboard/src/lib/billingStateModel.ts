@@ -9,6 +9,8 @@
  * view and words each billing mode the way Ops-Billing defined it.
  */
 
+import type { MessageCreditsUsage } from "./messageCredits";
+
 export type BillingMode = "beta" | "metered" | "capped" | "none";
 
 /** Columns the Desk reads from public.tenant_billing_state. */
@@ -67,7 +69,8 @@ export type OwnerBillingView = {
   messageUse: { sms: number; whatsapp: number; email: number };
   minutesIncluded: number;
   minutesLeft: number;
-  /** Low-balance banner for minutes or SMS. Null when nothing is low. */
+  onDemand: boolean;
+  /** Low-minutes line. Credits join it only through lowBalanceNotice. Null when nothing is low. */
   lowNotice: string | null;
   /** Neutral line under lowNotice. Beta says nothing is charged. */
   lowNoticeNote: string | null;
@@ -75,6 +78,8 @@ export type OwnerBillingView = {
   onDemandHint: string;
   periodEndLabel: string | null;
 };
+
+export type LowBalance = { lowNotice: string | null; lowNoticeNote: string | null };
 
 /** Below this share of the included amount we warn the owner. */
 export const LOW_SHARE = 0.1;
@@ -112,6 +117,38 @@ export function billingModeOf(state: TenantBillingStateRow | null): BillingMode 
 function isLow(included: number, left: number): boolean {
   if (included <= 0) return false;
   return left <= Math.max(1, Math.floor(included * LOW_SHARE));
+}
+
+/**
+ * Home's low-balance line from minutes and the plan's shared message credits.
+ * Null credits (no message_credits on the version) never warn, the same rule
+ * that hides the credits row on Usage.
+ */
+export function lowBalanceNotice(
+  view: Pick<OwnerBillingView, "mode" | "minutesIncluded" | "minutesLeft" | "periodEndLabel" | "onDemand">,
+  credits: MessageCreditsUsage | null,
+): LowBalance {
+  const lowMinutes = isLow(view.minutesIncluded, view.minutesLeft);
+  const lowCredits = credits ? isLow(credits.included, credits.left) : false;
+  if (view.mode === "none" || (!lowMinutes && !lowCredits)) return { lowNotice: null, lowNoticeNote: null };
+  const until = view.periodEndLabel ? ` until ${view.periodEndLabel}` : "";
+  let what: string;
+  if (lowMinutes && lowCredits && credits) {
+    what = `Minutes and message credits are running low. ${count(view.minutesLeft)} minutes and ${count(credits.left)} credits left${until}.`;
+  } else if (lowCredits && credits) {
+    what = `Message credits are running low. ${count(credits.left)} of ${count(credits.included)} left${until}.`;
+  } else {
+    what = `${count(view.minutesLeft)} of ${count(view.minutesIncluded)} minutes left${until}.`;
+  }
+  if (view.mode === "beta") return { lowNotice: what, lowNoticeNote: "During beta nothing is charged and calls keep working." };
+  if (view.onDemand) {
+    return { lowNotice: `${what} Extra usage is on, so anything past this is billed on your next invoice.`, lowNoticeNote: null };
+  }
+  if (!lowMinutes) return { lowNotice: what, lowNoticeNote: null };
+  return {
+    lowNotice: `${what} When minutes run out, calls stop unless you turn on extra usage.`,
+    lowNoticeNote: null,
+  };
 }
 
 export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
@@ -164,29 +201,10 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     email: Math.max(0, Math.floor(num(input.messagesSent?.email))),
   };
 
-  const lowMinutes = isLow(minutesIncluded, minutesLeft);
-  const lowSms = isLow(smsIncluded, smsLeft);
-  let lowNotice: string | null = null;
-  let lowNoticeNote: string | null = null;
-  if (mode !== "none" && (lowMinutes || lowSms)) {
-    const what =
-      lowMinutes && lowSms
-        ? `${count(minutesLeft)} minutes and ${count(smsLeft)} message credits left`
-        : lowMinutes
-          ? `${count(minutesLeft)} of ${count(minutesIncluded)} minutes left`
-          : `${count(smsLeft)} of ${count(smsIncluded)} message credits left`;
-    const until = endLabel ? ` until ${endLabel}` : "";
-    if (mode === "beta") {
-      lowNotice = `${what}${until}.`;
-      lowNoticeNote = "During beta nothing is charged and calls keep working.";
-    } else if (onDemand) {
-      lowNotice = `${what}${until}. Extra usage is on, so anything past this is billed on your next invoice.`;
-    } else {
-      lowNotice = lowMinutes
-        ? `${what}${until}. When they run out, calls stop unless you turn on extra usage.`
-        : `${what}${until}. When they run out, SMS to callers stop unless you turn on extra usage.`;
-    }
-  }
+  const { lowNotice, lowNoticeNote } = lowBalanceNotice(
+    { mode, minutesIncluded, minutesLeft, periodEndLabel: endLabel, onDemand },
+    null,
+  );
 
   let onDemandHint: string;
   if (mode === "beta") {
@@ -211,6 +229,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     messageUse,
     minutesIncluded,
     minutesLeft,
+    onDemand,
     lowNotice,
     lowNoticeNote,
     onDemandHint,
