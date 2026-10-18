@@ -19,7 +19,7 @@ const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
 const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 'true').toLowerCase() !== 'false';
 const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 0);
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
-const { billableTalkSeconds, inboundOpen } = require('./billing/packageOverage');
+const { billableTalkSeconds, inboundOpen, effectiveOnDemand } = require('./billing/packageOverage');
 const recordingCopy = require('./sautikit/recordingCopy');
 
 function throwIfError(context, error) {
@@ -331,7 +331,7 @@ async function listInboundTenantRows() {
   const selects = [
     // archived_at / line_status drive the closed-line gate (#639/#651).
     // billing_enforcement: beta (off) never rejects at the cap (#631).
-    'id, business_name, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement',
+    'id, business_name, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement, spend_limit_blocked',
     'id, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled',
     'id, sautikit_virtual_number, is_active, archived_at, minutes_included, seconds_used, on_demand_usage_enabled',
     'id, sautikit_virtual_number, is_active, line_status, minutes_included, seconds_used, on_demand_usage_enabled',
@@ -363,11 +363,19 @@ async function listInboundTenantRows() {
  */
 async function getTenantPackageUsage(tenantId) {
   if (!tenantId) return null;
-  const { data, error } = await supabase
+  const baseSelect = 'id, business_name, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement';
+  let { data, error } = await supabase
     .from('tenants')
-    .select('id, business_name, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement')
+    .select(`${baseSelect}, spend_limit_blocked`)
     .eq('id', tenantId)
     .maybeSingle();
+  if (error && /spend_limit_blocked|column|schema cache/i.test(error.message || '')) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(baseSelect)
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
   if (error) {
     if (!/minutes_included|seconds_used|on_demand_usage_enabled|billing_enforcement|column|schema cache/i.test(error.message || '')) {
       console.warn('[db] getTenantPackageUsage:', error.message);
@@ -399,6 +407,7 @@ async function getTenantPackageUsage(tenantId) {
     minutesIncluded: data.minutes_included,
     secondsUsed: data.seconds_used,
     onDemand: Boolean(data.on_demand_usage_enabled),
+    spendLimitBlocked: data.spend_limit_blocked === true,
     enforcement: data.billing_enforcement || 'off',
     periodStart,
     hasPackage,
@@ -434,7 +443,7 @@ async function packageInboundOpen({ toNumber, fromNumber, tenantId } = {}) {
     ...inboundOpen({
       minutesIncluded: usage.minutesIncluded,
       secondsUsed: usage.secondsUsed,
-      onDemand: usage.onDemand,
+      onDemand: effectiveOnDemand(usage.onDemand, usage.spendLimitBlocked),
       enforcement: usage.enforcement,
       hasPackage: usage.hasPackage,
     }),
