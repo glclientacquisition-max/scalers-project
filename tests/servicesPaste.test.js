@@ -8,6 +8,8 @@ const jiti = require(path.join(root, "dashboard/node_modules/jiti"))(__filename,
   alias: { "@": path.join(root, "dashboard/src") },
 });
 const { parseBulkServices } = jiti(path.join(root, "dashboard/src/lib/servicesCatalog.ts"));
+const { catalogSaveError, omitUnsavedPrices } = jiti(path.join(root, "dashboard/src/lib/catalogValidation.ts"));
+const { settleCatalogPrices } = jiti(path.join(root, "dashboard/src/lib/catalogPricing.ts"));
 
 function row(line) {
   const parsed = parseBulkServices(line);
@@ -57,6 +59,51 @@ describe("paste list splits a price off the service name", () => {
     const parsed = row("Garden clearing KSh 3,000 per job");
     assert.equal(parsed.name, "Garden clearing");
     assert.equal(parsed.price_range, "KSh 3,000 per job");
+  });
+});
+
+describe("paste then save keeps ask wording and the other rows", () => {
+  const pasted = [
+    "Window cleaning KSh 60 per sq ft",
+    "Garden clearing KSh 3,000 per job",
+    "Ironing KSh 250 /kg",
+    "Office cleaning KES 8,000 a month",
+    "Deep clean price depends on size",
+    "Nope - abc",
+  ].join("\n");
+
+  it("accepts the lines the preview splits, including depends on size", () => {
+    const rows = parseBulkServices(pasted);
+    assert.deepEqual(
+      rows.map((row) => [row.name, row.price_range]),
+      [
+        ["Window cleaning", "KSh 60 per sq ft"],
+        ["Garden clearing", "KSh 3,000 per job"],
+        ["Ironing", "KSh 250 /kg"],
+        ["Office cleaning", "KES 8,000 a month"],
+        ["Deep clean", "price depends on size"],
+        ["Nope", "abc"],
+      ]
+    );
+    const split = omitUnsavedPrices(rows, "price_range");
+    assert.deepEqual(
+      split.rows.map((row) => row.name),
+      ["Window cleaning", "Garden clearing", "Ironing", "Office cleaning", "Deep clean"]
+    );
+    assert.equal(split.issues.length, 1);
+    assert.match(split.issues[0].message, /Nope:.*"abc" isn't a price/);
+    assert.equal(catalogSaveError({ services: split.rows }), null);
+
+    const settled = settleCatalogPrices(split.rows, [], "service");
+    const deep = settled.find((row) => row.name === "Deep clean");
+    assert.equal(deep.price_range, "price depends on size");
+    assert.equal(deep.pricing.mode, "ask");
+    assert.equal(deep.pricing.amount_ksh, null);
+
+    const office = settled.find((row) => row.name === "Office cleaning");
+    assert.equal(office.price_range, "KES 8,000 a month");
+    assert.equal(office.pricing.mode, "fixed");
+    assert.equal(office.pricing.amount_ksh, 8000);
   });
 });
 

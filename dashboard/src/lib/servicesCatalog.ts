@@ -1,3 +1,4 @@
+import { isAskPriceWording } from "./catalogValidation";
 import { parsePriceText, sanitizePricing, type StructuredPrice } from "./structuredData";
 import { stableRowId } from "@/lib/factHash";
 
@@ -158,7 +159,7 @@ function isPriceWording(raw: string): boolean {
   const parsed = parsePriceText(text);
   if (parsed.mode === "fixed" || parsed.mode === "from" || parsed.mode === "range") return true;
   if (parsed.amount_ksh != null) return true;
-  return /^(?:price\s+)?(?:ask|call|varies|depends|tbd|quote|quotation|on request)\b/i.test(text);
+  return isAskPriceWording(text);
 }
 
 /** Colon or comma only when the right side is a price, not "3,000" or "9:00". */
