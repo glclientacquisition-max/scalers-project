@@ -36,6 +36,10 @@ import {
 } from "@/lib/agentTools";
 import { CatalogPriceEditor } from "@/components/settings/catalog/CatalogPriceEditor";
 import {
+  transitionCatalogPriceKind,
+  type CatalogPriceDraft,
+} from "@/lib/catalogPriceEditorState";
+import {
   applyCatalogPriceFields,
   catalogPriceInputsFromRow,
   type PriceKind,
@@ -291,6 +295,43 @@ function catalogPriceError(
   return fields[catalogPriceFieldKey(name)] ?? null;
 }
 
+type CatalogPriceDraftMap = Record<string, CatalogPriceDraft>;
+
+function servicePriceDraftKey(row: ServiceItem, index: number): string {
+  return stableRowId(row) || `service:${index}`;
+}
+
+function productPriceDraftKey(row: ProductItem, index: number): string {
+  const sku = row.sku.trim();
+  return stableRowId(row) || (sku ? `product:${sku}` : `product:${index}`);
+}
+
+function getServicePriceFields(
+  row: ServiceItem,
+  index: number,
+  drafts: CatalogPriceDraftMap
+): CatalogPriceDraft {
+  const key = servicePriceDraftKey(row, index);
+  return drafts[key] ?? catalogPriceInputsFromRow(row);
+}
+
+function getProductPriceFields(
+  row: ProductItem,
+  index: number,
+  drafts: CatalogPriceDraftMap
+): CatalogPriceDraft {
+  const key = productPriceDraftKey(row, index);
+  return drafts[key] ?? catalogPriceInputsFromRow(row);
+}
+
+function applyDraftToCatalogRow<T extends ServiceItem | ProductItem>(
+  row: T,
+  draft: CatalogPriceDraft,
+  textKey: "price_range" | "price"
+): T {
+  return applyCatalogPriceFields(row, draft.kind, draft.minInput, draft.maxInput, textKey);
+}
+
 const STOCK_OPTIONS = [
   { value: "yes", label: "In stock" },
   { value: "no", label: "Out of stock" },
@@ -404,6 +445,8 @@ function TenantFormInner({
     const rows = normalizeProductCatalog(tenant.product_catalog);
     return rows.length ? rows.map((row) => markSavedRow(row)) : [];
   });
+  const [servicePriceDrafts, setServicePriceDrafts] = useState<CatalogPriceDraftMap>({});
+  const [productPriceDrafts, setProductPriceDrafts] = useState<CatalogPriceDraftMap>({});
   const [socialHandles, setSocialHandles] = useState<SocialHandles>(() => {
     const next = normalizeSocialHandles(tenant.social_handles);
     return { channels: next.channels.map((row) => markSavedRow(row)) };
@@ -579,12 +622,28 @@ function TenantFormInner({
     return dups;
   }, [faqs]);
   const servicesJson = useMemo(
-    () => JSON.stringify(services.filter((s) => s.name.trim())),
-    [services]
+    () =>
+      JSON.stringify(
+        services
+          .map((row, index) => {
+            const draft = getServicePriceFields(row, index, servicePriceDrafts);
+            return applyDraftToCatalogRow(row, draft, "price_range");
+          })
+          .filter((s) => s.name.trim())
+      ),
+    [services, servicePriceDrafts]
   );
   const productsJson = useMemo(
-    () => JSON.stringify(products.filter((p) => p.name.trim())),
-    [products]
+    () =>
+      JSON.stringify(
+        products
+          .map((row, index) => {
+            const draft = getProductPriceFields(row, index, productPriceDrafts);
+            return applyDraftToCatalogRow(row, draft, "price");
+          })
+          .filter((p) => p.name.trim())
+      ),
+    [products, productPriceDrafts]
   );
   // ?filter=unpriced (from the Overview "Add prices" row) shows only items with no price.
   // The set is frozen while you type (a row must not vanish on its first digit) and is
@@ -762,13 +821,30 @@ function TenantFormInner({
 
   function updateServicePrice(index: number, kind: PriceKind, minInput: string, maxInput: string) {
     const current = services[index];
-    if (current?.name.trim()) {
+    if (!current) return;
+    if (current.name.trim()) {
       queueOwnerPath(`catalog.service.${stableRowId(current) || String(index + 1)}.name`);
     }
+    const key = servicePriceDraftKey(current, index);
+    const prevDraft = getServicePriceFields(current, index, servicePriceDrafts);
+    const nextDraft =
+      kind !== prevDraft.kind
+        ? transitionCatalogPriceKind(prevDraft, kind)
+        : { kind, minInput, maxInput };
+    setServicePriceDrafts((prev) => ({ ...prev, [key]: nextDraft }));
     setServices((prev) =>
       prev.map((row, i) => {
         if (i !== index) return row;
-        const next = applyCatalogPriceFields(row, kind, minInput, maxInput, "price_range");
+        const next =
+          nextDraft.kind === "quote"
+            ? applyCatalogPriceFields(row, "quote", "", "", "price_range")
+            : applyCatalogPriceFields(
+                row,
+                nextDraft.kind,
+                nextDraft.minInput,
+                nextDraft.maxInput,
+                "price_range"
+              );
         return carrySavedRow({ ...next, source: "owner" }, row);
       })
     );
@@ -776,14 +852,31 @@ function TenantFormInner({
 
   function updateProductPrice(index: number, kind: PriceKind, minInput: string, maxInput: string) {
     const current = products[index];
-    if (current?.name.trim()) {
+    if (!current) return;
+    if (current.name.trim()) {
       const sku = current.sku.trim() || String(index + 1);
       queueOwnerPath(`catalog.product.${sku}.name`);
     }
+    const key = productPriceDraftKey(current, index);
+    const prevDraft = getProductPriceFields(current, index, productPriceDrafts);
+    const nextDraft =
+      kind !== prevDraft.kind
+        ? transitionCatalogPriceKind(prevDraft, kind)
+        : { kind, minInput, maxInput };
+    setProductPriceDrafts((prev) => ({ ...prev, [key]: nextDraft }));
     setProducts((prev) =>
       prev.map((row, i) => {
         if (i !== index) return row;
-        const next = applyCatalogPriceFields(row, kind, minInput, maxInput, "price");
+        const next =
+          nextDraft.kind === "quote"
+            ? applyCatalogPriceFields(row, "quote", "", "", "price")
+            : applyCatalogPriceFields(
+                row,
+                nextDraft.kind,
+                nextDraft.minInput,
+                nextDraft.maxInput,
+                "price"
+              );
         return carrySavedRow({ ...next, source: "owner" }, row);
       })
     );
@@ -1451,7 +1544,7 @@ function TenantFormInner({
             {visibleServices.map((service, localIndex) => {
               const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
               const priceError = catalogPriceError(state.fields, service.name);
-              const priceFields = catalogPriceInputsFromRow(service);
+              const priceFields = getServicePriceFields(service, index, servicePriceDrafts);
               return (
                 <div key={`service-m-${index}`} className="grid grid-cols-[minmax(0,1fr)_2.75rem] items-start gap-x-2 gap-y-2 px-3 py-2.5">
                   <div className="min-w-0">
@@ -1494,6 +1587,7 @@ function TenantFormInner({
                     onMaxChange={(value) =>
                       updateServicePrice(index, priceFields.kind, priceFields.minInput, value)
                     }
+                    revealAllErrors={Boolean(priceError)}
                   />
                   {priceError ? (
                     <p id={`svc-price-m-${index}-error`} className="col-span-2 text-meta text-warn" role="alert">
@@ -1537,7 +1631,7 @@ function TenantFormInner({
                   {visibleServices.map((service, localIndex) => {
                     const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
                     const priceError = catalogPriceError(state.fields, service.name);
-                    const priceFields = catalogPriceInputsFromRow(service);
+                    const priceFields = getServicePriceFields(service, index, servicePriceDrafts);
                     return (
                       <Fragment key={`service-${index}`}>
                         <tr className="align-top">
@@ -1622,6 +1716,7 @@ function TenantFormInner({
                               onMaxChange={(value) =>
                                 updateServicePrice(index, priceFields.kind, priceFields.minInput, value)
                               }
+                              revealAllErrors={Boolean(priceError)}
                             />
                             {priceError ? (
                               <p id={`svc-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">
@@ -1733,7 +1828,7 @@ function TenantFormInner({
               {visibleProducts.map((product, localIndex) => {
                 const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
                 const priceError = catalogPriceError(state.fields, product.name);
-                const priceFields = catalogPriceInputsFromRow(product);
+                const priceFields = getProductPriceFields(product, index, productPriceDrafts);
                 return (
                   <div key={`product-m-${index}`} className="grid grid-cols-[minmax(0,1fr)_2.75rem] items-start gap-2 px-3 py-2">
                     <div className="min-w-0">
@@ -1770,6 +1865,7 @@ function TenantFormInner({
                       onMaxChange={(value) =>
                         updateProductPrice(index, priceFields.kind, priceFields.minInput, value)
                       }
+                      revealAllErrors={Boolean(priceError)}
                     />
                     {priceError ? (
                       <p id={`prod-price-m-${index}-error`} className="col-span-2 text-meta text-warn" role="alert">
@@ -1834,7 +1930,7 @@ function TenantFormInner({
                     {visibleProducts.map((product, localIndex) => {
                       const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
                       const priceError = catalogPriceError(state.fields, product.name);
-                      const priceFields = catalogPriceInputsFromRow(product);
+                      const priceFields = getProductPriceFields(product, index, productPriceDrafts);
                       return (
                         <Fragment key={`product-${index}`}>
                           <tr className="align-top">
@@ -1928,6 +2024,7 @@ function TenantFormInner({
                                 onMaxChange={(value) =>
                                   updateProductPrice(index, priceFields.kind, priceFields.minInput, value)
                                 }
+                                revealAllErrors={Boolean(priceError)}
                               />
                               {priceError ? (
                                 <p id={`prod-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">

@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { SegmentedControl } from "@/components/ui/Segmented";
 import {
-  type PriceKind,
-  validateCatalogPriceFields,
-} from "@/lib/catalogPricingMode";
+  type CatalogPriceTouch,
+  catalogPriceFieldErrors,
+  emptyCatalogPriceTouch,
+} from "@/lib/catalogPriceEditorState";
+import type { PriceKind } from "@/lib/catalogPricingMode";
 import { cx } from "@/lib/cx";
 
 const MODES: Array<{ value: PriceKind; label: string }> = [
@@ -26,6 +29,8 @@ type Props = {
   labelClass?: string;
   /** Server or client validation messages keyed min / max */
   errors?: { min?: string; max?: string };
+  /** After save attempt, show all field errors even if not blurred */
+  revealAllErrors?: boolean;
 };
 
 export function CatalogPriceEditor({
@@ -39,8 +44,15 @@ export function CatalogPriceEditor({
   fieldClass,
   labelClass = "mb-1 block text-meta text-ink-2",
   errors,
+  revealAllErrors = false,
 }: Props) {
-  const local = validateCatalogPriceFields(kind, minInput, maxInput);
+  const [touch, setTouch] = useState<CatalogPriceTouch>(emptyCatalogPriceTouch);
+
+  const local = catalogPriceFieldErrors(
+    { kind, minInput, maxInput },
+    touch,
+    revealAllErrors
+  );
   const minError = errors?.min ?? local.min;
   const maxError = errors?.max ?? local.max;
 
@@ -75,6 +87,7 @@ export function CatalogPriceEditor({
               autoComplete="off"
               maxLength={12}
               onChange={(e) => onMinChange(stripNonDigits(e.target.value))}
+              onBlur={() => setTouch((t) => ({ ...t, min: true }))}
               placeholder={kind === "from" ? "1500" : "2000"}
               aria-invalid={minError ? true : undefined}
               aria-describedby={minError ? `${idPrefix}-min-err` : undefined}
@@ -98,6 +111,7 @@ export function CatalogPriceEditor({
                 autoComplete="off"
                 maxLength={12}
                 onChange={(e) => onMaxChange(stripNonDigits(e.target.value))}
+                onBlur={() => setTouch((t) => ({ ...t, max: true }))}
                 placeholder="800"
                 aria-invalid={maxError ? true : undefined}
                 aria-describedby={maxError ? `${idPrefix}-max-err` : undefined}
