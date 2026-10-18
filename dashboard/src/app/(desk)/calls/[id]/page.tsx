@@ -1,4 +1,5 @@
 import { createDeskTimer } from "@/lib/deskTiming";
+import { summaryTopic } from "@/lib/ownerTopic";
 import { loadTranscriptTurns } from "@/lib/transcriptLoad";
 import { memberCan } from "@/lib/requireMember";
 import { CallFactsCorrection } from "@/components/structured/CallFactsCorrection";
@@ -13,7 +14,6 @@ import {
 } from "@/lib/supabase";
 import {
   pickCallOwnerCard,
-  pickCallOwnerReason,
   pickCallOwnerWant,
   shapeTicketChat,
 } from "@/lib/callSummarySentence";
@@ -187,13 +187,12 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
   const summaryName = typeof meta.name === "string" ? meta.name.trim() : "";
   const contactName = person?.name?.trim() || "";
   const name = contactName || summaryName || null;
-  const reason = pickCallOwnerReason(meta);
   const want = pickCallOwnerWant(meta);
   const summaryCard = pickCallOwnerCard(meta);
   const leadStatus = parseLeadStatus(row.lead_status);
   const resolution = parseCallResolution(row.resolution);
   const businessName = tenant.business_name?.trim() || "us";
-  const waMessage = followUpWhatsAppMessage({ businessName, name, reason, topic: typeof meta.topic === "string" ? meta.topic : null });
+  const waMessage = followUpWhatsAppMessage({ businessName, name, topic: summaryTopic(meta) });
   const escalatedTo =
     meta.escalated_to && typeof meta.escalated_to === "object"
       ? (meta.escalated_to as { name?: string; role?: string; phone?: string })

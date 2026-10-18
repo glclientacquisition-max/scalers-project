@@ -354,7 +354,6 @@ async function HomeOverviewBody() {
                       message={followUpWhatsAppMessage({
                         businessName: business,
                         name: nextReturn.callerName,
-                        reason: nextReturnReason,
                         topic: nextReturn.lead?.topic,
                       })}
                       variant="icon"
@@ -396,7 +395,6 @@ async function HomeOverviewBody() {
                     message={followUpWhatsAppMessage({
                       businessName: business,
                       name: nextReturn.callerName,
-                      reason: nextReturnReason,
                       topic: nextReturn.lead?.topic,
                     })}
                     variant="ghost"

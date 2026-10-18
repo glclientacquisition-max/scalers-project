@@ -1,3 +1,4 @@
+import { followUpWhatsAppText, summaryTopic } from "./ownerTopic";
 import { pickCallOwnerReason } from "@/lib/callSummarySentence";
 import { applyOwnerFacts, type OwnerFacts } from "@/lib/ownerCallFacts";
 import {
@@ -19,7 +20,7 @@ export type Lead = {
   leadStatus: LeadStatus;
   resolution: CallResolution;
   primaryIntent: string | null;
-  /** Brain's short noun phrase for the call ("apartment cleaning"). Null until Brain writes summary.topic. */
+  /** summary.topic (or owner_review.topic) from Brain. Null when null or missing; never built from the reason. */
   topic?: string | null;
   /** Owner's corrected Wanted / Result labels, when they fixed this call. */
   ownerWanted?: string | null;
@@ -48,7 +49,7 @@ export function toLead(call: CallRow, facts?: OwnerFacts | null): Lead {
     call,
     name: typeof meta.name === "string" ? meta.name : null,
     reason: pickCallOwnerReason(meta),
-    topic: whatsAppTopicFromSummary(meta.topic),
+    topic: summaryTopic(meta),
     notified: Boolean(meta.owner_notified || meta.whatsapp_sent),
     urgent: String(call.sentiment || "").toLowerCase() === "urgent",
     leadStatus: parseLeadStatus(call.lead_status),
@@ -202,46 +203,15 @@ export function sanitizeSearchQuery(raw: string | undefined): string {
     .replace(/[%_,.()]/g, " ");
 }
 
-/** Prefilled WhatsApp opener for Kenyan SME follow-up. */
-/** summary.topic when it is a short noun phrase; anything else is ignored. */
-export function whatsAppTopicFromSummary(raw: unknown): string | null {
-  const text = String(raw ?? "").replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
-  if (!text || text.length > 60) return null;
-  return text;
-}
-
-const SENTENCE_REASON =
-  /^.+\b(asked|wanted|wants|called|enquired|inquired|requested|said|needs|was|is|would|could|will)\b/i;
-
 /**
- * A call reason that can follow "Thanks for calling about": a short noun phrase
- * ("carpet cleaning in Kisumu"). The summary sentence ("Caller asked about
- * apartment cleaning services.") is never pasted in (owner review, 18 Oct 2026).
+ * Prefilled WhatsApp opener for Kenyan SME follow-up. Uses summary.topic only
+ * (Brain #751 contract); the reason sentence is never pasted in.
  */
-export function whatsAppTopicFromReason(reason: string | null | undefined): string | null {
-  const text = String(reason ?? "").replace(/\s+/g, " ").trim();
-  if (!text) return null;
-  if (SENTENCE_REASON.test(text)) return null;
-  const bare = text.replace(/\.$/, "");
-  // A full sentence (inner punctuation or a second sentence) or a long line is not a topic.
-  if (/[.!?;:]/.test(bare)) return null;
-  if (bare.split(" ").length > 6) return null;
-  // Case kept as written: a product or place name must not be lower-cased.
-  return bare;
-}
-
 export function followUpWhatsAppMessage(opts: {
   businessName: string;
   name: string | null;
-  reason: string | null;
-  topic?: string | null;
+  topic: string | null | undefined;
 }): string {
-  const who = opts.name?.trim() || "there";
-  const biz = opts.businessName.trim() || "us";
-  const topic = whatsAppTopicFromSummary(opts.topic) || whatsAppTopicFromReason(opts.reason);
-  if (topic) {
-    return `Hi ${who}, this is ${biz}. Thanks for calling about ${topic}. How can we help you next?`;
-  }
-  return `Hi ${who}, this is ${biz}. Thanks for calling. How can we help you?`;
+  return followUpWhatsAppText(opts);
 }
 
