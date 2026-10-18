@@ -75,6 +75,8 @@ Earlier merges since 9 Oct (see git log for detail):
 
 One dated line per event: SHA, change, rollback, approver. Newest first. Times in EAT.
 
+- 2026-10-18 10:17 EAT — **Esga Stationery prod data (Esga only, no SHA, data change):** on-demand usage turned OFF via `set_tenant_on_demand_usage(c81b3480…, false)` (tenant_billing_state.on_demand_enabled true → false); ops_audit_log `set_on_demand_usage` fe9629cf, actor `desk-engineer (Alvin approved 2026-10-18)`. Rollback: `select * from set_tenant_on_demand_usage('c81b3480-0cc5-4224-b0e7-24c641d78db2', true)`. Approved by Alvin 2026-10-18 10:15 EAT.
+- 2026-10-18 10:17 EAT — **Esga Stationery prod data (Esga only):** cleared the unconfirmed seeded `business_policies.delivery` (source seed, `backfill:roadmap_10_5`, "Same-day Nairobi delivery…") to empty; confirmed Nakuru `service_areas`/`coverage_areas` untouched; `llm_system_prompt` unchanged (it never contained the seed line). ops_audit_log `clear_seed_policy` 1ab1fd8a keeps the old text. Rollback: restore the old text from that audit row with `jsonb_set(business_policies,'{delivery}',…)`. Approved by Alvin 2026-10-18 10:15 EAT.
 - 2026-10-17 21:57 EAT — #738 closed-tenant send guard (VOICE_CLOSED_TENANT_GUARD, default on) merged b568c288, Railway ef9bea89; rollback: set VOICE_CLOSED_TENANT_GUARD=off or revert b568c288; approved by Alvin via Chief of Scalers.
 - 2026-10-17 ~21:55 EAT — #737 Desk Suspend/Archive/Purge SQL applied on **staging only** (SQL files from cd8db691); not applied on prod, purge schedule not applied; rollback: not recorded; approver: not recorded (*per team notes*).
 
