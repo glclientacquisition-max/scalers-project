@@ -280,6 +280,9 @@ test('a "From" price reads mid-sentence in both languages', () => {
   fact.confirmed = true;
   assert.equal(factSheet.renderFactRefs('Sofa cleaning is {price.sofa_cleaning}.', sheet, { language: 'en' }).text, 'Sofa cleaning is from KSh 2,500.');
   assert.equal(factSheet.renderFactRefs('Sofa ni {price.sofa_cleaning}.', sheet, { language: 'sw' }).text, 'Sofa ni kuanzia KSh 2,500.');
+  // Repair sentence (a dropped wrong price) keeps "from" lower case mid-sentence.
+  assert.equal(factSheet.factSentence(fact, 'en'), 'Sofa cleaning is from KSh 2,500.');
+  assert.equal(factSheet.factSentence(fact, 'sw'), 'Sofa cleaning ni kuanzia KSh 2,500.');
 });
 
 test('HD_9939ca74d492: "starts from {price.x}" says "from" once (en and sw)', () => {

@@ -355,8 +355,11 @@ function factSentence(fact, language, profile = null) {
   if (!fact || !fact.confirmed) return unknownAnswerLine(language, profile);
   const value = renderFact(fact, language);
   switch (fact.kind) {
-    case 'price':
-      return sw ? `${fact.label} ni ${value}.` : `${fact.label} is ${value}.`;
+    case 'price': {
+      // Mid-sentence: "Sofa cleaning is from KSh 2,500.", not "is From".
+      const mid = value.replace(/^(From|Kuanzia)\b/, (w) => w.toLowerCase());
+      return sw ? `${fact.label} ni ${mid}.` : `${fact.label} is ${mid}.`;
+    }
     case 'fee': {
       const noun = fact.feeKind === 'travel' ? (sw ? 'Ada ya usafiri' : 'The travel fee') : sw ? 'Ada ya delivery' : 'The delivery fee';
       return sw ? `${noun} hadi ${fact.label} ni ${value}.` : `${noun} to ${fact.label} is ${value}.`;
