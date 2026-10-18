@@ -6,6 +6,7 @@
 
 const { readAreaTerms, matchArea } = require('../conversation/areaTerms');
 const { pickUnknownAnswerLine, callbackSafeLine, factSheetFor, TEAM_DEFAULT_LINE } = require('../conversation/factSheet');
+const { normalisePrice, priceIsSpeakable } = require('../conversation/factPrice');
 const { parseHoursSchedule, eatParts, openClosedStatus } = require('../conversation/businessHours');
 const { speakMoney, numberToEn } = require('../speech/spokenForms');
 const { speakSwClock } = require('../speech/swahiliTime');
@@ -143,35 +144,15 @@ function joinAnd(items, andWord) {
   return `${items.slice(0, -1).join(', ')} ${andWord} ${items[items.length - 1]}`;
 }
 
-/** factSheet.normalisePrice when the shared fact module has landed, else the stand-in. */
-function readNormalisedPrice(item) {
-  const sheet = require('../conversation/factSheet');
-  const fn = typeof sheet.normalisePrice === 'function'
-    ? sheet.normalisePrice
-    : require('./priceNormalise').normalisePrice;
-  const norm = fn(item) || { kind: 'unknown', min: null, max: null };
-  const kind = String(norm.kind || 'unknown');
-  return {
-    kind,
-    min: norm.min == null ? null : Number(norm.min),
-    max: norm.max == null ? null : Number(norm.max),
-  };
-}
-
-function speakablePrice(norm) {
-  if (!norm) return false;
-  if (norm.kind === 'unknown' || norm.kind === 'quote') return false;
-  if (norm.kind === 'range') return Number.isFinite(norm.min) && Number.isFinite(norm.max);
-  return Number.isFinite(norm.min);
-}
-
-/** Speech from a normalised price only. Never reads the legacy price string. */
+/** Speech from factPrice.normalisePrice only. Never reads the legacy price string. */
 function speakNormalisedPrice(norm, lang) {
-  if (!speakablePrice(norm)) return '';
+  if (!priceIsSpeakable(norm)) return '';
   const sw = lang === 'sw';
   if (norm.kind === 'range') {
+    if (!Number.isFinite(norm.min) || !Number.isFinite(norm.max)) return '';
     return `${speakMoney(norm.min, lang)} ${sw ? 'hadi' : 'to'} ${speakMoney(norm.max, lang)}`;
   }
+  if (!Number.isFinite(norm.min)) return '';
   const body = speakMoney(norm.min, lang);
   if (norm.kind === 'from') return `${sw ? 'kuanzia' : 'from'} ${body}`;
   return body;
@@ -234,10 +215,10 @@ function lookupPrice(query, ctx, sheet) {
     }, profile);
   }
   const fact = top[0].f;
-  const row = catalogueRow(profile, fact.label) || { name: fact.label, price: fact.value };
-  const norm = readNormalisedPrice(row);
-  // 'Ask' and any other non-numeric price is the cannot-answer line, never spoken.
-  if (!speakablePrice(norm)) return notOnFile(profile, fact.id);
+  const row = catalogueRow(profile, fact.label) || { name: fact.label, price: fact.legacyPrice || fact.value };
+  const norm = normalisePrice(row);
+  // quote, unknown, and a non-numeric price such as "Ask" are never spoken.
+  if (!priceIsSpeakable(norm)) return notOnFile(profile, fact.id);
   if (!fact.confirmed) return unconfirmed(profile, fact.id, 'catalogue');
   const enVal = speakNormalisedPrice(norm, 'en');
   const swVal = speakNormalisedPrice(norm, 'sw');
@@ -660,7 +641,5 @@ module.exports = {
   speechOf,
   lookupWithDeadline,
   cataloguePhrases,
-  readNormalisedPrice,
-  speakNormalisedPrice,
   lookupToolDeclaration,
 };

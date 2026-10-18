@@ -81,10 +81,21 @@ function profiles() {
       servicesCatalog: [
         {
           name: 'Oven cleaning',
+          pricing_mode: 'range',
+          price: '1,500',
+          price_max: '2,500',
           price_range: 'Ask',
-          price_kind: 'range',
-          price_min: 1500,
-          price_max: 2500,
+          source: 'owner',
+          confirmed: true,
+        },
+      ],
+    }),
+    quote: base({
+      servicesCatalog: [
+        {
+          name: 'Gutter cleaning',
+          pricing_mode: 'quote',
+          price: '4,500',
           source: 'owner',
           confirmed: true,
         },

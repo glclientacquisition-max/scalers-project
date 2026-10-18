@@ -27,7 +27,7 @@ A local answer is stored once, with `spokenAnswer` and `turn_id`, so the next tu
 
 ## Prices
 
-Price speech goes through one function, `readNormalisedPrice`. It calls `factSheet.normalisePrice` when that export exists, and otherwise `src/knowledge/priceNormalise.js`. Both return `{ kind, min, max }` where `kind` is `fixed`, `from`, `range`, `quote`, or `unknown`. Columns `price_kind`, `price_min` and `price_max` win when they are present. Legacy text is parsed only inside that function.
+Price speech calls `normalisePrice` in `src/conversation/factPrice.js` and speaks only what that returns. A catalogue row uses `pricing_mode` (`fixed`, `from`, `range`, or `quote`; legacy `ask` is `quote`), `price`, and `price_max`. When those fields are absent, the same function reads the legacy price text.
 
 `quote`, `unknown`, and a non-numeric price such as "Ask" are never spoken. They use the cannot-answer line.
 

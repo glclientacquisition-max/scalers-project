@@ -2,8 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { lookup, speechOf, readNormalisedPrice, lookupWithDeadline } = require('../src/knowledge/lookup');
-const { normalisePrice } = require('../src/knowledge/priceNormalise');
+const { lookup, speechOf, lookupWithDeadline } = require('../src/knowledge/lookup');
+const { normalisePrice, priceIsSpeakable } = require('../src/conversation/factPrice');
 const { profiles, FALLBACK } = require('../evals/replay/profiles');
 const { matchArea } = require('../src/knowledge/v2/nlu');
 
@@ -31,14 +31,23 @@ test('price kinds speak words, and Ask is the cannot-answer line', () => {
   assert.match(range.speech, /one thousand five hundred shillings to two thousand five hundred shillings/);
 });
 
-test('the normaliser is one function and columns win over legacy text', () => {
-  assert.deepEqual(readNormalisedPrice({ price: 'Ask' }), { kind: 'unknown', min: null, max: null });
+test('pricing_mode quote is the cannot-answer line, even with a number on the row', () => {
+  const quote = say('price', 'How much is gutter cleaning?', profiles().quote, 'en');
+  assert.equal(quote.result.status, 'not_on_file');
+  assert.equal(quote.speech, FALLBACK);
+  assert.doesNotMatch(quote.speech, /four thousand|4,500|4500/);
+});
+
+test('lookup prices come from factPrice.normalisePrice', () => {
+  assert.equal(normalisePrice({ price_range: 'Ask' }).kind, 'quote');
+  assert.equal(priceIsSpeakable(normalisePrice({ price_range: 'Ask' })), false);
+  assert.equal(normalisePrice({ pricing_mode: 'ask', price: '4,500' }).kind, 'quote');
+  assert.equal(normalisePrice({ pricing_mode: 'quote', price: '4,500' }).kind, 'quote');
   assert.deepEqual(
-    normalisePrice({ price: 'Ask', price_kind: 'range', price_min: 1500, price_max: 2500 }),
-    { kind: 'range', min: 1500, max: 2500 }
+    normalisePrice({ pricing_mode: 'range', price: '1,500', price_max: '2,500', price_range: 'Ask' }),
+    { kind: 'range', min: 1500, max: 2500, currency: 'KES' }
   );
-  assert.equal(normalisePrice({ price: 'From KSh 2,500' }).kind, 'from');
-  assert.equal(normalisePrice({ price: 'KSh 1,500 - 2,500' }).kind, 'range');
+  assert.equal(normalisePrice({ price_range: 'From KSh 2,500' }).kind, 'from');
 });
 
 test('Kileleshwa fee is pre-rendered, Sheng uses Swahili', () => {
