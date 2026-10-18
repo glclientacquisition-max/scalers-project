@@ -145,14 +145,33 @@ function readStoredMax(row: CatalogPriceRow): number | null {
   return n != null && n > 0 ? n : null;
 }
 
+/** Products use `price` as display text; services use `price_range` and optional structured `price`. */
+function usesPriceAsDisplayColumn(row: CatalogPriceRow): boolean {
+  return !String(row.price_range ?? "").trim();
+}
+
+/** Keep owner/import wording on display columns; structured `price` on services stays digits-only. */
+function visiblePriceField(
+  row: CatalogPriceRow,
+  kind: PriceKind,
+  parsedAmount: number | null
+): string {
+  if (kind === "quote") return "";
+  const original = String(row.price ?? "").trim();
+  if (usesPriceAsDisplayColumn(row) && original) return original;
+  if (original && !/^[\d,]+$/.test(original)) return original;
+  return amountString(parsedAmount);
+}
+
 /** Fill pricing_mode / price / price_max from legacy text when missing. */
 export function hydrateCatalogPriceFields<T extends CatalogPriceRow>(row: T): T {
   const fromMode = pricingModeToKind(row.pricing_mode ?? row.price_mode);
   if (fromMode && (fromMode === "quote" || readStoredPrice(row) != null || readStoredMax(row) != null)) {
+    const amount = readStoredPrice(row);
     return {
       ...row,
       pricing_mode: kindToPricingMode(fromMode),
-      price: fromMode === "quote" ? "" : amountString(readStoredPrice(row)),
+      price: visiblePriceField(row, fromMode, amount),
       price_max: fromMode === "range" ? readStoredMax(row) : null,
     };
   }
@@ -161,17 +180,10 @@ export function hydrateCatalogPriceFields<T extends CatalogPriceRow>(row: T): T 
   const kind = fromMode ?? parsed.kind;
   const price = readStoredPrice(row) ?? parsed.price;
   const priceMax = readStoredMax(row) ?? parsed.priceMax;
-  const priceLooksLikeDisplay =
-    row.price != null && String(row.price).trim() !== "" && !/^[\d,]+$/.test(String(row.price).trim());
   return {
     ...row,
     pricing_mode: kindToPricingMode(kind),
-    price:
-      kind === "quote"
-        ? ""
-        : priceLooksLikeDisplay
-          ? String(row.price).trim()
-          : amountString(price),
+    price: visiblePriceField(row, kind, price),
     price_max: kind === "range" ? priceMax : null,
   };
 }
