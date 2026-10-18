@@ -35,7 +35,7 @@ export function mapBillingHistory(
   options: { fromPay: boolean; beta?: boolean },
 ): MappedInvoice[] {
   const beta = Boolean(options.beta);
-  return (body?.invoices || []).flatMap((invoice) => {
+  const rows: MappedInvoice[] = (body?.invoices || []).flatMap((invoice) => {
     const id = invoice.id ? String(invoice.id) : "";
     if (!id) return [];
     const status = String(invoice.status || "");
@@ -61,6 +61,9 @@ export function mapBillingHistory(
       },
     ];
   });
+  // Due invoices first, then the rest in the order the API sent them.
+  const owed = (row: MappedInvoice) => (row.statusLabel === "Paid" || row.statusLabel === "Checking payment" ? 1 : 0);
+  return rows.map((row, index) => ({ row, index })).sort((a, b) => owed(a.row) - owed(b.row) || a.index - b.index).map((item) => item.row);
 }
 
 /** Redirect only to the one-time path the pay-link POST returns. */

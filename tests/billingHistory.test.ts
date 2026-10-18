@@ -33,6 +33,14 @@ describe("billing history", () => {
     assert.equal(JSON.stringify(rows).includes("credit"), false);
   });
 
+  it("lists due invoices before paid ones", () => {
+    const rows = mapBillingHistory(
+      { invoices: [{ ...open, id: "inv-0", status: "paid", pay_link_path: null }, open] },
+      { fromPay: false },
+    );
+    assert.deepEqual(rows.map((row) => row.id), ["inv-1", "inv-0"]);
+  });
+
   it("hides Pay during beta, while checking, and when the link is missing", () => {
     assert.equal(mapBillingHistory({ invoices: [open] }, { fromPay: false, beta: true })[0]?.payLabel, null);
     const checking = mapBillingHistory({ invoices: [open] }, { fromPay: true })[0];
