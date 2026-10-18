@@ -35,6 +35,7 @@ export const deskRoutes = {
   usage: "/wallet", // Usage page: plan, allowances, extra usage switch
   calls: "/calls",
   setup: "/onboarding",
+  lineSetup: "/onboarding/line", // number + call setup choices (Desk brief 2026-10-18)
   alerts: "/settings?tab=alerts",
   team: "/settings?tab=team",
   answers: "/settings?tab=train&panel=identity",

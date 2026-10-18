@@ -82,18 +82,25 @@ test("follow-ups are capped at 2 and say when they stop", () => {
   }
 });
 
-test("line live: one combined forwarding code with ring time, fallbacks and turn off", async () => {
+test("line live: two options, one recommended code with ring time, airtime note, Desk setup button", async () => {
   const fx = fixtures.find((f) => f.kind === "line_live")!;
   const e = await renderEmail(fx.kind, fx.props as never);
   const dial = (fx.props as { dialNumber: string }).dialNumber;
-  for (const code of [`**004*${dial}**20#`, `**61*${dial}**20#`, `**67*${dial}#`, `**62*${dial}#`, "##002#"]) {
+  for (const code of [`**004*${dial}**20#`, "##002#"]) {
     assert.ok(e.text.includes(code), `missing ${code} in text`);
     assert.ok(e.html.includes(code), `missing ${code} in html`);
   }
+  assert.match(e.text, /Option 1: Use this as your business number/);
+  assert.match(e.text, /Option 2: Forward your current number/);
+  assert.match(e.text, /airtime, minutes or a talk-time bundle/);
+  assert.ok(e.text.includes(`https://app.scalers.co.ke${deskRoutes.lineSetup}`), "button must go to the Desk setup page");
+  // Keep the email short: the individual codes live in Desk.
+  assert.ok(!/\*\*6[127]\*/.test(e.text), "individual codes belong in Desk, not the email");
   // Single-star timer form puts the seconds in the service slot and can stop voice forwarding.
-  assert.ok(!new RegExp(`\\*61\\*${dial}\\*20#`).test(e.text), "wrong single-star ring-time form");
+  assert.ok(!new RegExp(`\\*004\\*${dial}\\*20#`).test(e.text), "wrong single-star ring-time form");
   assert.ok(!/\*\*21\*|\*\*002\*/.test(e.text), "must never forward every call");
-  assert.ok(!/href="tel:/.test(e.html), "no tel: links; iPhone blocks forwarding links");
+  assert.ok(!/href="tel:\*|href="tel:%23/.test(e.html), "no forwarding tel: links; iPhone blocks them");
+  assert.ok(!/put (the |a )?caller through|transfer/i.test(e.text), "no live transfer claims");
   const e15 = await renderEmail("line_live", { ...(fx.props as object), ringSeconds: 15 } as never);
   assert.ok(e15.text.includes(`**004*${dial}**15#`) && e15.text.includes("about 15 seconds"));
 });
