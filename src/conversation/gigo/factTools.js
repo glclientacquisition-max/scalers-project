@@ -40,7 +40,7 @@ const GIGO_FACT_TOOLS = Object.freeze([
   }),
   Object.freeze({
     name: 'check_coverage',
-    description: "Check a caller's place against the confirmed areas served.",
+    description: "Check a caller's place against the confirmed areas served. A covered area returns its fee, time and how it is served.",
     parameters: {
       type: 'object',
       properties: { place: { type: 'string' } },
@@ -135,7 +135,7 @@ function runFactTool(name, args = {}, profileIn = {}, opts = {}) {
         tool: name,
         status: res.status,
         reason: res.reason,
-        value: res.status === 'unknown' ? null : { areas: res.areas },
+        value: res.status === 'unknown' ? null : { areas: res.areas, ...(res.area ? { area: res.area } : {}) },
         say:
           res.say ||
           (res.status === 'unknown'

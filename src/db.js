@@ -1486,6 +1486,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       faqs: [],
       teamDirectory: [],
       unknownAnswerFallback: null,
+      unknownAnswerSpoken: null,
       dailyBulletin: [],
       alertEmail: null,
       notifyChannels: { sms: true, whatsapp: true, email: true, caller_sms: false },
@@ -1508,8 +1509,46 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
 
   return tenantProfileFromRow(row, {
     openAppointments: await listOpenAppointments(row.id),
+    serviceAreas:
+      row.service_areas !== undefined || !require('./conversation/areaTerms').areaFeesEnabled()
+        ? undefined
+        : await getTenantServiceAreas(row.id),
     ...(await loadProvenanceForProfile(row.id)),
+    ...(await loadUnknownAnswerSpoken(row.id)),
   });
+}
+
+/** tenants.service_areas (Locations area terms) when the main select did not read it. Null on an old schema or error. */
+async function getTenantServiceAreas(tenantId) {
+  if (!tenantId) return null;
+  try {
+    const { data, error } = await supabase.from('tenants').select('service_areas').eq('id', tenantId).maybeSingle();
+    if (error) return null;
+    return data?.service_areas ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * tenants.unknown_answer_spoken ({en, sw, source, updated_at}), written by the
+ * Desk. Read only with VOICE_FACT_REFS on, in its own query so a database
+ * without the column (or any error) still loads the call: null, never a throw.
+ */
+async function loadUnknownAnswerSpoken(tenantId) {
+  try {
+    const { factRefsEnabled } = require('./conversation/factSheet');
+    if (!tenantId || !factRefsEnabled()) return {};
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('unknown_answer_spoken')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (error) return { unknownAnswerSpoken: null };
+    return { unknownAnswerSpoken: data?.unknown_answer_spoken ?? null };
+  } catch {
+    return { unknownAnswerSpoken: null };
+  }
 }
 
 async function loadProvenanceForProfile(tenantId) {

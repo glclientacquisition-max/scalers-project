@@ -154,7 +154,7 @@ describe("automatic tested only from the test phone", () => {
     assert.equal(status.worksTitle("main_number"), "Your number works");
   });
 
-  it("any other call only shows Calls are reaching your assistant, not tested", () => {
+  it("any other call only shows Calls are reaching your Business Assistant, not tested", () => {
     const s = resolve(opened, act(null, iso(T0 + 3600e3)), T0 + DAY);
     assert.equal(s.tested, false);
     assert.equal(s.testedVia, null);
@@ -162,7 +162,7 @@ describe("automatic tested only from the test phone", () => {
     assert.equal(s.showFinish, false);
     assert.equal(s.showReaching, true);
     assert.equal(status.callSetupCardMode(s), "reaching");
-    assert.deepEqual(status.testedLine(s), { title: "Calls are reaching your assistant", detail: "Forwarding not tested yet", ok: false });
+    assert.deepEqual(status.testedLine(s), { title: "Calls are reaching your Business Assistant", detail: "Forwarding not tested yet", ok: false });
   });
 
   it("calls before opening do not count at all", () => {

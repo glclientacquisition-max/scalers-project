@@ -100,6 +100,20 @@ function buildGeminiContents(messages, windowSize = CONTEXT_WINDOW) {
   const recentMessages = Array.isArray(messages) ? messages.slice(-windowSize) : [];
   const contents = [];
   for (const message of recentMessages) {
+    if (message && message.local && message.spokenAnswer && message.role === 'assistant') {
+      // VOICE_FACT_REFS: a line Voice spoke itself has no thought signature,
+      // so it cannot be a model turn. Carry it as a note in the user turn,
+      // between the question it answered and the next question, so the model
+      // does not answer that question again.
+      const note = `(Already answered aloud: "${String(message.content || '').trim()}" Do not repeat it.)`;
+      const prev = contents[contents.length - 1];
+      if (prev && prev.role === 'user' && prev.parts.length === 1 && typeof prev.parts[0].text === 'string') {
+        prev.parts[0].text = `${prev.parts[0].text} ${note}`.trim();
+      } else {
+        contents.push({ role: 'user', parts: [{ text: note }] });
+      }
+      continue;
+    }
     if (!message || message.role === 'system' || message.local) continue;
     const role = message.role === 'assistant' ? 'model' : 'user';
     let parts;

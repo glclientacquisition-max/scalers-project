@@ -53,7 +53,7 @@ const HOME_INTENTS = [
     requiredSlots: [],
     optionalSlots: ['area'],
     completion:
-      'If POLICIES has a Coverage line, that list is the service area. Delivery text is timing and other instructions. If there is no Coverage line, use Delivery and LOCATIONS coverage notes. If outside the area, say that area is outside our coverage. Do not offer a callback note until a callback row is saved. Do not promise a visit.',
+      'If POLICIES has a Coverage line, that list is the service area. Give that area\'s travel fee and time from its brackets; a fee "confirmed on callback" is confirmed by the team when they call back, never guess an amount. Delivery text is timing and other instructions. If there is no Coverage line, use Delivery and LOCATIONS coverage notes. If outside the area, say that area is outside our coverage. Do not offer a callback note until a callback row is saved. Do not promise a visit.',
     tool: null,
     patterns: [
       /\b(service area|coverage|do you (cover|serve|come to)|mnaenda|mnafanya (kwa| Nairobi|kiambu|mombasa)|areas?)\b/i,

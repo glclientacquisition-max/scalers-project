@@ -252,7 +252,7 @@ function buildLiveGroundTruth(profile = {}) {
     parts.push('', openVisits);
   }
 
-  parts.push('', 'POLICIES:', formatPoliciesBlock(policies));
+  parts.push('', 'POLICIES:', formatPoliciesBlock(policies, { areaTerms: profile.areaTerms || null }));
 
   parts.push('', formatUnknownSection(unknownTopics));
 
@@ -261,6 +261,15 @@ function buildLiveGroundTruth(profile = {}) {
     'CONFIRMED FAQs (owner-confirmed facts. Answer these exactly when asked. Do not treat pack seeds as fact):',
     faqs.length ? formatFaqsBlock(faqs) : '(none confirmed)'
   );
+
+  // VOICE_FACT_REFS: the FACT CARD (IDs for prices, area fees, hours and
+  // payment numbers). No clock and no caller data, so it stays in the
+  // cacheable part of the prompt (#779 puts this block first).
+  const factSheet = require('./factSheet');
+  if (factSheet.factRefsEnabled()) {
+    const card = factSheet.formatFactCard(factSheet.factSheetFor(profile));
+    if (card) parts.push('', card);
+  }
 
   if (tools.escalate) {
     parts.push(

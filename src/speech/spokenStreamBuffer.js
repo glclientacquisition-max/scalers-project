@@ -4,6 +4,10 @@
 const { stripSpokenInstructionLeaks } = require('./spokenInstructionLeak');
 const { softenCataloguePunctuation } = require('./catalogueMouth');
 
+function factRefsOn() {
+  return require('../conversation/factSheet').factRefsEnabled();
+}
+
 /**
  * Gemini stream parts often omit the leading space on the next word.
  * Live HD_0ef68f8e7930 spoke "Ican" / "Youhave" / "Understood,Alvin".
@@ -55,6 +59,10 @@ function stripMarkersForSpeech(raw, opts = {}) {
       if (idx >= 0 && idx < cut) cut = idx;
     }
     s = s.slice(0, cut);
+    // VOICE_FACT_REFS: hold an unfinished {fact.id} reference so a chunk never
+    // ends inside the braces ("{price." would read as a sentence end).
+    const open = s.lastIndexOf('{');
+    if (open >= 0 && s.indexOf('}', open) < 0 && factRefsOn()) s = s.slice(0, open);
   }
 
   return stripSpokenInstructionLeaks(s.replace(/\s+/g, ' ').trim(), { final });

@@ -67,6 +67,7 @@ import {
   type SocialChannel,
   type SocialHandles,
 } from "@/lib/socialHandles";
+import { catalogPriceFieldKey } from "@/lib/catalogValidation";
 import {
   saveAndCompileSettings,
   type SettingsCompileState,
@@ -275,6 +276,15 @@ const denseFieldClass = settingsDenseFieldClass;
 /** Phone service rows: labels stay visible (no placeholder-only fields at 360/390). */
 const serviceMobileLabelClass = "mb-1 block text-meta text-ink-2";
 
+function catalogPriceError(
+  fields: SettingsCompileState["fields"],
+  name: string
+): string | null {
+  const key = name.trim().toLowerCase();
+  if (!key || !fields) return null;
+  return fields[catalogPriceFieldKey(name)] ?? null;
+}
+
 const STOCK_OPTIONS = [
   { value: "yes", label: "In stock" },
   { value: "no", label: "Out of stock" },
@@ -344,6 +354,12 @@ function CatalogPager({
   );
 }
 
+function servicePricePlaceholder(service: Pick<ServiceItem, "pricing_mode" | "pricing">): string {
+  const mode = service.pricing_mode || service.pricing?.mode;
+  if (mode === "ask") return "You confirm";
+  return "KSh 2,500";
+}
+
 function isOwnerTeamRow(phone: string, ownerPhone: string | null | undefined): boolean {
   const a = normalizeContactPhone(phone);
   return Boolean(a && a === normalizeContactPhone(ownerPhone));
@@ -394,6 +410,7 @@ function TenantFormInner({
   });
   const [bulkServicesText, setBulkServicesText] = useState("");
   const [bulkServicesError, setBulkServicesError] = useState<string | null>(null);
+  const [bulkServicesNote, setBulkServicesNote] = useState<string | null>(null);
   const [servicesImportOpen, setServicesImportOpen] = useState(false);
   const [productsImportOpen, setProductsImportOpen] = useState(false);
   const [bulkProductsText, setBulkProductsText] = useState("");
@@ -860,10 +877,15 @@ function TenantFormInner({
       );
       return;
     }
-    setServices((prev) => {
-      const existing = prev.filter((s) => s.name.trim());
-      return [...existing, ...parsed].slice(0, 40);
-    });
+    const existing = services.filter((s) => s.name.trim());
+    const combined = [...existing, ...parsed];
+    const dropped = Math.max(0, combined.length - 40);
+    setServices(combined.slice(0, 40));
+    setBulkServicesNote(
+      dropped > 0
+        ? `Services stay at 40. ${dropped} more ${dropped === 1 ? "was" : "were"} left out.`
+        : null,
+    );
     saveAfterPasteRef.current = true;
     setBulkServicesText("");
     setBulkServicesError(null);
@@ -1037,7 +1059,7 @@ function TenantFormInner({
       <section className={panel === "identity" ? "space-y-3" : "hidden"}>
         {panel === "identity" ? structuredSlot?.identity : null}
         <SettingsGroup title="Business Assistant">
-          <SettingsRow label="Assistant name" htmlFor="agent_name">
+          <SettingsRow label="Business Assistant name" htmlFor="agent_name">
             <input
               id="agent_name"
               value={agentName}
@@ -1342,7 +1364,12 @@ function TenantFormInner({
           isEmpty={false}
         >
         <div className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+          {state.error ? (
+            <p className="text-body text-warn" role="alert">
+              {state.error}
+            </p>
+          ) : null}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className={settingsBlockTitleClass}>Services</p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -1385,10 +1412,16 @@ function TenantFormInner({
               {bulkServicesError}
             </p>
           ) : null}
+          {bulkServicesNote ? (
+            <p className="text-body text-ink-2" role="status">
+              {bulkServicesNote}
+            </p>
+          ) : null}
 
           <div className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline lg:hidden">
             {visibleServices.map((service, localIndex) => {
               const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
+              const priceError = catalogPriceError(state.fields, service.name);
               return (
                 <div key={`service-m-${index}`} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_2.75rem] items-end gap-x-2 gap-y-2 px-3 py-2.5">
                   <div className="min-w-0">
@@ -1397,7 +1430,15 @@ function TenantFormInner({
                   </div>
                   <div className="min-w-0">
                     <label className={serviceMobileLabelClass} htmlFor={`svc-price-m-${index}`}>Price</label>
-                    <input id={`svc-price-m-${index}`} value={service.price_range} onChange={(e) => updateService(index, "price_range", e.target.value)} placeholder="from 2,500 KES" className={denseFieldClass} />
+                    <input
+                      id={`svc-price-m-${index}`}
+                      value={service.price_range}
+                      onChange={(e) => updateService(index, "price_range", e.target.value)}
+                      placeholder={servicePricePlaceholder(service)}
+                      aria-invalid={priceError ? true : undefined}
+                      aria-describedby={priceError ? `svc-price-m-${index}-error` : undefined}
+                      className={denseFieldClass}
+                    />
                   </div>
                   <button
                     type="button"
@@ -1419,13 +1460,18 @@ function TenantFormInner({
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
-                  <div className="min-w-0">
+                  {priceError ? (
+                    <p id={`svc-price-m-${index}-error`} className="col-span-3 text-meta text-warn" role="alert">
+                      {priceError}
+                    </p>
+                  ) : null}
+                  <div className="col-span-3 min-w-0">
                     <label className={serviceMobileLabelClass} htmlFor={`svc-notes-m-${index}`}>Notes</label>
-                    <input id={`svc-notes-m-${index}`} value={service.notes} onChange={(e) => updateService(index, "notes", e.target.value)} placeholder="Free quotation" className={denseFieldClass} />
+                    <input id={`svc-notes-m-${index}`} value={service.notes} onChange={(e) => updateService(index, "notes", e.target.value)} className={denseFieldClass} />
                   </div>
                   <div className="col-span-2 min-w-0">
                     <label className={serviceMobileLabelClass} htmlFor={`svc-oos-m-${index}`}>Not offered</label>
-                    <input id={`svc-oos-m-${index}`} value={service.out_of_scope} onChange={(e) => updateService(index, "out_of_scope", e.target.value)} placeholder="No commercial offices" className={denseFieldClass} />
+                    <input id={`svc-oos-m-${index}`} value={service.out_of_scope} onChange={(e) => updateService(index, "out_of_scope", e.target.value)} className={denseFieldClass} />
                   </div>
                 </div>
               );
@@ -1456,6 +1502,7 @@ function TenantFormInner({
                 <tbody className="divide-y divide-hairline bg-surface">
                   {visibleServices.map((service, localIndex) => {
                     const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
+                    const priceError = catalogPriceError(state.fields, service.name);
                     return (
                       <tr key={`service-${index}`} className="align-middle">
                         <td className="min-w-0 px-3 py-2">
@@ -1485,9 +1532,16 @@ function TenantFormInner({
                             onChange={(e) =>
                               updateService(index, "price_range", e.target.value)
                             }
-                            placeholder="from 2,500 KES"
+                            placeholder={servicePricePlaceholder(service)}
+                            aria-invalid={priceError ? true : undefined}
+                            aria-describedby={priceError ? `svc-price-${index}-error` : undefined}
                             className={tableFieldClass}
                           />
+                          {priceError ? (
+                            <p id={`svc-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">
+                              {priceError}
+                            </p>
+                          ) : null}
                         </td>
                         <td className="px-3 py-2">
                           <label className="sr-only" htmlFor={`svc-notes-${index}`}>
@@ -1497,7 +1551,6 @@ function TenantFormInner({
                             id={`svc-notes-${index}`}
                             value={service.notes}
                             onChange={(e) => updateService(index, "notes", e.target.value)}
-                            placeholder="Free quotation"
                             className={tableFieldClass}
                           />
                         </td>
@@ -1511,7 +1564,6 @@ function TenantFormInner({
                             onChange={(e) =>
                               updateService(index, "out_of_scope", e.target.value)
                             }
-                            placeholder="No commercial offices"
                             className={tableFieldClass}
                           />
                         </td>
@@ -1639,6 +1691,7 @@ function TenantFormInner({
             <div className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline lg:hidden">
               {visibleProducts.map((product, localIndex) => {
                 const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
+                const priceError = catalogPriceError(state.fields, product.name);
                 return (
                   <div key={`product-m-${index}`} className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_2.75rem] items-center gap-2 px-3 py-2">
                     <div className="min-w-0">
@@ -1647,7 +1700,15 @@ function TenantFormInner({
                     </div>
                     <div className="min-w-0">
                       <label className="sr-only" htmlFor={`prod-price-m-${index}`}>Price</label>
-                      <input id={`prod-price-m-${index}`} value={product.price} onChange={(e) => updateProduct(index, "price", e.target.value)} placeholder="2,500 KES" className={denseFieldClass} />
+                      <input
+                        id={`prod-price-m-${index}`}
+                        value={product.price}
+                        onChange={(e) => updateProduct(index, "price", e.target.value)}
+                        placeholder="KSh 2,500"
+                        aria-invalid={priceError ? true : undefined}
+                        aria-describedby={priceError ? `prod-price-m-${index}-error` : undefined}
+                        className={denseFieldClass}
+                      />
                     </div>
                     <button
                       type="button"
@@ -1664,6 +1725,11 @@ function TenantFormInner({
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
+                    {priceError ? (
+                      <p id={`prod-price-m-${index}-error`} className="col-span-3 text-meta text-warn" role="alert">
+                        {priceError}
+                      </p>
+                    ) : null}
                     <div className="min-w-0">
                       <label className="sr-only" htmlFor={`prod-cat-m-${index}`}>Category</label>
                       <input id={`prod-cat-m-${index}`} value={product.category} onChange={(e) => updateProduct(index, "category", e.target.value)} placeholder="Self-help" className={denseFieldClass} />
@@ -1722,6 +1788,7 @@ function TenantFormInner({
                   <tbody className="divide-y divide-hairline bg-surface">
                     {visibleProducts.map((product, localIndex) => {
                       const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
+                      const priceError = catalogPriceError(state.fields, product.name);
                       return (
                         <tr key={`product-${index}`} className="align-middle">
                           <td className="min-w-0 px-3 py-2">
@@ -1745,9 +1812,16 @@ function TenantFormInner({
                               id={`prod-price-${index}`}
                               value={product.price}
                               onChange={(e) => updateProduct(index, "price", e.target.value)}
-                              placeholder="2,500 KES"
+                              placeholder="KSh 2,500"
+                              aria-invalid={priceError ? true : undefined}
+                              aria-describedby={priceError ? `prod-price-${index}-error` : undefined}
                               className={tableFieldClass}
                             />
+                            {priceError ? (
+                              <p id={`prod-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">
+                                {priceError}
+                              </p>
+                            ) : null}
                           </td>
                           <td className="px-3 py-2">
                             <label className="sr-only" htmlFor={`prod-cat-${index}`}>
@@ -1985,7 +2059,7 @@ function TenantFormInner({
               <SettingsRow
                 label="Book a time slot directly"
                 control="switch"
-                hint="Off: callers ask for a time and you confirm it. On: your Business Assistant books the time."
+                hint="Off: callers ask for a time and you confirm it. On: your Business Assistant notes the time they ask for, and you confirm it."
               >
                 <ToolSwitch
                   checked={readBookingMode(policies) === "confirmed_slot"}
