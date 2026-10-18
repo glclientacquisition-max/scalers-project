@@ -48,9 +48,9 @@
 
 ## Phase 4 — Search (Desk)
 
-- [ ] `adminGlobalSearch(q)` server helper  
-- [ ] Search field on Businesses (extend to header md+)
+- [x] `adminGlobalSearch(q)` server helper  
+- [x] Search field on Businesses (extend to header md+)
 
 ## Phase 5 — Ops gaps (when RPCs exist)
 
-- [ ] Business edit, members, owner reset on shop page
+- [x] Business edit, members, owner reset on shop page

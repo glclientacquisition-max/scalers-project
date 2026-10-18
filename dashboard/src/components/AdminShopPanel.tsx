@@ -34,7 +34,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Stamp } from "@/components/ui/Stamp";
 import { Switch } from "@/components/ui/Switch";
 
-type SheetKind = "assign" | "release" | "plan" | "charges" | "package" | "lifecycle";
+type SheetKind = "assign" | "release" | "plan" | "charges" | "package" | "lifecycle" | "edit";
 type LifecycleAction = "suspend" | "unsuspend" | "archive" | "restore";
 type PackOption = { id: string; name: string; isActive?: boolean };
 
@@ -102,6 +102,8 @@ export function AdminShopPanel({
   const [packs, setPacks] = useState<PackOption[]>([]);
   const [packageId, setPackageId] = useState("");
   const [period, setPeriod] = useState<"month" | "year">(business.package_period || "month");
+  const [editName, setEditName] = useState(business.business_name);
+  const [editNotify, setEditNotify] = useState(business.whatsapp_notification_number);
 
   async function run(body: Record<string, unknown>, url = "/api/admin/businesses") {
     setError("");
@@ -199,6 +201,15 @@ export function AdminShopPanel({
             }
           />
         ) : null}
+        <ListRow
+          title="Business details"
+          preview={b.business_name}
+          onOpen={() => {
+            setEditName(b.business_name);
+            setEditNotify(b.whatsapp_notification_number);
+            setSheet("edit");
+          }}
+        />
         <ListRow title="Notify" preview={notifyLabel(b.whatsapp_notification_number)} />
         <ListRow title="Created" preview={formatCreated(b.created_at)} />
         <ListRow title="Activity" href={`/admin/activity?business=${b.id}`} preview="Who changed what, and when" />
@@ -475,6 +486,51 @@ export function AdminShopPanel({
             ))}
           </ul>
         )}
+      </Sheet>
+
+      <Sheet
+        open={sheet === "edit"}
+        onOpenChange={(next) => {
+          if (!next) setSheet(null);
+        }}
+        title="Business details"
+        theme="admin"
+        footer={
+          <Button
+            type="button"
+            block
+            pending={pending}
+            disabled={!editName.trim()}
+            onClick={() =>
+              void run({
+                action: "update_profile",
+                business_id: b.id,
+                business_name: editName.trim(),
+                whatsapp_notification_number: editNotify.trim(),
+              })
+            }
+          >
+            Save
+          </Button>
+        }
+      >
+        <SheetNote error={error} />
+        <Field id="shop-edit-name" label="Business name">
+          {(props) => (
+            <Input {...props} autoComplete="off" value={editName} onChange={(event) => setEditName(event.target.value)} />
+          )}
+        </Field>
+        <Field id="shop-edit-notify" label="Notify number" hint="WhatsApp or SMS for owner alerts.">
+          {(props) => (
+            <Input
+              {...props}
+              autoComplete="off"
+              inputMode="tel"
+              value={editNotify}
+              onChange={(event) => setEditNotify(event.target.value)}
+            />
+          )}
+        </Field>
       </Sheet>
 
       <ConfirmSheet

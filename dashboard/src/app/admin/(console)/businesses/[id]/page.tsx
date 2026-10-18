@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSetupError } from "@/components/AdminSetupError";
+import { AdminShopPeople } from "@/components/admin/AdminShopPeople";
 import { AdminShopPanel } from "@/components/AdminShopPanel";
+import { loadAdminShopPeople } from "@/lib/adminShopPeople";
 import { previewLine, statusLabel, statusTone } from "@/lib/adminBusinessUi";
 import { getAdminBusinessById } from "@/lib/admin";
 import { noQualityBadges, qualityBadges } from "@/lib/adminQuality";
@@ -17,12 +19,16 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
   let business;
   let badges;
   let availableDids;
+  let people;
   try {
     const loaded = await getAdminBusinessById(id);
     if (!loaded) notFound();
     business = loaded.business;
     availableDids = loaded.availableDids;
-    badges = await qualityBadges().catch(noQualityBadges(`business:${id}`));
+    [badges, people] = await Promise.all([
+      qualityBadges().catch(noQualityBadges(`business:${id}`)),
+      loadAdminShopPeople(id).catch(() => null),
+    ]);
   } catch (err) {
     logAdminError("business-detail", err);
     return <AdminSetupError />;
@@ -42,6 +48,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
         availableDids={availableDids}
         freeCount={availableDids.length}
       />
+      {people ? <AdminShopPeople businessId={business.id} people={people} /> : null}
     </div>
   );
 }
