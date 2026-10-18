@@ -192,7 +192,7 @@ export function ServiceAreasEditor({
           {unconfirmed ? (
             <div className="space-y-2 bg-accent-tonal px-4 py-3" role="note">
               <p className="text-body font-medium text-ink">Add your fee</p>
-              <p className="text-meta text-ink">We moved these from Policies. Until you set a fee, callers hear it is confirmed on a callback.</p>
+              <p className="text-meta text-ink">Until you set a fee, callers hear that you will confirm it when you call back.</p>
               {canEdit ? (
                 <Button variant="tonal" size="sm" onClick={() => openChangeFee(value.areas.filter((a) => !a.confirmed).map((a) => a.id))}>
                   Set one fee for all

@@ -1,8 +1,11 @@
-/** Compact Needs you count for the Inbox nav badge. Same pile as the filter. Not a second pile. */
+import { formatNeedsBadge } from "./inboxCounts";
+
+/**
+ * Needs you count for the Inbox nav badge. Same pile as the filter. Not a second pile.
+ * Shows the real number up to 99: "9+" next to a "Needs you 78" tab read as a different count.
+ */
 export function formatAttentionCount(count: number): string | null {
-  const n = Math.floor(Number(count));
-  if (!Number.isFinite(n) || n < 1) return null;
-  return n > 9 ? "9+" : String(n);
+  return formatNeedsBadge(count);
 }
 
 export function formatAttentionCountAriaLabel(count: number): string | null {

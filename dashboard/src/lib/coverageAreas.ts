@@ -76,6 +76,22 @@ export function formatCoverageList(areas: readonly string[]): string {
     .join(", ");
 }
 
+/**
+ * Owner-facing list for any stored coverage value: directory ids become place
+ * names, plain text stays as typed. Never shows "county:nairobi" to an owner.
+ */
+export function coverageDisplayList(raw: unknown): string {
+  const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : [];
+  const out: string[] = [];
+  for (const entry of list) {
+    const text = String(entry || "").trim();
+    if (!text) continue;
+    const label = /^(county|place):/i.test(text) ? coverageAreaLabel(text.toLowerCase()).split(",")[0].trim() : text;
+    if (label && !out.includes(label)) out.push(label);
+  }
+  return out.join(", ");
+}
+
 export { areasFromPlainText } from "./coverageSeed";
 
 /** Type an estate. Empty query stays on counties. */

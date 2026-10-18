@@ -27,7 +27,7 @@ const FALSE_CLAIM =
   /escalation sent|\brings\b|\bonline\b|last seen|active now/i;
 const FAILED = /Needs human\. Notify failed/i;
 const CHANNEL_SENT = /^(SMS|WhatsApp|Email)\b/i;
-const ESCALATED_TO = /^Escalated to /i;
+const ESCALATED_TO = /^(?:Escalated|Passed) to /i;
 
 function speechSpeaker(raw: string): TranscriptSpeechSpeaker | null {
   const speaker = raw.toLowerCase();

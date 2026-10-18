@@ -111,6 +111,8 @@ export type TranscriptRow = {
   speaker: string;
   text_content: string;
   latency_ms: number | null;
+  /** 0-based turn index from Voice. Absent until transcripts.seq is applied. */
+  seq?: number | null;
 };
 
 export type TeamDirectoryEntry = {

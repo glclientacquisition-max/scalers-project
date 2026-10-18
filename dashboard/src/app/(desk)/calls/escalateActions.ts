@@ -10,6 +10,8 @@ import { getVoicePublicBase } from "@/lib/sautikit";
 import { parseSummary } from "@/lib/supabase";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { outboundSendBlock } from "@/lib/tenantLine";
+import { escalateRefusalMessage, pingBlockMessage } from "@/lib/tenantLineState";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type PingTeammateResult = {
@@ -62,6 +64,10 @@ export async function pingTeammateAction(opts: {
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return { error: "Not signed in." };
 
+  // Paused or closed line: no ping goes out and nothing is recorded.
+  const blocked = await outboundSendBlock(workspace.client, tenant.id);
+  if (blocked) return { error: pingBlockMessage(blocked) };
+
   const { data: call, error: loadError } = await workspace.client
     .from("calls")
     .select("id, sautikit_call_sid, summary, resolution_note")
@@ -70,7 +76,7 @@ export async function pingTeammateAction(opts: {
     .maybeSingle();
 
   if (loadError) {
-    return ownerSaveFailed("ping-teammate", loadError.message, "Could not ping.");
+    return ownerSaveFailed("ping-teammate", loadError.message, "Could not send the alert.");
   }
   if (!call) return { error: "Missing call." };
 
@@ -112,11 +118,17 @@ export async function pingTeammateAction(opts: {
         language: "en",
       }),
       cache: "no-store",
+      // Never hold the Alert button open on a slow voice server.
+      signal: AbortSignal.timeout(8_000),
     });
     const json = (await res.json().catch(() => null)) as
       | { ok?: boolean; reason?: string; escalation_notify?: Record<string, unknown> }
       | null;
     revalidatePath(`/calls/${callId}`);
+
+    // Voice refused because the line is paused or the business is closed (409). Not a retry.
+    const refused = escalateRefusalMessage(json);
+    if (refused) return { error: refused };
 
     if (String(json?.reason || "") === "instance_already_sent") {
       return { ok: true, line: "Already pinged this ticket." };
@@ -134,16 +146,28 @@ export async function pingTeammateAction(opts: {
       };
     }
 
-    const delivery = formatEscalationDelivery({
-      escalated_to: { name: teammate.name, role: teammate.role, phone: teammate.phone },
-      escalation_notify: json.escalation_notify,
-    });
+    const delivery = formatEscalationDelivery(
+      {
+        escalated_to: { name: teammate.name, role: teammate.role, phone: teammate.phone },
+        escalation_notify: json.escalation_notify,
+      },
+      { fromDesk: true }
+    );
     return {
       ok: true,
       line: delivery.line || undefined,
       failed: delivery.state === "failed",
     };
-  } catch {
+  } catch (err) {
+    // Timed out: the alert may still go out, so do not record it as failed.
+    if (err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError")) {
+      console.warn(`[ping-teammate] voice line slow for call ${callId}; not marking failed`);
+      return {
+        failed: true,
+        line: "Still sending. Check this call again in a minute.",
+        error: "Still sending. Check this call again in a minute.",
+      };
+    }
     return persistNotifyFailed(workspace.client, tenant.id, callId, call.resolution_note);
   }
 }

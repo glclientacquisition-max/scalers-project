@@ -9,6 +9,10 @@
 --   - Wallet may go negative during the grace window. The line stays live.
 --   - After line_paid_through + line_grace_days, ops may suspend the DID.
 -- Beta: everything free. No line fee, no suspend for non-payment.
+--
+-- If this file is re-run, re-run admin_business_suspend.sql after it: that file
+-- replaces refresh_line_status / suspend_line_for_nonpayment so an admin
+-- suspension (tenants.suspended_at) is never lifted by the rental rules.
 
 -- ---------------------------------------------------------------------------
 -- 1) Columns

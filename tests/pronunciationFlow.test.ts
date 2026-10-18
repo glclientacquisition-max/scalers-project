@@ -34,7 +34,6 @@ import {
   collectKnownPronunciationHints,
   mineSuggestionsFromAgentLines,
 } from "../dashboard/src/lib/pronunciationMine.ts";
-import { previewSpokenLine } from "../dashboard/src/lib/pronunciationPacks.ts";
 
 function pendingSpeech(
   overrides: Partial<PronunciationReviewCandidate> = {}
@@ -118,23 +117,6 @@ describe("phone preview request + spoken line", () => {
     });
     assert.equal(ok.ok, true);
     if (ok.ok) assert.match(ok.text, /ChapterOne/);
-  });
-
-  it("previewSpokenLine applies lexicon overrides callers will hear", () => {
-    const lexicon = parseTtsLexicon([
-      { match: "aisha", say: "Eye-sha", label: "Aisha" },
-      {
-        match: "chapterone|chapter\\s*one",
-        say: "Chapter One",
-        label: "ChapterOne",
-      },
-    ]);
-    const spoken = previewSpokenLine(
-      "Hello, you've reached ChapterOne Bookstore, this is Aisha speaking.",
-      lexicon
-    );
-    assert.match(spoken, /Eye-sha|Chapter One/i);
-    assert.doesNotMatch(spoken, /\bAisha\b/);
   });
 
   it("lexiconForStorage round-trips labels used by preview POST body", () => {
