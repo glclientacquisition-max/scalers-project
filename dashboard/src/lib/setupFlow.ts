@@ -4,6 +4,7 @@
  * tests share one contract.
  */
 
+import { parseCataloguePriceText } from "./catalogPricingMode";
 import { priceFromSetup } from "./structuredData";
 import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/mobile";
 
@@ -651,15 +652,37 @@ export function formatKenyaNumber(raw: unknown): string {
 
 /** Turn an imported price string ("from 300", "200-400", "ask", "1,500") into row fields. */
 export function rowFromImport(name: string, price: string, notes = "", category = ""): CatalogueRow {
-  const row = { ...emptyRow(name.slice(0, LIMITS.name)), notes: notes.slice(0, LIMITS.notes), category: category.slice(0, LIMITS.category) };
-  const p = String(price || "").trim().toLowerCase().replace(/ksh|kes/g, "").trim();
-  if (!p) return { ...row, pricing_mode: "fixed" };
-  if (/^(ask|on request|quoted)$/.test(p)) return { ...row, pricing_mode: "ask" };
-  const from = /^from\s+([\d,.]+)$/.exec(p);
-  if (from) return { ...row, pricing_mode: "from", price: from[1] };
-  const range = /^([\d,.]+)\s*(?:-|to|–)\s*([\d,.]+)$/.exec(p);
-  if (range) return { ...row, pricing_mode: "range", price: range[1], price_max: range[2] };
-  return { ...row, pricing_mode: "fixed", price: p.slice(0, 20) };
+  const row = {
+    ...emptyRow(name.slice(0, LIMITS.name)),
+    notes: notes.slice(0, LIMITS.notes),
+    category: category.slice(0, LIMITS.category),
+  };
+  const original = String(price || "").trim();
+  const parsed = parseCataloguePriceText(original);
+  if (parsed.kind === "quote") return { ...row, pricing_mode: "ask" };
+  const pricing_mode = parsed.kind;
+  if (parsed.kind === "range") {
+    return {
+      ...row,
+      pricing_mode,
+      price: String(parsed.price ?? "").slice(0, 20),
+      price_max: String(parsed.priceMax ?? "").slice(0, 20),
+    };
+  }
+  if (parsed.kind === "from") {
+    const fromDigits = original.match(/(\d[\d,]*)/);
+    return {
+      ...row,
+      pricing_mode,
+      price: (fromDigits ? fromDigits[1] : String(parsed.price ?? "")).slice(0, 20),
+    };
+  }
+  const fixedDigits = original.match(/(\d[\d,]*)/);
+  return {
+    ...row,
+    pricing_mode: "fixed",
+    price: (fixedDigits ? fixedDigits[1] : String(parsed.price ?? "")).slice(0, 20),
+  };
 }
 
 const toMin = (t: string) => {
