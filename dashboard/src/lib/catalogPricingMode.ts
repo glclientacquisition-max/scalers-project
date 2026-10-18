@@ -171,29 +171,58 @@ function visiblePriceField(
   return amountString(parsedAmount);
 }
 
-/** Fill pricing_mode / price / price_max from legacy text when missing. */
+/**
+ * A row that already has pricing_mode / price_mode keeps that string.
+ * A row with none gets a mode only for a derived from, range, or quote
+ * (quote only when the owner actually wrote price text). A plain fixed
+ * amount stays without pricing_mode; readers already treat a missing mode as fixed.
+ */
+function stampDerivedPricingMode<T extends CatalogPriceRow>(row: T, kind: PriceKind, display: string): T {
+  const next = { ...row } as T;
+  if (pricingModeToKind(row.pricing_mode) || pricingModeToKind(row.price_mode)) return next;
+  const write =
+    kind === "from" || kind === "range" || (kind === "quote" && display.trim())
+      ? kindToPricingMode(kind)
+      : undefined;
+  if (write) {
+    next.pricing_mode = write;
+    next.price_mode = write;
+    return next;
+  }
+  delete next.pricing_mode;
+  delete next.price_mode;
+  return next;
+}
+
+/** Fill price / price_max from legacy text. Does not invent pricing_mode for a plain fixed amount. */
 export function hydrateCatalogPriceFields<T extends CatalogPriceRow>(row: T): T {
   const fromMode = pricingModeToKind(row.pricing_mode ?? row.price_mode);
+  const display = String(row.price_range ?? row.price ?? "").trim();
   if (fromMode && (fromMode === "quote" || readStoredPrice(row) != null || readStoredMax(row) != null)) {
     const amount = readStoredPrice(row);
-    return {
-      ...row,
-      pricing_mode: kindToPricingMode(fromMode),
-      price: visiblePriceField(row, fromMode, amount),
-      price_max: fromMode === "range" ? readStoredMax(row) : null,
-    };
+    return stampDerivedPricingMode(
+      {
+        ...row,
+        price: visiblePriceField(row, fromMode, amount),
+        price_max: fromMode === "range" ? readStoredMax(row) : null,
+      },
+      fromMode,
+      display
+    );
   }
-  const text = String(row.price_range ?? row.price ?? "").trim();
-  const parsed = parseCataloguePriceText(text);
+  const parsed = parseCataloguePriceText(display);
   const kind = fromMode ?? parsed.kind;
   const price = readStoredPrice(row) ?? parsed.price;
   const priceMax = readStoredMax(row) ?? parsed.priceMax;
-  return {
-    ...row,
-    pricing_mode: kindToPricingMode(kind),
-    price: visiblePriceField(row, kind, price),
-    price_max: kind === "range" ? priceMax : null,
-  };
+  return stampDerivedPricingMode(
+    {
+      ...row,
+      price: visiblePriceField(row, kind, price),
+      price_max: kind === "range" ? priceMax : null,
+    },
+    kind,
+    display
+  );
 }
 
 /** Apply structured price choice to a catalogue row (services or products). */
@@ -240,27 +269,30 @@ export function structureImportedCatalogRow<T extends CatalogPriceRow>(
 ): T {
   const display = String(row[textKey] ?? "");
   const parsed = parseCataloguePriceText(display.trim());
-  const mode = kindToPricingMode(parsed.kind);
   const priceMax = parsed.kind === "range" ? parsed.priceMax : null;
 
   if (textKey === "price_range") {
-    return {
-      ...row,
-      pricing_mode: mode,
-      price_mode: mode,
-      price: parsed.kind === "quote" ? "" : amountString(parsed.price),
-      price_max: priceMax,
-      price_range: display,
-    } as T;
+    return stampDerivedPricingMode(
+      {
+        ...row,
+        price: parsed.kind === "quote" ? "" : amountString(parsed.price),
+        price_max: priceMax,
+        price_range: display,
+      } as T,
+      parsed.kind,
+      display.trim()
+    );
   }
 
-  return {
-    ...row,
-    pricing_mode: mode,
-    price_mode: mode,
-    price_max: priceMax,
-    price: display,
-  } as T;
+  return stampDerivedPricingMode(
+    {
+      ...row,
+      price_max: priceMax,
+      price: display,
+    } as T,
+    parsed.kind,
+    display.trim()
+  );
 }
 
 const IMPORT_PRICE_TYPE_LABELS: Record<PriceKind, string> = {
@@ -303,7 +335,12 @@ export function catalogPriceInputsFromRow(row: CatalogPriceRow): {
   maxInput: string;
 } {
   const hydrated = hydrateCatalogPriceFields(row);
-  const kind = pricingModeToKind(hydrated.pricing_mode ?? hydrated.price_mode) ?? "fixed";
+  const display = usesPriceAsDisplayColumn(hydrated)
+    ? String(hydrated.price ?? "").trim()
+    : String(hydrated.price_range ?? "").trim();
+  const kind =
+    pricingModeToKind(hydrated.pricing_mode ?? hydrated.price_mode) ??
+    parseCataloguePriceText(display).kind;
   const minInput =
     kind === "quote"
       ? ""

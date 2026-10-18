@@ -57,8 +57,8 @@ test("parseBulkServices sets pricing_mode from pasted price text", () => {
 
 test("parseBulkProducts line import structures prices", () => {
   const row = parseBulkProducts("Notebook - KSh 2,000")[0];
-  assert.equal(row.pricing_mode, "fixed");
-  assert.ok(row.price.includes("2") && row.price.includes("000"));
+  assert.equal(row.pricing_mode, undefined);
+  assert.equal(row.price, "KSh 2,000");
   assert.match(catalogImportPriceLabel(row), /2/);
 });
 
@@ -108,7 +108,7 @@ const UNIT_SUFFIX_LINES = [
 test("paste import keeps unit suffixes on price_range", () => {
   for (const [line, mode, amount, priceRange] of UNIT_SUFFIX_LINES) {
     const row = parseBulkServices(line)[0];
-    assert.equal(row.pricing_mode, mode, line);
+    assert.equal(row.pricing_mode, mode === "fixed" ? undefined : mode, line);
     assert.equal(row.price_range, priceRange, line);
     assert.equal(row.price, String(amount), line);
     if (mode === "range") assert.equal(row.price_max, 800, line);
@@ -119,7 +119,7 @@ test("paste add and save stores pricing_mode and amounts with display unchanged"
   const serviceCases = [
     {
       line: "Carpet wash - KSh 60 per sq ft",
-      pricing_mode: "fixed",
+      pricing_mode: undefined,
       price: "60",
       price_range: "KSh 60 per sq ft",
       price_max: null,
@@ -156,7 +156,7 @@ test("paste add and save stores pricing_mode and amounts with display unchanged"
   }
 
   const [product] = suggestImportedProducts(parseBulkProducts("Notebook - KSh 2,000"));
-  assert.equal(product.pricing_mode, "fixed");
+  assert.equal(product.pricing_mode, undefined);
   assert.equal(product.price, "KSh 2,000");
   assert.equal(product.price_max ?? null, null);
 });

@@ -52,7 +52,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `notify_sms_billable` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 
-## Functions (104)
+## Functions (105)
 
 | Function | Defined in |
 | --- | --- |
@@ -61,6 +61,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `_catalogue_item_key` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `_catalogue_name_path` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_data_quality_rows` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
+| `_parse_catalogue_pricing_mode` | `docs/supabase/manual/catalogue_pricing_mode_json_backfill_DO_NOT_RUN.sql` |
 | `_price_amounts_kept` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_price_sig_tokens` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_price_text_covers` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
