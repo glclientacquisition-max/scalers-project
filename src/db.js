@@ -11,6 +11,7 @@ const { finalizeOnceEnabled, TERMINAL } = require('./callFinalizeOnce');
 const { supabase } = require('./lib/supabaseClient');
 const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
 const { mergeContactIdentity } = require('./conversation/contactIdentity');
+const { resolveContactIdentityForUpsert } = require('./conversation/contactNameLock');
 const { buildCallerMemoryCard } = require('./conversation/callerMemory');
 const { tenantProfileFromRow } = require('./tenantProfile');
 
@@ -1585,7 +1586,9 @@ async function upsertContact({
     throwIfError('upsertContact(find)', findErr);
 
     if (existing?.id) {
-      const identity = mergeContactIdentity(existing, {
+      // VOICE_CONTACT_NAME_LOCK=on: keep a locked / single_person name and
+      // never re-add alternate_names_dismissed. Unset = today's merge.
+      const identity = resolveContactIdentityForUpsert(existing, {
         name: nameNorm,
         callId: callId || null,
         seenAt: now,
@@ -1622,7 +1625,7 @@ async function upsertContact({
     }
   }
 
-  const identity = mergeContactIdentity(null, {
+  const identity = resolveContactIdentityForUpsert(null, {
     name: nameNorm,
     callId: callId || null,
     seenAt: now,
