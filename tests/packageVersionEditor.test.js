@@ -148,8 +148,15 @@ describe("package version editor commands", () => {
       status: 400,
       error: "invalid",
     });
+    assert.deepEqual(
+      mod.packageVersionEditorHttpStatus("a beta business is not moved onto a package version"),
+      { status: 400, error: "invalid" },
+    );
     const sql = read("docs/supabase/package_version_editor.sql");
     assert.match(sql, /message credits are required/);
+    assert.match(sql, /a beta business is not moved onto a package version/);
+    assert.match(sql, /a package change keeps the current version/);
+    assert.doesNotMatch(sql, /insert into public\.invoices/i);
     assert.match(sql, /sms_kes = v_sms_burn/);
     assert.match(sql, /message_credits stays null/);
     assert.equal(mod.packageEditorWritesAllowed({

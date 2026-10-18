@@ -262,14 +262,17 @@ begin
 end $$;
 
 -- A version dated in the future is not what new subscribers get.
--- Archiving it does not move anyone. An explicit move does, and only those businesses.
+-- Archiving it does not move anyone. A beta business stays on its version.
+-- A package change keeps that version number. A paid business can still be moved.
 do $$
 declare
   v_draft uuid;
+  v_growth uuid;
   v_legacy int;
   v_other int;
   v_new int;
-  v_moved_version int;
+  v_paid int;
+  v_invoices int;
 begin
   v_draft := (public.admin_draft_package_version('starter', 'ada', 'a later starter')) ->> 'version_id';
   perform public.admin_publish_package_version(
@@ -298,15 +301,20 @@ begin
     raise exception 'a future version should not be the one new subscribers get, got %', v_new;
   end if;
 
-  perform public.admin_move_subscribers_to_package_version(
-    (select v.id from public.billing_package_versions v
-      join public.billing_packages p on p.id = v.package_id
-      where p.sku = 'starter' and v.version = 2),
-    array['11111111-1111-1111-1111-111111111111']::uuid[],
-    'ada',
-    'move one grandfathered business'
-  );
-  select v.version into v_moved_version
+  begin
+    perform public.admin_move_subscribers_to_package_version(
+      (select v.id from public.billing_package_versions v
+        join public.billing_packages p on p.id = v.package_id
+        where p.sku = 'starter' and v.version = 2),
+      array['11111111-1111-1111-1111-111111111111']::uuid[],
+      'ada',
+      'move one grandfathered business'
+    );
+    raise exception 'beta move was allowed';
+  exception when others then
+    if sqlerrm not like '%not moved onto a package version%' then raise; end if;
+  end;
+  select v.version into v_legacy
   from public.tenant_subscriptions s
   join public.billing_package_versions v on v.id = s.package_version_id
   where s.tenant_id = '11111111-1111-1111-1111-111111111111';
@@ -314,14 +322,103 @@ begin
   from public.tenant_subscriptions s
   join public.billing_package_versions v on v.id = s.package_version_id
   where s.tenant_id = '22222222-2222-2222-2222-222222222222';
-  if v_moved_version <> 2 or v_other <> 1 then
-    raise exception 'move should have changed one business only (% %)', v_moved_version, v_other;
+  if v_legacy <> 1 or v_other <> 1 then
+    raise exception 'beta move changed a business (% %)', v_legacy, v_other;
   end if;
   if (select billing_status from public.tenant_subscriptions where tenant_id = '11111111-1111-1111-1111-111111111111') <> 'beta'
      or (select minutes_included from public.tenants where id = '11111111-1111-1111-1111-111111111111') <> 300
      or (select billing_enforcement from public.tenants where id = '11111111-1111-1111-1111-111111111111') <> 'off'
+     or exists (
+       select 1 from public.billing_audit_log
+       where action = 'move_package_version'
+         and tenant_id = '11111111-1111-1111-1111-111111111111'
+     )
+     or exists (select 1 from public.invoices)
   then
-    raise exception 'move changed billing status, minutes, or enforcement';
+    raise exception 'beta move changed billing, wrote an audit, or created an invoice';
+  end if;
+
+  v_growth := (public.admin_draft_package_version('growth', 'ada', 'a later growth')) ->> 'version_id';
+  perform public.admin_update_package_version_draft(
+    v_growth::uuid,
+    pg_temp.version_patch(v_growth::uuid, '{"monthly_price_kes": 12000}'::jsonb),
+    'ada',
+    'fixture growth price'
+  );
+  perform public.admin_publish_package_version(v_growth::uuid, now(), 'ada', 'publish growth for the pin check');
+  update public.tenant_subscriptions
+  set package_id = (select id from public.billing_packages where sku = 'growth')
+  where tenant_id = '11111111-1111-1111-1111-111111111111';
+  select v.version into v_legacy
+  from public.tenant_subscriptions s
+  join public.billing_package_versions v on v.id = s.package_version_id
+  join public.billing_packages p on p.id = s.package_id
+  where s.tenant_id = '11111111-1111-1111-1111-111111111111';
+  if v_legacy <> 1
+     or (select sku from public.billing_packages p
+         join public.tenant_subscriptions s on s.package_id = p.id
+         where s.tenant_id = '11111111-1111-1111-1111-111111111111') <> 'growth'
+     or (select billing_enforcement from public.tenants where id = '11111111-1111-1111-1111-111111111111') <> 'off'
+  then
+    raise exception 'package change attached a later version';
+  end if;
+  update public.tenant_subscriptions
+  set package_id = (select id from public.billing_packages where sku = 'starter')
+  where tenant_id = '11111111-1111-1111-1111-111111111111';
+  select v.version into v_legacy
+  from public.tenant_subscriptions s
+  join public.billing_package_versions v on v.id = s.package_version_id
+  where s.tenant_id = '11111111-1111-1111-1111-111111111111';
+  if v_legacy <> 1 then
+    raise exception 'restoring the package attached a later version';
+  end if;
+  begin
+    update public.tenant_subscriptions
+    set package_id = (select id from public.billing_packages where sku = 'scale')
+    where tenant_id = '99999999-9999-9999-9999-999999999991';
+    raise exception 'package change was allowed onto another generation';
+  exception when others then
+    if sqlerrm not like '%that generation%' then raise; end if;
+  end;
+
+  insert into public.tenants (
+    id, business_name, sautikit_virtual_number, minutes_included, whatsapp_notification_number
+  ) values (
+    '99999999-9999-9999-9999-999999999993',
+    'Paid Later',
+    'pending:99999999-9999-9999-9999-999999999993',
+    300,
+    '+254700000093'
+  );
+  insert into public.tenant_subscriptions (tenant_id, package_id, package_version_id, billing_status, status)
+  select '99999999-9999-9999-9999-999999999993', p.id, v.id, 'active', 'active'
+  from public.billing_packages p
+  join public.billing_package_versions v on v.package_id = p.id
+  where p.sku = 'starter' and v.version = 1;
+  perform set_config('scalers.wallet_write', '1', true);
+  update public.tenants
+  set billing_enforcement = 'soft'
+  where id = '99999999-9999-9999-9999-999999999993';
+  perform set_config('scalers.wallet_write', '0', true);
+  select count(*) into v_invoices from public.invoices;
+  perform public.admin_move_subscribers_to_package_version(
+    (select v.id from public.billing_package_versions v
+      join public.billing_packages p on p.id = v.package_id
+      where p.sku = 'starter' and v.version = 2),
+    array['99999999-9999-9999-9999-999999999993']::uuid[],
+    'ada',
+    'move one paid business'
+  );
+  select v.version into v_paid
+  from public.tenant_subscriptions s
+  join public.billing_package_versions v on v.id = s.package_version_id
+  where s.tenant_id = '99999999-9999-9999-9999-999999999993';
+  if v_paid <> 2
+     or (select billing_status from public.tenant_subscriptions where tenant_id = '99999999-9999-9999-9999-999999999993') <> 'active'
+     or (select billing_enforcement from public.tenants where id = '99999999-9999-9999-9999-999999999993') <> 'soft'
+     or (select count(*) from public.invoices) <> v_invoices
+  then
+    raise exception 'paid move changed billing mode or created an invoice';
   end if;
   begin
     update public.tenant_subscriptions
@@ -341,7 +438,7 @@ begin
   from public.tenant_subscriptions s
   join public.billing_package_versions v on v.id = s.package_version_id
   where s.tenant_id = '11111111-1111-1111-1111-111111111111';
-  if v_legacy <> 2 or (select status from public.billing_package_versions where id = v_draft::uuid) <> 'retired' then
+  if v_legacy <> 1 or (select status from public.billing_package_versions where id = v_draft::uuid) <> 'retired' then
     raise exception 'archive moved a subscriber or did not retire the version';
   end if;
 end $$;
@@ -571,12 +668,19 @@ begin
     select 1 from public.billing_audit_log
     where action = 'move_package_version'
       and actor = 'ada'
-      and tenant_id = '11111111-1111-1111-1111-111111111111'
-      and detail ->> 'reason' = 'move one grandfathered business'
+      and tenant_id = '99999999-9999-9999-9999-999999999993'
+      and detail ->> 'reason' = 'move one paid business'
       and detail -> 'before' ->> 'package_version_id' is not null
       and detail -> 'after' ->> 'package_version_id' is not null
   ) then
     raise exception 'move audit row missing';
+  end if;
+  if exists (
+    select 1 from public.billing_audit_log
+    where action = 'move_package_version'
+      and tenant_id = '11111111-1111-1111-1111-111111111111'
+  ) then
+    raise exception 'a beta business was moved';
   end if;
   if not exists (
     select 1 from public.billing_audit_log

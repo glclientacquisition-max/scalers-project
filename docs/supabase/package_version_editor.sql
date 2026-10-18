@@ -1,8 +1,11 @@
 -- package_version_editor.sql
 -- Purpose: Super Admin package versions. Draft from the current version, edit
 --          the draft, publish it from a date, or archive it. Published rows
---          stay frozen. Subscribers stay on their version until an admin
---          moves them. The trial is the trial package version.
+--          stay frozen. A new subscription pins the latest published version.
+--          An existing business keeps its version. A beta business
+--          (billing_enforcement off, usage metered only) is not moved onto a
+--          later version, enforcement is not turned on, and no invoice is
+--          written. The trial is the trial package version.
 -- Run after: billing_data_layer.sql
 -- Idempotent. Safe to re-run.
 --
@@ -241,11 +244,68 @@ begin
      and old.package_version_id is not null
      and current_setting('scalers.billing_version_move', true) is distinct from '1'
   then
-    raise exception 'package version is pinned; change the package to move version';
+    raise exception 'package version is pinned';
   end if;
   return new;
 end;
 $$;
+
+-- A new row pins the latest published version of its package. An existing row
+-- does not. Changing its package keeps the same version number on the new
+-- package, so a business already on version 1 cannot land on a later price.
+-- Changing the version on a beta business (status beta, or enforcement off)
+-- is refused here as well as in the move function.
+create or replace function public.tenant_subscriptions_b_pin_version()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_version uuid;
+  v_generation integer;
+  v_enforcement text;
+begin
+  if new.billing_status is null then
+    new.billing_status := 'beta';
+  end if;
+  if tg_op = 'INSERT' then
+    if new.package_version_id is null then
+      v_version := public.billing_latest_package_version(new.package_id);
+      if v_version is null then
+        raise exception 'no published package version for this package';
+      end if;
+      new.package_version_id := v_version;
+    end if;
+    return new;
+  end if;
+  if new.package_id is distinct from old.package_id then
+    select v.version into v_generation
+    from public.billing_package_versions v
+    where v.id = old.package_version_id;
+    select v.id into v_version
+    from public.billing_package_versions v
+    where v.package_id = new.package_id
+      and v.version = v_generation
+      and v.status = 'published';
+    if v_version is null then
+      raise exception 'a package change keeps the current version; this package has no published version at that generation';
+    end if;
+    new.package_version_id := v_version;
+    return new;
+  end if;
+  if new.package_version_id is distinct from old.package_version_id then
+    select coalesce(t.billing_enforcement, 'off') into v_enforcement
+    from public.tenants t
+    where t.id = new.tenant_id;
+    if new.billing_status = 'beta' or v_enforcement = 'off' then
+      raise exception 'a beta business is not moved onto a package version';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+comment on column public.tenant_subscriptions.package_version_id is
+  'Pinned on insert to the latest published version. An existing row keeps that version. A package change keeps the same version number. A beta business is not moved onto a later version.';
 
 -- ---------------------------------------------------------------------------
 -- 2. Second-admin approvals. Append-only.
@@ -1177,6 +1237,7 @@ declare
   v_status text;
   v_minutes integer;
   v_enforcement text;
+  v_invoices integer;
 begin
   perform public._package_editor_open();
   perform public._package_editor_actor(p_actor, p_reason);
@@ -1191,6 +1252,7 @@ begin
     raise exception 'move businesses onto a published version';
   end if;
   select sku into v_sku from public.billing_packages where id = v_version.package_id;
+  select count(*) into v_invoices from public.invoices;
   foreach v_tenant in array p_tenant_ids
   loop
     select * into v_sub from public.tenant_subscriptions where tenant_id = v_tenant for update;
@@ -1203,6 +1265,9 @@ begin
     v_status := v_sub.billing_status;
     select minutes_included, billing_enforcement into v_minutes, v_enforcement
     from public.tenants where id = v_tenant;
+    if v_status = 'beta' or coalesce(v_enforcement, 'off') = 'off' then
+      raise exception 'a beta business is not moved onto a package version';
+    end if;
     perform set_config('scalers.billing_version_move', '1', true);
     update public.tenant_subscriptions
     set package_version_id = p_version_id
@@ -1228,6 +1293,9 @@ begin
     );
     v_moved := v_moved + 1;
   end loop;
+  if (select count(*) from public.invoices) is distinct from v_invoices then
+    raise exception 'a version move must not create an invoice';
+  end if;
   perform set_config('scalers.billing_version_move', '0', true);
   return jsonb_build_object(
     'version_id', p_version_id,

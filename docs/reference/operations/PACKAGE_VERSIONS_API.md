@@ -7,7 +7,7 @@ last_reviewed: 2026-10-18
 
 Desk builds the Packages screens. This is the server contract. The live catalogue route `POST /api/admin/packages` is unchanged.
 
-A package version is what a Business Assistant package includes: monthly price, included minutes, one shared message-credit allowance, a burn rate for SMS, WhatsApp, and email, seats, numbers, call overage rates, features, and (for the trial only) trial length in days. Published versions are frozen. A business stays on the version it was given until an admin moves it.
+A package version is what a Business Assistant package includes: monthly price, included minutes, one shared message-credit allowance, a burn rate for SMS, WhatsApp, and email, seats, numbers, call overage rates, features, and (for the trial only) trial length in days. Published versions are frozen. A new subscription pins the latest published version of the package on that insert. An existing business keeps its version. Current businesses stay on free beta: billing enforcement off, usage metered only. This editor does not move them, turn enforcement on, or create an invoice.
 
 Messages are one allowance. 1 credit = KSh 1 at the on-demand rate. The owner defaults are 1 credit per SMS segment, 2 credits per WhatsApp alert, and 1 credit per email. A draft copies those burns. An admin can change each one. Changing a burn is a price change.
 
@@ -171,7 +171,7 @@ Result: `{ "version_id", "discarded": true }`. Audit action `discard_package_ver
 
 ### `move_subscribers`
 
-The only way to take a business off the version it is grandfathered on. Target must be published and the same package. 1 to 200 tenant ids. Does not change billing status, included minutes, or enforcement.
+Moves a business that is already on a paid billing mode onto another published version of the same package. Refuses when billing status is beta or billing enforcement is off (`a beta business is not moved onto a package version`). 1 to 200 tenant ids. Does not change billing status, included minutes, or enforcement, and does not create an invoice. Current businesses stay on free beta, so this action does not apply to them. A new subscription does not use this action: the insert pins the latest published version.
 
 ```json
 {
@@ -207,19 +207,19 @@ Result: `{ "version_id", "moved", "version" }`. One audit row per business, acti
 
 `message` on 400 and 409 is the database text, capitalized, at most 180 characters. It does not name vendors, SQL files, or environment variables.
 
-Checks the database enforces, in addition to the route: no negative numbers, reason required, actor required, trial length only on `trial`, every feature key once, discount 0 to 100, notes at most 500 characters, `message_credits` set before an editor publish, cannot archive the only published version, move stays on the same package.
+Checks the database enforces, in addition to the route: no negative numbers, reason required, actor required, trial length only on `trial`, every feature key once, discount 0 to 100, notes at most 500 characters, `message_credits` set before an editor publish, cannot archive the only published version, move stays on the same package, a beta business is not moved, a move does not create an invoice.
 
 ## What publish does not do
 
-- It does not move existing subscribers. New signups pin to the latest published version whose `active_from` is already due.
-- It does not charge, send a message, or change the live rate card used by today's catalogue screen.
+- It does not move existing subscribers. A new subscription pins to the latest published version whose `active_from` is already due. Changing the package on an existing subscription keeps the same version number. It does not attach a later version.
+- It does not charge, send a message, turn billing enforcement on, create an invoice, or change the live rate card used by today's catalogue screen.
 - It does not put the trial on the public catalogue.
 - It does not make sending spend `message_credits`. Notify, consume, and the wallet still read the old SMS, WhatsApp, and email buckets. Burning one shared pool is a later change. Until then the editor only stores the allowance and the per-channel burn, and mirrors each burn into `sms_kes`, `whatsapp_kes`, and `email_kes`.
 - It does not enforce `on_demand_allowed` on a call. That flag is stored on the version. Sending still follows the business on-demand switch. Enforcement is a later change.
 
 ## Owner price table
 
-[`package_version_owner_prices.sql`](../../supabase/package_version_owner_prices.sql) publishes the locked prices (ex-VAT, KSh) through the editor functions. Staging only. It does not move a business. It does not change `billing_packages` or `billing_rate_card`, so the public catalogue screen keeps the previous prices until Desk reads versions. A second run does not publish another version. It refuses when the editor is off, when a second-admin threshold is set, or when a draft is already open.
+[`package_version_owner_prices.sql`](../../supabase/package_version_owner_prices.sql) publishes the locked prices (ex-VAT, KSh) through the editor functions. Staging only. It does not move a business, change billing enforcement, or create an invoice. Current businesses stay on free beta. The new versions apply only when a new subscription is inserted. It does not change `billing_packages` or `billing_rate_card`, so the public catalogue screen keeps the previous prices until Desk reads versions. A second run does not publish another version. It refuses when the editor is off, when a second-admin threshold is set, or when a draft is already open. It also refuses if a pin, a billing mode, or an invoice count changed during the run.
 
 Annual price is the usual rounding of monthly times 12 times (1 minus the discount). Starter discount is 17 percent. Growth and Scale are 10 percent. Call rates are stored per second at 5 decimals, the same rounding the desk uses, so the minute figures below display back as written. Outbound on-demand is 34 per minute on every plan, including the trial. 1 credit = KSh 1. Burns are SMS segment 1, WhatsApp alert 2, email 1.
 

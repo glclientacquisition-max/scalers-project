@@ -5,9 +5,11 @@
 -- Idempotent. A second run does not publish another version.
 --
 -- Staging only (sgcdncjxauhsbunobmob). DO NOT RUN on production
--- fjxcdccgyhnvnnlnovcl. This file does not move a business. It does not change
--- billing_packages or billing_rate_card. The public catalogue screen keeps
--- reading those tables until Desk reads package versions.
+-- fjxcdccgyhnvnnlnovcl. This file does not move a business, does not change
+-- billing_enforcement, and does not create an invoice. Current businesses stay
+-- on free beta. The published versions are what a new subscription pins to.
+-- It does not change billing_packages or billing_rate_card. The public
+-- catalogue screen keeps reading those tables until Desk reads package versions.
 --
 -- Annual price is not stored. It is round(monthly * 12 * (1 - discount/100)):
 -- Starter 17% is 69,720. Growth and Scale 10% are 194,400 and 378,000.
@@ -144,6 +146,7 @@ declare
   v_expect_annual numeric;
   v_expect_inbound numeric;
   v_expect_outbound numeric;
+  v_invoice_count integer;
 begin
   if not coalesce(
     (select package_editor_enabled from public.billing_lifecycle_settings where id = 1),
@@ -168,6 +171,18 @@ begin
   create temp table owner_price_seed_pins on commit drop as
   select tenant_id, package_version_id
   from public.tenant_subscriptions;
+
+  create temp table owner_price_seed_beta on commit drop as
+  select
+    t.id as tenant_id,
+    t.billing_enforcement,
+    s.billing_status,
+    s.package_id,
+    s.package_version_id
+  from public.tenants t
+  left join public.tenant_subscriptions s on s.tenant_id = t.id;
+
+  select count(*) into v_invoice_count from public.invoices;
 
   create temp table owner_price_seed_ids (
     sku text primary key,
@@ -312,6 +327,21 @@ begin
   ) or (select count(*) from public.tenant_subscriptions) <> (select count(*) from owner_price_seed_pins)
   then
     raise exception 'owner price seed moved a business';
+  end if;
+
+  if exists (
+    select 1
+    from public.tenants t
+    left join public.tenant_subscriptions s on s.tenant_id = t.id
+    join owner_price_seed_beta b on b.tenant_id = t.id
+    where t.billing_enforcement is distinct from b.billing_enforcement
+       or s.billing_status is distinct from b.billing_status
+       or s.package_id is distinct from b.package_id
+       or s.package_version_id is distinct from b.package_version_id
+  ) or (select count(*) from public.tenants) <> (select count(*) from owner_price_seed_beta)
+     or (select count(*) from public.invoices) is distinct from v_invoice_count
+  then
+    raise exception 'owner price seed changed billing mode or created an invoice';
   end if;
 
   if exists (select 1 from public.billing_package_versions where status = 'draft') then

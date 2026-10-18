@@ -78,7 +78,9 @@ export function packageVersionEditorHttpStatus(message: string): { status: numbe
     text.includes("approval threshold") ||
     text.includes("allowances placeholder") ||
     text.includes("message credits") ||
-    text.includes("on-demand setting")
+    text.includes("on-demand setting") ||
+    text.includes("beta business") ||
+    text.includes("must not create an invoice")
   ) {
     return { status: 400, error: "invalid" };
   }
