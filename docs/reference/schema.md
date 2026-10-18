@@ -52,15 +52,20 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `notify_sms_billable` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 
-## Functions (99)
+## Functions (104)
 
 | Function | Defined in |
 | --- | --- |
 | `_billing_package_snapshot` | `docs/supabase/package_state_rules.sql` |
 | `_billing_package_snapshot_of` | `docs/supabase/package_state_rules.sql` |
 | `_catalogue_item_key` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
+| `_catalogue_name_path` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_data_quality_rows` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
+| `_price_amounts_kept` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
+| `_price_sig_tokens` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
+| `_price_text_covers` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_record_catalogue_prices` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
+| `_repair_catalogue_price_item` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_tenant_append_field_history` | `docs/supabase/tenant_field_provenance.sql` |
 | `_tenant_assert_member` | `docs/supabase/tenant_field_provenance.sql` |
 | `_tenant_catalog_product_score` | `docs/supabase/tenant_field_provenance.sql`<br>`supabase/migrations/20261011170000_completeness_matches_onboarding.sql` |
@@ -114,7 +119,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `member_can_write` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `notify_sends_deny_mutation` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/purge_archived_tenants.sql` |
 | `parse_payments_text` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012090000_payments_policies_v2.sql` |
-| `parse_price_ksh` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
+| `parse_price_ksh` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `payments_to_v2` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `payments_valid` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `platform_soniox_voices_enforce_single_default` | `docs/supabase/soniox_voice_id.sql` |
