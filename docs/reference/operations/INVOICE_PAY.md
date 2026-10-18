@@ -165,6 +165,26 @@ Desk builds the Billing screen. This API does not.
 
 `node scripts/billing-payment-reconcile.js` prints that report. It refuses the production project. In sandbox it may read `payment_status` and add a disagreement row. It still does not write.
 
+## Sandbox drill (19 Oct 2026, 02:18 EAT)
+
+Against `https://sandbox-api.bachs.io` only, with the staging preview `BACHS_MODE=sandbox` key. No live key, no `api.bachs.io`, no production database. The key is not in this repo.
+
+The rows were a synthetic tenant, `Invoice Pay Drill`, number `pending:invoice-pay-drill`, enforcement `soft`, subscription `active` (not beta), on starter's package id only as a foreign key. It is not one of the six staging businesses. Five drafts were finalized, then the tenant was deleted. Issued notices were `skipped` / `no recipient` and were deleted with the tenant. Nothing was sent. No payment, attempt, token, receipt, or credit row was written. The six businesses and the letterhead row were unchanged. `billing_invoice_counters` for 2026 stays at 5, so `SCL-2026-000001` through `SCL-2026-000005` are not reused. After cleanup: 0 invoices, 0 notices, 0 attempts.
+
+Phone `+254700000099`. Email `drill@example.com`. Hosted creates used the same body as the pay client: `pricing.currency` KES, `payment_method_types` `MOMO_KES`, public example.com return URLs. Collection, underpay, and the overpay attempt used custom checkout (`ui_mode: custom`) plus `POST .../confirm` with `simulated_outcome`, because that is the sandbox API for a result. Hosted M-Pesa results are page controls (succeed, fail, underpaid), not a request field.
+
+| Case | Invoice | Session | Result |
+| --- | --- | --- | --- |
+| Collection | SCL-2026-000001, KSh 1,000 | `chk_EtETcFcM12cZmJOp` | `simulated_outcome=success`. Confirm `201` `3af8822e-2ad9-4ed8-bc8d-1e0a3f564e73`. GET `9d56cc35-f0bf-4bc8-be4c-e4f2edfdd2b2`: session `completed`, `payment_status` `succeeded`, charge `succeeded`, `amount_paid` `1000.00`. |
+| Cancel | SCL-2026-000002, KSh 1,500 | `chk_Z5Tgi5myjj5i325Z` | Create `201` `ffd058b1-decc-4121-b501-e475ac84f28a`, status `open`. GET before `f8ff8b7e-d17c-4be9-b767-d9c52852a871`. `POST /v1/checkout-sessions/{id}/cancel` `404` `NOT_FOUND` `a3294288-62d6-4a2e-9f36-a22466974b06`. GET after `a2008721-b31a-4167-a98b-c32a4d45ba58`: still `open`, `payment_status` `requires_payment_method`, charge `open`, `amount_paid` `0.00`. The route does not void the session. |
+| Underpay | SCL-2026-000003, KSh 2,000 | `chk_oAm3Rzf0PFzHOkdx` | `simulated_outcome=underpaid`. Confirm `201` `337c31b3-dfaf-48fb-9656-124e4639f74e`. GET `cd12cfc3-ad71-439f-bf63-ef72bf44ae5c`: session stayed `open`, `payment_status` `requires_action`, charge `underpaid`, `amount_paid` `1400.00`, `amount_remaining` `600.00`. |
+| Overpay | SCL-2026-000004, KSh 2,500 | `chk_KZjG3TERFeUmPa2b` | `simulated_outcome=overpaid` refused. Confirm `400` `VALIDATION_ERROR` `153defff-31a9-4608-ba98-91cb69fc7ae1`: `simulated_outcome` must be `success`, `failed`, or `underpaid`. GET `94cb2bec-664a-4537-9c6e-20e1478e6c4a`: still `open`, `amount_paid` `0.00`. Overpay cannot be simulated. |
+| Split | SCL-2026-000005, KSh 200,000 | `chk_L1whw5ryGM6ftSNi`, `chk_6uQQ4FT7UsteSMco` | `invoice_kes_parts` returned `100000, 100000`. Two hosted sessions, KSh 100,000 each. Create `201` `c3a3d92b-8a21-4713-b63f-bd3675b5c58a` and `f1a9f9e3-16e3-43d7-b45f-30254efd3196`. Both `open`. |
+
+The same `POST .../cancel` on the two split sessions (`e266ae28-092b-4f84-adf0-fd1db69b7994`, `30f79224-5592-4f22-b310-9b5f84c786b1`) and on the custom overpay session (`781f411a-739a-42a5-ae97-b84f3d1f5a04`) was also `404`. The session stayed `open`. `DELETE` on the cancel session was `405` `7109a021-6ade-4d5b-9211-2a08d4c7d591`. `PATCH` with `status: cancelled` was `400` `01b18d32-df51-4809-9cf3-ade8b70d334d` (it asked for `currency` and `payment_method`). `POST .../expire` was `404` `8e61fc8f-1e97-4d9c-a4d0-e25f4dc0f0a2`. None of those changed the session off `open`.
+
+The pay client treats HTTP 404 from that cancel path as success, then GETs the session. Because the sandbox leaves it `open`, the next click reuses the stored URL or blocks with `Previous payment still processing.` It does not insert a second attempt. A real void is not available on this sandbox route. The hosted cancel and split sessions expire at `2026-10-18T23:48:55Z`. The custom underpay and overpay sessions used the 60-minute default and expire at `2026-10-19T00:18:58Z`. No staging invoice was marked paid from these charges.
+
 ## What the owner provides for Bachs
 
 1. An account at [https://app.bachs.io](https://app.bachs.io).
