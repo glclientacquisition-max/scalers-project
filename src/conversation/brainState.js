@@ -402,7 +402,19 @@ function promoteCallerGoal(next, text, input, previousIntent) {
   // do at") never replaces a goal already held.
   if (fixesOn && fixesD199.isFragmentTurn(text) && callerAskSpecificity(usable) === 0) return;
   // After the file name is bound, the goal is the last actionable ask.
+  // BRAIN_CALL_FIXES_D199 (18 Oct owner review 3): a turn with no ask in it
+  // ("We going through?") does not replace a goal that has one.
   if (next.caller?.nameConfirmed) {
+    if (
+      fixesOn &&
+      callerAskSpecificity(usable) === 0 &&
+      callerAskSpecificity(current) > 0 &&
+      !fixesD199.looksLikeRescheduleAsk(usable) &&
+      !fixesD199.looksLikeNewJobAsk(usable) &&
+      !fixesD199.looksLikeFileAsk(usable)
+    ) {
+      return;
+    }
     next.goal.description = usable;
     return;
   }
@@ -419,6 +431,45 @@ function promoteCallerGoal(next, text, input, previousIntent) {
   if (intentChanged && nextScore > 0 && nextScore >= currentScore) {
     next.goal.description = usable;
   }
+}
+
+/**
+ * BRAIN_CALL_FIXES_D199 (18 Oct owner review): note catalogue names the
+ * caller said (conversation.topicHits, last 5), cues such as a previous
+ * booking (conversation.topicCues), and a turn that is only a
+ * team member's name (conversation.personAsked; askedForPerson). Returns the
+ * person when the turn named one, so it is not taken as the goal.
+ */
+function noteTopicTurn(next, text, profile, lastAgentText = '') {
+  if (!next.conversation || !text) return null;
+  const topics = require('./ownerTopic');
+  const names = topics.catalogueTopicNames(profile || {});
+  if (names.length) {
+    const hits = topics.catalogueHits(text, names);
+    if (hits.length) {
+      const kept = (Array.isArray(next.conversation.topicHits) ? next.conversation.topicHits : []).filter(
+        (name) => !hits.includes(name)
+      );
+      next.conversation.topicHits = [...kept, ...hits].slice(-5);
+    }
+  }
+  const cues = topics.turnCues(text);
+  if (cues.length) {
+    const kept = (Array.isArray(next.conversation.topicCues) ? next.conversation.topicCues : []).filter(
+      (cue) => !cues.includes(cue)
+    );
+    next.conversation.topicCues = [...kept, ...cues].slice(-5);
+  }
+  // A name given when we asked for theirs ("Chris." after "May I have your
+  // name?") is the caller, not a person asked for.
+  if (/\b(?:your name|name please|jina lako|jina yako|naongea na|speaking with)\b/i.test(String(lastAgentText || ''))) return null;
+  const person = topics.teamPersonNamed(text, topics.teamPeople(profile || {}));
+  if (!person) return null;
+  const callerName = String(next.caller?.name || '').trim().toLowerCase();
+  if (callerName && person.name.toLowerCase().includes(callerName.split(/\s+/)[0])) return null;
+  next.conversation.personAsked = person;
+  next.conversation.askedForPerson = true;
+  return person;
 }
 
 function observeCallerTurn(state, input = {}) {
@@ -521,7 +572,11 @@ function observeCallerTurn(state, input = {}) {
   next.goal.primary = GOAL_BY_INTENT[intent] || 'resolve_enquiry';
   // Voice may pass unfinished/weak. Open stems are rejected even when the flag is absent.
   // TODO(Voice): pass unfinished and weakStt from flushUtterance, and consume nameConfirmed before TTS.
-  promoteCallerGoal(next, text, input, previousIntent);
+  // BRAIN_CALL_FIXES_D199 (18 Oct owner review 1, 3): what the caller named
+  // from the catalogue, and a bare team name ("Chris."), for summary.topic.
+  const ownerTextOn = require('./callFixesD199').callFixesD199Enabled();
+  const personNamed = ownerTextOn ? noteTopicTurn(next, text, input.profile, input.lastAgentText) : null;
+  if (!personNamed) promoteCallerGoal(next, text, input, previousIntent);
   next.goal.status = 'active';
   // A completed handoff is not re-opened by a repeat ask; nextBestAction answers it.
   next.handoff.requested = intent === 'human' && next.handoff.completed !== true;

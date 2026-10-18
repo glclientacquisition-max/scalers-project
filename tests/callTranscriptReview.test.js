@@ -379,7 +379,11 @@ describe('mergeTranscriptReview', () => {
         });
         assert.equal(merged.resolution, 'needs_human');
         assert.equal(merged.primaryIntent, on ? 'book_visit' : 'human');
-        assert.equal(merged.want, 'Carpet cleaning in Runda in the morning. No name.');
+        // 18 Oct owner review (2): a sentence on, never "No name.".
+        assert.equal(
+          merged.want,
+          on ? 'Caller wanted to book carpet cleaning in Runda in the morning.' : 'Carpet cleaning in Runda in the morning. No name.'
+        );
         assert.equal(merged.done, 'None.');
         assert.equal(merged.next, 'Call them back.');
         assert.doesNotMatch(merged.want, /7:00|Rongai|callback was noted/i);

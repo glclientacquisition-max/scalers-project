@@ -636,12 +636,19 @@ function isClosingCue(text) {
 const THINKING_FILLER =
   /^(?:natafakari|nafikiria|ngoja(?: kidogo)?|subiri(?: kidogo)?|let me think|hold on|one (?:sec|second|moment)|wait|um+|uh+|hmm+|mm+|m-m|a-a|eh+|ah+)$/i;
 
+// 18 Oct owner review (HD_73fa119a7435, HD_c19044667595): "We're leaving",
+// "Just leave it at that". Goal text only; isClosingCue (which can end a
+// call) is unchanged.
+const LEAVE_OFF =
+  /^(?:(?:ok(?:ay)?|sawa|haya|no|yeah|uh+|um+),? )?(?:(?:so |then )?(?:we'?re|we are|i'?m|i am) (?:leaving|going|off|done)(?: now)?|(?:just |let'?s |we can )?leave it(?: at that| there| for now| hapo)?|never ?mind|forget (?:it|about it)|achana nayo|wacha tu|wacha hivyo|tuachie hapo|tuache hapo|tutaongea baadaye)$/i;
+
 /** A closing or a thinking filler ("Natafakari.") is never a goal. */
 function notAGoal(text) {
   const raw = String(text || '').trim().replace(/[.!,]+$/g, '').trim();
   if (!raw) return true;
   if (isClosingCue(raw)) return true;
   if (THINKING_FILLER.test(raw)) return true;
+  if (LEAVE_OFF.test(raw.replace(/[’]/g, "'"))) return true;
   // HD_b82fbfef7649 (3): "Haya.", "Sawa.", "Okay then", "Uh, I appreciate it
   // then": every clause an ack, a thanks, or a filler. Never a goal.
   if (/\?/.test(raw)) return false;
@@ -652,7 +659,10 @@ function notAGoal(text) {
     .split(/[,.!;]+/)
     .map((part) => part.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
-  return parts.length > 0 && parts.every((part) => CLOSING_PART.test(part) || THINKING_FILLER.test(part));
+  return (
+    parts.length > 0 &&
+    parts.every((part) => CLOSING_PART.test(part) || THINKING_FILLER.test(part) || LEAVE_OFF.test(part))
+  );
 }
 
 // ------------------------------------- HD_ceba9d9b3f37 (8) review topics
