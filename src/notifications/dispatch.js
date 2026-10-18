@@ -30,6 +30,7 @@ const {
   sendReserved,
 } = require('./sendLedger');
 const { escalationHold, noteInboxOnly } = require('./escalationGate');
+const { renderStaffSms, toGsm7 } = require('./templates');
 
 function whatsAppSenderReady() {
   return isWhatsAppConfigured();
@@ -61,6 +62,24 @@ async function sendEmailFallback({ to, body, lead = {}, subject } = {}) {
   return { channel: 'email', to: dest, result };
 }
 
+function deskBaseUrl() {
+  return String(process.env.DESK_PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://app.scalers.co.ke').trim() ||
+    'https://app.scalers.co.ke';
+}
+
+/** SMS body: explicit smsBody, else the one-segment staff alert, else the full text. */
+function staffSmsText({ smsBody, text, lead, ledger, kind } = {}) {
+  if (smsBody && String(smsBody).trim()) return toGsm7(smsBody);
+  const k = kind || (ledger && ledger.kind);
+  const short = renderStaffSms({
+    kind: k,
+    lead: lead && typeof lead === 'object' ? lead : {},
+    callId: ledger && ledger.callId,
+    deskBase: deskBaseUrl(),
+  });
+  return short || text;
+}
+
 async function trySendSms({ to, body }) {
   const dest = normalizeSmsTo(to);
   if (!smsSenderReady() || !dest) return null;
@@ -86,8 +105,11 @@ async function trySendWhatsApp({ to, body, lead, kind }) {
  * @param {object} [opts.lead]
  * @param {string} [opts.subject]
  */
-async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger, kind } = {}) {
+async function dispatchAlert({ to, email, body, smsBody, lead = {}, subject, channels, ledger, kind } = {}) {
   const text = body || buildLeadText(lead);
+  // Staff call alerts go out on SMS as one GSM-7 segment (templates.js
+  // renderStaffSms). WhatsApp and email keep the full text.
+  const smsText = staffSmsText({ smsBody, text, lead, ledger, kind });
   const errors = [];
   const prefs = parseNotifyChannels(channels);
   const dests = [normalizeSmsTo(to), normalizeWhatsAppTo(to), normalizeEmail(email)].filter(
@@ -121,7 +143,15 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
 
   async function viaReserve(channel, dest, send) {
     const out = await sendReserved(
-      { ledger, key, kind: ledgerKind, channel, to: dest, body: text, strict: ledger?.strict },
+      {
+        ledger,
+        key,
+        kind: ledgerKind,
+        channel,
+        to: dest,
+        body: channel === 'sms' ? smsText : text,
+        strict: ledger?.strict,
+      },
       send
     );
     if (out.legacy) legacy = true;
@@ -131,7 +161,7 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
   // Legacy path (reserve_notify_send not applied yet): record after the send.
   async function accept(result) {
     if (result?.channel) {
-      const recorded = await recordDispatchResult(ledger, result, text);
+      const recorded = await recordDispatchResult(ledger, result, result.channel === 'sms' ? smsText : text);
       const claim = durableSendClaim(recorded);
       if (!claim.ok) {
         return { channel: null, reason: claim.reason, errors: [...errors] };
@@ -149,7 +179,7 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
         if (!legacy) {
           try {
             const out = await viaReserve('sms', smsTo, async () => {
-              const sms = await trySendSms({ to, body: text });
+              const sms = await trySendSms({ to, body: smsText });
               if (!sms) throw new Error('sms_unavailable');
               return sms;
             });
@@ -174,7 +204,7 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
           }
         }
         if (!handled) {
-          const claim = await claimTenantSms(ledger, text);
+          const claim = await claimTenantSms(ledger, smsText);
           if (!claim.allowed) {
             errors.push(`sms:${claim.reason || 'sms_allowance_exhausted'}`);
             console.warn(
@@ -183,7 +213,7 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
           } else {
             if (ledger && typeof ledger === 'object') ledger.overage = Boolean(claim.overage);
             try {
-              const sms = await trySendSms({ to, body: text });
+              const sms = await trySendSms({ to, body: smsText });
               if (sms) return accept(sms);
             } catch (err) {
               errors.push(`sms:${err?.message || err}`);

@@ -32,7 +32,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
-| `DESK_PUBLIC_URL` | voice | `server.js` |
+| `DESK_PUBLIC_URL` | voice | `server.js`<br>`src/notifications/dispatch.js` |
 | `DOCS_STALE_DAYS` | scripts | `scripts/docs/check-docs.js` |
 | `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/replay-voice-suite.js`<br>`scripts/smoke-mvp-retail.js`<br>+1 more |
 | `GEMINI_API_KEY` | desk, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+8 more |
@@ -59,7 +59,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `MPESA_CONSUMER_SECRET` | desk | `dashboard/src/lib/walletTopUp.ts` |
 | `MPESA_PASSKEY` | desk | `dashboard/src/lib/walletTopUp.ts` |
 | `MPESA_SHORTCODE` | desk | `dashboard/src/lib/walletTopUp.ts` |
-| `NEXT_PUBLIC_APP_URL` | voice | `server.js` |
+| `NEXT_PUBLIC_APP_URL` | voice | `server.js`<br>`src/notifications/dispatch.js` |
 | `NEXT_PUBLIC_SITE_URL` | desk | `dashboard/src/app/layout.tsx`<br>`dashboard/src/lib/admin-auth.ts` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |

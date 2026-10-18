@@ -248,7 +248,129 @@ function escalationBody({
   return lines.join('\n');
 }
 
+// ---------------------------------------------------------------------------
+// Staff call-alert SMS: one GSM-7 segment (160 chars).
+// Owner/staff alerts for a call (lead, escalation, request, visit, voicemail,
+// callback) go out as SMS in this short form. WhatsApp and email keep the
+// full renderStaffText / escalationBody text. Basic GSM-7 only: one emoji,
+// curly quote or en dash would switch the SMS to UCS-2 (70 chars).
+// Callbacks only: never imply a live transfer or a confirmed booking.
+// ---------------------------------------------------------------------------
+const SMS_MAX = 160;
+const STAFF_SMS_KINDS = new Set(['lead', 'escalation', 'service_request', 'appointment', 'voicemail', 'callback']);
+const STAFF_SMS_LABELS = Object.freeze({
+  lead: 'Missed call',
+  escalation: 'Call back',
+  service_request: 'Request',
+  appointment: 'Visit request, to confirm',
+  voicemail: 'Voicemail',
+  callback: 'Callback request',
+});
+// Titles that serviceRequestTitle / appointmentTitle put in front of the reason.
+const STAFF_SMS_TITLE_LABELS = Object.freeze({
+  'ENQUIRY': 'Enquiry',
+  'HOLD / PICKUP': 'Hold request',
+  'ORDER': 'Order request',
+  'CALLBACK': 'Callback request',
+  'VISIT REQUEST': 'Visit request, to confirm',
+  'VISIT UPDATED': 'Visit changed, to confirm',
+  'VISIT CANCELLED': 'Visit cancelled',
+});
+
+// Basic GSM 03.38 characters that are also ASCII (extension chars [ ] { } ~ ^ | \ count double).
+const GSM7_BASIC_RE = /^[A-Za-z0-9 \n\r!"#$%&'()*+,\-./:;<=>?@_]*$/;
+
+function isGsm7Basic(text) {
+  return GSM7_BASIC_RE.test(String(text == null ? '' : text));
+}
+
+/** Plain GSM-7 text: straight quotes, hyphens, no emoji, no extension chars. */
+function toGsm7(text) {
+  return String(text == null ? '' : text)
+    .replace(/[\u2018\u2019\u201a\u201b\u2032`\u00b4]/g, "'")
+    .replace(/[\u201c\u201d\u201e\u201f\u2033\u00ab\u00bb]/g, '"')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/[\u00a0\u2000-\u200b\u202f\u205f\u3000\t]/g, ' ')
+    .replace(/[[{]/g, '(')
+    .replace(/[\]}]/g, ')')
+    .replace(/~/g, '-')
+    .replace(/[\\|]/g, '/')
+    .replace(/\u20ac/g, 'EUR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9 \n!"#$%&'()*+,\-./:;<=>?@_]/g, '')
+    .replace(/ {2,}/g, ' ')
+    .trim();
+}
+
+function oneLine(text) {
+  return toGsm7(String(text == null ? '' : text).replace(/\s*[\r\n]+\s*/g, ' '));
+}
+
+/** Cut to max chars with "...", on a word boundary when one is close. */
+function clip(text, max) {
+  const t = String(text || '');
+  if (t.length <= max) return t;
+  if (max <= 3) return t.slice(0, Math.max(0, max));
+  let cut = t.slice(0, max - 3);
+  const space = cut.lastIndexOf(' ');
+  if (space > 0 && space >= cut.length - 10) cut = cut.slice(0, space);
+  return `${cut.replace(/[\s.,;:&/+-]+$/, '')}...`;
+}
+
+function deskCallLink(callId, deskBase) {
+  const id = String(callId || '').trim();
+  if (!id || !/^[A-Za-z0-9-]{1,64}$/.test(id)) return null;
+  const base = String(deskBase || '').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  if (!base || !isGsm7Basic(base)) return null;
+  return `${base}/calls/${id}`;
+}
+
+/**
+ * One-segment SMS for a staff call alert, or null when kind is not one
+ * (caller texts, billing notices, wallet / ops alerts keep their own text).
+ * @param {{ kind: string, lead?: { businessName?: string, name?: string, reason?: string, callerNumber?: string }, callId?: string|null, deskBase?: string|null }} opts
+ */
+function renderStaffSms({ kind, lead = {}, callId = null, deskBase = null } = {}) {
+  const k = String(kind || '').trim();
+  if (!STAFF_SMS_KINDS.has(k)) return null;
+  let label = STAFF_SMS_LABELS[k];
+  let detail = oneLine(lead && lead.reason);
+  const m = /^([A-Z][A-Z /]+?):\s*/.exec(detail);
+  if (m && STAFF_SMS_TITLE_LABELS[m[1].trim()]) {
+    label = STAFF_SMS_TITLE_LABELS[m[1].trim()];
+    detail = detail.slice(m[0].length).trim();
+  }
+  // Fixed caps: business 20, caller name 20, number 16. The detail (what
+  // they want) gets the rest. The Desk link is 60 chars (no short route
+  // yet): it is added only when the detail still fits whole or keeps 50+
+  // chars beside it.
+  const biz = clip(oneLine(lead && lead.businessName), 20);
+  const name = clip(oneLine(lead && lead.name) || 'Caller', 20);
+  const phone = clip(oneLine(lead && lead.callerNumber), 16);
+  const link = deskCallLink(callId, deskBase);
+  const head = biz ? `${label} - ${biz}` : label;
+  const who = [name, phone].filter(Boolean).join(' ');
+  const base = `${head}\n${who}`;
+  const room = SMS_MAX - base.length - 1; // newline before the detail
+  const parts = [base];
+  if (link && room - 1 - link.length >= Math.min(detail.length || 0, 50)) {
+    if (detail) parts.push(clip(detail, room - 1 - link.length));
+    parts.push(link);
+  } else if (detail) {
+    parts.push(clip(detail, room));
+  }
+  const out = parts.join('\n');
+  return out.length <= SMS_MAX ? out : clip(out, SMS_MAX);
+}
+
 module.exports = {
+  SMS_MAX,
+  STAFF_SMS_KINDS,
+  isGsm7Basic,
+  renderStaffSms,
+  toGsm7,
   STAFF_ACTIONS,
   STAFF_TITLES,
   appointmentTitle,
