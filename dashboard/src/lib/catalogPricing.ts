@@ -8,7 +8,7 @@
  *
  * Pure and browser-safe. Relative imports only so node tests can load it.
  */
-import { hydrateCatalogPriceFields } from "./catalogPriceKind";
+import { hydrateCatalogPriceFields } from "./catalogPricingMode";
 import { isUnpriced, sanitizePricing, stockBool, syncPricing, type StructuredPrice } from "./structuredData";
 import { stableRowId } from "./factHash";
 
@@ -109,10 +109,10 @@ export function settleCatalogPrices<T extends Row>(
         ...row,
         [key]: storedText,
         pricing,
-        price_kind: p.price_kind as string | undefined,
-        price_min: p.price_min as number | null | undefined,
-        price_max: p.price_max as number | null | undefined,
         pricing_mode: p.pricing_mode as string | undefined,
+        price_mode: p.price_mode as string | undefined,
+        price: p.price as string | undefined,
+        price_max: p.price_max as number | string | null | undefined,
       }) as T;
     }
     const pricing = syncPricing({ pricing: prevPricing, unit }, text, row.in_stock);

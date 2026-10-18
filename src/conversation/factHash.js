@@ -193,16 +193,17 @@ function priceFactValue(row, kind) {
     kind === 'product'
       ? firstDefined(row.price, row.price_range)
       : firstDefined(row.price_range, row.priceRange, row.price);
-  const priceKind = firstDefined(row.price_kind, row.priceKind);
-  let mode = firstDefined(priceKind, row.price_mode, row.pricing_mode, row.priceMode, row.pricingMode);
+  let mode = firstDefined(row.price_mode, row.pricing_mode, row.priceMode, row.pricingMode);
   if (mode === 'ask') mode = 'quote';
-  const priceMin = firstDefined(row.price_min, row.priceMin);
   const priceMax = firstDefined(row.price_max, row.priceMax);
+  const structuredLo = firstDefined(row.price, row.price_amount);
   const out = {};
   if (!isEmptyLeaf(price)) out.price = price;
   if (!isEmptyLeaf(mode)) out.mode = mode;
-  if (!isEmptyLeaf(priceKind)) out.price_kind = priceKind === 'ask' ? 'quote' : priceKind;
-  if (priceMin !== undefined && priceMin !== null && priceMin !== '') out.price_min = Number(priceMin);
+  if (structuredLo !== undefined && structuredLo !== null && structuredLo !== '' && mode && mode !== 'quote') {
+    const amount = Number(String(structuredLo).replace(/,/g, ''));
+    if (Number.isFinite(amount)) out.amount = amount;
+  }
   if (priceMax !== undefined && priceMax !== null && priceMax !== '') out.price_max = Number(priceMax);
   return Object.keys(out).length ? out : null;
 }

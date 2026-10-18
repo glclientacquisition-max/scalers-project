@@ -4,14 +4,14 @@ import { SegmentedControl } from "@/components/ui/Segmented";
 import {
   type PriceKind,
   validateCatalogPriceFields,
-} from "@/lib/catalogPriceKind";
+} from "@/lib/catalogPricingMode";
 import { cx } from "@/lib/cx";
 
 const MODES: Array<{ value: PriceKind; label: string }> = [
   { value: "fixed", label: "Fixed" },
   { value: "from", label: "From" },
   { value: "range", label: "Range" },
-  { value: "quote", label: "Quote on request" },
+  { value: "quote", label: "Quote" },
 ];
 
 type Props = {
@@ -56,7 +56,7 @@ export function CatalogPriceEditor({
         value={kind}
         onChange={(v) => onKindChange(v as PriceKind)}
         items={MODES.map((m) => ({ value: m.value, label: m.label }))}
-        className="grid w-full !grid-cols-2 lg:!inline-grid lg:!auto-cols-fr lg:!grid-flow-col"
+        className="grid w-full grid-cols-2 md:grid-cols-4"
       />
       {kind === "quote" ? (
         <p className="text-meta text-ink-2">

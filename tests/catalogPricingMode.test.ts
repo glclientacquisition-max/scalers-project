@@ -5,15 +5,16 @@ import {
   numericPriceInputError,
   parseCataloguePriceText,
   validateCatalogPriceFields,
-} from "../dashboard/src/lib/catalogPriceKind.ts";
+  applyCatalogPriceFields,
+} from "../dashboard/src/lib/catalogPricingMode.ts";
 import { hashFactValue, priceFactValue } from "../dashboard/src/lib/factHash.ts";
 
 test("parseCataloguePriceText fixtures", () => {
-  assert.deepEqual(parseCataloguePriceText("Ask"), { kind: "quote", min: null, max: null });
-  assert.deepEqual(parseCataloguePriceText("2,000"), { kind: "fixed", min: 2000, max: null });
-  assert.deepEqual(parseCataloguePriceText("from 1500"), { kind: "from", min: 1500, max: null });
-  assert.deepEqual(parseCataloguePriceText("500-800"), { kind: "range", min: 500, max: 800 });
-  assert.deepEqual(parseCataloguePriceText(""), { kind: "quote", min: null, max: null });
+  assert.deepEqual(parseCataloguePriceText("Ask"), { kind: "quote", price: null, priceMax: null });
+  assert.deepEqual(parseCataloguePriceText("2,000"), { kind: "fixed", price: 2000, priceMax: null });
+  assert.deepEqual(parseCataloguePriceText("from 1500"), { kind: "from", price: 1500, priceMax: null });
+  assert.deepEqual(parseCataloguePriceText("500-800"), { kind: "range", price: 500, priceMax: 800 });
+  assert.deepEqual(parseCataloguePriceText(""), { kind: "quote", price: null, priceMax: null });
 });
 
 test("formatCatalogueLegacyPrice", () => {
@@ -35,26 +36,38 @@ test("numericPriceInputError", () => {
   assert.match(numericPriceInputError("12abc") ?? "", /numbers only/i);
 });
 
-test("priceFactValue includes price_kind and amounts when set", () => {
+test("applyCatalogPriceFields sets pricing_mode, price, price_max", () => {
+  const row = applyCatalogPriceFields(
+    { name: "Clean", price_range: "" },
+    "range",
+    "500",
+    "800",
+    "price_range"
+  );
+  assert.equal(row.pricing_mode, "range");
+  assert.equal(row.price, "500");
+  assert.equal(row.price_max, 800);
+  assert.equal(row.price_range, "KSh 500–800");
+});
+
+test("priceFactValue uses pricing_mode, price, price_max (not price_kind)", () => {
   const row = {
     price_range: "KSh 500–800",
-    price_kind: "range",
-    price_min: 500,
-    price_max: 800,
     pricing_mode: "range",
+    price: "500",
+    price_max: 800,
   };
   assert.deepEqual(priceFactValue(row, "service"), {
     price: "KSh 500–800",
     mode: "range",
-    price_kind: "range",
-    price_min: 500,
+    amount: 500,
     price_max: 800,
   });
-  const quote = { price_range: "", price_kind: "quote", pricing_mode: "quote" };
-  assert.deepEqual(priceFactValue(quote, "service"), { mode: "quote", price_kind: "quote" });
+  const quote = { price_range: "", pricing_mode: "quote" };
+  assert.deepEqual(priceFactValue(quote, "service"), { mode: "quote" });
   const before = hashFactValue(priceFactValue(row, "service"));
   const after = hashFactValue(
-    priceFactValue({ ...row, price_min: 600, price_max: 800 }, "service")
+    priceFactValue({ ...row, price: "600", price_range: "KSh 600–800" }, "service")
   );
   assert.notEqual(before, after);
 });

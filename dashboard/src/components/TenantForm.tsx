@@ -39,7 +39,7 @@ import {
   applyCatalogPriceFields,
   catalogPriceInputsFromRow,
   type PriceKind,
-} from "@/lib/catalogPriceKind";
+} from "@/lib/catalogPricingMode";
 import {
   emptyService,
   extractServicesNotes,
@@ -1526,7 +1526,6 @@ function TenantFormInner({
                 <thead>
                   <tr className="border-b border-hairline bg-surface-canvas text-left text-meta font-medium text-ink-2">
                     <th className="min-w-0 px-3 py-2.5 font-medium">Name</th>
-                    <th className="px-3 py-2.5 font-medium">Price</th>
                     <th className="px-3 py-2.5 font-medium">Notes</th>
                     <th className="px-3 py-2.5 font-medium">Out of scope</th>
                     <th className="px-3 py-2.5 font-medium w-16">
@@ -1540,94 +1539,98 @@ function TenantFormInner({
                     const priceError = catalogPriceError(state.fields, service.name);
                     const priceFields = catalogPriceInputsFromRow(service);
                     return (
-                      <tr key={`service-${index}`} className="align-top">
-                        <td className="min-w-0 px-3 py-2">
-                          <label className="sr-only" htmlFor={`svc-name-${index}`}>
-                            Service name
-                          </label>
-                          <input
-                            id={`svc-name-${index}`}
-                            value={service.name}
-                            title={service.name || undefined}
-                            onChange={(e) => updateService(index, "name", e.target.value)}
-                            placeholder={
-                              vertical === "retail"
-                                ? "Book sourcing / special orders"
-                                : "Home cleaning"
-                            }
-                            className={tableFieldClass}
-                          />
-                        </td>
-                        <td className="min-w-[14rem] px-3 py-2">
-                          <CatalogPriceEditor
-                            idPrefix={`svc-price-${index}`}
-                            kind={priceFields.kind}
-                            minInput={priceFields.minInput}
-                            maxInput={priceFields.maxInput}
-                            fieldClass={tableFieldClass}
-                            onKindChange={(kind) =>
-                              updateServicePrice(index, kind, priceFields.minInput, priceFields.maxInput)
-                            }
-                            onMinChange={(value) =>
-                              updateServicePrice(index, priceFields.kind, value, priceFields.maxInput)
-                            }
-                            onMaxChange={(value) =>
-                              updateServicePrice(index, priceFields.kind, priceFields.minInput, value)
-                            }
-                          />
-                          {priceError ? (
-                            <p id={`svc-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">
-                              {priceError}
-                            </p>
-                          ) : null}
-                        </td>
-                        <td className="px-3 py-2">
-                          <label className="sr-only" htmlFor={`svc-notes-${index}`}>
-                            Notes
-                          </label>
-                          <input
-                            id={`svc-notes-${index}`}
-                            value={service.notes}
-                            onChange={(e) => updateService(index, "notes", e.target.value)}
-                            className={tableFieldClass}
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <label className="sr-only" htmlFor={`svc-oos-${index}`}>
-                            Out of scope
-                          </label>
-                          <input
-                            id={`svc-oos-${index}`}
-                            value={service.out_of_scope}
-                            onChange={(e) =>
-                              updateService(index, "out_of_scope", e.target.value)
-                            }
-                            className={tableFieldClass}
-                          />
-                        </td>
-                        <td className="px-2 py-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              requestRemove(
-                                service,
-                                `Remove ${service.name.trim() || "this service"}?`,
-                                "It leaves the catalogue when you save.",
-                                () =>
-                                  setServices((prev) =>
-                                    prev.length <= 1
-                                      ? [emptyService()]
-                                      : prev.filter((_, i) => i !== index)
-                                  )
-                              )
-                            }
-                            className={settingsTrashButtonClass}
-                            aria-label={`Remove service ${index + 1}`}
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
+                      <>
+                        <tr key={`service-${index}`} className="align-top">
+                          <td className="min-w-0 px-3 py-2">
+                            <label className="sr-only" htmlFor={`svc-name-${index}`}>
+                              Service name
+                            </label>
+                            <input
+                              id={`svc-name-${index}`}
+                              value={service.name}
+                              title={service.name || undefined}
+                              onChange={(e) => updateService(index, "name", e.target.value)}
+                              placeholder={
+                                vertical === "retail"
+                                  ? "Book sourcing / special orders"
+                                  : "Home cleaning"
+                              }
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`svc-notes-${index}`}>
+                              Notes
+                            </label>
+                            <input
+                              id={`svc-notes-${index}`}
+                              value={service.notes}
+                              onChange={(e) => updateService(index, "notes", e.target.value)}
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`svc-oos-${index}`}>
+                              Out of scope
+                            </label>
+                            <input
+                              id={`svc-oos-${index}`}
+                              value={service.out_of_scope}
+                              onChange={(e) =>
+                                updateService(index, "out_of_scope", e.target.value)
+                              }
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                requestRemove(
+                                  service,
+                                  `Remove ${service.name.trim() || "this service"}?`,
+                                  "It leaves the catalogue when you save.",
+                                  () =>
+                                    setServices((prev) =>
+                                      prev.length <= 1
+                                        ? [emptyService()]
+                                        : prev.filter((_, i) => i !== index)
+                                    )
+                                )
+                              }
+                              className={settingsTrashButtonClass}
+                              aria-label={`Remove service ${index + 1}`}
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                        <tr key={`service-price-${index}`} className="border-b border-hairline">
+                          <td colSpan={4} className="px-3 pb-3 pt-0">
+                            <CatalogPriceEditor
+                              idPrefix={`svc-price-${index}`}
+                              kind={priceFields.kind}
+                              minInput={priceFields.minInput}
+                              maxInput={priceFields.maxInput}
+                              fieldClass={tableFieldClass}
+                              onKindChange={(kind) =>
+                                updateServicePrice(index, kind, priceFields.minInput, priceFields.maxInput)
+                              }
+                              onMinChange={(value) =>
+                                updateServicePrice(index, priceFields.kind, value, priceFields.maxInput)
+                              }
+                              onMaxChange={(value) =>
+                                updateServicePrice(index, priceFields.kind, priceFields.minInput, value)
+                              }
+                            />
+                            {priceError ? (
+                              <p id={`svc-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">
+                                {priceError}
+                              </p>
+                            ) : null}
+                          </td>
+                        </tr>
+                      </>
                     );
                   })}
                 </tbody>
@@ -1820,7 +1823,6 @@ function TenantFormInner({
                   <thead>
                     <tr className="border-b border-hairline bg-surface-canvas text-left text-meta font-medium text-ink-2">
                       <th className="min-w-0 px-3 py-2.5 font-medium">Name</th>
-                      <th className="px-3 py-2.5 font-medium">Price</th>
                       <th className="px-3 py-2.5 font-medium">Category</th>
                       <th className="px-3 py-2.5 font-medium">Stock</th>
                       <th className="px-3 py-2.5 font-medium w-12">
@@ -1834,103 +1836,107 @@ function TenantFormInner({
                       const priceError = catalogPriceError(state.fields, product.name);
                       const priceFields = catalogPriceInputsFromRow(product);
                       return (
-                        <tr key={`product-${index}`} className="align-top">
-                          <td className="min-w-0 px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-name-${index}`}>
-                              Product name
-                            </label>
-                            <input
-                              id={`prod-name-${index}`}
-                              value={product.name}
-                              title={product.name || undefined}
-                              onChange={(e) => updateProduct(index, "name", e.target.value)}
-                              placeholder="Atomic Habits"
-                              className={tableFieldClass}
-                            />
-                          </td>
-                          <td className="min-w-[14rem] px-3 py-2">
-                            <CatalogPriceEditor
-                              idPrefix={`prod-price-${index}`}
-                              kind={priceFields.kind}
-                              minInput={priceFields.minInput}
-                              maxInput={priceFields.maxInput}
-                              fieldClass={tableFieldClass}
-                              onKindChange={(kind) =>
-                                updateProductPrice(index, kind, priceFields.minInput, priceFields.maxInput)
-                              }
-                              onMinChange={(value) =>
-                                updateProductPrice(index, priceFields.kind, value, priceFields.maxInput)
-                              }
-                              onMaxChange={(value) =>
-                                updateProductPrice(index, priceFields.kind, priceFields.minInput, value)
-                              }
-                            />
-                            {priceError ? (
-                              <p id={`prod-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">
-                                {priceError}
-                              </p>
-                            ) : null}
-                          </td>
-                          <td className="px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-cat-${index}`}>
-                              Category
-                            </label>
-                            <input
-                              id={`prod-cat-${index}`}
-                              value={product.category}
-                              onChange={(e) => updateProduct(index, "category", e.target.value)}
-                              placeholder="Self-help"
-                              className={tableFieldClass}
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-stock-${index}`}>
-                              Stock status
-                            </label>
-                            <DeskSelect
-                              id={`prod-stock-${index}`}
-                              aria-label="Stock status"
-                              value={
-                                product.in_stock === "yes" ||
-                                product.in_stock === "no" ||
-                                product.in_stock === "unknown"
-                                  ? product.in_stock
-                                  : ""
-                              }
-                              placeholder="Not set"
-                              className={tableFieldClass}
-                              options={STOCK_OPTIONS}
-                              onChange={(next) =>
-                                updateProduct(index, "in_stock", next)
-                              }
-                            />
-                            <span className="mt-1 flex items-center justify-between gap-2 text-meta text-ink-2">
-                              Hold
-                              <ToolSwitch
-                                checked={product.holdable === true}
-                                label={`Can hold ${product.name.trim() || `product ${index + 1}`}`}
-                                onChange={(next) => setProductHoldable(index, next)}
+                        <>
+                          <tr key={`product-${index}`} className="align-top">
+                            <td className="min-w-0 px-3 py-2">
+                              <label className="sr-only" htmlFor={`prod-name-${index}`}>
+                                Product name
+                              </label>
+                              <input
+                                id={`prod-name-${index}`}
+                                value={product.name}
+                                title={product.name || undefined}
+                                onChange={(e) => updateProduct(index, "name", e.target.value)}
+                                placeholder="Atomic Habits"
+                                className={tableFieldClass}
                               />
-                            </span>
-                          </td>
-                          <td className="px-2 py-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                requestRemove(
-                                  product,
-                                  `Remove ${product.name.trim() || "this product"}?`,
-                                  "It leaves the catalogue when you save.",
-                                  () => setProducts((prev) => prev.filter((_, i) => i !== index))
-                                )
-                              }
-                              className={settingsTrashButtonClass}
-                              aria-label={`Remove product ${index + 1}`}
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
+                            </td>
+                            <td className="px-3 py-2">
+                              <label className="sr-only" htmlFor={`prod-cat-${index}`}>
+                                Category
+                              </label>
+                              <input
+                                id={`prod-cat-${index}`}
+                                value={product.category}
+                                onChange={(e) => updateProduct(index, "category", e.target.value)}
+                                placeholder="Self-help"
+                                className={tableFieldClass}
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <label className="sr-only" htmlFor={`prod-stock-${index}`}>
+                                Stock status
+                              </label>
+                              <DeskSelect
+                                id={`prod-stock-${index}`}
+                                aria-label="Stock status"
+                                value={
+                                  product.in_stock === "yes" ||
+                                  product.in_stock === "no" ||
+                                  product.in_stock === "unknown"
+                                    ? product.in_stock
+                                    : ""
+                                }
+                                placeholder="Not set"
+                                className={tableFieldClass}
+                                options={STOCK_OPTIONS}
+                                onChange={(next) =>
+                                  updateProduct(index, "in_stock", next)
+                                }
+                              />
+                              <span className="mt-1 flex items-center justify-between gap-2 text-meta text-ink-2">
+                                Hold
+                                <ToolSwitch
+                                  checked={product.holdable === true}
+                                  label={`Can hold ${product.name.trim() || `product ${index + 1}`}`}
+                                  onChange={(next) => setProductHoldable(index, next)}
+                                />
+                              </span>
+                            </td>
+                            <td className="px-2 py-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  requestRemove(
+                                    product,
+                                    `Remove ${product.name.trim() || "this product"}?`,
+                                    "It leaves the catalogue when you save.",
+                                    () => setProducts((prev) => prev.filter((_, i) => i !== index))
+                                  )
+                                }
+                                className={settingsTrashButtonClass}
+                                aria-label={`Remove product ${index + 1}`}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                          <tr key={`product-price-${index}`} className="border-b border-hairline">
+                            <td colSpan={4} className="px-3 pb-3 pt-0">
+                              <CatalogPriceEditor
+                                idPrefix={`prod-price-${index}`}
+                                kind={priceFields.kind}
+                                minInput={priceFields.minInput}
+                                maxInput={priceFields.maxInput}
+                                fieldClass={tableFieldClass}
+                                onKindChange={(kind) =>
+                                  updateProductPrice(index, kind, priceFields.minInput, priceFields.maxInput)
+                                }
+                                onMinChange={(value) =>
+                                  updateProductPrice(index, priceFields.kind, value, priceFields.maxInput)
+                                }
+                                onMaxChange={(value) =>
+                                  updateProductPrice(index, priceFields.kind, priceFields.minInput, value)
+                                }
+                              />
+                              {priceError ? (
+                                <p id={`prod-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">
+                                  {priceError}
+                                </p>
+                              ) : null}
+                            </td>
+                          </tr>
+                        </>
                       );
                     })}
                   </tbody>

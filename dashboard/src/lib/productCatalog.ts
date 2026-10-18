@@ -1,4 +1,4 @@
-import { hydrateCatalogPriceFields } from "./catalogPriceKind";
+import { hydrateCatalogPriceFields } from "./catalogPricingMode";
 import { sanitizePricing, type StructuredPrice } from "./structuredData";
 import { stableRowId } from "./factHash";
 export type ProductItem = {
@@ -17,8 +17,6 @@ export type ProductItem = {
   aliases: string[];
   /** fixed | from | range | quote. Omitted until the owner or import sets it. */
   price_mode?: string;
-  price_kind?: "fixed" | "from" | "range" | "quote";
-  price_min?: number | null;
   price_max?: number | null;
   /** Owner confirmed this row can be held. */
   holdable?: boolean;
@@ -119,11 +117,7 @@ export function normalizeProductCatalog(raw: unknown): ProductItem[] {
       ) {
         item.price_mode = priceMode === "ask" ? "quote" : priceMode;
       }
-      const pk = String(r.price_kind || r.priceKind || "").trim();
-      if (pk === "fixed" || pk === "from" || pk === "range" || pk === "quote") item.price_kind = pk;
-      const pmin = r.price_min ?? r.priceMin;
       const pmax = r.price_max ?? r.priceMax;
-      if (pmin !== undefined && pmin !== null && pmin !== "") item.price_min = Number(pmin);
       if (pmax !== undefined && pmax !== null && pmax !== "") item.price_max = Number(pmax);
       const source = String(r.source || "").trim().toLowerCase();
       if (
