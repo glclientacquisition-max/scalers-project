@@ -208,6 +208,11 @@ const INTENT_TOPIC = {
   emergency: 'an emergency',
 };
 
+const TIME_ASK =
+  /\bwhat(?:'s| is)? the time\b|\bwhat time (?:is it|it is)\b|\b(?:ni )?saa ngapi\b/i;
+// "What time do you open?" / "Mnafungua saa ngapi?" is an hours ask, not the clock.
+const HOURS_WORD = /\b(?:open|opening|close|closing|clos|hours|fungua|funga|mnafungua|mnafunga)\w*/i;
+
 function intentTopic(intent, { person = null } = {}) {
   const key = String(intent || '').toLowerCase();
   if (key === 'human' && person?.name) return `speaking to ${person.name}`;
@@ -247,6 +252,8 @@ function summaryTopic({ results = [], hits = [], intent = '', person = null, nam
   if (hit) return { topic: topicName(hit), source: 'catalogue' };
   const word = serviceWordTopic(goal);
   if (word) return { topic: word, source: 'catalogue' };
+  // HD_95e6745c0df1 (#734): a clock ask is a fixed topic, not the raw goal words.
+  if (TIME_ASK.test(String(goal || '')) && !HOURS_WORD.test(String(goal || ''))) return { topic: 'what time it is', source: 'intent' };
   const label = intentTopic(intent, { person }) || cueTopic(cues);
   if (label) return { topic: label, source: 'intent' };
   return { topic: null, source: null };

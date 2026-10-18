@@ -556,3 +556,10 @@ describe('18 Oct: starter and receptionist-instruction policy lines are not fact
       assert.ok(split.policies.warranty);
     }));
 });
+
+it('summary.topic: a clock ask is "what time it is"; an hours ask is not (#734 HD_95e6745c0df1)', () => {
+  const { summaryTopic } = require('../src/conversation/ownerTopic');
+  assert.equal(summaryTopic({ goal: 'What time is it' }).topic, 'what time it is');
+  assert.equal(summaryTopic({ goal: 'Ni saa ngapi sasa?' }).topic, 'what time it is');
+  assert.equal(summaryTopic({ goal: 'Mnafungua saa ngapi?' }).topic, null);
+});
