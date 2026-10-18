@@ -21,7 +21,7 @@ Prod DID **+254709221536** is Aris, the live paying customer: **never release, r
 
 **Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.
 
-Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage. Metering is live. Invoices and payments are not built. Bachs is the chosen payment provider. Prices are about to be raised. The new prices are not decided. Detail in [Billing](#billing).
+Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage. Metering is live. Invoices and payments are not on prod. A pay-link draft is in flight (section 4) and is not applied on staging. Bachs is the chosen payment provider. Prices are about to be raised. The new prices are not decided. Detail in [Billing](#billing).
 
 **Gate right now:** the next step is a clean, scored Aris call on prod. Until then, nothing else ships except live-call voice fixes Alvin approves (see section 4).
 
@@ -120,6 +120,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 **Ops-Billing (dated per the STATUS rule):**
 
 - **18 Oct 2026, in flight: #775** billing data layer (`cursor/billing-data-layer-cc4b`). Staging SQL only (section 3). No charges, no send-path change, no prod SQL.
+- **18 Oct 2026, in flight:** invoice pay (`cursor/invoice-pay-0c16`), stacked on #775. Pay tokens, public `/pay/<token>`, mock Bachs checkout, webhook inbox, split parts above KSh 150,000, and a report-only reconciliation. SQL is `docs/supabase/invoice_pay.sql`. Not applied on staging or prod. No keys. Live mode is refused. Desk handoff: [`INVOICE_PAY.md`](reference/operations/INVOICE_PAY.md).
 
 
 
@@ -195,7 +196,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **Admin:** Suspend/Archive shipped (#737, 18 Oct). Purge schedule not applied. Still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
 - **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
-- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status`, invoices, notices, `tenant_escalation_allowed`, number quarantine). No charges and no prod SQL. Package catalogue UI and a pay action remain.
+- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status`, invoices, notices, `tenant_escalation_allowed`, number quarantine). No charges and no prod SQL. Package catalogue UI remains. A public pay page is drafted (section 4) and is not applied.
 - **Landing page** (#492 parked until its turn).
 - **Legal pack draft #653** (Terms, Privacy, DPA, call notice, beta terms). Parked; call notice ties to the recording decision.
 - **WhatsApp as the assistant doing work** (not just alerts).
@@ -207,9 +208,9 @@ Public copy never mentions unbuilt features.
 
 ## Billing
 
-Metering is live: packages, usage caps, the SMS reserve, send and settle ledger, and monthly rollover. There are no invoices and no payments. Bachs is the chosen payment provider (collection per invoice later; Scalers keeps the subscription record). Prices are about to be raised. The new prices are not decided, so none are written here.
+Metering is live: packages, usage caps, the SMS reserve, send and settle ledger, and monthly rollover. Invoices and payments exist on staging as the #775 data layer only. They are not on prod. The pay page and Bachs adapter are drafted and not applied (section 4). Bachs is the chosen payment provider (collection per invoice; Scalers keeps the subscription record). Prices are about to be raised. The new prices are not decided, so none are written here.
 
-This is Phase 0 of the 18 Oct 2026 ops and billing plan: correct the #737 and #643 migration records, and revoke anon execute on the seat functions. That seat revoke is on staging (`20261018164459`) and production (`20261018180156`). `create_tenant_invite`, `accept_tenant_invite`, and `transfer_tenant_ownership` allowed the anon role on both databases. Each revoke keeps `service_role` only. Create is on staging (`20261018180447`). Accept and transfer are on staging (`20261018180648`). Production waits for the owner's OK. Later phases (invoices, Bachs checkout, the admin billing console) are not started.
+This is Phase 0 of the 18 Oct 2026 ops and billing plan: correct the #737 and #643 migration records, and revoke anon execute on the seat functions. That seat revoke is on staging (`20261018164459`) and production (`20261018180156`). `create_tenant_invite`, `accept_tenant_invite`, and `transfer_tenant_ownership` allowed the anon role on both databases. Each revoke keeps `service_role` only. Create is on staging (`20261018180447`). Accept and transfer are on staging (`20261018180648`). Production waits for the owner's OK. The admin billing console is not started. Invoice pay is drafted and not applied.
 
 Paid-mode copy on Usage still says "next invoice". That wording is a Desk hand-off (`billingStateModel.ts`, `usageCap.ts`). Do not ship it as a promise until invoices exist.
 

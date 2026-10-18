@@ -5,7 +5,7 @@ last_reviewed: 2026-10-18
 
 # Billing read models for Desk
 
-What the admin console and the owner dashboard can read after `docs/supabase/billing_data_layer.sql`. No pay button. No prices beyond the versions already on the account. The trial row is not a priced plan.
+What the admin console and the owner dashboard can read after `docs/supabase/billing_data_layer.sql`. The owner desk has no pay button. A public pay page is a separate token link ([`INVOICE_PAY.md`](./INVOICE_PAY.md)). No prices beyond the versions already on the account. The trial row is not a priced plan.
 
 ## Owner (signed in, own business only)
 
@@ -25,7 +25,11 @@ Select is allowed. Insert and update are not, except marking a notice read.
 
 `voicemail_until` is the voicemail window after a trial ends or a line is suspended (default 7 days, `billing_lifecycle_settings.voicemail_hold_days`). Callers can leave a voicemail until then. After that, callers hear that the line is not available. The dashboard does not play either message.
 
-Payments, payment attempts, credits, and the audit log are not owner reads.
+Payments, payment attempts, credits, pay tokens, and the audit log are not owner reads.
+
+## Public pay page
+
+`/pay/<token>` is not an owner read and not an admin screen. The Desk server calls `pay_invoice_by_token` with the service role. `invoice_pay_tokens` stores the sha256 hex only. Anon and authenticated cannot mint or read tokens. A business with `billing_enforcement` off has no pay link. The page never marks an invoice paid. See [`INVOICE_PAY.md`](./INVOICE_PAY.md). The SQL is not applied yet.
 
 ## Admin (service role)
 
