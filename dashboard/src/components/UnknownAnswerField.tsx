@@ -48,7 +48,7 @@ export function UnknownAnswerField({
           {isDefault ? (
             <span className="text-meta text-ink-3">Default</span>
           ) : (
-            <Button variant="ghost" size="sm" className="-mr-3 text-accent" onClick={onReset}>
+            <Button variant="ghost" size="sm" className="-mr-3" onClick={onReset}>
               Reset to default
             </Button>
           )}
