@@ -1,4 +1,4 @@
-import { sanitizePricing, type StructuredPrice } from "./structuredData";
+import { parsePriceText, sanitizePricing, type StructuredPrice } from "./structuredData";
 import { stableRowId } from "@/lib/factHash";
 
 export type ServiceItem = {
@@ -146,6 +146,65 @@ export function extractServicesNotes(servicesOffered: string): string {
   return text;
 }
 
+/**
+ * A tail is a price when the catalogue price reader (parsePriceText) finds an
+ * amount, or the words are an ask line ("depends on size", "price depends").
+ * Typed units such as "sq ft" and "per day" stay in this text. Reading them
+ * into unit_label is PR #771 (spokenPrice); this split does not copy that reader.
+ */
+function isPriceWording(raw: string): boolean {
+  const text = raw.trim();
+  if (!text) return false;
+  const parsed = parsePriceText(text);
+  if (parsed.mode === "fixed" || parsed.mode === "from" || parsed.mode === "range") return true;
+  if (parsed.amount_ksh != null) return true;
+  return /^(?:price\s+)?(?:ask|call|varies|depends|tbd|quote|quotation|on request)\b/i.test(text);
+}
+
+/** Colon or comma only when the right side is a price, not "3,000" or "9:00". */
+function splitMarkedPrice(line: string, mark: RegExp): { name: string; price: string } | null {
+  const match = line.match(mark);
+  if (!match) return null;
+  const name = match[1].trim();
+  const price = match[2].trim();
+  if (!name || !/^(?:ksh|kes|from|starting|kuanzia|price|ask|call|varies|depends|tbd|quote|quotation|on request)\b/i.test(price)) {
+    return null;
+  }
+  if (!isPriceWording(price)) return null;
+  return { name, price };
+}
+
+function splitCurrencyPrice(line: string): { name: string; price: string } | null {
+  const match = /\s+(?=(?:ksh|kes)\b)/i.exec(line);
+  if (!match || match.index <= 0) return null;
+  const name = line.slice(0, match.index).trim();
+  const price = line.slice(match.index).trim();
+  if (!name || /^(?:from|starting|kuanzia|base\s*\+|min(?:imum)?)$/i.test(name)) return null;
+  if (!isPriceWording(price)) return null;
+  return { name, price };
+}
+
+function splitAskPrice(line: string): { name: string; price: string } | null {
+  const match = line.match(/^(.*?)\s+((?:price\s+)?depends\s+on\b.+)$/i);
+  if (!match) return null;
+  const name = match[1].trim();
+  const price = match[2].trim();
+  if (!name || !isPriceWording(price)) return null;
+  return { name, price };
+}
+
+function serviceFromNamePrice(name: string, price: string): ServiceItem | null {
+  if (!name.trim()) return null;
+  return {
+    name: name.trim(),
+    price_range: price.trim(),
+    notes: "",
+    out_of_scope: "",
+    in_stock: "",
+    category: "",
+  };
+}
+
 function parseBulkServiceLine(line: string): ServiceItem | null {
   const cleaned = line.replace(/^[-*•]\s*/, "").trim();
   if (!cleaned) return null;
@@ -180,31 +239,32 @@ function parseBulkServiceLine(line: string): ServiceItem | null {
     };
   }
 
-  // Simple menu list: "Home cleaning - from 2,500 KES"
+  // "Home cleaning - from 2,500 KES", "Name: KSh 60 per sq ft", "Name, KSh 60"
   const dash = cleaned.match(/^(.+?)\s+[-–—]\s+(.+)$/);
   if (dash) {
-    const name = dash[1].trim();
-    const price = dash[2].trim();
-    if (!name) return null;
-    return {
-      name,
-      price_range: price,
-      notes: "",
-      out_of_scope: "",
-      in_stock: "",
-      category: "",
-    };
+    const row = serviceFromNamePrice(dash[1], dash[2]);
+    if (row) return row;
+  }
+  const marked =
+    splitMarkedPrice(cleaned, /^(.+?):\s+(.+)$/) ||
+    splitMarkedPrice(cleaned, /^(.+?),\s+(.+)$/);
+  if (marked) {
+    const row = serviceFromNamePrice(marked.name, marked.price);
+    if (row) return row;
+  }
+  const currency = splitCurrencyPrice(cleaned);
+  if (currency) {
+    const row = serviceFromNamePrice(currency.name, currency.price);
+    if (row) return row;
+  }
+  const ask = splitAskPrice(cleaned);
+  if (ask) {
+    const row = serviceFromNamePrice(ask.name, ask.price);
+    if (row) return row;
   }
 
   // Name only
-  return {
-    name: cleaned,
-    price_range: "",
-    notes: "",
-    out_of_scope: "",
-    in_stock: "",
-    category: "",
-  };
+  return serviceFromNamePrice(cleaned, "");
 }
 
 /**
@@ -212,6 +272,8 @@ function parseBulkServiceLine(line: string): ServiceItem | null {
  *
  * Simple (preferred):
  *   Home cleaning - from 2,500 KES
+ *   Window cleaning KSh 60 per sq ft
+ *   Deep clean price depends on size
  *   Plumbing
  *
  * Advanced (unchanged):
