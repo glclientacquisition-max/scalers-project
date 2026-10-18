@@ -202,10 +202,15 @@ async function HomeOverviewBody() {
             label: copy.jobFilter,
             href: callsHref({ purpose: "job" }),
             count: work.toConfirm,
+            // Count is every open visit (requested + booked), the same 22 as the
+            // Inbox Visits tab. The part still to confirm is named so it matches
+            // the briefing ("21 to confirm"): "22 · 21 to confirm".
             unit:
               work.requested > 0 && work.requested === work.toConfirm
                 ? homeQueueUnit(work.toConfirm, copy.jobUnit, jobSample)
-                : "",
+                : work.requested > 0
+                  ? `· ${work.requested} ${copy.jobUnit}`
+                  : "",
           },
         ]
       : []),

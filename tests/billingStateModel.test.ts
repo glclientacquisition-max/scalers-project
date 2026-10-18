@@ -77,7 +77,7 @@ describe("ownerBillingView rows", () => {
     assert.ok(sms);
     assert.equal(sms.used, 193);
     assert.equal(sms.left, 7);
-    assert.match(String(sms.note), /193 SMS credits \(102 messages\)/);
+    assert.equal(sms.note, "193 credits used (102 messages)");
   });
 
   it("seats come from seat_included and tenant_seats_used", () => {
@@ -93,6 +93,11 @@ describe("ownerBillingView rows", () => {
     assert.match(String(v.lowNotice), /During beta nothing is charged/);
     const metered = ownerBillingView(input({ ...esgaRow, mode_label: "metered" }));
     assert.match(String(metered.lowNotice), /next invoice/);
+  });
+
+  it("low rule: 10% or less of the included amount left (50 of 200 is not low, 20 of 200 is)", () => {
+    assert.equal(ownerBillingView(input({ ...esgaRow, used_minutes: 0, sms_used: 150 })).lowNotice, null);
+    assert.ok(ownerBillingView(input({ ...esgaRow, used_minutes: 0, sms_used: 180 })).lowNotice);
   });
 
   it("no notice when nothing is low", () => {

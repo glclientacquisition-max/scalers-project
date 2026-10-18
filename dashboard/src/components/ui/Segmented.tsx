@@ -34,11 +34,17 @@ function Count({ n, active }: { n: number; active: boolean }) {
 export function Segmented({
   items,
   onSelect,
+  onNavigate,
   label,
   className,
 }: {
   items: SegmentedItem[];
   onSelect?: (key: string) => void;
+  /**
+   * Link mode: called on a plain click. Return true when the parent handled it
+   * on the client (the Link's own navigation is then skipped).
+   */
+  onNavigate?: (key: string) => boolean;
   /** Accessible name for the group. */
   label: string;
   className?: string;
@@ -81,6 +87,12 @@ export function Segmented({
               data-segmented-active={active ? "" : undefined}
               aria-current={active ? "page" : undefined}
               aria-disabled={item.disabled || undefined}
+              onClick={(event) => {
+                if (!onNavigate) return;
+                if (event.defaultPrevented || event.button !== 0) return;
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                if (onNavigate(item.key)) event.preventDefault();
+              }}
               className={cx(itemBase, itemState(active), item.disabled && "pointer-events-none opacity-50")}
             >
               {item.label}

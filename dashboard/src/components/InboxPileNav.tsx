@@ -53,6 +53,8 @@ type InboxPileNavValue = {
   goPile: (next: string) => void;
   setQuery: (next: string) => void;
   prefetchAdjacent: () => void;
+  /** List mode (not a Work/Week board): chip taps may switch piles on the client. */
+  listMode: boolean;
 };
 
 const InboxPileNavCtx = createContext<InboxPileNavValue | null>(null);
@@ -329,6 +331,7 @@ export function InboxPileNavProvider({
       goPile,
       setQuery,
       prefetchAdjacent,
+      listMode: enableSelect,
     }),
     [
       localPurpose,

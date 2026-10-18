@@ -149,7 +149,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
 
   const smsNote =
     input.smsMessages != null && input.smsMessages !== smsUsed
-      ? `${count(smsUsed)} SMS credits (${count(input.smsMessages)} message${input.smsMessages === 1 ? "" : "s"})`
+      ? `${count(smsUsed)} credits used (${count(input.smsMessages)} message${input.smsMessages === 1 ? "" : "s"})`
       : null;
 
   const rows: UsageRow[] = [

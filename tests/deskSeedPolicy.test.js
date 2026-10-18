@@ -85,6 +85,26 @@ process.stdout.write(JSON.stringify(p.factPolicyMap(${JSON.stringify(ESGA_POLICI
     assert.ok(out.policies.warranty);
   });
 
+  it('Settings starter text: unmarked exact starter shows (Esga delivery); owner text does not (D&D)', () => {
+    const child = spawnSync(
+      process.execPath,
+      [
+        '--experimental-strip-types', '--no-warnings', '--import', './tests/registerTs.mjs', '--input-type=module', '-e',
+        `import { seedStarterPolicies, normalizeBusinessPolicies } from './dashboard/src/lib/businessPolicies.ts';
+const esga = normalizeBusinessPolicies(${JSON.stringify(ESGA_POLICIES)});
+const dnd = normalizeBusinessPolicies({ payment: 'M-Pesa till 123. Deposit for deep cleans.', provenance: { payment: { source: 'owner', confirmed: true } } });
+const marked = normalizeBusinessPolicies({ returns: 'Our own words', provenance: { returns: { source: 'seed' } } });
+process.stdout.write(JSON.stringify({ esga: seedStarterPolicies(esga).map((r) => r.key), dnd: seedStarterPolicies(dnd).length, marked: seedStarterPolicies(marked).map((r) => r.key) }));`,
+      ],
+      { encoding: 'utf8' }
+    );
+    assert.equal(child.status, 0, child.stderr);
+    const out = JSON.parse(child.stdout);
+    assert.deepEqual(out.esga.sort(), ['delivery', 'returns']);
+    assert.equal(out.dnd, 0);
+    assert.deepEqual(out.marked, ['returns']);
+  });
+
   it('matches Brain line for line when Brain has the filter (#751)', (t) => {
     const brain = require('../src/conversation/provenance');
     if (typeof brain.isSeedPolicyText !== 'function') {
