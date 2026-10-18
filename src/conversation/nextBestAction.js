@@ -241,6 +241,17 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     };
   }
 
+  // BRAIN_NAME_FOLD: first-call read-back holds the turn before any save.
+  const readBack = require('./nameReadBack').readBackSlot(state);
+  if (readBack) {
+    return {
+      action: ACTIONS.ASK_CLARIFICATION,
+      slot: readBack.slot,
+      name: readBack.name,
+      reason: require('./nameReadBack').readBackInstruction(readBack.name),
+    };
+  }
+
   const nameCollision = Array.isArray(state?.caller?.nameCollision)
     ? state.caller.nameCollision.filter(Boolean)
     : [];

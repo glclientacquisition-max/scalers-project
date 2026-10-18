@@ -1,0 +1,19 @@
+{
+  "_doc": "BRAIN_NAME_FOLD contract (src/conversation/nameFold.js). Desk mirrors namesFold and must pass these same pairs.",
+  "fold": [
+    ["Alwyn", "Alvin"], ["Brian", "Bryan"], ["Collins", "Colin"], ["Ann", "Anne"],
+    ["Stephen", "Steven"], ["Sara", "Sarah"], ["John", "Jon"], ["Jhon", "John"],
+    ["Mercy", "Marcy"], ["Michael", "Micheal"], ["Esther", "Ester"], ["Shiro", "Siro"],
+    ["Rachel", "Racheal"], ["Jane", "Jan"], ["Lucy", "Lucie"], ["Agnes", "Agness"],
+    ["Philip", "Phillip"], ["Catherine", "Katherine"], ["Daniel", "Danielle"],
+    ["Linda", "Lynda"], ["Moses", "Mosses"], ["Eric", "Erick"], ["Victor", "Viktor"]
+  ],
+  "distinct": [
+    ["Alvin", "Kevin"], ["Mary", "Martin"], ["Joy", "John"], ["Grace", "Gracie"],
+    ["Martin", "Marvin"], ["Kevin", "Kelvin"], ["Peter", "Petra"], ["Joy", "Joe"],
+    ["Tom", "Tim"], ["Dan", "Don"], ["Mark", "Mary"], ["Brenda", "Brendan"],
+    ["Julia", "Julio"], ["Wanjiru", "Wanjiku"], ["Ivy", "Ivan"], ["Mike", "Mika"],
+    ["Fred", "Fredy"], ["Eve", "Evans"], ["Faith", "Fatma"], ["Alvin", "Alvin Yegon"],
+    ["Alwyn", "Mary"], ["", "Alvin"]
+  ]
+}

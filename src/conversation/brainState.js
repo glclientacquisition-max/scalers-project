@@ -614,6 +614,12 @@ function observeCallerTurn(state, input = {}) {
   } else if (!next.caller.name) {
     delete next.entities.name;
   }
+  // BRAIN_NAME_FOLD: first-call spelling read-back (nameReadBack.js).
+  require('./nameReadBack').advanceReadBack(state, next, {
+    text,
+    lastAgentText: input.lastAgentText,
+    profile: input.profile,
+  });
   next.caller.nameJustConfirmed = !wasNameConfirmed && next.caller.nameConfirmed === true;
   applyLiveCallerFile(input.profile, next);
   next.caller.boundRole = next.caller.nameConfirmed

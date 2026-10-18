@@ -260,7 +260,11 @@ function canonicalizeCallerName(heard, opts = {}) {
  * Same person, not a new household name.
  * Exact compact, or both fold to the same Kenya canonical. No free-form Levenshtein.
  */
-function namesLikelySame(a, b) {
+// BRAIN_NAME_FOLD: the fold itself lives in nameFold.js (dependency-free,
+// the copy Desk mirrors). Re-exported here for Brain callers.
+const { nameFoldEnabled, nameFoldKey, namesFold } = require('./nameFold');
+
+function namesLikelySame(a, b, opts = {}) {
   const left = String(a || '').trim();
   const right = String(b || '').trim();
   if (!left || !right) return false;
@@ -280,7 +284,8 @@ function namesLikelySame(a, b) {
   if (rightKenya && compactNameKey(rightKenya.canonical) === compactNameKey(left)) {
     return true;
   }
-  return sameCollisionGroup(left, right);
+  if (sameCollisionGroup(left, right)) return true;
+  return opts.fold !== false && nameFoldEnabled() && namesFold(left, right);
 }
 
 function preferredContactSpelling(primary, incoming) {
@@ -326,6 +331,9 @@ module.exports = {
   matchCallerName,
   canonicalizeCallerName,
   namesLikelySame,
+  nameFoldEnabled,
+  nameFoldKey,
+  namesFold,
   preferredContactSpelling,
   collectKnownCallerNames,
   collisionGroupFor,

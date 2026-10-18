@@ -1,6 +1,6 @@
 ---
 owner: brain
-last_reviewed: 2026-10-07
+last_reviewed: 2026-10-18
 ---
 
 # Caller identity and summary (runtime contract)
@@ -143,6 +143,36 @@ HD_39c40ec3ad1f (same contracts): T1 `Mm-hm. Namna gani, Shy? Nilikuwa nataka ku
 | **Brain later** | Brain | Wait+tools hold rotation contract; brief rewrite (≤2k redacted) |
 
 Staging test before merge. Do not ship another Voice-only mouth filter for one Kiswahili stem.
+
+## 6. Name fold and owner lock (`BRAIN_NAME_FOLD`, Chief ruling 18 Oct 2026)
+
+Flag: `BRAIN_NAME_FOLD`, on only when the value is exactly `on`. Off keeps every behaviour above. Fixture: HD_af5868852bc7 (Jirani staging, file `Alwyn`, alternate `Alvin`).
+
+**Fold.** Two one-word names on one phone that are STT spellings of one name are ONE person, not a shared line. Code: `src/conversation/nameFold.js` (no imports; Desk mirrors it). Shared cases: `tests/fixtures/name-fold-cases.json`.
+
+- Same first letter after the sound map, and either the same Kenyan-English sound key (ph/f/v/w, l/r, c/k/q, z/s, y/i, silent h after the first letter, double letters, trailing e/s), or, when both names have 5+ letters, key edit distance <= 2 with the same last key letter and the same consonant skeleton.
+- Folds: Alwyn/Alvin, Brian/Bryan, Collins/Colin, Ann/Anne, Stephen/Steven, Mercy/Marcy, Jane/Jan, Daniel/Danielle.
+- Stays two people: Alvin/Kevin, Mary/Martin, Joy/John, Grace/Gracie, Martin/Marvin, Kevin/Kelvin, Tom/Tim, Mark/Mary, any multi-word name ("Alvin" vs "Alvin Yegon").
+
+**Where it applies (no row is rewritten).**
+
+- `namesLikelySame` folds (so `distinctOtherPerson` and name binding fold); `{ fold: false }` is the strict form.
+- `alternateIsAPerson` returns false for a folded alternate.
+- `buildCallerMemoryCard`: folded alternates leave `alternateNames` and go to `nameVariants`; `sharedLine` counts only the others. A folded file is bound to that person from turn 1 (`identityBound`, `fileRole: primary`, `nameFolded`), so Brain never asks "Am I speaking with" for that pair. A truly different name keeps the shared line and its flow.
+- Spelling: owner/caller lock (`contacts.name`), else the most-seen spelling (primary counts 1 + `metadata.name_seen_count`, each alternate row 1), else the primary. Ties keep the primary (`nameSpellingSource`).
+- `mergeContactIdentity` (Brain copy): a folded incoming name is not added and does not re-spell the name. Stored folded alternates stay as history.
+
+**Owner lock contract** (`contacts.metadata`; Desk `DESK_CONTACT_NAME_LOCK`, Voice `VOICE_CONTACT_NAME_LOCK`, Brain `BRAIN_NAME_FOLD`):
+
+| Key | Meaning | Brain |
+| --- | --- | --- |
+| `single_person: true` | One person on this phone | Never shared; bound to `contacts.name` |
+| `name_locked: { at, by: 'owner'\|'caller' }` | `contacts.name` is the spelling | Never shared; bound; merge never replaces or re-spells, adds no alternates |
+| `alternate_names_dismissed: [{ name, at }]` | Owner removed these | Never on the card; merge never adds them back |
+
+**First-call spelling read-back** (`src/conversation/nameReadBack.js`). A number with no name on file: once a name is captured and a save is ahead (booking, hold, order, cancellation, message, escalation), `determineNextBestAction` returns the speech act `slot: 'name_readback'` (with `name`) before anything else that turn. Code holds `caller.nameReadBack.status`: `pending` -> `asked` (only when the agent's last line read the name back as a question) -> `confirmed` (explicit yes, a matching spelling, or the caller's correction, which binds the corrected spelling) / `declined` (plain no) / `unanswered` (anything else, including "okay"/"sawa"). Offered twice without being spoken -> `skipped`. Never on a file that has a name or a lock; never twice on a call. On `confirmed`, `deriveCallSummary` adds `nameLock` and `persistCompletedCallContact` writes that spelling with `metadata.name_locked = { at, by: 'caller' }`. Prompt owns the words; the slot reason is a placeholder instruction.
+
+Backfill report (read only): `node scripts/name-fold-backfill-report.js --sql`, run the SELECT, then pass the rows file. 18 Oct: staging 6 contacts with alternates, 1 folds (Jirani Alwyn/Alvin, stops being shared); prod 7 with alternates, 0 fold.
 
 ## Related
 
