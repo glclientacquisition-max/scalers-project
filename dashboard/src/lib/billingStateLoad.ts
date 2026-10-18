@@ -7,7 +7,7 @@ import {
 } from "@/lib/billingStateModel";
 
 const STATE_COLS =
-  "package_state, package_id, package_name, billing_term, period_start, period_end, included_minutes, used_minutes, remaining_minutes, sms_included, sms_used, sms_used_source, on_demand_enabled, enforcement_mode, mode_label, overage_owed_kes";
+  "package_state, package_id, package_name, billing_term, period_start, period_end, included_minutes, used_seconds, used_minutes, remaining_minutes, sms_included, sms_used, sms_used_source, on_demand_enabled, enforcement_mode, mode_label, overage_owed_kes";
 
 function num(raw: unknown): number {
   const n = Number(raw);

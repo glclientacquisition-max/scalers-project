@@ -10,8 +10,10 @@ function read(rel) {
 describe("package usage meter", () => {
   it("ceils seconds to minutes and never goes negative", () => {
     const catalog = read("dashboard/src/lib/packageCatalog.ts");
-    assert.match(catalog, /export function minutesUsedFromSeconds/);
-    assert.match(catalog, /Math\.ceil\(Math\.max\(0, Number\(seconds\) \|\| 0\) \/ 60\)/);
+    const minutes = read("dashboard/src/lib/minutes.ts");
+    assert.match(catalog, /export \{ minutesUsedFromSeconds \}/);
+    assert.match(minutes, /export function minutesUsedFromSeconds/);
+    assert.match(minutes, /Math\.ceil\(Math\.max\(0, Number\.isFinite\(n\) \? n : 0\) \/ 60\)/);
     assert.match(catalog, /export function remainingCount/);
     assert.match(
       catalog,
@@ -47,6 +49,7 @@ describe("package usage meter", () => {
     assert.doesNotMatch(page, /Top up prepaid/);
     assert.doesNotMatch(page, /daysRemainingAtPace/);
   });
+
 
   it("does not list package prices on the landing page", () => {
     const catalog = read("dashboard/src/lib/packageCatalog.ts");

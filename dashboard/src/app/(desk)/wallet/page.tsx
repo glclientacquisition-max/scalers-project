@@ -105,7 +105,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
     <UsageSummary
       minutesLeft={view.minutesLeft}
       minutesIncluded={view.minutesIncluded}
-      minutesUsed={Math.max(0, view.minutesIncluded - view.minutesLeft)}
+      minutesUsed={view.minutesUsed}
       periodEndLabel={view.periodEndLabel}
       beta={extras.freeBeta}
       planLine={planLine}

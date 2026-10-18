@@ -15,6 +15,7 @@ import { creditBurnsFrom, type CreditBurns } from "@/lib/messageCredits";
 import { trialRemaining } from "@/lib/trialRemaining";
 import { planRowText } from "@/lib/planEntry";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { minutesUsedFromSeconds } from "@/lib/minutes";
 
 const SELL = ["starter", "growth", "scale"] as const;
 
@@ -458,7 +459,7 @@ export async function loadOwnerPlan(tenantId: string): Promise<{ ok: true; model
         seatsUsed: Math.max(0, Math.round(num(seats.data))),
         seatsIncluded: Math.max(0, Math.round(num(row.version_seats))),
         minutesIncluded: Math.max(0, Math.round(num(row.minutes_included))),
-        minutesUsed: Math.max(0, Math.ceil(num(row.seconds_used) / 60)),
+        minutesUsed: minutesUsedFromSeconds(row.seconds_used),
         trialText: trial?.text ?? null,
         onDemandLocked: status === "trialing",
         invoices: invoices.rows,

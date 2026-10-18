@@ -4,6 +4,7 @@ import {
   packageUsageGap,
   type PackageUsageCounters,
 } from "@/lib/packageUsageAlign";
+import { minutesUsedFromSeconds } from "@/lib/minutes";
 
 export type BillingRateCard = {
   inboundKesPerSecond: number;
@@ -117,9 +118,7 @@ export function parseCount(raw: unknown): number | null {
   return n;
 }
 
-export function minutesUsedFromSeconds(seconds: number): number {
-  return Math.ceil(Math.max(0, Number(seconds) || 0) / 60);
-}
+export { minutesUsedFromSeconds };
 
 export function remainingCount(included: number, used: number): number {
   return Math.max(0, Math.floor(Number(included) || 0) - Math.max(0, Number(used) || 0));

@@ -10,6 +10,7 @@
  */
 
 import type { MessageCreditsUsage } from "./messageCredits";
+import { minutesUsedFromSeconds } from "./minutes";
 
 export type BillingMode = "beta" | "metered" | "capped" | "none";
 
@@ -21,6 +22,8 @@ export type TenantBillingStateRow = {
   period_start?: string | null;
   period_end?: string | null;
   included_minutes?: number | string | null;
+  /** Metered seconds (tenants.seconds_used). Minutes used come from this, not the rounded used_minutes. */
+  used_seconds?: number | string | null;
   used_minutes?: number | string | null;
   remaining_minutes?: number | string | null;
   sms_included?: number | string | null;
@@ -68,6 +71,7 @@ export type OwnerBillingView = {
   /** Per-channel counts behind the shared message-credit total. Never shown per channel. */
   messageUse: { sms: number; whatsapp: number; email: number };
   minutesIncluded: number;
+  minutesUsed: number;
   minutesLeft: number;
   onDemand: boolean;
   /** Low-minutes line. Credits join it only through lowBalanceNotice. Null when nothing is low. */
@@ -177,7 +181,10 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
   }
 
   const minutesIncluded = Math.max(0, Math.floor(num(state?.included_minutes)));
-  const minutesUsed = Math.max(0, Math.ceil(num(state?.used_minutes)));
+  const minutesUsed =
+    state?.used_seconds != null && state.used_seconds !== ""
+      ? minutesUsedFromSeconds(state.used_seconds)
+      : Math.max(0, Math.ceil(num(state?.used_minutes)));
   const minutesLeft = Math.max(0, minutesIncluded - minutesUsed);
   const smsIncluded = Math.max(0, Math.floor(num(state?.sms_included)));
   const smsUsed = Math.max(0, Math.floor(num(state?.sms_used)));
@@ -228,6 +235,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     rows,
     messageUse,
     minutesIncluded,
+    minutesUsed,
     minutesLeft,
     onDemand,
     lowNotice,
