@@ -269,3 +269,31 @@ test('a failed fragment is dropped; the callback line only when nothing else was
   assert.doesNotMatch(kept.text, /Wacha niulize timu/);
   assert.match(kept.text, /Ungependa kuweka miadi\?/);
 });
+
+test('EN and SW tomorrow/today answers name the same day for the same Nairobi clock', () => {
+  const EN_TO_SW = {
+    Monday: 'Jumatatu', Tuesday: 'Jumanne', Wednesday: 'Jumatano', Thursday: 'Alhamisi',
+    Friday: 'Ijumaa', Saturday: 'Jumamosi', Sunday: 'Jumapili',
+  };
+  const clocks = [
+    ['2026-10-18T23:25:00.000Z', 'Tuesday', 'Monday'], // Mon 02:25 EAT (the call)
+    ['2026-10-18T20:59:00.000Z', 'Monday', 'Sunday'], // Sun 23:59 EAT
+    ['2026-10-18T21:01:00.000Z', 'Tuesday', 'Monday'], // Mon 00:01 EAT (UTC is still Sunday)
+    ['2026-10-24T10:00:00.000Z', 'Sunday', 'Saturday'], // Sat 13:00 EAT
+    ['2026-10-24T21:30:00.000Z', 'Monday', 'Sunday'], // Sun 00:30 EAT
+  ];
+  for (const [iso, tomorrow, today] of clocks) {
+    const now = new Date(iso);
+    for (const [en, sw, day] of [
+      ['Are you open tomorrow?', 'Mnafungua kesho?', tomorrow],
+      ['Are you open today?', 'Mko wazi leo?', today],
+    ]) {
+      const e = plan(en, { conversation: {} }, 'en', liveProfile(), now).speech;
+      const s = plan(sw, { conversation: {} }, 'sw', liveProfile(), now).speech;
+      const enDay = (e.match(/^(?:Tomorrow|Today), (\w+),/) || [])[1];
+      const swDay = (s.match(/^(?:Kesho|Leo), (\w+),/) || [])[1];
+      assert.equal(enDay, day, `${iso} EN: ${e}`);
+      assert.equal(swDay, EN_TO_SW[day], `${iso} SW: ${s}`);
+    }
+  }
+});
