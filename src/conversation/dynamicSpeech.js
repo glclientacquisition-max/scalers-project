@@ -361,6 +361,53 @@ function looksLikeSpokenServiceDump(text) {
   return (raw.match(/,/g) || []).length >= 3 && unique.size >= 2;
 }
 
+const DUMP_GENERIC = new Set([
+  'cleaning', 'clean', 'service', 'services', 'the', 'and', 'our', 'we', 'do',
+  'with', 'for', 'you', 'your', 'that', 'this', 'from', 'also', 'plus', 'more',
+]);
+
+function dumpHelpLine(language) {
+  const lang = confirmationLanguage(language);
+  return lang === 'sw' || lang === 'sheng'
+    ? 'Tunaweza kusaidia. Unahitaji huduma gani?'
+    : 'We can help with that. What do you need done?';
+}
+
+function noteDrop(dropReasons, reason) {
+  if (Array.isArray(dropReasons) && reason && !dropReasons.includes(reason)) dropReasons.push(reason);
+}
+
+/** Catalogue-name check. Flag-on only. Null means the caller did not opt in. */
+function catalogueServiceDump(raw, opts) {
+  if (!require('../knowledge/flags').anyLookupOn()) return null;
+  const { cataloguePhrases } = require('../knowledge/lookup');
+  const names = cataloguePhrases(opts.profile || {})
+    .map((name) => name.toLowerCase())
+    .filter((name) => name.length >= 4);
+  const items = raw.split(/\s*,\s*|\band\b|\bna\b/i).map((part) => part.trim()).filter(Boolean);
+  const mentions = (item) => {
+    const low = item.toLowerCase();
+    return names.some((name) => {
+      if (low.includes(name)) return true;
+      return name
+        .replace(/[^a-z ]/g, ' ')
+        .split(/\s+/)
+        .filter((word) => word.length >= 4 && !DUMP_GENERIC.has(word))
+        .some((word) => low.includes(word));
+    });
+  };
+  const kept = items.filter(mentions);
+  if (items.length && kept.length === items.length) return raw;
+  noteDrop(opts.dropReasons, 'service_dump');
+  logSpokenFilterDrop('service_dump', raw);
+  if (kept.length < 2) return dumpHelpLine(opts.language);
+  const lang = confirmationLanguage(opts.language);
+  const and = lang === 'sw' || lang === 'sheng' ? 'na' : 'and';
+  const list = kept.length === 1 ? kept[0] : `${kept.slice(0, -1).join(', ')} ${and} ${kept[kept.length - 1]}`;
+  const sentence = /[.!?]$/.test(list) ? list : `${list}.`;
+  return /^[a-z]/.test(sentence) ? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}` : sentence;
+}
+
 function trimSpokenServiceDump(text, opts = {}) {
   const raw = String(text || '').trim();
   const callerText = String(
@@ -375,13 +422,10 @@ function trimSpokenServiceDump(text, opts = {}) {
     return raw;
   }
   if (!looksLikeSpokenServiceDump(raw)) return raw;
-  const lang = confirmationLanguage(opts.language);
-  const line =
-    lang === 'sw' || lang === 'sheng'
-      ? 'Tunaweza kusaidia. Unahitaji huduma gani?'
-      : 'We can help with that. What do you need done?';
+  const checked = catalogueServiceDump(raw, opts);
+  if (checked != null) return checked;
   logSpokenFilterDrop('service_dump', raw);
-  return line;
+  return dumpHelpLine(opts.language);
 }
 
 const HEDGE_OPENER =
@@ -428,6 +472,7 @@ const PREMATURE_OUTCOME =
 function stripPrematureOutcomeClaims(text, opts = {}) {
   let raw = String(text || '').trim();
   if (!raw) return raw;
+  PREMATURE_OUTCOME.lastIndex = 0;
   raw = raw.replace(PREMATURE_OUTCOME, '');
   raw = raw.replace(/\s+/g, ' ').replace(/^[,.]+\s*/, '').replace(/\s+[,.]+/g, '.').trim();
   if (!raw) {
@@ -436,13 +481,71 @@ function stripPrematureOutcomeClaims(text, opts = {}) {
   return raw;
 }
 
+function splitSpokenSentences(text) {
+  return String(text || '')
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Lookups on: a hedge or a booked/transferred claim is dropped as a whole
+ * sentence, or kept whole when cutting it would leave a lowercase fragment.
+ */
+function wholeSentenceClaims(text, opts, dropReasons) {
+  const kept = [];
+  for (const sentence of splitSpokenSentences(text)) {
+    let stripped = stripHedgeAlone(sentence, HEDGE_OPENER);
+    HEDGE_PHRASE.lastIndex = 0;
+    stripped = stripHedgeAlone(stripped, HEDGE_PHRASE);
+    stripped = stripped.replace(/\s+/g, ' ').replace(/^[,.]+\s*/, '').trim();
+    if (!stripped) {
+      noteDrop(dropReasons, 'hedge');
+      logSpokenFilterDrop('hedge', sentence);
+      continue;
+    }
+    if (/^[a-z]/.test(stripped)) {
+      kept.push(sentence);
+      continue;
+    }
+    PREMATURE_OUTCOME.lastIndex = 0;
+    const premature = stripped.replace(PREMATURE_OUTCOME, '').replace(/\s+/g, ' ').trim();
+    PREMATURE_OUTCOME.lastIndex = 0;
+    if (premature !== stripped) {
+      noteDrop(dropReasons, 'premature_outcome');
+      logSpokenFilterDrop('premature_outcome', sentence);
+      continue;
+    }
+    kept.push(stripped);
+  }
+  const joined = kept.join(' ').trim();
+  if (!joined) return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
+  return joined;
+}
+
+/** Lookup speech is already the answer. Never re-parse it, never log the sentence. */
+function safeLookupSpeech(text, opts) {
+  const factSheet = require('./factSheet');
+  const raw = String(text || '').trim();
+  if (factSheet.callbackSafeLine(raw)) return { text: raw, dropReasons: [] };
+  return {
+    text: factSheet.pickUnknownAnswerLine(opts.profile || {}, opts.language).text,
+    dropReasons: ['callbacks_only'],
+  };
+}
+
 /**
  * Final spoken text. When the caller has a brain state (`opts.state`) the
  * speech guard runs too: no new numbers, no saved claim without a tool result,
  * no coverage flip, no transfer claim. See speechGuard.js.
  */
 function polishSpokenDetail(text, opts = {}) {
+  if (opts.lookupSpeech) {
+    const safe = safeLookupSpeech(text, opts);
+    return { text: safe.text, reason: safe.dropReasons[0] || '', dropReasons: safe.dropReasons };
+  }
   const dropReasons = [];
+  const lookupsOn = require('../knowledge/flags').anyLookupOn();
   let spoken = stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true });
   // VOICE_FACT_REFS: put the owner's values in for {price.x} / {fee.x} /
   // {hours.x} / {pay.x} before the guard reads the sentence. The values are
@@ -502,10 +605,9 @@ function polishSpokenDetail(text, opts = {}) {
   const callerText = String(
     (opts.callerTurns || opts.state?.conversation?.answersReceived || []).slice(-1)[0] || ''
   );
-  spoken = trimSpokenServiceDump(
-    stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts),
-    { ...opts, callerText }
-  );
+  if (lookupsOn) spoken = wholeSentenceClaims(spoken, opts, dropReasons);
+  else spoken = stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts);
+  spoken = trimSpokenServiceDump(spoken, { ...opts, callerText, dropReasons });
   const sanitized = sanitizeSpokenFileClaim(spoken, {
     callerText,
     state: opts.state,
@@ -522,8 +624,33 @@ function polishSpokenDetail(text, opts = {}) {
       callerText,
     });
   }
+  if (lookupsOn && dropReasons.includes('service_dump') && dropReasons.includes('slop')) {
+    noteDrop(dropReasons, 'service_dump→slop');
+  }
+  if (lookupsOn && out) {
+    const { lintSentence, sentencesOf } = require('../knowledge/sentenceLint');
+    const parts = sentencesOf(out);
+    let failed = false;
+    const fallback = require('./factSheet').pickUnknownAnswerLine(opts.profile || {}, opts.language).text;
+    const fixed = [];
+    for (const sentence of parts) {
+      if (!lintSentence(sentence)) {
+        fixed.push(sentence);
+        continue;
+      }
+      failed = true;
+      if (!fixed.includes(fallback)) fixed.push(fallback);
+    }
+    if (failed) {
+      noteDrop(dropReasons, 'sentence_fragment');
+      out = fixed.join(' ').trim();
+    }
+  }
   const before = String(text || '').trim();
   const after = String(out || '').trim();
+  if (lookupsOn && after.length < before.length && dropReasons.length === 0) {
+    noteDrop(dropReasons, 'rewritten');
+  }
   let reason = '';
   if (dropReasons.length) reason = dropReasons[0];
   else if (!after) reason = 'dropped';
