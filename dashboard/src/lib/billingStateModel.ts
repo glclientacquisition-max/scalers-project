@@ -84,7 +84,7 @@ function num(raw: unknown): number {
 }
 
 function kes(n: number): string {
-  return `KES ${Math.round(n).toLocaleString("en-KE")}`;
+  return `KSh ${Math.round(n).toLocaleString("en-KE")}`;
 }
 
 function count(n: number): string {
@@ -128,7 +128,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     headline = `${packageName} · Free during beta. We count your usage so you can see it. Nothing is charged until we tell you.`;
     shortLabel = `${packageName} · Free during beta`;
   } else if (mode === "metered") {
-    headline = `${packageName} · ${priced}. Usage past what's included is added to your next invoice at the rates below.`;
+    headline = `${packageName} · ${priced}. Usage past what's included is billed on your next invoice at the rates below.`;
     shortLabel = `${packageName} · ${priced}`;
   } else if (mode === "capped") {
     headline = `${packageName} · ${priced}. When your included minutes run out, calls stop until ${endLabel || "the end of the month"} unless you turn on extra usage.`;
@@ -154,7 +154,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
 
   const rows: UsageRow[] = [
     { key: "minutes", label: "Call minutes", included: minutesIncluded, used: minutesUsed, left: minutesLeft, note: null },
-    { key: "sms", label: "SMS credits", included: smsIncluded, used: smsUsed, left: smsLeft, note: smsNote },
+    { key: "sms", label: "Message credits", included: smsIncluded, used: smsUsed, left: smsLeft, note: smsNote },
     { key: "seats", label: "Team seats", included: seatsIncluded, used: seatsUsed, left: Math.max(0, seatsIncluded - seatsUsed), note: null },
   ];
   for (const [key, label] of [["email", "Team email alerts"], ["whatsapp", "Team WhatsApp alerts"]] as const) {
@@ -171,15 +171,15 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
   if (mode !== "none" && (lowMinutes || lowSms)) {
     const what =
       lowMinutes && lowSms
-        ? `${count(minutesLeft)} minutes and ${count(smsLeft)} SMS credits left`
+        ? `${count(minutesLeft)} minutes and ${count(smsLeft)} message credits left`
         : lowMinutes
           ? `${count(minutesLeft)} of ${count(minutesIncluded)} minutes left`
-          : `${count(smsLeft)} of ${count(smsIncluded)} SMS credits left`;
+          : `${count(smsLeft)} of ${count(smsIncluded)} message credits left`;
     const until = endLabel ? ` until ${endLabel}` : "";
     if (mode === "beta") {
       lowNotice = `${what}${until}. During beta nothing is charged and calls keep working.`;
     } else if (onDemand) {
-      lowNotice = `${what}${until}. Extra usage is on, so anything past this goes on your next invoice.`;
+      lowNotice = `${what}${until}. Extra usage is on, so anything past this is billed on your next invoice.`;
     } else {
       lowNotice = lowMinutes
         ? `${what}${until}. When they run out, calls stop unless you turn on extra usage.`
@@ -196,7 +196,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     onDemandHint = "Without a package, all usage is billed at the rates below.";
   } else {
     onDemandHint = onDemand
-      ? "On. Usage past what's included is added to your next invoice at the rates below."
+      ? "On. Usage past what's included is billed on your next invoice at the rates below."
       : `Off. When included minutes run out, calls stop until ${endLabel || "the end of the month"}.`;
   }
 

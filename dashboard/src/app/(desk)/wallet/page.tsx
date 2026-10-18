@@ -4,6 +4,8 @@ import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
 import { getCurrentTenant, createWorkspaceDataClient } from "@/lib/tenant";
 import { getTenantUsageSummary } from "@/lib/wallet";
 import { inboundKesPerMinute, loadOwnerPackageMeter } from "@/lib/packageCatalog";
+import { loadUsageBillingExtras } from "@/lib/ownerPlanLoad";
+import { formatKsh, spendLimitDisplayKes } from "@/lib/planPricing";
 import { loadOwnerBillingView } from "@/lib/billingStateLoad";
 import { ownerBillingView } from "@/lib/billingStateModel";
 import { createDeskTimer } from "@/lib/deskTiming";
@@ -65,8 +67,9 @@ async function WalletBody({ searchParams }: WalletPageProps) {
   let usage;
   let billing;
   let pack;
+  let extras;
   try {
-    [usage, billing, pack] = await Promise.all([
+    [usage, billing, pack, extras] = await Promise.all([
       getTenantUsageSummary(workspace.client, tenant.id, {
         ledgerPage: page,
         ledgerPageSize: DEFAULT_PAGE_SIZE,
@@ -78,6 +81,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
       }),
       loadOwnerBillingView(tenant.id),
       loadOwnerPackageMeter(tenant.id),
+      loadUsageBillingExtras(tenant.id),
     ]);
   } catch {
     return <DeskLoadError>Could not load Usage.</DeskLoadError>;
@@ -116,7 +120,28 @@ async function WalletBody({ searchParams }: WalletPageProps) {
     redirect(safePage > 1 ? `/wallet?page=${safePage}` : "/wallet");
   }
 
-  const inboundMin = inboundKesPerMinute(pack.rates.inboundKesPerSecond);
+  const inboundMin = extras.inboundPerMinuteKes ?? inboundKesPerMinute(pack.rates.inboundKesPerSecond);
+  const outboundMin = extras.outboundPerMinuteKes;
+  const usageRows =
+    extras.messageCredits == null
+      ? view.rows
+      : view.rows
+          .filter((row) => row.key !== "email" && row.key !== "whatsapp")
+          .map((row) =>
+            row.key === "sms"
+              ? {
+                  ...row,
+                  label: "Message credits",
+                  included: extras.messageCredits as number,
+                  used: 0,
+                  left: extras.messageCredits as number,
+                  note: "1 credit is KSh 1 on demand",
+                }
+              : row,
+          );
+  const spendLimit = extras.freeBeta
+    ? null
+    : spendLimitDisplayKes(tenant.soft_spend_limit_kes, extras.monthlyPriceKes);
   const minutesLeft = view.minutesLeft;
   const minuteMax = Math.max(0, view.minutesIncluded);
   const minuteLeftPct = minuteMax > 0 ? Math.min(100, Math.round((minutesLeft / minuteMax) * 100)) : 0;
@@ -170,7 +195,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
             </tr>
           </thead>
           <tbody>
-            {view.rows.map((row) => (
+            {usageRows.map((row) => (
               <tr key={row.key} className="border-b border-hairline">
                 <th scope="row" className="py-3 pr-3 font-normal text-ink">
                   {row.label}
@@ -190,7 +215,21 @@ async function WalletBody({ searchParams }: WalletPageProps) {
           tenantId={tenant.id}
           enabled={Boolean(tenant.on_demand_usage_enabled)}
           hint={view.onDemandHint}
+          locked={extras.onDemandLocked}
         />
+        {extras.freeBeta ? null : (
+          <p className="mt-3 text-body text-ink-2">
+            When on-demand is off and credits run out, sending stops and updates go to your Inbox only.
+          </p>
+        )}
+        {spendLimit != null ? (
+          <p className="mt-3 text-body text-ink">
+            Spend limit <span className="tabular-nums">{formatKsh(spendLimit)}</span>
+            {Number(tenant.soft_spend_limit_kes) > 0 ? null : (
+              <span className="text-ink-2"> Suggested until you set one.</span>
+            )}
+          </p>
+        ) : null}
       </div>
 
       <section className="mt-6 rounded-2xl border border-hairline bg-surface p-5">
@@ -200,19 +239,25 @@ async function WalletBody({ searchParams }: WalletPageProps) {
           <tbody>
             <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">Calls</th>
-              <td className="py-3 text-right tabular-nums text-ink">KES {kes(inboundMin)} a minute</td>
+              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(inboundMin)} a minute</td>
             </tr>
+            {outboundMin != null ? (
+              <tr className="border-b border-hairline">
+                <th scope="row" className="py-3 pr-3 font-normal text-ink">Outbound</th>
+                <td className="py-3 text-right tabular-nums text-ink">KSh {kes(outboundMin)} a minute</td>
+              </tr>
+            ) : null}
             <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">SMS</th>
-              <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.smsKes)} a credit</td>
+              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.smsKes)} a credit</td>
             </tr>
             <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">Email</th>
-              <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.emailKes)}</td>
+              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.emailKes)}</td>
             </tr>
             <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">WhatsApp</th>
-              <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.whatsappKes)}</td>
+              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.whatsappKes)}</td>
             </tr>
           </tbody>
         </table>
@@ -238,7 +283,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
                   scope="col"
                   className="px-4 py-2 text-right text-meta font-semibold"
                 >
-                  KES
+                  KSh
                 </th>
               </tr>
             </thead>

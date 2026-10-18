@@ -120,8 +120,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 **Ops-Billing (dated per the STATUS rule):**
 
 - **18 Oct 2026, in flight: #775** billing data layer (`cursor/billing-data-layer-cc4b`). Staging SQL only (section 3). No charges, no send-path change, no prod SQL.
-
-
+- **18 Oct 2026, in flight:** owner Plan and Billing (`cursor/desk-billing-ui-d7b0`), draft on #775. Current businesses stay on the free beta view. No pay page, no plan-change RPC, no voicemail label on calls. No SQL.
 
 - **18 Oct 2026, SHIPPED: #748** (squash merge of branch `ops-billing/rollover-audit-sms-alerts`, head `7e8ecff5`; merge SHA `0f280504e0a706b6efc81b70a50bfbda48549eea`). Approved by Alvin, GO 14:11 EAT; Scalers Voice granted the prod slot 14:16 EAT. **#748 shipped after D199 (flipped 13:31, Railway 67413ba8)**, so Brain can separate the effects.
   - *What it changes:* (1) `package_period_rollover.sql`: a catch-up roll (jumps more than one period, or the new period already has usage) rebuilds `seconds_used` from `calls.package_seconds_applied` and `sms_used_units` from `notify_sms_billable` (+ pending holds) for the new period instead of zeroing; an on-time roll still zeroes. (2) New `on_demand_usage_audit.sql`: `set_tenant_on_demand_usage` writes an `ops_audit_log` row (`set_on_demand_usage`, actor, before, after). (3) `package_state_rules.sql`: assign/unassign Activity rows carry `detail.before` / `detail.after` `{package_sku, package_name, period, period_start, period_end, status}`; existing fields kept. (4) Voice: package SMS 80%/100% ops email (`src/billing/smsUsageAlerts.js`), deduped like the minute notices. (5) `docs/supabase/staging/dnd_usage_counter_reconcile.sql` (staging only).

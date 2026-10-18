@@ -55,7 +55,7 @@ describe("ownerBillingView headlines", () => {
 
   it("metered uses the package price from data, never a hardcoded 5,000", () => {
     const v = ownerBillingView(input({ ...esgaRow, mode_label: "metered" }));
-    assert.match(v.headline, /^Starter · KES 4,000 a month\. Usage past what's included is added to your next invoice/);
+    assert.match(v.headline, /^Starter · KSh 4,000 a month\. Usage past what's included is billed on your next invoice/);
     assert.doesNotMatch(v.headline, /5,000/);
   });
 
